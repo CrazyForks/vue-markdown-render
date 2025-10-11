@@ -208,23 +208,29 @@ export async function renderMarkdownAsync(md: MarkdownIt, content: string) {
       try {
         return await renderKaTeXInWorker(latex, false, 800)
       }
-      catch {
-        try {
-          const data = katex.renderToString(latex, {
-            throwOnError: true,
-            displayMode: false,
-          })
+      catch (err: any) {
+        // Only fallback to synchronous main-thread KaTeX render if the worker
+        // couldn't be instantiated (init error). If the worker reported a
+        // render/syntax error, we should not treat it as an init failure.
+        if (err?.code === 'WORKER_INIT_ERROR' || err?.fallbackToRenderer) {
           try {
-            setKaTeXCache(latex, false, data)
+            const data = katex.renderToString(latex, {
+              throwOnError: true,
+              displayMode: false,
+            })
+            try {
+              setKaTeXCache(latex, false, data)
+            }
+            catch {
+              // ignore cache set errors
+            }
+            return data
           }
           catch {
-            // ignore cache set errors
+            return null
           }
-          return data
         }
-        catch {
-          return null
-        }
+        return null
       }
     })()
   })

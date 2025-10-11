@@ -8,4 +8,5 @@ it('recognizes \"\\boldsymbol{...}\" as math-like', () => {
   expect(isMathLike('\\(f^{(k)}(a)\\)')).toBe(true)
   expect(isMathLike('\\(W^\perp\\)')).toBe(true)
   expect(isMathLike('\\(2025/9/30 21:37:24\\)')).toBe(false)
+  expect(isMathLike('operatorname{')).toBe(true)
 })

@@ -44,33 +44,44 @@ function renderMath() {
       mathBlockElement.value.innerHTML = html
       hasRenderedOnce = true
     })
-    .catch(() => {
+    .catch((err: any) => {
       // ignore if a newer render was requested or component unmounted
       if (isUnmounted || renderId !== currentRenderId)
         return
       if (!mathBlockElement.value)
         return
-      // Try a synchronous KaTeX render on the main thread as a fallback
-      try {
-        const html = katex.renderToString(props.node.content, {
-          throwOnError: true,
-          displayMode: true,
-        })
-        mathBlockElement.value.innerHTML = html
-        hasRenderedOnce = true
-        // populate worker client cache so future calls hit cache
+
+      // If the worker failed to initialize (e.g. bad new Worker path), the
+      // worker client will return a special error with code 'WORKER_INIT_ERROR'
+      // and `fallbackToRenderer = true`. In that case, perform a synchronous
+      // KaTeX render on the main thread as a fallback. If the error is a
+      // KaTeX render error from the worker (syntax), we should ignore it here
+      // and fall through to the raw/text fallback below.
+      if (err?.code === 'WORKER_INIT_ERROR' || err?.fallbackToRenderer) {
         try {
-          setKaTeXCache(props.node.content, true, html)
+          const html = katex.renderToString(props.node.content, {
+            throwOnError: true,
+            displayMode: true,
+          })
+          mathBlockElement.value.innerHTML = html
+          hasRenderedOnce = true
+          // populate worker client cache so future calls hit cache
+          try {
+            setKaTeXCache(props.node.content, true, html)
+          }
+          catch {
+            // ignore cache set errors
+          }
+          return
         }
         catch {
-          // ignore cache set errors
+          // if synchronous render fails, fall through to raw/text fallback
         }
       }
-      catch {
-        // show raw fallback when we never successfully rendered before or when loading flag is false
-        if (!hasRenderedOnce || !props.node.loading) {
-          mathBlockElement.value.textContent = props.node.raw
-        }
+
+      // show raw fallback when we never successfully rendered before or when loading flag is false
+      if (!hasRenderedOnce || !props.node.loading) {
+        mathBlockElement.value.textContent = props.node.raw
       }
     })
 }

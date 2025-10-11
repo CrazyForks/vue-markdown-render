@@ -988,10 +988,7 @@ function cleanupAfterLoadingSettled() {
     previewPollController = null
   }
   // terminate parser worker to free resources; it will be recreated on demand
-  try {
-    terminateMermaidWorker()
-  }
-  catch {}
+  terminateMermaidWorker()
 }
 
 function scheduleNextPreviewPoll(delay = 800) {
@@ -1233,10 +1230,7 @@ onUnmounted(() => {
     currentWorkController.abort()
     currentWorkController = null
   }
-  try {
-    terminateMermaidWorker()
-  }
-  catch {}
+  terminateMermaidWorker()
   stopPreviewPolling()
 })
 

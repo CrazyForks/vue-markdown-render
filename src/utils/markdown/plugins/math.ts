@@ -120,6 +120,11 @@ const CONTROL_MAP: Record<string, string> = {
 const TEX_CMD_RE = /\\[a-z]+/i
 const PREFIX_CLASS = '(?:\\\\|\\u0008)'
 const TEX_CMD_WITH_BRACES_RE = new RegExp(`${PREFIX_CLASS}(?:${ESCAPED_TEX_BRACE_COMMANDS})\\s*\\{[^}]+\\}`, 'i')
+// Detect brace-taking TeX commands even when the leading backslash or the
+// closing brace/content is missing (e.g. "operatorname{" or "operatorname{span").
+// This helps the heuristic treat incomplete but clearly TeX-like fragments
+// as math-like instead of plain text.
+const TEX_BRACE_CMD_START_RE = new RegExp(`(?:${PREFIX_CLASS})?(?:${ESCAPED_TEX_BRACE_COMMANDS})\s*\{`, 'i')
 const TEX_SPECIFIC_RE = /\\(?:text|frac|left|right|times)/
 const SUPER_SUB_RE = /\^|_/
 // Match common math operator symbols or named commands.
@@ -158,6 +163,7 @@ export function isMathLike(s: string) {
   // TeX commands e.g. \frac, \alpha
   const texCmd = TEX_CMD_RE.test(norm)
   const texCmdWithBraces = TEX_CMD_WITH_BRACES_RE.test(norm)
+  const texBraceStart = TEX_BRACE_CMD_START_RE.test(norm)
 
   // Explicit common TeX tokens (keeps compatibility with previous heuristic)
   const texSpecific = TEX_SPECIFIC_RE.test(norm)
@@ -170,7 +176,7 @@ export function isMathLike(s: string) {
   // common math words
   const words = WORDS_RE.test(norm)
 
-  return texCmd || texCmdWithBraces || texSpecific || superSub || ops || funcCall || words
+  return texCmd || texCmdWithBraces || texBraceStart || texSpecific || superSub || ops || funcCall || words
 }
 
 export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
@@ -285,9 +291,32 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         // 不能简单地用 indexOf 找到第一个 close — 需要处理嵌套与转义字符
         const endIdx = findMatchingClose(src, index + open.length, open, close)
         if (endIdx === -1) {
+          // loading 状态的 math，没有找到匹配的结尾
+          const preSearchPos = searchPos
           // no matching close for this opener; skip forward
           searchPos = index + open.length
-          continue
+          const content = src.slice(searchPos)
+          if (isMathLike(content)) {
+            foundAny = true
+            if (!silent) {
+              if (preSearchPos)
+                pushText(src.slice(preSearchPos, searchPos))
+              else
+                pushText(src.slice(0, index))
+              const token = state.push('math_inline', 'math', 0)
+              token.content = normalizeStandaloneBackslashT(content, mathOpts)
+              token.markup = open === '$$' ? '$$' : open === '\\(' ? '\\(\\)' : open === '$' ? '$' : '()'
+              token.loading = true
+              // consume the full inline source
+              state.pos = src.length
+            }
+            searchPos = src.length
+            // break
+          }
+          else {
+            pushText(src.slice(preSearchPos, searchPos))
+          }
+          break
         }
         const content = src.slice(index + open.length, endIdx)
         if (!isMathLike(content)) {
