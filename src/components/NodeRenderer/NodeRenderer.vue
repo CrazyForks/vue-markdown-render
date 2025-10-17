@@ -18,8 +18,6 @@ import InlineCodeNode from '../../components/InlineCodeNode'
 import InsertNode from '../../components/InsertNode'
 import LinkNode from '../../components/LinkNode'
 import ListNode from '../../components/ListNode'
-import MathBlockNode from '../../components/MathBlockNode'
-import MathInlineNode from '../../components/MathInlineNode'
 import MermaidBlockNode from '../../components/MermaidBlockNode'
 import ParagraphNode from '../../components/ParagraphNode'
 import PreCodeNode from '../../components/PreCodeNode'
@@ -34,6 +32,7 @@ import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import { getMarkdown, parseMarkdownToStructure } from '../../utils/markdown'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
+import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import FallbackComponent from './FallbackComponent.vue'
 import { preload } from './preloadMonaco'
 
@@ -110,6 +109,7 @@ const CodeBlockNodeAsync = defineAsyncComponent(async () => {
     return PreCodeNode
   }
 })
+
 // 组件映射表
 const nodeComponents = {
   text: TextNode,
@@ -127,8 +127,8 @@ const nodeComponents = {
   link: LinkNode,
   image: ImageNode,
   thematic_break: ThematicBreakNode,
-  math_inline: MathInlineNode,
-  math_block: MathBlockNode,
+  math_inline: MathInlineNodeAsync,
+  math_block: MathBlockNodeAsync,
   strong: StrongNode,
   emphasis: EmphasisNode,
   strikethrough: StrikethroughNode,

@@ -3,6 +3,7 @@ import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
 import { parseFenceToken } from './fence-parser'
+import { fixListItem } from './fixListItem'
 import { fixStrongTokens } from './fixStrongTokens'
 import { parseFootnoteRefToken } from './footnote-ref-parser'
 import { parseHardbreakToken } from './hardbreak-parser'
@@ -29,15 +30,19 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
 
   let i = 0
   tokens = fixStrongTokens(tokens)
+  tokens = fixListItem(tokens)
 
   while (i < tokens.length) {
-    const token = tokens[i]
+    const token = tokens[i] as any
     switch (token.type) {
       case 'text': {
-        const content = token.content || ''
-        if (content === '`' || content === '|' || content === '$') {
+        let content = token.content || ''
+        if (content === '`' || content === '|' || content === '$' || content === '1' || /^\*+$/.test(content)) {
           i++
           break
+        }
+        if (/[^\]]\s*\(\s*$/.test(content)) {
+          content = content.replace(/\(\s*$/, '')
         }
         if (raw?.startsWith('[') && pPreToken?.type === 'list_item_open') {
           const _content = content.slice(1)
@@ -71,9 +76,9 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
           i++
           break
         }
-        if (/[^~]*~+[^~]+/.test(content)) {
+        if (/[^~]*~~+[^~]+/.test(content)) {
           // 处理成 parseStrikethroughToken
-          const index = content.indexOf('~') || 0
+          const index = content.indexOf('~~') || 0
           const _text = content.slice(0, index)
           if (_text) {
             if (currentTextNode) {
@@ -284,7 +289,7 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
         if (token.content.endsWith('undefined') && !raw.endsWith('undefined')) {
           token.content = token.content.slice(0, -9)
         }
-        const textNode = parseTextToken(token)
+        const textNode = parseTextToken({ ...token, content })
 
         if (linkStart !== -1) {
           const textNodeContent = content.slice(0, linkStart)
@@ -306,14 +311,13 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
           }
         }
         const preToken = tokens[i - 1]
-        const maybeMath = preToken?.tag === 'br' && tokens[i - 2]?.content === '['
         if (currentTextNode) {
           // Merge with the previous text node
           currentTextNode.content += textNode.content.replace(/(\*+|\(|\\)$/, '')
           currentTextNode.raw += textNode.raw
-          currentTextNode.center = maybeMath
         }
         else {
+          const maybeMath = preToken?.tag === 'br' && tokens[i - 2]?.content === '['
           // Start a new text node
           textNode.content = textNode.content.replace(/(\*+|\(|\\)$/, '')
           currentTextNode = textNode
@@ -342,12 +346,24 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
 
       case 'link_open': {
         currentTextNode = null // Reset current text node
-        const pre = result.length > 0 ? result[result.length - 1] : null
-        const { node, nextIndex } = parseLinkToken(tokens, i)
-        i = nextIndex
-        if (pre?.type === 'link' && pre.loading) {
+        if (token.info) {
+          const pre: any = result.length > 0 ? result[result.length - 1] : null
+          const text = pre?.text || (pre as any).content?.slice(1, -1) || ''
+
+          result.splice(result.length - 1, 1, {
+            type: 'link',
+            href: '',
+            text,
+            loading: true,
+          } as any) // remove the pre node
+          i += 3
+          if (tokens[i]?.content === '.')
+            i++
           break
         }
+        const { node, nextIndex } = parseLinkToken(tokens, i)
+        i = nextIndex
+
         node.loading = false
         result.push(node)
         break

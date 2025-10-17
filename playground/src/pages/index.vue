@@ -2,6 +2,8 @@
 import { Icon } from '@iconify/vue'
 import MarkdownRender from '../../../src/components/NodeRenderer'
 import { streamContent } from '../const/markdown'
+import 'katex/dist/katex.min.css'
+
 // 每隔 10 毫秒输出一部分内容
 const content = ref<string>('')
 const streamDelay = useLocalStorage<number>('vmr-settings-stream-delay', 16)

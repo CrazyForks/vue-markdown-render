@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import katex from 'katex'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { renderKaTeXInWorker } from '../../workers/katexWorkerClient'
+import { getKatex } from './katex'
 
 const props = defineProps<{
   node: {
@@ -11,6 +11,10 @@ const props = defineProps<{
     loading?: boolean
   }
 }>()
+let katex = null
+getKatex().then((k) => {
+  katex = k
+})
 
 const mathElement = ref<HTMLElement | null>(null)
 let hasRenderedOnce = false
@@ -51,7 +55,7 @@ function renderMath() {
       // Only attempt synchronous KaTeX fallback when the worker failed to initialize.
       // If the worker returned a render error (syntax), leave the loading state as-is
       // and don't try to synchronously render here to avoid surfacing KaTeX errors.
-      if (err?.code === 'WORKER_INIT_ERROR' || err?.fallbackToRenderer) {
+      if (katex && (err?.code === 'WORKER_INIT_ERROR' || err?.fallbackToRenderer)) {
         try {
           const html = katex.renderToString(props.node.content, { throwOnError: true, displayMode: false })
           renderingLoading.value = false
@@ -71,14 +75,6 @@ function renderMath() {
     })
 }
 
-// watch(
-//   () => props.node.loading,
-//   (newVal) => {
-//     nextTick(() => {
-
-//     })
-//   },
-// )
 watch(
   () => props.node.content,
   () => {

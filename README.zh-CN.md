@@ -54,7 +54,20 @@ yarn add vue-renderer-markdown vue
 | `shiki` | ^3.13.0 | MarkdownCodeBlockNode 语法高亮 | 仅显示纯文本 |
 | `vue-i18n` | >=9 | 国际化 | 内置同步翻译器 |
 
-- ✅ KaTeX 已随库一并打包，无需额外安装
+- ⚠️ KaTeX 未随本库打包或自动注入。如需 LaTeX 数学公式渲染，请在宿主应用中安装 `katex` 并手动引入其样式表。示例：
+
+```bash
+pnpm add katex
+# 或
+npm install katex
+```
+
+然后在应用入口（例如 `main.ts`）中引入样式：
+
+```ts
+import 'katex/dist/katex.min.css'
+```
+
 - 🖼️ 工具栏图标改用本地 SVG，无需额外图标库
 
 ## 快速开始
@@ -315,7 +328,7 @@ setCustomComponents({
 - 使用 `setCustomComponents('id', mapping)` 为不同渲染实例分别注册组件，并在不再需要时移除，减少内存占用。
 - 在应用启动时调用 `setDefaultMathOptions`，统一数学公式配置，防止在渲染期间重复计算。
 - 对复杂 Mermaid 图表可提前在服务端校验或预渲染，再将结果作为缓存内容传给组件。
-- Math 渲染错误时，可通过 `setDefaultMathOptions` 调整需要自动补全反斜杠的指令集合，或预先在服务端缓存 KaTeX 输出。
+  - Math 渲染错误时，可通过 `setDefaultMathOptions` 调整需要自动补全反斜杠的指令集合。若需在服务端生成或缓存 KaTeX 输出，请确保宿主应用已安装 `katex` 并将其包含在构建中。
 
 ## 国际化 / 备用翻译
 

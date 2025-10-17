@@ -1,6 +1,5 @@
 import { Buffer } from 'node:buffer'
 import { vi } from 'vitest'
-import { defineComponent, h } from 'vue'
 
 class WorkerStub {
   onmessage: ((event: MessageEvent) => void) | null = null

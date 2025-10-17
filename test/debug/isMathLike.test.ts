@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { isMathLike } from '../../src/utils/markdown/plugins/math'
+import { isMathLike } from '../../src/utils/markdown/plugins/isMathLike'
 
 it('recognizes \"\\boldsymbol{...}\" as math-like', () => {
   expect(isMathLike('\\boldsymbol{\\beta}')).toBe(true)
@@ -11,4 +11,5 @@ it('recognizes \"\\boldsymbol{...}\" as math-like', () => {
   expect(isMathLike('operatorname{')).toBe(true)
   expect(isMathLike('served from /vue-markdown-icon.svg')).toBe(false)
   expect(isMathLike('served from vue-markdown-icon.1')).toBe(false)
+  expect(isMathLike('get_time')).toBe(false)
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isMathLike } from '../src/utils/markdown/plugins/math'
+import { isMathLike } from '../src/utils/markdown/plugins/isMathLike'
 
 describe('isMathLike heuristic', () => {
   it('detects \\boldsymbol{\u03B1}^T \\boldsymbol{\u03B2} = 0 as math-like', () => {

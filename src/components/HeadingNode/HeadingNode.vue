@@ -10,7 +10,7 @@ import ImageNode from '../ImageNode'
 import InlineCodeNode from '../InlineCodeNode'
 import InsertNode from '../InsertNode'
 import LinkNode from '../LinkNode'
-import MathInlineNode from '../MathInlineNode'
+import { MathInlineNodeAsync } from '../NodeRenderer/asyncComponent'
 import ReferenceNode from '../ReferenceNode'
 import StrikethroughNode from '../StrikethroughNode'
 import StrongNode from '../StrongNode'
@@ -54,7 +54,7 @@ const nodeComponents = {
   checkbox_input: CheckboxNode,
   footnote_reference: FootnoteReferenceNode,
   hardbreak: HardBreakNode,
-  math_inline: MathInlineNode,
+  math_inline: MathInlineNodeAsync,
   reference: ReferenceNode,
   // 添加其他内联元素组件
   ...getCustomNodeComponents(props.customId),

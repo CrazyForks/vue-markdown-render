@@ -30,6 +30,10 @@ export function parseList(
     && tokens[j].type !== 'ordered_list_close'
   ) {
     if (tokens[j].type === 'list_item_open') {
+      if (tokens[j].markup === '*') {
+        j++
+        continue
+      }
       const itemChildren: ParsedNode[] = []
       let k = j + 1
       while (k < tokens.length && tokens[k].type !== 'list_item_close') {
@@ -37,6 +41,10 @@ export function parseList(
         if (tokens[k].type === 'paragraph_open') {
           const contentToken = tokens[k + 1]
           const preToken = tokens[k - 1]
+          if (/\n\d+$/.test(contentToken.content)) {
+            contentToken.content = contentToken.content.replace(/\n\d+$/, '')
+            contentToken.children.splice(-1, 1)
+          }
           itemChildren.push({
             type: 'paragraph',
             children: parseInlineTokens(contentToken.children || [], contentToken.content || '', preToken),
@@ -54,6 +62,10 @@ export function parseList(
           tokens[k].type === 'bullet_list_open'
           || tokens[k].type === 'ordered_list_open'
         ) {
+          if (tokens[k].markup === '*') {
+            k++
+            continue
+          }
           // Parse nested list
           const [nestedListNode, newIndex] = parseNestedList(tokens, k)
           itemChildren.push(nestedListNode)
@@ -172,6 +184,10 @@ function parseNestedList(
     && tokens[j].type !== 'ordered_list_close'
   ) {
     if (tokens[j].type === 'list_item_open') {
+      if (tokens[j].markup === '*') {
+        j++
+        continue
+      }
       const itemChildren: ParsedNode[] = []
       let k = j + 1
 
@@ -191,6 +207,11 @@ function parseNestedList(
           tokens[k].type === 'bullet_list_open'
           || tokens[k].type === 'ordered_list_open'
         ) {
+          if (tokens[k].markup === '*') {
+            k++
+            continue
+          }
+
           // Handle deeper nested lists
           const [deeperNestedListNode, newIndex] = parseNestedList(tokens, k)
           itemChildren.push(deeperNestedListNode)

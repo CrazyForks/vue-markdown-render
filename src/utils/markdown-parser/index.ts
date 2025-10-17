@@ -28,7 +28,14 @@ export function parseMarkdownToStructure(
     // 放置markdown 解析 - * 会被处理成多个 ul >li 嵌套列表
     safeMarkdown = safeMarkdown.replace(/- \*$/, '- \\*')
   }
-
+  if (/\n\s*-\s*$/.test(safeMarkdown)) {
+    // 此时 markdown 解析会出错要跳过
+    safeMarkdown = safeMarkdown.replace(/\n\s*-\s*$/, '\n')
+  }
+  else if (/\n[[(]\n*$/.test(safeMarkdown)) {
+    // 此时 markdown 解析会出错要跳过
+    safeMarkdown = safeMarkdown.replace(/(\n\[|\n\()+\n*$/g, '\n')
+  }
   // Get tokens from markdown-it
   const tokens = md.parse(safeMarkdown, {}) as MarkdownToken[]
   // Defensive: ensure tokens is an array

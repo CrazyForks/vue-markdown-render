@@ -2,36 +2,16 @@ import type MarkdownIt from 'markdown-it'
 import type { MathOptions } from '../config'
 
 import findMatchingClose from '../findMatchingClose'
+import { ESCAPED_TEX_BRACE_COMMANDS, isMathLike } from './isMathLike'
 
 // Heuristic to decide whether a piece of text is likely math.
 // Matches common TeX commands, math operators, function-call patterns like f(x),
 // superscripts/subscripts, and common math words.
 // Common TeX formatting commands that take a brace argument, e.g. \boldsymbol{...}
 // Keep this list in a single constant so it's easy to extend/test.
-export const TEX_BRACE_COMMANDS = [
-  'mathbf',
-  'boldsymbol',
-  'mathbb',
-  'mathcal',
-  'mathfrak',
-  'mathrm',
-  'mathit',
-  'mathsf',
-  'vec',
-  'hat',
-  'bar',
-  'tilde',
-  'overline',
-  'underline',
-  'mathscr',
-  'mathnormal',
-  'operatorname',
-  'mathbf*',
-]
 
 // Precompute an escaped, |-joined string of TEX brace commands so we don't
 // rebuild it on every call to `isMathLike`.
-export const ESCAPED_TEX_BRACE_COMMANDS = TEX_BRACE_COMMANDS.map(c => c.replace(/[.*+?^${}()|[\\]"\]/g, '\\$&')).join('|')
 
 // Common KaTeX/TeX command names that might lose their leading backslash.
 // Keep this list conservative to avoid false-positives in normal text.
@@ -114,31 +94,6 @@ const CONTROL_MAP: Record<string, string> = {
   '\v': 'v',
 }
 
-// Precompiled regexes for isMathLike to avoid reconstructing them per-call
-// and prebuilt default regexes for normalizeStandaloneBackslashT when the
-// default command set is used.
-const TEX_CMD_RE = /\\[a-z]+/i
-const PREFIX_CLASS = '(?:\\\\|\\u0008)'
-const TEX_CMD_WITH_BRACES_RE = new RegExp(`${PREFIX_CLASS}(?:${ESCAPED_TEX_BRACE_COMMANDS})\\s*\\{[^}]+\\}`, 'i')
-// Detect brace-taking TeX commands even when the leading backslash or the
-// closing brace/content is missing (e.g. "operatorname{" or "operatorname{span").
-// This helps the heuristic treat incomplete but clearly TeX-like fragments
-// as math-like instead of plain text.
-const TEX_BRACE_CMD_START_RE = new RegExp(`(?:${PREFIX_CLASS})?(?:${ESCAPED_TEX_BRACE_COMMANDS})\s*\{`, 'i')
-const TEX_SPECIFIC_RE = /\\(?:text|frac|left|right|times)/
-const SUPER_SUB_RE = /\^|_/
-// Match common math operator symbols or named commands.
-// Avoid treating the C/C++ increment operator ("++") as a math operator by
-// ensuring a lone '+' isn't matched when it's part of a '++' sequence.
-// Use a RegExp constructed from a string to avoid issues escaping '/' in a
-// regex literal on some platforms/linters.
-// eslint-disable-next-line prefer-regex-literals
-const OPS_RE = new RegExp('(?<!\\+)\\+(?!\\+)|[=\\-*/^<>]|\\\\times|\\\\pm|\\\\cdot|\\\\le|\\\\ge|\\\\neq')
-const FUNC_CALL_RE = /[A-Z]+\s*\([^)]+\)/i
-const WORDS_RE = /\b(?:sin|cos|tan|log|ln|exp|sqrt|frac|sum|lim|int|prod)\b/
-// Heuristic to detect common date/time patterns like 2025/9/30 21:37:24 and
-// avoid classifying them as math merely because they contain '/' or ':'
-const DATE_TIME_RE = /\b\d{4}\/\d{1,2}\/\d{1,2}(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?\b/
 function countUnescapedStrong(s: string) {
   const re = /(^|[^\\])(__|\*\*)/g
   let m: RegExpExecArray | null
@@ -148,52 +103,6 @@ function countUnescapedStrong(s: string) {
     c++
   }
   return c
-}
-
-export function isMathLike(s: string) {
-  if (!s)
-    return false
-
-  // Normalize accidental control characters that may appear if a single
-  // backslash sequence was interpreted in a JS string literal (for example
-  // '\\b' becoming a backspace U+0008). Convert such control characters
-  // back into their two-character escaped forms so our regexes can match
-  // TeX commands reliably.
-  // eslint-disable-next-line no-control-regex
-  const norm = s.replace(/\u0008/g, '\\b')
-  const stripped = norm.trim()
-
-  // quick bailouts
-  // If the content looks like a timestamp or date, it's not math.
-  if (DATE_TIME_RE.test(stripped))
-    return false
-  if (stripped.length > 2000)
-    return true // very long blocks likely math
-
-  if (/[./]\s*\D|\D\s*[./]/.test(s)) {
-    return false
-  }
-
-  // TeX commands e.g. \frac, \alpha
-  const texCmd = TEX_CMD_RE.test(norm)
-  const texCmdWithBraces = TEX_CMD_WITH_BRACES_RE.test(norm)
-  const texBraceStart = TEX_BRACE_CMD_START_RE.test(norm)
-
-  // Explicit common TeX tokens (keeps compatibility with previous heuristic)
-  const texSpecific = TEX_SPECIFIC_RE.test(norm)
-  // caret or underscore for super/subscripts
-  const superSub = SUPER_SUB_RE.test(norm)
-  // common math operator symbols or named commands
-  const ops = OPS_RE.test(norm)
-  // function-like patterns: f(x), sin(x)
-  const funcCall = FUNC_CALL_RE.test(norm)
-  // common math words
-  const words = WORDS_RE.test(norm)
-  // 纯单个英文字命，也渲染成数学公式
-  // e.g. (w) (x) (y) (z)
-  // const pureWord = /^\([a-zA-Z]\)$/i.test(stripped)
-
-  return texCmd || texCmdWithBraces || texBraceStart || texSpecific || superSub || ops || funcCall || words
 }
 
 export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
@@ -246,9 +155,6 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
   // Inline rule for \(...\) and $$...$$ and $...$
   const mathInline = (state: any, silent: boolean) => {
-    if (state.src.includes('\n')) {
-      return false
-    }
     if (/^\*[^*]+/.test(state.src)) {
       return false
     }
@@ -257,6 +163,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       ['\\(', '\\)'],
       ['\(', '\)'],
     ]
+
     let searchPos = 0
     let preMathPos = 0
     // use findMatchingClose from util
@@ -336,6 +243,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         // endIndex 需要找到与 open 对应的 close
         // 不能简单地用 indexOf 找到第一个 close — 需要处理嵌套与转义字符
         const endIdx = findMatchingClose(src, index + open.length, open, close)
+
         if (endIdx === -1) {
           // no matching close for this opener; skip forward
           const content = src.slice(index + open.length)
@@ -505,18 +413,16 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         if (open.includes('[')) {
           if (lineText.replace('\\', '') === '[') {
             if (startLine + 1 < endLine) {
-              const nextLineStart
-                = state.bMarks[startLine + 1] + state.tShift[startLine + 1]
-              const nextLineText = state.src.slice(
-                nextLineStart,
-                state.eMarks[startLine + 1],
-              )
-              if (isMathLike(nextLineText.trim())) {
-                matched = true
-                openDelim = open
-                closeDelim = close
-                break
-              }
+              // const nextLineStart
+              //   = state.bMarks[startLine + 1] + state.tShift[startLine + 1]
+              // const nextLineText = state.src.slice(
+              //   nextLineStart,
+              //   state.eMarks[startLine + 1],
+              // )
+              matched = true
+              openDelim = open
+              closeDelim = close
+              break
             }
             continue
           }
@@ -554,6 +460,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       token.markup
         = openDelim === '$$' ? '$$' : openDelim === '[' ? '[]' : '\\[\\]'
       token.map = [startLine, startLine + 1]
+      token.raw = `${openDelim}${content}${closeDelim}`
       token.block = true
       token.loading = false
       state.line = startLine + 1
@@ -599,6 +506,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     token.content = normalizeStandaloneBackslashT(content)
     token.markup
       = openDelim === '$$' ? '$$' : openDelim === '[' ? '[]' : '\\[\\]'
+    token.raw = `${openDelim}${content}${content.startsWith('\n') ? '\n' : ''}${closeDelim}`
     token.map = [startLine, nextLine + 1]
     token.block = true
     token.loading = !found

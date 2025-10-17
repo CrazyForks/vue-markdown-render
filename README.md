@@ -86,7 +86,7 @@ yarn add vue-renderer-markdown
 
 ### Peer Dependencies
 
-This package requires **Vue 3** and includes **KaTeX** as a bundled dependency. Additional optional peer dependencies enable advanced features and are lazy-loaded at runtime when available.
+This package requires **Vue 3**. Math (LaTeX) rendering is optional and requires installing `katex` as a peer dependency — KaTeX is not bundled or auto-injected. Additional optional peer dependencies enable advanced features and are lazy-loaded at runtime when available.
 
 #### Required Peer Dependencies
 
@@ -131,8 +131,21 @@ yarn add mermaid vue-use-monaco shiki
 
 **Important Notes:**
 
-- ✅ **KaTeX is bundled** with this package and does not need to be installed separately
-- 🖼️ Toolbar icons ship as local SVGs—no additional icon libraries required
+⚠️ KaTeX is not bundled or auto-injected. To enable LaTeX math rendering install `katex` and import its CSS in your application. Example:
+
+```bash
+pnpm add katex
+# or
+npm install katex
+```
+
+Then import the stylesheet in your app entry (for example `main.ts`):
+
+```ts
+import 'katex/dist/katex.min.css'
+```
+
+🖼️ Toolbar icons ship as local SVGs—no additional icon libraries required
 - The exact peer version ranges are declared in this package's `package.json`
 - Optional peers are lazy-loaded at runtime, so you can start with minimal dependencies and add features later
 - For monorepos or pnpm workspaces, install peers at the workspace root to ensure they are available to consuming packages
@@ -194,7 +207,7 @@ This test ensures the library can be imported in a Node environment without thro
 ### Notes
 
 - Optional peers (Mermaid, Monaco, icons) are lazy-loaded only in the browser
-- Math rendering (KaTeX) works during SSR as it's a bundled dependency
+-- Math rendering (KaTeX) works during SSR when `katex` is installed and available to the build. Since KaTeX is not bundled, ensure you add `katex` as a dependency if you need server-side math rendering.
 - For pre-rendered diagrams/code, generate static HTML server-side and pass it as raw HTML or AST
 - If you encounter `window is not defined` errors, please [open an issue](https://github.com/Simon-He95/vue-markdown-render/issues) with the stack trace
 
@@ -1266,9 +1279,9 @@ See the [Tailwind section](#tailwind-eg-shadcn--fix-style-ordering-issues) for m
 
 **Solutions:**
 
-1. KaTeX is bundled with the library and should work automatically. Ensure you're using valid LaTeX syntax:
-   - Inline math: `$a^2 + b^2 = c^2$`
-   - Block math: `$$\int_0^\infty e^{-x^2} dx$$`
+1. LaTeX math rendering is optional and requires `katex` to be installed by the host application. If you need math rendering, install `katex` and import its stylesheet (see the "Important Notes" above). Ensure you're using valid LaTeX syntax:
+  - Inline math: `$a^2 + b^2 = c^2$`
+  - Block math: `$$\int_0^\infty e^{-x^2} dx$$`
 
 2. For advanced customization, configure math options:
    ```ts

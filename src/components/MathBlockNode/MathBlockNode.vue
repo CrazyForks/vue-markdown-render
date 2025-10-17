@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import katex from 'katex'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { renderKaTeXInWorker, setKaTeXCache } from '../../workers/katexWorkerClient'
+import { getKatex } from '../MathInlineNode/katex'
 
 const props = defineProps<{
   node: {
@@ -11,7 +11,10 @@ const props = defineProps<{
     loading?: boolean
   }
 }>()
-
+let katex = null
+getKatex().then((k) => {
+  katex = k
+})
 const mathBlockElement = ref<HTMLElement | null>(null)
 let hasRenderedOnce = false
 let currentRenderId = 0
@@ -57,7 +60,7 @@ function renderMath() {
       // KaTeX render on the main thread as a fallback. If the error is a
       // KaTeX render error from the worker (syntax), we should ignore it here
       // and fall through to the raw/text fallback below.
-      if (err?.code === 'WORKER_INIT_ERROR' || err?.fallbackToRenderer) {
+      if (katex && (err?.code === 'WORKER_INIT_ERROR' || err?.fallbackToRenderer)) {
         try {
           const html = katex.renderToString(props.node.content, {
             throwOnError: true,
