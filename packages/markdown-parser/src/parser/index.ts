@@ -113,6 +113,8 @@ export function processTokens(tokens: MarkdownToken[]): ParsedNode[] {
         break
 
       case 'html_block':
+        i += 1
+        break
       case 'code_block':
         result.push(parseCodeBlock(tokens[i]))
         i += 1

@@ -4,6 +4,10 @@ export const streamContent = `
 
 [Star on GitHub](https://github.com/Simon-He95/vue-markdown-render)
 
+<a href="https://simonhe.me/">我是 a 元素标签</a>
+
+https://github.com/Simon-He95/vue-markdown-render
+
 [【Author: Simon】](https://simonhe.me/)
 
 

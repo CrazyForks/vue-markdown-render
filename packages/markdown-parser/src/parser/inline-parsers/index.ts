@@ -6,6 +6,7 @@ import { parseFenceToken } from './fence-parser'
 import { parseFootnoteRefToken } from './footnote-ref-parser'
 import { parseHardbreakToken } from './hardbreak-parser'
 import { parseHighlightToken } from './highlight-parser'
+import { parseHtmlInlineCodeToken } from './html-inline-code-parser'
 import { parseImageToken } from './image-parser'
 import { parseInlineCodeToken } from './inline-code-parser'
 import { parseInsertToken } from './insert-parser'
@@ -280,6 +281,12 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
         pushNode(parseInlineCodeToken(token))
         i++
         break
+      case 'html_inline': {
+        const [node, index] = parseHtmlInlineCodeToken(token, tokens, i)
+        pushNode(node)
+        i = index
+        break
+      }
 
       case 'link_open': {
         handleLinkOpen(token)
@@ -608,13 +615,13 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
     // may do this), prefer the parseLinkToken's initial loading value
     // (which defaults to true for mid-state links).
     if (raw && hrefStr) {
-    // More robust: locate the first "](" after the link text and see if
-    // there's a matching ')' that closes the href. This avoids false
-    // positives when other parentheses appear elsewhere in the source.
+      // More robust: locate the first "](" after the link text and see if
+      // there's a matching ')' that closes the href. This avoids false
+      // positives when other parentheses appear elsewhere in the source.
       const openIdx = raw.indexOf('](')
       if (openIdx === -1) {
-      // No explicit link start found in raw — be conservative and keep
-      // the parser's default loading value.
+        // No explicit link start found in raw — be conservative and keep
+        // the parser's default loading value.
       }
       else {
         const closeIdx = raw.indexOf(')', openIdx + 2)
@@ -622,7 +629,7 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
           node.loading = true
         }
         else {
-        // Check that the href inside the parens corresponds to this token
+          // Check that the href inside the parens corresponds to this token
           const inside = raw.slice(openIdx + 2, closeIdx)
           if (inside.includes(hrefStr))
             node.loading = false
