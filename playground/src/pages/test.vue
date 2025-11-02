@@ -67,9 +67,12 @@ function decodeFromUrl(s: string) {
 }
 
 function generateShareLink() {
-  const data = encodeForUrl(input.value)
-  if (!data)
+  const encodedRaw = encodeURIComponent(input.value)
+  const compressed = encodeForUrl(input.value)
+  if (!compressed && !encodedRaw)
     return
+  // Choose the shorter representation: compressed (URL-safe) or raw encoded
+  const data = (compressed && compressed.length < encodedRaw.length) ? compressed : `raw:${encodedRaw}`
   const url = new URL(window.location.href)
   url.hash = `data=${data}`
   const full = url.toString()
@@ -166,9 +169,21 @@ function restoreFromUrl() {
       return
     const m = hash.match(/data=([^&]+)/)
     if (m && m[1]) {
-      const decoded = decodeFromUrl(m[1])
-      if (decoded)
-        input.value = decoded
+      const payload = m[1]
+      // support `raw:` fallback where we stored uncompressed (encoded) content
+      if (payload.startsWith('raw:')) {
+        try {
+          input.value = decodeURIComponent(payload.slice(4))
+        }
+        catch {
+          // ignore
+        }
+      }
+      else {
+        const decoded = decodeFromUrl(payload)
+        if (decoded)
+          input.value = decoded
+      }
     }
   }
   catch {
