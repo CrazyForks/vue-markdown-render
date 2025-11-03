@@ -32,6 +32,13 @@ graph TD
 \`\`\`
 `)
 
+// 流式渲染相关状态
+const streamContent = ref<string>('')
+const isStreaming = ref(false)
+const streamSpeed = ref(1) // 每次添加的字符数，可调整速度
+const streamInterval = ref(16) // 每次更新的时间间隔（毫秒）
+const showStreamSettings = ref(false) // 是否显示流式渲染设置
+
 // 预加载 Monaco 编辑器和 worker
 getUseMonaco()
 setKaTeXWorker(new KatexWorker())
@@ -195,6 +202,56 @@ onMounted(() => {
   restoreFromUrl()
   shareUrl.value = window.location.href
 })
+
+// 流式渲染函数
+let streamTimer: number | null = null
+
+function startStreamRender() {
+  if (isStreaming.value) {
+    // 如果正在流式渲染，停止它
+    stopStreamRender()
+    return
+  }
+
+  // 重置流式内容
+  streamContent.value = ''
+  isStreaming.value = true
+  let currentIndex = 0
+  const fullText = input.value
+
+  const streamStep = () => {
+    if (currentIndex >= fullText.length) {
+      // 完成流式渲染
+      stopStreamRender()
+      return
+    }
+
+    // 每次截取指定数量的字符
+    const nextIndex = Math.min(currentIndex + streamSpeed.value, fullText.length)
+    streamContent.value = fullText.slice(0, nextIndex)
+    currentIndex = nextIndex
+
+    // 继续下一次渲染，使用用户设置的时间间隔
+    streamTimer = window.setTimeout(streamStep, streamInterval.value)
+  }
+
+  streamStep()
+}
+
+function stopStreamRender() {
+  if (streamTimer !== null) {
+    clearTimeout(streamTimer)
+    streamTimer = null
+  }
+  isStreaming.value = false
+  // 确保显示完整内容
+  if (streamContent.value && streamContent.value !== input.value)
+    streamContent.value = input.value
+}
+
+function toggleStreamSettings() {
+  showStreamSettings.value = !showStreamSettings.value
+}
 </script>
 
 <template>
@@ -206,12 +263,71 @@ onMounted(() => {
         </h2>
         <div class="text-sm text-gray-500 flex items-center gap-3">
           <span>左侧输入，右侧预览</span>
+          <button
+            class="px-2 py-1 rounded text-sm flex items-center gap-2"
+            :class="isStreaming ? 'bg-red-600 text-white' : 'bg-purple-600 text-white'"
+            @click="startStreamRender"
+          >
+            {{ isStreaming ? '停止流式渲染' : '流式渲染' }}
+          </button>
+          <button
+            class="px-2 py-1 bg-gray-500 text-white rounded text-sm"
+            :class="{ 'bg-gray-700': showStreamSettings }"
+            @click="toggleStreamSettings"
+          >
+            ⚙️ 设置
+          </button>
           <button :disabled="isWorking" class="px-2 py-1 bg-blue-600 text-white rounded text-sm flex items-center gap-2" @click="generateAndCopy">
             生成并复制分享链接
           </button>
           <button class="bg-green-600 text-white rounded px-2 py-1 text-sm" @click="openIssueInNewTab">
             打开 Issue
           </button>
+        </div>
+      </div>
+
+      <!-- 流式渲染设置面板 -->
+      <div v-if="showStreamSettings" class="mb-4 p-4 bg-white dark:bg-gray-800 rounded border border-purple-300 dark:border-purple-700 shadow-md">
+        <h3 class="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
+          流式渲染设置
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              每次截取字符数: <span class="text-purple-600 dark:text-purple-400 font-semibold">{{ streamSpeed }}</span>
+            </label>
+            <input
+              v-model.number="streamSpeed"
+              type="range"
+              min="1"
+              max="100"
+              class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+            >
+            <div class="flex justify-between text-xs text-gray-500 mt-1">
+              <span>1 (慢)</span>
+              <span>100 (快)</span>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              更新间隔(毫秒): <span class="text-purple-600 dark:text-purple-400 font-semibold">{{ streamInterval }}ms</span>
+            </label>
+            <input
+              v-model.number="streamInterval"
+              type="range"
+              min="10"
+              max="500"
+              step="10"
+              class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+            >
+            <div class="flex justify-between text-xs text-gray-500 mt-1">
+              <span>10ms (快)</span>
+              <span>500ms (慢)</span>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 p-2 bg-purple-50 dark:bg-purple-900/20 rounded text-xs text-gray-600 dark:text-gray-400">
+          💡 提示：字符数越大或间隔越小，渲染速度越快
         </div>
       </div>
 
@@ -222,9 +338,14 @@ onMounted(() => {
         </div>
 
         <div>
-          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">预览</label>
+          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            预览
+            <span v-if="streamContent" class="ml-2 text-xs text-purple-600 dark:text-purple-400">
+              (流式渲染模式 {{ isStreaming ? '- 渲染中...' : '- 已完成' }})
+            </span>
+          </label>
           <div class="max-w-none p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 min-h-[14rem] overflow-auto">
-            <MarkdownRender :content="input" />
+            <MarkdownRender :content="streamContent || input" />
           </div>
           <div class="mt-2 text-xs text-gray-500 break-words">
             <template v-if="tooLong">
@@ -367,5 +488,36 @@ onMounted(() => {
 :deep(.is-rendering) {
   position: relative;
   animation: renderingGlow 2s ease-in-out infinite;
+}
+
+/* 滑块样式优化 */
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #9333ea;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: #7c3aed;
+  transform: scale(1.2);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #9333ea;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  background: #7c3aed;
+  transform: scale(1.2);
 }
 </style>
