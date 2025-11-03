@@ -85,12 +85,17 @@ async function renderMath() {
           katex = await getKatex()
         }
         if (katex) {
-          const html = katex.renderToString(props.node.content, { throwOnError: false, displayMode: false })
-          renderingLoading.value = false
-          mathElement.value.innerHTML = html
-          hasRenderedOnce = true
-          // populate worker client cache for inline as well
-          setKaTeXCache(props.node.content, false, html)
+          try {
+            const html = katex.renderToString(props.node.content, { throwOnError: props.node.loading, displayMode: false })
+            renderingLoading.value = false
+            mathElement.value.innerHTML = html
+            hasRenderedOnce = true
+            // populate worker client cache for inline as well
+            setKaTeXCache(props.node.content, false, html)
+          }
+          catch {
+          }
+
           return
         }
       }

@@ -95,15 +95,19 @@ async function renderMath() {
           katex = await getKatex()
         }
         if (katex) {
-          const html = katex.renderToString(props.node.content, {
-            throwOnError: false,
-            displayMode: true,
-          })
-          mathBlockElement.value.innerHTML = html
-          hasRenderedOnce = true
-          renderingLoading.value = false
-          // populate worker client cache so future calls hit cache
-          setKaTeXCache(props.node.content, true, html)
+          try {
+            const html = katex.renderToString(props.node.content, {
+              throwOnError: props.node.loading,
+              displayMode: true,
+            })
+            mathBlockElement.value.innerHTML = html
+            hasRenderedOnce = true
+            renderingLoading.value = false
+            // populate worker client cache so future calls hit cache
+            setKaTeXCache(props.node.content, true, html)
+          }
+          catch {
+          }
           return
         }
       }
