@@ -55,6 +55,11 @@ export interface CodeBlockNode extends BaseNode {
   raw: string
 }
 
+export interface HtmlBlockNode extends BaseNode {
+  type: 'html_block'
+  content: string
+}
+
 export interface InlineCodeNode extends BaseNode {
   type: 'inline_code'
   code: string
@@ -267,6 +272,7 @@ export type ParsedNode
     | MathInlineNode
     | MathBlockNode
     | ReferenceNode
+    | HtmlBlockNode
     | Record<string, unknown>
 export interface CustomComponents {
   text: unknown

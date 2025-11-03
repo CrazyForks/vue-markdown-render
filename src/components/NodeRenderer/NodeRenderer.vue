@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BaseNode, ParsedNode, ParseOptions } from 'stream-markdown-parser'
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, ref } from 'vue'
+import { getMarkdown, parseMarkdownToStructure } from '../../../packages/markdown-parser'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -32,6 +32,7 @@ import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import { provideViewportPriority } from '../../composables/viewportPriority'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
+import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import FallbackComponent from './FallbackComponent.vue'
 
@@ -161,6 +162,7 @@ const nodeComponents = {
   checkbox_input: CheckboxNode,
   inline_code: InlineCodeNode,
   reference: ReferenceNode,
+  html_block: HtmlBlockNode,
   // 可以添加更多节点类型
   // 例如:custom_node: CustomNode,
   ...getCustomNodeComponents(props.customId),

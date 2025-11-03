@@ -23,6 +23,7 @@ declare module 'vue' {
     HardBreakNode: typeof import('./src/components/HardBreakNode/HardBreakNode.vue')['default']
     HeadingNode: typeof import('./src/components/HeadingNode/HeadingNode.vue')['default']
     HighlightNode: typeof import('./src/components/HighlightNode/HighlightNode.vue')['default']
+    HtmlBlockNode: typeof import('./src/components/HtmlBlockNode/HtmlBlockNode.vue')['default']
     ImageNode: typeof import('./src/components/ImageNode/ImageNode.vue')['default']
     InlineCodeNode: typeof import('./src/components/InlineCodeNode/InlineCodeNode.vue')['default']
     InsertNode: typeof import('./src/components/InsertNode/InsertNode.vue')['default']

@@ -76,7 +76,7 @@ describe('link parsing', () => {
 
   it('test the intermediate state of the link tag', () => {
     const nodes = parseMarkdownToStructure(`<a href="https://example.com">`, md) as any
-    expect(nodes.length).toBe(0)
+    expect(nodes.length).toBe(1)
   })
 
   it('parses link with parentheses and CJK brackets as a single link', () => {

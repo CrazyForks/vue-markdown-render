@@ -10,6 +10,7 @@ import { parseDefinitionList } from './node-parsers/definition-list-parser'
 import { parseFootnote } from './node-parsers/footnote-parser'
 import { parseHardBreak } from './node-parsers/hardbreak-parser'
 import { parseHeading } from './node-parsers/heading-parser'
+import { parseHtmlBlock } from './node-parsers/html-block-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseMathBlock } from './node-parsers/math-block-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
@@ -35,6 +36,7 @@ export function parseMarkdownToStructure(
     // 此时 markdown 解析会出错要跳过
     safeMarkdown = safeMarkdown.replace(/(\n\[|\n\()+\n*$/g, '\n')
   }
+
   // Get tokens from markdown-it
   const tokens = md.parse(safeMarkdown, {}) as MarkdownToken[]
   // Defensive: ensure tokens is an array
@@ -113,6 +115,7 @@ export function processTokens(tokens: MarkdownToken[]): ParsedNode[] {
         break
 
       case 'html_block':
+        result.push(parseHtmlBlock(token))
         i += 1
         break
       case 'code_block':
