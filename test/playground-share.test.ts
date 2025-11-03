@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
+import { describe, expect, it } from 'vitest'
 
 function makeDataForUrl(input: string) {
   const encodedRaw = encodeURIComponent(input)

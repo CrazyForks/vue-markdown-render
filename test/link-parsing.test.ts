@@ -61,6 +61,24 @@ describe('link parsing', () => {
     expect(containsBare).toBe(true)
   })
 
+  it('test the link tag', () => {
+    const nodes = parseMarkdownToStructure(`<a href="https://example.com">Example</a>`, md) as any
+    const p = nodes[0]
+    const children = p.children
+    expect(children.length).toBe(1)
+    const link = p.children[0]
+    expect(link.type).toBe('link')
+    expect(link.href).toBe('https://example.com')
+    expect(link.text).toBe('Example')
+    expect(link.children[0].type).toBe('text')
+    expect(link.children[0].content).toBe('Example')
+  })
+
+  it('test the intermediate state of the link tag', () => {
+    const nodes = parseMarkdownToStructure(`<a href="https://example.com">`, md) as any
+    expect(nodes.length).toBe(0)
+  })
+
   it('parses link with parentheses and CJK brackets as a single link', () => {
     const special = '[【名称】(test).mp4](https://github.com/Simon-He95/vue-markdown-renderer)'
     const nodes = parseMarkdownToStructure(special, md)
