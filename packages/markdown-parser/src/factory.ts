@@ -1,5 +1,5 @@
 import type { MathOptions } from './config'
-import MarkdownIt from 'markdown-it'
+import MarkdownIt from 'markdown-it-ts'
 import { getDefaultMathOptions } from './config'
 import { applyContainers } from './plugins/containers'
 import { applyFixLinkInline } from './plugins/fixLinkInline'
@@ -17,8 +17,8 @@ export interface FactoryOptions extends Record<string, unknown> {
   mathOptions?: { commands?: string[], escapeExclamation?: boolean }
 }
 
-export function factory(opts: FactoryOptions = {}): MarkdownIt {
-  const md = new MarkdownIt({
+export function factory(opts: FactoryOptions = {}) {
+  const md = MarkdownIt({
     html: true,
     linkify: true,
     typographer: true,

@@ -19,6 +19,8 @@
 - ⚡ **高性能** - 性能优化
 - 🌊 **流式友好** - 支持渐进式解析
 
+> ℹ️ 自当前版本起我们基于 [`markdown-it-ts`](https://www.npmjs.com/package/markdown-it-ts)（一个 TypeScript 优先的 markdown-it 发行版）进行构建。API 与 markdown-it 保持一致，但内部仅依赖其解析流程，并提供更丰富的 token 类型定义。
+
 ## 安装
 
 ```bash
@@ -36,16 +38,16 @@ yarn add stream-markdown-parser
 ```typescript
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-// 创建一个带有默认插件的 markdown-it 实例
+// 创建一个带有默认插件的 markdown-it-ts 实例
 const md = getMarkdown()
 
-// 将 Markdown 解析为 HTML
-const html = md.render('# Hello World\n\nThis is **bold**.')
-
-// 或解析为 AST 结构
+// 将 Markdown 解析为流式友好的 AST 结构
 const nodes = parseMarkdownToStructure('# Hello World', md)
 console.log(nodes)
 // [{ type: 'heading', level: 1, children: [...] }]
+
+// 如果仍需 HTML 输出，markdown-it-ts 依旧提供 render()
+const html = md.render?.('# Hello World\n\nThis is **bold**.')
 ```
 
 ### 配置数学公式选项
@@ -117,7 +119,7 @@ const md = getMarkdown('editor-1', {
 
 #### `getMarkdown(msgId?, options?)`
 
-创建一个配置好的 markdown-it 实例。
+创建一个配置好的 `markdown-it-ts` 实例（与 markdown-it API 兼容）。
 
 **参数：**
 - `msgId` (string, 可选): 该实例的唯一标识符。默认值：`editor-${Date.now()}`
@@ -126,7 +128,7 @@ const md = getMarkdown('editor-1', {
 **选项：**
 ```typescript
 interface GetMarkdownOptions {
-  // 要使用的 markdown-it 插件数组
+  // 要使用的 markdown-it / markdown-it-ts 插件数组
   plugin?: Array<Plugin | [Plugin, any]>
 
   // 修改 md 实例的函数数组
@@ -143,7 +145,7 @@ interface GetMarkdownOptions {
 
 **参数：**
 - `content` (string): 要解析的 Markdown 内容
-- `md` (MarkdownIt, 可选): markdown-it 实例。如果未提供，则使用 `getMarkdown()` 创建
+- `md` (MarkdownItCore, 可选): markdown-it-ts 实例。如果未提供，则使用 `getMarkdown()` 创建
 - `options` (ParseOptions, 可选): 带有钩子的解析选项
 
 **返回值：** `ParsedNode[]` - 解析后的节点数组
@@ -154,7 +156,7 @@ interface GetMarkdownOptions {
 
 #### `parseInlineTokens(tokens, md)`
 
-解析内联 markdown-it tokens。
+解析内联 markdown-it-ts tokens。
 
 ### 配置函数
 

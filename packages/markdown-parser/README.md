@@ -19,6 +19,8 @@ This package contains the core markdown parsing logic extracted from `stream-mar
 - ⚡ **Fast** - Optimized for performance
 - 🌊 **Streaming-friendly** - Progressive parsing support
 
+> ℹ️ We now build on top of [`markdown-it-ts`](https://www.npmjs.com/package/markdown-it-ts), a TypeScript-first distribution of markdown-it. The API stays the same, but we only rely on its parsing pipeline and ship richer typings for tokens and hooks.
+
 ## Installation
 
 ```bash
@@ -36,16 +38,17 @@ yarn add stream-markdown-parser
 ```typescript
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-// Create a markdown-it instance with default plugins
+// Create a markdown-it-ts instance with default plugins
 const md = getMarkdown()
 
-// Parse markdown to HTML
-const html = md.render('# Hello World\n\nThis is **bold**.')
-
-// Or parse to AST structure
+// Parse markdown to our streaming-friendly AST structure
 const nodes = parseMarkdownToStructure('# Hello World', md)
 console.log(nodes)
 // [{ type: 'heading', level: 1, children: [...] }]
+
+// markdown-it-ts still exposes render() if you need HTML output,
+// but this package now focuses on the token -> AST pipeline.
+const html = md.render?.('# Hello World\n\nThis is **bold**.')
 ```
 
 ### With Math Options
@@ -117,7 +120,7 @@ const md = getMarkdown('editor-1', {
 
 #### `getMarkdown(msgId?, options?)`
 
-Creates a configured markdown-it instance.
+Creates a configured `markdown-it-ts` instance (API-compatible with markdown-it).
 
 **Parameters:**
 - `msgId` (string, optional): Unique identifier for this instance. Default: `editor-${Date.now()}`
@@ -126,7 +129,7 @@ Creates a configured markdown-it instance.
 **Options:**
 ```typescript
 interface GetMarkdownOptions {
-  // Array of markdown-it plugins to use
+  // Array of markdown-it/markdown-it-ts plugins to use
   plugin?: Array<Plugin | [Plugin, any]>
 
   // Array of functions to mutate the md instance
@@ -143,7 +146,7 @@ Parses markdown content into a structured node tree.
 
 **Parameters:**
 - `content` (string): The markdown content to parse
-- `md` (MarkdownIt, optional): A markdown-it instance. If not provided, creates one using `getMarkdown()`
+- `md` (MarkdownItCore, optional): A markdown-it-ts instance. If not provided, creates one using `getMarkdown()`
 - `options` (ParseOptions, optional): Parsing options with hooks
 
 **Returns:** `ParsedNode[]` - An array of parsed nodes
@@ -154,7 +157,7 @@ Processes raw markdown-it tokens into a flat array.
 
 #### `parseInlineTokens(tokens, md)`
 
-Parses inline markdown-it tokens.
+Parses inline markdown-it-ts tokens.
 
 ### Configuration Functions
 

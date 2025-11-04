@@ -51,7 +51,6 @@
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "markdown-it": "^14.1.0",
     "markdown-it-container": "^4.0.0",
     "markdown-it-emoji": "^3.0.0",
     "markdown-it-footnote": "^4.0.0",
@@ -59,11 +58,11 @@
     "markdown-it-mark": "^4.0.0",
     "markdown-it-sub": "^2.0.0",
     "markdown-it-sup": "^2.0.0",
-    "markdown-it-task-checkbox": "^1.0.6"
+    "markdown-it-task-checkbox": "^1.0.6",
+    "markdown-it-ts": "0.0.2-beta.1"
   },
   "devDependencies": {
-    "@types/markdown-it": "^14.1.2",
-    "@types/node": "^22.18.13",
+    "@types/node": "^22.19.0",
     "tsdown": "^0.15.12",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

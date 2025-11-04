@@ -1,4 +1,4 @@
-import type MarkdownIt from 'markdown-it'
+import type MarkdownIt from 'markdown-it-ts'
 import type { MarkdownToken, ParsedNode, ParseOptions } from '../types'
 import { parseInlineTokens } from './inline-parsers'
 import { parseFenceToken } from './inline-parsers/fence-parser'
@@ -38,7 +38,7 @@ export function parseMarkdownToStructure(
   }
 
   // Get tokens from markdown-it
-  const tokens = md.parse(safeMarkdown, {}) as MarkdownToken[]
+  const tokens = md.parse(safeMarkdown, {})
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
     return []
@@ -46,9 +46,9 @@ export function parseMarkdownToStructure(
   // Allow consumers to transform tokens before processing
   const pre = options.preTransformTokens
   const post = options.postTransformTokens
-  let transformedTokens = tokens
+  let transformedTokens = tokens as unknown as MarkdownToken[]
   if (pre && typeof pre === 'function') {
-    transformedTokens = pre(tokens) || tokens
+    transformedTokens = pre(transformedTokens) || transformedTokens
   }
 
   // Process the tokens into our structured format

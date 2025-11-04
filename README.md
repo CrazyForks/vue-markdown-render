@@ -104,9 +104,9 @@ yarn add vue-renderer-markdown
 
 ### Custom parse hooks
 
-For advanced use-cases you can inject hooks into the parsing pipeline via `parseMarkdownToStructure`'s `options` argument or by calling the utility directly when you need an AST.
+For advanced use-cases you can inject hooks into the parsing pipeline via `parseMarkdownToStructure`'s `options` argument or by calling the utility directly when you need an AST. Internally we now rely on [`markdown-it-ts`](https://www.npmjs.com/package/markdown-it-ts), a TypeScript-first fork of markdown-it, but the hook API and plugin ecosystem remain compatible.
 
-- `preTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — called immediately after `markdown-it` produces tokens. Use this to rewrite or replace tokens before library parsing.
+- `preTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — called immediately after `markdown-it-ts` produces tokens. Use this to rewrite or replace tokens before library parsing.
 - `postTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — called after internal fixes; if you return a different token array instance it will be re-processed into nodes.
 - `postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]` — operate directly on the parsed node tree. This is often the simplest and most efficient way to adjust the final output.
 

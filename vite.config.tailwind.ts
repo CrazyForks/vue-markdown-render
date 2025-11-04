@@ -34,7 +34,7 @@ export default defineConfig({
     rollupOptions: {
       external: [
         'vue',
-        'markdown-it',
+        'markdown-it-ts',
         'markdown-it-container',
         'markdown-it-emoji',
         'markdown-it-footnote',

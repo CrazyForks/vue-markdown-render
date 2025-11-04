@@ -137,6 +137,14 @@ import 'katex/dist/katex.min.css'
 - 工具栏图标以本地 SVG 提供，无需额外图标库。
 - 可选 peer 在运行时按需懒加载，因此你可先以最小依赖开始，然后按需增加功能。
 
+### 自定义解析钩子
+
+对于高级用法，你可以通过 `parseMarkdownToStructure` 的 `options` 参数在解析流程中注入钩子，或者在需要 AST 时直接调用该工具。我们现在内部使用 [`markdown-it-ts`](https://www.npmjs.com/package/markdown-it-ts)（与 markdown-it 兼容的 TypeScript 发行版），因此钩子 API 与插件生态保持一致。
+
+- `preTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` —— 在 `markdown-it-ts` 生成 tokens 后立即调用，可在组件解析前重写或替换 token。
+- `postTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` —— 在内部修正执行后调用；若返回新的 token 数组，将重新解析成节点。
+- `postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]` —— 直接在已解析的节点树上操作，通常是调整最终输出的最简方式。
+
 ## 服务端渲染（SSR）
 
 库的导入对 SSR 是安全的。重型依赖（Monaco、Mermaid、Worker）会在浏览器端懒加载。注意某些功能（Monaco 编辑器、渐进式 Mermaid、Web Worker）依赖浏览器 API，只能在客户端渲染。

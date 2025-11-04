@@ -1,3 +1,5 @@
+import type { Token } from 'markdown-it-ts'
+
 export interface BaseNode {
   type: string
   raw: string
@@ -224,19 +226,25 @@ export interface ReferenceNode extends BaseNode {
 }
 
 // Define markdown-it token type
-export interface MarkdownToken {
+export interface MarkdownTokenLite {
   type: string
   tag?: string
   content?: string
   info?: string
-  loading?: boolean
-  children?: MarkdownToken[]
-  attrs?: [string, string][]
   markup?: string
   meta?: unknown
-  map?: [number, number]
+  map?: [number, number] | number[] | null
+  block?: boolean
+  hidden?: boolean
+  attrs?: [string, string][] | null
+  nesting?: number
+  level?: number
+  children?: MarkdownToken[] | null
+  loading?: boolean
   raw?: string
 }
+
+export type MarkdownToken = (Token & { loading?: boolean, raw?: string }) | MarkdownTokenLite
 
 export type ParsedNode
   = | TextNode

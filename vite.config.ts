@@ -76,7 +76,7 @@ export default defineConfig(({ mode }) => {
             return true
           return [
             'vue',
-            'markdown-it',
+            'markdown-it-ts',
             'markdown-it-container',
             'markdown-it-emoji',
             'markdown-it-footnote',

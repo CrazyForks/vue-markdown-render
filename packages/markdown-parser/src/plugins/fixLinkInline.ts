@@ -1,4 +1,4 @@
-import type MarkdownIt from 'markdown-it'
+import type MarkdownIt from 'markdown-it-ts'
 
 export function applyFixLinkInline(md: MarkdownIt) {
   // Inline tokenizer that tries to recognize [text](href) and loading

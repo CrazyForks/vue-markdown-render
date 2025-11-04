@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { getMarkdown, parseMarkdownToStructure, renderMarkdown } from 'stream-markdown-parser'
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
 
 const md = getMarkdown('e2e')
@@ -108,12 +108,4 @@ describe('e2e markdown parsing (fixtures)', () => {
       expect(minimal).toMatchSnapshot(f)
     })
   }
-
-  it('renders markdown to HTML containing expected fragments', () => {
-    const small = 'This has inline math (\\alpha) and code:\n\n```ts\nlet x = 1\n```'
-    const html = renderMarkdown(md, small)
-    expect(html).toContain('code-block')
-    // inline math is rendered via KaTeX into a <math> or HTML; assert a math-like fragment
-    expect(html).toMatch(/<math|katex|\^|\\alpha/)
-  })
 })

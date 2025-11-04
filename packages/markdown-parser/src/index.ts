@@ -1,12 +1,13 @@
+import type { MarkdownItPlugin } from 'markdown-it-ts'
+import type MarkdownIt from 'markdown-it-ts'
 import type { FactoryOptions } from './factory'
-import MarkdownIt from 'markdown-it'
 import { full as markdownItEmoji } from 'markdown-it-emoji'
 import markdownItFootnote from 'markdown-it-footnote'
 import markdownItIns from 'markdown-it-ins'
 import markdownItMark from 'markdown-it-mark'
 import markdownItSub from 'markdown-it-sub'
-import markdownItSup from 'markdown-it-sup'
 
+import markdownItSup from 'markdown-it-sup'
 import * as markdownItCheckbox from 'markdown-it-task-checkbox'
 import { factory } from './factory'
 import {
@@ -48,9 +49,6 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
   // keep legacy behaviour but delegate to new factory and reapply project-specific rules
   const md = factory(options)
 
-  // Narrow plugin function type for user-supplied plugins so we avoid wide `any`.
-  type MdPluginType = (md: MarkdownIt, opts?: unknown) => void
-
   // Setup i18n translator function
   const defaultTranslations: Record<string, string> = {
     'common.copy': 'Copy',
@@ -77,10 +75,10 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
         const fn = pluginItem[0]
         const opts = pluginItem[1]
         if (typeof fn === 'function')
-          md.use(fn as unknown as MdPluginType, opts)
+          md.use(fn, opts)
       }
       else if (typeof pluginItem === 'function') {
-        md.use(pluginItem as unknown as MdPluginType)
+        md.use(pluginItem as MarkdownItPlugin)
       }
       // otherwise ignore non-callable plugins
     }
@@ -109,7 +107,7 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
   type CheckboxPluginFn = (md: MarkdownIt, opts?: unknown) => void
   const markdownItCheckboxPlugin = ((markdownItCheckbox as unknown) as {
     default?: CheckboxPluginFn
-  }).default ?? (markdownItCheckbox as unknown as CheckboxPluginFn)
+  }).default ?? markdownItCheckbox
   md.use(markdownItCheckboxPlugin)
   md.use(markdownItIns)
   md.use(markdownItFootnote)
@@ -217,19 +215,4 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
   }
 
   return md
-}
-
-export function getCommonMarkdown() {
-  const md = new MarkdownIt({
-    html: true,
-    linkify: true,
-    typographer: true,
-    breaks: false,
-  })
-  return md
-}
-
-export function renderMarkdown(md: MarkdownIt, content: string) {
-  const html = md.render(content)
-  return html
 }
