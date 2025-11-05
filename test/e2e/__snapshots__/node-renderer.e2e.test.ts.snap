@@ -5,7 +5,7 @@ exports[`markdownRender node e2e coverage > renders admonition node 1`] = `
   <div data-v-8dfe8a80="">
     <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
     <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-      <div data-v-c8910e11="" data-v-8dfe8a80="" class="admonition admonition-stable" is-dark="false">
+      <div data-v-c8910e11="" data-v-8dfe8a80="" class="admonition admonition-stable">
         <div data-v-c8910e11="" id="admonition-stable" class="admonition-stable"><span data-v-c8910e11="" class="admonition-stable">⚠️</span><span data-v-c8910e11="" class="admonition-stable">Warning</span><!-- 可选的折叠控制（放在 header 末端） -->
           <!--v-if-->
         </div>
@@ -402,7 +402,7 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
   <div data-v-8dfe8a80="">
     <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
     <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-      <div data-v-8fb37ab3="" data-v-8dfe8a80="" class="table-node-wrapper" loading="false" is-dark="false">
+      <div data-v-8fb37ab3="" data-v-8dfe8a80="" class="table-node-wrapper" loading="false">
         <table data-v-8fb37ab3="" class="w-full my-8 text-sm text-left table-fixed table-node" aria-busy="false">
           <colgroup data-v-8fb37ab3="">
             <col data-v-8fb37ab3="" style="width: 50%;">
@@ -410,7 +410,7 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
           </colgroup>
           <thead data-v-8fb37ab3="" class="border-[var(--table-border,#cbd5e1)]">
             <tr data-v-8fb37ab3="" class="border-b">
-              <th data-v-8fb37ab3="" dir="auto" class="text-left font-semibold dark:text-white truncate p-[calc(4/7*1em)]">
+              <th data-v-8fb37ab3="" dir="auto" class="text-left font-semibold truncate p-[calc(4/7*1em)]">
                 <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markdown-renderer">
                   <div data-v-8dfe8a80="">
                     <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
@@ -418,7 +418,7 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
                   </div>
                 </div>
               </th>
-              <th data-v-8fb37ab3="" dir="auto" class="text-left font-semibold dark:text-white truncate p-[calc(4/7*1em)]">
+              <th data-v-8fb37ab3="" dir="auto" class="text-left font-semibold truncate p-[calc(4/7*1em)]">
                 <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markdown-renderer">
                   <div data-v-8dfe8a80="">
                     <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
