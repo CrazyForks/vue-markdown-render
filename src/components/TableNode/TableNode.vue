@@ -33,6 +33,7 @@ interface TableNode {
 const props = defineProps<{
   node: TableNode
   indexKey: string | number
+  isDark?: boolean
 }>()
 
 // 定义事件
@@ -69,7 +70,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
             v-for="(cell, index) in node.header.cells"
             :key="`header-${index}`"
             dir="auto"
-            class="text-left font-semibold dark:text-white truncate p-[calc(4/7*1em)]"
+            class="text-left font-semibold truncate p-[calc(4/7*1em)]"
           >
             <NodeRenderer
               :nodes="cell.children"

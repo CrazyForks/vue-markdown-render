@@ -18,7 +18,7 @@ interface AdmonitionNode {
 }
 
 // 接收 props（并在 script 中使用）
-const props = defineProps<{ node: AdmonitionNode, indexKey: number | string }>()
+const props = defineProps<{ node: AdmonitionNode, indexKey: number | string, isDark?: boolean }>()
 // 定义事件
 const emit = defineEmits(['copy'])
 
@@ -55,7 +55,7 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
 </script>
 
 <template>
-  <div class="admonition" :class="`admonition-${props.node.kind}`">
+  <div class="admonition" :class="[`admonition-${props.node.kind}`, props.isDark ? 'is-dark' : '']">
     <div :id="headerId" class="admonition-header">
       <span v-if="iconMap[props.node.kind]" class="admonition-icon">{{ iconMap[props.node.kind] }}</span>
       <span class="admonition-title">{{ displayTitle }}</span>
@@ -211,13 +211,32 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
   outline-offset: 2px;
 }
 
-/* 深色模式支持：支持 .dark 类切换与系统偏好 */
-.dark .admonition {
+/* 深色模式支持：支持 props.isDark（组件级）与系统偏好（媒体查询） */
+.admonition.is-dark {
   --admonition-bg: #0b1220;
   --admonition-border: rgba(255, 255, 255, 0.06);
   --admonition-header-bg: rgba(255, 255, 255, 0.03);
   --admonition-text: #e6eef8;
   --admonition-muted: #cbd5e1;
+}
+
+/* 当组件通过 props.isDark 指定为暗色时，增强语义色块 */
+.admonition.is-dark .admonition-note .admonition-header,
+.admonition.is-dark .admonition-info .admonition-header {
+  background-color: rgba(68, 138, 255, 0.12);
+  color: var(--admonition-note-color);
+}
+.admonition.is-dark .admonition-tip .admonition-header {
+  background-color: rgba(0, 191, 165, 0.12);
+  color: var(--admonition-tip-color);
+}
+.admonition.is-dark .admonition-warning .admonition-header {
+  background-color: rgba(255, 145, 0, 0.12);
+  color: var(--admonition-warning-color);
+}
+.admonition.is-dark .admonition-danger .admonition-header {
+  background-color: rgba(255, 82, 82, 0.12);
+  color: var(--admonition-danger-color);
 }
 
 @media (prefers-color-scheme: dark) {

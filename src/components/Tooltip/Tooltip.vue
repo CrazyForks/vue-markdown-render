@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom'
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps<{
   visible: boolean
@@ -11,7 +11,24 @@ const props = defineProps<{
   originX?: number | null
   originY?: number | null
   id?: string | null
+  isDark?: boolean | null
 }>()
+
+// Determine effective dark mode: prefer explicit prop, otherwise detect global/document preference
+const isDarkEffective = computed(() => {
+  if (props.isDark !== undefined && props.isDark !== null)
+    return Boolean(props.isDark)
+  if (typeof document !== 'undefined') {
+    try {
+      if (document.documentElement.classList.contains('dark'))
+        return true
+      if ((window as any)?.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        return true
+    }
+    catch {}
+  }
+  return false
+})
 
 const tooltip = ref<HTMLElement | null>(null)
 // Position via transform to allow smooth transitions
@@ -121,7 +138,7 @@ onBeforeUnmount(() => {
         :id="props.id"
         ref="tooltip"
         :style="{ position: 'fixed', left: style.left, top: style.top, transform: style.transform }"
-        class="z-[9999] inline-block text-base bg-white text-gray-900 dark:bg-gray-900 dark:text-white py-2 px-3 rounded-md shadow-md whitespace-nowrap pointer-events-none border border-gray-200 dark:border-gray-700 tooltip-element"
+        class="z-[9999] inline-block text-base py-2 px-3 rounded-md shadow-md whitespace-nowrap pointer-events-none tooltip-element border" :class="[isDarkEffective ? 'bg-gray-900 text-white border-gray-700 border is-dark' : 'bg-white text-gray-900 border-gray-200 border']"
         role="tooltip"
       >
         {{ content }}

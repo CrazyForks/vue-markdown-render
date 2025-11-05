@@ -8,6 +8,7 @@ const anchorEl = ref<HTMLElement | null>(null)
 const tooltipId = ref<string | null>(null)
 const originX = ref<number | null>(null)
 const originY = ref<number | null>(null)
+const tooltipIsDark = ref<boolean | null>(null)
 
 let showTimer: ReturnType<typeof setTimeout> | null = null
 let hideTimer: ReturnType<typeof setTimeout> | null = null
@@ -45,6 +46,7 @@ function ensureMounted() {
         'id': tooltipId.value,
         'originX': originX.value,
         'originY': originY.value,
+        'isDark': tooltipIsDark.value ?? undefined,
       })
     },
   }
@@ -58,6 +60,7 @@ export function showTooltipForAnchor(
   place: typeof placement.value = 'top',
   immediate = false,
   origin?: { x: number, y: number } | undefined,
+  isDark?: boolean | null,
 ) {
   if (!el)
     return
@@ -71,6 +74,8 @@ export function showTooltipForAnchor(
     // expose origin coordinates for initial animation
     originX.value = origin?.x ?? null
     originY.value = origin?.y ?? null
+    // allow caller to hint dark mode; if omitted, remain null (tooltip will detect global)
+    tooltipIsDark.value = typeof isDark === 'boolean' ? isDark : null
     visible.value = true
     try {
       el.setAttribute('aria-describedby', tooltipId.value!)

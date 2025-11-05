@@ -299,7 +299,7 @@ function onBtnHover(e: Event, text: string, place: TooltipPlacement = 'top') {
     return
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(e.currentTarget as HTMLElement, text, place, false, origin)
+  showTooltipForAnchor(e.currentTarget as HTMLElement, text, place, false, origin, props.isDark)
 }
 
 function onBtnLeave() {
@@ -312,7 +312,7 @@ function onCopyHover(e: Event) {
   const txt = copyText.value ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(e.currentTarget as HTMLElement, txt, 'top', false, origin)
+  showTooltipForAnchor(e.currentTarget as HTMLElement, txt, 'top', false, origin, props.isDark)
 }
 
 // Expand/collapse functionality
@@ -384,7 +384,8 @@ function previewCode() {
   <div
     v-else
     :style="containerStyle"
-    class="code-block-container my-4 rounded-lg border border-gray-200 dark:border-gray-700/30 overflow-hidden shadow-sm bg-white dark:bg-gray-900"
+    class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    :class="[props.isDark ? 'border-gray-700/30 bg-gray-900' : 'border-gray-200 bg-white', props.isDark ? 'is-dark' : '']"
   >
     <div
       v-if="props.showHeader"
@@ -572,7 +573,7 @@ function previewCode() {
   border-radius: 0.25rem;
 }
 
-.dark .skeleton-line {
+.code-block-container.is-dark .skeleton-line {
   background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.06) 63%);
   background-size: 400% 100%;
 }
