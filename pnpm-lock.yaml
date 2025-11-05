@@ -142,8 +142,8 @@ importers:
         specifier: ^1.0.6
         version: 1.0.6
       markdown-it-ts:
-        specifier: 0.0.2-beta.1
-        version: 0.0.2-beta.1
+        specifier: 0.0.2-beta.2
+        version: 0.0.2-beta.2
     devDependencies:
       '@types/node':
         specifier: ^22.19.0
@@ -2834,8 +2834,8 @@ packages:
   markdown-it-task-checkbox@1.0.6:
     resolution: {integrity: sha512-7pxkHuvqTOu3iwVGmDPeYjQg+AIS9VQxzyLP9JCg9lBjgPAJXGEkChK6A2iFuj3tS0GV3HG2u5AMNhcQqwxpJw==}
 
-  markdown-it-ts@0.0.2-beta.1:
-    resolution: {integrity: sha512-FfDNvTwmtHFODywXsaB94J+fzBz/GDZZ3Vo98B0Mz528+vd65N3HaTu/1L8ICb8mJlHXjBL9pbOuTDiXIKCkdQ==}
+  markdown-it-ts@0.0.2-beta.2:
+    resolution: {integrity: sha512-6159xBTm+/80Ex+ggAe88nKCEPv2yWH0y14tI3+k1otQ0rD8O4RBuWlzPVEL+cypNDhgIV5aGkX+mzbYhgbOlQ==}
 
   markdown-it@14.1.0:
     resolution: {integrity: sha512-a54IwgWPaeBCAAsv13YgmALOF1elABB08FxO9i+r4VFk5Vl4pKokRPeX8u5TCgSsPi6ec1otfLjdOpVcgbpshg==}
@@ -7083,7 +7083,7 @@ snapshots:
 
   markdown-it-task-checkbox@1.0.6: {}
 
-  markdown-it-ts@0.0.2-beta.1:
+  markdown-it-ts@0.0.2-beta.2:
     dependencies:
       entities: 4.5.0
       linkify-it: 5.0.0

@@ -18,7 +18,7 @@ export interface FactoryOptions extends Record<string, unknown> {
 }
 
 export function factory(opts: FactoryOptions = {}) {
-  const md = MarkdownIt({
+  const md = new MarkdownIt({
     html: true,
     linkify: true,
     typographer: true,
