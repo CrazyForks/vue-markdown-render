@@ -27,6 +27,12 @@ export interface ParagraphNode extends BaseNode {
   maybeCheckbox?: boolean
 }
 
+export interface InlineNode extends BaseNode {
+  type: 'inline'
+  children: ParsedNode[]
+  content?: string
+}
+
 export interface ListNode extends BaseNode {
   type: 'list'
   ordered: boolean
@@ -59,7 +65,14 @@ export interface CodeBlockNode extends BaseNode {
 
 export interface HtmlBlockNode extends BaseNode {
   type: 'html_block'
+  tag: string
   content: string
+}
+
+export interface HtmlInlineNode extends BaseNode {
+  type: 'html_inline'
+  content: string
+  children: ParsedNode[]
 }
 
 export interface InlineCodeNode extends BaseNode {
