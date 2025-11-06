@@ -1,4 +1,4 @@
-import type MarkdownIt from 'markdown-it-ts'
+import type { MarkdownIt } from 'markdown-it-ts'
 import type { MarkdownToken } from '../types'
 
 export function applyFixLinkTokens(md: MarkdownIt) {

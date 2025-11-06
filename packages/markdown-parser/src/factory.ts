@@ -22,6 +22,7 @@ export function factory(opts: FactoryOptions = {}) {
     html: true,
     linkify: true,
     typographer: true,
+    stream: true,
     ...(opts.markdownItOptions ?? {}),
   })
 

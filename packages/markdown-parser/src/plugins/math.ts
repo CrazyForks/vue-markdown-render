@@ -1,4 +1,4 @@
-import type MarkdownIt from 'markdown-it-ts'
+import type { MarkdownIt } from 'markdown-it-ts'
 import type { MathOptions } from '../config'
 
 import findMatchingClose from '../findMatchingClose'

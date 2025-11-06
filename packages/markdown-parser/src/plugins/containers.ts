@@ -1,4 +1,4 @@
-import type MarkdownIt from 'markdown-it-ts'
+import type { MarkdownIt } from 'markdown-it-ts'
 import markdownItContainer from 'markdown-it-container'
 
 export function applyContainers(md: MarkdownIt) {

@@ -1,5 +1,4 @@
-import type { MarkdownItPlugin } from 'markdown-it-ts'
-import type MarkdownIt from 'markdown-it-ts'
+import type { MarkdownIt, MarkdownItPlugin } from 'markdown-it-ts'
 import type { FactoryOptions } from './factory'
 import { full as markdownItEmoji } from 'markdown-it-emoji'
 import markdownItFootnote from 'markdown-it-footnote'
