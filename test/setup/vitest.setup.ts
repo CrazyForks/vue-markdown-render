@@ -30,27 +30,39 @@ if (!(globalThis as any).atob) {
   ;(globalThis as any).atob = (input: string) => Buffer.from(input, 'base64').toString('utf-8')
 }
 
+const editorView = {
+  getModel: () => ({ getLineCount: () => 1 }),
+  getOption: () => 14,
+  updateOptions: () => {},
+  layout: () => {},
+}
+
+const diffEditorView = {
+  getModel: () => ({ getLineCount: () => 1 }),
+  getOption: () => 14,
+  updateOptions: () => {},
+  layout: () => {},
+}
+
+const streamMonacoHelpers = {
+  createEditor: vi.fn(async () => {}),
+  createDiffEditor: vi.fn(async () => {}),
+  updateCode: vi.fn(),
+  updateDiff: vi.fn(),
+  getEditor: vi.fn(() => null),
+  getEditorView: vi.fn(() => editorView),
+  getDiffEditorView: vi.fn(() => diffEditorView),
+  cleanupEditor: vi.fn(() => {}),
+  safeClean: vi.fn(() => {}),
+  setTheme: vi.fn(async () => {}),
+}
+
+// Tests reach into this global handle to reset/inspect the shared stream-monaco mock.
+;(globalThis as any).__streamMonacoHelpers = streamMonacoHelpers
+
 vi.mock('stream-monaco', () => ({
-  useMonaco: () => ({
-    createEditor: () => {},
-    createDiffEditor: () => {},
-    updateCode: () => {},
-    updateDiff: () => {},
-    getEditor: () => null,
-    getEditorView: () => ({
-      getModel: () => ({ getLineCount: () => 1 }),
-      getOption: () => 14,
-      updateOptions: () => {},
-    }),
-    getDiffEditorView: () => ({
-      getModel: () => ({ getLineCount: () => 1 }),
-      getOption: () => 14,
-      updateOptions: () => {},
-    }),
-    cleanupEditor: () => {},
-    setTheme: async () => {},
-  }),
-  preloadMonacoWorkers: () => {},
+  useMonaco: () => streamMonacoHelpers,
+  preloadMonacoWorkers: vi.fn(async () => {}),
   detectLanguage: () => 'plaintext',
 }))
 
