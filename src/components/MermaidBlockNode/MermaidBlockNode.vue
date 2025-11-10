@@ -784,7 +784,7 @@ async function initMermaid() {
         () => (mermaid as any).render(
           id,
           codeWithTheme,
-          mermaidContent.value,
+          // mermaidContent.value,
         ),
         { timeoutMs: timeouts.value.fullRender },
       )
@@ -863,7 +863,7 @@ async function renderPartial(code: string) {
       mermaidContent.value.style.opacity = '0'
 
     const res: any = await withTimeoutSignal(
-      () => (mermaid as any).render(id, codeWithTheme, mermaidContent.value!),
+      () => (mermaid as any).render(id, codeWithTheme),
       { timeoutMs: timeouts.value.render },
     )
     const svg = res?.svg
