@@ -65,6 +65,7 @@ export interface CodeBlockNode extends BaseNode {
 
 export interface HtmlBlockNode extends BaseNode {
   type: 'html_block'
+  attrs?: [string, string][] | null
   tag: string
   content: string
 }
