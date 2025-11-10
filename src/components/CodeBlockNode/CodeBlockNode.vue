@@ -83,6 +83,7 @@ const codeLanguage = ref(String(props.node.language ?? ''))
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
 const editorCreated = ref(false)
+const monacoReady = ref(false)
 let expandRafId: number | null = null
 const heightBeforeCollapse = ref<number | null>(null)
 let resumeGuardFrames = 0
@@ -99,6 +100,7 @@ let getEditorView: () => any = () => ({ getModel: () => ({ getLineCount: () => 1
 let getDiffEditorView: () => any = () => ({ getModel: () => ({ getLineCount: () => 1 }), getOption: () => 14, updateOptions: () => {} })
 let cleanupEditor: () => void = () => {}
 let safeClean = () => {}
+let createEditorPromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
 let setTheme: (theme: MonacoTheme) => Promise<void> = async () => {}
 const isDiff = computed(() => props.node.diff)
@@ -145,15 +147,12 @@ if (typeof window !== 'undefined') {
         getEditorView = helpers.getEditorView || getEditorView
         getDiffEditorView = helpers.getDiffEditorView || getDiffEditorView
         cleanupEditor = helpers.cleanupEditor || cleanupEditor
-        safeClean = helpers.cleanupEditor || safeClean
+        safeClean = helpers.safeClean || helpers.cleanupEditor || safeClean
         setTheme = helpers.setTheme || setTheme
+        monacoReady.value = true
 
-        if (!editorCreated.value && codeEditor.value) {
-          editorCreated.value = true
-          isDiff.value
-            ? createDiffEditor(codeEditor.value as HTMLElement, String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), codeLanguage.value)
-            : createEditor(codeEditor.value as HTMLElement, props.node.code, codeLanguage.value)
-        }
+        if (codeEditor.value)
+          await ensureEditorCreation(codeEditor.value as HTMLElement)
       }
     }
     catch (err) {
@@ -717,9 +716,73 @@ function setAutomaticLayout(expanded: boolean) {
   catch {}
 }
 
+async function runEditorCreation(el: HTMLElement) {
+  if (!createEditor)
+    return
+
+  if (isDiff.value) {
+    safeClean()
+    if (createDiffEditor)
+      await createDiffEditor(el as HTMLElement, String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), codeLanguage.value)
+    else
+      await createEditor(el as HTMLElement, props.node.code, codeLanguage.value)
+  }
+  else {
+    await createEditor(el as HTMLElement, props.node.code, codeLanguage.value)
+  }
+
+  const editor = isDiff.value ? getDiffEditorView() : getEditorView()
+  if (typeof props.monacoOptions?.fontSize === 'number') {
+    editor?.updateOptions({ fontSize: props.monacoOptions.fontSize, automaticLayout: false })
+    defaultCodeFontSize.value = props.monacoOptions.fontSize
+    codeFontSize.value = props.monacoOptions.fontSize
+  }
+  else {
+    const actual = readActualFontSizeFromEditor()
+    if (actual && actual > 0) {
+      defaultCodeFontSize.value = actual
+      codeFontSize.value = actual
+    }
+    else {
+      defaultCodeFontSize.value = 12
+      codeFontSize.value = 12
+    }
+  }
+
+  if (!isExpanded.value && !isCollapsed.value)
+    updateCollapsedHeight()
+
+  if (props.loading === false) {
+    await nextTick()
+    safeRaf(() => {
+      if (isExpanded.value && !isCollapsed.value)
+        updateExpandedHeight()
+      else if (!isCollapsed.value)
+        updateCollapsedHeight()
+    })
+  }
+}
+
+function ensureEditorCreation(el: HTMLElement) {
+  if (!createEditor)
+    return null
+  if (createEditorPromise)
+    return createEditorPromise
+
+  editorCreated.value = true
+  const pending = (async () => {
+    await runEditorCreation(el)
+  })()
+
+  createEditorPromise = pending.finally(() => {
+    createEditorPromise = null
+  })
+  return createEditorPromise
+}
+
 // 延迟创建编辑器：仅当不是 Mermaid 时才创建，避免无意义的初始化
 const stopCreateEditorWatch = watch(
-  () => [codeEditor.value, isMermaid.value, isDiff.value, props.stream, props.loading] as const,
+  () => [codeEditor.value, isMermaid.value, isDiff.value, props.stream, props.loading, monacoReady.value] as const,
   async ([el, _isMermaid, _isDiff, stream, loading]) => {
     if (!el || !createEditor)
       return
@@ -734,48 +797,12 @@ const stopCreateEditorWatch = watch(
       return
     }
 
-    editorCreated.value = true
+    const creation = ensureEditorCreation(el as HTMLElement)
+    if (!creation)
+      return
 
-    if (isDiff.value) {
-      safeClean()
-      await createDiffEditor(el as HTMLElement, String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), codeLanguage.value)
-    }
-    else {
-      await createEditor(el as HTMLElement, props.node.code, codeLanguage.value)
-    }
-    const editor = isDiff.value ? getDiffEditorView() : getEditorView()
-    if (typeof props.monacoOptions?.fontSize === 'number') {
-      editor?.updateOptions({ fontSize: props.monacoOptions.fontSize, automaticLayout: false })
-      defaultCodeFontSize.value = props.monacoOptions.fontSize
-      codeFontSize.value = props.monacoOptions.fontSize
-    }
-    else {
-      const actual = readActualFontSizeFromEditor()
-      if (actual && actual > 0) {
-        defaultCodeFontSize.value = actual
-        codeFontSize.value = actual
-      }
-      else {
-        defaultCodeFontSize.value = 12
-        codeFontSize.value = 12
-      }
-    }
+    await creation
 
-    // Ensure a visible baseline height while collapsed
-    if (!isExpanded.value && !isCollapsed.value) {
-      updateCollapsedHeight()
-    }
-
-    if (props.loading === false) {
-      await nextTick()
-      safeRaf(() => {
-        if (isExpanded.value && !isCollapsed.value)
-          updateExpandedHeight()
-        else if (!isCollapsed.value)
-          updateCollapsedHeight()
-      })
-    }
-    // automaticLayout handles layout in expanded mode; no manual RAF needed
     stopCreateEditorWatch()
   },
 )
