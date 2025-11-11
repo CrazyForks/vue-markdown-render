@@ -469,9 +469,9 @@ setMermaidWorker(new MermaidWorker())
 
 ## LinkNode 下划线动画与颜色定制
 
-`LinkNode` 支持运行时配置下划线动画与颜色的若干 prop，默认保持此前的外观。可调整的 prop 包括 `color`、`underlineHeight`、`underlineBottom`、`animationDuration`、`animationOpacity`、`animationTiming`、`animationIteration`。
+`LinkNode` 支持运行时配置下划线动画与颜色的若干 prop，默认保持此前的外观。可调整的 prop 包括 `color`、`underlineHeight`、`underlineBottom`、`animationDuration`、`animationOpacity`、`animationTiming`、`animationIteration`、`showTooltip`。
 
-示例、默认值与注意事项见英文文档。
+示例、默认值与注意事项见英文文档（`showTooltip` 默认为 `true`，设置为 `false` 时将回退到原生 `title` 提示）。
 
 ## Monaco 编辑器集成
 

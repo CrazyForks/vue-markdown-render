@@ -1032,6 +1032,7 @@ Available props (pass to the component that renders `LinkNode`):
 | `animationOpacity` | `number` | `0.9` | Underline opacity. |
 | `animationTiming` | `string` | `linear` | CSS timing function (e.g., `linear`, `ease`, `ease-in-out`). |
 | `animationIteration` | `string \| number` | `infinite` | Animation iteration count or `'infinite'`. |
+| `showTooltip` | `boolean` | `true` | Whether to show the custom singleton tooltip on hover/focus. When `false`, the link `title` attribute is set to the link href/title/text (for native browser tooltip). |
 
 Example:
 
@@ -1049,6 +1050,8 @@ Example:
     :animation-duration="1.2"
     :animation-opacity="0.8"
     animation-timing="ease-in-out"
+    <!-- disable the singleton tooltip and fall back to the native title attribute -->
+    :show-tooltip="false"
   />
 </template>
 ```
@@ -1056,6 +1059,8 @@ Example:
 Notes:
 - The underline color uses `currentColor`, so by default it matches the `color` prop. If you need an independent underline color, consider a small local CSS override or opening an issue to discuss exposing an `underlineColor` prop.
 - All props are optional; when omitted, sensible defaults are used to preserve backward compatibility.
+
+- `showTooltip` defaults to `true`. When enabled, hovering or focusing a link opens the library's singleton tooltip that shows the link href (or title/text). If you prefer the browser's native tooltip instead (or need accessibility behavior relying on `title`), set `:show-tooltip="false"` — the component will expose the link href/title/text via the `title` attribute in that case.
 
 ### Override Language Icons
 
