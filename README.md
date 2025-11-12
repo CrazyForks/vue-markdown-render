@@ -484,6 +484,29 @@ Notes:
 
 pnpm add mermaid
 ```
+### NodeRenderer prop: `typewriter`
+
+The `<MarkdownRender />` component (a.k.a. `NodeRenderer`) accepts a `typewriter` boolean prop which controls whether non-`code_block` nodes are wrapped with the small "typewriter" enter transition used by the demo and tests. This transition only affects the enter animation (opacity fade) for nodes rendered by the component — `code_block` nodes are never wrapped in this transition to avoid touching Monaco internals.
+
+- Type: `boolean`
+- Default: `true`
+
+Why expose it? In some environments (large documents, instant rendering UI, or when you render server-side snapshots) you may prefer deterministic output without the enter animation. Set `:typewriter="false"` on the component to disable the transition.
+
+Example:
+
+```vue
+<template>
+  <!-- disable enter animation -->
+  <MarkdownRender :content="markdownString" :typewriter="false" />
+</template>
+```
+
+Note: The animation duration and easing can be tuned with the CSS custom properties used by the component:
+
+- `--typewriter-fade-duration` (default `900ms`)
+- `--typewriter-fade-ease` (default `ease-out`)
+
 
 **Monaco Editor (Interactive Code Editing):**
 ```bash

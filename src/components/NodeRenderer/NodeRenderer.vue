@@ -69,6 +69,8 @@ const props = withDefaults(defineProps<
     isDark?: boolean
     customId?: string
     indexKey?: number | string
+    /** Enable/disable the non-code-node enter transition (typewriter). Default: true */
+    typewriter?: boolean
   }
   | {
     content?: undefined
@@ -97,8 +99,10 @@ const props = withDefaults(defineProps<
     isDark?: boolean
     customId?: string
     indexKey?: number | string
+    /** Enable/disable the non-code-node enter transition (typewriter). Default: true */
+    typewriter?: boolean
   }
->(), { codeBlockStream: true })
+>(), { codeBlockStream: true, typewriter: true })
 
 // 定义事件
 defineEmits(['copy', 'handleArtifactClick', 'click', 'mouseover', 'mouseout'])
@@ -212,7 +216,7 @@ function getBindingsFor(node: ParsedNode) {
       <template v-for="(node, index) in parsedNodes" :key="index">
         <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
         <transition
-          v-if="node.type !== 'code_block'"
+          v-if="node.type !== 'code_block' && props.typewriter !== false"
           name="typewriter"
           appear
         >
