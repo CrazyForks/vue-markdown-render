@@ -256,7 +256,7 @@ function toggleStreamSettings() {
 
 <template>
   <div class="p-4 app-container h-full bg-gray-50 dark:bg-gray-900">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-6xl mx-auto h-full overflow-hidden flex flex-col">
       <div class="mb-4 flex items-center justify-between">
         <h2 class="text-lg font-semibold">
           Markdown 输入 & 实时渲染
@@ -331,23 +331,23 @@ function toggleStreamSettings() {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-hidden">
         <div>
           <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">输入</label>
           <textarea v-model="input" rows="18" class="w-full p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 resize-none" />
         </div>
 
-        <div>
-          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+        <div class="h-full overflow-hidden flex-col flex">
+          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200 shrink-0">
             预览
             <span v-if="streamContent" class="ml-2 text-xs text-purple-600 dark:text-purple-400">
               (流式渲染模式 {{ isStreaming ? '- 渲染中...' : '- 已完成' }})
             </span>
           </label>
-          <div class="max-w-none p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 min-h-[14rem] overflow-auto">
+          <div class="max-w-none p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 min-h-[14rem] overflow-auto flex-1">
             <MarkdownRender :content="streamContent || input" />
           </div>
-          <div class="mt-2 text-xs text-gray-500 break-words">
+          <div class="mt-2 text-xs text-gray-500 break-words shrink-0">
             <template v-if="tooLong">
               <div class="mb-2 p-2 rounded bg-yellow-50 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
                 内容过长，无法嵌入到 URL。建议在 issue 中粘贴完整输入以便分享。

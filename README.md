@@ -507,7 +507,6 @@ Note: The animation duration and easing can be tuned with the CSS custom propert
 - `--typewriter-fade-duration` (default `900ms`)
 - `--typewriter-fade-ease` (default `ease-out`)
 
-
 **Monaco Editor (Interactive Code Editing):**
 ```bash
 pnpm add stream-monaco
@@ -1073,9 +1072,11 @@ Example:
     :animation-duration="1.2"
     :animation-opacity="0.8"
     animation-timing="ease-in-out"
-    <!-- disable the singleton tooltip and fall back to the native title attribute -->
+    <!-- disable the singleton tooltip and fall back to the native title attribute --
+  >
     :show-tooltip="false"
-  />
+    />
+  </linknode>
 </template>
 ```
 
