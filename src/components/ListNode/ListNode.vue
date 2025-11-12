@@ -15,7 +15,7 @@ interface ListItem {
   raw: string
 }
 
-const { node } = defineProps<{
+const { node, customId, indexKey, typewriter } = defineProps<{
   node: {
     type: 'list'
     ordered: boolean
@@ -25,6 +25,7 @@ const { node } = defineProps<{
   }
   customId?: string
   indexKey?: number | string
+  typewriter?: boolean
 }>()
 
 defineEmits(['copy'])
@@ -42,6 +43,7 @@ defineEmits(['copy'])
       :item="item"
       :custom-id="customId"
       :index-key="`${indexKey || 'list'}-${index}`"
+      :typewriter="typewriter"
       :value="node.ordered ? (node.start ?? 1) + index : undefined"
       @copy="$emit('copy', $event)"
     />

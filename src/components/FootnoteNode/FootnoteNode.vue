@@ -13,6 +13,7 @@ interface FootnoteNode {
 defineProps<{
   node: FootnoteNode
   indexKey: string | number
+  typewriter?: boolean
 }>()
 
 // 定义事件
@@ -26,7 +27,7 @@ defineEmits(['copy'])
   >
     <span class="font-semibold mr-2 text-[#0366d6]">[{{ node.id }}]</span>
     <div class="flex-1">
-      <NodeRenderer :index-key="`footnote-${indexKey}`" :nodes="node.children" @copy="$emit('copy', $event)" />
+  <NodeRenderer :index-key="`footnote-${indexKey}`" :nodes="node.children" :typewriter="typewriter" @copy="$emit('copy', $event)" />
     </div>
   </div>
 </template>

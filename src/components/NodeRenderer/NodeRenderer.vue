@@ -206,7 +206,11 @@ function getBindingsFor(node: ParsedNode) {
         maxWidth: props.codeBlockMaxWidth,
         ...(props.codeBlockProps || {}),
       }
-    : {}
+    : {
+        // Forward `typewriter` flag to non-code node components so they can
+        // opt in/out of enter transitions or other typewriter-like behaviour.
+        typewriter: props.typewriter,
+      }
 }
 </script>
 

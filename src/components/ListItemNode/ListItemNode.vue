@@ -20,6 +20,8 @@ const props = defineProps<{
   item: ListItem
   indexKey?: number | string
   value?: number
+  /** Forwarded flag to enable/disable non-code node enter transition */
+  typewriter?: boolean
 }>()
 
 defineEmits<{
@@ -36,6 +38,7 @@ const liValueAttr = computed(() =>
     <NodeRenderer
       :index-key="`list-item-${props.indexKey}`"
       :nodes="props.item.children"
+      :typewriter="props.typewriter"
       @copy="$emit('copy', $event)"
     />
   </li>
