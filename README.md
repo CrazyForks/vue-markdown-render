@@ -1072,11 +1072,8 @@ Example:
     :animation-duration="1.2"
     :animation-opacity="0.8"
     animation-timing="ease-in-out"
-    <!-- disable the singleton tooltip and fall back to the native title attribute --
-  >
     :show-tooltip="false"
-    />
-  </linknode>
+  />
 </template>
 ```
 
