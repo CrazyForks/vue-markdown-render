@@ -80,7 +80,7 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
       class="admonition-content"
       :aria-labelledby="headerId"
     >
-      <NodeRenderer :index-key="`admonition-${indexKey}`" :nodes="props.node.children" :typewriter="props.typewriter" @copy="emit('copy', $event)" />
+  <NodeRenderer :index-key="`admonition-${indexKey}`" :nodes="props.node.children" :typewriter="props.typewriter" @copy="emit('copy', $event)" />
     </div>
   </div>
 </template>

@@ -2,7 +2,6 @@ import type { MarkdownIt } from 'markdown-it-ts'
 import type { MathOptions } from '../config'
 
 import findMatchingClose from '../findMatchingClose'
-import { LRUCache } from '../utils/lru'
 import { ESCAPED_TEX_BRACE_COMMANDS, isMathLike } from './isMathLike'
 
 // Heuristic to decide whether a piece of text is likely math.
@@ -95,25 +94,6 @@ const CONTROL_MAP: Record<string, string> = {
   '\v': 'v',
 }
 
-// Precompile default regexes and caches to avoid recreating them on every call.
-// These depend only on module-level constants and are safe to reuse.
-const DEFAULT_STANDALONE_BACKSLASH_T_RE = new RegExp(
-  `${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${ESCAPED_KATEX_COMMANDS})\\b`,
-  'g',
-)
-
-// Default brace-taking command regex (uses both TEX brace commands and KaTeX commands).
-const DEFAULT_BRACE_CMD_RE = (() => {
-  const combined = [ESCAPED_TEX_BRACE_COMMANDS, ESCAPED_KATEX_COMMANDS].filter(Boolean).join('|')
-  return combined ? new RegExp(`(^|[^\\\\\\w])(${combined})\\s*\\{`, 'g') : null
-})()
-
-// Use shared LRU implementation from ../utils/lru to bound memory for dynamic RegExp
-
-// Cache compiled RegExp objects for user-supplied command lists.
-const commandsRegexCache = new LRUCache<string, RegExp>(500)
-const braceCmdRegexCache = new LRUCache<string, RegExp>(500)
-
 function countUnescapedStrong(s: string) {
   const re = /(^|[^\\])(__|\*\*)/g
   let m: RegExpExecArray | null
@@ -134,23 +114,12 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
   // Build or reuse regex: match control chars or unescaped command words.
   let re: RegExp
   if (useDefault) {
-    re = DEFAULT_STANDALONE_BACKSLASH_T_RE
+    re = new RegExp(`${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${ESCAPED_KATEX_COMMANDS})\\b`, 'g')
   }
   else {
-    const key = commands.slice().sort((a, b) => b.length - a.length).join('|')
-    re = commandsRegexCache.getOrCreate(key, () => {
-      const commandPattern = `(?:${commands
-        .slice()
-        .sort((a, b) => b.length - a.length)
-        .map(c => c.replace(/[.*+?^${}()|[\\]\\"\\\]/g, '\\$&'))
-        .join('|')})`
-      return new RegExp(`${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${commandPattern})\\b`, 'g')
-    })
+    const commandPattern = `(?:${commands.slice().sort((a, b) => b.length - a.length).map(c => c.replace(/[.*+?^${}()|[\\]\\"\]/g, '\\$&')).join('|')})`
+    re = new RegExp(`${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${commandPattern})\\b`, 'g')
   }
-
-  // Reset lastIndex in case the regex is reused elsewhere (global regexes are stateful).
-  if (re && 'lastIndex' in re)
-    (re as RegExp).lastIndex = 0
 
   let out = s.replace(re, (m: string, cmd?: string) => {
     if (CONTROL_MAP[m] !== undefined)
@@ -176,30 +145,8 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
     : [commands.map(c => c.replace(/[.*+?^${}()|[\\]\\\]/g, '\\$&')).join('|'), ESCAPED_TEX_BRACE_COMMANDS].filter(Boolean).join('|')
   let result = out
   if (braceEscaped) {
-    // Use default precompiled regex when possible, otherwise compile and cache a
-    // regex for this specific `commands` set.
-    let braceCmdRe: RegExp | null = null
-    if (useDefault && DEFAULT_BRACE_CMD_RE) {
-      braceCmdRe = DEFAULT_BRACE_CMD_RE
-    }
-    else {
-      const key = commands.slice().sort((a, b) => b.length - a.length).join('|')
-      const cmdPart = commands
-        .map(c => c.replace(/[.*+?^${}()|[\\]\\"\]/g, '\\$&'))
-        .join('|')
-      const combined = [cmdPart, ESCAPED_TEX_BRACE_COMMANDS].filter(Boolean).join('|')
-      if (combined) {
-        braceCmdRe = braceCmdRegexCache.getOrCreate(key, () => new RegExp(`(^|[^\\\\\\w])(${combined})\\s*\\{`, 'g'))
-      }
-      else {
-        braceCmdRe = null
-      }
-    }
-    if (braceCmdRe) {
-      if ('lastIndex' in braceCmdRe)
-        braceCmdRe.lastIndex = 0
-      result = result.replace(braceCmdRe, (_m: string, p1: string, p2: string) => `${p1}\\${p2}{`)
-    }
+    const braceCmdRe = new RegExp(`(^|[^\\\\\\w])(${braceEscaped})\\s*\\{`, 'g')
+    result = result.replace(braceCmdRe, (_m: string, p1: string, p2: string) => `${p1}\\${p2}{`)
   }
   result = result.replace(/span\{([^}]+)\}/, 'span\\{$1\\}')
     .replace(/\\operatorname\{span\}\{((?:[^{}]|\{[^}]*\})+)\}/, '\\operatorname{span}\\{$1\\}')

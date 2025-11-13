@@ -1,8 +1,4 @@
 import type { HtmlBlockNode, MarkdownToken } from '../../types'
-import { LRUCache } from '../../utils/lru'
-
-// Cache for compiled closing-tag regexes per tag
-const htmlCloseTagRegexCache = new LRUCache<string, RegExp>(200)
 
 export function parseHtmlBlock(token: MarkdownToken): HtmlBlockNode {
   const raw = String(token.content ?? '')
@@ -55,8 +51,7 @@ export function parseHtmlBlock(token: MarkdownToken): HtmlBlockNode {
   const isVoid = VOID_TAGS.has(tag)
 
   // Already closed somewhere in the block (case-insensitive)
-  const closeTagRe = htmlCloseTagRegexCache.getOrCreate(tag, () => new RegExp(`<\\/\\s*${tag}\\b`, 'i'))
-  const hasClosing = closeTagRe.test(raw)
+  const hasClosing = new RegExp(`<\\/\\s*${tag}\\b`, 'i').test(raw)
 
   const loading = !(isVoid || selfClosing || hasClosing)
 
