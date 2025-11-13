@@ -1,6 +1,10 @@
 import type { AdmonitionNode, MarkdownToken, ParsedNode, TextNode } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseList } from './list-parser'
+import { LRUCache } from '../../utils/lru'
+
+// Cache regexes for container close types by kind to avoid reallocating
+const containerCloseTypeCache = new LRUCache<string, RegExp>(50)
 
 export function parseContainer(
   tokens: MarkdownToken[],
@@ -19,7 +23,10 @@ export function parseContainer(
     const info = String(openToken.info ?? '').trim()
     if (info && !info.startsWith(':::')) {
       // if info looks like 'warning title', drop leading kind token
-      const maybe = info.replace(new RegExp(`^${kind}`), '').trim()
+      let maybe = info
+      if (maybe.startsWith(kind))
+        maybe = maybe.slice(kind.length).trim()
+      maybe = maybe.trim()
       if (maybe)
         title = maybe
     }
@@ -44,7 +51,8 @@ export function parseContainer(
   let j = index + 1
 
   // Accept closing tokens: 'container_close' or 'container_<kind>_close'
-  const closeType = new RegExp(`^container_${kind}_close$`)
+  const key = kind
+  const closeType = containerCloseTypeCache.getOrCreate(key, () => new RegExp(`^container_${kind}_close$`))
 
   while (
     j < tokens.length
