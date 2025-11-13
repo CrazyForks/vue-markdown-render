@@ -30,7 +30,7 @@ defineEmits<{
 
 <template>
   <blockquote class="blockquote" dir="auto" :cite="node.cite">
-    <NodeRenderer :index-key="`blockquote-${indexKey}`" :nodes="node.children || []" :typewriter="typewriter" @copy="$emit('copy', $event)" />
+  <NodeRenderer :index-key="`blockquote-${indexKey}`" :nodes="node.children || []" :typewriter="typewriter" @copy="$emit('copy', $event)" />
   </blockquote>
 </template>
 
