@@ -31,10 +31,20 @@ defineEmits(['copy'])
   <dl class="definition-list">
     <template v-for="(item, index) in node.items" :key="index">
       <dt class="definition-term">
-        <NodeRenderer :index-key="`definition-term-${indexKey}-${index}`" :nodes="item.term" :typewriter="typewriter" @copy="$emit('copy', $event)" />
+        <NodeRenderer
+          :index-key="`definition-term-${indexKey}-${index}`"
+          :nodes="item.term"
+          :typewriter="typewriter"
+          @copy="$emit('copy', $event)"
+        />
       </dt>
       <dd class="definition-desc">
-        <NodeRenderer :index-key="`definition-desc-${indexKey}-${index}`" :nodes="item.definition" :typewriter="typewriter" @copy="$emit('copy', $event)" />
+        <NodeRenderer
+          :index-key="`definition-desc-${indexKey}-${index}`"
+          :nodes="item.definition"
+          :typewriter="typewriter"
+          @copy="$emit('copy', $event)"
+        />
       </dd>
     </template>
   </dl>
@@ -58,6 +68,7 @@ defineEmits(['copy'])
 /* 避免列表中嵌套 NodeRenderer 的 content-visibility 导致空白占位 */
 .definition-list :deep(.markdown-renderer) {
   content-visibility: visible;
-  contain-intrinsic-size: auto;
+  contain: content;
+  contain-intrinsic-size: 0px 0px;
 }
 </style>

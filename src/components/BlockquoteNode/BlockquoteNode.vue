@@ -30,7 +30,13 @@ defineEmits<{
 
 <template>
   <blockquote class="blockquote" dir="auto" :cite="node.cite">
-    <NodeRenderer :index-key="`blockquote-${indexKey}`" :nodes="node.children || []" :typewriter="typewriter" @copy="$emit('copy', $event)" />
+    <NodeRenderer
+      v-memo="[node.children]"
+      :index-key="`blockquote-${indexKey}`"
+      :nodes="node.children || []"
+      :typewriter="typewriter"
+      @copy="$emit('copy', $event)"
+    />
   </blockquote>
 </template>
 
@@ -48,6 +54,7 @@ defineEmits<{
 /* 防止内部 NodeRenderer 使用 content-visibility: auto 时在大文档滚动中出现“高但空白”的占位 */
 .blockquote :deep(.markdown-renderer) {
   content-visibility: visible;
-  contain-intrinsic-size: auto;
+  contain: content;
+  contain-intrinsic-size: 0px 0px;
 }
 </style>

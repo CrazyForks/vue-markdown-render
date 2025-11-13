@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onUnmounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
+import { useViewportPriority } from '../../composables/viewportPriority'
 import { getLanguageIcon, languageMap } from '../../utils'
 import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
@@ -87,6 +88,33 @@ const monacoReady = ref(false)
 let expandRafId: number | null = null
 const heightBeforeCollapse = ref<number | null>(null)
 let resumeGuardFrames = 0
+const registerVisibility = useViewportPriority()
+const viewportHandle = ref<ReturnType<typeof registerVisibility> | null>(null)
+const viewportReady = ref(typeof window === 'undefined')
+if (typeof window !== 'undefined') {
+  watch(
+    () => container.value,
+    (el) => {
+      viewportHandle.value?.destroy()
+      viewportHandle.value = null
+      if (!el) {
+        viewportReady.value = false
+        return
+      }
+      const handle = registerVisibility(el, { rootMargin: '400px' })
+      viewportHandle.value = handle
+      viewportReady.value = handle.isVisible.value
+      handle.whenVisible.then(() => {
+        viewportReady.value = true
+      })
+    },
+    { immediate: true },
+  )
+}
+onBeforeUnmount(() => {
+  viewportHandle.value?.destroy()
+  viewportHandle.value = null
+})
 
 // Lazy-load `stream-monaco` helpers at runtime so consumers who don't install
 // `stream-monaco` won't have the editor code bundled. We provide safe no-op
@@ -782,9 +810,11 @@ function ensureEditorCreation(el: HTMLElement) {
 
 // 延迟创建编辑器：仅当不是 Mermaid 时才创建，避免无意义的初始化
 const stopCreateEditorWatch = watch(
-  () => [codeEditor.value, isMermaid.value, isDiff.value, props.stream, props.loading, monacoReady.value] as const,
-  async ([el, _isMermaid, _isDiff, stream, loading]) => {
+  () => [codeEditor.value, isMermaid.value, isDiff.value, props.stream, props.loading, monacoReady.value, viewportReady.value] as const,
+  async ([el, _isMermaid, _isDiff, stream, loading, _monacoReady, visible]) => {
     if (!el || !createEditor)
+      return
+    if (!visible)
       return
 
     // If streaming is disabled, defer editor creation until loading is finished
@@ -808,9 +838,9 @@ const stopCreateEditorWatch = watch(
 )
 
 const watchTheme = watch(
-  () => [props.darkTheme, props.lightTheme, editorCreated.value],
+  () => [props.darkTheme, props.lightTheme, editorCreated.value, viewportReady.value],
   () => {
-    if (!editorCreated.value)
+    if (!editorCreated.value || !viewportReady.value)
       return
     if (isMermaid.value) {
       return watchTheme()
@@ -833,9 +863,9 @@ function themeUpdate() {
 // Watch for monacoOptions changes (deep) and try to update editor options or
 // recreate the editor when necessary.
 const watchMonacoOptions = watch(
-  () => props.monacoOptions,
+  () => [props.monacoOptions, viewportReady.value],
   () => {
-    if (!createEditor)
+    if (!createEditor || !viewportReady.value)
       return
     if (isMermaid.value) {
       return watchMonacoOptions()
@@ -859,8 +889,10 @@ const watchMonacoOptions = watch(
 // 当 loading 变为 false 时：计算并缓存一次展开高度，随后停止观察
 
 const stopLoadingWatch = watch(
-  () => props.loading,
-  async (loaded) => {
+  () => [props.loading, viewportReady.value],
+  async ([loaded, visible]) => {
+    if (!visible)
+      return
     if (isMermaid.value) {
       nextTick(() => {
         stopLoadingWatch?.()

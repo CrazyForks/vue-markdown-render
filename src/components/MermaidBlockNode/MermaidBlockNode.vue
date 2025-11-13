@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { CodeBlockNode } from '../../types'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
+import { useViewportPriority } from '../../composables/viewportPriority'
 import mermaidIconUrl from '../../icon/mermaid.svg?url'
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
@@ -47,6 +48,9 @@ const mermaidWrapper = ref<HTMLElement>()
 const mermaidContent = ref<HTMLElement>()
 const modalContent = ref<HTMLElement>()
 const modalCloneWrapper = ref<HTMLElement | null>(null)
+const registerViewport = useViewportPriority()
+const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
+const viewportReady = ref(typeof window === 'undefined')
 // Mode container used to animate height between Source and Preview
 const modeContainerRef = ref<HTMLElement>()
 const baseFixedCode = computed(() => {
@@ -124,6 +128,32 @@ let previewPollDelay = 800
 let previewPollController: AbortController | null = null
 let lastPreviewStopAt = 0
 let allowPartialPreview = true
+
+if (typeof window !== 'undefined') {
+  watch(
+    () => mermaidContainer.value,
+    (el) => {
+      viewportHandle.value?.destroy()
+      viewportHandle.value = null
+      if (!el) {
+        viewportReady.value = false
+        return
+      }
+      const handle = registerViewport(el, { rootMargin: '400px' })
+      viewportHandle.value = handle
+      viewportReady.value = handle.isVisible.value
+      handle.whenVisible.then(() => {
+        viewportReady.value = true
+      })
+    },
+    { immediate: true },
+  )
+}
+
+onBeforeUnmount(() => {
+  viewportHandle.value?.destroy()
+  viewportHandle.value = null
+})
 
 // Helper: wrap an async operation with timeout and AbortSignal support
 function withTimeoutSignal<T>(
@@ -1233,10 +1263,26 @@ watch(
 
 onMounted(async () => {
   await nextTick()
-  // Prefer progressive path to avoid throwing on incomplete code at mount
-  debouncedProgressiveRender()
-  lastContentLength.value = baseFixedCode.value.length
+  if (viewportReady.value) {
+    debouncedProgressiveRender()
+    lastContentLength.value = baseFixedCode.value.length
+  }
 })
+
+watch(
+  () => viewportReady.value,
+  (visible) => {
+    if (!visible)
+      return
+    if (!hasRenderedOnce.value) {
+      debouncedProgressiveRender()
+      lastContentLength.value = baseFixedCode.value.length
+    }
+    if (!props.loading && !hasRenderedOnce.value)
+      debouncedProgressiveRender()
+  },
+  { immediate: false },
+)
 
 onUnmounted(() => {
   if (contentStableTimer) {

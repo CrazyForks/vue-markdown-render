@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { getKatex } from '../MathInlineNode/katex'
+import { useKatexReady } from '../../composables/useKatexReady'
 
 defineProps<{
   node: {
@@ -11,15 +10,12 @@ defineProps<{
   }
 }>()
 defineEmits(['copy'])
-const katex = ref<boolean>(false)
-getKatex().then((k) => {
-  katex.value = !!k
-})
+const katexReady = useKatexReady()
 </script>
 
 <template>
   <span
-    :class="[katex && node.center ? '!inline-flex !justify-center w-full' : '']"
+    :class="[katexReady && node.center ? 'text-node-center' : '']"
     class="whitespace-pre-wrap break-words text-node"
   >
     {{ node.content }}
@@ -31,5 +27,10 @@ getKatex().then((k) => {
   display: inline;
   font-weight: inherit;
   vertical-align: baseline;
+}
+.text-node-center {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
 }
 </style>

@@ -36,9 +36,11 @@ const liValueAttr = computed(() =>
 <template>
   <li class="list-item pl-1.5 my-2" dir="auto" v-bind="liValueAttr">
     <NodeRenderer
+      v-memo="[props.item.children]"
       :index-key="`list-item-${props.indexKey}`"
       :nodes="props.item.children"
       :typewriter="props.typewriter"
+      :batch-rendering="false"
       @copy="$emit('copy', $event)"
     />
   </li>
@@ -56,7 +58,7 @@ ul > .list-item::marker{
 /* 大列表滚动到视口时，嵌套 NodeRenderer 需要立即绘制内容，避免空白 */
 .list-item :deep(.markdown-renderer) {
   content-visibility: visible;
-  contain-intrinsic-size: auto;
+  contain-intrinsic-size: 0px 0px;
   contain: none;
 }
 </style>

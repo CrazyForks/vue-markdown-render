@@ -177,7 +177,8 @@ const bodyRows = computed(() => props.node.rows ?? [])
 /* 表格单元格内的 NodeRenderer 禁用 content-visibility 的占位行为，避免“高但空”的问题 */
 .table-node :deep(.markdown-renderer) {
   content-visibility: visible;
-  contain-intrinsic-size: auto;
+  contain: content;
+  contain-intrinsic-size: 0px 0px;
 }
 
 @keyframes table-node-shimmer {

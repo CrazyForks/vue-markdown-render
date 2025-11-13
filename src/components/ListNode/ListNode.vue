@@ -40,6 +40,7 @@ defineEmits(['copy'])
     <ListItemNode
       v-for="(item, index) in node.items"
       :key="`${indexKey || 'list'}-${index}`"
+      v-memo="[item]"
       :item="item"
       :custom-id="customId"
       :index-key="`${indexKey || 'list'}-${index}`"

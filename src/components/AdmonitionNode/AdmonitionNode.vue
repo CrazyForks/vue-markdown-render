@@ -80,7 +80,13 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
       class="admonition-content"
       :aria-labelledby="headerId"
     >
-      <NodeRenderer :index-key="`admonition-${indexKey}`" :nodes="props.node.children" :typewriter="props.typewriter" @copy="emit('copy', $event)" />
+      <NodeRenderer
+        v-memo="[props.node.children]"
+        :index-key="`admonition-${indexKey}`"
+        :nodes="props.node.children"
+        :typewriter="props.typewriter"
+        @copy="emit('copy', $event)"
+      />
     </div>
   </div>
 </template>
@@ -190,9 +196,8 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
    保证内容按时渲染，避免“空白但很高”的现象。*/
 .admonition-content :deep(.markdown-renderer) {
   content-visibility: visible;
-  contain-intrinsic-size: auto;
-  /* 维持 layout 隔离通常没问题，如需彻底还原可改为 initial： */
-  /* contain: initial; */
+  contain: content;
+  contain-intrinsic-size: 0px 0px;
 }
 
 /* 折叠按钮样式 */

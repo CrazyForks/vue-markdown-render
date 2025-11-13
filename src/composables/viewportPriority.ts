@@ -21,7 +21,7 @@ type InjectionKey<T> = symbol & { __type?: T }
 export function provideViewportPriority(
   getRootEl: () => HTMLElement | null | undefined,
   enabled: Ref<boolean> | boolean,
-) {
+): RegisterFn {
   const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
   const enabledRef = typeof enabled === 'boolean' ? ref(enabled) : enabled
 
@@ -104,6 +104,7 @@ export function provideViewportPriority(
   }
 
   provide(ViewportPriorityKey, register)
+  return register
 }
 
 /**

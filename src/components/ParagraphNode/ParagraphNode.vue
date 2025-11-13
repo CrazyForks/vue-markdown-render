@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useKatexReady } from '../../composables/useKatexReady'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmojiNode from '../EmojiNode'
@@ -15,7 +16,6 @@ import StrikethroughNode from '../StrikethroughNode'
 import StrongNode from '../StrongNode'
 import SubscriptNode from '../SubscriptNode'
 import SuperscriptNode from '../SuperscriptNode'
-import TextNode from '../TextNode'
 
 // Define the type for the node children
 interface NodeChild {
@@ -34,7 +34,6 @@ const props = defineProps<{
   indexKey?: number | string
 }>()
 const nodeComponents = {
-  text: TextNode,
   inline_code: InlineCodeNode,
   image: ImageNode,
   link: LinkNode,
@@ -54,18 +53,27 @@ const nodeComponents = {
   // 添加其他内联元素组件
   ...getCustomNodeComponents(props.customId),
 }
+const katexReady = useKatexReady()
 </script>
 
 <template>
   <p dir="auto" class="paragraph-node">
-    <component
-      :is="nodeComponents[child.type]"
-      v-for="(child, index) in node.children"
-      :key="`${indexKey || 'paragraph'}-${index}`"
-      :node="child"
-      :index-key="`${indexKey}-${index}`"
-      :custom-id="props.customId"
-    />
+    <template v-for="(child, index) in node.children" :key="`${indexKey || 'paragraph'}-${index}`">
+      <component
+        :is="nodeComponents[child.type]"
+        v-if="child.type !== 'text'"
+        :node="child"
+        :index-key="`${indexKey}-${index}`"
+        :custom-id="props.customId"
+      />
+      <span
+        v-else
+        :class="[katexReady && child.center ? 'text-node-center' : '']"
+        class="whitespace-pre-wrap break-words text-node"
+      >
+        {{ child.content }}
+      </span>
+    </template>
   </p>
 </template>
 
@@ -75,5 +83,15 @@ const nodeComponents = {
 }
 li .paragraph-node{
   margin: 0;
+}
+.text-node {
+  display: inline;
+  font-weight: inherit;
+  vertical-align: baseline;
+}
+.text-node-center {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
 }
 </style>

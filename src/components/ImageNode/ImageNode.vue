@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
+import { useViewportPriority } from '../../composables/viewportPriority'
 
 // 定义图片节点类型
 interface ImageNode {
@@ -34,9 +35,40 @@ const emit = defineEmits<{ (e: 'load', src: string): void, (e: 'error', src: str
 const imageLoaded = ref(false)
 const hasError = ref(false)
 const fallbackTried = ref(false)
+const figureRef = ref<HTMLElement | null>(null)
+const registerVisibility = useViewportPriority()
+const visibilityHandle = ref<ReturnType<typeof registerVisibility> | null>(null)
+const isVisible = ref(typeof window === 'undefined')
+
+if (typeof window !== 'undefined') {
+  watch(
+    () => figureRef.value,
+    (el) => {
+      visibilityHandle.value?.destroy()
+      visibilityHandle.value = null
+      if (!el) {
+        isVisible.value = false
+        return
+      }
+      const handle = registerVisibility(el, { rootMargin: '400px' })
+      visibilityHandle.value = handle
+      isVisible.value = handle.isVisible.value
+      handle.whenVisible.then(() => {
+        isVisible.value = true
+      })
+    },
+    { immediate: true },
+  )
+}
+
+onBeforeUnmount(() => {
+  visibilityHandle.value?.destroy()
+  visibilityHandle.value = null
+})
 
 // 计算当前用于渲染的 src（当有 error 且提供 fallback 时使用 fallback）
 const displaySrc = computed(() => hasError.value && props.fallbackSrc ? props.fallbackSrc : props.node.src)
+const canRenderImage = computed(() => !props.lazy || isVisible.value)
 
 // 是否为 svg 文件（可能没有内置尺寸）
 const isSvg = computed(() => /\.svg(?:\?|$)/i.test(displaySrc.value))
@@ -71,13 +103,13 @@ watch(displaySrc, () => {
 </script>
 
 <template>
-  <figure class="text-center my-8">
+  <figure ref="figureRef" class="text-center my-8">
     <div class="relative inline-block">
       <!-- 包裹条件渲染元素，启用 out-in 模式以在替换时做平滑过渡 -->
       <transition name="img-switch" mode="out-in">
         <!-- 图片展示区域：当有错误且没有 fallback 时显示占位符 -->
         <img
-          v-if="!node.loading && !hasError"
+          v-if="!node.loading && !hasError && canRenderImage"
           key="image"
           :src="displaySrc"
           :alt="String(props.node.alt ?? props.node.title ?? '')"
