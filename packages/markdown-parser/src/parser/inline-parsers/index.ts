@@ -1,4 +1,5 @@
 import type { LinkNode, MarkdownToken, ParsedNode, TextNode } from '../../types'
+import { LRUCache } from '../../utils/lru'
 import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
@@ -29,6 +30,18 @@ export function isLikelyUrl(href?: string) {
     return false
   return AUTOLINK_PROTOCOL_RE.test(href) || AUTOLINK_GENERIC_RE.test(href)
 }
+
+// Small helpers and caches for dynamic RegExp construction used by inline parsers.
+// Hoisting these avoids repeatedly allocating identical RegExp instances.
+function escapeRegExp(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Use shared LRU implementation to bound memory usage for dynamically generated RegExp
+
+const bracketRegexCache = new LRUCache<string, RegExp>(500)
+const parenHrefRegexCache = new LRUCache<string, RegExp>(500)
+const linkMatchRegexCache = new LRUCache<string, RegExp>(500)
 
 // Process inline tokens (for text inside paragraphs, headings, etc.)
 export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreToken?: MarkdownToken): ParsedNode[] {
@@ -527,15 +540,12 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
     // mirror logic previously in the switch-case for 'link_open'
     resetCurrentTextNode()
     const href = token.attrs?.find(([name]) => name === 'href')?.[1]
-    // 如果 text 不在[]里说明，它不是一个link， 当 text 处理
-    function escapeRegExp(str: string) {
-      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    }
+    // local escapeRegExp removed; using hoisted helper and regex caches
 
     if (raw && tokens[i + 1].type === 'text') {
       const text = String(tokens[i + 1]?.content ?? '')
       const escText = escapeRegExp(text)
-      const reg = new RegExp(`\\[${escText}\\s*\\]`)
+      const reg = bracketRegexCache.getOrCreate(escText, () => new RegExp(`\\[${escText}\\s*\\]`))
       if (!reg.test(raw)) {
         // If this link_open comes from an autolinkified URL (e.g. http://...)
         // treat it as a real link node rather than plain text. Otherwise
@@ -567,7 +577,11 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
       }
     }
     if (raw && href) {
-      const loadingMath = new RegExp(`\\(\\s*${escapeRegExp(href)}\\s*\\)`)
+      const hrefStrLocal = String(href)
+      const loadingMath = parenHrefRegexCache.getOrCreate(hrefStrLocal, () => {
+        const escHref = escapeRegExp(hrefStrLocal)
+        return new RegExp(`\\(\\s*${escHref}\\s*\\)`)
+      })
       const pre = result.length > 0 ? result[result.length - 1] : undefined as ParsedNode | undefined
       const loading = !loadingMath.test(raw)
       if (loading && pre) {
@@ -580,7 +594,7 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
           else if (((pre as { content?: unknown }).content) && typeof (pre as { content?: unknown }).content === 'string')
             preText = String((pre as { content?: string }).content ?? '').slice(1, -1)
         }
-        const isLinkMatch = new RegExp(`\\[${escapeRegExp(preText)}\\s*\\]\\(`)
+        const isLinkMatch = linkMatchRegexCache.getOrCreate(preText, () => new RegExp(`\\[${escapeRegExp(preText)}\\s*\\]\\(`))
         if (isLinkMatch.test(raw)) {
           const text = String(preText ?? '')
           resetCurrentTextNode()
