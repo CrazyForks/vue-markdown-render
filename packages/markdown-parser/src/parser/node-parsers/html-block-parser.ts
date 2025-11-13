@@ -55,11 +55,7 @@ export function parseHtmlBlock(token: MarkdownToken): HtmlBlockNode {
   const isVoid = VOID_TAGS.has(tag)
 
   // Already closed somewhere in the block (case-insensitive)
-  let closeTagRe = htmlCloseTagRegexCache.get(tag)
-  if (!closeTagRe) {
-    closeTagRe = new RegExp(`<\\/\\s*${tag}\\b`, 'i')
-    htmlCloseTagRegexCache.set(tag, closeTagRe)
-  }
+  const closeTagRe = htmlCloseTagRegexCache.getOrCreate(tag, () => new RegExp(`<\\/\\s*${tag}\\b`, 'i'))
   const hasClosing = closeTagRe.test(raw)
 
   const loading = !(isVoid || selfClosing || hasClosing)

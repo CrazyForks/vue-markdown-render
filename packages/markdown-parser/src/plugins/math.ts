@@ -2,8 +2,8 @@ import type { MarkdownIt } from 'markdown-it-ts'
 import type { MathOptions } from '../config'
 
 import findMatchingClose from '../findMatchingClose'
-import { ESCAPED_TEX_BRACE_COMMANDS, isMathLike } from './isMathLike'
 import { LRUCache } from '../utils/lru'
+import { ESCAPED_TEX_BRACE_COMMANDS, isMathLike } from './isMathLike'
 
 // Heuristic to decide whether a piece of text is likely math.
 // Matches common TeX commands, math operators, function-call patterns like f(x),
@@ -142,7 +142,7 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
       const commandPattern = `(?:${commands
         .slice()
         .sort((a, b) => b.length - a.length)
-        .map(c => c.replace(/[.*+?^${}()|[\\]\\"\\]/g, '\\$&'))
+        .map(c => c.replace(/[.*+?^${}()|[\\]\\"\\\]/g, '\\$&'))
         .join('|')})`
       return new RegExp(`${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${commandPattern})\\b`, 'g')
     })
@@ -179,12 +179,13 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
     // Use default precompiled regex when possible, otherwise compile and cache a
     // regex for this specific `commands` set.
     let braceCmdRe: RegExp | null = null
-    if (useDefault && DEFAULT_BRACE_CMD_RE)
+    if (useDefault && DEFAULT_BRACE_CMD_RE) {
       braceCmdRe = DEFAULT_BRACE_CMD_RE
+    }
     else {
       const key = commands.slice().sort((a, b) => b.length - a.length).join('|')
       const cmdPart = commands
-        .map(c => c.replace(/[.*+?^${}()|[\\]\\\"]/g, '\\$&'))
+        .map(c => c.replace(/[.*+?^${}()|[\\]\\"\]/g, '\\$&'))
         .join('|')
       const combined = [cmdPart, ESCAPED_TEX_BRACE_COMMANDS].filter(Boolean).join('|')
       if (combined) {

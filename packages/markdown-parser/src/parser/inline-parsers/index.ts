@@ -1,6 +1,6 @@
 import type { LinkNode, MarkdownToken, ParsedNode, TextNode } from '../../types'
-import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { LRUCache } from '../../utils/lru'
+import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
 import { parseFenceToken } from './fence-parser'

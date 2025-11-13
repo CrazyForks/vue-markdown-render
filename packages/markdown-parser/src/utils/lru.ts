@@ -10,7 +10,8 @@ export class LRUCache<K, V> {
   }
 
   get(key: K): V | undefined {
-    if (!this.map.has(key)) return undefined
+    if (!this.map.has(key))
+      return undefined
     const val = this.map.get(key) as V
     // mark as recently used
     this.map.delete(key)
@@ -19,7 +20,8 @@ export class LRUCache<K, V> {
   }
 
   set(key: K, value: V): void {
-    if (this.map.has(key)) this.map.delete(key)
+    if (this.map.has(key))
+      this.map.delete(key)
     this.map.set(key, value)
     if (this.map.size > this.max) {
       const iter = this.map.keys()
@@ -32,7 +34,8 @@ export class LRUCache<K, V> {
   // convenience: get or create via factory
   getOrCreate(key: K, factory: () => V): V {
     const existing = this.get(key)
-    if (existing !== undefined) return existing
+    if (existing !== undefined)
+      return existing
     const v = factory()
     this.set(key, v)
     return v

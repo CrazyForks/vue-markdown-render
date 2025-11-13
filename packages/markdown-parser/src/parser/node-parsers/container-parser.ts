@@ -1,7 +1,7 @@
 import type { AdmonitionNode, MarkdownToken, ParsedNode, TextNode } from '../../types'
+import { LRUCache } from '../../utils/lru'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseList } from './list-parser'
-import { LRUCache } from '../../utils/lru'
 
 // Cache regexes for container close types by kind to avoid reallocating
 const containerCloseTypeCache = new LRUCache<string, RegExp>(50)
