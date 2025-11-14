@@ -1,5 +1,26 @@
 import type { HtmlBlockNode, MarkdownToken } from '../../types'
 
+// Common void tags that don't require a closing tag
+const VOID_TAGS = new Set([
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
+])
+
+// Cache for dynamic closing-tag regexes per tag name
+const CLOSE_TAG_RE_CACHE = new Map<string, RegExp>()
+
 export function parseHtmlBlock(token: MarkdownToken): HtmlBlockNode {
   const raw = String(token.content ?? '')
 
@@ -29,29 +50,17 @@ export function parseHtmlBlock(token: MarkdownToken): HtmlBlockNode {
     }
   }
 
-  const VOID_TAGS = new Set([
-    'area',
-    'base',
-    'br',
-    'col',
-    'embed',
-    'hr',
-    'img',
-    'input',
-    'link',
-    'meta',
-    'param',
-    'source',
-    'track',
-    'wbr',
-  ])
-
   // Self-closing first tag like <img ... />
   const selfClosing = /^\s*<[^>]*\/\s*>/.test(raw)
   const isVoid = VOID_TAGS.has(tag)
 
   // Already closed somewhere in the block (case-insensitive)
-  const hasClosing = new RegExp(`<\\/\\s*${tag}\\b`, 'i').test(raw)
+  let closeRe = CLOSE_TAG_RE_CACHE.get(tag)
+  if (!closeRe) {
+    closeRe = new RegExp(`<\\/\\s*${tag}\\b`, 'i')
+    CLOSE_TAG_RE_CACHE.set(tag, closeRe)
+  }
+  const hasClosing = closeRe.test(raw)
 
   const loading = !(isVoid || selfClosing || hasClosing)
 

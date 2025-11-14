@@ -19,6 +19,14 @@ import { parseSubscriptToken } from './subscript-parser'
 import { parseSuperscriptToken } from './superscript-parser'
 import { parseTextToken } from './text-parser'
 
+// Precompiled regexes used frequently in inline parsing
+const STRONG_PAIR_RE = /\*\*([\s\S]*?)\*\*/
+
+// Shared helper for building safe dynamic regex parts
+function escapeRegExp(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 // Helper: detect likely URLs/hrefs (autolinks). Extracted so the
 // detection logic is easy to tweak and test.
 const AUTOLINK_PROTOCOL_RE = /^(?:https?:\/\/|mailto:|ftp:\/\/)/i
@@ -96,8 +104,7 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
       }
 
       // find the first matching closing ** pair in the content
-      const re = /\*\*([\s\S]*?)\*\*/
-      const exec = re.exec(content)
+      const exec = STRONG_PAIR_RE.exec(content)
       let inner = ''
       let after = ''
       if (exec && typeof exec.index === 'number') {
@@ -528,9 +535,6 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
     resetCurrentTextNode()
     const href = token.attrs?.find(([name]) => name === 'href')?.[1]
     // 如果 text 不在[]里说明，它不是一个link， 当 text 处理
-    function escapeRegExp(str: string) {
-      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    }
 
     if (raw && tokens[i + 1].type === 'text') {
       const text = String(tokens[i + 1]?.content ?? '')

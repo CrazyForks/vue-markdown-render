@@ -1,28 +1,28 @@
 import type { MarkdownIt, Token } from 'markdown-it-ts'
 
+const VOID_TAGS = new Set([
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
+])
+
 export function applyFixHtmlInlineTokens(md: MarkdownIt) {
   // Fix certain single-token inline HTML cases by expanding into [openTag, text, closeTag]
   // This helps downstream inline parsers (e.g., <a>text</a>) to recognize inner text reliably.
   md.core.ruler.push('fix_html_inline_tokens', (state: unknown) => {
     const s = state as unknown as { tokens?: Token[] }
     const toks = s.tokens ?? []
-
-    const VOID_TAGS = new Set([
-      'area',
-      'base',
-      'br',
-      'col',
-      'embed',
-      'hr',
-      'img',
-      'input',
-      'link',
-      'meta',
-      'param',
-      'source',
-      'track',
-      'wbr',
-    ])
 
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i] as Token & { content?: string, children: any[] }

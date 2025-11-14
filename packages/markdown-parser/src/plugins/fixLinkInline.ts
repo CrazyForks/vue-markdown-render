@@ -1,5 +1,9 @@
 import type { MarkdownIt } from 'markdown-it-ts'
 
+// Match link prefix: "[text](href" without requiring a closing ')'.
+// The href part may be empty, so use '*' (no extra '?').
+const LINK_PREFIX_RE = /^\[([^\]]*)\]\(([^)\s]*)/
+
 export function applyFixLinkInline(md: MarkdownIt) {
   // Inline tokenizer that tries to recognize [text](href) and loading
   // link forms like "[x](http://a" earlier, producing link_open/text/link_close
@@ -16,8 +20,8 @@ export function applyFixLinkInline(md: MarkdownIt) {
 
     // Look for closing ']' and opening '(' after it
     const rest = s.src.slice(start)
-    // eslint-disable-next-line regexp/no-useless-quantifier
-    const m = /^\[([^\]]*)\]\(([^)\s]*)?/.exec(rest)
+
+    const m = LINK_PREFIX_RE.exec(rest)
     if (!m)
       return false
 

@@ -245,14 +245,6 @@ function updateLiveRange() {
   liveRange.end = Math.min(total, desiredStart + windowSize)
 }
 
-watch(
-  [focusIndex, maxLiveNodesResolved, liveNodeBufferResolved, () => parsedNodes.value.length, virtualizationEnabled],
-  () => {
-    updateLiveRange()
-  },
-  { immediate: true },
-)
-
 const nodeHeights = reactive<Record<number, number>>({})
 const heightStats = reactive({ total: 0, count: 0 })
 
@@ -681,11 +673,12 @@ const CodeBlockNodeAsync = defineAsyncComponent(async () => {
 })
 
 // 组件映射表
+const codeBlockComponent = computed(() => props.renderCodeBlocksAsPre ? PreCodeNode : CodeBlockNodeAsync)
 const nodeComponents = {
   text: TextNode,
   paragraph: ParagraphNode,
   heading: HeadingNode,
-  code_block: props.renderCodeBlocksAsPre ? PreCodeNode : CodeBlockNodeAsync,
+  code_block: CodeBlockNodeAsync,
   list: ListNode,
   blockquote: BlockquoteNode,
   table: TableNode,
@@ -729,7 +722,7 @@ function getNodeComponent(node: ParsedNode) {
       const custom = getCustomNodeComponents(props.customId).mermaid
       return (custom as any) || MermaidBlockNode
     }
-    return nodeComponents.code_block
+    return codeBlockComponent.value
   }
   return (nodeComponents as any)[String((node as any).type)] || FallbackComponent
 }

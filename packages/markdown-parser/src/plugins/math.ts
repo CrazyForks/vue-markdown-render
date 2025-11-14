@@ -84,6 +84,51 @@ export const ESCAPED_KATEX_COMMANDS = KATEX_COMMANDS
   .join('|')
 const CONTROL_CHARS_CLASS = '[\t\r\b\f\v]'
 
+// Precompiled helpers reused by normalization
+const SPAN_CURLY_RE = /span\{([^}]+)\}/
+const OPERATORNAME_SPAN_RE = /\\operatorname\{span\}\{((?:[^{}]|\{[^}]*\})+)\}/
+const SINGLE_BACKSLASH_NEWLINE_RE = /(^|[^\\])\\\r?\n/g
+const ENDING_SINGLE_BACKSLASH_RE = /(^|[^\\])\\$/g
+
+// Cache for dynamically built regexes depending on commands list
+const DEFAULT_MATH_RE = new RegExp(`${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${ESCAPED_KATEX_COMMANDS})\\b`, 'g')
+const MATH_RE_CACHE = new Map<string, RegExp>()
+const BRACE_CMD_RE_CACHE = new Map<string, RegExp>()
+
+function getMathRegex(commands: ReadonlyArray<string> | undefined) {
+  if (!commands)
+    return DEFAULT_MATH_RE
+  const arr = [...commands]
+  arr.sort((a, b) => b.length - a.length)
+  const key = arr.join('\u0001')
+  const cached = MATH_RE_CACHE.get(key)
+  if (cached)
+    return cached
+  const commandPattern = `(?:${arr.map(c => c.replace(/[.*+?^${}()|[\\]\\"\]/g, '\\$&')).join('|')})`
+  const re = new RegExp(`${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${commandPattern})\\b`, 'g')
+  MATH_RE_CACHE.set(key, re)
+  return re
+}
+
+function getBraceCmdRegex(useDefault: boolean, commands: ReadonlyArray<string> | undefined) {
+  const arr = useDefault ? [] : [...(commands ?? [])]
+  if (!useDefault)
+    arr.sort((a, b) => b.length - a.length)
+  const key = useDefault ? '__default__' : arr.join('\u0001')
+  const cached = BRACE_CMD_RE_CACHE.get(key)
+  if (cached)
+    return cached
+  const braceEscaped = useDefault
+    ? [ESCAPED_TEX_BRACE_COMMANDS, ESCAPED_KATEX_COMMANDS].filter(Boolean).join('|')
+    : [
+        arr.map(c => c.replace(/[.*+?^${}()|[\\]\\\]/g, '\\$&')).join('|'),
+        ESCAPED_TEX_BRACE_COMMANDS,
+      ].filter(Boolean).join('|')
+  const re = new RegExp(`(^|[^\\\\\\w])(${braceEscaped})\\s*\\{`, 'g')
+  BRACE_CMD_RE_CACHE.set(key, re)
+  return re
+}
+
 // Hoisted map of control characters -> escaped letter (e.g. '\t' -> 't').
 // Kept at module scope to avoid recreating on every normalization call.
 const CONTROL_MAP: Record<string, string> = {
@@ -112,14 +157,7 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
   const useDefault = opts?.commands == null
 
   // Build or reuse regex: match control chars or unescaped command words.
-  let re: RegExp
-  if (useDefault) {
-    re = new RegExp(`${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${ESCAPED_KATEX_COMMANDS})\\b`, 'g')
-  }
-  else {
-    const commandPattern = `(?:${commands.slice().sort((a, b) => b.length - a.length).map(c => c.replace(/[.*+?^${}()|[\\]\\"\]/g, '\\$&')).join('|')})`
-    re = new RegExp(`${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${commandPattern})\\b`, 'g')
-  }
+  const re = getMathRegex(useDefault ? undefined : commands)
 
   let out = s.replace(re, (m: string, cmd?: string) => {
     if (CONTROL_MAP[m] !== undefined)
@@ -140,25 +178,20 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
   // Use default escaped list when possible. Include TEX_BRACE_COMMANDS so
   // known brace-taking TeX commands (e.g. `text`, `boldsymbol`) are also
   // restored when their leading backslash was lost.
-  const braceEscaped = useDefault
-    ? [ESCAPED_TEX_BRACE_COMMANDS, ESCAPED_KATEX_COMMANDS].filter(Boolean).join('|')
-    : [commands.map(c => c.replace(/[.*+?^${}()|[\\]\\\]/g, '\\$&')).join('|'), ESCAPED_TEX_BRACE_COMMANDS].filter(Boolean).join('|')
   let result = out
-  if (braceEscaped) {
-    const braceCmdRe = new RegExp(`(^|[^\\\\\\w])(${braceEscaped})\\s*\\{`, 'g')
-    result = result.replace(braceCmdRe, (_m: string, p1: string, p2: string) => `${p1}\\${p2}{`)
-  }
-  result = result.replace(/span\{([^}]+)\}/, 'span\\{$1\\}')
-    .replace(/\\operatorname\{span\}\{((?:[^{}]|\{[^}]*\})+)\}/, '\\operatorname{span}\\{$1\\}')
+  const braceCmdRe = getBraceCmdRegex(useDefault, useDefault ? undefined : commands)
+  result = result.replace(braceCmdRe, (_m: string, p1: string, p2: string) => `${p1}\\${p2}{`)
+  result = result.replace(SPAN_CURLY_RE, 'span\\{$1\\}')
+    .replace(OPERATORNAME_SPAN_RE, '\\operatorname{span}\\{$1\\}')
 
   // If a single backslash appears immediately before a newline (e.g. "... 8 \n5..."),
   // it's likely intended as a LaTeX linebreak (`\\`). Double it, but avoid
   // changing already escaped `\\` sequences.
   // Match a single backslash not preceded by another backslash, followed by an optional CR and a LF.
-  result = result.replace(/(^|[^\\])\\\r?\n/g, '$1\\\\\n')
+  result = result.replace(SINGLE_BACKSLASH_NEWLINE_RE, '$1\\\\\n')
 
   // If the string ends with a single backslash (no trailing newline), double it.
-  result = result.replace(/(^|[^\\])\\$/g, '$1\\\\')
+  result = result.replace(ENDING_SINGLE_BACKSLASH_RE, '$1\\\\')
   return result
 }
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {

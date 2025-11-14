@@ -189,11 +189,12 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
   }
 
   // reference rule (legacy)
+  const RE_REFERENCE = /^\[(\d+)\]/
   const referenceInline = (state: unknown, silent: boolean) => {
     const s = state as unknown as { src: string, pos: number, push: (type: string, tag?: string, nesting?: number) => any }
     if (s.src[s.pos] !== '[')
       return false
-    const match = /^\[(\d+)\]/.exec(s.src.slice(s.pos))
+    const match = RE_REFERENCE.exec(s.src.slice(s.pos))
     if (!match)
       return false
     if (!silent) {

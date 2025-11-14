@@ -1,18 +1,25 @@
 import type { CodeBlockNode, MarkdownToken } from '../../types'
 
+// Strip a final line that looks like a fence marker (``` etc.)
+const TRAILING_FENCE_LINE_RE = /\r?\n[ \t]*`+\s*$/
+// Unified diff metadata/header line prefixes to skip when splitting a diff
+const DIFF_HEADER_PREFIXES = ['diff ', 'index ', '--- ', '+++ ', '@@ ']
+// Newline splitter reused in this module
+const NEWLINE_RE = /\r?\n/
+
 function splitUnifiedDiff(content: string) {
   const orig: string[] = []
   const updated: string[] = []
-  for (const rawLine of content.split(/\r?\n/)) {
+  for (const rawLine of content.split(NEWLINE_RE)) {
     const line = rawLine
     // skip diff metadata lines
-    if (/^(?:diff |index |--- |\+\+\+ |@@ )/.test(line))
+    if (DIFF_HEADER_PREFIXES.some(p => line.startsWith(p)))
       continue
 
-    if (line.startsWith('- ')) {
+    if (line.length >= 2 && line[0] === '-' && line[1] === ' ') {
       orig.push(` ${line.slice(1)}`)
     }
-    else if (line.startsWith('+ ')) {
+    else if (line.length >= 2 && line[0] === '+' && line[1] === ' ') {
       updated.push(` ${line.slice(1)}`)
     }
     else {
@@ -33,7 +40,15 @@ export function parseFenceToken(token: MarkdownToken): CodeBlockNode {
   const closed = typeof tokenMeta.closed === 'boolean' ? tokenMeta.closed : undefined
   const info = String(token.info ?? '')
   const diff = info.startsWith('diff')
-  const language = diff ? String(info.split(' ')[1] ?? '') : info
+  const language = diff
+    ? (() => {
+        const s = info
+        const sp = s.indexOf(' ')
+        return sp === -1
+          ? ''
+          : String(s.slice(sp + 1) ?? '')
+      })()
+    : info
 
   // Defensive sanitization: sometimes a closing fence line (e.g. ``` or ``)
   // can accidentally end up inside `token.content` (for example when
@@ -44,9 +59,8 @@ export function parseFenceToken(token: MarkdownToken): CodeBlockNode {
   // fence marker (starts with optional spaces then one or more ` and
   // only whitespace until end-of-string).
   let content = String(token.content ?? '')
-  const trailingFenceLine = /\r?\n[ \t]*`+\s*$/
-  if (trailingFenceLine.test(content))
-    content = content.replace(trailingFenceLine, '')
+  if (TRAILING_FENCE_LINE_RE.test(content))
+    content = content.replace(TRAILING_FENCE_LINE_RE, '')
 
   if (diff) {
     const { original, updated } = splitUnifiedDiff(content)
