@@ -32,7 +32,46 @@ function fixStrongTokens(tokens: MarkdownToken[]): MarkdownToken[] {
   const token = tokens[i]
   const nextToken = tokens[i + 1]
   const tokenContent = String(token.content ?? '')
-  if (token.type === 'text' && tokenContent.endsWith('*') && nextToken.type === 'em_open') {
+  if (token.type === 'link_open' && tokens[i - 1].type === 'em_open' && tokens[i - 2].type === 'text' && tokens[i - 2].content?.endsWith('*')) {
+    const textContent = String(tokens[i - 2].content ?? '').slice(0, -1)
+
+    const replaceTokens = [
+      {
+        type: 'strong_open',
+        tag: 'strong',
+        attrs: null,
+        map: null,
+        children: null,
+        content: '',
+        markup: '**',
+        info: '',
+        meta: null,
+      },
+      tokens[i],
+      tokens[i + 1],
+      tokens[i + 2],
+      {
+        type: 'strong_close',
+        tag: 'strong',
+        attrs: null,
+        map: null,
+        children: null,
+        content: '',
+        markup: '**',
+        info: '',
+        meta: null,
+      },
+    ]
+    if (textContent) {
+      replaceTokens.unshift({
+        type: 'text',
+        content: textContent,
+        raw: textContent,
+      })
+    }
+    fixedTokens.splice(i - 2, 6, ...replaceTokens)
+  }
+  else if (token.type === 'text' && tokenContent.endsWith('*') && nextToken.type === 'em_open') {
     // 解析有问题，要合并 emphasis 和 前面的 * 为 strong
     const _nextToken = tokens[i + 2]
     const count = _nextToken?.type === 'text' ? 4 : 3
