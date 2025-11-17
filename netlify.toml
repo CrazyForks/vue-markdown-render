@@ -1,22 +1,22 @@
 [build]
-	# Default Netlify build: build the markdown docs
-	command = "pnpm docs:build"
-	publish = "docs/.vitepress/dist"
+# Default Netlify build: build the markdown docs
+command = "pnpm docs:build"
+publish = "docs/.vitepress/dist"
 
 [build.environment]
-	NODE_VERSION = "22"
-	# The VitePress base should usually be '/' for Netlify; set this if you deploy under a subpath
-	VITEPRESS_BASE = "/"
+NODE_VERSION = "22"
+# The VitePress base should usually be '/' for Netlify; set this if you deploy under a subpath
+VITEPRESS_BASE = "/"
 
 # Deploy the playground in preview builds (optional) so authors can preview the demo app
 [context.deploy-preview]
-	command = "pnpm run play:build"
-	publish = "playground/dist"
+command = "pnpm run play:build"
+publish = "playground/dist"
 
 # If you want to host the docs at the root of the domain but keep the user guide
 # as the primary entry point, add a rewrite to /guide/.
 [[redirects]]
-	from = "/"
-	to = "/guide/"
-	status = 200
-	force = true
+from = "/"
+to = "/guide/"
+status = 200
+force = true

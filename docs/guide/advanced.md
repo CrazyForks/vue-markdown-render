@@ -46,3 +46,38 @@ Example:
 ```
 
 CSS variables: `--typewriter-fade-duration` and `--typewriter-fade-ease` are available for theme tuning.
+
+## Internationalization (i18n)
+
+By default, `getMarkdown` uses English text for UI elements (e.g., "Copy" button in code blocks). You can customize these texts by providing an `i18n` option:
+
+**Using a translation map:**
+
+```ts
+import { getMarkdown } from 'vue-renderer-markdown'
+
+const md = getMarkdown('editor-1', {
+  i18n: {
+    'common.copy': '复制',
+  }
+})
+```
+
+**Using a translation function:**
+
+```ts
+import { useI18n } from 'vue-i18n' // or any i18n library
+import { getMarkdown } from 'vue-renderer-markdown'
+
+const { t } = useI18n()
+
+const md = getMarkdown('editor-1', {
+  i18n: (key: string) => t(key)
+})
+```
+
+**Default translations:**
+
+- `common.copy`: "Copy" — Used in code block copy buttons
+
+This design keeps the markdown utilities pure and free from global side effects, allowing you to integrate with any i18n solution or provide static translations.
