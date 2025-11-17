@@ -10,6 +10,20 @@ https://github.com/Simon-He95/vue-markdown-render
 
 [【Author: Simon】](https://simonhe.me/)
 
+- **[Link (Test 1)](https://simonhe.me/)**
+
+**[Link (Test 2)](https://simonhe.me/)**
+
+**Markdown链接**：  
+1. [GitHub官网](https://github.com)  
+2. [知乎 - 有问题就会有答案](https://www.zhihu.com)  
+3. **加粗链接**：[Google](https://www.google.com)  
+4. 嵌套格式的链接：[*斜体链接*](https://example.com)  
+
+**普通链接**：  
+1. https://www.wikipedia.org  
+2. http://example.com/path?query=test  
+3. 纯文本URL：https://markdown-guide.readthedocs.io
 
 ![Vue Markdown Icon](/vue-markdown-icon.svg "Vue Markdown Icon")
 *Figure: Vue Markdown Icon (served from /vue-markdown-icon.svg)*

@@ -125,7 +125,6 @@ function onAnchorLeave() {
 .link-node {
   color: var(--link-color, #0366d6);
   text-decoration: none;
-  display: inline-flex;
 }
 
 .link-node:hover {

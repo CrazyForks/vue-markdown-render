@@ -495,7 +495,8 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
     }
     if (handleCheckboxLike(content))
       return
-    if (content === '[') {
+    const preToken = tokens[i - 1]
+    if ((content === '[' && !nextToken?.markup?.includes('*')) || (content === ']' && !preToken.markup?.includes('*'))) {
       i++
       return
     }
@@ -510,7 +511,6 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
 
     if (handleInlineLinkContent(content, token))
       return
-    const preToken = tokens[i - 1]
     if (currentTextNode) {
       // Merge with the previous text node
       currentTextNode.content += textNode.content.replace(/(\*+|\(|\\)$/, '')

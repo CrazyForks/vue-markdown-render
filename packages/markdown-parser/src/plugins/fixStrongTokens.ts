@@ -30,9 +30,11 @@ function fixStrongTokens(tokens: MarkdownToken[]): MarkdownToken[] {
     return fixedTokens
   const i = tokens.length - 4
   const token = tokens[i]
+  if (!token)
+    return fixedTokens
   const nextToken = tokens[i + 1]
   const tokenContent = String(token.content ?? '')
-  if (token.type === 'link_open' && tokens[i - 1].type === 'em_open' && tokens[i - 2].type === 'text' && tokens[i - 2].content?.endsWith('*')) {
+  if (token.type === 'link_open' && tokens[i - 1]?.type === 'em_open' && tokens[i - 2]?.type === 'text' && tokens[i - 2].content?.endsWith('*')) {
     const textContent = String(tokens[i - 2].content ?? '').slice(0, -1)
 
     const replaceTokens = [
