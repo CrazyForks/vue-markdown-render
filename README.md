@@ -4,9 +4,12 @@
 
 [![NPM version](https://img.shields.io/npm/v/vue-renderer-markdown?color=a1b858&label=)](https://www.npmjs.com/package/vue-renderer-markdown)
 [![中文版](https://img.shields.io/badge/docs-中文文档-blue)](README.zh-CN.md)
+[![Docs](https://img.shields.io/badge/docs-vitepress-blue)](https://simon-he95.github.io/vue-markdown-render/)
 [![NPM downloads](https://img.shields.io/npm/dm/vue-renderer-markdown)](https://www.npmjs.com/package/vue-renderer-markdown)
 [![Bundle size](https://img.shields.io/bundlephobia/minzip/vue-renderer-markdown)](https://bundlephobia.com/package/vue-renderer-markdown)
 [![License](https://img.shields.io/npm/l/vue-renderer-markdown)](./LICENSE)
+
+> ⚠️ This README is intentionally shortened in favor of a VitePress documentation website. For a well-structured guide and examples, see the `docs/` folder or run `pnpm docs:dev` locally.
 
 ## Table of Contents
 
@@ -36,7 +39,28 @@
 - [Thanks](#thanks)
 - [Star History](#star-history)
 - [License](#license)
+- [Docs](#docs)
 
+## Docs
+
+This repository ships a dedicated VitePress documentation site in `docs/` that breaks the long README into focused pages. Read the full docs for usage, API, performance tips, SSR details and more:
+
+- Guide: https://your-docs-url/guide/
+- Quick Start & Installation: https://your-docs-url/guide/installation
+- Performance: https://your-docs-url/guide/performance
+- API & Advanced: https://your-docs-url/guide/usage
+ - Search: https://your-docs-url/guide/search
+The docs site includes a built-in (local) search — set up Algolia DocSearch for a hosted, multi-language search experience and better Chinese support. See `/guide/search` for details.
+ - Parser & API: https://your-docs-url/guide/parser
+ - Mermaid & Tailwind tips: https://your-docs-url/guide/mermaid
+
+Prefer the docs site for detail — this README now serves as a short summary and quick links.
+
+## Deploy docs
+
+You can deploy the VitePress docs to GitHub Pages or Netlify. A sample GitHub Actions workflow (`.github/workflows/deploy-docs.yml`) is included and builds + publishes the docs to `gh-pages` on every push to `main`.
+
+If you'd like a GitHub Pages URL like `https://Simon-He95.github.io/vue-markdown-render/`, set the `base` option in `docs/.vitepress/config.ts` to `/vue-markdown-render/` before building.
 ## Why use it?
 
 - Progressive Mermaid: diagrams render incrementally so users see results earlier.
@@ -78,6 +102,24 @@ This short video introduces the vue-renderer-markdown component library and high
 Watch the intro on YouTube: [Open in YouTube](https://youtu.be/qUggGP5bWNw)
 
 ## Features
+## Documentation site
+
+This repository also includes a VitePress-based documentation site found in `docs/`.
+
+Run the docs locally with pnpm:
+
+```bash
+pnpm docs:dev
+```
+
+After building:
+
+```bash
+pnpm docs:build
+pnpm docs:serve
+```
+
+The site splits the long README into smaller pages for better discoverability.
 
 - ⚡ **Ultra-High Performance**: Optimized for real-time streaming with minimal re-renders and efficient DOM updates
 - 🌊 **Streaming-First Design**: Built specifically to handle incomplete, rapidly updating, and tokenized Markdown content
@@ -554,69 +596,12 @@ That's it! See the sections below for advanced features and customization.
 
 ## TypeScript Usage
 
-### Typed AST rendering
+TypeScript examples and strongly-typed custom component examples are available in the documentation site:
 
-```vue
-<script setup lang="ts">
-import type { BaseNode } from 'vue-renderer-markdown'
-import { ref, watchEffect } from 'vue'
-import MarkdownRender, { parseMarkdownToStructure } from 'vue-renderer-markdown'
+- English: `/guide/type-script`
+- 中文: `/zh/guide/type-script`
 
-const content = ref<string>('# Hello \n\n```ts\nconsole.log(1)\n```')
-const nodes = ref<BaseNode[]>([])
-
-watchEffect(() => {
-  nodes.value = parseMarkdownToStructure(content.value)
-})
-</script>
-
-<template>
-  <MarkdownRender :nodes="nodes" />
-</template>
-```
-
-### Strongly typed custom components
-
-```vue
-<!-- components/CustomCodeBlock.vue -->
-<script setup lang="ts">
-import type { CodeBlockNode } from 'vue-renderer-markdown'
-
-const props = defineProps<{ node: CodeBlockNode }>()
-</script>
-
-<template>
-  <pre class="custom-code">
-    <code :data-lang="props.node.language">{{ props.node.code }}</code>
-  </pre>
-</template>
-```
-
-```ts
-// main.ts
-import { createApp } from 'vue'
-import { setCustomComponents, VueRendererMarkdown } from 'vue-renderer-markdown'
-import App from './App.vue'
-import CustomCodeBlock from './components/CustomCodeBlock.vue'
-
-const app = createApp(App)
-
-setCustomComponents('docs', {
-  code_block: CustomCodeBlock,
-})
-
-app.use(VueRendererMarkdown, {
-  mathOptions: {
-    commands: ['infty', 'perp', 'alpha'],
-    escapeExclamation: true,
-  },
-  getLanguageIcon(lang) {
-    return lang === 'shell' ? '<span>sh</span>' : undefined
-  },
-})
-
-app.mount('#app')
-```
+The doc page includes typed AST rendering examples (`parseMarkdownToStructure`) and strongly-typed `setCustomComponents` usage.
 
 ## Why vue-renderer-markdown?
 
@@ -685,37 +670,15 @@ This is **markdown** rendered as HTML!
 </template>
 ```
 
-## Performance Features
+## Performance & opts
 
-The streaming-optimized engine delivers:
+This repository includes a performance-focused guide with tips, best practices and profiling notes. See the docs for full details:
 
-- **Incremental Parsing Code Blocks**: Only processes changed content, not the entire code block
-- **Efficient DOM Updates**: Minimal re-renders
-- **Monaco Streaming**: Fast, incremental updates for large code snippets without blocking the UI
-- **Progressive Mermaid**: Diagrams render as soon as syntax is valid and refine as content streams in
-- **Memory Optimized**: Intelligent cleanup prevents memory leaks during long streaming sessions
-- **Animation Frame Based**: Smooth animations
-- **Graceful Degradation**: Handles malformed or incomplete Markdown without breaking
+- Performance features & tips: `/guide/performance`
+- Monaco editor integration & packaging: `/guide/monaco` and `/guide/monaco-internals`
+- Props and runtime flags: `/guide/props`
 
-## Performance Tips
-
-- Stream long documents in chunks to avoid blocking the main thread; the renderer incrementally patches the DOM.
-- Prefer `MarkdownCodeBlockNode` or `render-code-blocks-as-pre` when you only need read-only output — this skips Monaco initialization.
-- Scope custom component overrides with `setCustomComponents(id, mapping)` so unused components can be garbage-collected.
-- Use the built-in `setDefaultMathOptions` helper once during app bootstrap to avoid repeatedly computing math config per render.
-- When Mermaid diagrams are heavy, pre-validate or pre-render them server-side and feed the resulting HTML as cached content.
-
-### Props
-
-| Name               | Type                  | Required | Description                                        |
-| ------------------ | --------------------- | -------- | -------------------------------------------------- |
-| `content`          | `string`              | ✓        | Markdown string to render                          |
-| `nodes`            | `BaseNode[]`          |          | Parsed markdown AST nodes (alternative to content) |
-| `renderCodeBlocksAsPre` | `boolean` | | When true, render all `code_block` nodes as simple `<pre><code>` blocks (uses `PreCodeNode`) instead of the full `CodeBlockNode`. Useful for lightweight, dependency-free rendering of multi-line text such as AI "thinking" outputs. Defaults to `false`. |
-| `codeBlockStream`  | `boolean`             |          | Controls streaming behavior for `code_block` nodes. When `true` (default), code blocks update progressively as content streams in. When `false`, code blocks stay in a lightweight loading state and render only once when the final code is ready (defers Monaco creation). |
-| `viewportPriority` | `boolean`             |          | When enabled (default), heavy nodes (e.g. Mermaid, Monaco) prioritize rendering for content within or near the viewport, deferring offscreen work to improve responsiveness. Set to `false` to render everything eagerly (useful for print/export or when you need immediate layout for all nodes). Defaults to `true`. |
-
-> Either `content` or `nodes` must be provided.
+Prefer the docs site for performance best practices and detailed prop tables — the docs are shorter, organized and translated into Chinese.
 
 Note: when using the component in a Vue template, camelCase prop names should be written in kebab-case (for example, `renderCodeBlocksAsPre` -> `render-code-blocks-as-pre`).
 
@@ -1150,63 +1113,7 @@ Notes:
 
 ## Monaco Editor Integration
 
-If you are using Monaco Editor in your project, configure `vite-plugin-monaco-editor-esm` to handle global injection of workers. Our renderer is optimized for streaming updates to large code blocks—when content changes incrementally, only the necessary parts are updated for smooth, responsive rendering. On Windows, you may encounter issues during the build process. To resolve this, configure `customDistPath` to ensure successful packaging.
-
-> Note: If you only need to render a Monaco editor (for editing or previewing code) and don't require this library's full Markdown rendering pipeline, you can integrate Monaco directly using `stream-monaco` for a lighter, more direct integration.
-
-```bash
-pnpm add vite-plugin-monaco-editor-esm monaco-editor -d
-```
-
-npm equivalent:
-
-```bash
-npm install vite-plugin-monaco-editor-esm monaco-editor --save-dev
-```
-
-yarn equivalent:
-
-```bash
-yarn add vite-plugin-monaco-editor-esm monaco-editor -d
-```
-
-### Example Configuration
-
-```ts
-import path from 'node:path'
-import monacoEditorPlugin from 'vite-plugin-monaco-editor-esm'
-
-export default {
-  plugins: [
-    monacoEditorPlugin({
-      languageWorkers: [
-        'editorWorkerService',
-        'typescript',
-        'css',
-        'html',
-        'json',
-      ],
-      customDistPath(root, buildOutDir, base) {
-        return path.resolve(buildOutDir, 'monacoeditorwork')
-      },
-    }),
-  ],
-}
-```
-
-### Tip: Preload Monaco workers for smoother first code-block rendering
-
-If your application uses the Monaco editor for editable code blocks, you can call `getUseMonaco()` during app initialization or on page mount to proactively import `stream-monaco` and preload the required workers. This helps avoid a noticeable delay or flicker when the first `code_block` renders. Example:
-
-```ts
-// Call during app init or on page mount
-import { getUseMonaco } from './src/components/CodeBlockNode/monaco'
-
-// Trigger dynamic import + preload (failures are handled gracefully)
-getUseMonaco()
-```
-
-Internally, `getUseMonaco()` will attempt to dynamically import `stream-monaco` and call the library's preload helper to register/load Monaco workers; if the module is unavailable (not installed or during SSR) the function returns `null` and the renderer falls back safely.
+For details about Vite configuration, Monaco worker packaging and preloading tips see `/guide/monaco` and `/guide/monaco-internals` for deeper notes.
 
 ### Internationalization / Fallback translations
 
@@ -1629,20 +1536,14 @@ See the [Tailwind section](#tailwind-eg-shadcn--fix-style-ordering-issues) for m
   - Console errors or screenshots
   - Steps to reproduce the issue
 
-## Thanks
+## Thanks & Star History
 
-This project is built with the help of these awesome libraries:
+Thanks and the project's star history have been moved to the VitePress documentation site:
 
-- [stream-monaco](https://github.com/Simon-He95/stream-monaco) — A framework-agnostic library for integrating Monaco Editor with Shiki highlighting, optimized for streaming updates
-- [stream-markdown](https://github.com/Simon-He95/stream-markdown) — Streaming code/markdown highlighter utilities (Shiki-based)
-- [mermaid](https://mermaid-js.github.io/mermaid) — Diagramming and charting tool that uses Markdown-inspired syntax
-- [shiki](https://github.com/shikijs/shiki) — Syntax highlighter powered by TextMate grammars and VS Code themes
+- English: `/guide/thanks`
+- 中文: `/zh/guide/thanks`
 
-Thanks to the authors and contributors of these projects!
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Simon-He95/vue-markdown-render&type=Date)](https://www.star-history.com/#Simon-He95/vue-markdown-render&Date)
+If you'd like to see the live star chart on the README again, feel free to revert this change — otherwise the docs site keeps the README shorter and focuses on quick usage.
 
 ## License
 

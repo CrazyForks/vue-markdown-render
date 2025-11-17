@@ -1,0 +1,40 @@
+# Mermaid: Progressive Rendering Example
+
+Mermaid diagrams can be streamed progressively. The diagram renders as soon as the syntax becomes valid and refines as more content arrives.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import MarkdownRender from 'vue-renderer-markdown'
+
+const content = ref('')
+const steps = [
+  '```mermaid\n',
+  'graph TD\n',
+  'A[Start]-->B{Is valid?}\n',
+  'B -- Yes --> C[Render]\n',
+  'B -- No  --> D[Wait]\n',
+  '```\n',
+]
+
+let i = 0
+const id = setInterval(() => {
+  content.value += steps[i] || ''
+  i++
+  if (i >= steps.length)
+    clearInterval(id)
+}, 120)
+</script>
+
+<template>
+  <MarkdownRender :content="content" />
+  <!-- Diagram progressively appears as content streams in -->
+</template>
+```
+
+Notes:
+- Mermaid must be installed as a peer dependency for diagrams to render.
+- If Mermaid fails to render, the component will fall back to showing the source text.
+- For heavy diagrams, consider pre-rendering server-side or caching the SVG output.
+
+![Mermaid demo](/screenshots/mermaid-demo.svg)
