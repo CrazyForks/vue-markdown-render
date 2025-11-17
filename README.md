@@ -4,13 +4,13 @@
 
 [![NPM version](https://img.shields.io/npm/v/vue-renderer-markdown?color=a1b858&label=)](https://www.npmjs.com/package/vue-renderer-markdown)
 [![中文版](https://img.shields.io/badge/docs-中文文档-blue)](README.zh-CN.md)
-[![Docs](https://img.shields.io/badge/docs-vitepress-blue)](http://vue-markdown-renderer-docs.simonhe.me/)
+[![Docs](https://img.shields.io/badge/docs-vitepress-blue)](https://vue-markdown-renderer-docs.simonhe.me/)
 [![NPM downloads](https://img.shields.io/npm/dm/vue-renderer-markdown)](https://www.npmjs.com/package/vue-renderer-markdown)
 [![Bundle size](https://img.shields.io/bundlephobia/minzip/vue-renderer-markdown)](https://bundlephobia.com/package/vue-renderer-markdown)
 [![License](https://img.shields.io/npm/l/vue-renderer-markdown)](./LICENSE)
 
 > 📖 All detailed documentation, API, examples, and advanced usage have been migrated to the VitePress documentation site:
-> http://vue-markdown-renderer-docs.simonhe.me/guide/
+> https://vue-markdown-renderer-docs.simonhe.me/guide/
 
 ## 🚀 Playground & Demo
 
@@ -48,7 +48,7 @@ Watch on Bilibili: [Open in Bilibili](https://www.bilibili.com/video/BV17Z4qzpE9
 ## Troubleshooting & Common Issues
 
 Troubleshooting has moved into the docs:
-http://vue-markdown-renderer-docs.simonhe.me/guide/troubleshooting
+https://vue-markdown-renderer-docs.simonhe.me/guide/troubleshooting
 
 If you can't find a solution there, open a GitHub issue:
 https://github.com/Simon-He95/vue-markdown-render/issues

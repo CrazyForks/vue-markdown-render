@@ -3,13 +3,13 @@
 > 针对 Vue 3 的高性能、流式友好型 Markdown 渲染组件 — 支持渐进式 Mermaid、流式 diff 代码块以及为大文档优化的实时预览。
 
 [![NPM version](https://img.shields.io/npm/v/vue-renderer-markdown?color=a1b858&label=)](https://www.npmjs.com/package/vue-renderer-markdown)
-[![Docs](https://img.shields.io/badge/docs-中文文档-blue)](http://vue-markdown-renderer-docs.simonhe.me/zh/guide/)
+[![Docs](https://img.shields.io/badge/docs-中文文档-blue)](https://vue-markdown-renderer-docs.simonhe.me/zh/guide/)
 [![NPM downloads](https://img.shields.io/npm/dm/vue-renderer-markdown)](https://www.npmjs.com/package/vue-renderer-markdown)
 [![Bundle size](https://img.shields.io/bundlephobia/minzip/vue-renderer-markdown)](https://bundlephobia.com/package/vue-renderer-markdown)
 [![License](https://img.shields.io/npm/l/vue-renderer-markdown)](./LICENSE)
 
 > 📖 所有详细文档、API、示例和高级用法已迁移至 VitePress 中文文档站点：
-> http://vue-markdown-renderer-docs.simonhe.me/zh/guide/
+> https://vue-markdown-renderer-docs.simonhe.me/zh/guide/
 
 ## 🚀 实时演示
 
@@ -48,7 +48,7 @@
 ## 故障排查 & 常见问题
 
 详细故障排查与常见问题已迁移至文档站点：
-http://vue-markdown-renderer-docs.simonhe.me/zh/guide/troubleshooting
+https://vue-markdown-renderer-docs.simonhe.me/zh/guide/troubleshooting
 
 如需更多帮助，请到 GitHub Issues 创建问题：
 https://github.com/Simon-He95/vue-markdown-render/issues
