@@ -20,7 +20,7 @@ jobs:
           node-version: '18'
           cache: pnpm
       - name: Install pnpm
-          uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v2
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Check docs parity
