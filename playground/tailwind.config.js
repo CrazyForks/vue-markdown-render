@@ -1,5 +1,7 @@
+import typography from '@tailwindcss/typography'
+
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   darkMode: ['selector'],
   safelist: [
     'border-gray-400/5',
@@ -15,5 +17,5 @@ module.exports = {
     extend: {
     },
   },
-  plugins: [require('@tailwindcss/typography')],
+  plugins: [ typography ],
 }
