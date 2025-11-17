@@ -12,6 +12,12 @@ Netlify / Vercel:
 - Set the build command to: `pnpm docs:build`
 - Set the publish directory to: `docs/.vitepress/dist`
 
+Netlify specifics:
+
+- Engine: Node 18+ (Netlify uses `NODE_VERSION` from `netlify.toml` or set `NODE_VERSION` in site settings)
+- Use `VITEPRESS_BASE=/` if your Netlify site is hosted at a root domain; otherwise add `VITEPRESS_BASE=/repo-name/` for sub-path deployments (e.g., GitHub Pages). You can set this as a Netlify environment variable in Site settings -> Build & deploy -> Environment.
+- To keep the `playground/` site available for preview builds, configure a `[context.deploy-preview]` in `netlify.toml` with `command: pnpm run play:build` and `publish: playground/dist`.
+
 Tricks:
 
 - Use `docs:build` in your CI to catch build-time issues early
