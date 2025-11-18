@@ -280,6 +280,14 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
           currentTextNode.content += '\n'
           currentTextNode.raw += '\n' // Assuming raw should also reflect the newline
         }
+        else {
+          currentTextNode = {
+            type: 'text',
+            content: '\n',
+            raw: '\n',
+          }
+          result.push(currentTextNode)
+        }
         // Don't create a node for softbreak itself, just modify text
         i++
         break

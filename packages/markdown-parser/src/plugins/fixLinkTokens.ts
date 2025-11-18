@@ -226,7 +226,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       const text = tokens[i - 1].content || ''
       let href = tokens[i - 2].attrs?.[0]?.[1] || ''
       let count = 3
-      if (tokens[i].markup === 'linkify' && tokens[i + 1]?.type === 'text') {
+      if (tokens[i].markup === 'linkify' && tokens[i + 1]?.type === 'text' && !tokens[i + 1]?.content?.startsWith(' ')) {
         const m = (tokens[i + 1]?.content ?? '').indexOf(')')
         if (m === -1) {
           href += (tokens[i + 1]?.content?.slice(0, m) || '')

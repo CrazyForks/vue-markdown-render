@@ -29,7 +29,7 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt) {
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i] as Token & { content?: string, children: any[] }
       if (t.type === 'html_block') {
-        const tag = t.content?.match(/<([^\s>/]+)/)?.[1] ?? ''
+        const tag = (t.content?.match(/<([^\s>/]+)/)?.[1] ?? '').toLowerCase()
         const isClosingTag = /<\s*\/\s*[^\s>]+\s*>/.test(t.content || '')
         if (!isClosingTag) {
           // 开始标签，入栈
@@ -52,7 +52,7 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt) {
           continue
         }
         const content = t.content || ''
-        const CLOSING_TAG_REGEX = new RegExp(`<\\s*\\/\\s*${tagStack[tagStack.length - 1][0]}\\s*>`)
+        const CLOSING_TAG_REGEX = new RegExp(`<\\s*\\/\\s*${tagStack[tagStack.length - 1][0]}\\s*>`, 'i')
         const isClosingTag = CLOSING_TAG_REGEX.test(content)
 
         if (content) {
@@ -78,17 +78,23 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt) {
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i] as Token & { content?: string, children: any[], loading?: boolean }
       if (t.type === 'html_block') {
-        const tag = t.content?.match(/<([^\s>/]+)/)?.[1] ?? ''
+        const rawTag = t.content?.match(/<([^\s>/]+)/)?.[1] ?? ''
+        const tag = rawTag.toLowerCase()
+        // Do not attempt to convert or close comments/doctypes/processing-instructions
+        if (tag.startsWith('!') || tag.startsWith('?')) {
+          t.loading = false
+          continue
+        }
         // 如果是常见的 block 标签，则跳过，否则转换成 inline 处理
         if (['br', 'hr', 'img', 'input', 'link', 'meta', 'div', 'p', 'ul', 'li'].includes(tag))
           continue
         t.type = 'inline'
-        const loading = t.content?.includes(`</${tag}>`) ? false : t.loading !== undefined ? t.loading : true
+        const loading = t.content?.toLowerCase().includes(`</${tag}>`) ? false : t.loading !== undefined ? t.loading : true
         t.children = [
           {
             type: 'html_block',
             content: t.content,
-            tag: t.content?.match(/<([^\s>/]+)/)?.[1] ?? '',
+            tag,
             loading,
           },
         ] as any[]

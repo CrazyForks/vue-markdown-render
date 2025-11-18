@@ -196,4 +196,44 @@ describe('link parsing', () => {
       }
     `)
   })
+
+  it('parses URL with inline trailing text (no newline)', () => {
+    const mdText = `第一个气泡（无换行）：
+http://127.0.0.1:8001/upload/20251118/4737bbe0-c42e-11f0-8471-37360564882d.docx  请在文档末尾增加一段示例内容`
+    const nodes = parseMarkdownToStructure(mdText, md)
+
+    expect(
+      textIncludes(
+        nodes,
+        'http://127.0.0.1:8001/upload/20251118/4737bbe0-c42e-11f0-8471-37360564882d.docx',
+      ),
+    ).toBe(true)
+    expect(textIncludes(nodes, '请在文档末尾增加一段示例内容')).toBe(true)
+  })
+
+  it('parses URL followed by newline and trailing text', () => {
+    const mdText = `第二个气泡（有换行）：
+  http://127.0.0.1:8001/upload/20251118/4737bbe0-c42e-11f0-8471-37360564882d.docx  
+  请在文档末尾增加一段示例内容`
+    const nodes = parseMarkdownToStructure(mdText, md)
+
+    expect(
+      textIncludes(
+        nodes,
+        'http://127.0.0.1:8001/upload/20251118/4737bbe0-c42e-11f0-8471-37360564882d.docx',
+      ),
+    ).toBe(true)
+    expect(textIncludes(nodes, '请在文档末尾增加一段示例内容')).toBe(true)
+
+    // Ensure a hard line break node is present for the newline between URL and trailing text
+    let foundHardBreak = false
+    const walk = (n: any) => {
+      if (!n) return
+      if (n.type === 'hardbreak') foundHardBreak = true
+      if (Array.isArray(n.children)) n.children.forEach(walk)
+      if (Array.isArray(n.items)) n.items.forEach(walk)
+    }
+    nodes.forEach(walk)
+    expect(foundHardBreak).toBe(true)
+  })
 })

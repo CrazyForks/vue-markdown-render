@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BaseNode, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import { getMarkdown, parseMarkdownToStructure } from '../../../packages/markdown-parser'
 import { computed, defineAsyncComponent, markRaw, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
