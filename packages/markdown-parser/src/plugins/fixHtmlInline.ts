@@ -24,20 +24,72 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt) {
     const s = state as unknown as { tokens?: Token[] }
     const toks = s.tokens ?? []
 
+    // 有一些很特殊的场景，比如 html_block 开始 <thinking>，但是后面跟着很多段落,如果没匹配到</thinking>，中间的都应该合并为html_block的 content
+    const tagStack: [string, number][] = []
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i] as Token & { content?: string, children: any[] }
-      if (t.type === 'html_block' && /^<[^>\s/]+>$/.test(t.content)) {
+      if (t.type === 'html_block') {
+        const tag = t.content?.match(/<([^\s>/]+)/)?.[1] ?? ''
+        const isClosingTag = /<\s*\/\s*[^\s>]+\s*>/.test(t.content || '')
+        if (!isClosingTag) {
+          // 开始标签，入栈
+          tagStack.push([tag, i])
+        }
+        else {
+          // 结束标签，出栈
+          if (tagStack.length > 0 && tagStack[tagStack.length - 1][0] === tag) {
+            tagStack.pop()
+          }
+        }
+        continue
+      }
+      else if (tagStack.length > 0) {
+        // 如果在标签栈中，说明是未闭合标签的内容，合并到上一个 html_block
+        if (t.type === 'paragraph_open' || t.type === 'paragraph_close') {
+          // 应该删除这些标签
+          toks.splice(i, 1)
+          i-- // 调整索引
+          continue
+        }
+        const content = t.content || ''
+        const CLOSING_TAG_REGEX = new RegExp(`<\\s*\\/\\s*${tagStack[tagStack.length - 1][0]}\\s*>`)
+        const isClosingTag = CLOSING_TAG_REGEX.test(content)
+
+        if (content) {
+          // 插入到栈顶标签对应的 html_block 中
+          const [, openIndex] = tagStack[tagStack.length - 1]
+          const openToken = toks[openIndex] as Token & { content?: string, loading: boolean }
+          openToken.content = `${openToken.content || ''}\n${content}`
+          if (openToken.loading !== false)
+            openToken.loading = !isClosingTag
+        }
+        if (isClosingTag) {
+          tagStack.pop()
+        }
+        // 删除当前 token
+        toks.splice(i, 1)
+        i-- // 调整索引
+      }
+      else {
+        continue
+      }
+    }
+
+    for (let i = 0; i < toks.length; i++) {
+      const t = toks[i] as Token & { content?: string, children: any[], loading?: boolean }
+      if (t.type === 'html_block') {
         const tag = t.content?.match(/<([^\s>/]+)/)?.[1] ?? ''
         // 如果是常见的 block 标签，则跳过，否则转换成 inline 处理
-        if (['br', 'hr', 'img', 'input', 'link', 'meta'].includes(tag))
+        if (['br', 'hr', 'img', 'input', 'link', 'meta', 'div', 'p', 'ul', 'li'].includes(tag))
           continue
         t.type = 'inline'
+        const loading = t.content?.includes(`</${tag}>`) ? false : t.loading !== undefined ? t.loading : true
         t.children = [
           {
             type: 'html_block',
             content: t.content,
             tag: t.content?.match(/<([^\s>/]+)/)?.[1] ?? '',
-            loading: true,
+            loading,
           },
         ] as any[]
         continue

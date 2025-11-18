@@ -195,6 +195,10 @@ export function processTokens(tokens: MarkdownToken[]): ParsedNode[] {
         i += 1
         break
 
+      case 'inline':
+        result.push(...parseInlineTokens(token.children || []))
+        i += 1
+        break
       default:
         // Handle other token types or skip them
         i += 1

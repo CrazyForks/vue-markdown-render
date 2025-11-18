@@ -87,7 +87,7 @@ const parseOptions = {
               }
             }
             // eslint-disable-next-line regexp/no-super-linear-backtracking
-            const content = t.content.replace(/<thinking[^>]*>/, '').replace(/<\/*t*h*i*n*k*i*n*g*>*$/, '')
+            const content = t.content.replace(/<thinking[^>]*>/, '').replace(/<\/*t*h*i*n*k*i*n*g*>*\n*$/, '')
             return {
               type: 'thinking',
               loading: t.loading,
