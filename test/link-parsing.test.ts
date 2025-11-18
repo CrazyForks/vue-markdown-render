@@ -228,10 +228,14 @@ http://127.0.0.1:8001/upload/20251118/4737bbe0-c42e-11f0-8471-37360564882d.docx 
     // Ensure a hard line break node is present for the newline between URL and trailing text
     let foundHardBreak = false
     const walk = (n: any) => {
-      if (!n) return
-      if (n.type === 'hardbreak') foundHardBreak = true
-      if (Array.isArray(n.children)) n.children.forEach(walk)
-      if (Array.isArray(n.items)) n.items.forEach(walk)
+      if (!n)
+        return
+      if (n.type === 'hardbreak')
+        foundHardBreak = true
+      if (Array.isArray(n.children))
+        n.children.forEach(walk)
+      if (Array.isArray(n.items))
+        n.items.forEach(walk)
     }
     nodes.forEach(walk)
     expect(foundHardBreak).toBe(true)

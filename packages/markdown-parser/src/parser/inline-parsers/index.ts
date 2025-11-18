@@ -469,6 +469,11 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
     // 合并连续的 text 节点
     let index = result.length - 1
     let content = String(token.content ?? '').replace(/\\/g, '')
+
+    if (content === '1' && tokens[i - 1]?.tag === 'br') {
+      i++
+      return
+    }
     if (content.startsWith(')') && result[result.length - 1]?.type === 'link') {
       content = content.slice(1)
     }
