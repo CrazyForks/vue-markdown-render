@@ -6,6 +6,25 @@ import type {
 } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 
+// Extract alignment from attrs (e.g. ['style','text-align:left'])
+function extractAlign(attrs: MarkdownToken['attrs']): 'left' | 'right' | 'center' | undefined {
+  if (!attrs)
+    return 'left'
+  for (const a of attrs) {
+    if (!a)
+      continue
+    const [key, val] = a
+    if (!val)
+      continue
+    const value = String(val).trim().toLowerCase()
+    if (key === 'style') {
+      const m = /text-align\s*:\s*(left|right|center)/i.exec(value)
+      if (m)
+        return m[1].toLowerCase() as any
+    }
+  }
+  return 'left'
+}
 export function parseTable(
   tokens: MarkdownToken[],
   index: number,
@@ -14,7 +33,6 @@ export function parseTable(
   let headerRow: TableRowNode | null = null
   const rows: TableRowNode[] = []
   let isHeader = false
-
   while (j < tokens.length && tokens[j].type !== 'table_close') {
     if (tokens[j].type === 'thead_open') {
       isHeader = true
@@ -39,12 +57,14 @@ export function parseTable(
           const isHeaderCell = tokens[k].type === 'th_open'
           const contentToken = tokens[k + 1]
           const content = String(contentToken.content ?? '')
+          const align = extractAlign(tokens[k].attrs)
 
           cells.push({
             type: 'table_cell',
             header: isHeaderCell || isHeader,
             children: parseInlineTokens(contentToken.children || [], content),
             raw: content,
+            align,
           })
 
           k += 3 // Skip th_open/td_open, inline, th_close/td_close

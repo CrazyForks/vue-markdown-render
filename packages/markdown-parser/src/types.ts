@@ -138,6 +138,7 @@ export interface TableCellNode extends BaseNode {
   type: 'table_cell'
   header: boolean
   children: ParsedNode[]
+  align?: 'left' | 'right' | 'center'
 }
 
 export interface DefinitionListNode extends BaseNode {

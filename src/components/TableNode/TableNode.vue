@@ -11,6 +11,7 @@ interface TableCellNode {
     raw: string
   }[]
   raw: string
+  align?: 'left' | 'right' | 'center'
 }
 
 // 定义行节点
@@ -58,7 +59,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
 <template>
   <div class="table-node-wrapper">
     <table
-      class="w-full my-8 text-sm text-left table-fixed table-node"
+      class="w-full my-8 text-sm table-fixed table-node"
       :class="{ 'table-node--loading': isLoading }"
       :aria-busy="isLoading"
     >
@@ -71,7 +72,14 @@ const bodyRows = computed(() => props.node.rows ?? [])
             v-for="(cell, index) in node.header.cells"
             :key="`header-${index}`"
             dir="auto"
-            class="text-left font-semibold truncate p-[calc(4/7*1em)]"
+            class="font-semibold truncate p-[calc(4/7*1em)]"
+            :class="[
+              cell.align === 'right'
+                ? 'text-right'
+                : cell.align === 'center'
+                  ? 'text-center'
+                  : 'text-left',
+            ]"
           >
             <NodeRenderer
               :nodes="cell.children"
@@ -92,7 +100,14 @@ const bodyRows = computed(() => props.node.rows ?? [])
           <td
             v-for="(cell, cellIndex) in row.cells"
             :key="`cell-${rowIndex}-${cellIndex}`"
-            class="text-left truncate p-[calc(4/7*1em)]"
+            class="truncate p-[calc(4/7*1em)]"
+            :class="[
+              cell.align === 'right'
+                ? 'text-right'
+                : cell.align === 'center'
+                  ? 'text-center'
+                  : 'text-left',
+            ]"
             dir="auto"
           >
             <NodeRenderer
