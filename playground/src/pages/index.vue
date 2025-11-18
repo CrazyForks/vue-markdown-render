@@ -71,30 +71,32 @@ const parseOptions = {
     // Example: Log tokens during parsing
     // console.log('Pre-transform tokens:', tokens)
     return tokens.map((token) => {
-      if (token.content === '<') {
-        token.content = ''
-        if (token.children)
-          token.children.length = 0
-      }
-      if (token.type === 'html_block' && /^<\w+/.test(token.content) && !token.content.includes('>')) {
-        token.type = 'inline'
-        token.children = []
-      }
-      if (token.type === 'inline' && /^<\w*/.test(token.content) && !token.content.includes('>')) {
-        token.children.length = 0
-      }
-      if ((token.type === 'inline' || token.type === 'html_block') && token.content.startsWith('<thinking>')) {
-        const loading = !token.content.endsWith('</thinking>')
-        return {
-          children: [
-            {
+      if (token.type === 'inline' && token.content.includes('<thinking')) {
+        token.children = token.children.map((t: any) => {
+          if (t.type === 'html_block' && t.tag === 'thinking') {
+            const m = t.content.match(/<thinking([^>]*)>/)
+            const attrs = []
+            if (m) {
+              const attrString = m[1]
+              const attrRegex = /([^\s=]+)(?:="([^"]*)")?/g
+              let match
+              while ((match = attrRegex.exec(attrString)) !== null) {
+                const attrName = match[1]
+                const attrValue = match[2] || true
+                attrs.push({ name: attrName, value: attrValue })
+              }
+            }
+            // eslint-disable-next-line regexp/no-super-linear-backtracking
+            const content = t.content.replace(/<thinking[^>]*>/, '').replace(/<\/*t*h*i*n*k*i*n*g*>*$/, '')
+            return {
               type: 'thinking',
-              loading,
-              // eslint-disable-next-line regexp/no-super-linear-backtracking
-              content: token.content.replace('<thinking>', '').replace(/<\/*t*h*i*n*k*i*n*g*>*$/, ''),
-            },
-          ],
-        }
+              loading: t.loading,
+              attrs,
+              content,
+            }
+          }
+          return t
+        })
       }
       return token
     })

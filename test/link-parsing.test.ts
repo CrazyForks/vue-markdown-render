@@ -114,4 +114,86 @@ describe('link parsing', () => {
     expect(para.children.length).toBe(1)
     expect(para.children[0].type).toBe('link')
   })
+
+  it('parses link with parentheses and emphasis and ListNode', () => {
+    const special = '- **[Link (Test 1)](https://simonhe.me/)**'
+    const nodes = parseMarkdownToStructure(special, md)
+    expect(nodes[0]).toMatchInlineSnapshot(`
+      {
+        "items": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "content": "Link (Test 1)",
+                            "raw": "Link (Test 1)",
+                            "type": "text",
+                          },
+                        ],
+                        "href": "https://simonhe.me/",
+                        "loading": false,
+                        "raw": "[Link (Test 1)](https://simonhe.me/)",
+                        "text": "Link (Test 1)",
+                        "title": "",
+                        "type": "link",
+                      },
+                    ],
+                    "raw": "****",
+                    "type": "strong",
+                  },
+                ],
+                "raw": "**[Link (Test 1)](https://simonhe.me/)**",
+                "type": "paragraph",
+              },
+            ],
+            "raw": "**[Link (Test 1)](https://simonhe.me/)**",
+            "type": "list_item",
+          },
+        ],
+        "ordered": false,
+        "raw": "**[Link (Test 1)](https://simonhe.me/)**",
+        "start": undefined,
+        "type": "list",
+      }
+    `)
+  })
+
+  it('parses link with parentheses and emphasis', () => {
+    const special = '**[Link (Test 2)](https://simonhe.me/)**'
+    const nodes = parseMarkdownToStructure(special, md)
+    expect(nodes[0]).toMatchInlineSnapshot(`
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "content": "Link (Test 2)",
+                    "raw": "Link (Test 2)",
+                    "type": "text",
+                  },
+                ],
+                "href": "https://simonhe.me/",
+                "loading": false,
+                "raw": "[Link (Test 2)](https://simonhe.me/)",
+                "text": "Link (Test 2)",
+                "title": "",
+                "type": "link",
+              },
+            ],
+            "raw": "****",
+            "type": "strong",
+          },
+        ],
+        "raw": "**[Link (Test 2)](https://simonhe.me/)**",
+        "type": "paragraph",
+      }
+    `)
+  })
 })
