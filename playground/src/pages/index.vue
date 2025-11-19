@@ -2,7 +2,7 @@
 import { Icon } from '@iconify/vue'
 import { useRouter } from 'vue-router'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
-import MarkdownRender from '../../../src/components/NodeRenderer'
+import MarkdownRender from 'vue-renderer-markdown'
 import { removeCustomComponents, setCustomComponents } from '../../../src/utils/nodeComponents'
 import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline'
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'

@@ -26,10 +26,18 @@ export default defineConfig(({ mode }) => {
       Vue(),
       dts({
         outDir: 'dist/types',
+        // Ensure the plugin emits a single `dist/types/exports.d.ts` entry
+        // that re-exports all public types. This helps downstream bundlers
+        // (rollup-plugin-dts) consume a stable entrypoint instead of relying
+        // on ad-hoc merges which can accidentally drop or rename exports.
+        insertTypesEntry: true,
         // Use a build-only tsconfig without path aliases to avoid rewriting
         // imports like "stream-markdown-parser" into relative workspace paths
         // in the emitted .d.ts (which breaks type bundling).
         tsconfigPath: './tsconfig.build.json',
+        // Skip type-checking inside the plugin for faster builds; we keep
+        // `vue-tsc --noEmit` for CI/typecheck separately.
+        skipDiagnostics: true,
       }),
       UnpluginClassExtractor({
         output: 'dist/tailwind.ts',
