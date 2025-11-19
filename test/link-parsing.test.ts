@@ -197,6 +197,35 @@ describe('link parsing', () => {
     `)
   })
 
+  it('parses emphasized link with asterisk inside list item', () => {
+    const special = '- [*DR (Danmarks Radio)*](https://www.dr.dk/nyheder)'
+    const nodes = parseMarkdownToStructure(special, md)
+
+    // Collect link nodes
+    const links: any[] = []
+    const walk = (n: any) => {
+      if (!n)
+        return
+      if (n.type === 'link')
+        links.push(n)
+      if (Array.isArray(n.children))
+        n.children.forEach(walk)
+      if (Array.isArray(n.items))
+        n.items.forEach(walk)
+    }
+    nodes.forEach(walk)
+
+    expect(links.length).toBe(1)
+    expect(links[0].href).toBe('https://www.dr.dk/nyheder')
+    // The parser may keep emphasis markup in link.text or emit nested emphasis nodes.
+    // Accept either form by using the tolerant helper.
+    const found
+      = textIncludes(links[0], 'DR (Danmarks Radio)')
+        || textIncludes(links[0], '*DR (Danmarks Radio)*')
+        || textIncludes(links[0], '_DR (Danmarks Radio)_')
+    expect(found).toBe(true)
+  })
+
   it('parses URL with inline trailing text (no newline)', () => {
     const mdText = `第一个气泡（无换行）：
 http://127.0.0.1:8001/upload/20251118/4737bbe0-c42e-11f0-8471-37360564882d.docx  请在文档末尾增加一段示例内容`

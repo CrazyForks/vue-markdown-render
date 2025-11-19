@@ -1,6 +1,59 @@
 import type { MarkdownIt } from 'markdown-it-ts'
 import type { MarkdownToken } from '../types'
 
+// Small helpers to reduce repetition when building token fragments
+function textToken(content: string) {
+  return {
+    type: 'text',
+    content,
+    raw: content,
+  }
+}
+
+function pushEmOpen(arr: any[], type: number) {
+  if (type === 1) {
+    arr.push({ type: 'em_open', tag: 'em', nesting: 1 })
+  }
+  else if (type === 2) {
+    arr.push({ type: 'strong_open', tag: 'strong', nesting: 1 })
+  }
+  else if (type === 3) {
+    arr.push({ type: 'strong_open', tag: 'strong', nesting: 1 })
+    arr.push({ type: 'em_open', tag: 'em', nesting: 1 })
+  }
+}
+
+function pushEmClose(arr: any[], type: number) {
+  if (type === 1) {
+    arr.push({ type: 'em_close', tag: 'em', nesting: -1 })
+  }
+  else if (type === 2) {
+    arr.push({ type: 'strong_close', tag: 'strong', nesting: -1 })
+  }
+  else if (type === 3) {
+    arr.push({ type: 'em_close', tag: 'em', nesting: -1 })
+    arr.push({ type: 'strong_close', tag: 'strong', nesting: -1 })
+  }
+}
+
+function createLinkToken(text: string, href: string, loading: boolean) {
+  return {
+    type: 'link',
+    loading,
+    href,
+    title: '',
+    text,
+    children: [
+      {
+        type: 'text',
+        content: text,
+        raw: text,
+      },
+    ],
+    raw: String(`[${text}](${href})`),
+  }
+}
+
 // todo: The code below has been refactored because it involves a lot of repetitive data transformations and needs to accommodate different scenarios, such as plain text. It should now be correctly converted to a link.
 export function applyFixLinkTokens(md: MarkdownIt) {
   // Run after the inline rule so markdown-it has produced inline tokens
@@ -31,10 +84,20 @@ export function applyFixLinkTokens(md: MarkdownIt) {
 function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
   if (tokens.length < 4)
     return tokens
-
   for (let i = 0; i <= tokens.length - 1; i++) {
+    if (i < 0) {
+      i = 0
+    }
     if (!tokens[i])
       break
+    if (tokens[i]?.type === 'em_open' && tokens[i - 1]?.type === 'text' && tokens[i - 1].content?.endsWith('*')) {
+      const beforeText = tokens[i - 1].content?.replace(/(\*+)$/, '') || ''
+      tokens[i - 1].content = beforeText
+      // 修改当前 type 'em_open' -> 'strong_open'
+      tokens[i].type = 'strong_open'
+      tokens[i].tag = 'strong'
+      tokens[i].markup = '**'
+    }
     if (tokens[i]?.type === 'text' && tokens[i].content?.endsWith('(') && tokens[i + 1]?.type === 'link_open') {
       const match = tokens[i].content!.match(/\[([^\]]+)\]/)
       if (match) {
@@ -43,66 +106,22 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         const replacerTokens = []
         if (emphasisMatch) {
           beforeText = beforeText.slice(0, emphasisMatch.index)
-          if (beforeText) {
-            replacerTokens.push({
-              type: 'text',
-              content: beforeText,
-              raw: beforeText,
-            })
-          }
+          if (beforeText)
+            replacerTokens.push(textToken(beforeText))
           const text = match[1]
           const type = emphasisMatch[1].length
-          if (type === 1) {
-            replacerTokens.push({ type: 'em_open', tag: 'em', nesting: 1 })
-          }
-          else if (type === 2) {
-            replacerTokens.push({ type: 'strong_open', tag: 'strong', nesting: 1 })
-          }
-          else if (type === 3) {
-            replacerTokens.push({ type: 'strong_open', tag: 'strong', nesting: 1 })
-            replacerTokens.push({ type: 'em_open', tag: 'em', nesting: 1 })
-          }
+          pushEmOpen(replacerTokens, type)
           let href = tokens[i + 2]?.content || ''
           if (tokens[i + 4]?.type === 'text' && !tokens[i + 4].content?.startsWith(')')) {
             href += tokens[i + 4]?.content || ''
             tokens[i + 4].content = ''
           }
-          replacerTokens.push(
-            {
-              type: 'link',
-              loading: !tokens[i + 4]?.content?.startsWith(')'),
-              href,
-              title: '',
-              text,
-              children: [
-                {
-                  type: 'text',
-                  content: text,
-                  raw: text,
-                },
-              ],
-              raw: String(`[${text}](${href})`),
-            },
-          )
-          if (type === 1) {
-            replacerTokens.push({ type: 'em_close', tag: 'em', nesting: -1 })
-          }
-          else if (type === 2) {
-            replacerTokens.push({ type: 'strong_close', tag: 'strong', nesting: -1 })
-          }
-          else if (type === 3) {
-            replacerTokens.push({ type: 'em_close', tag: 'em', nesting: -1 })
-            replacerTokens.push({ type: 'strong_close', tag: 'strong', nesting: -1 })
-          }
+          replacerTokens.push(createLinkToken(text, href, !tokens[i + 4]?.content?.startsWith(')')))
+          pushEmClose(replacerTokens, type)
           if (tokens[i + 4]?.type === 'text') {
             const afterText = tokens[i + 4].content?.replace(/^\)\**/, '')
-            if (afterText) {
-              replacerTokens.push({
-                type: 'text',
-                content: afterText,
-                raw: afterText,
-              })
-            }
+            if (afterText)
+              replacerTokens.push(textToken(afterText))
             tokens.splice(i, 5, ...replacerTokens)
           }
           else {
@@ -110,45 +129,52 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
           }
         }
         else {
-          if (beforeText) {
-            replacerTokens.push({
-              type: 'text',
-              content: beforeText,
-              raw: beforeText,
-            })
+          if (beforeText)
+            replacerTokens.push(textToken(beforeText))
+          let text = match[1]
+          const emphasisMatch = text.match(/^\*+/)
+          if (emphasisMatch) {
+            const type = emphasisMatch[0].length
+            text = text.replace(/^\*+/, '').replace(/\*+$/, '')
+            // Put emphasis inside the link children when the asterisks are inside the brackets
+            // so link nodes will contain the emphasis node as a child.
+            let href = tokens[i + 2]?.content || ''
+            if (tokens[i + 4]?.type === 'text' && !tokens[i + 4].content?.startsWith(')')) {
+              href += tokens[i + 4]?.content || ''
+              tokens[i + 4].content = ''
+            }
+            // wrap the link with emphasis open/close tokens
+            pushEmOpen(replacerTokens, type)
+            replacerTokens.push(createLinkToken(text, href, !tokens[i + 4]?.content?.startsWith(')')))
+            pushEmClose(replacerTokens, type)
+            // we've already pushed the link, skip the standard push below
+            if (tokens[i + 4]?.type === 'text') {
+              const afterText = tokens[i + 4].content?.replace(/^\)/, '')
+              if (afterText)
+                replacerTokens.push(textToken(afterText))
+              tokens.splice(i, 5, ...replacerTokens)
+            }
+            else {
+              tokens.splice(i, 4, ...replacerTokens)
+            }
+            if (i === 0) {
+              i = replacerTokens.length - 1
+            }
+            else {
+              i -= (replacerTokens.length - 1)
+            }
+            continue
           }
-          const text = match[1]
           let href = tokens[i + 2]?.content || ''
           if (tokens[i + 4]?.type === 'text' && !tokens[i + 4].content?.startsWith(')')) {
             href += tokens[i + 4]?.content || ''
             tokens[i + 4].content = ''
           }
-          replacerTokens.push(...[
-            {
-              type: 'link',
-              loading: !tokens[i + 4]?.content?.startsWith(')'),
-              href,
-              title: '',
-              text,
-              children: [
-                {
-                  type: 'text',
-                  content: text,
-                  raw: text,
-                },
-              ],
-              raw: String(`[${text}](${href})`),
-            },
-          ])
+          replacerTokens.push(createLinkToken(text, href, !tokens[i + 4]?.content?.startsWith(')')))
           if (tokens[i + 4]?.type === 'text') {
             const afterText = tokens[i + 4].content?.replace(/^\)/, '')
-            if (afterText) {
-              replacerTokens.push({
-                type: 'text',
-                content: afterText,
-                raw: afterText,
-              })
-            }
+            if (afterText)
+              replacerTokens.push(textToken(afterText))
             tokens.splice(i, 5, ...replacerTokens)
           }
           else {
@@ -174,29 +200,10 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
             tokens[i + 3].content = ''
           }
 
-          replacerTokens.push({
-            type: 'link',
-            loading,
-            href,
-            title: '',
-            text,
-            children: [
-              {
-                type: 'text',
-                content: text,
-                raw: text,
-              },
-            ],
-            raw: String(`[${text}](${href})`),
-          })
+          replacerTokens.push(createLinkToken(text, href, loading))
           const afterText = tokens[i + 3].content?.replace(/^\)\**/, '')
-          if (afterText) {
-            replacerTokens.push({
-              type: 'text',
-              content: afterText,
-              raw: afterText,
-            })
-          }
+          if (afterText)
+            replacerTokens.push(textToken(afterText))
           tokens.splice(i - 4, 8, ...replacerTokens)
         }
         else {
@@ -219,69 +226,81 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         }
         continue
       }
+      else if (tokens[i - 1].content === '](' && tokens[i - 3]?.type === 'text' && tokens[i - 3].content?.endsWith(')')) {
+        // 移除 i-3 的 link部分，合并到 link_open 下的 text中
+        if (tokens[i - 2]?.type === 'strong_open') {
+          const [beforeText, linText] = tokens[i - 3].content?.split('[**') || []
+          tokens[i + 1].content = linText || ''
+          tokens[i - 3].content = beforeText || ''
+          tokens[i - 1].content = ''
+        }
+        else if (tokens[i - 2]?.type === 'em_open') {
+          const [beforeText, linText] = tokens[i - 3].content?.split('[*') || []
+          tokens[i + 1].content = linText || ''
+          tokens[i - 3].content = beforeText || ''
+          tokens[i - 1].content = ''
+        }
+        else {
+          const [beforeText, linText] = tokens[i - 3].content?.split('[') || []
+          tokens[i + 1].content = linText || ''
+          tokens[i - 3].content = beforeText || ''
+          tokens[i - 1].content = ''
+        }
+      }
     }
-    if (tokens[i].type === 'link_close' && tokens[i].nesting === -1 && tokens[i + 1]?.type === 'text' && tokens[i - 1]?.type === 'text' && tokens[i + 2]?.type !== 'link_open') {
+    if (tokens[i].type === 'link_close' && tokens[i].nesting === -1 && tokens[i + 1]?.type === 'text' && tokens[i - 1]?.type === 'text') {
       // 修复链接后多余文本被包含在链接内的问题
-      tokens[i - 2].loading = true
+      let loading = true
       const text = tokens[i - 1].content || ''
       let href = tokens[i - 2].attrs?.[0]?.[1] || ''
       let count = 3
+      let deleteCount = 2
+      const beforeText = tokens[i - 3]?.content || ''
+      const emphasisMatch = beforeText.match(/^(\*+)$/)
+      const replacerTokens: any[] = []
+      if (emphasisMatch) {
+        deleteCount += 1
+        const type = emphasisMatch[1].length
+        pushEmOpen(replacerTokens, type)
+      }
+      if (tokens[i].markup === '' || (tokens[i + 1].type === 'text' && (tokens[i + 1].content === '.' || tokens[i + 1].content === '?'))) {
+        loading = false
+      }
+
       if (tokens[i].markup === 'linkify' && tokens[i + 1]?.type === 'text' && !tokens[i + 1]?.content?.startsWith(' ')) {
         const m = (tokens[i + 1]?.content ?? '').indexOf(')')
         if (m === -1) {
           href += (tokens[i + 1]?.content?.slice(0, m) || '')
           tokens[i + 1].content = ''
         }
+        else {
+          loading = false
+        }
         count += 1
       }
-      tokens.splice(i - 2, count, {
-        type: 'link',
-        loading: false,
-        href,
-        title: '',
-        text,
-        children: [
-          {
-            type: 'text',
-            content: text,
-            raw: text,
-          },
-        ],
-        raw: String(`[${text}](${href})`),
-      } as any)
-    }
-    else if (tokens[i].content?.startsWith('](') && tokens[i - 1].markup?.includes('*') && tokens[i - 4].type === 'text' && tokens[i - 4].content?.endsWith('[')) {
-      const type = tokens[i - 1].markup!.length
-      const replacerTokens = []
-      const beforeText = tokens[i - 4].content!.slice(0, tokens[i - 4].content!.length - 1 - type)
-      if (beforeText) {
-        replacerTokens.push({
-          type: 'text',
-          content: beforeText,
-          raw: beforeText,
-        })
-      }
-      if (type === 1) {
-        replacerTokens.push({ type: 'em_open', tag: 'em', nesting: 1 })
-      }
-      else if (type === 2) {
-        replacerTokens.push({ type: 'strong_open', tag: 'strong', nesting: 1 })
-      }
-      else if (type === 3) {
-        replacerTokens.push({ type: 'strong_open', tag: 'strong', nesting: 1 })
-        replacerTokens.push({ type: 'em_open', tag: 'em', nesting: 1 })
-      }
-      const text = tokens[i - 2].content || ''
-      let href = tokens[i].content!.slice(2)
-      let loading = true
-      if (tokens[i + 1]?.type === 'text') {
-        const m = (tokens[i + 1]?.content ?? '').indexOf(')')
-        loading = m === -1
-        if (m === -1) {
-          href += (tokens[i + 1]?.content?.slice(0, m) || '')
-          tokens[i + 1].content = ''
+      else if (tokens[i + 1].type === 'text' && tokens[i + 1]?.content?.startsWith('](')) {
+        count += 1
+        for (let j = i + 1; j < tokens.length; j++) {
+          const type = emphasisMatch ? emphasisMatch[1].length : tokens[i - 3].markup!.length
+          const t = tokens[j]
+          if (type === 1 && t.type === 'em_close') {
+            loading = false
+            break
+          }
+          else if (type === 2 && t.type === 'strong_close') {
+            loading = false
+            break
+          }
+          else if (type === 3) {
+            if (t.type === 'em_close' || t.type === 'strong_close') {
+              loading = false
+              break
+            }
+          }
+          count += 1
         }
       }
+
       replacerTokens.push({
         type: 'link',
         loading,
@@ -296,26 +315,39 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
           },
         ],
         raw: String(`[${text}](${href})`),
-      })
-      if (type === 1) {
-        replacerTokens.push({ type: 'em_close', tag: 'em', nesting: -1 })
+      } as any)
+      if (emphasisMatch) {
+        const type = emphasisMatch[1].length
+        pushEmClose(replacerTokens, type)
       }
-      else if (type === 2) {
-        replacerTokens.push({ type: 'strong_close', tag: 'strong', nesting: -1 })
+      tokens.splice(i - deleteCount, count, ...replacerTokens)
+      i -= (replacerTokens.length - 1)
+      continue
+    }
+    else if (tokens[i].content?.startsWith('](') && tokens[i - 1].markup?.includes('*') && tokens[i - 4]?.type === 'text' && tokens[i - 4].content?.endsWith('[')) {
+      const type = tokens[i - 1].markup!.length
+      const replacerTokens = []
+      const beforeText = tokens[i - 4].content!.slice(0, tokens[i - 4].content!.length - type)
+      if (beforeText)
+        replacerTokens.push(textToken(beforeText))
+      pushEmOpen(replacerTokens, type)
+      const text = tokens[i - 2].content || ''
+      let href = tokens[i].content!.slice(2)
+      let loading = true
+      if (tokens[i + 1]?.type === 'text') {
+        const m = (tokens[i + 1]?.content ?? '').indexOf(')')
+        loading = m === -1
+        if (m === -1) {
+          href += (tokens[i + 1]?.content?.slice(0, m) || '')
+          tokens[i + 1].content = ''
+        }
       }
-      else if (type === 3) {
-        replacerTokens.push({ type: 'em_close', tag: 'em', nesting: -1 })
-        replacerTokens.push({ type: 'strong_close', tag: 'strong', nesting: -1 })
-      }
+      replacerTokens.push(createLinkToken(text, href, loading))
+      pushEmClose(replacerTokens, type)
       if (tokens[i + 1]?.type === 'text') {
         const afterText = tokens[i + 1].content?.replace(/^\)\**/, '')
-        if (afterText) {
-          replacerTokens.push({
-            type: 'text',
-            content: afterText,
-            raw: afterText,
-          })
-        }
+        if (afterText)
+          replacerTokens.push(textToken(afterText))
         tokens.splice(i - 4, 8, ...replacerTokens)
       }
       else if (tokens[i + 1]?.type === 'link_open') {

@@ -509,21 +509,23 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
     if (handleCheckboxLike(content))
       return
     const preToken = tokens[i - 1]
-    if ((content === '[' && !nextToken?.markup?.includes('*')) || (content === ']' && !preToken.markup?.includes('*'))) {
+    if ((content === '[' && !nextToken?.markup?.includes('*')) || (content === ']' && !preToken?.markup?.includes('*'))) {
       i++
       return
     }
     if (handleInlineCodeContent(content, token))
       return
-    if (handleEmphasisAndStrikethrough(content, token))
-      return
+
     if (handleInlineImageContent(content, token))
       return
 
-    const textNode = parseTextToken({ ...token, content })
-
     if (handleInlineLinkContent(content, token))
       return
+
+    if (handleEmphasisAndStrikethrough(content, token))
+      return
+
+    const textNode = parseTextToken({ ...token, content })
     if (currentTextNode) {
       // Merge with the previous text node
       currentTextNode.content += textNode.content.replace(/(\*+|\(|\\)$/, '')
@@ -729,18 +731,68 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
       const linkContentEnd = content.indexOf(')', linkEnd)
       const href = linkContentEnd !== -1 ? content.slice(linkEnd + 2, linkContentEnd) : ''
       const loading = linkContentEnd === -1
-
+      let emphasisMatch = textNodeContent.match(/\*+$/)
+      if (emphasisMatch) {
+        textNodeContent = textNodeContent.replace(/\*+$/, '')
+      }
       if (textNodeContent) {
         pushText(textNodeContent, textNodeContent)
       }
-      pushParsed({
-        type: 'link',
-        href,
-        title: null,
-        text,
-        children: [{ type: 'text', content: text, raw: text }],
-        loading,
-      } as ParsedNode)
+      if (!emphasisMatch)
+        emphasisMatch = text.match(/^\*+/)
+      if (emphasisMatch) {
+        const type = emphasisMatch[0].length
+        text = text.replace(/^\*+/, '').replace(/\*+$/, '')
+        const newTokens = []
+        if (type === 1) {
+          newTokens.push({ type: 'em_open', tag: 'em', nesting: 1 })
+        }
+        else if (type === 2) {
+          newTokens.push({ type: 'strong_open', tag: 'strong', nesting: 1 })
+        }
+        else if (type === 3) {
+          newTokens.push({ type: 'strong_open', tag: 'strong', nesting: 1 })
+          newTokens.push({ type: 'em_open', tag: 'em', nesting: 1 })
+        }
+        newTokens.push({
+          type: 'link',
+          href,
+          title: null,
+          text,
+          children: [{ type: 'text', content: text, raw: text }],
+          loading,
+        })
+        if (type === 1) {
+          newTokens.push({ type: 'em_close', tag: 'em', nesting: -1 })
+          const { node } = parseEmphasisToken(newTokens, 0)
+          pushNode(node)
+        }
+        else if (type === 2) {
+          newTokens.push({ type: 'strong_close', tag: 'strong', nesting: -1 })
+          const { node } = parseStrongToken(newTokens, 0)
+          pushNode(node)
+        }
+        else if (type === 3) {
+          newTokens.push({ type: 'em_close', tag: 'em', nesting: -1 })
+          newTokens.push({ type: 'strong_close', tag: 'strong', nesting: -1 })
+          const { node } = parseStrongToken(newTokens, 0)
+          pushNode(node)
+        }
+        else {
+          const { node } = parseEmphasisToken(newTokens, 0)
+          pushNode(node)
+        }
+      }
+      else {
+        pushParsed({
+          type: 'link',
+          href,
+          title: null,
+          text,
+          children: [{ type: 'text', content: text, raw: text }],
+          loading,
+        } as ParsedNode)
+      }
 
       const afterText = linkContentEnd !== -1 ? content.slice(linkContentEnd + 1) : ''
       if (afterText) {

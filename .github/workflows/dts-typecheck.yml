@@ -2,9 +2,9 @@ name: Types Declaration Check
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   dts-and-typecheck:

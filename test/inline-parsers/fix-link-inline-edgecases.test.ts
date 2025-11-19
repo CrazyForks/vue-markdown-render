@@ -25,7 +25,7 @@ describe('fix-link-inline edge cases', () => {
     const links = collectLinks(nodes as any[])
     if (links.length > 0) {
       const l = links[0]
-      const textOk = l.text === '*x' || (l.children && l.children.some((c: any) => c.type === 'emphasis'))
+      const textOk = l.text === 'x' || (l.children && l.children.some((c: any) => c.type === 'emphasis'))
       expect(textOk).toBe(true)
       expect(!!l.loading).toBe(true)
     }

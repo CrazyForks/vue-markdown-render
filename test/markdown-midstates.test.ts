@@ -150,7 +150,7 @@ describe('parseMarkdownToStructure - incremental/mid-typing states', () => {
       const ls = links(nodes)
       if (ls.length > 0) {
         const l = ls[0]
-        const textOk = l.text === '*x' || (l.children && textIncludes(l.children, 'emphasis'))
+        const textOk = l.text === 'x' || (l.children && textIncludes(l.children, 'emphasis'))
         expect(textOk).toBe(true)
         expect(!!l.loading).toBe(true)
       }

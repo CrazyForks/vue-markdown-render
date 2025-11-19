@@ -1,5 +1,5 @@
-import fs from 'fs'
-import path from 'path'
+import fs from 'node:fs'
+import path from 'node:path'
 import dts from 'rollup-plugin-dts'
 
 // Bundle the generated declaration entry into a single dist/index.d.ts.
