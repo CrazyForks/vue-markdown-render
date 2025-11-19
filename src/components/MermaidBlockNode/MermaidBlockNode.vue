@@ -32,12 +32,14 @@ const props = withDefaults(
 )
 const emits = defineEmits(['copy'])
 let mermaid: any = null
+const mermaidAvailable = ref(false)
 
 // Only initialize mermaid on the client to avoid SSR errors
 if (typeof window !== 'undefined') {
   ;(async () => {
     mermaid = await getMermaid()
-    mermaid.initialize?.({ startOnLoad: false, securityLevel: 'loose' })
+    mermaidAvailable.value = !!mermaid
+    mermaid?.initialize?.({ startOnLoad: false, securityLevel: 'loose' })
   })()
 }
 
@@ -77,6 +79,7 @@ const translateY = ref(0)
 const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
 const showSource = ref(false)
+const userToggledShowSource = ref(false)
 const isRendering = ref(false)
 const renderQueue = ref<Promise<void> | null>(null)
 const RENDER_DEBOUNCE_DELAY = 300
@@ -564,6 +567,11 @@ function checkContentStability() {
     return
   }
 
+  // 如果 mermaid 不可用，则不要在源码稳定后切换到预览
+  if (!mermaidAvailable.value) {
+    return
+  }
+
   const currentLength = baseFixedCode.value.length
 
   // 只要长度不一致，就认为内容在变化
@@ -739,6 +747,7 @@ async function exportSvg() {
 async function switchMode(target: 'source' | 'preview') {
   const el = modeContainerRef.value
   if (!el) {
+    userToggledShowSource.value = true
     showSource.value = (target === 'source')
     return
   }
@@ -748,6 +757,7 @@ async function switchMode(target: 'source' | 'preview') {
   el.style.overflow = 'hidden'
 
   // Toggle mode
+  userToggledShowSource.value = true
   showSource.value = (target === 'source')
   await nextTick()
 
@@ -1103,7 +1113,7 @@ watch(
     // Use idle progressive path; will call initMermaid when full code becomes valid
     debouncedProgressiveRender()
     // Ensure background polling while previewing (to upgrade to full render when ready)
-    if (!showSource.value)
+    if (!showSource.value && mermaidAvailable.value)
       startPreviewPolling()
     checkContentStability()
   },
@@ -1174,6 +1184,9 @@ watch(
         return
       }
       await nextTick()
+      // If mermaid is not available, do not attempt progressive render or start polling
+      if (!mermaidAvailable.value)
+        return
       // Use progressive path to avoid throwing on incomplete code
       await progressiveRender()
       // Start background polling to auto-upgrade to full render when ready
@@ -1263,11 +1276,25 @@ watch(
 
 onMounted(async () => {
   await nextTick()
+  // Set initial default tab based on mermaid availability (unless user already toggled)
+  if (!userToggledShowSource.value) {
+    showSource.value = !mermaidAvailable.value
+  }
   if (viewportReady.value) {
     debouncedProgressiveRender()
     lastContentLength.value = baseFixedCode.value.length
   }
 })
+
+// Auto-update default tab when mermaid availability changes, but don't override user actions
+watch(
+  () => mermaidAvailable.value,
+  (available) => {
+    if (userToggledShowSource.value)
+      return
+    showSource.value = !available
+  },
+)
 
 watch(
   () => viewportReady.value,
@@ -1347,7 +1374,7 @@ const computedButtonStyle = computed(() => {
       </div>
 
       <!-- 中间切换按钮 -->
-      <div class="flex items-center space-x-1 rounded-md p-0.5" :class="props.isDark ? 'bg-gray-700' : 'bg-gray-100'">
+      <div v-if="mermaidAvailable" class="flex items-center space-x-1 rounded-md p-0.5" :class="props.isDark ? 'bg-gray-700' : 'bg-gray-100'">
         <button
           class="px-2.5 py-1 text-xs rounded transition-colors"
           :class="[
@@ -1411,6 +1438,7 @@ const computedButtonStyle = computed(() => {
           <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
         </button>
         <button
+          v-if="mermaidAvailable"
           :class="`${computedButtonStyle} ${isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : ''}`"
           :disabled="isFullscreenDisabled"
           @click="exportSvg"
@@ -1422,6 +1450,7 @@ const computedButtonStyle = computed(() => {
           <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 15V3m9 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10l5 5l5-5" /></g></svg>
         </button>
         <button
+          v-if="mermaidAvailable"
           :class="`${computedButtonStyle} ${isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : ''}`"
           :disabled="isFullscreenDisabled"
           @click="openModal"
