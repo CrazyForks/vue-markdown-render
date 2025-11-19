@@ -24,8 +24,8 @@ importers:
         specifier: '>=0.0.9'
         version: 0.0.9(shiki@3.14.0)
       stream-markdown-parser:
-        specifier: workspace:*
-        version: link:packages/markdown-parser
+        specifier: ^0.0.26
+        version: 0.0.26
       stream-monaco:
         specifier: '>=0.0.2'
         version: 0.0.2(monaco-editor@0.52.2)
@@ -159,7 +159,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.1)(@vitest/ui@4.0.10)(jiti@2.6.1)(jsdom@24.1.3)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.1)
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.1)(@vitest/ui@4.0.10(vitest@4.0.10))(jiti@2.6.1)(jsdom@24.1.3)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.1)
 
   playground:
     dependencies:
@@ -195,7 +195,7 @@ importers:
         version: 11.1.12(vue@3.5.24(typescript@5.9.3))
       vue-renderer-markdown:
         specifier: latest
-        version: 0.0.62-beta.5(katex@0.16.25)(mermaid@11.12.1)(shiki@3.14.0)(stream-markdown@0.0.9(shiki@3.14.0))(stream-monaco@0.0.2(monaco-editor@0.52.2))(vue-i18n@11.1.12(vue@3.5.24(typescript@5.9.3)))(vue@3.5.24(typescript@5.9.3))
+        version: 0.0.62-beta.8(katex@0.16.25)(mermaid@11.12.1)(shiki@3.14.0)(stream-markdown@0.0.9(shiki@3.14.0))(stream-monaco@0.0.2(monaco-editor@0.52.2))(vue-i18n@11.1.12(vue@3.5.24(typescript@5.9.3)))(vue@3.5.24(typescript@5.9.3))
       vue-router:
         specifier: ^4.6.3
         version: 4.6.3(vue@3.5.24(typescript@5.9.3))
@@ -3959,8 +3959,8 @@ packages:
   std-env@3.10.0:
     resolution: {integrity: sha512-5GS12FdOZNliM5mAOxFRg7Ir0pWz8MdpYm6AY6VPkGpbA7ZzmbzNcBJQ0GPvvyWgcY7QAhCgf9Uy89I03faLkg==}
 
-  stream-markdown-parser@0.0.24:
-    resolution: {integrity: sha512-wNTvcBDI30jKrn+KvcHUaC2MalDPCi5bvAOoCPN0U2tlhTNjex/5bgLRe7/boVkqsPEh+ntf6iG7BN0kqvZLZQ==}
+  stream-markdown-parser@0.0.26:
+    resolution: {integrity: sha512-ednPqHArQj0+VB1XcS2nNn6PNtHrnhXeI4XA+OAay0jDCHjQVB4c7McS2HGWub8E0WA1cV1VrNB+l6RzLT6i0Q==}
 
   stream-markdown@0.0.9:
     resolution: {integrity: sha512-oodVRz9a4AF03eIkOZkP4LIAw0UusWU2KJwQLDI4Yu463KEYVCdsHpdg0OjLdRgh55aT97N5E6y77CJfauWgoA==}
@@ -4614,8 +4614,8 @@ packages:
     peerDependencies:
       vue: ^3.0.0
 
-  vue-renderer-markdown@0.0.62-beta.5:
-    resolution: {integrity: sha512-LaUzK/pQacsVKx72K/Ja184Tk4iEoCGLvtRtAyTF6tIIkZWBf4Vb9H7e5rG/thp5wWgT4sk5WX+FxCfQYsGmnw==}
+  vue-renderer-markdown@0.0.62-beta.8:
+    resolution: {integrity: sha512-UIn2mNHgfezU16znz2pDGC2uet7yM/qihfCh0YOYlu3tLeJtBufAINpJ9XOxj2ISji/QQsC7Hy2tJlwl+ayRSQ==}
     peerDependencies:
       katex: '>=0.16.22'
       mermaid: '>=11'
@@ -8848,7 +8848,7 @@ snapshots:
 
   std-env@3.10.0: {}
 
-  stream-markdown-parser@0.0.24:
+  stream-markdown-parser@0.0.26:
     dependencies:
       markdown-it-container: 4.0.0
       markdown-it-emoji: 3.0.0
@@ -9464,7 +9464,7 @@ snapshots:
       - typescript
       - universal-cookie
 
-  vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.1)(@vitest/ui@4.0.10)(jiti@2.6.1)(jsdom@24.1.3)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.1):
+  vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.1)(@vitest/ui@4.0.10(vitest@4.0.10))(jiti@2.6.1)(jsdom@24.1.3)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.1):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/expect': 3.2.4
@@ -9589,10 +9589,10 @@ snapshots:
       '@vue/devtools-api': 6.6.4
       vue: 3.5.24(typescript@5.9.3)
 
-  vue-renderer-markdown@0.0.62-beta.5(katex@0.16.25)(mermaid@11.12.1)(shiki@3.14.0)(stream-markdown@0.0.9(shiki@3.14.0))(stream-monaco@0.0.2(monaco-editor@0.52.2))(vue-i18n@11.1.12(vue@3.5.24(typescript@5.9.3)))(vue@3.5.24(typescript@5.9.3)):
+  vue-renderer-markdown@0.0.62-beta.8(katex@0.16.25)(mermaid@11.12.1)(shiki@3.14.0)(stream-markdown@0.0.9(shiki@3.14.0))(stream-monaco@0.0.2(monaco-editor@0.52.2))(vue-i18n@11.1.12(vue@3.5.24(typescript@5.9.3)))(vue@3.5.24(typescript@5.9.3)):
     dependencies:
       '@floating-ui/dom': 1.7.4
-      stream-markdown-parser: 0.0.24
+      stream-markdown-parser: link:packages/markdown-parser
       vue: 3.5.24(typescript@5.9.3)
     optionalDependencies:
       katex: 0.16.25
