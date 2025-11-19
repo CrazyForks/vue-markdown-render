@@ -41,6 +41,7 @@
       "require": "./dist/index.js"
     },
     "./index.css": "./dist/index.css",
+    "./index.tailwind.css": "./dist/index.tailwind.css",
     "./tailwind": "./dist/tailwind.ts",
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
     "./workers/mermaidParser.worker": "./dist/workers/mermaidParser.worker.js"
@@ -65,7 +66,7 @@
     "play": "pnpm run -C playground dev",
     "play:build": "pnpm run -C playground build",
     "preview": "pnpm run -C playground preview",
-    "build": "vite build --mode npm && pnpm run build:dts",
+    "build": "vite build --mode npm && vite build --config vite.config.tailwind.ts --mode npm && pnpm run build:dts",
     "docs:dev": "vitepress dev docs",
     "docs:sync-zh": "node scripts/sync-zh-docs.mjs",
     "docs:check-zh": "node scripts/check-zh-parity.mjs",
