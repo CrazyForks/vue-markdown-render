@@ -20,8 +20,5 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build d.ts bundle
-        run: pnpm run build:dts
-
       - name: Run typecheck
         run: pnpm run typecheck
