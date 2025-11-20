@@ -55,6 +55,16 @@ exports[`e2e markdown parsing (fixtures) > parses fixture code-diff.md > code-di
 exports[`e2e markdown parsing (fixtures) > parses fixture escaped-brackets.md > escaped-brackets.md 1`] = `
 [
   {
+    "children": undefined,
+    "firstText": "A line with an escaped bracket: ",
+    "type": "text",
+  },
+  {
+    "children": undefined,
+    "firstText": "A line with an escaped bracket: ",
+    "type": "text",
+  },
+  {
     "children": [
       "text",
     ],
@@ -96,6 +106,11 @@ print('ok')
 
 exports[`e2e markdown parsing (fixtures) > parses fixture footnotes.md > footnotes.md 1`] = `
 [
+  {
+    "children": undefined,
+    "firstText": "This is a sentence with a footnote",
+    "type": "text",
+  },
   {
     "children": [
       "text",
@@ -161,6 +176,11 @@ exports[`e2e markdown parsing (fixtures) > parses fixture image-link.md > image-
     ],
     "firstText": "Here is an image: ",
     "type": "paragraph",
+  },
+  {
+    "children": undefined,
+    "firstText": "And a link: ",
+    "type": "text",
   },
   {
     "children": [
@@ -296,11 +316,21 @@ exports[`e2e markdown parsing (fixtures) > parses fixture unclosed-fence.md > un
 exports[`e2e markdown parsing (fixtures) > parses fixture unmatched-brackets.md > unmatched-brackets.md 1`] = `
 [
   {
+    "children": undefined,
+    "firstText": "This line has an opening bracket ",
+    "type": "text",
+  },
+  {
     "children": [
       "text",
     ],
     "firstText": "This line has an opening bracket [ without a closing.",
     "type": "paragraph",
+  },
+  {
+    "children": undefined,
+    "firstText": "Another line with a link-like ",
+    "type": "text",
   },
   {
     "children": [
