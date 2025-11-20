@@ -6,7 +6,9 @@ export const MathInlineNodeAsync = defineAsyncComponent(async () => {
   // In test environment prefer the simple text fallback to avoid
   // race conditions with workers/KaTeX rendering.
   const isTestEnv = typeof globalThis !== 'undefined'
+    // eslint-disable-next-line node/prefer-global/process
     && typeof (globalThis as any).process !== 'undefined'
+    // eslint-disable-next-line node/prefer-global/process
     && (globalThis as any).process?.env?.NODE_ENV === 'test'
   if (isTestEnv) {
     return (props) => {
