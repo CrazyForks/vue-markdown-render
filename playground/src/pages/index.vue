@@ -3,7 +3,7 @@ import { Icon } from '@iconify/vue'
 import MarkdownRender from 'vue-renderer-markdown'
 import { useRouter } from 'vue-router'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
-import { removeCustomComponents, setCustomComponents } from '../../../src/utils/nodeComponents'
+import { setCustomComponents } from '../../../src/utils/nodeComponents'
 import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline'
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
 import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
@@ -182,465 +182,89 @@ function formatThemeName(themeName: string) {
 // 设置面板显示状态
 const showSettings = ref(false)
 
-// Auto-scroll to bottom as content streams in
+// Use reversed column layout and let the browser handle native scrolling.
+// Removed custom JS scroll management (observers, programmatic scroll, and
+// pointer/wheel/touch heuristics) to rely on CSS `flex-direction: column-reverse`.
 const messagesContainer = ref<HTMLElement | null>(null)
-const autoScrollEnabled = ref(true) // Track if auto-scroll is enabled
-const lastScrollTop = ref(0) // Track last scroll position to detect scroll direction
-// Track the last user-driven scroll direction: 'none' (no user scroll yet), 'up', or 'down'
-const lastUserScrollDirection = ref<'none' | 'up' | 'down'>('none')
-// Timestamp of last user scroll event (ms)
-const lastUserScrollTime = ref(0)
-// Flag to ignore scroll events caused by our own programmatic scrolling
-const isProgrammaticScroll = ref(false)
-let lastKnownScrollHeight = 0
-// Check if user is at the bottom of scroll area (fallback based on pixels)
-function isAtBottom(element: HTMLElement, threshold = 50): boolean {
-  return element.scrollHeight - element.scrollTop - element.clientHeight <= threshold
-}
 
-// IntersectionObserver sentinel ref for robust bottom detection (better on mobile)
-const bottomSentinel = ref<HTMLElement | null>(null)
-let bottomObserver: IntersectionObserver | null = null
+// 性能友好的监听：使用 ResizeObserver 监听容器和渲染内容变化，
+// 当内容高度超过容器可见高度时，为 `.markdown-renderer` 添加 `disable-min-height` 类以移除 min-height。
+let __roContainer: ResizeObserver | null = null
+let __roContent: ResizeObserver | null = null
+let __mo: MutationObserver | null = null
+let __scheduled = false
+// Observers and scheduler
 
-// ResizeObserver to detect content height changes (for async rendering like code highlighting, mermaid, etc.)
-let contentResizeObserver: ResizeObserver | null = null
-// MutationObserver to detect DOM changes (like table loading -> content)
-let contentMutationObserver: MutationObserver | null = null
-
-function setupBottomObserver() {
-  if (!messagesContainer.value)
+function scheduleCheckMinHeight() {
+  if (__scheduled)
     return
-
-  // If already observing, disconnect first
-  if (bottomObserver) {
-    bottomObserver.disconnect()
-    bottomObserver = null
-  }
-
-  // Create observer that watches a tiny sentinel element positioned after the content.
-  // When visible, we consider the user to be at (or very near) the bottom and can
-  // re-enable auto-scroll. This approach is more reliable on mobile where scroll
-  // metrics and visualViewport changes can be noisy.
-  // We use a slight negative bottom rootMargin so the sentinel becomes "intersecting"
-  // a little before the true bottom. This helps on mobile where layout/viewport
-  // adjustments (keyboard, visualViewport) can delay reaching the exact scroll bottom.
-  const BOTTOM_OBSERVER_ROOT_MARGIN = '0px 0px -120px 0px' // trigger ~120px before bottom
-
-  bottomObserver = new IntersectionObserver((entries) => {
-    for (const entry of entries) {
-      if (entry.isIntersecting) {
-        // Re-enable auto-scroll only if the user hasn't recently scrolled up.
-        // This prevents interrupting an intentional user scroll away from bottom.
-        // If lastUserScrollDirection is 'up' and recent, don't re-enable immediately.
-        const recentUser = Date.now() - lastUserScrollTime.value < 1000
-        if (lastUserScrollDirection.value === 'up' && recentUser) {
-          // Keep auto-scroll disabled for now.
-          return
-        }
-
-        autoScrollEnabled.value = true
+  __scheduled = true
+  requestAnimationFrame(() => {
+    __scheduled = false
+    const container = messagesContainer.value
+    if (!container)
+      return
+    const contentEl = container.querySelector('.markdown-renderer') as HTMLElement | null
+    if (!contentEl)
+      return
+    const shouldRemove = contentEl.scrollHeight > container.clientHeight
+    if (shouldRemove) {
+      contentEl.classList.add('disable-min-height')
+      // 内容已超出：不再需要继续监听，断开所有 observer 以节省开销
+      try {
+        __roContainer?.disconnect()
+        __roContent?.disconnect()
+        __mo?.disconnect()
+      }
+      finally {
+        __roContainer = null
+        __roContent = null
+        __mo = null
       }
     }
-  }, {
-    root: messagesContainer.value,
-    rootMargin: BOTTOM_OBSERVER_ROOT_MARGIN,
-    threshold: 0,
-  })
-
-  // Observe the sentinel if it exists. If sentinel isn't present yet, try again
-  // after a microtask (it will be present after nextTick when rendering).
-  nextTick(() => {
-    if (bottomSentinel.value)
-      bottomObserver?.observe(bottomSentinel.value)
-  })
-}
-
-function teardownBottomObserver() {
-  if (bottomObserver) {
-    bottomObserver.disconnect()
-    bottomObserver = null
-  }
-}
-
-// Unified function to perform auto-scroll to bottom
-let scrollCheckTimeoutId: number | null = null
-let lastScrollAttemptTime = 0
-function performAutoScrollIfNeeded(force = false) {
-  if (!messagesContainer.value || !autoScrollEnabled.value)
-    return
-
-  const container = messagesContainer.value
-  const nearBottom = isAtBottom(container, 150)
-  const shouldScroll = force || nearBottom
-  if (!shouldScroll)
-    return
-
-  const doImmediateScroll = () => {
-    executeScroll()
-    lastScrollAttemptTime = Date.now()
-    // Run a follow-up on the next frame so late layout changes still snap to bottom.
-    requestAnimationFrame(() => {
-      executeScroll()
-      lastScrollAttemptTime = Date.now()
-    })
-  }
-
-  if (force) {
-    if (scrollCheckTimeoutId !== null) {
-      clearTimeout(scrollCheckTimeoutId)
-      scrollCheckTimeoutId = null
-    }
-    doImmediateScroll()
-    return
-  }
-
-  const now = Date.now()
-  const timeSinceLastScroll = now - lastScrollAttemptTime
-
-  if (timeSinceLastScroll > 16)
-    doImmediateScroll()
-
-  if (scrollCheckTimeoutId !== null)
-    clearTimeout(scrollCheckTimeoutId)
-
-  scrollCheckTimeoutId = window.setTimeout(() => {
-    doImmediateScroll()
-    scrollCheckTimeoutId = null
-  }, 10)
-}
-
-function forceScrollWithFrames(frameCount = 2) {
-  if (!autoScrollEnabled.value)
-    return
-
-  let remaining = Math.max(0, frameCount)
-  const step = () => {
-    performAutoScrollIfNeeded(true)
-    if (remaining <= 0)
-      return
-    remaining -= 1
-    requestAnimationFrame(step)
-  }
-  step()
-}
-
-function executeScroll() {
-  if (!messagesContainer.value)
-    return
-
-  try {
-    isProgrammaticScroll.value = true
-    const targetScroll = messagesContainer.value.scrollHeight
-    messagesContainer.value.scrollTo({ top: targetScroll, behavior: 'auto' })
-
-    // Wait for scroll to settle, then update lastScrollTop
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (messagesContainer.value) {
-          lastScrollTop.value = messagesContainer.value.scrollTop
-          lastKnownScrollHeight = messagesContainer.value.scrollHeight
-        }
-        isProgrammaticScroll.value = false
-      })
-    })
-  }
-  catch {
-    isProgrammaticScroll.value = false
-  }
-}
-
-// Setup ResizeObserver to detect content height changes
-function setupContentResizeObserver() {
-  if (!messagesContainer.value)
-    return
-
-  // Disconnect existing observer if any
-  if (contentResizeObserver) {
-    contentResizeObserver.disconnect()
-    contentResizeObserver = null
-  }
-
-  // Track the last known scroll height to detect when content grows
-  let lastContentHeight = messagesContainer.value.scrollHeight
-
-  contentResizeObserver = new ResizeObserver(() => {
-    if (!messagesContainer.value)
-      return
-
-    const currentHeight = messagesContainer.value.scrollHeight
-    // Only react to height increases (new content rendered)
-    if (currentHeight > lastContentHeight)
-      forceScrollWithFrames(3)
-    lastContentHeight = currentHeight
-  })
-
-  // Observe the entire messages container for size changes
-  contentResizeObserver.observe(messagesContainer.value)
-}
-
-// Setup MutationObserver to detect DOM changes (table content loading, etc.)
-function setupContentMutationObserver() {
-  if (!messagesContainer.value)
-    return
-
-  // Disconnect existing observer if any
-  if (contentMutationObserver) {
-    contentMutationObserver.disconnect()
-    contentMutationObserver = null
-  }
-
-  contentMutationObserver = new MutationObserver((mutations) => {
-    // Check if any mutation affected the content
-    let shouldCheck = false
-    for (const mutation of mutations) {
-      // Check for childList changes (nodes added/removed)
-      if (mutation.type === 'childList' && (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0)) {
-        shouldCheck = true
-        break
-      }
-      // Check for attribute changes that might affect layout (class, style)
-      if (mutation.type === 'attributes' && (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
-        shouldCheck = true
-        break
-      }
-    }
-
-    if (shouldCheck) {
-      // Use nextTick to ensure Vue has finished updating
-      queueMicrotask(() => {
-        forceScrollWithFrames(3)
-      })
+    else {
+      contentEl.classList.remove('disable-min-height')
     }
   })
-
-  // Observe the messages container and its entire subtree
-  contentMutationObserver.observe(messagesContainer.value, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class', 'style'],
-  })
-}
-
-function teardownContentResizeObserver() {
-  if (contentResizeObserver) {
-    contentResizeObserver.disconnect()
-    contentResizeObserver = null
-  }
-}
-
-function teardownContentMutationObserver() {
-  if (contentMutationObserver) {
-    contentMutationObserver.disconnect()
-    contentMutationObserver = null
-  }
-  if (scrollCheckTimeoutId !== null) {
-    clearTimeout(scrollCheckTimeoutId)
-    scrollCheckTimeoutId = null
-  }
-}
-
-// Handle scroll event to manage auto-scroll behavior
-function handleContainerScroll() {
-  if (!messagesContainer.value)
-    return
-
-  // Ignore scroll events initiated by our programmatic scrollTo calls
-  if (isProgrammaticScroll.value)
-    return
-
-  const currentScrollTop = messagesContainer.value.scrollTop
-  const currentScrollHeight = messagesContainer.value.scrollHeight
-
-  // If scrollTop hasn't changed but we're being called, it might be due to content height changes.
-  // In this case, check if we're still at bottom and don't treat it as user scroll.
-  if (currentScrollTop === lastScrollTop.value) {
-    // Content height changed but scroll position stayed the same
-    // Don't update user scroll direction or disable auto-scroll
-    // Just check if we're still at bottom
-    if (isAtBottom(messagesContainer.value)) {
-      autoScrollEnabled.value = true
-    }
-    lastKnownScrollHeight = currentScrollHeight
-    return
-  }
-
-  // Check if scrollTop decreased due to content height shrinking (not user scroll)
-  // This happens when loading placeholders are replaced with smaller actual content
-  if (currentScrollTop < lastScrollTop.value && currentScrollHeight < lastKnownScrollHeight) {
-    // Content shrank, causing scrollTop to decrease passively
-    // Check if we're still at or near bottom - if so, don't disable auto-scroll
-    if (isAtBottom(messagesContainer.value, 50)) {
-      lastScrollTop.value = currentScrollTop
-      lastKnownScrollHeight = currentScrollHeight
-      return
-    }
-  }
-
-  // Update timestamp and determine direction
-  lastUserScrollTime.value = Date.now()
-  if (currentScrollTop < lastScrollTop.value) {
-    // User scrolled up
-    lastUserScrollDirection.value = 'up'
-    autoScrollEnabled.value = false
-  }
-  else if (currentScrollTop > lastScrollTop.value) {
-    // User scrolled down
-    lastUserScrollDirection.value = 'down'
-    // If near bottom, re-enable auto-scroll
-    if (isAtBottom(messagesContainer.value))
-      autoScrollEnabled.value = true
-  }
-
-  // Update last scroll position for future comparisons
-  lastScrollTop.value = currentScrollTop
-  lastKnownScrollHeight = currentScrollHeight
-}
-
-// Track touch/pointer start positions to detect direction
-const touchStartY = ref<number | null>(null)
-const pointerStartY = ref<number | null>(null)
-
-// Wheel: only disable auto-scroll when user scrolls up (deltaY < 0).
-function handleWheel(e: WheelEvent) {
-  try {
-    if (!messagesContainer.value)
-      return
-
-    // Treat wheel as a user-driven scroll; record time and direction
-    lastUserScrollTime.value = Date.now()
-    if (e.deltaY < 0) {
-      // Scrolling up
-      lastUserScrollDirection.value = 'up'
-      autoScrollEnabled.value = false
-    }
-    else if (e.deltaY > 0) {
-      // Scrolling down
-      lastUserScrollDirection.value = 'down'
-      if (isAtBottom(messagesContainer.value))
-        autoScrollEnabled.value = true
-    }
-  }
-  catch {
-    // ignore
-  }
-}
-
-// Touch handlers: detect move direction between touchstart and touchmove
-function handleTouchStart(e: TouchEvent) {
-  if (e.touches && e.touches.length > 0) {
-    touchStartY.value = e.touches[0].clientY
-  }
-}
-
-function handleTouchMove(e: TouchEvent) {
-  if (!messagesContainer.value || touchStartY.value == null || !e.touches || e.touches.length === 0)
-    return
-
-  const currentY = e.touches[0].clientY
-  const delta = currentY - touchStartY.value
-  // Positive delta means finger moved down -> content scrolls up (towards top) -> user viewing earlier content
-  lastUserScrollTime.value = Date.now()
-  if (delta > 0) {
-    lastUserScrollDirection.value = 'up'
-    autoScrollEnabled.value = false
-  }
-  else if (delta < 0) {
-    lastUserScrollDirection.value = 'down'
-    if (isAtBottom(messagesContainer.value))
-      autoScrollEnabled.value = true
-  }
-}
-
-// Pointer handlers for scrollbar drag / pointer-based dragging
-function handlePointerDown(e: PointerEvent) {
-  pointerStartY.value = (e as PointerEvent).clientY
-  // Attach move/up listeners to document to track the drag
-  const move = (ev: PointerEvent) => {
-    if (pointerStartY.value == null)
-      return
-    const delta = ev.clientY - pointerStartY.value
-    lastUserScrollTime.value = Date.now()
-    if (delta > 0) {
-      lastUserScrollDirection.value = 'up'
-      autoScrollEnabled.value = false
-    }
-    else if (delta < 0) {
-      lastUserScrollDirection.value = 'down'
-      if (messagesContainer.value && isAtBottom(messagesContainer.value))
-        autoScrollEnabled.value = true
-    }
-  }
-
-  const up = () => {
-    document.removeEventListener('pointermove', move)
-    document.removeEventListener('pointerup', up)
-    pointerStartY.value = null
-  }
-
-  document.addEventListener('pointermove', move)
-  document.addEventListener('pointerup', up)
-}
-
-// Keyboard interactions: only treat upward navigation as disabling; downward navigation may re-enable when near bottom.
-function handleKeyDown(e: KeyboardEvent) {
-  const upKeys = ['PageUp', 'ArrowUp', 'Home']
-  const downKeys = ['PageDown', 'ArrowDown', 'End', 'Space']
-  if (upKeys.includes(e.key)) {
-    autoScrollEnabled.value = false
-  }
-  else if (downKeys.includes(e.key)) {
-    if (messagesContainer.value && isAtBottom(messagesContainer.value))
-      autoScrollEnabled.value = true
-  }
 }
 
 onMounted(() => {
-  // Initialize lastScrollTop and attach extra listeners
-  if (messagesContainer.value) {
-    lastScrollTop.value = messagesContainer.value.scrollTop
-    lastKnownScrollHeight = messagesContainer.value.scrollHeight
-    messagesContainer.value.addEventListener('wheel', handleWheel, { passive: true })
-    messagesContainer.value.addEventListener('touchstart', handleTouchStart, { passive: true })
-    messagesContainer.value.addEventListener('touchmove', handleTouchMove, { passive: true })
-    messagesContainer.value.addEventListener('pointerdown', handlePointerDown)
-    // keydown could be on document
-    document.addEventListener('keydown', handleKeyDown)
-    // Setup IntersectionObserver sentinel after mount
-    setupBottomObserver()
-    // Setup ResizeObserver to detect content height changes
-    setupContentResizeObserver()
-    // Setup MutationObserver to detect DOM changes (table loading -> content)
-    setupContentMutationObserver()
-  }
-})
-
-onUnmounted(() => {
-  if (messagesContainer.value) {
-    messagesContainer.value.removeEventListener('wheel', handleWheel)
-    messagesContainer.value.removeEventListener('touchstart', handleTouchStart)
-    messagesContainer.value.removeEventListener('touchmove', handleTouchMove)
-    messagesContainer.value.removeEventListener('pointerdown', handlePointerDown)
-    document.removeEventListener('keydown', handleKeyDown)
-    teardownBottomObserver()
-    teardownContentResizeObserver()
-    teardownContentMutationObserver()
-  }
-  // cleanup any playground scoped custom components
-  try {
-    removeCustomComponents('playground-demo')
-  }
-  catch {
-    // ignore
-  }
-})
-
-watch(content, () => {
-  if (!autoScrollEnabled.value)
+  // 初始检查和观察
+  const container = messagesContainer.value
+  if (!container)
     return
+  // 初次判断（确保组件渲染完）
+  requestAnimationFrame(scheduleCheckMinHeight)
 
-  forceScrollWithFrames(4)
-}, { flush: 'post' })
+  // 观察容器尺寸变化（窗口大小、面板大小）
+  __roContainer = new ResizeObserver(scheduleCheckMinHeight)
+  __roContainer.observe(container)
+
+  // 观察渲染内容尺寸变化（markdown 内容动态变化）
+  const tryObserveContent = () => {
+    const el = container.querySelector('.markdown-renderer') as HTMLElement | null
+    if (el) {
+      if (__roContent)
+        __roContent.disconnect()
+      __roContent = new ResizeObserver(scheduleCheckMinHeight)
+      __roContent.observe(el)
+    }
+  }
+  tryObserveContent()
+
+  // 如果 MarkdownRender 在后续替换了子节点，使用 MutationObserver 重新 attach
+  __mo = new MutationObserver(() => {
+    tryObserveContent()
+    scheduleCheckMinHeight()
+  })
+  __mo.observe(container, { childList: true, subtree: true })
+})
+
+onBeforeUnmount(() => {
+  __roContainer?.disconnect()
+  __roContent?.disconnect()
+  __mo?.disconnect()
+})
 </script>
 
 <template>
@@ -879,8 +503,8 @@ watch(content, () => {
         </div>
       </div>
 
-      <!-- Messages area with scroll -->
-      <main ref="messagesContainer" class="chatbot-messages flex-1 overflow-y-auto mr-[1px] mb-4" @scroll="handleContainerScroll">
+      <!-- Messages area with scroll (use column-reverse on the scroll container) -->
+      <main ref="messagesContainer" class="chatbot-messages flex-1 overflow-y-auto mr-[1px] mb-4 flex flex-col-reverse">
         <MarkdownRender
           :content="content"
           :code-block-dark-theme="selectedTheme || undefined"
@@ -891,8 +515,6 @@ watch(content, () => {
           custom-id="playground-demo"
           class="p-6"
         />
-        <!-- Sentinel observed by IntersectionObserver to detect reaching bottom reliably on mobile -->
-        <div ref="bottomSentinel" aria-hidden="true" class="w-full h-1 pointer-events-none" />
       </main>
     </div>
   </div>
@@ -918,6 +540,14 @@ watch(content, () => {
 .chatbot-messages {
   scroll-behavior: smooth;
   overscroll-behavior: contain;
+}
+.chatbot-messages > .markdown-renderer {
+  min-height: 100%;
+}
+
+/* 当真实内容高度超出容器时，移除默认 min-height（由 JS 切换类名） */
+.chatbot-messages > .markdown-renderer.disable-min-height {
+  min-height: unset !important;
 }
 
 .chatbot-messages::-webkit-scrollbar {
