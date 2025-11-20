@@ -70,3 +70,15 @@ Lightweight syntax highlighting (requires `shiki`, `stream-markdown`)
 - `setCustomComponents(id?, mapping)` — register node renderers
 
 For full prop types, see the `types` export or the `packages/markdown-parser/README.md` which includes the public TypeScript interfaces.
+
+## ImageNode — Custom preview handling
+
+`ImageNode` renders images and emits `click`, `load` and `error` events so you can implement custom preview behavior (lightbox/modal) without replacing the renderer.
+
+For a full example (wrapper component + VitePress registration), see the dedicated guide: [ImageNode — Custom preview handling](/guide/image-node.md).
+
+Quick summary:
+- `click` payload: `[Event, string]` — the second value is the effective image `src` (may be a fallback).
+- `load` / `error` payload: the image `src`.
+
+Common approach: create a wrapper that intercepts `click`, opens a preview, then register it via `setCustomComponents` in the client app.
