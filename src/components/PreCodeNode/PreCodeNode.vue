@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import type { CodeBlockNode as VmdrCodeBlockNode } from '../../types'
+import type { PreCodeNodeProps } from '../../types/component-props'
+
 import { computed } from 'vue'
 
-const props = defineProps<{
-  node: VmdrCodeBlockNode
-}>()
+const props = defineProps<PreCodeNodeProps>()
 
 // Normalize language to a safe, lowercase token (fallback to 'plaintext')
 const normalizedLanguage = computed(() => {

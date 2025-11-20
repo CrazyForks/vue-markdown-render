@@ -40,7 +40,9 @@ import './index.css'
 import './workers/katexRenderer.worker?worker'
 import './workers/mermaidParser.worker?worker'
 
+// Export centralized props interfaces so they appear in package d.ts
 export * from './utils'
+
 export * from './workers/katexWorkerClient'
 export * from './workers/mermaidWorkerClient'
 export { KATEX_COMMANDS, normalizeStandaloneBackslashT, setDefaultMathOptions } from 'stream-markdown-parser'

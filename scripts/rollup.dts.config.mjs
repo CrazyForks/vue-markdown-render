@@ -19,8 +19,8 @@ export default [
     input: inputPath,
     plugins: [
       dts({
-        // Leave external type imports in place
-        respectExternal: true,
+        // Inline local type imports to ensure named interfaces are bundled
+        respectExternal: false,
       }),
     ],
     external: [

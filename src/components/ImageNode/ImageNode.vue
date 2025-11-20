@@ -1,26 +1,13 @@
 <script setup lang="ts">
+// 定义图片节点类型
+import type { ImageNodeProps } from '../../types/component-props'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
+
 import { useViewportPriority } from '../../composables/viewportPriority'
 
-// 定义图片节点类型
-interface ImageNode {
-  type: 'image'
-  src: string
-  alt: string
-  title: string | null
-  raw: string
-}
-
 // 接收props：node 是必须，其他为可选配置（fallback、是否显示caption、是否启用lazy）
-const props = withDefaults(defineProps<{
-  node: ImageNode & { loading?: boolean }
-  fallbackSrc?: string
-  showCaption?: boolean
-  lazy?: boolean
-  svgMinHeight?: string
-  usePlaceholder?: boolean
-}>(), {
+const props = withDefaults(defineProps<ImageNodeProps>(), {
   fallbackSrc: '',
   showCaption: false,
   lazy: true,

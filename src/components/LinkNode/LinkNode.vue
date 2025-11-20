@@ -1,44 +1,16 @@
 <script setup lang="ts">
+// 定义链接节点
+import type { LinkNodeProps } from '../../types/component-props'
 import { computed, useAttrs } from 'vue'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import EmphasisNode from '../EmphasisNode/EmphasisNode.vue'
 import StrikethroughNode from '../StrikethroughNode'
 import StrongNode from '../StrongNode'
+
 import TextNode from '../TextNode'
 
-// 定义链接节点
-interface LinkNode {
-  type: 'link'
-  href: string
-  title: string | null
-  text: string
-  children: { type: string, raw: string }[]
-  raw: string
-  loading?: boolean
-}
-
 // 接收props — 把动画/颜色相关配置暴露为props，并通过CSS变量注入样式
-const props = withDefaults(defineProps<{
-  node: LinkNode
-  indexKey: number | string
-  customId?: string
-  /** whether to show the custom singleton tooltip on hover/focus. Default: true */
-  showTooltip?: boolean
-  /** link text / underline color (CSS color string) */
-  color?: string
-  /** underline height in px */
-  underlineHeight?: number
-  /** underline bottom offset (px). Can be negative. */
-  underlineBottom?: number | string
-  /** total animation duration in seconds */
-  animationDuration?: number
-  /** underline opacity */
-  animationOpacity?: number
-  /** animation timing function */
-  animationTiming?: string
-  /** animation iteration (e.g. 'infinite' or a number) */
-  animationIteration?: string | number
-}>(), {
+const props = withDefaults(defineProps<LinkNodeProps>(), {
   showTooltip: true,
 })
 
