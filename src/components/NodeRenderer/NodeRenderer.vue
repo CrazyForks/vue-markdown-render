@@ -43,107 +43,60 @@ interface IdleDeadlineLike {
   timeRemaining?: () => number
 }
 
-const props = withDefaults(defineProps<
-  | {
-    content: string
-    nodes?: undefined
-    /** Options forwarded to parseMarkdownToStructure when content is provided */
-    parseOptions?: ParseOptions
-    /** Enable priority rendering for visible viewport area */
-    viewportPriority?: boolean
-    /**
-     * Whether code_block renders should stream updates.
-     * When false, code blocks stay in a loading state and render once when final content is ready.
-     * Default: true
-     */
-    codeBlockStream?: boolean
-    // 全局传递到每个 CodeBlockNode 的主题（monaco theme 对象）
-    codeBlockDarkTheme?: any
-    codeBlockLightTheme?: any
-    // 传递给 CodeBlockNode 的 monacoOptions（比如 fontSize, MAX_HEIGHT 等）
-    codeBlockMonacoOptions?: Record<string, any>
-    /** If true, render all `code_block` nodes as plain <pre><code> blocks instead of the full CodeBlockNode */
-    renderCodeBlocksAsPre?: boolean
-    /** Minimum width forwarded to CodeBlockNode (px or CSS unit) */
-    codeBlockMinWidth?: string | number
-    /** Maximum width forwarded to CodeBlockNode (px or CSS unit) */
-    codeBlockMaxWidth?: string | number
-    /** Arbitrary props to forward to every CodeBlockNode */
-    codeBlockProps?: Record<string, any>
-    themes?: string[]
-    isDark?: boolean
-    customId?: string
-    indexKey?: number | string
-    /** Enable/disable the non-code-node enter transition (typewriter). Default: true */
-    typewriter?: boolean
-    /** Enable incremental/batched rendering of nodes to avoid large single flush costs. Default: true */
-    batchRendering?: boolean
-    /** How many nodes to render immediately before batching kicks in. Default: 40 */
-    initialRenderBatchSize?: number
-    /** How many additional nodes to render per batch tick. Default: 80 */
-    renderBatchSize?: number
-    /** Extra delay (ms) before each batch after rAF; helps yield to input. Default: 16 */
-    renderBatchDelay?: number
-    /** Target budget (ms) for each batch before we shrink subsequent batch sizes. Default: 6 */
-    renderBatchBudgetMs?: number
-    /** Timeout (ms) for requestIdleCallback slices. Default: 120 */
-    renderBatchIdleTimeoutMs?: number
-    /** Defer rendering nodes until they are near the viewport */
-    deferNodesUntilVisible?: boolean
-    /** Maximum number of fully rendered nodes kept in DOM. Default: 320 */
-    maxLiveNodes?: number
-    /** Number of nodes to keep before/after focus. Default: 60 */
-    liveNodeBuffer?: number
-  }
-  | {
-    content?: undefined
-    nodes: BaseNode[]
-    parseOptions?: ParseOptions
-    /** Enable priority rendering for visible viewport area */
-    viewportPriority?: boolean
-    /**
-     * Whether code_block renders should stream updates.
-     * When false, code blocks stay in a loading state and render once when final content is ready.
-     * Default: true
-     */
-    codeBlockStream?: boolean
-    codeBlockDarkTheme?: any
-    codeBlockLightTheme?: any
-    codeBlockMonacoOptions?: Record<string, any>
-    /** If true, render all `code_block` nodes as plain <pre><code> blocks instead of the full CodeBlockNode */
-    renderCodeBlocksAsPre?: boolean
-    /** Minimum width forwarded to CodeBlockNode (px or CSS unit) */
-    codeBlockMinWidth?: string | number
-    /** Maximum width forwarded to CodeBlockNode (px or CSS unit) */
-    codeBlockMaxWidth?: string | number
-    /** Arbitrary props to forward to every CodeBlockNode */
-    codeBlockProps?: Record<string, any>
-    themes?: string[]
-    isDark?: boolean
-    customId?: string
-    indexKey?: number | string
-    /** Enable/disable the non-code-node enter transition (typewriter). Default: true */
-    typewriter?: boolean
-    /** Enable incremental/batched rendering of nodes to avoid large single flush costs. Default: true */
-    batchRendering?: boolean
-    /** How many nodes to render immediately before batching kicks in. Default: 40 */
-    initialRenderBatchSize?: number
-    /** How many additional nodes to render per batch tick. Default: 80 */
-    renderBatchSize?: number
-    /** Extra delay (ms) before each batch after rAF; helps yield to input. Default: 16 */
-    renderBatchDelay?: number
-    /** Target budget (ms) for each batch before we shrink subsequent batch sizes. Default: 6 */
-    renderBatchBudgetMs?: number
-    /** Timeout (ms) for requestIdleCallback slices. Default: 120 */
-    renderBatchIdleTimeoutMs?: number
-    /** Defer rendering nodes until they are near the viewport */
-    deferNodesUntilVisible?: boolean
-    /** Maximum number of fully rendered nodes kept in DOM. Default: 320 */
-    maxLiveNodes?: number
-    /** Number of nodes to keep before/after focus. Default: 60 */
-    liveNodeBuffer?: number
-  }
->(), {
+// Exported props interface so declaration generators can include prop types
+export interface NodeRendererProps {
+  content?: string
+  nodes?: BaseNode[]
+  /** Options forwarded to parseMarkdownToStructure when content is provided */
+  parseOptions?: ParseOptions
+  /** Enable priority rendering for visible viewport area */
+  viewportPriority?: boolean
+  /**
+   * Whether code_block renders should stream updates.
+   * When false, code blocks stay in a loading state and render once when final content is ready.
+   * Default: true
+   */
+  codeBlockStream?: boolean
+  // 全局传递到每个 CodeBlockNode 的主题（monaco theme 对象）
+  codeBlockDarkTheme?: any
+  codeBlockLightTheme?: any
+  // 传递给 CodeBlockNode 的 monacoOptions（比如 fontSize, MAX_HEIGHT 等）
+  codeBlockMonacoOptions?: Record<string, any>
+  /** If true, render all `code_block` nodes as plain <pre><code> blocks instead of the full CodeBlockNode */
+  renderCodeBlocksAsPre?: boolean
+  /** Minimum width forwarded to CodeBlockNode (px or CSS unit) */
+  codeBlockMinWidth?: string | number
+  /** Maximum width forwarded to CodeBlockNode (px or CSS unit) */
+  codeBlockMaxWidth?: string | number
+  /** Arbitrary props to forward to every CodeBlockNode */
+  codeBlockProps?: Record<string, any>
+  themes?: string[]
+  isDark?: boolean
+  customId?: string
+  indexKey?: number | string
+  /** Enable/disable the non-code-node enter transition (typewriter). Default: true */
+  typewriter?: boolean
+  /** Enable incremental/batched rendering of nodes to avoid large single flush costs. Default: true */
+  batchRendering?: boolean
+  /** How many nodes to render immediately before batching kicks in. Default: 40 */
+  initialRenderBatchSize?: number
+  /** How many additional nodes to render per batch tick. Default: 80 */
+  renderBatchSize?: number
+  /** Extra delay (ms) before each batch after rAF; helps yield to input. Default: 16 */
+  renderBatchDelay?: number
+  /** Target budget (ms) for each batch before we shrink subsequent batch sizes. Default: 6 */
+  renderBatchBudgetMs?: number
+  /** Timeout (ms) for requestIdleCallback slices. Default: 120 */
+  renderBatchIdleTimeoutMs?: number
+  /** Defer rendering nodes until they are near the viewport */
+  deferNodesUntilVisible?: boolean
+  /** Maximum number of fully rendered nodes kept in DOM. Default: 320 */
+  maxLiveNodes?: number
+  /** Number of nodes to keep before/after focus. Default: 60 */
+  liveNodeBuffer?: number
+}
+
+const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
   typewriter: true,
   batchRendering: true,

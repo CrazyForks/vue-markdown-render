@@ -1,17 +1,12 @@
 <script setup lang="ts">
+import type { MathInlineNodeProps } from '../../types/component-props'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
+
 import { getKatex } from './katex'
 
-const props = defineProps<{
-  node: {
-    type: 'math_inline'
-    content: string
-    raw: string
-    loading?: boolean
-  }
-}>()
+const props = defineProps<MathInlineNodeProps>()
 let katex = null
 getKatex().then((k) => {
   katex = k

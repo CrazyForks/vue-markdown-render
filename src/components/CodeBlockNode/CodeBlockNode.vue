@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CodeBlockNodeProps } from '../../types/component-props'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
 import { computed, nextTick, onBeforeUnmount, onUnmounted, ref, watch } from 'vue'
@@ -11,49 +12,8 @@ import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
 import { getUseMonaco } from './monaco'
 
-interface MonacoOptions {
-  fontSize?: number
-  MAX_HEIGHT?: number | string
-  [k: string]: any
-}
-type MonacoTheme = any
-
 const props = withDefaults(
-  defineProps<{
-    node: {
-      type: 'code_block'
-      language: string
-      code: string
-      raw: string
-      diff?: boolean
-      originalCode?: string
-      updatedCode?: string
-    }
-    isDark?: boolean
-    loading?: boolean
-    /**
-     * If true, update and render code content as it streams in.
-     * If false, keep a lightweight loading state and create the editor only when loading becomes false.
-     */
-    stream?: boolean
-    darkTheme?: MonacoTheme
-    lightTheme?: MonacoTheme
-    isShowPreview?: boolean
-    monacoOptions?: MonacoOptions
-    enableFontSizeControl?: boolean
-    /** Minimum width for the code block container (px or CSS unit string) */
-    minWidth?: string | number
-    /** Maximum width for the code block container (px or CSS unit string) */
-    maxWidth?: string | number
-    themes?: MonacoTheme[]
-    /** Header visibility and controls */
-    showHeader?: boolean
-    showCopyButton?: boolean
-    showExpandButton?: boolean
-    showPreviewButton?: boolean
-    showFontSizeButtons?: boolean
-    customId?: string
-  }>(),
+  defineProps<CodeBlockNodeProps>(),
   {
     isShowPreview: true,
     darkTheme: undefined,
@@ -130,7 +90,7 @@ let cleanupEditor: () => void = () => {}
 let safeClean = () => {}
 let createEditorPromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
-let setTheme: (theme: MonacoTheme) => Promise<void> = async () => {}
+let setTheme: (theme: any) => Promise<void> = async () => {}
 const isDiff = computed(() => props.node.diff)
 const usePreCodeRender = ref(false)
 // Defer client-only editor initialization to the browser to avoid SSR errors

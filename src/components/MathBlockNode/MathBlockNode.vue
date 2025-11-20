@@ -1,17 +1,12 @@
 <script setup lang="ts">
+import type { MathBlockNodeProps } from '../../types/component-props'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
+
 import { getKatex } from '../MathInlineNode/katex'
 
-const props = defineProps<{
-  node: {
-    type: 'math_block'
-    content: string
-    raw: string
-    loading?: boolean
-  }
-}>()
+const props = defineProps<MathBlockNodeProps>()
 let katex = null
 getKatex().then((k) => {
   katex = k

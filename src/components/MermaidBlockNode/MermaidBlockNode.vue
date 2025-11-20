@@ -1,26 +1,18 @@
 <script setup lang="ts">
-import type { CodeBlockNode } from '../../types'
+// Exported props interface for MermaidBlockNode
+import type { MermaidBlockNodeProps } from '../../types/component-props'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import mermaidIconUrl from '../../icon/mermaid.svg?url'
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
+
 import { getMermaid } from './mermaid'
 
 const props = withDefaults(
   // 全屏按钮禁用状态
-  defineProps<{
-    node: CodeBlockNode
-    maxHeight?: string | null
-    loading?: boolean
-    isDark?: boolean
-    // Optional timeouts (ms) to control parsing/rendering behavior
-    workerTimeoutMs?: number
-    parseTimeoutMs?: number
-    renderTimeoutMs?: number
-    fullRenderTimeoutMs?: number
-  }>(),
+  defineProps<MermaidBlockNodeProps>(),
   {
     maxHeight: '500px',
     loading: true,
