@@ -21,7 +21,7 @@ npm i stream-monaco
 - 行为：当 `stream-monaco` 可用时，内置的 `CodeBlockNode` 会使用基于 Monaco 的流式更新，适合大型或频繁更新的代码块。
 
 - Vite Worker 注意事项：Monaco 与部分基于 Worker 的功能需要在打包时正确配置 Worker（例如 Vite 的 worker 配置），以确保运行时能加载对应的 worker。有关配置示例与 SSR 安全初始化，请参阅 `docs/nuxt-ssr.md`。
-	- 另请参阅：`docs/zh/guide/monaco.md`，其中包含 Vite `?worker` 示例和手动注册 worker 的代码片段。
+- 另请参阅：`docs/zh/guide/monaco.md`，其中包含 Vite `?worker` 示例和手动注册 worker 的代码片段。
 
 ## Markdown 模式（使用 stream-markdown）
 

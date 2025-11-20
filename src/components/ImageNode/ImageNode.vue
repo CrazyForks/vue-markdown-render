@@ -28,8 +28,8 @@ const props = withDefaults(defineProps<{
   usePlaceholder: true,
 })
 
-// 事件：load / error
-const emit = defineEmits<{ (e: 'load', src: string): void, (e: 'error', src: string): void }>()
+// 事件：load / error / click（click 用于外部处理图片预览）
+const emit = defineEmits<{ (e: 'load', src: string): void, (e: 'error', src: string): void, (e: 'click', payload: [Event, string]): void }>()
 
 // 图片加载状态
 const imageLoaded = ref(false)
@@ -93,6 +93,16 @@ function handleImageLoad() {
   emit('load', displaySrc.value)
 }
 
+// 当用户点击/触摸图片时（仅对已成功加载的图片有效），向外发出 click 事件（用于图片 preview）
+function handleClick(e: Event) {
+  // stop propagation so parent click handlers don't see both pointerup and click
+  e.preventDefault()
+
+  if (!imageLoaded.value || hasError.value)
+    return
+  emit('click', [e, displaySrc.value])
+}
+
 const { t } = useSafeI18n()
 
 // When the src changes (displaySrc), reset imageLoaded so the new image can fade in
@@ -116,11 +126,14 @@ watch(displaySrc, () => {
           :title="String(props.node.title ?? props.node.alt ?? '')"
           class="max-w-96 h-auto rounded-lg transition-opacity duration-200 ease-in-out"
           :style="isSvg ? { minHeight: props.svgMinHeight, width: '100%', height: 'auto', objectFit: 'contain' } : undefined"
-          :class="{ 'opacity-0': !imageLoaded, 'opacity-100': imageLoaded }"
+          :class="{ 'opacity-0': !imageLoaded, 'opacity-100': imageLoaded, 'cursor-pointer': imageLoaded }"
           :loading="props.lazy ? 'lazy' : 'eager'"
           decoding="async"
+          :tabindex="imageLoaded ? 0 : -1"
+          :aria-label="props.node.alt ?? t('image.preview')"
           @error="handleImageError"
           @load="handleImageLoad"
+          @click="handleClick"
         >
 
         <!-- 加载时的简单占位/骨架；允许通过 usePlaceholder 关闭占位展示，改为纯文本 -->
