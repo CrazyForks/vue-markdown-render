@@ -17,6 +17,13 @@ const input = ref<string>(`# Hello
 示例包含：
 
   - **加粗**、*斜体*、` + '`inline code`' + `
+
+强调链接：
+- **[DR (Danmarks Radio)](https://www.dr.dk/nyheder)**
+- **[DR **(Danmarks Radio)](https://www.dr.dk/nyheder)**
+- **[DR (Danmarks Radio)**](https://www.dr.dk/nyheder)**
+- **[DR **(Danmarks Radio)**](https://www.dr.dk/nyheder)**
+
 - 代码块：
 
 \`\`\`js

@@ -88,20 +88,21 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
     if (i < 0) {
       i = 0
     }
-    if (!tokens[i])
+    const curToken = tokens[i]
+    if (!curToken)
       break
-    if (tokens[i]?.type === 'em_open' && tokens[i - 1]?.type === 'text' && tokens[i - 1].content?.endsWith('*')) {
+    if (curToken?.type === 'em_open' && tokens[i - 1]?.type === 'text' && tokens[i - 1].content?.endsWith('*')) {
       const beforeText = tokens[i - 1].content?.replace(/(\*+)$/, '') || ''
       tokens[i - 1].content = beforeText
       // 修改当前 type 'em_open' -> 'strong_open'
-      tokens[i].type = 'strong_open'
-      tokens[i].tag = 'strong'
-      tokens[i].markup = '**'
+      curToken.type = 'strong_open'
+      curToken.tag = 'strong'
+      curToken.markup = '**'
     }
-    if (tokens[i]?.type === 'text' && tokens[i].content?.endsWith('(') && tokens[i + 1]?.type === 'link_open') {
-      const match = tokens[i].content!.match(/\[([^\]]+)\]/)
+    if (curToken?.type === 'text' && curToken.content?.endsWith('(') && tokens[i + 1]?.type === 'link_open') {
+      const match = curToken.content!.match(/\[([^\]]+)\]/)
       if (match) {
-        let beforeText = tokens[i].content!.slice(0, match.index)
+        let beforeText = curToken.content!.slice(0, match.index)
         const emphasisMatch = beforeText.match(/(\*+)$/)
         const replacerTokens = []
         if (emphasisMatch) {
@@ -185,12 +186,12 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         continue
       }
     }
-    else if (tokens[i].type === 'link_open' && tokens[i].markup === 'linkify' && tokens[i - 1]?.type === 'text' && tokens[i - 1].content?.endsWith('(')) {
+    else if (curToken.type === 'link_open' && curToken.markup === 'linkify' && tokens[i - 1]?.type === 'text' && tokens[i - 1].content?.endsWith('(')) {
       if (tokens[i - 2]?.type === 'link_close') {
         // 合并link
         const replacerTokens = []
         const text = (tokens[i - 3].content || '')
-        let href = tokens[i].attrs?.find(attr => attr[0] === 'href')?.[1] || ''
+        let href = curToken.attrs?.find(attr => attr[0] === 'href')?.[1] || ''
 
         if (tokens[i + 3]?.type === 'text') {
           const m = (tokens[i + 3]?.content ?? '').indexOf(')')
@@ -248,7 +249,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         }
       }
     }
-    if (tokens[i].type === 'link_close' && tokens[i].nesting === -1 && tokens[i + 1]?.type === 'text' && tokens[i - 1]?.type === 'text') {
+    if (curToken.type === 'link_close' && curToken.nesting === -1 && tokens[i + 1]?.type === 'text' && tokens[i - 1]?.type === 'text') {
       // 修复链接后多余文本被包含在链接内的问题
       let loading = true
       const text = tokens[i - 1].content || ''
@@ -263,11 +264,11 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         const type = emphasisMatch[1].length
         pushEmOpen(replacerTokens, type)
       }
-      if (tokens[i].markup === '' || (tokens[i + 1].type === 'text' && (tokens[i + 1].content === '.' || tokens[i + 1].content === '?'))) {
+      if (curToken.markup === '' || (tokens[i + 1].type === 'text' && (tokens[i + 1].content === '.' || tokens[i + 1].content === '?'))) {
         loading = false
       }
 
-      if (tokens[i].markup === 'linkify' && tokens[i + 1]?.type === 'text' && !tokens[i + 1]?.content?.startsWith(' ')) {
+      if (curToken.markup === 'linkify' && tokens[i + 1]?.type === 'text' && !tokens[i + 1]?.content?.startsWith(' ')) {
         const m = (tokens[i + 1]?.content ?? '').indexOf(')')
         if (m === -1) {
           href += (tokens[i + 1]?.content?.slice(0, m) || '')
@@ -324,7 +325,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       i -= (replacerTokens.length - 1)
       continue
     }
-    else if (tokens[i].content?.startsWith('](') && tokens[i - 1].markup?.includes('*') && tokens[i - 4]?.type === 'text' && tokens[i - 4].content?.endsWith('[')) {
+    else if (curToken.content?.startsWith('](') && tokens[i - 1].markup?.includes('*') && tokens[i - 4]?.type === 'text' && tokens[i - 4].content?.endsWith('[')) {
       const type = tokens[i - 1].markup!.length
       const replacerTokens = []
       const beforeText = tokens[i - 4].content!.slice(0, tokens[i - 4].content!.length - type)
@@ -332,7 +333,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         replacerTokens.push(textToken(beforeText))
       pushEmOpen(replacerTokens, type)
       const text = tokens[i - 2].content || ''
-      let href = tokens[i].content!.slice(2)
+      let href = curToken.content!.slice(2)
       let loading = true
       if (tokens[i + 1]?.type === 'text') {
         const m = (tokens[i + 1]?.content ?? '').indexOf(')')
@@ -359,6 +360,38 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       }
       i -= (replacerTokens.length - 1)
       continue
+    }
+    // 处理强调 + 链接拆分：首个 text 含前导星号与 '['，后续出现独立的 "]("、link_open、href、link_close、")"、strong_close。
+    // 期望合并为：strong_open + 复合 link(label 尾部补回星号) + strong_close。
+    if (
+      curToken.type === 'text'
+      && /\*+\[[^\]]*$/.test(curToken.content || '')
+      && tokens[i + 1]?.type === 'strong_open'
+      && tokens[i + 2]?.type === 'text' && tokens[i + 2].content === ']('
+      && tokens[i + 3]?.type === 'link_open'
+      && tokens[i + 5]?.type === 'link_close'
+      && tokens[i + 6]?.type === 'text' && tokens[i + 6].content === ')'
+      && tokens[i + 7]?.type === 'strong_close'
+    ) {
+      const contentVal = curToken.content || ''
+      const startMatch = contentVal.match(/^(\*+)\[(.*)$/)
+      if (startMatch) {
+        const innerLabel = startMatch[2] || ''
+        // 将前导星号数量追加到标签末尾
+        const finalLabel = innerLabel + startMatch[1]
+        // 获取 href：优先使用 link_open 的属性，若为空则回退到后续文本 token 内容
+        let href = tokens[i + 3]?.attrs?.find(a => a[0] === 'href')?.[1] || ''
+        if (!href && tokens[i + 4]?.type === 'text') {
+          href = tokens[i + 4].content || ''
+        }
+        const out: MarkdownToken[] = []
+        pushEmOpen(out as any[], 2)
+        out.push(createLinkToken(finalLabel, href, false))
+        pushEmClose(out as any[], 2)
+        tokens.splice(i, 9, ...out)
+        i -= (out.length - 1)
+        continue
+      }
     }
   }
   return tokens
