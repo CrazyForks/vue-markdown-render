@@ -203,7 +203,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       return false
     }
     const delimiters: [string, string][] = [
-      ['$$', '$$'],
+      ['$', '$'],
       ['\\(', '\\)'],
       ['\(', '\)'],
     ]
@@ -438,7 +438,16 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     let openDelim = ''
     let closeDelim = ''
     for (const [open, close] of delimiters) {
-      if (lineText === open || lineText.startsWith(open)) {
+      // 这里其实不应该只匹配 startWith的情况因为很可能前面还有 text
+      const m = lineText.indexOf(open)
+      if (m !== -1) {
+        const beforeText = lineText.slice(0, m)
+        if (beforeText) {
+          const inline = s.push('inline', '', 0)
+          inline.content = beforeText
+          inline.map = [startLine, startLine]
+          inline.children = []
+        }
         if (open.includes('[')) {
           if (lineText.replace('\\', '') === '[') {
             if (startLine + 1 < endLine) {
