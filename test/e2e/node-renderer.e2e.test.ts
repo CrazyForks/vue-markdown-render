@@ -359,6 +359,7 @@ describe('markdownRender node e2e coverage', () => {
     {
       name: 'math inline node',
       markdown: 'Einstein wrote $E=mc^2$.',
+      skipSnapshot: false,
       // Accept either raw Dollar-delimited text or rendered KaTeX output
       expectedText: ['Einstein wrote', 'E=mc^2'],
       assert: async (wrapper) => {
