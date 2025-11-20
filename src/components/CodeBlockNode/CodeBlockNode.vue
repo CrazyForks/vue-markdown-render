@@ -510,15 +510,26 @@ watch(
 
 watch(
   () => props.node.code,
-  (newCode) => {
+  async (newCode) => {
     if (props.stream === false)
       return
     if (!codeLanguage.value)
       codeLanguage.value = detectLanguage(newCode)
 
-    isDiff.value
-      ? updateDiffCode(String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), codeLanguage.value)
-      : updateCode(newCode, codeLanguage.value)
+    // If the editor helpers exist but the editor hasn't been created yet,
+    // ensure creation first so update calls don't get lost.
+    if (createEditor && !editorCreated.value && codeEditor.value) {
+      try {
+        await ensureEditorCreation(codeEditor.value as HTMLElement)
+      }
+      catch {}
+    }
+
+    if (isDiff.value)
+      updateDiffCode(String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), codeLanguage.value)
+    else
+      updateCode(newCode, codeLanguage.value)
+
     if (isExpanded.value) {
       safeRaf(() => updateExpandedHeight())
     }
