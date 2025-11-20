@@ -3,3 +3,6 @@ node_modules
 .eslintcache
 .history
 .DS_Store
+
+# vite press
+cache
