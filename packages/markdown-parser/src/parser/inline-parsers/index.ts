@@ -478,6 +478,12 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
       content = content.slice(1)
     }
 
+    // math 公式 $ 只出现一个并且在末尾，优化掉
+    if (Array.from(content.matchAll(/\$/g)).length === 1 && content.endsWith('$')) {
+      content = content.slice(0, -1)
+    }
+
+    // 处理 undefined 结尾的问题
     if (content.endsWith('undefined') && !raw?.endsWith('undefined')) {
       content = content.slice(0, -9)
     }

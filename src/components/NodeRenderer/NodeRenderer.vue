@@ -546,7 +546,7 @@ watch(
     const datasetKey = props.indexKey
     const datasetChanged = datasetKey !== undefined
       ? datasetKey !== prevCtx.key
-      : total < prevCtx.total
+      : total !== prevCtx.total
     previousRenderContext.value = { key: datasetKey, total }
 
     const prevBatch = previousBatchConfig.value

@@ -443,6 +443,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       if (m !== -1) {
         const beforeText = lineText.slice(0, m)
         if (beforeText) {
+          if (beforeText.endsWith('!')) {
+            // image-node need break
+            return false
+          }
           const inline = s.push('inline', '', 0)
           inline.content = beforeText
           inline.map = [startLine, startLine]
