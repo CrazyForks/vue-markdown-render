@@ -470,7 +470,7 @@ export function parseInlineTokens(tokens: MarkdownToken[], raw?: string, pPreTok
     let index = result.length - 1
     let content = String(token.content ?? '').replace(/\\/g, '')
 
-    if (content === '1' && tokens[i - 1]?.tag === 'br') {
+    if (token.content === '<' || (content === '1' && tokens[i - 1]?.tag === 'br')) {
       i++
       return
     }

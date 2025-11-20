@@ -39,6 +39,7 @@ export function parseMarkdownToStructure(
 
   // Get tokens from markdown-it
   const tokens = md.parse(safeMarkdown, {})
+
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
     return []
