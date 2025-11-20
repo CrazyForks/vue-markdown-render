@@ -671,10 +671,18 @@ function getNodeComponent(node: ParsedNode) {
     return FallbackComponent
   if (node.type === 'code_block') {
     const lang = String((node as any).language ?? '').trim().toLowerCase()
+    // If this is a mermaid block, prefer a custom `mermaid` mapping if provided.
     if (lang === 'mermaid') {
-      const custom = getCustomNodeComponents(props.customId).mermaid
-      return (custom as any) || MermaidBlockNode
+      const customMermaid = getCustomNodeComponents(props.customId).mermaid
+      return (customMermaid as any) || MermaidBlockNode
     }
+
+    // Honor a custom `code_block` component if the consumer registered one
+    // via `setCustomComponents(customId, { code_block: MyComponent })`.
+    const customCodeBlock = getCustomNodeComponents(props.customId).code_block
+    if (customCodeBlock)
+      return (customCodeBlock as any)
+
     return codeBlockComponent.value
   }
   return (nodeComponents as any)[String((node as any).type)] || FallbackComponent
