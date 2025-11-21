@@ -1,66 +1,108 @@
 <script setup lang="ts">
-import type { Highlighter, ThemeInput } from 'shiki'
 import { Icon } from '@iconify/vue'
-import katex from 'katex'
-import { defaultLanguages, registerHighlight } from 'stream-markdown'
-import { getMarkdown } from 'stream-markdown-parser'
-import { languageMap } from '../../../src/utils'
+import MarkdownRender from 'vue-renderer-markdown'
+import { useRouter } from 'vue-router'
+import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
+import { setCustomComponents } from '../../../src/utils/nodeComponents'
+import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline'
+import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
+import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
+import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
+import ThinkingNode from '../components/ThinkingNode.vue'
 import { streamContent } from '../const/markdown'
+import 'katex/dist/katex.min.css'
+import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
+
 // 每隔 10 毫秒输出一部分内容
 const content = ref<string>('')
+const streamDelay = useLocalStorage<number>('vmr-settings-stream-delay', 16)
+const streamChunkSize = useLocalStorage<number>('vmr-settings-stream-chunk-size', 1)
+const normalizedChunkSize = computed(() => Math.max(1, Math.floor(streamChunkSize.value) || 1))
+
+// 预加载 Monaco 编辑器
+getUseMonaco()
+setKaTeXWorker(new KatexWorker())
+setMermaidWorker(new MermaidWorker())
+const router = useRouter()
+
+function goToTest() {
+  // Prefer router navigation, fallback to full redirect if it fails.
+  router.push('/test').catch(() => {
+    window.location.href = '/test'
+  })
+}
+
+// Keep persisted values within reasonable bounds on hydration.
+watchEffect(() => {
+  const parsedDelay = Number(streamDelay.value)
+  const fallbackDelay = Number.isFinite(parsedDelay) ? parsedDelay : 16
+  const boundedDelay = Math.min(200, Math.max(4, fallbackDelay))
+  if (streamDelay.value !== boundedDelay)
+    streamDelay.value = boundedDelay
+})
+
+watchEffect(() => {
+  const parsedChunk = Number(streamChunkSize.value)
+  const fallbackChunk = Number.isFinite(parsedChunk) ? parsedChunk : 1
+  const normalizedChunk = Math.floor(fallbackChunk) || 1
+  const boundedChunk = Math.min(16, Math.max(1, normalizedChunk))
+  if (streamChunkSize.value !== boundedChunk)
+    streamChunkSize.value = boundedChunk
+})
 
 // To avoid flashing sequences like ":::" during streaming (which later
 // become an AdmonitionNode), we look ahead when encountering ":" and
 // defer appending consecutive colons until a non-colon character is seen.
-useInterval(16, {
+useInterval(streamDelay, {
   callback() {
     const cur = content.value.length
     if (cur >= streamContent.length)
       return
-    const nextChar = streamContent.charAt(cur)
-    // Normal single-character append for non-colon characters.
-    content.value += nextChar
+    const chunkSize = normalizedChunkSize.value
+    const nextChunk = streamContent.slice(cur, cur + chunkSize)
+    // Append chunk-sized slices so users can preview larger batches while streaming.
+    content.value += nextChunk
   },
 })
 
-const highlighter = ref<Highlighter | null>(null)
-const selectedTheme = ref('vitesse-dark')
-
-const md = getMarkdown('hi', {
-  markdownItOptions: {
-    highlight: (str: string, lang: string) => {
-      const _lang = lang.split(':')[0] || 'plaintext'
-      if (!(_lang in languageMap))
-        lang = 'plaintext'
-      if (highlighter.value)
-        return highlighter.value.codeToHtml(str, { lang: _lang, theme: selectedTheme.value })
-      return str
-    },
+setCustomComponents('playground-demo', { thinking: ThinkingNode, code_block: MarkdownCodeBlockNode })
+const parseOptions = {
+  preTransformTokens: (tokens: any[]) => {
+    // Example: Log tokens during parsing
+    // console.log('Pre-transform tokens:', tokens)
+    return tokens.map((token) => {
+      if (token.type === 'inline' && token.content.includes('<thinking')) {
+        token.children = token.children.map((t: any) => {
+          if (t.type === 'html_block' && t.tag === 'thinking') {
+            const m = t.content.match(/<thinking([^>]*)>/)
+            const attrs = []
+            if (m) {
+              const attrString = m[1]
+              const attrRegex = /([^\s=]+)(?:="([^"]*)")?/g
+              let match
+              while ((match = attrRegex.exec(attrString)) !== null) {
+                const attrName = match[1]
+                const attrValue = match[2] || true
+                attrs.push({ name: attrName, value: attrValue })
+              }
+            }
+            // eslint-disable-next-line regexp/no-super-linear-backtracking
+            const content = t.content.replace(/<thinking[^>]*>/, '').replace(/<\/*t*h*i*n*k*i*n*g*>*\n*$/, '')
+            return {
+              type: 'thinking',
+              loading: t.loading,
+              attrs,
+              content,
+            }
+          }
+          return t
+        })
+      }
+      return token
+    })
   },
-})
-md.renderer.rules.math_inline = (tokens: any[], index: number) => {
-  const rendered = katex.renderToString(tokens[index].content, { throwOnError: false, strict: 'ignore' })
-  if (rendered)
-    return `<span class="math-inline">${rendered}</span>`
-  return `<span class="math-inline">${tokens[index].content}</span>`
-}
-md.renderer.rules.math_block = (tokens: any[], index: number) => {
-  const rendered = katex.renderToString(tokens[index].content, { throwOnError: false, displayMode: true, strict: 'ignore' })
-  if (rendered)
-    return `<div class="math-block my-4">${rendered}</div>`
-  return `<div class="math-block my-4">${tokens[index].content}</div>`
-}
-md.renderer.rules.fence = (tokens, idx) => {
-  const token = tokens[idx]
-  const langInfo = token.info ? token.info.trim() : ''
-  const lang = langInfo.split(':')[0] || 'plaintext'
-  if (highlighter.value) {
-    return highlighter.value.codeToHtml(token.content, { lang: defaultLanguages.includes(lang) ? lang : 'plaintext', theme: selectedTheme.value })
-  }
-  return `<pre><code class="language-${lang}">${token.content}</code></pre>`
 }
 
-const html = computed(() => md.render(content.value))
 // 主题切换
 const isDark = useDark()
 const toggleTheme = useToggle(isDark)
@@ -127,17 +169,8 @@ const themes = [
   'vitesse-dark',
   'vitesse-light',
 ]
+const selectedTheme = useLocalStorage<string>('vmr-settings-selected-theme', 'vitesse-dark')
 
-if (typeof window !== 'undefined') {
-  watch(() => selectedTheme.value, async (newThemes) => {
-    if (!highlighter.value) {
-      highlighter.value = await registerHighlight({
-        themes: themes as ThemeInput[],
-      })
-    }
-    highlighter.value?.loadTheme(newThemes as ThemeInput)
-  }, { immediate: true })
-}
 // 格式化主题名称显示
 function formatThemeName(themeName: string) {
   return themeName
@@ -149,442 +182,88 @@ function formatThemeName(themeName: string) {
 // 设置面板显示状态
 const showSettings = ref(false)
 
-// Auto-scroll to bottom as content streams in
+// Use reversed column layout and let the browser handle native scrolling.
+// Removed custom JS scroll management (observers, programmatic scroll, and
+// pointer/wheel/touch heuristics) to rely on CSS `flex-direction: column-reverse`.
 const messagesContainer = ref<HTMLElement | null>(null)
-const autoScrollEnabled = ref(true) // Track if auto-scroll is enabled
-const lastScrollTop = ref(0) // Track last scroll position to detect scroll direction
-// Track the last user-driven scroll direction: 'none' (no user scroll yet), 'up', or 'down'
-const lastUserScrollDirection = ref<'none' | 'up' | 'down'>('none')
-// Timestamp of last user scroll event (ms)
-const lastUserScrollTime = ref(0)
-// Flag to ignore scroll events caused by our own programmatic scrolling
-const isProgrammaticScroll = ref(false)
-let lastKnownScrollHeight = 0
-// Check if user is at the bottom of scroll area (fallback based on pixels)
-function isAtBottom(element: HTMLElement, threshold = 50): boolean {
-  return element.scrollHeight - element.scrollTop - element.clientHeight <= threshold
-}
 
-// IntersectionObserver sentinel ref for robust bottom detection (better on mobile)
-const bottomSentinel = ref<HTMLElement | null>(null)
-let bottomObserver: IntersectionObserver | null = null
+// 性能友好的监听：使用 ResizeObserver 监听容器和渲染内容变化，
+// 当内容高度超过容器可见高度时，为 `.markdown-renderer` 添加 `disable-min-height` 类以移除 min-height。
+let __roContainer: ResizeObserver | null = null
+let __roContent: ResizeObserver | null = null
+let __mo: MutationObserver | null = null
+let __scheduled = false
+// Observers and scheduler
 
-// ResizeObserver to detect content height changes (for async rendering like code highlighting, mermaid, etc.)
-let contentResizeObserver: ResizeObserver | null = null
-// MutationObserver to detect DOM changes (like table loading -> content)
-let contentMutationObserver: MutationObserver | null = null
-
-function setupBottomObserver() {
-  if (!messagesContainer.value)
+function scheduleCheckMinHeight() {
+  if (__scheduled)
     return
-
-  // If already observing, disconnect first
-  if (bottomObserver) {
-    bottomObserver.disconnect()
-    bottomObserver = null
-  }
-
-  // Create observer that watches a tiny sentinel element positioned after the content.
-  // When visible, we consider the user to be at (or very near) the bottom and can
-  // re-enable auto-scroll. This approach is more reliable on mobile where scroll
-  // metrics and visualViewport changes can be noisy.
-  // We use a slight negative bottom rootMargin so the sentinel becomes "intersecting"
-  // a little before the true bottom. This helps on mobile where layout/viewport
-  // adjustments (keyboard, visualViewport) can delay reaching the exact scroll bottom.
-  const BOTTOM_OBSERVER_ROOT_MARGIN = '0px 0px -120px 0px' // trigger ~120px before bottom
-
-  bottomObserver = new IntersectionObserver((entries) => {
-    for (const entry of entries) {
-      if (entry.isIntersecting) {
-        // Re-enable auto-scroll only if the user hasn't recently scrolled up.
-        // This prevents interrupting an intentional user scroll away from bottom.
-        // If lastUserScrollDirection is 'up' and recent, don't re-enable immediately.
-        const recentUser = Date.now() - lastUserScrollTime.value < 1000
-        if (lastUserScrollDirection.value === 'up' && recentUser) {
-          // Keep auto-scroll disabled for now.
-          return
-        }
-
-        autoScrollEnabled.value = true
+  __scheduled = true
+  requestAnimationFrame(() => {
+    __scheduled = false
+    const container = messagesContainer.value
+    if (!container)
+      return
+    const contentEl = container.querySelector('.markdown-renderer') as HTMLElement | null
+    if (!contentEl)
+      return
+    const shouldRemove = contentEl.scrollHeight > container.clientHeight
+    if (shouldRemove) {
+      contentEl.classList.add('disable-min-height')
+      // 内容已超出：不再需要继续监听，断开所有 observer 以节省开销
+      try {
+        __roContainer?.disconnect()
+        __roContent?.disconnect()
+        __mo?.disconnect()
+      }
+      finally {
+        __roContainer = null
+        __roContent = null
+        __mo = null
       }
     }
-  }, {
-    root: messagesContainer.value,
-    rootMargin: BOTTOM_OBSERVER_ROOT_MARGIN,
-    threshold: 0,
-  })
-
-  // Observe the sentinel if it exists. If sentinel isn't present yet, try again
-  // after a microtask (it will be present after nextTick when rendering).
-  nextTick(() => {
-    if (bottomSentinel.value)
-      bottomObserver?.observe(bottomSentinel.value)
-  })
-}
-
-function teardownBottomObserver() {
-  if (bottomObserver) {
-    bottomObserver.disconnect()
-    bottomObserver = null
-  }
-}
-
-// Unified function to perform auto-scroll to bottom
-let scrollCheckTimeoutId: number | null = null
-let lastScrollAttemptTime = 0
-function performAutoScrollIfNeeded() {
-  if (!messagesContainer.value || !autoScrollEnabled.value)
-    return
-
-  const container = messagesContainer.value
-  const shouldScroll = isAtBottom(container, 150)
-
-  if (shouldScroll) {
-    const now = Date.now()
-    const timeSinceLastScroll = now - lastScrollAttemptTime
-
-    // Immediate scroll if it's been more than 50ms since last scroll
-    // This ensures real-time scrolling while still batching rapid changes
-    if (timeSinceLastScroll > 50) {
-      executeScroll()
-      lastScrollAttemptTime = now
-    }
-
-    // Clear any pending timeout
-    if (scrollCheckTimeoutId !== null) {
-      clearTimeout(scrollCheckTimeoutId)
-    }
-
-    // Schedule a follow-up scroll to catch any content that renders after this call
-    scrollCheckTimeoutId = window.setTimeout(() => {
-      executeScroll()
-      scrollCheckTimeoutId = null
-      lastScrollAttemptTime = Date.now()
-    }, 50)
-  }
-}
-
-function executeScroll() {
-  if (!messagesContainer.value)
-    return
-
-  try {
-    isProgrammaticScroll.value = true
-    const targetScroll = messagesContainer.value.scrollHeight
-    messagesContainer.value.scrollTo({ top: targetScroll, behavior: 'auto' })
-
-    // Wait for scroll to settle, then update lastScrollTop
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (messagesContainer.value) {
-          lastScrollTop.value = messagesContainer.value.scrollTop
-          lastKnownScrollHeight = messagesContainer.value.scrollHeight
-        }
-        isProgrammaticScroll.value = false
-      })
-    })
-  }
-  catch {
-    isProgrammaticScroll.value = false
-  }
-}
-
-// Setup ResizeObserver to detect content height changes
-function setupContentResizeObserver() {
-  if (!messagesContainer.value)
-    return
-
-  // Disconnect existing observer if any
-  if (contentResizeObserver) {
-    contentResizeObserver.disconnect()
-    contentResizeObserver = null
-  }
-
-  // Track the last known scroll height to detect when content grows
-  let lastContentHeight = messagesContainer.value.scrollHeight
-
-  contentResizeObserver = new ResizeObserver(() => {
-    if (!messagesContainer.value)
-      return
-
-    const currentHeight = messagesContainer.value.scrollHeight
-    // Only react to height increases (new content rendered)
-    if (currentHeight > lastContentHeight) {
-      performAutoScrollIfNeeded()
-    }
-    lastContentHeight = currentHeight
-  })
-
-  // Observe the entire messages container for size changes
-  contentResizeObserver.observe(messagesContainer.value)
-}
-
-// Setup MutationObserver to detect DOM changes (table content loading, etc.)
-function setupContentMutationObserver() {
-  if (!messagesContainer.value)
-    return
-
-  // Disconnect existing observer if any
-  if (contentMutationObserver) {
-    contentMutationObserver.disconnect()
-    contentMutationObserver = null
-  }
-
-  contentMutationObserver = new MutationObserver((mutations) => {
-    // Check if any mutation affected the content
-    let shouldCheck = false
-    for (const mutation of mutations) {
-      // Check for childList changes (nodes added/removed)
-      if (mutation.type === 'childList' && (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0)) {
-        shouldCheck = true
-        break
-      }
-      // Check for attribute changes that might affect layout (class, style)
-      if (mutation.type === 'attributes' && (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
-        shouldCheck = true
-        break
-      }
-    }
-
-    if (shouldCheck) {
-      // Use nextTick to ensure Vue has finished updating
-      nextTick(() => {
-        performAutoScrollIfNeeded()
-      })
+    else {
+      contentEl.classList.remove('disable-min-height')
     }
   })
-
-  // Observe the messages container and its entire subtree
-  contentMutationObserver.observe(messagesContainer.value, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class', 'style'],
-  })
-}
-
-function teardownContentResizeObserver() {
-  if (contentResizeObserver) {
-    contentResizeObserver.disconnect()
-    contentResizeObserver = null
-  }
-}
-
-function teardownContentMutationObserver() {
-  if (contentMutationObserver) {
-    contentMutationObserver.disconnect()
-    contentMutationObserver = null
-  }
-  if (scrollCheckTimeoutId !== null) {
-    clearTimeout(scrollCheckTimeoutId)
-    scrollCheckTimeoutId = null
-  }
-}
-
-// Handle scroll event to manage auto-scroll behavior
-function handleContainerScroll() {
-  if (!messagesContainer.value)
-    return
-
-  // Ignore scroll events initiated by our programmatic scrollTo calls
-  if (isProgrammaticScroll.value)
-    return
-
-  const currentScrollTop = messagesContainer.value.scrollTop
-  const currentScrollHeight = messagesContainer.value.scrollHeight
-
-  // If scrollTop hasn't changed but we're being called, it might be due to content height changes.
-  // In this case, check if we're still at bottom and don't treat it as user scroll.
-  if (currentScrollTop === lastScrollTop.value) {
-    // Content height changed but scroll position stayed the same
-    // Don't update user scroll direction or disable auto-scroll
-    // Just check if we're still at bottom
-    if (isAtBottom(messagesContainer.value)) {
-      autoScrollEnabled.value = true
-    }
-    lastKnownScrollHeight = currentScrollHeight
-    return
-  }
-
-  // Check if scrollTop decreased due to content height shrinking (not user scroll)
-  // This happens when loading placeholders are replaced with smaller actual content
-  if (currentScrollTop < lastScrollTop.value && currentScrollHeight < lastKnownScrollHeight) {
-    // Content shrank, causing scrollTop to decrease passively
-    // Check if we're still at or near bottom - if so, don't disable auto-scroll
-    if (isAtBottom(messagesContainer.value, 50)) {
-      lastScrollTop.value = currentScrollTop
-      lastKnownScrollHeight = currentScrollHeight
-      return
-    }
-  }
-
-  // Update timestamp and determine direction
-  lastUserScrollTime.value = Date.now()
-  if (currentScrollTop < lastScrollTop.value) {
-    // User scrolled up
-    lastUserScrollDirection.value = 'up'
-    autoScrollEnabled.value = false
-  }
-  else if (currentScrollTop > lastScrollTop.value) {
-    // User scrolled down
-    lastUserScrollDirection.value = 'down'
-    // If near bottom, re-enable auto-scroll
-    if (isAtBottom(messagesContainer.value))
-      autoScrollEnabled.value = true
-  }
-
-  // Update last scroll position for future comparisons
-  lastScrollTop.value = currentScrollTop
-  lastKnownScrollHeight = currentScrollHeight
-}
-
-// Track touch/pointer start positions to detect direction
-const touchStartY = ref<number | null>(null)
-const pointerStartY = ref<number | null>(null)
-
-// Wheel: only disable auto-scroll when user scrolls up (deltaY < 0).
-function handleWheel(e: WheelEvent) {
-  try {
-    if (!messagesContainer.value)
-      return
-
-    // Treat wheel as a user-driven scroll; record time and direction
-    lastUserScrollTime.value = Date.now()
-    if (e.deltaY < 0) {
-      // Scrolling up
-      lastUserScrollDirection.value = 'up'
-      autoScrollEnabled.value = false
-    }
-    else if (e.deltaY > 0) {
-      // Scrolling down
-      lastUserScrollDirection.value = 'down'
-      if (isAtBottom(messagesContainer.value))
-        autoScrollEnabled.value = true
-    }
-  }
-  catch {
-    // ignore
-  }
-}
-
-// Touch handlers: detect move direction between touchstart and touchmove
-function handleTouchStart(e: TouchEvent) {
-  if (e.touches && e.touches.length > 0) {
-    touchStartY.value = e.touches[0].clientY
-  }
-}
-
-function handleTouchMove(e: TouchEvent) {
-  if (!messagesContainer.value || touchStartY.value == null || !e.touches || e.touches.length === 0)
-    return
-
-  const currentY = e.touches[0].clientY
-  const delta = currentY - touchStartY.value
-  // Positive delta means finger moved down -> content scrolls up (towards top) -> user viewing earlier content
-  lastUserScrollTime.value = Date.now()
-  if (delta > 0) {
-    lastUserScrollDirection.value = 'up'
-    autoScrollEnabled.value = false
-  }
-  else if (delta < 0) {
-    lastUserScrollDirection.value = 'down'
-    if (isAtBottom(messagesContainer.value))
-      autoScrollEnabled.value = true
-  }
-}
-
-// Pointer handlers for scrollbar drag / pointer-based dragging
-function handlePointerDown(e: PointerEvent) {
-  pointerStartY.value = (e as PointerEvent).clientY
-  // Attach move/up listeners to document to track the drag
-  const move = (ev: PointerEvent) => {
-    if (pointerStartY.value == null)
-      return
-    const delta = ev.clientY - pointerStartY.value
-    lastUserScrollTime.value = Date.now()
-    if (delta > 0) {
-      lastUserScrollDirection.value = 'up'
-      autoScrollEnabled.value = false
-    }
-    else if (delta < 0) {
-      lastUserScrollDirection.value = 'down'
-      if (messagesContainer.value && isAtBottom(messagesContainer.value))
-        autoScrollEnabled.value = true
-    }
-  }
-
-  const up = () => {
-    document.removeEventListener('pointermove', move)
-    document.removeEventListener('pointerup', up)
-    pointerStartY.value = null
-  }
-
-  document.addEventListener('pointermove', move)
-  document.addEventListener('pointerup', up)
-}
-
-// Keyboard interactions: only treat upward navigation as disabling; downward navigation may re-enable when near bottom.
-function handleKeyDown(e: KeyboardEvent) {
-  const upKeys = ['PageUp', 'ArrowUp', 'Home']
-  const downKeys = ['PageDown', 'ArrowDown', 'End', 'Space']
-  if (upKeys.includes(e.key)) {
-    autoScrollEnabled.value = false
-  }
-  else if (downKeys.includes(e.key)) {
-    if (messagesContainer.value && isAtBottom(messagesContainer.value))
-      autoScrollEnabled.value = true
-  }
 }
 
 onMounted(() => {
-  // Initialize lastScrollTop and attach extra listeners
-  if (messagesContainer.value) {
-    lastScrollTop.value = messagesContainer.value.scrollTop
-    lastKnownScrollHeight = messagesContainer.value.scrollHeight
-    messagesContainer.value.addEventListener('wheel', handleWheel, { passive: true })
-    messagesContainer.value.addEventListener('touchstart', handleTouchStart, { passive: true })
-    messagesContainer.value.addEventListener('touchmove', handleTouchMove, { passive: true })
-    messagesContainer.value.addEventListener('pointerdown', handlePointerDown)
-    // keydown could be on document
-    document.addEventListener('keydown', handleKeyDown)
-    // Setup IntersectionObserver sentinel after mount
-    setupBottomObserver()
-    // Setup ResizeObserver to detect content height changes
-    setupContentResizeObserver()
-    // Setup MutationObserver to detect DOM changes (table loading -> content)
-    setupContentMutationObserver()
-  }
-})
-
-onUnmounted(() => {
-  if (messagesContainer.value) {
-    messagesContainer.value.removeEventListener('wheel', handleWheel)
-    messagesContainer.value.removeEventListener('touchstart', handleTouchStart)
-    messagesContainer.value.removeEventListener('touchmove', handleTouchMove)
-    messagesContainer.value.removeEventListener('pointerdown', handlePointerDown)
-    document.removeEventListener('keydown', handleKeyDown)
-    teardownBottomObserver()
-    teardownContentResizeObserver()
-    teardownContentMutationObserver()
-  }
-})
-
-watch(content, () => {
-  // Only auto-scroll if enabled (user hasn't scrolled away from bottom)
-  if (!autoScrollEnabled.value)
+  // 初始检查和观察
+  const container = messagesContainer.value
+  if (!container)
     return
+  // 初次判断（确保组件渲染完）
+  requestAnimationFrame(scheduleCheckMinHeight)
 
-  // Trigger the unified auto-scroll function immediately
-  performAutoScrollIfNeeded()
+  // 观察容器尺寸变化（窗口大小、面板大小）
+  __roContainer = new ResizeObserver(scheduleCheckMinHeight)
+  __roContainer.observe(container)
 
-  // Also schedule additional checks to handle async rendering
-  // (like code highlighting, mermaid, etc.)
-  const retryDelays = [100, 200, 400, 800]
-  retryDelays.forEach((delay) => {
-    setTimeout(() => {
-      performAutoScrollIfNeeded()
-    }, delay)
+  // 观察渲染内容尺寸变化（markdown 内容动态变化）
+  const tryObserveContent = () => {
+    const el = container.querySelector('.markdown-renderer') as HTMLElement | null
+    if (el) {
+      if (__roContent)
+        __roContent.disconnect()
+      __roContent = new ResizeObserver(scheduleCheckMinHeight)
+      __roContent.observe(el)
+    }
+  }
+  tryObserveContent()
+
+  // 如果 MarkdownRender 在后续替换了子节点，使用 MutationObserver 重新 attach
+  __mo = new MutationObserver(() => {
+    tryObserveContent()
+    scheduleCheckMinHeight()
   })
+  __mo.observe(container, { childList: true, subtree: true })
+})
+
+onBeforeUnmount(() => {
+  __roContainer?.disconnect()
+  __roContent?.disconnect()
+  __mo?.disconnect()
 })
 </script>
 
@@ -666,6 +345,46 @@ watch(content, () => {
                   class="w-4 h-4 text-gray-400 dark:text-gray-500"
                 />
               </div>
+            </div>
+          </div>
+
+          <!-- 流式速度控制 -->
+          <div class="space-y-2">
+            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+              Stream Delay
+            </label>
+            <div class="flex items-center gap-3">
+              <input
+                v-model.number="streamDelay"
+                type="range"
+                min="4"
+                max="200"
+                step="4"
+                class="flex-1 cursor-pointer"
+              >
+              <span class="text-xs font-medium text-gray-600 dark:text-gray-400 w-12 text-right">
+                {{ streamDelay }}ms
+              </span>
+            </div>
+          </div>
+
+          <!-- 流式字符数量控制 -->
+          <div class="space-y-2">
+            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+              Chunk Size
+            </label>
+            <div class="flex items-center gap-3">
+              <input
+                v-model.number="streamChunkSize"
+                type="range"
+                min="1"
+                max="16"
+                step="1"
+                class="flex-1 cursor-pointer"
+              >
+              <span class="text-xs font-medium text-gray-600 dark:text-gray-400 w-12 text-right">
+                {{ normalizedChunkSize }}
+              </span>
             </div>
           </div>
 
@@ -752,12 +471,13 @@ watch(content, () => {
             </div>
           </div>
 
-          <!-- GitHub Star Button -->
-          <a
-            href="https://github.com/Simon-He95/vue-markdown-render"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="
+          <div class="flex">
+            <!-- GitHub Star Button -->
+            <a
+              href="https://github.com/Simon-He95/vue-markdown-render"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="
               github-star-btn flex items-center gap-2 px-3 py-1.5
               bg-gray-800 dark:bg-gray-700 hover:bg-gray-700 dark:hover:bg-gray-600
               text-white text-sm font-medium rounded-lg
@@ -765,18 +485,36 @@ watch(content, () => {
               shadow-md hover:shadow-lg
               focus:outline-none focus:ring-2 focus:ring-blue-500/50
             "
-          >
-            <Icon icon="carbon:star" class="w-4 h-4" />
-            <span>Star</span>
-          </a>
+            >
+              <Icon icon="carbon:star" class="w-4 h-4" />
+              <span>Star</span>
+            </a>
+
+            <!-- Test Page Button -->
+            <button
+              class="ml-2 test-page-btn flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              title="Go to Test page"
+              @click="goToTest"
+            >
+              <Icon icon="carbon:rocket" class="w-4 h-4" />
+              <span>Test</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Messages area with scroll -->
-      <main ref="messagesContainer" class="chatbot-messages prose prose-sm max-w-full flex-1 overflow-y-auto mr-[1px] mb-4" @scroll="handleContainerScroll">
-        <div class="p-6" v-html="html" />
-        <!-- Sentinel observed by IntersectionObserver to detect reaching bottom reliably on mobile -->
-        <div ref="bottomSentinel" aria-hidden="true" class="w-full h-1 pointer-events-none" />
+      <!-- Messages area with scroll (use column-reverse on the scroll container) -->
+      <main ref="messagesContainer" class="chatbot-messages flex-1 overflow-y-auto mr-[1px] mb-4 flex flex-col-reverse">
+        <MarkdownRender
+          :content="content"
+          :code-block-dark-theme="selectedTheme || undefined"
+          :code-block-light-theme="selectedTheme || undefined"
+          :themes="themes"
+          :is-dark="isDark"
+          :parse-options="parseOptions"
+          custom-id="playground-demo"
+          class="p-6"
+        />
       </main>
     </div>
   </div>
@@ -802,6 +540,14 @@ watch(content, () => {
 .chatbot-messages {
   scroll-behavior: smooth;
   overscroll-behavior: contain;
+}
+.chatbot-messages > .markdown-renderer {
+  min-height: 100%;
+}
+
+/* 当真实内容高度超出容器时，移除默认 min-height（由 JS 切换类名） */
+.chatbot-messages > .markdown-renderer.disable-min-height {
+  min-height: unset !important;
 }
 
 .chatbot-messages::-webkit-scrollbar {
@@ -896,12 +642,5 @@ watch(content, () => {
 :deep(.is-rendering) {
   position: relative;
   animation: renderingGlow 2s ease-in-out infinite;
-}
-:deep(.prose .markdown-renderer p) {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-.prose{
-  max-width: 100% !important;
 }
 </style>
