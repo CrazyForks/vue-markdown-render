@@ -3,6 +3,7 @@ import { Icon } from '@iconify/vue'
 import MarkdownRender from 'vue-renderer-markdown'
 import { useRouter } from 'vue-router'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
+import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
 import { setCustomComponents } from '../../../src/utils/nodeComponents'
 import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline'
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
@@ -11,7 +12,6 @@ import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
 import ThinkingNode from '../components/ThinkingNode.vue'
 import { streamContent } from '../const/markdown'
 import 'katex/dist/katex.min.css'
-import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
 
 // 每隔 10 毫秒输出一部分内容
 const content = ref<string>('')

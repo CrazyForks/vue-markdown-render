@@ -439,19 +439,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     let closeDelim = ''
     for (const [open, close] of delimiters) {
       // 这里其实不应该只匹配 startWith的情况因为很可能前面还有 text
-      const m = lineText.indexOf(open)
-      if (m !== -1) {
-        const beforeText = lineText.slice(0, m)
-        if (beforeText) {
-          if (beforeText.endsWith('!')) {
-            // image-node need break
-            return false
-          }
-          const inline = s.push('inline', '', 0)
-          inline.content = beforeText
-          inline.map = [startLine, startLine]
-          inline.children = []
-        }
+      if (lineText.startsWith(open)) {
         if (open.includes('[')) {
           if (lineText.replace('\\', '') === '[') {
             if (startLine + 1 < endLine) {

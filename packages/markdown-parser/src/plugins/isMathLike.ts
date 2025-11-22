@@ -37,6 +37,10 @@ const TEX_SPECIFIC_RE = /\\(?:text|frac|left|right|times)/
 // regex literal on some platforms/linters.
 // eslint-disable-next-line prefer-regex-literals
 const OPS_RE = new RegExp('(?<!\\+)\\+(?!\\+)|[=\\-*/^<>]|\\\\times|\\\\pm|\\\\cdot|\\\\le|\\\\ge|\\\\neq')
+// Hyphenated multi-word (like "Quasi-Streaming") should not be treated
+// as a math operator. But single-letter-variable hyphens (e.g. "x-y") are
+// still math; so only ignore hyphens between multi-letter words.
+const HYPHENATED_MULTIWORD_RE = /\b[A-Z]{2,}-[A-Z]{2,}\b/i
 const FUNC_CALL_RE = /[A-Z]+\s*\([^)]+\)/i
 const WORDS_RE = /\b(?:sin|cos|tan|log|ln|exp|sqrt|frac|sum|lim|int|prod)\b/
 // Heuristic to detect common date/time patterns like 2025/9/30 21:37:24 and
@@ -79,14 +83,16 @@ export function isMathLike(s: string) {
   const superscriptPattern = /(?:^|[^\w\\])(?:[A-Z]|\\[A-Z]+)\^(?:\{[^}]+\}|[A-Z0-9\\])/i
   const superSub = subscriptPattern.test(norm) || superscriptPattern.test(norm)
   // common math operator symbols or named commands
-  const ops = OPS_RE.test(norm)
+  // Ignore operator-like hyphens that are clearly word compound separators
+  // (e.g. "Quasi-Streaming"). Keep hyphens for math like "x-y".
+  const ops = OPS_RE.test(norm) && !HYPHENATED_MULTIWORD_RE.test(norm)
   // function-like patterns: f(x), sin(x)
   const funcCall = FUNC_CALL_RE.test(norm)
   // common math words
   const words = WORDS_RE.test(norm)
-  // 纯单个英文字命，也渲染成数学公式
+  // 纯单个英文字母也渲染成数学公式
   // e.g. (w) (x) (y) (z)
-  // const pureWord = /^\([a-zA-Z]\)$/i.test(stripped)
+  const pureWord = /^\([a-z]\)$/i.test(stripped)
 
-  return texCmd || texCmdWithBraces || texBraceStart || texSpecific || superSub || ops || funcCall || words
+  return texCmd || texCmdWithBraces || texBraceStart || texSpecific || superSub || ops || funcCall || words || pureWord
 }

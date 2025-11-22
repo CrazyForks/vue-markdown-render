@@ -261,13 +261,7 @@ exports[`markdownRender node e2e coverage > renders footnote nodes 1`] = `
 "<div data-v-8dfe8a80="" class="markdown-renderer">
   <div data-v-8dfe8a80="">
     <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>
-    <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
-      <div data-v-8dfe8a80="" class="node-content">
-        <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-        <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true"><span data-v-a84b8095="" data-v-8dfe8a80="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0" typewriter="true" is-dark="false">A footnote reference</span></transition-stub>
-      </div>
-    </div>
-    <div data-v-8dfe8a80="" class="node-slot" data-node-index="1" data-node-type="paragraph">
+    <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
       <div data-v-8dfe8a80="" class="node-content">
         <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
         <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
@@ -277,7 +271,7 @@ exports[`markdownRender node e2e coverage > renders footnote nodes 1`] = `
         </transition-stub>
       </div>
     </div>
-    <div data-v-8dfe8a80="" class="node-slot" data-node-index="2" data-node-type="footnote">
+    <div data-v-8dfe8a80="" class="node-slot" data-node-index="1" data-node-type="footnote">
       <div data-v-8dfe8a80="" class="node-content">
         <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
         <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
@@ -436,17 +430,11 @@ exports[`markdownRender node e2e coverage > renders link node 1`] = `
 "<div data-v-8dfe8a80="" class="markdown-renderer">
   <div data-v-8dfe8a80="">
     <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>
-    <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
-      <div data-v-8dfe8a80="" class="node-content">
-        <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-        <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true"><span data-v-a84b8095="" data-v-8dfe8a80="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0" typewriter="true" is-dark="false">Visit </span></transition-stub>
-      </div>
-    </div>
-    <div data-v-8dfe8a80="" class="node-slot" data-node-index="1" data-node-type="paragraph">
+    <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
       <div data-v-8dfe8a80="" class="node-content">
         <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
         <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-          <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">Visit </span><a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="https://vuejs.org" aria-label="Link: https://vuejs.org" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--link-color: #0366d6; --underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.9; --underline-duration: 0.8s; --underline-timing: linear; --underline-iteration: infinite;"><span data-v-a84b8095="" data-v-994bfd08="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-1-1-0">Vue</span></a><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node"> now.</span></p>
+          <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">Visit </span><a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="https://vuejs.org" aria-label="Link: https://vuejs.org" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--link-color: #0366d6; --underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.9; --underline-duration: 0.8s; --underline-timing: linear; --underline-iteration: infinite;"><span data-v-a84b8095="" data-v-994bfd08="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-1-0">Vue</span></a><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node"> now.</span></p>
         </transition-stub>
       </div>
     </div>
@@ -543,17 +531,11 @@ exports[`markdownRender node e2e coverage > renders reference node 1`] = `
 "<div data-v-8dfe8a80="" class="markdown-renderer">
   <div data-v-8dfe8a80="">
     <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>
-    <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
-      <div data-v-8dfe8a80="" class="node-content">
-        <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-        <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true"><span data-v-a84b8095="" data-v-8dfe8a80="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0" typewriter="true" is-dark="false">Cite research </span></transition-stub>
-      </div>
-    </div>
-    <div data-v-8dfe8a80="" class="node-slot" data-node-index="1" data-node-type="paragraph">
+    <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
       <div data-v-8dfe8a80="" class="node-content">
         <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
         <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-          <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">Cite research </span><span data-v-93ee5c2d="" class="reference-node cursor-pointer bg-accent text-xs rounded-md px-1.5 mx-0.5 hover:bg-secondary" role="button" tabindex="0" index-key="markdown-renderer-1-1">1</span><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node"> for details.</span></p>
+          <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">Cite research </span><span data-v-93ee5c2d="" class="reference-node cursor-pointer bg-accent text-xs rounded-md px-1.5 mx-0.5 hover:bg-secondary" role="button" tabindex="0" index-key="markdown-renderer-0-1">1</span><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node"> for details.</span></p>
         </transition-stub>
       </div>
     </div>
