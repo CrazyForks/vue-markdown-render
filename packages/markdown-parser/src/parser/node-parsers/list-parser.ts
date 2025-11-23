@@ -63,11 +63,7 @@ export function parseList(
           tokens[k].type === 'bullet_list_open'
           || tokens[k].type === 'ordered_list_open'
         ) {
-          if (tokens[k].markup === '*') {
-            k++
-            continue
-          }
-          // Parse nested list
+          // Parse nested list (do not skip '*' — treat all bullet types consistently)
           const [nestedListNode, newIndex] = parseNestedList(tokens, k)
           itemChildren.push(nestedListNode)
           k = newIndex
@@ -206,11 +202,6 @@ function parseNestedList(
           tokens[k].type === 'bullet_list_open'
           || tokens[k].type === 'ordered_list_open'
         ) {
-          if (tokens[k].markup === '*') {
-            k++
-            continue
-          }
-
           // Handle deeper nested lists
           const [deeperNestedListNode, newIndex] = parseNestedList(tokens, k)
           itemChildren.push(deeperNestedListNode)
