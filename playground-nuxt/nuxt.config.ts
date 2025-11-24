@@ -7,7 +7,6 @@ export default defineNuxtConfig({
   ],
   css: [
     '@/assets/tailwind.css',
-    'vue-renderer-markdown/index.tailwind.css',
     'vue-renderer-markdown/index.css',
     'katex/dist/katex.min.css',
   ],
@@ -20,6 +19,9 @@ export default defineNuxtConfig({
   vite: {
     optimizeDeps: {
       exclude: ['monaco-editor', 'stream-monaco', 'vue-renderer-markdown'],
+    },
+    worker: {
+      format: 'es',
     },
   },
   runtimeConfig: {
