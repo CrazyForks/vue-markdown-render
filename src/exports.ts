@@ -36,6 +36,7 @@ import TextNode from './components/TextNode'
 import ThematicBreakNode from './components/ThematicBreakNode'
 import { setLanguageIconResolver } from './utils/languageIcon'
 import { clearGlobalCustomComponents, getCustomNodeComponents, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
+import { setDefaultI18nMap } from './composables/useSafeI18n'
 import './index.css'
 import './workers/katexRenderer.worker?worker'
 import './workers/mermaidParser.worker?worker'
@@ -78,6 +79,7 @@ export {
   ReferenceNode,
   removeCustomComponents,
   setCustomComponents,
+  setDefaultI18nMap,
   StrikethroughNode,
   StrongNode,
   SubscriptNode,

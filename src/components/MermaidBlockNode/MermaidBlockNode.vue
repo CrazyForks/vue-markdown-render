@@ -2,6 +2,7 @@
 // Exported props interface for MermaidBlockNode
 import type { MermaidBlockNodeProps } from '../../types/component-props'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import mermaidIconUrl from '../../icon/mermaid.svg?url'
@@ -23,6 +24,8 @@ const props = withDefaults(
   },
 )
 const emits = defineEmits(['copy'])
+const { t } = useSafeI18n()
+
 let mermaid: any = null
 const mermaidAvailable = ref(false)
 
@@ -253,7 +256,7 @@ function onBtnLeave() {
 function onCopyHover(e: Event) {
   if (shouldSkipEventTarget(e.currentTarget))
     return
-  const txt = copyText.value ? ('Copied') : ('Copy')
+  const txt = copyText.value ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
   showTooltipForAnchor(e.currentTarget as HTMLElement, txt, 'top', false, origin, props.isDark)
@@ -1375,14 +1378,14 @@ const computedButtonStyle = computed(() => {
               : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'),
           ]"
           @click="switchMode('preview')"
-          @mouseenter="onBtnHover($event, 'Preview')"
-          @focus="onBtnHover($event, 'Preview')"
+          @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
+          @focus="onBtnHover($event, t('common.preview') || 'Preview')"
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
           <div class="flex items-center space-x-1">
             <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></g></svg>
-            <span>Preview</span>
+            <span>{{ t('common.preview') || 'Preview' }}</span>
           </div>
         </button>
         <button
@@ -1393,14 +1396,14 @@ const computedButtonStyle = computed(() => {
               : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'),
           ]"
           @click="switchMode('source')"
-          @mouseenter="onBtnHover($event, 'Source')"
-          @focus="onBtnHover($event, 'Source')"
+          @mouseenter="onBtnHover($event, t('common.source') || 'Source')"
+          @focus="onBtnHover($event, t('common.source') || 'Source')"
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
           <div class="flex items-center space-x-1">
             <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16 18l6-6l-6-6M8 6l-6 6l6 6" /></svg>
-            <span>Source</span>
+            <span>{{ t('common.source') || 'Source' }}</span>
           </div>
         </button>
       </div>
@@ -1411,8 +1414,8 @@ const computedButtonStyle = computed(() => {
           :class="computedButtonStyle"
           :aria-pressed="isCollapsed"
           @click="isCollapsed = !isCollapsed"
-          @mouseenter="onBtnHover($event, isCollapsed ? 'Expand' : 'Collapse')"
-          @focus="onBtnHover($event, isCollapsed ? 'Expand' : 'Collapse')"
+          @mouseenter="onBtnHover($event, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))"
+          @focus="onBtnHover($event, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))"
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
@@ -1434,8 +1437,8 @@ const computedButtonStyle = computed(() => {
           :class="`${computedButtonStyle} ${isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : ''}`"
           :disabled="isFullscreenDisabled"
           @click="exportSvg"
-          @mouseenter="onBtnHover($event, 'Export')"
-          @focus="onBtnHover($event, 'Export')"
+          @mouseenter="onBtnHover($event, t('common.export') || 'Export')"
+          @focus="onBtnHover($event, t('common.export') || 'Export')"
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
@@ -1446,8 +1449,8 @@ const computedButtonStyle = computed(() => {
           :class="`${computedButtonStyle} ${isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : ''}`"
           :disabled="isFullscreenDisabled"
           @click="openModal"
-          @mouseenter="onBtnHover($event, isModalOpen ? 'Minimize' : 'Open')"
-          @focus="onBtnHover($event, isModalOpen ? 'Minimize' : 'Open')"
+          @mouseenter="onBtnHover($event, isModalOpen ? (t('common.minimize') || 'Minimize') : (t('common.open') || 'Open'))"
+          @focus="onBtnHover($event, isModalOpen ? (t('common.minimize') || 'Minimize') : (t('common.open') || 'Open'))"
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
@@ -1469,28 +1472,28 @@ const computedButtonStyle = computed(() => {
             <button
               class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
               @click="zoomIn"
-              @mouseenter="onBtnHover($event, 'Zoom in')"
-              @focus="onBtnHover($event, 'Zoom in')"
+              @mouseenter="onBtnHover($event, t('common.zoomIn') || 'Zoom in')"
+              @focus="onBtnHover($event, t('common.zoomIn') || 'Zoom in')"
               @mouseleave="onBtnLeave"
               @blur="onBtnLeave"
             >
-              <svg data-v-3d59cc65="" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
             </button>
             <button
               class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
               @click="zoomOut"
-              @mouseenter="onBtnHover($event, 'Zoom out')"
-              @focus="onBtnHover($event, 'Zoom out')"
+              @mouseenter="onBtnHover($event, t('common.zoomOut') || 'Zoom out')"
+              @focus="onBtnHover($event, t('common.zoomOut') || 'Zoom out')"
               @mouseleave="onBtnLeave"
               @blur="onBtnLeave"
             >
-              <svg data-v-3d59cc65="" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
             </button>
             <button
               class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
               @click="resetZoom"
-              @mouseenter="onBtnHover($event, 'Reset zoom')"
-              @focus="onBtnHover($event, 'Reset zoom')"
+              @mouseenter="onBtnHover($event, t('common.resetZoom') || 'Reset zoom')"
+              @focus="onBtnHover($event, t('common.resetZoom') || 'Reset zoom')"
               @mouseleave="onBtnLeave"
               @blur="onBtnLeave"
             >
@@ -1542,13 +1545,13 @@ const computedButtonStyle = computed(() => {
                     class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
                     @click="zoomIn"
                   >
-                    <svg data-v-3d59cc65="" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g data-v-3d59cc65="" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle data-v-3d59cc65="" cx="11" cy="11" r="8" /><path data-v-3d59cc65="" d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
                   </button>
                   <button
                     class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
                     @click="zoomOut"
                   >
-                    <svg data-v-3d59cc65="" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
                   </button>
                   <button
                     class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
