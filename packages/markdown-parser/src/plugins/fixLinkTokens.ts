@@ -54,7 +54,6 @@ function createLinkToken(text: string, href: string, loading: boolean) {
   }
 }
 
-// todo: The code below has been refactored because it involves a lot of repetitive data transformations and needs to accommodate different scenarios, such as plain text. It should now be correctly converted to a link.
 export function applyFixLinkTokens(md: MarkdownIt) {
   // Run after the inline rule so markdown-it has produced inline tokens
   // for block-level tokens; we then adjust each inline token's children
@@ -345,6 +344,43 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       }
       replacerTokens.push(createLinkToken(text, href, loading))
       pushEmClose(replacerTokens, type)
+      if (tokens[i + 1]?.type === 'text') {
+        const afterText = tokens[i + 1].content?.replace(/^\)\**/, '')
+        if (afterText)
+          replacerTokens.push(textToken(afterText))
+        tokens.splice(i - 4, 8, ...replacerTokens)
+      }
+      else if (tokens[i + 1]?.type === 'link_open') {
+        // 特殊情况其实要把href也处理，这里可以直接跳过
+        tokens.splice(i - 4, 10, ...replacerTokens)
+      }
+      else {
+        tokens.splice(i - 4, 7, ...replacerTokens)
+      }
+      i -= (replacerTokens.length - 1)
+      continue
+    }
+    else if (curToken.content?.startsWith('](') && tokens[i - 1].type === 'strong_close' && tokens[i - 4]?.type === 'text' && tokens[i - 4]?.content?.includes('**[')) {
+      // 此时的场景是 link 被 strong 包裹，link 中又包含了强调符号
+      i++
+      const replacerTokens = []
+      const beforeText = tokens[i - 4].content!.split('**[')[0]
+      if (beforeText)
+        replacerTokens.push(textToken(beforeText))
+      pushEmOpen(replacerTokens, 2)
+      const text = tokens[i - 2].content || ''
+      let href = curToken.content!.slice(2)
+      let loading = true
+      if (tokens[i + 1]?.type === 'text') {
+        const m = (tokens[i + 1]?.content ?? '').indexOf(')')
+        loading = m === -1
+        if (m === -1) {
+          href += (tokens[i + 1]?.content?.slice(0, m) || '')
+          tokens[i + 1].content = ''
+        }
+      }
+      replacerTokens.push(createLinkToken(text, href, loading))
+      pushEmClose(replacerTokens, 2)
       if (tokens[i + 1]?.type === 'text') {
         const afterText = tokens[i + 1].content?.replace(/^\)\**/, '')
         if (afterText)

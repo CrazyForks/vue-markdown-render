@@ -213,10 +213,17 @@ export function parseInlineTokens(
       // editors can style it while typing; for multi-backtick runs, keep it as
       // plain text to avoid over-eager code spans.
       if (runLen === 1) {
+        // beforeText 可能包含 strong/emphasis，需要递归处理
         const beforeText = content.slice(0, codeStart)
         const codeContent = content.slice(codeStart + 1)
-        if (beforeText)
-          pushText(beforeText, beforeText)
+        if (beforeText) {
+          const handled = handleEmphasisAndStrikethrough(beforeText, _token)
+          if (!handled)
+            pushText(beforeText, beforeText)
+          else
+            i--
+        }
+
         pushParsed({ type: 'inline_code', code: codeContent, raw: String(codeContent) } as ParsedNode)
         i++
         return true
@@ -690,7 +697,7 @@ export function parseInlineTokens(
     // 如果 text 不在[]里说明，它不是一个link， 当 text 处理
 
     if (raw && tokens[i + 1].type === 'text') {
-      const text = String(tokens[i + 1]?.content ?? '')
+      let text = String(tokens[i + 1]?.content ?? '')
       const escText = escapeRegExp(text)
       const reg = new RegExp(`\\[${escText}\\s*\\]`)
       if (!reg.test(raw)) {
@@ -718,8 +725,29 @@ export function parseInlineTokens(
           return
         }
 
-        pushText(text, text)
-        i += 3
+        if (tokens[i + 2]?.type === 'strong_open') {
+          i += 2
+          while (i < tokens.length - 1 && tokens[i] && tokens[i]?.type !== 'link_close') {
+            text += String(tokens[i]?.markup || tokens[i]?.content || '')
+            i++
+          }
+          const node = {
+            type: 'link',
+            href: String(hrefAttr),
+            title: null,
+            text,
+            children: [
+              { type: 'text', content: text, raw: text },
+            ],
+            loading: false,
+          } as ParsedNode
+          pushParsed(node)
+          i += 1
+        }
+        else {
+          pushText(text, text)
+          i += 3
+        }
         return
       }
     }
