@@ -90,11 +90,9 @@ export function isMathLike(s: string) {
   const funcCall = FUNC_CALL_RE.test(norm)
   // common math words
   const words = WORDS_RE.test(norm)
-  // 纯单个英文字母也渲染成数学公式（常见变量/元素符号）
-  // e.g. (w) (x) (y) (z) 或 $H$, $x$ 等
-  const pureWord = /^\([a-z]\)$/i.test(stripped) || /^[a-z]$/i.test(stripped)
-  // 简单的化学式/下标：如 H_2O, CO_2, CH_3CH_2OH, CH_3COOH
-  const chemicalLike = /^(?:[A-Z][a-z]?(_\{?[A-Za-z0-9]+\}?|\^[A-Za-z0-9]+)?)+$/i.test(stripped)
+  // 纯单个英文字母也渲染成数学公式
+  // e.g. (w) (x) (y) (z)
+  const pureWord = /^\([a-z]\)$/i.test(stripped)
 
-  return texCmd || texCmdWithBraces || texBraceStart || texSpecific || superSub || ops || funcCall || words || pureWord || chemicalLike
+  return texCmd || texCmdWithBraces || texBraceStart || texSpecific || superSub || ops || funcCall || words || pureWord
 }
