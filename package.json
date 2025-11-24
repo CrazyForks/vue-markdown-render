@@ -112,7 +112,17 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.7.4",
-    "stream-markdown-parser": "^0.0.30"
+    "markdown-it": "^14.1.0",
+    "markdown-it-container": "^4.0.0",
+    "markdown-it-emoji": "^3.0.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-ins": "^4.0.0",
+    "markdown-it-mark": "^4.0.0",
+    "markdown-it-sub": "^2.0.0",
+    "markdown-it-sup": "^2.0.0",
+    "markdown-it-task-checkbox": "^1.0.6",
+    "markdown-it-ts": "0.0.2-beta.4",
+    "stream-markdown-parser": "workspace:^"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^5.4.1",
