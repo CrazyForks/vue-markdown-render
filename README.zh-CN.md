@@ -61,6 +61,7 @@ https://github.com/Simon-He95/vue-markdown-render/issues
 - [stream-markdown](https://github.com/Simon-He95/stream-markdown)
 - [mermaid](https://mermaid-js.github.io/mermaid)
 - [shiki](https://github.com/shikijs/shiki)
+- [markdown-it-ts](https://github.com/Simon-He95/markdown-it-ts)
 
 感谢这些项目的作者与贡献者！
 
