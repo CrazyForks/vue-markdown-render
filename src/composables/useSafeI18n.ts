@@ -17,8 +17,15 @@ const defaultMap: Record<string, string> = {
   'common.expand': 'Expand',
   'common.collapse': 'Collapse',
   'common.preview': 'Preview',
+  'common.source': 'Source',
+  'common.export': 'Export',
+  'common.open': 'Open',
+  'common.zoomIn': 'Zoom in',
+  'common.zoomOut': 'Zoom out',
+  'common.resetZoom': 'Reset zoom',
   'image.loadError': 'Image failed to load',
   'image.loading': 'Loading image...',
+
 }
 
 /**
