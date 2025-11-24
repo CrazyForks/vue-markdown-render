@@ -64,4 +64,4 @@ pnpm install
 pnpm play:nuxt
 ```
 
-上述命令会启动 Nuxt 4 开发服务器（默认 <http://localhost:3000>），你可以直接在其中测试 `vue-renderer-markdown` 的 Nuxt 集成，并按需拷贝其中的配置到你的项目。
+上述命令会启动 Nuxt 4 开发服务器（默认 `http://localhost:3000`），你可以直接在其中测试 `vue-renderer-markdown` 的 Nuxt 集成，并按需拷贝其中的配置到你的项目。

@@ -64,4 +64,4 @@ pnpm install
 pnpm play:nuxt
 ```
 
-The command boots Nuxt 4 (dev server at <http://localhost:3000>) and renders the same Markdown stream as the main playground, so you can verify SSR, workers, and Tailwind interactions in an actual Nuxt environment. Feel free to copy pieces from that folder when wiring up your own project.
+The command boots Nuxt 4 (dev server at `http://localhost:3000`) and renders the same Markdown stream as the main playground, so you can verify SSR, workers, and Tailwind interactions in an actual Nuxt environment. Feel free to copy pieces from that folder when wiring up your own project.
