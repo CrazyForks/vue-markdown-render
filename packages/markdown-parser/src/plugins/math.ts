@@ -438,7 +438,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     silent: boolean,
   ) => {
     const s = state as any
-    const strict = !!mathOpts?.strictDelimiters
+    const strict = mathOpts?.strictDelimiters ?? true
     const delimiters: [string, string][] = strict
       ? [
           ['\\[', '\\]'],

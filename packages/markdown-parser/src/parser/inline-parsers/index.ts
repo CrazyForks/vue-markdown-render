@@ -560,7 +560,17 @@ export function parseInlineTokens(
 
       case 'math_inline': {
         resetCurrentTextNode()
-        pushNode(parseMathInlineToken(token))
+        // 可能遇到 math_inline text math_inline 的特殊情况，需要合并成一个
+        if (!token.content && token.markup === '$' && tokens[i + 1]?.type === 'text' && tokens[i + 2]?.type === 'math_inline') {
+          pushNode(parseMathInlineToken({
+            ...token,
+            content: tokens[i + 1].content,
+          }))
+          i += 2
+        }
+        else {
+          pushNode(parseMathInlineToken(token))
+        }
         i++
         break
       }
@@ -775,13 +785,11 @@ export function parseInlineTokens(
         if (closeIdx === -1) {
           node.loading = true
         }
-        else {
+        else if (node.loading) {
           // Check that the href inside the parens corresponds to this token
           const inside = raw.slice(openIdx + 2, closeIdx)
           if (inside.includes(hrefStr))
             node.loading = false
-          else
-            node.loading = true
         }
       }
     }
@@ -1026,7 +1034,7 @@ function parseFromRawWithCodeAndStrong(raw: string): ParsedNode[] {
     const last = cur()[cur().length - 1]
     if (last && last.type === 'text') {
       (last as any).content += s
-      ;(last as any).raw += s
+      ; (last as any).raw += s
     }
     else {
       cur().push({ type: 'text', content: s, raw: s } as ParsedNode)

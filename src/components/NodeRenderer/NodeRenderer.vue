@@ -739,47 +739,32 @@ function handleContainerMouseout(event: MouseEvent) {
     @mouseover="handleContainerMouseover"
     @mouseout="handleContainerMouseout"
   >
-    <div>
+    <div
+      v-if="virtualizationEnabled"
+      class="node-spacer"
+      :style="{ height: `${topSpacerHeight}px` }"
+      aria-hidden="true"
+    />
+    <template v-for="item in visibleNodes" :key="item.index">
       <div
-        v-if="virtualizationEnabled"
-        class="node-spacer"
-        :style="{ height: `${topSpacerHeight}px` }"
-        aria-hidden="true"
-      />
-      <template v-for="item in visibleNodes" :key="item.index">
+        :ref="el => setNodeSlotElement(item.index, el as HTMLElement | null)"
+        class="node-slot"
+        :data-node-index="item.index"
+        :data-node-type="item.node.type"
+      >
         <div
-          :ref="el => setNodeSlotElement(item.index, el as HTMLElement | null)"
-          class="node-slot"
-          :data-node-index="item.index"
-          :data-node-type="item.node.type"
+          v-if="shouldRenderNode(item.index)"
+          :ref="el => setNodeContentRef(item.index, el as HTMLElement | null)"
+          class="node-content"
         >
-          <div
-            v-if="shouldRenderNode(item.index)"
-            :ref="el => setNodeContentRef(item.index, el as HTMLElement | null)"
-            class="node-content"
+          <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
+          <transition
+            v-if="item.node.type !== 'code_block' && props.typewriter !== false"
+            name="typewriter"
+            appear
           >
-            <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-            <transition
-              v-if="item.node.type !== 'code_block' && props.typewriter !== false"
-              name="typewriter"
-              appear
-            >
-              <component
-                :is="getNodeComponent(item.node)"
-                :node="item.node"
-                :loading="item.node.loading"
-                :index-key="`${indexKey || 'markdown-renderer'}-${item.index}`"
-                v-bind="getBindingsFor(item.node)"
-                :custom-id="props.customId"
-                :is-dark="props.isDark"
-                @copy="emit('copy', $event)"
-                @handle-artifact-click="emit('handleArtifactClick', $event)"
-              />
-            </transition>
-
             <component
               :is="getNodeComponent(item.node)"
-              v-else
               :node="item.node"
               :loading="item.node.loading"
               :index-key="`${indexKey || 'markdown-renderer'}-${item.index}`"
@@ -789,21 +774,34 @@ function handleContainerMouseout(event: MouseEvent) {
               @copy="emit('copy', $event)"
               @handle-artifact-click="emit('handleArtifactClick', $event)"
             />
-          </div>
-          <div
+          </transition>
+
+          <component
+            :is="getNodeComponent(item.node)"
             v-else
-            class="node-placeholder"
-            :style="{ height: `${nodeHeights[item.index] ?? averageNodeHeight}px` }"
+            :node="item.node"
+            :loading="item.node.loading"
+            :index-key="`${indexKey || 'markdown-renderer'}-${item.index}`"
+            v-bind="getBindingsFor(item.node)"
+            :custom-id="props.customId"
+            :is-dark="props.isDark"
+            @copy="emit('copy', $event)"
+            @handle-artifact-click="emit('handleArtifactClick', $event)"
           />
         </div>
-      </template>
-      <div
-        v-if="virtualizationEnabled"
-        class="node-spacer"
-        :style="{ height: `${bottomSpacerHeight}px` }"
-        aria-hidden="true"
-      />
-    </div>
+        <div
+          v-else
+          class="node-placeholder"
+          :style="{ height: `${nodeHeights[item.index] ?? averageNodeHeight}px` }"
+        />
+      </div>
+    </template>
+    <div
+      v-if="virtualizationEnabled"
+      class="node-spacer"
+      :style="{ height: `${bottomSpacerHeight}px` }"
+      aria-hidden="true"
+    />
   </div>
 </template>
 

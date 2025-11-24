@@ -72,7 +72,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
             v-for="(cell, index) in node.header.cells"
             :key="`header-${index}`"
             dir="auto"
-            class="font-semibold truncate p-[calc(4/7*1em)]"
+            class="font-semibold p-[calc(4/7*1em)] overflow-x-auto"
             :class="[
               cell.align === 'right'
                 ? 'text-right'
@@ -100,7 +100,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
           <td
             v-for="(cell, cellIndex) in row.cells"
             :key="`cell-${rowIndex}-${cellIndex}`"
-            class="truncate p-[calc(4/7*1em)]"
+            class="p-[calc(4/7*1em)] overflow-x-auto"
             :class="[
               cell.align === 'right'
                 ? 'text-right'
@@ -190,10 +190,22 @@ const bodyRows = computed(() => props.node.rows ?? [])
 }
 
 /* 表格单元格内的 NodeRenderer 禁用 content-visibility 的占位行为，避免“高但空”的问题 */
-.table-node :deep(.markdown-renderer) {
+:deep(.table-node .markdown-renderer) {
+  /* Make the NodeRenderer wrapper behave as if it's not there so
+     table cells keep their expected inline/flow layout. */
+  display: contents;
   content-visibility: visible;
   contain: content;
   contain-intrinsic-size: 0px 0px;
+}
+
+/* Also make internal NodeRenderer wrapper elements layout-transparent
+   so they don't introduce block-level boxes inside table cells. */
+:deep(.table-node .markdown-renderer .node-slot),
+:deep(.table-node .markdown-renderer .node-content),
+:deep(.table-node .markdown-renderer .node-space)
+{
+  display: contents;
 }
 
 @keyframes table-node-shimmer {

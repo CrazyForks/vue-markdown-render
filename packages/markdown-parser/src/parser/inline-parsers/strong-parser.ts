@@ -15,7 +15,17 @@ export function parseStrongToken(
   const innerTokens: MarkdownToken[] = []
 
   // Process tokens between strong_open and strong_close
-  while (i < tokens.length && tokens[i].type !== 'strong_close') {
+  // 这里可能会遇到多个 strong_open, 需要记录嵌套层级
+  let openCount = 1
+  while (i < tokens.length) {
+    if (tokens[i].type === 'strong_close') {
+      if (openCount === 1)
+        break
+      openCount--
+    }
+    if (tokens[i].type === 'strong_open') {
+      openCount++
+    }
     strongText += String(tokens[i].content ?? '')
     innerTokens.push(tokens[i])
     i++

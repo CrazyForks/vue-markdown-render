@@ -51,7 +51,9 @@ export function parseMarkdownToStructure(
   if (pre && typeof pre === 'function') {
     transformedTokens = pre(transformedTokens) || transformedTokens
   }
-
+  // todo: 优化下面流式的中间态
+  // 1. - **[DR **(Danmarks Radio)**](https://www.dr.dk/nyheder)**
+  // 2. 3.  **多维度波动性估计 (\`longTermDeviation()\`)**
   // Process the tokens into our structured format
   let result = processTokens(transformedTokens)
 
