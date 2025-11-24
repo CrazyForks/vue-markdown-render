@@ -14,36 +14,6 @@ importers:
       katex:
         specifier: '>=0.16.22'
         version: 0.16.25
-      markdown-it:
-        specifier: ^14.1.0
-        version: 14.1.0
-      markdown-it-container:
-        specifier: ^4.0.0
-        version: 4.0.0
-      markdown-it-emoji:
-        specifier: ^3.0.0
-        version: 3.0.0
-      markdown-it-footnote:
-        specifier: ^4.0.0
-        version: 4.0.0
-      markdown-it-ins:
-        specifier: ^4.0.0
-        version: 4.0.0
-      markdown-it-mark:
-        specifier: ^4.0.0
-        version: 4.0.0
-      markdown-it-sub:
-        specifier: ^2.0.0
-        version: 2.0.0
-      markdown-it-sup:
-        specifier: ^2.0.0
-        version: 2.0.0
-      markdown-it-task-checkbox:
-        specifier: ^1.0.6
-        version: 1.0.6
-      markdown-it-ts:
-        specifier: 0.0.2-beta.4
-        version: 0.0.2-beta.4
       mermaid:
         specifier: '>=11'
         version: 11.12.1
@@ -4601,10 +4571,6 @@ packages:
   markdown-it-ts@0.0.2-beta.5:
     resolution: {integrity: sha512-Qi4Hq90DmtTzRAkKD816ZAMJ0FHZpaTAkjC+QZsrD0iG6x3+MJfgzadHDC8sIyC8dt7cYBlMhJZCOB+/2aoXsA==}
     engines: {node: '>=18'}
-
-  markdown-it@14.1.0:
-    resolution: {integrity: sha512-a54IwgWPaeBCAAsv13YgmALOF1elABB08FxO9i+r4VFk5Vl4pKokRPeX8u5TCgSsPi6ec1otfLjdOpVcgbpshg==}
-    hasBin: true
 
   markdown-table@3.0.4:
     resolution: {integrity: sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw==}
@@ -11687,15 +11653,6 @@ snapshots:
 
   markdown-it-ts@0.0.2-beta.5:
     dependencies:
-      entities: 4.5.0
-      linkify-it: 5.0.0
-      mdurl: 2.0.0
-      punycode.js: 2.3.1
-      uc.micro: 2.1.0
-
-  markdown-it@14.1.0:
-    dependencies:
-      argparse: 2.0.1
       entities: 4.5.0
       linkify-it: 5.0.0
       mdurl: 2.0.0

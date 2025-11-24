@@ -55,6 +55,7 @@ export function parseInlineTokens(
   // yielding code_inline nodes that contain non-ASCII prose (e.g. "方法会根据").
   // When detected, prefer re-parsing from the original raw string to rebuild
   // inline_code spans and basic strong emphasis segments in a stable way.
+  // eslint-disable-next-line no-control-regex
   const hasSuspiciousCodeInline = tokens.some(t => t.type === 'code_inline' && /[^\x00-\x7F]/.test(String(t.content ?? '')))
   const hasBackticksInRaw = typeof raw === 'string' && /`/.test(raw)
   const hasMathInlineUsingBackticks = tokens.some(t => t.type === 'math_inline' && /`/.test(String((t as any).raw ?? t.content ?? '')))
@@ -203,14 +204,8 @@ export function parseInlineTokens(
 
     // Find a matching closing run of the same length
     const closingSeq = '`'.repeat(runLen)
-    let searchFrom = codeStart + runLen
-    let codeEnd = -1
-    while (searchFrom < content.length) {
-      const idx = content.indexOf(closingSeq, searchFrom)
-      if (idx === -1) break
-      codeEnd = idx
-      break
-    }
+    const searchFrom = codeStart + runLen
+    const codeEnd = content.indexOf(closingSeq, searchFrom)
 
     // If no matching closing run is found within this token stream, treat as mid-state.
     if (codeEnd === -1) {
@@ -368,7 +363,8 @@ export function parseInlineTokens(
             else if (t.type === 'strong_close') {
               depth--
               out += '**'
-              if (depth === 0) break
+              if (depth === 0)
+                break
             }
             else if (t.type === 'em_open' || t.type === 'em_close') {
               out += String(t.markup ?? '*')
@@ -416,7 +412,8 @@ export function parseInlineTokens(
             else if (t.type === 'em_close') {
               depth--
               out += '*'
-              if (depth === 0) break
+              if (depth === 0)
+                break
             }
             else if (t.type === 'strong_open' || t.type === 'strong_close') {
               out += String(t.markup ?? '**')
@@ -651,8 +648,10 @@ export function parseInlineTokens(
       return
 
     // Drop empty text tokens to avoid spurious empty nodes before emphasis
-    if (!content)
-      { i++; return }
+    if (!content) {
+      i++
+      return
+    }
     const textNode = parseTextToken({ ...token, content })
     const insideLink = !!opts?.insideLink
     if (currentTextNode) {
@@ -1002,7 +1001,7 @@ function normalizeSingleLinkResult(raw: string | undefined, nodes: ParsedNode[])
   // Find a link node with matching href; prefer the one whose text equals the label
   const candidates = nodes.filter(n => n.type === 'link') as any[]
   const preferred = candidates.find(n => String(n.href || '') === href && String(n.text || '') === label)
-                    || candidates.find(n => String(n.href || '') === href)
+    || candidates.find(n => String(n.href || '') === href)
   if (preferred)
     return [preferred]
   return nodes
@@ -1017,7 +1016,9 @@ function parseFromRawWithCodeAndStrong(raw: string): ParsedNode[] {
   const stack: Array<{ type: 'root' | 'strong', children: ParsedNode[] }> = [{ type: 'root', children: root }]
   let i = 0
 
-  function cur() { return stack[stack.length - 1].children }
+  function cur() {
+    return stack[stack.length - 1].children
+  }
 
   function pushText(s: string) {
     if (!s)
@@ -1053,7 +1054,10 @@ function parseFromRawWithCodeAndStrong(raw: string): ParsedNode[] {
       // count opening run
       let runLen = 1
       let k = i + 1
-      while (k < raw.length && raw[k] === '`') { runLen++; k++ }
+      while (k < raw.length && raw[k] === '`') {
+        runLen++
+        k++
+      }
       const closingSeq = '`'.repeat(runLen)
       const codeStart = i + runLen
       const close = raw.indexOf(closingSeq, codeStart)

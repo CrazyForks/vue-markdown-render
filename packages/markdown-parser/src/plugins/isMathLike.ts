@@ -97,7 +97,7 @@ export function isMathLike(s: string) {
   // 收紧规则：
   // - 区分大小写（化学元素以大写或大写+小写开头）
   // - 下标/上标通常是数字（可选花括号），避免匹配 get_time 之类的普通下划线单词
-  const chemicalLike = /^(?:[A-Z][a-z]?(_\{?\d+\}?|\^\{?\d+\}?)?)+$/.test(stripped)
+  const chemicalLike = /^(?:[A-Z][a-z]?(?:_\{?\d+\}?|\^\{?\d+\}?)?)+$/.test(stripped)
 
   return texCmd || texCmdWithBraces || texBraceStart || texSpecific || superSub || ops || funcCall || words || pureWord || chemicalLike
 }
