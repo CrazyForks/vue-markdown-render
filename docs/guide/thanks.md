@@ -6,6 +6,7 @@ This project is built with help from several open source projects and libraries.
 - [stream-markdown](https://github.com/Simon-He95/stream-markdown)
 - [mermaid](https://mermaid-js.github.io/mermaid)
 - [shiki](https://github.com/shikijs/shiki)
+- [markdown-it-ts](https://github.com/Simon-He95/markdown-it-ts)
 
 If you want to support the project, star it on GitHub or open an issue to request a feature.
 

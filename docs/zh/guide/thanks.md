@@ -6,6 +6,7 @@
 - [stream-markdown](https://github.com/Simon-He95/stream-markdown)
 - [mermaid](https://mermaid-js.github.io/mermaid)
 - [shiki](https://github.com/shikijs/shiki)
+- [markdown-it-ts](https://github.com/Simon-He95/markdown-it-ts)
 
 如果你想支持该项目，请在 GitHub 上给我们点个 Star 或打开 issue 请求功能。
 

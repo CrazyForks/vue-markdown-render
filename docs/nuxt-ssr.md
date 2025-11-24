@@ -55,4 +55,13 @@ Then pass pre-rendered fragments into the renderer as trusted HTML or a server-s
 
 ---
 
-If you'd like, I can also add a ready-to-run Nuxt 3 playground example under `playground/` (small project + page) that shows this integration end-to-end.
+## Nuxt playground
+
+This repository now ships with a Nuxt playground that mirrors the streaming demo from the Vite playground. It lives in `playground-nuxt/` at the repo root.
+
+```bash
+pnpm install
+pnpm play:nuxt
+```
+
+The command boots Nuxt 4 (dev server at `http://localhost:3000`) and renders the same Markdown stream as the main playground, so you can verify SSR, workers, and Tailwind interactions in an actual Nuxt environment. Feel free to copy pieces from that folder when wiring up your own project.
