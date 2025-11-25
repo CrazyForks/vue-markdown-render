@@ -53,71 +53,75 @@ https://github.com/Simon-He95/vue-markdown-render
 
 ---
 
+## 0. 薛定谔方程（量子力学）
+$$i\\hbar \\frac{\\partial}{\\partial t} \\Psi(\\mathbf{r},t) = \\left[ -\\frac{\\hbar^2}{2m} \\nabla^2 + V(\\mathbf{r},t) \\right] \\Psi(\\mathbf{r},t)$$
+
+
 ## 1. 泰勒公式（Taylor's Formula）
 
 ### 一般形式（在点 \\(x = a\\) 处展开）：
 \[
 f(x) = f(a) + f'(a)(x-a) + \frac{f''(a)}{2!}(x-a)^2 + \frac{f'''(a)}{3!}(x-a)^3 + \cdots + \frac{f^{(n)}(a)}{n!}(x-a)^n + R_n(x)
-\]
+\\]
 
 其中：
 - \\(f^{(k)}(a)\\) 是 \\(f(x)\\) 在 \\(x=a\\\) 处的 \\(k\\) 阶导数
 - \\(R_n(x)\\) 是余项，常见形式有拉格朗日余项：
 \[
 R_n(x) = \frac{f^{(n+1)}(xi)}{(n+1)!}(x-a)^{n+1}, \quad xi \text{ 在 } a \text{ 和 } x \text{ 之间}
-\]
+\\]
 
 ---
 
 ## 2. 麦克劳林公式（Maclaurin's Formula，即 \\(a=0\\) 时的泰勒公式）：
 \[
 f(x) = f(0) + f'(0)x + \frac{f''(0)}{2!}x^2 + \frac{f'''(0)}{3!}x^3 + \cdots + \frac{f^{(n)}(0)}{n!}x^n + R_n(x)
-\]
+\\]
 
 ---
 
 ## 3. 常见函数的麦克劳林展开（前几项）
 
 - **指数函数**：
-\[
+\\[
 e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots, \quad x \in \mathbb{R}
-\]
+\\]
 
 - **正弦函数**：
-\[
+\\[
 \sin x = x - \frac{x^3}{3!} + \frac{x^5}{5!} - \frac{x^7}{7!} + \cdots + (-1)^n \frac{x^{2n+1}}{(2n+1)!} + \cdots
-\]
+\\]
 
 - **余弦函数**：
-\[
+\\[
 \cos x = 1 - \frac{x^2}{2!} + \frac{x^4}{4!} - \frac{x^6}{6!} + \cdots + (-1)^n \frac{x^{2n}}{(2n)!} + \cdots
-\]
+\\]
 
-- **自然对数**（在 \(x=0\) 附近）：
-\[
+- **自然对数**（在 \\(x=0\\) 附近）：
+\\[
 \ln(1+x) = x - \frac{x^2}{2} + \frac{x^3}{3} - \frac{x^4}{4} + \cdots + (-1)^{n-1} \frac{x^n}{n} + \cdots, \quad -1 < x \le 1
-\]
+\\]
 
 - **二项式展开**（\\( (1+x)^m \\)，\\(m\\) 为实数）：
 \[
 (1+x)^m = 1 + mx + \frac{m(m-1)}{2!}x^2 + \frac{m(m-1)(m-2)}{3!}x^3 + \cdots, \quad |x| < 1
-\]
+\\]
 
 - **矩阵**：
-\[
+\\[
 \begin{bmatrix}
 2x_2 - 8x_3 = 8 \\
 5x_1 - 5x_3 = 10
 \end{bmatrix}
-\]
+\\]
 
 - **公式**
 
 
 - **代入数据**
-   \[
+   \\[
    \frac{363}{15,\!135} \times 100\% = 2.398\%
-   \]
+   \\]
 
 - **计算工具验证**
    通过数学计算工具确认结果：
