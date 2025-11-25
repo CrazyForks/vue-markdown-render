@@ -1,9 +1,10 @@
-import type { HighlightNode, MarkdownToken, ParsedNode } from '../../types'
+import type { HighlightNode, MarkdownToken, ParsedNode, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../index'
 
 export function parseHighlightToken(
   tokens: MarkdownToken[],
   startIndex: number,
+  options?: ParseOptions,
 ): {
   node: HighlightNode
   nextIndex: number
@@ -21,7 +22,7 @@ export function parseHighlightToken(
   }
 
   // Parse inner tokens to handle nested elements
-  children.push(...parseInlineTokens(innerTokens))
+  children.push(...parseInlineTokens(innerTokens, undefined, undefined, { requireClosingStrong: options?.requireClosingStrong }))
 
   const node: HighlightNode = {
     type: 'highlight',

@@ -1,10 +1,11 @@
-import type { AdmonitionNode, MarkdownToken, ParsedNode, TextNode } from '../../types'
+import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions, TextNode } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseList } from './list-parser'
 
 export function parseContainer(
   tokens: MarkdownToken[],
   index: number,
+  options?: ParseOptions,
 ): [AdmonitionNode, number] {
   const openToken = tokens[index]
 
@@ -66,7 +67,7 @@ export function parseContainer(
         const _children = i !== -1 ? childrenArr.slice(0, i) : childrenArr
         children.push({
           type: 'paragraph',
-          children: parseInlineTokens(_children || []),
+          children: parseInlineTokens(_children || [], undefined, undefined, { requireClosingStrong: options?.requireClosingStrong }),
           raw: String(contentToken.content ?? '').replace(/\n:+$/, '').replace(/\n\s*:::\s*$/, ''),
         })
       }
@@ -76,7 +77,7 @@ export function parseContainer(
       tokens[j].type === 'bullet_list_open'
       || tokens[j].type === 'ordered_list_open'
     ) {
-      const [listNode, newIndex] = parseList(tokens, j)
+      const [listNode, newIndex] = parseList(tokens, j, options)
       children.push(listNode)
       j = newIndex
     }

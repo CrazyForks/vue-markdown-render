@@ -1,9 +1,10 @@
-import type { FootnoteNode, MarkdownToken, ParsedNode } from '../../types'
+import type { FootnoteNode, MarkdownToken, ParsedNode, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 
 export function parseFootnote(
   tokens: MarkdownToken[],
   index: number,
+  options?: ParseOptions,
 ): [FootnoteNode, number] {
   const token = tokens[index]
   const meta = (token.meta ?? {}) as unknown as { label?: number | string }
@@ -16,7 +17,7 @@ export function parseFootnote(
       const contentToken = tokens[j + 1]
       footnoteChildren.push({
         type: 'paragraph',
-        children: parseInlineTokens(contentToken.children || []),
+        children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), undefined, { requireClosingStrong: options?.requireClosingStrong }),
         raw: String(contentToken.content ?? ''),
       })
       j += 3 // Skip paragraph_open, inline, paragraph_close

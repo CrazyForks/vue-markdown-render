@@ -1,9 +1,10 @@
-import type { MarkdownToken, ParsedNode, SuperscriptNode } from '../../types'
+import type { MarkdownToken, ParsedNode, ParseOptions, SuperscriptNode } from '../../types'
 import { parseInlineTokens } from '../index'
 
 export function parseSuperscriptToken(
   tokens: MarkdownToken[],
   startIndex: number,
+  options?: ParseOptions,
 ): {
   node: SuperscriptNode
   nextIndex: number
@@ -21,7 +22,7 @@ export function parseSuperscriptToken(
   }
 
   // Parse inner tokens to handle nested elements
-  children.push(...parseInlineTokens(innerTokens))
+  children.push(...parseInlineTokens(innerTokens, undefined, undefined, { requireClosingStrong: options?.requireClosingStrong }))
 
   const node: SuperscriptNode = {
     type: 'superscript',

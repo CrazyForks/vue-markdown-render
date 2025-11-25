@@ -1,9 +1,10 @@
-import type { LinkNode, MarkdownToken } from '../../types'
+import type { LinkNode, MarkdownToken, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../index'
 
 export function parseLinkToken(
   tokens: MarkdownToken[],
   startIndex: number,
+  options?: ParseOptions,
 ): {
   node: LinkNode
   nextIndex: number
@@ -29,7 +30,7 @@ export function parseLinkToken(
   }
 
   // Parse the collected tokens as inline content
-  const children = parseInlineTokens(linkTokens, undefined, undefined, { insideLink: true })
+  const children = parseInlineTokens(linkTokens, undefined, undefined, { requireClosingStrong: options?.requireClosingStrong })
   const linkText = children
     .map((node) => {
       const nodeAny = node as unknown as { content?: string, raw?: string }

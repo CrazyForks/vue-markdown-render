@@ -1,9 +1,10 @@
-import type { InsertNode, MarkdownToken, ParsedNode } from '../../types'
+import type { InsertNode, MarkdownToken, ParsedNode, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../index'
 
 export function parseInsertToken(
   tokens: MarkdownToken[],
   startIndex: number,
+  options?: ParseOptions,
 ): {
   node: InsertNode
   nextIndex: number
@@ -21,7 +22,7 @@ export function parseInsertToken(
   }
 
   // Parse inner tokens to handle nested elements
-  children.push(...parseInlineTokens(innerTokens))
+  children.push(...parseInlineTokens(innerTokens, undefined, undefined, { requireClosingStrong: options?.requireClosingStrong }))
 
   const node: InsertNode = {
     type: 'insert',

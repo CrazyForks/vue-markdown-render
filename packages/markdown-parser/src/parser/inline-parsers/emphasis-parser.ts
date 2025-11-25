@@ -1,9 +1,10 @@
-import type { EmphasisNode, MarkdownToken, ParsedNode } from '../../types'
+import type { EmphasisNode, MarkdownToken, ParsedNode, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../index'
 
 export function parseEmphasisToken(
   tokens: MarkdownToken[],
   startIndex: number,
+  options?: ParseOptions,
 ): {
   node: EmphasisNode
   nextIndex: number
@@ -21,7 +22,7 @@ export function parseEmphasisToken(
   }
 
   // Parse inner tokens to handle nested elements
-  children.push(...parseInlineTokens(innerTokens))
+  children.push(...parseInlineTokens(innerTokens, undefined, undefined, { requireClosingStrong: options?.requireClosingStrong }))
 
   const node: EmphasisNode = {
     type: 'emphasis',

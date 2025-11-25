@@ -97,8 +97,17 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       curToken.type = 'strong_open'
       curToken.tag = 'strong'
       curToken.markup = '**'
+      // 还需要把对应的 em_close 也修改为 strong_close
+      for (let j = i + 1; j < tokens.length; j++) {
+        if (tokens[j]?.type === 'em_close') {
+          tokens[j].type = 'strong_close'
+          tokens[j].tag = 'strong'
+          tokens[j].markup = '**'
+          break
+        }
+      }
     }
-    if (curToken?.type === 'text' && curToken.content?.endsWith('(') && tokens[i + 1]?.type === 'link_open') {
+    else if (curToken?.type === 'text' && curToken.content?.endsWith('(') && tokens[i + 1]?.type === 'link_open') {
       const match = curToken.content!.match(/\[([^\]]+)\]/)
       if (match) {
         let beforeText = curToken.content!.slice(0, match.index)
@@ -396,6 +405,44 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       }
       i -= (replacerTokens.length - 1)
       continue
+    }
+    else if (curToken.type === 'strong_close' && tokens[i + 1]?.type === 'text' && tokens[i + 1].content?.includes('](') && tokens[i - 1].type === 'text' && /\[.*$/.test(tokens[i - 1].content || '')) {
+      const replacerTokens = []
+      const [beforeText, afterText] = tokens[i - 1].content?.split('[') || ['', '']
+      if (beforeText)
+        replacerTokens.push(textToken(beforeText))
+      pushEmOpen(replacerTokens, 2)
+      let [text, href] = tokens[i + 1].content!.split('](')
+      text = afterText + text
+      let deleteCount = 4
+      if (tokens[i + 2]?.type === 'link_open') {
+        const _href = tokens[i + 2].attrs?.find(a => a[0] === 'href')?.[1]
+        if (tokens[i + 5]?.type === 'text' && tokens[i + 5].content === '.') {
+          href = (_href || href) + tokens[i + 5].content
+          tokens[i + 5].content = ''
+        }
+        else {
+          href = _href || href
+        }
+
+        deleteCount += 3
+      }
+      let loading = true
+      if (curToken.nesting === -1) {
+        // 嵌套 strong_close，需要去掉尾部的 **
+        text = text.replace(/\*+$/, '')
+      }
+      if (tokens[i + 2]?.type === 'text') {
+        const m = (tokens[i + 2]?.content ?? '').indexOf(')')
+        loading = m === -1
+        if (m === -1) {
+          href += (tokens[i + 2]?.content?.slice(0, m) || '')
+          tokens[i + 2].content = ''
+        }
+      }
+      replacerTokens.push(createLinkToken(text, href, loading))
+      pushEmClose(replacerTokens, 2)
+      tokens.splice(i - 2, deleteCount, ...replacerTokens)
     }
     // 处理强调 + 链接拆分：首个 text 含前导星号与 '['，后续出现独立的 "]("、link_open、href、link_close、")"、strong_close。
     // 期望合并为：strong_open + 复合 link(label 尾部补回星号) + strong_close。

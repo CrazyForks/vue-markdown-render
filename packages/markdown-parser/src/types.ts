@@ -336,6 +336,8 @@ export type TransformTokensHook = (tokens: MarkdownToken[]) => MarkdownToken[]
 export interface ParseOptions {
   preTransformTokens?: TransformTokensHook
   postTransformTokens?: TransformTokensHook
+  // When true, require a closing `**` to parse strong; otherwise allow mid-state strong
+  requireClosingStrong?: boolean
 }
 
 export type PostTransformNodesHook = (nodes: ParsedNode[]) => ParsedNode[]

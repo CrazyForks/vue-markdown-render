@@ -1,6 +1,7 @@
 import type {
   MarkdownToken,
   ParsedNode,
+  ParseOptions,
   StrikethroughNode,
 } from '../../types'
 import { parseInlineTokens } from '../index'
@@ -8,6 +9,7 @@ import { parseInlineTokens } from '../index'
 export function parseStrikethroughToken(
   tokens: MarkdownToken[],
   startIndex: number,
+  options?: ParseOptions,
 ): {
   node: StrikethroughNode
   nextIndex: number
@@ -25,7 +27,7 @@ export function parseStrikethroughToken(
   }
 
   // Parse inner tokens to handle nested elements
-  children.push(...parseInlineTokens(innerTokens))
+  children.push(...parseInlineTokens(innerTokens, undefined, undefined, { requireClosingStrong: options?.requireClosingStrong }))
 
   const node: StrikethroughNode = {
     type: 'strikethrough',

@@ -49,9 +49,13 @@ describe('strong containing link edge-case', () => {
     expect(link.href).toMatch(/https:\/\/baidu\.com\/?/)
 
     const text = link.children?.[0]
+    const strongText = link.children?.[1]
+    expect(strongText).toBeDefined()
+    expect(strongText.type).toBe('strong')
+    expect(strongText.children?.[0].content).toBe('(Danmarks Radio)')
     expect(text).toBeDefined()
     expect(text.type).toBe('text')
-    expect(text.content).toBe(label)
+    expect(text.content).toBe('DR ')
   })
 
   it('parses **[DR (Danmarks Radio)**](https://baidu.com/)** as strong -> link -> text', () => {
@@ -77,7 +81,7 @@ describe('strong containing link edge-case', () => {
     const text = link.children?.[0]
     expect(text).toBeDefined()
     expect(text.type).toBe('text')
-    expect(text.content).toBe(label)
+    expect(text.content).toBe(label.slice(0, -2))
   })
 
   it('parses **[**(Danmarks Radio)**](https://baidu.com/)** as strong -> link -> text', () => {
@@ -102,7 +106,7 @@ describe('strong containing link edge-case', () => {
 
     const text = link.children?.[0]
     expect(text).toBeDefined()
-    expect(text.type).toBe('text')
-    expect(text.content).toBe(label)
+    expect(text.type).toBe('strong')
+    expect(text.children?.[0].content).toBe(label.slice(2, -2))
   })
 })

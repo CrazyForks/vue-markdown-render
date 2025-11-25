@@ -1,9 +1,10 @@
-import type { MarkdownToken, ParsedNode, SubscriptNode } from '../../types'
+import type { MarkdownToken, ParsedNode, ParseOptions, SubscriptNode } from '../../types'
 import { parseInlineTokens } from '../index'
 
 export function parseSubscriptToken(
   tokens: MarkdownToken[],
   startIndex: number,
+  options?: ParseOptions,
 ): {
   node: SubscriptNode
   nextIndex: number
@@ -21,7 +22,7 @@ export function parseSubscriptToken(
   }
 
   // Parse inner tokens to handle nested elements
-  children.push(...parseInlineTokens(innerTokens))
+  children.push(...parseInlineTokens(innerTokens, undefined, undefined, { requireClosingStrong: options?.requireClosingStrong }))
 
   const startContent = String(tokens[startIndex].content ?? '')
   const display = subText || startContent

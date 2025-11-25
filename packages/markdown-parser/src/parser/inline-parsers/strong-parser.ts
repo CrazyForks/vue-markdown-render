@@ -1,10 +1,11 @@
-import type { MarkdownToken, ParsedNode, StrongNode } from '../../types'
+import type { MarkdownToken, ParsedNode, ParseOptions, StrongNode } from '../../types'
 import { parseInlineTokens } from '../index'
 
 export function parseStrongToken(
   tokens: MarkdownToken[],
   startIndex: number,
   raw?: string,
+  options?: ParseOptions,
 ): {
   node: StrongNode
   nextIndex: number
@@ -32,7 +33,7 @@ export function parseStrongToken(
   }
 
   // Parse inner tokens to handle nested elements
-  children.push(...parseInlineTokens(innerTokens, raw))
+  children.push(...parseInlineTokens(innerTokens, raw, undefined, { requireClosingStrong: options?.requireClosingStrong }))
 
   const node: StrongNode = {
     type: 'strong',

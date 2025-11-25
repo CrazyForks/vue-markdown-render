@@ -58,6 +58,29 @@ When calling `parseMarkdownToStructure` you can pass `ParseOptions` with these h
 
 These hooks are also available via `parseOptions` prop on the `MarkdownRender` component (applies only when using `content` instead of `nodes`).
 
+### ParseOptions: `requireClosingStrong`
+
+`requireClosingStrong` (boolean | optional) controls how the parser treats unmatched `**` strong delimiters inside inline content. Default: `true`.
+
+- **true**: The parser requires a matching closing `**` to create a strong node. Unclosed `**` are left as plain text. This is the recommended, strict mode for non-interactive rendering and avoids incorrect strong parsing inside constructs like link text (for example, `[**cxx](xxx)`).
+- **false**: The parser allows mid-state/unfinished `**` (useful for editor live-preview scenarios), which can produce a temporary strong node even when the closing `**` is missing.
+
+Example — strict parsing (default):
+
+```ts
+import { parseMarkdownToStructure } from 'packages/markdown-parser'
+
+const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: true })
+// the text `[**cxx](xxx)` will be preserved without creating a dangling strong node
+```
+
+Example — editor-friendly parsing:
+
+```ts
+const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: false })
+// allows creating a temporary/"mid-state" strong node for live-edit previews
+```
+
 ## Types
 A condensed list of exported types to reference in your code:
 
