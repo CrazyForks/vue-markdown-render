@@ -669,7 +669,6 @@ const nodeComponents = {
   html_block: HtmlBlockNode,
   // 可以添加更多节点类型
   // 例如:custom_node: CustomNode,
-  ...getCustomNodeComponents(props.customId),
 }
 
 // Decide which component to use for a given node. Ensure that code blocks
@@ -678,6 +677,14 @@ const nodeComponents = {
 function getNodeComponent(node: ParsedNode) {
   if (!node)
     return FallbackComponent
+  // Allow consumers to override any node type at runtime using
+  // `setCustomComponents(id, { my_node: MyComponent })` or the global
+  // legacy API. We fetch the mapping on-demand so updates take effect
+  // after registration and without relying on a snapshot created at
+  // component initialization.
+  const customForType = (getCustomNodeComponents(props.customId) as any)[String((node as any).type)]
+  if (customForType)
+    return customForType
   if (node.type === 'code_block') {
     const lang = String((node as any).language ?? '').trim().toLowerCase()
     // If this is a mermaid block, prefer a custom `mermaid` mapping if provided.
