@@ -1,4 +1,4 @@
-# vue-markdown-render
+# markstream-vue
 
 A streaming-friendly, Vue 3 markdown renderer with progressive Mermaid support, streaming diff code blocks and high-performance handling of large documents.
 

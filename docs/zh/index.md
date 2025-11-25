@@ -1,6 +1,6 @@
-# vue-markdown-render (中文)
+# markstream-vue (中文)
 
-这是 `vue-markdown-render` 的中文文档首页 — 文档正在积极同步维护。以下是常见入口：
+这是 `markstream-vue` 的中文文档首页 — 文档正在积极同步维护。以下是常见入口：
 
 - 指南：/zh/guide/
 - Nuxt SSR：/zh/nuxt-ssr

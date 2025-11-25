@@ -80,7 +80,7 @@ describe('link parsing', () => {
   })
 
   it('parses link with parentheses and CJK brackets as a single link', () => {
-    const special = '[【名称】(test).mp4](https://github.com/Simon-He95/vue-markdown-renderer)'
+    const special = '[【名称】(test).mp4](https://github.com/Simon-He95/markstream-vueer)'
     const nodes = parseMarkdownToStructure(special, md)
 
     // Flatten and collect link nodes
@@ -98,7 +98,7 @@ describe('link parsing', () => {
     nodes.forEach(walk)
     // Expect only a single link node in the paragraph without stray text nodes
     expect(links.length).toBe(1)
-    expect(links[0].href).toBe('https://github.com/Simon-He95/vue-markdown-renderer')
+    expect(links[0].href).toBe('https://github.com/Simon-He95/markstream-vueer')
     // Ensure the full visible text is preserved inside the link
     // Accept either direct text aggregation or nested children text
     const text = links[0].text || ''

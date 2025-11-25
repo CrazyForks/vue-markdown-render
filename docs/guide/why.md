@@ -1,4 +1,4 @@
-# Why use vue-markdown-render
+# Why use markstream-vue
 
 - Progressive Mermaid: diagrams render incrementally so users see results earlier.
 - Streaming diff code blocks: show diffs as they arrive for instant feedback.

@@ -24,7 +24,7 @@
 ## 包结构
 
 ```
-vue-markdown-render/
+markstream-vue/
 ├── packages/
 │   └── markdown-parser/          # stream-markdown-parser
 │       ├── src/

@@ -11,7 +11,7 @@
 
 ```vue
 <script setup lang="ts">
-import ImageNode from 'vue-markdown-render'
+import ImageNode from 'markstream-vue'
 
 const emit = defineEmits(['load', 'error', 'click'])
 
@@ -33,7 +33,7 @@ function onImageClick(payload: [Event, string]) {
 2) 在 VitePress 客户端增强（`docs/.vitepress/clientAppEnhance.ts`）中注册自定义组件：
 
 ```ts
-import { setCustomComponents } from 'vue-markdown-render'
+import { setCustomComponents } from 'markstream-vue'
 // .vitepress/clientAppEnhance.ts
 import CustomImageNode from './components/CustomImageNode.vue'
 

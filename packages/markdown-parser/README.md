@@ -330,4 +330,4 @@ MIT © Simon He
 
 ## Related
 
-- [stream-markdown-parser](https://github.com/Simon-He95/vue-markdown-render) - Full-featured Vue 3 Markdown renderer
+- [stream-markdown-parser](https://github.com/Simon-He95/markstream-vue) - Full-featured Vue 3 Markdown renderer

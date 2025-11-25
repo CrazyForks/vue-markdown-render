@@ -13,7 +13,7 @@ Create a small wrapper component that intercepts `click` and use `setCustomCompo
 
 ```vue
 <script setup lang="ts">
-import ImageNode from 'vue-markdown-render'
+import ImageNode from 'markstream-vue'
 
 const emit = defineEmits(['load', 'error', 'click'])
 
@@ -35,7 +35,7 @@ function onImageClick(payload: [Event, string]) {
 ### 2) Register in VitePress client enhance
 
 ```ts
-import { setCustomComponents } from 'vue-markdown-render'
+import { setCustomComponents } from 'markstream-vue'
 // .vitepress/clientAppEnhance.ts
 import CustomImageNode from './components/CustomImageNode.vue'
 

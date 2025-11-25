@@ -6,14 +6,14 @@
   "description": "Pure markdown parser and renderer utilities with streaming support - framework agnostic",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://github.com/Simon-He95/vue-markdown-render/tree/main/packages/markdown-parser",
+  "homepage": "https://github.com/Simon-He95/markstream-vue/tree/main/packages/markdown-parser",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Simon-He95/vue-markdown-render.git",
+    "url": "git+https://github.com/Simon-He95/markstream-vue.git",
     "directory": "packages/markdown-parser"
   },
   "bugs": {
-    "url": "https://github.com/Simon-He95/vue-markdown-render/issues"
+    "url": "https://github.com/Simon-He95/markstream-vue/issues"
   },
   "keywords": [
     "markdown",

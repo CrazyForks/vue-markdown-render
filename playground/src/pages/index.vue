@@ -481,7 +481,7 @@ onBeforeUnmount(() => {
           <div class="flex">
             <!-- GitHub Star Button -->
             <a
-              href="https://github.com/Simon-He95/vue-markdown-render"
+              href="https://github.com/Simon-He95/markstream-vue"
               target="_blank"
               rel="noopener noreferrer"
               class="

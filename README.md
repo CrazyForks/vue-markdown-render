@@ -51,7 +51,7 @@ Troubleshooting has moved into the docs:
 https://markstream-vue-docs.simonhe.me/guide/troubleshooting
 
 If you can't find a solution there, open a GitHub issue:
-https://github.com/Simon-He95/vue-markdown-render/issues
+https://github.com/Simon-He95/markstream-vue/issues
 
 ## Thanks
 
@@ -66,7 +66,7 @@ Thanks to the authors and contributors of these projects!
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Simon-He95/vue-markdown-render&type=Date)](https://www.star-history.com/#Simon-He95/vue-markdown-render&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Simon-He95/markstream-vue&type=Date)](https://www.star-history.com/#Simon-He95/markstream-vue&Date)
 
 ## License
 

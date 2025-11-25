@@ -1,6 +1,6 @@
 # 数学公式（KaTeX）
 
-`vue-markdown-render` 在检测到 `katex` 时使用 KaTeX 渲染数学。KaTeX 为可选 peer 依赖，需单独安装。
+`markstream-vue` 在检测到 `katex` 时使用 KaTeX 渲染数学。KaTeX 为可选 peer 依赖，需单独安装。
 
 安装示例：
 

@@ -1,6 +1,6 @@
 # Monaco 内部实现
 
-本文档介绍在 `vue-markdown-render` 中使用 `monaco-editor` 时的打包和运行时要点（用于在项目中集成大型编辑器时减少问题）。
+本文档介绍在 `markstream-vue` 中使用 `monaco-editor` 时的打包和运行时要点（用于在项目中集成大型编辑器时减少问题）。
 
 ## 安装
 
@@ -24,7 +24,7 @@ export default defineConfig({ plugins: [monacoEditorPlugin()] })
 - 确认插件将 worker 文件打包到可访问的路径（可通过插件提供的 `customDistPath` 配置来控制）。
 - 在构建产物中检查 worker 文件是否存在，并确认 CDN 或静态资源路径可访问。
 
-如果你将 `vue-markdown-render` 发布为库，请确保使用者把 `stream-monaco` 作为 peer 依赖安装；否则在运行时找不到 Monaco worker 与 runtime。
+如果你将 `markstream-vue` 发布为库，请确保使用者把 `stream-monaco` 作为 peer 依赖安装；否则在运行时找不到 Monaco worker 与 runtime。
 
 ## 运行时行为与性能
 - 本库设计为当 `CodeBlockNode` 挂载时懒加载 Monaco，从而减少首次渲染时的包体积。仅在需要时才初始化 Monaco 编辑器。

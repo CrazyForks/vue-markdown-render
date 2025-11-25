@@ -7,7 +7,7 @@ The markdown parsing utilities have been extracted into a separate package `stre
 ## Package Structure
 
 ```
-vue-markdown-render/
+markstream-vue/
 ├── packages/
 │   └── markdown-parser/          # stream-markdown-parser
 │       ├── src/

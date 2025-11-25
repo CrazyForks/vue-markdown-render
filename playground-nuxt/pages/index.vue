@@ -382,7 +382,7 @@ onBeforeUnmount(() => {
 
           <div class="flex">
             <a
-              href="https://github.com/Simon-He95/vue-markdown-render"
+              href="https://github.com/Simon-He95/markstream-vue"
               target="_blank"
               rel="noopener noreferrer"
               class="github-star-btn flex items-center gap-2 px-3 py-1.5 bg-gray-800 dark:bg-gray-700 hover:bg-gray-700 dark:hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50"

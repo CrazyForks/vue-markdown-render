@@ -14,4 +14,4 @@ If you want to support the project, star it on GitHub or open an issue to reques
 
 An interactive Star History graph is available (live on GitHub):
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Simon-He95/vue-markdown-render&type=Date)](https://www.star-history.com/#Simon-He95/vue-markdown-render&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Simon-He95/markstream-vue&type=Date)](https://www.star-history.com/#Simon-He95/markstream-vue&Date)

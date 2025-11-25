@@ -2,11 +2,11 @@ export const streamContent = `
 <thinking>这是一段自定义解析处理的thinking组件</thinking>
 >>>I'll create a simple Electron + Vue chat application demo. Here's the structure:
 
-[Star on GitHub](https://github.com/Simon-He95/vue-markdown-render)
+[Star on GitHub](https://github.com/Simon-He95/markstream-vue)
 
 <a href="https://simonhe.me/">我是 a 元素标签</a>
 
-https://github.com/Simon-He95/vue-markdown-render
+https://github.com/Simon-He95/markstream-vue
 
 [【Author: Simon】](https://simonhe.me/)
 
@@ -227,10 +227,10 @@ app.on('activate', () => {
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git + git@github.com:Simon-He95/vue-markdown-render.git"
+    "url": "git + git@github.com:Simon-He95/markstream-vue.git"
   },
   "bugs": {
-    "url": "https://github.com/Simon-He95/vue-markdown-render/issues"
+    "url": "https://github.com/Simon-He95/markstream-vue/issues"
   },
   "keywords": [
     "vue",

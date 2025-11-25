@@ -329,4 +329,4 @@ MIT © Simon He
 
 ## 相关项目
 
-- [stream-markdown-parser](https://github.com/Simon-He95/vue-markdown-render) - 功能完整的 Vue 3 Markdown 渲染器
+- [stream-markdown-parser](https://github.com/Simon-He95/markstream-vue) - 功能完整的 Vue 3 Markdown 渲染器

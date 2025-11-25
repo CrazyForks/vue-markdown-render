@@ -4,19 +4,19 @@ import { defineConfig } from 'vitepress'
 // TypeScript sometimes rejects VitePress site locales on the `Config` type.
 // Cast to `any` to avoid strict type errors in the docs config while keeping intellisense.
 export default defineConfig({
-  title: 'vue-markdown-render',
+  title: 'markstream-vue',
   description: 'Streaming-friendly Markdown renderer for Vue 3 — progressive Mermaid, streaming diff code blocks',
   // Support deploying under a sub-path (for GitHub Pages like /username/repo/)
   base: process.env.VITEPRESS_BASE || '/',
   locales: {
     '/': {
       lang: 'en-US',
-      title: 'vue-markdown-render',
+      title: 'markstream-vue',
       description: 'Streaming-friendly Markdown renderer for Vue 3',
     },
     '/zh/': {
       lang: 'zh-CN',
-      title: 'vue-markdown-render',
+      title: 'markstream-vue',
       description: '适用于 Vue 3 的流式 Markdown 渲染器',
     },
   },
@@ -34,7 +34,7 @@ export default defineConfig({
       { text: 'API', link: '/guide/components' },
       { text: 'Playground', link: 'https://markstream-vue.simonhe.me/' },
       { text: 'Search', link: '/guide/search' },
-      { text: 'GitHub', link: 'https://github.com/Simon-He95/vue-markdown-render' },
+      { text: 'GitHub', link: 'https://github.com/Simon-He95/markstream-vue' },
       {
         text: 'Languages',
         items: [
@@ -195,7 +195,7 @@ export default defineConfig({
           { text: 'API', link: '/guide/components' },
           { text: 'Playground', link: 'https://markstream-vue.simonhe.me/' },
           { text: 'Search', link: '/guide/search' },
-          { text: 'GitHub', link: 'https://github.com/Simon-He95/vue-markdown-render' },
+          { text: 'GitHub', link: 'https://github.com/Simon-He95/markstream-vue' },
         ],
       },
       '/zh/': {
@@ -208,7 +208,7 @@ export default defineConfig({
           { text: 'API', link: '/zh/guide/components' },
           { text: '演示', link: 'https://markstream-vue.simonhe.me/' },
           { text: '搜索', link: '/zh/guide/search' },
-          { text: 'GitHub', link: 'https://github.com/Simon-He95/vue-markdown-render' },
+          { text: 'GitHub', link: 'https://github.com/Simon-He95/markstream-vue' },
         ],
       },
     },

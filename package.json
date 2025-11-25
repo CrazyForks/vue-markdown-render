@@ -77,7 +77,7 @@
     "docs:build": "vitepress build docs",
     "docs:build:netlify": "VITEPRESS_BASE=/ pnpm docs:build",
     "docs:serve": "vitepress serve docs",
-    "docs:deploy": "VITEPRESS_BASE=/vue-markdown-render/ pnpm docs:build && pnpm docs:serve",
+    "docs:deploy": "VITEPRESS_BASE=/markstream-vue/ pnpm docs:build && pnpm docs:serve",
     "docs:deploy:netlify": "pnpm docs:build && echo 'Docs built to docs/.vitepress/dist'",
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
     "build:demo": "vite build",

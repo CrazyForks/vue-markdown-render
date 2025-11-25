@@ -11,7 +11,7 @@ If unsure, reproduce issue using the playground (or the hosted quick test) and t
 
 Hosted quick test: https://markstream-vue.netlify.app/test
 
-Open a new issue (quick link): https://github.com/Simon-He95/vue-markdown-renderer/issues/new?template=bug_report.yml
+Open a new issue (quick link): https://github.com/Simon-He95/markstream-vueer/issues/new?template=bug_report.yml
 
 ## Common problems (FAQ)
 

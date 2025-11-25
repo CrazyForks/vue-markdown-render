@@ -42,6 +42,6 @@
 
   如果准备好了，使用快速创建 issue 链接：
 
-  https://github.com/Simon-He95/vue-markdown-renderer/issues/new?template=bug_report.yml
+  https://github.com/Simon-He95/markstream-vueer/issues/new?template=bug_report.yml
 
   额外建议：如果你可以编写一个单测或集成测试来复现 bug，请将其放入 `test/` 文件夹并在本地运行 `pnpm test`，这通常能帮助维护者快速定位并修复回归。

@@ -1,4 +1,4 @@
-# 为什么使用 vue-markdown-render
+# 为什么使用 markstream-vue
 
 - 渐进式 Mermaid：图表可逐步渲染，用户更早看到结果。
 - 流式 diff 代码块：随着数据到达即时显示 diff，反馈迅速。

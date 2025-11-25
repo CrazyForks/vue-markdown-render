@@ -51,7 +51,7 @@
 https://markstream-vue-docs.simonhe.me/zh/guide/troubleshooting
 
 如需更多帮助，请到 GitHub Issues 创建问题：
-https://github.com/Simon-He95/vue-markdown-render/issues
+https://github.com/Simon-He95/markstream-vue/issues
 
 ## 鸣谢
 
@@ -67,7 +67,7 @@ https://github.com/Simon-He95/vue-markdown-render/issues
 
 ## Star 历史
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Simon-He95/vue-markdown-render&type=Date)](https://www.star-history.com/#Simon-He95/vue-markdown-render&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Simon-He95/markstream-vue&type=Date)](https://www.star-history.com/#Simon-He95/markstream-vue&Date)
 
 ## 许可
 
