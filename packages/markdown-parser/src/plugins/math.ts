@@ -91,7 +91,12 @@ const SINGLE_BACKSLASH_NEWLINE_RE = /(^|[^\\])\\\r?\n/g
 const ENDING_SINGLE_BACKSLASH_RE = /(^|[^\\])\\$/g
 
 // Cache for dynamically built regexes depending on commands list
-const DEFAULT_MATH_RE = new RegExp(`${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${ESCAPED_KATEX_COMMANDS})\\b`, 'g')
+// Avoid lookbehind; capture possible prefix so replacements can preserve it.
+// Pattern groups:
+// 1 - control char (e.g. '\t')
+// 2 - optional prefix char (start or a non-word/non-backslash)
+// 3 - command name
+const DEFAULT_MATH_RE = new RegExp(`(${CONTROL_CHARS_CLASS})|(${ESCAPED_KATEX_COMMANDS})\\b`, 'g')
 const MATH_RE_CACHE = new Map<string, RegExp>()
 const BRACE_CMD_RE_CACHE = new Map<string, RegExp>()
 
@@ -105,7 +110,9 @@ function getMathRegex(commands: ReadonlyArray<string> | undefined) {
   if (cached)
     return cached
   const commandPattern = `(?:${arr.map(c => c.replace(/[.*+?^${}()|[\\]\\"\]/g, '\\$&')).join('|')})`
-  const re = new RegExp(`${CONTROL_CHARS_CLASS}|(?<!\\\\|\\w)(${commandPattern})\\b`, 'g')
+  // Use non-lookbehind prefix but capture the prefix so replacement can
+  // re-insert it. Groups: (control) | (prefix)(command)
+  const re = new RegExp(`(${CONTROL_CHARS_CLASS})|(${commandPattern})\\b`, 'g')
   MATH_RE_CACHE.set(key, re)
   return re
 }
@@ -159,11 +166,17 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
   // Build or reuse regex: match control chars or unescaped command words.
   const re = getMathRegex(useDefault ? undefined : commands)
 
-  let out = s.replace(re, (m: string, cmd?: string) => {
-    if (CONTROL_MAP[m] !== undefined)
-      return `\\${CONTROL_MAP[m]}`
-    if (cmd && commands.includes(cmd))
+  // Replace callback receives groups: (match, controlChar, cmd)
+  let out = s.replace(re, (m: string, control?: string, cmd?: string, offset?: number, str?: string) => {
+    if (control !== undefined && CONTROL_MAP[control] !== undefined)
+      return `\\${CONTROL_MAP[control]}`
+    if (cmd && commands.includes(cmd)) {
+      // Ensure we are not inside a word or escaped by a backslash
+      const prev = (str && typeof offset === 'number') ? str[offset - 1] : undefined
+      if (prev === '\\' || (prev && /\w/.test(prev)))
+        return m
       return `\\${cmd}`
+    }
     return m
   })
 

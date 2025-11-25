@@ -71,6 +71,7 @@ export default defineConfig({
             { text: 'Math', link: '/guide/math' },
             { text: 'Mermaid', link: '/guide/mermaid' },
             { text: 'Tailwind', link: '/guide/tailwind' },
+            { text: 'Legacy builds & iOS regex compatibility', link: '/guide/legacy-builds' },
             { text: 'Thanks', link: '/guide/thanks' },
           ],
         },
@@ -124,6 +125,7 @@ export default defineConfig({
             { text: 'Math', link: '/zh/guide/math' },
             { text: 'Mermaid', link: '/zh/guide/mermaid' },
             { text: 'Tailwind', link: '/zh/guide/tailwind' },
+            { text: 'Legacy 构建与 iOS 正则兼容', link: '/zh/guide/legacy-builds' },
             { text: '致谢', link: '/zh/guide/thanks' },
             {
               text: '研究与调查',
@@ -163,6 +165,7 @@ export default defineConfig({
             { text: 'Math', link: '/guide/math' },
             { text: 'Mermaid', link: '/guide/mermaid' },
             { text: 'Tailwind', link: '/guide/tailwind' },
+            { text: 'Legacy builds & iOS regex compatibility', link: '/guide/legacy-builds' },
             { text: 'Thanks', link: '/guide/thanks' },
           ],
         },

@@ -35,8 +35,10 @@ const TEX_SPECIFIC_RE = /\\(?:text|frac|left|right|times)/
 // ensuring a lone '+' isn't matched when it's part of a '++' sequence.
 // Use a RegExp constructed from a string to avoid issues escaping '/' in a
 // regex literal on some platforms/linters.
+
+// Avoid lookbehind for older iOS: use a non-capturing prefix instead
 // eslint-disable-next-line prefer-regex-literals
-const OPS_RE = new RegExp('(?<!\\+)\\+(?!\\+)|[=\\-*/^<>]|\\\\times|\\\\pm|\\\\cdot|\\\\le|\\\\ge|\\\\neq')
+const OPS_RE = new RegExp('(?:^|[^+])\\+(?!\\+)|[=\\-*/^<>]|\\\\times|\\\\pm|\\\\cdot|\\\\le|\\\\ge|\\\\neq')
 // Hyphenated multi-word (like "Quasi-Streaming") should not be treated
 // as a math operator. But single-letter-variable hyphens (e.g. "x-y") are
 // still math; so only ignore hyphens between multi-letter words.
