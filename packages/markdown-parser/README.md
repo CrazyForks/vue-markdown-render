@@ -287,7 +287,6 @@ This package comes with the following markdown-it plugins pre-configured:
 - `markdown-it-sub` - Subscript support (`H~2~O`)
 - `markdown-it-sup` - Superscript support (`x^2^`)
 - `markdown-it-mark` - Highlight/mark support (`==highlighted==`)
-- `markdown-it-emoji` - Emoji support (`:smile:` → 😄)
 - `markdown-it-task-checkbox` - Task list support (`- [ ] Todo`)
 - `markdown-it-ins` - Insert tag support (`++inserted++`)
 - `markdown-it-footnote` - Footnote support

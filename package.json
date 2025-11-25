@@ -128,6 +128,7 @@
     "eslint": "^9.39.1",
     "lint-staged": "^13.3.0",
     "lz-string": "^1.5.0",
+    "markdown-it-emoji": "^3.0.0",
     "picocolors": "^1.1.1",
     "postcss-cli": "^11.0.1",
     "rollup": "^3.29.5",

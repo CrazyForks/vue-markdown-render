@@ -89,7 +89,31 @@ A condensed list of exported types to reference in your code:
 Use `import type { ParsedNode, CodeBlockNode } from 'stream-markdown-parser'` in your TypeScript code.
 
 ## Plugins & Defaults
-This package ships with common plugin support (emoji, footnotes, task checkboxes) and includes pre-configured convenience plugins for typical flows. To add custom plugins, pass them via `getMarkdown`'s `plugin` option.
+This package includes a set of parsing helpers and convenience plugins for common flows (for example: footnotes, task checkboxes, sub/sup/mark). Note that emoji handling is no longer enabled by default — consumers who want emoji support should register the emoji plugin explicitly.
+
+You can add custom plugins in several ways:
+- Pass plugins to `getMarkdown` via the `plugin` option.
+- Use `apply` functions in `getMarkdown` options to mutate the returned `MarkdownIt` instance.
+- When using the `MarkdownRender` component, use the `customMarkdownIt` prop to receive and mutate the `MarkdownIt` instance used for that renderer.
+
+Example — enable emoji via the component prop:
+
+```vue
+<script setup lang="ts">
+import type { MarkdownIt } from 'markdown-it-ts'
+import { full as markdownItEmoji } from 'markdown-it-emoji'
+import MarkdownRender from 'vue-renderer-markdown'
+
+function enableEmoji(md: MarkdownIt) {
+  md.use(markdownItEmoji)
+  return md
+}
+</script>
+
+<template>
+  <MarkdownRender :content="source" :custom-markdown-it="enableEmoji" />
+</template>
+```
 
 ## Examples
 Use the playground to test your parse transforms quickly. For instance, use a `preTransformTokens` hook to transform custom `html_block` tokens into a `thinking_block` type, then register a custom component for the new node type via `setCustomComponents`.

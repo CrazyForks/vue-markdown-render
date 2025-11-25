@@ -286,7 +286,6 @@ import type {
 - `markdown-it-sub` - 下标支持（`H~2~O`）
 - `markdown-it-sup` - 上标支持（`x^2^`）
 - `markdown-it-mark` - 高亮/标记支持（`==highlighted==`）
-- `markdown-it-emoji` - Emoji 支持（`:smile:` → 😄）
 - `markdown-it-task-checkbox` - 任务列表支持（`- [ ] Todo`）
 - `markdown-it-ins` - 插入标签支持（`++inserted++`）
 - `markdown-it-footnote` - 脚注支持

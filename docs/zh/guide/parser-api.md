@@ -79,6 +79,30 @@ import type { CodeBlockNode, ParsedNode } from 'stream-markdown-parser'
 ```
 
 ## 插件与默认配置
-默认启用一些常见插件（emoji、footnote、task checkbox 等），并支持通过 `getMarkdown` 的 `plugin` 选项自定义插件。
+本项目为常见解析场景提供了一些便捷插件（例如：footnote、task checkbox、sub/sup/mark 等）。注意：`emoji` 插件已从默认配置中移除——需要 Emoji 支持的用户请显式注册该插件。
+
+可以通过多种方式添加自定义插件：
+- 在 `getMarkdown` 的 `plugin` 选项中传入插件数组。
+- 在 `getMarkdown` 的 `apply` 回调中直接修改返回的 `MarkdownIt` 实例。
+- 在使用 `MarkdownRender` 组件时，通过 `customMarkdownIt` prop 获取并修改该渲染器使用的 `MarkdownIt` 实例。
+
+示例 — 在组件中启用 Emoji：
+
+```vue
+<script setup lang="ts">
+import type { MarkdownIt } from 'markdown-it-ts'
+import { full as markdownItEmoji } from 'markdown-it-emoji'
+import MarkdownRender from 'vue-renderer-markdown'
+
+function enableEmoji(md: MarkdownIt) {
+  md.use(markdownItEmoji)
+  return md
+}
+</script>
+
+<template>
+  <MarkdownRender :content="source" :custom-markdown-it="enableEmoji" />
+</template>
+```
 
 更多示例与完整 API 请参考仓库内的 `packages/markdown-parser/README.md`。

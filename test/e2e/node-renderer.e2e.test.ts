@@ -1,5 +1,6 @@
 import type { VueWrapper } from '@vue/test-utils'
 import { mount } from '@vue/test-utils'
+import { full as markdownItEmoji } from 'markdown-it-emoji'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { flushAll } from '../setup/flush-all'
 
@@ -21,6 +22,7 @@ async function mountMarkdown(markdown: string, props: Record<string, any> = {}) 
     props: {
       content: markdown,
       ...props,
+      customMarkdownIt: (md: any) => md.use(markdownItEmoji),
     },
   })
   await flushAll()
