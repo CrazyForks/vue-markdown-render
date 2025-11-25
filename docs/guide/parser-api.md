@@ -119,3 +119,45 @@ function enableEmoji(md: MarkdownIt) {
 Use the playground to test your parse transforms quickly. For instance, use a `preTransformTokens` hook to transform custom `html_block` tokens into a `thinking_block` type, then register a custom component for the new node type via `setCustomComponents`.
 
 For full details and more examples, see `packages/markdown-parser/README.md` in the repository.
+
+### Custom components and tag-like elements
+
+Tag-like custom elements (for example `<MyWidget ...>...</MyWidget>`) produce complex `html_block`/inline token shapes that are often difficult to reconstruct reliably from the parsed AST using simple regex or string splicing. To reduce maintenance cost and avoid brittle post-processing, we recommend extracting those raw component strings before feeding the remaining content to the Markdown parser and rendering the extracted parts separately as Vue components.
+
+Recommended approach:
+- Pre-scan the incoming Markdown content and extract custom-component blocks into a small map keyed by an id (or placeholder).
+- Replace the original markup in the Markdown string with a stable placeholder token (for example `[[CUSTOM:1]]`).
+- Let the Markdown parser run on the placeholder-bearing content and then render the AST as usual.
+- In your rendering layer, render placeholders by looking up the extracted component string and mounting the corresponding Vue component (or compile it via a lightweight renderer).
+
+Benefits:
+- Avoids brittle AST post-processing for nested/tag-like HTML.
+- Keeps the Markdown parsing focused on Markdown semantics.
+- Allows you to control hydration and scope for custom components separately.
+
+Example (simple sketch):
+
+```ts
+// 1) extract custom tags
+const extracted = new Map<string,string>()
+let id = 1
+const contentWithPlaceholders = source.replace(/<MyWidget[\s\S]*?<\/MyWidget>/g, (m)=>{
+  const key = `[[CUSTOM:${id++}]]`
+  extracted.set(key, m)
+  return key
+})
+
+// 2) parse the markdown with placeholders
+const nodes = parseMarkdownToStructure(contentWithPlaceholders)
+
+// 3) render: when you encounter a placeholder node, mount your extracted component
+// Example pseudo-Vue render logic:
+// if (node.type === 'text' && extracted.has(node.content)) {
+//   return h(CustomWrapper, { raw: extracted.get(node.content) })
+// }
+```
+
+Thinking blocks and small inline-rich fragments
+-- If you only need a lightweight rendering for short "thinking" fragments (for example AI assistant thinking traces), the library's `MarkdownRenderer` (used internally by `MarkdownRender`) supports stream-friendly rendering hooks and is lighter to reuse than reassembling the AST into component trees yourself. Use `parseOptions` or preTransform hooks to identify thinking regions and render them with the lighter-weight renderer while keeping complex tag-like custom components extracted and rendered separately.
+
+This hybrid approach minimizes fragile string-manipulation of the Markdown AST while giving you full control over custom component hydration and rendering scope.
