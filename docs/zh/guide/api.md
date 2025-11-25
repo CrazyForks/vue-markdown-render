@@ -50,12 +50,12 @@
 
 ```ts
 // 1) 提取自定义标签
-const extracted = new Map<string,string>()
+const extracted = new Map<string, string>()
 let id = 1
-const contentWithPlaceholders = source.replace(/<MyWidget[\s\S]*?<\/MyWidget>/g, (m)=>{
-	const key = `[[CUSTOM:${id++}]]`
-	extracted.set(key, m)
-	return key
+const contentWithPlaceholders = source.replace(/<MyWidget[\s\S]*?<\/MyWidget>/g, (m) => {
+  const key = `[[CUSTOM:${id++}]]`
+  extracted.set(key, m)
+  return key
 })
 
 // 2) 用占位符内容解析 Markdown
@@ -71,4 +71,3 @@ const nodes = parseMarkdownToStructure(contentWithPlaceholders)
 -- 如果你的场景只是需要对短小的“thinking”片段进行轻量渲染（例如 AI 助手的思路记录），可以复用库中为流式渲染设计的 `MarkdownRenderer`（`MarkdownRender` 内部使用的渲染器）来渲染这些片段，它比自己把 AST 拼回组件树要轻量很多。你可以通过 `parseOptions` 或 `preTransform` 钩子识别 thinking 区域，使用轻量渲染器渲染思路文本，同时对复杂的标签型自定义组件仍然采用前置抽取并单独渲染的策略。
 
 这种混合方案兼顾了可维护性与渲染灵活性，避免了对 Markdown AST 的脆弱字符串操作。
-

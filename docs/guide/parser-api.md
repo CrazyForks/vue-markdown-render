@@ -139,9 +139,9 @@ Example (simple sketch):
 
 ```ts
 // 1) extract custom tags
-const extracted = new Map<string,string>()
+const extracted = new Map<string, string>()
 let id = 1
-const contentWithPlaceholders = source.replace(/<MyWidget[\s\S]*?<\/MyWidget>/g, (m)=>{
+const contentWithPlaceholders = source.replace(/<MyWidget[\s\S]*?<\/MyWidget>/g, (m) => {
   const key = `[[CUSTOM:${id++}]]`
   extracted.set(key, m)
   return key
