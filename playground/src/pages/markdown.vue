@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import MarkdownRender from 'vue-renderer-markdown'
+import MarkdownRender from 'markstream-vue'
 import { useRouter } from 'vue-router'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
 import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
@@ -463,7 +463,7 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <h1 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
-                vue-renderer-markdown
+                markstream-vue
               </h1>
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 Streaming markdown demo

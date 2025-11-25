@@ -3,7 +3,7 @@
 
 
 @layer components {
-  @import 'vue-renderer-markdown/index.css';
+  @import 'markstream-vue/index.css';
 }
 
 html,

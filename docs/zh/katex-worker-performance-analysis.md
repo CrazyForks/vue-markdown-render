@@ -89,10 +89,10 @@ N ≈ floor(B / (R × (1 - H)))
 node scripts/measure-katex-threshold.mjs
 ```
 
-此外，`vue-renderer-markdown` 提供了辅助函数可推荐阈值：
+此外，`markstream-vue` 提供了辅助函数可推荐阈值：
 
 ```ts
-import { recommendNForSamples, recommendWorkerThreshold } from 'vue-renderer-markdown/utils/katex-threshold'
+import { recommendNForSamples, recommendWorkerThreshold } from 'markstream-vue/utils/katex-threshold'
 ```
 
 ## 浏览器中实时监控性能
@@ -100,7 +100,7 @@ import { recommendNForSamples, recommendWorkerThreshold } from 'vue-renderer-mar
 可以在应用中启用性能监控：
 
 ```ts
-import { enablePerfMonitoring, getPerfReport } from 'vue-renderer-markdown/utils/performance-monitor'
+import { enablePerfMonitoring, getPerfReport } from 'markstream-vue/utils/performance-monitor'
 
 enablePerfMonitoring()
 setTimeout(() => {

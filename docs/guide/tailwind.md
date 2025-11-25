@@ -1,6 +1,6 @@
 # Tailwind Integration & Style Ordering
 
-If your project uses a Tailwind component library like `shadcn`, you may run into style ordering or overriding issues when including `vue-renderer-markdown` CSS. The recommended approach is to import the library CSS inside a controlled Tailwind layer.
+If your project uses a Tailwind component library like `shadcn`, you may run into style ordering or overriding issues when including `markstream-vue` CSS. The recommended approach is to import the library CSS inside a controlled Tailwind layer.
 
 Example `styles/index.css`:
 
@@ -10,7 +10,7 @@ Example `styles/index.css`:
 @tailwind utilities;
 
 @layer components {
-  @import 'vue-renderer-markdown/index.css';
+  @import 'markstream-vue/index.css';
 }
 ```
 
@@ -35,8 +35,8 @@ module.exports = {
   content: [
     './src/**/*.{js,ts,vue}',
     // include the helper produced by the package
-    // installed packages can reference: require('vue-renderer-markdown/tailwind')
-    require('vue-renderer-markdown/tailwind'),
+    // installed packages can reference: require('markstream-vue/tailwind')
+    require('markstream-vue/tailwind'),
   ],
 }
 ```
@@ -48,7 +48,7 @@ Example CSS import (app entry):
 @tailwind components;
 @tailwind utilities;
 
-@import 'vue-renderer-markdown/index.tailwind.css';
+@import 'markstream-vue/index.tailwind.css';
 ```
 
 - Tailwind v4: you can directly include `index.tailwind.css` and rely on the v4 scanner to discover classes without needing the extra `tailwind.ts` helper.
@@ -56,9 +56,9 @@ Example CSS import (app entry):
 - Non-Tailwind projects: continue to import the precompiled `index.css`:
 
 ```css
-@import 'vue-renderer-markdown/index.css';
+@import 'markstream-vue/index.css';
 ```
 
 Notes:
-- The package exposes a `./tailwind` entry (`./dist/tailwind.ts`) which exports the extracted class list. When installing from npm, `require('vue-renderer-markdown/tailwind')` will load that helper for use in your Tailwind config.
+- The package exposes a `./tailwind` entry (`./dist/tailwind.ts`) which exports the extracted class list. When installing from npm, `require('markstream-vue/tailwind')` will load that helper for use in your Tailwind config.
 - If you develop locally against the repo, you may reference the generated file directly (e.g. `./dist/tailwind.ts`).

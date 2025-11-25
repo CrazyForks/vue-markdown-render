@@ -102,7 +102,7 @@ Example — enable emoji via the component prop:
 <script setup lang="ts">
 import type { MarkdownIt } from 'markdown-it-ts'
 import { full as markdownItEmoji } from 'markdown-it-emoji'
-import MarkdownRender from 'vue-renderer-markdown'
+import MarkdownRender from 'markstream-vue'
 
 function enableEmoji(md: MarkdownIt) {
   md.use(markdownItEmoji)

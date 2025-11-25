@@ -17,7 +17,7 @@ import 'katex/dist/katex.min.css'
 Customize math parsing behaviour with `getMarkdown` options or `setDefaultMathOptions`:
 
 ```ts
-import { getMarkdown, setDefaultMathOptions } from 'vue-renderer-markdown'
+import { getMarkdown, setDefaultMathOptions } from 'markstream-vue'
 
 setDefaultMathOptions({
   commands: ['infty', 'perp'],

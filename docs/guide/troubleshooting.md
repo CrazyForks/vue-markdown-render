@@ -9,7 +9,7 @@ If something breaks, here are common fixes:
 
 If unsure, reproduce issue using the playground (or the hosted quick test) and then open an issue with stack trace and minimal markdown sample.
 
-Hosted quick test: https://vue-markdown-renderer.netlify.app/test
+Hosted quick test: https://markstream-vue.netlify.app/test
 
 Open a new issue (quick link): https://github.com/Simon-He95/vue-markdown-renderer/issues/new?template=bug_report.yml
 
@@ -19,7 +19,7 @@ Open a new issue (quick link): https://github.com/Simon-He95/vue-markdown-render
 
   Quick fixes:
 
-  - Import `vue-renderer-markdown/index.css` inside a `@layer components { ... }` block (see the Tailwind page). This controls style ordering.
+  - Import `markstream-vue/index.css` inside a `@layer components { ... }` block (see the Tailwind page). This controls style ordering.
   - Consider setting a `prefix` in Tailwind config (e.g., `tw-`) to avoid collisions with component library class names.
   - Use scoped selectors or `:deep` to target only the elements you need to override.
 
@@ -31,7 +31,7 @@ Open a new issue (quick link): https://github.com/Simon-He95/vue-markdown-render
   Quick example (replace the renderer for `code_block` nodes scoped to `my-docs`):
 
 ```ts
-import { setCustomComponents } from 'vue-renderer-markdown'
+import { setCustomComponents } from 'markstream-vue'
 
 setCustomComponents('my-docs', {
   code_block: MyCustomCodeBlock,

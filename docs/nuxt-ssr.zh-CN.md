@@ -2,7 +2,7 @@
 
 > For the English version, see [nuxt-ssr.md](./nuxt-ssr.md).
 
-本示例演示如何在 Nuxt 3 中安全地集成 `vue-renderer-markdown`，确保仅在浏览器端初始化 Monaco、Mermaid、Web Worker 等客户端功能。
+本示例演示如何在 Nuxt 3 中安全地集成 `markstream-vue`，确保仅在浏览器端初始化 Monaco、Mermaid、Web Worker 等客户端功能。
 
 ## 安装浏览器端依赖
 
@@ -24,8 +24,8 @@ npm install mermaid stream-monaco
 
 ```vue
 <script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
-import MarkdownRender from 'vue-renderer-markdown'
 
 const markdown = ref(`# 来自 Nuxt 3 的问候\n\n这段内容仅在客户端渲染。`)
 </script>
@@ -64,4 +64,4 @@ pnpm install
 pnpm play:nuxt
 ```
 
-上述命令会启动 Nuxt 4 开发服务器（默认 `http://localhost:3000`），你可以直接在其中测试 `vue-renderer-markdown` 的 Nuxt 集成，并按需拷贝其中的配置到你的项目。
+上述命令会启动 Nuxt 4 开发服务器（默认 `http://localhost:3000`），你可以直接在其中测试 `markstream-vue` 的 Nuxt 集成，并按需拷贝其中的配置到你的项目。

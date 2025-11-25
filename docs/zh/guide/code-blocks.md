@@ -36,7 +36,7 @@ npm i stream-markdown
 - 通过 `setCustomComponents` 覆盖 `code_block` 节点以注册 Markdown 风格的代码块渲染器。示例：
 
 ```ts
-import { setCustomComponents } from 'vue-renderer-markdown'
+import { setCustomComponents } from 'markstream-vue'
 import MyMarkdownCodeBlock from './MyMarkdownCodeBlock.vue'
 
 setCustomComponents({ code_block: MyMarkdownCodeBlock })

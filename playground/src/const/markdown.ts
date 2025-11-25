@@ -217,7 +217,7 @@ app.on('activate', () => {
 
 \`\`\`diff json:package.json
 {
-  "name": "vue-renderer-markdown",
+  "name": "markstream-vue",
   "type": "module",
 - "version": "0.0.49",
 + "version": "0.0.54-beta.1",

@@ -3,11 +3,11 @@
 使用 `pnpm`, `npm` 或 `yarn`:
 
 ```bash
-pnpm add vue-renderer-markdown
+pnpm add markstream-vue
 # 或
-npm install vue-renderer-markdown
+npm install markstream-vue
 # 或
-yarn add vue-renderer-markdown
+yarn add markstream-vue
 ```
 
 可选 peer 依赖：

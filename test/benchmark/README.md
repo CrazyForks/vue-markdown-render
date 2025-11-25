@@ -36,7 +36,7 @@ Open `katex-performance-demo.html` in a browser to see an interactive performanc
 Add to your application:
 
 ```typescript
-import { enablePerfMonitoring, getPerfReport } from 'vue-renderer-markdown/utils/performance-monitor'
+import { enablePerfMonitoring, getPerfReport } from 'markstream-vue/utils/performance-monitor'
 
 enablePerfMonitoring()
 

@@ -5,8 +5,8 @@ Short examples; see `playground` for interactive demos.
 ## Streaming Markdown
 ```vue
 <script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
-import MarkdownRender from 'vue-renderer-markdown'
 
 const content = ref('')
 const fullContent = `# Streaming Content\n\nThis text appears character by character...`

@@ -4,8 +4,8 @@ Mermaid diagrams can be streamed progressively. The diagram renders as soon as t
 
 ```vue
 <script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
-import MarkdownRender from 'vue-renderer-markdown'
 
 const content = ref('')
 const steps = [

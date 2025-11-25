@@ -79,7 +79,7 @@ node scripts/measure-katex-threshold.mjs
 代码内复用（按内容估计）：
 
 ```ts
-import { recommendNForSamples, recommendWorkerThreshold } from 'vue-renderer-markdown/utils/katex-threshold'
+import { recommendNForSamples, recommendWorkerThreshold } from 'markstream-vue/utils/katex-threshold'
 
 // 已知 R/H/B 的精确计算
 const N = recommendWorkerThreshold({ R: 10 /* ms */, H: 0, B: 50 })
@@ -98,7 +98,7 @@ const N2 = recommendNForSamples(['x', '\\sum_{i=1}^{n}', '\\int f(x) dx'], { H: 
 在你的应用中启用性能监控：
 
 ```typescript
-import { enablePerfMonitoring, getPerfReport } from 'vue-renderer-markdown/utils/performance-monitor'
+import { enablePerfMonitoring, getPerfReport } from 'markstream-vue/utils/performance-monitor'
 
 // 启用监控
 enablePerfMonitoring()
@@ -252,7 +252,7 @@ const CACHE_MAX = 500 // 从 200 增加到 500
 ### 2. 预渲染常见公式
 
 ```typescript
-import { setKaTeXCache } from 'vue-renderer-markdown/workers/katexWorkerClient'
+import { setKaTeXCache } from 'markstream-vue/workers/katexWorkerClient'
 
 // 预热常见公式
 const commonFormulas = ['x', 'y', 'E=mc^2', '\\sum_{i=1}^{n}']

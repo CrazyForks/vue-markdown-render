@@ -54,7 +54,7 @@ By default, `getMarkdown` uses English text for UI elements (e.g., "Copy" button
 **Using a translation map:**
 
 ```ts
-import { getMarkdown } from 'vue-renderer-markdown'
+import { getMarkdown } from 'markstream-vue'
 
 const md = getMarkdown('editor-1', {
   i18n: {
@@ -66,8 +66,8 @@ const md = getMarkdown('editor-1', {
 **Using a translation function:**
 
 ```ts
+import { getMarkdown } from 'markstream-vue'
 import { useI18n } from 'vue-i18n' // or any i18n library
-import { getMarkdown } from 'vue-renderer-markdown'
 
 const { t } = useI18n()
 

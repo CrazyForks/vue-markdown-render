@@ -3,8 +3,8 @@
 本库以 TypeScript 为首选语言，导出公共 API 类型。使用 `import type` 来获取节点定义以用于高级用法。
 
 ```ts
-import type { BaseNode } from 'vue-renderer-markdown'
-import { getMarkdown } from 'vue-renderer-markdown'
+import type { BaseNode } from 'markstream-vue'
+import { getMarkdown } from 'markstream-vue'
 ```
 
 ## 强类型自定义组件
@@ -13,7 +13,7 @@ import { getMarkdown } from 'vue-renderer-markdown'
 
 ```vue
 <script setup lang="ts">
-import type { CodeBlockNode } from 'vue-renderer-markdown'
+import type { CodeBlockNode } from 'markstream-vue'
 
 const props = defineProps<{ node: CodeBlockNode }>()
 </script>
@@ -28,7 +28,7 @@ const props = defineProps<{ node: CodeBlockNode }>()
 然后注册该组件：
 
 ```ts
-import { setCustomComponents } from 'vue-renderer-markdown'
+import { setCustomComponents } from 'markstream-vue'
 
 setCustomComponents('docs', {
   code_block: CustomCodeBlock,

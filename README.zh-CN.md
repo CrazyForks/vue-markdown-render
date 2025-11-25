@@ -1,24 +1,24 @@
-# vue-renderer-markdown
+# markstream-vue
 
 > 针对 Vue 3 的高性能、流式友好型 Markdown 渲染组件 — 支持渐进式 Mermaid、流式 diff 代码块以及为大文档优化的实时预览。
 
-[![NPM version](https://img.shields.io/npm/v/vue-renderer-markdown?color=a1b858&label=)](https://www.npmjs.com/package/vue-renderer-markdown)
-[![Docs](https://img.shields.io/badge/docs-中文文档-blue)](https://vue-markdown-renderer-docs.simonhe.me/zh/guide/)
-[![NPM downloads](https://img.shields.io/npm/dm/vue-renderer-markdown)](https://www.npmjs.com/package/vue-renderer-markdown)
-[![Bundle size](https://img.shields.io/bundlephobia/minzip/vue-renderer-markdown)](https://bundlephobia.com/package/vue-renderer-markdown)
-[![License](https://img.shields.io/npm/l/vue-renderer-markdown)](./LICENSE)
+[![NPM version](https://img.shields.io/npm/v/markstream-vue?color=a1b858&label=)](https://www.npmjs.com/package/markstream-vue)
+[![Docs](https://img.shields.io/badge/docs-中文文档-blue)](https://markstream-vue-docs.simonhe.me/zh/guide/)
+[![NPM downloads](https://img.shields.io/npm/dm/markstream-vue)](https://www.npmjs.com/package/markstream-vue)
+[![Bundle size](https://img.shields.io/bundlephobia/minzip/markstream-vue)](https://bundlephobia.com/package/markstream-vue)
+[![License](https://img.shields.io/npm/l/markstream-vue)](./LICENSE)
 
 > 📖 所有详细文档、API、示例和高级用法已迁移至 VitePress 中文文档站点：
-> https://vue-markdown-renderer-docs.simonhe.me/zh/guide/
+> https://markstream-vue-docs.simonhe.me/zh/guide/
 
 ## 🚀 实时演示
 
-- Playground（交互演示）： https://vue-markdown-renderer.simonhe.me/
-- 交互测试页面： https://vue-markdown-renderer.simonhe.me/test
+- Playground（交互演示）： https://markstream-vue.simonhe.me/
+- 交互测试页面： https://markstream-vue.simonhe.me/test
 
 ### 交互测试页面
 
-- 试用交互式测试页面以便快速验证与调试： https://vue-markdown-renderer.simonhe.me/test
+- 试用交互式测试页面以便快速验证与调试： https://markstream-vue.simonhe.me/test
 
   此页面提供左侧编辑器与右侧实时预览（由本库驱动）。页面包含“生成并复制分享链接”功能，会将你的输入编码到 URL 中以便分享；当输入过长无法嵌入 URL 时，会提供直接打开或预填 GitHub Issue 的回退流程。
 
@@ -26,7 +26,7 @@
 
 ### 介绍视频
 
-一段短视频介绍了 vue-renderer-markdown 的关键特性与使用方式。
+一段短视频介绍了 markstream-vue 的关键特性与使用方式。
 
 [![在 Bilibili 查看介绍](https://i1.hdslb.com/bfs/archive/f073718bd0e51acaea436d7197880478213113c6.jpg)](https://www.bilibili.com/video/BV17Z4qzpE9c/)
 
@@ -48,7 +48,7 @@
 ## 故障排查 & 常见问题
 
 详细故障排查与常见问题已迁移至文档站点：
-https://vue-markdown-renderer-docs.simonhe.me/zh/guide/troubleshooting
+https://markstream-vue-docs.simonhe.me/zh/guide/troubleshooting
 
 如需更多帮助，请到 GitHub Issues 创建问题：
 https://github.com/Simon-He95/vue-markdown-render/issues

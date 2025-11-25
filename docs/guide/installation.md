@@ -3,11 +3,11 @@
 Install with pnpm, npm or yarn.
 
 ```bash
-pnpm add vue-renderer-markdown
+pnpm add markstream-vue
 # or
-npm install vue-renderer-markdown
+npm install markstream-vue
 # or
-yarn add vue-renderer-markdown
+yarn add markstream-vue
 ```
 
 Optional peer dependencies:

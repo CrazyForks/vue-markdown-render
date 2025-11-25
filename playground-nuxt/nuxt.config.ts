@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   ],
   css: [
     '@/assets/tailwind.css',
-    'vue-renderer-markdown/index.css',
+    'markstream-vue/index.css',
     'katex/dist/katex.min.css',
   ],
   nitro: {
@@ -18,7 +18,7 @@ export default defineNuxtConfig({
   },
   vite: {
     optimizeDeps: {
-      exclude: ['monaco-editor', 'stream-monaco', 'vue-renderer-markdown'],
+      exclude: ['monaco-editor', 'stream-monaco', 'markstream-vue'],
     },
     worker: {
       format: 'es',

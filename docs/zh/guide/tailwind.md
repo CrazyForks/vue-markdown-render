@@ -1,6 +1,6 @@
 # Tailwind 集成与样式顺序
 
-如果你的项目使用 Tailwind 或基于 Tailwind 的组件库（如 shadcn），可能会遇到样式覆盖问题。推荐将 `vue-renderer-markdown` 的 CSS 导入置于 `@layer components { ... }` 中以控制样式优先级。
+如果你的项目使用 Tailwind 或基于 Tailwind 的组件库（如 shadcn），可能会遇到样式覆盖问题。推荐将 `markstream-vue` 的 CSS 导入置于 `@layer components { ... }` 中以控制样式优先级。
 
 示例：
 
@@ -10,7 +10,7 @@
 @tailwind utilities;
 
 @layer components {
-  @import 'vue-renderer-markdown/index.css';
+  @import 'markstream-vue/index.css';
 }
 ```
 
@@ -30,8 +30,8 @@
 module.exports = {
   content: [
     './src/**/*.{js,ts,vue}',
-    // 包安装后可以使用：require('vue-renderer-markdown/tailwind')
-    require('vue-renderer-markdown/tailwind'),
+    // 包安装后可以使用：require('markstream-vue/tailwind')
+    require('markstream-vue/tailwind'),
   ],
 }
 ```
@@ -43,7 +43,7 @@ module.exports = {
 @tailwind components;
 @tailwind utilities;
 
-@import 'vue-renderer-markdown/index.tailwind.css';
+@import 'markstream-vue/index.tailwind.css';
 ```
 
 - Tailwind v4：可以直接包含 `index.tailwind.css`，使用 v4 的扫描器发现类名，无需额外的 `tailwind.ts` 辅助文件。
@@ -51,9 +51,9 @@ module.exports = {
 - 非 Tailwind 项目：继续使用预编译好的 `index.css`：
 
 ```css
-@import 'vue-renderer-markdown/index.css';
+@import 'markstream-vue/index.css';
 ```
 
 说明：
-- 本包导出 `./tailwind` 条目（`./dist/tailwind.ts`），导出的是提取出的 class 列表。发布到 npm 后可以在 `tailwind.config.js` 中通过 `require('vue-renderer-markdown/tailwind')` 引入该列表。
+- 本包导出 `./tailwind` 条目（`./dist/tailwind.ts`），导出的是提取出的 class 列表。发布到 npm 后可以在 `tailwind.config.js` 中通过 `require('markstream-vue/tailwind')` 引入该列表。
 - 在本地开发时也可以直接引用生成文件（例如 `./dist/tailwind.ts`）。

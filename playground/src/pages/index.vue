@@ -2,7 +2,7 @@
 import type { MarkdownIt } from 'markdown-it-ts'
 import { Icon } from '@iconify/vue'
 import { full as markdownItEmoji } from 'markdown-it-emoji'
-import MarkdownRender from 'vue-renderer-markdown'
+import MarkdownRender from 'markstream-vue'
 import { useRouter } from 'vue-router'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
 import { setCustomComponents } from '../../../src/utils/nodeComponents'
@@ -470,7 +470,7 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <h1 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
-                vue-renderer-markdown
+                markstream-vue
               </h1>
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 Streaming markdown demo

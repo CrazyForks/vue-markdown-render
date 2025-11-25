@@ -21,7 +21,7 @@
   快速示例（将 `code_block` 节点替换为自定义渲染器）：
 
   ```ts
-  import { setCustomComponents } from 'vue-renderer-markdown'
+  import { setCustomComponents } from 'markstream-vue'
 
   setCustomComponents('my-docs', {
     code_block: MyCustomCodeBlock,
@@ -38,7 +38,7 @@
 
   优先提供一个 `playground` 对应的复现链接；你也可以使用托管的快速测试以便快速调试：
 
-  https://vue-markdown-renderer.netlify.app/test
+  https://markstream-vue.netlify.app/test
 
   如果准备好了，使用快速创建 issue 链接：
 

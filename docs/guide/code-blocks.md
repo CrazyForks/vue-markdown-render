@@ -36,7 +36,7 @@ npm i stream-markdown
 - Override the `code_block` node via `setCustomComponents` to register a Markdown-style code block renderer. Example:
 
 ```ts
-import { setCustomComponents } from 'vue-renderer-markdown'
+import { setCustomComponents } from 'markstream-vue'
 import MyMarkdownCodeBlock from './MyMarkdownCodeBlock.vue'
 
 setCustomComponents({ code_block: MyMarkdownCodeBlock })

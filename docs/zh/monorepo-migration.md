@@ -47,7 +47,7 @@ vue-markdown-render/
 
 ### 2. 对主包的影响
 
-`vue-renderer-markdown` 仍作为主要交付包，但现在依赖 `stream-markdown-parser`：
+`markstream-vue` 仍作为主要交付包，但现在依赖 `stream-markdown-parser`：
 
 ```json
 {

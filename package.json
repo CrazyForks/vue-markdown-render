@@ -1,19 +1,19 @@
 {
-  "name": "vue-renderer-markdown",
+  "name": "markstream-vue",
   "type": "module",
-  "version": "0.0.63-beta.4",
+  "version": "0.0.1",
   "packageManager": "pnpm@10.23.0",
   "description": "Vue 3 Markdown renderer optimized for large docs: progressive Mermaid, streaming diff code blocks, and fast real-time preview.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://github.com/Simon-He95/vue-markdown-render",
+  "homepage": "https://github.com/Simon-He95/markstream-vue",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Simon-He95/vue-markdown-render.git",
-    "homepage": "https://github.com/Simon-He95/vue-markdown-render"
+    "url": "git+https://github.com/Simon-He95/markstream-vue.git",
+    "homepage": "https://github.com/Simon-He95/markstream-vue#readme"
   },
   "bugs": {
-    "url": "https://github.com/Simon-He95/vue-markdown-render/issues"
+    "url": "https://github.com/Simon-He95/markstream-vue/issues"
   },
   "keywords": [
     "vue",
@@ -32,7 +32,8 @@
     "diff-codeblock",
     "large-documents",
     "performance",
-    "real-time-preview"
+    "real-time-preview",
+    "markstream-vue"
   ],
   "exports": {
     ".": {

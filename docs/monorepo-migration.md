@@ -40,7 +40,7 @@ vue-markdown-render/
 
 ### 2. Updated Main Package
 
-The main `vue-renderer-markdown` package now depends on `stream-markdown-parser`:
+The main `markstream-vue` package now depends on `stream-markdown-parser`:
 
 ```json
 {
@@ -54,12 +54,12 @@ The main `vue-renderer-markdown` package now depends on `stream-markdown-parser`
 
 **Before:**
 ```typescript
-import { getMarkdown, parseMarkdownToStructure, setDefaultMathOptions } from 'vue-renderer-markdown'
+import { getMarkdown, parseMarkdownToStructure, setDefaultMathOptions } from 'markstream-vue'
 ```
 
 **After (same for consumers):**
 ```typescript
-import { getMarkdown, parseMarkdownToStructure, setDefaultMathOptions } from 'vue-renderer-markdown'
+import { getMarkdown, parseMarkdownToStructure, setDefaultMathOptions } from 'markstream-vue'
 ```
 
 The API remains the same for end users! The change is internal.

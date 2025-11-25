@@ -47,7 +47,7 @@ export default defineConfig({
 To avoid a first-render flash when the first code block mounts, preload the Monaco integration during app initialization or on first route mount:
 
 ```ts
-import { getUseMonaco } from 'vue-renderer-markdown'
+import { getUseMonaco } from 'markstream-vue'
 
 getUseMonaco()
 ```

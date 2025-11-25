@@ -54,7 +54,7 @@ CSS 变量：`--typewriter-fade-duration` 和 `--typewriter-fade-ease` 可用于
 **翻译映射用法：**
 
 ```ts
-import { getMarkdown } from 'vue-renderer-markdown'
+import { getMarkdown } from 'markstream-vue'
 
 const md = getMarkdown('editor-1', {
   i18n: {
@@ -66,8 +66,8 @@ const md = getMarkdown('editor-1', {
 **翻译函数用法：**
 
 ```ts
+import { getMarkdown } from 'markstream-vue'
 import { useI18n } from 'vue-i18n' // 或其他 i18n 库
-import { getMarkdown } from 'vue-renderer-markdown'
 
 const { t } = useI18n()
 

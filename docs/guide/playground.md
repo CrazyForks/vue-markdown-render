@@ -18,7 +18,7 @@ The playground demonstrates:
 
  Example pages (open from the playground):
 
- - `https://vue-markdown-renderer.netlify.app/test` — quick playground for stress-testing streaming features (hosted demo)
+ - `https://markstream-vue.netlify.app/test` — quick playground for stress-testing streaming features (hosted demo)
  - `/markdown` — Markdown vs static rendering comparison
 
 ![Playground demo](/screenshots/playground-demo.svg)

@@ -9,7 +9,7 @@ export default {
   ],
   content: [
     './src/**/*.{vue,js,ts,jsx,tsx}',
-    './node_modules/vue-renderer-markdown/dist/tailwind.ts',
+    './node_modules/markstream-vue/dist/tailwind.ts',
     // 在 dev 环境为了不需要安装依赖，从 上层 dist 目录引入
     '../dist/tailwind.ts',
   ],

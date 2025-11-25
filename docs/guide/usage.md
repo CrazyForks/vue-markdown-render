@@ -7,7 +7,7 @@ This page provides short usage examples and points to advanced customization: pa
 - Components: `MarkdownRender`, `CodeBlockNode`, `MarkdownCodeBlockNode`, `MermaidNode`.
 
 ```ts
-import { getMarkdown, parseMarkdownToStructure } from 'vue-renderer-markdown'
+import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
 const md = getMarkdown()
 const nodes = parseMarkdownToStructure('# Title', md)

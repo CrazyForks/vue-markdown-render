@@ -5,6 +5,6 @@
 // the playground imports the component by relative path.
 declare module '../../../src/components/NodeRenderer' {
   // Use the package's exported default type as the component type.
-  const comp: import('vue-renderer-markdown').default
+  const comp: import('markstream-vue').default
   export default comp
 }

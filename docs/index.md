@@ -2,12 +2,12 @@
 
 A streaming-friendly, Vue 3 markdown renderer with progressive Mermaid support, streaming diff code blocks and high-performance handling of large documents.
 
-- Live demo: https://vue-markdown-renderer.simonhe.me/
+- Live demo: https://markstream-vue.simonhe.me/
 
 ## Quick links
 
 - Guide: /guide/
-- Playground: https://vue-markdown-renderer.simonhe.me/
+- Playground: https://markstream-vue.simonhe.me/
 - Nuxt SSR: /nuxt-ssr
 
 ## Why move from README to a docs site

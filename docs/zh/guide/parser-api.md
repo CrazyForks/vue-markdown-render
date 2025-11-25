@@ -92,7 +92,7 @@ import type { CodeBlockNode, ParsedNode } from 'stream-markdown-parser'
 <script setup lang="ts">
 import type { MarkdownIt } from 'markdown-it-ts'
 import { full as markdownItEmoji } from 'markdown-it-emoji'
-import MarkdownRender from 'vue-renderer-markdown'
+import MarkdownRender from 'markstream-vue'
 
 function enableEmoji(md: MarkdownIt) {
   md.use(markdownItEmoji)

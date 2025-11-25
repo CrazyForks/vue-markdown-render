@@ -6,8 +6,8 @@ Mermaid 图表可以随内容逐步渲染。图表在语法达到可渲染状态
 
 ```vue
 <script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
-import MarkdownRender from 'vue-renderer-markdown'
 
 const content = ref('')
 const steps = [

@@ -2,10 +2,10 @@
 import { useRouter } from '#imports'
 import { Icon } from '@iconify/vue'
 import { useDark, useInterval, useLocalStorage, useToggle } from '@vueuse/core'
+import MarkdownRender, { getUseMonaco, setCustomComponents, setKaTeXWorker, setMermaidWorker } from 'markstream-vue'
+import KatexWorker from 'markstream-vue/workers/katexRenderer.worker?worker&inline'
+import MermaidWorker from 'markstream-vue/workers/mermaidParser.worker?worker&inline'
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
-import MarkdownRender, { getUseMonaco, setCustomComponents, setKaTeXWorker, setMermaidWorker } from 'vue-renderer-markdown'
-import KatexWorker from 'vue-renderer-markdown/workers/katexRenderer.worker?worker&inline'
-import MermaidWorker from 'vue-renderer-markdown/workers/mermaidParser.worker?worker&inline'
 import { streamContent } from '../../playground/src/const/markdown'
 import ThinkingNode from '../components/ThinkingNode.vue'
 
@@ -372,7 +372,7 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <h1 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
-                vue-renderer-markdown
+                markstream-vue
               </h1>
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 Streaming markdown demo

@@ -2,7 +2,7 @@
 
 > 中文版请查看 [nuxt-ssr.zh-CN.md](./nuxt-ssr.zh-CN.md)。
 
-This short recipe shows a minimal, safe way to use `vue-renderer-markdown` in Nuxt 3 so that client-only features (Monaco, Mermaid, Web Workers) are only initialized in the browser.
+This short recipe shows a minimal, safe way to use `markstream-vue` in Nuxt 3 so that client-only features (Monaco, Mermaid, Web Workers) are only initialized in the browser.
 
 ## Install peers (client-side)
 
@@ -24,8 +24,8 @@ Create a page or component that defers mounting the renderer to the client. Nuxt
 
 ```vue
 <script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
-import MarkdownRender from 'vue-renderer-markdown'
 
 const markdown = ref(`# Hello from Nuxt 3\n\nThis content is rendered only on the client.`)
 </script>

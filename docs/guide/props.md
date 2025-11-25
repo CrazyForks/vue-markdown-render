@@ -1,6 +1,6 @@
 # Component props & options
 
-This page summarizes important props and flags you will use when integrating `vue-renderer-markdown`.
+This page summarizes important props and flags you will use when integrating `markstream-vue`.
 
 ## Primary props
 
