@@ -35,9 +35,6 @@ export default defineConfig(({ mode }) => {
         // imports like "stream-markdown-parser" into relative workspace paths
         // in the emitted .d.ts (which breaks type bundling).
         tsconfigPath: './tsconfig.build.json',
-        // Skip type-checking inside the plugin for faster builds; we keep
-        // `vue-tsc --noEmit` for CI/typecheck separately.
-        skipDiagnostics: true,
       }),
       UnpluginClassExtractor({
         output: 'dist/tailwind.ts',

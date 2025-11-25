@@ -8,9 +8,6 @@ import { getKatex } from './katex'
 
 const props = defineProps<MathInlineNodeProps>()
 let katex = null
-getKatex().then((k) => {
-  katex = k
-})
 
 const containerEl = ref<HTMLElement | null>(null)
 const mathElement = ref<HTMLElement | null>(null)
