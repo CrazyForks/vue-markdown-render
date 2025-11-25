@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import type { MarkdownIt } from 'markdown-it-ts'
 import { Icon } from '@iconify/vue'
+import { full as markdownItEmoji } from 'markdown-it-emoji'
 import MarkdownRender from 'vue-renderer-markdown'
 import { useRouter } from 'vue-router'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
@@ -101,6 +103,11 @@ const parseOptions = {
       return token
     })
   },
+}
+
+function enableEmoji(md: MarkdownIt) {
+  md.use(markdownItEmoji)
+  return md
 }
 
 // 主题切换
@@ -510,6 +517,7 @@ onBeforeUnmount(() => {
           :code-block-dark-theme="selectedTheme || undefined"
           :code-block-light-theme="selectedTheme || undefined"
           :themes="themes"
+          :custom-markdown-it="enableEmoji"
           :is-dark="isDark"
           :parse-options="parseOptions"
           custom-id="playground-demo"

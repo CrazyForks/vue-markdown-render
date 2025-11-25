@@ -43,7 +43,7 @@ export function parseInlineTokens(
   tokens: MarkdownToken[],
   raw?: string,
   pPreToken?: MarkdownToken,
-  opts?: { insideLink?: boolean },
+  options?: { requireClosingStrong?: boolean },
 ): ParsedNode[] {
   if (!tokens || tokens.length === 0)
     return []
@@ -64,6 +64,8 @@ export function parseInlineTokens(
   }
 
   let i = 0
+  // Default to strict matching for strong unless caller explicitly sets false
+  const requireClosingStrong = options?.requireClosingStrong
   // Note: strong-token normalization and list-item normalization are
   // applied during markdown-it parsing via core rules (plugins that
   // run after 'inline'). Inline parsers should receive normalized
@@ -75,10 +77,6 @@ export function parseInlineTokens(
   }
 
   function handleEmphasisAndStrikethrough(content: string, token: MarkdownToken): boolean {
-    const insideLink = !!opts?.insideLink
-    // When inside link labels, keep markup literal (do not parse ~~/*/**)
-    if (insideLink)
-      return false
     // strikethrough (~~)
     if (/[^~]*~{2,}[^~]+/.test(content)) {
       let idx = content.indexOf('~~')
@@ -112,7 +110,7 @@ export function parseInlineTokens(
     }
 
     // strong (**)
-    if (/\*\*/.test(content)) {
+    if (/\*\*/.test(content) && !content.endsWith('**')) {
       const openIdx = content.indexOf('**')
       const beforeText = openIdx > -1 ? content.slice(0, openIdx) : ''
       if (beforeText) {
@@ -133,7 +131,14 @@ export function parseInlineTokens(
         after = content.slice(exec.index + exec[0].length)
       }
       else {
-        // no closing pair found: mid-state, take rest as inner
+        // no closing pair found: decide behavior based on strict option
+        if (requireClosingStrong) {
+          // 严格模式：不要硬匹配 strong，保留原文为普通文本
+          pushText(content, content)
+          i++
+          return true
+        }
+        // 非严格模式（原行为）：mid-state, take rest as inner
         inner = content.slice(openIdx + 2)
         after = ''
       }
@@ -142,7 +147,7 @@ export function parseInlineTokens(
         { type: 'strong_open', tag: 'strong', content: '', markup: '*', info: '', meta: null },
         { type: 'text', tag: '', content: inner, markup: '', info: '', meta: null },
         { type: 'strong_close', tag: 'strong', content: '', markup: '*', info: '', meta: null },
-      ], 0, raw)
+      ], 0, raw, options as any)
 
       resetCurrentTextNode()
       pushNode(node)
@@ -181,7 +186,7 @@ export function parseInlineTokens(
         { type: 'em_open', tag: 'em', content: '', markup: '*', info: '', meta: null },
         { type: 'text', tag: '', content: emphasisContent.replace(/\*/g, ''), markup: '', info: '', meta: null },
         { type: 'em_close', tag: 'em', content: '', markup: '*', info: '', meta: null },
-      ], 0)
+      ], 0, options as any)
       resetCurrentTextNode()
       pushNode(node)
       i++
@@ -213,10 +218,17 @@ export function parseInlineTokens(
       // editors can style it while typing; for multi-backtick runs, keep it as
       // plain text to avoid over-eager code spans.
       if (runLen === 1) {
+        // beforeText 可能包含 strong/emphasis，需要递归处理
         const beforeText = content.slice(0, codeStart)
         const codeContent = content.slice(codeStart + 1)
-        if (beforeText)
-          pushText(beforeText, beforeText)
+        if (beforeText) {
+          const handled = handleEmphasisAndStrikethrough(beforeText, _token)
+          if (!handled)
+            pushText(beforeText, beforeText)
+          else
+            i--
+        }
+
         pushParsed({ type: 'inline_code', code: codeContent, raw: String(codeContent) } as ParsedNode)
         i++
         return true
@@ -348,104 +360,23 @@ export function parseInlineTokens(
 
       case 'strong_open': {
         resetCurrentTextNode()
-        if (opts?.insideLink) {
-          // Flatten strong inside link label into literal text with ** markers,
-          // preserving inner literals like backticks and nested * markers.
-          let j = i + 1
-          let depth = 1
-          let out = '**'
-          while (j < tokens.length && depth > 0) {
-            const t = tokens[j] as MarkdownToken
-            if (t.type === 'strong_open') {
-              out += '**'
-              depth++
-            }
-            else if (t.type === 'strong_close') {
-              depth--
-              out += '**'
-              if (depth === 0)
-                break
-            }
-            else if (t.type === 'em_open' || t.type === 'em_close') {
-              out += String(t.markup ?? '*')
-            }
-            else if (t.type === 'code_inline') {
-              const mark = String((t as any).markup ?? '`')
-              out += mark + String(t.content ?? '') + mark
-            }
-            else if (t.type === 'text') {
-              out += String(t.content ?? '')
-            }
-            else if (typeof (t as any).content === 'string') {
-              out += String((t as any).content ?? '')
-            }
-            j++
-          }
-          // append closing if loop ended without adding it
-          if (!out.endsWith('**'))
-            out += '**'
-          pushText(out, out)
-          i = Math.min(j + 1, tokens.length)
-        }
-        else {
-          const { node, nextIndex } = parseStrongToken(tokens, i, token.content)
-          pushNode(node)
-          i = nextIndex
-        }
+        const { node, nextIndex } = parseStrongToken(tokens, i, token.content, options as any)
+        pushNode(node)
+        i = nextIndex
         break
       }
 
       case 'em_open': {
         resetCurrentTextNode()
-        if (opts?.insideLink) {
-          // Flatten emphasis inside link label into literal text with * markers,
-          // preserving inner literals like backticks and nested * markers.
-          let j = i + 1
-          let depth = 1
-          let out = '*'
-          while (j < tokens.length && depth > 0) {
-            const t = tokens[j] as MarkdownToken
-            if (t.type === 'em_open') {
-              out += '*'
-              depth++
-            }
-            else if (t.type === 'em_close') {
-              depth--
-              out += '*'
-              if (depth === 0)
-                break
-            }
-            else if (t.type === 'strong_open' || t.type === 'strong_close') {
-              out += String(t.markup ?? '**')
-            }
-            else if (t.type === 'code_inline') {
-              const mark = String((t as any).markup ?? '`')
-              out += mark + String(t.content ?? '') + mark
-            }
-            else if (t.type === 'text') {
-              out += String(t.content ?? '')
-            }
-            else if (typeof (t as any).content === 'string') {
-              out += String((t as any).content ?? '')
-            }
-            j++
-          }
-          if (!out.endsWith('*'))
-            out += '*'
-          pushText(out, out)
-          i = Math.min(j + 1, tokens.length)
-        }
-        else {
-          const { node, nextIndex } = parseEmphasisToken(tokens, i)
-          pushNode(node)
-          i = nextIndex
-        }
+        const { node, nextIndex } = parseEmphasisToken(tokens, i, options as any)
+        pushNode(node)
+        i = nextIndex
         break
       }
 
       case 's_open': {
         resetCurrentTextNode()
-        const { node, nextIndex } = parseStrikethroughToken(tokens, i)
+        const { node, nextIndex } = parseStrikethroughToken(tokens, i, options as any)
         pushNode(node)
         i = nextIndex
         break
@@ -453,7 +384,7 @@ export function parseInlineTokens(
 
       case 'mark_open': {
         resetCurrentTextNode()
-        const { node, nextIndex } = parseHighlightToken(tokens, i)
+        const { node, nextIndex } = parseHighlightToken(tokens, i, options as any)
         pushNode(node)
         i = nextIndex
         break
@@ -461,7 +392,7 @@ export function parseInlineTokens(
 
       case 'ins_open': {
         resetCurrentTextNode()
-        const { node, nextIndex } = parseInsertToken(tokens, i)
+        const { node, nextIndex } = parseInsertToken(tokens, i, options as any)
         pushNode(node)
         i = nextIndex
         break
@@ -469,7 +400,7 @@ export function parseInlineTokens(
 
       case 'sub_open': {
         resetCurrentTextNode()
-        const { node, nextIndex } = parseSubscriptToken(tokens, i)
+        const { node, nextIndex } = parseSubscriptToken(tokens, i, options as any)
         pushNode(node)
         i = nextIndex
         break
@@ -477,7 +408,7 @@ export function parseInlineTokens(
 
       case 'sup_open': {
         resetCurrentTextNode()
-        const { node, nextIndex } = parseSuperscriptToken(tokens, i)
+        const { node, nextIndex } = parseSuperscriptToken(tokens, i, options as any)
         pushNode(node)
         i = nextIndex
         break
@@ -628,7 +559,7 @@ export function parseInlineTokens(
       i++
       return
     }
-    if (!opts?.insideLink && (content === '`' || content === '|' || content === '$' || /^\*+$/.test(content))) {
+    if (content === '`' || content === '|' || content === '$' || /^\*+$/.test(content)) {
       i++
       return
     }
@@ -663,17 +594,17 @@ export function parseInlineTokens(
       return
     }
     const textNode = parseTextToken({ ...token, content })
-    const insideLink = !!opts?.insideLink
+
     if (currentTextNode) {
       // Merge with the previous text node
-      currentTextNode.content += insideLink ? textNode.content : textNode.content.replace(/(\*+|\(|\\)$/, '')
+      currentTextNode.content += textNode.content.replace(/(\*+|\(|\\)$/, '')
       currentTextNode.raw += textNode.raw
     }
     else {
       const maybeMath = preToken?.tag === 'br' && tokens[i - 2]?.content === '['
       // Start a new text node
       const nextToken = tokens[i + 1]
-      if (!insideLink && !nextToken)
+      if (!nextToken)
         textNode.content = textNode.content.replace(/(\*+|\(|\\)$/, '')
 
       currentTextNode = textNode
@@ -690,7 +621,7 @@ export function parseInlineTokens(
     // 如果 text 不在[]里说明，它不是一个link， 当 text 处理
 
     if (raw && tokens[i + 1].type === 'text') {
-      const text = String(tokens[i + 1]?.content ?? '')
+      let text = String(tokens[i + 1]?.content ?? '')
       const escText = escapeRegExp(text)
       const reg = new RegExp(`\\[${escText}\\s*\\]`)
       if (!reg.test(raw)) {
@@ -718,8 +649,29 @@ export function parseInlineTokens(
           return
         }
 
-        pushText(text, text)
-        i += 3
+        if (tokens[i + 2]?.type === 'strong_open') {
+          i += 2
+          while (i < tokens.length - 1 && tokens[i] && tokens[i]?.type !== 'link_close') {
+            text += String(tokens[i]?.markup || tokens[i]?.content || '')
+            i++
+          }
+          const node = {
+            type: 'link',
+            href: String(hrefAttr),
+            title: null,
+            text,
+            children: [
+              { type: 'text', content: text, raw: text },
+            ],
+            loading: false,
+          } as ParsedNode
+          pushParsed(node)
+          i += 1
+        }
+        else {
+          pushText(text, text)
+          i += 3
+        }
         return
       }
     }
@@ -759,7 +711,7 @@ export function parseInlineTokens(
         }
       }
     }
-    const { node, nextIndex } = parseLinkToken(tokens, i)
+    const { node, nextIndex } = parseLinkToken(tokens, i, { requireClosingStrong })
     i = nextIndex
     // Determine loading state conservatively: if the link token parser
     // marked it as loading already, keep it; otherwise compute from raw
@@ -876,7 +828,7 @@ export function parseInlineTokens(
       }
       if (!emphasisMatch)
         emphasisMatch = text.match(/^\*+/)
-      if (emphasisMatch) {
+      if (!requireClosingStrong && emphasisMatch) {
         const type = emphasisMatch[0].length
         text = text.replace(/^\*+/, '').replace(/\*+$/, '')
         const newTokens = []
@@ -900,22 +852,22 @@ export function parseInlineTokens(
         })
         if (type === 1) {
           newTokens.push({ type: 'em_close', tag: 'em', nesting: -1 })
-          const { node } = parseEmphasisToken(newTokens, 0)
+          const { node } = parseEmphasisToken(newTokens, 0, options as any)
           pushNode(node)
         }
         else if (type === 2) {
           newTokens.push({ type: 'strong_close', tag: 'strong', nesting: -1 })
-          const { node } = parseStrongToken(newTokens, 0)
+          const { node } = parseStrongToken(newTokens, 0, undefined, options as any)
           pushNode(node)
         }
         else if (type === 3) {
           newTokens.push({ type: 'em_close', tag: 'em', nesting: -1 })
           newTokens.push({ type: 'strong_close', tag: 'strong', nesting: -1 })
-          const { node } = parseStrongToken(newTokens, 0)
+          const { node } = parseStrongToken(newTokens, 0, undefined, options as any)
           pushNode(node)
         }
         else {
-          const { node } = parseEmphasisToken(newTokens, 0)
+          const { node } = parseEmphasisToken(newTokens, 0, options as any)
           pushNode(node)
         }
       }

@@ -1,7 +1,7 @@
 {
   "name": "vue-renderer-markdown",
   "type": "module",
-  "version": "0.0.63-beta.0",
+  "version": "0.0.63-beta.1",
   "packageManager": "pnpm@10.23.0",
   "description": "Vue 3 Markdown renderer optimized for large docs: progressive Mermaid, streaming diff code blocks, and fast real-time preview.",
   "author": "Simon He",
@@ -119,15 +119,17 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^5.4.1",
+    "@types/markdown-it-emoji": "^3.0.1",
     "@types/node": "^18.19.130",
     "@vitejs/plugin-vue": "^5.2.4",
-    "@vitest/ui": "^4.0.12",
+    "@vitest/ui": "^4.0.13",
     "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.22",
     "bumpp": "^8.2.1",
     "eslint": "^9.39.1",
     "lint-staged": "^13.3.0",
     "lz-string": "^1.5.0",
+    "markdown-it-emoji": "^3.0.0",
     "picocolors": "^1.1.1",
     "postcss-cli": "^11.0.1",
     "rollup": "^3.29.5",
@@ -143,8 +145,8 @@
     "vite-plugin-pages": "^0.33.1",
     "vite-svg-loader": "^5.1.0",
     "vitepress": "^1.6.4",
-    "vitest": "^4.0.12",
-    "vue": "^3.5.24",
+    "vitest": "^4.0.13",
+    "vue": "^3.5.25",
     "vue-tsc": "^2.2.12"
   },
   "lint-staged": {

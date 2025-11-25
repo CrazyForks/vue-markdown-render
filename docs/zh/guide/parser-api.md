@@ -49,6 +49,29 @@ setDefaultMathOptions({
 
 这些钩子也可通过 `MarkdownRender` 组件传入 `parseOptions` prop（仅当使用 `content` prop 时生效）。
 
+### ParseOptions: `requireClosingStrong`
+
+`requireClosingStrong`（boolean，可选）控制解析器在解析 inline 内容时如何处理未闭合的 `**` 加粗分隔符。默认值：`true`。
+
+- **true**：要求存在匹配的关闭 `**` 才会生成加粗（strong）节点。未闭合的 `**` 会被保留为普通文本。这是非交互渲染（例如静态页面或服务器端渲染）推荐的严格模式，可以避免像 `[**cxx](xxx)` 这类在链接文本中错误地解析出 dangling strong 的问题。
+- **false**：允许中间态/未完成的 `**`（适用于编辑器的实时预览），解析器会在某些未闭合情况下仍生成临时的加粗节点。
+
+示例 — 严格模式（默认）：
+
+```ts
+import { parseMarkdownToStructure } from 'packages/markdown-parser'
+
+const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: true })
+// 文本 `[**cxx](xxx)` 将被保留，不会创建不完整的加粗节点
+```
+
+示例 — 编辑器友好模式：
+
+```ts
+const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: false })
+// 允许在实时预览中创建临时/中间态的加粗节点
+```
+
 ## 类型提示
 导出的类型包含 `CodeBlockNode`、`ParsedNode` 等，可在 TS 中导入：
 ```ts
@@ -56,6 +79,30 @@ import type { CodeBlockNode, ParsedNode } from 'stream-markdown-parser'
 ```
 
 ## 插件与默认配置
-默认启用一些常见插件（emoji、footnote、task checkbox 等），并支持通过 `getMarkdown` 的 `plugin` 选项自定义插件。
+本项目为常见解析场景提供了一些便捷插件（例如：footnote、task checkbox、sub/sup/mark 等）。注意：`emoji` 插件已从默认配置中移除——需要 Emoji 支持的用户请显式注册该插件。
+
+可以通过多种方式添加自定义插件：
+- 在 `getMarkdown` 的 `plugin` 选项中传入插件数组。
+- 在 `getMarkdown` 的 `apply` 回调中直接修改返回的 `MarkdownIt` 实例。
+- 在使用 `MarkdownRender` 组件时，通过 `customMarkdownIt` prop 获取并修改该渲染器使用的 `MarkdownIt` 实例。
+
+示例 — 在组件中启用 Emoji：
+
+```vue
+<script setup lang="ts">
+import type { MarkdownIt } from 'markdown-it-ts'
+import { full as markdownItEmoji } from 'markdown-it-emoji'
+import MarkdownRender from 'vue-renderer-markdown'
+
+function enableEmoji(md: MarkdownIt) {
+  md.use(markdownItEmoji)
+  return md
+}
+</script>
+
+<template>
+  <MarkdownRender :content="source" :custom-markdown-it="enableEmoji" />
+</template>
+```
 
 更多示例与完整 API 请参考仓库内的 `packages/markdown-parser/README.md`。

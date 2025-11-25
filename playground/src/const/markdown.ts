@@ -60,21 +60,21 @@ $$i\\hbar \\frac{\\partial}{\\partial t} \\Psi(\\mathbf{r},t) = \\left[ -\\frac{
 ## 1. 泰勒公式（Taylor's Formula）
 
 ### 一般形式（在点 \\(x = a\\) 处展开）：
-\\[
+\[
 f(x) = f(a) + f'(a)(x-a) + \frac{f''(a)}{2!}(x-a)^2 + \frac{f'''(a)}{3!}(x-a)^3 + \cdots + \frac{f^{(n)}(a)}{n!}(x-a)^n + R_n(x)
 \\]
 
 其中：
-- \\(f^{(k)}(a)\\) 是 \\(f(x)\\) 在 \\(x=a\\) 处的 \\(k\\) 阶导数
+- \\(f^{(k)}(a)\\) 是 \\(f(x)\\) 在 \\(x=a\\\) 处的 \\(k\\) 阶导数
 - \\(R_n(x)\\) 是余项，常见形式有拉格朗日余项：
-\\[
+\[
 R_n(x) = \frac{f^{(n+1)}(xi)}{(n+1)!}(x-a)^{n+1}, \quad xi \text{ 在 } a \text{ 和 } x \text{ 之间}
 \\]
 
 ---
 
 ## 2. 麦克劳林公式（Maclaurin's Formula，即 \\(a=0\\) 时的泰勒公式）：
-\\[
+\[
 f(x) = f(0) + f'(0)x + \frac{f''(0)}{2!}x^2 + \frac{f'''(0)}{3!}x^3 + \cdots + \frac{f^{(n)}(0)}{n!}x^n + R_n(x)
 \\]
 
@@ -103,7 +103,7 @@ e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots
 \\]
 
 - **二项式展开**（\\( (1+x)^m \\)，\\(m\\) 为实数）：
-\\[
+\[
 (1+x)^m = 1 + mx + \frac{m(m-1)}{2!}x^2 + \frac{m(m-1)(m-2)}{3!}x^3 + \cdots, \quad |x| < 1
 \\]
 
@@ -284,7 +284,7 @@ def echo(msg: Message):
     return {"reply": f"Echo: {msg.text}"}
 \`\`\`
 
-5. Create a native module example \\(C++\\):
+5. Create a native module example \(C++\):
 
 \`\`\`cpp:src/native/compute.cpp
 #include <bits/stdc++.h>
@@ -403,11 +403,10 @@ graph TD
 
 ### 2. **正交补空间的概念**
    - 在线性代数中，对于一个子空间 \\(W\\)，它的正交补空间（记为 \\(W^\perp\\)）定义为所有与 \\(W\\) 中每个向量正交的向量的集合。即：
-     \\[
+     \[
      W^\perp = \{ \mathbf{v} \in \mathbb{R}^3 \mid \mathbf{v} \cdot \mathbf{w} = 0 \text{ 对于所有 } \mathbf{w} \in W \}
-     \\]
+     \]
    - 例如，如果 \\(W\\) 是由一个向量 \\(\boldsymbol{\alpha}\\) 张成的一维子空间（即 \\(W = \operatorname{span}\{\boldsymbol{\alpha}\}\\)），那么 \\(W^\perp\\) 就是所有与 \\(\boldsymbol{\alpha}\\) 正交的向量构成的二维平面。
-
 ### 3. **\\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 与正交补空间的联系**
    - 当 \\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 时，这意味着：
      - \\(\boldsymbol{\beta}\\) 属于 \\(\operatorname{span}\{\boldsymbol{\alpha}\}\\) 的正交补空间，即 \\(\boldsymbol{\beta} \in (\operatorname{span}\{\boldsymbol{\alpha}\})^\perp\\)。
@@ -421,7 +420,6 @@ graph TD
 ### 5. **推广到更一般的情况**
    - 如果考虑多个向量，正交补空间的概念可以扩展。例如，如果有一组向量 \\(\{\boldsymbol{\alpha}_1, \boldsymbol{\alpha}_2, \ldots, \boldsymbol{\alpha}_k\}\\)，那么它们的张成子空间 \\(W = \operatorname{span}\{\boldsymbol{\alpha}_1, \ldots, \boldsymbol{\alpha}_k\}\\) 的正交补空间 \\(W^\perp\\) 包含所有与这些向量正交的向量。
    - 在这种情况下，\\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 可以看作 \\(\boldsymbol{\beta}\\) 与 \\(W\\) 正交的一个特例（当 \\(W\\) 只由 \\(\boldsymbol{\alpha}\\) 张成时）。
-
 总之，\\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 直接体现了正交补空间的关系：它表明一个向量属于另一个向量张成子空间的正交补空间。如果你有更多向量或子空间，这种联系可以进一步深化。
 
 **示例：** emm\`1-(5)\`、\`3-(3)\`、\`3-(4)\` complex test \`1-(4)\`“heiheihei”中，hello world。

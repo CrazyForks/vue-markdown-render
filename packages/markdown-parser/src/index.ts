@@ -1,6 +1,5 @@
 import type { MarkdownIt, MarkdownItPlugin } from 'markdown-it-ts'
 import type { FactoryOptions } from './factory'
-import { full as markdownItEmoji } from 'markdown-it-emoji'
 import markdownItFootnote from 'markdown-it-footnote'
 import markdownItIns from 'markdown-it-ins'
 import markdownItMark from 'markdown-it-mark'
@@ -15,12 +14,26 @@ import {
   processTokens,
 } from './parser'
 
+// Module-level registry for callers that want to add plugins to every
+// `getMarkdown()` instance without modifying call sites. Useful for tests
+// or apps that want a central place to `use` plugins.
+const _registeredMarkdownPlugins: Array<unknown> = []
+
+export function registerMarkdownPlugin(plugin: unknown) {
+  _registeredMarkdownPlugins.push(plugin)
+}
+
+export function clearRegisteredMarkdownPlugins() {
+  _registeredMarkdownPlugins.length = 0
+}
+
 // Re-export config
 export { setDefaultMathOptions } from './config'
 
 // Re-export parser functions
 export { parseInlineTokens, parseMarkdownToStructure, processTokens }
 export type { MathOptions } from './config'
+export type { MarkdownIt }
 
 // Re-export utilities
 export { findMatchingClose } from './findMatchingClose'
@@ -97,11 +110,26 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
     }
   }
 
+  // Apply any globally registered plugins (via registerMarkdownPlugin)
+  if (_registeredMarkdownPlugins.length) {
+    for (const p of _registeredMarkdownPlugins) {
+      if (Array.isArray(p)) {
+        const fn = p[0] as any
+        const opts = p[1]
+        if (typeof fn === 'function')
+          md.use(fn, opts)
+      }
+      else if (typeof p === 'function') {
+        md.use(p as MarkdownItPlugin)
+      }
+      // ignore non-callable registrations
+    }
+  }
+
   // Re-apply a few project specific plugins that were previously always enabled
   md.use(markdownItSub)
   md.use(markdownItSup)
   md.use(markdownItMark)
-  md.use(markdownItEmoji)
   // Safely resolve default export or the module itself for checkbox plugin
   type CheckboxPluginFn = (md: MarkdownIt, opts?: unknown) => void
   const markdownItCheckboxPlugin = ((markdownItCheckbox as unknown) as {
@@ -139,9 +167,9 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
       const closed = endLine > openLine + 1 && count >= minLen && j === line.length
       const tokenShape = token as unknown as { meta?: Record<string, unknown> }
       tokenShape.meta = tokenShape.meta ?? {}
-      ;(tokenShape.meta as Record<string, unknown>).unclosed = !closed
+      ; (tokenShape.meta as Record<string, unknown>).unclosed = !closed
       // also set a explicit `closed` boolean for compatibility with plugins/tests
-      ;(tokenShape.meta as Record<string, unknown>).closed = !!closed
+      ; (tokenShape.meta as Record<string, unknown>).closed = !!closed
     }
   })
 

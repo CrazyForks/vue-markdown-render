@@ -28,7 +28,7 @@ export function setCustomComponents(
 export function getCustomNodeComponents(customId?: string) {
   if (!customId)
     return scopedCustomComponents[GLOBAL_KEY] || {}
-  return scopedCustomComponents[customId] || {}
+  return scopedCustomComponents[customId] || scopedCustomComponents[GLOBAL_KEY] || {}
 }
 
 /**

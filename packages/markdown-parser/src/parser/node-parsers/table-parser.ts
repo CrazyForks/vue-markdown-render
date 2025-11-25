@@ -1,5 +1,6 @@
 import type {
   MarkdownToken,
+  ParseOptions,
   TableCellNode,
   TableNode,
   TableRowNode,
@@ -28,6 +29,7 @@ function extractAlign(attrs: MarkdownToken['attrs']): 'left' | 'right' | 'center
 export function parseTable(
   tokens: MarkdownToken[],
   index: number,
+  options?: ParseOptions,
 ): [TableNode, number] {
   let j = index + 1
   let headerRow: TableRowNode | null = null
@@ -62,7 +64,7 @@ export function parseTable(
           cells.push({
             type: 'table_cell',
             header: isHeaderCell || isHeader,
-            children: parseInlineTokens(contentToken.children || [], content),
+            children: parseInlineTokens(contentToken.children || [], content, undefined, { requireClosingStrong: options?.requireClosingStrong }),
             raw: content,
             align,
           })

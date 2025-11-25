@@ -3,12 +3,14 @@ import type {
   DefinitionListNode,
   MarkdownToken,
   ParsedNode,
+  ParseOptions,
 } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 
 export function parseDefinitionList(
   tokens: MarkdownToken[],
   index: number,
+  options?: ParseOptions,
 ): [DefinitionListNode, number] {
   const items: DefinitionItemNode[] = []
   let j = index + 1
@@ -19,7 +21,7 @@ export function parseDefinitionList(
     if (tokens[j].type === 'dt_open') {
       // Process term
       const termToken = tokens[j + 1]
-      termNodes = parseInlineTokens(termToken.children || [])
+      termNodes = parseInlineTokens(termToken.children || [], undefined, undefined, { requireClosingStrong: options?.requireClosingStrong })
       j += 3 // Skip dt_open, inline, dt_close
     }
     else if (tokens[j].type === 'dd_open') {
@@ -32,7 +34,7 @@ export function parseDefinitionList(
           const contentToken = tokens[k + 1]
           definitionNodes.push({
             type: 'paragraph',
-            children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? '')),
+            children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), undefined, { requireClosingStrong: options?.requireClosingStrong }),
             raw: String(contentToken.content ?? ''),
           })
           k += 3 // Skip paragraph_open, inline, paragraph_close

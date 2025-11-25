@@ -1,4 +1,4 @@
-import type { AdmonitionNode, MarkdownToken, ParsedNode } from '../../types'
+import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseList } from './list-parser'
 
@@ -6,6 +6,7 @@ export function parseAdmonition(
   tokens: MarkdownToken[],
   index: number,
   match: RegExpExecArray,
+  options?: ParseOptions,
 ): [AdmonitionNode, number] {
   const kind = String(match[1] ?? 'note')
   const title = String(match[2] ?? (kind.charAt(0).toUpperCase() + kind.slice(1)))
@@ -18,7 +19,7 @@ export function parseAdmonition(
       if (contentToken) {
         admonitionChildren.push({
           type: 'paragraph',
-          children: parseInlineTokens(contentToken.children || []),
+          children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), undefined, { requireClosingStrong: options?.requireClosingStrong }),
           raw: String(contentToken.content ?? ''),
         })
       }
@@ -29,7 +30,7 @@ export function parseAdmonition(
       || tokens[j].type === 'ordered_list_open'
     ) {
       // Handle nested lists - use parseList directly for proper nested list support
-      const [listNode, newIndex] = parseList(tokens, j)
+      const [listNode, newIndex] = parseList(tokens, j, options)
       admonitionChildren.push(listNode)
       j = newIndex
     }

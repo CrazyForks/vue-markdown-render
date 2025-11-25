@@ -1,9 +1,10 @@
-import type { HeadingNode, MarkdownToken } from '../../types'
+import type { HeadingNode, MarkdownToken, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 
 export function parseHeading(
   tokens: MarkdownToken[],
   index: number,
+  options?: ParseOptions,
 ): HeadingNode {
   const token = tokens[index]
   const levelStr = String(token.tag?.substring(1) ?? '1')
@@ -15,7 +16,7 @@ export function parseHeading(
     type: 'heading',
     level: headingLevel,
     text: headingContent,
-    children: parseInlineTokens(headingContentToken.children || []),
+    children: parseInlineTokens(headingContentToken.children || [], headingContent, undefined, { requireClosingStrong: options?.requireClosingStrong }),
     raw: headingContent,
   }
 }

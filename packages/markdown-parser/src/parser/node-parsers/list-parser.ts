@@ -3,6 +3,7 @@ import type {
   ListNode,
   MarkdownToken,
   ParsedNode,
+  ParseOptions,
 } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseFenceToken } from '../inline-parsers/fence-parser'
@@ -19,6 +20,7 @@ import { parseThematicBreak } from './thematic-break-parser'
 export function parseList(
   tokens: MarkdownToken[],
   index: number,
+  options?: ParseOptions,
 ): [ListNode, number] {
   const token = tokens[index]
   const listItems: ListItemNode[] = []
@@ -48,7 +50,7 @@ export function parseList(
           }
           itemChildren.push({
             type: 'paragraph',
-            children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken),
+            children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken, { requireClosingStrong: options?.requireClosingStrong }),
             raw: String(contentToken.content ?? ''),
           })
           k += 3 // Skip paragraph_open, inline, paragraph_close
@@ -64,7 +66,7 @@ export function parseList(
           || tokens[k].type === 'ordered_list_open'
         ) {
           // Parse nested list (do not skip '*' — treat all bullet types consistently)
-          const [nestedListNode, newIndex] = parseNestedList(tokens, k)
+          const [nestedListNode, newIndex] = parseNestedList(tokens, k, options)
           itemChildren.push(nestedListNode)
           k = newIndex
         }
@@ -170,6 +172,7 @@ export function parseList(
 function parseNestedList(
   tokens: MarkdownToken[],
   index: number,
+  options?: ParseOptions,
 ): [ListNode, number] {
   // We can directly use parseList since we're in the same file
   // This avoids circular dependency issues
@@ -193,7 +196,7 @@ function parseNestedList(
           const preToken = tokens[k - 1]
           itemChildren.push({
             type: 'paragraph',
-            children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken),
+            children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken, { requireClosingStrong: options?.requireClosingStrong }),
             raw: String(contentToken.content ?? ''),
           })
           k += 3 // Skip paragraph_open, inline, paragraph_close
@@ -203,7 +206,7 @@ function parseNestedList(
           || tokens[k].type === 'ordered_list_open'
         ) {
           // Handle deeper nested lists
-          const [deeperNestedListNode, newIndex] = parseNestedList(tokens, k)
+          const [deeperNestedListNode, newIndex] = parseNestedList(tokens, k, options)
           itemChildren.push(deeperNestedListNode)
           k = newIndex
         }

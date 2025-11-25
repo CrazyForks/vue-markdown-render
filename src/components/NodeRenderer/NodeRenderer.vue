@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BaseNode, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, markRaw, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue'
@@ -49,6 +49,7 @@ export interface NodeRendererProps {
   nodes?: BaseNode[]
   /** Options forwarded to parseMarkdownToStructure when content is provided */
   parseOptions?: ParseOptions
+  customMarkdownIt?: (md: MarkdownIt) => MarkdownIt
   /** Enable priority rendering for visible viewport area */
   viewportPriority?: boolean
   /**
@@ -112,17 +113,25 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
 
 // 定义事件
 const emit = defineEmits(['copy', 'handleArtifactClick', 'click', 'mouseover', 'mouseout'])
-const md = getMarkdown()
 const containerRef = ref<HTMLElement>()
 // Provide viewport-priority registrar so heavy nodes can defer work until visible
 const viewportPriorityEnabled = ref(props.viewportPriority !== false)
 const registerNodeVisibility = provideViewportPriority(() => containerRef.value, viewportPriorityEnabled)
+const md = getMarkdown()
+const mdInstance = computed(() => {
+  return props.customMarkdownIt
+    ? props.customMarkdownIt(md)
+    : md
+})
 const parsedNodes = computed<ParsedNode[]>(() => {
   // 解析 content 字符串为节点数组
   if (props.nodes?.length)
     return props.nodes as unknown as ParsedNode[]
   if (props.content) {
-    const parsed = parseMarkdownToStructure(props.content, md, props.parseOptions)
+    // Prefer an explicitly passed `markdown` prop, then a globally
+    // provided markdown via `setGlobalMarkdown`, otherwise fall back
+    // to the legacy `getMarkdown()` factory.
+    const parsed = parseMarkdownToStructure(props.content, mdInstance.value, props.parseOptions)
     return markRaw(parsed)
   }
   return []
@@ -660,7 +669,6 @@ const nodeComponents = {
   html_block: HtmlBlockNode,
   // 可以添加更多节点类型
   // 例如:custom_node: CustomNode,
-  ...getCustomNodeComponents(props.customId),
 }
 
 // Decide which component to use for a given node. Ensure that code blocks
@@ -669,6 +677,14 @@ const nodeComponents = {
 function getNodeComponent(node: ParsedNode) {
   if (!node)
     return FallbackComponent
+  // Allow consumers to override any node type at runtime using
+  // `setCustomComponents(id, { my_node: MyComponent })` or the global
+  // legacy API. We fetch the mapping on-demand so updates take effect
+  // after registration and without relying on a snapshot created at
+  // component initialization.
+  const customForType = (getCustomNodeComponents(props.customId) as any)[String((node as any).type)]
+  if (customForType)
+    return customForType
   if (node.type === 'code_block') {
     const lang = String((node as any).language ?? '').trim().toLowerCase()
     // If this is a mermaid block, prefer a custom `mermaid` mapping if provided.

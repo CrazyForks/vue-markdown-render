@@ -1,8 +1,16 @@
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { collect, fenceOrParagraph, hasEmoji, hasLoadingLink, hasNode, hasParagraph, links, paragraphFirst, paragraphHasCheckbox, textIncludes } from './utils/midstate-utils'
 
 const md = getMarkdown('midstates')
+
+beforeAll(async () => {
+  // Tests opt-in to emoji support explicitly so the library avoids bundling
+  // it by default in production. Register emoji plugin on the named md
+  // instance used in these midstate tests.
+  const emoji = await import('markdown-it-emoji')
+  md.use((emoji as any).full)
+})
 
 // `collect` imported from test/utils/midstate-utils
 

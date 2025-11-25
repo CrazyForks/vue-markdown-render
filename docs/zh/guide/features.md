@@ -5,7 +5,7 @@
 - 🧠 **Monaco 流式更新**：为大代码块提供平滑的增量编辑体验
 - 🪄 **渐进式 Mermaid**：图表在语法可用时尽快渲染并逐步完善
 - 🧩 **自定义组件**：允许在 Markdown 内容中嵌入 Vue 组件
-- 📝 **完整 Markdown 支持**：表格、公式、Emoji、复选框、代码块等
+-- 📝 **完整 Markdown 支持（可选 Emoji 插件）**：表格、公式、复选框、代码块等。Emoji 支持现作为插件提供，默认不启用，需要在 `getMarkdown` 配置或通过组件的 `customMarkdownIt` prop 显式注册 `markdown-it-emoji`。
 - 🔌 **零配置出箱**：适用于 Vue 3 项目
 
 要了解更多示例，请查看文档页：`/zh/guide/usage`、`/zh/guide/features`。
