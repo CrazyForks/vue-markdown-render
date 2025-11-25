@@ -68,10 +68,6 @@ export function isMathLike(s: string) {
   if (stripped.length > 2000)
     return true // very long blocks likely math
 
-  if (/[./]\s*\D|\D\s*[./]/.test(s)) {
-    return false
-  }
-
   // TeX commands e.g. \frac, \alpha
   const texCmd = TEX_CMD_RE.test(norm)
   const texCmdWithBraces = TEX_CMD_WITH_BRACES_RE.test(norm)

@@ -458,14 +458,48 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       // 这里其实不应该只匹配 startWith的情况因为很可能前面还有 text
       if (lineText.startsWith(open)) {
         if (open.includes('[')) {
-          if (lineText.replace('\\', '') === '[') {
-            if (startLine + 1 < endLine) {
-              matched = true
-              openDelim = open
-              closeDelim = close
-              break
+          if (mathOpts?.strictDelimiters) {
+            if (lineText.replace('\\', '') === '[') {
+              if (startLine + 1 < endLine) {
+                matched = true
+                openDelim = open
+                closeDelim = close
+                break
+              }
+              continue
             }
-            continue
+          }
+          else {
+            if (lineText.replace('\\', '') === '[') {
+              if (startLine + 1 < endLine) {
+                matched = true
+                openDelim = open
+                closeDelim = close
+                break
+              }
+              continue
+            }
+            else {
+              // inline math block
+              // 排除 todo list 的情况
+              const lastToken = s.tokens[s.tokens.length - 1]
+              if (lastToken && lastToken.type === 'list_item_open' && lastToken.mark === '-' && lineText.slice(open.length, lineText.indexOf(']')).trim() === 'x') {
+                continue
+              }
+              if (lineText.replace('\\', '').startsWith('[') && !lineText.includes('](')) {
+                const closeIndex = lineText.indexOf(']')
+                if (lineText.slice(closeIndex).trim() !== ']') {
+                  continue
+                }
+                if (isMathLike(lineText.slice(open.length, closeIndex))) {
+                  matched = true
+                  openDelim = open
+                  closeDelim = close
+                  break
+                }
+                continue
+              }
+            }
           }
         }
         else {

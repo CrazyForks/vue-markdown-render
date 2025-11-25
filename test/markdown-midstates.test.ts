@@ -599,9 +599,10 @@ describe('parseMarkdownToStructure - incremental/mid-typing states', () => {
       it('use-before-def mid-state: "[x][id]\n[id]:" tolerates as text or partial link', () => {
         const nodes = parseMarkdownToStructure('[x][id]\n[id]:', md)
         const links = collect(nodes, 'link')
+        const texts = collect(nodes, 'text')
         // Either link is recognized or kept as text until def completes
         expect(links.length >= 0).toBe(true)
-        expect(links.length > 0 || textIncludes(nodes, '[x][id]')).toBe(true)
+        expect(texts.length === 1 || textIncludes(nodes, '[x][id]\n[id]:')).toBe(true)
       })
     })
 
