@@ -125,8 +125,13 @@ const mdInstance = computed(() => {
 })
 const parsedNodes = computed<ParsedNode[]>(() => {
   // 解析 content 字符串为节点数组
+  // If the consumer passed an explicit `nodes` array, return a shallow
+  // copy so the computed value has a new identity whenever the caller
+  // replaces or mutates the array in-place. This ensures the watchers
+  // that rely on `parsedNodes` will run and update rendering even when
+  // the array length doesn't change.
   if (props.nodes?.length)
-    return props.nodes as unknown as ParsedNode[]
+    return markRaw((props.nodes as unknown as ParsedNode[]).slice())
   if (props.content) {
     // Prefer an explicitly passed `markdown` prop, then a globally
     // provided markdown via `setGlobalMarkdown`, otherwise fall back
@@ -238,12 +243,15 @@ function estimateHeightRange(start: number, end: number) {
 }
 
 const visibleNodes = computed(() => {
+  // Use the full `parsedNodes` list to build the visible window so that
+  // placeholders and spacer heights represent the entire dataset even when
+  // only a subset of nodes have been materialized into `renderedNodes`.
   if (!virtualizationEnabled.value)
-    return renderedNodes.value.map((node, index) => ({ node, index }))
-  const total = renderedNodes.value.length
+    return parsedNodes.value.map((node, index) => ({ node, index }))
+  const total = parsedNodes.value.length
   const start = clamp(liveRange.start, 0, total)
   const end = clamp(liveRange.end, start, total)
-  return renderedNodes.value.slice(start, end).map((node, idx) => ({
+  return parsedNodes.value.slice(start, end).map((node, idx) => ({
     node,
     index: start + idx,
   }))
@@ -252,15 +260,20 @@ const visibleNodes = computed(() => {
 const topSpacerHeight = computed(() => {
   if (!virtualizationEnabled.value)
     return 0
-  return estimateHeightRange(0, Math.min(liveRange.start, renderedNodes.value.length))
+  // Estimate height from the start up to the live window start based on
+  // recorded heights or averages for the full parsedNodes list.
+  return estimateHeightRange(0, Math.min(liveRange.start, parsedNodes.value.length))
 })
 
 const bottomSpacerHeight = computed(() => {
   if (!virtualizationEnabled.value)
     return 0
-  const total = renderedNodes.value.length
+  // Estimate height after the live window end up to the total number of
+  // parsed nodes. This ensures the scrollable area matches the full
+  // dataset even when not all nodes are currently rendered.
+  const total = parsedNodes.value.length
   const end = Math.min(liveRange.end, total)
-  return estimateHeightRange(end, Math.min(total, renderedCount.value))
+  return estimateHeightRange(end, total)
 })
 
 function syncRenderedNodes() {
