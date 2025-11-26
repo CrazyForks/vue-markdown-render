@@ -309,6 +309,9 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
           count += 1
         }
       }
+      else {
+        loading = false
+      }
 
       replacerTokens.push({
         type: 'link',

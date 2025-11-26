@@ -359,6 +359,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         if (!silent) {
           // push text before this math
           const before = src.slice(0, index)
+          // 如果 before 包含 单边的 ` ** 或 __ ，则直接跳过，交给 md 处理
+
+          const m = before.match(/(^|[^\\])(`+|__|\*\*)/)
+          if (m) {
+            return false
+          }
+
           // If we already consumed some content, avoid duplicating the prefix
           // Only push the portion from previous search position
           const prevConsumed = src.slice(0, searchPos)
@@ -463,10 +470,11 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           ['$$', '$$'],
         ]
     const startPos = s.bMarks[startLine] + s.tShift[startLine]
-    const lineText = s.src.slice(startPos, s.eMarks[startLine]).trim()
+    let lineText = s.src.slice(startPos, s.eMarks[startLine]).trim()
     let matched = false
     let openDelim = ''
     let closeDelim = ''
+    let skipFirstLine = false
     for (const [open, close] of delimiters) {
       // 这里其实不应该只匹配 startWith的情况因为很可能前面还有 text
       if (lineText.startsWith(open)) {
@@ -522,6 +530,22 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           break
         }
       }
+      // 这里可能 ai 返回的格式有问题 $$ 跟在文本的最后，而不是单独一行，此时匹配是否有下一行，把它当作块级公式处理
+      else if (lineText.endsWith(open) && startLine + 1 < endLine) {
+        // lineText 要变成下一行的内容，把之前lineText的内容当作普通文本处理
+        s.push('text', '', 0).content = lineText.slice(0, lineText.length - open.length)
+        const nextLineStartPos = s.bMarks[startLine + 1] + s.tShift[startLine + 1]
+        const nextLineText = s.src.slice(nextLineStartPos, s.eMarks[startLine + 1]).trim()
+        lineText = nextLineText
+        // 更新 endLine
+        if (open === '$$') {
+          skipFirstLine = true
+          matched = true
+          openDelim = open
+          closeDelim = close
+          break
+        }
+      }
     }
 
     if (!matched)
@@ -568,7 +592,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       nextLine = startLine
     }
     else {
-      if (firstLineContent)
+      if (firstLineContent && !skipFirstLine)
         content = firstLineContent
 
       for (nextLine = startLine + 1; nextLine < endLine; nextLine++) {
@@ -591,6 +615,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
     // In strict mode, do not emit mid-state (unclosed) block math
     if (strict && !found)
+      return false
+    // 追加检测内容是否是 math
+    if (!isMathLike(content))
       return false
 
     const token: any = s.push('math_block', 'math', 0)
