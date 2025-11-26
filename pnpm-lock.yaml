@@ -189,7 +189,7 @@ importers:
         version: 0.16.25
       markstream-vue:
         specifier: latest
-        version: 0.0.1(katex@0.16.25)(mermaid@11.12.1)(shiki@3.15.0)(stream-markdown@0.0.10(shiki@3.15.0))(stream-monaco@0.0.6(monaco-editor@0.52.2))(vue-i18n@11.2.2(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3))
+        version: 0.0.2-beta.0(katex@0.16.25)(mermaid@11.12.1)(shiki@3.15.0)(stream-markdown@0.0.10(shiki@3.15.0))(stream-monaco@0.0.6(monaco-editor@0.52.2))(vue-i18n@11.2.2(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3))
       stream-markdown:
         specifier: ^0.0.10
         version: 0.0.10(shiki@3.15.0)
@@ -4591,8 +4591,8 @@ packages:
     engines: {node: '>= 20'}
     hasBin: true
 
-  markstream-vue@0.0.1:
-    resolution: {integrity: sha512-of3BycipXBZTAfm3AohYcTFulvpOID7NJpXZUAnSKIHy8OFOIlJ5DU8nzVWlYPeakzjOhYg/t4UJIml0HUMIrw==}
+  markstream-vue@0.0.2-beta.0:
+    resolution: {integrity: sha512-u5XsNJdyQIW/LGeDMxPhircpsN3VpYprZjfkEuacJDhWkw6fepBFHDg5IY8IHzjqEk3NuEuFuO7bfS9wx9Roww==}
     peerDependencies:
       katex: '>=0.16.22'
       mermaid: '>=11'
@@ -11669,7 +11669,7 @@ snapshots:
 
   marked@16.4.2: {}
 
-  markstream-vue@0.0.1(katex@0.16.25)(mermaid@11.12.1)(shiki@3.15.0)(stream-markdown@0.0.10(shiki@3.15.0))(stream-monaco@0.0.6(monaco-editor@0.52.2))(vue-i18n@11.2.2(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3)):
+  markstream-vue@0.0.2-beta.0(katex@0.16.25)(mermaid@11.12.1)(shiki@3.15.0)(stream-markdown@0.0.10(shiki@3.15.0))(stream-monaco@0.0.6(monaco-editor@0.52.2))(vue-i18n@11.2.2(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3)):
     dependencies:
       '@floating-ui/dom': 1.7.4
       vue: 3.5.25(typescript@5.9.3)
