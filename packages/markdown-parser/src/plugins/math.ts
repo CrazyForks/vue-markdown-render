@@ -363,16 +363,16 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           const before = src.slice(0, index)
           // 如果 before 包含 单边的 ` ** 或 __ ，则直接跳过，交给 md 处理
 
-          const m = before.match(/(^|[^\\])(`+|__|\*\*)/)
-          if (m) {
-            // If there is an unclosed code/emphasis marker before the
-            // potential math opener, don't abort the whole inline rule
-            // (which can cause the parser to repeatedly re-run this rule
-            // leading to a loop). Instead skip this opener and continue
-            // scanning after it so other rules can handle the content.
-            searchPos = index + open.length
-            continue
-          }
+          // const m = before.match(/(^|[^\\])(`+|__|\*\*)/)
+          // if (m) {
+          //   // If there is an unclosed code/emphasis marker before the
+          //   // potential math opener, don't abort the whole inline rule
+          //   // (which can cause the parser to repeatedly re-run this rule
+          //   // leading to a loop). Instead skip this opener and continue
+          //   // scanning after it so other rules can handle the content.
+          //   searchPos = index + open.length
+          //   continue
+          // }
 
           // If we already consumed some content, avoid duplicating the prefix
           // Only push the portion from previous search position
