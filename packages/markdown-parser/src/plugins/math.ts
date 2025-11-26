@@ -365,7 +365,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
           const m = before.match(/(^|[^\\])(`+|__|\*\*)/)
           if (m) {
-            return false
+            // If there is an unclosed code/emphasis marker before the
+            // potential math opener, don't abort the whole inline rule
+            // (which can cause the parser to repeatedly re-run this rule
+            // leading to a loop). Instead skip this opener and continue
+            // scanning after it so other rules can handle the content.
+            searchPos = index + open.length
+            continue
           }
 
           // If we already consumed some content, avoid duplicating the prefix
