@@ -531,7 +531,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         }
       }
       // 这里可能 ai 返回的格式有问题 $$ 跟在文本的最后，而不是单独一行，此时匹配是否有下一行，把它当作块级公式处理
-      else if (lineText.endsWith(open) && startLine + 1 < endLine) {
+      else if (lineText.endsWith(open) && !lineText.slice(0, lineText.length - open.length).trim().includes(open) && startLine + 1 < endLine) {
         // lineText 要变成下一行的内容，把之前lineText的内容当作普通文本处理
         s.push('text', '', 0).content = lineText.slice(0, lineText.length - open.length)
         const nextLineStartPos = s.bMarks[startLine + 1] + s.tShift[startLine + 1]
