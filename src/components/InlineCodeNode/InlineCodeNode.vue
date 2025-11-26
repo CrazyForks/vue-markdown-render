@@ -10,6 +10,6 @@ defineProps<{
 
 <template>
   <code
-    class="inline px-1 py-0.5 rounded text-xs font-mono bg-secondary whitespace-normal break-words max-w-full before:content-[''] after:content-['']"
+    class="inline text-[85%] px-1 py-0.5 rounded font-mono bg-secondary whitespace-normal break-words max-w-full before:content-[''] after:content-['']"
   >{{ node.code }}</code>
 </template>

@@ -51,25 +51,9 @@ export function parseInlineTokens(
   const result: ParsedNode[] = []
   let currentTextNode: TextNode | null = null
 
-  // Fallback: markdown-it sometimes mis-tokenizes code_inline around CJK text
-  // yielding code_inline nodes that contain non-ASCII prose (e.g. "方法会根据").
-  // When detected, prefer re-parsing from the original raw string to rebuild
-  // inline_code spans and basic strong emphasis segments in a stable way.
-  // eslint-disable-next-line no-control-regex
-  const hasSuspiciousCodeInline = tokens.some(t => t.type === 'code_inline' && /[^\x00-\x7F]/.test(String(t.content ?? '')))
-  const hasBackticksInRaw = typeof raw === 'string' && /`/.test(raw)
-  const hasMathInlineUsingBackticks = tokens.some(t => t.type === 'math_inline' && /`/.test(String((t as any).raw ?? t.content ?? '')))
-  if (hasBackticksInRaw && (hasSuspiciousCodeInline || hasMathInlineUsingBackticks)) {
-    return parseFromRawWithCodeAndStrong(String(raw ?? ''))
-  }
-
   let i = 0
   // Default to strict matching for strong unless caller explicitly sets false
   const requireClosingStrong = options?.requireClosingStrong
-  // Note: strong-token normalization and list-item normalization are
-  // applied during markdown-it parsing via core rules (plugins that
-  // run after 'inline'). Inline parsers should receive normalized
-  // children and only focus on parsing.
 
   // Helpers to manage text node merging and pushing parsed nodes
   function resetCurrentTextNode() {
@@ -965,90 +949,4 @@ function normalizeSingleLinkResult(raw: string | undefined, nodes: ParsedNode[])
   if (preferred)
     return [preferred]
   return nodes
-}
-
-// Minimal, robust fallback parser: split raw by backticks into
-// text and inline_code, and parse simple **strong** inside text.
-function parseFromRawWithCodeAndStrong(raw: string): ParsedNode[] {
-  // Tokenize raw handling two constructs: backticks `...` and strong **...**
-  // Build a small AST allowing code inside strong and vice versa.
-  const root: ParsedNode[] = []
-  const stack: Array<{ type: 'root' | 'strong', children: ParsedNode[] }> = [{ type: 'root', children: root }]
-  let i = 0
-
-  function cur() {
-    return stack[stack.length - 1].children
-  }
-
-  function pushText(s: string) {
-    if (!s)
-      return
-    const last = cur()[cur().length - 1]
-    if (last && last.type === 'text') {
-      (last as any).content += s
-      ; (last as any).raw += s
-    }
-    else {
-      cur().push({ type: 'text', content: s, raw: s } as ParsedNode)
-    }
-  }
-
-  while (i < raw.length) {
-    // strong open/close (only when both ** are present)
-    if (raw[i] === '*' && raw[i + 1] === '*') {
-      // If already inside strong, close it; otherwise open new strong
-      const isClosing = stack.length > 1 && stack[stack.length - 1].type === 'strong'
-      i += 2
-      if (isClosing) {
-        const nodeChildren = stack.pop()!.children
-        cur().push({ type: 'strong', children: nodeChildren, raw: `**${nodeChildren.map(n => (n as any).raw ?? '').join('')}**` } as ParsedNode)
-      }
-      else {
-        stack.push({ type: 'strong', children: [] })
-      }
-      continue
-    }
-
-    // inline code with variable-length backtick runs
-    if (raw[i] === '`') {
-      // count opening run
-      let runLen = 1
-      let k = i + 1
-      while (k < raw.length && raw[k] === '`') {
-        runLen++
-        k++
-      }
-      const closingSeq = '`'.repeat(runLen)
-      const codeStart = i + runLen
-      const close = raw.indexOf(closingSeq, codeStart)
-      if (close === -1) {
-        // no closing run; treat the rest as text
-        pushText(raw.slice(i))
-        break
-      }
-      const code = raw.slice(codeStart, close)
-      cur().push({ type: 'inline_code', code, raw: code } as ParsedNode)
-      i = close + runLen
-      continue
-    }
-
-    // regular text: read until next special
-    let next = raw.indexOf('`', i)
-    const nextStrong = raw.indexOf('**', i)
-    if (nextStrong !== -1 && (next === -1 || nextStrong < next))
-      next = nextStrong
-    if (next === -1)
-      next = raw.length
-    pushText(raw.slice(i, next))
-    i = next
-  }
-
-  // If there are unclosed strongs, degrade them into plain text with ** markers
-  while (stack.length > 1) {
-    const dangling = stack.pop()!
-    const content = dangling.children.map(n => (n as any).raw ?? (n as any).content ?? '').join('')
-    pushText(`**${content}`)
-  }
-
-  return root
 }
