@@ -50,6 +50,7 @@ export default defineConfig({
         'mermaid',
         'vue-i18n',
         'katex',
+        'katex/contrib/mhchem',
         // syntax highlighting / editor libs that previously caused
         // many language/theme chunks to be emitted
         'shiki',

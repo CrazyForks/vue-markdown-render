@@ -20,6 +20,8 @@ export const KATEX_COMMANDS = [
   'cdots',
   'quad',
   'in',
+  'ce',
+  'pu',
   'end',
   'infty',
   'perp',

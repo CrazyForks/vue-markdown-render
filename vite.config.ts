@@ -83,6 +83,7 @@ export default defineConfig(({ mode }) => {
             'vue',
             'vue-i18n',
             'katex',
+            'katex/contrib/mhchem',
             'stream-monaco',
             'stream-markdown',
             'monaco-editor',

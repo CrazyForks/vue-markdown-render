@@ -13,6 +13,6 @@
     "isolatedModules": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "src/shims-vue.d.ts"],
+  "include": ["src/**/*.ts", "src/**/*.vue", "src/shims-vue.d.ts", "src/types/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

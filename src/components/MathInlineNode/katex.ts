@@ -7,6 +7,7 @@ export async function getKatex() {
     return null
   try {
     katex = await import('katex')
+    await import('katex/contrib/mhchem')
     return katex
   }
   catch {
