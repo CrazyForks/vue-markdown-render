@@ -25,13 +25,22 @@ export function applyFixStrongTokens(md: MarkdownIt) {
 }
 
 function fixStrongTokens(tokens: MarkdownToken[]): MarkdownToken[] {
-  const fixedTokens = [...tokens]
-  if (tokens.length < 4)
-    return fixedTokens
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]
+    if (t.type === 'strong_open' || t.type === 'strong_close') {
+      const markup = String(t.markup ?? '')
+      if (markup !== '**') {
+        t.type = 'text'
+        t.content = markup
+        t.markup = ''
+      }
+    }
+  }
+  if (tokens.length < 5)
+    return tokens
   const i = tokens.length - 4
   const token = tokens[i]
-  if (!token)
-    return fixedTokens
+  const fixedTokens = [...tokens]
   const nextToken = tokens[i + 1]
   const tokenContent = String(token.content ?? '')
   if (token.type === 'link_open' && tokens[i - 1]?.type === 'em_open' && tokens[i - 2]?.type === 'text' && tokens[i - 2].content?.endsWith('*')) {

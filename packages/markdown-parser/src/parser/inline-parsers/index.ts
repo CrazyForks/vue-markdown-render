@@ -128,9 +128,9 @@ export function parseInlineTokens(
       }
 
       const { node } = parseStrongToken([
-        { type: 'strong_open', tag: 'strong', content: '', markup: '*', info: '', meta: null },
+        { type: 'strong_open', tag: 'strong', content: '', markup: '**', info: '', meta: null },
         { type: 'text', tag: '', content: inner, markup: '', info: '', meta: null },
-        { type: 'strong_close', tag: 'strong', content: '', markup: '*', info: '', meta: null },
+        { type: 'strong_close', tag: 'strong', content: '', markup: '**', info: '', meta: null },
       ], 0, raw, options as any)
 
       resetCurrentTextNode()

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
-import StrongNode from '.'
 import EmojiNode from '../EmojiNode'
 import EmphasisNode from '../EmphasisNode'
 import FootnoteReferenceNode from '../FootnoteReferenceNode'
@@ -46,7 +45,6 @@ const nodeComponents = {
   footnote_reference: FootnoteReferenceNode,
   math_inline: MathInlineNodeAsync,
   reference: ReferenceNode,
-  strong: StrongNode,
   // 添加其他内联元素组件
   ...getCustomNodeComponents(props.customId),
 }
