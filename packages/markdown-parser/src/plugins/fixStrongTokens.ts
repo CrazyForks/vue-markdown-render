@@ -25,15 +25,97 @@ export function applyFixStrongTokens(md: MarkdownIt) {
 }
 
 function fixStrongTokens(tokens: MarkdownToken[]): MarkdownToken[] {
+  let strongIndex = 0
+  const cleansStrong = new Set<number>()
+  const cleansEm = new Set<number>()
+  let emIndex = 0
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i]
-    if (t.type === 'strong_open' || t.type === 'strong_close') {
+    const type = t.type
+    if (type === 'strong_open') {
+      strongIndex++
       const markup = String(t.markup ?? '')
-      if (markup !== '**') {
-        t.type = 'text'
-        t.content = markup
-        t.markup = ''
+      let j = i - 1
+      while (j >= 0 && tokens[j].type === 'text' && tokens[j].content === '') {
+        j--
       }
+      const preToken = tokens[j]
+      let k = i + 1
+      while (k < tokens.length && tokens[k].type === 'text' && tokens[k].content === '') {
+        k++
+      }
+      const postToken = tokens[k]
+
+      if (markup === '__' && (preToken?.content?.endsWith('_') || postToken?.content?.startsWith('_') || postToken?.markup?.includes('_'))) {
+        t.type = 'text'
+        t.tag = ''
+        t.content = markup
+        t.raw = markup
+        t.markup = ''
+        t.attrs = null
+        t.map = null
+        t.info = ''
+        t.meta = null
+        cleansStrong.add(strongIndex)
+      }
+    }
+    else if (type === 'strong_close') {
+      if (cleansStrong.has(strongIndex) && t.markup === '__') {
+        t.type = 'text'
+        t.content = t.markup
+        t.raw = String(t.markup ?? '')
+        t.tag = ''
+        t.markup = ''
+        t.attrs = null
+        t.map = null
+        t.info = ''
+        t.meta = null
+      }
+      strongIndex--
+      if (strongIndex < 0)
+        strongIndex = 0
+    }
+    else if (type === 'em_open') {
+      emIndex++
+      const markup = String(t.markup ?? '')
+      let j = i - 1
+      while (j >= 0 && tokens[j].type === 'text' && tokens[j].content === '') {
+        j--
+      }
+      const preToken = tokens[j]
+      let k = i + 1
+      while (k < tokens.length && tokens[k].type === 'text' && tokens[k].content === '') {
+        k++
+      }
+      const postToken = tokens[k]
+      if (markup === '_' && (preToken?.content?.endsWith('_') || postToken?.content?.startsWith('_') || postToken?.markup?.includes('_'))) {
+        t.type = 'text'
+        t.tag = ''
+        t.content = markup
+        t.raw = markup
+        t.markup = ''
+        t.attrs = null
+        t.map = null
+        t.info = ''
+        t.meta = null
+        cleansEm.add(emIndex)
+      }
+    }
+    else if (type === 'em_close') {
+      if (cleansEm.has(emIndex) && t.markup === '_') {
+        t.type = 'text'
+        t.content = t.markup
+        t.raw = String(t.markup ?? '')
+        t.tag = ''
+        t.markup = ''
+        t.attrs = null
+        t.map = null
+        t.info = ''
+        t.meta = null
+      }
+      emIndex--
+      if (emIndex < 0)
+        emIndex = 0
     }
   }
   if (tokens.length < 5)
@@ -57,6 +139,7 @@ function fixStrongTokens(tokens: MarkdownToken[]): MarkdownToken[] {
         markup: '**',
         info: '',
         meta: null,
+        raw: '',
       },
       tokens[i],
       tokens[i + 1],
@@ -71,6 +154,7 @@ function fixStrongTokens(tokens: MarkdownToken[]): MarkdownToken[] {
         markup: '**',
         info: '',
         meta: null,
+        raw: '',
       },
     ]
     if (textContent) {
@@ -97,10 +181,12 @@ function fixStrongTokens(tokens: MarkdownToken[]): MarkdownToken[] {
         markup: '**',
         info: '',
         meta: null,
+        raw: '',
       },
       {
         type: 'text',
         content: _nextToken?.type === 'text' ? String(_nextToken.content ?? '') : '',
+        raw: _nextToken?.type === 'text' ? String(_nextToken.content ?? '') : '',
       },
       {
         type: 'strong_close',
@@ -112,6 +198,7 @@ function fixStrongTokens(tokens: MarkdownToken[]): MarkdownToken[] {
         markup: '**',
         info: '',
         meta: null,
+        raw: '',
       },
     ] as MarkdownToken[]
     const beforeText = tokenContent.slice(0, -1)

@@ -165,12 +165,20 @@ export function parseInlineTokens(
           result.push(currentTextNode)
         }
       }
-      const emphasisContent = content.slice(idx)
+      const closeIndex = content.indexOf('*', idx + 1)
+      const emphasisContent = content.slice(idx, closeIndex > -1 ? closeIndex + 1 : undefined)
       const { node } = parseEmphasisToken([
         { type: 'em_open', tag: 'em', content: '', markup: '*', info: '', meta: null },
         { type: 'text', tag: '', content: emphasisContent.replace(/\*/g, ''), markup: '', info: '', meta: null },
         { type: 'em_close', tag: 'em', content: '', markup: '*', info: '', meta: null },
       ], 0, options as any)
+
+      if (closeIndex !== -1 && closeIndex < content.length - 1) {
+        const afterContent = content.slice(closeIndex + 1)
+        if (afterContent) {
+          handleToken({ type: 'text', content: afterContent, raw: afterContent } as unknown as MarkdownToken)
+        }
+      }
       resetCurrentTextNode()
       pushNode(node)
       i++
