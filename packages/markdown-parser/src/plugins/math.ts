@@ -20,6 +20,10 @@ export const KATEX_COMMANDS = [
   'cdots',
   'quad',
   'in',
+  'displaystyle',
+  'int_',
+  'lim',
+  'lim_',
   'ce',
   'pu',
   'end',
@@ -32,7 +36,6 @@ export const KATEX_COMMANDS = [
   'leftarrow',
   'math',
   'mathrm',
-  'mathbf',
   'mathit',
   'mathbb',
   'mathcal',
@@ -44,8 +47,8 @@ export const KATEX_COMMANDS = [
   'epsilon',
   'lambda',
   'sum',
+  'sum_',
   'prod',
-  'int',
   'sqrt',
   'fbox',
   'boxed',
@@ -67,11 +70,18 @@ export const KATEX_COMMANDS = [
   'log',
   'ln',
   'exp',
-  'lim',
   'frac',
   'text',
   'left',
   'right',
+]
+
+// 允许不含空格直接跟下面的公式
+const ANY_COMMANDS = [
+  'cdot',
+  'mathbf{',
+  'partial',
+  'mu_{',
 ]
 
 // Precompute escaped KATEX commands and default regex used by
@@ -85,6 +95,7 @@ export const ESCAPED_KATEX_COMMANDS = KATEX_COMMANDS
   .map(c => c.replace(/[.*+?^${}()|[\\]\\\]/g, '\\$&'))
   .join('|')
 const CONTROL_CHARS_CLASS = '[\t\r\b\f\v]'
+export const ESCAPED_MKATWX_COMMANDS = new RegExp(`([^\\\\])(${ANY_COMMANDS.map(c => c).join('|')})+`, 'g')
 
 // Precompiled helpers reused by normalization
 const SPAN_CURLY_RE = /span\{([^}]+)\}/
@@ -207,6 +218,10 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
 
   // If the string ends with a single backslash (no trailing newline), double it.
   result = result.replace(ENDING_SINGLE_BACKSLASH_RE, '$1\\\\')
+  // 将 \n\w+ 转义 \\n\w+
+  // result = result.replace(/ \n(\w)/,' \\n$1')
+  result = result.replace(ESCAPED_MKATWX_COMMANDS, '$1\\$2')
+
   return result
 }
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
@@ -286,7 +301,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         // endIndex 需要找到与 open 对应的 close
         // 不能简单地用 indexOf 找到第一个 close — 需要处理嵌套与转义字符
         const endIdx = findMatchingClose(src, index + open.length, open, close)
-
         if (endIdx === -1) {
           // no matching close for this opener; skip forward
           const content = src.slice(index + open.length)

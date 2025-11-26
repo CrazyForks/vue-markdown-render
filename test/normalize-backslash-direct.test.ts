@@ -56,4 +56,12 @@ describe('normalizeStandaloneBackslashT direct tests', () => {
     const out = normalizeStandaloneBackslashT('operatorname{span}{\boldsymbol{alpha}}')
     expect(out).toBe('\\operatorname{span}\\{\\boldsymbol{\\alpha}\\}')
   })
+
+  it('\n', () => {
+    const out = normalizeStandaloneBackslashT('\displaystyle \nabla\cdot\mathbf{E}= \frac{\rho}{\varepsilon_{0}}')
+    expect(out).toMatchInlineSnapshot(`
+      "\\displaystyle 
+      abla\\mathbf{E}= \\frac{\\rho}{\\varepsilon_{0}}"
+    `)
+  })
 })

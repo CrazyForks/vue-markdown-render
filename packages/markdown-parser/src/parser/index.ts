@@ -23,7 +23,8 @@ export function parseMarkdownToStructure(
   options: ParseOptions = {},
 ): ParsedNode[] {
   // Ensure markdown is a string — guard against null/undefined inputs from callers
-  let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\right/g, '$1\\right')
+  // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
+  let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
   if (safeMarkdown.endsWith('- *')) {
     // 放置markdown 解析 - * 会被处理成多个 ul >li 嵌套列表
     safeMarkdown = safeMarkdown.replace(/- \*$/, '- \\*')
@@ -39,7 +40,6 @@ export function parseMarkdownToStructure(
 
   // Get tokens from markdown-it
   const tokens = md.parse(safeMarkdown, {})
-
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
     return []
