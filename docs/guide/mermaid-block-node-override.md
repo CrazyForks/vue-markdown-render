@@ -5,6 +5,7 @@ If you want to completely replace the `mermaid` renderer used by `MarkdownRender
 Example:
 
 ```ts
+import { MermaidBlockNode, setCustomComponents } from 'markstream-vue'
 import { h } from 'vue'
 
 setCustomComponents('playground-demo', {

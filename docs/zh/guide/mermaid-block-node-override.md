@@ -5,6 +5,7 @@
 示例：
 
 ```ts
+import { MermaidBlockNode, setCustomComponents } from 'markstream-vue'
 import { h } from 'vue'
 
 setCustomComponents('playground-demo', {
