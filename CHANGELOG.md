@@ -1,0 +1,1498 @@
+## [0.0.2-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.2...v0.0.2-beta.3) (2025-11-26)
+
+
+### Bug Fixes
+
+* enhance markdown parsing and math command recognition ([25d66f3](https://github.com/Simon-He95/markstream-vue/commit/25d66f30c3cce85286fdddfa4e4bdf9e31ef32d8))
+* improve handling of nodes and height estimation in NodeRenderer ([f6de5bd](https://github.com/Simon-He95/markstream-vue/commit/f6de5bda4cdb3a25e2e4fc19e1617d02847b1ae1))
+
+
+
+## [0.0.2-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.1...v0.0.2-beta.2) (2025-11-26)
+
+
+### Bug Fixes
+
+* update markstream-vue version to 0.0.2-beta.0 in pnpm-lock.yaml ([a8a2db5](https://github.com/Simon-He95/markstream-vue/commit/a8a2db509e4997488efe3fbf16636d189447a423))
+
+
+
+## [0.0.2-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.0...v0.0.2-beta.1) (2025-11-26)
+
+
+### Bug Fixes
+
+* render stack ([b232b54](https://github.com/Simon-He95/markstream-vue/commit/b232b54c0f18a55ad75b03f0e18f4f39d3499e68))
+
+
+
+## [0.0.2-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.63-beta.4...v0.0.2-beta.0) (2025-11-26)
+
+
+### Bug Fixes
+
+* Component StrongNode will call its own but dose not import self ([77e2076](https://github.com/Simon-He95/markstream-vue/commit/77e2076186c29a66be7d8d6e045f80a1c4115436))
+* enhance strong and emphasis token handling in parser ([dfb19de](https://github.com/Simon-He95/markstream-vue/commit/dfb19de48c0e825b3e2c8ac5ec6151ddc357926e))
+* handle loading state in link tokens and improve math token parsing ([4be4f1f](https://github.com/Simon-He95/markstream-vue/commit/4be4f1f11712875d3b4836f580642acd600c1900))
+* improve math block detection logic for inline formulas ([31b881f](https://github.com/Simon-He95/markstream-vue/commit/31b881f44ee64c6bf76717cb22f7e33b093989fe))
+* parser strong wrong ([310f4ef](https://github.com/Simon-He95/markstream-vue/commit/310f4efb6e0d999dc659dac14e2852b48c7085be))
+* some link render ([185b25f](https://github.com/Simon-He95/markstream-vue/commit/185b25fc636535fd94aa2e98a35c97abf5e0a324))
+* update dependencies for vitest and vue-i18n to latest versions ([dfaae55](https://github.com/Simon-He95/markstream-vue/commit/dfaae552b9f7380c83d2172aa34442fa0e5e7d88))
+* update markdown-it-ts to version 0.0.2-beta.7 in package.json and pnpm-lock.yaml ([dbef4d6](https://github.com/Simon-He95/markstream-vue/commit/dbef4d694f343b76d9938c1efd53870199c5655a))
+
+
+### Features
+
+* support mhchem ([5d12f9b](https://github.com/Simon-He95/markstream-vue/commit/5d12f9ba16aa4e695fce3fe174e2469926a9ff91))
+
+
+
+## [0.0.63-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.63-beta.3...v0.0.63-beta.4) (2025-11-25)
+
+
+### Features
+
+* add legacy builds documentation and improve regex compatibility for older iOS ([425ce44](https://github.com/Simon-He95/markstream-vue/commit/425ce44192343d17a9fd88c51d00dbc96763cee3)), closes [#162](https://github.com/Simon-He95/markstream-vue/issues/162)
+
+
+
+## [0.0.63-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.63-beta.2...v0.0.63-beta.3) (2025-11-25)
+
+
+### Bug Fixes
+
+* improve code formatting for better readability in parser API examples ([9c6ab1e](https://github.com/Simon-He95/markstream-vue/commit/9c6ab1ec71c45f423bea0bbce702f5a618b10a09))
+* refine math parsing logic and improve test assertions for mid-state handling ([cd8a340](https://github.com/Simon-He95/markstream-vue/commit/cd8a34002854b5594c0a00561585bcbba39a2bf0))
+* update InlineCodeNode styles for better responsiveness ([fa262f4](https://github.com/Simon-He95/markstream-vue/commit/fa262f40e00f475b9a43b95e088c725729144e7f))
+
+
+
+## [0.0.63-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.63-beta.0...v0.0.63-beta.2) (2025-11-25)
+
+
+* feat(markdown)!: strict math delimiters, robust inline code parsing; drop plain parentheses as math ([8890aab](https://github.com/Simon-He95/markstream-vue/commit/8890aab22295431eda7a390f7ab1e6ffffb8da89))
+
+
+### Bug Fixes
+
+* **docs:** avoid dead-link build failure by using code span for localhost URL ([f50de00](https://github.com/Simon-He95/markstream-vue/commit/f50de00aa6f5048df1d33d58bdde4808c765005b))
+* enhance code block rendering to support custom components for mermaid and code_block types ([e89d477](https://github.com/Simon-He95/markstream-vue/commit/e89d477ccad59bf91df3691f1ddc7071c80bd4b1))
+* enhance streaming controls and improve content rendering performance ([ef3a3e3](https://github.com/Simon-He95/markstream-vue/commit/ef3a3e39d6e6d00eb4f66f47eb81635ababffbb4))
+* ensure editor creation before updating code in CodeBlockNode ([b78c646](https://github.com/Simon-He95/markstream-vue/commit/b78c6462e8a4c90618c8fcded74790b2e65f2a7d))
+* escape LaTeX syntax in markdown for proper rendering ([eb987d9](https://github.com/Simon-He95/markstream-vue/commit/eb987d949467cb02facff9a6c3cd61484e78a050))
+* i18n in mermaid block ([30036be](https://github.com/Simon-He95/markstream-vue/commit/30036be77ed3e6b6087e99ba18712d99721dd52b))
+* math formula in the Playground examples fixed ([2823a11](https://github.com/Simon-He95/markstream-vue/commit/2823a11cf4359aea435b94c7377ee3b88ed38828))
+* nuxt build ([bbe1cba](https://github.com/Simon-He95/markstream-vue/commit/bbe1cba8d40c8752f1fc38d51f01d311ffdb8edc))
+* remove default value for strictDelimiters in applyMath function ([b55a778](https://github.com/Simon-He95/markstream-vue/commit/b55a77838ddcd03f542b96e6444aa890c732eed0))
+* render error ([e01b9ee](https://github.com/Simon-He95/markstream-vue/commit/e01b9ee6178f35cb30094dd4d1311543799bb248)), closes [#144](https://github.com/Simon-He95/markstream-vue/issues/144) [#151](https://github.com/Simon-He95/markstream-vue/issues/151) [#147](https://github.com/Simon-He95/markstream-vue/issues/147) [#143](https://github.com/Simon-He95/markstream-vue/issues/143)
+* setCustomComponents not work ([120c5f5](https://github.com/Simon-He95/markstream-vue/commit/120c5f58da458fac3d33386d83470930ac6d534c))
+* update dependencies in pnpm-lock.yaml and add markdown-it-ts ([dee3d70](https://github.com/Simon-He95/markstream-vue/commit/dee3d7011722bb98703ea64397bee793ec7fe56c))
+* update node_version matrix to use lts/* for consistency ([fe4fd55](https://github.com/Simon-He95/markstream-vue/commit/fe4fd553cd37276429f69305411ad7d92723d273))
+* update stream-markdown-parser to version 0.0.30 and enhance math-like detection logic ([a3fd3b5](https://github.com/Simon-He95/markstream-vue/commit/a3fd3b5dd2ae406be9c128f8262612003a2f1fcc))
+
+
+### Features
+
+* add @types/markdown-it-emoji to devDependencies ([35cf7de](https://github.com/Simon-He95/markstream-vue/commit/35cf7de08aedf53cd2beff1161e603f345b6dab0))
+* add markdown-it-ts to acknowledgments in documentation ([6425f1a](https://github.com/Simon-He95/markstream-vue/commit/6425f1aac9f81ed4eca7f0f2425bb08efa4a0b28))
+* add strict strong parsing option to inline token parser ([b8790bb](https://github.com/Simon-He95/markstream-vue/commit/b8790bb3564f5c4c9fb4d63a4e80f4d8fd7e4334))
+* add support for markdown-it-emoji plugin and enhance documentation ([a6a7d1f](https://github.com/Simon-He95/markstream-vue/commit/a6a7d1f53d457942b4e764a158a79ca1145aec3e))
+* add vitest setup for markdown-parser tests to reuse global mocks ([491f184](https://github.com/Simon-He95/markstream-vue/commit/491f1842ca11091347eb926f7343d1fe955fbb27))
+* **parser:** robust backticks, literal markup in link labels, scoped link fallback, stricter math-like ([16e25ac](https://github.com/Simon-He95/markstream-vue/commit/16e25aca4e0d5b28c0f44b6f2c018b74e47fd398))
+
+
+### BREAKING CHANGES
+
+* plain ( ... ) is no longer treated as inline math. Use \(...\) or $...$ for inline formulas.
+
+
+
+## [0.0.63-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62...v0.0.63-beta.0) (2025-11-20)
+
+
+### Bug Fixes
+
+* enhance math inline rendering for test environment and update snapshots ([0b82285](https://github.com/Simon-He95/markstream-vue/commit/0b822854b7bc737872b596583d409fd2e7269c2d))
+* enhance math inline rendering for test environment and update snapshots ([ba29393](https://github.com/Simon-He95/markstream-vue/commit/ba2939392d36a800b121a41de3224b5ff7283e28))
+* streamline dts-typecheck workflow and improve async component test environment checks ([da6f179](https://github.com/Simon-He95/markstream-vue/commit/da6f179d3c583d9e072d82ea2fb035a7bf50b7a3))
+* streamline dts-typecheck workflow and improve async component test environment checks ([b7307bb](https://github.com/Simon-He95/markstream-vue/commit/b7307bb1dcd67385e054d4a0bfca8e9f981af04c))
+* **strong-link-parser:** correctly parse strong links ([80a5298](https://github.com/Simon-He95/markstream-vue/commit/80a52989c3e15dd25efca06634c0d5c9a43c80d9))
+* update vue-renderer-markdown to version 0.0.62 and remove deprecated stream-markdown-parser version ([7083852](https://github.com/Simon-He95/markstream-vue/commit/7083852ab859710e5bee9d23d80d028c2379cd7f))
+* update vue-renderer-markdown to version 0.0.62 and remove deprecated stream-markdown-parser version ([2d00e1d](https://github.com/Simon-He95/markstream-vue/commit/2d00e1d97fc1d9cfcfce63612553dfde977590f0))
+
+
+### Features
+
+* centralize and export component prop interfaces for improved type safety and consistency ([f6ad138](https://github.com/Simon-He95/markstream-vue/commit/f6ad138563d7a8eb07ab4d1de0557988efa64c45))
+* centralize and export component prop interfaces for improved type safety and consistency ([653803b](https://github.com/Simon-He95/markstream-vue/commit/653803be813ed8afe017573f129a1878a9b967bc))
+
+
+
+## [0.0.62](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62-beta.9...v0.0.62) (2025-11-20)
+
+
+### Bug Fixes
+
+* add tabindex and aria-label for accessibility in image node rendering ([8aabd3c](https://github.com/Simon-He95/markstream-vue/commit/8aabd3c2751113814dd0b74e52462659792871ea))
+* **math:** inline mathBlock ([cb3509d](https://github.com/Simon-He95/markstream-vue/commit/cb3509d4cbd29c6bda875e8add8e3e0f0ae8eff8))
+* optimize math formula handling and improve NodeRenderer dataset change detection ([08aae5c](https://github.com/Simon-He95/markstream-vue/commit/08aae5c6b837ad92d4f64fd4f16425a34a9ef673))
+* update stream-markdown-parser to version 0.0.27 ([8cfcae9](https://github.com/Simon-He95/markstream-vue/commit/8cfcae9453e76f49a09f99108dc0909759400ce1))
+* update stream-markdown-parser version to 0.0.26 in package.json and pnpm-lock.yaml ([44022f8](https://github.com/Simon-He95/markstream-vue/commit/44022f8cb5b8637ca79cc028a96af4dd85452595))
+
+
+### Features
+
+* add code block rendering documentation in English and Chinese ([2a57a3d](https://github.com/Simon-He95/markstream-vue/commit/2a57a3d9656c12368cf14d667a761fbdffbdf671))
+* add documentation for ImageNode custom preview handling and props in English and Chinese ([5c2e833](https://github.com/Simon-He95/markstream-vue/commit/5c2e83320e65e58b110186c3026a7fc6bbfa5469)), closes [#140](https://github.com/Simon-He95/markstream-vue/issues/140)
+* enhance ImageNode component to emit click event for image preview ([af1aebe](https://github.com/Simon-He95/markstream-vue/commit/af1aebe7920c6c8d1496d78d5cf58cdba1d980e9))
+
+
+
+## [0.0.62-beta.9](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62-beta.8...v0.0.62-beta.9) (2025-11-19)
+
+
+
+## [0.0.62-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62-beta.7...v0.0.62-beta.8) (2025-11-19)
+
+
+### Bug Fixes
+
+* improve link parsing and handling of emphasis in markdown ([ec7a314](https://github.com/Simon-He95/markstream-vue/commit/ec7a3141a38e7dd668261c42d5333d43f0182b05))
+
+
+### Features
+
+* enhance mermaid availability handling and user interface interactions ([2519dde](https://github.com/Simon-He95/markstream-vue/commit/2519dde1a7db89732525daa33b1f3157a64601ff))
+
+
+
+## [0.0.62-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62-beta.6...v0.0.62-beta.7) (2025-11-19)
+
+
+### Bug Fixes
+
+* docs github workflow ([401add4](https://github.com/Simon-He95/markstream-vue/commit/401add425705bbd4917d46a6a46059e8ff591b8c))
+
+
+### Features
+
+* add TypeScript declaration checks and improve module imports ([86f4ecc](https://github.com/Simon-He95/markstream-vue/commit/86f4ecc504e1dd53010d863608ed307338f3fbb6))
+
+
+
+## [0.0.62-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62-beta.5...v0.0.62-beta.6) (2025-11-18)
+
+
+### Bug Fixes
+
+* enhance inline parsing for URLs and improve test coverage for trailing text handling ([6f21c09](https://github.com/Simon-He95/markstream-vue/commit/6f21c09cb0911816a25652ae7b2c932e1ac5e575))
+* improve inline token parsing and enhance link parsing tests for better handling of edge cases ([42b6d13](https://github.com/Simon-He95/markstream-vue/commit/42b6d13d07ab20930a21ded1fbf1a97809805dae))
+* update stream-markdown-parser to version 0.0.25 ([fc16f7d](https://github.com/Simon-He95/markstream-vue/commit/fc16f7d2f1341f33b775f2c7cdad68653e477208))
+
+
+
+## [0.0.62-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62-beta.4...v0.0.62-beta.5) (2025-11-18)
+
+
+### Bug Fixes
+
+* update stream-markdown-parser to version 0.0.23 and enhance HTML token handling ([d831a3f](https://github.com/Simon-He95/markstream-vue/commit/d831a3ff9178814aff4a0b96b80cb27acfd8b63d))
+* update version to 0.0.24 and enhance table cell alignment handling ([c859da1](https://github.com/Simon-He95/markstream-vue/commit/c859da1b00a1d0a44cf8921111e7c8c03f546f54)), closes [#127](https://github.com/Simon-He95/markstream-vue/issues/127)
+
+
+
+## [0.0.62-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62-beta.3...v0.0.62-beta.4) (2025-11-18)
+
+
+### Bug Fixes
+
+* change pnpm installation step to use npm instead of action ([791424f](https://github.com/Simon-He95/markstream-vue/commit/791424fd4461ed8f4bb66a71ce81a208fee53fa7))
+* enhance HTML token handling and add tests for link parsing with parentheses ([5904b9e](https://github.com/Simon-He95/markstream-vue/commit/5904b9e0d231405583d208447f93bcbda8e66251))
+* improve link token handling and update link node styles ([761bbab](https://github.com/Simon-He95/markstream-vue/commit/761bbab5a5d718911e183d24dab1d425cd4b87a8))
+* update dependencies to latest versions for improved stability ([302dc92](https://github.com/Simon-He95/markstream-vue/commit/302dc92368eae13cd1ca11cda00381f3e8d60381))
+* update documentation links to use HTTPS ([c0cc5be](https://github.com/Simon-He95/markstream-vue/commit/c0cc5befb7a221854320f4d6761c207bf0e74f42))
+* update Node.js version to 20 and use pnpm action for installation ([23b8606](https://github.com/Simon-He95/markstream-vue/commit/23b8606bd3b1d411c9fb8790f23e02f67108fb7d))
+
+
+
+## [0.0.62-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62-beta.2...v0.0.62-beta.3) (2025-11-17)
+
+
+### Bug Fixes
+
+* correct indentation for pnpm action setup in docs parity workflow ([c1925b9](https://github.com/Simon-He95/markstream-vue/commit/c1925b9d663cff1df02ebb65cc8a165ad0b68e3a))
+* correct indentation for pnpm installation step in docs parity workflow ([98a61cd](https://github.com/Simon-He95/markstream-vue/commit/98a61cd26178edb353247775950bd17758c2af38))
+* intermediate state of link with emphasis ([ac02c11](https://github.com/Simon-He95/markstream-vue/commit/ac02c11cd81ae2cf90aed633aa26841b0e32ae37)), closes [#134](https://github.com/Simon-He95/markstream-vue/issues/134)
+* update stream-markdown-parser version to 0.0.21 in package.json and pnpm-lock.yaml ([46f81fe](https://github.com/Simon-He95/markstream-vue/commit/46f81fec00a15e1082379c7e827be8645d310c4c))
+
+
+### Features
+
+* add scripts to check and sync Chinese documentation placeholders ([4523999](https://github.com/Simon-He95/markstream-vue/commit/45239995a569b5efd78aeb24f2f126ae7ef521ca)), closes [#121](https://github.com/Simon-He95/markstream-vue/issues/121)
+* refactor pnpm setup steps in workflows for clarity ([67d90a7](https://github.com/Simon-He95/markstream-vue/commit/67d90a73a66dcf162ae2ba0eb209b56780f06981))
+* reorder pnpm installation step for improved workflow clarity ([9758aba](https://github.com/Simon-He95/markstream-vue/commit/9758aba1dc4438398e897bc0a4b04014eb32c616))
+* replace pnpm setup script with action in workflow files for consistency ([38dfb32](https://github.com/Simon-He95/markstream-vue/commit/38dfb32a291ba89e81276545bb84f6d0a5d09251))
+* update Chinese README and documentation ([8bc4d00](https://github.com/Simon-He95/markstream-vue/commit/8bc4d0046bf8b71df3e374192bc52fbbc56b34ab))
+* update Netlify deployment configuration and add build scripts for documentation ([4618897](https://github.com/Simon-He95/markstream-vue/commit/461889709a4a4b06d0ff800ac5d1486cb88896af))
+* update pnpm setup steps for consistency across workflows ([24bff32](https://github.com/Simon-He95/markstream-vue/commit/24bff32a5a8cebb88fe69602a05c724d6f9605c0))
+
+
+
+## [0.0.62-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62-beta.1...v0.0.62-beta.2) (2025-11-14)
+
+
+### Bug Fixes
+
+* **strong-link:** parse wrong ([137842b](https://github.com/Simon-He95/markstream-vue/commit/137842bf53121bc3b371e0057deda5485c9fc8b5))
+
+
+
+## [0.0.62-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.62-beta.0...v0.0.62-beta.1) (2025-11-13)
+
+
+### Bug Fixes
+
+* adjust indentation for NodeRenderer components in multiple nodes ([c2cd3ac](https://github.com/Simon-He95/markstream-vue/commit/c2cd3ac3ef5dcc9a629630742b709a7edd9c8ce5))
+* missing typewriter property passing ([a02229c](https://github.com/Simon-He95/markstream-vue/commit/a02229c6c6b494ab42d54a0d9af1546940c8689d))
+
+
+
+## [0.0.62-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.61-beta.9...v0.0.62-beta.0) (2025-11-12)
+
+
+### Bug Fixes
+
+* improve layout and overflow handling in test.vue for better user experience ([005f844](https://github.com/Simon-He95/markstream-vue/commit/005f8444d4cc12be761fbf364e36ecbcbfe86df8))
+* remove commented-out tooltip code in README.md for cleaner documentation ([3f17f09](https://github.com/Simon-He95/markstream-vue/commit/3f17f094b4c0eab52ae0381658586f94aa57adaf))
+
+
+### Features
+
+* add typewriter prop to NodeRenderer for controlling enter transition ([a9a8b06](https://github.com/Simon-He95/markstream-vue/commit/a9a8b064050821cfe21c4436f447d72748e75b86))
+
+
+
+## [0.0.61-beta.9](https://github.com/Simon-He95/markstream-vue/compare/v0.0.61-beta.8...v0.0.61-beta.9) (2025-11-10)
+
+
+### Bug Fixes
+
+* update stream-markdown-parser and markdown-it-ts dependencies to latest versions ([48319d8](https://github.com/Simon-He95/markstream-vue/commit/48319d8e006276f0ba360bb2c14b11380da85282))
+
+
+### Features
+
+* add attrs property to HtmlBlockNode and update HtmlBlockNode component to bind attributes ([4501016](https://github.com/Simon-He95/markstream-vue/commit/45010165e94d0bb66b259828f1fde80b790f17ea)), closes [#116](https://github.com/Simon-He95/markstream-vue/issues/116)
+* implement HTML block and inline token fixes with corresponding tests ([0e94ec2](https://github.com/Simon-He95/markstream-vue/commit/0e94ec24cea099d319af6fe310992e4e7d811073))
+
+
+
+## [0.0.61-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.61-beta.7...v0.0.61-beta.8) (2025-11-05)
+
+
+### Bug Fixes
+
+* handle errors during KaTeX rendering in MathBlockNode and MathInlineNode components ([6b5b2db](https://github.com/Simon-He95/markstream-vue/commit/6b5b2dbc5c04a1c7c14fa1b6be97eccca9a455fd))
+* improve share link generation by choosing shorter representation and add tests for payload handling ([840f871](https://github.com/Simon-He95/markstream-vue/commit/840f871e5d0c10bdbf1d32ef3fd4b6913ff7d6ce))
+* remove unnecessary is-dark attributes from admonition and table node wrappers ([5b0ebef](https://github.com/Simon-He95/markstream-vue/commit/5b0ebef43a03c3b2bc68ce983608758445417077))
+* update markdown-it-ts dependency to version 0.0.2-beta.2 ([05db9af](https://github.com/Simon-He95/markstream-vue/commit/05db9af487c96ba00d6fa6065bcdbc1e0223b11e))
+* update stream-markdown-parser dependency to version 0.0.15 ([ccb3142](https://github.com/Simon-He95/markstream-vue/commit/ccb3142e7bfcd744b3ab6bf976f17d3bd8b7624d))
+
+
+### Features
+
+* add dark mode support to tooltip and various components with isDark prop ([37fb15e](https://github.com/Simon-He95/markstream-vue/commit/37fb15ebe7b9c1687da81ab6ac99dde8d59cc596))
+* add HtmlBlockNode component and parser for HTML block support ([ee9e4ee](https://github.com/Simon-He95/markstream-vue/commit/ee9e4ee168bbff1132a0452a4a6b4967e0f989c4))
+* add streaming rendering feature with adjustable speed and interval settings ([70c5534](https://github.com/Simon-He95/markstream-vue/commit/70c55348154c47843169e046933ef898b39de240))
+* migrate to markdown-it-ts for improved TypeScript support and enhanced token handling ([296cbdc](https://github.com/Simon-He95/markstream-vue/commit/296cbdc4092170301b4b6e4b3048a460202f9f2a)), closes [#106](https://github.com/Simon-He95/markstream-vue/issues/106)
+
+
+
+## [0.0.61-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.61-beta.6...v0.0.61-beta.7) (2025-11-02)
+
+
+### Bug Fixes
+
+* update stream-markdown-parser to version 0.0.14 and add inline HTML parsing support ([281f538](https://github.com/Simon-He95/markstream-vue/commit/281f538e814bfdbd3c586c2c5192aa16ef7d4c04))
+
+
+
+## [0.0.61-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.61-beta.5...v0.0.61-beta.6) (2025-11-01)
+
+
+### Bug Fixes
+
+* remove unnecessary class from preview container in test page ([ed15dcb](https://github.com/Simon-He95/markstream-vue/commit/ed15dcbd2f82947f3b4dcc9374e3e5ceee7e99d2))
+* update stream-markdown-parser to version 0.0.13 and enhance autolink detection with new tests ([1349611](https://github.com/Simon-He95/markstream-vue/commit/13496113e7a2235d9b36a3168af42de2981876dd))
+
+
+
+## [0.0.61-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.61-beta.4...v0.0.61-beta.5) (2025-10-31)
+
+
+### Bug Fixes
+
+* remove unused function for building issue URL from link ([59d5a19](https://github.com/Simon-He95/markstream-vue/commit/59d5a19d1883764af3d520932666efc5c50966c4))
+* update stream-markdown-parser version to 0.0.12 and improve list item rendering styles ([c05df9a](https://github.com/Simon-He95/markstream-vue/commit/c05df9a6a4169416ce10a3515955e3641bc1daee))
+
+
+### Features
+
+* add navigation to test page and improve issue link generation in test component ([cf66c3b](https://github.com/Simon-He95/markstream-vue/commit/cf66c3b7e5378c98568445b1322502bad2fa8b81))
+
+
+
+## [0.0.61-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.61-beta.3...v0.0.61-beta.4) (2025-10-31)
+
+
+### Bug Fixes
+
+* update import path for markdown parser in NodeRenderer component ([e4757b6](https://github.com/Simon-He95/markstream-vue/commit/e4757b6ecc0eaacaf915aa61ec83349187874297))
+
+
+
+## [0.0.61-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.61-beta.2...v0.0.61-beta.3) (2025-10-31)
+
+
+### Features
+
+* add Markdown input and live preview component ([d19fe9b](https://github.com/Simon-He95/markstream-vue/commit/d19fe9b4a2cfab1b4c7c5598a0e79d65ac52e29f))
+* update math parsing and rendering capabilities, enhance bug report template, and improve share link functionality ([11ce18b](https://github.com/Simon-He95/markstream-vue/commit/11ce18bd4f4c6daeebbb393c15dbc52c39a9b4f2))
+
+
+
+## [0.0.61-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.61-beta.1...v0.0.61-beta.2) (2025-10-30)
+
+
+
+## [0.0.61-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.61-beta.0...v0.0.61-beta.1) (2025-10-29)
+
+
+### Features
+
+* **link-node:** add tooltip support and aria-label for accessibility ([4dea770](https://github.com/Simon-He95/markstream-vue/commit/4dea77086e82108a27a59a66ed01f5051873a9ca))
+* **markdown-parser:** implement link and list item normalization plugins; update version to 0.0.9 ([8423a86](https://github.com/Simon-He95/markstream-vue/commit/8423a86509d7697f16555424a989102864c9b00b))
+
+
+
+## [0.0.61-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.60-beta.5...v0.0.61-beta.0) (2025-10-27)
+
+
+### Bug Fixes
+
+* complex inline_code with strong ([11e7406](https://github.com/Simon-He95/markstream-vue/commit/11e74061405a9285f97961390eaf752c93562372))
+* improve error handling in parse probes and midstate utilities ([af36aed](https://github.com/Simon-He95/markstream-vue/commit/af36aedb88d2bd41ed080e085678ae032244eae0))
+* **inline-parsers:**  checkbox_input ([2bf674d](https://github.com/Simon-He95/markstream-vue/commit/2bf674de57dd24b13e3b3f8a24c0505ba1d98326))
+* **list_item:** The text inside the element is not centered ([14d39b4](https://github.com/Simon-He95/markstream-vue/commit/14d39b4ab09173a4cc04f724d56c52a602cf0c72))
+* **list:** prevent unintended li value attribute ([b00ea58](https://github.com/Simon-He95/markstream-vue/commit/b00ea58f516710d1be834053c1f169b3e6a2c500))
+
+
+### Features
+
+* add codeBlockStream prop for controlling streaming behavior of code blocks ([3ac4629](https://github.com/Simon-He95/markstream-vue/commit/3ac4629419f095e7588308bdb1c4fda882aed47e))
+
+
+
+## [0.0.60-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.60-beta.4...v0.0.60-beta.5) (2025-10-24)
+
+
+### Bug Fixes
+
+* dep required shiki ([136a065](https://github.com/Simon-He95/markstream-vue/commit/136a0659b029e16512de11414f6d374f36e914f8)), closes [#97](https://github.com/Simon-He95/markstream-vue/issues/97) [#98](https://github.com/Simon-He95/markstream-vue/issues/98)
+
+
+
+## [0.0.60-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.60-beta.3...v0.0.60-beta.4) (2025-10-24)
+
+
+### Bug Fixes
+
+* enhance link token parsing and update related tests ([5f1ce31](https://github.com/Simon-He95/markstream-vue/commit/5f1ce3198a0f13957b72f2233d992fbce769a794))
+* update stream-markdown-parser to version 0.0.6 ([29ca069](https://github.com/Simon-He95/markstream-vue/commit/29ca06908c75e75b382b2f293a167d403c50d294))
+
+
+
+## [0.0.60-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.60-beta.2...v0.0.60-beta.3) (2025-10-24)
+
+
+### Bug Fixes
+
+* improve link handling in parseInlineTokens function ([c1486f5](https://github.com/Simon-He95/markstream-vue/commit/c1486f58d8b9780bf5844c4bcd920b110ac27767))
+* update stream-markdown-parser dependency to version 0.0.5 ([4ecf899](https://github.com/Simon-He95/markstream-vue/commit/4ecf89990090336f5ca86d23d28948e344f85474))
+
+
+
+## [0.0.60-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.60-beta.1...v0.0.60-beta.2) (2025-10-24)
+
+
+### Bug Fixes
+
+* enhance reference token handling in parseInlineTokens function ([2511a32](https://github.com/Simon-He95/markstream-vue/commit/2511a32829cc9adb038deb40ea72190e535f1af6))
+* update stream-markdown dependency to version 0.0.5 and remove unused language prop in MarkdownCodeBlockNode ([952cac2](https://github.com/Simon-He95/markstream-vue/commit/952cac2cd26edf34e4c630b4b4ea31ee696e04ad))
+
+
+
+## [0.0.60-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.60-beta.0...v0.0.60-beta.1) (2025-10-23)
+
+
+### Bug Fixes
+
+* add author link to markdown content ([d8d0a50](https://github.com/Simon-He95/markstream-vue/commit/d8d0a5055294c6d91b3102e480b2df0dd6a1c001))
+* update version to 0.0.4 and refine regex in fixListItem function ([a9a88fe](https://github.com/Simon-He95/markstream-vue/commit/a9a88fe9babe1c4d38f2f0787f6adf8060fc9c4e))
+
+
+
+## [0.0.60-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.59...v0.0.60-beta.0) (2025-10-23)
+
+
+### Bug Fixes
+
+* enhance link parsing and improve inline token handling in markdown parser ([2ee6be7](https://github.com/Simon-He95/markstream-vue/commit/2ee6be7c33050e6d808de6a40d98484a6d64cfc3))
+* reorder imports in NodeRenderer component for consistency ([b74bf05](https://github.com/Simon-He95/markstream-vue/commit/b74bf05720e9fd1d4ecb14685e86085f88234762))
+* restore monaco-editor dependency and improve loading state handling in MathInlineNode ([955578c](https://github.com/Simon-He95/markstream-vue/commit/955578c74a02694044b95c9b44796e4d54834507))
+* update stream-markdown-parser dependency to version 0.0.3 and adjust imports in NodeRenderer component ([08f0abb](https://github.com/Simon-He95/markstream-vue/commit/08f0abb32aa4292e7c3edb0c7cc458930523a51f))
+* update vite dependency to version 7.1.12 in package.json files ([5e507ab](https://github.com/Simon-He95/markstream-vue/commit/5e507ab19d413816bf4fdd945f8d053f96e2d0b4))
+
+
+
+## [0.0.59](https://github.com/Simon-He95/markstream-vue/compare/v0.0.58-beta.7...v0.0.59) (2025-10-22)
+
+
+### Bug Fixes
+
+* add null checks for optional properties in markdown parser functions ([3b8eb0a](https://github.com/Simon-He95/markstream-vue/commit/3b8eb0a10418cf837dc00268448bb35629c7c99a))
+* comment out example code for MarkdownIt with custom math options ([3dfd856](https://github.com/Simon-He95/markstream-vue/commit/3dfd856f271e8eb90799e06f55e3df699129d2ae))
+* **parser:** add validation for link tokens to prevent malformed links ([1c1bb33](https://github.com/Simon-He95/markstream-vue/commit/1c1bb33a9141e8406d05e3fcab4909ef12f417de))
+* restore monaco-editor dependency in package.json and pnpm-lock.yaml ([888791d](https://github.com/Simon-He95/markstream-vue/commit/888791dfca10484c6a685c7cd71c0cead151b13f))
+* **tableNode:** adjust class order for table node to improve styling ([faa9f3c](https://github.com/Simon-He95/markstream-vue/commit/faa9f3c51e6ac3fb9b5284d4b9712a51a577ca5d))
+* **tableNode:** lint ([6cb3830](https://github.com/Simon-He95/markstream-vue/commit/6cb38306628aaf70cfaf920182583691f98547b9))
+* **tableNode:** remove body td pl-0 ([7996da2](https://github.com/Simon-He95/markstream-vue/commit/7996da2fcb4d0f2cea6338e97280b218033a813c))
+* update import path for getMarkdown to use stream-markdown-parser ([5358b8e](https://github.com/Simon-He95/markstream-vue/commit/5358b8e5a242e18107596d651c8fb247e449f92e))
+* update stream-markdown-parser dependency to specific version in package.json and pnpm-lock.yaml ([4c51c9a](https://github.com/Simon-He95/markstream-vue/commit/4c51c9af4bde2e6d12b04d7157f09e058af5d649))
+* update version and main entry point in package.json ([a5dc3c2](https://github.com/Simon-He95/markstream-vue/commit/a5dc3c225a70c42fd49f4a47534eb189d5d12353))
+* update Vite configuration and TypeScript settings for improved type handling and asset resolution ([b516d12](https://github.com/Simon-He95/markstream-vue/commit/b516d12376f7ebd1535ad556c273926a12444b81))
+
+
+### Features
+
+* add stream-markdown dependency and update documentation for MarkdownCodeBlockNode usage ([c9bcb4a](https://github.com/Simon-He95/markstream-vue/commit/c9bcb4a7d166a310cc7d788886c39ba044edace2))
+* implement factory function for MarkdownIt with math and container support ([3e0a894](https://github.com/Simon-He95/markstream-vue/commit/3e0a894d58c1925e9bd31af784c1b2adda493bcd))
+* **tableNode:** remove useless pl-0 ([8d1237f](https://github.com/Simon-He95/markstream-vue/commit/8d1237f1a5e6b6c2a1e1ec7872c6e693dcda132d))
+* update pnpm workspace and refactor imports for stream-markdown-parser ([c860400](https://github.com/Simon-He95/markstream-vue/commit/c86040065d47e29470c883cb07cb75e10aa154d3))
+
+
+
+## [0.0.58-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.58-beta.6...v0.0.58-beta.7) (2025-10-21)
+
+
+### Features
+
+* export CodeBlockNode monaco component for improved integration ([9126c84](https://github.com/Simon-He95/markstream-vue/commit/9126c84c5b5b77ea4a0a4ed69f4307e3bfef2d57))
+
+
+
+## [0.0.58-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.58-beta.5...v0.0.58-beta.6) (2025-10-21)
+
+
+### Features
+
+* implement link token parsing and enhance inline token processing ([72344ee](https://github.com/Simon-He95/markstream-vue/commit/72344ee93066bbae1580be241f82d6b1064135b1))
+* replace vue-use-monaco with stream-monaco for Monaco Editor integration ([b87d1bf](https://github.com/Simon-He95/markstream-vue/commit/b87d1bf9116324ff174f2c58ee8fc2f8b94c8649))
+
+
+
+## [0.0.58-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.58-beta.4...v0.0.58-beta.5) (2025-10-21)
+
+
+### Bug Fixes
+
+* improve loading state handling in MathInlineNode rendering ([06312c5](https://github.com/Simon-He95/markstream-vue/commit/06312c55435c935cdb55a28c7cf41cdd3f61b052))
+
+
+### Features
+
+* add loading state management to MathBlockNode and MathInlineNode for improved rendering feedback ([012cbb9](https://github.com/Simon-He95/markstream-vue/commit/012cbb989d33f5785c1a2f709a5c11c8884ca9ac))
+* enhance MathBlockNode and MathInlineNode for improved loading state and worker management ([62197f3](https://github.com/Simon-He95/markstream-vue/commit/62197f37f65deab5eb409989ba4e440c89fd3c28))
+
+
+
+## [0.0.58-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.58-beta.3...v0.0.58-beta.4) (2025-10-20)
+
+
+### Features
+
+* add configurable timeouts for parsing and rendering in MermaidBlockNode and improve error handling in worker calls ([d42ea75](https://github.com/Simon-He95/markstream-vue/commit/d42ea75f98a201bb918ef599f49b3381fa0c8968))
+* add viewportPriority prop to optimize rendering for offscreen nodes in Markdown rendering ([681bdcb](https://github.com/Simon-He95/markstream-vue/commit/681bdcb3e478d0d6ed55447f9e387cdb010ed6e9))
+* enhance MathBlockNode and MathInlineNode to handle busy worker fallback and improve rendering logic ([14d3a95](https://github.com/Simon-He95/markstream-vue/commit/14d3a95a6eae7757bdb308efef2bca18cf2d8f4d))
+
+
+
+## [0.0.58-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.58-beta.2...v0.0.58-beta.3) (2025-10-20)
+
+
+### Bug Fixes
+
+* update regex for loading state detection to correctly match href in parentheses ([0f9b048](https://github.com/Simon-He95/markstream-vue/commit/0f9b048df3e91ce9a83b0864fcbd8dac97512564))
+
+
+### Features
+
+* implement viewport priority rendering for MathBlockNode and MathInlineNode components ([d32f78a](https://github.com/Simon-He95/markstream-vue/commit/d32f78acc49bb4f360a0ab363201e95207bc068a))
+* integrate viewport priority handling in MathBlockNode and MathInlineNode components ([10e6fa3](https://github.com/Simon-He95/markstream-vue/commit/10e6fa33aeac9b8d111dc3743eea93ec08603d38))
+
+
+
+## [0.0.58-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.58-beta.1...v0.0.58-beta.2) (2025-10-20)
+
+
+### Bug Fixes
+
+* disable content-visibility for NodeRenderer in various components to prevent empty placeholders during large document scrolling ([4b28e34](https://github.com/Simon-He95/markstream-vue/commit/4b28e34eade77ced1fcc7b0db9ecc2f1c873155f))
+
+
+
+## [0.0.58-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.58-beta.0...v0.0.58-beta.1) (2025-10-20)
+
+
+
+## [0.0.58-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.57...v0.0.58-beta.0) (2025-10-20)
+
+
+
+## [0.0.57](https://github.com/Simon-He95/markstream-vue/compare/v0.0.57-beta.6...v0.0.57) (2025-10-20)
+
+
+
+## [0.0.57-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.57-beta.5...v0.0.57-beta.6) (2025-10-20)
+
+
+### Features
+
+* enhance SSR support and worker integration, update Vite config to use Terser for minification ([1d4861e](https://github.com/Simon-He95/markstream-vue/commit/1d4861ea23f2433bf17b3ab46cce2f5753321fdf))
+
+
+
+## [0.0.57-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.57-beta.4...v0.0.57-beta.5) (2025-10-20)
+
+
+
+## [0.0.57-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.57-beta.3...v0.0.57-beta.4) (2025-10-20)
+
+
+### Features
+
+* add build and validation workflow for distribution files, including worker scripts ([47ed3b9](https://github.com/Simon-He95/markstream-vue/commit/47ed3b91eb759bc87a25a027a50c5d1a4d35f733))
+
+
+### Performance Improvements
+
+* preload monaco request ([7edc402](https://github.com/Simon-He95/markstream-vue/commit/7edc402a0279fd85e57411765dd4a5937067deb9))
+
+
+
+## [0.0.57-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.57-beta.2...v0.0.57-beta.3) (2025-10-19)
+
+
+### Bug Fixes
+
+* prevent scroll jump when Monaco editor loads above viewport ([0b29b5a](https://github.com/Simon-He95/markstream-vue/commit/0b29b5a3d8242f0c8236ac25bff2c7589e913f89))
+* update vue-renderer-markdown version and @types/node dependency in package.json and pnpm-lock.yaml ([803daf0](https://github.com/Simon-He95/markstream-vue/commit/803daf08de45907f29105eaa40c91ed1200afaac))
+
+
+### Features
+
+* add custom parse hooks and parseOptions prop for enhanced markdown processing ([4b7ba40](https://github.com/Simon-He95/markstream-vue/commit/4b7ba40111e5e207522a0aa42f4a438fee09ad1b))
+* enhance ThinkingNode component with loading state and decorative icon ([16254ef](https://github.com/Simon-He95/markstream-vue/commit/16254ef675487f4f035362d0f3a1ebf4c5f77e93))
+
+
+
+## [0.0.57-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.57-beta.1...v0.0.57-beta.2) (2025-10-17)
+
+
+### Bug Fixes
+
+* only match double tildes for strikethrough syntax ([e54464b](https://github.com/Simon-He95/markstream-vue/commit/e54464b338d5821be5f671fea08f25edd88c2688))
+
+
+### Features
+
+* implement isMathLike function for improved math detection and refactor related tests ([2aa4ab0](https://github.com/Simon-He95/markstream-vue/commit/2aa4ab03fdfcbc1aea3329e5d110bcfd27ea6a0d))
+* update KaTeX integration and improve math rendering ([103e703](https://github.com/Simon-He95/markstream-vue/commit/103e70310ddb6db65e961938babbd413a9b67518))
+
+
+
+## [0.0.57-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.57-beta.0...v0.0.57-beta.1) (2025-10-16)
+
+
+### Bug Fixes
+
+* format onMounted function for better readability in README files ([c1b5a2a](https://github.com/Simon-He95/markstream-vue/commit/c1b5a2a7171c534af242a8de0a8be70ef6764002))
+
+
+### Features
+
+* add chunk size control for streaming content preview ([e1d459b](https://github.com/Simon-He95/markstream-vue/commit/e1d459b6455a02f323c72dd8016a44f95d7c2638))
+* add markdown streaming component with theme selection and auto-scroll functionality ([c91bbf5](https://github.com/Simon-He95/markstream-vue/commit/c91bbf54211d7f5c7d9ea794760431d37c01a47b))
+* add raw property to MarkdownToken and enhance math inline parsing ([b05ca32](https://github.com/Simon-He95/markstream-vue/commit/b05ca32cab9f1f12c7d0df8cdb3e43203adb37b5))
+* add stream delay control for improved content streaming experience ([9ce73ac](https://github.com/Simon-He95/markstream-vue/commit/9ce73acfb6e515f87ae3ec2bcaffc06a2c4203d1))
+* add support for checkbox inputs in lists and enhance inline token parsing ([61d18a6](https://github.com/Simon-He95/markstream-vue/commit/61d18a6a675ac7d820fc94137b9328ae59aecbab)), closes [#76](https://github.com/Simon-He95/markstream-vue/issues/76)
+* enhance auto-scroll functionality with frame-based scrolling and immediate updates ([8a1783a](https://github.com/Simon-He95/markstream-vue/commit/8a1783a099503a55f18336db1add652b9ada238d))
+* **i18n:** add fallback translation support and update documentation ([d8e6a5f](https://github.com/Simon-He95/markstream-vue/commit/d8e6a5fc61580a17ce905dfead06838becc8070c)), closes [#74](https://github.com/Simon-He95/markstream-vue/issues/74)
+* replace refs with useLocalStorage for stream settings and theme selection ([b3c8be6](https://github.com/Simon-He95/markstream-vue/commit/b3c8be6fc5426c2d20939d8a25daee7488c4b949))
+
+
+
+## [0.0.57-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.56-beta.8...v0.0.57-beta.0) (2025-10-15)
+
+
+### Bug Fixes
+
+* **markdown-parser:** enhance table parsing to support additional edge cases ([2d446f5](https://github.com/Simon-He95/markstream-vue/commit/2d446f5aac41c5289e51b0a818992d26f201cf79))
+
+
+### Features
+
+* **App.vue:** add ResizeObserver for dynamic content height detection and auto-scroll management ([22a536f](https://github.com/Simon-He95/markstream-vue/commit/22a536ff7163d664c246a81a5f3dde4e17c5e0a2))
+* **markdown-parser:** implement table token fixing and strong token handling ([af08dd4](https://github.com/Simon-He95/markstream-vue/commit/af08dd4cb5ccee8faa41420b8f8c612739dad172))
+* **TableNode:** add loading slot and loading state support for table rendering ([8a309a0](https://github.com/Simon-He95/markstream-vue/commit/8a309a0f1164217ec7e72d2d037275f6d6ba5da6))
+* **TableNode:** enhance table rendering with loading state and improved structure ([2413509](https://github.com/Simon-He95/markstream-vue/commit/241350954a385ae53a5a76ec61581aec034aaa75))
+
+
+
+## [0.0.56-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.56-beta.7...v0.0.56-beta.8) (2025-10-14)
+
+
+### Bug Fixes
+
+* **App.vue:** adjust app container height for better layout consistency ([9a5dccb](https://github.com/Simon-He95/markstream-vue/commit/9a5dccb5186d6c580f1ff71bdc5984b96aecc7af))
+* **math-plugin:** correct inline content parsing and snapshot for Chinese text ([1285980](https://github.com/Simon-He95/markstream-vue/commit/1285980651d285ae6428d8ebfd70b8f49f746a99))
+* **tests:** update e2e tests for MarkdownRender and improve snapshot handling ([46ae70e](https://github.com/Simon-He95/markstream-vue/commit/46ae70e1743b5b2587ac8805f4d496421bd384cf))
+
+
+### Features
+
+* **App.vue:** implement IntersectionObserver for improved auto-scroll detection on mobile ([5fa6f36](https://github.com/Simon-He95/markstream-vue/commit/5fa6f36f2b2c3373b1bfa54b0ca8fb9b8c72c126))
+* **markdown:** add center prop to TextNode for improved alignment handling ([41adbff](https://github.com/Simon-He95/markstream-vue/commit/41adbff131a6aa9da71b14771b6fb3cc7a8bc4b1))
+* **markdown:** add handling for inline code tokens in parseInlineTokens function ([1d4f00c](https://github.com/Simon-He95/markstream-vue/commit/1d4f00cfdaca368ffda78e4c1de3f91055dd0e60))
+
+
+
+## [0.0.56-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.56-beta.6...v0.0.56-beta.7) (2025-10-13)
+
+
+### Features
+
+* add indexKey prop to various node components for improved rendering and identification ([4581b60](https://github.com/Simon-He95/markstream-vue/commit/4581b60e41bf09206147aa5a29d8dc12e72f5224))
+
+
+
+## [0.0.56-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.56-beta.5...v0.0.56-beta.6) (2025-10-13)
+
+
+### Bug Fixes
+
+* **math:** prevent processing of empty pending state in applyMath function ([08c28c8](https://github.com/Simon-He95/markstream-vue/commit/08c28c82d067d44c3c5a11b5b041aaaed8255532))
+
+
+### Features
+
+* **markdown:** enhance emoji and inline parsing, improve token handling and structure ([e2489a1](https://github.com/Simon-He95/markstream-vue/commit/e2489a168c8919ae1781714216f002a0f1df972b))
+
+
+### Performance Improvements
+
+* **markdown:** improve inline emphasis token handling and text node merging ([2b64ae8](https://github.com/Simon-He95/markstream-vue/commit/2b64ae816cff3b7ba20b129d00c2ab5ba5251b69))
+
+
+
+## [0.0.56-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.56-beta.4...v0.0.56-beta.5) (2025-10-12)
+
+
+### Bug Fixes
+
+* chat container in mobile viewport height ([a39c13d](https://github.com/Simon-He95/markstream-vue/commit/a39c13db3886a54746f4ece033315bfa4cf553ee))
+* **ci:** switch to corepack for pnpm setup and activation ([6dec5db](https://github.com/Simon-He95/markstream-vue/commit/6dec5dba800aac4fc3edb9af204416554558f134))
+* **ci:** update CI configuration to use matrix for OS and Node versions ([e247b9d](https://github.com/Simon-He95/markstream-vue/commit/e247b9d1a3c16b7929027d85561373407c9014a8))
+* **ci:** update CI steps for consistency and clarity in git configuration and node setup ([ac7dcdc](https://github.com/Simon-He95/markstream-vue/commit/ac7dcdc9f7ad9f7472e14d2488f5cf0974ac2443))
+* **demo:** update demo site URL for improved accessibility ([3a6a504](https://github.com/Simon-He95/markstream-vue/commit/3a6a5046b4fc3efd943dfca6f4dafdcddb56683f))
+* **katex:** improve error handling for worker initialization and fallback rendering ([01e434d](https://github.com/Simon-He95/markstream-vue/commit/01e434d90fcf73ed80b66ebce0672c13c18796f2))
+* **math:** enhance math recognition for incomplete TeX commands and improve loading state handling ([5a955ac](https://github.com/Simon-He95/markstream-vue/commit/5a955ac503cdc21c198949938c98951b64e573a2))
+
+
+### Features
+
+* **markdown:** enhance markdown processing with new inline token handling and sanitization ([f128740](https://github.com/Simon-He95/markstream-vue/commit/f128740f79526fe5b9590d51c3f9d873c39d8836))
+
+
+
+## [0.0.56-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.56-beta.3...v0.0.56-beta.4) (2025-10-10)
+
+
+### Bug Fixes
+
+* **math:** add heuristic to exclude date/time patterns from math classification ([cde9c69](https://github.com/Simon-He95/markstream-vue/commit/cde9c691bea911db74c47371f419f66fd6b406db))
+* **math:** enhance KaTeX rendering with caching and debug support ([b22ffa9](https://github.com/Simon-He95/markstream-vue/commit/b22ffa9df9729e9b124ea00005a84833c1bfab54))
+* **math:** improve handling of math delimiters and escape sequences ([b06e11c](https://github.com/Simon-He95/markstream-vue/commit/b06e11c3101daa022b3b74e8029fbeeb42bdad25))
+
+
+
+## [0.0.56-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.56-beta.2...v0.0.56-beta.3) (2025-10-10)
+
+
+
+## [0.0.56-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.56-beta.1...v0.0.56-beta.2) (2025-10-10)
+
+
+### Bug Fixes
+
+* correct CSS properties for checkbox and text nodes ([c3c9bf5](https://github.com/Simon-He95/markstream-vue/commit/c3c9bf554aa0040d1646edf570fe5f295c458aee))
+* lint duplicated ci ([6715903](https://github.com/Simon-He95/markstream-vue/commit/6715903f96d3a3caa2bc6db576d9c4a5e427f67c))
+* **markdown:** correct LaTeX syntax for mathematical expressions and enhance clarity ([96266d1](https://github.com/Simon-He95/markstream-vue/commit/96266d1be24c4e8a74e878244c6f94ea07cb8f72))
+* **math:** adjust interval timing and improve math rendering logic ([b076c15](https://github.com/Simon-He95/markstream-vue/commit/b076c159bcdfa010efd52d74d32d6e05704ae494))
+
+
+### Features
+
+* enhance auto-scroll behavior with user interaction detection for better UX ([209448b](https://github.com/Simon-He95/markstream-vue/commit/209448b7094f59e55d16a3e1adf958888cbd4880))
+* implement isMathLike heuristic and add corresponding tests ([050537e](https://github.com/Simon-He95/markstream-vue/commit/050537e042b6fe30a12e3884b19a5e5b83408f46))
+* **math:** enhance math rendering and parsing capabilities ([934d60b](https://github.com/Simon-He95/markstream-vue/commit/934d60b672367429bad6050cdc7039bea0fadbd3))
+* **math:** enhance normalization of backslashes and improve test coverage ([c4dc156](https://github.com/Simon-He95/markstream-vue/commit/c4dc1565a6f121736a561178653b3cf908d6e228))
+* **math:** enhance regex for KaTeX commands and strong text handling ([1584dcc](https://github.com/Simon-He95/markstream-vue/commit/1584dcca3e001c338ca8027a8310cabcea1254ac))
+* **scroll:** enhance auto-scroll behavior with user scroll tracking ([496ebd5](https://github.com/Simon-He95/markstream-vue/commit/496ebd56031e3d580e1334a23ad3e01ac6f3cf2b))
+
+
+
+## [0.0.56-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.56-beta.0...v0.0.56-beta.1) (2025-10-08)
+
+
+
+## [0.0.56-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.55...v0.0.56-beta.0) (2025-10-08)
+
+
+### Bug Fixes
+
+* ensure inline content is parsed correctly in container rendering ([cc14970](https://github.com/Simon-He95/markstream-vue/commit/cc14970c45a9726d1206e3a7cf1bee39ec1e7387))
+* simplify error handling in user interaction event ([d8e2c05](https://github.com/Simon-He95/markstream-vue/commit/d8e2c0592bea6cbe9ee845e81756cfc37ad53848))
+
+
+### Features
+
+* add support for checkbox input nodes and update related components ([8b949ae](https://github.com/Simon-He95/markstream-vue/commit/8b949ae0ee597d1d0a903ab5eb88f9aa601e19e8))
+* enhance auto-scroll functionality with user interaction detection ([f5d161f](https://github.com/Simon-He95/markstream-vue/commit/f5d161f3285254b406ef7c09a0bfe676e21dbf48))
+
+
+
+## [0.0.55](https://github.com/Simon-He95/markstream-vue/compare/v0.0.55-beta.2...v0.0.55) (2025-10-07)
+
+
+### Features
+
+* Add GitHub star button to header ([0571ccc](https://github.com/Simon-He95/markstream-vue/commit/0571ccceb67a49181f3dbfafcddc56285869b732))
+* Enhance math rendering with abort signal and cleanup for trailing backticks ([b41779b](https://github.com/Simon-He95/markstream-vue/commit/b41779b5e1b1984ef85394b5251f2ba5bd1eae60))
+* Transform playground into chatbot-style interface with fixed height container ([c24f52c](https://github.com/Simon-He95/markstream-vue/commit/c24f52c9bbd494cfc4b42bd0e87e8fd811d7fc21))
+
+
+
+## [0.0.55-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.55-beta.1...v0.0.55-beta.2) (2025-10-03)
+
+
+### Bug Fixes
+
+* update base configuration comments for clarity in vite.config.ts ([343cc31](https://github.com/Simon-He95/markstream-vue/commit/343cc31c5a358e404247f9cf2bf868d737c4cf88))
+
+
+
+## [0.0.55-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.55-beta.0...v0.0.55-beta.1) (2025-10-03)
+
+
+### Features
+
+* add support for Mermaid blocks in NodeRenderer and update related components ([bda601c](https://github.com/Simon-He95/markstream-vue/commit/bda601cc7793bb66830d5ddacbb923b7743dd4b4))
+
+
+
+## [0.0.55-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.54-beta.9...v0.0.55-beta.0) (2025-10-03)
+
+
+### Bug Fixes
+
+* codeLanguage update ([8642453](https://github.com/Simon-He95/markstream-vue/commit/864245330e2e19627c2af0ea4d98b84a1a355373))
+
+
+### Features
+
+* add MarkdownCodeBlockNode for lightweight syntax highlighting and flexible code rendering options ([d71c32d](https://github.com/Simon-He95/markstream-vue/commit/d71c32d8f231b558e5fcb17ab5094ca9b0dd1e5c))
+* Add Monaco-like header capabilities to MarkdownCodeBlockNode ([e3d4cce](https://github.com/Simon-He95/markstream-vue/commit/e3d4ccec5a6bc67bbd7926ea0685c670e949623c))
+
+
+
+## [0.0.54-beta.9](https://github.com/Simon-He95/markstream-vue/compare/v0.0.54-beta.8...v0.0.54-beta.9) (2025-10-02)
+
+
+### Bug Fixes
+
+* **CodeBlockNode:** restore editor creation logic and update code handling ([a507cc4](https://github.com/Simon-He95/markstream-vue/commit/a507cc498fc1a316c5c59ea8ba8859ccfdba15e3))
+
+
+### Features
+
+* add demo content and structure for Electron + Vue chat application ([1621138](https://github.com/Simon-He95/markstream-vue/commit/1621138bf36def5de393092de39b30e2010926c0))
+* add normalizeStandaloneBackslashT function and corresponding tests for escape sequences ([50b8cb9](https://github.com/Simon-He95/markstream-vue/commit/50b8cb99efe79f80c32c98e4e7b770c53d6250fc))
+* implement off-thread rendering for KaTeX and Mermaid diagrams ([6ac59d6](https://github.com/Simon-He95/markstream-vue/commit/6ac59d62244a0f2885cb139273cf4112c5f05d9f))
+
+
+
+## [0.0.54-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.54-beta.7...v0.0.54-beta.8) (2025-09-29)
+
+
+### Bug Fixes
+
+* **code-block:** use Monaco default as initial font baseline and await editor creation to fix first-decrease issue ([8191156](https://github.com/Simon-He95/markstream-vue/commit/81911561ac688c65d0f8365dbe19614e5ce5adfc))
+* **dependencies:** update vue-use-monaco to version 0.0.33 ([1f72589](https://github.com/Simon-He95/markstream-vue/commit/1f725896369168546c86f98950d23a889cbf3643))
+* **TableNode:** ensure text color is white in dark mode for header cells ([b2adb88](https://github.com/Simon-He95/markstream-vue/commit/b2adb880a32dc01b4ffb2c73877b57aa2d313f99))
+* update markdown content and reintroduce KaTeX CSS import ([a43b256](https://github.com/Simon-He95/markstream-vue/commit/a43b256c30d29d1a1927358eb3daf0847bd6f8df))
+* update vue-use-monaco dependency to version 0.0.32 ([a20dad4](https://github.com/Simon-He95/markstream-vue/commit/a20dad44dc486c99fc8849792c138ecbf83faa96))
+
+
+### Features
+
+* **CodeBlockNode:** add header-only collapse mode for code-block ([#42](https://github.com/Simon-He95/markstream-vue/issues/42)) ([05354ab](https://github.com/Simon-He95/markstream-vue/commit/05354ab6783305118fdee65b3503abab85196134))
+
+
+### Reverts
+
+* **MathBlock:** The commit 14b4e98 caused KaTeX math formulas to fail to render properly. Temporarily revert the mathnode-related changes in this commit. ([0165ad2](https://github.com/Simon-He95/markstream-vue/commit/0165ad2bd951064ef6a47c037e9e51fadc1e34b8))
+
+
+
+## [0.0.54-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.54-beta.6...v0.0.54-beta.7) (2025-09-27)
+
+
+### Features
+
+* add support for Mermaid block nodes and enhance code block handling ([d86a78f](https://github.com/Simon-He95/markstream-vue/commit/d86a78f0e9471965c60f904f71b65292c0ddd0d5))
+* enhance node component handling and add support for custom components ([6cd3f19](https://github.com/Simon-He95/markstream-vue/commit/6cd3f19052ba92e06732f44f07f4b79cf84472aa))
+
+
+
+## [0.0.54-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.54-beta.5...v0.0.54-beta.6) (2025-09-26)
+
+
+### Bug Fixes
+
+* **LinkNode:** update link text wrapper to use inline-flex for better alignment ([bff4520](https://github.com/Simon-He95/markstream-vue/commit/bff45202bda81da1f9a473179b66918236ecdca9))
+
+
+
+## [0.0.54-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.54-beta.4...v0.0.54-beta.5) (2025-09-26)
+
+
+### Bug Fixes
+
+* **App.vue:** adjust main content width and set max-width for prose ([f0f25a2](https://github.com/Simon-He95/markstream-vue/commit/f0f25a2ebceee9ef04d2551ceaf695f2122ececc))
+* **ListNode:** marker ([39b48aa](https://github.com/Simon-He95/markstream-vue/commit/39b48aa1dd87f3138286a76dc1bc39224e6fda5f))
+
+
+### Features
+
+* enhance code block rendering with loading animation and improve template structure ([4dbb857](https://github.com/Simon-He95/markstream-vue/commit/4dbb8572ab463865a847420d7aeb2db6f776cbf4))
+* **ImageNode:** add support for custom loading and error slots; enhance image loading experience ([eb4f795](https://github.com/Simon-He95/markstream-vue/commit/eb4f795638f788b74bbd41dd5d890721e0cd1260)), closes [#38](https://github.com/Simon-He95/markstream-vue/issues/38)
+* **ImageNode:** add usePlaceholder prop to toggle placeholder display during image loading ([091eb70](https://github.com/Simon-He95/markstream-vue/commit/091eb70bc5dcad291a9979f01ababa850dfdcb2b))
+* **LinkNode:** enhance link styling with customizable props for animation and appearance ([d5d7369](https://github.com/Simon-He95/markstream-vue/commit/d5d73694e4adbb692d238b94485cc2df84ab05e0))
+* **markdown-parser:** enhance inline token parsing to support image syntax ([8730505](https://github.com/Simon-He95/markstream-vue/commit/8730505cc49bd329b7cf3b4b09e645db89c9f00f))
+* **MermaidBlockNode:** add header-only collapse mode for Mermaid ([cfd11d9](https://github.com/Simon-He95/markstream-vue/commit/cfd11d9741fdc2830588d395d0603c8efb67f6ba))
+* **MermaidBlockNode:** update collapse button icon and adjust container reference ([192e774](https://github.com/Simon-He95/markstream-vue/commit/192e774e2baf03a45bdb512367927847a52ff850))
+* **README:** add new prop renderCodeBlocksAsPre for lightweight code block rendering ([b01dc24](https://github.com/Simon-He95/markstream-vue/commit/b01dc2443144214fd6111e59dd91653ef0ec63a6))
+* **README:** add renderCodeBlocksAsPre prop for lightweight code block rendering ([ba2728f](https://github.com/Simon-He95/markstream-vue/commit/ba2728f8d23a172a771681e5bd3ca5979ab92f9a))
+* **README:** update example markdown syntax for clarity ([f3523ff](https://github.com/Simon-He95/markstream-vue/commit/f3523ffd82ae0d4bc5076a9d63b136aa927aa668))
+
+
+### Performance Improvements
+
+* linkBlock render ([c4d3a70](https://github.com/Simon-He95/markstream-vue/commit/c4d3a70dfe8059bb7037ac47da1597246986c2bc))
+
+
+
+## [0.0.54-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.54-beta.3...v0.0.54-beta.4) (2025-09-24)
+
+
+### Bug Fixes
+
+* update vue-use-monaco version to 0.0.31 in package.json and pnpm-lock.yaml; adjust diff parsing in fence-parser.ts for improved line handling ([3e75591](https://github.com/Simon-He95/markstream-vue/commit/3e75591f3ff3e8e9f8c58ce14a4e409459206e81))
+* updateCollapsedHeight ([c09179d](https://github.com/Simon-He95/markstream-vue/commit/c09179d0fe9c89318c90e5b0ad3b8f665c2267da))
+
+
+### Features
+
+* add PreCodeNode component for rendering code blocks as plain <pre><code> elements; update NodeRenderer to support new rendering option ([3cc460c](https://github.com/Simon-He95/markstream-vue/commit/3cc460c620983f3b6c3ac74bf6faa89b04eefb2a))
+* add Tooltip component to GlobalComponents; refactor MathBlockNode and MathInlineNode for improved rendering and cleanup ([14b4e98](https://github.com/Simon-He95/markstream-vue/commit/14b4e981ce0468ac45a5b069304eb1155675d607))
+* enhance admonition support with error type and collapsible feature; improve markdown parsing safety ([8feb7cc](https://github.com/Simon-He95/markstream-vue/commit/8feb7cc65fb90c551ece05494ae15287ece2c68c))
+* **ImageNode:** enhance image loading with fallback support and loading state; update i18n for load error message ([7dddce1](https://github.com/Simon-He95/markstream-vue/commit/7dddce1330033ab43f995192b52f02c15d385e27))
+
+
+
+## [0.0.54-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.54-beta.2...v0.0.54-beta.3) (2025-09-23)
+
+
+### Bug Fixes
+
+* **vite.config:** refine externalization logic for 'mermaid' package to prevent local file conflicts ([0d06b62](https://github.com/Simon-He95/markstream-vue/commit/0d06b6257d5d04da07195edaa0d4ffda46fdc79b))
+
+
+
+## [0.0.54-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.54-beta.1...v0.0.54-beta.2) (2025-09-23)
+
+
+### Bug Fixes
+
+* auto height compute ([ebd24c0](https://github.com/Simon-He95/markstream-vue/commit/ebd24c001e42a647c31b85ffd08b760e0df5d6ce))
+* code diff block can expand now ([62158b2](https://github.com/Simon-He95/markstream-vue/commit/62158b2628937acdda173f8d7a8ca5a3ff43c303))
+* update vue-renderer-markdown dependency to latest version ([7ad8fb4](https://github.com/Simon-He95/markstream-vue/commit/7ad8fb4b3ddf09c4db8cd889efdc9939fe5bcac5))
+
+
+### Features
+
+* add demo content and setup instructions for Electron + Vue chat application ([77539ef](https://github.com/Simon-He95/markstream-vue/commit/77539ef72864e7c201377ed577c529fcbd9263ef))
+* **CodeBlockNode, NodeRenderer:** add min/max width props for code block customization ([08ef2ab](https://github.com/Simon-He95/markstream-vue/commit/08ef2abe83f49e5c9126cd2f3192527d1dcfba47))
+* **CodeBlockNode:** add customizable header options for enhanced user control ([1b73f53](https://github.com/Simon-He95/markstream-vue/commit/1b73f5358c95d3d42063e496b436b0ed9802963a)), closes [#33](https://github.com/Simon-He95/markstream-vue/issues/33)
+* **CodeBlockNode:** integrate themes and Monaco options for enhanced customization ([b9579dc](https://github.com/Simon-He95/markstream-vue/commit/b9579dc2cb63c8d66f5a845227934adccf24abb2))
+* enhance code block handling with diff support and update package metadata ([52523e7](https://github.com/Simon-He95/markstream-vue/commit/52523e7d3b28c681639a0de1f3c44b514f6a0510))
+* implement diff editor view handling in CodeBlockNode component ([a1e7813](https://github.com/Simon-He95/markstream-vue/commit/a1e7813aa1be5f56757c72eab498351fb98056b7))
+* import styles for vue-renderer-markdown in main application ([25dcdd1](https://github.com/Simon-He95/markstream-vue/commit/25dcdd171e322023e50bc1b0cc5f21b6979b966e))
+
+
+
+## [0.0.54-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.54-beta.0...v0.0.54-beta.1) (2025-09-19)
+
+
+### Bug Fixes
+
+* add cleanup logic on component unmount to prevent memory leaks ([5ad2f78](https://github.com/Simon-He95/markstream-vue/commit/5ad2f78d5baab9696aec86755fef5651be8d8aba))
+* expand code on loading is false ([f8d1a76](https://github.com/Simon-He95/markstream-vue/commit/f8d1a761eaa65390648134be9e4796100c546673))
+* reorder tooltip imports for consistency and clarity ([5ef26db](https://github.com/Simon-He95/markstream-vue/commit/5ef26db7b996a864a8c1eb4d43089b95c65ce492))
+* update fallback component for CodeBlockNode to InlineCodeNode in error handling ([02d71df](https://github.com/Simon-He95/markstream-vue/commit/02d71df81f729230813f9534894ef6c95c190536))
+
+
+### Features
+
+* add support for custom languageicon [#28](https://github.com/Simon-He95/markstream-vue/issues/28) ([4e2d6b0](https://github.com/Simon-He95/markstream-vue/commit/4e2d6b012b9ea41a792eafbfdf985b6395dea483))
+* add Tooltip component and integrate it into CodeBlockNode for enhanced user interaction ([0dfa2dc](https://github.com/Simon-He95/markstream-vue/commit/0dfa2dca85c01f916332822cf0a9bc7916458df3))
+* add vue-renderer-markdown dependency to enhance markdown rendering capabilities ([89abe35](https://github.com/Simon-He95/markstream-vue/commit/89abe35107e165b801c381e7710e218f97c2a9ca))
+* **CodeBlockNode:** add font size control functionality to CodeBlockNode ([f54265c](https://github.com/Simon-He95/markstream-vue/commit/f54265ca4750c7f55bab9ab01ca7abd30f8689f8))
+* enhance getMarkdown function to support user-defined plugins and apply functions ([9e8aa8b](https://github.com/Simon-He95/markstream-vue/commit/9e8aa8b5ca22dd1ede2774d5fec5e1295e9abc04))
+* enhance tooltip functionality with origin coordinates for smoother animations ([743e68f](https://github.com/Simon-He95/markstream-vue/commit/743e68f3fb40ef81b31b5e4ce1f02cd9a69ca9ab))
+
+
+
+## [0.0.54-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.53...v0.0.54-beta.0) (2025-09-17)
+
+
+### Features
+
+* enhance markdown token metadata for compatibility with plugins and tests ([6ab3dcd](https://github.com/Simon-He95/markstream-vue/commit/6ab3dcd615b50d748994a19f7bc3f93fe5495c77))
+
+
+
+## [0.0.53](https://github.com/Simon-He95/markstream-vue/compare/v0.0.52-beta.3...v0.0.53) (2025-09-17)
+
+
+### Features
+
+* add error handling and state management for rendering process ([032fc01](https://github.com/Simon-He95/markstream-vue/commit/032fc01ec651643a624367dbcdcf0257a4786d34))
+
+
+
+## [0.0.52-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.52-beta.2...v0.0.52-beta.3) (2025-09-17)
+
+
+### Features
+
+* optimize rendering by tracking last rendered code and skipping redundant renders ([092f759](https://github.com/Simon-He95/markstream-vue/commit/092f7590855370e41c2030115a55e1d12ce3d0e6))
+
+
+
+## [0.0.52-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.52-beta.1...v0.0.52-beta.2) (2025-09-17)
+
+
+### Features
+
+* enhance MermaidBlockNode with safe prefix candidate and smooth mode switching ([641fccd](https://github.com/Simon-He95/markstream-vue/commit/641fccdc8f22d342cda694a2a40f9f8907d0a55f))
+
+
+
+## [0.0.52-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.52-beta.0...v0.0.52-beta.1) (2025-09-16)
+
+
+### Bug Fixes
+
+* normalize standalone backslash-t in math block tokens ([74cb769](https://github.com/Simon-He95/markstream-vue/commit/74cb769cc3411b6b3f2875edce41ace68ba3fbc3))
+
+
+
+## [0.0.52-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.50...v0.0.52-beta.0) (2025-09-16)
+
+
+### Bug Fixes
+
+* update parser worker import to use URL for improved compatibility ([a3464d5](https://github.com/Simon-He95/markstream-vue/commit/a3464d579c9d96df5a59f4c253ae8e0530275360))
+* update version to 0.0.50-alpha.4 and remove CSS build script ([d0a37f8](https://github.com/Simon-He95/markstream-vue/commit/d0a37f828959a991999a7958feab79f7b8c78052))
+* update version to 0.0.51 in package.json ([63800f1](https://github.com/Simon-He95/markstream-vue/commit/63800f1d2687151fa0836a62824f979ae9d605f1))
+
+
+### Features
+
+* add ESM support for web workers in Vite configuration ([5243dcd](https://github.com/Simon-He95/markstream-vue/commit/5243dcdf72dafd60c89986781c93bc4f3ebde8c2))
+
+
+
+## [0.0.50](https://github.com/Simon-He95/markstream-vue/compare/v0.0.49...v0.0.50) (2025-09-16)
+
+
+### Bug Fixes
+
+* correct formatting in conditional check for Mermaid editor cleanup ([4eb4daf](https://github.com/Simon-He95/markstream-vue/commit/4eb4daf1e6acdf8b5aeffe3a0caff0849ab11245))
+
+
+### Features
+
+* Enhance Mermaid diagram rendering with progressive loading and error handling ([6613a5c](https://github.com/Simon-He95/markstream-vue/commit/6613a5c4bf5ac03dcfea8ab8e8e8a64ddaa8156c))
+* implement fence streaming support and enhance code block parsing ([1c72879](https://github.com/Simon-He95/markstream-vue/commit/1c72879ccbd5d19fc0662aff36673bea3aea25d5))
+
+
+
+## [0.0.49](https://github.com/Simon-He95/markstream-vue/compare/v0.0.48...v0.0.49) (2025-09-15)
+
+
+### Bug Fixes
+
+* **CodeBlockNode:** languageIcon ([c81e5c2](https://github.com/Simon-He95/markstream-vue/commit/c81e5c273ef0d1353a236f7d2bfa06b655d21ac9))
+* **MermaidBlockNode:** resolve rendering issues during view mode switching ([6f3dcc5](https://github.com/Simon-He95/markstream-vue/commit/6f3dcc580d78d706fc837b1c5a2f88e3b1f24ef6))
+* support detect code fence close ([c3ef7ec](https://github.com/Simon-He95/markstream-vue/commit/c3ef7eccfd755bd773b1f00d46c16341d83c252c))
+
+
+### Features
+
+* add expand for code block ([ed7006e](https://github.com/Simon-He95/markstream-vue/commit/ed7006ecb26347fcd2b692444502f845cdeb6da9))
+* **theme-toggle:** add theme switch button and integrate iconify for dark mode ([c9a2dd4](https://github.com/Simon-He95/markstream-vue/commit/c9a2dd4932fec4072c6ceaf0a98b0891c151f888))
+
+
+### Performance Improvements
+
+* **renderer): remove typing-burst class toggling and fade last-child via TransitionGroup\n\n- Replace container reflow approach with TransitionGroup enter-only animations\n- Keep cursor logic; only reposition on content growth\n- Avoid forced reflow and class churn for better perf\n\nperf(code-block:** lazy-init Monaco editors when visible\n\n- Create Monaco editor only after code block enters viewport\n- Fade only outer container; isolate editor layout via contain: content\n- Reduce layout thrash during transitions and improve smoothness ([2198747](https://github.com/Simon-He95/markstream-vue/commit/21987474b5be69887af84d95c4d05f721536baf8))
+
+
+
+## [0.0.48](https://github.com/Simon-He95/markstream-vue/compare/v0.0.47...v0.0.48) (2025-09-13)
+
+
+### Bug Fixes
+
+* improve peer dependency check and auto-install functionality ([f896b72](https://github.com/Simon-He95/markstream-vue/commit/f896b7202313798c5ef1da12c0efa1c51dbd33a4)), closes [#22](https://github.com/Simon-He95/markstream-vue/issues/22)
+
+
+
+## [0.0.47](https://github.com/Simon-He95/markstream-vue/compare/v0.0.46...v0.0.47) (2025-09-12)
+
+
+### Bug Fixes
+
+* update type imports for Monaco themes in CodeBlockNode.vue ([50f79fa](https://github.com/Simon-He95/markstream-vue/commit/50f79faae65d4a5f7c5993b3e62da19b5f1a1033))
+
+
+
+## [0.0.46](https://github.com/Simon-He95/markstream-vue/compare/v0.0.45...v0.0.46) (2025-09-12)
+
+
+### Bug Fixes
+
+* a better way for auto scroll ([dcceb57](https://github.com/Simon-He95/markstream-vue/commit/dcceb571b4f784dbf9d229b56c0dca320ac73488))
+* optimize null checking in parseCodeBlock ([092d787](https://github.com/Simon-He95/markstream-vue/commit/092d787f9d5cbcddcb30a48957097553b96f8d6a))
+
+
+### Performance Improvements
+
+* remove rafThrottle to vue-use-monaco & monaco scroll behavior ([f9a4f7b](https://github.com/Simon-He95/markstream-vue/commit/f9a4f7b1a0cd05a723abbed3785da68f7641a046))
+
+
+
+## [0.0.45](https://github.com/Simon-He95/markstream-vue/compare/v0.0.44...v0.0.45) (2025-09-11)
+
+
+### Performance Improvements
+
+* stream appendCode ([b45d128](https://github.com/Simon-He95/markstream-vue/commit/b45d1284919805de45afd894c7e442b366d066d3))
+
+
+
+## [0.0.44](https://github.com/Simon-He95/markstream-vue/compare/v0.0.43...v0.0.44) (2025-09-09)
+
+
+
+## [0.0.43](https://github.com/Simon-He95/markstream-vue/compare/v0.0.42...v0.0.43) (2025-09-08)
+
+
+
+## [0.0.42](https://github.com/Simon-He95/markstream-vue/compare/v0.0.41...v0.0.42) (2025-09-08)
+
+
+### Bug Fixes
+
+* add fullscreen button disable logic and update button styles ([194d10b](https://github.com/Simon-He95/markstream-vue/commit/194d10b41e78c304116002733b8ee07bd31cb83f))
+* update vue-renderer-markdown dependency to latest version ([f08c529](https://github.com/Simon-He95/markstream-vue/commit/f08c529b506e1c25381456865e9fb748fa07bc2e))
+
+
+### Performance Improvements
+
+* add debounce render ([89b1808](https://github.com/Simon-He95/markstream-vue/commit/89b1808d2ae59103656b6fd7bb713b916ce154e9))
+
+
+
+## [0.0.41](https://github.com/Simon-He95/markstream-vue/compare/v0.0.40...v0.0.41) (2025-09-08)
+
+
+### Bug Fixes
+
+* auto-adaptive height of MermaidBlockNode ([68fd38f](https://github.com/Simon-He95/markstream-vue/commit/68fd38f84d7b1a52de02cf49f661c1a061aa6461))
+* improve code readability by simplifying conditional statements and formatting ([e92782b](https://github.com/Simon-He95/markstream-vue/commit/e92782b38c0cedc624df94e44ac133a249025520))
+* keep mermaid container more tight ([6eda7e0](https://github.com/Simon-He95/markstream-vue/commit/6eda7e03c5748a26c8a71afb89c6d4b8ae0acc5a))
+
+
+### Features
+
+* **MermaidBlockNode:** add fullscreen ([10b1992](https://github.com/Simon-He95/markstream-vue/commit/10b19921613117a3bde475e468699cae6fc219c1))
+
+
+
+## [0.0.40](https://github.com/Simon-He95/markstream-vue/compare/v0.0.39...v0.0.40) (2025-09-06)
+
+
+
+## [0.0.39](https://github.com/Simon-He95/markstream-vue/compare/v0.0.38...v0.0.39) (2025-09-06)
+
+
+### Bug Fixes
+
+* update KaTeX rendering options to ignore strict parsing for MathBlockNode and MathInlineNode ([bdeee7c](https://github.com/Simon-He95/markstream-vue/commit/bdeee7c103c853da8cc0a783eb90fa09a9980cf1))
+
+
+### Features
+
+* add support for Mermaid diagrams and enhance code block parsing ([72fbea4](https://github.com/Simon-He95/markstream-vue/commit/72fbea42685b3c43d695f7e5f44eaf454382d30c))
+
+
+
+## [0.0.38](https://github.com/Simon-He95/markstream-vue/compare/v0.0.37...v0.0.38) (2025-09-05)
+
+
+### Bug Fixes
+
+* improve smooth scrolling functionality and update type re-exports ([5d8ce4a](https://github.com/Simon-He95/markstream-vue/commit/5d8ce4a72b58c8622c4f00fc64a7f8649dc733f6))
+* remove packageManager field from package.json ([23cec95](https://github.com/Simon-He95/markstream-vue/commit/23cec9559c3f1216754e6562e0bb012566d1f10b))
+* update vue-renderer-markdown dependency to version ^0.0.37 and ensure proper build configuration ([a938f28](https://github.com/Simon-He95/markstream-vue/commit/a938f285e92faf9609c201773a72e97e8a02d7ba))
+
+
+### Features
+
+* update auto-imports and dependencies for VueUse and improve AdmonitionNode styles ([3882253](https://github.com/Simon-He95/markstream-vue/commit/388225390d9420dccff8b9df8137d7ee17500bc0))
+
+
+
+## [0.0.37](https://github.com/Simon-He95/markstream-vue/compare/v0.0.36...v0.0.37) (2025-09-04)
+
+
+### Bug Fixes
+
+* improve smooth scrolling behavior and optimize cursor updates in NodeRenderer ([382d0f0](https://github.com/Simon-He95/markstream-vue/commit/382d0f030afd3f28123ad188b823c5eb292b1d4a))
+* streamline type re-export in auto-imports and update build command in netlify.toml ([f035bff](https://github.com/Simon-He95/markstream-vue/commit/f035bff20dc2b6f2df426805980d87cf30727ab0))
+
+
+### Features
+
+* implement container and math plugins for enhanced markdown rendering ([4ca52fd](https://github.com/Simon-He95/markstream-vue/commit/4ca52fd39d285602d6b3b207f037a1aa6b667332))
+
+
+
+## [0.0.36](https://github.com/Simon-He95/markstream-vue/compare/v0.0.35...v0.0.36) (2025-09-02)
+
+
+### Bug Fixes
+
+* build ([f4ab54b](https://github.com/Simon-He95/markstream-vue/commit/f4ab54bf490e2b496caa28e19c09071ce2c89911))
+* **button:** add missing props to resolve Vue warnings ([b8a7964](https://github.com/Simon-He95/markstream-vue/commit/b8a79646fb6ecf65ee97e7e631982f5bd4fc47ef))
+* **CodeBlockNode:** add MonacoOptions prop and update editor configuration ([47c6457](https://github.com/Simon-He95/markstream-vue/commit/47c6457e5be43a6358ec5596176af66c60d22f63))
+* **i18n:** add missing translation keys for copy functionality ([6a247e1](https://github.com/Simon-He95/markstream-vue/commit/6a247e1c32caff2a046d2a0fefe436d908cfee75))
+* improve error handling security ([b31edbb](https://github.com/Simon-He95/markstream-vue/commit/b31edbbb2ae3e9aa5a3dcbc7ec2b5223ec6f3c1e))
+* **mermaid:** resolve race conditions and UI flicker issues ([b8d78dc](https://github.com/Simon-He95/markstream-vue/commit/b8d78dcbee5f2f98795c9a9063b96da527c3488c))
+* **playground:** build ([f33cf16](https://github.com/Simon-He95/markstream-vue/commit/f33cf16da0f50ed75a2300c0c9c72b72f69b850d))
+
+
+### Features
+
+* **mermaid:** add auto-switch to preview when content generation completes ([77c81a5](https://github.com/Simon-He95/markstream-vue/commit/77c81a5ef71812f3901999433d5025f8116eabd0))
+
+
+
+## [0.0.35](https://github.com/Simon-He95/markstream-vue/compare/v0.0.34...v0.0.35) (2025-09-01)
+
+
+### Features
+
+* **mermaid:** add automatic dark theme support ([b890ab4](https://github.com/Simon-He95/markstream-vue/commit/b890ab400dd87b0683950addd9499fc95550870b))
+* **mermaid:** add mouse wheel zoom support with Ctrl/Cmd modifier ([28202bf](https://github.com/Simon-He95/markstream-vue/commit/28202bf33c961c35c8a806b6ed5341fb477544ff))
+
+
+
+## [0.0.34](https://github.com/Simon-He95/markstream-vue/compare/v0.0.33...v0.0.34) (2025-08-11)
+
+
+### Bug Fixes
+
+* **math:** parser ([871447c](https://github.com/Simon-He95/markstream-vue/commit/871447c8c5443da6e9236d9094fa64ac896a2f3f))
+
+
+
+## [0.0.33](https://github.com/Simon-He95/markstream-vue/compare/v0.0.32...v0.0.33) (2025-08-04)
+
+
+### Features
+
+* integrate Tailwind CSS and refactor components ([3663c73](https://github.com/Simon-He95/markstream-vue/commit/3663c738a81fbc662ec6fdae52cd32bbbca5d5bb))
+
+
+
+## [0.0.32](https://github.com/Simon-He95/markstream-vue/compare/v0.0.31...v0.0.32) (2025-08-02)
+
+
+### Features
+
+* add typewriter effect for streaming content in Markdown renderer ([27f7cd8](https://github.com/Simon-He95/markstream-vue/commit/27f7cd8916d12b9cb9a041ebf981e89a343e134a))
+
+
+
+## [0.0.31](https://github.com/Simon-He95/markstream-vue/compare/v0.0.30...v0.0.31) (2025-06-30)
+
+
+### Bug Fixes
+
+* update NPM badge link to correct package name ([eb31f9c](https://github.com/Simon-He95/markstream-vue/commit/eb31f9c802357469dfb441ecdb8622a12440e7ea))
+
+
+
+## [0.0.30](https://github.com/Simon-He95/markstream-vue/compare/v0.0.29...v0.0.30) (2025-06-18)
+
+
+### Features
+
+* implement auto-scrolling behavior in chat view based on user scroll position ([352ff37](https://github.com/Simon-He95/markstream-vue/commit/352ff37bebbd99bb1e0fdb3ddf5657f7ff1c1cb8))
+
+
+
+## [0.0.29](https://github.com/Simon-He95/markstream-vue/compare/v0.0.28...v0.0.29) (2025-06-12)
+
+
+
+## [0.0.28](https://github.com/Simon-He95/markstream-vue/compare/v0.0.27...v0.0.28) (2025-06-12)
+
+
+
+## [0.0.27](https://github.com/Simon-He95/markstream-vue/compare/v0.0.26...v0.0.27) (2025-06-10)
+
+
+### Bug Fixes
+
+* add dir="auto" attribute to various components for improved text direction handling ([cba804e](https://github.com/Simon-He95/markstream-vue/commit/cba804e38c3afaba8685c45d4d78912a55f8149c))
+* update MermaidBlockNode styling for improved content handling ([4cdb08f](https://github.com/Simon-He95/markstream-vue/commit/4cdb08fb705563f48b1b3c536e5172f0093b2d39))
+
+
+### Features
+
+* enhance scrolling behavior in chat application and refactor code structure ([5b2fdc9](https://github.com/Simon-He95/markstream-vue/commit/5b2fdc95569808c5cf5c28ffeb1920eb7e0eef33))
+
+
+
+## [0.0.26](https://github.com/Simon-He95/markstream-vue/compare/v0.0.25...v0.0.26) (2025-06-06)
+
+
+### Bug Fixes
+
+* update unplugin-class-extractor to version 0.0.5 and adjust include pattern in Vite config ([5ae6d8e](https://github.com/Simon-He95/markstream-vue/commit/5ae6d8e130f6e97320d96dd5f0c04cc95e004056))
+
+
+
+## [0.0.25](https://github.com/Simon-He95/markstream-vue/compare/v0.0.24...v0.0.25) (2025-06-06)
+
+
+### Bug Fixes
+
+* **markdown:** katex style lose ([7afe593](https://github.com/Simon-He95/markstream-vue/commit/7afe59393164481ecd995c645cc6aaf07bb09f54))
+* update vue-use-monaco version to ^0.0.2 in package.json and pnpm-lock.yaml ([10aa0fb](https://github.com/Simon-He95/markstream-vue/commit/10aa0fb3b4177798da9db3d917e4ec804071db66))
+
+
+
+## [0.0.24](https://github.com/Simon-He95/markstream-vue/compare/v0.0.23...v0.0.24) (2025-06-05)
+
+
+
+## [0.0.23](https://github.com/Simon-He95/markstream-vue/compare/v0.0.22...v0.0.23) (2025-06-05)
+
+
+### Features
+
+* 兼容ai返回的markdown格式 ([970e9e7](https://github.com/Simon-He95/markstream-vue/commit/970e9e73eea14a9669bc2be6b452771504949d97))
+
+
+
+## [0.0.22](https://github.com/Simon-He95/markstream-vue/compare/v0.0.21...v0.0.22) (2025-06-04)
+
+
+
+## [0.0.21](https://github.com/Simon-He95/markstream-vue/compare/v0.0.20...v0.0.21) (2025-06-03)
+
+
+
+## [0.0.20](https://github.com/Simon-He95/markstream-vue/compare/v0.0.19...v0.0.20) (2025-06-03)
+
+
+### Features
+
+* update package exports structure and remove deprecated components file ([45197b2](https://github.com/Simon-He95/markstream-vue/commit/45197b2022dec8a978fe0ae2172505dbf822a46e))
+
+
+
+## [0.0.19](https://github.com/Simon-He95/markstream-vue/compare/v0.0.18...v0.0.19) (2025-06-03)
+
+
+### Features
+
+* refactor component exports and add Vue plugin for Markdown rendering ([b1d71dc](https://github.com/Simon-He95/markstream-vue/commit/b1d71dc091746bb0bf5103ed89015e5081dbdea3))
+
+
+
+## [0.0.18](https://github.com/Simon-He95/markstream-vue/compare/v0.0.17...v0.0.18) (2025-06-03)
+
+
+### Bug Fixes
+
+* update vue-i18n dependency version and clean up unused worker imports in useMonaco ([6d8a478](https://github.com/Simon-He95/markstream-vue/commit/6d8a4785822b2d9856fb805fa6cb4bf2cf20142f))
+
+
+
+## [0.0.17](https://github.com/Simon-He95/markstream-vue/compare/v0.0.16...v0.0.17) (2025-06-03)
+
+
+### Features
+
+* integrate monaco-editor and add theme support in code editor ([fc319b5](https://github.com/Simon-He95/markstream-vue/commit/fc319b50505efa6237cf5f262ea90544427b7e0d))
+
+
+
+## [0.0.16](https://github.com/Simon-He95/markstream-vue/compare/v0.0.15...v0.0.16) (2025-06-03)
+
+
+### Bug Fixes
+
+* revert version to 0.0.15 in package.json and remove markdown-it dependency from pnpm-lock.yaml ([f59b86d](https://github.com/Simon-He95/markstream-vue/commit/f59b86d4fb5fb10a1336ba0c7ad9eaa7f0607afd))
+
+
+
+## [0.0.15](https://github.com/Simon-He95/markstream-vue/compare/v0.0.14...v0.0.15) (2025-05-30)
+
+
+
+## [0.0.14](https://github.com/Simon-He95/markstream-vue/compare/v0.0.13...v0.0.14) (2025-05-30)
+
+
+### Features
+
+* **FootnoteReferenceNode:** enhance footnote scrolling behavior and update template structure ([43bd26a](https://github.com/Simon-He95/markstream-vue/commit/43bd26a08861c3f9fcb7da4c3251c6959728832f))
+
+
+
+## [0.0.13](https://github.com/Simon-He95/markstream-vue/compare/v0.0.12...v0.0.13) (2025-05-30)
+
+
+### Features
+
+* refactor node components management and enhance footnote parsing ([04e2e0b](https://github.com/Simon-He95/markstream-vue/commit/04e2e0bbbf70d44b9c27f1b69a129a056a960b2b))
+
+
+
+## [0.0.12](https://github.com/Simon-He95/markstream-vue/compare/v0.0.11...v0.0.12) (2025-05-28)
+
+
+### Bug Fixes
+
+* **useCodeEditor:** correct theme variable initialization order ([cfb93cc](https://github.com/Simon-He95/markstream-vue/commit/cfb93cc16bb8281dbd87eadb26ed8efcc2d799c4))
+
+
+
+## [0.0.11](https://github.com/Simon-He95/markstream-vue/compare/v0.0.10...v0.0.11) (2025-05-28)
+
+
+### Features
+
+* **theme:** export createTheme for external usage ([5ce0db6](https://github.com/Simon-He95/markstream-vue/commit/5ce0db6649c7b74838e9712b55ecacfc4805a9e5))
+
+
+
+## [0.0.10](https://github.com/Simon-He95/markstream-vue/compare/v0.0.9...v0.0.10) (2025-05-28)
+
+
+### Bug Fixes
+
+* style ([3f36584](https://github.com/Simon-He95/markstream-vue/commit/3f3658489b9ee1af910996cdeaf21cda56b4590d))
+
+
+### Features
+
+* **CodeBlockNode:** support custom theme ([8017f26](https://github.com/Simon-He95/markstream-vue/commit/8017f26b0ffe9a65bd318609edcfec38cf32102d))
+
+
+
+## [0.0.9](https://github.com/Simon-He95/markstream-vue/compare/v0.0.8...v0.0.9) (2025-05-28)
+
+
+### Bug Fixes
+
+* style ([f0e65e7](https://github.com/Simon-He95/markstream-vue/commit/f0e65e723a03b4c333ff4a8a7f352f1c4b38e046))
+
+
+
+## [0.0.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.7...v0.0.8) (2025-05-28)
+
+
+
+## [0.0.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.6...v0.0.7) (2025-05-27)
+
+
+
+## [0.0.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.5...v0.0.6) (2025-05-26)
+
+
+
+## [0.0.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4...v0.0.5) (2025-05-26)
+
+
+### Bug Fixes
+
+* refactor cleanupEditor function to ensure proper editor instance cleanup ([f16380f](https://github.com/Simon-He95/markstream-vue/commit/f16380f386bdf9b03758609c376244f9b5d73a31))
+
+
+
+## [0.0.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3...v0.0.4) (2025-05-26)
+
+
+### Bug Fixes
+
+* fix the dts error & support vue.use ([a462867](https://github.com/Simon-He95/markstream-vue/commit/a462867088cc3a4c95ab8fcc0e7f04da09763750))
+
+
+
+## [0.0.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2...v0.0.3) (2025-05-26)
+
+
+
+## 0.0.2 (2025-05-26)
+
+
+

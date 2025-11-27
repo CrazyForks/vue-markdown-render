@@ -13,14 +13,14 @@ export interface MathOptions {
   /** Whether to escape standalone '!' (default: true). */
   escapeExclamation?: boolean
   /**
-  * Strict delimiter mode.
-  * - When true, only explicit TeX delimiters are recognized as math:
-  *   inline: `$...$` and `\\(...\\)`; block: `$$...$$` and `\\[...\\]`.
-  *
-  * Important: authors should write explicit TeX delimiters with escaped
-  * backslashes in source (for example, write `\\(...\\)` rather than
-  * an unescaped `\(...\)`). Unescaped `\(...\)` cannot be reliably
-  * distinguished from ordinary parentheses and may not be parsed as math.
+   * Strict delimiter mode.
+   * - When true, only explicit TeX delimiters are recognized as math:
+   *   inline: `$...$` and `\\(...\\)`; block: `$$...$$` and `\\[...\\]`.
+   *
+   * Important: authors should write explicit TeX delimiters with escaped
+   * backslashes in source (for example, write `\\(...\\)` rather than
+   * an unescaped `\(...\)`). Unescaped `\(...\)` cannot be reliably
+   * distinguished from ordinary parentheses and may not be parsed as math.
    * - Heuristics and mid-state (unclosed) math detection are disabled.
    */
   strictDelimiters?: boolean
