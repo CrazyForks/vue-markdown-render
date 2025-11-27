@@ -28,3 +28,8 @@ const md = getMarkdown()
 ```
 
 If KaTeX is not installed, the renderer will leave math content as text and still be import-safe under SSR.
+
+Important: when writing source Markdown, always use literal (escaped) backslashes
+for TeX parenthesis delimiters. Write `\\(...\\)` rather than `\(...\)` so
+the parser can reliably detect inline TeX delimiters. Unescaped `\(...\)`
+cannot be distinguished from ordinary parentheses and may not be parsed as math.

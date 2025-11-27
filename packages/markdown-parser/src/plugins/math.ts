@@ -225,7 +225,7 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
   return result
 }
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
-  // Inline rule for \(...\) and $$...$$ and $...$
+  // Inline rule for `\\(...\\)` and `$$...$$` and `$...$`
   const mathInline = (state: unknown, silent: boolean) => {
     const s = state as any
     const strict = !!mathOpts?.strictDelimiters
@@ -235,7 +235,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     }
     const delimiters: [string, string][] = [
       ['$', '$'],
-      // Support explicit TeX inline delimiters only: \( ... \)
+      // Support explicit TeX inline delimiters only: `\\(...\\)`
+      // NOTE: in source text authors must write the backslashes literally
+      // (e.g. `\\(...\\)`). Unescaped `\(...\)` cannot be reliably
+      // distinguished from ordinary parentheses and may not be parsed as math.
       ['\\(', '\\)'],
       // Do NOT treat plain parentheses as math delimiters. Using ['\(', '\)']
       // accidentally becomes ['(', ')'] in JS/TS strings and over-matches
