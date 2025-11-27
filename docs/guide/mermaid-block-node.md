@@ -1,42 +1,38 @@
 # MermaidBlockNode (Component)
 
-`MermaidBlockNode` 提供一个易于使用且可扩展的 Mermaid 渲染器，适用于需要在文档中内嵌交互式 Mermaid 图的场景。组件支持渐进式渲染、源码/预览切换、复制源码、导出 SVG，以及伪全屏查看（带缩放与拖拽）。
+`MermaidBlockNode` is a lightweight, extensible renderer for Mermaid diagrams intended for embedding interactive Mermaid charts within documents. The component supports progressive rendering, source/preview toggling, copying source, exporting SVG, and a pseudo-fullscreen modal (with zoom and drag).
 
-## Props（关键）
-- `node: any` — Mermaid 代码节点（必须）
-- `isDark?: boolean` — 暗色模式开关
-- `loading?: boolean` — 初始加载占位
-- `maxHeight?: string | null` — 最大高度
-- Header/按钮控制（全部可选，默认 `true`）:
-  - `showHeader` / `showModeToggle` / `showCopyButton` / `showExportButton` / `showFullscreenButton` / `showCollapseButton` / `showZoomControls`
+## Props (key)
+- `node: any` — the Mermaid code node (required)
+- `isDark?: boolean` — dark mode flag
+- `loading?: boolean` — initial loading placeholder
+- `maxHeight?: string | null` — maximum height
+- Header / control props (all optional, default `true`):
+  - `showHeader`, `showModeToggle`, `showCopyButton`, `showExportButton`, `showFullscreenButton`, `showCollapseButton`, `showZoomControls`
 
 ## Slots
-- `header-left` — 替换左侧（默认是 Mermaid 图标 + 标签）
-- `header-center` — 替换中间区域（默认 preview/source 切换）
-- `header-right` — 替换右侧操作按钮（完整接管默认按钮）
+- `header-left` — replace the left area (defaults to Mermaid icon + label)
+- `header-center` — replace the center area (defaults to preview/source toggle)
+- `header-right` — replace the right-side action buttons (take full control of the default controls)
 
 ## Emits
-组件发出的事件都使用统一的 `MermaidBlockEvent` 对象，支持 `preventDefault()` 来阻止组件默认行为：
+The component emits events using a unified `MermaidBlockEvent` object. Listeners can call `preventDefault()` on the event to stop the component's default behavior:
 
-- `copy` — 复制事件（保留默认复制逻辑）
-- `export` — 导出按钮点击，处理签名：`(ev: MermaidBlockEvent<{ type: 'export' }>)`
-- `openModal` — 请求打开 pseudo-fullscreen，处理签名：`(ev: MermaidBlockEvent<{ type: 'open-modal' }>)`（组件内部 emit 名称为 `openModal`）
-- `toggleMode` — 切换 `source | preview`，处理签名：`(target: 'source' | 'preview', ev: MermaidBlockEvent<{ type: 'toggle-mode'; target: 'source' | 'preview' }>)`（组件内部 emit 名称为 `toggleMode`）
+- `copy` — copy event (component retains default copy behavior unless prevented)
+- `export` — export button clicked, signature: `(ev: MermaidBlockEvent<{ type: 'export' }>)`
+- `openModal` — request to open the pseudo-fullscreen modal, signature: `(ev: MermaidBlockEvent<{ type: 'openModal' }>)`
+- `toggleMode` — toggle between `source` and `preview`, signature: `(target: 'source' | 'preview', ev: MermaidBlockEvent<{ type: 'toggleMode'; target: 'source' | 'preview' }>)`
 
-### 拦截示例
-完全替换组件默认导出行为：
+### Intercept example
+Completely override the component's default export behavior:
 
 ```vue
-<template>
-  <MermaidBlockNode :node="node" @export="onExport" />
-</template>
-
 <script setup lang="ts">
 import type { MermaidBlockEvent } from '../../types/component-props'
 
 function onExport(ev: any /* MermaidBlockEvent */) {
   ev.preventDefault()
-  // 组件在事件对象中暴露了 svgElement，直接使用它更方便
+  // The component exposes the rendered SVG element on the event as `svgElement`.
   const svgEl = ev.svgElement as SVGElement | null
   if (!svgEl) {
     console.warn('No svg element available')
@@ -46,11 +42,15 @@ function onExport(ev: any /* MermaidBlockEvent */) {
   uploadSvg(svgString)
 }
 </script>
+
+<template>
+  <MermaidBlockNode :node="node" @export="onExport" />
+</template>
 ```
 
-> Note: 组件现在会在事件对象中附带 `svgElement`（DOM 节点）。如果你需要 `svg` 字符串（已序列化），我可以把 `svgString` 也包含在 `export`/`openModal` payload 中。
+> Note: The event object currently includes `svgElement` (the DOM node). If you prefer the component to also provide a serialized `svgString` in the event payload, I can add that.
 
-## Slot 示例：完全接管右侧操作按钮
+## Slot example — fully replace right-side controls
 
 ```vue
 <MermaidBlockNode :node="node" :showExportButton="false">
@@ -61,14 +61,18 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 </MermaidBlockNode>
 ```
 
-## 推荐用法
-- 如果你要实现自定义导出/上传，最佳做法是：在 `export` 监听器中 `preventDefault()`，并在监听回调中直接从组件渲染的 DOM 中读取 `svg`。
-- 如果你想要完全替换头部的 UI，使用 `header-*` 插槽并把相应 `show*` props 设为 `false` 来隐藏默认按钮。
+## Recommended usage
+- To implement custom export/upload behavior, call `preventDefault()` in the `export` listener and extract the SVG from the rendered DOM in your handler.
+- To fully replace the header UI, use the `header-*` slots and set the corresponding `show*` props to `false` to hide the default controls.
 
 ---
 
-如果你希望我现在：
-- A) 将 `export` / `openModal` 事件的 payload 增加 `svg` 字符串（我可以实现并更新组件与文档）；
-- B) 把本页面加入 docs 左侧目录或导航（需要修改 docs 配置）；
-- C) 生成一个可运行的示例页面（playground/demo）；
-请选择一个继续。
+If you'd like me to:
+- A) add `svgString` to the `export` / `openModal` event payloads (I can implement and update docs);
+- B) add this page to the docs sidebar/navigation (requires docs config changes);
+- C) create a runnable demo/playground page for this example;
+please choose one to continue.
+
+## See also
+
+- Override `MermaidBlockNode` (use `setCustomComponents` with `MarkdownRender`): [Override MermaidBlockNode in MarkdownRender](./mermaid-block-node-override.md)

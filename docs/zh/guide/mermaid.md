@@ -39,3 +39,7 @@ const id = setInterval(() => {
 - 若解析/渲染失败，请检查浏览器控制台与网络请求中是否缺失 Mermaid 资源。
 
 `Mermaid` 为可选 peer 依赖：要启用请安装 `mermaid`。
+
+另请参阅：
+
+- `MermaidBlockNode` — 带有头部控制、导出和模态框的高级 Mermaid 组件：[MermaidBlockNode 指南](./mermaid-block-node.md)

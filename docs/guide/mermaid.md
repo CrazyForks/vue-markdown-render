@@ -37,4 +37,8 @@ Notes:
 - If Mermaid fails to render, the component will fall back to showing the source text.
 - For heavy diagrams, consider pre-rendering server-side or caching the SVG output.
 
+See also:
+
+- `MermaidBlockNode` — advanced Mermaid component with header controls, export, and modal: [MermaidBlockNode guide](./mermaid-block-node.md)
+
 ![Mermaid demo](/screenshots/mermaid-demo.svg)
