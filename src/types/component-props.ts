@@ -80,6 +80,26 @@ export interface MermaidBlockNodeProps {
   parseTimeoutMs?: number
   renderTimeoutMs?: number
   fullRenderTimeoutMs?: number
+  // header customization
+  showHeader?: boolean
+  showModeToggle?: boolean
+  showCopyButton?: boolean
+  showExportButton?: boolean
+  showFullscreenButton?: boolean
+  showCollapseButton?: boolean
+  showZoomControls?: boolean
+}
+
+// Generic event wrapper used by MermaidBlockNode emits. Consumers can call
+// `preventDefault()` to stop the component's default action.
+export interface MermaidBlockEvent<TPayload = any> {
+  payload?: TPayload
+  defaultPrevented: boolean
+  preventDefault: () => void
+  // optional: direct access to the rendered SVG element (if available)
+  svgElement?: SVGElement | null
+  // optional: serialized SVG string (may be absent to avoid extra work)
+  svgString?: string | null
 }
 
 export interface MathBlockNodeProps {

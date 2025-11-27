@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Exported props interface for MermaidBlockNode
-import type { MermaidBlockNodeProps } from '../../types/component-props'
+import type { MermaidBlockEvent, MermaidBlockNodeProps } from '../../types/component-props'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
@@ -21,9 +21,17 @@ const props = withDefaults(
     parseTimeoutMs: 1800,
     renderTimeoutMs: 2500,
     fullRenderTimeoutMs: 4000,
+    // header/button control defaults
+    showHeader: true,
+    showModeToggle: true,
+    showCopyButton: true,
+    showExportButton: true,
+    showFullscreenButton: true,
+    showCollapseButton: true,
+    showZoomControls: true,
   },
 )
-const emits = defineEmits(['copy'])
+const emits = defineEmits(['copy', 'export', 'openModal', 'toggleMode'])
 const { t } = useSafeI18n()
 
 let mermaid: any = null
@@ -709,14 +717,8 @@ async function copy() {
 }
 
 // Export SVG
-async function exportSvg() {
+async function exportSvg(svgElement) {
   try {
-    const svgElement = mermaidContent.value?.querySelector('svg')
-    if (!svgElement) {
-      console.error('SVG element not found')
-      return
-    }
-
     const svgData = new XMLSerializer().serializeToString(svgElement)
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -735,6 +737,56 @@ async function exportSvg() {
   }
   catch (error) {
     console.error('Failed to export SVG:', error)
+  }
+}
+
+function handleExportClick() {
+  const svgElement = mermaidContent.value?.querySelector('svg')
+  if (!svgElement) {
+    console.error('SVG element not found')
+    return
+  }
+  const ev: MermaidBlockEvent<{ type: 'export' }> = {
+    payload: { type: 'export' },
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true
+    },
+    svgElement,
+  }
+  emits('export', ev)
+  if (!ev.defaultPrevented) {
+    exportSvg(svgElement)
+  }
+}
+
+function handleOpenModalClick() {
+  const svgElement = mermaidContent.value?.querySelector('svg') ?? null
+  const ev: MermaidBlockEvent<{ type: 'open-modal' }> = {
+    payload: { type: 'open-modal' },
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true
+    },
+    svgElement,
+  }
+  emits('openModal', ev)
+  if (!ev.defaultPrevented) {
+    openModal()
+  }
+}
+
+function handleSwitchMode(target: 'source' | 'preview') {
+  const ev: MermaidBlockEvent<{ type: 'toggle-mode', target: 'source' | 'preview' }> = {
+    payload: { type: 'toggle-mode', target },
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true
+    },
+  }
+  emits('toggleMode', target, ev)
+  if (!ev.defaultPrevented) {
+    switchMode(target)
   }
 }
 
@@ -1359,17 +1411,24 @@ const computedButtonStyle = computed(() => {
   >
     <!-- 重新设计的头部区域 -->
     <div
+      v-if="props.showHeader"
       class="mermaid-block-header flex justify-between items-center px-4 py-2.5 border-b"
       :class="props.isDark ? 'bg-gray-800 border-gray-700/30' : 'bg-gray-50 border-gray-200'"
     >
-      <!-- 左侧语言标签 -->
-      <div class="flex items-center space-x-2">
+      <!-- 左侧插槽（允许完全接管左侧显示） -->
+      <div v-if="$slots['header-left']">
+        <slot name="header-left" />
+      </div>
+      <div v-else class="flex items-center space-x-2">
         <img :src="mermaidIconUrl" class="w-4 h-4 my-0" alt="Mermaid">
         <span class="text-sm font-medium font-mono" :class="props.isDark ? 'text-gray-400' : 'text-gray-600'">Mermaid</span>
       </div>
 
-      <!-- 中间切换按钮 -->
-      <div v-if="mermaidAvailable" class="flex items-center space-x-1 rounded-md p-0.5" :class="props.isDark ? 'bg-gray-700' : 'bg-gray-100'">
+      <!-- 中间插槽或默认切换按钮 -->
+      <div v-if="$slots['header-center']">
+        <slot name="header-center" />
+      </div>
+      <div v-else-if="props.showModeToggle && mermaidAvailable" class="flex items-center space-x-1 rounded-md p-0.5" :class="props.isDark ? 'bg-gray-700' : 'bg-gray-100'">
         <button
           class="px-2.5 py-1 text-xs rounded transition-colors"
           :class="[
@@ -1377,7 +1436,7 @@ const computedButtonStyle = computed(() => {
               ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm')
               : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'),
           ]"
-          @click="switchMode('preview')"
+          @click="() => handleSwitchMode('preview')"
           @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
           @focus="onBtnHover($event, t('common.preview') || 'Preview')"
           @mouseleave="onBtnLeave"
@@ -1395,7 +1454,7 @@ const computedButtonStyle = computed(() => {
               ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm')
               : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'),
           ]"
-          @click="switchMode('source')"
+          @click="() => handleSwitchMode('source')"
           @mouseenter="onBtnHover($event, t('common.source') || 'Source')"
           @focus="onBtnHover($event, t('common.source') || 'Source')"
           @mouseleave="onBtnLeave"
@@ -1408,9 +1467,13 @@ const computedButtonStyle = computed(() => {
         </button>
       </div>
 
-      <!-- 右侧操作按钮 -->
-      <div class="flex items-center space-x-1">
+      <!-- 右侧插槽或默认操作按钮（可通过 props 控制每个按钮显隐） -->
+      <div v-if="$slots['header-right']">
+        <slot name="header-right" />
+      </div>
+      <div v-else class="flex items-center space-x-1">
         <button
+          v-if="props.showCollapseButton"
           :class="computedButtonStyle"
           :aria-pressed="isCollapsed"
           @click="isCollapsed = !isCollapsed"
@@ -1422,6 +1485,7 @@ const computedButtonStyle = computed(() => {
           <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
         </button>
         <button
+          v-if="props.showCopyButton"
           :class="computedButtonStyle"
           @click="copy"
           @mouseenter="onCopyHover($event)"
@@ -1433,10 +1497,10 @@ const computedButtonStyle = computed(() => {
           <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
         </button>
         <button
-          v-if="mermaidAvailable"
+          v-if="props.showExportButton && mermaidAvailable"
           :class="`${computedButtonStyle} ${isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : ''}`"
           :disabled="isFullscreenDisabled"
-          @click="exportSvg"
+          @click="handleExportClick"
           @mouseenter="onBtnHover($event, t('common.export') || 'Export')"
           @focus="onBtnHover($event, t('common.export') || 'Export')"
           @mouseleave="onBtnLeave"
@@ -1445,10 +1509,10 @@ const computedButtonStyle = computed(() => {
           <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 15V3m9 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10l5 5l5-5" /></g></svg>
         </button>
         <button
-          v-if="mermaidAvailable"
+          v-if="props.showFullscreenButton && mermaidAvailable"
           :class="`${computedButtonStyle} ${isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : ''}`"
           :disabled="isFullscreenDisabled"
-          @click="openModal"
+          @click="handleOpenModalClick"
           @mouseenter="onBtnHover($event, isModalOpen ? (t('common.minimize') || 'Minimize') : (t('common.open') || 'Open'))"
           @focus="onBtnHover($event, isModalOpen ? (t('common.minimize') || 'Minimize') : (t('common.open') || 'Open'))"
           @mouseleave="onBtnLeave"
@@ -1467,7 +1531,7 @@ const computedButtonStyle = computed(() => {
       </div>
       <div v-else class="relative">
         <!-- ...existing preview content... -->
-        <div class="absolute top-2 right-2 z-10 rounded-lg">
+        <div v-if="props.showZoomControls" class="absolute top-2 right-2 z-10 rounded-lg">
           <div class="flex items-center gap-2 backdrop-blur rounded-lg">
             <button
               class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
