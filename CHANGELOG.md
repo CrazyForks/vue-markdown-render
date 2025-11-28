@@ -1,3 +1,13 @@
+## [0.0.2-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.3...v0.0.2-beta.4) (2025-11-27)
+
+
+### Features
+
+* add CodeBlockNode and MermaidBlockNode components with detailed documentation ([b27ed27](https://github.com/Simon-He95/markstream-vue/commit/b27ed27a7b7415ef4a744098322b0e827d229a9b))
+* add MermaidBlockNode and CodeBlockNode documentation in English and Chinese; remove outdated README files ([2c540e8](https://github.com/Simon-He95/markstream-vue/commit/2c540e8ee6918c03aac533dd4c465241ee52c828))
+
+
+
 ## [0.0.2-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.2...v0.0.2-beta.3) (2025-11-26)
 
 
