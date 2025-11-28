@@ -34,13 +34,6 @@ function goToTest() {
   })
 }
 
-function goToMermaidExportDemo() {
-  // Prefer router navigation, fallback to full redirect if it fails.
-  router.push('/mermaid-export-demo').catch(() => {
-    window.location.href = '/mermaid-export-demo'
-  })
-}
-
 // Keep persisted values within reasonable bounds on hydration.
 watchEffect(() => {
   const parsedDelay = Number(streamDelay.value)
@@ -512,15 +505,6 @@ onBeforeUnmount(() => {
             >
               <Icon icon="carbon:rocket" class="w-4 h-4" />
               <span>Test</span>
-            </button>
-            <!-- Mermaid export demo -->
-            <button
-              class="ml-2 test-page-btn flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-green-500/50"
-              title="Mermaid export demo"
-              @click="goToMermaidExportDemo"
-            >
-              <Icon icon="carbon:download" class="w-4 h-4" />
-              <span>Mermaid Export</span>
             </button>
           </div>
         </div>

@@ -520,9 +520,6 @@ export function parseInlineTokens(
       i++
       return
     }
-    if (content.startsWith(')') && result[result.length - 1]?.type === 'link') {
-      content = content.slice(1)
-    }
 
     // math 公式 $ 只出现一个并且在末尾，优化掉
     if (Array.from(content.matchAll(/\$/g)).length === 1 && content.endsWith('$')) {

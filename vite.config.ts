@@ -1,6 +1,8 @@
-import Vue from '@vitejs/plugin-vue'
+import process from 'node:process'
 /// <reference types="vitest" />
 
+import Vue from '@vitejs/plugin-vue'
+import { visualizer } from 'rollup-plugin-visualizer'
 import UnpluginClassExtractor from 'unplugin-class-extractor/vite'
 import Components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vite'
@@ -41,6 +43,13 @@ export default defineConfig(({ mode }) => {
         include: [/\/src\/components\/(?:[^/]+\/)*[^/]+\.vue(\?.*)?$/],
       }) as any,
     ]
+    // Add optional bundle visualizer when ANALYZE=true
+    if (process.env.ANALYZE === 'true') {
+      plugins.push(
+        // write interactive treemap to `dist/bundle-visualizer.html`
+        visualizer({ filename: 'dist/bundle-visualizer.html', gzipSize: true, brotliSize: true }) as any,
+      )
+    }
     build = {
       target: 'es2015',
       cssTarget: 'chrome61',
@@ -86,6 +95,7 @@ export default defineConfig(({ mode }) => {
             'katex/contrib/mhchem',
             'stream-monaco',
             'stream-markdown',
+            'stream-markdown-parser',
             'monaco-editor',
             'shiki',
           ].includes(id)

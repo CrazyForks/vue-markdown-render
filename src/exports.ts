@@ -1,11 +1,11 @@
 import type { App, Component, Plugin } from 'vue'
 import type { LanguageIconResolver } from './utils/languageIcon'
 import { setDefaultMathOptions } from 'stream-markdown-parser'
+import { defineAsyncComponent } from 'vue'
 import AdmonitionNode from './components/AdmonitionNode'
 
 import BlockquoteNode from './components/BlockquoteNode'
 import CheckboxNode from './components/CheckboxNode'
-import CodeBlockNode from './components/CodeBlockNode'
 import DefinitionListNode from './components/DefinitionListNode'
 import EmojiNode from './components/EmojiNode'
 import FootnoteNode from './components/FootnoteNode'
@@ -20,8 +20,6 @@ import LinkNode from './components/LinkNode'
 import ListItemNode from './components/ListItemNode'
 import ListNode from './components/ListNode'
 import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
-import MathBlockNode from './components/MathBlockNode'
-import MathInlineNode from './components/MathInlineNode'
 import MermaidBlockNode from './components/MermaidBlockNode'
 import MarkdownRender from './components/NodeRenderer'
 import ParagraphNode from './components/ParagraphNode'
@@ -38,8 +36,13 @@ import { setDefaultI18nMap } from './composables/useSafeI18n'
 import { setLanguageIconResolver } from './utils/languageIcon'
 import { clearGlobalCustomComponents, getCustomNodeComponents, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
 import './index.css'
+// Re-add top-level worker imports so builds emit worker bundles into `dist/`
 import './workers/katexRenderer.worker?worker'
 import './workers/mermaidParser.worker?worker'
+
+const CodeBlockNode = defineAsyncComponent(() => import('./components/CodeBlockNode'))
+const MathBlockNode = defineAsyncComponent(() => import('./components/MathBlockNode'))
+const MathInlineNode = defineAsyncComponent(() => import('./components/MathInlineNode'))
 
 // Export centralized props interfaces so they appear in package d.ts
 export * from './utils'

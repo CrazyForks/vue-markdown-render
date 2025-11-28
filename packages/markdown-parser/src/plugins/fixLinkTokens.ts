@@ -83,6 +83,7 @@ export function applyFixLinkTokens(md: MarkdownIt) {
 function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
   if (tokens.length < 4)
     return tokens
+
   for (let i = 0; i <= tokens.length - 1; i++) {
     if (i < 0) {
       i = 0
@@ -281,11 +282,11 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         if (m === -1) {
           href += (tokens[i + 1]?.content?.slice(0, m) || '')
           tokens[i + 1].content = ''
+          count += 1
         }
         else {
           loading = false
         }
-        count += 1
       }
       else if (tokens[i + 1].type === 'text' && tokens[i + 1]?.content?.startsWith('](')) {
         count += 1

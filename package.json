@@ -35,6 +35,9 @@
     "real-time-preview",
     "markstream-vue"
   ],
+  "sideEffects": [
+    "src/index.css"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -136,6 +139,7 @@
     "postcss-cli": "^11.0.1",
     "rollup": "^3.29.5",
     "rollup-plugin-dts": "^5.3.1",
+    "rollup-plugin-visualizer": "^6.0.5",
     "stream-markdown-parser": "workspace:^",
     "tailwindcss": "^3.4.18",
     "terser": "^5.44.1",

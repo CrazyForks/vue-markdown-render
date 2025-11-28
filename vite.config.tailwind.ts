@@ -1,21 +1,29 @@
-import Vue from '@vitejs/plugin-vue'
+import process from 'node:process'
 /// <reference types="vitest" />
 
+import Vue from '@vitejs/plugin-vue'
 import autoprefixer from 'autoprefixer'
+import { visualizer } from 'rollup-plugin-visualizer'
 import UnpluginClassExtractor from 'unplugin-class-extractor/vite'
 import { defineConfig } from 'vite'
 import { name } from './package.json'
 
 // https://vitejs.dev/config/
+const pluginsArr: any[] = [
+  Vue(),
+  UnpluginClassExtractor({
+    output: 'dist/tailwind.ts',
+    include: [/\/src\/components\/(?:[^/]+\/)*[^/]+\.vue(\?.*)?$/],
+  }) as any,
+]
+
+if (process.env.ANALYZE === 'true') {
+  pluginsArr.push(visualizer({ filename: 'dist/bundle-visualizer-tailwind.html', gzipSize: true }) as any)
+}
+
 export default defineConfig({
   base: '/',
-  plugins: [
-    Vue(),
-    UnpluginClassExtractor({
-      output: 'dist/tailwind.ts',
-      include: [/\/src\/components\/(?:[^/]+\/)*[^/]+\.vue(\?.*)?$/],
-    }) as any,
-  ],
+  plugins: pluginsArr,
   build: {
     target: 'es2015',
     cssTarget: 'chrome61',
@@ -58,6 +66,8 @@ export default defineConfig({
         'monaco-editor-core',
         'stream-monaco',
         'stream-markdown',
+        'stream-markdown-parser',
+        '@floating-ui/dom',
         'vscode-textmate',
         'vscode-oniguruma',
       ],

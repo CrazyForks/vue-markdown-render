@@ -57,15 +57,20 @@ exports[`e2e markdown parsing (fixtures) > parses fixture escaped-brackets.md > 
   {
     "children": [
       "text",
+      "text_special",
+      "text",
+      "text_special",
     ],
-    "firstText": "A line with an escaped bracket: [not a link]",
+    "firstText": "A line with an escaped bracket: ",
     "type": "paragraph",
   },
   {
     "children": [
       "text",
+      "text_special",
+      "text",
     ],
-    "firstText": "And a literal backslash  and more text.",
+    "firstText": "And a literal backslash ",
     "type": "paragraph",
   },
 ]
@@ -178,8 +183,12 @@ exports[`e2e markdown parsing (fixtures) > parses fixture math.md > math.md 1`] 
   {
     "children": [
       "text",
+      "text_special",
+      "text",
+      "text_special",
+      "text",
     ],
-    "firstText": "Inline math (alpha + beta) and another form (x_i).",
+    "firstText": "Inline math (",
     "type": "paragraph",
   },
   {

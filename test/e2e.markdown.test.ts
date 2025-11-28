@@ -91,7 +91,7 @@ describe('e2e markdown parsing (fixtures)', () => {
         }
         else {
           // generic: record if has children
-          out.children = (n as any).children ? (n as any).children.map(item => item.type) : undefined
+          out.children = (n as any).children ? (n as any).children.map((item: any) => item.type) : undefined
         }
         // Tolerate environment differences for escaped backslash in a specific fixture
         if (f === 'escaped-brackets.md' && typeof out.firstText === 'string') {

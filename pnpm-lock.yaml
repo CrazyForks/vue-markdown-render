@@ -87,6 +87,9 @@ importers:
       rollup-plugin-dts:
         specifier: ^5.3.1
         version: 5.3.1(rollup@3.29.5)(typescript@5.9.3)
+      rollup-plugin-visualizer:
+        specifier: ^6.0.5
+        version: 6.0.5(rolldown@1.0.0-beta.45)(rollup@3.29.5)
       stream-markdown-parser:
         specifier: workspace:^
         version: link:packages/markdown-parser
@@ -157,8 +160,8 @@ importers:
         specifier: ^1.0.6
         version: 1.0.6
       markdown-it-ts:
-        specifier: 0.0.2-beta.7
-        version: 0.0.2-beta.7
+        specifier: 0.0.2-beta.8
+        version: 0.0.2-beta.8
     devDependencies:
       '@types/node':
         specifier: ^22.19.1
@@ -192,7 +195,7 @@ importers:
         version: 0.16.25
       markstream-vue:
         specifier: latest
-        version: 0.0.2-beta.0(katex@0.16.25)(mermaid@11.12.1)(shiki@3.15.0)(stream-markdown@0.0.10(shiki@3.15.0))(stream-monaco@0.0.7(monaco-editor@0.52.2))(vue-i18n@11.2.2(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3))
+        version: 0.0.2-beta.4(katex@0.16.25)(mermaid@11.12.1)(shiki@3.15.0)(stream-markdown@0.0.10(shiki@3.15.0))(stream-monaco@0.0.7(monaco-editor@0.52.2))(vue-i18n@11.2.2(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3))
       stream-markdown:
         specifier: latest
         version: 0.0.10(shiki@3.15.0)
@@ -4711,8 +4714,8 @@ packages:
   markdown-it-task-checkbox@1.0.6:
     resolution: {integrity: sha512-7pxkHuvqTOu3iwVGmDPeYjQg+AIS9VQxzyLP9JCg9lBjgPAJXGEkChK6A2iFuj3tS0GV3HG2u5AMNhcQqwxpJw==}
 
-  markdown-it-ts@0.0.2-beta.7:
-    resolution: {integrity: sha512-2CSbb9ZYarUsAQl4w5bxxlPAf8ZLs5oFaasyAK1zNWmifmSIymVn4D1rTWMCzKp9jMvkhdtLNdFyguyWscXjcg==}
+  markdown-it-ts@0.0.2-beta.8:
+    resolution: {integrity: sha512-Muef2Pd7onDeVPIy0oPeIkLBqyQG8R8r87LicVWHTjX5Aww+3JYARlMbRlpKprWH5PWS1s0/osZdTdZtj+Q7Yg==}
     engines: {node: '>=18'}
 
   markdown-table@3.0.4:
@@ -4723,14 +4726,14 @@ packages:
     engines: {node: '>= 20'}
     hasBin: true
 
-  markstream-vue@0.0.2-beta.0:
-    resolution: {integrity: sha512-u5XsNJdyQIW/LGeDMxPhircpsN3VpYprZjfkEuacJDhWkw6fepBFHDg5IY8IHzjqEk3NuEuFuO7bfS9wx9Roww==}
+  markstream-vue@0.0.2-beta.4:
+    resolution: {integrity: sha512-tHzSKslCwPVa+Xp5StyUkAPhPY+T+OhxcAN0FqgVYRHh45kz3SMIwyh24afep/q6wn4vYtGSZu7UGx+umSGvwA==}
     peerDependencies:
       katex: '>=0.16.22'
       mermaid: '>=11'
       shiki: ^3.13.0
       stream-markdown: '>=0.0.10'
-      stream-monaco: '>=0.0.6'
+      stream-monaco: '>=0.0.7'
       vue: 3.5.25
       vue-i18n: '>=9'
     peerDependenciesMeta:
@@ -11993,7 +11996,7 @@ snapshots:
 
   markdown-it-task-checkbox@1.0.6: {}
 
-  markdown-it-ts@0.0.2-beta.7:
+  markdown-it-ts@0.0.2-beta.8:
     dependencies:
       entities: 4.5.0
       linkify-it: 5.0.0
@@ -12005,7 +12008,7 @@ snapshots:
 
   marked@16.4.2: {}
 
-  markstream-vue@0.0.2-beta.0(katex@0.16.25)(mermaid@11.12.1)(shiki@3.15.0)(stream-markdown@0.0.10(shiki@3.15.0))(stream-monaco@0.0.7(monaco-editor@0.52.2))(vue-i18n@11.2.2(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3)):
+  markstream-vue@0.0.2-beta.4(katex@0.16.25)(mermaid@11.12.1)(shiki@3.15.0)(stream-markdown@0.0.10(shiki@3.15.0))(stream-monaco@0.0.7(monaco-editor@0.52.2))(vue-i18n@11.2.2(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3)):
     dependencies:
       '@floating-ui/dom': 1.7.4
       vue: 3.5.25(typescript@5.9.3)
@@ -13489,6 +13492,16 @@ snapshots:
       typescript: 5.9.3
     optionalDependencies:
       '@babel/code-frame': 7.27.1
+
+  rollup-plugin-visualizer@6.0.5(rolldown@1.0.0-beta.45)(rollup@3.29.5):
+    dependencies:
+      open: 8.4.2
+      picomatch: 4.0.3
+      source-map: 0.7.6
+      yargs: 17.7.2
+    optionalDependencies:
+      rolldown: 1.0.0-beta.45
+      rollup: 3.29.5
 
   rollup-plugin-visualizer@6.0.5(rolldown@1.0.0-beta.45)(rollup@4.53.3):
     dependencies:

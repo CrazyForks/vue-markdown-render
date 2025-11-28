@@ -269,4 +269,62 @@ http://127.0.0.1:8001/upload/20251118/4737bbe0-c42e-11f0-8471-37360564882d.docx 
     nodes.forEach(walk)
     expect(foundHardBreak).toBe(true)
   })
+
+  it('parses Danish list item with parenthetical URL', () => {
+    const special = '- **Kilde:**\u202FGrammatip – “Tekstretter” (https://www.grammatip.com/tekstretter) – her beskrives, hvordan værktøjet automatisk markerer fejl, giver fejltyper, leverer farvekodet feedback, giver lærerne et samlet overblik og muligheden for at tilpasse, hvilke fejl eleven skal se.'
+    const nodes = parseMarkdownToStructure(special, md)
+
+    // Find the paragraph node inside the list item
+    let para: any = null
+    const findPara = (n: any) => {
+      if (!n)
+        return
+      if (n.type === 'paragraph') {
+        para = n
+        return
+      }
+      if (Array.isArray(n.children))
+        n.children.forEach(findPara)
+      if (Array.isArray(n.items))
+        n.items.forEach(findPara)
+    }
+    nodes.forEach(findPara)
+    expect(para).toBeTruthy()
+
+    // Flatten paragraph descendants into ordered tokens, marking links specially
+    const tokens: string[] = []
+    const flatten = (n: any) => {
+      if (!n)
+        return
+      if (n.type === 'link') {
+        tokens.push(`<LINK:${n.href || n.text || ''}>`)
+        return
+      }
+      if (n.type === 'text') {
+        tokens.push(n.content || n.text || '')
+        return
+      }
+      if (Array.isArray(n.children)) {
+        for (const c of n.children) flatten(c)
+      }
+    }
+    flatten(para)
+
+    // There should be at least one link token with the expected href
+    const linkIndex = tokens.findIndex(t => t.startsWith('<LINK:'))
+    expect(linkIndex).toBeGreaterThanOrEqual(0)
+    const linkToken = tokens[linkIndex]
+    expect(linkToken).toContain('https://www.grammatip.com/tekstretter')
+
+    // Check text immediately before the link contains the title/context
+    const before = tokens[linkIndex - 1] || ''
+    const hasBefore = before.includes('Tekstretter') || before.includes('Grammatip') || before.includes('Kilde')
+    expect(hasBefore).toBe(true)
+
+    // Check text immediately after the link contains the trailing explanation
+    const afterTokens = tokens.slice(linkIndex + 1)
+    const afterFull = afterTokens.join('').trim()
+    const expectedAfter = ') – her beskrives, hvordan værktøjet automatisk markerer fejl, giver fejltyper, leverer farvekodet feedback, giver lærerne et samlet overblik og muligheden for at tilpasse, hvilke fejl eleven skal se.'
+    expect(afterFull).toBe(expectedAfter)
+  })
 })
