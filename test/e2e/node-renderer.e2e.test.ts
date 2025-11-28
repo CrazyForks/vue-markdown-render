@@ -230,10 +230,11 @@ describe('markdownRender node e2e coverage', () => {
       markdown: 'A footnote reference[^1].\n\n[^1]: Footnote explanation',
       expectedText: ['A footnote reference', 'Footnote explanation'],
       assert: (wrapper) => {
-        const footnoteBlock = wrapper.find('[id="footnote-1"]')
+        const footnoteBlock = wrapper.find('[id="fnref-1"]')
         expect(footnoteBlock.exists()).toBe(true)
-        expect(footnoteBlock.text()).toContain('Footnote explanation')
-        expect(wrapper.html()).toContain('[1]')
+        expect(footnoteBlock.text()).toBe('[1]')
+        const footerAnchor = wrapper.find('.footnote-anchor')
+        expect(footerAnchor.exists()).toBe(true)
       },
     },
     {

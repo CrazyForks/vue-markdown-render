@@ -234,9 +234,7 @@ exports[`markdownRender node e2e coverage > renders footnote nodes 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-        <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">A footnote reference</span>
-          <!----><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">.</span>
-        </p>
+        <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">A footnote reference</span><sup data-v-ba0412bc="" data-v-93ee5c2d="" class="footnote-reference" id="fnref-1" index-key="markdown-renderer-0-1"><span data-v-ba0412bc="" href="#footnote-1" title="查看脚注 1" class="footnote-link cursor-pointer">[1]</span></sup><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">.</span></p>
       </transition-stub>
     </div>
   </div>
@@ -244,7 +242,8 @@ exports[`markdownRender node e2e coverage > renders footnote nodes 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-        <div data-v-8dfe8a80="" id="footnote-1" class="flex mt-2 mb-2 text-sm leading-relaxed border-t border-[#eaecef] pt-2" is-dark="false"><span class="font-semibold mr-2 text-[#0366d6]">[1]</span>
+        <div data-v-8dfe8a80="" id="fnref--1" class="flex mt-2 mb-2 text-sm leading-relaxed border-t border-[#eaecef] pt-2" is-dark="false">
+          <!-- <span class="font-semibold mr-2 text-[#0366d6]">[{{ node.id }}]</span> -->
           <div class="flex-1">
             <div data-v-8dfe8a80="" class="markdown-renderer">
               <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>
@@ -252,7 +251,7 @@ exports[`markdownRender node e2e coverage > renders footnote nodes 1`] = `
                 <div data-v-8dfe8a80="" class="node-content">
                   <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
                   <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-                    <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">Footnote explanation</span></p>
+                    <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">Footnote explanation</span><a data-v-31914872="" data-v-93ee5c2d="" class="footnote-anchor text-sm text-[#0366d6] hover:underline cursor-pointer" href="#fnref-1" title="返回引用 1" index-key="footnote-markdown-renderer-1-0-1"> ↩︎ </a></p>
                   </transition-stub>
                 </div>
               </div>
@@ -273,7 +272,7 @@ exports[`markdownRender node e2e coverage > renders footnote reference node 1`] 
   <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="footnote_reference">
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-      <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true"><sup data-v-ba0412bc="" data-v-8dfe8a80="" class="footnote-reference" index-key="markdown-renderer-0" typewriter="true" is-dark="false"><span data-v-ba0412bc="" href="#footnote-1" title="查看脚注 1" class="footnote-link cursor-pointer">[1]</span></sup></transition-stub>
+      <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true"><sup data-v-ba0412bc="" data-v-8dfe8a80="" class="footnote-reference" id="fnref-1" index-key="markdown-renderer-0" typewriter="true" is-dark="false"><span data-v-ba0412bc="" href="#footnote-1" title="查看脚注 1" class="footnote-link cursor-pointer">[1]</span></sup></transition-stub>
     </div>
   </div>
   <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>
@@ -296,21 +295,6 @@ exports[`markdownRender node e2e coverage > renders hardbreak node 1`] = `
 `;
 
 exports[`markdownRender node e2e coverage > renders heading node 1`] = `
-"<div data-v-8dfe8a80="" class="markdown-renderer">
-  <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>
-  <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="heading">
-    <div data-v-8dfe8a80="" class="node-content">
-      <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-      <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-        <h1 data-v-9f883140="" data-v-8dfe8a80="" class="heading-node heading-1" dir="auto" typewriter="true" is-dark="false"><span data-v-a84b8095="" data-v-9f883140="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-0">Heading Node Title</span></h1>
-      </transition-stub>
-    </div>
-  </div>
-  <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>
-</div>"
-`;
-
-exports[`markdownRender node e2e coverage > renders heading node 2`] = `
 "<div data-v-8dfe8a80="" class="markdown-renderer">
   <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>
   <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="heading">
@@ -400,7 +384,7 @@ exports[`markdownRender node e2e coverage > renders link node 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-        <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">Visit </span><a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="https://vuejs.org" aria-label="Link: https://vuejs.org" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--link-color: #0366d6; --underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.9; --underline-duration: 0.8s; --underline-timing: linear; --underline-iteration: infinite;"><span data-v-a84b8095="" data-v-994bfd08="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-1-0">Vue</span></a><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node"> now.</span></p>
+        <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">Visit </span><a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="https://vuejs.org" title="" aria-label="Link: " aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--link-color: #0366d6; --underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.9; --underline-duration: 0.8s; --underline-timing: linear; --underline-iteration: infinite;"><span data-v-a84b8095="" data-v-994bfd08="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-1-0">Vue</span></a><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node"> now.</span></p>
       </transition-stub>
     </div>
   </div>

@@ -130,6 +130,7 @@ describe('link parsing', () => {
                       {
                         "children": [
                           {
+                            "center": false,
                             "content": "Link (Test 1)",
                             "raw": "Link (Test 1)",
                             "type": "text",
@@ -139,11 +140,11 @@ describe('link parsing', () => {
                         "loading": false,
                         "raw": "[Link (Test 1)](https://simonhe.me/)",
                         "text": "Link (Test 1)",
-                        "title": "",
+                        "title": null,
                         "type": "link",
                       },
                     ],
-                    "raw": "****",
+                    "raw": "**Link (Test 1)**",
                     "type": "strong",
                   },
                 ],
@@ -174,6 +175,7 @@ describe('link parsing', () => {
               {
                 "children": [
                   {
+                    "center": false,
                     "content": "Link (Test 2)",
                     "raw": "Link (Test 2)",
                     "type": "text",
@@ -183,11 +185,11 @@ describe('link parsing', () => {
                 "loading": false,
                 "raw": "[Link (Test 2)](https://simonhe.me/)",
                 "text": "Link (Test 2)",
-                "title": "",
+                "title": null,
                 "type": "link",
               },
             ],
-            "raw": "****",
+            "raw": "**Link (Test 2)**",
             "type": "strong",
           },
         ],

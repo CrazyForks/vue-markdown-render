@@ -37,11 +37,17 @@ function pushEmClose(arr: any[], type: number) {
 }
 
 function createLinkToken(text: string, href: string, loading: boolean) {
+  let title = ''
+  if(href.includes('"')){
+    const temps = href.split('"')
+    href = temps[0].trim()
+    title = temps[1].trim()
+  }
   return {
     type: 'link',
     loading,
     href,
-    title: '',
+    title,
     text,
     children: [
       {
@@ -262,7 +268,9 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       // 修复链接后多余文本被包含在链接内的问题
       let loading = true
       const text = tokens[i - 1].content || ''
-      let href = tokens[i - 2].attrs?.[0]?.[1] || ''
+      const attrs = tokens[i - 2].attrs || []
+      let href = attrs.find(a => a[0] === 'href')?.[1] || ''
+      const title = attrs.find(a => a[0] === 'title')?.[1] || ''
       let count = 3
       let deleteCount = 2
       const beforeText = tokens[i - 3]?.content || ''
@@ -318,7 +326,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         type: 'link',
         loading,
         href,
-        title: '',
+        title,
         text,
         children: [
           {

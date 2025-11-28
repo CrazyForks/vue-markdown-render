@@ -27,7 +27,7 @@ function handleScroll() {
 </script>
 
 <template>
-  <sup class="footnote-reference" @click="handleScroll">
+  <sup class="footnote-reference" :id="`fnref-${node.id}`" @click="handleScroll">
     <span
       :href="href"
       :title="`查看脚注 ${node.id}`"

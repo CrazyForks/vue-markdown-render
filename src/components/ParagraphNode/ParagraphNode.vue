@@ -4,6 +4,8 @@ import { getCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmojiNode from '../EmojiNode'
 import EmphasisNode from '../EmphasisNode'
+import FootnoteAnchorNode from '../FootnoteAnchorNode'
+import FootnoteReferenceNode from '../FootnoteReferenceNode'
 import HardBreakNode from '../HardBreakNode'
 import HighlightNode from '../HighlightNode'
 import ImageNode from '../ImageNode'
@@ -50,6 +52,8 @@ const nodeComponents = {
   math_inline: MathInlineNodeAsync,
   checkbox_input: CheckboxNode,
   reference: ReferenceNode,
+  footnote_anchor: FootnoteAnchorNode,
+  footnote_reference: FootnoteReferenceNode,
   // 添加其他内联元素组件
   ...getCustomNodeComponents(props.customId),
 }

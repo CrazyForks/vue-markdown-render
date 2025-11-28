@@ -4,9 +4,10 @@ import type { LinkNodeProps } from '../../types/component-props'
 import { computed, useAttrs } from 'vue'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import EmphasisNode from '../EmphasisNode/EmphasisNode.vue'
+import ImageNode from '../ImageNode'
 import StrikethroughNode from '../StrikethroughNode'
-import StrongNode from '../StrongNode'
 
+import StrongNode from '../StrongNode'
 import TextNode from '../TextNode'
 
 // 接收props — 把动画/颜色相关配置暴露为props，并通过CSS变量注入样式
@@ -36,6 +37,7 @@ const nodeComponents = {
   strong: StrongNode,
   strikethrough: StrikethroughNode,
   emphasis: EmphasisNode,
+  image: ImageNode,
 }
 
 // forward any non-prop attributes (e.g. custom-id) to the rendered element
@@ -57,6 +59,7 @@ function onAnchorLeave() {
     return
   hideTooltip()
 }
+const title = computed(() => String(props.node.title ?? props.node.href ?? ''))
 </script>
 
 <template>
@@ -64,8 +67,8 @@ function onAnchorLeave() {
     v-if="!node.loading"
     class="link-node"
     :href="node.href"
-    :title="!props.showTooltip ? String(node.href ?? node.title ?? '') : undefined"
-    :aria-label="`Link: ${node.href ?? node.title ?? node.text}`"
+    :title="title"
+    :aria-label="`Link: ${title}`"
     :aria-hidden="node.loading ? 'true' : 'false'"
     target="_blank"
     rel="noopener noreferrer"

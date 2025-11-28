@@ -82,6 +82,7 @@ export function applyContainers(md: MarkdownIt) {
 
       // Open a paragraph, push inline content and then close paragraph
       s.push('paragraph_open', 'p', 1)
+      debugger
       const inlineToken = s.push('inline', '', 0)
       inlineToken.content = contentLines.join('\n')
       inlineToken.map = [startLine + 1, nextLine]

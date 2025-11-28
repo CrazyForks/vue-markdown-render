@@ -11,6 +11,7 @@ import EmojiNode from '../../components/EmojiNode'
 import EmphasisNode from '../../components/EmphasisNode'
 import FootnoteNode from '../../components/FootnoteNode'
 import FootnoteReferenceNode from '../../components/FootnoteReferenceNode'
+import FootnoteAnchorNode from '../../components/FootnoteAnchorNode'
 import HardBreakNode from '../../components/HardBreakNode'
 import HeadingNode from '../../components/HeadingNode'
 import HighlightNode from '../../components/HighlightNode'
@@ -660,6 +661,7 @@ const nodeComponents = {
   definition_list: DefinitionListNode,
   footnote: FootnoteNode,
   footnote_reference: FootnoteReferenceNode,
+  footnote_anchor: FootnoteAnchorNode,
   admonition: AdmonitionNode,
   hardbreak: HardBreakNode,
   link: LinkNode,

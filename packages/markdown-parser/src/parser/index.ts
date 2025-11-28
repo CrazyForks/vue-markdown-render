@@ -168,6 +168,18 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         i = newIndex
         break
       }
+      case 'footnote_anchor':{
+          const meta = (token.meta ?? {}) as Record<string, unknown>
+          const id = String(meta.label ?? token.content ?? '')
+          result.push({
+            type: 'footnote_anchor',
+            id,
+            raw: String(token.content ?? ''),
+          } as ParsedNode)
+
+        i++
+        break
+      }
 
       case 'container_open': {
         const match

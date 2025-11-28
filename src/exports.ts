@@ -10,6 +10,7 @@ import DefinitionListNode from './components/DefinitionListNode'
 import EmojiNode from './components/EmojiNode'
 import FootnoteNode from './components/FootnoteNode'
 import FootnoteReferenceNode from './components/FootnoteReferenceNode'
+import FootnoteAnchorNode from './components/FootnoteAnchorNode'
 import HardBreakNode from './components/HardBreakNode'
 import HeadingNode from './components/HeadingNode'
 import HighlightNode from './components/HighlightNode'
@@ -62,6 +63,7 @@ export {
   EmojiNode,
   FootnoteNode,
   FootnoteReferenceNode,
+  FootnoteAnchorNode,
   getCustomNodeComponents,
   HardBreakNode,
   HeadingNode,
@@ -103,6 +105,7 @@ const componentMap: Record<string, Component> = {
   EmojiNode,
   FootnoteNode,
   FootnoteReferenceNode,
+  FootnoteAnchorNode,
   HardBreakNode,
   HeadingNode,
   HighlightNode,

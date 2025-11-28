@@ -3,7 +3,6 @@ import MarkdownIt from 'markdown-it-ts'
 import { getDefaultMathOptions } from './config'
 import { applyContainers } from './plugins/containers'
 import { applyFixHtmlInlineTokens } from './plugins/fixHtmlInline'
-import { applyFixLinkInline } from './plugins/fixLinkInline'
 import { applyFixLinkTokens } from './plugins/fixLinkTokens'
 import { applyFixListItem } from './plugins/fixListItem'
 import { applyFixStrongTokens } from './plugins/fixStrongTokens'
@@ -33,11 +32,6 @@ export function factory(opts: FactoryOptions = {}) {
   }
   if (opts.enableContainers ?? true)
     applyContainers(md)
-  // Apply link-fixing plugin early so tokens produced during parsing
-  // have corrected inline children. This runs during markdown-it's
-  // core stage (after inline tokenization) instead of after parse.
-  // Install inline-level link tokenizer before the built-in 'link' rule
-  applyFixLinkInline(md)
   // Retain the core-stage fix as a fallback for any cases the inline
   // tokenizer does not handle.
   applyFixLinkTokens(md)
