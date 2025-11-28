@@ -25,3 +25,9 @@ Some AI or LLM sources send content in large bursts, which can feel like the pre
 - **Fall back for code blocks** when a burst happens: disable `codeBlockStream` or temporarily use `renderCodeBlocksAsPre` during streaming so that syntax-highlighting work does not stall text updates.
 
 These knobs keep DOM work under a predictable budget, so users perceive a calm, steady flow of characters even when the backend sends data in erratic bursts.
+
+Try this — tune rendering performance by enabling `viewportPriority`:
+
+```vue
+<MarkdownRender :content="md" :viewport-priority="true" />
+```

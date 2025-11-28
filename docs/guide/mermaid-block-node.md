@@ -48,7 +48,7 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 </template>
 ```
 
-> Note: The event object currently includes `svgElement` (the DOM node). If you prefer the component to also provide a serialized `svgString` in the event payload, I can add that.
+> Note: The event object includes both `svgElement` (DOM node) and `svgString` (serialized SVG) on `export` and `openModal` events — use whichever is more convenient.
 
 ## Slot example — fully replace right-side controls
 
@@ -67,12 +67,26 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 
 ---
 
-If you'd like me to:
-- A) add `svgString` to the `export` / `openModal` event payloads (I can implement and update docs);
-- B) add this page to the docs sidebar/navigation (requires docs config changes);
-- C) create a runnable demo/playground page for this example;
-please choose one to continue.
+Notes:
+- `svgString` is already included in `export` and `openModal` event payloads (the serialized SVG string is available on the event), so consumers can upload or post the SVG without re-serializing.
+- This page is linked from the docs sidebar and a runnable playground demo is provided in the repo (route: `/mermaid-export-demo`, file: `playground/src/pages/mermaid-export-demo.vue`).
 
 ## See also
 
 - Override `MermaidBlockNode` (use `setCustomComponents` with `MarkdownRender`): [Override MermaidBlockNode in MarkdownRender](./mermaid-block-node-override.md)
+
+Playground demo: there's a runnable playground page demonstrating how to intercept `export` and upload `ev.svgString` — see the playground route `mermaid-export-demo` (file: `playground/src/pages/mermaid-export-demo.vue`).
+
+Try this — quick mermaid example you can paste into a component:
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const md = `\n\`\`\`mermaid\ngraph TD\nA-->B\n\`\`\`\n`
+</script>
+
+<template>
+  <MarkdownRender :content="md" />
+</template>
+```

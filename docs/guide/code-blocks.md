@@ -52,3 +52,9 @@ If you don't install either optional package the renderer falls back to a simple
 
 - Worker / SSR guidance: `docs/nuxt-ssr.md`
 - Installation notes: `docs/guide/installation.md`
+
+Try this — simple CodeBlock render:
+
+```vue
+<CodeBlockNode :node="{ type: 'code_block', language: 'js', code: 'console.log(42)', raw: 'console.log(42)' }" />
+```

@@ -43,3 +43,10 @@ pnpm docs:build
 - [ ] Add a short PR description noting language and scope of changes
 
 If you'd like me to add a GitHub Action that automatically checks PRs for missing translations or broken links, I can add that as a follow-up. Thank you for contributing translations!
+
+Try this — validate your local docs translation build:
+
+```bash
+pnpm docs:dev
+# switch to /zh/ using the language selector and confirm pages render
+```

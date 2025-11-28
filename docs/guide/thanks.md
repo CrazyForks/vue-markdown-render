@@ -15,3 +15,11 @@ If you want to support the project, star it on GitHub or open an issue to reques
 An interactive Star History graph is available (live on GitHub):
 
 [![Star History Chart](https://api.star-history.com/svg?repos=Simon-He95/markstream-vue&type=Date)](https://www.star-history.com/#Simon-He95/markstream-vue&Date)
+
+Try this — run the playground locally to test examples and say thanks by starring the repo:
+
+```bash
+pnpm install
+pnpm play
+# open the playground at the shown dev server and try interactive demos
+```

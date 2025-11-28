@@ -78,3 +78,10 @@ pnpm dlx rg "\\(\\?<!|\\(\\?<=|\\\\p\\{" --glob "**/*.{js,ts,vue,jsx,tsx,mjs,cjs
 
 Summary
 - Legacy builds are useful for many syntax & API gaps, but they are not a replacement for fixing engine-level RegExp syntax in source. Prefer: source fix -> legacy bundle -> CI + old-device smoke tests.
+
+Quick test — run a local legacy build (Vite + plugin-legacy):
+
+```bash
+pnpm build
+# verify modern + legacy bundles output and test on an older device or simulator
+```

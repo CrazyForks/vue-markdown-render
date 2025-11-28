@@ -9,3 +9,12 @@ Highlights:
 - `setDefaultMathOptions()` — global math options
 
 For full function signatures and advanced config, refer to `packages/markdown-parser/README.md` which is included with the project and provides examples for custom rules and plugins.
+
+Try this quickly — parse a small string and render the result in your app:
+
+```ts
+import { parseMarkdownToStructure } from 'markstream-vue'
+
+const nodes = parseMarkdownToStructure('# Hello\n\nThis is a test')
+// Render nodes with <MarkdownRender :nodes="nodes" />
+```

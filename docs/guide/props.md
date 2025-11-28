@@ -38,3 +38,18 @@ If you need the full property table for `CodeBlockNode`, please check the `READM
 - `typewriter` — show small enter animation; defaults to `true`.
 
 These props let you tune streaming behaviour and heavy node rendering to match your app's performance requirements.
+
+Try it (example):
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const md = '# Title\n\nSome content here.'
+</script>
+
+<template>
+  <!-- use props like viewportPriority / codeBlockStream on MarkdownRender -->
+  <MarkdownRender :content="md" :viewport-priority="true" :code-block-stream="true" />
+</template>
+```

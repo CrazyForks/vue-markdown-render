@@ -74,6 +74,24 @@ Events and notes
 - To hide a specific toolbar button set, use the boolean props `showCopyButton`, `showExpandButton`, `showPreviewButton`, `showFontSizeButtons`.
 - The `showHeader` prop controls whether the header is rendered at all.
 
+Try this — replace the header in a small example:
+
+```vue
+<script setup>
+const node = { type: 'code_block', language: 'js', code: 'console.log("run")', raw: 'console.log("run")' }
+</script>
+
+<template>
+  <CodeBlockNode :node="node" :show-copy-button="false">
+    <template #header-right>
+      <button @click="() => console.log('run')">
+        Run
+      </button>
+    </template>
+  </CodeBlockNode>
+</template>
+```
+
 Troubleshooting
 
 If you run into style conflicts (for instance, Tailwind reset/utility rules changing the header's layout), see the main Troubleshooting page which covers Tailwind import ordering and quick fixes: `/guide/troubleshooting`.

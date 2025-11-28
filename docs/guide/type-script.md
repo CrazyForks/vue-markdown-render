@@ -39,3 +39,11 @@ setCustomComponents('docs', {
 ```
 
 This approach provides full TypeScript checking and code completion for node props inside your components.
+
+Try this — typed node value example you can use in your code:
+
+```ts
+import type { CodeBlockNode } from 'markstream-vue'
+
+const node: CodeBlockNode = { type: 'code_block', language: 'ts', code: 'console.log(1)', raw: 'console.log(1)' }
+```

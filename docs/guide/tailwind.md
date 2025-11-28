@@ -62,3 +62,19 @@ Example CSS import (app entry):
 Notes:
 - The package exposes a `./tailwind` entry (`./dist/tailwind.ts`) which exports the extracted class list. When installing from npm, `require('markstream-vue/tailwind')` will load that helper for use in your Tailwind config.
 - If you develop locally against the repo, you may reference the generated file directly (e.g. `./dist/tailwind.ts`).
+
+Quick try — verify Tailwind classes are discovered by adding `index.tailwind.css` and a small component:
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const md = '# Tailwind test\n\nThis text is styled by tailwind'
+</script>
+
+<template>
+  <div class="prose">
+    <MarkdownRender :content="md" />
+  </div>
+</template>
+```

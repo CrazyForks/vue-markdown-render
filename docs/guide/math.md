@@ -33,3 +33,9 @@ Important: when writing source Markdown, always use literal (escaped) backslashe
 for TeX parenthesis delimiters. Write `\\(...\\)` rather than `\(...\)` so
 the parser can reliably detect inline TeX delimiters. Unescaped `\(...\)`
 cannot be distinguished from ordinary parentheses and may not be parsed as math.
+
+```ts
+// Try snippet to demonstrate KaTeX usage
+const example = `\\(E = mc^2\\)`
+console.log(example)
+```

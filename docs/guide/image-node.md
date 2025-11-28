@@ -51,3 +51,13 @@ For zoom/gesture/slide support, call a lightbox library such as `photoswipe`, `f
 ## Summary
 
 The `click` event from `ImageNode` is the primary hook for implementing custom previews. The usual approach is wrapping the original component and registering it with `setCustomComponents` in the client app. The wrapper can also forward `load`/`error` events or add additional behavior (analytics, alternative lazy-load handling, custom placeholders, etc.).
+
+Quick try — register `CustomImageNode` in a VitePress client enhance and test clicking images in the `playground`:
+
+```ts
+// .vitepress/clientAppEnhance.ts
+import { setCustomComponents } from 'markstream-vue'
+import CustomImageNode from './components/CustomImageNode.vue'
+
+export default ({ app }) => setCustomComponents('vitepress-image-preview', { ImageNode: CustomImageNode })
+```

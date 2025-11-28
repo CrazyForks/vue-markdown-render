@@ -32,3 +32,17 @@ const interval = setInterval(() => {
 
 ## Rendering with `nodes`
 - Call `parseMarkdownToStructure` from `stream-markdown-parser` and pass `nodes` to `MarkdownRender` for custom rendering.
+
+Try this — quickly stream a Markdown string with `typewriter` enabled:
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const md = '# Streaming test\n\nThis text appears with a typewriter effect.'
+</script>
+
+<template>
+  <MarkdownRender :content="md" :typewriter="true" />
+</template>
+```

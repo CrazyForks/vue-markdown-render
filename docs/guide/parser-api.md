@@ -120,6 +120,16 @@ Use the playground to test your parse transforms quickly. For instance, use a `p
 
 For full details and more examples, see `packages/markdown-parser/README.md` in the repository.
 
+Try this — quick test of a parse option:
+
+```ts
+import { parseMarkdownToStructure } from 'markstream-vue'
+
+const nodes = parseMarkdownToStructure('Hello **world**')
+console.log(nodes)
+// Render with <MarkdownRender :nodes="nodes" />
+```
+
 ### Custom components and tag-like elements
 
 Tag-like custom elements (for example `<MyWidget ...>...</MyWidget>`) produce complex `html_block`/inline token shapes that are often difficult to reconstruct reliably from the parsed AST using simple regex or string splicing. To reduce maintenance cost and avoid brittle post-processing, we recommend extracting those raw component strings before feeding the remaining content to the Markdown parser and rendering the extracted parts separately as Vue components.

@@ -48,7 +48,7 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 </template>
 ```
 
-> Note: 组件现在会在事件对象中附带 `svgElement`（DOM 节点）。如果你需要 `svg` 字符串（已序列化），我可以把 `svgString` 也包含在 `export`/`openModal` payload 中。
+> 注意：`export` / `openModal` 事件的事件对象现已同时包含 `svgElement`（DOM 节点）和 `svgString`（已序列化的 SVG 字符串），任选其一使用更方便。
 
 ## Slot 示例：完全接管右侧操作按钮
 
@@ -76,3 +76,5 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 ## 参考
 
 - 覆盖 `MermaidBlockNode`（在 `MarkdownRender` 中使用 `setCustomComponents`）的示例（中文）：[覆盖 MermaidBlockNode（MarkdownRender 示例）](./mermaid-block-node-override.md)
+
+Playground 示例：仓库包含一个可运行的 playground 页面演示如何拦截 `export` 并上传 `ev.svgString` —— 路由: `mermaid-export-demo` (文件：`playground/src/pages/mermaid-export-demo.vue`)。

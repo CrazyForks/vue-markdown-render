@@ -54,3 +54,10 @@ Algolia also provides options for multilingual indexing and synonyms to improve 
 - For Algolia, configure the indexing on Algolia's side and then update the site keys.
 
 If you want me to register an index for this repo and add DocSearch configuration, provide the appId, apiKey, and indexName and I'll update the config accordingly.
+
+Try this — enable local search (already the default) and test locally by running the docs server:
+
+```bash
+pnpm docs:dev
+# open the site and try the search box in the top-right
+```

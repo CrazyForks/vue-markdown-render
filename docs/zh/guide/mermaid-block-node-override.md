@@ -13,10 +13,11 @@ setCustomComponents('playground-demo', {
     ...props,
     // 使用 `h()` 时，通过驼峰的 on<EventName> 传入事件监听器
     onExport: (ev: any) => {
-      // 如果组件在事件中暴露了 svgElement，可以直接使用
+      // 组件在事件中同时暴露 `svgElement` 和 `svgString`，直接优先使用 ev.svgString
       const svgEl = ev.svgElement as SVGElement | null
-      if (svgEl) {
-        const svgString = new XMLSerializer().serializeToString(svgEl)
+      const svgStringFromEv = ev.svgString as string | null
+      const svgString = svgStringFromEv ?? (svgEl ? new XMLSerializer().serializeToString(svgEl) : null)
+      if (svgString) {
         // 将 svgString 上传或保存到后端
         uploadSvgToServer(svgString)
       }

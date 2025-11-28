@@ -26,3 +26,11 @@ pnpm add stream-monaco
 
 ## Troubleshooting
 - If you see `Failed to load Monaco worker`, check that the worker files are present in `dist` and accessible by the built site. The plugin's `customDistPath` can help relocate them.
+
+Quick try — preload Monaco at app startup so editor mounts faster:
+
+```ts
+import { getUseMonaco } from 'markstream-vue'
+
+getUseMonaco()
+```

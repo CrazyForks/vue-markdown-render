@@ -24,3 +24,17 @@ The playground demonstrates:
 ![Playground demo](/screenshots/playground-demo.svg)
 
 If you want to add examples to the playground for documentation pages, keep them minimal and focused (the `playground/src/pages` folder is a good place to add pages).
+
+Quick try — add a simple playground page by creating `playground/src/pages/quick-test.vue` and pasting a small test like:
+
+```vue
+<script setup>
+import MarkdownRender from 'markstream-vue'
+
+const md = '# Quick playground test\n\nThis is a demo.'
+</script>
+
+<template>
+  <MarkdownRender :content="md" />
+</template>
+```

@@ -41,20 +41,22 @@ This page documents the most commonly used components and props.
 
 ## MarkdownRender
 Props
-- `content: string` — the Markdown string (required unless `nodes` provided)
-- `nodes: BaseNode[]` — parse nodes (alternative to `content`)
-- `renderCodeBlocksAsPre: boolean` — render `code_block` nodes as simple `<pre><code>` blocks
-- `codeBlockStream: boolean` — controls streaming behavior for code blocks
-- `viewportPriority: boolean` — defer heavy nodes offscreen
-- `parseOptions: ParseOptions` — token and node hooks (see advanced page)
-- `customId: string` — scope for `setCustomComponents`
 
+Try this (quick) — render with `MarkdownRender`:
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const md = '# Component test\n\nThis is a paragraph.'
+</script>
+
+<template>
+  <MarkdownRender :content="md" />
+</template>
+```
 ### CodeBlockNode
 Feature-rich code block with Monaco integration (optional peers: `stream-monaco`)
-- `node` — CodeBlock node
-- `darkTheme` / `lightTheme` — theme names
-- `loading` — boolean, show placeholder
-- `showHeader` / `showCopyButton` / etc — header customizations (see Code block header page)
 
 ### MarkdownCodeBlockNode
 Lightweight syntax highlighting (requires `shiki`, `stream-markdown`)

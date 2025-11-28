@@ -12,3 +12,9 @@ Example usage in a markdown page:
 ![Playground demo](/screenshots/playground-demo.svg)
 
 Thanks for making docs better! Please link the original playground page if you add a screenshot for reproducibility.
+
+Quick try — add an SVG screenshot (example):
+
+```md
+![Playground demo](/screenshots/playground-demo.svg)
+```

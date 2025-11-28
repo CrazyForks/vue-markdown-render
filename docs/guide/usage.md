@@ -14,3 +14,13 @@ const nodes = parseMarkdownToStructure('# Title', md)
 ```
 
 For more examples and deep dives, see README and playground.
+
+Try it locally (quick):
+
+```ts
+import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure('# Live Test\n\n`inline`', md)
+// render these nodes with <MarkdownRender :nodes="nodes" /> in your app
+```

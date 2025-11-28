@@ -22,3 +22,10 @@ Tricks:
 
 - Use `docs:build` in your CI to catch build-time issues early
 - Keep dev-only assets out of `docs/.vitepress/public` if they are large; instead store them in `public/` and reference by absolute path
+
+Try this — locally test your docs build output:
+
+```bash
+pnpm docs:build
+# inspect docs/.vitepress/dist to verify static site is generated
+```

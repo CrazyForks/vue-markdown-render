@@ -41,4 +41,14 @@ See also:
 
 - `MermaidBlockNode` — advanced Mermaid component with header controls, export, and modal: [MermaidBlockNode guide](./mermaid-block-node.md)
 
+Quick try — paste this Markdown into a page or component to test progressive Mermaid rendering:
+
+```md
+\`\`\`mermaid
+graph LR
+A[Start]-->B
+B-->C[End]
+\`\`\`
+```
+
 ![Mermaid demo](/screenshots/mermaid-demo.svg)

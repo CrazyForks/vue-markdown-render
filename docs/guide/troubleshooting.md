@@ -49,3 +49,10 @@ setCustomComponents('my-docs', {
   Prefer to share a small `playground` reproduction and include a link; maintainers will triage and ask for more context if needed.
 
   Extra tip: if you can write a unit/integration test that reproduces the bug, add it under the `test/` folder and run `pnpm test` locally — this is the fastest way for maintainers to validate and fix regressions.
+
+Quick test — run the playground locally to reproduce and debug:
+
+```bash
+pnpm play
+# open the playground and reproduce the issue with a minimal Markdown sample
+```

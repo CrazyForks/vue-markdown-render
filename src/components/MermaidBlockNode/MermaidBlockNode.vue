@@ -717,9 +717,9 @@ async function copy() {
 }
 
 // Export SVG
-async function exportSvg(svgElement) {
+async function exportSvg(svgElement, svgString = null) {
   try {
-    const svgData = new XMLSerializer().serializeToString(svgElement)
+    const svgData = svgString ?? new XMLSerializer().serializeToString(svgElement)
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     if (typeof document !== 'undefined') {
@@ -746,6 +746,8 @@ function handleExportClick() {
     console.error('SVG element not found')
     return
   }
+  const svgString = new XMLSerializer().serializeToString(svgElement)
+
   const ev: MermaidBlockEvent<{ type: 'export' }> = {
     payload: { type: 'export' },
     defaultPrevented: false,
@@ -753,15 +755,18 @@ function handleExportClick() {
       this.defaultPrevented = true
     },
     svgElement,
+    svgString,
   }
   emits('export', ev)
   if (!ev.defaultPrevented) {
-    exportSvg(svgElement)
+    exportSvg(svgElement, svgString)
   }
 }
 
 function handleOpenModalClick() {
   const svgElement = mermaidContent.value?.querySelector('svg') ?? null
+  const svgString = svgElement ? new XMLSerializer().serializeToString(svgElement) : null
+
   const ev: MermaidBlockEvent<{ type: 'open-modal' }> = {
     payload: { type: 'open-modal' },
     defaultPrevented: false,
@@ -769,6 +774,7 @@ function handleOpenModalClick() {
       this.defaultPrevented = true
     },
     svgElement,
+    svgString,
   }
   emits('openModal', ev)
   if (!ev.defaultPrevented) {

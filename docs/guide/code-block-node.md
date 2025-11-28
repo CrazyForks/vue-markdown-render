@@ -62,6 +62,18 @@ pnpm add stream-monaco
 - The CodeBlock header API is documented in `docs/guide/codeblock-header.md` (examples for replacing header and custom loading placeholder).
 - If you'd like `copy`/`previewCode` to use the same `MermaidBlockEvent` wrapper with `preventDefault()` semantics, I can update the component and docs accordingly — this enables consumers to intercept and cancel default behaviors.
 
+Try this — simple snapshot example (inline usage):
+
+```vue
+<script setup lang="ts">
+const node = { type: 'code_block', language: 'js', code: 'console.log("hello")', raw: 'console.log("hello")' }
+</script>
+
+<template>
+  <CodeBlockNode :node="node" />
+</template>
+```
+
 ---
 
 Tell me if you want me to also:

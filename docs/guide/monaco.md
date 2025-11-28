@@ -53,3 +53,15 @@ getUseMonaco()
 ```
 
 `getUseMonaco` attempts to dynamically import `stream-monaco` and call its helper to register workers; if not available it fails gracefully and the code block falls back to a lightweight rendering.
+
+Quick try — Render a monaco-enabled code block (after installing `stream-monaco`):
+
+```vue
+<script setup>
+const node = { type: 'code_block', language: 'js', raw: 'console.log(123)', code: 'console.log(123)' }
+</script>
+
+<template>
+  <CodeBlockNode :node="node" />
+</template>
+```

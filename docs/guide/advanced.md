@@ -81,3 +81,12 @@ const md = getMarkdown('editor-1', {
 - `common.copy`: "Copy" — Used in code block copy buttons
 
 This design keeps the markdown utilities pure and free from global side effects, allowing you to integrate with any i18n solution or provide static translations.
+
+Try this — minimal example using parseOptions and a custom component registration:
+
+```ts
+import { parseMarkdownToStructure, setCustomComponents } from 'markstream-vue'
+
+setCustomComponents('docs', { thinking: ThinkingNode })
+const nodes = parseMarkdownToStructure('[[CUSTOM:1]]')
+```

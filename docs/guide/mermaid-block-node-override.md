@@ -28,3 +28,21 @@ Key points:
 - Use `onExport` / `onCopy` (camelCase) when passing listeners via `h()`.
 - Call `ev.preventDefault()` to prevent the default behavior inside `MermaidBlockNode`.
 - `ev.svgElement` (if present) gives direct access to the rendered SVG DOM node.
+- `ev.svgElement` gives direct access to the rendered SVG DOM node and `ev.svgString` contains a serialized string of the SVG (ready to upload or send to an API).
+
+Quick try — test the override by mounting the custom renderer inside your app's client entry and interacting with onExport in the playground.
+
+```ts
+// .vitepress/clientAppEnhance.ts or playground client entry
+import { setCustomComponents } from 'markstream-vue'
+
+setCustomComponents('playground-demo', {
+  mermaid: (props: any) => h(MermaidBlockNode, { ...props, onExport: (ev) => {
+    ev.preventDefault()
+    console.log('exported', ev.svgElement)
+  } })
+})
+```
+
+Playground demo: the repo includes a runnable playground page demonstrating intercepting the export event and uploading the svg — open: /playground/src/pages/mermaid-export-demo.vue or run the playground and visit the route for the demo.
+```

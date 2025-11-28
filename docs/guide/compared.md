@@ -7,3 +7,19 @@ Traditional Markdown renderers typically convert a finished Markdown string into
 - Built-in diff/code-stream components: show diffs as they arrive (line-by-line or token-by-token) with minimal reflow.
 - Progressive diagrams and editors: Mermaid and Monaco-based previews update progressively.
 - Flexible code block rendering: pick Monaco for interactive editing or Shiki for display-only highlighting.
+
+Quick try — render streaming content and static fallback side-by-side:
+
+```vue
+<script setup>
+const streaming = '# Streaming example\n\nThis appears progressively'
+const staticMd = '# Static example\n\nRendered once'
+</script>
+
+<template>
+  <div>
+    <MarkdownRender :content="streaming" />
+    <MarkdownRender :content="staticMd" />
+  </div>
+</template>
+```

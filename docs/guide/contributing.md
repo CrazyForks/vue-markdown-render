@@ -22,3 +22,10 @@ Guidelines:
 - Keep docs concise and example-driven
 - If adding code snippets to docs, verify they run in `playground` or tests
 - Add tests for any new features in `test/` and update `README` / docs accordingly
+
+Quick try — run the docs site locally and add a simple page to verify the flow:
+
+```bash
+pnpm docs:dev
+# open http://localhost:5173, add docs/guide/new-page.md and confirm build
+```

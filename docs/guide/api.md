@@ -26,3 +26,17 @@ This page provides short usage examples and points to advanced customization: pa
 Call `setCustomComponents` to override internal node rendering. For example, to use `MarkdownCodeBlockNode` instead of `CodeBlockNode` for `code_block` nodes.
 
 For parse hooks, use `parseMarkdownToStructure` options: `preTransformTokens`, `postTransformTokens`, and `postTransformNodes`.
+
+Try this — a minimal render snippet for the API page:
+
+```vue
+<script setup>
+import MarkdownRender from 'markstream-vue'
+
+const md = '# API quick test\n\nThis page shows a quick render example.'
+</script>
+
+<template>
+  <MarkdownRender :content="md" />
+</template>
+```
