@@ -10,15 +10,84 @@ npm install markstream-vue
 yarn add markstream-vue
 ```
 
-可选 peer 依赖：
+## 可选 Peer 依赖
 
-- mermaid
-- stream-monaco
-- shiki
-- katex
+markstream-vue 通过可选的 peer 依赖支持各种功能。按需安装：
 
-KaTeX 的 CSS 需要在应用入口处导入，例如 `main.ts`:
+| 功能 | 需要的包 | 安装命令 |
+|------|---------|---------|
+| 代码语法高亮 | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
+| Monaco 编辑器（完整代码块功能） | `stream-monaco` | `pnpm add stream-monaco` |
+| Mermaid 图表 | `mermaid` | `pnpm add mermaid` |
+| 数学公式渲染（KaTeX） | `katex` | `pnpm add katex` |
+
+### 快速安装：全部功能
+
+一次性启用所有功能：
+
+```bash
+pnpm add shiki stream-markdown stream-monaco mermaid katex
+# 或
+npm install shiki stream-markdown stream-monaco mermaid katex
+```
+
+### 功能详情
+
+#### 代码语法高亮
+
+需要同时安装 `shiki` 和 `stream-markdown`：
+
+```bash
+pnpm add shiki stream-markdown
+```
+
+这将使用 Shiki 在代码块中启用语法高亮。
+
+#### Monaco 编辑器
+
+获得完整的代码块功能（复制按钮、字体大小控制、展开/折叠）：
+
+```bash
+pnpm add stream-monaco
+```
+
+没有 `stream-monaco`，代码块会渲染但交互按钮可能无法工作。
+
+#### Mermaid 图表
+
+渲染 Mermaid 图表：
+
+```bash
+pnpm add mermaid
+```
+
+#### KaTeX 数学公式渲染
+
+渲染数学公式：
+
+```bash
+pnpm add katex
+```
+
+还需要在应用入口文件（如 `main.ts`）中导入 KaTeX 的 CSS：
 
 ```ts
 import 'katex/dist/katex.min.css'
+```
+
+## 快速测试
+
+导入并渲染一个简单的 markdown 字符串：
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+import 'markstream-vue/index.css'
+
+const md = '# 你好，markstream-vue！'
+</script>
+
+<template>
+  <MarkdownRender :content="md" />
+</template>
 ```
