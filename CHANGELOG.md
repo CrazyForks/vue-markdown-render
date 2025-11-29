@@ -1,3 +1,13 @@
+## [0.0.2-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.4...v0.0.2-beta.5) (2025-11-28)
+
+
+### Features
+
+* add footnote anchor component and update footnote handling ([d2bdd5d](https://github.com/Simon-He95/markstream-vue/commit/d2bdd5d1dd22071f8714355edc7fc00f4ee28f20))
+* add rollup-plugin-visualizer for bundle analysis; update dependencies and improve link parsing tests and fix the text following the link is missing. ([34a9331](https://github.com/Simon-He95/markstream-vue/commit/34a9331931a5919f782fe8a6276121e5bf086af0))
+
+
+
 ## [0.0.2-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.3...v0.0.2-beta.4) (2025-11-27)
 
 
