@@ -40,6 +40,7 @@ export const KATEX_COMMANDS = [
   'mathbb',
   'mathcal',
   'mathfrak',
+  'implies',
   'alpha',
   'beta',
   'gamma',
@@ -286,7 +287,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const index = src.indexOf(open, searchPos)
         if (index === -1)
           break
-
         // If the delimiter is immediately preceded by a ']' (possibly with
         // intervening spaces), it's likely part of a markdown link like
         // `[text](...)`, so we should not treat this '(' as the start of
@@ -431,14 +431,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
               s.push('strong_close', '', 0)
             }
             if (raw) {
-              const textContentToken = s.push('text', '', 0)
-              textContentToken.content = (raw == null ? '' : String(raw)).replace(/^\*+/, '')
+              // 这里的 raw 可能还会有 math_inline, 应该交给后续的规则处理，直接 s.pos 到当前位置
+              s.pos = endIdx + close.length
+              searchPos = s.pos
+              preMathPos = searchPos
             }
             if (!isBeforeClose)
               s.push('strong_close', '', 0)
-            s.pos = src.length
-            searchPos = src.length
-            preMathPos = searchPos
             continue
           }
           else {

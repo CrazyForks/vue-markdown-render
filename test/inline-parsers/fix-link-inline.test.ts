@@ -398,7 +398,7 @@ describe('inline parser fixes (link mid-states)', () => {
     expect(String(text)).toContain('Launch')
   })
 
-  it('Link inside a **definition list** (GitHub‑flavoured Markdown)', () => {
+  it('link inside a **definition list** (GitHub‑flavoured Markdown)', () => {
     const mdText = 'Term  \n: Definition with a link to the [OpenAI site](https://openai.com).'
     const nodes = parseMarkdownToStructure(mdText, md)
     const links = collectLinks(nodes as any[])
@@ -409,7 +409,7 @@ describe('inline parser fixes (link mid-states)', () => {
     expect(String(text)).toContain('OpenAI')
   })
 
-  it('Link with **multiple titles** (only the first title is used)', () => {
+  it('link with **multiple titles** (only the first title is used)', () => {
     const mdText = `[OpenAI](https://openai.com "First title" "Second title")`
     const nodes = parseMarkdownToStructure(mdText, md)
     const links = collectLinks(nodes as any[])
@@ -426,7 +426,7 @@ describe('inline parser fixes (link mid-states)', () => {
     }
   })
 
-  it('Link inside a **nested list**', () => {
+  it('link inside a **nested list**', () => {
     const mdText = `- Main item
   1. Sub‑item with a link: [OpenAI](https://openai.com)
   2. Another sub‑item`
@@ -440,7 +440,7 @@ describe('inline parser fixes (link mid-states)', () => {
     expect(String(text)).toContain('OpenAI')
   })
 
-  it('Link with **non‑ASCII characters**', () => {
+  it('link with **non‑ASCII characters**', () => {
     const mdText = `[Åbent bibliotek](https://example.com/åbent)`
     const nodes = parseMarkdownToStructure(mdText, md)
     const links = collectLinks(nodes as any[])
@@ -454,7 +454,7 @@ describe('inline parser fixes (link mid-states)', () => {
     expect(String(text)).toContain('Åbent')
   })
 
-  it('Link inside a **footnote** (CommonMark footnote syntax)', () => {
+  it('link inside a **footnote** (CommonMark footnote syntax)', () => {
     const mdText = `Here is a reference[^1].
 
 [^1]: See the [OpenAI documentation](https://platform.openai.com/docs).`
@@ -472,7 +472,7 @@ describe('inline parser fixes (link mid-states)', () => {
     expect(String(l.text || l.children?.[0]?.content || '')).toContain('OpenAI documentation')
   })
 
-  it('Link with **HTML entity** in the link text', () => {
+  it('link with **HTML entity** in the link text', () => {
     const nodes = parseMarkdownToStructure('[OpenAI &amp; ChatGPT](https://openai.com)', md)
     const links = collectLinks(nodes as any[])
     expect(links.length).toBeGreaterThan(0)
@@ -486,7 +486,7 @@ describe('inline parser fixes (link mid-states)', () => {
     expect(String(text)).toMatch(/&amp;|&/)
   })
 
-  it('Link with **line break** inside the link text (using `<br>`)', () => {
+  it('link with **line break** inside the link text (using `<br>`)', () => {
     const nodes = parseMarkdownToStructure('[OpenAI<br>Platform](https://platform.openai.com)', md)
     const links = collectLinks(nodes as any[])
     expect(links.length).toBeGreaterThan(0)
@@ -517,7 +517,7 @@ describe('inline parser fixes (link mid-states)', () => {
     expect(hasImageChild).toBe(true)
   })
 
-  it('Link inside a **table header**', () => {
+  it('link inside a **table header**', () => {
     const tableMd = `| **Service** | **URL** |
 |-------------|----------|
 | OpenAI      | [openai.com](https://openai.com) |`

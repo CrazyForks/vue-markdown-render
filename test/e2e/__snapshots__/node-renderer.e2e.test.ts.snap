@@ -234,7 +234,7 @@ exports[`markdownRender node e2e coverage > renders footnote nodes 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-        <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">A footnote reference</span><sup data-v-ba0412bc="" data-v-93ee5c2d="" class="footnote-reference" id="fnref-1" index-key="markdown-renderer-0-1"><span data-v-ba0412bc="" href="#footnote-1" title="查看脚注 1" class="footnote-link cursor-pointer">[1]</span></sup><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">.</span></p>
+        <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">A footnote reference</span><sup data-v-ba0412bc="" data-v-93ee5c2d="" id="fnref-1" class="footnote-reference" index-key="markdown-renderer-0-1"><span data-v-ba0412bc="" href="#footnote-1" title="查看脚注 1" class="footnote-link cursor-pointer">[1]</span></sup><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">.</span></p>
       </transition-stub>
     </div>
   </div>
@@ -272,7 +272,7 @@ exports[`markdownRender node e2e coverage > renders footnote reference node 1`] 
   <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="footnote_reference">
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-      <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true"><sup data-v-ba0412bc="" data-v-8dfe8a80="" class="footnote-reference" id="fnref-1" index-key="markdown-renderer-0" typewriter="true" is-dark="false"><span data-v-ba0412bc="" href="#footnote-1" title="查看脚注 1" class="footnote-link cursor-pointer">[1]</span></sup></transition-stub>
+      <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true"><sup data-v-ba0412bc="" data-v-8dfe8a80="" id="fnref-1" class="footnote-reference" index-key="markdown-renderer-0" typewriter="true" is-dark="false"><span data-v-ba0412bc="" href="#footnote-1" title="查看脚注 1" class="footnote-link cursor-pointer">[1]</span></sup></transition-stub>
     </div>
   </div>
   <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>

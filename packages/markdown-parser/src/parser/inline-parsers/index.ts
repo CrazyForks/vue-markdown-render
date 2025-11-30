@@ -467,7 +467,7 @@ export function parseInlineTokens(
         i++
         break
 
-      case 'footnote_anchor':
+      case 'footnote_anchor':{
         // Emit a footnote_anchor node so NodeRenderer can render a backlink
         // element (e.g. a small "↩" that scrolls back to the reference).
         resetCurrentTextNode()
@@ -482,6 +482,7 @@ export function parseInlineTokens(
 
         i++
         break
+      }
 
       case 'hardbreak':
         resetCurrentTextNode()
@@ -676,11 +677,11 @@ export function parseInlineTokens(
         else {
           // 找到闭合的 link_close
           i += 2
-          while (i < tokens.length && tokens[i].type !== "link_close") {
+          while (i < tokens.length && tokens[i].type !== 'link_close') {
             text += String(tokens[i]?.content || '')
             i++
           }
-          let loading = tokens[i].type !== 'link_close'
+          const loading = tokens[i].type !== 'link_close'
           const node = {
             type: 'link',
             href: String(hrefAttr),
@@ -693,7 +694,6 @@ export function parseInlineTokens(
           } as ParsedNode
           pushParsed(node)
           // pushText(text, text)
-
         }
         return
       }

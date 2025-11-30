@@ -38,7 +38,7 @@ function pushEmClose(arr: any[], type: number) {
 
 function createLinkToken(text: string, href: string, loading: boolean) {
   let title = ''
-  if(href.includes('"')){
+  if (href.includes('"')) {
     const temps = href.split('"')
     href = temps[0].trim()
     title = temps[1].trim()

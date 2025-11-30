@@ -9,7 +9,7 @@ function scrollToReference(e) {
   // Try to find the reference element rendered by FootnoteReferenceNode.
   // FootnoteReferenceNode renders a span. We search for .footnote-link text matching [id].
   const anchors = document.getElementById(id)
-  if(anchors){
+  if (anchors) {
     anchors.scrollIntoView({ behavior: 'smooth' })
   }
 }
@@ -18,9 +18,9 @@ function scrollToReference(e) {
 <template>
   <a
     class="footnote-anchor text-sm text-[#0366d6] hover:underline cursor-pointer"
-    @click="scrollToReference"
     :href="`#fnref-${node.id}`"
     :title="`返回引用 ${node.id}`"
+    @click="scrollToReference"
   >
     ↩︎
   </a>

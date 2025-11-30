@@ -17,7 +17,7 @@ export function parseFootnote(
       const contentToken = tokens[j + 1]
       const children = contentToken.children || []
       if (tokens[j + 2].type === 'footnote_anchor') {
-        children.push(tokens[j+2] as any)
+        children.push(tokens[j + 2] as any)
       }
       footnoteChildren.push({
         type: 'paragraph',
