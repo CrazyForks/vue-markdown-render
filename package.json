@@ -2,7 +2,7 @@
   "name": "markstream-vue",
   "type": "module",
   "version": "0.0.2-beta.6",
-  "packageManager": "pnpm@10.23.0",
+  "packageManager": "pnpm@10.24.0",
   "description": "Vue 3 Markdown renderer optimized for large docs: progressive Mermaid, streaming diff code blocks, and fast real-time preview.",
   "author": "Simon He",
   "license": "MIT",
@@ -120,7 +120,7 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.7.4",
-    "stream-markdown-parser": "^0.0.32"
+    "stream-markdown-parser": "^0.0.33"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^5.4.1",
