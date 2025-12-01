@@ -1,3 +1,17 @@
+## [0.0.2-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.6...v0.0.2-beta.7) (2025-12-01)
+
+
+### Bug Fixes
+
+* **math_inline:** edge case ([37a0861](https://github.com/Simon-He95/markstream-vue/commit/37a0861e2e4e887437045ed9f4b007f225df2ad2))
+
+
+### Features
+
+* update CHANGELOG for v0.0.2-beta.5; add footnote anchor component and rollup-plugin-visualizer ([2790a89](https://github.com/Simon-He95/markstream-vue/commit/2790a89d5569cbd86b5e7a0ccddf1424fc861edf))
+
+
+
 ## [0.0.2-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.5...v0.0.2-beta.6) (2025-11-29)
 
 
