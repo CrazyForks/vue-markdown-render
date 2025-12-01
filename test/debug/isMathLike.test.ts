@@ -14,4 +14,5 @@ it('recognizes \"\\boldsymbol{...}\" as math-like', () => {
   expect(isMathLike('get_time')).toBe(false)
   expect(isMathLike('or **matrix of coefficients**')).toBe(false)
   expect(isMathLike('Quasi-Streaming')).toBe(false)
+  expect(isMathLike('\frac')).toBe(true)
 })

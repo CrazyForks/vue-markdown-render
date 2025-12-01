@@ -1,5 +1,7 @@
 import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions, TextNode } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
+import { parseBasicBlockToken } from './block-token-parser'
+import { parseBlockquote } from './blockquote-parser'
 import { parseList } from './list-parser'
 
 export function parseContainer(
@@ -81,8 +83,20 @@ export function parseContainer(
       children.push(listNode)
       j = newIndex
     }
+    else if (tokens[j].type === 'blockquote_open') {
+      const [blockquoteNode, newIndex] = parseBlockquote(tokens, j, options)
+      children.push(blockquoteNode)
+      j = newIndex
+    }
     else {
-      j++
+      const handled = parseBasicBlockToken(tokens, j, options)
+      if (handled) {
+        children.push(handled[0])
+        j = handled[1]
+      }
+      else {
+        j++
+      }
     }
   }
 

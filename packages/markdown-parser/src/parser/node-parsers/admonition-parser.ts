@@ -1,5 +1,7 @@
 import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
+import { parseBasicBlockToken } from './block-token-parser'
+import { parseBlockquote } from './blockquote-parser'
 import { parseList } from './list-parser'
 
 export function parseAdmonition(
@@ -29,13 +31,24 @@ export function parseAdmonition(
       tokens[j].type === 'bullet_list_open'
       || tokens[j].type === 'ordered_list_open'
     ) {
-      // Handle nested lists - use parseList directly for proper nested list support
       const [listNode, newIndex] = parseList(tokens, j, options)
       admonitionChildren.push(listNode)
       j = newIndex
     }
+    else if (tokens[j].type === 'blockquote_open') {
+      const [blockquoteNode, newIndex] = parseBlockquote(tokens, j, options)
+      admonitionChildren.push(blockquoteNode)
+      j = newIndex
+    }
     else {
-      j++
+      const handled = parseBasicBlockToken(tokens, j, options)
+      if (handled) {
+        admonitionChildren.push(handled[0])
+        j = handled[1]
+      }
+      else {
+        j++
+      }
     }
   }
 

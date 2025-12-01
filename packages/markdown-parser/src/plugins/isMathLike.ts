@@ -53,11 +53,23 @@ export function isMathLike(s: string) {
 
   // Normalize accidental control characters that may appear if a single
   // backslash sequence was interpreted in a JS string literal (for example
-  // '\\b' becoming a backspace U+0008). Convert such control characters
-  // back into their two-character escaped forms so our regexes can match
-  // TeX commands reliably.
+  // '\\frac' being typed as '\frac' which turns into a form-feed + "rac").
+  // Convert the handful of control characters that collide with common TeX
+  // commands (\b, \f, \v) back into their two-character escaped forms so our
+  // regexes can match the intent reliably without flagging real newlines/tabs.
   // eslint-disable-next-line no-control-regex
-  const norm = s.replace(/\u0008/g, '\\b')
+  const norm = s.replace(/[\u0008\v\f]/g, (ch) => {
+    switch (ch) {
+      case '\u0008':
+        return '\\b'
+      case '\u000B':
+        return '\\v'
+      case '\u000C':
+        return '\\f'
+      default:
+        return ch
+    }
+  })
   const stripped = norm.trim()
 
   // quick bailouts
