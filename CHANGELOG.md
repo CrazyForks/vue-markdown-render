@@ -1,3 +1,18 @@
+## [0.0.2-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.5...v0.0.2-beta.6) (2025-11-29)
+
+
+### Bug Fixes
+
+* stream-markdown-parser ([f9365db](https://github.com/Simon-He95/markstream-vue/commit/f9365dbe3c309124b3b741a4d8292ab4a9c1f2f9))
+* update version to 0.0.32 in package.json ([2623793](https://github.com/Simon-He95/markstream-vue/commit/2623793d11393f79292e962addf49a90cd42cdc9))
+
+
+### Features
+
+* update CHANGELOG for v0.0.2-beta.4; add CodeBlockNode and MermaidBlockNode components with documentation ([99c0f31](https://github.com/Simon-He95/markstream-vue/commit/99c0f31da154124ef20f663aa1cc1a57d2dc8f3d))
+
+
+
 ## [0.0.2-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.4...v0.0.2-beta.5) (2025-11-28)
 
 
