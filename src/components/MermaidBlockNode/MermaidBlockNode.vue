@@ -1425,9 +1425,9 @@ const computedButtonStyle = computed(() => {
       <div v-if="$slots['header-left']">
         <slot name="header-left" />
       </div>
-      <div v-else class="flex items-center space-x-2">
+      <div v-else class="flex items-center space-x-2 overflow-hidden">
         <img :src="mermaidIconUrl" class="w-4 h-4 my-0" alt="Mermaid">
-        <span class="text-sm font-medium font-mono" :class="props.isDark ? 'text-gray-400' : 'text-gray-600'">Mermaid</span>
+        <span class="text-sm font-medium font-mono truncate" :class="props.isDark ? 'text-gray-400' : 'text-gray-600'">Mermaid</span>
       </div>
 
       <!-- 中间插槽或默认切换按钮 -->

@@ -18,7 +18,7 @@ describe('math inline edgecases', () => {
     expect(/\\?operatorname/.test(mathContent)).toBe(true)
     expect(/\\?boldsymbol/.test(mathContent)).toBe(true)
   })
-  
+
   it('parses Chinese list item with inline math and fractions', () => {
     const md = getMarkdown()
     const content = `*   **情况 2.1: $b=1$**\n    如果 $b=1$，则 $k = \\frac{a^2+1^2}{a \\cdot 1+1} = \\frac{a^2+1}{a+1}$。`

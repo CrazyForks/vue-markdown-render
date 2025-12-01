@@ -930,9 +930,9 @@ onUnmounted(() => {
     >
       <!-- left slot / fallback language label -->
       <slot name="header-left">
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-2 flex-1 overflow-hidden">
           <span class="icon-slot h-4 w-4 flex-shrink-0" v-html="languageIcon" />
-          <span class="text-sm font-medium font-mono">{{ displayLanguage }}</span>
+          <span class="text-sm font-medium font-mono truncate">{{ displayLanguage }}</span>
         </div>
       </slot>
 
