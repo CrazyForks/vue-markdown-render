@@ -50,7 +50,7 @@ function onAnchorEnter(e: Event) {
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
   // show the link href in tooltip; fall back to title/text if href missing
-  const txt = props.node?.href ?? props.node?.title ?? props.node?.text ?? ''
+  const txt = props.node?.title || props.node?.href || props.node?.text || ''
   showTooltipForAnchor(e.currentTarget as HTMLElement, txt, 'top', false, origin)
 }
 
@@ -67,7 +67,7 @@ const title = computed(() => String(props.node.title ?? props.node.href ?? ''))
     v-if="!node.loading"
     class="link-node"
     :href="node.href"
-    :title="title"
+    :title="showTooltip ? '' : title"
     :aria-label="`Link: ${title}`"
     :aria-hidden="node.loading ? 'true' : 'false'"
     target="_blank"
