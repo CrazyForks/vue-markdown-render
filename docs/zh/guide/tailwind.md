@@ -57,3 +57,37 @@ module.exports = {
 说明：
 - 本包导出 `./tailwind` 条目（`./dist/tailwind.ts`），导出的是提取出的 class 列表。发布到 npm 后可以在 `tailwind.config.js` 中通过 `require('markstream-vue/tailwind')` 引入该列表。
 - 在本地开发时也可以直接引用生成文件（例如 `./dist/tailwind.ts`）。
+
+## UnoCSS 集成
+
+UnoCSS 遵循相同规则：先导入 reset，再将库的 CSS 放到受控 layer 中，避免被 `utilities` 覆盖。
+
+1. 在 `uno.config.ts` 中注入 `preflights`：
+
+```ts
+import { defineConfig, presetUno, presetWind } from 'unocss'
+
+export default defineConfig({
+  presets: [presetUno(), presetWind()],
+  preflights: [
+    {
+      layer: 'preflights',
+      getCSS: () => '@import "markstream-vue/index.css";',
+    },
+  ],
+})
+```
+
+2. 或者手动在样式表中声明：
+
+```css
+@import '@unocss/reset/tailwind.css';
+
+@layer components {
+  @import 'markstream-vue/index.css';
+}
+```
+
+3. 当类名与 Uno/Tailwind 冲突时，可以在配置中设置 prefix（如 Tailwind `prefix: 'tw-'`，Uno 通过 `shortcutsPrefix` 或自定义规则），或者将 `MarkdownRender` 包裹在 `custom-id` 上下文中再进行覆盖。
+
+调试技巧：在浏览器 DevTools 中打开 “Cascade Layers” 面板，确认 `markstream-vue` 的样式位于 utilities 之上。如果不在正确层级，请调整导入位置或 `preflights` 顺序。

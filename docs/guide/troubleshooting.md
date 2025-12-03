@@ -50,6 +50,50 @@ setCustomComponents('my-docs', {
 
   Extra tip: if you can write a unit/integration test that reproduces the bug, add it under the `test/` folder and run `pnpm test` locally — this is the fastest way for maintainers to validate and fix regressions.
 
+## CSS looks wrong? Start here
+
+Most rendering bugs are caused by style ordering, missing resets, or utility frameworks (Tailwind/UnoCSS) trumping component CSS. Run through this checklist before filing an issue:
+
+1. **Reset browser defaults** — margins on `p`, `dl`, `table`, and `pre` differ per browser. Import a reset (`modern-css-reset`, `@unocss/reset`, or Tailwind's `@tailwind base`) *before* `markstream-vue` styles:
+
+```css
+@import 'modern-css-reset';
+@tailwind base;
+@tailwind components;
+
+@import 'markstream-vue/index.css';
+```
+
+2. **Use CSS layers** — When Tailwind or UnoCSS runs in `@layer components` or `utilities`, wrap the library CSS import so the cascade is predictable:
+
+```css
+@layer components {
+  @import 'markstream-vue/index.css';
+}
+```
+
+For UnoCSS, inject the CSS inside `preflights`:
+
+```ts
+import { defineConfig, presetUno } from 'unocss'
+
+export default defineConfig({
+  presets: [presetUno()],
+  preflights: [
+    {
+      layer: 'components',
+      getCSS: () => '@import "markstream-vue/index.css";',
+    },
+  ],
+})
+```
+
+3. **Double-check peer CSS** — Monaco, KaTeX, and Mermaid each ship CSS. Missing imports show up as invisible editors or unstyled formulas. Confirm the component guide you are following calls out the extra stylesheet.
+
+4. **Scope overrides via `custom-id`** — When integrating with larger design systems, renderers can stomp on each other. Add `custom-id="docs"` to `MarkdownRender` and apply overrides scoped to `[data-custom-id="docs"]` so other layouts stay untouched.
+
+If none of the above helps, reproduce the issue in the playground (`pnpm play`) with a CSS-only snippet and include the link when reporting the bug.
+
 Quick test — run the playground locally to reproduce and debug:
 
 ```bash

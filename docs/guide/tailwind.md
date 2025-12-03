@@ -74,7 +74,43 @@ const md = '# Tailwind test\n\nThis text is styled by tailwind'
 
 <template>
   <div class="prose">
-    <MarkdownRender :content="md" />
+  <MarkdownRender :content="md" />
   </div>
 </template>
 ```
+
+## UnoCSS integration
+
+UnoCSS follows the same rules: import resets first, then wrap renderer CSS so component styles stay in the correct layer.
+
+1. Install Uno presets (`presetUno`, `presetWind`) and include the package CSS inside a `preflight`:
+
+```ts
+// uno.config.ts
+import { defineConfig, presetUno, presetWind } from 'unocss'
+
+export default defineConfig({
+  presets: [presetUno(), presetWind()],
+  preflights: [
+    {
+      // ensures the CSS runs with the base reset
+      layer: 'preflights',
+      getCSS: () => '@import "markstream-vue/index.css";',
+    },
+  ],
+})
+```
+
+2. If you prefer to rely on CSS layers manually, include the CSS in your main stylesheet:
+
+```css
+@import '@unocss/reset/tailwind.css';
+
+@layer components {
+  @import 'markstream-vue/index.css';
+}
+```
+
+3. Use Uno prefixes (e.g., `uno` config `rules: [], shortcuts: [], theme: {}` + `shortcutsPrefix: 'u-'`) when class names collide with renderer classes. Tailwind users can also set `prefix: 'tw-'` in `tailwind.config.js`.
+
+Troubleshooting tip: enable the “Cascade Layers” view in devtools to check whether Uno/Tailwind utilities override renderer selectors. If utilities appear below the component layer, move the import into `@layer components` or adjust the preflight order.

@@ -1,42 +1,94 @@
-# Usage & API
+# API guide
 
-This page provides short usage examples and points to advanced customization: parse hooks, rendering strategies and code block options.
+This page connects the parser helpers, renderer props, and customization hooks exposed by `markstream-vue`. Pair it with the [Usage](/guide/usage) and [Props](/guide/props) pages when wiring everything together.
 
-- `getMarkdown()` — get a configured `markdown-it-ts` instance and options
-- `parseMarkdownToStructure()` — transform tokens to the AST nodes used by the renderer
-- Components: `MarkdownRender`, `CodeBlockNode`, `MarkdownCodeBlockNode`, `MermaidNode`.
+## Render pipeline at a glance
 
-### Streaming vs Basic modes
+```
+Markdown string → getMarkdown() → markdown-it-ts instance
+            ↓
+   parseMarkdownToStructure() → AST (BaseNode[])
+            ↓
+   <MarkdownRender> → node components (CodeBlockNode, ImageNode, …)
+```
 
-- Streaming Markdown: excellent for AI model responses and real-time previews. It updates in small tokens to avoid re-parsing entire documents
-- Basic Usage: simply pass a static `content` string to `MarkdownRender` for regular pre-generated Markdown
+You can jump in at any stage:
+- Provide `content` to let the component handle parsing automatically.
+- Provide `nodes` when you need full control over the AST (server-side parsing, custom transforms).
 
-### Props and options
+## Parser helpers
 
-(See README for a full props table; this page is a condensed version.)
+| Helper | Purpose | When to use |
+| ------ | ------- | ----------- |
+| `getMarkdown(options?)` | Returns a configured `markdown-it-ts` instance with the plugins this package expects. | Customize parser options (HTML toggles, additional plugins) before transforming tokens. |
+| `parseMarkdownToStructure(content, md?)` | Generates the AST consumed by `MarkdownRender`. Accepts either a markdown string or tokens. | Pre-parse on the server, run validations, or reuse the AST across renders. |
 
-- `content` (string) — required unless `nodes` provided
-- `nodes` (BaseNode[]) — optional AST node input
-- `renderCodeBlocksAsPre` — boolean
-- `codeBlockStream` — boolean
-- `viewportPriority` — boolean
+Both helpers are framework-agnostic and can run in Node or the browser. For large documents you can reuse the `md` instance between parses to avoid re-initializing plugins.
 
-### Advanced
+## Custom components & scoping
 
-Call `setCustomComponents` to override internal node rendering. For example, to use `MarkdownCodeBlockNode` instead of `CodeBlockNode` for `code_block` nodes.
+Use `setCustomComponents(customId?, mapping)` to override any node renderer. Pair it with the `custom-id` prop on `MarkdownRender` so replacements stay scoped.
 
-For parse hooks, use `parseMarkdownToStructure` options: `preTransformTokens`, `postTransformTokens`, and `postTransformNodes`.
+```ts
+import { setCustomComponents } from 'markstream-vue'
+import CustomImageNode from './CustomImageNode.vue'
 
-Try this — a minimal render snippet for the API page:
+setCustomComponents('docs', {
+  image: CustomImageNode,
+})
+```
 
 ```vue
-<script setup>
-import MarkdownRender from 'markstream-vue'
-
-const md = '# API quick test\n\nThis page shows a quick render example.'
-</script>
-
-<template>
-  <MarkdownRender :content="md" />
-</template>
+<MarkdownRender custom-id="docs" :content="md" />
 ```
+
+Tips:
+- Use descriptive IDs (`docs`, `playground`, `pdf-export`) for tracing.
+- Call `setCustomComponents(undefined, mapping)` to set globals, but prefer scoped IDs to avoid surprises in multi-instance apps.
+- Clean up mappings in SPA routers if you register them dynamically.
+
+## Parse hooks & transforms
+
+When passing `content`, you can intercept parser stages through `parse-options` (prop) or the `ParseOptions` parameter of `parseMarkdownToStructure`.
+
+Hooks:
+- `preTransformTokens(tokens)` — mutate tokens before default handling.
+- `postTransformTokens(tokens)` — inspect/adjust tokens before node generation.
+- `postTransformNodes(nodes)` — modify the AST right before rendering.
+
+Example: flag AI “thinking” blocks before rendering:
+
+```ts
+const parseOptions = {
+  postTransformNodes(nodes) {
+    return nodes.map((node) =>
+      node.type === 'html_block' && /<thinking>/.test(node.value)
+        ? { ...node, meta: { type: 'thinking' } }
+        : node,
+    )
+  },
+}
+```
+
+```vue
+<MarkdownRender :content="doc" :parse-options="parseOptions" />
+```
+
+Inside your custom node component you can check `node.meta?.type`.
+
+## Utility exports
+
+Besides the core renderer and parser helpers, the package exposes:
+
+- `CodeBlockNode`, `MarkdownCodeBlockNode`, `MermaidBlockNode`, `MathBlockNode`, `ImageNode`, etc. — see [Components](/guide/components) for their props and CSS requirements.
+- `VisibilityWrapper`, `NodeRenderer`, and type exports under `types`.
+
+Refer to `packages/markdown-parser/README.md` for the canonical TypeScript interfaces.
+
+## Styling + troubleshooting reminders
+
+- Always include a reset before `markstream-vue/index.css` and wrap it with `@layer components` when using Tailwind or UnoCSS. See the [Tailwind guide](/guide/tailwind) and the [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here).
+- Code/graph peers (Monaco, Shiki, Mermaid, KaTeX) each need their own CSS imports. Missing styles often manifest as blank editors or invisible formulas.
+- Use `custom-id` to scope overrides and avoid global selector conflicts.
+
+Need more examples? Jump into the [Playground](/guide/playground) or run `pnpm play` locally to experiment with custom parsers and renderers.

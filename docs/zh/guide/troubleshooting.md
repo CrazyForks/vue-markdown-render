@@ -30,7 +30,7 @@
 
   这将告知所有带有 `custom-id="my-docs"` 的 `MarkdownRender` 实例，使用 `MyCustomCodeBlock` 渲染 `code_block` 节点；更多示例请参见 `Advanced` 页面。
 
- - 重现与提单：遇到渲染异常或报错时，请先在 `playground` 中尝试复现问题并提供最小 Markdown 示例（或使用托管的快速测试页面）。可以运行 `pnpm test` 进行本地测试以确认是否为回归问题。打开 issue 时请包含：
+- 重现与提单：遇到渲染异常或报错时，请先在 `playground` 中尝试复现问题并提供最小 Markdown 示例（或使用托管的快速测试页面）。可以运行 `pnpm test` 进行本地测试以确认是否为回归问题。打开 issue 时请包含：
 
   1. 可复现的最小 Markdown 示例（粘贴在 issue 中或放到 gist）。
   2. 在 playground 的复现步骤或 `playground` 链接，以及运行环境信息（浏览器、Node 版本、Vite/Nuxt）。
@@ -45,3 +45,47 @@
   https://github.com/Simon-He95/markstream-vueer/issues/new?template=bug_report.yml
 
   额外建议：如果你可以编写一个单测或集成测试来复现 bug，请将其放入 `test/` 文件夹并在本地运行 `pnpm test`，这通常能帮助维护者快速定位并修复回归。
+
+## 样式错乱？先做这几件事 {#css-looks-wrong-start-here}
+
+绝大部分渲染问题都源自 CSS 重置缺失、导入顺序不对，或者 Tailwind / UnoCSS 等工具类框架覆盖组件样式。提问前请按以下清单排查：
+
+1. **导入 reset** —— 浏览器默认 `p`、`dl`、`table`、`pre` 的 margin/padding 各不相同。先引入 reset（`modern-css-reset`、`@unocss/reset`、`@tailwind base`），再引入 `markstream-vue`：
+
+```css
+@import 'modern-css-reset';
+@tailwind base;
+@tailwind components;
+
+@import 'markstream-vue/index.css';
+```
+
+2. **使用 CSS layer** —— Tailwind/UnoCSS 在 `@layer components`/`utilities` 中输出工具类，如果包的 CSS 在这些 layer 之前导入，样式可能被覆盖。把库的样式包裹在 layer 里：
+
+```css
+@layer components {
+  @import 'markstream-vue/index.css';
+}
+```
+
+UnoCSS 也可以通过 `preflights` 注入：
+
+```ts
+import { defineConfig, presetUno } from 'unocss'
+
+export default defineConfig({
+  presets: [presetUno()],
+  preflights: [
+    {
+      layer: 'components',
+      getCSS: () => '@import "markstream-vue/index.css";',
+    },
+  ],
+})
+```
+
+3. **确认同伴 CSS** —— Monaco、KaTeX、Mermaid 都有自己的样式文件。缺少时会表现为空白编辑器或无样式公式。对照组件指南确认已引入对应 CSS。
+
+4. **用 `custom-id` 限定覆盖范围** —— 集成到大型设计系统时，其他全局样式可能影响渲染器。给 `MarkdownRender` 传 `custom-id="docs"`，再通过 `[data-custom-id="docs"]` 编写覆盖，可避免污染其它页面。
+
+如果上述步骤仍无法解决，请使用 `pnpm play` 启动 playground，准备一个只包含 CSS/Markdown 的最小示例并附带链接提 issue。

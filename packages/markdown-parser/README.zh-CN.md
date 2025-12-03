@@ -21,6 +21,15 @@
 
 > ℹ️ 自当前版本起我们基于 [`markdown-it-ts`](https://www.npmjs.com/package/markdown-it-ts)（一个 TypeScript 优先的 markdown-it 发行版）进行构建。API 与 markdown-it 保持一致，但内部仅依赖其解析流程，并提供更丰富的 token 类型定义。
 
+## 文档
+
+完整的使用说明与集成教程见 markstream-vue 文档站：
+
+- English: https://markstream-vue-docs.simonhe.me/guide/api
+- 中文: https://markstream-vue-docs.simonhe.me/zh/guide/api
+
+本 README 聚焦解析器 API；如需 VitePress/Vite/Nuxt 集成、Worker 流式解析、Tailwind/UnoCSS 配置等指南，请查阅上述文档。
+
 ## 安装
 
 ```bash
@@ -31,7 +40,45 @@ npm install stream-markdown-parser
 yarn add stream-markdown-parser
 ```
 
+## 快速 API 速览
+
+- `getMarkdown(options)` — 返回一个预配置的 `markdown-it-ts` 实例；支持 `plugin`、`apply`、`i18n` 等选项（内置任务列表、上下标、数学等插件）。
+- `registerMarkdownPlugin(plugin)` / `clearRegisteredMarkdownPlugins()` — 全局注册/清除插件，在所有 `getMarkdown()` 调用中生效（适合特性开关或测试环境）。
+- `parseMarkdownToStructure(markdown, md, parseOptions)` — 将 Markdown 转换为可供 `markstream-vue` 等渲染器使用的 AST。
+- `processTokens(tokens)` / `parseInlineTokens(children, content)` — 更底层的 token → 节点工具，方便自定义管线。
+- `applyMath`、`applyContainers`、`normalizeStandaloneBackslashT`、`findMatchingClose` 等 — 用于构建自定义解析、lint 或内容清洗流程。
+
 ## 使用
+
+### 流式解析流程
+
+```
+Markdown 字符串
+   ↓ getMarkdown() → 带插件的 markdown-it-ts 实例
+parseMarkdownToStructure() → AST (ParsedNode[])
+   ↓ 交给你的渲染器（markstream-vue、自定义 UI、Worker 等）
+```
+
+多次解析时复用同一个 `md` 实例可以避免重复注册插件。与 [`markstream-vue`](../../README.zh-CN.md) 一起使用时，你可以把 AST 传给 `<MarkdownRender :nodes="nodes" />`，或仅传入原始 `content` 并共享同一套解析配置。
+
+### 增量 / 流式示例
+
+处理 AI/SSE 流时，可以复用同一个 `md` 实例不停地对累积缓冲区解析，并把 AST 推送给 UI（例如 `markstream-vue`）：
+
+```ts
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = getMarkdown()
+let buffer = ''
+
+async function handleChunk(chunk: string) {
+  buffer += chunk
+  const nodes = parseMarkdownToStructure(buffer, md)
+  postMessage({ type: 'markdown:update', nodes })
+}
+```
+
+在前端通过 `<MarkdownRender :nodes="nodes" />` 渲染即可避免重复解析。具体串联示例见[文档用法指南](../../docs/zh/guide/usage.md)。
 
 ### 基础示例
 
@@ -113,6 +160,29 @@ const md = getMarkdown('editor-1', {
 })
 ```
 
+### 全局扩展
+
+想在所有 `getMarkdown()` 实例上启用同一个插件，而无需修改调用点？可使用内置 helper：
+
+```ts
+import {
+  registerMarkdownPlugin,
+  clearRegisteredMarkdownPlugins,
+} from 'stream-markdown-parser'
+
+registerMarkdownPlugin(myPlugin)
+
+const md = getMarkdown()
+// 现在 md 会自动包含 myPlugin
+
+// 测试或清理阶段：
+clearRegisteredMarkdownPlugins()
+```
+
+- `plugin` 选项 → 针对单次 `getMarkdown` 调用传入 `md.use(...)`。
+- `apply` 选项 → 直接操作实例（如 `md.inline.ruler.before(...)`）。如果需要严格模式，可自行包裹 try/catch；默认会打印错误保持兼容。
+- `registerMarkdownPlugin` → 全局注册表，适用于 SSR / Worker 等场景统一开启功能。
+
 ## API
 
 ### 主要函数
@@ -174,6 +244,34 @@ interface MathOptions {
 }
 ```
 
+### 解析钩子（精细化变换）
+
+`parseMarkdownToStructure()` 与 `<MarkdownRender :parse-options>` 可使用相同的钩子：
+
+```ts
+interface ParseOptions {
+  preTransformTokens?(tokens: Token[]): Token[]
+  postTransformTokens?(tokens: Token[]): Token[]
+  postTransformNodes?(nodes: ParsedNode[]): ParsedNode[]
+}
+```
+
+示例 —— 标记 AI “思考” 块：
+
+```ts
+const parseOptions = {
+  postTransformNodes(nodes) {
+    return nodes.map((node) =>
+      node.type === 'html_block' && /<thinking>/.test(node.value)
+        ? { ...node, meta: { type: 'thinking' } }
+        : node,
+    )
+  },
+}
+```
+
+在渲染器中读取 `node.meta` 即可渲染自定义 UI，而无需直接修改 Markdown 文本。
+
 ### 工具函数
 
 #### `isMathLike(content)`
@@ -197,6 +295,14 @@ interface MathOptions {
 
 **返回值：** `number` - 匹配闭合的索引，如果未找到则返回 -1
 
+## 使用建议与排障
+
+- **复用解析实例**：缓存 `getMarkdown()` 的结果，避免重复注册插件。
+- **服务端解析**：在服务端运行 `parseMarkdownToStructure` 后把 AST 下发给客户端，配合 `markstream-vue` 实现确定性输出。
+- **自定义 HTML 组件**：在解析前先把 `<MyWidget>` 这类片段替换为占位符，渲染时再注入，避免在 `html_block` 上进行脆弱的字符串操作。
+- **样式提示**：如果将节点交给 `markstream-vue`，务必按照文档的 [CSS 排查清单](../../docs/zh/guide/troubleshooting.md#css-looks-wrong-start-here) 调整 reset / layer，防止 Tailwind/UnoCSS 覆盖样式。
+- **错误处理**：`apply` 钩子内部默认捕获异常后打印日志，如需在 CI/生产中抛出错误，可在传入前自行封装并 rethrow。
+
 #### `parseFenceToken(token)`
 
 将代码围栏 token 解析为 CodeBlockNode。
@@ -215,6 +321,25 @@ interface MathOptions {
 - `options` (MathOptions, 可选): 数学选项
 
 **返回值：** `string`
+
+### 低阶辅助函数
+
+需要更细粒度地控制 token → AST 流程时，可直接使用以下导出：
+
+```ts
+import {
+  parseInlineTokens,
+  processTokens,
+  type MarkdownToken,
+} from 'stream-markdown-parser'
+
+const tokens: MarkdownToken[] = md.parse(markdown, {})
+const nodes = processTokens(tokens)
+// 或仅解析内联内容：
+const inlineNodes = parseInlineTokens(tokens[0].children ?? [], tokens[0].content ?? '')
+```
+
+`processTokens` 即 `parseMarkdownToStructure` 内部使用的同一个转换器，可在自定义管线中复用，避免重复实现 Markdown-it 遍历。
 
 ### 插件函数
 

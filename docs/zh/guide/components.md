@@ -1,86 +1,250 @@
-```markdown
-### LinkNode：下划线动画与颜色自定义
-`LinkNode`（用于渲染锚点的内部节点）支持在运行时通过 props 自定义下划线动画和颜色，无需覆盖全局 CSS。默认值保持向后兼容以保留先前外观。
+# 组件与节点渲染器
 
-可用 props（传给渲染 `LinkNode` 的组件）：
-| 名称 | 类型 | 默认 | 说明 |
-| ---- | ---- | ----- | ---- |
-| `color` | `string` | `#0366d6` | 链接文字颜色（任意有效 CSS 颜色）。下划线使用 `currentColor`，因此会跟随此颜色。 |
-| `underlineHeight` | `number` | `2` | 下划线厚度（像素）。 |
-| `underlineBottom` | `number \| string` | `-3px` | 相对于文本基线的偏移；支持 `px` 或任意 CSS 长度（例如 `0.2rem`）。 |
-| `animationDuration` | `number` | `0.8` | 动画总时长（秒）。 |
-| `animationOpacity` | `number` | `0.9` | 下划线不透明度。 |
-| `animationTiming` | `string` | `linear` | CSS timing function（例如 `linear`、`ease`、`ease-in-out`）。 |
-| `animationIteration` | `string \| number` | `infinite` | 动画重复次数或 `'infinite'`。 |
-| `showTooltip` | `boolean` | `true` | 是否在悬停/聚焦时显示库提供的单例 tooltip。为 `false` 时，会把链接 href/title/text 设置为 `title` 属性（使用浏览器原生提示）。 |
+本页说明各个渲染器之间的关系、所需的同伴依赖与 CSS，并列出常见的排障提示。编写或更新文档时，可以结合 [VitePress 文档指南](/zh/guide/vitepress-docs) 一起使用。
 
-示例：
-```vue
-<template>
-  <!-- 默认样式 -->
-  <LinkNode :node="node" />
-  <!-- 自定义颜色与下划线样式 -->
-  <LinkNode
-    :node="node"
-    color="#e11d48"
-    :underline-height="3"
-    underline-bottom="-4px"
-    :animation-duration="1.2"
-    :animation-opacity="0.8"
-    animation-timing="ease-in-out"
-    :show-tooltip="false"
-  />
-</template>
-```
-说明：
-- 下划线颜色使用 `currentColor`，因此默认情况下和 `color` prop 保持一致。如果需要独立的下划线颜色，可使用局部 CSS 覆盖或在 issue 中建议新增 `underlineColor` prop。
-- 所有 props 都是可选的；省略时使用合理默认值以保持向后兼容。
-- `showTooltip` 默认为 `true`，启用时悬停或聚焦链接会显示库的单例 tooltip（展示链接 href 或 title/text）。如需浏览器原生提示或基于 `title` 的无障碍行为，请设置 `:show-tooltip="false"`，组件会在该情况下把链接信息暴露到 `title` 属性。
+## 快速参考
 
-# API 参考 — 组件
-
-以下文档列出最常用的组件与 props 的中文说明（与英文 `/guide/components` 对应）。
+| 组件 | 推荐场景 | 关键 props / 事件 | 额外 CSS / 同伴依赖 | 排障提示 |
+| ---- | -------- | ---------------- | ------------------- | -------- |
+| `MarkdownRender` | 渲染完整 AST（默认导出） | `content`、`custom-id`、`setCustomComponents`、生命周期钩子 | 在 reset 之后引入 `markstream-vue/index.css`，并放入受控 layer | 给 `MarkdownRender` 添加 `custom-id`，配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
+| `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`autoExpand`、`viewportPriority`、`toolbar` slot | 安装 `stream-monaco` 并引入 `stream-monaco/esm/index.css` | 没有 CSS 会导致空白编辑器；确保 Tailwind/UnoCSS 使用 `@layer components` |
+| `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`theme`、`lang` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
+| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`theme`、`onRender` | `mermaid` ≥ 11 & `mermaid/dist/mermaid.css` | 详见 `/zh/guide/mermaid` |
+| `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node`、`displayMode`、`macros` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
+| `ImageNode` | 自定义图片预览 / 懒加载 | 触发 `click` / `load` / `error` 事件 | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
+| `LinkNode` | 下划线动画、颜色自定义 | `color`、`underlineHeight`、`showTooltip` | 无 | 浏览器默认 `a` 样式可通过 reset 解决 |
 
 ## MarkdownRender
-Props
-- `content: string` — Markdown 字符串（若未提供 `nodes` 则必需）
-- `nodes: BaseNode[]` — 解析后的节点数组（可替代 `content`）
-- `renderCodeBlocksAsPre: boolean` — 将 `code_block` 节点渲染为简单的 `<pre><code>` 块
-- `codeBlockStream: boolean` — 控制代码块的流式渲染行为
-- `viewportPriority: boolean` — 延迟渲染不可见（屏幕外）的高开销节点
-- `parseOptions: ParseOptions` — token/node 钩子（见高级页面）
-- `customId: string` — `setCustomComponents` 的作用域标识
 
-### CodeBlockNode
-功能丰富的代码块，支持可选的 Monaco 集成（可选同伴依赖：`stream-monaco`）
-- `node` — CodeBlock 节点
-- `darkTheme` / `lightTheme` — 主题名称
-- `loading` — 布尔，显示占位
-- `showHeader` / `showCopyButton` / 等 — 头部自定义（参见“代码块头部”页面）
+> 主入口：接受 Markdown 字符串或解析后的 AST，然后使用内置节点渲染器输出。
 
-### MarkdownCodeBlockNode
-轻量级语法高亮（需要 `shiki` 与 `stream-markdown` 等支持）
-- Props 与 `CodeBlockNode` 类似，但使用 `shiki` 主题
+### 快速要点
+- **适用**：Vite/Nuxt/VitePress 中渲染整篇 Markdown。
+- **关键 props**：`content`、`custom-id`、`beforeRender`/`afterRender` 钩子、`setCustomComponents`。
+- **CSS 顺序**：先引入 reset（`modern-css-reset`、`@unocss/reset`、`@tailwind base`），再在 `@layer components` 中导入 `markstream-vue/index.css`。
 
-### MermaidNode
-- 在存在 `mermaid` 同伴依赖时，渐进式渲染 Mermaid 图表
-- `node` — Mermaid 代码块节点
+### 使用阶梯
 
-### Utility 函数
-- `getMarkdown()` — 创建并返回已配置的 `markdown-it-ts` 实例
-- `parseMarkdownToStructure()` — 解析并返回 AST 节点结构
-- `setCustomComponents(id?, mapping)` — 注册节点渲染器映射
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
 
-有关完整的 prop 类型，请参见 `types` 导出或 `packages/markdown-parser/README.md`（包含公共 TypeScript 接口）。
+const md = '# 你好\n\n使用 custom-id 控制样式。'
+</script>
 
-## ImageNode — 自定义预览处理
-
-`ImageNode` 渲染图片并会触发 `click`、`load` 与 `error` 事件，便于实现自定义预览（lightbox / modal），无需替换渲染器。
-
-示例与要点：
-- `click` 负载：`[Event, string]` — 第二项为生效的图片 `src`（可能为回退 URL）。
-- `load` / `error` 负载：图片 `src`。
-
-常见做法：创建一个包装组件拦截 `click` 事件并打开预览，然后在客户端应用中通过 `setCustomComponents` 注册该包装组件。
-
+<template>
+  <MarkdownRender custom-id="docs" :content="md" />
+</template>
 ```
+
+```ts
+// 注册自定义节点
+import { setCustomComponents } from 'markstream-vue'
+import CustomImageNode from './CustomImageNode.vue'
+
+setCustomComponents('docs', {
+  image: CustomImageNode,
+})
+```
+
+```css
+/* styles/main.css */
+@import 'modern-css-reset';
+@tailwind base;
+
+@layer components {
+  @import 'markstream-vue/index.css';
+}
+
+[data-custom-id='docs'] .prose {
+  max-width: 720px;
+}
+```
+
+### 常见问题
+- **样式错乱**：先检查 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here)（reset、layer 顺序、同伴 CSS）。
+- **工具类覆盖**：传入 `custom-id` 并使用 `[data-custom-id="docs"]` 限定样式。
+- **SSR 报错**：对只在浏览器可用的同伴依赖（Mermaid、Monaco）使用 `<ClientOnly>` 或 `onMounted`。
+
+## CodeBlockNode
+
+> 支持 Monaco 渲染、流式 diff、工具栏插槽的代码块组件。
+
+### 快速要点
+- **适用**：需要交互、滚动同步或流式输出的代码片段。
+- **依赖**：`stream-monaco`，并在入口导入 `stream-monaco/esm/index.css`；若需要 `@shikijs/monaco` 主题，请在 Vite 配置 worker。
+- **CSS**：Tailwind/UnoCSS 项目务必在 `@layer components` 中导入上述 CSS，避免被 `@tailwind utilities` 覆盖。
+
+### 示例
+
+```vue
+<script setup lang="ts">
+import { CodeBlockNode } from 'markstream-vue'
+import 'stream-monaco/esm/index.css'
+
+const node = {
+  type: 'code_block',
+  lang: 'ts',
+  value: 'const a = 1',
+}
+</script>
+
+<template>
+  <CodeBlockNode :node="node" :monaco-options="{ fontSize: 14 }" />
+</template>
+```
+
+```vue
+<!-- 进阶：流式 diff + 自定义工具栏 -->
+<template>
+  <CodeBlockNode
+    custom-id="docs"
+    :node="node"
+    :auto-expand="true"
+    :viewport-priority="true"
+  >
+    <template #toolbar>
+      <button class="copy-btn" @click="copy()">Copy</button>
+    </template>
+  </CodeBlockNode>
+</template>
+```
+
+### 常见问题
+- **编辑器空白**：未导入 Monaco CSS 或 worker 未注册。
+- **Tailwind 覆盖字体/背景**：确保 `stream-monaco/esm/index.css` 位于 `@layer components`。
+- **SSR**：Monaco 依赖浏览器 API，Nuxt 需 `<ClientOnly>`，Vite SSR 需 `onMounted` 才渲染节点。
+
+## MarkdownCodeBlockNode
+
+> 基于 Shiki 的轻量代码块，专为 SSR/静态站点或对包体积敏感的场景设计。
+
+### 快速要点
+- **依赖**：`shiki` + `stream-markdown`。
+- **Props**：与 `CodeBlockNode` 保持一致（`theme`、`lang`、`wordWrap`、插槽）。
+- **适用场景**：VitePress、内容站点或无需 Monaco 的应用。
+
+### 示例
+
+```vue
+<script setup lang="ts">
+import { MarkdownCodeBlockNode } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  lang: 'vue',
+  value: '<template><p>Hello</p></template>',
+}
+</script>
+
+<template>
+  <MarkdownCodeBlockNode :node="node" theme="vitesse-dark" />
+</template>
+```
+
+排障：
+- 未安装 `shiki` 时会退回 `<pre><code>`，请确认依赖与 bundler 配置。
+- 同样需要在 `@layer components` 中引入相关 CSS，避免被 Tailwind/Uno 覆盖。
+
+## MermaidBlockNode
+
+> 渐进式渲染 Mermaid 图，随着 `mermaid` 解析完成即时更新。
+
+### 快速要点
+- **依赖**：`mermaid` ≥ 11（推荐 ESM 构建）。
+- **CSS**：`import 'mermaid/dist/mermaid.css'`。
+- **Props**：`node`、`theme`、`mermaidOptions`、`onRender`、`custom-id`。
+
+### 示例
+
+```ts
+import 'mermaid/dist/mermaid.css'
+```
+
+```vue
+<MermaidBlockNode
+  custom-id="docs"
+  :node="node"
+  theme="forest"
+  :mermaid-options="{ securityLevel: 'strict' }"
+  @render="handleMermaidRender"
+/>
+```
+
+排障：
+- 若出现空白，请查看控制台日志（多数为 CSS 漏引或语法不兼容）。
+- SSR/Nuxt 环境需要 `onMounted` 或 `<ClientOnly>` 避免在服务端执行 mermaid。
+
+## MathBlockNode / MathInlineNode
+
+> 使用 KaTeX 渲染块级与行内公式。
+
+### 快速要点
+- **依赖**：`katex`
+- **CSS**：`import 'katex/dist/katex.min.css'`
+- **Props**：`displayMode`、`macros`、`throwOnError`
+
+### 示例
+
+```ts
+import 'katex/dist/katex.min.css'
+```
+
+```vue
+<MathBlockNode :node="node" :display-mode="true" :macros="{ '\\RR': '\\mathbb{R}' }" />
+<MathInlineNode :node="inlineNode" />
+```
+
+排障：
+- 缺少 CSS 会导致公式不可见。
+- Nuxt SSR 需要 `<ClientOnly>` 或 `client:only`，以防 KaTeX 访问 DOM。
+- 如需自定义样式，请配合 `[data-custom-id]` 定位，勿直接修改 KaTeX 全局样式。
+
+## ImageNode — 自定义预览
+
+`ImageNode` 会触发 `click`、`load`、`error`，常见做法是用自定义组件拦截 `click` 并打开 lightbox。
+
+```vue
+<template>
+  <ImageNode :node="node" @click="open(node.props.src)" />
+</template>
+```
+
+```ts
+import ImagePreview from './ImagePreview.vue'
+import { setCustomComponents } from 'markstream-vue'
+
+setCustomComponents('docs', { image: ImagePreview })
+```
+
+样式提示：
+- 浏览器默认 `img` 边框、间距不同，记得引入 reset。
+- Tailwind/UnoCSS 的 `img` 工具类可能覆盖宽高，使用 `[data-custom-id]` 限定范围。
+
+## LinkNode — 下划线与提示
+
+`LinkNode` 暴露 `color`、`underlineHeight`、`underlineBottom`、`animationDuration`、`showTooltip` 等 props，便于无需 CSS 覆盖即可调整动画。
+
+```vue
+<LinkNode
+  :node="node"
+  color="#e11d48"
+  :underline-height="3"
+  underline-bottom="-4px"
+  :animation-duration="1.2"
+  :show-tooltip="false"
+/>
+```
+
+提示：
+- 下划线颜色跟随 `currentColor`，如需独立颜色请添加局部 CSS。
+- `showTooltip=false` 时会退回浏览器原生 `title`。
+- 如果 anchor 样式被浏览器默认值影响，请结合 reset/`@layer` 方案。
+
+## 工具函数
+
+- `getMarkdown()` — 返回预设好的 `markdown-it-ts` 实例。
+- `parseMarkdownToStructure()` — 将 Markdown 字符串解析成 AST，可直接传给 `MarkdownRender`。
+- `setCustomComponents(id?, mapping)` — 为指定 `custom-id` 替换任何节点渲染器。
+
+若新增组件或修改行为，请同步更新本页与 [VitePress 文档指南](/zh/guide/vitepress-docs)，确保贡献者能够沿用相同结构。

@@ -1,6 +1,32 @@
-# Mermaid: Progressive Rendering Example
+# Mermaid quick start
 
-Mermaid diagrams can be streamed progressively. The diagram renders as soon as the syntax becomes valid and refines as more content arrives.
+Mermaid diagrams stream progressively in `markstream-vue`: as soon as the syntax becomes valid the chart renders, then refines as more tokens arrive. This page covers setup, a streaming example, and common fixes.
+
+## 1. Install & import
+
+```bash
+pnpm add mermaid
+```
+
+```ts
+// main.ts / entry
+import 'mermaid/dist/mermaid.css'
+```
+
+Keep the CSS import after your reset and inside `@layer components` when using Tailwind/UnoCSS so utility layers do not override Mermaid styles.
+
+```css
+@import 'modern-css-reset';
+
+@layer components {
+  @import 'mermaid/dist/mermaid.css';
+  @import 'markstream-vue/index.css';
+}
+```
+
+## 2. Streaming example
+
+Mermaid renders as soon as the snippet is syntactically valid. The snippet below shows a gradual update (ideal for AI responses or long-running tasks):
 
 ```vue
 <script setup lang="ts">
@@ -32,16 +58,7 @@ const id = setInterval(() => {
 </template>
 ```
 
-Notes:
-- Mermaid must be installed as a peer dependency for diagrams to render.
-- If Mermaid fails to render, the component will fall back to showing the source text.
-- For heavy diagrams, consider pre-rendering server-side or caching the SVG output.
-
-See also:
-
-- `MermaidBlockNode` — advanced Mermaid component with header controls, export, and modal: [MermaidBlockNode guide](./mermaid-block-node.md)
-
-Quick try — paste this Markdown into a page or component to test progressive Mermaid rendering:
+Quick try — paste this Markdown into a page or component:
 
 ```md
 \`\`\`mermaid
@@ -52,3 +69,17 @@ B-->C[End]
 ```
 
 ![Mermaid demo](/screenshots/mermaid-demo.svg)
+
+## 3. Advanced component: `MermaidBlockNode`
+
+Need header controls, export buttons, or a pseudo-fullscreen modal? Use [`MermaidBlockNode`](/guide/mermaid-block-node) or override the default renderer via [setCustomComponents](/guide/mermaid-block-node-override). A runnable playground demo lives at `/mermaid-export-demo`.
+
+## 4. Troubleshooting checklist
+
+1. **Peer not installed** — run `pnpm add mermaid`. Without it the renderer falls back to showing source text.
+2. **CSS missing** — import `mermaid/dist/mermaid.css` after your reset (and wrap it in `@layer components` when Tailwind/UnoCSS is present). Missing CSS manifests as invisible diagrams.
+3. **Async errors** — check the browser console for Mermaid logs. Versions prior to 11 are unsupported; upgrade to ≥ 11.
+4. **SSR guard** — Mermaid needs the DOM. Wrap the component in `<ClientOnly>` for Nuxt or check `typeof window !== 'undefined'` before mounting in SSR contexts.
+5. **Heavy graphs** — consider pre-rendering server-side (mermaid CLI) or caching SVG output; the component exposes `svgString` when using `MermaidBlockNode` export events.
+
+Still stuck? Reproduce the issue in the playground (`pnpm play`) with a minimal Markdown sample and link it when opening a bug report.

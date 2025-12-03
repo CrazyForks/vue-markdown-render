@@ -44,6 +44,7 @@
 - 📦 TypeScript 优先：提供完善的类型定义与智能提示
 - 🔌 零配置：开箱即可在 Vue 3 项目中使用
 - 🎨 灵活的代码块渲染：可选 Monaco 编辑器 (`CodeBlockNode`) 或轻量的 Shiki 高亮 (`MarkdownCodeBlockNode`)
+- 🧰 解析工具集：[`stream-markdown-parser`](./packages/markdown-parser) 文档现已覆盖如何在 Worker/SSE 流中复用解析器、直接向 `<MarkdownRender :nodes>` 输送 AST、以及注册全局插件/数学辅助函数的方式。
 
 ## 故障排查 & 常见问题
 

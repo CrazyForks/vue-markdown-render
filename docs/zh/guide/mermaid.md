@@ -1,8 +1,30 @@
-# Mermaid：渐进式渲染示例
+# Mermaid 快速上手
 
-Mermaid 图表可以随内容逐步渲染。图表在语法达到可渲染状态时会立即显示，随后随着更多内容到达而逐步完善。
+`markstream-vue` 支持渐进式 Mermaid 渲染：一旦语法合法就立即生成图表，后续 token 会继续完善图。以下内容介绍安装、流式示例以及常见排障。
 
-示例代码见下方：
+## 1. 安装与样式导入
+
+```bash
+pnpm add mermaid
+```
+
+```ts
+// main.ts / 入口
+import 'mermaid/dist/mermaid.css'
+```
+
+在使用 Tailwind/UnoCSS 时，请在 reset 之后、`@layer components` 中导入 Mermaid 与库的 CSS，避免 utilities 覆盖：
+
+```css
+@import 'modern-css-reset';
+
+@layer components {
+  @import 'mermaid/dist/mermaid.css';
+  @import 'markstream-vue/index.css';
+}
+```
+
+## 2. 流式示例
 
 ```vue
 <script setup lang="ts">
@@ -34,12 +56,28 @@ const id = setInterval(() => {
 </template>
 ```
 
-注意：
-- Mermaid 为可选 peer 依赖；若未安装，渲染器会回退到显示原始源文本。
-- 若解析/渲染失败，请检查浏览器控制台与网络请求中是否缺失 Mermaid 资源。
+快速测试 — 将以下 Markdown 粘贴到任意组件中：
 
-`Mermaid` 为可选 peer 依赖：要启用请安装 `mermaid`。
+```md
+\`\`\`mermaid
+graph LR
+A[Start]-->B
+B-->C[End]
+\`\`\`
+```
 
-另请参阅：
+![Mermaid demo](/screenshots/mermaid-demo.svg)
 
-- `MermaidBlockNode` — 带有头部控制、导出和模态框的高级 Mermaid 组件：[MermaidBlockNode 指南](./mermaid-block-node.md)
+## 3. 进阶组件：`MermaidBlockNode`
+
+若需要头部控制、导出按钮、伪全屏等能力，请参考 [`MermaidBlockNode`](/zh/guide/mermaid-block-node) 或通过 [setCustomComponents 进行覆盖](/zh/guide/mermaid-block-node-override)。仓库内的 playground 提供 `/mermaid-export-demo` 路由可直接试用。
+
+## 4. 常见问题排查
+
+1. **未安装依赖**：确保执行 `pnpm add mermaid`。缺失时组件会退回显示原始文本。
+2. **缺少 CSS**：导入 `mermaid/dist/mermaid.css`，并在 Tailwind/UnoCSS 项目中用 `@layer components` 包裹，缺失时会出现空白。
+3. **版本过旧**：请使用 `mermaid` ≥ 11，旧版本无法兼容异步渲染。
+4. **SSR 报错**：Mermaid 依赖 DOM。Nuxt 请包裹 `<ClientOnly>`，Vite SSR 请在 `onMounted` 中渲染。
+5. **图表过大**：考虑在服务端预渲染或缓存 SVG，`MermaidBlockNode` 导出事件中提供 `svgString` 可直接上传或持久化。
+
+若问题仍存在，请在 playground (`pnpm play`) 中构造最小示例并附带链接提交 issue，方便复现与定位。

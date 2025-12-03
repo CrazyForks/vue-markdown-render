@@ -44,6 +44,7 @@ Watch on Bilibili: [Open in Bilibili](https://www.bilibili.com/video/BV17Z4qzpE9
 - 📦 TypeScript-first: complete type definitions and IntelliSense
 - 🔌 Zero config: works out of the box in Vue 3 projects
 - 🎨 Flexible code block rendering: choose Monaco editor (`CodeBlockNode`) or lightweight Shiki highlighting (`MarkdownCodeBlockNode`)
+- 🧰 Parser toolkit: [`stream-markdown-parser`](./packages/markdown-parser) now documents how to reuse the parser in workers/SSE streams and feed `<MarkdownRender :nodes>` directly, plus APIs for registering global plugins and custom math helpers.
 
 ## Troubleshooting & Common Issues
 
