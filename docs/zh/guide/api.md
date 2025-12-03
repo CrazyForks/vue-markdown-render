@@ -60,7 +60,7 @@ setCustomComponents('docs', {
 ```ts
 const parseOptions = {
   postTransformNodes(nodes) {
-    return nodes.map((node) =>
+    return nodes.map(node =>
       node.type === 'html_block' && /<thinking>/.test(node.value)
         ? { ...node, meta: { type: 'thinking' } }
         : node,

@@ -167,8 +167,8 @@ Need to add a plugin everywhere without touching each call site? Use the helper 
 
 ```ts
 import {
-  registerMarkdownPlugin,
   clearRegisteredMarkdownPlugins,
+  registerMarkdownPlugin,
 } from 'stream-markdown-parser'
 
 registerMarkdownPlugin(myPlugin)
@@ -251,9 +251,9 @@ Both `parseMarkdownToStructure()` and `<MarkdownRender :parse-options>` accept t
 
 ```ts
 interface ParseOptions {
-  preTransformTokens?(tokens: Token[]): Token[]
-  postTransformTokens?(tokens: Token[]): Token[]
-  postTransformNodes?(nodes: ParsedNode[]): ParsedNode[]
+  preTransformTokens?: (tokens: Token[]) => Token[]
+  postTransformTokens?: (tokens: Token[]) => Token[]
+  postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]
 }
 ```
 
@@ -262,7 +262,7 @@ Example — flag AI “thinking” blocks:
 ```ts
 const parseOptions = {
   postTransformNodes(nodes) {
-    return nodes.map((node) =>
+    return nodes.map(node =>
       node.type === 'html_block' && /<thinking>/.test(node.value)
         ? { ...node, meta: { type: 'thinking' } }
         : node,
@@ -328,10 +328,11 @@ Normalize backslash-t sequences in math content.
 If you need full control over how tokens are transformed, you can import the primitive builders directly:
 
 ```ts
+import type { MarkdownToken } from 'stream-markdown-parser'
 import {
+
   parseInlineTokens,
-  processTokens,
-  type MarkdownToken,
+  processTokens
 } from 'stream-markdown-parser'
 
 const tokens: MarkdownToken[] = md.parse(markdown, {})
@@ -439,11 +440,11 @@ import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 const md = getMarkdown()
 let buffer = ''
 
-self.addEventListener('message', (event) => {
+globalThis.addEventListener('message', (event) => {
   if (event.data.type === 'chunk') {
     buffer += event.data.value
     const nodes = parseMarkdownToStructure(buffer, md)
-    self.postMessage({ type: 'update', nodes })
+    globalThis.postMessage({ type: 'update', nodes })
   }
 })
 ```

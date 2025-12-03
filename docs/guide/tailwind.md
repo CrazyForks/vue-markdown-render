@@ -74,7 +74,7 @@ const md = '# Tailwind test\n\nThis text is styled by tailwind'
 
 <template>
   <div class="prose">
-  <MarkdownRender :content="md" />
+    <MarkdownRender :content="md" />
   </div>
 </template>
 ```

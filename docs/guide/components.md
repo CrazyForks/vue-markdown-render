@@ -104,7 +104,9 @@ const node = {
     :viewport-priority="true"
   >
     <template #toolbar>
-      <button class="copy-btn" @click="copy()">Copy</button>
+      <button class="copy-btn" @click="copy()">
+        Copy
+      </button>
     </template>
   </CodeBlockNode>
 </template>
@@ -159,8 +161,7 @@ Troubleshooting:
 ### Usage
 
 ```ts
-import { setCustomComponents } from 'markstream-vue'
-import { MermaidBlockNode } from 'markstream-vue'
+import { MermaidBlockNode, setCustomComponents } from 'markstream-vue'
 import 'mermaid/dist/mermaid.css'
 ```
 
@@ -195,6 +196,7 @@ import 'katex/dist/katex.min.css'
 
 ```vue
 <MathBlockNode :node="node" :display-mode="true" :macros="{ '\\RR': '\\mathbb{R}' }" />
+
 <MathInlineNode :node="inlineNode" />
 ```
 
@@ -214,8 +216,8 @@ Troubleshooting:
 ```
 
 ```ts
-import CustomImageNode from './ImagePreview.vue'
 import { setCustomComponents } from 'markstream-vue'
+import CustomImageNode from './ImagePreview.vue'
 
 setCustomComponents('docs', { image: CustomImageNode })
 ```

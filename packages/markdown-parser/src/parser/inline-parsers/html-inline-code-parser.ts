@@ -16,6 +16,15 @@ export function parseHtmlInlineCodeToken(token: MarkdownToken, tokens: MarkdownT
     const m = html.match(/>([\s\S]*?)<\s*\/\s*[\w-]+>/)
     return m ? m[1] : ''
   }
+  if (tag === 'br') {
+    return [
+      {
+        type: 'hardbreak',
+        raw: code,
+      } as ParsedNode,
+      i + 1,
+    ]
+  }
 
   if (tag === 'a') {
     let loading = false

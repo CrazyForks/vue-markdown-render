@@ -166,8 +166,8 @@ const md = getMarkdown('editor-1', {
 
 ```ts
 import {
-  registerMarkdownPlugin,
   clearRegisteredMarkdownPlugins,
+  registerMarkdownPlugin,
 } from 'stream-markdown-parser'
 
 registerMarkdownPlugin(myPlugin)
@@ -250,9 +250,9 @@ interface MathOptions {
 
 ```ts
 interface ParseOptions {
-  preTransformTokens?(tokens: Token[]): Token[]
-  postTransformTokens?(tokens: Token[]): Token[]
-  postTransformNodes?(nodes: ParsedNode[]): ParsedNode[]
+  preTransformTokens?: (tokens: Token[]) => Token[]
+  postTransformTokens?: (tokens: Token[]) => Token[]
+  postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]
 }
 ```
 
@@ -261,7 +261,7 @@ interface ParseOptions {
 ```ts
 const parseOptions = {
   postTransformNodes(nodes) {
-    return nodes.map((node) =>
+    return nodes.map(node =>
       node.type === 'html_block' && /<thinking>/.test(node.value)
         ? { ...node, meta: { type: 'thinking' } }
         : node,
@@ -327,10 +327,11 @@ const parseOptions = {
 需要更细粒度地控制 token → AST 流程时，可直接使用以下导出：
 
 ```ts
+import type { MarkdownToken } from 'stream-markdown-parser'
 import {
+
   parseInlineTokens,
-  processTokens,
-  type MarkdownToken,
+  processTokens
 } from 'stream-markdown-parser'
 
 const tokens: MarkdownToken[] = md.parse(markdown, {})

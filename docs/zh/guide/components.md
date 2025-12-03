@@ -104,7 +104,9 @@ const node = {
     :viewport-priority="true"
   >
     <template #toolbar>
-      <button class="copy-btn" @click="copy()">Copy</button>
+      <button class="copy-btn" @click="copy()">
+        Copy
+      </button>
     </template>
   </CodeBlockNode>
 </template>
@@ -192,6 +194,7 @@ import 'katex/dist/katex.min.css'
 
 ```vue
 <MathBlockNode :node="node" :display-mode="true" :macros="{ '\\RR': '\\mathbb{R}' }" />
+
 <MathInlineNode :node="inlineNode" />
 ```
 
@@ -211,8 +214,8 @@ import 'katex/dist/katex.min.css'
 ```
 
 ```ts
-import ImagePreview from './ImagePreview.vue'
 import { setCustomComponents } from 'markstream-vue'
+import ImagePreview from './ImagePreview.vue'
 
 setCustomComponents('docs', { image: ImagePreview })
 ```
