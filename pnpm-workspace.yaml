@@ -2,4 +2,5 @@ packages:
   - playground
   - playground-vue2
   - playground-nuxt
+  - playground-react
   - packages/*

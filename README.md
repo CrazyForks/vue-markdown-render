@@ -39,6 +39,10 @@ Looking for Vue 2.6? Use [`markstream-vue2`](./packages/markstream-vue2/README.m
 > 📖 All detailed documentation, API, examples, and advanced usage have been migrated to the VitePress documentation site:
 > https://markstream-vue-docs.simonhe.me/guide/
 
+> ✅ Looking for a React renderer? A first-pass port now lives under `packages/markstream-react`. See `packages/markstream-react/README.md` for usage instructions while its documentation is fleshed out.
+
+> ✅ Looking for a React renderer? A first-pass port now lives under `packages/markstream-react`. See `packages/markstream-react/README.md` for usage instructions while its documentation is fleshed out.
+
 ## TL;DR Highlights
 
 - Purpose-built for **streaming Markdown** (AI/chat/SSE) with zero flicker and predictable memory.
