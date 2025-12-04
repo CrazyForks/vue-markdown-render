@@ -288,6 +288,8 @@ function computeContentHeight(): number | null {
     if (isDiff.value && ed?.getOriginalEditor && ed?.getModifiedEditor) {
       const o = ed.getOriginalEditor?.()
       const m = ed.getModifiedEditor?.()
+      o?.layout?.()
+      m?.layout?.()
       const oh = (o?.getContentHeight?.() as number) || 0
       const mh = (m?.getContentHeight?.() as number) || 0
       const h = Math.max(oh, mh)
@@ -301,6 +303,7 @@ function computeContentHeight(): number | null {
       return Math.ceil(lc * (lh + LINE_EXTRA_PER_LINE) + CONTENT_PADDING + PIXEL_EPSILON)
     }
     else if (ed?.getContentHeight) {
+      ed?.layout?.()
       const h = ed.getContentHeight()
       if (h > 0)
         return Math.ceil(h + PIXEL_EPSILON)
