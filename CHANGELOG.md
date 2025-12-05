@@ -1,3 +1,13 @@
+## [0.0.2-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.7...v0.0.2-beta.8) (2025-12-01)
+
+
+### Bug Fixes
+
+* **CodeBlockNode, MermaidBlockNode:** add overflow handling and text truncation for better layout ([1731e38](https://github.com/Simon-He95/markstream-vue/commit/1731e38e0c30ea8b276d66901a7ff84f1d80eab5))
+* update stream-markdown-parser to v0.0.34 and improve block parsing logic ([ebc7fad](https://github.com/Simon-He95/markstream-vue/commit/ebc7fad43213a46b1daaeb82d981ec0a6388a55c)), closes [#175](https://github.com/Simon-He95/markstream-vue/issues/175) [#176](https://github.com/Simon-He95/markstream-vue/issues/176)
+
+
+
 ## [0.0.2-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.6...v0.0.2-beta.7) (2025-12-01)
 
 

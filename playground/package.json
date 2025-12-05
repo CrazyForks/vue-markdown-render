@@ -10,7 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@iconify-json/carbon": "^1.2.14",
+    "@iconify-json/carbon": "^1.2.15",
     "@iconify/vue": "^5.0.0",
     "@tailwindcss/typography": "^0.5.19",
     "@vueuse/core": "^13.9.0",
@@ -18,7 +18,7 @@
     "markstream-vue": "latest",
     "stream-markdown": "latest",
     "stream-monaco": "latest",
-    "vite": "^7.2.4",
+    "vite": "^7.2.6",
     "vue": "^3.5.25",
     "vue-i18n": "^11.2.2",
     "vue-router": "^4.6.3"
