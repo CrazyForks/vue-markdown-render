@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import MarkdownRender from 'markstream-vue'
 import { useRouter } from 'vue-router'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
 import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
+import MarkdownRender from '../../../src/components/NodeRenderer'
 import { setCustomComponents } from '../../../src/utils/nodeComponents'
 import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline'
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'

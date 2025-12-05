@@ -141,7 +141,9 @@ function closePreview() {
   <dialog v-if="preview" class="my-preview" open>
     <header>
       <strong>{{ preview.artifactTitle }}</strong>
-      <button type="button" @click="closePreview">关闭</button>
+      <button type="button" @click="closePreview">
+        关闭
+      </button>
     </header>
     <iframe
       v-if="preview.artifactType === 'text/html'"
