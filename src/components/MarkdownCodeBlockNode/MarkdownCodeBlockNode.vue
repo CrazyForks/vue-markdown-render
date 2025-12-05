@@ -41,8 +41,10 @@ const props = withDefaults(
   }>(),
   {
     isShowPreview: true,
-    darkTheme: undefined,
-    lightTheme: undefined,
+    // Align defaults with CodeBlockNode behaviour: light first, explicit dark
+    darkTheme: 'vitesse-dark',
+    lightTheme: 'vitesse-light',
+    isDark: false,
     loading: true,
     stream: true,
     enableFontSizeControl: true,

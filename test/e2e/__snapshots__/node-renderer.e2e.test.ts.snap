@@ -116,9 +116,8 @@ exports[`markdownRender node e2e coverage > renders code block node 1`] = `
   <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>
   <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="code_block">
     <div data-v-8dfe8a80="" class="node-content">
-      <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals --><pre data-v-8dfe8a80="" class="language-ts" aria-busy="false" aria-label="Code block: ts" data-language="ts" tabindex="0" loading="false" index-key="markdown-renderer-0" stream="true" is-dark="false">    <code translate="no">export const sum = (a: number, b: number) =&gt; a + b
-</code>
-  </pre>
+      <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals --><pre data-v-8dfe8a80="" class="language-ts" aria-busy="false" aria-label="Code block: ts" data-language="ts" tabindex="0" loading="false" index-key="markdown-renderer-0" stream="true" is-dark="false"><code translate="no">export const sum = (a: number, b: number) =&gt; a + b
+</code></pre>
     </div>
   </div>
   <div data-v-8dfe8a80="" class="node-spacer" style="height: 0px;" aria-hidden="true"></div>

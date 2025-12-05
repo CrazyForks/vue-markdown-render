@@ -1,3 +1,5 @@
+import { isMermaidEnabled } from '../components/MermaidBlockNode/mermaid'
+
 type Theme = 'light' | 'dark'
 
 let worker: Worker | null = null
@@ -30,6 +32,7 @@ export function getMermaidWorkerLoad() {
 }
 
 export const MERMAID_WORKER_BUSY_CODE = 'WORKER_BUSY'
+export const MERMAID_DISABLED_CODE = 'MERMAID_DISABLED'
 
 /**
  * Allow user to inject a Worker instance, e.g. from Vite ?worker import.
@@ -129,6 +132,12 @@ function ensureWorker() {
 }
 
 function callWorker<T>(action: 'canParse' | 'findPrefix', payload: any, timeout = 1400): Promise<T> {
+  if (!isMermaidEnabled()) {
+    const err: any = new Error('Mermaid rendering disabled')
+    err.name = 'MermaidDisabled'
+    err.code = MERMAID_DISABLED_CODE
+    return Promise.reject(err)
+  }
   if (workerInitError)
     return Promise.reject(workerInitError)
 

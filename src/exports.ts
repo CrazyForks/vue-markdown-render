@@ -21,7 +21,9 @@ import LinkNode from './components/LinkNode'
 import ListItemNode from './components/ListItemNode'
 import ListNode from './components/ListNode'
 import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
+import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import MermaidBlockNode from './components/MermaidBlockNode'
+import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
 import MarkdownRender from './components/NodeRenderer'
 import ParagraphNode from './components/ParagraphNode'
 import PreCodeNode from './components/PreCodeNode'
@@ -45,9 +47,11 @@ const CodeBlockNode = defineAsyncComponent(() => import('./components/CodeBlockN
 const MathBlockNode = defineAsyncComponent(() => import('./components/MathBlockNode'))
 const MathInlineNode = defineAsyncComponent(() => import('./components/MathInlineNode'))
 
+export type { KatexLoader } from './components/MathInlineNode/katex'
+
+export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
 // Export centralized props interfaces so they appear in package d.ts
 export * from './utils'
-
 export * from './workers/katexWorkerClient'
 export * from './workers/mermaidWorkerClient'
 export { KATEX_COMMANDS, normalizeStandaloneBackslashT, setDefaultMathOptions } from 'stream-markdown-parser'
@@ -60,7 +64,11 @@ export {
   clearGlobalCustomComponents,
   CodeBlockNode,
   DefinitionListNode,
+  disableKatex,
+  disableMermaid,
   EmojiNode,
+  enableKatex,
+  enableMermaid,
   FootnoteAnchorNode,
   FootnoteNode,
   FootnoteReferenceNode,
@@ -71,6 +79,8 @@ export {
   ImageNode,
   InlineCodeNode,
   InsertNode,
+  isKatexEnabled,
+  isMermaidEnabled,
   LinkNode,
   ListItemNode,
   ListNode,
@@ -85,6 +95,8 @@ export {
   removeCustomComponents,
   setCustomComponents,
   setDefaultI18nMap,
+  setKatexLoader,
+  setMermaidLoader,
   StrikethroughNode,
   StrongNode,
   SubscriptNode,

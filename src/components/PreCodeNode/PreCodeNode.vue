@@ -28,9 +28,7 @@ const ariaLabel = computed(() => {
     :aria-label="ariaLabel"
     :data-language="normalizedLanguage"
     tabindex="0"
-  >
-    <code translate="no" v-text="node.code" />
-  </pre>
+  ><code translate="no" v-text="node.code" /></pre>
 </template>
 
 <style>

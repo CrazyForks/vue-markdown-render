@@ -692,30 +692,32 @@ const nodeComponents = {
 function getNodeComponent(node: ParsedNode) {
   if (!node)
     return FallbackComponent
-  // Allow consumers to override any node type at runtime using
-  // `setCustomComponents(id, { my_node: MyComponent })` or the global
-  // legacy API. We fetch the mapping on-demand so updates take effect
-  // after registration and without relying on a snapshot created at
-  // component initialization.
-  const customForType = (getCustomNodeComponents(props.customId) as any)[String((node as any).type)]
-  if (customForType)
-    return customForType
+  const customComponents = getCustomNodeComponents(props.customId)
+  const customForType = (customComponents as any)[String((node as any).type)]
   if (node.type === 'code_block') {
     const lang = String((node as any).language ?? '').trim().toLowerCase()
-    // If this is a mermaid block, prefer a custom `mermaid` mapping if provided.
+    // Keep Mermaid blocks routed to MermaidBlockNode unless a specific
+    // `mermaid` override is provided.
     if (lang === 'mermaid') {
-      const customMermaid = getCustomNodeComponents(props.customId).mermaid
-      return (customMermaid as any) || MermaidBlockNode
+      const customMermaid = (customComponents as any).mermaid
+      return customMermaid || MermaidBlockNode
     }
+
+    if (customForType)
+      return customForType
 
     // Honor a custom `code_block` component if the consumer registered one
     // via `setCustomComponents(customId, { code_block: MyComponent })`.
-    const customCodeBlock = getCustomNodeComponents(props.customId).code_block
+    const customCodeBlock = (customComponents as any).code_block
     if (customCodeBlock)
-      return (customCodeBlock as any)
+      return customCodeBlock
 
     return codeBlockComponent.value
   }
+
+  if (customForType)
+    return customForType
+
   return (nodeComponents as any)[String((node as any).type)] || FallbackComponent
 }
 

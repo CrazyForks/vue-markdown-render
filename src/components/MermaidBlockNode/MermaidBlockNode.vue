@@ -34,15 +34,33 @@ const props = withDefaults(
 const emits = defineEmits(['copy', 'export', 'openModal', 'toggleMode'])
 const { t } = useSafeI18n()
 
-let mermaid: any = null
 const mermaidAvailable = ref(false)
+
+async function resolveMermaidInstance() {
+  try {
+    const instance = await getMermaid()
+    mermaidAvailable.value = !!instance
+    return instance
+  }
+  catch (err) {
+    mermaidAvailable.value = false
+    throw err
+  }
+}
 
 // Only initialize mermaid on the client to avoid SSR errors
 if (typeof window !== 'undefined') {
   ;(async () => {
-    mermaid = await getMermaid()
-    mermaidAvailable.value = !!mermaid
-    mermaid?.initialize?.({ startOnLoad: false, securityLevel: 'loose' })
+    try {
+      const instance = await resolveMermaidInstance()
+      if (!instance)
+        return
+      instance?.initialize?.({ startOnLoad: false, securityLevel: 'loose' })
+    }
+    catch (err) {
+      mermaidAvailable.value = false
+      console.warn('[markstream-vue] Failed to initialize mermaid renderer. Call enableMermaid() to configure a loader.', err)
+    }
   })()
 }
 
@@ -326,11 +344,10 @@ async function canParseOnMain(
   theme: 'light' | 'dark',
   opts?: { signal?: AbortSignal, timeoutMs?: number },
 ) {
-  // Ensure mermaid instance is available; initial async load may not have completed yet
-  if (!mermaid) {
+  const mermaidInstance = await resolveMermaidInstance()
+  if (!mermaidInstance)
     return
-  }
-  const anyMermaid = mermaid as any
+  const anyMermaid = mermaidInstance as any
   const themed = applyThemeTo(code, theme)
   if (typeof anyMermaid.parse === 'function') {
     await withTimeoutSignal(() => anyMermaid.parse(themed), {
@@ -341,7 +358,7 @@ async function canParseOnMain(
   }
   // Fallback: try a headless render (no target element) just to validate
   const id = `mermaid-parse-${Math.random().toString(36).slice(2, 9)}`
-  await withTimeoutSignal(() => (mermaid as any).render(id, themed), {
+  await withTimeoutSignal(() => (mermaidInstance as any).render(id, themed), {
     timeoutMs: opts?.timeoutMs ?? timeouts.value.render,
     signal: opts?.signal,
   })
@@ -852,21 +869,20 @@ async function initMermaid() {
   isRendering.value = true
 
   renderQueue.value = (async () => {
-    // Ensure mermaid is loaded before attempting render
-    if (!mermaid) {
-      return
-    }
     if (mermaidContent.value) {
       mermaidContent.value.style.opacity = '0'
     }
 
     try {
+      const mermaidInstance = await resolveMermaidInstance()
+      if (!mermaidInstance)
+        return
       const id = `mermaid-${Date.now()}-${Math.random()
         .toString(36)
         .substring(2, 11)}`
 
       if (!hasRenderedOnce.value && !isThemeRendering.value) {
-        mermaid.initialize?.({
+        mermaidInstance.initialize?.({
           securityLevel: 'loose',
           startOnLoad: false,
         })
@@ -874,7 +890,7 @@ async function initMermaid() {
       const currentTheme = props.isDark ? 'dark' : 'light'
       const codeWithTheme = getCodeWithTheme(currentTheme)
       const res: any = await withTimeoutSignal(
-        () => (mermaid as any).render(
+        () => (mermaidInstance as any).render(
           id,
           codeWithTheme,
           // mermaidContent.value,
@@ -941,10 +957,9 @@ async function renderPartial(code: string) {
 
   isRendering.value = true
   try {
-    // Ensure mermaid is loaded before attempting render
-    if (!mermaid) {
+    const mermaidInstance = await resolveMermaidInstance()
+    if (!mermaidInstance)
       return
-    }
     const id = `mermaid-partial-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
     const theme = props.isDark ? 'dark' : 'light'
     // 如果最后一行是不完整的（如以 |、-、> 等连接符结尾），则剪裁到上一行，
@@ -956,7 +971,7 @@ async function renderPartial(code: string) {
       mermaidContent.value.style.opacity = '0'
 
     const res: any = await withTimeoutSignal(
-      () => (mermaid as any).render(id, codeWithTheme),
+      () => (mermaidInstance as any).render(id, codeWithTheme),
       { timeoutMs: timeouts.value.render },
     )
     const svg = res?.svg
