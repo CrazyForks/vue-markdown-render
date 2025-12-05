@@ -112,6 +112,49 @@ const node = {
 </template>
 ```
 
+### HTML/SVG 预览对话框
+- 当 `node.lang` 为 `html` 或 `svg`（且 `isShowPreview` 保持 `true`）时，工具栏会显示 Preview 按钮。不监听 `@preview-code` 的情况下，点击会调用内置的 iframe 弹窗（`HtmlPreviewFrame`），并在沙箱 `<iframe>` 中渲染你的代码。
+- 监听 `@preview-code` 即可完全接管预览。事件会携带 `{ node, artifactType, artifactTitle, id }`，你可以用它来打开自研弹窗、把 HTML 注入到 playground，或记录埋点。一旦存在监听器，默认弹窗会被自动禁用。
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+
+const preview = ref(null)
+
+function handlePreview(artifact) {
+  preview.value = artifact
+}
+
+function closePreview() {
+  preview.value = null
+}
+</script>
+
+<template>
+  <CodeBlockNode
+    :node="node"
+    show-preview-button
+    @preview-code="handlePreview"
+  />
+
+  <dialog v-if="preview" class="my-preview" open>
+    <header>
+      <strong>{{ preview.artifactTitle }}</strong>
+      <button type="button" @click="closePreview">关闭</button>
+    </header>
+    <iframe
+      v-if="preview.artifactType === 'text/html'"
+      :srcdoc="preview.node.code"
+      sandbox="allow-scripts allow-same-origin"
+    />
+    <div v-else v-html="preview.node.code" />
+  </dialog>
+</template>
+```
+
+> 小贴士：可以通过 `:show-preview-button="false"` 隐藏按钮，或者直接传入 `:is-show-preview="false"`，让所有 CodeBlock 都跳过预览逻辑。
+
 ### 常见问题
 - **编辑器空白**：未导入 Monaco CSS 或 worker 未注册。
 - **Tailwind 覆盖字体/背景**：确保 `stream-monaco/esm/index.css` 位于 `@layer components`。

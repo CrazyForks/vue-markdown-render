@@ -112,6 +112,49 @@ const node = {
 </template>
 ```
 
+### HTML/SVG preview dialog
+- When `node.lang` is `html` or `svg` (and `isShowPreview` stays `true`), the toolbar exposes a Preview button. Without any listener, clicking it opens the built-in iframe dialog (`HtmlPreviewFrame`) that renders your code inside a sandboxed `<iframe>`.
+- Attach `@preview-code` to fully override the dialog. The emitted payload contains `{ node, artifactType, artifactTitle, id }`, so you can decide whether to spin up your own modal, route the HTML into a playground, or log artifacts elsewhere. Returning a listener automatically disables the default iframe overlay.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+
+const preview = ref(null)
+
+function handlePreview(artifact) {
+  preview.value = artifact
+}
+
+function closePreview() {
+  preview.value = null
+}
+</script>
+
+<template>
+  <CodeBlockNode
+    :node="node"
+    show-preview-button
+    @preview-code="handlePreview"
+  />
+
+  <dialog v-if="preview" class="my-preview" open>
+    <header>
+      <strong>{{ preview.artifactTitle }}</strong>
+      <button type="button" @click="closePreview">Close</button>
+    </header>
+    <iframe
+      v-if="preview.artifactType === 'text/html'"
+      :srcdoc="preview.node.code"
+      sandbox="allow-scripts allow-same-origin"
+    />
+    <div v-else v-html="preview.node.code" />
+  </dialog>
+</template>
+```
+
+> Tip: hide the toolbar control entirely with `:show-preview-button="false"` or globally disable previews via `:is-show-preview="false"` when your docs never need this dialog.
+
 ### Common pitfalls
 - **Editor invisible**: missing Monaco CSS or worker registration.
 - **Tailwind overriding fonts**: wrap imports in `@layer components`.
