@@ -2,7 +2,7 @@
 import type { CodeBlockNodeProps } from '../../types/component-props'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
-import { computed, nextTick, onBeforeUnmount, onUnmounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onUnmounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
@@ -10,6 +10,7 @@ import { useViewportPriority } from '../../composables/viewportPriority'
 import { getLanguageIcon, languageMap } from '../../utils'
 import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
+import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
 import { getUseMonaco } from './monaco'
 
 const props = withDefaults(
@@ -33,6 +34,11 @@ const props = withDefaults(
 )
 
 const emits = defineEmits(['previewCode', 'copy'])
+const instance = getCurrentInstance()
+const hasPreviewListener = computed(() => {
+  const props = instance?.vnode.props as Record<string, unknown> | null | undefined
+  return !!(props && (props.onPreviewCode || props.onPreviewCode))
+})
 const { t } = useSafeI18n()
 // No mermaid-specific handling here; NodeRenderer routes mermaid blocks.
 const codeEditor = ref<HTMLElement | null>(null)
@@ -93,6 +99,7 @@ let detectLanguage: (code: string) => string = () => String(props.node.language 
 let setTheme: (theme: any) => Promise<void> = async () => {}
 const isDiff = computed(() => props.node.diff)
 const usePreCodeRender = ref(false)
+const showInlinePreview = ref(false)
 // Defer client-only editor initialization to the browser to avoid SSR errors
 if (typeof window !== 'undefined') {
   ;(async () => {
@@ -691,17 +698,23 @@ function previewCode() {
     return
 
   const lowerLang = (codeLanguage.value || props.node.language).toLowerCase()
-  const artifactType = lowerLang === 'html' ? 'text/html' : 'image/svg+xml'
-  const artifactTitle
-    = lowerLang === 'html'
-      ? t('artifacts.htmlPreviewTitle') || 'HTML Preview'
-      : t('artifacts.svgPreviewTitle') || 'SVG Preview'
-  emits('previewCode', {
-    node: props.node,
-    artifactType,
-    artifactTitle,
-    id: `temp-${lowerLang}-${Date.now()}`,
-  })
+  if (hasPreviewListener.value) {
+    const artifactType = lowerLang === 'html' ? 'text/html' : 'image/svg+xml'
+    const artifactTitle
+      = lowerLang === 'html'
+        ? t('artifacts.htmlPreviewTitle') || 'HTML Preview'
+        : t('artifacts.svgPreviewTitle') || 'SVG Preview'
+    emits('previewCode', {
+      node: props.node,
+      artifactType,
+      artifactTitle,
+      id: `temp-${lowerLang}-${Date.now()}`,
+    })
+    return
+  }
+
+  if (lowerLang === 'html')
+    showInlinePreview.value = !showInlinePreview.value
 }
 
 function setAutomaticLayout(expanded: boolean) {
@@ -1040,6 +1053,12 @@ onUnmounted(() => {
       </slot>
     </div>
     <div v-show="!isCollapsed && (stream ? true : !loading)" ref="codeEditor" class="code-editor-container" :class="[stream ? '' : 'code-height-placeholder']" />
+    <HtmlPreviewFrame
+      v-if="showInlinePreview && !hasPreviewListener && isPreviewable && codeLanguage.trim().toLowerCase() === 'html'"
+      :code="node.code"
+      :is-dark="props.isDark"
+      :on-close="() => (showInlinePreview = false)"
+    />
     <!-- Loading placeholder (non-streaming mode) can be overridden via slot -->
     <div v-show="!stream && loading" class="code-loading-placeholder">
       <slot name="loading" :loading="loading" :stream="stream">
