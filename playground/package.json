@@ -17,6 +17,7 @@
     "katex": "^0.16.25",
     "stream-markdown": "latest",
     "stream-monaco": "latest",
+    "markstream-vue": "latest",
     "vite": "^7.2.6",
     "vue": "^3.5.25",
     "vue-i18n": "^11.2.2",
