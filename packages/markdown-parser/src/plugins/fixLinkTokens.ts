@@ -383,7 +383,6 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
     }
     else if (curToken.content?.startsWith('](') && tokens[i - 1].type === 'strong_close' && tokens[i - 4]?.type === 'text' && tokens[i - 4]?.content?.includes('**[')) {
       // 此时的场景是 link 被 strong 包裹，link 中又包含了强调符号
-      i++
       const replacerTokens = []
       const beforeText = tokens[i - 4].content!.split('**[')[0]
       if (beforeText)
