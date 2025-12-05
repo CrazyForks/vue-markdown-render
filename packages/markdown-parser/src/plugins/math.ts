@@ -377,7 +377,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
         if (!silent) {
           // push text before this math
-          const before = src.slice(0, index)
+          const before = src.slice(s.pos - s.pending.length, index)
           // 如果 before 包含 单边的 ` ** 或 __ ，则直接跳过，交给 md 处理
 
           // const m = before.match(/(^|[^\\])(`+|__|\*\*)/)
