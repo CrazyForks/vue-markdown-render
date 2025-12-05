@@ -30,23 +30,23 @@ const props = defineProps<{
   indexKey?: string | number
 }>()
 
-// Available node components for child rendering
+const overrides = getCustomNodeComponents(props.customId)
+
+// Available node components for child rendering; prefer custom overrides
 const nodeComponents = {
-  text: TextNode,
-  inline_code: InlineCodeNode,
-  link: LinkNode,
-  strong: StrongNode,
-  emphasis: EmphasisNode,
-  highlight: HighlightNode,
-  insert: InsertNode,
-  subscript: SubscriptNode,
-  superscript: SuperscriptNode,
-  emoji: EmojiNode,
-  footnote_reference: FootnoteReferenceNode,
-  math_inline: MathInlineNodeAsync,
-  reference: ReferenceNode,
-  // 添加其他内联元素组件
-  ...getCustomNodeComponents(props.customId),
+  text: overrides.text || TextNode,
+  inline_code: overrides.inline_code || InlineCodeNode,
+  link: overrides.link || LinkNode,
+  strong: overrides.strong || StrongNode,
+  emphasis: overrides.emphasis || EmphasisNode,
+  highlight: overrides.highlight || HighlightNode,
+  insert: overrides.insert || InsertNode,
+  subscript: overrides.subscript || SubscriptNode,
+  superscript: overrides.superscript || SuperscriptNode,
+  emoji: overrides.emoji || EmojiNode,
+  footnote_reference: overrides.footnote_reference || FootnoteReferenceNode,
+  math_inline: overrides.math_inline || MathInlineNodeAsync,
+  reference: overrides.reference || ReferenceNode,
 }
 </script>
 

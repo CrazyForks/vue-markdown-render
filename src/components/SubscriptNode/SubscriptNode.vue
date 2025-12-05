@@ -30,22 +30,22 @@ const props = defineProps<{
   indexKey?: number | string
 }>()
 
+const overrides = getCustomNodeComponents(props.customId)
+
 const nodeComponents = {
-  text: TextNode,
-  inline_code: InlineCodeNode,
-  link: LinkNode,
-  strong: StrongNode,
-  emphasis: EmphasisNode,
-  footnote_reference: FootnoteReferenceNode,
-  strikethrough: StrikethroughNode,
-  highlight: HighlightNode,
-  insert: InsertNode,
-  superscript: SuperscriptNode,
-  emoji: EmojiNode,
-  math_inline: MathInlineNodeAsync,
-  reference: ReferenceNode,
-  // 添加其他内联元素组件
-  ...getCustomNodeComponents(props.customId),
+  text: overrides.text || TextNode,
+  inline_code: overrides.inline_code || InlineCodeNode,
+  link: overrides.link || LinkNode,
+  strong: overrides.strong || StrongNode,
+  emphasis: overrides.emphasis || EmphasisNode,
+  footnote_reference: overrides.footnote_reference || FootnoteReferenceNode,
+  strikethrough: overrides.strikethrough || StrikethroughNode,
+  highlight: overrides.highlight || HighlightNode,
+  insert: overrides.insert || InsertNode,
+  superscript: overrides.superscript || SuperscriptNode,
+  emoji: overrides.emoji || EmojiNode,
+  math_inline: overrides.math_inline || MathInlineNodeAsync,
+  reference: overrides.reference || ReferenceNode,
 }
 </script>
 

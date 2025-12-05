@@ -35,27 +35,27 @@ const props = defineProps<{
   customId?: string
   indexKey?: number | string
 }>()
+const overrides = getCustomNodeComponents(props.customId)
+
 const nodeComponents = {
-  inline_code: InlineCodeNode,
-  image: ImageNode,
-  link: LinkNode,
-  hardbreak: HardBreakNode,
-  emphasis: EmphasisNode,
-  strong: StrongNode,
-  strikethrough: StrikethroughNode,
-  highlight: HighlightNode,
-  insert: InsertNode,
-  subscript: SubscriptNode,
-  superscript: SuperscriptNode,
-  emoji: EmojiNode,
-  checkbox: CheckboxNode,
-  math_inline: MathInlineNodeAsync,
-  checkbox_input: CheckboxNode,
-  reference: ReferenceNode,
-  footnote_anchor: FootnoteAnchorNode,
-  footnote_reference: FootnoteReferenceNode,
-  // 添加其他内联元素组件
-  ...getCustomNodeComponents(props.customId),
+  inline_code: overrides.inline_code || InlineCodeNode,
+  image: overrides.image || ImageNode,
+  link: overrides.link || LinkNode,
+  hardbreak: overrides.hardbreak || HardBreakNode,
+  emphasis: overrides.emphasis || EmphasisNode,
+  strong: overrides.strong || StrongNode,
+  strikethrough: overrides.strikethrough || StrikethroughNode,
+  highlight: overrides.highlight || HighlightNode,
+  insert: overrides.insert || InsertNode,
+  subscript: overrides.subscript || SubscriptNode,
+  superscript: overrides.superscript || SuperscriptNode,
+  emoji: overrides.emoji || EmojiNode,
+  checkbox: overrides.checkbox || CheckboxNode,
+  math_inline: overrides.math_inline || MathInlineNodeAsync,
+  checkbox_input: overrides.checkbox_input || CheckboxNode,
+  reference: overrides.reference || ReferenceNode,
+  footnote_anchor: overrides.footnote_anchor || FootnoteAnchorNode,
+  footnote_reference: overrides.footnote_reference || FootnoteReferenceNode,
 }
 const katexReady = useKatexReady()
 </script>

@@ -37,27 +37,27 @@ const props = defineProps<{
   indexKey?: number | string
 }>()
 
+const overrides = getCustomNodeComponents(props.customId)
+
 const nodeComponents = {
-  text: TextNode,
-  inline_code: InlineCodeNode,
-  link: LinkNode,
-  image: ImageNode,
-  strong: StrongNode,
-  emphasis: EmphasisNode,
-  strikethrough: StrikethroughNode,
-  highlight: HighlightNode,
-  insert: InsertNode,
-  subscript: SubscriptNode,
-  superscript: SuperscriptNode,
-  emoji: EmojiNode,
-  checkbox: CheckboxNode,
-  checkbox_input: CheckboxNode,
-  footnote_reference: FootnoteReferenceNode,
-  hardbreak: HardBreakNode,
-  math_inline: MathInlineNodeAsync,
-  reference: ReferenceNode,
-  // 添加其他内联元素组件
-  ...getCustomNodeComponents(props.customId),
+  text: overrides.text || TextNode,
+  inline_code: overrides.inline_code || InlineCodeNode,
+  link: overrides.link || LinkNode,
+  image: overrides.image || ImageNode,
+  strong: overrides.strong || StrongNode,
+  emphasis: overrides.emphasis || EmphasisNode,
+  strikethrough: overrides.strikethrough || StrikethroughNode,
+  highlight: overrides.highlight || HighlightNode,
+  insert: overrides.insert || InsertNode,
+  subscript: overrides.subscript || SubscriptNode,
+  superscript: overrides.superscript || SuperscriptNode,
+  emoji: overrides.emoji || EmojiNode,
+  checkbox: overrides.checkbox || CheckboxNode,
+  checkbox_input: overrides.checkbox_input || CheckboxNode,
+  footnote_reference: overrides.footnote_reference || FootnoteReferenceNode,
+  hardbreak: overrides.hardbreak || HardBreakNode,
+  math_inline: overrides.math_inline || MathInlineNodeAsync,
+  reference: overrides.reference || ReferenceNode,
 }
 </script>
 
