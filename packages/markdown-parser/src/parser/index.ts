@@ -63,6 +63,9 @@ export function parseMarkdownToStructure(
       }
     }
   }
+  if (options.debug) {
+    console.log('Parsed Markdown Tree Structure:', result)
+  }
   return result
 }
 

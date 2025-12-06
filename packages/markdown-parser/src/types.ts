@@ -343,6 +343,8 @@ export interface ParseOptions {
   postTransformTokens?: TransformTokensHook
   // When true, require a closing `**` to parse strong; otherwise allow mid-state strong
   requireClosingStrong?: boolean
+  // When true, log the parsed tree structure for debugging
+  debug?: boolean
 }
 
 export type PostTransformNodesHook = (nodes: ParsedNode[]) => ParsedNode[]

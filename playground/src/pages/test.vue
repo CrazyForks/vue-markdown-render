@@ -59,6 +59,7 @@ const codeBlockStream = useLocalStorage<boolean>('vmr-test-code-stream', true)
 const viewportPriority = useLocalStorage<boolean>('vmr-test-viewport-priority', true)
 const batchRendering = useLocalStorage<boolean>('vmr-test-batch-rendering', true)
 const typewriter = useLocalStorage<boolean>('vmr-test-typewriter', true)
+const debugParse = useLocalStorage<boolean>('vmr-test-debug-parse', false)
 const mathEnabled = useLocalStorage<boolean>('vmr-test-math-enabled', isKatexEnabled())
 const mermaidEnabled = useLocalStorage<boolean>('vmr-test-mermaid-enabled', isMermaidEnabled())
 
@@ -428,8 +429,8 @@ function toggleStreamSettings() {
                 <label for="toggle-math" class="cursor-pointer">启用数学 (KaTeX)</label>
               </div>
               <div class="flex items-center gap-2">
-                <input id="toggle-mermaid" v-model="mermaidEnabled" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
-                <label for="toggle-mermaid" class="cursor-pointer">启用 Mermaid</label>
+                <input id="toggle-debug-parse" v-model="debugParse" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
+                <label for="toggle-debug-parse" class="cursor-pointer">调试解析树结构（console）</label>
               </div>
             </div>
           </div>
@@ -456,6 +457,7 @@ function toggleStreamSettings() {
               :batch-rendering="batchRendering"
               :typewriter="typewriter"
               :code-block-stream="codeBlockStream"
+              :parse-options="{ debug: debugParse }"
             />
           </div>
           <div class="mt-2 text-xs text-gray-500 break-words shrink-0">
