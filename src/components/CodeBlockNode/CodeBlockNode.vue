@@ -7,7 +7,7 @@ import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
-import { getLanguageIcon, languageMap } from '../../utils'
+import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils'
 import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
@@ -46,7 +46,8 @@ const container = ref<HTMLElement | null>(null)
 const copyText = ref(false)
 // local tooltip logic removed; use shared `showTooltipForAnchor` / `hideTooltip`
 
-const codeLanguage = ref(String(props.node.language ?? ''))
+const codeLanguage = ref(normalizeLanguageIdentifier(props.node.language))
+const monacoLanguage = computed(() => resolveMonacoLanguageId(codeLanguage.value))
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
 const editorCreated = ref(false)
@@ -501,20 +502,15 @@ function getMaxHeightValue(): number {
 }
 
 // Check if the language is previewable (HTML or SVG)
-const isPreviewable = computed(() => {
-  const lang = codeLanguage.value.trim().toLowerCase()
-  return props.isShowPreview && (lang === 'html' || lang === 'svg')
-})
+const isPreviewable = computed(() => props.isShowPreview && (codeLanguage.value === 'html' || codeLanguage.value === 'svg'))
 
 // Check if the code block is a Mermaid diagram
-const isMermaid = computed(
-  () => codeLanguage.value.trim().toLowerCase() === 'mermaid',
-)
+const isMermaid = computed(() => codeLanguage.value === 'mermaid')
 
 watch(
   () => props.node.language,
   (newLanguage) => {
-    codeLanguage.value = newLanguage
+    codeLanguage.value = normalizeLanguageIdentifier(newLanguage)
   },
 )
 
@@ -524,7 +520,7 @@ watch(
     if (props.stream === false)
       return
     if (!codeLanguage.value)
-      codeLanguage.value = detectLanguage(newCode)
+      codeLanguage.value = normalizeLanguageIdentifier(detectLanguage(newCode))
 
     // If the editor helpers exist but the editor hasn't been created yet,
     // ensure creation first so update calls don't get lost.
@@ -536,9 +532,9 @@ watch(
     }
 
     if (isDiff.value)
-      updateDiffCode(String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), codeLanguage.value)
+      updateDiffCode(String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), monacoLanguage.value)
     else
-      updateCode(newCode, codeLanguage.value)
+      updateCode(newCode, monacoLanguage.value)
 
     if (isExpanded.value) {
       safeRaf(() => updateExpandedHeight())
@@ -548,15 +544,14 @@ watch(
 
 // 计算用于显示的语言名称
 const displayLanguage = computed(() => {
-  const lang = codeLanguage.value.trim().toLowerCase()
+  const lang = codeLanguage.value
+  if (!lang)
+    return languageMap[''] || 'Plain Text'
   return languageMap[lang] || lang.charAt(0).toUpperCase() + lang.slice(1)
 })
 
 // Computed property for language icon
-const languageIcon = computed(() => {
-  const lang = codeLanguage.value.trim().toLowerCase()
-  return getLanguageIcon(lang.split(':')[0])
-})
+const languageIcon = computed(() => getLanguageIcon(codeLanguage.value || ''))
 
 // Compute inline style for container to respect optional min/max width
 const containerStyle = computed(() => {
@@ -697,7 +692,7 @@ function previewCode() {
   if (!isPreviewable.value)
     return
 
-  const lowerLang = (codeLanguage.value || props.node.language).toLowerCase()
+  const lowerLang = codeLanguage.value
   if (hasPreviewListener.value) {
     const artifactType = lowerLang === 'html' ? 'text/html' : 'image/svg+xml'
     const artifactTitle
@@ -738,12 +733,12 @@ async function runEditorCreation(el: HTMLElement) {
   if (isDiff.value) {
     safeClean()
     if (createDiffEditor)
-      await createDiffEditor(el as HTMLElement, String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), codeLanguage.value)
+      await createDiffEditor(el as HTMLElement, String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), monacoLanguage.value)
     else
-      await createEditor(el as HTMLElement, props.node.code, codeLanguage.value)
+      await createEditor(el as HTMLElement, props.node.code, monacoLanguage.value)
   }
   else {
-    await createEditor(el as HTMLElement, props.node.code, codeLanguage.value)
+    await createEditor(el as HTMLElement, props.node.code, monacoLanguage.value)
   }
 
   const editor = isDiff.value ? getDiffEditorView() : getEditorView()
@@ -1054,7 +1049,7 @@ onUnmounted(() => {
     </div>
     <div v-show="!isCollapsed && (stream ? true : !loading)" ref="codeEditor" class="code-editor-container" :class="[stream ? '' : 'code-height-placeholder']" />
     <HtmlPreviewFrame
-      v-if="showInlinePreview && !hasPreviewListener && isPreviewable && codeLanguage.trim().toLowerCase() === 'html'"
+      v-if="showInlinePreview && !hasPreviewListener && isPreviewable && codeLanguage === 'html'"
       :code="node.code"
       :is-dark="props.isDark"
       :on-close="() => (showInlinePreview = false)"

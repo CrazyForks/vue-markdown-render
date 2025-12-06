@@ -65,13 +65,78 @@ export function setLanguageIconResolver(resolver?: LanguageIconResolver | null) 
   userLanguageIconResolver = resolver ?? null
 }
 
+const LANGUAGE_ALIAS_MAP: Record<string, string> = {
+  '': '',
+  'javascript': 'javascript',
+  'js': 'javascript',
+  'mjs': 'javascript',
+  'cjs': 'javascript',
+  'typescript': 'typescript',
+  'ts': 'typescript',
+  'jsx': 'jsx',
+  'tsx': 'tsx',
+  'golang': 'go',
+  'py': 'python',
+  'rb': 'ruby',
+  'sh': 'shell',
+  'bash': 'shell',
+  'zsh': 'shell',
+  'shellscript': 'shell',
+  'bat': 'shell',
+  'batch': 'shell',
+  'ps1': 'powershell',
+  'plaintext': 'plain',
+  'text': 'plain',
+  'c++': 'cpp',
+  'c#': 'csharp',
+  'objective-c': 'objectivec',
+  'objective-c++': 'objectivecpp',
+  'yml': 'yaml',
+  'md': 'markdown',
+  'rs': 'rust',
+  'kt': 'kotlin',
+}
+
+function extractLanguageToken(lang?: string | null): string {
+  if (!lang)
+    return ''
+  const trimmed = lang.trim()
+  if (!trimmed)
+    return ''
+  const [firstToken] = trimmed.split(/\s+/)
+  const [base] = firstToken.split(':')
+  return base.toLowerCase()
+}
+
+export function normalizeLanguageIdentifier(lang?: string | null): string {
+  const token = extractLanguageToken(lang)
+  return LANGUAGE_ALIAS_MAP[token] ?? token
+}
+
+export function resolveMonacoLanguageId(lang?: string | null): string {
+  const canonical = normalizeLanguageIdentifier(lang)
+  if (!canonical)
+    return 'plaintext'
+  switch (canonical) {
+    case 'plain':
+      return 'plaintext'
+    case 'jsx':
+      return 'javascript'
+    case 'tsx':
+      return 'typescript'
+    default:
+      return canonical
+  }
+}
+
 export function getLanguageIcon(lang: string): string {
   if (userLanguageIconResolver) {
     const hit = userLanguageIconResolver(lang)
     if (hit != null && hit !== '')
       return hit
   }
-  switch (lang) {
+  const normalized = normalizeLanguageIdentifier(lang)
+  switch (normalized) {
     case 'javascript':
     case 'js':
       return JsIcon
@@ -205,6 +270,7 @@ export function getLanguageIcon(lang: string): string {
       return TerraformIcon
     case 'plain':
     case 'text':
+    case '':
       return TextIcon
     default:
       return SquareCodeIcon
@@ -214,6 +280,7 @@ export function getLanguageIcon(lang: string): string {
 // 映射一些常见语言的显示名称
 export const languageMap: Record<string, string> = {
   'js': 'JavaScript',
+  'javascript': 'JavaScript',
   'ts': 'TypeScript',
   'jsx': 'JSX',
   'tsx': 'TSX',
