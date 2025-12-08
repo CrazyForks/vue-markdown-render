@@ -18,6 +18,7 @@
     "markstream-vue": "latest",
     "stream-markdown-parser": "workspace:*",
     "stream-monaco": "latest",
+    "stream-markdown":"latest",
     "vite": "^7.2.6",
     "vue": "^3.5.25",
     "vue-i18n": "^11.2.2",
