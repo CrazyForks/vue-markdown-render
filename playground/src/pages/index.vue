@@ -497,6 +497,18 @@ onBeforeUnmount(() => {
               <span>Star</span>
             </a>
 
+            <!-- Docs Page Link -->
+            <a
+              class="ml-2 flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white shadow-md transition-all duration-200 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 docs-page-btn"
+              title="Open Docs"
+              href="https://markstream-vue-docs.simonhe.me/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Icon icon="carbon:book" class="w-4 h-4" />
+              <span>Docs</span>
+            </a>
+
             <!-- Test Page Button -->
             <button
               class="ml-2 test-page-btn flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
