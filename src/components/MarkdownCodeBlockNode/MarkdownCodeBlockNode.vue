@@ -136,8 +136,8 @@ function getPreferredColorScheme() {
 }
 // Lazy-load stream-markdown (and thus shiki) only when needed
 interface ShikiRenderer {
-  updateCode: (code: string, lang?: string) => void
-  setTheme: (theme?: string) => void
+  updateCode: (code: string, lang?: string) => void | Promise<void>
+  setTheme: (theme?: string) => void | Promise<void>
   dispose: () => void
 }
 let renderer: ShikiRenderer | undefined
@@ -147,6 +147,45 @@ let createShikiRenderer:
 
 let registerHighlight
 let disposeHighlighter = () => {}
+let registeredHighlightLanguages: Set<string> | undefined
+const warnedMissingLanguages = new Set<string>()
+const warnedRendererErrors = new Set<string>()
+const isDevEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV)
+
+function normalizeRendererLanguage(rawLang?: string | null) {
+  const [baseToken] = String(rawLang ?? '').split(':')
+  const normalized = baseToken?.trim().toLowerCase() ?? ''
+  if (!normalized)
+    return 'plaintext'
+  if (!registeredHighlightLanguages || registeredHighlightLanguages.has(normalized))
+    return normalized
+  if (isDevEnv && !warnedMissingLanguages.has(normalized)) {
+    warnedMissingLanguages.add(normalized)
+    console.warn(`[MarkdownCodeBlockNode] Language "${normalized}" not preloaded in stream-markdown; falling back to plaintext.`)
+  }
+  return 'plaintext'
+}
+
+async function updateRendererWithFallback(code: string, rawLang?: string | null) {
+  if (!renderer)
+    return
+  const normalized = normalizeRendererLanguage(rawLang)
+  try {
+    await renderer.updateCode(code, normalized)
+  }
+  catch (err) {
+    if (normalized !== 'plaintext') {
+      if (isDevEnv && !warnedRendererErrors.has(normalized)) {
+        warnedRendererErrors.add(normalized)
+        console.warn(`[MarkdownCodeBlockNode] Failed to render language "${normalized}", retrying as plaintext.`, err)
+      }
+      await renderer.updateCode(code, 'plaintext')
+    }
+    else if (isDevEnv) {
+      console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', err)
+    }
+  }
+}
 async function ensureStreamMarkdownLoaded() {
   if (createShikiRenderer)
     return
@@ -155,13 +194,14 @@ async function ensureStreamMarkdownLoaded() {
     createShikiRenderer = mod.createShikiStreamRenderer
     registerHighlight = mod.registerHighlight
     disposeHighlighter = mod.disposeHighlighter
+    const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
+    registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
     registerHighlight({ themes: props.themes })
     renderer = createShikiRenderer(codeBlockContent.value, {
       theme: getPreferredColorScheme(),
     })
     if (!props.loading) {
-      const lang = codeLanguage.value.split(':')[0].toLocaleLowerCase().trim() // 支持 language:variant 形式
-      renderer.updateCode(props.node.code, lang)
+      await updateRendererWithFallback(props.node.code, codeLanguage.value)
     }
   }
   catch (e) {
@@ -207,8 +247,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   if (props.stream === false && props.loading)
     return
 
-  lang = lang.split(':')[0].toLocaleLowerCase().trim() // 支持 language:variant 形式
-  renderer.updateCode(code, lang)
+  await updateRendererWithFallback(code, lang)
 })
 
 const watchTheme = watch(

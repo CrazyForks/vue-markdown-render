@@ -75,4 +75,3 @@ fn main() {}
 ```
 
 > `languages` 中的每个条目都可以是 Monaco 的语言 ID，或 `stream-monaco` 文档里提到的懒加载函数（用于延迟加载语言包）。如果不是通过 `MarkdownRender`，直接在 `CodeBlockNode` 上使用 `:monaco-options="monacoOptions"` 即可。
-

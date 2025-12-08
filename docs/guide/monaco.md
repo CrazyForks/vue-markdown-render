@@ -66,7 +66,6 @@ const node = { type: 'code_block', language: 'js', raw: 'console.log(123)', code
 </template>
 ```
 
-
 ### Add extra languages & themes
 
 Only a minimal set of Monaco languages ships with the default integration to keep the first render fast. When you need additional grammars (Rust, Go, Bash, etc.) or want to ship your own VS Code themes, pass them through `monacoOptions` — either directly on `CodeBlockNode` or globally via `MarkdownRender`'s `codeBlockMonacoOptions` prop. The object is forwarded to `useMonaco()` unchanged.
