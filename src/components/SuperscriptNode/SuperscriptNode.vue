@@ -34,19 +34,20 @@ const overrides = getCustomNodeComponents(props.customId)
 
 // Available node components for child rendering; prefer custom overrides
 const nodeComponents = {
-  text: overrides.text || TextNode,
-  inline_code: overrides.inline_code || InlineCodeNode,
-  link: overrides.link || LinkNode,
-  strong: overrides.strong || StrongNode,
-  emphasis: overrides.emphasis || EmphasisNode,
-  footnote_reference: overrides.footnote_reference || FootnoteReferenceNode,
-  strikethrough: overrides.strikethrough || StrikethroughNode,
-  highlight: overrides.highlight || HighlightNode,
-  insert: overrides.insert || InsertNode,
-  subscript: overrides.subscript || SubscriptNode,
-  emoji: overrides.emoji || EmojiNode,
-  math_inline: overrides.math_inline || MathInlineNodeAsync,
-  reference: overrides.reference || ReferenceNode,
+  text: TextNode,
+  inline_code: InlineCodeNode,
+  link: LinkNode,
+  strong: StrongNode,
+  emphasis: EmphasisNode,
+  footnote_reference: FootnoteReferenceNode,
+  strikethrough: StrikethroughNode,
+  highlight: HighlightNode,
+  insert: InsertNode,
+  subscript: SubscriptNode,
+  emoji: EmojiNode,
+  math_inline: MathInlineNodeAsync,
+  reference: ReferenceNode,
+  ...overrides,
 }
 </script>
 

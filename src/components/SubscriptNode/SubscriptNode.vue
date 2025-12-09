@@ -33,19 +33,20 @@ const props = defineProps<{
 const overrides = getCustomNodeComponents(props.customId)
 
 const nodeComponents = {
-  text: overrides.text || TextNode,
-  inline_code: overrides.inline_code || InlineCodeNode,
-  link: overrides.link || LinkNode,
-  strong: overrides.strong || StrongNode,
-  emphasis: overrides.emphasis || EmphasisNode,
-  footnote_reference: overrides.footnote_reference || FootnoteReferenceNode,
-  strikethrough: overrides.strikethrough || StrikethroughNode,
-  highlight: overrides.highlight || HighlightNode,
-  insert: overrides.insert || InsertNode,
-  superscript: overrides.superscript || SuperscriptNode,
-  emoji: overrides.emoji || EmojiNode,
-  math_inline: overrides.math_inline || MathInlineNodeAsync,
-  reference: overrides.reference || ReferenceNode,
+  text: TextNode,
+  inline_code: InlineCodeNode,
+  link: LinkNode,
+  strong: StrongNode,
+  emphasis: EmphasisNode,
+  footnote_reference: FootnoteReferenceNode,
+  strikethrough: StrikethroughNode,
+  highlight: HighlightNode,
+  insert: InsertNode,
+  superscript: SuperscriptNode,
+  emoji: EmojiNode,
+  math_inline: MathInlineNodeAsync,
+  reference: ReferenceNode,
+  ...overrides,
 }
 </script>
 
