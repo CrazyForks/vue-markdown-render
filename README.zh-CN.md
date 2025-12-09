@@ -32,6 +32,39 @@
 
 在 Bilibili 上观看： [Open in Bilibili](https://www.bilibili.com/video/BV17Z4qzpE9c/)
 
+## ⚡ 快速上手
+
+```bash
+pnpm add markstream-vue
+# npm install markstream-vue
+# yarn add markstream-vue
+```
+
+```ts
+import MarkdownRender from 'markstream-vue'
+// main.ts
+import { createApp } from 'vue'
+import 'markstream-vue/index.css'
+
+createApp({
+  components: { MarkdownRender },
+  template: '<MarkdownRender custom-id="docs" :content="doc" />',
+  setup() {
+    const doc = '# Hello markstream-vue\\n\\n支持 **流式** 节点。'
+    return { doc }
+  },
+}).mount('#app')
+```
+
+确保在 CSS reset（如 `@tailwind base` 或 `@unocss/reset`）之后导入 `markstream-vue/index.css`，最好放在 `@layer components` 中以避免 Tailwind/UnoCSS 覆盖组件样式。根据需求再按需安装可选 peer 依赖：`stream-monaco`（Monaco 代码块）、`shiki`（Shiki 高亮）、`mermaid`（Mermaid 图表）、`katex`（数学公式）。
+
+## ⚙️ 性能模式
+
+- **默认虚拟化窗口**：保持 `max-live-nodes` 默认值（`320`），渲染器会立即渲染当前窗口的节点，同时只保留有限数量的 DOM 节点，实现平滑滚动与可控内存，占位骨架极少。
+- **增量流式模式**：当需要更明显的“打字机”体验时，将 `:max-live-nodes="0"`。这会关闭虚拟化并启用 `batchRendering` 系列参数控制的增量渲染，新的节点会以小批次加上占位骨架的形式进入视图。
+
+可根据页面类型选择最合适的模式：虚拟化适合长文档/回溯需求，增量流式适合聊天或 AI 输出面板。
+
 ## 快速链接
 
 - ⚡ 极致性能：为流式场景设计的最小化重渲染和高效 DOM 更新

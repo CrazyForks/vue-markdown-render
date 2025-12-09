@@ -61,6 +61,15 @@ setCustomComponents('docs', {
 }
 ```
 
+### Performance knobs
+
+- **Batching** — `batchRendering`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, and `renderBatchBudgetMs` define how many nodes transition from placeholders to full components per frame. This incremental mode runs only when virtualization is disabled (`:max-live-nodes="0"`); with virtualization on, the renderer favours instant paint plus DOM windowing over skeleton placeholders.
+- **Deferred nodes** — keep `deferNodesUntilVisible` + `viewportPriority` enabled to let heavy blocks (Mermaid, Monaco, KaTeX) yield until they approach the viewport. Disable only when you explicitly want every node to render eagerly.
+- **Virtualization window** — `maxLiveNodes` caps how many fully rendered nodes stay mounted; `liveNodeBuffer` controls overscan to avoid pop-in. Tuning these lets long docs stay responsive without sacrificing scrollback. See [Performance tips](/guide/performance) for sample values.
+- **Code block fallbacks** — `renderCodeBlocksAsPre` + `codeBlockStream` let you fall back to lightweight `<pre><code>` blocks or pause Monaco streaming when throughput takes priority over tooling.
+
+Combine these props with `custom-id` scoped styles and global parser options (`setDefaultMathOptions`, custom MarkdownIt plugins) to match the latency and UX expectations of your app.
+
 ### Common pitfalls
 - **Blank styles**: missing reset or incorrect layer ordering → use the [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here).
 - **Conflicting utility classes**: add `custom-id` and scope overrides to `[data-custom-id="..."]`.

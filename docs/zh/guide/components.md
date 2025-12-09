@@ -61,6 +61,15 @@ setCustomComponents('docs', {
 }
 ```
 
+### 性能相关 props
+
+- **批量渲染** —— `batchRendering`、`initialRenderBatchSize`、`renderBatchSize`、`renderBatchDelay`、`renderBatchBudgetMs` 控制每一帧有多少节点从占位骨架切换为真实组件。仅在关闭虚拟化（`:max-live-nodes="0"`）时会启用增量骨架模式；默认启用虚拟化时会直接渲染当前窗口的节点。
+- **延迟可见节点** —— `deferNodesUntilVisible` 与 `viewportPriority` 默认开启，让 Mermaid、Monaco、KaTeX 等重型节点只有在接近视口时才加载。除非明确需要一次性渲染所有节点，否则不建议关闭。
+- **虚拟化窗口** —— `maxLiveNodes` 限制 DOM 中最多保留多少个已渲染节点，`liveNodeBuffer` 控制超前/超后范围。合理设置可在保持可滚动回溯的同时，避免大文档拖慢页面。详见 [性能指南](/zh/guide/performance)。
+- **代码块降级** —— 通过 `renderCodeBlocksAsPre` 与 `codeBlockStream` 可以改用 `<pre><code>` 简化渲染，或在高负载时临时关闭 Monaco 流式更新。
+
+结合这些 props，再配合 `custom-id` 作用域样式与全局解析设置（`setDefaultMathOptions`、自定义 MarkdownIt 插件），即可针对不同项目调出最适合的性能与体验平衡。
+
 ### 常见问题
 - **样式错乱**：先检查 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here)（reset、layer 顺序、同伴 CSS）。
 - **工具类覆盖**：传入 `custom-id` 并使用 `[data-custom-id="docs"]` 限定样式。

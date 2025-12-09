@@ -2,7 +2,7 @@
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
-import { computed, defineAsyncComponent, markRaw, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, defineAsyncComponent, markRaw, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -169,19 +169,19 @@ const previousRenderContext = ref<{ key: typeof props.indexKey, total: number }>
   key: props.indexKey,
   total: 0,
 })
-const previousBatchConfig = ref({
-  batchSize: resolvedBatchSize.value,
-  initial: resolvedInitialBatch.value,
-  delay: props.renderBatchDelay ?? 16,
-  enabled: batchingEnabled.value,
-})
-const renderedNodes = shallowRef<ParsedNode[]>([])
 const adaptiveBatchSize = ref(Math.max(1, resolvedBatchSize.value || 1))
 const nodeVisibilityState = reactive<Record<number, boolean>>({})
 const nodeVisibilityHandles = new Map<number, VisibilityHandle>()
 const nodeSlotElements = new Map<number, HTMLElement | null>()
 const deferNodes = computed(() => props.deferNodesUntilVisible !== false && viewportPriorityEnabled.value !== false)
 const virtualizationEnabled = computed(() => (props.maxLiveNodes ?? 0) > 0)
+const incrementalRenderingActive = computed(() => batchingEnabled.value && !virtualizationEnabled.value)
+const previousBatchConfig = ref({
+  batchSize: resolvedBatchSize.value,
+  initial: resolvedInitialBatch.value,
+  delay: props.renderBatchDelay ?? 16,
+  enabled: incrementalRenderingActive.value,
+})
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
 const maxLiveNodesResolved = computed(() => Math.max(1, props.maxLiveNodes ?? 320))
 const liveNodeBufferResolved = computed(() => Math.max(0, props.liveNodeBuffer ?? 60))
@@ -246,7 +246,7 @@ function estimateHeightRange(start: number, end: number) {
 const visibleNodes = computed(() => {
   // Use the full `parsedNodes` list to build the visible window so that
   // placeholders and spacer heights represent the entire dataset even when
-  // only a subset of nodes have been materialized into `renderedNodes`.
+  // only a subset of nodes has been fully rendered so far.
   if (!virtualizationEnabled.value)
     return parsedNodes.value.map((node, index) => ({ node, index }))
   const total = parsedNodes.value.length
@@ -277,25 +277,12 @@ const bottomSpacerHeight = computed(() => {
   return estimateHeightRange(end, total)
 })
 
-function syncRenderedNodes() {
-  const total = parsedNodes.value.length
-  const limit = Math.min(total, renderedCount.value)
-  if (limit <= 0) {
-    renderedNodes.value = []
-    cleanupNodeVisibility(0)
-    return
-  }
-  if (limit >= total) {
-    renderedNodes.value = parsedNodes.value
-    cleanupNodeVisibility(limit)
-    return
-  }
-  renderedNodes.value = parsedNodes.value.slice(0, limit)
-  cleanupNodeVisibility(limit)
-}
-
 function cleanupNodeVisibility(maxIndex: number) {
   if (!nodeVisibilityHandles.size)
+    return
+  // When virtualization is disabled the DOM retains every slot, so keep
+  // observers intact; they will be cleaned up when the slot unmounts.
+  if (!virtualizationEnabled.value)
     return
   for (const [index, handle] of nodeVisibilityHandles) {
     if (index >= maxIndex) {
@@ -316,6 +303,10 @@ function markNodeVisible(index: number, visible: boolean) {
 }
 
 function shouldRenderNode(index: number) {
+  // Respect incremental rendering budget only when incremental batching
+  // is active (virtualization disabled). Otherwise render immediately.
+  if (incrementalRenderingActive.value && index >= renderedCount.value)
+    return false
   if (!deferNodes.value)
     return true
   if (index < resolvedInitialBatch.value)
@@ -365,9 +356,21 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
     return
   nodeVisibilityHandles.set(index, handle)
   markNodeVisible(index, handle.isVisible.value)
-  handle.whenVisible.then(() => {
-    markNodeVisible(index, true)
-  }).catch(() => {})
+  handle.whenVisible
+    .then(() => {
+      markNodeVisible(index, true)
+    })
+    .catch(() => {})
+    .finally(() => {
+      // Once visibility is confirmed we can release the handle reference so
+      // long-lived renders (no virtualization) do not leak observers.
+      if (nodeVisibilityHandles.get(index) === handle)
+        nodeVisibilityHandles.delete(index)
+      try {
+        handle.destroy()
+      }
+      catch {}
+    })
 }
 
 function setNodeContentRef(index: number, el: HTMLElement | null) {
@@ -407,7 +410,7 @@ function cancelBatchTimers() {
 }
 
 function scheduleBatch(increment: number, opts: { immediate?: boolean } = {}) {
-  if (!batchingEnabled.value)
+  if (!incrementalRenderingActive.value)
     return
   const target = desiredRenderedCount.value
   if (renderedCount.value >= target)
@@ -426,7 +429,7 @@ function scheduleBatch(increment: number, opts: { immediate?: boolean } = {}) {
     const applyAndMeasure = (size: number) => {
       const start = typeof performance !== 'undefined' ? performance.now() : Date.now()
       renderedCount.value = Math.min(target, renderedCount.value + Math.max(1, size))
-      syncRenderedNodes()
+      cleanupNodeVisibility(renderedCount.value)
       const end = typeof performance !== 'undefined' ? performance.now() : Date.now()
       const elapsed = end - start
       adjustAdaptiveBatchSize(elapsed)
@@ -485,6 +488,8 @@ function scheduleBatch(increment: number, opts: { immediate?: boolean } = {}) {
 }
 
 function queueNextBatch() {
+  if (!incrementalRenderingActive.value)
+    return
   const dynamicSize = batchingEnabled.value
     ? Math.max(1, Math.round(adaptiveBatchSize.value))
     : Math.max(1, resolvedBatchSize.value)
@@ -492,7 +497,7 @@ function queueNextBatch() {
 }
 
 function adjustAdaptiveBatchSize(elapsed: number) {
-  if (!batchingEnabled.value)
+  if (!incrementalRenderingActive.value)
     return
   const budget = Math.max(2, props.renderBatchBudgetMs ?? 6)
   const maxSize = Math.max(1, resolvedBatchSize.value || 1)
@@ -509,7 +514,7 @@ watch(
   [
     () => parsedNodes.value,
     () => parsedNodes.value.length,
-    () => batchingEnabled.value,
+    () => incrementalRenderingActive.value,
     () => resolvedBatchSize.value,
     () => resolvedInitialBatch.value,
     () => props.renderBatchDelay,
@@ -520,9 +525,9 @@ watch(
     const total = nodes.length
     const prevCtx = previousRenderContext.value
     const datasetKey = props.indexKey
-    const datasetChanged = datasetKey !== undefined
-      ? datasetKey !== prevCtx.key
-      : total !== prevCtx.total
+    const datasetKeyChanged = datasetKey !== undefined && datasetKey !== prevCtx.key
+    const lengthChanged = total !== prevCtx.total
+    const datasetChanged = datasetKeyChanged || lengthChanged
     previousRenderContext.value = { key: datasetKey, total }
 
     const prevBatch = previousBatchConfig.value
@@ -531,16 +536,16 @@ watch(
       = prevBatch.batchSize !== resolvedBatchSize.value
         || prevBatch.initial !== resolvedInitialBatch.value
         || prevBatch.delay !== currentDelay
-        || prevBatch.enabled !== batchingEnabled.value
+        || prevBatch.enabled !== incrementalRenderingActive.value
 
     previousBatchConfig.value = {
       batchSize: resolvedBatchSize.value,
       initial: resolvedInitialBatch.value,
       delay: currentDelay,
-      enabled: batchingEnabled.value,
+      enabled: incrementalRenderingActive.value,
     }
 
-    if (datasetChanged || batchConfigChanged || !batchingEnabled.value)
+    if (datasetChanged || batchConfigChanged || !incrementalRenderingActive.value)
       cancelBatchTimers()
     if (datasetChanged || batchConfigChanged)
       adaptiveBatchSize.value = Math.max(1, resolvedBatchSize.value || 1)
@@ -549,17 +554,19 @@ watch(
 
     if (!total) {
       renderedCount.value = 0
-      syncRenderedNodes()
+      cleanupNodeVisibility(0)
       return
     }
 
-    if (!batchingEnabled.value) {
+    if (!incrementalRenderingActive.value) {
       renderedCount.value = targetCount
-      syncRenderedNodes()
+      cleanupNodeVisibility(renderedCount.value)
       return
     }
 
-    if (datasetChanged || batchConfigChanged)
+    const shouldResetRenderedCount = datasetKeyChanged || prevCtx.total === 0
+
+    if (shouldResetRenderedCount || batchConfigChanged)
       renderedCount.value = Math.min(targetCount, resolvedInitialBatch.value)
     else
       renderedCount.value = Math.min(renderedCount.value, targetCount)
@@ -568,7 +575,7 @@ watch(
     if (renderedCount.value < targetCount)
       scheduleBatch(baseInitial, { immediate: !isClient })
     else
-      syncRenderedNodes()
+      cleanupNodeVisibility(renderedCount.value)
   },
   { immediate: true },
 )
@@ -607,6 +614,13 @@ watch(
 )
 
 watch(
+  () => props.viewportPriority,
+  (value) => {
+    viewportPriorityEnabled.value = value !== false
+  },
+)
+
+watch(
   [focusIndex, maxLiveNodesResolved, liveNodeBufferResolved, () => parsedNodes.value.length, virtualizationEnabled],
   () => {
     updateLiveRange()
@@ -617,7 +631,7 @@ watch(
 watch(
   () => desiredRenderedCount.value,
   (target, prev) => {
-    if (!batchingEnabled.value)
+    if (!incrementalRenderingActive.value)
       return
     if (typeof prev === 'number' && target <= prev)
       return

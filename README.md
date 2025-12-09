@@ -24,6 +24,39 @@ This page provides a left editor and right live preview (powered by this library
 
 You can use this page to reproduce rendering issues, verify math/Mermaid/code block behavior, and quickly generate shareable links or reproducible issues.
 
+## ⚡ Quick Start
+
+```bash
+pnpm add markstream-vue
+# npm install markstream-vue
+# yarn add markstream-vue
+```
+
+```ts
+import MarkdownRender from 'markstream-vue'
+// main.ts
+import { createApp } from 'vue'
+import 'markstream-vue/index.css'
+
+createApp({
+  components: { MarkdownRender },
+  template: '<MarkdownRender custom-id="docs" :content="doc" />',
+  setup() {
+    const doc = '# Hello from markstream-vue\\n\\nSupports **streaming** nodes.'
+    return { doc }
+  },
+}).mount('#app')
+```
+
+Import `markstream-vue/index.css` after your reset (e.g., Tailwind `@layer components`) so renderer styles win over utility classes. Install optional peers such as `stream-monaco`, `shiki`, `mermaid`, and `katex` only when you need Monaco code blocks, Shiki highlighting, diagrams, or math.
+
+## ⚙️ Performance presets
+
+- **Virtual window (default)** – keep `max-live-nodes` at its default `320` to enable virtualization. Nodes render immediately and the renderer keeps a sliding window of elements mounted so long docs remain responsive without showing skeleton placeholders.
+- **Incremental stream** – set `:max-live-nodes="0"` when you want a true typewriter effect. This disables virtualization and turns on incremental batching governed by `batchRendering`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, and `renderBatchBudgetMs`, so new content flows in small slices with lightweight placeholders.
+
+Pick one mode per surface: virtualization for best scrollback and steady memory usage, or incremental batching for AI-style “typing” previews.
+
 ## 📺 Introduction Video
 
 A short video introduces the key features and usage of markstream-vue:
