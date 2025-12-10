@@ -1,6 +1,6 @@
 # KaTeX Worker Performance Playbook
 
-> Looking for the Chinese version? See [KaTeX Worker 性能分析指南（中文）](/zh/guide/katex-worker-performance-analysis)。
+> Looking for the Chinese version? See [KaTeX Worker Performance Guide (ZH)](/zh/guide/katex-worker-performance-analysis).
 
 ## Question: is a Worker actually faster than rendering on the main thread?
 
@@ -11,40 +11,40 @@ Use this guide to decide when the Worker + cache pipeline is worth enabling.
 **Yes. A Worker backed by a cache easily wins in most real workloads.**
 
 Why:
-1. **The cache eliminates ~99 % of the cost** (cache hit rate commonly >70 %).
+1. **The cache eliminates ~99 % of the cost** (cache hit rate commonly >70 %).
 2. **The Worker keeps the main thread responsive**, so scrolling/typing stays smooth even when formulas are heavy.
-3. **Memory overhead is tiny** — roughly 10‑50 KB for ~200 cached formulas.
+3. **Memory overhead is tiny** -- roughly 10-50 KB for ~200 cached formulas.
 
 ## Quick performance comparisons
 
-### Scenario 1 – single lightweight formula
+### Scenario 1 - single lightweight formula
 ```
-Direct render:   ~2–5 ms
-Worker:          ~3–7 ms (includes postMessage overhead)
+Direct render:   ~2-5 ms
+Worker:          ~3-7 ms (includes postMessage overhead)
 Takeaway:        Worker is slightly slower but the difference is negligible.
 ```
 
-### Scenario 2 – single complex formula
+### Scenario 2 - single complex formula
 ```
-Direct render:   ~20–50 ms (blocks the main thread)
-Worker:          ~22–52 ms (main thread stays free)
+Direct render:   ~20-50 ms (blocks the main thread)
+Worker:          ~22-52 ms (main thread stays free)
 Takeaway:        UX improves because the page never freezes.
 ```
 
-### Scenario 3 – repeated formula with cache
+### Scenario 3 - repeated formula with cache
 ```
-Direct render:   5 ms × 10 renders = 50 ms
-Worker+cache:    5 ms + 0.01 ms × 9 hits = 5.09 ms
-Takeaway:        ~10× faster once cached.
+Direct render:   5 ms x 10 renders = 50 ms
+Worker+cache:    5 ms + 0.01 ms x 9 hits = 5.09 ms
+Takeaway:        ~10x faster once cached.
 ```
 
-### Scenario 4 – mixed real document
+### Scenario 4 - mixed real document
 ```
 50 formulas with 35 duplicates:
-- No cache:   250 ms (every formula rerenders)
-- With cache: 75 ms  (only 15 “unique” renders)
-- Cache hit rate: 70 %
-- Speedup: ~3.3×
+- No cache:   250 ms (every formula rerenders)
+- With cache: 75 ms  (only 15 "unique" renders)
+- Cache hit rate: 70 %
+- Speedup: ~3.3x
 ```
 
 ## How to benchmark
@@ -57,14 +57,14 @@ pnpm test test/benchmark/katex-worker-vs-direct.test.ts
 pnpm test test/benchmark/katex-worker-vs-direct.test.ts -- --reporter=verbose
 ```
 
-### 2. Estimate the “switch to Worker” threshold
+### 2. Estimate the "switch to Worker" threshold
 
 Compute how many unique formulas (N) you can render on the main thread before risking a noticeable jank:
 
-- Formula: `N ≈ floor(B / (R × (1 - H)))`
-  - `B`: main-thread budget in ms (use 50 ms for “user sees a hitch” or 16.7 ms for 1 frame).
+- Formula: `N ~ floor(B / (R x (1 - H)))`
+  - `B`: main-thread budget in ms (use 50 ms for "user sees a hitch" or 16.7 ms for 1 frame).
   - `R`: average time to render one unique formula.
-  - `H`: cache hit rate (0–1). When first rendering a page, assume `H = 0`.
+  - `H`: cache hit rate (0-1). When first rendering a page, assume `H = 0`.
 
 Fast helpers:
 
@@ -80,7 +80,7 @@ const sampleBased = recommendNForSamples(['x', '\\sum_{i=1}^{n}', '\\int f(x) dx
 ```
 
 Practical tips:
-- Default to the “medium complexity” threshold.
+- Default to the "medium complexity" threshold.
 - First paint: assume `B = 50` and `H = 0`. During scrolling or repeat renders, increase `N` because the cache hit rate climbs quickly.
 - If you detect lots of integrals/matrices, pick the conservative threshold (smaller `N`).
 
@@ -106,59 +106,59 @@ window.__katexPerfMonitor.exportMetrics()
 ### 4. Inspect Chrome DevTools
 
 #### A. Performance panel
-1. Open DevTools → **Performance**.
+1. Open DevTools -> **Performance**.
 2. Record while rendering formulas.
 3. Inspect:
-   - **Main** lane → watch `katex.renderToString`.
-   - **Worker** lane → ensure work moved off the main thread.
-   - **Long tasks** (>50 ms) → any red markers mean main thread was blocked.
+   - **Main** lane -> watch `katex.renderToString`.
+   - **Worker** lane -> ensure work moved off the main thread.
+   - **Long tasks** (>50 ms) -> any red markers mean main thread was blocked.
 
 #### B. Memory panel
 1. Take a **Heap snapshot** after rendering.
 2. Search for the cache `Map`.
 3. Check size:
-   - <1 MB → no worries.
-   - >5 MB → lower `CACHE_MAX`.
+   - <1 MB -> no worries.
+   - >5 MB -> lower `CACHE_MAX`.
 
 #### C. Performance Monitor
-1. Cmd/Ctrl + Shift + P → “Show Performance Monitor”.
+1. Cmd/Ctrl + Shift + P -> "Show Performance Monitor".
 2. Watch **CPU usage**, **JS heap**, **Frames** while rendering.
 
 ## Decision matrix
 
-### ✅ When to prefer Worker + cache
+### :white_check_mark: When to prefer Worker + cache
 
 | Scenario | Rationale |
 | --- | --- |
-| Complex math (>10 ms) | Keeps UI responsive. |
+| Complex math (>10 ms) | Keeps UI responsive. |
 | >5 formulas per page | Cache savings stack up. |
 | Lots of repetitions | Cache hit rate skyrockets. |
 | Smooth scrolling/typing required | No main-thread stalls. |
 | Mobile devices | CPUs are weaker, so avoid blocking. |
 
-### ⚠️ When direct render is fine
+### :warning: When direct render is fine
 
 | Scenario | Rationale |
 | --- | --- |
-| Only trivial formulas | <5 ms each, Worker overhead similar. |
+| Only trivial formulas | <5 ms each, Worker overhead similar. |
 | SSR / Node.js | Worker API unavailable. |
 | Single formula | Cache never pays off. |
 | Extreme bundle constraints | Worker adds a small chunk. |
 
-### 🎯 Recommended pipeline (already implemented)
+### :dart: Recommended pipeline (already implemented)
 
 ```
 try Worker + cache
-  ↓ on error / timeout
+  -> on error / timeout
 fallback to direct render
-  ↓ on success
+  -> on success
 store result back in cache
 ```
 
 Benefits:
-- ✅ Production-safe (there is always a fallback).
-- ✅ Fast path takes advantage of caching.
-- ✅ Progressive enhancement (Worker is optional).
+- :white_check_mark: Production-safe (there is always a fallback).
+- :white_check_mark: Fast path takes advantage of caching.
+- :white_check_mark: Progressive enhancement (Worker is optional).
 
 ## Real-world measurements
 
@@ -166,33 +166,33 @@ Benefits:
 
 | Type | Example | Avg time | Worker benefit |
 | --- | --- | --- | --- |
-| Simple | `x = y` | 2–3 ms | Low (~1 ms overhead). |
-| Medium | `\sum_{i=1}^{n}` | 5–10 ms | Medium (prevents frame drops). |
-| Complex | `\int_{-\infty}^{\infty}` | 15–30 ms | High (avoids jank). |
-| Matrix | `\begin{pmatrix}…` | 30–80 ms | Huge (main thread unusable otherwise). |
+| Simple | `x = y` | 2-3 ms | Low (~1 ms overhead). |
+| Medium | `\sum_{i=1}^{n}` | 5-10 ms | Medium (prevents frame drops). |
+| Complex | `\int_{-\infty}^{\infty}` | 15-30 ms | High (avoids jank). |
+| Matrix | `\begin{pmatrix}...` | 30-80 ms | Huge (main thread unusable otherwise). |
 
 ### Cache effectiveness
 
 | Case | First render | Cache hit | Speedup |
 | --- | --- | --- | --- |
-| Variable `x` | 2 ms | 0.005 ms | 400× |
-| Summation | 10 ms | 0.008 ms | 1250× |
-| Complex integral | 30 ms | 0.01 ms | 3000× |
+| Variable `x` | 2 ms | 0.005 ms | 400x |
+| Summation | 10 ms | 0.008 ms | 1250x |
+| Complex integral | 30 ms | 0.01 ms | 3000x |
 
 ### Sample document (50 formulas, 15 unique)
 
 | Strategy | Total time | Main-thread block | UX |
 | --- | --- | --- | --- |
-| No optimization | 250 ms | 250 ms | ⚠️ Noticeable hitching. |
-| Worker only | 265 ms | 0 ms | ✅ Smooth but slower. |
-| Worker + cache | 78 ms | 0 ms | ✅✅ Fast *and* smooth. |
+| No optimization | 250 ms | 250 ms | :warning: Noticeable hitching. |
+| Worker only | 265 ms | 0 ms | :white_check_mark: Smooth but slower. |
+| Worker + cache | 78 ms | 0 ms | :white_check_mark::white_check_mark: Fast *and* smooth. |
 
 ## Memory footprint
 
 ```
 Input formula:   ~30 bytes
 HTML output:     ~150 bytes
-Expansion ratio: ~5×
+Expansion ratio: ~5x
 One cache entry: ~180 bytes (with key)
 200 entries:     ~36 KB
 ```
@@ -234,23 +234,23 @@ if ('requestIdleCallback' in window) {
 
 ## Key takeaways
 
-1. Worker overhead is tiny (~1–2 ms).
-2. Cache hit rates >70 % are normal, so caching is the real win.
+1. Worker overhead is tiny (~1-2 ms).
+2. Cache hit rates >70 % are normal, so caching is the real win.
 3. Worker + cache + fallback is the optimal combo.
-4. Memory costs stay under ~100 KB even with aggressive caching.
+4. Memory costs stay under ~100 KB even with aggressive caching.
 5. Users notice the smoother scrolling much more than the extra kilobytes.
 
 ### Final recommendation
 
 **Keep the existing Worker + cache + fallback architecture.**
 
-- ✅ Great performance (cache removes most work).
-- ✅ Smooth UX (Worker isolates blocking work).
-- ✅ Stable (fallback guarantees output).
-- ✅ Memory friendly.
-- ✅ Progressive enhancement friendly.
+- :white_check_mark: Great performance (cache removes most work).
+- :white_check_mark: Smooth UX (Worker isolates blocking work).
+- :white_check_mark: Stable (fallback guarantees output).
+- :white_check_mark: Memory friendly.
+- :white_check_mark: Progressive enhancement friendly.
 
-Nothing else needs changing — the current design is already the sweet spot. 🎉
+Nothing else needs changing -- the current design is already the sweet spot. :tada:
 
 ## References
 
