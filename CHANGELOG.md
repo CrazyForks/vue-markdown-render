@@ -1,4 +1,13 @@
-## [0.0.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.9...v0.0.2) (2025-12-09)
+## [0.0.3-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.0...v0.0.3-beta.1) (2025-12-10)
+
+
+### Bug Fixes
+
+* update stream-markdown-parser dependency to version 0.0.36 ([12bd02b](https://github.com/Simon-He95/markstream-vue/commit/12bd02bc7fbb03c4f406ba24ce09bb2fd1d38a2a))
+
+
+
+## [0.0.3-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.2-beta.9...v0.0.3-beta.0) (2025-12-09)
 
 
 ### Bug Fixes
