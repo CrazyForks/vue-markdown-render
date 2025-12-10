@@ -67,7 +67,6 @@ if (typeof window !== 'undefined') {
 const copyText = ref(false)
 const isCollapsed = ref(false)
 const mermaidContainer = ref<HTMLElement>()
-const mermaidWrapper = ref<HTMLElement>()
 const mermaidContent = ref<HTMLElement>()
 const modalContent = ref<HTMLElement>()
 const modalCloneWrapper = ref<HTMLElement | null>(null)
@@ -1601,7 +1600,6 @@ const computedButtonStyle = computed(() => {
           @touchend.passive="stopDrag"
         >
           <div
-            ref="mermaidWrapper"
             data-mermaid-wrapper
             class="absolute inset-0 cursor-grab"
             :class="{ 'cursor-grabbing': isDragging }"
