@@ -29,6 +29,7 @@ const props = withDefaults(
     showFullscreenButton: true,
     showCollapseButton: true,
     showZoomControls: true,
+    enableWheelZoom: false,
   },
 )
 const emits = defineEmits(['copy', 'export', 'openModal', 'toggleMode'])
@@ -107,6 +108,43 @@ const CONTENT_STABLE_DELAY = 500
 const lastContentLength = ref(0)
 const isContentGenerating = ref(false)
 let contentStableTimer: number | null = null
+let renderRetryTimer: ReturnType<typeof setTimeout> | null = null
+let consecutiveRenderTimeouts = 0
+const MAX_RENDER_TIMEOUT_RETRIES = 3
+// Schedule progressive work in idle time
+const requestIdle
+  = (globalThis as any).requestIdleCallback
+    ?? ((cb: any, _opts?: any) => setTimeout(() => cb({ didTimeout: true }), 16))
+
+const debouncedProgressiveRender = debounce(() => {
+  requestIdle(() => {
+    progressiveRender()
+  }, { timeout: 500 })
+}, RENDER_DEBOUNCE_DELAY)
+
+function clearRenderRetryTimer() {
+  if (renderRetryTimer != null) {
+    (globalThis as any).clearTimeout(renderRetryTimer)
+    renderRetryTimer = null
+  }
+}
+
+function scheduleRenderRetry(delayMs = 600) {
+  if (typeof globalThis === 'undefined')
+    return
+  const safeDelay = Math.max(0, delayMs)
+  clearRenderRetryTimer()
+  const run = () => {
+    renderRetryTimer = null
+    if (props.loading || isRendering.value || !viewportReady.value) {
+      const nextDelay = Math.min(1200, Math.max(300, safeDelay * 1.2))
+      scheduleRenderRetry(nextDelay)
+      return
+    }
+    debouncedProgressiveRender()
+  }
+  renderRetryTimer = (globalThis as any).setTimeout(run, safeDelay)
+}
 
 const containerHeight = ref<string>('360px') // 初始值与 min-h 保持一致
 let resizeObserver: ResizeObserver | null = null
@@ -133,6 +171,7 @@ const savedTransformState = ref({
   translateY: 0,
   containerHeight: '360px',
 })
+const wheelListeners = computed(() => (props.enableWheelZoom ? { wheel: handleWheel } : {}))
 
 // Timeouts (ms) - configurable via props and reactive
 const timeouts = computed(() => ({
@@ -260,6 +299,16 @@ function renderErrorToContainer(error: unknown) {
   hasRenderError.value = true
   // 在错误显示时，停止任何预览轮询，避免错误被覆盖
   stopPreviewPolling()
+}
+
+function isTimeoutError(error: unknown) {
+  const message
+    = typeof error === 'string'
+      ? error
+      : typeof (error as any)?.message === 'string'
+        ? (error as any).message
+        : ''
+  return typeof message === 'string' && /timed out/i.test(message)
 }
 
 // Tooltip helpers (singleton)
@@ -689,6 +738,8 @@ function stopDrag() {
 
 // Wheel zoom functionality
 function handleWheel(event: WheelEvent) {
+  if (!props.enableWheelZoom)
+    return
   if (event.ctrlKey || event.metaKey) {
     event.preventDefault()
     if (!mermaidContainer.value)
@@ -920,12 +971,27 @@ async function initMermaid() {
         }
         // clear error state on successful render
         hasRenderError.value = false
+        consecutiveRenderTimeouts = 0
+        clearRenderRetryTimer()
       }
     }
     catch (error) {
-      console.error('Failed to render mermaid diagram:', error)
-      if (props.loading === false)
-        renderErrorToContainer(error)
+      const timedOut = isTimeoutError(error)
+      const nextAttempt = consecutiveRenderTimeouts + 1
+      if (timedOut && nextAttempt <= MAX_RENDER_TIMEOUT_RETRIES) {
+        consecutiveRenderTimeouts = nextAttempt
+        const backoff = Math.min(1200, 600 * nextAttempt)
+        scheduleRenderRetry(backoff)
+        if (typeof import.meta !== 'undefined' && import.meta.env?.DEV)
+          console.warn('[markstream-vue] Mermaid render timed out, retry scheduled:', nextAttempt)
+      }
+      else {
+        consecutiveRenderTimeouts = 0
+        clearRenderRetryTimer()
+        console.error('Failed to render mermaid diagram:', error)
+        if (props.loading === false)
+          renderErrorToContainer(error)
+      }
     }
     finally {
       await nextTick()
@@ -991,11 +1057,6 @@ async function renderPartial(code: string) {
     isRendering.value = false
   }
 }
-
-// Schedule progressive work in idle time
-const requestIdle
-  = (globalThis as any).requestIdleCallback
-    ?? ((cb: any, _opts?: any) => setTimeout(() => cb({ didTimeout: true }), 16))
 
 // Progressive render: if full parse passes -> run initMermaid; else restore last success (no prefix render)
 // Progressive render: if full parse passes -> run initMermaid; else try safe prefix preview; else restore last success
@@ -1066,12 +1127,6 @@ async function progressiveRender() {
   // else: keep current DOM (could be empty on very first run)
 }
 
-const debouncedProgressiveRender = debounce(() => {
-  requestIdle(() => {
-    progressiveRender()
-  }, { timeout: 500 })
-}, RENDER_DEBOUNCE_DELAY)
-
 function stopPreviewPolling() {
   if (!isPreviewPolling)
     return
@@ -1116,6 +1171,8 @@ function cleanupAfterLoadingSettled() {
   }
   // terminate parser worker to free resources; it will be recreated on demand
   terminateMermaidWorker()
+  clearRenderRetryTimer()
+  consecutiveRenderTimeouts = 0
 }
 
 function scheduleNextPreviewPoll(delay = 800) {
@@ -1392,6 +1449,7 @@ onUnmounted(() => {
   }
   terminateMermaidWorker()
   stopPreviewPolling()
+  clearRenderRetryTimer()
 })
 
 watch(
@@ -1590,7 +1648,7 @@ const computedButtonStyle = computed(() => {
           class="min-h-[360px] relative transition-all duration-100 overflow-hidden block"
           :class="props.isDark ? 'bg-gray-900' : 'bg-gray-50'"
           :style="{ height: containerHeight }"
-          @wheel="handleWheel"
+          v-on="wheelListeners"
           @mousedown="startDrag"
           @mousemove="onDrag"
           @mouseup="stopDrag"
@@ -1652,14 +1710,14 @@ const computedButtonStyle = computed(() => {
                 <div
                   ref="modalContent"
                   class="w-full h-full flex items-center justify-center p-4 overflow-hidden"
-                  @wheel="handleWheel"
+                  v-on="wheelListeners"
                   @mousedown="startDrag"
                   @mousemove="onDrag"
                   @mouseup="stopDrag"
                   @mouseleave="stopDrag"
-                  @touchstart="startDrag"
-                  @touchmove="onDrag"
-                  @touchend="stopDrag"
+                  @touchstart.passive="startDrag"
+                  @touchmove.passive="onDrag"
+                  @touchend.passive="stopDrag"
                 />
               </div>
             </div>

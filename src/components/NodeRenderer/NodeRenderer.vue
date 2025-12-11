@@ -114,10 +114,35 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
 
 // 定义事件
 const emit = defineEmits(['copy', 'handleArtifactClick', 'click', 'mouseover', 'mouseout'])
+const MAX_DEFERRED_NODE_COUNT = 900
+const MAX_VIEWPORT_OBSERVER_TARGETS = 640
+const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
+
 const containerRef = ref<HTMLElement>()
-// Provide viewport-priority registrar so heavy nodes can defer work until visible
-const viewportPriorityEnabled = ref(props.viewportPriority !== false)
-const registerNodeVisibility = provideViewportPriority(() => containerRef.value, viewportPriorityEnabled)
+const viewportPriorityAutoDisabled = ref(false)
+const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
+
+function resolveViewportRoot(node?: HTMLElement | null) {
+  if (typeof window === 'undefined')
+    return null
+  const base = node ?? containerRef.value
+  if (!base)
+    return null
+  const doc = base.ownerDocument || document
+  const rootScrollable = doc.scrollingElement || doc.documentElement
+  let current: HTMLElement | null = base
+  while (current) {
+    if (current === doc.body || current === rootScrollable)
+      break
+    const style = window.getComputedStyle(current)
+    const overflowY = (style.overflowY || '').toLowerCase()
+    const overflow = (style.overflow || '').toLowerCase()
+    if (SCROLL_PARENT_OVERFLOW_RE.test(overflowY) || SCROLL_PARENT_OVERFLOW_RE.test(overflow))
+      return current
+    current = current.parentElement
+  }
+  return null
+}
 const md = getMarkdown()
 const mdInstance = computed(() => {
   return props.customMarkdownIt
@@ -142,6 +167,32 @@ const parsedNodes = computed<ParsedNode[]>(() => {
   }
   return []
 })
+const maxLiveNodesResolved = computed(() => Math.max(1, props.maxLiveNodes ?? 320))
+const virtualizationEnabled = computed(() => {
+  if ((props.maxLiveNodes ?? 0) <= 0)
+    return false
+  return parsedNodes.value.length > maxLiveNodesResolved.value
+})
+// When viewport priority is requested but virtualization or very large datasets
+// are active, fallback to immediate rendering so IO limits don't block updates.
+const viewportPriorityEnabled = computed(() => {
+  if (props.viewportPriority === false)
+    return false
+  if (viewportPriorityAutoDisabled.value)
+    return false
+  if (props.deferNodesUntilVisible === false)
+    return false
+  if (virtualizationEnabled.value)
+    return false
+  if (parsedNodes.value.length > MAX_DEFERRED_NODE_COUNT)
+    return false
+  return true
+})
+// Provide viewport-priority registrar so heavy nodes can defer work until visible
+const registerNodeVisibility = provideViewportPriority(
+  target => resolveViewportRoot(target ?? containerRef.value ?? null),
+  viewportPriorityEnabled,
+)
 const isClient = typeof window !== 'undefined'
 const requestFrame = isClient && typeof window.requestAnimationFrame === 'function'
   ? window.requestAnimationFrame.bind(window)
@@ -172,9 +223,12 @@ const previousRenderContext = ref<{ key: typeof props.indexKey, total: number }>
 const adaptiveBatchSize = ref(Math.max(1, resolvedBatchSize.value || 1))
 const nodeVisibilityState = reactive<Record<number, boolean>>({})
 const nodeVisibilityHandles = new Map<number, VisibilityHandle>()
+const nodeVisibilityFallbackTimers = new Map<number, number>()
 const nodeSlotElements = new Map<number, HTMLElement | null>()
-const deferNodes = computed(() => props.deferNodesUntilVisible !== false && viewportPriorityEnabled.value !== false)
-const virtualizationEnabled = computed(() => (props.maxLiveNodes ?? 0) > 0)
+const scrollRootElement = ref<HTMLElement | null>(null)
+let detachScrollHandler: (() => void) | null = null
+let pendingFocusSync: { id: number | ReturnType<typeof setTimeout>, viaTimeout: boolean } | null = null
+const deferNodes = computed(() => false)
 const incrementalRenderingActive = computed(() => batchingEnabled.value && !virtualizationEnabled.value)
 const previousBatchConfig = ref({
   batchSize: resolvedBatchSize.value,
@@ -183,7 +237,6 @@ const previousBatchConfig = ref({
   enabled: incrementalRenderingActive.value,
 })
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
-const maxLiveNodesResolved = computed(() => Math.max(1, props.maxLiveNodes ?? 320))
 const liveNodeBufferResolved = computed(() => Math.max(0, props.liveNodeBuffer ?? 60))
 const focusIndex = ref(0)
 const liveRange = reactive({ start: 0, end: 0 })
@@ -196,6 +249,129 @@ const desiredRenderedCount = computed(() => {
   const target = Math.min(parsedNodes.value.length, windowEnd)
   return Math.max(renderedCount.value, target)
 })
+
+function resolveScrollContainer(node?: HTMLElement | null) {
+  const resolved = resolveViewportRoot(node ?? containerRef.value ?? null)
+  if (resolved)
+    return resolved
+  const host = node?.ownerDocument ?? containerRef.value?.ownerDocument ?? (typeof document !== 'undefined' ? document : null)
+  return host?.scrollingElement as HTMLElement || host?.documentElement || null
+}
+
+function cleanupScrollListener() {
+  if (detachScrollHandler) {
+    detachScrollHandler()
+    detachScrollHandler = null
+  }
+  scrollRootElement.value = null
+}
+
+function setupScrollListener() {
+  if (!isClient || !virtualizationEnabled.value)
+    return
+  const root = resolveScrollContainer()
+  if (!root || scrollRootElement.value === root)
+    return
+  cleanupScrollListener()
+  const handler = () => scheduleFocusSync()
+  root.addEventListener('scroll', handler, { passive: true })
+  scrollRootElement.value = root
+  detachScrollHandler = () => {
+    root.removeEventListener('scroll', handler)
+  }
+}
+
+function cancelScheduledFocusSync() {
+  if (!pendingFocusSync)
+    return
+  const win = containerRef.value?.ownerDocument?.defaultView ?? (typeof window !== 'undefined' ? window : null)
+  if (pendingFocusSync.viaTimeout)
+    win ? win.clearTimeout(pendingFocusSync.id as number) : clearTimeout(pendingFocusSync.id as ReturnType<typeof setTimeout>)
+  else
+    cancelFrame?.(pendingFocusSync.id as number)
+  pendingFocusSync = null
+}
+
+function scheduleFocusSync(options: { immediate?: boolean } = {}) {
+  if (!virtualizationEnabled.value)
+    return
+  if (!isClient) {
+    syncFocusToScroll(true)
+    return
+  }
+  if (options.immediate) {
+    cancelScheduledFocusSync()
+    syncFocusToScroll(true)
+    return
+  }
+  if (pendingFocusSync)
+    return
+  const run = () => {
+    pendingFocusSync = null
+    syncFocusToScroll()
+  }
+  if (requestFrame) {
+    pendingFocusSync = { id: requestFrame(run), viaTimeout: false }
+  }
+  else {
+    const win = containerRef.value?.ownerDocument?.defaultView ?? (typeof window !== 'undefined' ? window : null)
+    const timeoutId = win ? win.setTimeout(run, 16) : setTimeout(run, 16)
+    pendingFocusSync = { id: timeoutId, viaTimeout: true }
+  }
+}
+
+function syncFocusToScroll(force = false) {
+  if (!virtualizationEnabled.value)
+    return
+  const root = scrollRootElement.value || resolveScrollContainer()
+  if (!root)
+    return
+  const doc = root.ownerDocument || containerRef.value?.ownerDocument || document
+  const view = doc?.defaultView || (typeof window !== 'undefined' ? window : null)
+  const isViewportRoot = root === doc?.documentElement || root === doc?.body
+  const rootRect = !isViewportRoot ? root.getBoundingClientRect() : null
+  const viewportTop = isViewportRoot ? 0 : rootRect!.top
+  const viewportBottom = isViewportRoot
+    ? (view?.innerHeight ?? root.clientHeight ?? 0)
+    : rootRect!.bottom
+  const entries = Array.from(nodeSlotElements.entries()).sort((a, b) => a[0] - b[0])
+  let firstVisible: number | null = null
+  let lastVisible: number | null = null
+  for (const [index, el] of entries) {
+    if (!el)
+      continue
+    const rect = el.getBoundingClientRect()
+    if (rect.bottom <= viewportTop || rect.top >= viewportBottom)
+      continue
+    if (firstVisible == null)
+      firstVisible = index
+    lastVisible = index
+  }
+  if (firstVisible == null || lastVisible == null) {
+    const container = containerRef.value
+    if (!container)
+      return
+    const rootRect = isViewportRoot ? { top: 0 } : root.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+    const rootScrollTop = isViewportRoot
+      ? (doc?.documentElement?.scrollTop ?? doc?.body?.scrollTop ?? 0)
+      : root.scrollTop
+    const containerOffset
+      = (containerRect.top - (isViewportRoot ? 0 : rootRect.top)) + rootScrollTop
+    const relativeScrollTop = Math.max(0, rootScrollTop - containerOffset)
+    const viewportHeight = isViewportRoot
+      ? (view?.innerHeight ?? doc?.documentElement?.clientHeight ?? root.clientHeight ?? 0)
+      : root.clientHeight
+    const targetOffset = relativeScrollTop + Math.max(0, viewportHeight) * 0.5
+    const estimated = estimateIndexForOffset(targetOffset)
+    focusIndex.value = clamp(estimated, 0, Math.max(0, parsedNodes.value.length - 1))
+    return
+  }
+  const midpoint = Math.round((firstVisible + lastVisible) / 2)
+  if (!force && Math.abs(midpoint - focusIndex.value) <= 1)
+    return
+  focusIndex.value = clamp(midpoint, 0, Math.max(0, parsedNodes.value.length - 1))
+}
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
@@ -277,6 +453,20 @@ const bottomSpacerHeight = computed(() => {
   return estimateHeightRange(end, total)
 })
 
+function estimateIndexForOffset(offsetPx: number) {
+  if (offsetPx <= 0)
+    return 0
+  let remaining = offsetPx
+  const nodes = parsedNodes.value
+  for (let i = 0; i < nodes.length; i++) {
+    const height = nodeHeights[i] ?? averageNodeHeight.value
+    if (remaining <= height)
+      return i
+    remaining -= height
+  }
+  return Math.max(0, nodes.length - 1)
+}
+
 function cleanupNodeVisibility(maxIndex: number) {
   if (!nodeVisibilityHandles.size)
     return
@@ -290,6 +480,7 @@ function cleanupNodeVisibility(maxIndex: number) {
       nodeVisibilityHandles.delete(index)
       if (deferNodes.value)
         delete nodeVisibilityState[index]
+      clearVisibilityFallback(index)
       nodeSlotElements.delete(index)
     }
   }
@@ -298,8 +489,12 @@ function cleanupNodeVisibility(maxIndex: number) {
 function markNodeVisible(index: number, visible: boolean) {
   if (deferNodes.value)
     nodeVisibilityState[index] = visible
-  if (visible)
-    focusIndex.value = clamp(index, 0, Math.max(0, parsedNodes.value.length - 1))
+  if (visible) {
+    if (virtualizationEnabled.value)
+      scheduleFocusSync()
+    else
+      focusIndex.value = clamp(index, 0, Math.max(0, parsedNodes.value.length - 1))
+  }
 }
 
 function shouldRenderNode(index: number) {
@@ -320,6 +515,7 @@ function destroyNodeHandle(index: number) {
     handle.destroy()
     nodeVisibilityHandles.delete(index)
   }
+  clearVisibilityFallback(index)
 }
 
 function setNodeSlotElement(index: number, el: HTMLElement | null) {
@@ -327,19 +523,38 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
     nodeSlotElements.set(index, el)
   else
     nodeSlotElements.delete(index)
+  if (!el)
+    clearVisibilityFallback(index)
 
   if (!shouldObserveSlots.value || !registerNodeVisibility) {
     destroyNodeHandle(index)
     if (el)
-      markNodeVisible(index, true)
+      markNodeVisible(index, true, 'observation-disabled')
     else if (deferNodes.value)
       delete nodeVisibilityState[index]
     return
   }
 
+  if (
+    !virtualizationEnabled.value
+    && deferNodes.value
+    && !viewportPriorityAutoDisabled.value
+    && nodeVisibilityHandles.size >= MAX_VIEWPORT_OBSERVER_TARGETS
+  ) {
+    autoDisableViewportPriority('too-many-targets')
+    if (!shouldObserveSlots.value || !registerNodeVisibility) {
+      destroyNodeHandle(index)
+      if (el)
+        markNodeVisible(index, true, 'auto-disabled')
+      else if (deferNodes.value)
+        delete nodeVisibilityState[index]
+      return
+    }
+  }
+
   if (index < resolvedInitialBatch.value && !virtualizationEnabled.value) {
     destroyNodeHandle(index)
-    markNodeVisible(index, true)
+    markNodeVisible(index, true, 'initial-batch')
     return
   }
 
@@ -355,10 +570,13 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
   if (!handle)
     return
   nodeVisibilityHandles.set(index, handle)
-  markNodeVisible(index, handle.isVisible.value)
+  markNodeVisible(index, handle.isVisible.value, 'observer-initial')
+  if (deferNodes.value)
+    scheduleVisibilityFallback(index)
   handle.whenVisible
     .then(() => {
-      markNodeVisible(index, true)
+      clearVisibilityFallback(index)
+      markNodeVisible(index, true, 'observer-visible')
     })
     .catch(() => {})
     .finally(() => {
@@ -371,6 +589,9 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
       }
       catch {}
     })
+
+  if (virtualizationEnabled.value)
+    scheduleFocusSync()
 }
 
 function setNodeContentRef(index: number, el: HTMLElement | null) {
@@ -389,6 +610,7 @@ let batchTimeout: number | null = null
 let batchPending = false
 let pendingIncrement: number | null = null
 let batchIdle: number | null = null
+const VIEWPORT_FALLBACK_DELAY = 1800
 
 function cancelBatchTimers() {
   if (!isClient)
@@ -407,6 +629,46 @@ function cancelBatchTimers() {
   }
   batchPending = false
   pendingIncrement = null
+}
+
+function clearVisibilityFallback(index: number) {
+  if (!isClient)
+    return
+  const timer = nodeVisibilityFallbackTimers.get(index)
+  if (timer != null) {
+    window.clearTimeout(timer)
+    nodeVisibilityFallbackTimers.delete(index)
+  }
+}
+
+function scheduleVisibilityFallback(index: number) {
+  if (!isClient || !deferNodes.value)
+    return
+  clearVisibilityFallback(index)
+  const timer = window.setTimeout(() => {
+    nodeVisibilityFallbackTimers.delete(index)
+    markNodeVisible(index, true, 'fallback-timer')
+  }, VIEWPORT_FALLBACK_DELAY)
+  nodeVisibilityFallbackTimers.set(index, timer)
+}
+
+function autoDisableViewportPriority(reason: 'too-many-targets') {
+  if (viewportPriorityAutoDisabled.value)
+    return
+  viewportPriorityAutoDisabled.value = true
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV && typeof console !== 'undefined')
+    console.warn('[markstream-vue] viewportPriority auto-disabled:', reason)
+
+  for (const handle of nodeVisibilityHandles.values())
+    handle.destroy()
+  nodeVisibilityHandles.clear()
+  if (isClient) {
+    for (const timer of nodeVisibilityFallbackTimers.values())
+      window.clearTimeout(timer)
+  }
+  nodeVisibilityFallbackTimers.clear()
+  for (const key of Object.keys(nodeVisibilityState))
+    delete nodeVisibilityState[key]
 }
 
 function scheduleBatch(increment: number, opts: { immediate?: boolean } = {}) {
@@ -549,6 +811,8 @@ watch(
       cancelBatchTimers()
     if (datasetChanged || batchConfigChanged)
       adaptiveBatchSize.value = Math.max(1, resolvedBatchSize.value || 1)
+    if (datasetChanged && virtualizationEnabled.value)
+      scheduleFocusSync({ immediate: true })
 
     const targetCount = desiredRenderedCount.value
 
@@ -581,17 +845,51 @@ watch(
 )
 
 watch(
+  () => virtualizationEnabled.value,
+  (enabled) => {
+    if (!enabled) {
+      cleanupScrollListener()
+      cancelScheduledFocusSync()
+      return
+    }
+    setupScrollListener()
+    scheduleFocusSync({ immediate: true })
+  },
+  { immediate: true },
+)
+
+watch(
+  () => containerRef.value,
+  () => {
+    if (!virtualizationEnabled.value)
+      return
+    setupScrollListener()
+    scheduleFocusSync({ immediate: true })
+  },
+)
+
+watch(
+  () => parsedNodes.value.length,
+  () => {
+    if (virtualizationEnabled.value)
+      scheduleFocusSync({ immediate: true })
+  },
+)
+
+watch(
   () => deferNodes.value,
   (enabled) => {
     if (!enabled) {
       for (const handle of nodeVisibilityHandles.values())
         handle.destroy()
       nodeVisibilityHandles.clear()
+      for (const index of Array.from(nodeVisibilityFallbackTimers.keys()))
+        clearVisibilityFallback(index)
       for (const key of Object.keys(nodeVisibilityState))
         delete nodeVisibilityState[key]
       for (const [index, el] of nodeSlotElements) {
         if (el)
-          markNodeVisible(index, true)
+          markNodeVisible(index, true, 'defer-disabled')
       }
       return
     }
@@ -602,21 +900,22 @@ watch(
 )
 
 watch(
-  () => renderedCount.value,
-  (count, prev) => {
-    if (!virtualizationEnabled.value)
+  [() => props.viewportPriority, () => parsedNodes.value.length],
+  ([enabled, length]) => {
+    if (enabled === false) {
+      viewportPriorityAutoDisabled.value = false
       return
-    if (typeof prev === 'number' && count <= prev)
-      return
-    if (count > 0)
-      focusIndex.value = count - 1
+    }
+    if (viewportPriorityAutoDisabled.value && length <= VIEWPORT_PRIORITY_RECOVERY_COUNT)
+      viewportPriorityAutoDisabled.value = false
   },
 )
 
 watch(
-  () => props.viewportPriority,
-  (value) => {
-    viewportPriorityEnabled.value = value !== false
+  () => renderedCount.value,
+  () => {
+    if (virtualizationEnabled.value)
+      scheduleFocusSync({ immediate: true })
   },
 )
 
@@ -645,6 +944,10 @@ onBeforeUnmount(() => {
   for (const handle of nodeVisibilityHandles.values())
     handle.destroy()
   nodeVisibilityHandles.clear()
+  for (const index of Array.from(nodeVisibilityFallbackTimers.keys()))
+    clearVisibilityFallback(index)
+  cleanupScrollListener()
+  cancelScheduledFocusSync()
 })
 
 // 异步按需加载 CodeBlock 组件；失败时退回为 InlineCodeNode（内联代码渲染）

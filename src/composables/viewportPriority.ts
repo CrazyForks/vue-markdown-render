@@ -19,7 +19,7 @@ type InjectionKey<T> = symbol & { __type?: T }
  * If disabled or not in browser, registers resolve immediately.
  */
 export function provideViewportPriority(
-  getRootEl: () => HTMLElement | null | undefined,
+  getRootEl: (target?: HTMLElement | null) => HTMLElement | null | undefined,
   enabled: Ref<boolean> | boolean,
 ): RegisterFn {
   const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
@@ -27,15 +27,17 @@ export function provideViewportPriority(
 
   // Lazily created IO bound to the provided root element
   let io: IntersectionObserver | null = null
+  let observerOptions: { rootMargin?: string, threshold?: number } | null = null
   const targets = new WeakMap<Element, { resolve: () => void, visible: Ref<boolean> }>()
 
-  function ensureObserver() {
+  function ensureObserver(target?: HTMLElement) {
     if (io || !isBrowser)
       return io
     // Guard: some browser-like environments (e.g., jsdom) don't provide IO
     if (typeof IntersectionObserver === 'undefined')
       return null
-    const root = getRootEl() ?? null
+    const root = getRootEl?.(target ?? null) ?? null
+    const opts = observerOptions || {}
     io = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         const data = targets.get(entry.target)
@@ -57,13 +59,13 @@ export function provideViewportPriority(
       }
     }, {
       root,
-      rootMargin: '300px', // prefetch slightly before entering viewport
-      threshold: 0,
+      rootMargin: opts.rootMargin ?? '300px', // prefetch slightly before entering viewport
+      threshold: opts.threshold ?? 0,
     })
     return io
   }
 
-  const register: RegisterFn = (el, _opts) => {
+  const register: RegisterFn = (el, opts) => {
     const visible = ref(false)
     let settled = false
     let resolve!: () => void
@@ -91,7 +93,10 @@ export function provideViewportPriority(
       return { isVisible: visible, whenVisible, destroy: cleanup }
     }
 
-    const obs = ensureObserver()
+    if (!observerOptions && opts)
+      observerOptions = { ...opts }
+
+    const obs = ensureObserver(el)
     if (!obs) {
       visible.value = true
       resolve()

@@ -88,6 +88,7 @@ export interface MermaidBlockNodeProps {
   showFullscreenButton?: boolean
   showCollapseButton?: boolean
   showZoomControls?: boolean
+  enableWheelZoom?: boolean
 }
 
 // Generic event wrapper used by MermaidBlockNode emits. Consumers can call
