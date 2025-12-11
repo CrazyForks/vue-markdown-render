@@ -529,7 +529,7 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
   if (!shouldObserveSlots.value || !registerNodeVisibility) {
     destroyNodeHandle(index)
     if (el)
-      markNodeVisible(index, true, 'observation-disabled')
+      markNodeVisible(index, true)
     else if (deferNodes.value)
       delete nodeVisibilityState[index]
     return
@@ -545,7 +545,7 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
     if (!shouldObserveSlots.value || !registerNodeVisibility) {
       destroyNodeHandle(index)
       if (el)
-        markNodeVisible(index, true, 'auto-disabled')
+        markNodeVisible(index, true)
       else if (deferNodes.value)
         delete nodeVisibilityState[index]
       return
@@ -554,7 +554,7 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
 
   if (index < resolvedInitialBatch.value && !virtualizationEnabled.value) {
     destroyNodeHandle(index)
-    markNodeVisible(index, true, 'initial-batch')
+    markNodeVisible(index, true)
     return
   }
 
@@ -570,13 +570,13 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
   if (!handle)
     return
   nodeVisibilityHandles.set(index, handle)
-  markNodeVisible(index, handle.isVisible.value, 'observer-initial')
+  markNodeVisible(index, handle.isVisible.value)
   if (deferNodes.value)
     scheduleVisibilityFallback(index)
   handle.whenVisible
     .then(() => {
       clearVisibilityFallback(index)
-      markNodeVisible(index, true, 'observer-visible')
+      markNodeVisible(index, true)
     })
     .catch(() => {})
     .finally(() => {
@@ -647,7 +647,7 @@ function scheduleVisibilityFallback(index: number) {
   clearVisibilityFallback(index)
   const timer = window.setTimeout(() => {
     nodeVisibilityFallbackTimers.delete(index)
-    markNodeVisible(index, true, 'fallback-timer')
+    markNodeVisible(index, true)
   }, VIEWPORT_FALLBACK_DELAY)
   nodeVisibilityFallbackTimers.set(index, timer)
 }
@@ -889,7 +889,7 @@ watch(
         delete nodeVisibilityState[key]
       for (const [index, el] of nodeSlotElements) {
         if (el)
-          markNodeVisible(index, true, 'defer-disabled')
+          markNodeVisible(index, true)
       }
       return
     }

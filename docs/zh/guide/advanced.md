@@ -27,17 +27,18 @@ const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens: pre }
 处理 `<thinking>` 等自定义组件时，`markdown-it` 对内联 HTML 支持有限，建议让标签单独换行（如 `a\n<thinking></thinking>\nb`，不要写成 `a<thinking></thinking>b`）。可以在传入解析前用正则修正换行，再用钩子变换 token：
 
 ```ts
-const normalizeCustomBlocks = (raw: string) =>
-  raw.replace(/<thinking([\s\S]*?)>([\s\S]*?)<\/thinking>/g, (_m, attrs, body) =>
-    `\n<thinking${attrs || ''}>\n${body.trim()}\n</thinking>\n`,
-  )
+function normalizeCustomBlocks(raw: string) {
+  return raw.replace(/<thinking([^>]*)>([\s\S]*?)<\/thinking>/g, (_m, attrs, body) =>
+    `\n<thinking${attrs || ''}>\n${body.trim()}\n</thinking>\n`,)
+}
 
-const preTransformTokens = (tokens: MarkdownToken[]) =>
-  tokens.map(t =>
+function preTransformTokens(tokens: MarkdownToken[]) {
+  return tokens.map(t =>
     t.type === 'html_block' && t.content?.includes('<thinking')
-      ? { ...t, type: 'thinking_block', content: t.content.replace(/<\/?thinking.*?>/g, '').trim() }
+      ? { ...t, type: 'thinking_block', content: t.content.replace(/<\/?thinking[^>]*>/g, '').trim() }
       : t,
   )
+}
 
 const nodes = parseMarkdownToStructure(
   normalizeCustomBlocks(content),

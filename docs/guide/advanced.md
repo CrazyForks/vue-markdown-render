@@ -27,17 +27,18 @@ const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens: pre }
 `markdown-it` is strict with inline HTML; keep custom tags on their own lines (prefer `a\n<thinking></thinking>\nb`, avoid `a<thinking></thinking>b`). Normalize the content first, then use hooks to turn the HTML block into a custom node:
 
 ```ts
-const normalizeCustomBlocks = (raw: string) =>
-  raw.replace(/<thinking([\s\S]*?)>([\s\S]*?)<\/thinking>/g, (_m, attrs, body) =>
-    `\n<thinking${attrs || ''}>\n${body.trim()}\n</thinking>\n`,
-  )
+function normalizeCustomBlocks(raw: string) {
+  return raw.replace(/<thinking([^>]*)>([\s\S]*?)<\/thinking>/g, (_m, attrs, body) =>
+    `\n<thinking${attrs || ''}>\n${body.trim()}\n</thinking>\n`,)
+}
 
-const preTransformTokens = (tokens: MarkdownToken[]) =>
-  tokens.map(t =>
+function preTransformTokens(tokens: MarkdownToken[]) {
+  return tokens.map(t =>
     t.type === 'html_block' && t.content?.includes('<thinking')
-      ? { ...t, type: 'thinking_block', content: t.content.replace(/<\/?thinking.*?>/g, '').trim() }
+      ? { ...t, type: 'thinking_block', content: t.content.replace(/<\/?thinking[^>]*>/g, '').trim() }
       : t,
   )
+}
 
 const nodes = parseMarkdownToStructure(
   normalizeCustomBlocks(content),
