@@ -229,7 +229,7 @@ const scrollRootElement = ref<HTMLElement | null>(null)
 let detachScrollHandler: (() => void) | null = null
 let pendingFocusSync: { id: number | ReturnType<typeof setTimeout>, viaTimeout: boolean } | null = null
 const deferNodes = computed(() => false)
-const incrementalRenderingActive = computed(() => batchingEnabled.value && !virtualizationEnabled.value)
+const incrementalRenderingActive = computed(() => batchingEnabled.value && (props.maxLiveNodes ?? 0) <= 0)
 const previousBatchConfig = ref({
   batchSize: resolvedBatchSize.value,
   initial: resolvedInitialBatch.value,

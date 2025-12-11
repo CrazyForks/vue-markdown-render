@@ -13,6 +13,28 @@ import PreCodeNode from '../PreCodeNode'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
 import { getUseMonaco } from './monaco'
 
+const props = withDefaults(
+  defineProps<CodeBlockNodeProps>(),
+  {
+    isShowPreview: true,
+    darkTheme: undefined,
+    lightTheme: undefined,
+    loading: true,
+    stream: true,
+    enableFontSizeControl: true,
+    minWidth: undefined,
+    maxWidth: undefined,
+    // Header configuration: allow consumers to toggle built-in buttons and header visibility
+    showHeader: true,
+    showCopyButton: true,
+    showExpandButton: true,
+    showPreviewButton: true,
+    showFontSizeButtons: true,
+  },
+)
+
+const emits = defineEmits(['previewCode', 'copy'])
+
 // Chrome warns when Monaco registers non-passive touchstart listeners.
 // Patch the editor host so touch handlers default to passive for Monaco roots.
 const MONACO_TOUCH_PATCH_FLAG = '__markstreamMonacoPassiveTouch__'
@@ -70,27 +92,6 @@ function withPassiveOptions(options?: boolean | AddEventListenerOptions): AddEve
   return { passive: true }
 }
 
-const props = withDefaults(
-  defineProps<CodeBlockNodeProps>(),
-  {
-    isShowPreview: true,
-    darkTheme: undefined,
-    lightTheme: undefined,
-    loading: true,
-    stream: true,
-    enableFontSizeControl: true,
-    minWidth: undefined,
-    maxWidth: undefined,
-    // Header configuration: allow consumers to toggle built-in buttons and header visibility
-    showHeader: true,
-    showCopyButton: true,
-    showExpandButton: true,
-    showPreviewButton: true,
-    showFontSizeButtons: true,
-  },
-)
-
-const emits = defineEmits(['previewCode', 'copy'])
 const instance = getCurrentInstance()
 const hasPreviewListener = computed(() => {
   const props = instance?.vnode.props as Record<string, unknown> | null | undefined
