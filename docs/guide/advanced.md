@@ -22,6 +22,34 @@ function pre(tokens) {
 const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens: pre })
 ```
 
+## Custom component parsing
+
+`markdown-it` is strict with inline HTML; keep custom tags on their own lines (prefer `a\n<thinking></thinking>\nb`, avoid `a<thinking></thinking>b`). Normalize the content first, then use hooks to turn the HTML block into a custom node:
+
+```ts
+const normalizeCustomBlocks = (raw: string) =>
+  raw.replace(/<thinking([\s\S]*?)>([\s\S]*?)<\/thinking>/g, (_m, attrs, body) =>
+    `\n<thinking${attrs || ''}>\n${body.trim()}\n</thinking>\n`,
+  )
+
+const preTransformTokens = (tokens: MarkdownToken[]) =>
+  tokens.map(t =>
+    t.type === 'html_block' && t.content?.includes('<thinking')
+      ? { ...t, type: 'thinking_block', content: t.content.replace(/<\/?thinking.*?>/g, '').trim() }
+      : t,
+  )
+
+const nodes = parseMarkdownToStructure(
+  normalizeCustomBlocks(content),
+  md,
+  { preTransformTokens },
+)
+```
+
+Alternative flows (pick what fits your pipeline):
+- Have the backend split `thinking` into its own field/type; render `thinking` with one `MarkdownRender` and the remaining content with another, so the parser never sees raw custom HTML inline.
+- Replace custom blocks with placeholders before parsing: capture `<thinking>...</thinking>` via regex, render the cleaned body with `MarkdownRender`, then swap placeholders back to your custom component. When `thinking` is always at the top, you can also slice the head section out for dedicated rendering.
+
 ## setCustomComponents(id, mapping)
 - Use `setCustomComponents('docs', { thinking: ThinkingComponent })` to scope to `MarkdownRender` instances with `custom-id="docs"`.
 - Call `removeCustomComponents` to clean up mappings and avoid memory leaks in single-page apps.

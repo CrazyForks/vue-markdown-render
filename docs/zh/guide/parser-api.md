@@ -19,6 +19,8 @@
 ### `parseMarkdownToStructure(content, md?, options?)`
 将 Markdown 字符串解析为供渲染器使用的节点树（AST）。
 
+> 提示：用 `preTransformTokens` 将 `<thinking>` 等内联 HTML 转为自定义节点时，请让标签独占行或先行正则规整，避免生成异常 token。参见 [自定义组件解析示例](/zh/guide/advanced#自定义组件解析示例)。
+
 返回：`ParsedNode[]`
 
 ### 其他有用函数
@@ -106,3 +108,50 @@ function enableEmoji(md: MarkdownIt) {
 ```
 
 更多示例与完整 API 请参考仓库内的 `packages/markdown-parser/README.md`。
+
+## 示例
+使用 playground 快速验证解析变换：例如通过 `preTransformTokens` 把 `html_block` 变成 `thinking_block`，再用 `setCustomComponents` 注册对应组件。
+
+快速测试 `parseOptions`：
+
+```ts
+import { parseMarkdownToStructure } from 'markstream-vue'
+
+const nodes = parseMarkdownToStructure('Hello **world**')
+console.log(nodes)
+// 渲染：<MarkdownRender :nodes="nodes" />
+```
+
+### 自定义组件与标签类元素
+
+标签类自定义元素（如 `<MyWidget ...>...</MyWidget>`）往往产出复杂的 `html_block`/inline token，事后用正则或 AST 拼接会很脆。建议在解析前先提取并占位，再对占位文本做 Markdown 解析，最后渲染时把占位符还原为 Vue 组件。
+
+推荐流程：
+- 预扫描 Markdown，把自定义组件提取到映射表，并用占位符（如 `[[CUSTOM:1]]`）替换原始位置。
+- 让解析器处理带占位符的内容，正常渲染 AST。
+- 渲染时遇到占位符节点，再从映射表取回原始片段并挂载对应组件。
+
+示例（简化版）：
+
+```ts
+// 1) 提取自定义标签
+const extracted = new Map<string, string>()
+let id = 1
+const contentWithPlaceholders = source.replace(/<MyWidget[\s\S]*?<\/MyWidget>/g, (m) => {
+  const key = `[[CUSTOM:${id++}]]`
+  extracted.set(key, m)
+  return key
+})
+
+// 2) 用占位符内容做 Markdown 解析
+const nodes = parseMarkdownToStructure(contentWithPlaceholders)
+
+// 3) 渲染时替换占位符
+// if (node.type === 'text' && extracted.has(node.content)) {
+//   return h(CustomWrapper, { raw: extracted.get(node.content) })
+// }
+```
+
+### thinking 片段
+
+针对短小的 “thinking” 片段（如 AI 思考过程），可以用 `parseOptions` 或 `preTransformTokens` 标记该区域，再用内置的 `MarkdownRenderer` 轻量渲染，同时对复杂的自定义组件仍采用上面的提取占位方案。这样避免对 AST 做易碎的字符串拼接，也便于控制自定义组件的挂载范围。

@@ -24,6 +24,8 @@ Parameters:
 - `md` (MarkdownItCore, optional): a markdown-it-ts instance — created if not provided
 - `options` (ParseOptions, optional): contains transform hooks described below
 
+> Tip for custom components: when converting inline HTML like `<thinking>` via `preTransformTokens`, keep those tags on their own lines or normalize them first to avoid malformed tokens. See [custom component parsing](/guide/advanced#custom-component-parsing) for a minimal regex example.
+
 Returns: `ParsedNode[]`
 
 ### `processTokens(tokens)`

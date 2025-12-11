@@ -22,6 +22,34 @@ function pre(tokens) {
 const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens: pre })
 ```
 
+## 自定义组件解析示例
+
+处理 `<thinking>` 等自定义组件时，`markdown-it` 对内联 HTML 支持有限，建议让标签单独换行（如 `a\n<thinking></thinking>\nb`，不要写成 `a<thinking></thinking>b`）。可以在传入解析前用正则修正换行，再用钩子变换 token：
+
+```ts
+const normalizeCustomBlocks = (raw: string) =>
+  raw.replace(/<thinking([\s\S]*?)>([\s\S]*?)<\/thinking>/g, (_m, attrs, body) =>
+    `\n<thinking${attrs || ''}>\n${body.trim()}\n</thinking>\n`,
+  )
+
+const preTransformTokens = (tokens: MarkdownToken[]) =>
+  tokens.map(t =>
+    t.type === 'html_block' && t.content?.includes('<thinking')
+      ? { ...t, type: 'thinking_block', content: t.content.replace(/<\/?thinking.*?>/g, '').trim() }
+      : t,
+  )
+
+const nodes = parseMarkdownToStructure(
+  normalizeCustomBlocks(content),
+  md,
+  { preTransformTokens },
+)
+```
+
+其他可选方案（按复杂度递增）：
+- 后端将 `thinking` 拆成单独字段/类型：前端用两次 `MarkdownRender`，一个渲染 `thinking`，另一个渲染剩余正文，互不干扰。
+- 在进入解析前用正则占位：先 `replace` 掉 `<thinking>...</thinking>` 保存到数组；正文用 `MarkdownRender`；最后把占位符替换回自定义组件渲染结果。`thinking` 常在开头时可以直接截取头部做单独渲染。
+
 ## setCustomComponents(id, mapping)
 - 使用 `setCustomComponents('docs', { thinking: ThinkingComponent })` 作用于带 `custom-id="docs"` 的 `MarkdownRender` 实例。
 - 调用 `removeCustomComponents` 清理映射，避免单页应用内存泄漏。
