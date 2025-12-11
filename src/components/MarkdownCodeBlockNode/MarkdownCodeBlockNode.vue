@@ -67,6 +67,10 @@ const copyText = ref(false)
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
 const codeBlockContent = ref<HTMLElement | null>(null)
+const rendererTarget = ref<HTMLElement | null>(null)
+const fallbackHtml = ref('')
+const rendererReady = ref(false)
+let renderObserver: MutationObserver | undefined
 
 // Auto-scroll state management
 const autoScrollEnabled = ref(true) // Start with auto-scroll enabled
@@ -134,6 +138,61 @@ const contentStyle = computed(() => {
 function getPreferredColorScheme() {
   return props.isDark ? props.darkTheme : props.lightTheme
 }
+
+function escapeHtml(str: string) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function renderFallback(code: string) {
+  renderObserver?.disconnect()
+  renderObserver = undefined
+  if (!code) {
+    fallbackHtml.value = ''
+    rendererReady.value = false
+    return
+  }
+  fallbackHtml.value = `<pre class="shiki shiki-fallback"><code>${escapeHtml(code)}</code></pre>`
+  rendererReady.value = false
+}
+
+function clearFallback() {
+  fallbackHtml.value = ''
+  rendererReady.value = true
+}
+
+function hasRendererContent() {
+  const target = rendererTarget.value
+  if (!target)
+    return false
+  if (target.childNodes.length > 0)
+    return true
+  return Boolean(target.textContent?.trim().length)
+}
+
+async function clearFallbackWhenRendererReady() {
+  await nextTick()
+  if (hasRendererContent()) {
+    clearFallback()
+    return
+  }
+  const target = rendererTarget.value
+  if (!target)
+    return
+  renderObserver?.disconnect()
+  renderObserver = new MutationObserver(() => {
+    if (!hasRendererContent())
+      return
+    clearFallback()
+    renderObserver?.disconnect()
+    renderObserver = undefined
+  })
+  renderObserver.observe(target, { childList: true, subtree: true })
+}
 // Lazy-load stream-markdown (and thus shiki) only when needed
 interface ShikiRenderer {
   updateCode: (code: string, lang?: string) => void | Promise<void>
@@ -152,14 +211,14 @@ const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV)
 
-function normalizeRendererLanguage(rawLang?: string | null) {
+function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) {
   const [baseToken] = String(rawLang ?? '').split(':')
   const normalized = baseToken?.trim().toLowerCase() ?? ''
   if (!normalized)
     return 'plaintext'
   if (!registeredHighlightLanguages || registeredHighlightLanguages.has(normalized))
     return normalized
-  if (isDevEnv && !warnedMissingLanguages.has(normalized)) {
+  if (hasContent && isDevEnv && !warnedMissingLanguages.has(normalized)) {
     warnedMissingLanguages.add(normalized)
     console.warn(`[MarkdownCodeBlockNode] Language "${normalized}" not preloaded in stream-markdown; falling back to plaintext.`)
   }
@@ -169,7 +228,7 @@ function normalizeRendererLanguage(rawLang?: string | null) {
 async function updateRendererWithFallback(code: string, rawLang?: string | null) {
   if (!renderer)
     return
-  const normalized = normalizeRendererLanguage(rawLang)
+  const normalized = normalizeRendererLanguage(rawLang, Boolean(code && code.length))
   try {
     await renderer.updateCode(code, normalized)
   }
@@ -196,13 +255,7 @@ async function ensureStreamMarkdownLoaded() {
     disposeHighlighter = mod.disposeHighlighter
     const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
     registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
-    registerHighlight({ themes: props.themes })
-    renderer = createShikiRenderer(codeBlockContent.value, {
-      theme: getPreferredColorScheme(),
-    })
-    if (!props.loading) {
-      await updateRendererWithFallback(props.node.code, codeLanguage.value)
-    }
+    registerHighlight?.({ themes: props.themes })
   }
   catch (e) {
     // stream-markdown is an optional peer; if missing, silently skip highlighting
@@ -214,9 +267,40 @@ async function initRenderer() {
   if (isMermaid.value) {
     disposeHighlighter()
     renderer?.dispose()
+    renderer = undefined
+    rendererReady.value = false
     return
   }
-  ensureStreamMarkdownLoaded()
+
+  await ensureStreamMarkdownLoaded()
+
+  if (!codeBlockContent.value || !rendererTarget.value) {
+    renderFallback(props.node.code)
+    return
+  }
+
+  registerHighlight?.({ themes: props.themes })
+
+  if (!renderer && createShikiRenderer) {
+    renderer = createShikiRenderer(rendererTarget.value, {
+      theme: getPreferredColorScheme(),
+    })
+    rendererReady.value = true
+  }
+
+  if (!renderer) {
+    renderFallback(props.node.code)
+    return
+  }
+
+  if (props.stream === false && props.loading) {
+    renderFallback(props.node.code)
+    return
+  }
+
+  renderFallback(props.node.code)
+  await updateRendererWithFallback(props.node.code, codeLanguage.value)
+  await clearFallbackWhenRendererReady()
 }
 initRenderer()
 onMounted(() => {
@@ -228,32 +312,44 @@ watch(() => props.themes, async () => {
     registerHighlight({ themes: props.themes })
 })
 
+watch(() => props.loading, (loading) => {
+  if (loading)
+    return
+  initRenderer()
+})
+
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   if (lang !== codeLanguage.value)
     codeLanguage.value = lang.trim()
-  if (!codeBlockContent.value)
+  if (!codeBlockContent.value || !rendererTarget.value) {
+    renderFallback(code)
     return
+  }
   if (isMermaid.value) {
     disposeHighlighter()
     renderer?.dispose()
     return
   }
 
-  if (!renderer)
+  if (!renderer) {
+    renderFallback(code)
     await initRenderer()
+  }
   if (!renderer || !code)
     return
 
   if (props.stream === false && props.loading)
     return
 
+  renderFallback(code)
   await updateRendererWithFallback(code, lang)
+  await clearFallbackWhenRendererReady()
 })
 
 const watchTheme = watch(
   () => [props.darkTheme, props.lightTheme],
   async () => {
-    if (!codeBlockContent.value)
+    if (!codeBlockContent.value || !rendererTarget.value)
       return
     if (isMermaid.value) {
       disposeHighlighter()
@@ -547,7 +643,10 @@ function previewCode() {
       class="code-block-content"
       :style="contentStyle"
       @scroll="handleScroll"
-    />
+    >
+      <div ref="rendererTarget" class="code-block-render" />
+      <div v-if="!rendererReady" class="code-fallback-plain" v-html="fallbackHtml" />
+    </div>
     <!-- Loading placeholder can be overridden via slot -->
     <div v-show="!stream && loading" class="code-loading-placeholder">
       <slot name="loading" :loading="loading" :stream="stream">
@@ -570,9 +669,43 @@ function previewCode() {
 }
 
 .code-block-content {
-  max-height: 500px;
+  max-height: min(70vh, 500px);
   overflow: auto;
   transition: max-height 0.3s ease;
+  font-family: var(--vscode-editor-font-family, 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
+  line-height: var(--vscode-editor-line-height, 1.5);
+}
+
+.code-block-render {
+  min-height: 1px;
+}
+
+:deep(.code-block-render pre),
+:deep(.code-block-content .shiki) {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+:deep(.code-block-content .shiki-fallback) {
+  padding: 1rem;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  white-space: pre;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.code-fallback-plain {
+  white-space: pre;
+  overflow: auto;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  font-family: inherit;
 }
 
 :deep(.code-block-content pre){
