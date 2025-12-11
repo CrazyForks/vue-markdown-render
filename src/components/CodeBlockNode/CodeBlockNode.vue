@@ -13,6 +13,63 @@ import PreCodeNode from '../PreCodeNode'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
 import { getUseMonaco } from './monaco'
 
+// Chrome warns when Monaco registers non-passive touchstart listeners.
+// Patch the editor host so touch handlers default to passive for Monaco roots.
+const MONACO_TOUCH_PATCH_FLAG = '__markstreamMonacoPassiveTouch__'
+
+if (typeof window !== 'undefined')
+  ensureMonacoPassiveTouchListeners()
+
+function ensureMonacoPassiveTouchListeners() {
+  try {
+    const globalObj = window as any
+    if (globalObj[MONACO_TOUCH_PATCH_FLAG])
+      return
+    const proto = window.Element?.prototype
+    const nativeAdd = proto?.addEventListener
+    if (!proto || !nativeAdd)
+      return
+    proto.addEventListener = function patchedMonacoTouchStart(
+      this: Element,
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | AddEventListenerOptions,
+    ) {
+      if (type === 'touchstart' && shouldForcePassiveForMonaco(this, options))
+        return nativeAdd.call(this, type, listener, withPassiveOptions(options))
+      return nativeAdd.call(this, type, listener, options)
+    }
+    globalObj[MONACO_TOUCH_PATCH_FLAG] = true
+  }
+  catch {}
+}
+
+function shouldForcePassiveForMonaco(target: EventTarget | null, options?: boolean | AddEventListenerOptions) {
+  if (!target)
+    return false
+  const el = target as Element
+  if (typeof el.closest !== 'function')
+    return false
+  if (!el.closest('.monaco-editor, .monaco-diff-editor'))
+    return false
+  if (options && typeof options === 'object' && 'passive' in options)
+    return false
+  return true
+}
+
+function withPassiveOptions(options?: boolean | AddEventListenerOptions): AddEventListenerOptions {
+  if (options == null)
+    return { passive: true }
+  if (typeof options === 'boolean')
+    return { capture: options, passive: true }
+  if (typeof options === 'object') {
+    if ('passive' in options)
+      return options
+    return { ...options, passive: true }
+  }
+  return { passive: true }
+}
+
 const props = withDefaults(
   defineProps<CodeBlockNodeProps>(),
   {
