@@ -75,6 +75,13 @@ export interface ImageNode extends BaseNode {
   title: string | null
 }
 
+export interface HtmlInlineNode extends BaseNode {
+  type: 'html_inline'
+  tag?: string
+  content: string
+  children: ParsedNode[]
+}
+
 export interface ThematicBreakNode extends BaseNode {
   type: 'thematic_break'
 }
@@ -243,6 +250,7 @@ export type ParsedNode
     | InlineCodeNode
     | LinkNode
     | ImageNode
+    | HtmlInlineNode
     | ThematicBreakNode
     | BlockquoteNode
     | TableNode
@@ -296,6 +304,7 @@ export interface CustomComponents {
   emoji: any
   checkbox: any
   inline_code: any
+  html_inline: any
   reference: any
   mermaid: any
   [key: string]: any

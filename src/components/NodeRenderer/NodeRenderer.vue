@@ -22,7 +22,6 @@ import LinkNode from '../../components/LinkNode'
 import ListNode from '../../components/ListNode'
 import MermaidBlockNode from '../../components/MermaidBlockNode'
 import ParagraphNode from '../../components/ParagraphNode'
-
 import PreCodeNode from '../../components/PreCodeNode'
 import ReferenceNode from '../../components/ReferenceNode'
 import StrikethroughNode from '../../components/StrikethroughNode'
@@ -35,6 +34,7 @@ import ThematicBreakNode from '../../components/ThematicBreakNode'
 import { provideViewportPriority } from '../../composables/viewportPriority'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
+import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import FallbackComponent from './FallbackComponent.vue'
 
@@ -997,6 +997,7 @@ const nodeComponents = {
   checkbox: CheckboxNode,
   checkbox_input: CheckboxNode,
   inline_code: InlineCodeNode,
+  html_inline: HtmlInlineNode,
   reference: ReferenceNode,
   html_block: HtmlBlockNode,
   // 可以添加更多节点类型

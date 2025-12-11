@@ -333,7 +333,15 @@ export function parseInlineTokens(
         i++
         break
       case 'html_inline': {
-        const [node, index] = parseHtmlInlineCodeToken(token, tokens, i)
+        const [node, index] = parseHtmlInlineCodeToken(
+          token,
+          tokens,
+          i,
+          parseInlineTokens,
+          raw,
+          pPreToken,
+          options,
+        )
         pushNode(node)
         i = index
         break

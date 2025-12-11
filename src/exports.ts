@@ -14,6 +14,7 @@ import FootnoteReferenceNode from './components/FootnoteReferenceNode'
 import HardBreakNode from './components/HardBreakNode'
 import HeadingNode from './components/HeadingNode'
 import HighlightNode from './components/HighlightNode'
+import HtmlInlineNode from './components/HtmlInlineNode'
 import ImageNode from './components/ImageNode'
 import InlineCodeNode from './components/InlineCodeNode'
 import InsertNode from './components/InsertNode'
@@ -76,6 +77,7 @@ export {
   HardBreakNode,
   HeadingNode,
   HighlightNode,
+  HtmlInlineNode,
   ImageNode,
   InlineCodeNode,
   InsertNode,
@@ -120,6 +122,7 @@ const componentMap: Record<string, Component> = {
   FootnoteAnchorNode,
   HardBreakNode,
   HeadingNode,
+  HtmlInlineNode,
   HighlightNode,
   ImageNode,
   InlineCodeNode,

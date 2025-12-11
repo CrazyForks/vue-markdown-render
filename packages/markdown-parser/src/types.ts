@@ -72,6 +72,7 @@ export interface HtmlBlockNode extends BaseNode {
 
 export interface HtmlInlineNode extends BaseNode {
   type: 'html_inline'
+  tag?: string
   content: string
   children: ParsedNode[]
 }
@@ -301,6 +302,7 @@ export type ParsedNode
     | MathBlockNode
     | ReferenceNode
     | HtmlBlockNode
+    | HtmlInlineNode
     | Record<string, unknown>
 export interface CustomComponents {
   text: unknown
@@ -330,6 +332,7 @@ export interface CustomComponents {
   emoji: unknown
   checkbox: unknown
   inline_code: unknown
+  html_inline: unknown
   reference: unknown
   mermaid: unknown
   [key: string]: unknown
