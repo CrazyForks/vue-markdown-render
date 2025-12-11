@@ -1,3 +1,23 @@
+## [0.0.3-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.1...v0.0.3-beta.2) (2025-12-11)
+
+
+### Bug Fixes
+
+* correct formatting and translation inconsistencies in performance analysis document ([320b879](https://github.com/Simon-He95/markstream-vue/commit/320b879351f0049681f44a745c6d8c44c0a355f6))
+* ensure passive touch listeners for Monaco editor to prevent Chrome warnings ([d544d8f](https://github.com/Simon-He95/markstream-vue/commit/d544d8fbc1cc151381f6b71156627c33ccd3ad4f))
+* remove unused mermaidWrapper reference in MermaidBlockNode component ([6585105](https://github.com/Simon-He95/markstream-vue/commit/6585105c0f110f28610d00f714cb543b565966f3))
+* viewport render ([9ae63a2](https://github.com/Simon-He95/markstream-vue/commit/9ae63a20bfcf37019b59abd1dbe474dce7df586c)), closes [#192](https://github.com/Simon-He95/markstream-vue/issues/192)
+
+
+### Features
+
+* add contribution guidelines, code of conduct, and security policy ([4283a9a](https://github.com/Simon-He95/markstream-vue/commit/4283a9a00141f0f94d743ab4ad960d9bbc43cc58))
+* add strict mode for enhanced security in MermaidBlockNode ([8cfdbd2](https://github.com/Simon-He95/markstream-vue/commit/8cfdbd28e0328142b6999df5e4eea8aca6ab659c))
+* enhance Markdown code block rendering with fallback and improved state management ([5a71844](https://github.com/Simon-He95/markstream-vue/commit/5a71844df29f150894c277da205f0c6075a00afe))
+* implement HtmlInlineNode component and enhance inline HTML parsing ([fe6cb48](https://github.com/Simon-He95/markstream-vue/commit/fe6cb48afc722930f0c0ae645de208e757a79959)), closes [#119](https://github.com/Simon-He95/markstream-vue/issues/119)
+
+
+
 ## [0.0.3-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.0...v0.0.3-beta.1) (2025-12-10)
 
 
