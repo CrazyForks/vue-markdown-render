@@ -89,6 +89,8 @@ export interface MermaidBlockNodeProps {
   showCollapseButton?: boolean
   showZoomControls?: boolean
   enableWheelZoom?: boolean
+  // When false, relax all sanitization/security (not recommended)
+  isStrict?: boolean
 }
 
 // Generic event wrapper used by MermaidBlockNode emits. Consumers can call

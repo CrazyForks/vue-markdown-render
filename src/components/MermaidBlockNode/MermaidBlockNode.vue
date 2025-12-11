@@ -30,12 +30,156 @@ const props = withDefaults(
     showCollapseButton: true,
     showZoomControls: true,
     enableWheelZoom: false,
+    isStrict: false,
   },
 )
+
 const emits = defineEmits(['copy', 'export', 'openModal', 'toggleMode'])
-const { t } = useSafeI18n()
+
+const DOMPURIFY_CONFIG = {
+  USE_PROFILES: { svg: true },
+  FORBID_TAGS: ['script'],
+  FORBID_ATTR: [/^on/i],
+  ADD_TAGS: ['style'],
+  ADD_ATTR: ['style'],
+  SAFE_FOR_TEMPLATES: true,
+} as const
 
 const mermaidAvailable = ref(false)
+const mermaidSecurityLevel = computed(() => props.isStrict ? 'strict' : 'loose')
+const mermaidInitConfig = computed(() => ({
+  startOnLoad: false,
+  securityLevel: mermaidSecurityLevel.value,
+  dompurifyConfig: mermaidSecurityLevel.value === 'strict' ? DOMPURIFY_CONFIG : undefined,
+  flowchart: mermaidSecurityLevel.value === 'strict' ? { htmlLabels: false } : undefined,
+}))
+
+function neutralizeScriptProtocols(raw: string) {
+  return raw
+    .replace(/["']\s*javascript:/gi, '#')
+    .replace(/\bjavascript:/gi, '#')
+    .replace(/["']\s*vbscript:/gi, '#')
+    .replace(/\bvbscript:/gi, '#')
+    .replace(/\bdata:text\/html/gi, '#')
+}
+
+const DISALLOWED_STYLE_PATTERNS = [/javascript:/i, /expression\s*\(/i, /url\s*\(\s*javascript:/i, /@import/i]
+const SAFE_URL_PROTOCOLS = /^(?:https?:|mailto:|tel:|#|\/|data:image\/(?:png|gif|jpe?g|webp);)/i
+
+function sanitizeUrl(value: string | null | undefined) {
+  if (!value)
+    return ''
+  const trimmed = value.trim()
+  if (SAFE_URL_PROTOCOLS.test(trimmed))
+    return trimmed
+  return ''
+}
+
+function scrubSvgElement(svgEl: SVGElement) {
+  const forbiddenTags = new Set(['script'])
+  const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll<SVGElement>('*'))]
+  for (const node of nodes) {
+    if (forbiddenTags.has(node.tagName.toLowerCase())) {
+      node.remove()
+      continue
+    }
+    const attrs = Array.from(node.attributes)
+    for (const attr of attrs) {
+      const name = attr.name
+      if (/^on/i.test(name)) {
+        node.removeAttribute(name)
+        continue
+      }
+      if (name === 'style' && attr.value) {
+        const val = attr.value
+        if (DISALLOWED_STYLE_PATTERNS.some(re => re.test(val))) {
+          node.removeAttribute(name)
+          continue
+        }
+      }
+      if ((name === 'href' || name === 'xlink:href') && attr.value) {
+        const safe = sanitizeUrl(attr.value)
+        if (!safe) {
+          node.removeAttribute(name)
+          continue
+        }
+        // ensure sanitized value is applied
+        if (safe !== attr.value)
+          node.setAttribute(name, safe)
+      }
+    }
+  }
+}
+
+function toSafeSvgElement(svg: string | null | undefined): SVGElement | null {
+  if (typeof window === 'undefined' || typeof DOMParser === 'undefined')
+    return null
+  if (!svg)
+    return null
+  const neutralized = neutralizeScriptProtocols(svg)
+  // DOMPurify may strip harmless label styles/text; rely on manual scrub after parse
+  const parsed = new DOMParser().parseFromString(neutralized, 'image/svg+xml')
+  const svgEl = parsed.documentElement
+  if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
+    return null
+  const svgElement = svgEl as unknown as SVGElement
+  scrubSvgElement(svgElement)
+  return svgElement
+}
+
+function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null | undefined) {
+  if (!target)
+    return ''
+  try {
+    target.replaceChildren()
+  }
+  catch {
+    // fallback for older environments
+    target.innerHTML = ''
+  }
+  const safeElement = toSafeSvgElement(svg)
+  if (safeElement) {
+    target.appendChild(safeElement)
+    return target.innerHTML
+  }
+  return ''
+}
+
+function clearElement(target: HTMLElement | null | undefined) {
+  if (!target)
+    return
+  try {
+    target.replaceChildren()
+  }
+  catch {
+    target.innerHTML = ''
+  }
+}
+
+function renderSvgToTarget(target: HTMLElement | null | undefined, svg: string | null | undefined) {
+  if (!target)
+    return ''
+  if (mermaidSecurityLevel.value === 'strict') {
+    return setSafeSvg(target, svg)
+  }
+  try {
+    target.replaceChildren()
+  }
+  catch {
+    target.innerHTML = ''
+  }
+  if (svg) {
+    try {
+      target.insertAdjacentHTML('afterbegin', svg)
+    }
+    catch {
+      target.innerHTML = svg
+    }
+  }
+  return target.innerHTML
+}
+
+const { t } = useSafeI18n()
 
 async function resolveMermaidInstance() {
   try {
@@ -56,7 +200,10 @@ if (typeof window !== 'undefined') {
       const instance = await resolveMermaidInstance()
       if (!instance)
         return
-      instance?.initialize?.({ startOnLoad: false, securityLevel: 'loose' })
+      instance?.initialize?.({
+        ...mermaidInitConfig.value,
+        // dompurifyConfig: { ...DOMPURIFY_CONFIG },
+      })
     }
     catch (err) {
       mermaidAvailable.value = false
@@ -83,8 +230,8 @@ const baseFixedCode = computed(() => {
 })
 
 // get the code with the theme configuration
-function getCodeWithTheme(theme: 'light' | 'dark') {
-  const baseCode = baseFixedCode.value
+function getCodeWithTheme(theme: 'light' | 'dark', code = baseFixedCode.value) {
+  const baseCode = code
   const themeValue = theme === 'dark' ? 'dark' : 'default'
   const themeConfig = `%%{init: {"theme": "${themeValue}"}}%%\n`
   if (baseCode.trim().startsWith('%%{')) {
@@ -293,7 +440,7 @@ function renderErrorToContainer(error: unknown) {
   const errorSpan = document.createElement('span')
   errorSpan.textContent = error instanceof Error ? error.message : 'Unknown error'
   errorDiv.appendChild(errorSpan)
-  mermaidContent.value.innerHTML = ''
+  clearElement(mermaidContent.value)
   mermaidContent.value.appendChild(errorDiv)
   containerHeight.value = '360px'
   hasRenderError.value = true
@@ -589,7 +736,7 @@ function openModal() {
       }
 
       // clear any previous content and append the clone
-      modalContent.value.innerHTML = ''
+      clearElement(modalContent.value)
       modalContent.value.appendChild(clone)
     }
   })
@@ -599,7 +746,7 @@ function closeModal() {
   isModalOpen.value = false
   // remove the cloned modal content and clear clone ref
   if (modalContent.value) {
-    modalContent.value.innerHTML = ''
+    clearElement(modalContent.value)
   }
   modalCloneWrapper.value = null
   if (typeof document !== 'undefined') {
@@ -933,8 +1080,8 @@ async function initMermaid() {
 
       if (!hasRenderedOnce.value && !isThemeRendering.value) {
         mermaidInstance.initialize?.({
-          securityLevel: 'loose',
-          startOnLoad: false,
+          ...mermaidInitConfig.value,
+          dompurifyConfig: { ...DOMPURIFY_CONFIG },
         })
       }
       const currentTheme = props.isDark ? 'dark' : 'light'
@@ -943,16 +1090,13 @@ async function initMermaid() {
         () => (mermaidInstance as any).render(
           id,
           codeWithTheme,
-          // mermaidContent.value,
         ),
         { timeoutMs: timeouts.value.fullRender },
       )
       const svg = res?.svg
-      const bindFunctions = res?.bindFunctions
 
       if (mermaidContent.value) {
-        mermaidContent.value.innerHTML = svg
-        bindFunctions?.(mermaidContent.value)
+        const rendered = renderSvgToTarget(mermaidContent.value, svg)
         // Successful full render clears Partial preview state
         if (!hasRenderedOnce.value && !isThemeRendering.value) {
           updateContainerHeight()
@@ -965,7 +1109,8 @@ async function initMermaid() {
           }
         }
         const currentTheme = props.isDark ? 'dark' : 'light'
-        svgCache.value[currentTheme] = svg
+        if (rendered)
+          svgCache.value[currentTheme] = rendered
         if (isThemeRendering.value) {
           isThemeRendering.value = false
         }
@@ -1040,10 +1185,8 @@ async function renderPartial(code: string) {
       { timeoutMs: timeouts.value.render },
     )
     const svg = res?.svg
-    const bindFunctions = res?.bindFunctions
     if (mermaidContent.value && svg) {
-      mermaidContent.value.innerHTML = svg
-      bindFunctions?.(mermaidContent.value)
+      renderSvgToTarget(mermaidContent.value, svg)
       updateContainerHeight()
     }
   }
@@ -1075,7 +1218,7 @@ async function progressiveRender() {
   const normalizedBase = base.replace(/\s+/g, '')
   if (!base.trim()) {
     if (mermaidContent.value)
-      mermaidContent.value.innerHTML = ''
+      clearElement(mermaidContent.value)
     lastSvgSnapshot.value = null
     lastRenderedCode.value = ''
     hasRenderError.value = false
@@ -1122,7 +1265,7 @@ async function progressiveRender() {
   // If we cannot apply partial and also shouldn't restore cached (e.g., error state), bail
   const cached = svgCache.value[theme]
   if (cached && mermaidContent.value) {
-    mermaidContent.value.innerHTML = cached
+    renderSvgToTarget(mermaidContent.value, cached)
   }
   // else: keep current DOM (could be empty on very first run)
 }
@@ -1253,9 +1396,10 @@ watch(() => props.isDark, async () => {
     return
   }
   const targetTheme = props.isDark ? 'dark' : 'light'
-  if (svgCache.value[targetTheme]) {
+  const cachedForTheme = svgCache.value[targetTheme]
+  if (cachedForTheme) {
     if (mermaidContent.value) {
-      mermaidContent.value.innerHTML = svgCache.value[targetTheme]!
+      renderSvgToTarget(mermaidContent.value, cachedForTheme)
     }
     return
   }
@@ -1298,7 +1442,7 @@ watch(
       if (hasRenderedOnce.value && svgCache.value[currentTheme]) {
         await nextTick()
         if (mermaidContent.value) {
-          mermaidContent.value.innerHTML = svgCache.value[currentTheme]!
+          renderSvgToTarget(mermaidContent.value, svgCache.value[currentTheme]!)
         }
         // Restoring full render from cache -> hide Partial badge
         zoom.value = savedTransformState.value.zoom
@@ -1346,7 +1490,7 @@ watch(
         await nextTick()
         // 保险：如果 DOM 被清空但有缓存，恢复一次，不触发重新渲染
         if (mermaidContent.value && !mermaidContent.value.querySelector('svg') && svgCache.value[theme]) {
-          mermaidContent.value.innerHTML = svgCache.value[theme]!
+          renderSvgToTarget(mermaidContent.value, svgCache.value[theme]!)
         }
         // 渲染已完成，清理后台任务
         cleanupAfterLoadingSettled()
