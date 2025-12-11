@@ -366,6 +366,7 @@ https://github.com/Simon-He95/markstream-vue/issues
 - [stream-monaco](https://github.com/Simon-He95/stream-monaco)
 - [stream-markdown](https://github.com/Simon-He95/stream-markdown)
 - [mermaid](https://mermaid-js.github.io/mermaid)
+- [katex](https://katex.org/)
 - [shiki](https://github.com/shikijs/shiki)
 - [markdown-it-ts](https://github.com/Simon-He95/markdown-it-ts)
 
@@ -377,4 +378,4 @@ https://github.com/Simon-He95/markstream-vue/issues
 
 ## 许可
 
-[MIT](./LICENSE) © [Simon He](https://github.com/Simon-He95)
+[MIT](./license) © [Simon He](https://github.com/Simon-He95)

@@ -366,6 +366,7 @@ This project uses and benefits from:
 - [stream-monaco](https://github.com/Simon-He95/stream-monaco)
 - [stream-markdown](https://github.com/Simon-He95/stream-markdown)
 - [mermaid](https://mermaid-js.github.io/mermaid)
+- [katex](https://katex.org/)
 - [shiki](https://github.com/shikijs/shiki)
 - [markdown-it-ts](https://github.com/Simon-He95/markdown-it-ts)
 
@@ -377,4 +378,4 @@ Thanks to the authors and contributors of these projects!
 
 ## License
 
-[MIT](./LICENSE) © [Simon He](https://github.com/Simon-He95)
+[MIT](./license) © [Simon He](https://github.com/Simon-He95)
