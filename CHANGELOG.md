@@ -1,3 +1,21 @@
+## [0.0.3-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.2...v0.0.3-beta.3) (2025-12-12)
+
+
+### Bug Fixes
+
+* correct formatting of node_version in CI configuration ([3bea48c](https://github.com/Simon-He95/markstream-vue/commit/3bea48c6354124129dad63a02cc7a8b2220bed15))
+* resolve issue with extraneous text being included in links ([98b4677](https://github.com/Simon-He95/markstream-vue/commit/98b467735a38444b9f896b265c9ecad3d496c0c3)), closes [#195](https://github.com/Simon-He95/markstream-vue/issues/195)
+
+
+### Features
+
+* add isPlainBracketMathLike function to improve math parsing logic and enhance mid-state handling in tests ([6613da9](https://github.com/Simon-He95/markstream-vue/commit/6613da96f9320fa5f639b5fbac9bfcc16df1efcd)), closes [#197](https://github.com/Simon-He95/markstream-vue/issues/197)
+* add isStrict prop for enhanced security in Mermaid rendering ([7121966](https://github.com/Simon-He95/markstream-vue/commit/71219662772620b041e4abec68b4d018ba9ddc25))
+* add KaTeX to dependencies in README files ([3073ef6](https://github.com/Simon-He95/markstream-vue/commit/3073ef6642ff832471d6970b46bee7c3bbc3800a))
+* implement streaming inline HTML mid-states with auto-closing support and suppress partial tags ([aa0635f](https://github.com/Simon-He95/markstream-vue/commit/aa0635f5b2dd1ceaf7421ec4bfbace1ede480cab)), closes [#194](https://github.com/Simon-He95/markstream-vue/issues/194)
+
+
+
 ## [0.0.3-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.1...v0.0.3-beta.2) (2025-12-11)
 
 
