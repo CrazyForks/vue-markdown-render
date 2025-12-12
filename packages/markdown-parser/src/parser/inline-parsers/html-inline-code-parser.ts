@@ -84,10 +84,13 @@ function collectHtmlFragment(tokens: MarkdownToken[], startIndex: number, tag: s
     nextIndex = closingIndex + 1
     closed = true
   }
-  else if (tokens[startIndex + 1]?.type === 'text') {
-    innerTokens = [tokens[startIndex + 1]]
-    fragmentTokens.push(tokens[startIndex + 1])
-    nextIndex = startIndex + 2
+  else {
+    // Streaming mid-state: if no matching closing tag exists yet,
+    // treat all following inline tokens as the inner content of this tag.
+    innerTokens = tokens.slice(startIndex + 1)
+    if (innerTokens.length)
+      fragmentTokens.push(...innerTokens)
+    nextIndex = tokens.length
   }
 
   return {
@@ -215,14 +218,27 @@ export function parseHtmlInlineCodeToken(
     ? parseInlineTokens(fragment.innerTokens, raw, pPreToken, options)
     : []
 
+  let content = fragment.html || code
+  let loading = !fragment.closed
+  let autoClosed = false
+  if (!fragment.closed) {
+    const closeTag = `</${tag}>`
+    if (!content.toLowerCase().includes(closeTag.toLowerCase()))
+      content += closeTag
+    autoClosed = true
+    // Still mark loading for mid-state, even though we auto-closed for rendering.
+    loading = true
+  }
+
   return [
     {
       type: 'html_inline',
       tag,
-      content: fragment.html || code,
+      content,
       children,
-      raw: fragment.html || code,
-      loading: !fragment.closed,
+      raw: content,
+      loading,
+      autoClosed,
     } as ParsedNode,
     fragment.nextIndex,
   ]

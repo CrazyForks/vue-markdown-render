@@ -74,6 +74,23 @@ const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosi
 // 允许在实时预览中创建临时/中间态的加粗节点
 ```
 
+### 流式内联 HTML 中间态（`html_inline`）
+
+在流式/聊天/编辑器场景中，内联 HTML 往往以不完整的片段逐步到达。解析器采用保守的中间态策略来减少抖动，同时尽早输出可稳定渲染的 HTML。
+
+行为说明：
+- **吞并未完成标签**：当 text token 中出现但尚未闭合到 `>` 的片段（如 `<span class="a"`、结尾的 `<`、`</sp`、结尾的 `</`），会被暂存并从 AST 中移除，避免以普通文本闪烁。
+- **识别已完成的开始标签**：常见 HTML 标签（保守白名单）一旦形成完整 `<tag ...>`，会被解析为 `html_inline` 节点。
+- **若尚未出现显式闭合标签**，解析器会：
+  - 将当前 inline 里后续所有 token 视为该标签的 inner content；
+  - 自动在 `content/raw` 末尾补上 `</tag>`，保证片段可作为合法 HTML 渲染；
+  - 仍标记为 `loading: true`，并设置 `autoClosed: true` 表示来源尚未真正闭合。
+- **当真实闭合标签到达后**，`autoClosed` 消失，`loading=false`。
+
+渲染层说明：
+- `HtmlInlineNode` 仅在 `loading===true` 且 `autoClosed!==true` 时显示原文。
+  自动补闭合的中间态会直接按 HTML 渲染（`innerHTML`），但仍保留 `loading=true` 供 UX/状态使用。
+
 ## 类型提示
 导出的类型包含 `CodeBlockNode`、`ParsedNode` 等，可在 TS 中导入：
 ```ts

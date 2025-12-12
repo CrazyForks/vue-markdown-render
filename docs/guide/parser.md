@@ -7,6 +7,7 @@ Highlights:
 - `getMarkdown()` — create and configure a `markdown-it-ts` instance
 - `parseMarkdownToStructure()` — turn a Markdown string into parsed nodes used by `MarkdownRender`
 - `setDefaultMathOptions()` — global math options
+- Streaming inline HTML mid-states (`html_inline`) — suppress partial tags and auto-close unclosed inline HTML for flicker-free streaming.
 
 For full function signatures and advanced config, refer to `packages/markdown-parser/README.md` which is included with the project and provides examples for custom rules and plugins.
 

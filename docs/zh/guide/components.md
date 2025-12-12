@@ -299,6 +299,15 @@ setCustomComponents('docs', { image: ImagePreview })
 - `showTooltip=false` 时会退回浏览器原生 `title`。
 - 如果 anchor 样式被浏览器默认值影响，请结合 reset/`@layer` 方案。
 
+## HtmlInlineNode — 流式内联 HTML
+
+`HtmlInlineNode` 用于渲染解析器产出的 `html_inline` 节点（如 `<span>...</span>` 这类内联 HTML）。
+
+流式行为：
+- 当节点处于**真实中间态**（`loading===true` 且 `autoClosed!==true`）时，为避免不完整标签闪烁，组件会直接显示原始文本。
+- 当节点处于**自动补闭合中间态**（`autoClosed===true`）时，解析器已为稳定渲染自动补上 `</tag>`，组件会按 HTML 渲染（`innerHTML`），但仍保留 `loading=true` 供业务判断“还没真正闭合”。
+- 当真实闭合标签到达后，解析器会清除 `loading/autoClosed`，节点表现为普通内联 HTML。
+
 ## 工具函数
 
 - `getMarkdown()` — 返回预设好的 `markdown-it-ts` 实例。

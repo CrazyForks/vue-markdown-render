@@ -83,6 +83,23 @@ const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosi
 // allows creating a temporary/"mid-state" strong node for live-edit previews
 ```
 
+### Streaming inline HTML mid-states (`html_inline`)
+
+For streaming/chat/editor scenarios, inline HTML often arrives in partial chunks. The parser applies a conservative mid‑state strategy to reduce flicker while still rendering stable HTML as soon as possible.
+
+Behavior:
+- **Suppress incomplete tags** in text tokens until `>` arrives. Examples of suppressed fragments: `<span class="a"`, trailing `<`, `</sp`, trailing `</`. These fragments are not emitted as plain text nodes to avoid jitter.
+- **Recognize complete open tags** for common HTML tags (conservative allowlist). Once `<tag ...>` is complete, it becomes an `html_inline` node.
+- **If no explicit closing tag exists yet**, the parser:
+  - Treats all following inline tokens as that tag’s inner content.
+  - Auto‑appends `</tag>` to `content/raw` so the fragment is valid HTML for rendering.
+  - Marks the node as `loading: true` and `autoClosed: true` to indicate the source is still incomplete.
+- **When the real closing tag arrives**, `autoClosed` disappears and `loading` becomes `false`.
+
+Renderer note:
+- `HtmlInlineNode` renders raw text only when `loading === true` and `autoClosed !== true`.
+  Auto‑closed mid‑states still render HTML (via `innerHTML`) but keep `loading=true` for UX/state.
+
 ## Types
 A condensed list of exported types to reference in your code:
 

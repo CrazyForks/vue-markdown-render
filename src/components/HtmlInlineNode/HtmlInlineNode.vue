@@ -7,6 +7,7 @@ const props = defineProps<{
     tag?: string
     content: string
     loading?: boolean
+    autoClosed?: boolean
   }
 }>()
 
@@ -32,16 +33,16 @@ function renderLoadingContent() {
 }
 
 onMounted(() => {
-  if (props.node.loading)
+  if (props.node.loading && !props.node.autoClosed)
     renderLoadingContent()
   else
     renderHtmlContent()
 })
 
 watch(
-  () => [props.node.content, props.node.loading],
+  () => [props.node.content, props.node.loading, props.node.autoClosed],
   () => {
-    if (props.node.loading)
+    if (props.node.loading && !props.node.autoClosed)
       renderLoadingContent()
     else
       renderHtmlContent()

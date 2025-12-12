@@ -17,7 +17,326 @@ const VOID_TAGS = new Set([
   'wbr',
 ])
 
+// A conservative set of common HTML tags used to detect streaming mid-states.
+// We only suppress/merge partial tags for these names to avoid false positives
+// (e.g., autolinks like <http://...>).
+const COMMON_HTML_TAGS = new Set<string>([
+  ...Array.from(VOID_TAGS),
+  // inline/common
+  'a',
+  'abbr',
+  'b',
+  'bdi',
+  'bdo',
+  'button',
+  'cite',
+  'code',
+  'data',
+  'del',
+  'dfn',
+  'em',
+  'i',
+  'img',
+  'input',
+  'ins',
+  'kbd',
+  'label',
+  'mark',
+  'q',
+  's',
+  'samp',
+  'small',
+  'span',
+  'strong',
+  'sub',
+  'sup',
+  'time',
+  'u',
+  'var',
+  // block/common
+  'article',
+  'aside',
+  'blockquote',
+  'div',
+  'details',
+  'figcaption',
+  'figure',
+  'footer',
+  'header',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'li',
+  'main',
+  'nav',
+  'ol',
+  'p',
+  'pre',
+  'section',
+  'summary',
+  'table',
+  'tbody',
+  'td',
+  'th',
+  'thead',
+  'tr',
+  'ul',
+  // svg-ish (often embedded inline)
+  'svg',
+  'g',
+  'path',
+])
+
+const OPEN_TAG_RE = /<([A-Z][\w-]*)(?=[\s/>]|$)/gi
+const CLOSE_TAG_RE = /<\/\s*([A-Z][\w-]*)(?=[\s/>]|$)/gi
+// Match a complete HTML tag starting at "<", capturing the tag name.
+// The attribute part is optional but requires leading whitespace, which
+// prevents ambiguous adjacent quantifiers and avoids super-linear backtracking.
+const FULL_TAG_RE = /^<\s*(?:\/\s*)?([A-Z][\w-]*)(?:\s[^>]*?)?\/?>/i
+
+function tokenToRaw(token: Token) {
+  const shape = token as unknown as { raw?: string, markup?: string, content?: string }
+  return String(shape.raw ?? shape.content ?? shape.markup ?? '')
+}
+
+function isCommonHtmlTagOrPrefix(tag: string) {
+  if (COMMON_HTML_TAGS.has(tag))
+    return true
+  for (const common of COMMON_HTML_TAGS) {
+    if (common.startsWith(tag))
+      return true
+  }
+  return false
+}
+
+function findFirstIncompleteTag(content: string) {
+  let first:
+    | { index: number, tag: string, closing: boolean }
+    | null = null
+
+  for (const m of content.matchAll(OPEN_TAG_RE)) {
+    const idx = m.index ?? -1
+    if (idx < 0)
+      continue
+    const tag = (m[1] ?? '').toLowerCase()
+    if (!COMMON_HTML_TAGS.has(tag))
+      continue
+    const rest = content.slice(idx)
+    if (rest.includes('>'))
+      continue
+    if (!first || idx < first.index)
+      first = { index: idx, tag, closing: false }
+  }
+
+  for (const m of content.matchAll(CLOSE_TAG_RE)) {
+    const idx = m.index ?? -1
+    if (idx < 0)
+      continue
+    const tag = (m[1] ?? '').toLowerCase()
+    // For closing tags we also accept prefixes of known HTML tags
+    // (e.g., '</sp' while typing '</span>').
+    if (!isCommonHtmlTagOrPrefix(tag))
+      continue
+    const rest = content.slice(idx)
+    if (rest.includes('>'))
+      continue
+    if (!first || idx < first.index)
+      first = { index: idx, tag, closing: true }
+  }
+
+  // Also swallow bare "<" or "</" at the end while typing.
+  const bareClose = /<\/\s*$/.exec(content)
+  if (bareClose && typeof bareClose.index === 'number') {
+    const idx = bareClose.index
+    const rest = content.slice(idx)
+    if (!rest.includes('>') && (!first || idx < first.index))
+      first = { index: idx, tag: '', closing: true }
+  }
+
+  const bareOpen = /<\s*$/.exec(content)
+  if (bareOpen && typeof bareOpen.index === 'number') {
+    const idx = bareOpen.index
+    const rest = content.slice(idx)
+    // Avoid matching "</" which is handled above.
+    if (!rest.startsWith('</') && !rest.includes('>') && (!first || idx < first.index))
+      first = { index: idx, tag: '', closing: false }
+  }
+
+  return first
+}
+
+function splitTextToken(token: Token, content: string) {
+  const t = token as Token & { content?: string, raw?: string }
+  // Preserve the original Token prototype (markdown-it-ts attaches helper methods).
+  const nt = Object.assign(
+    Object.create(Object.getPrototypeOf(t)),
+    t,
+    { type: 'text', content, raw: content },
+  ) as Token
+  return nt
+}
+
+function fixStreamingHtmlInlineChildren(children: Token[]) {
+  if (!children.length)
+    return { children }
+
+  const out: Token[] = []
+  let pending: { tag: string, buffer: string, closing: boolean } | null = null
+  let pendingAtEnd: string | null = null
+
+  function pushTextPart(text: string, baseToken?: Token) {
+    if (!text)
+      return
+    if (baseToken)
+      out.push(splitTextToken(baseToken, text))
+    else
+      out.push({ type: 'text', content: text, raw: text } as any)
+  }
+
+  function splitCompleteHtmlFromText(chunk: string, baseToken?: Token) {
+    let cursor = 0
+    while (cursor < chunk.length) {
+      const lt = chunk.indexOf('<', cursor)
+      if (lt === -1) {
+        pushTextPart(chunk.slice(cursor), baseToken)
+        break
+      }
+      pushTextPart(chunk.slice(cursor, lt), baseToken)
+      const sub = chunk.slice(lt)
+      const fullMatch = sub.match(FULL_TAG_RE)
+      if (!fullMatch) {
+        pushTextPart('<', baseToken)
+        cursor = lt + 1
+        continue
+      }
+      const tagText = fullMatch[0]
+      const tagName = (fullMatch[1] ?? '').toLowerCase()
+      if (COMMON_HTML_TAGS.has(tagName)) {
+        out.push({
+          type: 'html_inline',
+          tag: '',
+          content: tagText,
+          raw: tagText,
+        } as any)
+      }
+      else {
+        pushTextPart(tagText, baseToken)
+      }
+      cursor = lt + tagText.length
+    }
+  }
+
+  function processTextChunk(chunk: string, baseToken?: Token) {
+    if (!chunk)
+      return
+    const match = findFirstIncompleteTag(chunk)
+    if (!match) {
+      splitCompleteHtmlFromText(chunk, baseToken)
+      return
+    }
+
+    const before = chunk.slice(0, match.index)
+    if (before)
+      splitCompleteHtmlFromText(before, baseToken)
+    pending = {
+      tag: match.tag,
+      buffer: chunk.slice(match.index),
+      closing: match.closing,
+    }
+    pendingAtEnd = pending.buffer
+  }
+
+  for (const child of children) {
+    if (pending) {
+      pending.buffer += tokenToRaw(child)
+      pendingAtEnd = pending.buffer
+      const closeIdx = pending.buffer.indexOf('>')
+      if (closeIdx === -1) {
+        // still incomplete: swallow this token to avoid rendering jitter
+        continue
+      }
+
+      const tagChunk = pending.buffer.slice(0, closeIdx + 1)
+      const afterChunk = pending.buffer.slice(closeIdx + 1)
+      out.push({
+        type: 'html_inline',
+        tag: '',
+        content: tagChunk,
+        raw: tagChunk,
+      } as any)
+      pending = null
+      pendingAtEnd = null
+      if (afterChunk)
+        processTextChunk(afterChunk)
+      continue
+    }
+
+    if (child.type === 'text') {
+      const content = String((child as any).content ?? '')
+      if (!content.includes('<')) {
+        out.push(child)
+        continue
+      }
+      processTextChunk(content, child)
+      continue
+    }
+
+    out.push(child)
+  }
+
+  return {
+    children: out,
+    pendingBuffer: pendingAtEnd ?? undefined,
+  }
+}
+
 export function applyFixHtmlInlineTokens(md: MarkdownIt) {
+  // Streaming mid-state: suppress partial inline HTML in text tokens until the
+  // tag is fully closed with `>`, then allow it to be tokenized as html_inline.
+  md.core.ruler.after('inline', 'fix_html_inline_streaming', (state: unknown) => {
+    const s = state as unknown as { tokens?: Token[] }
+    const toks = s.tokens ?? []
+    for (const t of toks) {
+      const tok = t as Token & { children?: Token[], content?: string, raw?: string }
+      if (tok.type !== 'inline' || !Array.isArray(tok.children))
+        continue
+
+      // markdown-it-ts may emit inline tokens with empty children when the
+      // content starts with an incomplete HTML-ish fragment like "<span ...".
+      // In that case, synthesize a text token so we can suppress mid-states.
+      const originalContent = String(tok.content ?? '')
+      const sourceChildren = tok.children.length
+        ? tok.children
+        : (originalContent.includes('<')
+            ? [{ type: 'text', content: originalContent, raw: originalContent } as any]
+            : null)
+
+      if (!sourceChildren)
+        continue
+
+      try {
+        const fixed = fixStreamingHtmlInlineChildren(sourceChildren)
+        tok.children = fixed.children
+        if (fixed.pendingBuffer) {
+          const idx = originalContent.lastIndexOf(fixed.pendingBuffer)
+          if (idx !== -1) {
+            const trimmed = originalContent.slice(0, idx)
+            tok.content = trimmed
+            // keep raw in sync if present
+            if (typeof tok.raw === 'string')
+              tok.raw = trimmed
+          }
+        }
+      }
+      catch (e) {
+        console.error('[applyFixHtmlInlineTokens] failed to fix streaming html inline', e)
+      }
+    }
+  })
+
   // Fix certain single-token inline HTML cases by expanding into [openTag, text, closeTag]
   // This helps downstream inline parsers (e.g., <a>text</a>) to recognize inner text reliably.
   md.core.ruler.push('fix_html_inline_tokens', (state: unknown) => {

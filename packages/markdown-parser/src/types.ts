@@ -75,6 +75,11 @@ export interface HtmlInlineNode extends BaseNode {
   tag?: string
   content: string
   children: ParsedNode[]
+  /**
+   * True when the parser auto-appended a closing tag for streaming stability.
+   * The original source is still incomplete (no explicit close typed yet).
+   */
+  autoClosed?: boolean
 }
 
 export interface InlineCodeNode extends BaseNode {

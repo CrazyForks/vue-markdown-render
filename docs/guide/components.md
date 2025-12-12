@@ -301,6 +301,15 @@ Notes:
 - `showTooltip` toggles the singleton tooltip vs native browser `title`.
 - Browser default anchor styles may conflict; follow the reset guidance above.
 
+## HtmlInlineNode — streaming inline HTML
+
+`HtmlInlineNode` renders `html_inline` nodes produced by the parser (inline HTML like `<span>...</span>`).
+
+Streaming behavior:
+- If the node is a **true mid‑state** (`loading === true` and `autoClosed !== true`), the component renders the literal text to avoid flashing incomplete tags.
+- If the node is **auto‑closed mid‑state** (`autoClosed === true`), the parser has appended a closing tag for stability. The component renders HTML via `innerHTML` but keeps `loading=true` so your app can still treat it as incomplete input.
+- Once the real closing tag arrives, the parser clears `loading` and `autoClosed` and the node renders as normal HTML.
+
 ## Utility helpers
 
 - `getMarkdown()` — configured `markdown-it-ts` instance with the parser plugins this package expects.
