@@ -73,6 +73,7 @@ B-->C[End]
 ## 3. Advanced component: `MermaidBlockNode`
 
 Need header controls, export buttons, or a pseudo-fullscreen modal? Use [`MermaidBlockNode`](/guide/mermaid-block-node) or override the default renderer via [setCustomComponents](/guide/mermaid-block-node-override). A runnable playground demo lives at `/mermaid-export-demo`.
+If diagrams come from untrusted users/LLMs, pass `:is-strict="true"` to enable Mermaid's strict mode and SVG sanitization so injected HTML/event handlers are stripped before render.
 
 ## 4. Troubleshooting checklist
 

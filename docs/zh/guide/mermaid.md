@@ -71,6 +71,7 @@ B-->C[End]
 ## 3. 进阶组件：`MermaidBlockNode`
 
 若需要头部控制、导出按钮、伪全屏等能力，请参考 [`MermaidBlockNode`](/zh/guide/mermaid-block-node) 或通过 [setCustomComponents 进行覆盖](/zh/guide/mermaid-block-node-override)。仓库内的 playground 提供 `/mermaid-export-demo` 路由可直接试用。
+如果渲染的 Mermaid 来自用户/LLM 等不可信来源，可加上 `:is-strict="true"` 启用严格模式与 SVG 清理，阻断 HTML labels 或内联事件混入渲染结果。
 
 ## 4. 常见问题排查
 

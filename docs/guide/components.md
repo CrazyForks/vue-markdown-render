@@ -210,7 +210,7 @@ Troubleshooting:
 ### Quick reference
 - **Peer**: `mermaid` ≥ 11 (tree-shakable ESM build recommended).
 - **CSS**: import `mermaid/dist/mermaid.css` after your reset.
-- **Props**: `node`, `theme`, `mermaidOptions`, `onRender`, `custom-id`.
+- **Props**: `node`, `theme`, `isStrict`, `mermaidOptions`, `onRender`, `custom-id`.
 
 ### Usage
 
@@ -223,14 +223,15 @@ import 'mermaid/dist/mermaid.css'
 <MermaidBlockNode
   custom-id="docs"
   :node="node"
+  :is-strict="true"
   theme="forest"
-  :mermaid-options="{ securityLevel: 'strict' }"
   @render="handleMermaidRender"
 />
 ```
 
 Troubleshooting:
 - Async errors usually stem from missing CSS or unsupported syntax. Check browser console for Mermaid logs.
+- When diagrams come from untrusted sources (user/LLM), enable `isStrict` to sanitize the SVG and disable HTML labels—this closes holes where `javascript:` URLs or inline handlers could slip into the render.
 - When diagrams are blank in SSR, guard rendering with `onMounted` or `<ClientOnly>` and ensure Mermaid is initialized on the client.
 
 ## MathBlockNode / MathInlineNode

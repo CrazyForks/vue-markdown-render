@@ -209,7 +209,7 @@ const node = {
 ### 快速要点
 - **依赖**：`mermaid` ≥ 11（推荐 ESM 构建）。
 - **CSS**：`import 'mermaid/dist/mermaid.css'`。
-- **Props**：`node`、`theme`、`mermaidOptions`、`onRender`、`custom-id`。
+- **Props**：`node`、`theme`、`isStrict`、`mermaidOptions`、`onRender`、`custom-id`。
 
 ### 示例
 
@@ -221,14 +221,15 @@ import 'mermaid/dist/mermaid.css'
 <MermaidBlockNode
   custom-id="docs"
   :node="node"
+  :is-strict="true"
   theme="forest"
-  :mermaid-options="{ securityLevel: 'strict' }"
   @render="handleMermaidRender"
 />
 ```
 
 排障：
 - 若出现空白，请查看控制台日志（多数为 CSS 漏引或语法不兼容）。
+- 渲染不可信来源（用户/LLM 等）的 Mermaid 时，建议开启 `isStrict`，组件会对 SVG 进行清理并禁用 HTML labels，避免 `javascript:` 链接或内联事件混入渲染结果。
 - SSR/Nuxt 环境需要 `onMounted` 或 `<ClientOnly>` 避免在服务端执行 mermaid。
 
 ## MathBlockNode / MathInlineNode
