@@ -22,7 +22,7 @@
     "vite": "^7.2.7",
     "vue": "^3.5.25",
     "vue-i18n": "^11.2.2",
-    "vue-router": "^4.6.3"
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@types/node": "^20.19.26",
