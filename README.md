@@ -222,6 +222,7 @@ Pick one mode per surface: virtualization for best scrollback and steady memory 
 - `batchRendering`: fine-tune batches with `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, `renderBatchBudgetMs`.
 - `enableMermaid` / `enableKatex` / `enableMonaco`: opt-in heavy deps when needed.
 - `parse-options`: reuse parser hooks (e.g., `preTransformTokens`, `requireClosingStrong`) on the component.
+- `custom-html-tags`: extend streaming HTML allowlist for custom tags and emit them as custom nodes for `setCustomComponents` (e.g., `['thinking']`).
 - `custom-components`: register inline Vue components for custom tags/markers.
 
 Example: map Markdown placeholders to Vue components

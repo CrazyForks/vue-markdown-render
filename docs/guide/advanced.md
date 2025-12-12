@@ -9,42 +9,43 @@ This page explains how to customize parsing and provide scoped custom components
 - `postTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — further token transforms
 - `postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]` — manipulate final node tree
 
-### Example: token transform
-```ts
-function pre(tokens) {
-  // Convert <thinking> HTML blocks to thinking node
-  return tokens.map(t => t.type === 'html_block' && /<thinking>/.test(t.content || '')
-    ? { ...t, type: 'thinking_block', content: t.content.replace(/<\/?.+?>/g, '') }
-    : t
-  )
-}
+### Example: custom HTML-like tags (recommended)
+For simple custom tags like `<thinking>...</thinking>`, you no longer need to normalize the source or rewrite tokens. Just opt the tag into the allowlist and register a component:
 
-const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens: pre })
+```ts
+import { setCustomComponents } from 'markstream-vue'
+import ThinkingNode from './ThinkingNode.vue'
+
+setCustomComponents('docs', { thinking: ThinkingNode })
 ```
+
+```vue
+<MarkdownRender
+  custom-id="docs"
+  custom-html-tags="['thinking']"
+  :content="markdown"
+/>
+```
+
+When `custom-html-tags` includes a tag name, the parser:
+- suppresses streaming mid‑states until `<tag ...>` is complete,
+- emits a `CustomComponentNode` with `type: '<tag>'`, `content`, optional `attrs`, and `loading/autoClosed` flags.
 
 ## Custom component parsing
 
-`markdown-it` is strict with inline HTML; keep custom tags on their own lines (prefer `a\n<thinking></thinking>\nb`, avoid `a<thinking></thinking>b`). Normalize the content first, then use hooks to turn the HTML block into a custom node:
+The built‑in custom tag pipeline above handles most “component‑like” tags (inline or block).
+Hooks are still useful when you need to reshape the node — for example, to strip wrappers, merge adjacent blocks, or map attributes:
 
 ```ts
-function normalizeCustomBlocks(raw: string) {
-  return raw.replace(/<thinking([^>]*)>([\s\S]*?)<\/thinking>/g, (_m, attrs, body) =>
-    `\n<thinking${attrs || ''}>\n${body.trim()}\n</thinking>\n`,)
-}
-
 function preTransformTokens(tokens: MarkdownToken[]) {
-  return tokens.map(t =>
-    t.type === 'html_block' && t.content?.includes('<thinking')
-      ? { ...t, type: 'thinking_block', content: t.content.replace(/<\/?thinking[^>]*>/g, '').trim() }
-      : t,
-  )
+  return tokens.map((t) => {
+    if (t.type === 'html_block' && t.tag === 'thinking')
+      return { ...t, content: String(t.content ?? '').replace(/<\/?thinking[^>]*>/g, '').trim() }
+    return t
+  })
 }
 
-const nodes = parseMarkdownToStructure(
-  normalizeCustomBlocks(content),
-  md,
-  { preTransformTokens },
-)
+const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens })
 ```
 
 Alternative flows (pick what fits your pipeline):

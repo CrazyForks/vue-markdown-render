@@ -31,7 +31,6 @@ export function parseMarkdownToStructure(
 
   // Get tokens from markdown-it
   const tokens = md.parse(safeMarkdown, {})
-
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
     return []
@@ -132,7 +131,10 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         break
 
       case 'inline':
-        result.push(...parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, { requireClosingStrong: options?.requireClosingStrong }))
+        result.push(...parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, {
+          requireClosingStrong: options?.requireClosingStrong,
+          customHtmlTags: options?.customHtmlTags,
+        }))
         i += 1
         break
       default:

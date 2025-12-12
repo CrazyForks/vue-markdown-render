@@ -28,8 +28,27 @@ export function parseBasicBlockToken(
     case 'math_block':
       return [parseMathBlock(token), index + 1]
 
-    case 'html_block':
-      return [parseHtmlBlock(token), index + 1]
+    case 'html_block': {
+      const htmlBlockNode = parseHtmlBlock(token)
+      if (options?.customHtmlTags && htmlBlockNode.tag) {
+        const set = new Set(
+          options.customHtmlTags
+            .map((t) => {
+              const raw = String(t ?? '').trim()
+              const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
+              return m ? m[1].toLowerCase() : ''
+            })
+            .filter(Boolean),
+        )
+        if (set.has(htmlBlockNode.tag)) {
+          return [
+            { ...htmlBlockNode, type: htmlBlockNode.tag } as ParsedNode,
+            index + 1,
+          ]
+        }
+      }
+      return [htmlBlockNode, index + 1]
+    }
 
     case 'table_open': {
       const [tableNode, newIndex] = parseTable(tokens, index, options)

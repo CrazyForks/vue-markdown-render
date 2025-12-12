@@ -9,42 +9,43 @@
 - `postTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — 进一步变换 tokens
 - `postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]` — 操作最终节点树
 
-### 示例：token 变换
-```ts
-function pre(tokens) {
-  // 将 <thinking> HTML 块转换为 thinking 节点
-  return tokens.map(t => t.type === 'html_block' && /<thinking>/.test(t.content || '')
-    ? { ...t, type: 'thinking_block', content: t.content.replace(/<\/?.{2,}?>/g, '') }
-    : t
-  )
-}
+### 示例：自定义 HTML‑like 标签（推荐）
+对于 `<thinking>...</thinking>` 这类简单自定义标签，现在不再需要先正则换行或重写 token。只要把标签加入白名单并注册组件即可：
 
-const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens: pre })
+```ts
+import { setCustomComponents } from 'markstream-vue'
+import ThinkingNode from './ThinkingNode.vue'
+
+setCustomComponents('docs', { thinking: ThinkingNode })
 ```
+
+```vue
+<MarkdownRender
+  custom-id="docs"
+  custom-html-tags="['thinking']"
+  :content="markdown"
+/>
+```
+
+当 `custom-html-tags` 包含某个标签名时，解析器会：
+- 在流式场景下吞并未闭合中间态，直到 `<tag ...>` 完整出现；
+- 输出 `CustomComponentNode`（`type: '<tag>'`），并带上 `content`、可选 `attrs` 与 `loading/autoClosed` 标记。
 
 ## 自定义组件解析示例
 
-处理 `<thinking>` 等自定义组件时，`markdown-it` 对内联 HTML 支持有限，建议让标签单独换行（如 `a\n<thinking></thinking>\nb`，不要写成 `a<thinking></thinking>b`）。可以在传入解析前用正则修正换行，再用钩子变换 token：
+上面的内置白名单 + 自定义节点管线已覆盖大多数“组件式”标签（内联或块级）。
+当你需要进一步改造节点（例如剥掉包裹、合并分段、手动映射 attrs）时，再使用钩子：
 
 ```ts
-function normalizeCustomBlocks(raw: string) {
-  return raw.replace(/<thinking([^>]*)>([\s\S]*?)<\/thinking>/g, (_m, attrs, body) =>
-    `\n<thinking${attrs || ''}>\n${body.trim()}\n</thinking>\n`,)
-}
-
 function preTransformTokens(tokens: MarkdownToken[]) {
-  return tokens.map(t =>
-    t.type === 'html_block' && t.content?.includes('<thinking')
-      ? { ...t, type: 'thinking_block', content: t.content.replace(/<\/?thinking[^>]*>/g, '').trim() }
-      : t,
-  )
+  return tokens.map((t) => {
+    if (t.type === 'html_block' && t.tag === 'thinking')
+      return { ...t, content: String(t.content ?? '').replace(/<\/?thinking[^>]*>/g, '').trim() }
+    return t
+  })
 }
 
-const nodes = parseMarkdownToStructure(
-  normalizeCustomBlocks(content),
-  md,
-  { preTransformTokens },
-)
+const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens })
 ```
 
 其他可选方案（按复杂度递增）：

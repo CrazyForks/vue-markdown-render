@@ -10,6 +10,7 @@
 | `nodes` | `BaseNode[]` | – | 使用 `parseMarkdownToStructure` 预解析后的 AST。 |
 | `custom-id` | `string` | – | 作用域键，可在 `setCustomComponents` 注册映射并用 `[data-custom-id="docs"]` 做样式覆盖。 |
 | `parse-options` | `ParseOptions` | – | Token/节点级钩子（`preTransformTokens`、`postTransformTokens`、`postTransformNodes`），仅在传入 `content` 时生效。 |
+| `custom-html-tags` | `string[]` | – | 扩展流式内联 HTML 中间态白名单，并将这些标签直接输出为自定义节点（`type: <tag>`）以便 `setCustomComponents` 映射（会传给 `getMarkdown`，如 `['thinking']`）。 |
 | `typewriter` | `boolean` | `true` | 控制轻量进入动画。生成静态截图或 SSR 输出时可关闭。 |
 
 ## 流式与重节点开关

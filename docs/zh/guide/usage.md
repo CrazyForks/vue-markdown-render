@@ -32,6 +32,34 @@ const doc = '# 使用示例\n\n支持 **streaming** 渲染。'
 }
 ```
 
+## VitePress + 自定义标签
+
+在 VitePress 中，你只需要在 `enhanceApp` 里注册一次自定义节点组件，然后在 `MarkdownRender` 上使用 `custom-html-tags`，解析器就会自动输出对应的自定义节点。
+
+```ts
+import MarkdownRender, { setCustomComponents } from 'markstream-vue'
+// docs/.vitepress/theme/index.ts
+import DefaultTheme from 'vitepress/theme'
+import ThinkingNode from './components/ThinkingNode.vue'
+import 'markstream-vue/index.css'
+
+export default {
+  extends: DefaultTheme,
+  enhanceApp() {
+    setCustomComponents('docs', { thinking: ThinkingNode })
+  },
+}
+```
+
+```md
+<!-- 在 VitePress 页面里 -->
+<MarkdownRender
+  custom-id="docs"
+  custom-html-tags="['thinking']"
+  :content="source"
+/>
+```
+
 ## 解析流程
 
 ```ts

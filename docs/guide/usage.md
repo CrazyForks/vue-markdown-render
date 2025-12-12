@@ -32,6 +32,34 @@ const doc = '# Usage example\n\nSupports **streaming** nodes.'
 }
 ```
 
+## VitePress + custom tags
+
+In VitePress, register your custom node component once in `enhanceApp`, then use `custom-html-tags` on `MarkdownRender` to let the parser emit custom nodes automatically.
+
+```ts
+import MarkdownRender, { setCustomComponents } from 'markstream-vue'
+// docs/.vitepress/theme/index.ts
+import DefaultTheme from 'vitepress/theme'
+import ThinkingNode from './components/ThinkingNode.vue'
+import 'markstream-vue/index.css'
+
+export default {
+  extends: DefaultTheme,
+  enhanceApp() {
+    setCustomComponents('docs', { thinking: ThinkingNode })
+  },
+}
+```
+
+```md
+<!-- in a VitePress page -->
+<MarkdownRender
+  custom-id="docs"
+  custom-html-tags="['thinking']"
+  :content="source"
+/>
+```
+
 ## Parser pipeline
 
 ```ts

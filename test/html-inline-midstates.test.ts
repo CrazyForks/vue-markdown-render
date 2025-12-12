@@ -4,6 +4,7 @@ import { collect, hasNode, textIncludes } from './utils/midstate-utils'
 
 describe('html inline streaming mid-states', () => {
   const md = getMarkdown('html-inline-midstates')
+  const mdCustom = getMarkdown('html-inline-custom', { customHtmlTags: ['thinking'] })
 
   it('suppresses partial opening tags in text tokens', () => {
     const nodes = parseMarkdownToStructure('x <span class="a"', md)
@@ -19,6 +20,17 @@ describe('html inline streaming mid-states', () => {
     expect(p).toBeTruthy()
     expect(textIncludes(p, 'x')).toBe(true)
     expect(textIncludes(p, '<span')).toBe(false)
+  })
+
+  it('supports custom inline tags for mid-state suppression', () => {
+    const nodes = parseMarkdownToStructure('x <thinking foo="bar"', mdCustom)
+    expect(textIncludes(nodes, '<thinking')).toBe(false)
+  })
+
+  it('suppresses partial custom tags when adjacent to text', () => {
+    const nodes = parseMarkdownToStructure('x<thinking foo="bar"', mdCustom)
+    expect(textIncludes(nodes, '<thinking')).toBe(false)
+    expect(textIncludes(nodes, 'x')).toBe(true)
   })
 
   it('suppresses partial tag when line starts with "<tag"', () => {
@@ -37,6 +49,15 @@ describe('html inline streaming mid-states', () => {
     const html = collect(nodes, 'html_inline')[0] as any
     expect(html.loading).toBe(true)
     expect(textIncludes(html.children, '<span')).toBe(false)
+  })
+
+  it('auto-closes custom tags as html_inline and keeps loading', () => {
+    const nodes = parseMarkdownToStructure('x <thinking>hi', mdCustom, { customHtmlTags: ['thinking'] })
+    expect(hasNode(nodes, 'thinking')).toBe(true)
+    const thinking = collect(nodes, 'thinking')[0] as any
+    expect(thinking.loading).toBe(true)
+    expect(thinking.autoClosed).toBe(true)
+    expect(thinking.content).toContain('hi')
   })
 
   it('suppresses partial opening tag when adjacent to text', () => {

@@ -15,11 +15,12 @@
 - `plugin`：插件数组
 - `apply`：用于变更 `MarkdownIt` 实例的函数数组
 - `i18n`：翻译映射或函数
+- `customHtmlTags`：流式内联 HTML 中间态白名单扩展（如 `['thinking']`）
 
 ### `parseMarkdownToStructure(content, md?, options?)`
 将 Markdown 字符串解析为供渲染器使用的节点树（AST）。
 
-> 提示：用 `preTransformTokens` 将 `<thinking>` 等内联 HTML 转为自定义节点时，请让标签独占行或先行正则规整，避免生成异常 token。参见 [自定义组件解析示例](/zh/guide/advanced#自定义组件解析示例)。
+> 提示：对于 `<thinking>` 等简单自定义标签，推荐使用内置的 `customHtmlTags` / `custom-html-tags` 白名单让解析器直接输出自定义节点；只有在需要手动重写 `content/attrs` 时再用 `preTransformTokens`。参见 [自定义组件解析示例](/zh/guide/advanced#自定义组件解析示例)。
 
 返回：`ParsedNode[]`
 
@@ -87,6 +88,20 @@ const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosi
   - 仍标记为 `loading: true`，并设置 `autoClosed: true` 表示来源尚未真正闭合。
 - **当真实闭合标签到达后**，`autoClosed` 消失，`loading=false`。
 
+扩展白名单：
+如果需要让自定义标签（例如 `<thinking>`）也享受相同的中间态吞并与自动补闭合策略，可在创建实例时传入 `customHtmlTags`：
+
+```ts
+const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
+```
+
+输出自定义节点：
+如果希望这些标签直接产出自定义节点类型（便于 `setCustomComponents` 直接按 `type` 映射），可在 `ParseOptions` 中同时传入 `customHtmlTags`，或在 `MarkdownRender` 上使用 `custom-html-tags`（组件会自动透传）：
+
+```ts
+const nodes = parseMarkdownToStructure(source, md, { customHtmlTags: ['thinking'] })
+```
+
 渲染层说明：
 - `HtmlInlineNode` 仅在 `loading===true` 且 `autoClosed!==true` 时显示原文。
   自动补闭合的中间态会直接按 HTML 渲染（`innerHTML`），但仍保留 `loading=true` 供 UX/状态使用。
@@ -127,7 +142,7 @@ function enableEmoji(md: MarkdownIt) {
 更多示例与完整 API 请参考仓库内的 `packages/markdown-parser/README.md`。
 
 ## 示例
-使用 playground 快速验证解析变换：例如通过 `preTransformTokens` 把 `html_block` 变成 `thinking_block`，再用 `setCustomComponents` 注册对应组件。
+使用 playground 快速验证自定义标签解析：对于 `<thinking>` 等简单标签，传入 `customHtmlTags`（或组件上的 `custom-html-tags`）即可自动产出 `type: 'thinking'` 的自定义节点，再用 `setCustomComponents` 做映射。
 
 快速测试 `parseOptions`：
 

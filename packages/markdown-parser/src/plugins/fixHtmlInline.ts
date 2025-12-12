@@ -20,7 +20,7 @@ const VOID_TAGS = new Set([
 // A conservative set of common HTML tags used to detect streaming mid-states.
 // We only suppress/merge partial tags for these names to avoid false positives
 // (e.g., autolinks like <http://...>).
-const COMMON_HTML_TAGS = new Set<string>([
+const BASE_COMMON_HTML_TAGS = new Set<string>([
   ...Array.from(VOID_TAGS),
   // inline/common
   'a',
@@ -102,17 +102,33 @@ function tokenToRaw(token: Token) {
   return String(shape.raw ?? shape.content ?? shape.markup ?? '')
 }
 
-function isCommonHtmlTagOrPrefix(tag: string) {
-  if (COMMON_HTML_TAGS.has(tag))
+function buildCommonHtmlTagSet(extraTags?: readonly string[]) {
+  const set = new Set(BASE_COMMON_HTML_TAGS)
+  if (extraTags && Array.isArray(extraTags)) {
+    for (const t of extraTags) {
+      const raw = String(t ?? '').trim()
+      if (!raw)
+        continue
+      const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
+      if (!m)
+        continue
+      set.add(m[1].toLowerCase())
+    }
+  }
+  return set
+}
+
+function isCommonHtmlTagOrPrefix(tag: string, tagSet: Set<string>) {
+  if (tagSet.has(tag))
     return true
-  for (const common of COMMON_HTML_TAGS) {
+  for (const common of tagSet) {
     if (common.startsWith(tag))
       return true
   }
   return false
 }
 
-function findFirstIncompleteTag(content: string) {
+function findFirstIncompleteTag(content: string, tagSet: Set<string>) {
   let first:
     | { index: number, tag: string, closing: boolean }
     | null = null
@@ -122,7 +138,7 @@ function findFirstIncompleteTag(content: string) {
     if (idx < 0)
       continue
     const tag = (m[1] ?? '').toLowerCase()
-    if (!COMMON_HTML_TAGS.has(tag))
+    if (!tagSet.has(tag))
       continue
     const rest = content.slice(idx)
     if (rest.includes('>'))
@@ -138,7 +154,7 @@ function findFirstIncompleteTag(content: string) {
     const tag = (m[1] ?? '').toLowerCase()
     // For closing tags we also accept prefixes of known HTML tags
     // (e.g., '</sp' while typing '</span>').
-    if (!isCommonHtmlTagOrPrefix(tag))
+    if (!isCommonHtmlTagOrPrefix(tag, tagSet))
       continue
     const rest = content.slice(idx)
     if (rest.includes('>'))
@@ -179,7 +195,7 @@ function splitTextToken(token: Token, content: string) {
   return nt
 }
 
-function fixStreamingHtmlInlineChildren(children: Token[]) {
+function fixStreamingHtmlInlineChildren(children: Token[], tagSet: Set<string>) {
   if (!children.length)
     return { children }
 
@@ -214,7 +230,7 @@ function fixStreamingHtmlInlineChildren(children: Token[]) {
       }
       const tagText = fullMatch[0]
       const tagName = (fullMatch[1] ?? '').toLowerCase()
-      if (COMMON_HTML_TAGS.has(tagName)) {
+      if (tagSet.has(tagName)) {
         out.push({
           type: 'html_inline',
           tag: '',
@@ -232,7 +248,7 @@ function fixStreamingHtmlInlineChildren(children: Token[]) {
   function processTextChunk(chunk: string, baseToken?: Token) {
     if (!chunk)
       return
-    const match = findFirstIncompleteTag(chunk)
+    const match = findFirstIncompleteTag(chunk, tagSet)
     if (!match) {
       splitCompleteHtmlFromText(chunk, baseToken)
       return
@@ -293,7 +309,40 @@ function fixStreamingHtmlInlineChildren(children: Token[]) {
   }
 }
 
-export function applyFixHtmlInlineTokens(md: MarkdownIt) {
+export interface FixHtmlInlineOptions {
+  /**
+   * Custom HTML-like tag names that should participate in streaming
+   * mid-state suppression and complete-tag splitting (e.g. ['thinking']).
+   */
+  customHtmlTags?: readonly string[]
+}
+
+export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineOptions = {}) {
+  const commonHtmlTags = buildCommonHtmlTagSet(options.customHtmlTags)
+  // Tags that should stay inline when we auto-append a closing tag at core stage.
+  const autoCloseInlineTagSet = new Set<string>([
+    'a',
+    'span',
+    'strong',
+    'em',
+    'b',
+    'i',
+    'u',
+  ])
+  const customTagSet = new Set<string>()
+  if (options.customHtmlTags?.length) {
+    for (const t of options.customHtmlTags) {
+      const raw = String(t ?? '').trim()
+      if (!raw)
+        continue
+      const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
+      if (!m)
+        continue
+      const name = m[1].toLowerCase()
+      customTagSet.add(name)
+      autoCloseInlineTagSet.add(name)
+    }
+  }
   // Streaming mid-state: suppress partial inline HTML in text tokens until the
   // tag is fully closed with `>`, then allow it to be tokenized as html_inline.
   md.core.ruler.after('inline', 'fix_html_inline_streaming', (state: unknown) => {
@@ -318,7 +367,7 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt) {
         continue
 
       try {
-        const fixed = fixStreamingHtmlInlineChildren(sourceChildren)
+        const fixed = fixStreamingHtmlInlineChildren(sourceChildren, commonHtmlTags)
         tok.children = fixed.children
         if (fixed.pendingBuffer) {
           const idx = originalContent.lastIndexOf(fixed.pendingBuffer)
@@ -399,6 +448,8 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt) {
       if (t.type === 'html_block') {
         const rawTag = t.content?.match(/<([^\s>/]+)/)?.[1] ?? ''
         const tag = rawTag.toLowerCase()
+        // Keep custom tags as html_block so block-level custom components work.
+
         // Do not attempt to convert or close comments/doctypes/processing-instructions
         if (tag.startsWith('!') || tag.startsWith('?')) {
           t.loading = false
@@ -409,14 +460,41 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt) {
           continue
         t.type = 'inline'
         const loading = t.content?.toLowerCase().includes(`</${tag}>`) ? false : t.loading !== undefined ? t.loading : true
-        t.children = [
-          {
-            type: 'html_block',
-            content: t.content,
-            tag,
-            loading,
-          },
-        ] as any[]
+        const attrs: [string, string][] = []
+        // 解析属性
+        const attrRegex = /\s([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
+        let match
+        while ((match = attrRegex.exec(t.content || '')) !== null) {
+          const attrName = match[1]
+          const attrValue = match[2] || match[3] || match[4] || ''
+          attrs.push([attrName, attrValue])
+        }
+        if (customTagSet.has(tag)) {
+          // 提取内容中间的文本作为 children
+          const contentMatch = t.content?.match(new RegExp(`<\\s*${tag}[^>]*>([\\s\\S]*?)<\\s*\\/\\s*${tag}\\s*>`, 'i'))
+          const raw = t.content
+          const content = contentMatch ? contentMatch[1] : ''
+          t.children = [
+            {
+              type: tag,
+              content,
+              raw,
+              attrs,
+              tag,
+              loading,
+            },
+          ] as any[]
+        }
+        else {
+          t.children = [
+            {
+              type: 'html_block',
+              content: t.content,
+              tag,
+              loading,
+            },
+          ] as any[]
+        }
         continue
       }
       if (!t || t.type !== 'inline')
@@ -425,9 +503,10 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt) {
       // 修复children 是单个 html_inline的场景
       if (t.children.length === 2 && t.children[0].type === 'html_inline') {
         // 补充一个闭合标签
-        const tag = t.children[0].content?.match(/<([^\s>/]+)/)?.[1] ?? ''
-        // 如果是常见的 inline标签，则只追加结尾标签，否则转换成 html_block
-        if (['a', 'span', 'strong', 'em', 'b', 'i', 'u'].includes(tag)) {
+        const rawTag = t.children[0].content?.match(/<([^\s>/]+)/)?.[1] ?? ''
+        const tag = rawTag.toLowerCase()
+        // 如果是常见的 inline标签（含用户自定义），则只追加结尾标签，否则转换成 html_block
+        if (autoCloseInlineTagSet.has(tag)) {
           t.children[0].loading = true
           t.children[0].tag = tag
           t.children.push({
@@ -450,9 +529,10 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt) {
         continue
       }
       else if (t.children.length === 3 && t.children[0].type === 'html_inline' && t.children[2].type === 'html_inline') {
-        const tag = t.children[0].content?.match(/<([^\s>/]+)/)?.[1] ?? ''
-        // 如果是常见的 inline标签，则不处理，否则转换成 html_block
-        if (['a', 'span', 'strong', 'em', 'b', 'i', 'u'].includes(tag))
+        const rawTag = t.children[0].content?.match(/<([^\s>/]+)/)?.[1] ?? ''
+        const tag = rawTag.toLowerCase()
+        // 如果是常见的 inline标签（含用户自定义），则不处理，否则转换成 html_block
+        if (autoCloseInlineTagSet.has(tag))
           continue
         t.children = [
           {

@@ -82,6 +82,28 @@ export interface HtmlInlineNode extends BaseNode {
   autoClosed?: boolean
 }
 
+export type CustomComponentAttrs
+  = | [string, string][]
+    | Record<string, string | boolean>
+    | Array<{ name: string, value: string | boolean }>
+    | null
+
+/**
+ * A generic node shape for custom HTML-like components.
+ * When a tag name is included in `customHtmlTags`, the parser emits a node
+ * whose `type` equals that tag name and carries the raw HTML `content`
+ * plus any extracted `attrs` from user transforms.
+ */
+export interface CustomComponentNode extends BaseNode {
+  /** The custom tag name (same as `tag`) */
+  type: string
+  tag: string
+  content: string
+  attrs?: CustomComponentAttrs
+  children?: ParsedNode[]
+  autoClosed?: boolean
+}
+
 export interface InlineCodeNode extends BaseNode {
   type: 'inline_code'
   code: string
@@ -308,6 +330,7 @@ export type ParsedNode
     | ReferenceNode
     | HtmlBlockNode
     | HtmlInlineNode
+    | CustomComponentNode
     | Record<string, unknown>
 export interface CustomComponents {
   text: unknown
@@ -351,6 +374,13 @@ export interface ParseOptions {
   postTransformTokens?: TransformTokensHook
   // When true, require a closing `**` to parse strong; otherwise allow mid-state strong
   requireClosingStrong?: boolean
+  /**
+   * Custom HTML-like tag names that should be emitted as custom nodes
+   * instead of `html_inline` when encountered (e.g. ['thinking']).
+   * Used by inline parsing; pair with `getMarkdown({ customHtmlTags })`
+   * to enable mid-state suppression for the same tags during streaming.
+   */
+  customHtmlTags?: string[]
   // When true, log the parsed tree structure for debugging
   debug?: boolean
 }

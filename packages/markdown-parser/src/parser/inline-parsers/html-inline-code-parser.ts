@@ -4,7 +4,7 @@ type ParseInlineTokensFn = (
   tokens: MarkdownToken[],
   raw?: string,
   pPreToken?: MarkdownToken,
-  options?: { requireClosingStrong?: boolean },
+  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[] },
 ) => ParsedNode[]
 
 const VOID_TAGS = new Set([
@@ -35,6 +35,14 @@ function isClosingTag(html: string) {
 
 function isSelfClosing(tag: string, html: string) {
   return /\/\s*>\s*$/.test(html) || VOID_TAGS.has(tag)
+}
+
+function normalizeCustomTag(t: unknown) {
+  const raw = String(t ?? '').trim()
+  if (!raw)
+    return ''
+  const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
+  return m ? m[1].toLowerCase() : ''
 }
 
 function tokenToRaw(token: MarkdownToken) {
@@ -109,10 +117,14 @@ export function parseHtmlInlineCodeToken(
   parseInlineTokens: ParseInlineTokensFn,
   raw?: string,
   pPreToken?: MarkdownToken,
-  options?: { requireClosingStrong?: boolean },
+  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[] },
 ): [ParsedNode, number] {
   const code = String(token.content ?? '')
   const tag = getTagName(code)
+  const customTags = options?.customHtmlTags
+  const customTagSet = customTags && customTags.length
+    ? new Set(customTags.map(normalizeCustomTag).filter(Boolean))
+    : null
 
   if (!tag) {
     return [
@@ -185,9 +197,10 @@ export function parseHtmlInlineCodeToken(
   }
 
   if (selfClosing) {
+    const nodeType = customTagSet?.has(tag) ? tag : 'html_inline'
     return [
       {
-        type: 'html_inline',
+        type: nodeType,
         tag,
         content: code,
         children: [],
@@ -229,11 +242,37 @@ export function parseHtmlInlineCodeToken(
     // Still mark loading for mid-state, even though we auto-closed for rendering.
     loading = true
   }
-
+  const attrs = []
+  // 解析属性
+  const attrRegex = /\s([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
+  let match
+  while ((match = attrRegex.exec(code)) !== null) {
+    const attrName = match[1]
+    const attrValue = match[2] || match[3] || match[4] || ''
+    attrs.push([attrName, attrValue])
+  }
+  if (customTagSet?.has(tag)) {
+    const _content = fragment.innerTokens.length
+      ? stringifyTokens(fragment.innerTokens)
+      : ''
+    return [
+      {
+        type: tag,
+        tag,
+        attrs,
+        content: _content,
+        raw: content,
+        loading: token.loading || loading,
+        autoClosed,
+      } as ParsedNode,
+      fragment.nextIndex,
+    ]
+  }
   return [
     {
       type: 'html_inline',
       tag,
+      attrs,
       content,
       children,
       raw: content,

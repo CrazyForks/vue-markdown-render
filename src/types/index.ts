@@ -80,6 +80,22 @@ export interface HtmlInlineNode extends BaseNode {
   tag?: string
   content: string
   children: ParsedNode[]
+  autoClosed?: boolean
+}
+
+export type CustomComponentAttrs
+  = | [string, string][]
+    | Record<string, string | boolean>
+    | Array<{ name: string, value: string | boolean }>
+    | null
+
+export interface CustomComponentNode extends BaseNode {
+  type: string
+  tag: string
+  content: string
+  attrs?: CustomComponentAttrs
+  children?: ParsedNode[]
+  autoClosed?: boolean
 }
 
 export interface ThematicBreakNode extends BaseNode {
@@ -251,6 +267,7 @@ export type ParsedNode
     | LinkNode
     | ImageNode
     | HtmlInlineNode
+    | CustomComponentNode
     | ThematicBreakNode
     | BlockquoteNode
     | TableNode
@@ -316,6 +333,11 @@ export type TransformTokensHook = (tokens: MarkdownToken[]) => MarkdownToken[]
 export interface ParseOptions {
   preTransformTokens?: TransformTokensHook
   postTransformTokens?: TransformTokensHook
+  /**
+   * Custom HTML-like tag names that should be emitted as custom nodes
+   * instead of `html_inline` when encountered (e.g. ['thinking']).
+   */
+  customHtmlTags?: readonly string[]
 }
 
 export type PostTransformNodesHook = (nodes: ParsedNode[]) => ParsedNode[]

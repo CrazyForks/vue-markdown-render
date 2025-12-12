@@ -2,6 +2,7 @@
 defineProps<{ node: {
   type: 'thinking'
   content: string
+  children: any[]
   loading?: boolean
 } }>()
 </script>

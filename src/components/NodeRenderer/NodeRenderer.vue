@@ -51,6 +51,11 @@ export interface NodeRendererProps {
   /** Options forwarded to parseMarkdownToStructure when content is provided */
   parseOptions?: ParseOptions
   customMarkdownIt?: (md: MarkdownIt) => MarkdownIt
+  /**
+   * Custom HTML-like tags that participate in streaming mid‑state handling
+   * and are emitted as custom nodes (e.g. ['thinking']). Forwarded to `getMarkdown()`.
+   */
+  customHtmlTags?: readonly string[]
   /** Enable priority rendering for visible viewport area */
   viewportPriority?: boolean
   /**
@@ -143,12 +148,46 @@ function resolveViewportRoot(node?: HTMLElement | null) {
   }
   return null
 }
-const md = getMarkdown()
-const mdInstance = computed(() => {
-  return props.customMarkdownIt
-    ? props.customMarkdownIt(md)
-    : md
+const instanceMsgId = props.customId
+  ? `renderer-${props.customId}`
+  : `renderer-${Date.now()}-${Math.random().toString(36).slice(2)}`
+const defaultMd = getMarkdown(instanceMsgId)
+const mdBase = computed(() => {
+  const tags = props.customHtmlTags
+  if (!tags || tags.length === 0)
+    return defaultMd
+  return getMarkdown(instanceMsgId, { customHtmlTags: tags })
 })
+const mdInstance = computed(() => {
+  const base = mdBase.value
+  return props.customMarkdownIt
+    ? props.customMarkdownIt(base)
+    : base
+})
+
+function normalizeCustomTag(t: unknown) {
+  const raw = String(t ?? '').trim()
+  if (!raw)
+    return ''
+  const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
+  return m ? m[1].toLowerCase() : ''
+}
+
+const mergedParseOptions = computed(() => {
+  const base = props.parseOptions ?? {}
+  const propTags = props.customHtmlTags ?? []
+  const optionTags = (base as any).customHtmlTags ?? []
+  const merged = [...propTags, ...optionTags]
+    .map(normalizeCustomTag)
+    .filter(Boolean)
+  if (!merged.length)
+    return base
+  return {
+    ...base,
+    customHtmlTags: Array.from(new Set(merged)),
+  } as ParseOptions
+})
+
 const parsedNodes = computed<ParsedNode[]>(() => {
   // 解析 content 字符串为节点数组
   // If the consumer passed an explicit `nodes` array, return a shallow
@@ -162,7 +201,7 @@ const parsedNodes = computed<ParsedNode[]>(() => {
     // Prefer an explicitly passed `markdown` prop, then a globally
     // provided markdown via `setGlobalMarkdown`, otherwise fall back
     // to the legacy `getMarkdown()` factory.
-    const parsed = parseMarkdownToStructure(props.content, mdInstance.value, props.parseOptions)
+    const parsed = parseMarkdownToStructure(props.content, mdInstance.value, mergedParseOptions.value)
     return markRaw(parsed)
   }
   return []

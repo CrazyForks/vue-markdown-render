@@ -56,25 +56,24 @@ Hooks:
 - `postTransformTokens(tokens)` — inspect/adjust tokens before node generation.
 - `postTransformNodes(nodes)` — modify the AST right before rendering.
 
-Example: flag AI “thinking” blocks before rendering:
+Example: render AI “thinking” tags as custom components (no hooks needed):
 
 ```ts
-const parseOptions = {
-  postTransformNodes(nodes) {
-    return nodes.map(node =>
-      node.type === 'html_block' && /<thinking>/.test(node.value)
-        ? { ...node, meta: { type: 'thinking' } }
-        : node,
-    )
-  },
-}
+import { setCustomComponents } from 'markstream-vue'
+import ThinkingNode from './ThinkingNode.vue'
+
+setCustomComponents('docs', { thinking: ThinkingNode })
 ```
 
 ```vue
-<MarkdownRender :content="doc" :parse-options="parseOptions" />
+<MarkdownRender
+  custom-id="docs"
+  custom-html-tags="['thinking']"
+  :content="doc"
+/>
 ```
 
-Inside your custom node component you can check `node.meta?.type`.
+Hooks remain useful if you want to reshape the emitted `thinking` node (strip wrappers, remap attrs, merge blocks, etc.).
 
 ## Utility exports
 

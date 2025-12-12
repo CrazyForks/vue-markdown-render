@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import type { MarkdownIt } from 'markdown-it-ts'
 import { Icon } from '@iconify/vue'
-import { full as markdownItEmoji } from 'markdown-it-emoji'
 import { useRouter } from 'vue-router'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
 import MarkdownRender from '../../../src/components/NodeRenderer'
@@ -68,47 +66,6 @@ useInterval(streamDelay, {
 })
 
 setCustomComponents('playground-demo', { thinking: ThinkingNode })
-const parseOptions = {
-  preTransformTokens: (tokens: any[]) => {
-    // Example: Log tokens during parsing
-    // console.log('Pre-transform tokens:', tokens)
-    return tokens.map((token) => {
-      if (token.type === 'inline' && token.content.includes('<thinking')) {
-        token.children = token.children.map((t: any) => {
-          if (t.type === 'html_block' && t.tag === 'thinking') {
-            const m = t.content.match(/<thinking([^>]*)>/)
-            const attrs = []
-            if (m) {
-              const attrString = m[1]
-              const attrRegex = /([^\s=]+)(?:="([^"]*)")?/g
-              let match
-              while ((match = attrRegex.exec(attrString)) !== null) {
-                const attrName = match[1]
-                const attrValue = match[2] || true
-                attrs.push({ name: attrName, value: attrValue })
-              }
-            }
-            // eslint-disable-next-line regexp/no-super-linear-backtracking
-            const content = t.content.replace(/<thinking[^>]*>/, '').replace(/<\/*t*h*i*n*k*i*n*g*>*\n*$/, '')
-            return {
-              type: 'thinking',
-              loading: t.loading,
-              attrs,
-              content,
-            }
-          }
-          return t
-        })
-      }
-      return token
-    })
-  },
-}
-
-function enableEmoji(md: MarkdownIt) {
-  md.use(markdownItEmoji)
-  return md
-}
 
 // 主题切换
 const isDark = useDark()
@@ -529,9 +486,8 @@ onBeforeUnmount(() => {
           :code-block-dark-theme="selectedTheme || undefined"
           :code-block-light-theme="selectedTheme || undefined"
           :themes="themes"
-          :custom-markdown-it="enableEmoji"
+          :custom-html-tags="['thinking']"
           :is-dark="isDark"
-          :parse-options="parseOptions"
           custom-id="playground-demo"
           class="p-6"
         />

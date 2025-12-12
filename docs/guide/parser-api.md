@@ -15,6 +15,7 @@ Options include:
 - `plugin`: list of Markdown-it plugins
 - `apply`: functions to mutate the `MarkdownIt` instance
 - `i18n`: translator map or function
+- `customHtmlTags`: custom HTML-like tags treated as common during streaming mid‑state handling (e.g. `['thinking']`)
 
 ### `parseMarkdownToStructure(content, md?, options?)`
 Parse a Markdown string into a streaming-friendly AST used by the renderer.
@@ -24,7 +25,7 @@ Parameters:
 - `md` (MarkdownItCore, optional): a markdown-it-ts instance — created if not provided
 - `options` (ParseOptions, optional): contains transform hooks described below
 
-> Tip for custom components: when converting inline HTML like `<thinking>` via `preTransformTokens`, keep those tags on their own lines or normalize them first to avoid malformed tokens. See [custom component parsing](/guide/advanced#custom-component-parsing) for a minimal regex example.
+> Tip for custom components: for simple HTML‑like tags such as `<thinking>`, prefer the built‑in `customHtmlTags` / `custom-html-tags` allowlist so the parser emits custom nodes directly. Use `preTransformTokens` only when you need to reshape `content`/`attrs`. See [custom component parsing](/guide/advanced#custom-component-parsing) for details.
 
 Returns: `ParsedNode[]`
 
@@ -96,6 +97,20 @@ Behavior:
   - Marks the node as `loading: true` and `autoClosed: true` to indicate the source is still incomplete.
 - **When the real closing tag arrives**, `autoClosed` disappears and `loading` becomes `false`.
 
+Extending the allowlist:
+To apply the same mid‑state suppression for custom tags (for example `<thinking>`), pass `customHtmlTags` when creating the markdown instance:
+
+```ts
+const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
+```
+
+Emitting custom nodes:
+If you want those tags to become custom node types (so `setCustomComponents` can map them directly), also pass `customHtmlTags` in `ParseOptions` or use the `custom-html-tags` prop on `MarkdownRender` (which wires this automatically):
+
+```ts
+const nodes = parseMarkdownToStructure(source, md, { customHtmlTags: ['thinking'] })
+```
+
 Renderer note:
 - `HtmlInlineNode` renders raw text only when `loading === true` and `autoClosed !== true`.
   Auto‑closed mid‑states still render HTML (via `innerHTML`) but keep `loading=true` for UX/state.
@@ -135,7 +150,7 @@ function enableEmoji(md: MarkdownIt) {
 ```
 
 ## Examples
-Use the playground to test your parse transforms quickly. For instance, use a `preTransformTokens` hook to transform custom `html_block` tokens into a `thinking_block` type, then register a custom component for the new node type via `setCustomComponents`.
+Use the playground to test custom‑tag parsing quickly. For simple tags like `<thinking>`, pass `customHtmlTags` (or `custom-html-tags` on the component) so the parser emits `type: 'thinking'` nodes automatically, then map them via `setCustomComponents`.
 
 For full details and more examples, see `packages/markdown-parser/README.md` in the repository.
 

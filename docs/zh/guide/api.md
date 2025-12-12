@@ -55,25 +55,24 @@ setCustomComponents('docs', {
 - `postTransformTokens(tokens)` — 在默认处理后继续调整。
 - `postTransformNodes(nodes)` — 最终 AST 可在此注入元数据或拆分合并节点。
 
-示例：标记 AI “思考”块
+示例：把 AI “thinking” 标签直接渲染成自定义组件（无需钩子）
 
 ```ts
-const parseOptions = {
-  postTransformNodes(nodes) {
-    return nodes.map(node =>
-      node.type === 'html_block' && /<thinking>/.test(node.value)
-        ? { ...node, meta: { type: 'thinking' } }
-        : node,
-    )
-  },
-}
+import { setCustomComponents } from 'markstream-vue'
+import ThinkingNode from './ThinkingNode.vue'
+
+setCustomComponents('docs', { thinking: ThinkingNode })
 ```
 
 ```vue
-<MarkdownRender :content="doc" :parse-options="parseOptions" />
+<MarkdownRender
+  custom-id="docs"
+  custom-html-tags="['thinking']"
+  :content="doc"
+/>
 ```
 
-然后在自定义节点组件中读取 `node.meta?.type`。
+如果你需要进一步改造 `thinking` 节点（剥掉包裹、重映射 attrs、合并分段等），再使用上述 hooks。
 
 ## 其他导出
 

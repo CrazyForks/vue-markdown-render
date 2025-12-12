@@ -221,6 +221,7 @@ function addChunk(chunk: string) {
 - `batchRendering`：用 `initialRenderBatchSize`、`renderBatchSize`、`renderBatchDelay`、`renderBatchBudgetMs` 微调批次。
 - `enableMermaid` / `enableKatex` / `enableMonaco`：按需启用重型依赖。
 - `parse-options`：在组件上复用解析钩子（如 `preTransformTokens`、`requireClosingStrong`）。
+- `custom-html-tags`：扩展流式 HTML 白名单并将这些标签输出为自定义节点，便于 `setCustomComponents` 直接映射（如 `['thinking']`）。
 - `custom-components`：为自定义标签/标记注册内嵌 Vue 组件。
 
 示例：将 Markdown 占位符映射到 Vue 组件
