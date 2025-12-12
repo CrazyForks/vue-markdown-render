@@ -27,6 +27,13 @@ describe('html inline streaming mid-states', () => {
     expect(textIncludes(nodes, '<thinking')).toBe(false)
   })
 
+  it('suppresses partial opening tags when ">" appears inside quotes', () => {
+    const nodes = parseMarkdownToStructure('x <a href="https://example.com?q=a>b', md)
+    expect(textIncludes(nodes, 'x')).toBe(true)
+    expect(textIncludes(nodes, '<a')).toBe(false)
+    expect(hasNode(nodes, 'link')).toBe(false)
+  })
+
   it('suppresses partial custom tags when adjacent to text', () => {
     const nodes = parseMarkdownToStructure('x<thinking foo="bar"', mdCustom)
     expect(textIncludes(nodes, '<thinking')).toBe(false)

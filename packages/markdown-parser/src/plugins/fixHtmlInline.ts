@@ -92,10 +92,28 @@ const BASE_COMMON_HTML_TAGS = new Set<string>([
 
 const OPEN_TAG_RE = /<([A-Z][\w-]*)(?=[\s/>]|$)/gi
 const CLOSE_TAG_RE = /<\/\s*([A-Z][\w-]*)(?=[\s/>]|$)/gi
-// Match a complete HTML tag starting at "<", capturing the tag name.
-// The attribute part is optional but requires leading whitespace, which
-// prevents ambiguous adjacent quantifiers and avoids super-linear backtracking.
-const FULL_TAG_RE = /^<\s*(?:\/\s*)?([A-Z][\w-]*)(?:\s[^>]*?)?\/?>/i
+const TAG_NAME_AT_START_RE = /^<\s*(?:\/\s*)?([A-Z][\w-]*)/i
+
+function findTagCloseIndexOutsideQuotes(html: string) {
+  let inSingle = false
+  let inDouble = false
+
+  for (let i = 0; i < html.length; i++) {
+    const ch = html[i]
+    if (ch === '"' && !inSingle) {
+      inDouble = !inDouble
+      continue
+    }
+    if (ch === '\'' && !inDouble) {
+      inSingle = !inSingle
+      continue
+    }
+    if (ch === '>' && !inSingle && !inDouble)
+      return i
+  }
+
+  return -1
+}
 
 function tokenToRaw(token: Token) {
   const shape = token as unknown as { raw?: string, markup?: string, content?: string }
@@ -141,7 +159,7 @@ function findFirstIncompleteTag(content: string, tagSet: Set<string>) {
     if (!tagSet.has(tag))
       continue
     const rest = content.slice(idx)
-    if (rest.includes('>'))
+    if (findTagCloseIndexOutsideQuotes(rest) !== -1)
       continue
     if (!first || idx < first.index)
       first = { index: idx, tag, closing: false }
@@ -157,7 +175,7 @@ function findFirstIncompleteTag(content: string, tagSet: Set<string>) {
     if (!isCommonHtmlTagOrPrefix(tag, tagSet))
       continue
     const rest = content.slice(idx)
-    if (rest.includes('>'))
+    if (findTagCloseIndexOutsideQuotes(rest) !== -1)
       continue
     if (!first || idx < first.index)
       first = { index: idx, tag, closing: true }
@@ -222,14 +240,21 @@ function fixStreamingHtmlInlineChildren(children: Token[], tagSet: Set<string>) 
       }
       pushTextPart(chunk.slice(cursor, lt), baseToken)
       const sub = chunk.slice(lt)
-      const fullMatch = sub.match(FULL_TAG_RE)
-      if (!fullMatch) {
+      const tagMatch = sub.match(TAG_NAME_AT_START_RE)
+      if (!tagMatch) {
         pushTextPart('<', baseToken)
         cursor = lt + 1
         continue
       }
-      const tagText = fullMatch[0]
-      const tagName = (fullMatch[1] ?? '').toLowerCase()
+      const closeIdx = findTagCloseIndexOutsideQuotes(sub)
+      if (closeIdx === -1) {
+        pushTextPart('<', baseToken)
+        cursor = lt + 1
+        continue
+      }
+
+      const tagText = sub.slice(0, closeIdx + 1)
+      const tagName = (tagMatch[1] ?? '').toLowerCase()
       if (tagSet.has(tagName)) {
         out.push({
           type: 'html_inline',
@@ -269,7 +294,7 @@ function fixStreamingHtmlInlineChildren(children: Token[], tagSet: Set<string>) 
     if (pending) {
       pending.buffer += tokenToRaw(child)
       pendingAtEnd = pending.buffer
-      const closeIdx = pending.buffer.indexOf('>')
+      const closeIdx = findTagCloseIndexOutsideQuotes(pending.buffer)
       if (closeIdx === -1) {
         // still incomplete: swallow this token to avoid rendering jitter
         continue
@@ -288,6 +313,25 @@ function fixStreamingHtmlInlineChildren(children: Token[], tagSet: Set<string>) 
       if (afterChunk)
         processTextChunk(afterChunk)
       continue
+    }
+
+    if (child.type === 'html_inline') {
+      const content = tokenToRaw(child)
+      const tagMatch = content.match(TAG_NAME_AT_START_RE)
+      const tagName = (tagMatch?.[1] ?? '').toLowerCase()
+      if (tagName && tagSet.has(tagName) && findTagCloseIndexOutsideQuotes(content) === -1) {
+        // markdown-it may prematurely close a tag at a ">" inside a quoted
+        // attribute value (e.g. `<a href="...a>b`), producing a broken html_inline
+        // token. Treat it as a streaming mid-state and swallow until we see a
+        // real tag close ">" outside quotes.
+        pending = {
+          tag: tagName,
+          buffer: content,
+          closing: /^<\s*\//.test(content),
+        }
+        pendingAtEnd = pending.buffer
+        continue
+      }
     }
 
     if (child.type === 'text') {
@@ -471,9 +515,20 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
         }
         if (customTagSet.has(tag)) {
           // 提取内容中间的文本作为 children
-          const contentMatch = t.content?.match(new RegExp(`<\\s*${tag}[^>]*>([\\s\\S]*?)<\\s*\\/\\s*${tag}\\s*>`, 'i'))
+          const contentMatch = t.content?.match(new RegExp(`<\\s*${tag}[^>]*>([\\s\\S]*)`, 'i'))
           const raw = t.content
-          const content = contentMatch ? contentMatch[1] : ''
+          const endTagRegex = new RegExp(`</\\s*${tag}\\s*>`, 'i')
+          const endTagIndex = t.content?.toLowerCase().indexOf(`</${tag}>`) ?? -1
+          const content = endTagIndex !== -1
+            ? contentMatch![1].split(endTagRegex)[0]
+              ? contentMatch
+                ? contentMatch[1]
+                : ''
+              : ''
+            : contentMatch
+              ? contentMatch[1].replace(/<.*$/, '')
+              : ''
+
           t.children = [
             {
               type: tag,
@@ -484,6 +539,17 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
               loading,
             },
           ] as any[]
+          if (endTagIndex !== -1) {
+            // 并且 endTagIndex !== t.content.length - `</tag>` 说明后面还有内容，需要让他被markdown继续解析
+            const afterContent = t.content?.slice(endTagIndex + tag.length + 3) || ''
+            if (afterContent.trim()) {
+              toks.splice(i + 1, 0, {
+                type: 'text',
+                content: afterContent,
+                raw: afterContent,
+              } as any)
+            }
+          }
         }
         else {
           t.children = [

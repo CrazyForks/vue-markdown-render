@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { MarkdownRender } from 'markstream-vue'
+
 defineProps<{ node: {
   type: 'thinking'
   content: string
@@ -35,12 +37,7 @@ defineProps<{ node: {
         <span v-if="node.loading" class="sr-only" aria-live="polite">Thinking…</span>
         <transition name="fade" mode="out-in">
           <div key="{{ node.loading ? 'loading' : 'ready' }}" class="content-area">
-            <div v-if="node.loading" class="partial-content">
-              {{ node.content }}
-            </div>
-            <div v-else class="full-content">
-              {{ node.content }}
-            </div>
+            <MarkdownRender :content="node.content" />
           </div>
         </transition>
       </div>
