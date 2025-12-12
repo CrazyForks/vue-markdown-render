@@ -1,3 +1,13 @@
+## [0.0.3-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.3...v0.0.3-beta.4) (2025-12-12)
+
+
+### Features
+
+* add support for custom HTML-like tags in markdown parser ([5850170](https://github.com/Simon-He95/markstream-vue/commit/5850170eb452b8c09ee805ff0102b9bb1e53c40e))
+* enhance HTML inline handling and support for custom tags in markdown parser ([6864479](https://github.com/Simon-He95/markstream-vue/commit/68644791db7402da6d7297d0eef8fe8be3c56a98))
+
+
+
 ## [0.0.3-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.2...v0.0.3-beta.3) (2025-12-12)
 
 
