@@ -225,6 +225,27 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
 
   return result
 }
+
+function isPlainBracketMathLike(content: string) {
+  const stripped = content.trim()
+  if (!isMathLike(stripped))
+    return false
+
+  const hasStrongSignal = /\\[a-z]+/i.test(stripped)
+    || /\d/.test(stripped)
+    || /[=+*/^<>]|\\times|\\pm|\\cdot|\\le|\\ge|\\neq/.test(stripped)
+    || /[_^]/.test(stripped)
+
+  // In non-strict mode, plain `[...]` is allowed as a display-math delimiter.
+  // During streaming, incomplete links like `[label]` may transiently appear
+  // as a full line before the following `(` arrives. Natural-language labels
+  // often use spaced hyphens ("foo - bar"), which should not be treated as math.
+  if (!hasStrongSignal && /\s-\s/.test(stripped))
+    return false
+
+  return true
+}
+
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
   // Inline rule for `\\(...\\)` and `$$...$$` and `$...$`
   const mathInline = (state: unknown, silent: boolean) => {
@@ -536,7 +557,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
                 if (lineText.slice(closeIndex).trim() !== ']') {
                   continue
                 }
-                if (isMathLike(lineText.slice(open.length, closeIndex))) {
+                const inner = lineText.slice(open.length, closeIndex)
+                const looksMath = open === '[' ? isPlainBracketMathLike(inner) : isMathLike(inner)
+                if (looksMath) {
                   matched = true
                   openDelim = open
                   closeDelim = close
@@ -641,7 +664,8 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if (strict && !found)
       return false
     // 追加检测内容是否是 math
-    if (!isMathLike(content))
+    const looksMath = openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content)
+    if (!looksMath)
       return false
 
     const token: any = s.push('math_block', 'math', 0)
