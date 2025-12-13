@@ -71,7 +71,7 @@ These hooks are also available via `parseOptions` prop on the `MarkdownRender` c
 Example — strict parsing (default):
 
 ```ts
-import { parseMarkdownToStructure } from 'packages/markdown-parser'
+import { parseMarkdownToStructure } from 'stream-markdown-parser'
 
 const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: true })
 // the text `[**cxx](xxx)` will be preserved without creating a dangling strong node

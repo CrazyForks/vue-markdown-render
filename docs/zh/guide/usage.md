@@ -55,7 +55,7 @@ export default {
 <!-- 在 VitePress 页面里 -->
 <MarkdownRender
   custom-id="docs"
-  custom-html-tags="['thinking']"
+  :custom-html-tags="['thinking']"
   :content="source"
 />
 ```
@@ -65,17 +65,13 @@ export default {
 ```ts
 import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
-const md = getMarkdown({
-  markdownIt: {
-    html: true,
-  },
-})
+const md = getMarkdown()
 
 const nodes = parseMarkdownToStructure('# 标题', md)
 // 将 nodes 传入 <MarkdownRender :nodes="nodes" />
 ```
 
-- `getMarkdown(options?)` 返回预设配置的 `markdown-it-ts`。
+- `getMarkdown(msgId?, options?)` 返回预设配置的 `markdown-it-ts`。
 - `parseMarkdownToStructure()` 将 Markdown 字符串/Token 转为渲染器使用的 AST。
 - 可搭配 `setCustomComponents(id?, mapping)` 为特定 `custom-id` 替换节点渲染器。
 

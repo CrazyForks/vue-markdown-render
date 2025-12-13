@@ -20,7 +20,7 @@ You can jump in at any stage:
 
 | Helper | Purpose | When to use |
 | ------ | ------- | ----------- |
-| `getMarkdown(options?)` | Returns a configured `markdown-it-ts` instance with the plugins this package expects. | Customize parser options (HTML toggles, additional plugins) before transforming tokens. |
+| `getMarkdown(msgId?, options?)` | Returns a configured `markdown-it-ts` instance with the plugins this package expects. | Customize parser options (HTML toggles, additional plugins) before transforming tokens. |
 | `parseMarkdownToStructure(content, md?)` | Generates the AST consumed by `MarkdownRender`. Accepts either a markdown string or tokens. | Pre-parse on the server, run validations, or reuse the AST across renders. |
 
 Both helpers are framework-agnostic and can run in Node or the browser. For large documents you can reuse the `md` instance between parses to avoid re-initializing plugins.
@@ -68,7 +68,7 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 ```vue
 <MarkdownRender
   custom-id="docs"
-  custom-html-tags="['thinking']"
+  :custom-html-tags="['thinking']"
   :content="doc"
 />
 ```
@@ -82,7 +82,7 @@ Besides the core renderer and parser helpers, the package exposes:
 - `CodeBlockNode`, `MarkdownCodeBlockNode`, `MermaidBlockNode`, `MathBlockNode`, `ImageNode`, etc. — see [Components](/guide/components) for their props and CSS requirements.
 - `VisibilityWrapper`, `NodeRenderer`, and type exports under `types`.
 
-Refer to `packages/markdown-parser/README.md` for the canonical TypeScript interfaces.
+For parser types and hooks, see [/guide/parser-api](/guide/parser-api) (or the `stream-markdown-parser` README on npm).
 
 ## Styling + troubleshooting reminders
 

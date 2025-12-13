@@ -15,7 +15,7 @@
 [![Support](https://img.shields.io/badge/support-guide-ff6f61)](./SUPPORT.md)
 [![Security](https://img.shields.io/badge/security-policy-8A2BE2)](./SECURITY.md)
 [![CI](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml/badge.svg)](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml)
-[![License](https://img.shields.io/npm/l/markstream-vue)](./LICENSE)
+[![License](https://img.shields.io/npm/l/markstream-vue)](./license)
 
 ## Contents
 

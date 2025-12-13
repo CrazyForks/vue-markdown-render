@@ -55,7 +55,7 @@ export default {
 <!-- in a VitePress page -->
 <MarkdownRender
   custom-id="docs"
-  custom-html-tags="['thinking']"
+  :custom-html-tags="['thinking']"
   :content="source"
 />
 ```
@@ -65,17 +65,13 @@ export default {
 ```ts
 import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
-const md = getMarkdown({
-  markdownIt: {
-    html: true,
-  },
-})
+const md = getMarkdown()
 
 const nodes = parseMarkdownToStructure('# Title', md)
 // pass nodes to <MarkdownRender :nodes="nodes" />
 ```
 
-- `getMarkdown(options?)` returns a configured `markdown-it-ts` instance.
+- `getMarkdown(msgId?, options?)` returns a configured `markdown-it-ts` instance.
 - `parseMarkdownToStructure()` transforms the Markdown string/tokens to the AST consumed by the renderer.
 - Combine with `setCustomComponents(id?, mapping)` to swap node renderers for a given `custom-id`.
 

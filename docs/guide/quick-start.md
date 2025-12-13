@@ -17,7 +17,7 @@ const md = `# Hello World\n\nThis is **bold** and this is *italic*.`
 
 Optional: wrap with `<client-only>` for Nuxt/SSR.
 
-See `/nuxt-ssr.md` for Nuxt-specific instructions.
+See `/nuxt-ssr` for Nuxt-specific instructions.
 
 Try this quickly in your app:
 

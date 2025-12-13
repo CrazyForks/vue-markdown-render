@@ -9,13 +9,13 @@ If something breaks, here are common fixes:
 
 If unsure, reproduce issue using the playground (or the hosted quick test) and then open an issue with stack trace and minimal markdown sample.
 
-Hosted quick test: https://markstream-vue.netlify.app/test
+Hosted quick test: https://markstream-vue.simonhe.me/test
 
-Open a new issue (quick link): https://github.com/Simon-He95/markstream-vueer/issues/new?template=bug_report.yml
+Open a new issue (quick link): https://github.com/Simon-He95/markstream-vue/issues/new?template=bug_report.yml
 
 ## Common problems (FAQ)
 
-- Tailwind / CSS utilities overriding styling: If your project uses Tailwind or a component library (e.g., shadcn), utility classes or global styles may override the library's styles. See the Tailwind integration guide for recommended import ordering and strategies: `/guide/tailwind`.
+- Tailwind / CSS utilities overriding styling: If your project uses Tailwind or a component library (e.g., shadcn), utility classes or global styles may override the library's styles. See the Tailwind integration guide for recommended import ordering and strategies: [/guide/tailwind](/guide/tailwind).
 
   Quick fixes:
 

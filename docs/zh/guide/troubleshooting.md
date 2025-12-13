@@ -13,6 +13,10 @@
 
   快速修复：
 
+  - 将 `markstream-vue/index.css` 放进 `@layer components { ... }`（详见 Tailwind 页面），稳定 CSS 顺序。
+  - Tailwind 里设置 `prefix`（例如 `tw-`）减少与组件库 class 冲突。
+  - 用容器选择器或 `:deep` 把覆盖范围限制在渲染区域。
+
 - 自定义样式：你可以通过覆盖 `src/index.css` 中的 CSS 变量来自定义外观（例如 `--vscode-editor-background`、`--vscode-editor-foreground`），或在你的应用样式中覆盖组件类。推荐使用 `@apply` 或将自定义样式限定到某个容器内。
 - 插槽优先：如果你需要更改组件内布局，先检查组件是否暴露了插槽（例如 `header-left`、`header-right`、`loading`）。插槽提供稳健的扩展点，无需替换组件内部实现。
 
@@ -38,11 +42,11 @@
 
   优先提供一个 `playground` 对应的复现链接；你也可以使用托管的快速测试以便快速调试：
 
-  https://markstream-vue.netlify.app/test
+  https://markstream-vue.simonhe.me/test
 
   如果准备好了，使用快速创建 issue 链接：
 
-  https://github.com/Simon-He95/markstream-vueer/issues/new?template=bug_report.yml
+  https://github.com/Simon-He95/markstream-vue/issues/new?template=bug_report.yml
 
   额外建议：如果你可以编写一个单测或集成测试来复现 bug，请将其放入 `test/` 文件夹并在本地运行 `pnpm test`，这通常能帮助维护者快速定位并修复回归。
 

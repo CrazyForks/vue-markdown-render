@@ -21,6 +21,24 @@ markstream-vue supports various features through optional peer dependencies. Ins
 | Mermaid Diagrams | `mermaid` | `pnpm add mermaid` |
 | Math Rendering (KaTeX) | `katex` | `pnpm add katex` |
 
+## Enable feature loaders (Mermaid / KaTeX)
+
+After installing optional peers, opt-in loaders in your client entry:
+
+```ts
+import { enableKatex, enableMermaid } from 'markstream-vue'
+
+enableMermaid()
+enableKatex()
+```
+
+Also remember required CSS:
+
+```ts
+import 'markstream-vue/index.css'
+import 'katex/dist/katex.min.css'
+```
+
 ### Quick Install: All Features
 
 To enable all features at once:

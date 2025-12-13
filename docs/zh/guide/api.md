@@ -20,7 +20,7 @@ Markdown 字符串 → getMarkdown() → markdown-it-ts 实例
 
 | Helper | 作用 | 适用场景 |
 | ------ | ---- | -------- |
-| `getMarkdown(options?)` | 返回预配置的 `markdown-it-ts` 实例。 | 需调整 parser 选项（HTML、插件）或复用实例时。 |
+| `getMarkdown(msgId?, options?)` | 返回预配置的 `markdown-it-ts` 实例。 | 需调整 parser 选项（HTML、插件）或复用实例时。 |
 | `parseMarkdownToStructure(content, md?)` | 生成渲染器使用的 AST。 | 服务端预解析、静态导出、或需在渲染前做校验时。 |
 
 两者均可在 Node/浏览器使用。处理大文档时可复用 `md` 实例避免重复初始化插件。
@@ -67,7 +67,7 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 ```vue
 <MarkdownRender
   custom-id="docs"
-  custom-html-tags="['thinking']"
+  :custom-html-tags="['thinking']"
   :content="doc"
 />
 ```
@@ -77,7 +77,7 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 ## 其他导出
 
 - 节点组件：`CodeBlockNode`、`MarkdownCodeBlockNode`、`MermaidBlockNode`、`MathBlockNode`、`ImageNode` 等（详见 [组件与节点渲染器](/zh/guide/components)）。
-- 工具：`VisibilityWrapper`、`NodeRenderer`、类型定义（位于 `types` 与 `packages/markdown-parser/README.md`）。
+- 工具：`VisibilityWrapper`、`NodeRenderer`、类型定义（参考 [/zh/guide/parser-api](/zh/guide/parser-api) 或 npm 上的 `stream-markdown-parser` README）。
 
 ## 样式 & 排障提醒
 

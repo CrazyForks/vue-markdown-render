@@ -22,7 +22,7 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 ```vue
 <MarkdownRender
   custom-id="docs"
-  custom-html-tags="['thinking']"
+  :custom-html-tags="['thinking']"
   :content="markdown"
 />
 ```

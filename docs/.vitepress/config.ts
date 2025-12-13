@@ -96,7 +96,6 @@ export default defineConfig({
         { text: 'Performance', link: '/guide/performance' },
         { text: 'Monaco', link: '/guide/monaco' },
         { text: 'Troubleshooting', link: '/guide/troubleshooting' },
-        { text: 'Nuxt SSR', link: '/zh/nuxt-ssr' },
         {
           text: 'Investigations',
           items: [
@@ -185,7 +184,6 @@ export default defineConfig({
           ],
         },
         { text: 'Nuxt SSR', link: '/nuxt-ssr' },
-        { text: 'Nuxt SSR', link: '/zh/nuxt-ssr' },
         { text: 'Performance', link: '/guide/performance' },
         { text: 'Monaco', link: '/guide/monaco' },
         { text: 'Troubleshooting', link: '/guide/troubleshooting' },
