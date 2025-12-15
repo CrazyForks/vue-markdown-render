@@ -529,11 +529,8 @@ export function parseInlineTokens(
       }
 
       case 'text_special':{
-        // treat as plain text
-        pushToken({
-          ...token,
-          type: 'text',
-        })
+        // treat as plain text (merge into adjacent text nodes)
+        pushText(String(token.content ?? ''), String(token.content ?? ''))
         i++
         break
       }
