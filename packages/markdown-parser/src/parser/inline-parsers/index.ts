@@ -528,6 +528,16 @@ export function parseInlineTokens(
         break
       }
 
+      case 'text_special':{
+        // treat as plain text
+        pushToken({
+          ...token,
+          type: 'text',
+        })
+        i++
+        break
+      }
+
       default:
         // Skip unknown token types, ensure text merging stops
         pushToken(token)
