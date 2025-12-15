@@ -1,3 +1,17 @@
+## [0.0.3-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.4...v0.0.3-beta.5) (2025-12-15)
+
+
+### Bug Fixes
+
+* correct node_version format in CI configuration ([50e32a8](https://github.com/Simon-He95/markstream-vue/commit/50e32a878d160fe801c4dc29ce11cf0d7c6a6507))
+* handle 'text_special' token type as plain text in parseInlineTokens function ([8106e01](https://github.com/Simon-He95/markstream-vue/commit/8106e0182730d0b7523735c27fc6ac322c43b200))
+* merge 'text_special' token type into adjacent text nodes in parseInlineTokens function ([2d70bc0](https://github.com/Simon-He95/markstream-vue/commit/2d70bc0779e497b528959a8b33ddfbd587e553c2))
+* update dependencies in package.json and pnpm-lock.yaml ([8fd5a2b](https://github.com/Simon-He95/markstream-vue/commit/8fd5a2ba3b43db3c0d6c6670ca6cb4e0ff8de06d))
+* update license links and improve documentation consistency across files ([01b840b](https://github.com/Simon-He95/markstream-vue/commit/01b840bdef4db118cf221b3247977f10f8b660c9))
+* update stream-markdown-parser to version 0.0.42 and add tests for inline text_special tokens ([895e8ab](https://github.com/Simon-He95/markstream-vue/commit/895e8ab4c7e22c7105ffc91a714538f2e6eb84fc)), closes [#198](https://github.com/Simon-He95/markstream-vue/issues/198)
+
+
+
 ## [0.0.3-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.3...v0.0.3-beta.4) (2025-12-12)
 
 
