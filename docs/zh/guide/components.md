@@ -6,7 +6,7 @@
 
 | 组件 | 推荐场景 | 关键 props / 事件 | 额外 CSS / 同伴依赖 | 排障提示 |
 | ---- | -------- | ---------------- | ------------------- | -------- |
-| `MarkdownRender` | 渲染完整 AST（默认导出） | `content`、`custom-id`、`setCustomComponents`、生命周期钩子 | 在 reset 之后引入 `markstream-vue/index.css`，并放入受控 layer | 给 `MarkdownRender` 添加 `custom-id`，配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
+| `MarkdownRender` | 渲染完整 AST（默认导出） | `content`、`custom-id`、`setCustomComponents`、生命周期钩子 | 在 reset 之后引入 `markstream-vue/index.css`（CSS 已被限定在内部 `.markstream-vue` 容器中），并放入受控 layer | 给 `MarkdownRender` 添加 `custom-id`，独立使用节点组件需包一层 `.markstream-vue`；配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`autoExpand`、`viewportPriority`、`toolbar` slot | 安装 `stream-monaco` 并引入 `stream-monaco/esm/index.css` | 没有 CSS 会导致空白编辑器；确保 Tailwind/UnoCSS 使用 `@layer components` |
 | `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`theme`、`lang` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
 | `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`theme`、`onRender` | `mermaid` ≥ 11 & `mermaid/dist/mermaid.css` | 详见 `/zh/guide/mermaid` |
@@ -22,6 +22,13 @@
 - **适用**：Vite/Nuxt/VitePress 中渲染整篇 Markdown。
 - **关键 props**：`content`、`custom-id`、`beforeRender`/`afterRender` 钩子、`setCustomComponents`。
 - **CSS 顺序**：先引入 reset（`modern-css-reset`、`@unocss/reset`、`@tailwind base`），再在 `@layer components` 中导入 `markstream-vue/index.css`。
+
+### CSS 作用域
+
+`markstream-vue` 已把打包后的 CSS 限定在内部 `.markstream-vue` 容器中，用于降低全局样式冲突。
+
+- 使用 `MarkdownRender` 时一般无需处理：它默认渲染在容器内部。
+- 如果你独立使用节点组件（例如 `CodeBlockNode`、`MathBlockNode`），请外层包一层 `<div class="markstream-vue">...</div>`，这样库内样式与变量才会生效。
 
 ### 使用阶梯
 
@@ -99,7 +106,9 @@ const node = {
 </script>
 
 <template>
-  <CodeBlockNode :node="node" :monaco-options="{ fontSize: 14 }" />
+  <div class="markstream-vue">
+    <CodeBlockNode :node="node" :monaco-options="{ fontSize: 14 }" />
+  </div>
 </template>
 ```
 

@@ -39,6 +39,8 @@ import 'markstream-vue/index.css'
 import 'katex/dist/katex.min.css'
 ```
 
+Note: `markstream-vue/index.css` is scoped under an internal `.markstream-vue` container to reduce global style conflicts. `MarkdownRender` renders inside that container by default. If you render node components standalone, wrap them with `<div class="markstream-vue">...</div>`.
+
 ### Quick Install: All Features
 
 To enable all features at once:

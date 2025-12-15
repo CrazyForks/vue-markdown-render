@@ -91,4 +91,19 @@ For a full list of components and props, visit [Components & node renderers](/gu
 3. **UNO/Tailwind conflicts** — follow the [Tailwind guide](/guide/tailwind) (includes UnoCSS examples) to prevent utilities from overriding renderer styles.
 4. **Peer CSS** — Monaco, KaTeX, Mermaid each need their own CSS files; missing imports → blank editors/graphs.
 
+## CSS scoping (important)
+
+The package CSS is scoped under an internal `.markstream-vue` container to minimize global style conflicts (Tailwind utilities and theme variables included).
+
+- When you use `MarkdownRender`, you get this container automatically.
+- If you render exported node components on their own (e.g. `PreCodeNode`, `FootnoteNode`), wrap them with a container element:
+
+```vue
+<template>
+  <div class="markstream-vue">
+    <PreCodeNode :node="node" />
+  </div>
+</template>
+```
+
 If visuals still look wrong, reproduce the issue inside the playground (`pnpm play`) and cross-check with the troubleshooting guide before filing a bug.

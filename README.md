@@ -89,6 +89,10 @@ createApp({
 
 Import `markstream-vue/index.css` after your reset (e.g., Tailwind `@layer components`) so renderer styles win over utility classes. Install optional peers such as `stream-monaco`, `shiki`, `mermaid`, and `katex` only when you need Monaco code blocks, Shiki highlighting, diagrams, or math.
 
+Renderer CSS is scoped under an internal `.markstream-vue` container to minimize global style conflicts. If you render exported node components outside of `MarkdownRender`, wrap them in an element with class `markstream-vue`.
+
+For dark theme variables, either add a `.dark` class on an ancestor, or pass `:is-dark="true"` to `MarkdownRender` to scope dark mode to the renderer.
+
 Enable heavy peers only when needed:
 
 ```ts

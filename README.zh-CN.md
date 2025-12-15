@@ -88,6 +88,10 @@ createApp({
 
 确保在 CSS reset（如 `@tailwind base` 或 `@unocss/reset`）之后导入 `markstream-vue/index.css`，最好放在 `@layer components` 中以避免 Tailwind/UnoCSS 覆盖组件样式。根据需求再按需安装可选 peer 依赖：`stream-monaco`（Monaco 代码块）、`shiki`（Shiki 高亮）、`mermaid`（Mermaid 图表）、`katex`（数学公式）。
 
+渲染器的 CSS 会作用于内部 `.markstream-vue` 容器下，以尽量降低对全局的影响；如果你脱离 `MarkdownRender` 单独使用导出的节点组件，请在外层包一层带 `markstream-vue` 类名的容器。
+
+暗色变量可以通过给祖先节点加 `.dark`，或直接给 `MarkdownRender` 传入 `:is-dark="true"`（仅对渲染器生效）。
+
 按需启用重型依赖：
 
 ```ts

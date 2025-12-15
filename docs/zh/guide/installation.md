@@ -91,3 +91,5 @@ const md = '# 你好，markstream-vue！'
   <MarkdownRender :content="md" />
 </template>
 ```
+
+补充说明：`markstream-vue/index.css` 已限定在内部 `.markstream-vue` 容器中，用于降低全局样式冲突。`MarkdownRender` 默认渲染在容器内部；如果你独立使用节点组件，请外层包一层 `<div class="markstream-vue">...</div>`。

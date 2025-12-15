@@ -91,4 +91,19 @@ const nodes = parseMarkdownToStructure('# 标题', md)
 3. **处理 Uno/Tailwind 冲突** —— 参见 [Tailwind 指南](/zh/guide/tailwind)（包含 UnoCSS 示例）。
 4. **同伴 CSS** —— Monaco、KaTeX、Mermaid 各自需要对应的 CSS，缺失会导致空白渲染。
 
+## CSS 作用域（重要）
+
+本包打包出来的 CSS 会限定在内部 `.markstream-vue` 容器下（包含 Tailwind 工具类与主题变量），以尽量降低全局冲突风险。
+
+- 使用 `MarkdownRender` 时会自动包含该容器，无需额外处理。
+- 如果你单独使用导出的节点组件（例如 `PreCodeNode`、`FootnoteNode`），请在外层包一层容器：
+
+```vue
+<template>
+  <div class="markstream-vue">
+    <PreCodeNode :node="node" />
+  </div>
+</template>
+```
+
 若仍无法解决，请运行 `pnpm play` 在 playground 中复现，并附带链接到 issue 中。

@@ -1124,7 +1124,7 @@ function handleContainerMouseout(event: MouseEvent) {
 <template>
   <div
     ref="containerRef"
-    class="markdown-renderer"
+    class="markstream-vue markdown-renderer" :class="[{ dark: props.isDark }]"
     @click="handleContainerClick"
     @mouseover="handleContainerMouseover"
     @mouseout="handleContainerMouseout"
@@ -1249,15 +1249,15 @@ function handleContainerMouseout(event: MouseEvent) {
 
 <style>
 /* Global (unscoped) CSS for TransitionGroup enter animations */
-.typewriter-enter-from {
+.markstream-vue .typewriter-enter-from {
   opacity: 0;
 }
-.typewriter-enter-active {
+.markstream-vue .typewriter-enter-active {
   transition: opacity var(--typewriter-fade-duration, 900ms)
     var(--typewriter-fade-ease, ease-out);
   will-change: opacity;
 }
-.typewriter-enter-to {
+.markstream-vue .typewriter-enter-to {
   opacity: 1;
 }
 </style>

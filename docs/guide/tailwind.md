@@ -2,6 +2,8 @@
 
 If your project uses a Tailwind component library like `shadcn`, you may run into style ordering or overriding issues when including `markstream-vue` CSS. The recommended approach is to import the library CSS inside a controlled Tailwind layer.
 
+`markstream-vue` scopes its packaged CSS under an internal `.markstream-vue` container to reduce global conflicts. Tailwind utilities from `markstream-vue/index.css` apply only inside the renderer container.
+
 Example `styles/index.css`:
 
 ```css

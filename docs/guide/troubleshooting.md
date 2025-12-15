@@ -23,6 +23,8 @@ Open a new issue (quick link): https://github.com/Simon-He95/markstream-vue/issu
   - Consider setting a `prefix` in Tailwind config (e.g., `tw-`) to avoid collisions with component library class names.
   - Use scoped selectors or `:deep` to target only the elements you need to override.
 
+  Note: `markstream-vue` scopes its packaged CSS under an internal `.markstream-vue` container (including theme variables and Tailwind utilities), so most conflicts come from ordering/resets inside the renderer area rather than global leakage.
+
 - Want to tweak looks? You can customize via CSS variables in `src/index.css` (e.g., `--vscode-editor-background`, `--vscode-editor-foreground`) or override component classes in your app's stylesheet. Use the `@apply` helper or your own stylesheet to keep style rules isolated.
 
 - Slots first: if the styling you want needs layout changes inside a component, check whether the component provides a named slot (e.g., `header-left`, `header-right`, `loading`). Slots are an easy and stable escape hatch that let you re-render interior markup without overriding internals.

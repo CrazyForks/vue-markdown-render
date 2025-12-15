@@ -6,7 +6,7 @@ This page explains how each renderer fits together, what peer dependencies or CS
 
 | Component | Best for | Key props/events | Extra CSS / peers | Troubleshooting hooks |
 | --------- | -------- | ---------------- | ----------------- | --------------------- |
-| `MarkdownRender` | Rendering full AST trees (default export) | `content`, `custom-id`, `setCustomComponents`, `beforeRender`, `afterRender` | Import `markstream-vue/index.css` inside a reset-aware layer | Add `custom-id="docs"` to scope overrides; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
+| `MarkdownRender` | Rendering full AST trees (default export) | `content`, `custom-id`, `setCustomComponents`, `beforeRender`, `afterRender` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Add `custom-id="docs"` to scope overrides; standalone node components need a `.markstream-vue` wrapper; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `autoExpand`, `viewportPriority` | Install `stream-monaco` + include Monaco CSS (`stream-monaco/esm/index.css`) | Missing CSS ⇒ blank editor; ensure Tailwind layers wrap the import |
 | `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `theme`, `lang`, `wordWrap` | Requires `shiki` + `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
 | `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `id`, `theme`, `onRender` | Peer `mermaid` ≥ 11; import `mermaid/dist/mermaid.css` for theme | For async errors see `/guide/mermaid` |
@@ -22,6 +22,13 @@ This page explains how each renderer fits together, what peer dependencies or CS
 - **Best for**: full markdown documents in Vite, Nuxt, VitePress.
 - **Key props**: `content`, `custom-id`, `renderer`, lifecycle hooks.
 - **CSS**: include a reset (`modern-css-reset`, `@unocss/reset`, or `@tailwind base`) before `markstream-vue/index.css`. Wrap import with `@layer components` when using Tailwind/UnoCSS.
+
+### CSS scoping
+
+`markstream-vue` scopes its packaged CSS under an internal `.markstream-vue` container to reduce global style conflicts.
+
+- If you use `MarkdownRender`, you normally don't need to do anything—it's already rendered inside that container.
+- If you render node components standalone (e.g., `CodeBlockNode`, `MathBlockNode`), wrap them with `<div class="markstream-vue">...</div>` so the library styles and variables apply.
 
 ### Usage ladder
 
@@ -99,7 +106,9 @@ const node = {
 </script>
 
 <template>
-  <CodeBlockNode :node="node" :monaco-options="{ fontSize: 14 }" />
+  <div class="markstream-vue">
+    <CodeBlockNode :node="node" :monaco-options="{ fontSize: 14 }" />
+  </div>
 </template>
 ```
 

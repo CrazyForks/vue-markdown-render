@@ -17,6 +17,8 @@
   - Tailwind 里设置 `prefix`（例如 `tw-`）减少与组件库 class 冲突。
   - 用容器选择器或 `:deep` 把覆盖范围限制在渲染区域。
 
+  说明：`markstream-vue` 的打包 CSS 会限定在内部 `.markstream-vue` 容器下（包含主题变量与 Tailwind 工具类），因此大多数冲突通常来自 reset/导入顺序在渲染区域内的覆盖，而不是库在全局“泄漏”样式。
+
 - 自定义样式：你可以通过覆盖 `src/index.css` 中的 CSS 变量来自定义外观（例如 `--vscode-editor-background`、`--vscode-editor-foreground`），或在你的应用样式中覆盖组件类。推荐使用 `@apply` 或将自定义样式限定到某个容器内。
 - 插槽优先：如果你需要更改组件内布局，先检查组件是否暴露了插槽（例如 `header-left`、`header-right`、`loading`）。插槽提供稳健的扩展点，无需替换组件内部实现。
 
