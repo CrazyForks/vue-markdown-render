@@ -62,7 +62,7 @@
     "markdown-it-ts": "0.0.3"
   },
   "devDependencies": {
-    "@types/node": "^22.19.2",
+    "@types/node": "^22.19.3",
     "tsdown": "^0.15.12",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
