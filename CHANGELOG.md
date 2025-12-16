@@ -1,3 +1,13 @@
+## [0.0.3-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.5...v0.0.3-beta.6) (2025-12-16)
+
+
+### Bug Fixes
+
+* custom html token ([f89c9d1](https://github.com/Simon-He95/markstream-vue/commit/f89c9d1ece23b5bcb01838b9d8a2b511787ea7f9)), closes [#202](https://github.com/Simon-He95/markstream-vue/issues/202)
+* update snapshot tests to reflect changes in class names for markdown renderer ([17991df](https://github.com/Simon-He95/markstream-vue/commit/17991dfdb9582f7a2950d1a3800a959d03cdd511))
+
+
+
 ## [0.0.3-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.4...v0.0.3-beta.5) (2025-12-15)
 
 
