@@ -3,6 +3,7 @@ import { getCustomNodeComponents } from '../../utils/nodeComponents'
 import EmojiNode from '../EmojiNode'
 import FootnoteReferenceNode from '../FootnoteReferenceNode'
 import HighlightNode from '../HighlightNode'
+import HtmlInlineNode from '../HtmlInlineNode'
 import InlineCodeNode from '../InlineCodeNode'
 import InsertNode from '../InsertNode'
 import LinkNode from '../LinkNode'
@@ -37,6 +38,7 @@ const nodeComponents = {
   text: TextNode,
   inline_code: InlineCodeNode,
   link: LinkNode,
+  html_inline: HtmlInlineNode,
   strong: StrongNode,
   strikethrough: StrikethroughNode,
   highlight: HighlightNode,

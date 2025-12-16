@@ -157,7 +157,34 @@ let __roContainer: ResizeObserver | null = null
 let __roContent: ResizeObserver | null = null
 let __mo: MutationObserver | null = null
 let __scheduled = false
+let __minHeightDisabled = false
+let __overflowConfirmations = 0
+let __clearConfirmations = 0
+let __lastShouldRemove: boolean | null = null
+let __lastDelta: number | null = null
+let __lastLoggedAt = 0
+let __lastNoContainerLoggedAt = 0
 // Observers and scheduler
+
+function isMinHeightDebugEnabled() {
+  try {
+    return typeof window !== 'undefined' && window.localStorage?.getItem('vmr-debug-min-height') === '1'
+  }
+  catch {
+    return false
+  }
+}
+
+// Streaming updates can change the rendered height without reliably triggering
+// ResizeObserver (e.g. due to layout containment / virtualization). Ensure we
+// re-check after Vue has flushed DOM updates.
+watch(
+  () => content.value.length,
+  () => {
+    scheduleCheckMinHeight()
+  },
+  { flush: 'post' },
+)
 
 function scheduleCheckMinHeight() {
   if (__scheduled)
@@ -166,14 +193,120 @@ function scheduleCheckMinHeight() {
   requestAnimationFrame(() => {
     __scheduled = false
     const container = messagesContainer.value
-    if (!container)
+    if (!container) {
+      if (isMinHeightDebugEnabled()) {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        if ((now - __lastNoContainerLoggedAt) > 2000) {
+          __lastNoContainerLoggedAt = now
+          console.debug('[min-height] no container')
+        }
+      }
       return
-    const contentEl = container.querySelector('.markdown-renderer') as HTMLElement | null
-    if (!contentEl)
+    }
+    // IMPORTANT: pick the direct child renderer; the page can contain nested
+    // `.markdown-renderer` instances (e.g. inside custom nodes). The CSS rule
+    // targets `.chatbot-messages > .markdown-renderer`, so we must toggle the
+    // class on the direct child.
+    const contentEl = Array.from(container.children).find(el =>
+      (el as HTMLElement).classList?.contains('markdown-renderer'),
+    ) as HTMLElement | undefined
+    if (!contentEl) {
+      if (isMinHeightDebugEnabled()) {
+        console.debug('[min-height] no direct .markdown-renderer child', {
+          children: Array.from(container.children).map(el => (el as HTMLElement).className),
+        })
+      }
       return
-    const shouldRemove = contentEl.scrollHeight > container.clientHeight
-    if (shouldRemove) {
+    }
+
+    const debug = isMinHeightDebugEnabled()
+    const hadClass = contentEl.classList.contains('disable-min-height')
+
+    // Hysteresis thresholds:
+    // - Require overflow to persist for a couple of checks before latching.
+    // - Require a few clear checks before undoing a latched state.
+    const REQUIRED_OVERFLOW_CONFIRMATIONS = 2
+    const REQUIRED_CLEAR_CONFIRMATIONS = 3
+
+    // If currently latched (or DOM already has class), keep class and only
+    // consider clearing after several consecutive non-overflow readings.
+    if (__minHeightDisabled || hadClass) {
       contentEl.classList.add('disable-min-height')
+      const containerDelta = container.scrollHeight - container.clientHeight
+      const shouldRemove = containerDelta > 1
+
+      if (shouldRemove) {
+        __clearConfirmations = 0
+        __minHeightDisabled = true
+      }
+      else {
+        __clearConfirmations++
+        if (__clearConfirmations >= REQUIRED_CLEAR_CONFIRMATIONS) {
+          __minHeightDisabled = false
+          __overflowConfirmations = 0
+          contentEl.classList.remove('disable-min-height')
+        }
+      }
+
+      if (debug) {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        const containerRect = container.getBoundingClientRect()
+        const rendererRect = contentEl.getBoundingClientRect()
+        const shouldLog
+          = __lastShouldRemove === null
+            || __lastShouldRemove !== shouldRemove
+            || __lastDelta === null
+            || __lastDelta !== containerDelta
+            || (now - __lastLoggedAt) > 2000
+        if (shouldLog) {
+          __lastLoggedAt = now
+          __lastDelta = containerDelta
+          console.debug('[min-height] check', {
+            shouldRemove,
+            latched: __minHeightDisabled,
+            containerDelta,
+            overflowConfirmations: __overflowConfirmations,
+            clearConfirmations: __clearConfirmations,
+            scrollHeight: container.scrollHeight,
+            clientHeight: container.clientHeight,
+            scrollTop: container.scrollTop,
+            containerRect: {
+              w: Math.round(containerRect.width),
+              h: Math.round(containerRect.height),
+            },
+            rendererRect: {
+              w: Math.round(rendererRect.width),
+              h: Math.round(rendererRect.height),
+            },
+            contentLength: content.value.length,
+            contentHasClass: contentEl.classList.contains('disable-min-height'),
+            contentClass: contentEl.className,
+          })
+        }
+      }
+      else {
+        __lastLoggedAt = 0
+        __lastDelta = null
+      }
+
+      __lastShouldRemove = shouldRemove
+      return
+    }
+
+    // Not latched: probe by temporarily unsetting min-height (same rAF tick).
+    contentEl.classList.add('disable-min-height')
+    const containerDelta = container.scrollHeight - container.clientHeight
+    const probeOverflow = containerDelta > 1
+    if (probeOverflow)
+      __overflowConfirmations++
+    else
+      __overflowConfirmations = 0
+
+    const shouldRemove = __overflowConfirmations >= REQUIRED_OVERFLOW_CONFIRMATIONS
+
+    if (shouldRemove) {
+      __minHeightDisabled = true
+      __clearConfirmations = 0
       // 内容已超出：不再需要继续监听，断开所有 observer 以节省开销
       try {
         __roContainer?.disconnect()
@@ -187,8 +320,52 @@ function scheduleCheckMinHeight() {
       }
     }
     else {
+      // Revert probe change before paint.
       contentEl.classList.remove('disable-min-height')
     }
+    if (debug) {
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+      const containerRect = container.getBoundingClientRect()
+      const rendererRect = contentEl.getBoundingClientRect()
+
+      const shouldLog
+        = __lastShouldRemove === null
+          || __lastShouldRemove !== shouldRemove
+          || __lastDelta === null
+          || __lastDelta !== containerDelta
+          || (now - __lastLoggedAt) > 2000
+
+      if (shouldLog) {
+        __lastLoggedAt = now
+        __lastDelta = containerDelta
+        console.debug('[min-height] check', {
+          shouldRemove,
+          latched: __minHeightDisabled,
+          containerDelta,
+          overflowConfirmations: __overflowConfirmations,
+          clearConfirmations: __clearConfirmations,
+          scrollHeight: container.scrollHeight,
+          clientHeight: container.clientHeight,
+          scrollTop: container.scrollTop,
+          containerRect: {
+            w: Math.round(containerRect.width),
+            h: Math.round(containerRect.height),
+          },
+          rendererRect: {
+            w: Math.round(rendererRect.width),
+            h: Math.round(rendererRect.height),
+          },
+          contentLength: content.value.length,
+          contentHasClass: contentEl.classList.contains('disable-min-height'),
+          contentClass: contentEl.className,
+        })
+      }
+    }
+    else {
+      __lastLoggedAt = 0
+      __lastDelta = null
+    }
+    __lastShouldRemove = shouldRemove
   })
 }
 
@@ -206,7 +383,9 @@ onMounted(() => {
 
   // 观察渲染内容尺寸变化（markdown 内容动态变化）
   const tryObserveContent = () => {
-    const el = container.querySelector('.markdown-renderer') as HTMLElement | null
+    const el = Array.from(container.children).find(child =>
+      (child as HTMLElement).classList?.contains('markdown-renderer'),
+    ) as HTMLElement | undefined
     if (el) {
       if (__roContent)
         __roContent.disconnect()
@@ -519,6 +698,7 @@ onBeforeUnmount(() => {
 }
 .chatbot-messages > .markdown-renderer {
   min-height: 100%;
+  box-sizing: border-box;
 }
 
 /* 当真实内容高度超出容器时，移除默认 min-height（由 JS 切换类名） */

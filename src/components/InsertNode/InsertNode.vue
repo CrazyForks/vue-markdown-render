@@ -4,6 +4,7 @@ import EmojiNode from '../EmojiNode'
 import EmphasisNode from '../EmphasisNode'
 import FootnoteReferenceNode from '../FootnoteReferenceNode'
 import HighlightNode from '../HighlightNode'
+import HtmlInlineNode from '../HtmlInlineNode'
 import InlineCodeNode from '../InlineCodeNode'
 import LinkNode from '../LinkNode'
 import { MathInlineNodeAsync } from '../NodeRenderer/asyncComponent'
@@ -37,6 +38,7 @@ const nodeComponents = {
   text: TextNode,
   inline_code: InlineCodeNode,
   link: LinkNode,
+  html_inline: HtmlInlineNode,
   strong: StrongNode,
   emphasis: EmphasisNode,
   strikethrough: StrikethroughNode,

@@ -255,12 +255,17 @@ export function parseHtmlInlineCodeToken(
     const _content = fragment.innerTokens.length
       ? stringifyTokens(fragment.innerTokens)
       : ''
+
+    const customChildren = fragment.innerTokens.length
+      ? parseInlineTokens(fragment.innerTokens, raw, pPreToken, options)
+      : []
     return [
       {
         type: tag,
         tag,
         attrs,
         content: _content,
+        children: customChildren,
         raw: content,
         loading: token.loading || loading,
         autoClosed,

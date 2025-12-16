@@ -94,7 +94,10 @@ export function parseInlineTokens(
     }
 
     // strong (**)
-    if (/\*\*/.test(content) && !content.endsWith('**')) {
+    // Note: markdown-it may sometimes leave `**...**` as a plain text token
+    // (e.g. when wrapping inline HTML like `<font>...</font>`). In that case,
+    // we still want to recognize and parse the first strong pair.
+    if (/\*\*/.test(content)) {
       const openIdx = content.indexOf('**')
       const beforeText = openIdx > -1 ? content.slice(0, openIdx) : ''
       if (beforeText) {

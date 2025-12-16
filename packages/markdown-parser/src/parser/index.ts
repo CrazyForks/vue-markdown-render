@@ -8,6 +8,24 @@ import { parseHardBreak } from './node-parsers/hardbreak-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
 
+function stripDanglingHtmlLikeTail(markdown: string) {
+  // In streaming mode it's common to have an incomplete HTML-ish fragment at
+  // the very end of the current buffer (e.g. '<fo' or '</think'). Letting it
+  // reach markdown-it can produce visible mid-state text nodes. We only strip
+  // the *tail* when there is no closing '>' anywhere after the last '<'.
+  const s = String(markdown ?? '')
+  const lastLt = s.lastIndexOf('<')
+  if (lastLt === -1)
+    return s
+  const tail = s.slice(lastLt)
+  if (tail.includes('>'))
+    return s
+  // Only strip when the tail looks like a tag start/prefix, not a random '<'.
+  if (!/^<\s*(?:\/\s*)?[A-Z!][\s\S]*$/i.test(tail))
+    return s
+  return s.slice(0, lastLt)
+}
+
 export function parseMarkdownToStructure(
   markdown: string,
   md: MarkdownIt,
@@ -20,14 +38,77 @@ export function parseMarkdownToStructure(
     // 放置markdown 解析 - * 会被处理成多个 ul >li 嵌套列表
     safeMarkdown = safeMarkdown.replace(/- \*$/, '- \\*')
   }
-  if (/\n\s*-\s*$/.test(safeMarkdown)) {
-    // 此时 markdown 解析会出错要跳过
-    safeMarkdown = safeMarkdown.replace(/\n\s*-\s*$/, '\n')
+  if (/(?:^|\n)\s*-\s*$/.test(safeMarkdown)) {
+    // streaming 中间态：单独的 "-" 行（或以换行结尾的 "-\n"）会被渲染成文本/列表前缀，
+    // 也会导致输入 "---" 时第一个 "-" 先闪出来再跳成 hr。
+    safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*-\s*$/, (m) => {
+      return m.startsWith('\n') ? '\n' : ''
+    })
+  }
+  else if (/(?:^|\n)\s*--\s*$/.test(safeMarkdown)) {
+    // streaming 中间态：输入 "---" 时的 "--" 前缀也不应该作为文本渲染，避免跳动。
+    safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*--\s*$/, (m) => {
+      return m.startsWith('\n') ? '\n' : ''
+    })
+  }
+  else if (/(?:^|\n)\s*>\s*$/.test(safeMarkdown)) {
+    // streaming 中间态：单独的 ">" 行会先被识别成 blockquote，导致 UI 闪烁/跳动。
+    // 只裁剪末尾这一个 marker，等后续内容到齐再正常解析。
+    safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*>\s*$/, (m) => {
+      return m.startsWith('\n') ? '\n' : ''
+    })
+  }
+  else if (/\n\s*[*+]\s*$/.test(safeMarkdown)) {
+    // streaming 中间态：单独的 "*"/"+" 行会被识别成空的 list item，导致 UI 闪出一个圆点
+    safeMarkdown = safeMarkdown.replace(/\n\s*[*+]\s*$/, '\n')
   }
   else if (/\n[[(]\n*$/.test(safeMarkdown)) {
     // 此时 markdown 解析会出错要跳过
     safeMarkdown = safeMarkdown.replace(/(\n\[|\n\()+\n*$/g, '\n')
   }
+
+  // For custom HTML-like blocks (e.g. <thinking>...</thinking>), markdown-it may
+  // keep parsing subsequent lines as part of the HTML block unless there's a
+  // blank line boundary. To ensure content immediately following a closing tag
+  // (like a list/table/blockquote/fence) is parsed as Markdown blocks, insert
+  // a single empty line after the closing tag when the next line begins with a
+  // block-level marker.
+  if (options.customHtmlTags?.length) {
+    const tags = options.customHtmlTags
+      .map(t => String(t ?? '').trim())
+      .filter(Boolean)
+      .map((t) => {
+        const m = t.match(/^[<\s/]*([A-Z][\w-]*)/i)
+        return (m?.[1] ?? '').toLowerCase()
+      })
+      .filter(Boolean)
+
+    if (tags.length) {
+      // Fast path: no closing tag marker at all.
+      if (!safeMarkdown.includes('</')) {
+        // no-op
+      }
+      else {
+        for (const tag of tags) {
+          const re = new RegExp(
+          // After a closing tag at end-of-line, if the next line is not blank
+          // (ignoring whitespace) and we're not at end-of-string, insert a
+          // blank line to force markdown-it to resume normal block parsing.
+          // Restrict to lines that contain ONLY the closing tag (plus whitespace)
+          // to avoid affecting inline occurrences like "x</thinking>y".
+            String.raw`(^[\t ]*<\s*\/\s*${tag}\s*>[\t ]*)(\r?\n)(?![\t ]*\r?\n|$)`,
+            'gim',
+          )
+          safeMarkdown = safeMarkdown.replace(re, '$1$2$2')
+        }
+      }
+    }
+  }
+
+  // 마지막에 남아있는 미완성 '<...'(예: '<fo', '</think') 꼬리 조각은
+  // streaming 중간 상태에서 화면에 그대로 찍힐 수 있으므로, markdown-it
+  // 파싱 전에 제거한다.
+  safeMarkdown = stripDanglingHtmlLikeTail(safeMarkdown)
 
   // Get tokens from markdown-it
   const tokens = md.parse(safeMarkdown, {})
@@ -42,8 +123,17 @@ export function parseMarkdownToStructure(
   if (pre && typeof pre === 'function') {
     transformedTokens = pre(transformedTokens) || transformedTokens
   }
-  // Process the tokens into our structured format
-  let result = processTokens(transformedTokens, options)
+
+  // Process the tokens into our structured format.
+  // Note: markdown-it's `html_block` token.content can be normalized in ways
+  // that drop some original lines. Keep the original source around so block
+  // parsers can reconstruct raw slices using token.map when needed.
+  const internalOptions = {
+    ...options,
+    __sourceMarkdown: safeMarkdown,
+    __customHtmlBlockCursor: 0,
+  } as any
+  let result = processTokens(transformedTokens, internalOptions)
 
   // Backwards compatible token-level post hook: if provided and returns
   // a modified token array, re-process tokens and override node-level result.
@@ -129,6 +219,22 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         result.push(parseHardBreak())
         i++
         break
+
+      case 'text': {
+        const content = String(token.content ?? '')
+        // In stream mode, markdown-it can occasionally emit a root-level `text`
+        // token (e.g. immediately after an HTML/custom block closes). Treat it
+        // as a normal paragraph so the content isn't dropped.
+        result.push({
+          type: 'paragraph',
+          raw: content,
+          children: content
+            ? [{ type: 'text', content, raw: content } as ParsedNode]
+            : [],
+        } as ParsedNode)
+        i++
+        break
+      }
 
       case 'inline':
         result.push(...parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, {

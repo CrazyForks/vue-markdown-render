@@ -35,6 +35,7 @@ const BASE_COMMON_HTML_TAGS = new Set<string>([
   'del',
   'dfn',
   'em',
+  'font',
   'i',
   'img',
   'input',
@@ -156,7 +157,9 @@ function findFirstIncompleteTag(content: string, tagSet: Set<string>) {
     if (idx < 0)
       continue
     const tag = (m[1] ?? '').toLowerCase()
-    if (!tagSet.has(tag))
+    // For opening tags we also accept prefixes of known HTML tags
+    // (e.g., '<fo' while typing '<font ...>').
+    if (!isCommonHtmlTagOrPrefix(tag, tagSet))
       continue
     const rest = content.slice(idx)
     if (findTagCloseIndexOutsideQuotes(rest) !== -1)
@@ -440,17 +443,93 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
     const tagStack: [string, number][] = []
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i] as Token & { content?: string, children: any[] }
+
+      // If we're currently inside an unclosed custom-tag html_block, merge
+      // everything (including other html_block tokens) into the opener until
+      // the matching closing tag arrives.
+      if (tagStack.length > 0) {
+        const [openTag, openIndex] = tagStack[tagStack.length - 1]
+        if (i !== openIndex) {
+          // Remove structural paragraph wrappers that can appear in stream mode.
+          if (t.type === 'paragraph_open' || t.type === 'paragraph_close') {
+            toks.splice(i, 1)
+            i--
+            continue
+          }
+
+          const chunk = String((t as any).content ?? (t as any).raw ?? '')
+          const closeRe = new RegExp(`<\\s*\\/\\s*${openTag}\\s*>`, 'i')
+          const closeMatch = chunk ? closeRe.exec(chunk) : null
+          const isClosingTag = !!closeMatch
+
+          if (chunk) {
+            const openToken = toks[openIndex] as Token & { content?: string, loading?: boolean }
+            if (closeMatch && typeof closeMatch.index === 'number') {
+              const end = closeMatch.index + String(closeMatch[0] ?? '').length
+              const before = chunk.slice(0, end)
+              const after = chunk.slice(end)
+
+              openToken.content = `${String(openToken.content || '')}\n${before}`
+              openToken.loading = false
+
+              const afterTrimmed = after.replace(/^\s+/, '')
+              // Remove current token after merging.
+              toks.splice(i, 1)
+              // Close the stack before reinserting trailing content.
+              tagStack.pop()
+              if (afterTrimmed) {
+                toks.splice(i, 0, afterTrimmed.startsWith('<')
+                  ? ({ type: 'html_block', content: afterTrimmed } as any)
+                  : ({ type: 'inline', content: afterTrimmed, children: [{ type: 'text', content: afterTrimmed, raw: afterTrimmed }] } as any))
+              }
+              i--
+              continue
+            }
+
+            openToken.content = `${String(openToken.content || '')}\n${chunk}`
+            if (openToken.loading !== false)
+              openToken.loading = !isClosingTag
+          }
+
+          // Remove current token after merging.
+          toks.splice(i, 1)
+          i--
+
+          if (isClosingTag)
+            tagStack.pop()
+          continue
+        }
+      }
+
       if (t.type === 'html_block') {
-        const tag = (t.content?.match(/<([^\s>/]+)/)?.[1] ?? '').toLowerCase()
-        const isClosingTag = /<\s*\/\s*[^\s>]+\s*>/.test(t.content || '')
+        const rawContent = String(t.content || '')
+        // Support both opening (<tag ...>) and closing (</tag>) blocks.
+        const tag = (rawContent.match(/<\s*(?:\/\s*)?([^\s>/]+)/)?.[1] ?? '').toLowerCase()
+        const isClosingTag = /^\s*<\s*\//.test(rawContent)
+
         if (!isClosingTag) {
           // 开始标签，入栈
-          tagStack.push([tag, i])
+          if (tag) {
+            // If the html_block already contains its own closing tag, do NOT
+            // push it onto the stack; otherwise we'd incorrectly merge the
+            // following blocks into this html_block.
+            const closeRe = new RegExp(`<\\s*\\/\\s*${tag}\\s*>`, 'i')
+            if (!closeRe.test(rawContent))
+              tagStack.push([tag, i])
+          }
         }
         else {
-          // 结束标签，出栈
-          if (tagStack.length > 0 && tagStack[tagStack.length - 1][0] === tag) {
+          // 结束标签：如果匹配到栈顶，则把 closing token 也合并进 opener 并删除自己
+          if (tagStack.length > 0 && tag && tagStack[tagStack.length - 1][0] === tag) {
+            const [, openIndex] = tagStack[tagStack.length - 1]
+            const openToken = toks[openIndex] as Token & { content?: string, loading?: boolean }
+            openToken.content = `${String(openToken.content || '')}\n${rawContent}`
+            openToken.loading = false
             tagStack.pop()
+
+            // Remove current closing html_block token so it doesn't become a stray node.
+            toks.splice(i, 1)
+            i--
           }
         }
         continue
@@ -487,12 +566,190 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
       }
     }
 
+    // Some custom tags (e.g. <thinking>) can be tokenized by markdown-it into
+    // multiple top-level inline tokens, with the closing tag arriving in a
+    // later inline token. Our inline parser can only match closing tags within
+    // the same inline token's children list, so we merge such sequences here.
+    if (customTagSet.size > 0) {
+      const openReCache = new Map<string, RegExp>()
+      const closeReCache = new Map<string, RegExp>()
+      const getOpenRe = (tag: string) => {
+        let r = openReCache.get(tag)
+        if (!r) {
+          r = new RegExp(`<\\s*${tag}\\b`, 'i')
+          openReCache.set(tag, r)
+        }
+        return r
+      }
+      const getCloseRe = (tag: string) => {
+        let r = closeReCache.get(tag)
+        if (!r) {
+          r = new RegExp(`<\\s*\\/\\s*${tag}\\s*>`, 'i')
+          closeReCache.set(tag, r)
+        }
+        return r
+      }
+
+      const stack: Array<{ tag: string, index: number }> = []
+      for (let i = 0; i < toks.length; i++) {
+        const tok = toks[i] as Token & { content?: string, children?: any[] }
+        const content = String(tok.content ?? '')
+
+        // If we're inside an unclosed custom tag, we may need to close it even
+        // if the closing tag is emitted as html_block (markdown-it can do this).
+        if (stack.length > 0) {
+          const top = stack[stack.length - 1]
+          const openTok = toks[top.index] as Token & { content?: string, children?: any[] }
+
+          // Close via an html_block token like "</thinking>"
+          if (tok.type === 'html_block' && getCloseRe(top.tag).test(content)) {
+            openTok.content = `${String(openTok.content ?? '')}\n${content}`
+            if (Array.isArray(openTok.children)) {
+              openTok.children.push({
+                type: 'html_inline',
+                content: `</${top.tag}>`,
+                raw: `</${top.tag}>`,
+              } as any)
+            }
+            toks.splice(i, 1)
+            i--
+            stack.pop()
+            continue
+          }
+
+          // Only merge inline tokens; keep block structure intact.
+          if (tok.type !== 'inline')
+            continue
+
+          const children = Array.isArray(tok.children) ? tok.children : []
+          const closeChildIndex = children.findIndex((c: any) => {
+            if (!c || c.type !== 'html_inline')
+              return false
+            const cContent = String(c.content ?? '')
+            return /^\s*<\s*\//.test(cContent) && cContent.toLowerCase().includes(top.tag)
+          })
+
+          // If the closing tag is inside this inline token, merge up to it and
+          // keep the trailing content as a new paragraph so it doesn't get
+          // swallowed by the custom tag.
+          if (closeChildIndex !== -1) {
+            const beforeChildren = children.slice(0, closeChildIndex + 1)
+            const afterChildren = children.slice(closeChildIndex + 1)
+
+            const beforeText = beforeChildren
+              .map((c: any) => String(c?.content ?? c?.raw ?? ''))
+              .join('')
+
+            // Only append the fragment up to and including the closing tag.
+            openTok.content = `${String(openTok.content ?? '')}\n${beforeText}`
+            if (Array.isArray(openTok.children))
+              openTok.children.push(...beforeChildren)
+
+            // Replace current token with trailing content (if any)
+            if (afterChildren.length) {
+              const afterText = afterChildren.map((c: any) => String(c.content ?? c.raw ?? '')).join('')
+              if (afterText.trim()) {
+                const trimmed = afterText.replace(/^\s+/, '')
+                if (trimmed.startsWith('<')) {
+                  toks.splice(i, 1, { type: 'html_block', content: trimmed } as any)
+                }
+                else {
+                  toks.splice(i, 1, { type: 'paragraph_open', tag: 'p', nesting: 1 } as any, { type: 'inline', tag: '', nesting: 0, content: afterText, children: [{ type: 'text', content: afterText, raw: afterText }] } as any, { type: 'paragraph_close', tag: 'p', nesting: -1 } as any)
+                  // current index now points at paragraph_open; move on
+                }
+              }
+              else {
+                toks.splice(i, 1)
+                i--
+              }
+            }
+            else {
+              toks.splice(i, 1)
+              i--
+            }
+
+            stack.pop()
+            continue
+          }
+
+          // No closing tag: merge everything and remove current inline token.
+          openTok.content = `${String(openTok.content ?? '')}\n${content}`
+          if (Array.isArray(openTok.children))
+            openTok.children.push(...children)
+          toks.splice(i, 1)
+          i--
+          continue
+        }
+
+        // Not inside: detect an opening custom tag that does not close within this token.
+        if (tok.type !== 'inline')
+          continue
+        for (const tag of customTagSet) {
+          if (getOpenRe(tag).test(content) && !getCloseRe(tag).test(content)) {
+            stack.push({ tag, index: i })
+            break
+          }
+        }
+      }
+    }
+
+    // Defensive cleanup: some edge cases can end up with an orphan
+    // paragraph_close token (without a matching paragraph_open) after
+    // core-stage token mutations. Drop such invalid closes so downstream
+    // consumers don't see stray paragraph_close.
+    {
+      let depth = 0
+      for (let i = 0; i < toks.length; i++) {
+        const t = toks[i] as Token
+        if (t.type === 'paragraph_open') {
+          depth++
+          continue
+        }
+        if (t.type === 'paragraph_close') {
+          if (depth > 0) {
+            depth--
+          }
+          else {
+            toks.splice(i, 1)
+            i--
+          }
+        }
+      }
+    }
+
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i] as Token & { content?: string, children: any[], loading?: boolean }
       if (t.type === 'html_block') {
         const rawTag = t.content?.match(/<([^\s>/]+)/)?.[1] ?? ''
         const tag = rawTag.toLowerCase()
         // Keep custom tags as html_block so block-level custom components work.
+
+        if (customTagSet.has(tag)) {
+          const raw = String(t.content ?? '')
+          const closeRe = new RegExp(`<\\/\\s*${tag}\\s*>`, 'i')
+          const hasClose = closeRe.test(raw)
+          t.loading = hasClose ? false : t.loading !== undefined ? t.loading : true
+
+          const closeMatch = closeRe.exec(raw)
+          const endTagIndex = closeMatch ? closeMatch.index : -1
+          const closeLen = closeMatch ? closeMatch[0].length : 0
+
+          if (endTagIndex !== -1) {
+            const rawForNode = raw.slice(0, endTagIndex + closeLen)
+            t.content = rawForNode
+            ;(t as any).raw = rawForNode
+
+            const afterContent = raw.slice(endTagIndex + closeLen) || ''
+            const afterTrimmed = afterContent.replace(/^\s+/, '')
+            if (afterTrimmed) {
+              toks.splice(i + 1, 0, afterTrimmed.startsWith('<')
+                ? ({ type: 'html_block', content: afterTrimmed } as any)
+                : ({ type: 'text', content: afterTrimmed, raw: afterTrimmed } as any))
+            }
+          }
+
+          continue
+        }
 
         // Do not attempt to convert or close comments/doctypes/processing-instructions
         if (tag.startsWith('!') || tag.startsWith('?')) {
@@ -503,7 +760,8 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
         if (['br', 'hr', 'img', 'input', 'link', 'meta', 'div', 'p', 'ul', 'li'].includes(tag))
           continue
         t.type = 'inline'
-        const loading = t.content?.toLowerCase().includes(`</${tag}>`) ? false : t.loading !== undefined ? t.loading : true
+        const hasClose = new RegExp(`<\\/\\s*${tag}\\s*>`, 'i').test(String(t.content ?? ''))
+        const loading = hasClose ? false : t.loading !== undefined ? t.loading : true
         const attrs: [string, string][] = []
         // 解析属性
         const attrRegex = /\s([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
@@ -514,40 +772,52 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
           attrs.push([attrName, attrValue])
         }
         if (customTagSet.has(tag)) {
-          // 提取内容中间的文本作为 children
-          const contentMatch = t.content?.match(new RegExp(`<\\s*${tag}[^>]*>([\\s\\S]*)`, 'i'))
-          const raw = t.content
-          const endTagRegex = new RegExp(`</\\s*${tag}\\s*>`, 'i')
-          const endTagIndex = t.content?.toLowerCase().indexOf(`</${tag}>`) ?? -1
-          const content = endTagIndex !== -1
-            ? contentMatch![1].split(endTagRegex)[0]
-              ? contentMatch
-                ? contentMatch[1]
-                : ''
-              : ''
-            : contentMatch
-              ? contentMatch[1].replace(/<.*$/, '')
-              : ''
+          const raw = String(t.content ?? '')
+          const closeRe = new RegExp(`<\\/\\s*${tag}\\s*>`, 'i')
+          const closeMatch = closeRe.exec(raw)
+          const endTagIndex = closeMatch ? closeMatch.index : -1
+          const closeLen = closeMatch ? closeMatch[0].length : 0
+
+          const rawForNode = endTagIndex !== -1
+            ? raw.slice(0, endTagIndex + closeLen)
+            : raw
+
+          // Extract inner content between the first opening '>' and the closing tag.
+          let inner = ''
+          const openEnd = findTagCloseIndexOutsideQuotes(raw)
+          if (openEnd !== -1) {
+            if (endTagIndex !== -1 && openEnd < endTagIndex) {
+              inner = raw.slice(openEnd + 1, endTagIndex)
+            }
+            else if (endTagIndex === -1) {
+              // Streaming mid-state: trim any trailing partial tag fragment.
+              inner = raw.slice(openEnd + 1).replace(/<.*$/, '')
+            }
+          }
 
           t.children = [
             {
               type: tag,
-              content,
-              raw,
+              content: inner,
+              raw: rawForNode,
               attrs,
               tag,
               loading,
             },
           ] as any[]
           if (endTagIndex !== -1) {
-            // 并且 endTagIndex !== t.content.length - `</tag>` 说明后面还有内容，需要让他被markdown继续解析
-            const afterContent = t.content?.slice(endTagIndex + tag.length + 3) || ''
-            if (afterContent.trim()) {
-              toks.splice(i + 1, 0, {
-                type: 'text',
-                content: afterContent,
-                raw: afterContent,
-              } as any)
+            // Always trim current token to the end of the closing tag.
+            // This prevents later blocks (e.g. another custom tag) from being
+            // included in the custom tag node's raw/content.
+            t.content = rawForNode
+            ;(t as any).raw = rawForNode
+
+            const afterContent = raw.slice(endTagIndex + closeLen) || ''
+            const afterTrimmed = afterContent.replace(/^\s+/, '')
+            if (afterTrimmed) {
+              toks.splice(i + 1, 0, afterTrimmed.startsWith('<')
+                ? ({ type: 'html_block', content: afterTrimmed } as any)
+                : ({ type: 'text', content: afterTrimmed, raw: afterTrimmed } as any))
             }
           }
         }
