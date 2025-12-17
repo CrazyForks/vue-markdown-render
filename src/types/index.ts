@@ -6,6 +6,13 @@ export interface BaseNode {
   diff?: boolean
 }
 
+/**
+ * A catch‑all node type for user extensions.
+ * Must still satisfy the renderer contract (`type` + `raw`), but may carry
+ * arbitrary extra fields.
+ */
+export type UnknownNode = BaseNode & Record<string, unknown>
+
 export interface TextNode extends BaseNode {
   type: 'text'
   content: string
@@ -292,7 +299,7 @@ export type ParsedNode
     | MathInlineNode
     | MathBlockNode
     | ReferenceNode
-    | Record<string, any>
+    | UnknownNode
 export interface CustomComponents {
   text: any
   paragraph: any
