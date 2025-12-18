@@ -46,19 +46,7 @@ import './workers/mermaidParser.worker?worker'
 const CodeBlockNode = defineAsyncComponent(() => import('./components/CodeBlockNode'))
 const MathBlockNode = defineAsyncComponent(() => import('./components/MathBlockNode'))
 const MathInlineNode = defineAsyncComponent(() => import('./components/MathInlineNode'))
-const MermaidBlockNode = defineAsyncComponent(async () => {
-  try {
-    const mod = await import('./components/MermaidBlockNode')
-    return mod.default
-  }
-  catch (e) {
-    console.warn(
-      '[markstream-vue] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
-      e,
-    )
-    return PreCodeNode
-  }
-})
+const MermaidBlockNode = defineAsyncComponent(() => import('./components/MermaidBlockNode'))
 
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
