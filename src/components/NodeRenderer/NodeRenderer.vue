@@ -20,7 +20,6 @@ import InlineCodeNode from '../../components/InlineCodeNode'
 import InsertNode from '../../components/InsertNode'
 import LinkNode from '../../components/LinkNode'
 import ListNode from '../../components/ListNode'
-import MermaidBlockNode from '../../components/MermaidBlockNode'
 import ParagraphNode from '../../components/ParagraphNode'
 import PreCodeNode from '../../components/PreCodeNode'
 import ReferenceNode from '../../components/ReferenceNode'
@@ -1004,6 +1003,20 @@ const CodeBlockNodeAsync = defineAsyncComponent(async () => {
   }
 })
 
+const MermaidBlockNodeAsync = defineAsyncComponent(async () => {
+  try {
+    const mod = await import('../../components/MermaidBlockNode')
+    return mod.default
+  }
+  catch (e) {
+    console.warn(
+      '[markstream-vue] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
+      e,
+    )
+    return PreCodeNode
+  }
+})
+
 // 组件映射表
 const codeBlockComponent = computed(() => props.renderCodeBlocksAsPre ? PreCodeNode : CodeBlockNodeAsync)
 const nodeComponents = {
@@ -1057,7 +1070,7 @@ function getNodeComponent(node: ParsedNode) {
     // `mermaid` override is provided.
     if (lang === 'mermaid') {
       const customMermaid = (customComponents as any).mermaid
-      return customMermaid || MermaidBlockNode
+      return customMermaid || MermaidBlockNodeAsync
     }
 
     if (customForType)

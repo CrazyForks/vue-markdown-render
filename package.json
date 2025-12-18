@@ -45,7 +45,7 @@
     "markstream-vue"
   ],
   "sideEffects": [
-    "src/index.css"
+    "**/*.css"
   ],
   "exports": {
     ".": {
@@ -82,7 +82,7 @@
     "play:nuxt:build": "pnpm run -C playground-nuxt build",
     "play:nuxt:preview": "pnpm run -C playground-nuxt preview",
     "preview": "pnpm run -C playground preview",
-    "build": "vite build --mode npm && vite build --config vite.config.tailwind.ts --mode npm && pnpm run build:dts",
+    "build": "vite build --mode npm && vite build --config vite.config.tailwind.ts --mode npm && node scripts/copy-tailwind-css.mjs && pnpm run build:dts",
     "docs:dev": "vitepress dev docs",
     "docs:sync-zh": "node scripts/sync-zh-docs.mjs",
     "docs:check-zh": "node scripts/check-zh-parity.mjs",

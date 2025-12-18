@@ -23,7 +23,6 @@ import ListItemNode from './components/ListItemNode'
 import ListNode from './components/ListNode'
 import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
-import MermaidBlockNode from './components/MermaidBlockNode'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
 import MarkdownRender from './components/NodeRenderer'
 import ParagraphNode from './components/ParagraphNode'
@@ -47,6 +46,19 @@ import './workers/mermaidParser.worker?worker'
 const CodeBlockNode = defineAsyncComponent(() => import('./components/CodeBlockNode'))
 const MathBlockNode = defineAsyncComponent(() => import('./components/MathBlockNode'))
 const MathInlineNode = defineAsyncComponent(() => import('./components/MathInlineNode'))
+const MermaidBlockNode = defineAsyncComponent(async () => {
+  try {
+    const mod = await import('./components/MermaidBlockNode')
+    return mod.default
+  }
+  catch (e) {
+    console.warn(
+      '[markstream-vue] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
+      e,
+    )
+    return PreCodeNode
+  }
+})
 
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
