@@ -1,3 +1,13 @@
+## [0.0.3-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.6...v0.0.3-beta.7) (2025-12-18)
+
+
+### Bug Fixes
+
+* **type:**  parseMarkdownToStructure ([65b2b6d](https://github.com/Simon-He95/markstream-vue/commit/65b2b6d335441e8296899775cea713b0cb95ac5e)), closes [#204](https://github.com/Simon-He95/markstream-vue/issues/204)
+* update MermaidBlockNode to load asynchronously and handle missing dependencies ([ff67177](https://github.com/Simon-He95/markstream-vue/commit/ff67177d1bee5403b4741a1294d6c7e1ba808d2d))
+
+
+
 ## [0.0.3-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.5...v0.0.3-beta.6) (2025-12-16)
 
 
