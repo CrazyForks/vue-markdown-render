@@ -171,6 +171,19 @@ function countUnescapedStrong(s: string) {
   return c
 }
 
+function findLastUnescapedStrongMarker(s: string) {
+  const re = /(^|[^\\])(__|\*\*)/g
+  let m: RegExpExecArray | null
+  let last: { marker: string, index: number } | null = null
+
+  while ((m = re.exec(s)) !== null) {
+    const marker = m[2]
+    const index = m.index + (m[1]?.length ?? 0)
+    last = { marker, index }
+  }
+  return last
+}
+
 export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
   const commands = opts?.commands ?? KATEX_COMMANDS
   const escapeExclamation = opts?.escapeExclamation ?? true
@@ -352,8 +365,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
                   pushText(text)
                 }
                 if (isStrongPrefix) {
+                  const strongMarker = findLastUnescapedStrongMarker(toPushBefore)?.marker ?? '**'
                   const strongToken = s.push('strong_open', '', 0)
-                  strongToken.markup = src.slice(0, index + 2)
+                  strongToken.markup = strongMarker
                   const token = s.push('math_inline', 'math', 0)
                   token.content = normalizeStandaloneBackslashT(content, mathOpts)
                   token.markup = open === '$$' ? '$$' : open === '\\(' ? '\\(\\)' : open === '$' ? '$' : '()'
@@ -420,19 +434,25 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           if (index !== s.pos && isStrongPrefix) {
             toPushBefore = s.pending + src.slice(s.pos, index)
           }
+          const strongMarkerInfo = isStrongPrefix ? findLastUnescapedStrongMarker(toPushBefore) : null
+          const strongMarker = strongMarkerInfo?.marker ?? '**'
 
           // strong prefix handling (preserve previous behavior)
           if (s.pending !== toPushBefore) {
             s.pending = ''
             if (isStrongPrefix) {
-              const _match = toPushBefore.match(/(\*+)/)
-              const after = toPushBefore.slice(_match!.index! + _match![0].length)
-              pushText(toPushBefore.slice(0, _match!.index!))
-              const strongToken = s.push('strong_open', '', 0)
-              strongToken.markup = _match![0]
-              const textToken = s.push('text', '', 0)
-              textToken.content = after
-              s.push('strong_close', '', 0)
+              if (strongMarkerInfo) {
+                const after = toPushBefore.slice(strongMarkerInfo.index + strongMarker.length)
+                pushText(toPushBefore.slice(0, strongMarkerInfo.index))
+                const strongToken = s.push('strong_open', '', 0)
+                strongToken.markup = strongMarker
+                const textToken = s.push('text', '', 0)
+                textToken.content = after
+                s.push('strong_close', '', 0)
+              }
+              else {
+                pushText(toPushBefore)
+              }
             }
             else {
               pushText(toPushBefore)
@@ -440,14 +460,14 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           }
           if (isStrongPrefix) {
             const strongToken = s.push('strong_open', '', 0)
-            strongToken.markup = '**'
+            strongToken.markup = strongMarker
             const token = s.push('math_inline', 'math', 0)
             token.content = normalizeStandaloneBackslashT(content, mathOpts)
             token.markup = open === '$$' ? '$$' : open === '\\(' ? '\\(\\)' : open === '$' ? '$' : '()'
             token.raw = `${open}${content}${close}`
             token.loading = false
             const raw = src.slice(endIdx + close.length)
-            const isBeforeClose = raw.startsWith('*')
+            const isBeforeClose = raw.startsWith(strongMarker)
             if (isBeforeClose) {
               s.push('strong_close', '', 0)
             }
