@@ -160,20 +160,7 @@ let __scheduled = false
 let __minHeightDisabled = false
 let __overflowConfirmations = 0
 let __clearConfirmations = 0
-let __lastShouldRemove: boolean | null = null
-let __lastDelta: number | null = null
-let __lastLoggedAt = 0
-let __lastNoContainerLoggedAt = 0
 // Observers and scheduler
-
-function isMinHeightDebugEnabled() {
-  try {
-    return typeof window !== 'undefined' && window.localStorage?.getItem('vmr-debug-min-height') === '1'
-  }
-  catch {
-    return false
-  }
-}
 
 // Streaming updates can change the rendered height without reliably triggering
 // ResizeObserver (e.g. due to layout containment / virtualization). Ensure we
@@ -193,16 +180,8 @@ function scheduleCheckMinHeight() {
   requestAnimationFrame(() => {
     __scheduled = false
     const container = messagesContainer.value
-    if (!container) {
-      if (isMinHeightDebugEnabled()) {
-        const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
-        if ((now - __lastNoContainerLoggedAt) > 2000) {
-          __lastNoContainerLoggedAt = now
-          console.debug('[min-height] no container')
-        }
-      }
+    if (!container)
       return
-    }
     // IMPORTANT: pick the direct child renderer; the page can contain nested
     // `.markdown-renderer` instances (e.g. inside custom nodes). The CSS rule
     // targets `.chatbot-messages > .markdown-renderer`, so we must toggle the
@@ -210,16 +189,8 @@ function scheduleCheckMinHeight() {
     const contentEl = Array.from(container.children).find(el =>
       (el as HTMLElement).classList?.contains('markdown-renderer'),
     ) as HTMLElement | undefined
-    if (!contentEl) {
-      if (isMinHeightDebugEnabled()) {
-        console.debug('[min-height] no direct .markdown-renderer child', {
-          children: Array.from(container.children).map(el => (el as HTMLElement).className),
-        })
-      }
+    if (!contentEl)
       return
-    }
-
-    const debug = isMinHeightDebugEnabled()
     const hadClass = contentEl.classList.contains('disable-min-height')
 
     // Hysteresis thresholds:
@@ -247,49 +218,6 @@ function scheduleCheckMinHeight() {
           contentEl.classList.remove('disable-min-height')
         }
       }
-
-      if (debug) {
-        const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
-        const containerRect = container.getBoundingClientRect()
-        const rendererRect = contentEl.getBoundingClientRect()
-        const shouldLog
-          = __lastShouldRemove === null
-            || __lastShouldRemove !== shouldRemove
-            || __lastDelta === null
-            || __lastDelta !== containerDelta
-            || (now - __lastLoggedAt) > 2000
-        if (shouldLog) {
-          __lastLoggedAt = now
-          __lastDelta = containerDelta
-          console.debug('[min-height] check', {
-            shouldRemove,
-            latched: __minHeightDisabled,
-            containerDelta,
-            overflowConfirmations: __overflowConfirmations,
-            clearConfirmations: __clearConfirmations,
-            scrollHeight: container.scrollHeight,
-            clientHeight: container.clientHeight,
-            scrollTop: container.scrollTop,
-            containerRect: {
-              w: Math.round(containerRect.width),
-              h: Math.round(containerRect.height),
-            },
-            rendererRect: {
-              w: Math.round(rendererRect.width),
-              h: Math.round(rendererRect.height),
-            },
-            contentLength: content.value.length,
-            contentHasClass: contentEl.classList.contains('disable-min-height'),
-            contentClass: contentEl.className,
-          })
-        }
-      }
-      else {
-        __lastLoggedAt = 0
-        __lastDelta = null
-      }
-
-      __lastShouldRemove = shouldRemove
       return
     }
 
@@ -323,49 +251,6 @@ function scheduleCheckMinHeight() {
       // Revert probe change before paint.
       contentEl.classList.remove('disable-min-height')
     }
-    if (debug) {
-      const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
-      const containerRect = container.getBoundingClientRect()
-      const rendererRect = contentEl.getBoundingClientRect()
-
-      const shouldLog
-        = __lastShouldRemove === null
-          || __lastShouldRemove !== shouldRemove
-          || __lastDelta === null
-          || __lastDelta !== containerDelta
-          || (now - __lastLoggedAt) > 2000
-
-      if (shouldLog) {
-        __lastLoggedAt = now
-        __lastDelta = containerDelta
-        console.debug('[min-height] check', {
-          shouldRemove,
-          latched: __minHeightDisabled,
-          containerDelta,
-          overflowConfirmations: __overflowConfirmations,
-          clearConfirmations: __clearConfirmations,
-          scrollHeight: container.scrollHeight,
-          clientHeight: container.clientHeight,
-          scrollTop: container.scrollTop,
-          containerRect: {
-            w: Math.round(containerRect.width),
-            h: Math.round(containerRect.height),
-          },
-          rendererRect: {
-            w: Math.round(rendererRect.width),
-            h: Math.round(rendererRect.height),
-          },
-          contentLength: content.value.length,
-          contentHasClass: contentEl.classList.contains('disable-min-height'),
-          contentClass: contentEl.className,
-        })
-      }
-    }
-    else {
-      __lastLoggedAt = 0
-      __lastDelta = null
-    }
-    __lastShouldRemove = shouldRemove
   })
 }
 
@@ -659,7 +544,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Messages area with scroll (use column-reverse on the scroll container) -->
-      <main ref="messagesContainer" class="chatbot-messages flex-1 overflow-y-auto mr-[1px] mb-4 flex flex-col-reverse">
+      <main ref="messagesContainer" class="mb-4 mr-[1px] flex flex-1 flex-col-reverse overflow-y-auto chatbot-messages">
         <MarkdownRender
           :content="content"
           :code-block-dark-theme="selectedTheme || undefined"

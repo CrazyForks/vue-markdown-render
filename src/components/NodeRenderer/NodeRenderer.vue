@@ -2,7 +2,7 @@
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
-import { computed, defineAsyncComponent, markRaw, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -50,6 +50,8 @@ export interface NodeRendererProps {
   /** Options forwarded to parseMarkdownToStructure when content is provided */
   parseOptions?: ParseOptions
   customMarkdownIt?: (md: MarkdownIt) => MarkdownIt
+  /** Log parse/render timing and virtualization stats (dev only) */
+  debugPerformance?: boolean
   /**
    * Custom HTML-like tags that participate in streaming mid‑state handling
    * and are emitted as custom nodes (e.g. ['thinking']). Forwarded to `getMarkdown()`.
@@ -106,6 +108,7 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
   typewriter: true,
   batchRendering: true,
+  debugPerformance: false,
   initialRenderBatchSize: 40,
   renderBatchSize: 80,
   renderBatchDelay: 16,
@@ -125,6 +128,14 @@ const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
 const containerRef = ref<HTMLElement>()
 const viewportPriorityAutoDisabled = ref(false)
 const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
+const isClient = typeof window !== 'undefined'
+const debugPerformanceEnabled = computed(() => props.debugPerformance && isClient && typeof console !== 'undefined')
+
+function logPerf(label: string, data: Record<string, unknown>) {
+  if (!debugPerformanceEnabled.value)
+    return
+  console.info(`[markstream-vue][perf] ${label}`, data)
+}
 
 function resolveViewportRoot(node?: HTMLElement | null) {
   if (typeof window === 'undefined')
@@ -200,7 +211,15 @@ const parsedNodes = computed<ParsedNode[]>(() => {
     // Prefer an explicitly passed `markdown` prop, then a globally
     // provided markdown via `setGlobalMarkdown`, otherwise fall back
     // to the legacy `getMarkdown()` factory.
+    const parseStart = debugPerformanceEnabled.value ? performance.now() : 0
     const parsed = parseMarkdownToStructure(props.content, mdInstance.value, mergedParseOptions.value)
+    if (debugPerformanceEnabled.value) {
+      logPerf('parse(sync)', {
+        ms: Math.round(performance.now() - parseStart),
+        nodes: parsed.length,
+        contentLength: props.content.length,
+      })
+    }
     return markRaw(parsed)
   }
   return []
@@ -226,7 +245,6 @@ const registerNodeVisibility = provideViewportPriority(
   target => resolveViewportRoot(target ?? containerRef.value ?? null),
   viewportPriorityEnabled,
 )
-const isClient = typeof window !== 'undefined'
 const requestFrame = isClient && typeof window.requestAnimationFrame === 'function'
   ? window.requestAnimationFrame.bind(window)
   : null
@@ -306,6 +324,44 @@ function resolveScrollContainer(node?: HTMLElement | null) {
   return host?.scrollingElement as HTMLElement || host?.documentElement || null
 }
 
+function isReverseFlexScrollRoot(root: HTMLElement) {
+  if (!isClient)
+    return false
+  try {
+    const style = window.getComputedStyle(root)
+    const display = (style.display || '').toLowerCase()
+    if (!display.includes('flex'))
+      return false
+    const dir = (style.flexDirection || '').toLowerCase()
+    return dir.endsWith('reverse')
+  }
+  catch {
+    return false
+  }
+}
+
+function getNormalizedScrollTop(root: HTMLElement, doc: Document, isViewportRoot: boolean) {
+  if (isViewportRoot)
+    return (doc?.documentElement?.scrollTop ?? doc?.body?.scrollTop ?? 0)
+  const raw = root.scrollTop
+  if (!isReverseFlexScrollRoot(root))
+    return raw
+  const distanceFromBottom = raw < 0 ? -raw : raw
+  const max = Math.max(0, (root.scrollHeight ?? 0) - (root.clientHeight ?? 0))
+  return max - distanceFromBottom
+}
+
+function getOffsetTopWithinRoot(node: HTMLElement, root: HTMLElement) {
+  let current: HTMLElement | null = node
+  let total = 0
+  let guard = 0
+  while (current && current !== root && guard++ < 64) {
+    total += current.offsetTop || 0
+    current = current.offsetParent as HTMLElement | null
+  }
+  return total
+}
+
 function cleanupScrollListener() {
   if (detachScrollHandler) {
     detachScrollHandler()
@@ -377,6 +433,26 @@ function syncFocusToScroll(force = false) {
   const doc = root.ownerDocument || containerRef.value?.ownerDocument || document
   const view = doc?.defaultView || (typeof window !== 'undefined' ? window : null)
   const isViewportRoot = root === doc?.documentElement || root === doc?.body
+
+  const total = parsedNodes.value.length
+  const reverseFlex = !isViewportRoot && total > 0 && isReverseFlexScrollRoot(root)
+  if (reverseFlex) {
+    // In reverse-flex scroll roots (chat UIs), `scrollTop` is effectively the
+    // distance from the bottom (often 0 when pinned). Estimating focus from
+    // the end keeps the virtual window responsive while scrolling upward
+    // through large spacers.
+    const viewportHeight = root.clientHeight || 0
+    const raw = root.scrollTop
+    // Some browsers report negative scrollTop with `flex-direction: column-reverse`.
+    const distanceFromBottom = raw < 0 ? -raw : raw
+    const offsetFromBottom = Math.max(0, distanceFromBottom) + Math.max(0, viewportHeight) * 0.5
+    const estimated = estimateIndexForOffsetFromEnd(offsetFromBottom)
+    const next = clamp(estimated, 0, Math.max(0, total - 1))
+    if (force || Math.abs(next - focusIndex.value) > 1)
+      focusIndex.value = next
+    return
+  }
+
   const rootRect = !isViewportRoot ? root.getBoundingClientRect() : null
   const viewportTop = isViewportRoot ? 0 : rootRect!.top
   const viewportBottom = isViewportRoot
@@ -400,13 +476,20 @@ function syncFocusToScroll(force = false) {
     if (!container)
       return
     const rootRect = isViewportRoot ? { top: 0 } : root.getBoundingClientRect()
-    const containerRect = container.getBoundingClientRect()
-    const rootScrollTop = isViewportRoot
-      ? (doc?.documentElement?.scrollTop ?? doc?.body?.scrollTop ?? 0)
-      : root.scrollTop
-    const containerOffset
-      = (containerRect.top - (isViewportRoot ? 0 : rootRect.top)) + rootScrollTop
-    const relativeScrollTop = Math.max(0, rootScrollTop - containerOffset)
+    const rootScrollTop = getNormalizedScrollTop(root, doc, isViewportRoot)
+    const relativeScrollTop = isViewportRoot
+      ? (() => {
+          // For viewport scrolling, estimate how far we've scrolled into the
+          // container by its visual position (negative top means we've scrolled
+          // past it).
+          const containerRect = container.getBoundingClientRect()
+          const rel = (isViewportRoot ? 0 : rootRect.top) - containerRect.top
+          return Math.max(0, rel)
+        })()
+      : (() => {
+          const offsetTop = getOffsetTopWithinRoot(container, root)
+          return Math.max(0, rootScrollTop - offsetTop)
+        })()
     const viewportHeight = isViewportRoot
       ? (view?.innerHeight ?? doc?.documentElement?.clientHeight ?? root.clientHeight ?? 0)
       : root.clientHeight
@@ -513,6 +596,22 @@ function estimateIndexForOffset(offsetPx: number) {
     remaining -= height
   }
   return Math.max(0, nodes.length - 1)
+}
+
+function estimateIndexForOffsetFromEnd(offsetPx: number) {
+  const nodes = parsedNodes.value
+  if (!nodes.length)
+    return 0
+  if (offsetPx <= 0)
+    return Math.max(0, nodes.length - 1)
+  let remaining = offsetPx
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const height = nodeHeights[i] ?? averageNodeHeight.value
+    if (remaining <= height)
+      return i
+    remaining -= height
+  }
+  return 0
 }
 
 function cleanupNodeVisibility(maxIndex: number) {
@@ -936,6 +1035,20 @@ watch(
   { immediate: true },
 )
 
+// Some scroll containers (e.g. `flex-direction: column-reverse` chat lists)
+// report `scrollTop=0` when visually at the bottom. To avoid a blank initial
+// viewport in virtualized mode, resync focus after the DOM has committed.
+watch(
+  [() => parsedNodes.value.length, () => virtualizationEnabled.value],
+  async ([length, enabled]) => {
+    if (!enabled || !length || !isClient)
+      return
+    await nextTick()
+    scheduleFocusSync({ immediate: true })
+  },
+  { flush: 'post' },
+)
+
 watch(
   () => containerRef.value,
   () => {
@@ -1003,6 +1116,37 @@ watch(
     updateLiveRange()
   },
   { immediate: true },
+)
+
+watch(
+  [() => parsedNodes.value.length, virtualizationEnabled, maxLiveNodesResolved, liveNodeBufferResolved, () => liveRange.start, () => liveRange.end],
+  ([length, virtualization, maxLiveNodes, buffer, start, end]) => {
+    if (!debugPerformanceEnabled.value)
+      return
+    logPerf('virtualization', {
+      nodes: length,
+      virtualization,
+      maxLiveNodes,
+      buffer,
+      focusIndex: focusIndex.value,
+      scroll: virtualization
+        ? (() => {
+            const root = scrollRootElement.value || resolveScrollContainer()
+            if (!root)
+              return null
+            return {
+              reverse: isReverseFlexScrollRoot(root),
+              scrollTop: Math.round(root.scrollTop),
+              scrollTopAbs: Math.round(Math.abs(root.scrollTop)),
+              scrollHeight: Math.round(root.scrollHeight),
+              clientHeight: Math.round(root.clientHeight),
+            }
+          })()
+        : null,
+      liveRange: { start, end },
+      rendered: renderedCount.value,
+    })
+  },
 )
 
 watch(
@@ -1177,7 +1321,8 @@ function handleContainerMouseout(event: MouseEvent) {
 <template>
   <div
     ref="containerRef"
-    class="markstream-vue markdown-renderer" :class="[{ dark: props.isDark }]"
+    class="markstream-vue markdown-renderer"
+    :class="[{ dark: props.isDark }, { virtualized: virtualizationEnabled }]"
     @click="handleContainerClick"
     @mouseover="handleContainerMouseover"
     @mouseout="handleContainerMouseout"
@@ -1256,6 +1401,15 @@ function handleContainerMouseout(event: MouseEvent) {
    /* 优化不可见时的渲染成本 */
   content-visibility: auto;
   contain-intrinsic-size: 800px 600px;
+}
+
+.markdown-renderer.virtualized {
+  /* When virtualization is active, `content-visibility: auto` can keep the
+     whole subtree unpainted until the scroll container dispatches a scroll
+     event in some layouts (e.g. complex chat shells). The virtual window
+     already limits DOM cost, so keep it visible to avoid a blank first paint. */
+  content-visibility: visible;
+  contain-intrinsic-size: auto;
 }
 
 .node-slot {
