@@ -1,3 +1,16 @@
+## [0.0.3-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.7...v0.0.3-beta.8) (2025-12-20)
+
+
+### Bug Fixes
+
+* enhance handling of inline math within strong markup and add related tests ([1397496](https://github.com/Simon-He95/markstream-vue/commit/139749660ca4ffbba966085abc914bcd2311f118))
+* improve viewport priority handling and add tests for node deferral behavior ([da9c8e0](https://github.com/Simon-He95/markstream-vue/commit/da9c8e0c964e0f4f45383a4dc5c45ab4d3291fa7)), closes [#206](https://github.com/Simon-He95/markstream-vue/issues/206)
+* update .gitignore to include dist-tw and refactor MermaidBlockNode loading ([2cc87dd](https://github.com/Simon-He95/markstream-vue/commit/2cc87ddd01db13b9b55e726816624c30af6f4ffe))
+* update package versions for improved compatibility and performance ([36ec68f](https://github.com/Simon-He95/markstream-vue/commit/36ec68fc0a1cb6d9a8e22a0a9e85aa90dff75851))
+* update packageManager and dependencies to latest versions ([bb2778a](https://github.com/Simon-He95/markstream-vue/commit/bb2778a22831ccb4d79987aceb1324359abf8609))
+
+
+
 ## [0.0.3-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.6...v0.0.3-beta.7) (2025-12-18)
 
 
