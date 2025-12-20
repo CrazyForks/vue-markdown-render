@@ -211,18 +211,13 @@ const virtualizationEnabled = computed(() => {
     return false
   return parsedNodes.value.length > maxLiveNodesResolved.value
 })
-// When viewport priority is requested but virtualization or very large datasets
-// are active, fallback to immediate rendering so IO limits don't block updates.
+// Viewport priority is used to defer heavy work (Monaco/Mermaid/KaTeX) until
+// nodes approach the viewport. Node-level deferral is controlled separately
+// via `deferNodes`.
 const viewportPriorityEnabled = computed(() => {
   if (props.viewportPriority === false)
     return false
   if (viewportPriorityAutoDisabled.value)
-    return false
-  if (props.deferNodesUntilVisible === false)
-    return false
-  if (virtualizationEnabled.value)
-    return false
-  if (parsedNodes.value.length > MAX_DEFERRED_NODE_COUNT)
     return false
   return true
 })
@@ -266,7 +261,22 @@ const nodeSlotElements = new Map<number, HTMLElement | null>()
 const scrollRootElement = ref<HTMLElement | null>(null)
 let detachScrollHandler: (() => void) | null = null
 let pendingFocusSync: { id: number | ReturnType<typeof setTimeout>, viaTimeout: boolean } | null = null
-const deferNodes = computed(() => false)
+const deferNodes = computed(() => {
+  if (props.deferNodesUntilVisible === false)
+    return false
+  // In the incremental/batched mode (`maxLiveNodes <= 0`), placeholders are
+  // driven by the batch scheduler rather than viewport deferral.
+  if ((props.maxLiveNodes ?? 0) <= 0)
+    return false
+  // When virtualization is active, the virtual window already limits DOM work.
+  // Keep rendering immediate within that window (no placeholders).
+  if (virtualizationEnabled.value)
+    return false
+  // Avoid registering too many observer targets in non-virtualized mode.
+  if (parsedNodes.value.length > MAX_DEFERRED_NODE_COUNT)
+    return false
+  return viewportPriorityEnabled.value
+})
 const incrementalRenderingActive = computed(() => batchingEnabled.value && (props.maxLiveNodes ?? 0) <= 0)
 const previousBatchConfig = ref({
   batchSize: resolvedBatchSize.value,
@@ -649,6 +659,7 @@ let batchPending = false
 let pendingIncrement: number | null = null
 let batchIdle: number | null = null
 const VIEWPORT_FALLBACK_DELAY = 1800
+const VIEWPORT_FALLBACK_MARGIN_PX = 500
 
 function cancelBatchTimers() {
   if (!isClient)
@@ -683,10 +694,39 @@ function scheduleVisibilityFallback(index: number) {
   if (!isClient || !deferNodes.value)
     return
   clearVisibilityFallback(index)
+  // Spread timers a bit so long documents don't cause a thundering herd.
+  const jitter = (index % 17) * 23
   const timer = window.setTimeout(() => {
     nodeVisibilityFallbackTimers.delete(index)
-    markNodeVisible(index, true)
-  }, VIEWPORT_FALLBACK_DELAY)
+    if (!deferNodes.value)
+      return
+    if (nodeVisibilityState[index] === true)
+      return
+    const el = nodeSlotElements.get(index)
+    if (!el) {
+      delete nodeVisibilityState[index]
+      return
+    }
+
+    const root = resolveScrollContainer(el)
+    const doc = el.ownerDocument || document
+    const view = doc.defaultView || window
+    const isViewportRoot = !root || root === doc.documentElement || root === doc.body
+    const rootRect = !isViewportRoot && root ? root.getBoundingClientRect() : null
+    const viewportTop = isViewportRoot ? 0 : rootRect!.top
+    const viewportBottom = isViewportRoot
+      ? (view.innerHeight ?? root?.clientHeight ?? 0)
+      : rootRect!.bottom
+    const rect = el.getBoundingClientRect()
+    const nearViewport = rect.bottom >= (viewportTop - VIEWPORT_FALLBACK_MARGIN_PX)
+      && rect.top <= (viewportBottom + VIEWPORT_FALLBACK_MARGIN_PX)
+
+    // Only force-render when we're reasonably close to the viewport. If the
+    // element is far away we leave it to the IO callback to avoid creating
+    // an always-running timer loop for large documents.
+    if (nearViewport)
+      markNodeVisible(index, true)
+  }, VIEWPORT_FALLBACK_DELAY + jitter)
   nodeVisibilityFallbackTimers.set(index, timer)
 }
 
