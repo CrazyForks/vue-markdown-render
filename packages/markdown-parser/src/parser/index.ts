@@ -9,6 +9,90 @@ import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
 
 function stripDanglingHtmlLikeTail(markdown: string) {
+  const isInsideFencedCodeBlock = (src: string, pos: number) => {
+    let inFence = false
+    let fenceChar: '`' | '~' | '' = ''
+    let fenceLen = 0
+
+    const isWs = (ch: string) => ch === ' ' || ch === '\t'
+
+    const parseFenceMarker = (line: string) => {
+      let i = 0
+      while (i < line.length && isWs(line[i])) i++
+      const ch = line[i]
+      if (ch !== '`' && ch !== '~')
+        return null
+      let j = i
+      while (j < line.length && line[j] === ch) j++
+      const len = j - i
+      if (len < 3)
+        return null
+      return { markerChar: ch as '`' | '~', markerLen: len, rest: line.slice(j) }
+    }
+
+    const stripBlockquotePrefix = (line: string) => {
+      let i = 0
+      while (i < line.length && isWs(line[i])) i++
+      let saw = false
+      while (i < line.length && line[i] === '>') {
+        saw = true
+        i++
+        while (i < line.length && isWs(line[i])) i++
+      }
+      return saw ? line.slice(i) : null
+    }
+
+    const matchFence = (rawLine: string) => {
+      const direct = parseFenceMarker(rawLine)
+      if (direct)
+        return direct
+
+      const afterQuote = stripBlockquotePrefix(rawLine)
+      if (afterQuote == null)
+        return null
+
+      return parseFenceMarker(afterQuote)
+    }
+
+    let offset = 0
+    const lines = src.split(/\r?\n/)
+    for (const line of lines) {
+      const lineStart = offset
+      const lineEnd = offset + line.length
+
+      const pastTargetLine = pos < lineStart
+      if (pastTargetLine)
+        break
+
+      const fenceMatch = matchFence(line)
+      if (fenceMatch) {
+        const markerChar = fenceMatch.markerChar
+        const markerLen = fenceMatch.markerLen
+        if (inFence) {
+          if (markerChar === fenceChar && markerLen >= fenceLen) {
+            if (/^\s*$/.test(fenceMatch.rest)) {
+              inFence = false
+              fenceChar = ''
+              fenceLen = 0
+            }
+          }
+        }
+        else {
+          inFence = true
+          fenceChar = markerChar
+          fenceLen = markerLen
+        }
+      }
+
+      if (pos <= lineEnd)
+        break
+
+      offset = lineEnd + 1
+    }
+
+    return inFence
+  }
+
   // In streaming mode it's common to have an incomplete HTML-ish fragment at
   // the very end of the current buffer (e.g. '<fo' or '</think'). Letting it
   // reach markdown-it can produce visible mid-state text nodes. We only strip
@@ -16,6 +100,8 @@ function stripDanglingHtmlLikeTail(markdown: string) {
   const s = String(markdown ?? '')
   const lastLt = s.lastIndexOf('<')
   if (lastLt === -1)
+    return s
+  if (isInsideFencedCodeBlock(s, lastLt))
     return s
   const tail = s.slice(lastLt)
   if (tail.includes('>'))
