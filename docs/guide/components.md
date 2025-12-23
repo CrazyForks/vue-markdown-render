@@ -326,7 +326,7 @@ Streaming behavior:
 
 ### Quick reference
 - **Best for**: Custom container blocks like `::: viewcode:topo-test-001 {"devId":"..."}`.
-- **Rendering**: Outputs raw text via `{{ node.raw }}` — perfect for custom overrides.
+- **Rendering**: Outputs raw text via `node.raw` — perfect for custom overrides.
 - **CSS**: Minimal base styles; add your own via `setCustomComponents`.
 
 ### Syntax

@@ -324,7 +324,7 @@ setCustomComponents('docs', { image: ImagePreview })
 
 ### 快速参考
 - **适用场景**：自定义容器块，如 `::: viewcode:topo-test-001 {"devId":"..."}`。
-- **渲染方式**：通过 `{{ node.raw }}` 输出原始文本——非常适合自定义覆盖。
+- **渲染方式**：通过 `node.raw` 输出原始文本——非常适合自定义覆盖。
 - **CSS**：极简基础样式；通过 `setCustomComponents` 添加你自己的样式。
 
 ### 语法
