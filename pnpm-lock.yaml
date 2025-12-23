@@ -30,8 +30,8 @@ importers:
         specifier: '>=0.0.11'
         version: 0.0.11(shiki@3.19.0)
       stream-markdown-parser:
-        specifier: ^0.0.46
-        version: 0.0.46
+        specifier: ^0.0.47
+        version: 0.0.47
       stream-monaco:
         specifier: '>=0.0.8'
         version: 0.0.8(monaco-editor@0.52.2)
@@ -195,7 +195,7 @@ importers:
         version: 0.16.27
       markstream-vue:
         specifier: latest
-        version: 0.0.3-beta.9(katex@0.16.27)(mermaid@11.12.2)(shiki@3.20.0)(stream-markdown@0.0.11(shiki@3.20.0))(stream-monaco@0.0.8(monaco-editor@0.52.2))(vue-i18n@11.2.2(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3))
+        version: 0.0.3(katex@0.16.27)(mermaid@11.12.2)(shiki@3.20.0)(stream-markdown@0.0.11(shiki@3.20.0))(stream-monaco@0.0.8(monaco-editor@0.52.2))(vue-i18n@11.2.7(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3))
       stream-markdown:
         specifier: latest
         version: 0.0.11(shiki@3.20.0)
@@ -212,8 +212,8 @@ importers:
         specifier: 3.5.25
         version: 3.5.25(typescript@5.9.3)
       vue-i18n:
-        specifier: ^11.2.2
-        version: 11.2.2(vue@3.5.25(typescript@5.9.3))
+        specifier: ^11.2.7
+        version: 11.2.7(vue@3.5.25(typescript@5.9.3))
       vue-router:
         specifier: ^4.6.4
         version: 4.6.4(vue@3.5.25(typescript@5.9.3))
@@ -291,8 +291,8 @@ importers:
         specifier: ^0.0.6
         version: 0.0.6(monaco-editor@0.52.2)
       vue-i18n:
-        specifier: ^11.2.2
-        version: 11.2.2(vue@3.5.25(typescript@5.9.3))
+        specifier: ^11.2.7
+        version: 11.2.7(vue@3.5.25(typescript@5.9.3))
 
 packages:
 
@@ -1269,12 +1269,24 @@ packages:
     resolution: {integrity: sha512-0mCTBOLKIqFUP3BzwuFW23hYEl9g/wby6uY//AC5hTgQfTsM2srCYF2/hYGp+a5DZ/HIFIgKkLJMzXTt30r0JQ==}
     engines: {node: '>= 16'}
 
+  '@intlify/core-base@11.2.7':
+    resolution: {integrity: sha512-+Ra9I/LAzXDnmv/IrTO03WMCiLya7pHRmGJvNl9fKwx/W4REJ0xaMk2PxCRqnxcBsX443amEMdebQ3R1geiuIw==}
+    engines: {node: '>= 16'}
+
   '@intlify/message-compiler@11.2.2':
     resolution: {integrity: sha512-XS2p8Ff5JxWsKhgfld4/MRQzZRQ85drMMPhb7Co6Be4ZOgqJX1DzcZt0IFgGTycgqL8rkYNwgnD443Q+TapOoA==}
     engines: {node: '>= 16'}
 
+  '@intlify/message-compiler@11.2.7':
+    resolution: {integrity: sha512-TFamC+GzJAotAFwUNvbtRVBgvuSn2nCwKNresmPUHv3IIVMmXJt7QQJj/DORI1h8hs46ZF6L0Fs2xBohSOE4iQ==}
+    engines: {node: '>= 16'}
+
   '@intlify/shared@11.2.2':
     resolution: {integrity: sha512-OtCmyFpSXxNu/oET/aN6HtPCbZ01btXVd0f3w00YsHOb13Kverk1jzA2k47pAekM55qbUw421fvPF1yxZ+gicw==}
+    engines: {node: '>= 16'}
+
+  '@intlify/shared@11.2.7':
+    resolution: {integrity: sha512-uvlkvc/0uQ4FDlHQZccpUnmcOwNcaI3i+69ck2YJ+GqM35AoVbuS63b+YfirV4G0SZh64Ij2UMcFRMmB4nr95w==}
     engines: {node: '>= 16'}
 
   '@ioredis/commands@1.4.0':
@@ -4936,8 +4948,8 @@ packages:
     engines: {node: '>= 20'}
     hasBin: true
 
-  markstream-vue@0.0.3-beta.9:
-    resolution: {integrity: sha512-lPQGUfiC8WC9AfqXrRo/KWDm9yc/GMn20m/i0ePXrn2TwsqziuGIvVY1oUanEgTM3VuMx+6jCRQO/0QEromLQg==}
+  markstream-vue@0.0.3:
+    resolution: {integrity: sha512-gxBhYJMwRgPrCKEcaZ108elaQgdrWndXJQ1MTfLl2pdaFMMnh0soPoin8HVbIGZ0OnMgNmmw+mRC62oJ9RkMOA==}
     peerDependencies:
       katex: '>=0.16.22'
       mermaid: '>=11'
@@ -6282,11 +6294,11 @@ packages:
   std-env@3.10.0:
     resolution: {integrity: sha512-5GS12FdOZNliM5mAOxFRg7Ir0pWz8MdpYm6AY6VPkGpbA7ZzmbzNcBJQ0GPvvyWgcY7QAhCgf9Uy89I03faLkg==}
 
-  stream-markdown-parser@0.0.45:
-    resolution: {integrity: sha512-rd3zGIUs/YygKnYMuahraF/oGphDli2czuessm5in/u45q4Z7drOC0+2ykuvAXDGyURgwzRY9Yusak6KN+du0w==}
-
   stream-markdown-parser@0.0.46:
     resolution: {integrity: sha512-9mez38VC81Ta6DlLWCIFoISI2gC3bam/vKA72obZ+tjJswkJge5xYtSdsJZn64X5+Xu89sE/MgSitOEWIRK83Q==}
+
+  stream-markdown-parser@0.0.47:
+    resolution: {integrity: sha512-fK3r3ebirAJW/gH81NudkR08uoA6apa9yQH+mfHxavWYx8AkgCWsnjDD9EbeFlvS7XCAgn5RkD8YqZhLSlW0AA==}
 
   stream-markdown@0.0.10:
     resolution: {integrity: sha512-k3B1h1gUga0nArchDSD6O8+rxXiL6WvuZ11hZgxpYy9Z1Pihjt8rYROoTdJeC2k2ymctLYTDIGRI6AASjipLeg==}
@@ -7247,6 +7259,12 @@ packages:
 
   vue-i18n@11.2.2:
     resolution: {integrity: sha512-ULIKZyRluUPRCZmihVgUvpq8hJTtOqnbGZuv4Lz+byEKZq4mU0g92og414l6f/4ju+L5mORsiUuEPYrAuX2NJg==}
+    engines: {node: '>= 16'}
+    peerDependencies:
+      vue: 3.5.25
+
+  vue-i18n@11.2.7:
+    resolution: {integrity: sha512-LPv8bAY5OA0UvFEXl4vBQOBqJzRrlExy92tWgRuwW7tbykHf7CH71G2Y4TM2OwGcIS4+hyqKHS2EVBqaYwPY9Q==}
     engines: {node: '>= 16'}
     peerDependencies:
       vue: 3.5.25
@@ -8279,12 +8297,24 @@ snapshots:
       '@intlify/message-compiler': 11.2.2
       '@intlify/shared': 11.2.2
 
+  '@intlify/core-base@11.2.7':
+    dependencies:
+      '@intlify/message-compiler': 11.2.7
+      '@intlify/shared': 11.2.7
+
   '@intlify/message-compiler@11.2.2':
     dependencies:
       '@intlify/shared': 11.2.2
       source-map-js: 1.2.1
 
+  '@intlify/message-compiler@11.2.7':
+    dependencies:
+      '@intlify/shared': 11.2.7
+      source-map-js: 1.2.1
+
   '@intlify/shared@11.2.2': {}
+
+  '@intlify/shared@11.2.7': {}
 
   '@ioredis/commands@1.4.0': {}
 
@@ -12442,10 +12472,10 @@ snapshots:
 
   marked@16.4.2: {}
 
-  markstream-vue@0.0.3-beta.9(katex@0.16.27)(mermaid@11.12.2)(shiki@3.20.0)(stream-markdown@0.0.11(shiki@3.20.0))(stream-monaco@0.0.8(monaco-editor@0.52.2))(vue-i18n@11.2.2(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3)):
+  markstream-vue@0.0.3(katex@0.16.27)(mermaid@11.12.2)(shiki@3.20.0)(stream-markdown@0.0.11(shiki@3.20.0))(stream-monaco@0.0.8(monaco-editor@0.52.2))(vue-i18n@11.2.7(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3)):
     dependencies:
       '@floating-ui/dom': 1.7.4
-      stream-markdown-parser: 0.0.45
+      stream-markdown-parser: 0.0.46
       vue: 3.5.25(typescript@5.9.3)
     optionalDependencies:
       katex: 0.16.27
@@ -12453,7 +12483,7 @@ snapshots:
       shiki: 3.20.0
       stream-markdown: 0.0.11(shiki@3.20.0)
       stream-monaco: 0.0.8(monaco-editor@0.52.2)
-      vue-i18n: 11.2.2(vue@3.5.25(typescript@5.9.3))
+      vue-i18n: 11.2.7(vue@3.5.25(typescript@5.9.3))
 
   math-intrinsics@1.1.0: {}
 
@@ -14196,7 +14226,7 @@ snapshots:
 
   std-env@3.10.0: {}
 
-  stream-markdown-parser@0.0.45:
+  stream-markdown-parser@0.0.46:
     dependencies:
       markdown-it-container: 4.0.0
       markdown-it-footnote: 4.0.0
@@ -14207,7 +14237,7 @@ snapshots:
       markdown-it-task-checkbox: 1.0.6
       markdown-it-ts: 0.0.3
 
-  stream-markdown-parser@0.0.46:
+  stream-markdown-parser@0.0.47:
     dependencies:
       markdown-it-container: 4.0.0
       markdown-it-footnote: 4.0.0
@@ -15301,6 +15331,13 @@ snapshots:
     dependencies:
       '@intlify/core-base': 11.2.2
       '@intlify/shared': 11.2.2
+      '@vue/devtools-api': 6.6.4
+      vue: 3.5.25(typescript@5.9.3)
+
+  vue-i18n@11.2.7(vue@3.5.25(typescript@5.9.3)):
+    dependencies:
+      '@intlify/core-base': 11.2.7
+      '@intlify/shared': 11.2.7
       '@vue/devtools-api': 6.6.4
       vue: 3.5.25(typescript@5.9.3)
 
