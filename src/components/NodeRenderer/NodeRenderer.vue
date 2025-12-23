@@ -30,6 +30,7 @@ import SuperscriptNode from '../../components/SuperscriptNode'
 import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
+import VmrContainerNode from '../../components/VmrContainerNode'
 import { provideViewportPriority } from '../../composables/viewportPriority'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
@@ -1216,6 +1217,7 @@ const nodeComponents = {
   footnote_reference: FootnoteReferenceNode,
   footnote_anchor: FootnoteAnchorNode,
   admonition: AdmonitionNode,
+  vmr_container: VmrContainerNode,
   hardbreak: HardBreakNode,
   link: LinkNode,
   image: ImageNode,

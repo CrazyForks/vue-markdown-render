@@ -210,6 +210,13 @@ export interface AdmonitionNode extends BaseNode {
   children: ParsedNode[]
 }
 
+export interface VmrContainerNode extends BaseNode {
+  type: 'vmr_container'
+  name: string
+  attrs?: Record<string, string>
+  children: ParsedNode[]
+}
+
 export interface StrongNode extends BaseNode {
   type: 'strong'
   children: ParsedNode[]
@@ -331,6 +338,7 @@ export type ParsedNode
     | FootnoteNode
     | FootnoteReferenceNode
     | AdmonitionNode
+    | VmrContainerNode
     | HardBreakNode
     | MathInlineNode
     | MathBlockNode

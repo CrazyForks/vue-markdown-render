@@ -13,6 +13,7 @@ This page explains how each renderer fits together, what peer dependencies or CS
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node`, `displayMode`, `macros` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
 | `ImageNode` | Custom previews/lightboxes | Emits `click`, `load`, `error`; accepts `lazy` props via `node.props` | None, but respects global CSS | Wrap in custom component + `setCustomComponents` to intercept events |
 | `LinkNode` | Animated underline, tooltips | `color`, `underlineHeight`, `showTooltip` | No extra CSS | Browser defaults can override `a` styles; import reset |
+| `VmrContainerNode` | Custom `:::` containers with JSON attrs | `node` (`name`, `attrs`, `children`, `raw`) | Minimal base CSS; override via `setCustomComponents` | Raw text visible → register custom component; invalid JSON → check `data-attrs` fallback |
 
 ## MarkdownRender
 
@@ -318,6 +319,198 @@ Streaming behavior:
 - If the node is a **true mid‑state** (`loading === true` and `autoClosed !== true`), the component renders the literal text to avoid flashing incomplete tags.
 - If the node is **auto‑closed mid‑state** (`autoClosed === true`), the parser has appended a closing tag for stability. The component renders HTML via `innerHTML` but keeps `loading=true` so your app can still treat it as incomplete input.
 - Once the real closing tag arrives, the parser clears `loading` and `autoClosed` and the node renders as normal HTML.
+
+## VmrContainerNode — custom ::: containers
+
+`VmrContainerNode` is a minimal text renderer for custom `:::` containers. It renders the raw markdown text as-is, giving you full control to override with custom components.
+
+### Quick reference
+- **Best for**: Custom container blocks like `::: viewcode:topo-test-001 {"devId":"..."}`.
+- **Rendering**: Outputs raw text via `{{ node.raw }}` — perfect for custom overrides.
+- **CSS**: Minimal base styles; add your own via `setCustomComponents`.
+
+### Syntax
+
+```markdown
+::: container-name {"key":"value"}
+Content here...
+:::
+```
+
+The parser extracts:
+- `name` — the container name (e.g., `viewcode:topo-test-001`)
+- `attrs` — JSON attributes parsed as data attributes
+- `children` — child nodes (parsed markdown content)
+- `raw` — the original raw markdown string
+
+### Node type definition
+
+```typescript
+interface VmrContainerNode {
+  type: 'vmr_container'
+  name: string // Container name from ::: name
+  attrs?: Record<string, string> // Parsed JSON attributes
+  children: ParsedNode[] // Child nodes
+  raw: string // Raw markdown source
+}
+```
+
+### Default rendering
+
+The default component renders the raw markdown as plain text:
+
+```vue
+<!-- Default VmrContainerNode output -->
+<div class="vmr-container vmr-container-container-name" data-key="value">
+  ::: container-name {"key":"value"}
+  Content here...
+  :::
+</div>
+```
+
+### Custom override
+
+To customize rendering, register your component using `setCustomComponents`:
+
+```vue
+<script setup lang="ts">
+import { setCustomComponents } from 'markstream-vue'
+import MyViewCode from './MyViewCode.vue'
+
+setCustomComponents('docs', {
+  vmr_container: MyViewCode,
+})
+</script>
+
+<template>
+  <MarkdownRender custom-id="docs" :content="markdown" />
+</template>
+```
+
+### Example: ViewCode component
+
+Here's a complete example that renders a custom `viewcode:*` container:
+
+```vue
+<!-- components/ViewCodeContainer.vue -->
+<script setup lang="ts">
+import NodeRenderer from 'markstream-vue'
+import { computed } from 'vue'
+
+interface Props {
+  node: {
+    type: 'vmr_container'
+    name: string
+    attrs?: Record<string, string>
+    children: any[]
+    raw: string
+  }
+  indexKey?: number | string
+  customId?: string
+}
+
+const props = defineProps<Props>()
+
+// Extract devId from attrs
+const devId = computed(() => props.node.attrs?.devId || '')
+
+// Check if this is a viewcode container
+const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
+</script>
+
+<template>
+  <!-- Custom rendering for viewcode containers -->
+  <div v-if="isViewCode" class="viewcode-wrapper">
+    <div class="viewcode-header">
+      <span class="viewcode-title">{{ node.name }}</span>
+      <span class="viewcode-dev-id">{{ devId }}</span>
+    </div>
+    <div class="viewcode-content">
+      <NodeRenderer
+        :nodes="node.children"
+        :custom-id="customId"
+        :index-key="`${indexKey}-viewcode`"
+      />
+    </div>
+  </div>
+
+  <!-- Fallback rendering for other containers -->
+  <div v-else class="vmr-container" :class="`vmr-container-${node.name}`">
+    <NodeRenderer
+      :nodes="node.children"
+      :custom-id="customId"
+      :index-key="`${indexKey}-fallback`"
+    />
+  </div>
+</template>
+
+<style scoped>
+.viewcode-wrapper {
+  border: 1px solid #eaecef;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.viewcode-header {
+  background: #f8f8f8;
+  padding: 0.5rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eaecef;
+}
+
+.viewcode-title {
+  font-weight: 600;
+  color: #333;
+}
+
+.viewcode-dev-id {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.viewcode-content {
+  padding: 1rem;
+}
+</style>
+```
+
+### Example: Conditional rendering by name
+
+You can also render different components based on the container name:
+
+```vue
+<script setup lang="ts">
+import { setCustomComponents } from 'markstream-vue'
+import AlertContainer from './AlertContainer.vue'
+import ChartContainer from './ChartContainer.vue'
+import GenericContainer from './GenericContainer.vue'
+
+// Mapping of container names to components
+const containerMap = {
+  chart: ChartContainer,
+  alert: AlertContainer,
+}
+
+setCustomComponents('docs', {
+  vmr_container: (node) => {
+    // Select component based on container name
+    const Component = containerMap[node.name as keyof typeof containerMap]
+      || GenericContainer
+
+    return h(Component, { node })
+  },
+})
+</script>
+```
+
+### Troubleshooting
+- **Raw text visible**: You're seeing the default renderer. Register a custom component via `setCustomComponents`.
+- **Attrs undefined**: Ensure your JSON syntax is valid. Invalid JSON falls back to `data-attrs` with the raw string.
+- **Component not receiving props**: Make sure your component accepts the `node` prop with the correct type.
 
 ## Utility helpers
 

@@ -13,6 +13,7 @@
 | `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node`、`displayMode`、`macros` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
 | `ImageNode` | 自定义图片预览 / 懒加载 | 触发 `click` / `load` / `error` 事件 | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
 | `LinkNode` | 下划线动画、颜色自定义 | `color`、`underlineHeight`、`showTooltip` | 无 | 浏览器默认 `a` 样式可通过 reset 解决 |
+| `VmrContainerNode` | 带 JSON 属性的自定义 `:::` 容器 | `node`（`name`、`attrs`、`children`、`raw`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | 显示原始文本 → 注册自定义组件；JSON 无效 → 检查 `data-attrs` 回退 |
 
 ## MarkdownRender
 
@@ -314,8 +315,200 @@ setCustomComponents('docs', { image: ImagePreview })
 
 流式行为：
 - 当节点处于**真实中间态**（`loading===true` 且 `autoClosed!==true`）时，为避免不完整标签闪烁，组件会直接显示原始文本。
-- 当节点处于**自动补闭合中间态**（`autoClosed===true`）时，解析器已为稳定渲染自动补上 `</tag>`，组件会按 HTML 渲染（`innerHTML`），但仍保留 `loading=true` 供业务判断“还没真正闭合”。
+- 当节点处于**自动补闭合中间态**（`autoClosed===true`）时，解析器已为稳定渲染自动补上 `</tag>`，组件会按 HTML 渲染（`innerHTML`），但仍保留 `loading=true` 供业务判断"还没真正闭合"。
 - 当真实闭合标签到达后，解析器会清除 `loading/autoClosed`，节点表现为普通内联 HTML。
+
+## VmrContainerNode — 自定义 ::: 容器
+
+`VmrContainerNode` 是一个极简的文本渲染器，用于自定义 `:::` 容器。它会按原样渲染原始 markdown 文本，让你可以通过自定义组件完全接管控制。
+
+### 快速参考
+- **适用场景**：自定义容器块，如 `::: viewcode:topo-test-001 {"devId":"..."}`。
+- **渲染方式**：通过 `{{ node.raw }}` 输出原始文本——非常适合自定义覆盖。
+- **CSS**：极简基础样式；通过 `setCustomComponents` 添加你自己的样式。
+
+### 语法
+
+```markdown
+::: container-name {"key":"value"}
+内容...
+:::
+```
+
+解析器会提取：
+- `name` — 容器名称（例如 `viewcode:topo-test-001`）
+- `attrs` — JSON 属性，解析为 data 属性
+- `children` — 子节点（解析后的 markdown 内容）
+- `raw` — 原始 markdown 源文本
+
+### 节点类型定义
+
+```typescript
+interface VmrContainerNode {
+  type: 'vmr_container'
+  name: string // 来自 ::: name 的容器名称
+  attrs?: Record<string, string> // 解析后的 JSON 属性
+  children: ParsedNode[] // 子节点
+  raw: string // 原始 markdown 源文本
+}
+```
+
+### 默认渲染
+
+默认组件将原始 markdown 渲染为纯文本：
+
+```vue
+<!-- 默认 VmrContainerNode 输出 -->
+<div class="vmr-container vmr-container-container-name" data-key="value">
+  ::: container-name {"key":"value"}
+  内容...
+  :::
+</div>
+```
+
+### 自定义覆盖
+
+使用 `setCustomComponents` 注册自定义组件：
+
+```vue
+<script setup lang="ts">
+import { setCustomComponents } from 'markstream-vue'
+import MyViewCode from './MyViewCode.vue'
+
+setCustomComponents('docs', {
+  vmr_container: MyViewCode,
+})
+</script>
+
+<template>
+  <MarkdownRender custom-id="docs" :content="markdown" />
+</template>
+```
+
+### 示例：ViewCode 组件
+
+以下是一个完整的示例，用于渲染自定义的 `viewcode:*` 容器：
+
+```vue
+<!-- components/ViewCodeContainer.vue -->
+<script setup lang="ts">
+import NodeRenderer from 'markstream-vue'
+import { computed } from 'vue'
+
+interface Props {
+  node: {
+    type: 'vmr_container'
+    name: string
+    attrs?: Record<string, string>
+    children: any[]
+    raw: string
+  }
+  indexKey?: number | string
+  customId?: string
+}
+
+const props = defineProps<Props>()
+
+// 从 attrs 提取 devId
+const devId = computed(() => props.node.attrs?.devId || '')
+
+// 检查是否为 viewcode 容器
+const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
+</script>
+
+<template>
+  <!-- viewcode 容器的自定义渲染 -->
+  <div v-if="isViewCode" class="viewcode-wrapper">
+    <div class="viewcode-header">
+      <span class="viewcode-title">{{ node.name }}</span>
+      <span class="viewcode-dev-id">{{ devId }}</span>
+    </div>
+    <div class="viewcode-content">
+      <NodeRenderer
+        :nodes="node.children"
+        :custom-id="customId"
+        :index-key="`${indexKey}-viewcode`"
+      />
+    </div>
+  </div>
+
+  <!-- 其他容器的回退渲染 -->
+  <div v-else class="vmr-container" :class="`vmr-container-${node.name}`">
+    <NodeRenderer
+      :nodes="node.children"
+      :custom-id="customId"
+      :index-key="`${indexKey}-fallback`"
+    />
+  </div>
+</template>
+
+<style scoped>
+.viewcode-wrapper {
+  border: 1px solid #eaecef;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.viewcode-header {
+  background: #f8f8f8;
+  padding: 0.5rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eaecef;
+}
+
+.viewcode-title {
+  font-weight: 600;
+  color: #333;
+}
+
+.viewcode-dev-id {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.viewcode-content {
+  padding: 1rem;
+}
+</style>
+```
+
+### 示例：按名称条件渲染
+
+也可以根据容器名称渲染不同的组件：
+
+```vue
+<script setup lang="ts">
+import { setCustomComponents } from 'markstream-vue'
+import AlertContainer from './AlertContainer.vue'
+import ChartContainer from './ChartContainer.vue'
+import GenericContainer from './GenericContainer.vue'
+
+// 容器名称到组件的映射
+const containerMap = {
+  chart: ChartContainer,
+  alert: AlertContainer,
+}
+
+setCustomComponents('docs', {
+  vmr_container: (node) => {
+    // 根据容器名称选择组件
+    const Component = containerMap[node.name as keyof typeof containerMap]
+      || GenericContainer
+
+    return h(Component, { node })
+  },
+})
+</script>
+```
+
+### 排障
+- **看到原始文本**：说明你使用的是默认渲染器。请通过 `setCustomComponents` 注册自定义组件。
+- **Attrs 为 undefined**：请确保 JSON 语法正确。无效的 JSON 会回退到 `data-attrs` 并存储原始字符串。
+- **组件未收到 props**：请确保你的组件正确接受 `node` prop 且类型匹配。
 
 ## 工具函数
 

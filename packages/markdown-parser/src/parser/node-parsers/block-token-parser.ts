@@ -1,4 +1,4 @@
-import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions } from '../../types'
+import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions, VmrContainerNode } from '../../types'
 import { parseFenceToken } from '../inline-parsers/fence-parser'
 import { parseCodeBlock } from './code-block-parser'
 import { parseDefinitionList } from './definition-list-parser'
@@ -8,6 +8,75 @@ import { parseHtmlBlock } from './html-block-parser'
 import { parseMathBlock } from './math-block-parser'
 import { parseTable } from './table-parser'
 import { parseThematicBreak } from './thematic-break-parser'
+
+function parseVmrContainer(
+  tokens: MarkdownToken[],
+  index: number,
+  options?: ParseOptions,
+): [VmrContainerNode, number] {
+  const openToken = tokens[index]
+
+  // Extract name from class attribute (e.g., "vmr-container vmr-container-viewcode:topo-test-001")
+  // Handle multiple class values by looking for vmr-container-* anywhere in the string
+  const attrs = openToken.attrs as [string, string][] | null
+  let name = ''
+  const containerAttrs: Record<string, string> = {}
+
+  if (attrs) {
+    for (const [key, value] of attrs) {
+      if (key === 'class') {
+        // Match vmr-container-* anywhere in the class string, not just at the end
+        const match = value.match(/(?:\s|^)vmr-container-(\S+)/)
+        if (match) {
+          name = match[1]
+        }
+      }
+      else if (key.startsWith('data-')) {
+        // Extract data attributes (e.g., "data-devId" -> "devId")
+        const attrName = key.slice(5)
+        containerAttrs[attrName] = value
+      }
+    }
+  }
+
+  const children: ParsedNode[] = []
+  let j = index + 1
+
+  // Parse children until we find the closing token
+  while (j < tokens.length && tokens[j].type !== 'vmr_container_close') {
+    const handled = parseBasicBlockToken(tokens, j, options)
+    if (handled) {
+      children.push(handled[0])
+      j = handled[1]
+    }
+    else {
+      j++
+    }
+  }
+
+  // Build raw content
+  let raw = `::: ${name}`
+  if (Object.keys(containerAttrs).length > 0) {
+    raw += ` ${JSON.stringify(containerAttrs)}`
+  }
+  raw += '\n'
+  if (children.length > 0) {
+    raw += children.map(c => c.raw).join('\n')
+    raw += '\n'
+  }
+  raw += ':::'
+
+  const containerNode: VmrContainerNode = {
+    type: 'vmr_container',
+    name,
+    attrs: Object.keys(containerAttrs).length > 0 ? containerAttrs : undefined,
+    children,
+    raw,
+  }
+
+  // Skip the closing token
+  return [containerNode, j + 1]
+}
 
 function findTagCloseIndexOutsideQuotes(input: string) {
   let inSingle = false
@@ -283,6 +352,10 @@ export function parseCommonBlockToken(
           return result
       }
       break
+    }
+
+    case 'vmr_container_open': {
+      return parseVmrContainer(tokens, index, options)
     }
     default:
       break
