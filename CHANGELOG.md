@@ -1,9 +1,10 @@
-## [0.0.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.9...v0.0.3) (2025-12-21)
+## [0.0.4-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.9...v0.0.4-beta.0) (2025-12-23)
 
 
 ### Features
 
 * add fenced code block handling to stripDanglingHtmlLikeTail and implement regression tests ([89ea8e6](https://github.com/Simon-He95/markstream-vue/commit/89ea8e6ad51947208bca2c630409d88c72668c3f)), closes [#206](https://github.com/Simon-He95/markstream-vue/issues/206)
+* implement VmrContainerNode component and parser for custom ::: containers ([fe07067](https://github.com/Simon-He95/markstream-vue/commit/fe0706745fa2478ad1d5c857efdae7fef135e10f))
 
 
 
