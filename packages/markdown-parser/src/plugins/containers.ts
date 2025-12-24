@@ -39,7 +39,9 @@ export function applyContainers(md: MarkdownIt) {
         tShift: number[]
         eMarks: number[]
         src: string
+        env: unknown
         push: (type: string, tag?: string, nesting?: number) => any
+        tokens: any[]
         md: any
         line: number
       }
@@ -50,7 +52,7 @@ export function applyContainers(md: MarkdownIt) {
 
       // Match ::: container syntax: ::: name {"json"}
       // Using separate patterns to avoid backtracking issues
-      const nameMatch = line.match(/^:::(\S+)/)
+      const nameMatch = line.match(/^:::\s*(\S+)/)
       if (!nameMatch)
         return false
 
@@ -116,26 +118,26 @@ export function applyContainers(md: MarkdownIt) {
         }
       }
 
+      // Parse inner content as full block markdown so block-level constructs
+      // (especially fenced code blocks) are preserved inside the container.
       const contentLines: string[] = []
       for (let i = startLine + 1; i < nextLine; i++) {
         const sPos = s.bMarks[i] + s.tShift[i]
         const ePos = s.eMarks[i]
         contentLines.push(s.src.slice(sPos, ePos))
       }
-
-      // Only render paragraph content if there's actual content (not just empty lines)
       const hasContent = contentLines.some(line => line.trim().length > 0)
       if (hasContent) {
-        // Open a paragraph, push inline content and then close paragraph
-        s.push('paragraph_open', 'p', 1)
-        const inlineToken = s.push('inline', '', 0)
-        inlineToken.content = contentLines.join('\n')
-        inlineToken.map = [startLine + 1, nextLine]
-        // Ensure children exist and parse the inline content into them so the renderer
-        // won't encounter a null children array (which causes .length read errors).
-        inlineToken.children = []
-        s.md.inline.parse(inlineToken.content, s.md, (s as any).env, inlineToken.children)
-        s.push('paragraph_close', 'p', -1)
+        // Always end with two newlines to ensure block separation (esp. for lists/paragraphs)
+        let innerSrc = contentLines.join('\n')
+        if (!innerSrc.endsWith('\n'))
+          innerSrc += '\n'
+        if (!innerSrc.endsWith('\n\n'))
+          innerSrc += '\n'
+        const innerTokens: any[] = []
+        // Use the same env as the parent block parser to ensure all block rules are available
+        s.md.block.parse(innerSrc, s.md, s.env, innerTokens)
+        s.tokens.push(...innerTokens)
       }
 
       s.push('vmr_container_close', 'div', -1)

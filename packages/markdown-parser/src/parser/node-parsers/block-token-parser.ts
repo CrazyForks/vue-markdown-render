@@ -1,10 +1,13 @@
 import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions, VmrContainerNode } from '../../types'
+import { parseInlineTokens } from '../inline-parsers'
 import { parseFenceToken } from '../inline-parsers/fence-parser'
+import { parseBlockquote } from './blockquote-parser'
 import { parseCodeBlock } from './code-block-parser'
 import { parseDefinitionList } from './definition-list-parser'
 import { parseFootnote } from './footnote-parser'
 import { parseHeading } from './heading-parser'
 import { parseHtmlBlock } from './html-block-parser'
+import { parseList } from './list-parser'
 import { parseMathBlock } from './math-block-parser'
 import { parseTable } from './table-parser'
 import { parseThematicBreak } from './thematic-break-parser'
@@ -44,13 +47,47 @@ function parseVmrContainer(
 
   // Parse children until we find the closing token
   while (j < tokens.length && tokens[j].type !== 'vmr_container_close') {
-    const handled = parseBasicBlockToken(tokens, j, options)
-    if (handled) {
-      children.push(handled[0])
-      j = handled[1]
+    if (tokens[j].type === 'paragraph_open') {
+      // Handle paragraph tokens (plain text)
+      const contentToken = tokens[j + 1]
+      if (contentToken) {
+        const childrenArr = (contentToken.children as MarkdownToken[]) || []
+        children.push({
+          type: 'paragraph',
+          children: parseInlineTokens(childrenArr || [], undefined, undefined, {
+            requireClosingStrong: options?.requireClosingStrong,
+            customHtmlTags: options?.customHtmlTags,
+          }),
+          raw: String(contentToken.content ?? ''),
+        })
+      }
+      j += 3 // Skip paragraph_open, inline, paragraph_close
+    }
+    else if (
+      tokens[j].type === 'bullet_list_open'
+      || tokens[j].type === 'ordered_list_open'
+    ) {
+      // Handle list tokens
+      const [listNode, newIndex] = parseList(tokens, j, options)
+      children.push(listNode)
+      j = newIndex
+    }
+    else if (tokens[j].type === 'blockquote_open') {
+      // Handle blockquote tokens
+      const [blockquoteNode, newIndex] = parseBlockquote(tokens, j, options)
+      children.push(blockquoteNode)
+      j = newIndex
     }
     else {
-      j++
+      // Handle other basic block tokens (heading, code_block, fence, etc.)
+      const handled = parseBasicBlockToken(tokens, j, options)
+      if (handled) {
+        children.push(handled[0])
+        j = handled[1]
+      }
+      else {
+        j++
+      }
     }
   }
 
