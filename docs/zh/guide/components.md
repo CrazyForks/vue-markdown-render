@@ -13,7 +13,7 @@
 | `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node`、`displayMode`、`macros` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
 | `ImageNode` | 自定义图片预览 / 懒加载 | 触发 `click` / `load` / `error` 事件 | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
 | `LinkNode` | 下划线动画、颜色自定义 | `color`、`underlineHeight`、`showTooltip` | 无 | 浏览器默认 `a` 样式可通过 reset 解决 |
-| `VmrContainerNode` | 带 JSON 属性的自定义 `:::` 容器 | `node`（`name`、`attrs`、`children`、`raw`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | 显示原始文本 → 注册自定义组件；JSON 无效 → 检查 `data-attrs` 回退 |
+| `VmrContainerNode` | 带 JSON 属性的自定义 `:::` 容器 | `node`（`name`、`attrs`、`children`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | 未知节点类型 → 检查 `FallbackComponent`；JSON 无效 → 检查 `data-attrs` 回退 |
 
 ## MarkdownRender
 
@@ -320,12 +320,20 @@ setCustomComponents('docs', { image: ImagePreview })
 
 ## VmrContainerNode — 自定义 ::: 容器
 
-`VmrContainerNode` 是一个极简的文本渲染器，用于自定义 `:::` 容器。它会按原样渲染原始 markdown 文本，让你可以通过自定义组件完全接管控制。
+`VmrContainerNode` 渲染自定义 `:::` 容器，支持嵌套的 markdown 内容。
 
 ### 快速参考
 - **适用场景**：自定义容器块，如 `::: viewcode:topo-test-001 {"devId":"..."}`。
-- **渲染方式**：通过 `node.raw` 输出原始文本——非常适合自定义覆盖。
-- **CSS**：极简基础样式；通过 `setCustomComponents` 添加你自己的样式。
+- **渲染方式**：递归渲染子节点（段落、列表、代码块等）。
+- **CSS**：极简基础样式；通过 `setCustomComponents` 覆盖。
+
+### 支持的子节点
+
+组件支持以下块级节点：
+- **内联节点**（段落内）：text、strong、emphasis、link、image、inline_code 等
+- **块级节点**：paragraph、heading、list、blockquote、code_block、fence、math_block、table
+
+未知节点类型会回退到 `FallbackComponent`，显示节点类型和原始内容用于调试。
 
 ### 语法
 
@@ -355,15 +363,30 @@ interface VmrContainerNode {
 
 ### 默认渲染
 
-默认组件将原始 markdown 渲染为纯文本：
+默认组件会递归渲染所有子节点：
 
 ```vue
 <!-- 默认 VmrContainerNode 输出 -->
 <div class="vmr-container vmr-container-container-name" data-key="value">
-  ::: container-name {"key":"value"}
-  内容...
-  :::
+  <!-- 子节点在这里渲染（段落、列表、代码块等） -->
 </div>
+```
+
+### 容器内内容示例
+
+```markdown
+::: info
+这是一个**粗体**段落，带有[链接](https://example.com)。
+
+## 容器内的标题
+
+- 列表项 1
+- 列表项 2
+
+```js
+console.log('代码块也可以工作')
+```
+:::
 ```
 
 ### 自定义覆盖

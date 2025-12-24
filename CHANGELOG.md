@@ -1,3 +1,17 @@
+## [0.0.4-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.0...v0.0.4-beta.1) (2025-12-24)
+
+
+### Bug Fixes
+
+* update rendering description for custom container blocks in documentation ([a93f371](https://github.com/Simon-He95/markstream-vue/commit/a93f3714a754e83b28b0a76fe3f4f25306a3e109))
+
+
+### Features
+
+* update VmrContainerNode component to support additional node types and improve rendering logic ([0a2b4a8](https://github.com/Simon-He95/markstream-vue/commit/0a2b4a82f167cda95d017515a91366fdb7e9ea8d)), closes [#212](https://github.com/Simon-He95/markstream-vue/issues/212)
+
+
+
 ## [0.0.4-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.3-beta.9...v0.0.4-beta.0) (2025-12-23)
 
 

@@ -13,7 +13,7 @@ This page explains how each renderer fits together, what peer dependencies or CS
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node`, `displayMode`, `macros` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
 | `ImageNode` | Custom previews/lightboxes | Emits `click`, `load`, `error`; accepts `lazy` props via `node.props` | None, but respects global CSS | Wrap in custom component + `setCustomComponents` to intercept events |
 | `LinkNode` | Animated underline, tooltips | `color`, `underlineHeight`, `showTooltip` | No extra CSS | Browser defaults can override `a` styles; import reset |
-| `VmrContainerNode` | Custom `:::` containers with JSON attrs | `node` (`name`, `attrs`, `children`, `raw`) | Minimal base CSS; override via `setCustomComponents` | Raw text visible → register custom component; invalid JSON → check `data-attrs` fallback |
+| `VmrContainerNode` | Custom `:::` containers with JSON attrs | `node` (`name`, `attrs`, `children`) | Minimal base CSS; override via `setCustomComponents` | Unknown node type → check `FallbackComponent`; invalid JSON → check `data-attrs` fallback |
 
 ## MarkdownRender
 
@@ -322,12 +322,20 @@ Streaming behavior:
 
 ## VmrContainerNode — custom ::: containers
 
-`VmrContainerNode` is a minimal text renderer for custom `:::` containers. It renders the raw markdown text as-is, giving you full control to override with custom components.
+`VmrContainerNode` renders custom `:::` containers with support for nested markdown content.
 
 ### Quick reference
 - **Best for**: Custom container blocks like `::: viewcode:topo-test-001 {"devId":"..."}`.
-- **Rendering**: Outputs raw text via `node.raw` — perfect for custom overrides.
-- **CSS**: Minimal base styles; add your own via `setCustomComponents`.
+- **Rendering**: Recursively renders child nodes (paragraphs, lists, code blocks, etc.).
+- **CSS**: Minimal base styles; override via `setCustomComponents`.
+
+### Supported child nodes
+
+The component supports the following block-level nodes inside containers:
+- **Inline nodes** (inside paragraphs): text, strong, emphasis, link, image, inline_code, etc.
+- **Block nodes**: paragraph, heading, list, blockquote, code_block, fence, math_block, table
+
+Unknown node types fall back to `FallbackComponent`, which displays the node type and raw content for debugging.
 
 ### Syntax
 
@@ -357,15 +365,30 @@ interface VmrContainerNode {
 
 ### Default rendering
 
-The default component renders the raw markdown as plain text:
+The default component recursively renders all child nodes:
 
 ```vue
 <!-- Default VmrContainerNode output -->
 <div class="vmr-container vmr-container-container-name" data-key="value">
-  ::: container-name {"key":"value"}
-  Content here...
-  :::
+  <!-- Child nodes rendered here (paragraphs, lists, code blocks, etc.) -->
 </div>
+```
+
+### Example content inside containers
+
+```markdown
+::: info
+This is a **bold** paragraph with [links](https://example.com).
+
+## Heading inside container
+
+- List item 1
+- List item 2
+
+```js
+console.log('code blocks work too')
+```
+:::
 ```
 
 ### Custom override
