@@ -1,3 +1,21 @@
+## [0.0.4-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.2...v0.0.4-beta.3) (2025-12-24)
+
+
+### Features
+
+* implement final mode for parser to handle end-of-stream scenarios and improve rendering stability ([c2ef2c1](https://github.com/Simon-He95/markstream-vue/commit/c2ef2c15259b54b8971216da4c09066418d0dd31)), closes [#213](https://github.com/Simon-He95/markstream-vue/issues/213)
+
+
+
+## [0.0.4-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.1...v0.0.4-beta.2) (2025-12-24)
+
+
+### Features
+
+* add CDN support for KaTeX and Mermaid with dedicated workers ([7973cbc](https://github.com/Simon-He95/markstream-vue/commit/7973cbcb1aee3fc0a2b934ddf261309ab7a67492))
+
+
+
 ## [0.0.4-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.0...v0.0.4-beta.1) (2025-12-24)
 
 
