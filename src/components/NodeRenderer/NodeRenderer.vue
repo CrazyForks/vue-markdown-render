@@ -48,6 +48,11 @@ interface IdleDeadlineLike {
 export interface NodeRendererProps {
   content?: string
   nodes?: BaseNode[]
+  /**
+   * Whether the input stream is complete (end-of-stream). When true, the parser
+   * will stop emitting streaming "loading" nodes for unfinished constructs.
+   */
+  final?: boolean
   /** Options forwarded to parseMarkdownToStructure when content is provided */
   parseOptions?: ParseOptions
   customMarkdownIt?: (md: MarkdownIt) => MarkdownIt
@@ -186,15 +191,23 @@ function normalizeCustomTag(t: unknown) {
 
 const mergedParseOptions = computed(() => {
   const base = props.parseOptions ?? {}
+  const resolvedFinal = props.final ?? (base as any).final
   const propTags = props.customHtmlTags ?? []
   const optionTags = (base as any).customHtmlTags ?? []
   const merged = [...propTags, ...optionTags]
     .map(normalizeCustomTag)
     .filter(Boolean)
-  if (!merged.length)
-    return base
+  if (!merged.length) {
+    if (resolvedFinal == null)
+      return base
+    return {
+      ...(base as any),
+      final: resolvedFinal,
+    } as ParseOptions
+  }
   return {
     ...base,
+    final: resolvedFinal,
     customHtmlTags: Array.from(new Set(merged)),
   } as ParseOptions
 })

@@ -19,8 +19,14 @@ const renderingLoading = ref(true)
 
 // Function to render math using KaTeX
 async function renderMath() {
-  if (!props.node.content || !mathBlockElement.value || isUnmounted)
+  if (!mathBlockElement.value || isUnmounted)
     return
+  if (!props.node.content) {
+    renderingLoading.value = false
+    mathBlockElement.value.textContent = props.node.raw
+    hasRenderedOnce = true
+    return
+  }
 
   // Wait until near/in viewport to prioritize visible area
   if (!hasRenderedOnce) {

@@ -390,6 +390,12 @@ export interface ParseOptions {
   // When true, require a closing `**` to parse strong; otherwise allow mid-state strong
   requireClosingStrong?: boolean
   /**
+   * When true, indicates the input buffer is complete (end-of-stream).
+   * This disables "mid-state" streaming behavior (e.g. unclosed math/link/code
+   * tokens staying in a loading state) and keeps trailing markers as literal text.
+   */
+  final?: boolean
+  /**
    * Custom HTML-like tag names that should be emitted as custom nodes
    * instead of `html_inline` when encountered (e.g. ['thinking']).
    * Used by inline parsing; pair with `getMarkdown({ customHtmlTags })`

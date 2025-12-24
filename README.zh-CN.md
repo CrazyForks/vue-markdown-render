@@ -241,6 +241,8 @@ function addChunk(chunk: string) {
 
 这样无需重新解析 SSR 内容，同时还能通过 SSE/WebSocket 持续追加后续片段。
 
+> 提示：当你明确知道流已结束（消息已完整）时，建议用 `parseMarkdownToStructure(buffer.value, md, { final: true })` 或在组件上设置 `:final="true"`，以关闭解析器的中间态（loading）策略，避免末尾残留分隔符（如 `$$`、未闭合 code fence）导致永久 loading。
+
 ## ⚙️ 性能模式
 
 - **默认虚拟化窗口**：保持 `max-live-nodes` 默认值（`320`），渲染器会立即渲染当前窗口的节点，同时只保留有限数量的 DOM 节点，实现平滑滚动与可控内存，占位骨架极少。
@@ -257,6 +259,7 @@ function addChunk(chunk: string) {
 - `batchRendering`：用 `initialRenderBatchSize`、`renderBatchSize`、`renderBatchDelay`、`renderBatchBudgetMs` 微调批次。
 - `enableMermaid` / `enableKatex` / `enableMonaco`：按需启用重型依赖。
 - `parse-options`：在组件上复用解析钩子（如 `preTransformTokens`、`requireClosingStrong`）。
+- `final`：标记“最终态/流结束”，关闭中间态 loading 解析并强制收敛未闭合结构。
 - `custom-html-tags`：扩展流式 HTML 白名单并将这些标签输出为自定义节点，便于 `setCustomComponents` 直接映射（如 `['thinking']`）。
 - `custom-components`：为自定义标签/标记注册内嵌 Vue 组件。
 

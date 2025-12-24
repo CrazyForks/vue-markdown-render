@@ -242,6 +242,8 @@ function addChunk(chunk: string) {
 
 This avoids re-parsing SSR content while letting later SSE/WebSocket chunks continue the stream.
 
+> Tip: when you know the stream has ended (the message is complete), use `parseMarkdownToStructure(buffer.value, md, { final: true })` or pass `:final="true"` to the component. This disables mid-state (`loading`) parsing so trailing delimiters (like `$$` or an unclosed code fence) won’t get stuck showing perpetual loading.
+
 ## ⚙️ Performance presets
 
 - **Virtual window (default)** – keep `max-live-nodes` at its default `320` to enable virtualization. Nodes render immediately and the renderer keeps a sliding window of elements mounted so long docs remain responsive without showing skeleton placeholders.
@@ -258,6 +260,7 @@ Pick one mode per surface: virtualization for best scrollback and steady memory 
 - `batchRendering`: fine-tune batches with `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, `renderBatchBudgetMs`.
 - `enableMermaid` / `enableKatex` / `enableMonaco`: opt-in heavy deps when needed.
 - `parse-options`: reuse parser hooks (e.g., `preTransformTokens`, `requireClosingStrong`) on the component.
+- `final`: marks end-of-stream; disables mid-state loading parsing and forces unfinished constructs to settle.
 - `custom-html-tags`: extend streaming HTML allowlist for custom tags and emit them as custom nodes for `setCustomComponents` (e.g., `['thinking']`).
 - `custom-components`: register inline Vue components for custom tags/markers.
 

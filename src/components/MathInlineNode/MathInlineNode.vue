@@ -19,8 +19,14 @@ const registerVisibility = useViewportPriority()
 let visibilityHandle: ReturnType<typeof registerVisibility> | null = null
 
 async function renderMath() {
-  if (!props.node.content || !mathElement.value || isUnmounted)
+  if (!mathElement.value || isUnmounted)
     return
+  if (!props.node.content) {
+    renderingLoading.value = false
+    mathElement.value.textContent = props.node.raw
+    hasRenderedOnce = true
+    return
+  }
 
   if (currentAbortController) {
     currentAbortController.abort()

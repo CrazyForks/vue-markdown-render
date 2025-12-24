@@ -264,6 +264,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
   const mathInline = (state: unknown, silent: boolean) => {
     const s = state as any
     const strict = !!mathOpts?.strictDelimiters
+    const allowLoading = !s?.env?.__markstreamFinal
 
     if (/^\*[^*]+/.test(s.src)) {
       return false
@@ -347,7 +348,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           }
           if (endIdx === -1) {
             // Do not treat segments containing inline code as math
-            if (!strict && isMathLike(content) && !content.includes('`')) {
+            if (allowLoading && !strict && isMathLike(content) && !content.includes('`')) {
               searchPos = index + open.length
               foundAny = true
               if (!silent) {
@@ -397,8 +398,11 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         // Always accept explicit dollar-delimited math ($...$) even if the
         // heuristic deems it not math-like (to support cases like $H$, $CO_2$).
         const hasBacktick = content.includes('`')
+        const isEmpty = !content || !content.trim()
         const isDollar = open === '$'
-        const shouldSkip = strict ? hasBacktick : (hasBacktick || (!isDollar && !isMathLike(content)))
+        const shouldSkip = strict
+          ? (hasBacktick || isEmpty)
+          : (hasBacktick || isEmpty || (!isDollar && !isMathLike(content)))
         if (shouldSkip) {
           // push remaining text after last match
           // not math-like; skip this match and continue scanning
@@ -523,6 +527,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     silent: boolean,
   ) => {
     const s = state as any
+    const allowLoading = !s?.env?.__markstreamFinal
     const strict = mathOpts?.strictDelimiters
     const delimiters: [string, string][] = strict
       ? [
@@ -680,8 +685,8 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       }
     }
 
-    // In strict mode, do not emit mid-state (unclosed) block math
-    if (strict && !found)
+    // In strict mode or final mode, do not emit mid-state (unclosed) block math
+    if ((!allowLoading || strict) && !found)
       return false
     // 追加检测内容是否是 math
     const looksMath = openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content)

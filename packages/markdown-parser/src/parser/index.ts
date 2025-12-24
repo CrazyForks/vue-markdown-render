@@ -117,40 +117,43 @@ export function parseMarkdownToStructure(
   md: MarkdownIt,
   options: ParseOptions = {},
 ): ParsedNode[] {
+  const isFinal = !!options.final
   // Ensure markdown is a string — guard against null/undefined inputs from callers
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
   let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
-  if (safeMarkdown.endsWith('- *')) {
-    // 放置markdown 解析 - * 会被处理成多个 ul >li 嵌套列表
-    safeMarkdown = safeMarkdown.replace(/- \*$/, '- \\*')
-  }
-  if (/(?:^|\n)\s*-\s*$/.test(safeMarkdown)) {
-    // streaming 中间态：单独的 "-" 行（或以换行结尾的 "-\n"）会被渲染成文本/列表前缀，
-    // 也会导致输入 "---" 时第一个 "-" 先闪出来再跳成 hr。
-    safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*-\s*$/, (m) => {
-      return m.startsWith('\n') ? '\n' : ''
-    })
-  }
-  else if (/(?:^|\n)\s*--\s*$/.test(safeMarkdown)) {
-    // streaming 中间态：输入 "---" 时的 "--" 前缀也不应该作为文本渲染，避免跳动。
-    safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*--\s*$/, (m) => {
-      return m.startsWith('\n') ? '\n' : ''
-    })
-  }
-  else if (/(?:^|\n)\s*>\s*$/.test(safeMarkdown)) {
-    // streaming 中间态：单独的 ">" 行会先被识别成 blockquote，导致 UI 闪烁/跳动。
-    // 只裁剪末尾这一个 marker，等后续内容到齐再正常解析。
-    safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*>\s*$/, (m) => {
-      return m.startsWith('\n') ? '\n' : ''
-    })
-  }
-  else if (/\n\s*[*+]\s*$/.test(safeMarkdown)) {
-    // streaming 中间态：单独的 "*"/"+" 行会被识别成空的 list item，导致 UI 闪出一个圆点
-    safeMarkdown = safeMarkdown.replace(/\n\s*[*+]\s*$/, '\n')
-  }
-  else if (/\n[[(]\n*$/.test(safeMarkdown)) {
-    // 此时 markdown 解析会出错要跳过
-    safeMarkdown = safeMarkdown.replace(/(\n\[|\n\()+\n*$/g, '\n')
+  if (!isFinal) {
+    if (safeMarkdown.endsWith('- *')) {
+      // 放置markdown 解析 - * 会被处理成多个 ul >li 嵌套列表
+      safeMarkdown = safeMarkdown.replace(/- \*$/, '- \\*')
+    }
+    if (/(?:^|\n)\s*-\s*$/.test(safeMarkdown)) {
+      // streaming 中间态：单独的 "-" 行（或以换行结尾的 "-\n"）会被渲染成文本/列表前缀，
+      // 也会导致输入 "---" 时第一个 "-" 先闪出来再跳成 hr。
+      safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*-\s*$/, (m) => {
+        return m.startsWith('\n') ? '\n' : ''
+      })
+    }
+    else if (/(?:^|\n)\s*--\s*$/.test(safeMarkdown)) {
+      // streaming 中间态：输入 "---" 时的 "--" 前缀也不应该作为文本渲染，避免跳动。
+      safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*--\s*$/, (m) => {
+        return m.startsWith('\n') ? '\n' : ''
+      })
+    }
+    else if (/(?:^|\n)\s*>\s*$/.test(safeMarkdown)) {
+      // streaming 中间态：单独的 ">" 行会先被识别成 blockquote，导致 UI 闪烁/跳动。
+      // 只裁剪末尾这一个 marker，等后续内容到齐再正常解析。
+      safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*>\s*$/, (m) => {
+        return m.startsWith('\n') ? '\n' : ''
+      })
+    }
+    else if (/\n\s*[*+]\s*$/.test(safeMarkdown)) {
+      // streaming 中间态：单独的 "*"/"+" 行会被识别成空的 list item，导致 UI 闪出一个圆点
+      safeMarkdown = safeMarkdown.replace(/\n\s*[*+]\s*$/, '\n')
+    }
+    else if (/\n[[(]\n*$/.test(safeMarkdown)) {
+      // 此时 markdown 解析会出错要跳过
+      safeMarkdown = safeMarkdown.replace(/(\n\[|\n\()+\n*$/g, '\n')
+    }
   }
 
   // For custom HTML-like blocks (e.g. <thinking>...</thinking>), markdown-it may
@@ -194,10 +197,11 @@ export function parseMarkdownToStructure(
   // 마지막에 남아있는 미완성 '<...'(예: '<fo', '</think') 꼬리 조각은
   // streaming 중간 상태에서 화면에 그대로 찍힐 수 있으므로, markdown-it
   // 파싱 전에 제거한다.
-  safeMarkdown = stripDanglingHtmlLikeTail(safeMarkdown)
+  if (!isFinal)
+    safeMarkdown = stripDanglingHtmlLikeTail(safeMarkdown)
 
   // Get tokens from markdown-it
-  const tokens = md.parse(safeMarkdown, {})
+  const tokens = md.parse(safeMarkdown, { __markstreamFinal: isFinal })
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
     return []

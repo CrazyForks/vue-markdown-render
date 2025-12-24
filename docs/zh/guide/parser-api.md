@@ -24,6 +24,22 @@
 
 返回：`ParsedNode[]`
 
+### ParseOptions: `final`（流结束/最终态）
+
+在流式渲染（SSE/AI Chat）中，解析器会主动产出一些 **“中间态（loading）节点”** 来降低闪烁，例如：
+- 未闭合的块级数学公式（以 `$$` 开头但还没等到结尾 `$$`）
+- 未闭合的 code fence（只收到 ``` 开始行）
+
+这样做能让 UI 在内容尚未到齐时也能稳定渲染。但当你 **明确知道内容已经结束**（流已结束、消息已完整），应该将解析切换到最终态：
+
+```ts
+const nodes = parseMarkdownToStructure(buffer, md, { final: true })
+```
+
+`final: true` 的效果：
+- 关闭上述“中间态 loading”策略：未闭合的 `$$...` 不再产出 `math_block/loading`；
+- 将 EOF 视作 code fence 的隐式闭合，避免代码块永远 loading。
+
 ### 其他有用函数
 - `processTokens(tokens)` — 将原始 token 处理为可用于构建节点列表的结构
 - `parseInlineTokens(tokens, md)` — 解析 inline tokens
@@ -74,6 +90,17 @@ const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosi
 const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: false })
 // 允许在实时预览中创建临时/中间态的加粗节点
 ```
+
+### `$$` 异常分隔符（空公式/误触发）的解释
+
+有些内容会出现“奇怪的 `$$`”，例如：
+
+```md
+adasd $$ dasdsa
+dasdsad
+```
+
+如果把 `$$` 误识别为数学公式分隔符但内部内容为空，就可能导致数学节点一直处于 loading（渲染层没有内容可渲染）。解析器现在会将 **空内容的 `$$` 视为普通文本**，避免这类永久 loading。
 
 ### 流式内联 HTML 中间态（`html_inline`）
 

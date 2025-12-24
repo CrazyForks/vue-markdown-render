@@ -29,6 +29,22 @@ Parameters:
 
 Returns: `ParsedNode[]`
 
+### ParseOptions: `final` (end-of-stream mode)
+
+In streaming contexts (SSE / AI chat), the parser intentionally emits some **mid-state (`loading`) nodes** to reduce flicker and keep rendering stable while content is incomplete, for example:
+- Unclosed block math (starts with `$$` but the closing `$$` hasn’t arrived yet)
+- Unclosed code fences (only the opening ``` has arrived)
+
+When you know the message is complete, switch the parser to “final” mode:
+
+```ts
+const nodes = parseMarkdownToStructure(buffer, md, { final: true })
+```
+
+What `final: true` does:
+- Disables mid-state loading behavior for unclosed constructs (so trailing `$$...` won’t produce perpetual `math_block/loading` nodes).
+- Treats EOF as an implicit closing fence so code blocks don’t get stuck in loading.
+
 ### `processTokens(tokens)`
 Converts raw markdown-it tokens into a processed token list ready for the AST phase.
 
@@ -83,6 +99,17 @@ Example — editor-friendly parsing:
 const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: false })
 // allows creating a temporary/"mid-state" strong node for live-edit previews
 ```
+
+### Stray `$$` delimiters (empty math)
+
+Sometimes streams contain an accidental `$$` sequence, e.g.
+
+```md
+adasd $$ dasdsa
+dasdsad
+```
+
+If `$$` is misinterpreted as a math delimiter with empty content, the renderer can appear “stuck” because there is no math content to render. The parser now treats empty `$$` as plain text to avoid perpetual loading spinners.
 
 ### Streaming inline HTML mid-states (`html_inline`)
 
