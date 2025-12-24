@@ -103,6 +103,38 @@ enableMermaid()
 enableKatex()
 ```
 
+如果你是用 CDN 引入 KaTeX，并且希望公式在 Web Worker 中渲染（不打包 / 不安装可选 peer），可以注入一个“CDN 加载 KaTeX”的 worker：
+
+```ts
+import { createKaTeXWorkerFromCDN, setKaTeXWorker } from 'markstream-vue'
+
+const { worker } = createKaTeXWorkerFromCDN({
+  mode: 'classic',
+  // worker 内通过 importScripts() 加载的 UMD 构建
+  katexUrl: 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js',
+  mhchemUrl: 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/mhchem.min.js',
+})
+
+if (worker)
+  setKaTeXWorker(worker)
+```
+
+如果你是用 CDN 引入 Mermaid，并且希望 Mermaid 的解析在 worker 中进行（用于渐进式 Mermaid 渲染的后台解析），可以注入 Mermaid parser worker：
+
+```ts
+import { createMermaidWorkerFromCDN, setMermaidWorker } from 'markstream-vue'
+
+const { worker } = createMermaidWorkerFromCDN({
+  // Mermaid CDN 构建通常是 ESM，推荐 module worker。
+  mode: 'module',
+  workerOptions: { type: 'module' },
+  mermaidUrl: 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs',
+})
+
+if (worker)
+  setMermaidWorker(worker)
+```
+
 ### Nuxt 快速接入
 
 ```ts
@@ -273,7 +305,8 @@ setCustomComponents({
 
 ## ❓ 快问快答
 
-- Mermaid / KaTeX 不显示？安装对应 peer（`mermaid` / `katex`），并传入 `:enable-mermaid="true"` / `:enable-katex="true"` 或调用 loader 设置函数。
+- Mermaid / KaTeX 不显示？安装对应 peer（`mermaid` / `katex`），并传入 `:enable-mermaid="true"` / `:enable-katex="true"` 或调用 loader 设置函数。如果你是用 CDN `<script>` 引入，库也会自动读取 `window.mermaid` / `window.katex`。
+- CDN + KaTeX worker：如果你不打包 `katex` 但仍希望公式在 worker 中渲染（不占主线程），可以用 `createKaTeXWorkerFromCDN()` 创建一个“CDN 加载 KaTeX”的 worker，然后通过 `setKaTeXWorker()` 注入。
 - 体积问题：可选 peer 不会被打包，CSS 只需导入一次；对代码块可用 Shiki（`MarkdownCodeBlockNode`）替代 Monaco 以减轻体积。
 - 自定义 UI：通过 `setCustomComponents`（全局）或 `custom-components` prop 注册组件，在 Markdown 中放置占位标记并映射到 Vue 组件。
 

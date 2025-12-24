@@ -84,3 +84,23 @@ If diagrams come from untrusted users/LLMs, pass `:is-strict="true"` to enable M
 5. **Heavy graphs** — consider pre-rendering server-side (mermaid CLI) or caching SVG output; the component exposes `svgString` when using `MermaidBlockNode` export events.
 
 Still stuck? Reproduce the issue in the playground (`pnpm play`) with a minimal Markdown sample and link it when opening a bug report.
+
+## CDN usage (no bundler)
+
+If you load Mermaid via CDN and want progressive off-main-thread parsing, inject a CDN-backed worker:
+
+```ts
+import { createMermaidWorkerFromCDN, enableMermaid, setMermaidLoader, setMermaidWorker } from 'markstream-vue'
+
+// use the CDN global (UMD) on the main thread
+setMermaidLoader(() => (window as any).mermaid)
+enableMermaid(() => (window as any).mermaid)
+
+// optional: worker used for parse/prefix checks during streaming
+const { worker } = createMermaidWorkerFromCDN({
+  mode: 'module',
+  mermaidUrl: 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs',
+})
+if (worker)
+  setMermaidWorker(worker)
+```

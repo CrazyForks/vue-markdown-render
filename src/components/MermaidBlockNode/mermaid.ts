@@ -9,6 +9,16 @@ function resetCachedMermaid() {
   cachedMermaid = null
 }
 
+function getGlobalMermaid() {
+  try {
+    const g: any = globalThis as any
+    return normalizeMermaidModule(g?.mermaid)
+  }
+  catch {
+    return null
+  }
+}
+
 export function setMermaidLoader(loader: MermaidLoader | null) {
   mermaidLoader = loader
   resetCachedMermaid()
@@ -90,6 +100,14 @@ function patchInitialize(target: any) {
 export async function getMermaid() {
   if (cachedMermaid)
     return cachedMermaid
+
+  const globalMermaid = getGlobalMermaid()
+  if (globalMermaid) {
+    cachedMermaid = globalMermaid
+    patchInitialize(cachedMermaid)
+    return cachedMermaid
+  }
+
   const loader = mermaidLoader
   if (!loader)
     return null

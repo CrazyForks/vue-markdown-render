@@ -5,6 +5,7 @@ If something breaks, here are common fixes:
 - If you get `window is not defined` during SSR, wrap components in `<client-only>` for Nuxt and use the `onMounted` guard for Vite SSR.
 - Install `katex` when math rendering fails, and import `katex/dist/katex.min.css` in your app entry.
 - For Mermaid issues, upgrade or pin `mermaid` to a version >= 11 and check asynchronous render logs.
+- If you load KaTeX/Mermaid via CDN `<script>`, make sure `window.katex` / `window.mermaid` exist before first render, or call `setKatexLoader(() => window.katex)` / `setMermaidLoader(() => window.mermaid)` once after they load.
 - For performance concerns, check that `viewportPriority` is true and avoid too many heavy nodes in a single mount.
 
 If unsure, reproduce issue using the playground (or the hosted quick test) and then open an issue with stack trace and minimal markdown sample.

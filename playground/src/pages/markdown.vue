@@ -32,6 +32,12 @@ function goToTest() {
   })
 }
 
+function goToCdnPeers() {
+  router.push('/cdn-peers').catch(() => {
+    window.location.href = '/cdn-peers'
+  })
+}
+
 // Keep persisted values within reasonable bounds on hydration.
 watchEffect(() => {
   const parsedDelay = Number(streamDelay.value)
@@ -498,6 +504,16 @@ onBeforeUnmount(() => {
             >
               <Icon icon="carbon:rocket" class="w-4 h-4" />
               <span>Test</span>
+            </button>
+
+            <!-- CDN peers demo -->
+            <button
+              class="ml-2 flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              title="Go to CDN peers demo"
+              @click="goToCdnPeers"
+            >
+              <Icon icon="carbon:cloud" class="w-4 h-4" />
+              <span>CDN</span>
             </button>
           </div>
         </div>

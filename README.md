@@ -104,6 +104,38 @@ enableMermaid()
 enableKatex()
 ```
 
+If you load KaTeX via CDN and want KaTeX rendering in a Web Worker (no bundler / optional peer not installed), inject a CDN-backed worker:
+
+```ts
+import { createKaTeXWorkerFromCDN, setKaTeXWorker } from 'markstream-vue'
+
+const { worker } = createKaTeXWorkerFromCDN({
+  mode: 'classic',
+  // UMD builds used by importScripts() inside the worker
+  katexUrl: 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js',
+  mhchemUrl: 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/mhchem.min.js',
+})
+
+if (worker)
+  setKaTeXWorker(worker)
+```
+
+If you load Mermaid via CDN and want off-main-thread parsing (used by progressive Mermaid rendering), inject a Mermaid parser worker:
+
+```ts
+import { createMermaidWorkerFromCDN, setMermaidWorker } from 'markstream-vue'
+
+const { worker } = createMermaidWorkerFromCDN({
+  // Mermaid CDN builds are commonly ESM; module worker is recommended.
+  mode: 'module',
+  workerOptions: { type: 'module' },
+  mermaidUrl: 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs',
+})
+
+if (worker)
+  setMermaidWorker(worker)
+```
+
 ### Nuxt quick drop-in
 
 ```ts
@@ -274,7 +306,8 @@ Parse hooks example (match server + client):
 
 ## ❓ FAQ (quick answers)
 
-- Mermaid/KaTeX not rendering? Install the peer (`mermaid` / `katex`) and pass `:enable-mermaid="true"` / `:enable-katex="true"` or call the loader setters.
+- Mermaid/KaTeX not rendering? Install the peer (`mermaid` / `katex`) and pass `:enable-mermaid="true"` / `:enable-katex="true"` or call the loader setters. If you load them via CDN script tags, the library will also pick up `window.mermaid` / `window.katex`.
+- CDN + KaTeX worker: if you don't bundle `katex` but still want off-main-thread rendering, create and inject a worker that loads KaTeX via CDN (UMD) using `createKaTeXWorkerFromCDN()` + `setKaTeXWorker()`.
 - Bundle size: peers are optional and not bundled; import only `markstream-vue/index.css` once. Use Shiki (`MarkdownCodeBlockNode`) when Monaco is too heavy.
 - Custom UI: register components via `setCustomComponents` (global) or `custom-components` prop, then emit markers/placeholders in Markdown and map them to Vue components.
 

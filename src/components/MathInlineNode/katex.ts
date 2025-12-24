@@ -4,11 +4,37 @@ let katex: any = null
 let importAttempted = false
 let katexLoader: KatexLoader | null = defaultKatexLoader
 
+function normalizeKatexModule(mod: any) {
+  const resolved = mod?.default ?? mod
+  if (resolved && typeof resolved.renderToString === 'function')
+    return resolved
+  return null
+}
+
+function getGlobalKatex() {
+  try {
+    const g: any = globalThis as any
+    return normalizeKatexModule(g?.katex)
+  }
+  catch {
+    return null
+  }
+}
+
 function defaultKatexLoader() {
   return (async () => {
+    const globalKatex = getGlobalKatex()
+    if (globalKatex)
+      return globalKatex
+
     const mod = await import('katex')
-    await import('katex/contrib/mhchem')
-    return mod
+    try {
+      await import('katex/contrib/mhchem')
+    }
+    catch {
+      // ignore missing optional contrib bundle
+    }
+    return normalizeKatexModule(mod)
   })()
 }
 
@@ -35,6 +61,12 @@ export function isKatexEnabled() {
 }
 
 export async function getKatex() {
+  const globalKatex = getGlobalKatex()
+  if (globalKatex) {
+    katex = globalKatex
+    return katex
+  }
+
   if (katex)
     return katex
   if (importAttempted)
@@ -47,7 +79,7 @@ export async function getKatex() {
   try {
     const result = await loader()
     if (result) {
-      katex = result
+      katex = normalizeKatexModule(result) ?? result
       return katex
     }
   }
