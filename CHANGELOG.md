@@ -1,3 +1,17 @@
+## [0.0.4-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.3...v0.0.4-beta.4) (2025-12-25)
+
+
+### Bug Fixes
+
+* **math:** some case stuck ([f525b5c](https://github.com/Simon-He95/markstream-vue/commit/f525b5c66f82bd0be707db4d2150ab841a65972e)), closes [#214](https://github.com/Simon-He95/markstream-vue/issues/214)
+
+
+### Features
+
+* add AI/LLM context links to documentation and README files ([ce01981](https://github.com/Simon-He95/markstream-vue/commit/ce019811deb31809b7a3e22e3cb71f6f34c9f297))
+
+
+
 ## [0.0.4-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.2...v0.0.4-beta.3) (2025-12-24)
 
 
