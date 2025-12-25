@@ -49,6 +49,8 @@
 - Playground（交互演示）： https://markstream-vue.simonhe.me/
 - 交互测试页（可分享链接，便于复现）： https://markstream-vue.simonhe.me/test
 - 文档： https://markstream-vue-docs.simonhe.me/zh/guide/
+- AI/LLM 项目索引（中文）： https://markstream-vue-docs.simonhe.me/llms.zh-CN.md
+- AI/LLM 项目索引（英文）： https://markstream-vue-docs.simonhe.me/llms.md
 - 一键 StackBlitz 体验： https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
 - 更新日志： [CHANGELOG.md](./CHANGELOG.md)
 - Nuxt playground：`pnpm play:nuxt`

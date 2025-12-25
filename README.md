@@ -50,6 +50,8 @@
 - Playground (interactive demo): https://markstream-vue.simonhe.me/
 - Interactive test page (shareable links, easy reproduction): https://markstream-vue.simonhe.me/test
 - Docs: https://markstream-vue-docs.simonhe.me/guide/
+- AI/LLM context (project map): https://markstream-vue-docs.simonhe.me/llms.md
+- AI/LLM context (中文): https://markstream-vue-docs.simonhe.me/llms.zh-CN.md
 - One-click StackBlitz demo: https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
 - Changelog: [CHANGELOG.md](./CHANGELOG.md)
 - Nuxt playground: `pnpm play:nuxt`
