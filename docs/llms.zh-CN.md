@@ -1,4 +1,4 @@
-# markstream-vue — LLM/AI 项目索引（`/llms.zh-CN.md`）
+# markstream-vue — LLM/AI 项目索引（`/llms.zh-CN`）
 
 这个文件是给 AI/LLM 用的“项目地图”，目标是：**最少阅读成本**定位到正确文档/源码入口，并给出可执行的答案。
 
@@ -115,7 +115,7 @@
 3) **是否显式启用**：`enableMermaid()` / `enableKatex()`（需要时）。
 4) **peer CSS 是否导入**：`katex/dist/katex.min.css`、`stream-monaco/esm/index.css`（Mermaid 主题需要时也导入）。
 5) **单独渲染节点组件**：外层需要 `.markstream-vue` 包裹以吃到库的 scoped CSS 变量。
-6) **SSR（Nuxt）**：用 `<client-only>` 包裹，确保重 peer/worker 仅在浏览器侧初始化。
+6) **SSR（Nuxt）**：用 `&lt;client-only&gt;` 包裹，确保重 peer/worker 仅在浏览器侧初始化。
 
 文档：`docs/guide/troubleshooting.md`, `docs/nuxt-ssr.md`, `docs/guide/tailwind.md`
 
@@ -127,18 +127,18 @@
 
 | 意图 | 常见表述 | 快速检查 | 回答骨架（可直接复用） | 最小追问（最多 1~3 个） | 优先打开文档 | 必要时看源码 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 安装 + 跑通最小例子 | “怎么用”, “最小示例” | CSS 已导入；组件能渲染 | “安装 `markstream-vue`，导入 `markstream-vue/index.css`，然后 `<MarkdownRender :content=\"md\" />` 即可渲染。” | “你是 Vite 还是 Nuxt？reset/CSS 导入顺序是怎样的？” | `docs/guide/quick-start.md`, `docs/guide/installation.md` | `src/exports.ts` |
+| 安装 + 跑通最小例子 | “怎么用”, “最小示例” | CSS 已导入；组件能渲染 | “安装 `markstream-vue`，导入 `markstream-vue/index.css`，然后 `&lt;MarkdownRender :content="md" /&gt;` 即可渲染。” | “你是 Vite 还是 Nuxt？reset/CSS 导入顺序是怎样的？” | `docs/guide/quick-start.md`, `docs/guide/installation.md` | `src/exports.ts` |
 | 样式缺失/很丑/不生效 | “没样式”, “CSS 乱了” | reset → 库 CSS；Tailwind 层；`.markstream-vue` 包裹 | “这类问题优先看 CSS 顺序：先 reset，再 `markstream-vue/index.css`（Tailwind 放 `@layer components`）。如果你没用 `MarkdownRender` 而是单独用节点组件，外层要有 `.markstream-vue`。” | “贴 `main.css`/入口 CSS 的导入顺序；你是用 `MarkdownRender` 还是单独节点组件？” | `docs/guide/troubleshooting.md`, `docs/guide/tailwind.md` | `src/index.css` |
 | Tailwind 覆盖冲突 | “Tailwind 抢样式” | `@layer components`；用 `custom-id` 做局部覆盖 | “把库 CSS 放进 `@layer components`，并用 `custom-id` + `[data-custom-id=\"...\"]` 做局部样式覆盖，避免全局互相踩。” | “你的 Tailwind layers 写法是什么？是否给 `MarkdownRender` 传了 `custom-id`？” | `docs/guide/tailwind.md`, `docs/guide/props.md` | `src/index.css` |
-| 流结束后卡 loading | “最后卡住”, “loading 一直转” | 结束时 `final: true` | “流式渲染结束时要设置 `final: true`（`parseMarkdownToStructure(..., { final: true })` 或 `<MarkdownRender final />`），否则未闭合 fence/数学公式会保持 mid-state。” | “你在 end-of-stream 时是否设置 `final`？最后一段 markdown 是否以 ``` 或 $$ 结尾？” | `docs/guide/parser-api.md`, `docs/guide/parser.md` | `packages/markdown-parser/src/index.ts` |
+| 流结束后卡 loading | “最后卡住”, “loading 一直转” | 结束时 `final: true` | “流式渲染结束时要设置 `final: true`（`parseMarkdownToStructure(..., { final: true })` 或 `&lt;MarkdownRender final /&gt;`），否则未闭合 fence/数学公式会保持 mid-state。” | “你在 end-of-stream 时是否设置 `final`？最后一段 markdown 是否以 ``` 或 $$ 结尾？” | `docs/guide/parser-api.md`, `docs/guide/parser.md` | `packages/markdown-parser/src/index.ts` |
 | 流式很跳/一坨一坨冒出来 | “不平滑”, “像卡顿后一次性出来” | 调 batch；保持重节点延迟 | “开启/调小 batch（`renderBatchSize`/`renderBatchDelay`）来做更平滑的‘打字机’；同时保持重节点延迟渲染，避免 Monaco/Mermaid 抢主线程。” | “你每次 chunk 都立刻 setState 吗？当前 batch 参数是多少？” | `docs/guide/performance.md`, `docs/guide/props.md` | `src/components/NodeRenderer/NodeRenderer.vue` |
 | 大文档性能差 | “长文卡”, “滚动掉帧” | 虚拟化 + buffer；延迟重节点 | “用虚拟化（`maxLiveNodes`, `liveNodeBuffer`）把 DOM 控制在窗口内，并延迟渲染 Monaco/Mermaid/KaTeX 等重节点。” | “文档大概多长（KB/行数）？是否包含很多 code block/mermaid？” | `docs/guide/performance.md` | `src/components/NodeRenderer/NodeRenderer.vue` |
 | Mermaid 不显示 | “mermaid 空白” | peer 安装；`enableMermaid()`；CSS 顺序 | “先确认安装了 `mermaid`，然后在客户端调用 `enableMermaid()`；再检查 reset/CSS 顺序。Mermaid 相关节点在 peer 未安装/未启用时不会正常渲染。” | “你在哪里调用 `enableMermaid()`？是否 SSR？fence 是否是 ```mermaid？” | `docs/guide/mermaid.md`, `docs/guide/troubleshooting.md` | `src/components/MermaidBlockNode/mermaid.ts` |
 | KaTeX 不显示 | “公式不渲染” | `katex` + CSS；`enableKatex()` | “安装 `katex` 并导入 `katex/dist/katex.min.css`，然后在客户端调用 `enableKatex()`。” | “是否导入 KaTeX CSS？你用的是 `$...$` 还是 `$$...$$`？是否 SSR？” | `docs/guide/math.md`, `docs/guide/installation.md` | `src/components/MathInlineNode/katex.ts` |
 | Monaco 代码块没功能/空白 | “toolbar 没了”, “编辑器空白” | `stream-monaco` + CSS；CSS 顺序 | “安装 `stream-monaco` 并导入 `stream-monaco/esm/index.css`；编辑器空白通常是缺 CSS 或 CSS 被覆盖。” | “是否导入 `stream-monaco/esm/index.css`？控制台有 worker/Monaco 报错吗？” | `docs/guide/monaco.md`, `docs/guide/components.md` | `src/components/CodeBlockNode/` |
-| 想要轻量代码块（不装 Monaco） | “SSR 友好”, “减包体” | Shiki 或 `<pre>` fallback | “如果不想装 Monaco，用 `MarkdownCodeBlockNode`（Shiki）或开启 `render-code-blocks-as-pre` 强制输出 `<pre><code>`。” | “你需要语法高亮吗？是否接受安装 `shiki` + `stream-markdown`？” | `docs/guide/code-blocks.md`, `docs/guide/components.md` | `src/components/MarkdownCodeBlockNode/`, `src/components/PreCodeNode/` |
-| Markdown 里嵌自定义组件 | “自定义 tag”, “<thinking>” | `customHtmlTags`/`custom-html-tags`；`setCustomComponents` | “把 tag 加进 `customHtmlTags`/`custom-html-tags` 让解析器产出对应 node type，再用 `setCustomComponents(customId, { thinking: 你的组件 })` 映射渲染。” | “tag 名称是什么？你希望按 HTML 透传还是变成自定义 node type？” | `docs/guide/advanced.md`, `docs/guide/parser-api.md` | `src/utils/nodeComponents.ts` |
-| Nuxt SSR 报错 | “window is not defined” | `<client-only>`；重 peer 仅客户端 | “Nuxt SSR 场景用 `<client-only>` 包裹渲染器，并确保 Mermaid/Monaco/worker 初始化只在浏览器端执行。” | “报错发生在 build 还是 runtime？安装/启用了哪些 peers？” | `docs/nuxt-ssr.md` | `playground-nuxt/` |
+| 想要轻量代码块（不装 Monaco） | “SSR 友好”, “减包体” | Shiki 或 `&lt;pre&gt;` fallback | “如果不想装 Monaco，用 `MarkdownCodeBlockNode`（Shiki）或开启 `render-code-blocks-as-pre` 强制输出 `&lt;pre&gt;&lt;code&gt;`。” | “你需要语法高亮吗？是否接受安装 `shiki` + `stream-markdown`？” | `docs/guide/code-blocks.md`, `docs/guide/components.md` | `src/components/MarkdownCodeBlockNode/`, `src/components/PreCodeNode/` |
+| Markdown 里嵌自定义组件 | “自定义 tag”, `&lt;thinking&gt;` | `customHtmlTags`/`custom-html-tags`；`setCustomComponents` | “把 tag 加进 `customHtmlTags`/`custom-html-tags` 让解析器产出对应 node type，再用 `setCustomComponents(customId, { thinking: 你的组件 })` 映射渲染。” | “tag 名称是什么？你希望按 HTML 透传还是变成自定义 node type？” | `docs/guide/advanced.md`, `docs/guide/parser-api.md` | `src/utils/nodeComponents.ts` |
+| Nuxt SSR 报错 | “window is not defined” | `&lt;client-only&gt;`；重 peer 仅客户端 | “Nuxt SSR 场景用 `&lt;client-only&gt;` 包裹渲染器，并确保 Mermaid/Monaco/worker 初始化只在浏览器端执行。” | “报错发生在 build 还是 runtime？安装/启用了哪些 peers？” | `docs/nuxt-ssr.md` | `playground-nuxt/` |
 | 想确认导出/怎么 import | “是否导出 X”, “import 路径” | 查 `exports.ts` + `package.json#exports` | “以 `src/exports.ts` 和 `package.json#exports` 为准，确认符号是否导出以及正确的 import 路径。” | “你要 import 的符号名是什么？现在写的 import 路径是什么？” | `docs/guide/api.md`, `docs/guide/components.md` | `src/exports.ts`, `package.json` |
 
 ---
