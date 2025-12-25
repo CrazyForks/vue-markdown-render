@@ -288,6 +288,12 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       // We'll scan the entire inline source and tokenize all occurrences
       const src = s.src
       let foundAny = false
+      // Guard against non-advancing loops: if we ever end up repeatedly
+      // matching the same opener at the same position, force `searchPos`
+      // to advance so the inline rule can't hang the UI.
+      let lastIndex = -1
+      let lastSearchPos = -1
+      let stallCount = 0
       const pushText = (text: string) => {
         // sanitize unexpected values
         if (text === 'undefined' || text == null) {
@@ -322,6 +328,18 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const index = src.indexOf(open, searchPos)
         if (index === -1)
           break
+        if (index === lastIndex && searchPos === lastSearchPos) {
+          stallCount++
+          if (stallCount > 2) {
+            searchPos = index + Math.max(1, open.length)
+            continue
+          }
+        }
+        else {
+          stallCount = 0
+          lastIndex = index
+          lastSearchPos = searchPos
+        }
         // If the delimiter is immediately preceded by a ']' (possibly with
         // intervening spaces), it's likely part of a markdown link like
         // `[text](...)`, so we should not treat this '(' as the start of
@@ -475,12 +493,12 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
             if (isBeforeClose) {
               s.push('strong_close', '', 0)
             }
-            if (raw) {
-              // 这里的 raw 可能还会有 math_inline, 应该交给后续的规则处理，直接 s.pos 到当前位置
-              s.pos = endIdx + close.length
-              searchPos = s.pos
-              preMathPos = searchPos
-            }
+            // Always advance cursor past the math span; otherwise when the math
+            // is at end-of-line (raw === ''), we'd loop forever on the same opener.
+            // 这里的 raw 可能还会有 math_inline, 应该交给后续的规则处理，直接 s.pos 到当前位置
+            s.pos = endIdx + close.length
+            searchPos = s.pos
+            preMathPos = searchPos
             if (!isBeforeClose)
               s.push('strong_close', '', 0)
             continue

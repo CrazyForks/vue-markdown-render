@@ -9,16 +9,120 @@ import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
 
 function stripDanglingHtmlLikeTail(markdown: string) {
+  const isWs = (ch: string) => ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r'
+
+  const isLikelyHtmlTagPrefix = (tail: string) => {
+    // Deterministic scanner (avoids ReDoS/backtracking regexes).
+    // Accepts prefixes like "<think", "</think", "<div class", "<a href=\"x"
+    // and treats them as "HTML-ish" tails that can be stripped in streaming mode.
+    if (!tail || tail[0] !== '<')
+      return false
+    if (tail.includes('>'))
+      return false
+
+    let i = 1
+    // "< " is likely comparison ("x < y"), not a tag
+    if (i < tail.length && isWs(tail[i]))
+      return false
+
+    if (tail[i] === '/') {
+      i++
+      // "</ " isn't a tag start
+      if (i < tail.length && isWs(tail[i]))
+        return false
+    }
+
+    const isAlpha = (ch: string) => {
+      const c = ch.charCodeAt(0)
+      return (c >= 65 && c <= 90) || (c >= 97 && c <= 122)
+    }
+    const isDigit = (ch: string) => {
+      const c = ch.charCodeAt(0)
+      return c >= 48 && c <= 57
+    }
+    const isNameStart = (ch: string) => ch === '!' || isAlpha(ch)
+    const isNameChar = (ch: string) => isAlpha(ch) || isDigit(ch) || ch === ':' || ch === '-'
+    const isAttrStart = (ch: string) => isAlpha(ch) || isDigit(ch) || ch === '_' || ch === '.' || ch === ':' || ch === '-'
+    const isAttrChar = isAttrStart
+
+    if (i >= tail.length || !isNameStart(tail[i]))
+      return false
+
+    // tag name
+    i++
+    while (i < tail.length && isNameChar(tail[i]))
+      i++
+
+    while (i < tail.length) {
+      // trailing whitespace ok
+      while (i < tail.length && isWs(tail[i]))
+        i++
+      if (i >= tail.length)
+        return true
+
+      // allow self-closing slash at end (e.g. "<br/")
+      if (tail[i] === '/') {
+        i++
+        while (i < tail.length && isWs(tail[i]))
+          i++
+        return i >= tail.length
+      }
+
+      // attribute name
+      if (!isAttrStart(tail[i]))
+        return false
+      i++
+      while (i < tail.length && isAttrChar(tail[i]))
+        i++
+
+      while (i < tail.length && isWs(tail[i]))
+        i++
+
+      if (i < tail.length && tail[i] === '=') {
+        i++
+        while (i < tail.length && isWs(tail[i]))
+          i++
+        if (i >= tail.length)
+          return true // incomplete value
+
+        const quote = tail[i]
+        if (quote === '"' || quote === '\'') {
+          i++
+          while (i < tail.length && tail[i] !== quote)
+            i++
+          // If we don't see the closing quote (tail ends), it's still a tag prefix
+          if (i >= tail.length)
+            return true
+          i++ // consume closing quote
+        }
+        else {
+          // unquoted value: scan until whitespace or forbidden delimiters
+          while (i < tail.length) {
+            const ch = tail[i]
+            if (isWs(ch) || ch === '<' || ch === '>' || ch === '"' || ch === '\'' || ch === '`')
+              break
+            i++
+          }
+          if (i >= tail.length)
+            return true // incomplete unquoted value
+        }
+      }
+      // else: boolean attr, continue
+    }
+
+    return true
+  }
+
   const isInsideFencedCodeBlock = (src: string, pos: number) => {
     let inFence = false
     let fenceChar: '`' | '~' | '' = ''
     let fenceLen = 0
 
-    const isWs = (ch: string) => ch === ' ' || ch === '\t'
+    const isIndentWs = (ch: string) => ch === ' ' || ch === '\t'
 
     const parseFenceMarker = (line: string) => {
       let i = 0
-      while (i < line.length && isWs(line[i])) i++
+      while (i < line.length && isIndentWs(line[i])) i++
       const ch = line[i]
       if (ch !== '`' && ch !== '~')
         return null
@@ -32,12 +136,12 @@ function stripDanglingHtmlLikeTail(markdown: string) {
 
     const stripBlockquotePrefix = (line: string) => {
       let i = 0
-      while (i < line.length && isWs(line[i])) i++
+      while (i < line.length && isIndentWs(line[i])) i++
       let saw = false
       while (i < line.length && line[i] === '>') {
         saw = true
         i++
-        while (i < line.length && isWs(line[i])) i++
+        while (i < line.length && isIndentWs(line[i])) i++
       }
       return saw ? line.slice(i) : null
     }
@@ -103,11 +207,29 @@ function stripDanglingHtmlLikeTail(markdown: string) {
     return s
   if (isInsideFencedCodeBlock(s, lastLt))
     return s
+
+  // Only treat it as an HTML-ish tail when "<" looks like a tag start.
+  // This avoids truncating normal text/math like "y_{<i}" or "x < y".
+  if (lastLt > 0) {
+    const prev = s[lastLt - 1]
+    const prevIsWs = prev === ' ' || prev === '\t' || prev === '\n' || prev === '\r'
+    // Some stream transports escape newlines as "\\n" / "\\r\\n". Treat those
+    // sequences as line boundaries too.
+    const prev2 = s[lastLt - 2]
+    const prevLooksLikeEscapedNewline = (prev === 'n' || prev === 'r') && prev2 === '\\'
+    if (!prevIsWs && !prevLooksLikeEscapedNewline)
+      return s
+  }
+
   const tail = s.slice(lastLt)
   if (tail.includes('>'))
     return s
-  // Only strip when the tail looks like a tag start/prefix, not a random '<'.
-  if (!/^<\s*(?:\/\s*)?[A-Z!][\s\S]*$/i.test(tail))
+  // If the char after '<' is whitespace, it's more likely a comparison ("x < y")
+  // than a tag start ("<div").
+  if (tail.length > 1 && (tail[1] === ' ' || tail[1] === '\t' || tail[1] === '\n' || tail[1] === '\r'))
+    return s
+
+  if (!isLikelyHtmlTagPrefix(tail))
     return s
   return s.slice(0, lastLt)
 }
