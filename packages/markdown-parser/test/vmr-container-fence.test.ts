@@ -28,21 +28,22 @@ describe('vmr_container fallback', () => {
 
   it('parses plain text inside ::: containers', () => {
     const md = getMarkdown('vmr_container_text')
-    const markdown = [
-      '::: viewcode:plain-text',
-      'just some plain text',
-      ':::',
-    ].join('\n')
-    const nodes = parseMarkdownToStructure(markdown, md) as any[]
-    // debug output
+    const cases = ['::: viewcode:plain-text', ':::viewcode:plain-text']
 
-    console.log('plain text AST:', JSON.stringify(nodes, null, 2))
-    expect(nodes[0]?.type).toBe('vmr_container')
-    expect(nodes[0]?.name).toBe('viewcode:plain-text')
-    const children = nodes[0]?.children as any[]
-    expect(children.length).toBe(1)
-    expect(children[0]?.type).toBe('paragraph')
-    expect(String(children[0]?.children?.[0]?.content ?? '')).toContain('plain text')
+    for (const openLine of cases) {
+      const markdown = [
+        openLine,
+        'just some plain text',
+        ':::',
+      ].join('\n')
+      const nodes = parseMarkdownToStructure(markdown, md) as any[]
+      expect(nodes[0]?.type).toBe('vmr_container')
+      expect(nodes[0]?.name).toBe('viewcode:plain-text')
+      const children = nodes[0]?.children as any[]
+      expect(children.length).toBe(1)
+      expect(children[0]?.type).toBe('paragraph')
+      expect(String(children[0]?.children?.[0]?.content ?? '')).toContain('plain text')
+    }
   })
 
   it('parses multiple blocks inside ::: containers', () => {
@@ -74,6 +75,20 @@ describe('vmr_container fallback', () => {
     const md = getMarkdown('vmr_container_empty')
     const markdown = [
       '::: viewcode:empty',
+      '   ',
+      ':::',
+    ].join('\n')
+    const nodes = parseMarkdownToStructure(markdown, md) as any[]
+    expect(nodes[0]?.type).toBe('vmr_container')
+    expect(nodes[0]?.name).toBe('viewcode:empty')
+    expect(Array.isArray(nodes[0]?.children)).toBe(true)
+    expect(nodes[0]?.children.length).toBe(0)
+  })
+
+  it('parses empty or whitespace-only containers -1', () => {
+    const md = getMarkdown('vmr_container_empty')
+    const markdown = [
+      ':::viewcode:empty',
       '   ',
       ':::',
     ].join('\n')

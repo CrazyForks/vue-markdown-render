@@ -52,7 +52,8 @@ export function applyContainers(md: MarkdownIt) {
 
       // Match ::: container syntax: ::: name {"json"}
       // Using separate patterns to avoid backtracking issues
-      const nameMatch = line.match(/^:::\s*(\S+)/)
+      // Allow both "::: name" and ":::name", and stop before inline JSON attrs.
+      const nameMatch = line.match(/^:::\s*([^\s{]+)/)
       if (!nameMatch)
         return false
 
