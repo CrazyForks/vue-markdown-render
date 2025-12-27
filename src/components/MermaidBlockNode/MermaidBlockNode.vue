@@ -1815,57 +1815,59 @@ const computedButtonStyle = computed(() => {
         </div>
         <!-- Modal pseudo-fullscreen overlay (teleported to body) -->
         <teleport to="body">
-          <transition name="mermaid-dialog" appear>
-            <div
-              v-if="isModalOpen"
-              class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-              @click.self="closeModal"
-            >
+          <div class="markstream-vue">
+            <transition name="mermaid-dialog" appear>
               <div
-                class="dialog-panel relative w-full h-full max-w-full max-h-full rounded shadow-lg overflow-hidden"
-                :class="props.isDark ? 'bg-gray-900' : 'bg-white'"
+                v-if="isModalOpen"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+                @click.self="closeModal"
               >
-                <div class="absolute top-6 right-6 z-50 flex items-center gap-2">
-                  <button
-                    class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
-                    @click="zoomIn"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
-                  </button>
-                  <button
-                    class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
-                    @click="zoomOut"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
-                  </button>
-                  <button
-                    class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
-                    @click="resetZoom"
-                  >
-                    {{ Math.round(zoom * 100) }}%
-                  </button>
-                  <button
-                    class="inline-flex items-center justify-center p-2 rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
-                    @click="closeModal"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12" /></svg>
-                  </button>
-                </div>
                 <div
-                  ref="modalContent"
-                  class="w-full h-full flex items-center justify-center p-4 overflow-hidden"
-                  v-on="wheelListeners"
-                  @mousedown="startDrag"
-                  @mousemove="onDrag"
-                  @mouseup="stopDrag"
-                  @mouseleave="stopDrag"
-                  @touchstart.passive="startDrag"
-                  @touchmove.passive="onDrag"
-                  @touchend.passive="stopDrag"
-                />
+                  class="dialog-panel relative w-full h-full max-w-full max-h-full rounded shadow-lg overflow-hidden"
+                  :class="props.isDark ? 'bg-gray-900' : 'bg-white'"
+                >
+                  <div class="absolute top-6 right-6 z-50 flex items-center gap-2">
+                    <button
+                      class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+                      @click="zoomIn"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
+                    </button>
+                    <button
+                      class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+                      @click="zoomOut"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
+                    </button>
+                    <button
+                      class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+                      @click="resetZoom"
+                    >
+                      {{ Math.round(zoom * 100) }}%
+                    </button>
+                    <button
+                      class="inline-flex items-center justify-center p-2 rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+                      @click="closeModal"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <div
+                    ref="modalContent"
+                    class="w-full h-full flex items-center justify-center p-4 overflow-hidden"
+                    v-on="wheelListeners"
+                    @mousedown="startDrag"
+                    @mousemove="onDrag"
+                    @mouseup="stopDrag"
+                    @mouseleave="stopDrag"
+                    @touchstart.passive="startDrag"
+                    @touchmove.passive="onDrag"
+                    @touchend.passive="stopDrag"
+                  />
+                </div>
               </div>
-            </div>
-          </transition>
+            </transition>
+          </div>
         </teleport>
       </div>
     </div>

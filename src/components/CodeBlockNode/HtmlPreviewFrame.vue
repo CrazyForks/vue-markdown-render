@@ -63,27 +63,29 @@ onUnmounted(() => {
 
 <template>
   <teleport to="body">
-    <div class="html-preview-frame__backdrop" :class="{ 'html-preview-frame__backdrop--dark': props.isDark }" @click="props.onClose?.()">
-      <div class="html-preview-frame" :class="{ 'html-preview-frame--dark': props.isDark }" @click.stop>
-        <div class="html-preview-frame__header">
-          <div class="html-preview-frame__title">
-            <span class="html-preview-frame__dot" />
-            <span class="html-preview-frame__label">{{ props.title || t('common.preview') || 'Preview' }}</span>
+    <div class="markstream-vue">
+      <div class="html-preview-frame__backdrop" :class="{ 'html-preview-frame__backdrop--dark': props.isDark }" @click="props.onClose?.()">
+        <div class="html-preview-frame" :class="{ 'html-preview-frame--dark': props.isDark }" @click.stop>
+          <div class="html-preview-frame__header">
+            <div class="html-preview-frame__title">
+              <span class="html-preview-frame__dot" />
+              <span class="html-preview-frame__label">{{ props.title || t('common.preview') || 'Preview' }}</span>
+            </div>
+            <button
+              type="button"
+              class="html-preview-frame__close"
+              :class="{ 'html-preview-frame__close--dark': props.isDark }"
+              @click="props.onClose?.()"
+            >
+              ×
+            </button>
           </div>
-          <button
-            type="button"
-            class="html-preview-frame__close"
-            :class="{ 'html-preview-frame__close--dark': props.isDark }"
-            @click="props.onClose?.()"
-          >
-            ×
-          </button>
+          <iframe
+            class="html-preview-frame__iframe"
+            sandbox="allow-scripts allow-same-origin"
+            :srcdoc="srcdoc"
+          />
         </div>
-        <iframe
-          class="html-preview-frame__iframe"
-          sandbox="allow-scripts allow-same-origin"
-          :srcdoc="srcdoc"
-        />
       </div>
     </div>
   </teleport>
