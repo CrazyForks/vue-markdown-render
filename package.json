@@ -77,7 +77,9 @@
     "check:ssr": "vitest --run -t \"SSR import safety\"",
     "prepublishOnly": "npm run build",
     "play": "pnpm run -C playground dev",
+    "play:vue2": "pnpm run -C playground-vue2 dev",
     "play:build": "pnpm run -C playground build",
+    "play:vue2:build": "pnpm run -C playground-vue2 build",
     "play:nuxt": "pnpm run -C playground-nuxt dev",
     "play:nuxt:build": "pnpm run -C playground-nuxt build",
     "play:nuxt:preview": "pnpm run -C playground-nuxt preview",
@@ -170,7 +172,8 @@
       "@vue/reactivity": "3.5.25",
       "@vue/runtime-core": "3.5.25",
       "@vue/runtime-dom": "3.5.25",
-      "vue": "3.5.25"
+      "vue@^2": "2.7.16",
+      "vue@^3": "3.5.25"
     }
   },
   "lint-staged": {

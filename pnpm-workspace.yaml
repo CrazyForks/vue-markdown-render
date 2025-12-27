@@ -1,4 +1,5 @@
 packages:
   - playground
+  - playground-vue2
   - playground-nuxt
   - packages/*
