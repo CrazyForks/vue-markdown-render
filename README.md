@@ -17,6 +17,8 @@
 [![CI](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml/badge.svg)](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/markstream-vue)](./license)
 
+Looking for Vue 2.6? Use [`markstream-vue2`](./packages/markstream-vue2/README.md) (a baseline port with fewer advanced features).
+
 ## Contents
 
 - [TL;DR Highlights](#tldr-highlights)

@@ -16,6 +16,8 @@
 [![CI](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml/badge.svg)](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/markstream-vue)](./license)
 
+需要 Vue 2.6 版本？请使用 [`markstream-vue2`](./packages/markstream-vue2/README.md)（基础移植版，功能更精简）。
+
 ## 目录
 
 - [速览](#速览)
