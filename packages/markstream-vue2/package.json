@@ -64,7 +64,7 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.7.4",
-    "stream-markdown-parser": "^0.0.50"
+    "stream-markdown-parser": "^0.0.51"
   },
   "devDependencies": {
     "@vitejs/plugin-vue2": "^2.3.4",
