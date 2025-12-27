@@ -1,3 +1,13 @@
+## [0.0.4-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.4...v0.0.4-beta.5) (2025-12-27)
+
+
+### Features
+
+* enhance ::: container parsing to support whitespace and variant syntax ([0ed7e34](https://github.com/Simon-He95/markstream-vue/commit/0ed7e348292baf8f3de04c9943138b291eb95b36)), closes [#212](https://github.com/Simon-He95/markstream-vue/issues/212)
+* update AI/LLM context links in documentation for consistency ([6efb1b2](https://github.com/Simon-He95/markstream-vue/commit/6efb1b26d8e8df08f6c75c8785c4aae3e90805ba))
+
+
+
 ## [0.0.4-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.3...v0.0.4-beta.4) (2025-12-25)
 
 
