@@ -12,6 +12,7 @@ pnpm add stream-monaco
 - 延迟初始化 Monaco（仅在可见或需要时才初始化）
 - 在生产构建中需要配置 worker 打包（使用 `vite-plugin-monaco-editor-esm`）
 - 如果需要更快的首次渲染，可使用 `getUseMonaco()` 在应用启动时预加载 Monaco
+- 不需要额外导入 CSS
 
 更多细节参见 `/zh/guide/monaco-internals`。
 
@@ -25,7 +26,6 @@ pnpm add stream-monaco
 <script setup lang="ts">
 import type { MonacoTheme } from 'stream-monaco'
 import MarkdownRender from 'markstream-vue'
-import 'stream-monaco/esm/index.css'
 
 const docsDark: MonacoTheme = {
   name: 'docs-dark',

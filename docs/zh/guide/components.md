@@ -7,8 +7,8 @@
 | 组件 | 推荐场景 | 关键 props / 事件 | 额外 CSS / 同伴依赖 | 排障提示 |
 | ---- | -------- | ---------------- | ------------------- | -------- |
 | `MarkdownRender` | 渲染完整 AST（默认导出） | `content`、`custom-id`、`setCustomComponents`、生命周期钩子 | 在 reset 之后引入 `markstream-vue/index.css`（CSS 已被限定在内部 `.markstream-vue` 容器中），并放入受控 layer | 给 `MarkdownRender` 添加 `custom-id`，独立使用节点组件需包一层 `.markstream-vue`；配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
-| `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`autoExpand`、`viewportPriority`、`toolbar` slot | 安装 `stream-monaco` 并引入 `stream-monaco/esm/index.css` | 没有 CSS 会导致空白编辑器；确保 Tailwind/UnoCSS 使用 `@layer components` |
-| `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`theme`、`lang` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
+| `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`stream`、`loading`；插槽 `header-left` / `header-right` | 安装 `stream-monaco`（peer）并打包 Monaco workers | 空白编辑器 → 优先检查 worker 打包与 SSR |
+| `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`stream`、`loading`；插槽 `header-left` / `header-right` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
 | `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`theme`、`onRender` | `mermaid` ≥ 11 & `mermaid/dist/mermaid.css` | 详见 `/zh/guide/mermaid` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node`、`displayMode`、`macros` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
 | `ImageNode` | 自定义图片预览 / 懒加载 | 触发 `click` / `load` / `error` 事件 | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
@@ -85,24 +85,24 @@ setCustomComponents('docs', {
 
 ## CodeBlockNode
 
-> 支持 Monaco 渲染、流式 diff、工具栏插槽的代码块组件。
+> 支持 Monaco 渲染、流式 diff，以及头部插槽（`header-left`、`header-right`）的代码块组件。
 
 ### 快速要点
 - **适用**：需要交互、滚动同步或流式输出的代码片段。
-- **依赖**：`stream-monaco`，并在入口导入 `stream-monaco/esm/index.css`；若需要 `@shikijs/monaco` 主题，请在 Vite 配置 worker。
-- **CSS**：Tailwind/UnoCSS 项目务必在 `@layer components` 中导入上述 CSS，避免被 `@tailwind utilities` 覆盖。
+- **依赖**：`stream-monaco`（peer）。生产构建需配置 Monaco worker 打包（Vite 推荐 `vite-plugin-monaco-editor-esm`）。
+- **CSS**：无需额外导入。
 
 ### 示例
 
 ```vue
 <script setup lang="ts">
 import { CodeBlockNode } from 'markstream-vue'
-import 'stream-monaco/esm/index.css'
 
 const node = {
   type: 'code_block',
-  lang: 'ts',
-  value: 'const a = 1',
+  language: 'ts',
+  code: 'const a = 1',
+  raw: 'const a = 1',
 }
 </script>
 
@@ -114,25 +114,24 @@ const node = {
 ```
 
 ```vue
-<!-- 进阶：流式 diff + 自定义工具栏 -->
+<!-- 进阶：自定义头部控制 -->
 <template>
   <CodeBlockNode
     custom-id="docs"
     :node="node"
-    :auto-expand="true"
-    :viewport-priority="true"
+    :show-copy-button="false"
   >
-    <template #toolbar>
-      <button class="copy-btn" @click="copy()">
-        Copy
-      </button>
+    <template #header-right>
+      <span class="tag">
+        Custom
+      </span>
     </template>
   </CodeBlockNode>
 </template>
 ```
 
 ### HTML/SVG 预览对话框
-- 当 `node.lang` 为 `html` 或 `svg`（且 `isShowPreview` 保持 `true`）时，工具栏会显示 Preview 按钮。不监听 `@preview-code` 的情况下，点击会调用内置的 iframe 弹窗（`HtmlPreviewFrame`），并在沙箱 `<iframe>` 中渲染你的代码。
+- 当 `node.language` 为 `html` 或 `svg`（且 `isShowPreview` 保持 `true`）时，工具栏会显示 Preview 按钮。不监听 `@preview-code` 的情况下，点击会调用内置的 iframe 弹窗（`HtmlPreviewFrame`），并在沙箱 `<iframe>` 中渲染你的代码。
 - 监听 `@preview-code` 即可完全接管预览。事件会携带 `{ node, artifactType, artifactTitle, id }`，你可以用它来打开自研弹窗、把 HTML 注入到 playground，或记录埋点。一旦存在监听器，默认弹窗会被自动禁用。
 
 ```vue
@@ -177,8 +176,8 @@ function closePreview() {
 > 小贴士：可以通过 `:show-preview-button="false"` 隐藏按钮，或者直接传入 `:is-show-preview="false"`，让所有 CodeBlock 都跳过预览逻辑。
 
 ### 常见问题
-- **编辑器空白**：未导入 Monaco CSS 或 worker 未注册。
-- **Tailwind 覆盖字体/背景**：确保 `stream-monaco/esm/index.css` 位于 `@layer components`。
+- **编辑器空白**：worker 未注册或 SSR 环境下提前执行。
+- **Tailwind 覆盖字体/背景**：复查 reset/layer 顺序，并避免全局样式覆盖编辑器容器。
 - **SSR**：Monaco 依赖浏览器 API，Nuxt 需 `<ClientOnly>`，Vite SSR 需 `onMounted` 才渲染节点。
 
 ## MarkdownCodeBlockNode
@@ -187,7 +186,7 @@ function closePreview() {
 
 ### 快速要点
 - **依赖**：`shiki` + `stream-markdown`。
-- **Props**：与 `CodeBlockNode` 保持一致（`theme`、`lang`、`wordWrap`、插槽）。
+- **Props**：与 `CodeBlockNode` 类似（streaming + 头部控制）；内部会懒加载 `stream-markdown` 来做 Shiki 渲染。
 - **适用场景**：VitePress、内容站点或无需 Monaco 的应用。
 
 ### 示例
@@ -198,13 +197,14 @@ import { MarkdownCodeBlockNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',
-  lang: 'vue',
-  value: '<template><p>Hello</p></template>',
+  language: 'vue',
+  code: '<template><p>Hello</p></template>',
+  raw: '<template><p>Hello</p></template>',
 }
 </script>
 
 <template>
-  <MarkdownCodeBlockNode :node="node" theme="vitesse-dark" />
+  <MarkdownCodeBlockNode :node="node" />
 </template>
 ```
 

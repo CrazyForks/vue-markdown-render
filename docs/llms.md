@@ -81,7 +81,7 @@ When “it doesn’t render” or “looks wrong”, check these in order:
 1) **CSS order/reset**: reset first, then `markstream-vue/index.css` (Tailwind usually inside `@layer components`).
 2) **Optional peer installed** (Mermaid/KaTeX/Monaco/Shiki).
 3) **Feature enabled** where required: `enableMermaid()` / `enableKatex()`.
-4) **Peer CSS imported** where required: `katex/dist/katex.min.css`, `stream-monaco/esm/index.css`.
+4) **Peer CSS imported** where required: `katex/dist/katex.min.css`, `mermaid/dist/mermaid.css`.
 5) **Standalone node wrapper**: standalone node components need a `.markstream-vue` wrapper for scoped styles/vars.
 6) **SSR**: in Nuxt, wrap with `&lt;client-only&gt;` when using browser-only peers/workers.
 
@@ -165,9 +165,8 @@ Use these as “answer skeletons”: quick steps + minimal repro questions + whe
 - Signals: “toolbar missing”, “blank editor”
 - Steps:
   - Install peer `stream-monaco`
-  - Import `stream-monaco/esm/index.css`
-  - Re-check CSS order
-- Ask: “Is `stream-monaco/esm/index.css` imported? Any worker-related console errors?”
+  - Ensure Monaco workers are bundled (Vite plugin) and you’re on the client
+- Ask: “Any worker-related console errors? Are Monaco workers bundled in production?”
 - Docs: `docs/guide/monaco.md`, `docs/guide/components.md`
 
 ### Prefer lightweight code blocks (no Monaco)

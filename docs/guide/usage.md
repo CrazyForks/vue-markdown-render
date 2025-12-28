@@ -79,7 +79,7 @@ const nodes = parseMarkdownToStructure('# Title', md)
 
 For a full list of components and props, visit [Components & node renderers](/guide/components). Highlights:
 
-- `CodeBlockNode` — Monaco-powered blocks; import `stream-monaco/esm/index.css`.
+- `CodeBlockNode` — Monaco-powered blocks (requires `stream-monaco`).
 - `MarkdownCodeBlockNode` — Shiki-based lightweight highlighting.
 - `MermaidBlockNode` — requires `mermaid` ≥ 11 + CSS.
 - `ImageNode` — emits `click`, `load`, `error` for custom previews.
@@ -89,7 +89,7 @@ For a full list of components and props, visit [Components & node renderers](/gu
 1. **Reset first** (`modern-css-reset`, `@tailwind base`, `@unocss/reset`), then import `markstream-vue` styles.
 2. **Use CSS layers** when Tailwind/UnoCSS is active (`@layer components { @import 'markstream-vue/index.css' }`).
 3. **UNO/Tailwind conflicts** — follow the [Tailwind guide](/guide/tailwind) (includes UnoCSS examples) to prevent utilities from overriding renderer styles.
-4. **Peer CSS** — Monaco, KaTeX, Mermaid each need their own CSS files; missing imports → blank editors/graphs.
+4. **Peer CSS** — KaTeX and Mermaid need their own CSS; Monaco does not.
 
 ## CSS scoping (important)
 

@@ -37,7 +37,10 @@ Also remember required CSS:
 ```ts
 import 'markstream-vue/index.css'
 import 'katex/dist/katex.min.css'
+import 'mermaid/dist/mermaid.css'
 ```
+
+Monaco (`stream-monaco`) does not require a separate CSS import.
 
 Note: `markstream-vue/index.css` is scoped under an internal `.markstream-vue` container to reduce global style conflicts. `MarkdownRender` renders inside that container by default. If you render node components standalone, wrap them with `<div class="markstream-vue">...</div>`.
 

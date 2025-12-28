@@ -81,7 +81,7 @@
 1) **CSS 顺序/Reset**：先 reset，再 `markstream-vue/index.css`（Tailwind 通常放进 `@layer components`）。
 2) **可选 peer 是否安装**（Mermaid/KaTeX/Monaco/Shiki）。
 3) **是否显式启用**（需要时）：`enableMermaid()` / `enableKatex()`。
-4) **peer CSS 是否导入**（需要时）：`katex/dist/katex.min.css`, `stream-monaco/esm/index.css`。
+4) **peer CSS 是否导入**（需要时）：`katex/dist/katex.min.css`, `mermaid/dist/mermaid.css`。
 5) **单独节点组件 wrapper**：单独用节点组件时，外层需要 `.markstream-vue`。
 6) **SSR（Nuxt）**：用 `&lt;client-only&gt;` 包裹，并确保重 peer/worker 仅浏览器初始化。
 
@@ -165,9 +165,8 @@
 - 表述： “工具栏没了”, “编辑器空白”
 - 步骤：
   - 安装 `stream-monaco` peer
-  - 导入 `stream-monaco/esm/index.css`
-  - 复查 CSS 顺序
-- 最小追问： “是否导入了 `stream-monaco/esm/index.css`？控制台是否有 worker/Monaco 报错？”
+  - 确认 Monaco workers 已正确打包（Vite plugin），并确保只在浏览器端执行
+- 最小追问： “控制台是否有 worker/Monaco 报错？生产环境是否已打包 Monaco workers？”
 - 文档：`docs/guide/monaco.md`, `docs/guide/components.md`
 
 ### 想要轻量代码块（不装 Monaco）

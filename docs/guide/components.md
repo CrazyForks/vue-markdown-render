@@ -7,8 +7,8 @@ This page explains how each renderer fits together, what peer dependencies or CS
 | Component | Best for | Key props/events | Extra CSS / peers | Troubleshooting hooks |
 | --------- | -------- | ---------------- | ----------------- | --------------------- |
 | `MarkdownRender` | Rendering full AST trees (default export) | `content`, `custom-id`, `setCustomComponents`, `beforeRender`, `afterRender` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Add `custom-id="docs"` to scope overrides; standalone node components need a `.markstream-vue` wrapper; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
-| `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `autoExpand`, `viewportPriority` | Install `stream-monaco` + include Monaco CSS (`stream-monaco/esm/index.css`) | Missing CSS ⇒ blank editor; ensure Tailwind layers wrap the import |
-| `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `theme`, `lang`, `wordWrap` | Requires `shiki` + `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
+| `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; slots `header-left` / `header-right` | Install `stream-monaco` (peer) + bundle Monaco workers | Blank editor ⇒ check worker bundling + SSR guards |
+| `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `stream`, `loading`; slots `header-left` / `header-right` | Requires `shiki` + `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
 | `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `id`, `theme`, `onRender` | Peer `mermaid` ≥ 11; import `mermaid/dist/mermaid.css` for theme | For async errors see `/guide/mermaid` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node`, `displayMode`, `macros` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
 | `ImageNode` | Custom previews/lightboxes | Emits `click`, `load`, `error`; accepts `lazy` props via `node.props` | None, but respects global CSS | Wrap in custom component + `setCustomComponents` to intercept events |
@@ -85,24 +85,24 @@ Combine these props with `custom-id` scoped styles and global parser options (`s
 
 ## CodeBlockNode
 
-> Feature-rich renderer that streams Monaco tokens, supports diff markers, and optional toolbar slots.
+> Feature-rich renderer that streams Monaco tokens, supports diff markers, and header slots (`header-left`, `header-right`).
 
 ### Quick reference
 - **Best for**: interactive editor-like blocks in docs/playgrounds.
 - **Peers**: `stream-monaco` (core), Monaco worker bundling via Vite, optional `@shikijs/monaco` for highlighting.
-- **CSS**: import `stream-monaco/esm/index.css` after your reset but before utility layers override it.
+- **CSS**: none (no extra import required).
 
 ### Usage
 
 ```vue
 <script setup lang="ts">
 import { CodeBlockNode } from 'markstream-vue'
-import 'stream-monaco/esm/index.css'
 
 const node = {
   type: 'code_block',
-  lang: 'ts',
-  value: 'const a = 1',
+  language: 'ts',
+  code: 'const a = 1',
+  raw: 'const a = 1',
 }
 </script>
 
@@ -114,25 +114,24 @@ const node = {
 ```
 
 ```vue
-<!-- Advanced: stream diff and custom toolbar -->
+<!-- Advanced: custom header controls -->
 <template>
   <CodeBlockNode
     custom-id="docs"
     :node="node"
-    :auto-expand="true"
-    :viewport-priority="true"
+    :show-copy-button="false"
   >
-    <template #toolbar>
-      <button class="copy-btn" @click="copy()">
-        Copy
-      </button>
+    <template #header-right>
+      <span class="tag">
+        Custom
+      </span>
     </template>
   </CodeBlockNode>
 </template>
 ```
 
 ### HTML/SVG preview dialog
-- When `node.lang` is `html` or `svg` (and `isShowPreview` stays `true`), the toolbar exposes a Preview button. Without any listener, clicking it opens the built-in iframe dialog (`HtmlPreviewFrame`) that renders your code inside a sandboxed `<iframe>`.
+- When `node.language` is `html` or `svg` (and `isShowPreview` stays `true`), the toolbar exposes a Preview button. Without any listener, clicking it opens the built-in iframe dialog (`HtmlPreviewFrame`) that renders your code inside a sandboxed `<iframe>`.
 - Attach `@preview-code` to fully override the dialog. The emitted payload contains `{ node, artifactType, artifactTitle, id }`, so you can decide whether to spin up your own modal, route the HTML into a playground, or log artifacts elsewhere. Returning a listener automatically disables the default iframe overlay.
 
 ```vue
@@ -177,7 +176,7 @@ function closePreview() {
 > Tip: hide the toolbar control entirely with `:show-preview-button="false"` or globally disable previews via `:is-show-preview="false"` when your docs never need this dialog.
 
 ### Common pitfalls
-- **Editor invisible**: missing Monaco CSS or worker registration.
+- **Editor invisible**: worker registration missing or blocked by SSR.
 - **Tailwind overriding fonts**: wrap imports in `@layer components`.
 - **SSR**: Monaco requires browser APIs; use lazy mounts (`client-only`) or `visibility-wrapper`.
 
@@ -187,7 +186,7 @@ function closePreview() {
 
 ### Quick reference
 - **Peers**: `shiki` + `stream-markdown`.
-- **Props**: mirrors `CodeBlockNode` (`theme`, `lang`, `wordWrap`, header slots) so you can drop it in with minimal changes.
+- **Props**: similar to `CodeBlockNode` (streaming + header controls); lazy-loads `stream-markdown` for Shiki rendering.
 - **When to choose it**: VitePress, Nuxt content sites, or anywhere Monaco would be overkill.
 
 ### Usage
@@ -195,17 +194,17 @@ function closePreview() {
 ```vue
 <script setup lang="ts">
 import { MarkdownCodeBlockNode } from 'markstream-vue'
-import { getHighlighter } from 'shiki'
 
 const node = {
   type: 'code_block',
-  lang: 'vue',
-  value: '<template><p>Hello</p></template>',
+  language: 'vue',
+  code: '<template><p>Hello</p></template>',
+  raw: '<template><p>Hello</p></template>',
 }
 </script>
 
 <template>
-  <MarkdownCodeBlockNode :node="node" theme="vitesse-dark" />
+  <MarkdownCodeBlockNode :node="node" />
 </template>
 ```
 

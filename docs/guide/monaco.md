@@ -13,6 +13,7 @@ Use `CodeBlockNode` (default) to render Monaco-powered code blocks. For read-onl
 Tips:
 - Defer Monaco initialization for offscreen code blocks
 - Use `codeBlockStream: false` to avoid partial updates if desired
+- No additional CSS import is required
 
 ![Monaco demo](/screenshots/codeblock-demo.svg)
 
@@ -76,7 +77,6 @@ Only a minimal set of Monaco languages ships with the default integration to kee
 <script setup lang="ts">
 import type { MonacoTheme } from 'stream-monaco'
 import MarkdownRender from 'markstream-vue'
-import 'stream-monaco/esm/index.css'
 
 const docsDark: MonacoTheme = {
   name: 'docs-dark',
