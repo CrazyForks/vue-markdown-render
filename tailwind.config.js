@@ -1,13 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    './src/**/*.{vue,js,ts,jsx,tsx}',
-    './packages/**/*.{vue,js,ts,jsx,tsx}',
-    './playground/**/*.{vue,js,ts,jsx,tsx}',
-    './playground-react/**/*.{js,ts,jsx,tsx}',
-    './playground-nuxt/**/*.{vue,js,ts,jsx,tsx}',
-    './docs/**/*.{vue,js,ts,md,mdx}',
-  ],
+  content: ['./src/**/*.{vue,js,ts,jsx,tsx}'],
   important: '.markstream-vue',
   theme: {
     extend: {
