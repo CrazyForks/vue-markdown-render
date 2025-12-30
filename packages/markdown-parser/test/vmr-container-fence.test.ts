@@ -98,4 +98,30 @@ describe('vmr_container fallback', () => {
     expect(Array.isArray(nodes[0]?.children)).toBe(true)
     expect(nodes[0]?.children.length).toBe(0)
   })
+
+  it('keeps content immediately above ::: as a separate node', () => {
+    const md = getMarkdown('vmr_container_adjacent_above')
+    const cases = ['::: viewcode:plain-text', ':::viewcode:plain-text']
+
+    for (const openLine of cases) {
+      const markdown = [
+        'Above text',
+        openLine,
+        'Inside text',
+        ':::',
+      ].join('\n')
+
+      const nodes = parseMarkdownToStructure(markdown, md) as any[]
+      expect(nodes[0]?.type).toBe('paragraph')
+      expect(String(nodes[0]?.children?.[0]?.content ?? '')).toContain('Above text')
+
+      expect(nodes[1]?.type).toBe('vmr_container')
+      expect(nodes[1]?.name).toBe('viewcode:plain-text')
+
+      const children = nodes[1]?.children as any[]
+      expect(children.length).toBe(1)
+      expect(children[0]?.type).toBe('paragraph')
+      expect(String(children[0]?.children?.[0]?.content ?? '')).toContain('Inside text')
+    }
+  })
 })

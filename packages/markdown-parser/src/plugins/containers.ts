@@ -146,5 +146,10 @@ export function applyContainers(md: MarkdownIt) {
       s.line = nextLine + 1
       return true
     },
+    {
+      // Ensure this rule can terminate an active paragraph so content immediately
+      // above `:::` isn't swallowed into the same paragraph block.
+      alt: ['paragraph', 'reference', 'blockquote', 'list'],
+    },
   )
 }
