@@ -109,6 +109,7 @@ const monacoLanguage = computed(() => resolveMonacoLanguageId(codeLanguage.value
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
 const editorCreated = ref(false)
+const editorMounted = ref(false)
 const monacoReady = ref(false)
 let expandRafId: number | null = null
 const heightBeforeCollapse = ref<number | null>(null)
@@ -158,6 +159,23 @@ let detectLanguage: (code: string) => string = () => String(props.node.language 
 let setTheme: (theme: any) => Promise<void> = async () => {}
 const isDiff = computed(() => props.node.diff)
 const usePreCodeRender = ref(false)
+const preFallbackWrap = computed(() => {
+  const wordWrap = (props.monacoOptions as any)?.wordWrap
+  // Keep consistent with CodeBlockNode's default `wordWrap: 'on'`.
+  if (wordWrap == null)
+    return true
+  return String(wordWrap) !== 'off'
+})
+const showPreWhileMonacoLoads = computed(() => {
+  // Avoid SSR hydration mismatches by only enabling this placeholder on client.
+  if (typeof window === 'undefined')
+    return false
+  // If Monaco isn't available at all, the component renders a standalone PreCodeNode.
+  if (usePreCodeRender.value)
+    return false
+  // Keep showing the fallback until Monaco finished mounting for this block.
+  return !editorMounted.value
+})
 const showInlinePreview = ref(false)
 // Defer client-only editor initialization to the browser to avoid SSR errors
 if (typeof window !== 'undefined') {
@@ -231,6 +249,39 @@ const fontBaselineReady = computed(() => {
   const a = defaultCodeFontSize.value
   const b = codeFontSize.value
   return typeof a === 'number' && Number.isFinite(a) && a > 0 && typeof b === 'number' && Number.isFinite(b) && b > 0
+})
+const preFallbackFontSize = computed(() => {
+  const fromOptions = (props.monacoOptions as any)?.fontSize
+  if (typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0)
+    return fromOptions
+  const fromState = codeFontSize.value
+  if (typeof fromState === 'number' && Number.isFinite(fromState) && fromState > 0)
+    return fromState
+  return 12
+})
+const preFallbackLineHeight = computed(() => {
+  const fromOptions = (props.monacoOptions as any)?.lineHeight
+  if (typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0)
+    return fromOptions
+  return Math.round(preFallbackFontSize.value * 1.5)
+})
+const preFallbackTabSize = computed(() => {
+  const fromOptions = (props.monacoOptions as any)?.tabSize
+  if (typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0)
+    return fromOptions
+  // Monaco default is 4.
+  return 4
+})
+const preFallbackStyle = computed(() => {
+  const fontFamily = (props.monacoOptions as any)?.fontFamily
+  return {
+    fontSize: `${preFallbackFontSize.value}px`,
+    lineHeight: `${preFallbackLineHeight.value}px`,
+    tabSize: preFallbackTabSize.value,
+    ...(typeof fontFamily === 'string' && fontFamily.trim()
+      ? { '--markstream-code-font-family': fontFamily.trim() }
+      : {}),
+  } as Record<string, string | number>
 })
 // Keep computed height tight to content. Extra padding caused visible bottom gap.
 const CONTENT_PADDING = 0
@@ -829,6 +880,10 @@ async function runEditorCreation(el: HTMLElement) {
         updateCollapsedHeight()
     })
   }
+
+  await nextTick()
+  editorMounted.value = true
+  syncEditorCssVars()
 }
 
 function ensureEditorCreation(el: HTMLElement) {
@@ -871,7 +926,13 @@ const stopCreateEditorWatch = watch(
     if (!creation)
       return
 
-    await creation
+    try {
+      await creation
+    }
+    catch {
+      // Keep the `<pre>` fallback if Monaco fails to mount for this block.
+      editorMounted.value = false
+    }
 
     stopCreateEditorWatch()
   },
@@ -1105,7 +1166,20 @@ onUnmounted(() => {
         </div>
       </slot>
     </div>
-    <div v-show="!isCollapsed && (stream ? true : !loading)" ref="codeEditor" class="code-editor-container" :class="[stream ? '' : 'code-height-placeholder']" />
+    <div v-show="!isCollapsed && (stream ? true : !loading)" class="code-editor-layer">
+      <div
+        ref="codeEditor"
+        class="code-editor-container"
+        :class="[stream ? '' : 'code-height-placeholder', { 'is-hidden': showPreWhileMonacoLoads }]"
+      />
+      <PreCodeNode
+        v-if="showPreWhileMonacoLoads"
+        class="code-pre-fallback"
+        :class="{ 'is-wrap': preFallbackWrap }"
+        :style="preFallbackStyle"
+        :node="(node as any)"
+      />
+    </div>
     <HtmlPreviewFrame
       v-if="showInlinePreview && !hasPreviewListener && isPreviewable && codeLanguage === 'html'"
       :code="node.code"
@@ -1138,6 +1212,55 @@ onUnmounted(() => {
 
 .code-editor-container {
   transition: height 180ms ease, max-height 180ms ease;
+}
+
+.code-editor-layer {
+  display: grid;
+}
+.code-editor-layer > .code-editor-container {
+  grid-area: 1 / 1;
+}
+:deep(.code-editor-layer > pre.code-pre-fallback) {
+  grid-area: 1 / 1;
+}
+
+.code-editor-container.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+:deep(pre.code-pre-fallback) {
+  margin: 0;
+  padding: var(--markstream-code-padding-y, 8px) var(--markstream-code-padding-x, 12px);
+  padding-left: var(--markstream-code-padding-left, 52px);
+  background: transparent;
+  color: var(--vscode-editor-foreground, inherit);
+  /* Match Monaco defaults to avoid a jarring swap while it loads */
+  font-size: var(--vscode-editor-font-size, 12px);
+  font-weight: 400;
+  font-family: var(
+    --markstream-code-font-family,
+    ui-monospace,
+    SFMono-Regular,
+    SF Mono,
+    Menlo,
+    Monaco,
+    Consolas,
+    Liberation Mono,
+    Courier New,
+    monospace
+  );
+}
+
+:deep(pre.code-pre-fallback > code) {
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+:deep(pre.code-pre-fallback.is-wrap) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .code-block-container.is-rendering .code-height-placeholder{

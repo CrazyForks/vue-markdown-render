@@ -62,6 +62,47 @@ describe('codeBlockNode editor creation locking', () => {
     resetStreamMonacoHelpers()
   })
 
+  it('renders a `<pre>` fallback until Monaco finishes mounting', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
+    expect(wrapper.find('.code-editor-container').classes()).toContain('is-hidden')
+
+    const finish = resolveCreate
+    if (finish)
+      finish()
+    await flushPendingMicrotasks()
+
+    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+    expect(wrapper.find('.code-editor-container').classes()).not.toContain('is-hidden')
+
+    wrapper.unmount()
+  })
+
   it('invokes createEditor only once while loading toggles mid-creation', async () => {
     const helpers = getStreamMonacoHelpers()
     let resolveCreate: (() => void) | null = null

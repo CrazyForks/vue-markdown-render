@@ -321,6 +321,32 @@ li .paragraph-node {
 
 .table-node-wrapper {
   position: relative;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.table-node {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.table-node th,
+.table-node td {
+  white-space: nowrap;
+}
+
+/* Override the default `break-words` / pre-wrap text styles inside tables so
+   dense tables don't turn into vertical glyph stacks. */
+.table-node .text-node,
+.table-node code {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  max-width: none;
 }
 
 .table-node--loading tbody td {
@@ -1000,9 +1026,18 @@ li .paragraph-node {
   overflow: auto;
   background: transparent;
   color: inherit;
+  /* Match Monaco defaults to avoid a jarring swap while it loads */
+  font-size: var(--vscode-editor-font-size, 12px);
+  line-height: var(--vscode-editor-line-height, 18px);
+  font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+  font-weight: var(--vscode-editor-font-weight, 400);
+}
+
+.code-fallback-plain > code {
   font-size: inherit;
   line-height: inherit;
   font-family: inherit;
+  font-weight: inherit;
 }
 
 .code-loading-placeholder {

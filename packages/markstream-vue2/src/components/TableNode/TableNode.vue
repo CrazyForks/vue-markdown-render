@@ -42,17 +42,6 @@ const props = defineProps<{
 // 定义事件
 defineEmits(['copy'])
 
-// 计算列宽，平均分配。如果需要更复杂的策略，可以在此扩展
-const colCount = computed(() => props.node?.header?.cells?.length ?? 0)
-const colWidths = computed(() => {
-  const n = colCount.value || 1
-  const base = Math.floor(100 / n)
-  // 为了保证总和为100%，最后一个列占剩余的百分比
-  return Array.from({ length: n }).map((_, i) =>
-    i === n - 1 ? `${100 - base * (n - 1)}%` : `${base}%`,
-  )
-})
-
 const isLoading = computed(() => props.node.loading ?? false)
 const bodyRows = computed(() => props.node.rows ?? [])
 </script>
@@ -60,20 +49,17 @@ const bodyRows = computed(() => props.node.rows ?? [])
 <template>
   <div class="table-node-wrapper">
     <table
-      class="w-full my-8 text-sm table-fixed table-node"
+      class="my-8 text-sm table-node"
       :class="{ 'table-node--loading': isLoading }"
       :aria-busy="isLoading"
     >
-      <colgroup>
-        <col v-for="(w, i) in colWidths" :key="`col-${i}`" :style="{ width: w }">
-      </colgroup>
       <thead class="border-[var(--table-border,#cbd5e1)] border-solid">
         <tr class="border-b border-solid">
           <th
             v-for="(cell, index) in node.header.cells"
             :key="`header-${index}`"
             dir="auto"
-            class="font-semibold p-[calc(4/7*1em)] overflow-x-auto"
+            class="font-semibold p-[calc(4/7*1em)]"
             :class="[
               cell.align === 'right'
                 ? 'text-right'
@@ -102,7 +88,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
           <td
             v-for="(cell, cellIndex) in row.cells"
             :key="`cell-${rowIndex}-${cellIndex}`"
-            class="p-[calc(4/7*1em)] overflow-x-auto"
+            class="p-[calc(4/7*1em)]"
             :class="[
               cell.align === 'right'
                 ? 'text-right'
@@ -137,6 +123,22 @@ const bodyRows = computed(() => props.node.rows ?? [])
 <style scoped>
 .table-node-wrapper {
   position: relative;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.table-node {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.table-node :deep(th),
+.table-node :deep(td) {
+  white-space: nowrap;
 }
 
 .table-node--loading tbody td {
@@ -209,6 +211,16 @@ const bodyRows = computed(() => props.node.rows ?? [])
 :deep(.table-node .markdown-renderer .node-space)
 {
   display: contents;
+}
+
+/* Override the default `break-words` / pre-wrap text styles inside tables so
+   dense tables don't turn into vertical glyph stacks. */
+:deep(.table-node .text-node),
+:deep(.table-node code) {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  max-width: none;
 }
 
 @keyframes table-node-shimmer {

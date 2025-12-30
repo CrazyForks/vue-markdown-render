@@ -6,13 +6,6 @@ import { renderInline } from '../../renderers/renderChildren'
 export function TableNode(props: NodeComponentProps<{ type: 'table', header?: any, rows?: any[], loading?: boolean }>) {
   const { node, ctx, renderNode, indexKey } = props
   const headerCells = Array.isArray(node?.header?.cells) ? node.header.cells : []
-  const columnCount = headerCells.length || Math.max(1, node?.rows?.[0]?.cells?.length || 0) || 1
-  const baseWidth = Math.floor(100 / columnCount)
-  const colWidths = Array.from({ length: columnCount }, (_, idx) => {
-    if (idx === columnCount - 1)
-      return `${100 - baseWidth * (columnCount - 1)}%`
-    return `${baseWidth}%`
-  })
   const isLoading = Boolean(node?.loading)
   const bodyRows = Array.isArray(node?.rows) ? node.rows : []
 
@@ -28,22 +21,17 @@ export function TableNode(props: NodeComponentProps<{ type: 'table', header?: an
     <div className="table-node-wrapper" data-index-key={indexKey}>
       <table
         className={clsx(
-          'w-full my-8 text-sm table-fixed table-node',
+          'my-8 text-sm table-node',
           isLoading && 'table-node--loading',
         )}
         aria-busy={isLoading}
       >
-        <colgroup>
-          {colWidths.map((width, idx) => (
-            <col key={`col-${idx}`} style={{ width }} />
-          ))}
-        </colgroup>
         <thead className="border-[var(--table-border,#cbd5e1)]">
           <tr className="border-b">
             {headerCells.map((cell: any, idx: number) => (
               <th
                 key={`header-${idx}`}
-                className={clsx('font-semibold p-[calc(4/7*1em)] overflow-x-auto', getAlignClass(cell.align))}
+                className={clsx('font-semibold p-[calc(4/7*1em)]', getAlignClass(cell.align))}
                 dir="auto"
               >
                 {ctx && renderNode ? renderInline(cell.children, ctx, `${String(indexKey ?? 'table')}-th-${idx}`, renderNode) : null}
@@ -63,7 +51,7 @@ export function TableNode(props: NodeComponentProps<{ type: 'table', header?: an
               {row.cells?.map((cell: any, cellIdx: number) => (
                 <td
                   key={`cell-${rowIdx}-${cellIdx}`}
-                  className={clsx('p-[calc(4/7*1em)] overflow-x-auto', getAlignClass(cell.align))}
+                  className={clsx('p-[calc(4/7*1em)]', getAlignClass(cell.align))}
                   dir="auto"
                 >
                   {ctx && renderNode ? renderInline(cell.children, ctx, `${String(indexKey ?? 'table')}-row-${rowIdx}-${cellIdx}`, renderNode) : null}
