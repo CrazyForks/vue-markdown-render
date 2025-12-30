@@ -3,7 +3,7 @@ import { shallowRef } from 'vue'
 
 // Store mappings per scope id. A special key is kept for the legacy/global mapping.
 const GLOBAL_KEY = '__global__'
-type CustomComponentsStore = {
+interface CustomComponentsStore {
   scopedCustomComponents: Record<string, Partial<CustomComponents>>
   revision: ReturnType<typeof shallowRef<number>>
 }

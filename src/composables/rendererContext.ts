@@ -24,4 +24,3 @@ export function provideMarkstreamRendererContext(ctx: MarkstreamRendererContext)
 export function useMarkstreamRendererContext() {
   return inject<MarkstreamRendererContext | null>(MARKSTREAM_RENDERER_CONTEXT, null)
 }
-

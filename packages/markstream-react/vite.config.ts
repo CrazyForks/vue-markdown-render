@@ -14,6 +14,14 @@ export default defineConfig(({ mode }) => {
     worker: {
       format: 'es',
       rollupOptions: {
+        // Keep heavy optional peer deps out of the published worker bundles.
+        // Consumers bundling `markstream-react/workers/*?worker` will still
+        // bundle these as needed in their own app build.
+        external: [
+          'katex',
+          'katex/contrib/mhchem',
+          'mermaid',
+        ],
         output: {
           entryFileNames: 'workers/[name].js',
           chunkFileNames: 'workers/[name].js',

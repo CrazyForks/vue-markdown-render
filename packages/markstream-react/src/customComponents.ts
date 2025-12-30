@@ -4,7 +4,7 @@ export type CustomComponentMap = Record<string, ComponentType<any>>
 
 const GLOBAL_KEY = '__global__'
 
-type Store = {
+interface Store {
   scopedComponents: Record<string, CustomComponentMap>
   revision: number
   listeners: Set<() => void>
