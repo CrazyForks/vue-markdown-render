@@ -1,23 +1,430 @@
 export const streamContent = `
-| C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | C12 | C13 | C14 | C15 | C16 | C17 | C18 | C19 | C20 | C21 | C22 | C23 | C24 | C25 | C26 | C27 | C28 | C29 | C30 |
-|----|----|----|----|----|----|----|----|----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|
-| R1-C1 | R1-C2 | R1-C3 | R1-C4 | R1-C5 | R1-C6 | R1-C7 | R1-C8 | R1-C9 | R1-C10 | R1-C11 | R1-C12 | R1-C13 | R1-C14 | R1-C15 | R1-C16 | R1-C17 | R1-C18 | R1-C19 | R1-C20 | R1-C21 | R1-C22 | R1-C23 | R1-C24 | R1-C25 | R1-C26 | R1-C27 | R1-C28 | R1-C29 | R1-C30 |
-| R2-C1 | R2-C2 | R2-C3 | R2-C4 | R2-C5 | R2-C6 | R2-C7 | R2-C8 | R2-C9 | R2-C10 | R2-C11 | R2-C12 | R2-C13 | R2-C14 | R2-C15 | R2-C16 | R2-C17 | R2-C18 | R2-C19 | R2-C20 | R2-C21 | R2-C22 | R2-C23 | R2-C24 | R2-C25 | R2-C26 | R2-C27 | R2-C28 | R2-C29 | R2-C30 |
-| R3-C1 | R3-C2 | R3-C3 | R3-C4 | R3-C5 | R3-C6 | R3-C7 | R3-C8 | R3-C9 | R3-C10 | R3-C11 | R3-C12 | R3-C13 | R3-C14 | R3-C15 | R3-C16 | R3-C17 | R3-C18 | R3-C19 | R3-C20 | R3-C21 | R3-C22 | R3-C23 | R3-C24 | R3-C25 | R3-C26 | R3-C27 | R3-C28 | R3-C29 | R3-C30 |
-| R4-C1 | R4-C2 | R4-C3 | R4-C4 | R4-C5 | R4-C6 | R4-C7 | R4-C8 | R4-C9 | R4-C10 | R4-C11 | R4-C12 | R4-C13 | R4-C14 | R4-C15 | R4-C16 | R4-C17 | R4-C18 | R4-C19 | R4-C20 | R4-C21 | R4-C22 | R4-C23 | R4-C24 | R4-C25 | R4-C26 | R4-C27 | R4-C28 | R4-C29 | R4-C30 |
-| R5-C1 | R5-C2 | R5-C3 | R5-C4 | R5-C5 | R5-C6 | R5-C7 | R5-C8 | R5-C9 | R5-C10 | R5-C11 | R5-C12 | R5-C13 | R5-C14 | R5-C15 | R5-C16 | R5-C17 | R5-C18 | R5-C19 | R5-C20 | R5-C21 | R5-C22 | R5-C23 | R5-C24 | R5-C25 | R5-C26 | R5-C27 | R5-C28 | R5-C29 | R5-C30 |
-| R6-C1 | R6-C2 | R6-C3 | R6-C4 | R6-C5 | R6-C6 | R6-C7 | R6-C8 | R6-C9 | R6-C10 | R6-C11 | R6-C12 | R6-C13 | R6-C14 | R6-C15 | R6-C16 | R6-C17 | R6-C18 | R6-C19 | R6-C20 | R6-C21 | R6-C22 | R6-C23 | R6-C24 | R6-C25 | R6-C26 | R6-C27 | R6-C28 | R6-C29 | R6-C30 |
-| R7-C1 | R7-C2 | R7-C3 | R7-C4 | R7-C5 | R7-C6 | R7-C7 | R7-C8 | R7-C9 | R7-C10 | R7-C11 | R7-C12 | R7-C13 | R7-C14 | R7-C15 | R7-C16 | R7-C17 | R7-C18 | R7-C19 | R7-C20 | R7-C21 | R7-C22 | R7-C23 | R7-C24 | R7-C25 | R7-C26 | R7-C27 | R7-C28 | R7-C29 | R7-C30 |
-| R8-C1 | R8-C2 | R8-C3 | R8-C4 | R8-C5 | R8-C6 | R8-C7 | R8-C8 | R8-C9 | R8-C10 | R8-C11 | R8-C12 | R8-C13 | R8-C14 | R8-C15 | R8-C16 | R8-C17 | R8-C18 | R8-C19 | R8-C20 | R8-C21 | R8-C22 | R8-C23 | R8-C24 | R8-C25 | R8-C26 | R8-C27 | R8-C28 | R8-C29 | R8-C30 |
-| R9-C1 | R9-C2 | R9-C3 | R9-C4 | R9-C5 | R9-C6 | R9-C7 | R9-C8 | R9-C9 | R9-C10 | R9-C11 | R9-C12 | R9-C13 | R9-C14 | R9-C15 | R9-C16 | R9-C17 | R9-C18 | R9-C19 | R9-C20 | R9-C21 | R9-C22 | R9-C23 | R9-C24 | R9-C25 | R9-C26 | R9-C27 | R9-C28 | R9-C29 | R9-C30 |
-| R10-C1 | R10-C2 | R10-C3 | R10-C4 | R10-C5 | R10-C6 | R10-C7 | R10-C8 | R10-C9 | R10-C10 | R10-C11 | R10-C12 | R10-C13 | R10-C14 | R10-C15 | R10-C16 | R10-C17 | R10-C18 | R10-C19 | R10-C20 | R10-C21 | R10-C22 | R10-C23 | R10-C24 | R10-C25 | R10-C26 | R10-C27 | R10-C28 | R10-C29 | R10-C30 |
-| R11-C1 | R11-C2 | R11-C3 | R11-C4 | R11-C5 | R11-C6 | R11-C7 | R11-C8 | R11-C9 | R11-C10 | R11-C11 | R11-C12 | R11-C13 | R11-C14 | R11-C15 | R11-C16 | R11-C17 | R11-C18 | R11-C19 | R11-C20 | R11-C21 | R11-C22 | R11-C23 | R11-C24 | R11-C25 | R11-C26 | R11-C27 | R11-C28 | R11-C29 | R11-C30 |
-| R12-C1 | R12-C2 | R12-C3 | R12-C4 | R12-C5 | R12-C6 | R12-C7 | R12-C8 | R12-C9 | R12-C10 | R12-C11 | R12-C12 | R12-C13 | R12-C14 | R12-C15 | R12-C16 | R12-C17 | R12-C18 | R12-C19 | R12-C20 | R12-C21 | R12-C22 | R12-C23 | R12-C24 | R12-C25 | R12-C26 | R12-C27 | R12-C28 | R12-C29 | R12-C30 |
-| R13-C1 | R13-C2 | R13-C3 | R13-C4 | R13-C5 | R13-C6 | R13-C7 | R13-C8 | R13-C9 | R13-C10 | R13-C11 | R13-C12 | R13-C13 | R13-C14 | R13-C15 | R13-C16 | R13-C17 | R13-C18 | R13-C19 | R13-C20 | R13-C21 | R13-C22 | R13-C23 | R13-C24 | R13-C25 | R13-C26 | R13-C27 | R13-C28 | R13-C29 | R13-C30 |
-| R14-C1 | R14-C2 | R14-C3 | R14-C4 | R14-C5 | R14-C6 | R14-C7 | R14-C8 | R14-C9 | R14-C10 | R14-C11 | R14-C12 | R14-C13 | R14-C14 | R14-C15 | R14-C16 | R14-C17 | R14-C18 | R14-C19 | R14-C20 | R14-C21 | R14-C22 | R14-C23 | R14-C24 | R14-C25 | R14-C26 | R14-C27 | R14-C28 | R14-C29 | R14-C30 |
-| R15-C1 | R15-C2 | R15-C3 | R15-C4 | R15-C5 | R15-C6 | R15-C7 | R15-C8 | R15-C9 | R15-C10 | R15-C11 | R15-C12 | R15-C13 | R15-C14 | R15-C15 | R15-C16 | R15-C17 | R15-C18 | R15-C19 | R15-C20 | R15-C21 | R15-C22 | R15-C23 | R15-C24 | R15-C25 | R15-C26 | R15-C27 | R15-C28 | R15-C29 | R15-C30 |
-| R16-C1 | R16-C2 | R16-C3 | R16-C4 | R16-C5 | R16-C6 | R16-C7 | R16-C8 | R16-C9 | R16-C10 | R16-C11 | R16-C12 | R16-C13 | R16-C14 | R16-C15 | R16-C16 | R16-C17 | R16-C18 | R16-C19 | R16-C20 | R16-C21 | R16-C22 | R16-C23 | R16-C24 | R16-C25 | R16-C26 | R16-C27 | R16-C28 | R16-C29 | R16-C30 |
-| R17-C1 | R17-C2 | R17-C3 | R17-C4 | R17-C5 | R17-C6 | R17-C7 | R17-C8 | R17-C9 | R17-C10 | R17-C11 | R17-C12 | R17-C13 | R17-C14 | R17-C15 | R17-C16 | R17-C17 | R17-C18 | R17-C19 | R17-C20 | R17-C21 | R17-C22 | R17-C23 | R17-C24 | R17-C25 | R17-C26 | R17-C27 | R17-C28 | R17-C29 | R17-C30 |
-| R18-C1 | R18-C2 | R18-C3 | R18-C4 | R18-C5 | R18-C6 | R18-C7 | R18-C8 | R18-C9 | R18-C10 | R18-C11 | R18-C12 | R18-C13 | R18-C14 | R18-C15 | R18-C16 | R18-C17 | R18-C18 | R18-C19 | R18-C20 | R18-C21 | R18-C22 | R18-C23 | R18-C24 | R18-C25 | R18-C26 | R18-C27 | R18-C28 | R18-C29 | R18-C30 |
-| R19-C1 | R19-C2 | R19-C3 | R19-C4 | R19-C5 | R19-C6 | R19-C7 | R19-C8 | R19-C9 | R19-C10 | R19-C11 | R19-C12 | R19-C13 | R19-C14 | R19-C15 | R19-C16 | R19-C17 | R19-C18 | R19-C19 | R19-C20 | R19-C21 | R19-C22 | R19-C23 | R19-C24 | R19-C25 | R19-C26 | R19-C27 | R19-C28 | R19-C29 | R19-C30 |
+<thinking>
+- markstream-vue playground
+- A Vue 3 component that renders Markdown string content as HTML, supporting custom components and advanced markdown features.
+</thinking>
+
+>>>I'll create a simple Electron + Vue chat application demo. Here's the structure:
+
+[Star on GitHub](https://github.com/Simon-He95/markstream-vue)
+
+<a href="https://simonhe.me/">我是 a 元素标签</a>
+
+https://github.com/Simon-He95/markstream-vue
+
+[【Author: Simon】](https://simonhe.me/)
+
+- **[Link (Test 1)](https://simonhe.me/)**
+
+**[Link (Test 2)](https://simonhe.me/)**
+
+**Markdown链接**：  
+1. [GitHub官网](https://github.com)  
+2. [知乎 - 有问题就会有答案](https://www.zhihu.com)  
+3. **加粗链接**：[Google](https://www.google.com)  
+4. 嵌套格式的链接：[*斜体链接*](https://example.com)  
+
+**普通链接**：  
+1. https://www.wikipedia.org  
+2. http://example.com/path?query=test  
+3. 纯文本URL：https://markdown-guide.readthedocs.io
+
+![Vue Markdown Icon](/vue-markdown-icon.svg "Vue Markdown Icon")
+*Figure: Vue Markdown Icon (served from /vue-markdown-icon.svg)*
+
+这是 ~~已删除的文本~~，这是一个表情 :smile:。
+
+- [ ] Star this repo
+- [x] Fork this repo
+- [ ] Create issues
+- [x] Submit PRs
+
+##  表格
+
+| 姓名 | 年龄 | 职业 |
+|------|------|------|
+| 张三 | 25   | 工程师 |
+| 李四 | 30   | 设计师 |
+| 王五 | 28   | 产品经理 |
+
+### 对齐表格
+| 左对齐 | 居中对齐 | 右对齐 |
+|:-------|:--------:|-------:|
+| 内容1  |  内容2   |  内容3 |
+| 内容4  |  内容5   |  内容6 |
+
+我将为您输出泰勒公式的一般形式及其常见展开式。
+
+---
+
+## 0. 薛定谔方程（量子力学）
+$$i\\hbar \\frac{\\partial}{\\partial t} \\Psi(\\mathbf{r},t) = \\left[ -\\frac{\\hbar^2}{2m} \\nabla^2 + V(\\mathbf{r},t) \\right] \\Psi(\\mathbf{r},t)$$
+
+
+## 1. 泰勒公式（Taylor's Formula）
+
+### 一般形式（在点 \\(x = a\\) 处展开）：
+\[
+f(x) = f(a) + f'(a)(x-a) + \frac{f''(a)}{2!}(x-a)^2 + \frac{f'''(a)}{3!}(x-a)^3 + \cdots + \frac{f^{(n)}(a)}{n!}(x-a)^n + R_n(x)
+\\]
+
+其中：
+- \\(f^{(k)}(a)\\) 是 \\(f(x)\\) 在 \\(x=a\\\) 处的 \\(k\\) 阶导数
+- \\(R_n(x)\\) 是余项，常见形式有拉格朗日余项：
+\[
+R_n(x) = \frac{f^{(n+1)}(xi)}{(n+1)!}(x-a)^{n+1}, \quad xi \text{ 在 } a \text{ 和 } x \text{ 之间}
+\\]
+
+---
+
+## 2. 麦克劳林公式（Maclaurin's Formula，即 \\(a=0\\) 时的泰勒公式）：
+\[
+f(x) = f(0) + f'(0)x + \frac{f''(0)}{2!}x^2 + \frac{f'''(0)}{3!}x^3 + \cdots + \frac{f^{(n)}(0)}{n!}x^n + R_n(x)
+\\]
+
+---
+
+## 3. 常见函数的麦克劳林展开（前几项）
+
+- **指数函数**：
+\\[
+e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots, \quad x \in \mathbb{R}
+\\]
+
+- **正弦函数**：
+\\[
+\sin x = x - \frac{x^3}{3!} + \frac{x^5}{5!} - \frac{x^7}{7!} + \cdots + (-1)^n \frac{x^{2n+1}}{(2n+1)!} + \cdots
+\\]
+
+- **余弦函数**：
+\\[
+\cos x = 1 - \frac{x^2}{2!} + \frac{x^4}{4!} - \frac{x^6}{6!} + \cdots + (-1)^n \frac{x^{2n}}{(2n)!} + \cdots
+\\]
+
+- **自然对数**（在 \\(x=0\\) 附近）：
+\\[
+\ln(1+x) = x - \frac{x^2}{2} + \frac{x^3}{3} - \frac{x^4}{4} + \cdots + (-1)^{n-1} \frac{x^n}{n} + \cdots, \quad -1 < x \le 1
+\\]
+
+- **二项式展开**（\\( (1+x)^m \\)，\\(m\\) 为实数）：
+\[
+(1+x)^m = 1 + mx + \frac{m(m-1)}{2!}x^2 + \frac{m(m-1)(m-2)}{3!}x^3 + \cdots, \quad |x| < 1
+\\]
+
+- **矩阵**：
+\\[
+\begin{bmatrix}
+2x_2 - 8x_3 = 8 \\
+5x_1 - 5x_3 = 10
+\end{bmatrix}
+\\]
+
+- **公式**
+
+
+- **代入数据**
+   \\[
+   \frac{363}{15,\!135} \times 100\% = 2.398\%
+   \\]
+
+- **计算工具验证**
+   通过数学计算工具确认结果：
+   \`363 ÷ 15,135 × 100 = 2.39841427...\`
+
+- **差异说明**
+   $$E=mc^2$$
+
+---
+
+如果您需要某个特定函数在特定点的泰勒展开，请告诉我，我可以为您详细写出。
+
+::: warning
+这是一个警告块。
+:::
+
+::: tip 提示标题
+这是带标题的提示。
+:::
+
+::: error 错误块
+这是一个错误块。
+:::
+
+مرحبا بكم في عالم اللغة العربية!
+1. First, let's set up the project:
+
+\`\`\`shellscript
+# Create Vue project
+npm create vue@latest electron-vue-chat
+
+# Navigate to project
+cd electron-vue-chat
+
+# Install dependencies
+npm install
+npm install electron electron-builder vue-router
+
+# Install dev dependencies
+npm install -D electron-dev-server concurrently wait-on
+\`\`\`
+
+2. Create the main Electron file:
+
+\`\`\`javascript:electron/main.js
+const { app, BrowserWindow } = require('electron');
+const path = require('path');
+const isDev = process.env.NODE_ENV === 'development';
+
+let mainWindow;
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 900,
+    height: 680,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  const url = isDev
+    ? 'http://localhost:5173'
+    : \`file://\${path.join(__dirname, '../dist/index.html')}\`;
+
+  mainWindow.loadURL(url);
+
+  if (isDev) {
+    mainWindow.webContents.openDevTools();
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+app.on('ready', createWindow);
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (mainWindow === null) {
+    createWindow();
+  }
+});
+\`\`\`
+
+3. Update package.json:
+
+\`\`\`diff json:package.json
+{
+  "name": "markstream-vue",
+  "type": "module",
+- "version": "0.0.49",
++ "version": "0.0.54-beta.1",
+  "packageManager": "pnpm@10.16.1",
+  "description": "A Vue 3 component that renders Markdown string content as HTML, supporting custom components and advanced markdown features.",
+  "author": "Simon He",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git + git@github.com:Simon-He95/markstream-vue.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Simon-He95/markstream-vue/issues"
+  },
+  "keywords": [
+    "vue",
+    "vue3",
+    "markdown",
+    "markdown-to-html",
+    "markdown-renderer",
+    "vue-markdown",
+    "vue-component",
+    "html",
+    "renderer",
+    "custom-component"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/types/exports.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./index.css": "./dist/index.css",
+    "./index.tailwind.css": "./dist/index.tailwind.css",
+    "./tailwind": "./dist/tailwind.ts"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/types/exports.d.ts",
+  "files": [
+    "dist"
+  ],
+}
+\`\`\`
+
+4. Create chat components \\(diversified languages\\):
+
+\`\`\`python:src/server/app.py
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Message(BaseModel):
+    sender: str
+    text: str
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.post("/echo")
+def echo(msg: Message):
+    return {"reply": f"Echo: {msg.text}"}
+\`\`\`
+
+5. Create a native module example \(C++\):
+
+\`\`\`cpp:src/native/compute.cpp
+#include <bits/stdc++.h>
+using namespace std;
+
+int fibonacci(int n){
+  if(n<=1) return n;
+  int a=0,b=1;
+  for(int i=2;i<=n;++i){ int c=a+b; a=b; b=c; }
+  return b;
+}
+
+int main(){
+  ios::sync_with_stdio(false);
+  cin.tie(nullptr);
+  cout << "fib(10)=" << fibonacci(10) << "\n";
+  return 0;
+}
+\`\`\`
+
+6. Update the main App.vue:
+
+\`\`\`vue:src/App.vue
+<template>
+  <router-view />
+<\/template>
+
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+}
+</style>
+\`\`\`
+
+7. Set up the router:
+
+\`\`\`javascript:src/router/index.js
+import { createRouter, createWebHistory } from 'vue-router';
+import ChatView from '../views/ChatView.vue';
+
+const routes = [
+  {
+    path: '/',
+    name: 'chat',
+    component: ChatView
+  }
+];
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+});
+
+export default router;
+\`\`\`
+
+8. Update main.js:
+
+\`\`\`javascript:src/main.js
+import { createApp } from 'vue';
+import App from './App.vue';
+import router from './router';
+
+createApp(App).use(router).mount('#app');
+\`\`\`
+
+9. Mermaid graphic:
+
+\`\`\`mermaid
+graph TD
+    Kira_Yamato[基拉·大和]
+    Lacus_Clyne[拉克丝·克莱因]
+    Athrun_Zala[阿斯兰·萨拉]
+    Cagalli_Yula_Athha[卡嘉莉·尤拉·阿斯哈]
+    Shinn_Asuka[真·飞鸟]
+    Lunamaria_Hawke[露娜玛丽亚·霍克]
+    COMPASS[世界和平监视组织COMPASS]
+    Foundation[芬德申王国]
+    Orphee_Lam_Tao[奥尔菲·拉姆·陶]
+    %% 节点定义结束，开始定义边
+    Kira_Yamato ---|恋人| Lacus_Clyne
+    Kira_Yamato ---|挚友| Athrun_Zala
+    Kira_Yamato -->|隶属| COMPASS
+    Kira_Yamato -->|前辈| Shinn_Asuka
+    Lacus_Clyne -->|初代总裁| COMPASS
+    Athrun_Zala ---|恋人| Cagalli_Yula_Athha
+    Athrun_Zala -.->|协力| COMPASS
+    Shinn_Asuka ---|恋人| Lunamaria_Hawke
+    Shinn_Asuka -->|隶属| COMPASS
+    Lunamaria_Hawke -->|隶属| COMPASS
+    COMPASS -->|对立| Foundation
+    Orphee_Lam_Tao -->|隶属| Foundation
+    Orphee_Lam_Tao -.->|追求| Lacus_Clyne
+\`\`\`
+
+\`\`\`mermaid
+  xychart
+    title "销售收入"
+    x-axis ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"]
+    y-axis "收入" 4000 --> 11000
+    line [5000, 6000, 7500, 8200, 9500, 10500, 11000, 10200, 9200, 8500, 7000, 6000]
+\`\`\`
+
+---
+# 复杂数学公式
+
+### 1. **理解 \\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 的含义**
+   - \\(\boldsymbol{\alpha}\\) 和 \\(\boldsymbol{\beta}\\) 是三维列向量，因此 \\(\boldsymbol{\alpha}^T \boldsymbol{\beta}\\) 表示它们的点积（内积）。
+   - \\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 意味着向量 \\(\boldsymbol{\alpha}\\) 和 \\(\boldsymbol{\beta}\\) 正交（即垂直），因为点积为零表示它们之间的夹角为 90 度。
+
+### 2. **正交补空间的概念**
+   - 在线性代数中，对于一个子空间 \\(W\\)，它的正交补空间（记为 \\(W^\perp\\)）定义为所有与 \\(W\\) 中每个向量正交的向量的集合。即：
+     \[
+     W^\perp = \{ \mathbf{v} \in \mathbb{R}^3 \mid \mathbf{v} \cdot \mathbf{w} = 0 \text{ 对于所有 } \mathbf{w} \in W \}
+     \]
+   - 例如，如果 \\(W\\) 是由一个向量 \\(\boldsymbol{\alpha}\\) 张成的一维子空间（即 \\(W = \operatorname{span}\{\boldsymbol{\alpha}\}\\)），那么 \\(W^\perp\\) 就是所有与 \\(\boldsymbol{\alpha}\\) 正交的向量构成的二维平面。
+### 3. **\\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 与正交补空间的联系**
+   - 当 \\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 时，这意味着：
+     - \\(\boldsymbol{\beta}\\) 属于 \\(\operatorname{span}\{\boldsymbol{\alpha}\}\\) 的正交补空间，即 \\(\boldsymbol{\beta} \in (\operatorname{span}\{\boldsymbol{\alpha}\})^\perp\\)。
+     - 同样，\\(\boldsymbol{\alpha}\\) 也属于 \\(\operatorname{span}\{\boldsymbol{\beta}\}\\) 的正交补空间，即 \\(\boldsymbol{\alpha} \in (\operatorname{span}\{\boldsymbol{\beta}\})^\perp\\)。
+   - 换句话说，\\(\boldsymbol{\beta}\\) 与 \\(\boldsymbol{\alpha}\\) 张成的直线正交，因此 \\(\boldsymbol{\beta}\\) 位于该直线的垂直平面（即正交补空间）上。反之亦然。
+
+### 4. **在三维空间中的几何意义**
+   - 在三维空间中，如果 \\(\boldsymbol{\alpha}\\) 是一个非零向量，那么 \\(\operatorname{span}\{\boldsymbol{\alpha}\}\\) 是一条通过原点的直线，而它的正交补空间 \\((\operatorname{span}\{\boldsymbol{\alpha}\})^\perp\\) 是一个通过原点且与该直线垂直的平面。
+   - \\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 表示 \\(\boldsymbol{\beta}\\) 位于这个垂直平面上。同样，如果 \\(\boldsymbol{\beta}\\) 非零，那么 \\(\boldsymbol{\alpha}\\) 也位于与 \\(\boldsymbol{\beta}\\) 垂直的平面上。
+
+### 5. **推广到更一般的情况**
+   - 如果考虑多个向量，正交补空间的概念可以扩展。例如，如果有一组向量 \\(\{\boldsymbol{\alpha}_1, \boldsymbol{\alpha}_2, \ldots, \boldsymbol{\alpha}_k\}\\)，那么它们的张成子空间 \\(W = \operatorname{span}\{\boldsymbol{\alpha}_1, \ldots, \boldsymbol{\alpha}_k\}\\) 的正交补空间 \\(W^\perp\\) 包含所有与这些向量正交的向量。
+   - 在这种情况下，\\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 可以看作 \\(\boldsymbol{\beta}\\) 与 \\(W\\) 正交的一个特例（当 \\(W\\) 只由 \\(\boldsymbol{\alpha}\\) 张成时）。
+总之，\\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 直接体现了正交补空间的关系：它表明一个向量属于另一个向量张成子空间的正交补空间。如果你有更多向量或子空间，这种联系可以进一步深化。
+
+**示例：** emm\`1-(5)\`、\`3-(3)\`、\`3-(4)\` complex test \`1-(4)\`“heiheihei”中，hello world。
 `
