@@ -11,6 +11,7 @@ export default defineNuxtConfig({
     'katex/dist/katex.min.css',
   ],
   nitro: {
+    preset: 'static',
     publicAssets: [
       { dir: 'public' },
       { dir: '../playground/public', baseURL: '/' },
