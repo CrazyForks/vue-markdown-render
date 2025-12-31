@@ -1,3 +1,21 @@
+## [0.0.4-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.7...v0.0.4-beta.8) (2025-12-31)
+
+
+### Bug Fixes
+
+* enhance table loading behavior to prevent layout jitter ([5bd2fa5](https://github.com/Simon-He95/markstream-vue/commit/5bd2fa5c716830e2bc239bdbe5775cd067c0d56a))
+* update prepublishOnly script to include pnpm publish ([03826d5](https://github.com/Simon-He95/markstream-vue/commit/03826d5f92785d771ab5610223276abecb4caf51))
+
+
+### Features
+
+* add Terser minification for worker bundles in Vite configuration ([66dee23](https://github.com/Simon-He95/markstream-vue/commit/66dee2367ca53c4904db0e7d3c5daaefffe59404))
+* **docs:** add Chinese documentation for React and Vue 2 installation, quick start, and components ([c6b5c84](https://github.com/Simon-He95/markstream-vue/commit/c6b5c842910c10337d7ec007ba16f07cd8f20136))
+* implement monaco theme management and update copy event handling in CodeBlockNode and MermaidBlockNode ([70c336e](https://github.com/Simon-He95/markstream-vue/commit/70c336ed16b69acfdca40a22f3bbd70d33a20344))
+* **parser:** enhance data attribute parsing in VmrContainer to support JSON values ([1221e03](https://github.com/Simon-He95/markstream-vue/commit/1221e03b7c65c7f6ba5a35857b2803bcc16908d6))
+
+
+
 ## [0.0.4-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.52...v0.0.4-beta.7) (2025-12-31)
 
 
