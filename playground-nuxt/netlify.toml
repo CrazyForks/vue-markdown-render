@@ -1,6 +1,6 @@
 [build]
 publish = ".output/public"
-command = "cd .. && npx pnpm i && pnpm --filter markdown-parser build && pnpm run build && cd playground-nuxt && npm run build"
+command = "cd .. && npx pnpm i && pnpm --filter stream-markdown-parser build && pnpm run build && cd playground-nuxt && npm run build"
 
 [build.environment]
 NPM_FLAGS = "--version"
