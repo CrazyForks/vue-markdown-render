@@ -18,8 +18,6 @@ markstream-vue2 提供与 markstream-vue 相同强大的组件，但专为 Vue 2
 | `batch-rendering` | `boolean` | `false` | 启用增量批处理渲染 |
 | `defer-nodes-until-visible` | `boolean` | `true` | 延迟渲染重型节点直到可见 |
 | `render-code-blocks-as-pre` | `boolean` | `false` | 将代码块回退为 `<pre><code>` |
-| `before-render` | `Function` | - | 渲染开始前的回调 |
-| `after-render` | `Function` | - | 渲染完成后的回调 |
 
 ### 使用
 
@@ -35,12 +33,6 @@ export default {
     }
   },
   methods: {
-    handleBeforeRender() {
-      console.log('渲染开始')
-    },
-    handleAfterRender() {
-      console.log('渲染完成')
-    }
   }
 }
 </script>
@@ -50,8 +42,6 @@ export default {
     custom-id="docs"
     :content="markdown"
     :max-live-nodes="150"
-    @before-render="handleBeforeRender"
-    @after-render="handleAfterRender"
   />
 </template>
 ```
@@ -122,8 +112,11 @@ export default {
     }
   },
   methods: {
-    handleMonacoReady(editor) {
-      console.log('Monaco 编辑器已就绪：', editor)
+    handleCopy(code) {
+      console.log('代码已复制：', code)
+    },
+    handlePreviewCode(artifact) {
+      console.log('预览代码：', artifact)
     }
   }
 }
@@ -135,7 +128,8 @@ export default {
       :node="codeNode"
       :monaco-options="{ fontSize: 14, theme: 'vs-dark' }"
       :stream="true"
-      @ready="handleMonacoReady"
+      @copy="handleCopy"
+      @preview-code="handlePreviewCode"
     />
   </div>
 </template>

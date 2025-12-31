@@ -6,8 +6,8 @@ This page explains how each renderer fits together, what peer dependencies or CS
 
 | Component | Best for | Key props/events | Extra CSS / peers | Troubleshooting hooks |
 | --------- | -------- | ---------------- | ----------------- | --------------------- |
-| `MarkdownRender` | Rendering full AST trees (default export) | `content`, `custom-id`, `setCustomComponents`, `beforeRender`, `afterRender` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Add `custom-id="docs"` to scope overrides; standalone node components need a `.markstream-vue` wrapper; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
-| `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; slots `header-left` / `header-right` | Install `stream-monaco` (peer) + bundle Monaco workers | Blank editor ⇒ check worker bundling + SSR guards |
+| `MarkdownRender` | Rendering full AST trees (default export) | `content`, `custom-id`, `setCustomComponents`; events: `copy`, `handleArtifactClick`, `click`, `mouseover`, `mouseout` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Add `custom-id="docs"` to scope overrides; standalone node components need a `.markstream-vue` wrapper; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
+| `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; events: `copy`, `previewCode`; slots `header-left` / `header-right` | Install `stream-monaco` (peer) + bundle Monaco workers | Blank editor ⇒ check worker bundling + SSR guards |
 | `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `stream`, `loading`; slots `header-left` / `header-right` | Requires `shiki` + `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
 | `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` ≥ 11; import `mermaid/dist/mermaid.css` | For async errors see `/guide/mermaid` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
@@ -21,7 +21,7 @@ This page explains how each renderer fits together, what peer dependencies or CS
 
 ### Quick reference
 - **Best for**: full markdown documents in Vite, Nuxt, VitePress.
-- **Key props**: `content`, `custom-id`, `renderer`, lifecycle hooks.
+- **Key props**: `content`, `custom-id`, `setCustomComponents` |
 - **CSS**: include a reset (`modern-css-reset`, `@unocss/reset`, or `@tailwind base`) before `markstream-vue/index.css`. Wrap import with `@layer components` when using Tailwind/UnoCSS.
 
 ### CSS scoping

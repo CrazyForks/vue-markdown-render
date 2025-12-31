@@ -18,8 +18,6 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 | `batchRendering` | `boolean` | `false` | 启用增量批处理渲染 |
 | `deferNodesUntilVisible` | `boolean` | `true` | 延迟渲染重型节点直到可见 |
 | `renderCodeBlocksAsPre` | `boolean` | `false` | 将代码块回退为 `<pre><code>` |
-| `onBeforeRender` | `() => void` | - | 渲染开始前的回调 |
-| `onAfterRender` | `() => void` | - | 渲染完成后的回调 |
 
 ### 使用
 
@@ -31,21 +29,11 @@ function App() {
 
 这是 markstream-react。`
 
-  const handleBeforeRender = () => {
-    console.log('渲染开始')
-  }
-
-  const handleAfterRender = () => {
-    console.log('渲染完成')
-  }
-
   return (
     <MarkdownRender
       customId="docs"
       content={markdown}
       maxLiveNodes={150}
-      onBeforeRender={handleBeforeRender}
-      onAfterRender={handleAfterRender}
     />
   )
 }
@@ -100,8 +88,12 @@ function MonacoCodeBlock() {
     raw: 'const greeting: string = "Hello"'
   }
 
-  const handleMonacoReady = (editor: any) => {
-    console.log('Monaco 编辑器已就绪：', editor)
+  const handleCopy = (code: string) => {
+    console.log('代码已复制：', code)
+  }
+
+  const handlePreviewCode = (artifact: any) => {
+    console.log('预览代码：', artifact)
   }
 
   return (
@@ -110,7 +102,8 @@ function MonacoCodeBlock() {
         node={codeNode}
         monacoOptions={{ fontSize: 14, theme: 'vs-dark' }}
         stream={true}
-        onReady={handleMonacoReady}
+        onCopy={handleCopy}
+        onPreviewCode={handlePreviewCode}
       />
     </div>
   )

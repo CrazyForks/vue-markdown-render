@@ -18,8 +18,6 @@ The primary component for rendering markdown content in Vue 2.
 | `batch-rendering` | `boolean` | `false` | Enable incremental batched rendering |
 | `defer-nodes-until-visible` | `boolean` | `true` | Defer heavy nodes until visible |
 | `render-code-blocks-as-pre` | `boolean` | `false` | Fall back to `<pre><code>` for code blocks |
-| `before-render` | `Function` | - | Callback before rendering starts |
-| `after-render` | `Function` | - | Callback after rendering completes |
 
 ### Usage
 
@@ -35,12 +33,6 @@ export default {
     }
   },
   methods: {
-    handleBeforeRender() {
-      console.log('Rendering started')
-    },
-    handleAfterRender() {
-      console.log('Rendering completed')
-    }
   }
 }
 </script>
@@ -50,8 +42,6 @@ export default {
     custom-id="docs"
     :content="markdown"
     :max-live-nodes="150"
-    @before-render="handleBeforeRender"
-    @after-render="handleAfterRender"
   />
 </template>
 ```
@@ -122,8 +112,11 @@ export default {
     }
   },
   methods: {
-    handleMonacoReady(editor) {
-      console.log('Monaco editor ready:', editor)
+    handleCopy(code) {
+      console.log('Code copied:', code)
+    },
+    handlePreviewCode(artifact) {
+      console.log('Preview code:', artifact)
     }
   }
 }
@@ -135,7 +128,8 @@ export default {
       :node="codeNode"
       :monaco-options="{ fontSize: 14, theme: 'vs-dark' }"
       :stream="true"
-      @ready="handleMonacoReady"
+      @copy="handleCopy"
+      @preview-code="handlePreviewCode"
     />
   </div>
 </template>

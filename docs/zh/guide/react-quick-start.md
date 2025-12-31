@@ -72,15 +72,8 @@ import MarkdownRender from 'markstream-react'
 function App() {
   const markdown = '# Hello TypeScript!'
 
-  const handleBeforeRender = () => {
-    console.log('渲染开始')
-  }
-
   return (
-    <MarkdownRender
-      content={markdown}
-      onBeforeRender={handleBeforeRender}
-    />
+    <MarkdownRender content={markdown} />
   )
 }
 ```
@@ -408,8 +401,6 @@ function LongDocument() {
 | `batchRendering` | `boolean` | `false` | 启用批处理渲染 |
 | `deferNodesUntilVisible` | `boolean` | `true` | 延迟重型节点 |
 | `renderCodeBlocksAsPre` | `boolean` | `false` | 使用 `<pre><code>` 回退 |
-| `onBeforeRender` | `() => void` | - | 渲染前回调 |
-| `onAfterRender` | `() => void` | - | 渲染后回调 |
 
 ## 样式
 

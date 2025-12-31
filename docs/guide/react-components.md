@@ -18,8 +18,6 @@ The primary component for rendering markdown content in React.
 | `batchRendering` | `boolean` | `false` | Enable incremental batched rendering |
 | `deferNodesUntilVisible` | `boolean` | `true` | Defer heavy nodes until visible |
 | `renderCodeBlocksAsPre` | `boolean` | `false` | Fall back to `<pre><code>` for code blocks |
-| `onBeforeRender` | `() => void` | - | Callback before rendering starts |
-| `onAfterRender` | `() => void` | - | Callback after rendering completes |
 
 ### Usage
 
@@ -31,21 +29,11 @@ function App() {
 
 This is markstream-react.`
 
-  const handleBeforeRender = () => {
-    console.log('Rendering started')
-  }
-
-  const handleAfterRender = () => {
-    console.log('Rendering completed')
-  }
-
   return (
     <MarkdownRender
       customId="docs"
       content={markdown}
       maxLiveNodes={150}
-      onBeforeRender={handleBeforeRender}
-      onAfterRender={handleAfterRender}
     />
   )
 }
@@ -100,8 +88,12 @@ function MonacoCodeBlock() {
     raw: 'const greeting: string = "Hello"'
   }
 
-  const handleMonacoReady = (editor: any) => {
-    console.log('Monaco editor ready:', editor)
+  const handleCopy = (code: string) => {
+    console.log('Code copied:', code)
+  }
+
+  const handlePreviewCode = (artifact: any) => {
+    console.log('Preview code:', artifact)
   }
 
   return (
@@ -110,7 +102,8 @@ function MonacoCodeBlock() {
         node={codeNode}
         monacoOptions={{ fontSize: 14, theme: 'vs-dark' }}
         stream={true}
-        onReady={handleMonacoReady}
+        onCopy={handleCopy}
+        onPreviewCode={handlePreviewCode}
       />
     </div>
   )

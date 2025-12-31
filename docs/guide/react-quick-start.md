@@ -72,16 +72,7 @@ import MarkdownRender from 'markstream-react'
 function App() {
   const markdown = '# Hello TypeScript!'
 
-  const handleBeforeRender = () => {
-    console.log('Rendering starts')
-  }
-
-  return (
-    <MarkdownRender
-      content={markdown}
-      onBeforeRender={handleBeforeRender}
-    />
-  )
+  return <MarkdownRender content={markdown} />
 }
 ```
 
@@ -408,8 +399,6 @@ function LongDocument() {
 | `batchRendering` | `boolean` | `false` | Enable batched rendering |
 | `deferNodesUntilVisible` | `boolean` | `true` | Defer heavy nodes |
 | `renderCodeBlocksAsPre` | `boolean` | `false` | Use `<pre><code>` fallback |
-| `onBeforeRender` | `() => void` | - | Callback before render |
-| `onAfterRender` | `() => void` | - | Callback after render |
 
 ## Styling
 
