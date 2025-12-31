@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react-swc'
 import { defineConfig } from 'vite'
 import monacoEditorPlugin from 'vite-plugin-monaco-editor-esm'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   base: './',
   server: {
     port: 4174,
@@ -15,11 +15,12 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['stream-monaco'],
   },
-  resolve: {
+  // Only use alias in dev mode - for production build, use the built package
+  resolve: mode === 'development' ? {
     alias: {
-      'markstream-react': new URL('../packages/markstream-react/src', import.meta.url).pathname,
+      'markstream-react': path.resolve(__dirname, '../packages/markstream-react/src'),
     },
-  },
+  } : undefined,
   plugins: [
     react(),
     monacoEditorPlugin({
@@ -35,4 +36,4 @@ export default defineConfig({
       },
     }) as unknown as PluginOption,
   ],
-})
+}))

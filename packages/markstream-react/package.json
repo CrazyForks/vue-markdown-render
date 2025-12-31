@@ -6,8 +6,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "import": "./dist/index.js"
     },
     "./index.css": "./dist/index.css",
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
