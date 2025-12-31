@@ -84,6 +84,22 @@ export default defineConfig({
           ],
         },
         {
+          text: 'Vue 2 (markstream-vue2)',
+          items: [
+            { text: 'Installation', link: '/guide/vue2-installation' },
+            { text: 'Quick Start', link: '/guide/vue2-quick-start' },
+            { text: 'Components & API', link: '/guide/vue2-components' },
+          ],
+        },
+        {
+          text: 'React (markstream-react)',
+          items: [
+            { text: 'Installation', link: '/guide/react-installation' },
+            { text: 'Quick Start', link: '/guide/react-quick-start' },
+            { text: 'Components & API', link: '/guide/react-components' },
+          ],
+        },
+        {
           text: 'Quick links',
           items: [
             { text: 'Examples', link: '/guide/examples' },
@@ -148,6 +164,22 @@ export default defineConfig({
             },
           ],
         },
+        {
+          text: 'Vue 2 (markstream-vue2)',
+          items: [
+            { text: '安装', link: '/zh/guide/vue2-installation' },
+            { text: '快速开始', link: '/zh/guide/vue2-quick-start' },
+            { text: '组件与 API', link: '/zh/guide/vue2-components' },
+          ],
+        },
+        {
+          text: 'React (markstream-react)',
+          items: [
+            { text: '安装', link: '/zh/guide/react-installation' },
+            { text: '快速开始', link: '/zh/guide/react-quick-start' },
+            { text: '组件与 API', link: '/zh/guide/react-components' },
+          ],
+        },
       ],
       '/': [
         {
@@ -181,6 +213,22 @@ export default defineConfig({
             { text: 'Tailwind', link: '/guide/tailwind' },
             { text: 'Legacy builds & iOS regex compatibility', link: '/guide/legacy-builds' },
             { text: 'Thanks', link: '/guide/thanks' },
+          ],
+        },
+        {
+          text: 'Vue 2 (markstream-vue2)',
+          items: [
+            { text: 'Installation', link: '/guide/vue2-installation' },
+            { text: 'Quick Start', link: '/guide/vue2-quick-start' },
+            { text: 'Components & API', link: '/guide/vue2-components' },
+          ],
+        },
+        {
+          text: 'React (markstream-react)',
+          items: [
+            { text: 'Installation', link: '/guide/react-installation' },
+            { text: 'Quick Start', link: '/guide/react-quick-start' },
+            { text: 'Components & API', link: '/guide/react-components' },
           ],
         },
         { text: 'Nuxt SSR', link: '/nuxt-ssr' },

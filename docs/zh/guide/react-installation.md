@@ -1,0 +1,226 @@
+# React 安装
+
+使用 pnpm、npm 或 yarn 安装 markstream-react。
+
+```bash
+pnpm add markstream-react
+# 或
+npm install markstream-react
+# 或
+yarn add markstream-react
+```
+
+## 要求
+
+markstream-react 需要：
+- **React 18+** 和 **ReactDOM 18+**
+- **stream-markdown-parser**（作为依赖自动安装）
+
+## 可选的对等依赖
+
+markstream-react 通过可选的对等依赖支持各种功能。只安装你需要的功能：
+
+| 功能 | 所需包 | 安装命令 |
+|---------|------------------|-----------------|
+| 代码语法高亮 | `shiki`、`stream-markdown` | `pnpm add shiki stream-markdown` |
+| Monaco 编辑器（完整代码块功能） | `stream-monaco` | `pnpm add stream-monaco` |
+| Mermaid 图表 | `mermaid` | `pnpm add mermaid` |
+| 数学公式渲染（KaTeX） | `katex` | `pnpm add katex` |
+
+## 启用功能加载器（Mermaid / KaTeX）
+
+安装可选的对等依赖后，在客户端入口文件中选择性启用：
+
+```tsx
+import { enableKatex, enableMermaid } from 'markstream-react'
+
+enableMermaid()
+enableKatex()
+```
+
+同时记得导入必需的 CSS：
+
+```tsx
+import 'markstream-react/index.css'
+import 'katex/dist/katex.min.css'
+import 'mermaid/dist/mermaid.css'
+```
+
+Monaco（`stream-monaco`）不需要单独导入 CSS。
+
+注意：`markstream-react/index.css` 的样式被限制在内部的 `.markstream-react` 容器下，以减少全局样式冲突。`MarkdownRender` 默认在该容器内渲染。如果你单独渲染节点组件，请用 `<div className="markstream-react">...</div>` 包裹它们。
+
+### 快速安装：所有功能
+
+一次性启用所有功能：
+
+```bash
+pnpm add shiki stream-markdown stream-monaco mermaid katex
+# 或
+npm install shiki stream-markdown stream-monaco mermaid katex
+```
+
+### 功能详情
+
+#### 代码语法高亮
+
+需要同时安装 `shiki` 和 `stream-markdown`：
+
+```bash
+pnpm add shiki stream-markdown
+```
+
+这将使用 Shiki 启用代码块的语法高亮。
+
+#### Monaco 编辑器
+
+完整的代码块功能（复制按钮、字体大小控制、展开/折叠）：
+
+```bash
+pnpm add stream-monaco
+```
+
+如果不安装 `stream-monaco`，代码块仍会渲染，但交互式按钮可能无法工作。
+
+#### Mermaid 图表
+
+渲染 Mermaid 图表：
+
+```bash
+pnpm add mermaid
+```
+
+#### KaTeX 数学公式渲染
+
+数学公式渲染：
+
+```bash
+pnpm add katex
+```
+
+同时在应用入口文件中导入 KaTeX CSS：
+
+```tsx
+import 'katex/dist/katex.min.css'
+```
+
+## 快速测试
+
+导入并渲染一个简单的 markdown 字符串：
+
+```tsx
+import MarkdownRender from 'markstream-react'
+import 'markstream-react/index.css'
+
+function App() {
+  const md = '# Hello from markstream-react!'
+
+  return <MarkdownRender content={md} />
+}
+
+export default App
+```
+
+## TypeScript 支持
+
+markstream-react 使用 TypeScript 编写，并包含完整的类型定义，无需额外配置：
+
+```tsx
+import type { MarkdownRenderProps, ParsedNode } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
+```
+
+## Next.js 集成
+
+对于 Next.js 项目，你需要确保组件仅在客户端渲染浏览器专属功能：
+
+```tsx
+'use client'
+
+import MarkdownRender from 'markstream-react'
+import { useEffect, useState } from 'react'
+import 'markstream-react/index.css'
+
+export default function MarkdownPage() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return <div>加载中...</div>
+  }
+
+  return <MarkdownRender content="# Hello Next.js!" />
+}
+```
+
+或使用 `'use client'` 指令配合动态导入：
+
+```tsx
+import dynamic from 'next/dynamic'
+
+const MarkdownRender = dynamic(
+  () => import('markstream-react').then(mod => mod.default),
+  { ssr: false }
+)
+
+export default function MarkdownPage() {
+  return <MarkdownRender content="# Hello Next.js!" />
+}
+```
+
+## Vite 集成
+
+对于 Vite 项目，只需导入组件和样式：
+
+```tsx
+// src/main.tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
+import 'markstream-react/index.css'
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+)
+```
+
+```tsx
+// src/App.tsx
+import MarkdownRender from 'markstream-react'
+
+function App() {
+  const content = `# Hello Vite!
+
+这是 markstream-react 与 **Vite** 配合使用。`
+
+  return <MarkdownRender content={content} />
+}
+
+export default App
+```
+
+## Webpack 集成
+
+对于使用 Webpack 的项目，确保你的配置处理 CSS 导入：
+
+```js
+module.exports = {
+  module: {
+    rules: [
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader']
+      }
+    ]
+  }
+}
+```
+
+## 自定义组件设置
+
+要使用自定义节点组件，你需要创建自定义渲染器。详情请参阅 [组件文档](/guide/react-components)。
