@@ -1,5 +1,6 @@
 [build]
-publish = ".output/public"
+base = ".."
+publish = "playground-nuxt/.output/public"
 command = "cd .. && npx pnpm i && pnpm --filter stream-markdown-parser build && pnpm run build && cd playground-nuxt && npm run build"
 
 [build.environment]
