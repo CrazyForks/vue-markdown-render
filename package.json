@@ -75,7 +75,7 @@
     "test:update": "vitest -u",
     "typecheck": "vue-tsc --noEmit",
     "check:ssr": "vitest --run -t \"SSR import safety\"",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && pnpm publish",
     "play": "pnpm run -C playground dev",
     "play:vue2": "pnpm run -C playground-vue2 dev",
     "play:build": "pnpm run -C playground build",
