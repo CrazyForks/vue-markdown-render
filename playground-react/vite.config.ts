@@ -16,11 +16,13 @@ export default defineConfig(({ mode }) => ({
     exclude: ['stream-monaco'],
   },
   // Only use alias in dev mode - for production build, use the built package
-  resolve: mode === 'development' ? {
-    alias: {
-      'markstream-react': path.resolve(__dirname, '../packages/markstream-react/src'),
-    },
-  } : undefined,
+  resolve: mode === 'development'
+    ? {
+        alias: {
+          'markstream-react': path.resolve(__dirname, '../packages/markstream-react/src'),
+        },
+      }
+    : undefined,
   plugins: [
     react(),
     monacoEditorPlugin({

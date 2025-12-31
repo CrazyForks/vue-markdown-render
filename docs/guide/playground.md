@@ -2,6 +2,15 @@
 
 This repository includes a playable demo under `/playground` that helps you test features locally and reproduce rendering issues.
 
+## Online Playgrounds
+
+- Vue 3: https://markstream-vue.simonhe.me/
+- React: https://markstream-react.netlify.app/
+- Nuxt: https://markstream-nuxt.netlify.app/
+- Vue 2: https://markstream-vue2.netlify.app/
+
+## Running Locally
+
 How to run the playground locally:
 
 ```bash

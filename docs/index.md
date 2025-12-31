@@ -13,7 +13,10 @@ A streaming-friendly, Vue 3 markdown renderer with progressive Mermaid support, 
 - Nuxt SSR: [/nuxt-ssr](/nuxt-ssr)
 - AI/LLM context: [/llms](/llms)
 - AI/LLM context (中文): [/llms.zh-CN](/llms.zh-CN)
-- Playground: https://markstream-vue.simonhe.me/
+- Playground (Vue 3): https://markstream-vue.simonhe.me/
+- Playground (React): https://markstream-react.netlify.app/
+- Playground (Nuxt): https://markstream-nuxt.netlify.app/
+- Playground (Vue 2): https://markstream-vue2.netlify.app/
 
 ## Why move from README to a docs site
 

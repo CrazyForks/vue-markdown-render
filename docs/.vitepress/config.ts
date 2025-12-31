@@ -36,7 +36,15 @@ export default defineConfig({
       { text: 'Get started', link: '/guide/quick-start' },
       { text: 'Examples', link: '/guide/examples' },
       { text: 'API', link: '/guide/components' },
-      { text: 'Playground', link: 'https://markstream-vue.simonhe.me/' },
+      {
+        text: 'Playground',
+        items: [
+          { text: 'Vue 3', link: 'https://markstream-vue.simonhe.me/' },
+          { text: 'React', link: 'https://markstream-react.netlify.app/' },
+          { text: 'Nuxt', link: 'https://markstream-nuxt.netlify.app/' },
+          { text: 'Vue 2', link: 'https://markstream-vue2.netlify.app/' },
+        ],
+      },
       { text: 'Search', link: '/guide/search' },
       { text: 'GitHub', link: 'https://github.com/Simon-He95/markstream-vue' },
       {
@@ -104,7 +112,15 @@ export default defineConfig({
           items: [
             { text: 'Examples', link: '/guide/examples' },
             { text: 'API Reference', link: '/guide/components' },
-            { text: 'Playground', link: 'https://markstream-vue.simonhe.me/' },
+            {
+              text: 'Playground',
+              items: [
+                { text: 'Vue 3', link: 'https://markstream-vue.simonhe.me/' },
+                { text: 'React', link: 'https://markstream-react.netlify.app/' },
+                { text: 'Nuxt', link: 'https://markstream-nuxt.netlify.app/' },
+                { text: 'Vue 2', link: 'https://markstream-vue2.netlify.app/' },
+              ],
+            },
             { text: 'Troubleshooting', link: '/guide/troubleshooting' },
           ],
         },
@@ -267,7 +283,15 @@ export default defineConfig({
           { text: '快速开始', link: '/zh/guide/quick-start' },
           { text: '示例', link: '/zh/guide/examples' },
           { text: 'API', link: '/zh/guide/components' },
-          { text: '演示', link: 'https://markstream-vue.simonhe.me/' },
+          {
+            text: '演示',
+            items: [
+              { text: 'Vue 3', link: 'https://markstream-vue.simonhe.me/' },
+              { text: 'React', link: 'https://markstream-react.netlify.app/' },
+              { text: 'Nuxt', link: 'https://markstream-nuxt.netlify.app/' },
+              { text: 'Vue 2', link: 'https://markstream-vue2.netlify.app/' },
+            ],
+          },
           { text: '搜索', link: '/zh/guide/search' },
           { text: 'GitHub', link: 'https://github.com/Simon-He95/markstream-vue' },
         ],
