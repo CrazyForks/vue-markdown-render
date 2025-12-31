@@ -126,6 +126,8 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
   const cleanupRef = useRef<(() => void) | null>(null)
   const createEditorPromiseRef = useRef<Promise<void> | null>(null)
   const editorKindRef = useRef<'diff' | 'single' | null>(null)
+  const editorMountElRef = useRef<HTMLElement | null>(null)
+  const editorLifecycleIdRef = useRef(0)
   const detectLanguageRef = useRef<((code: string) => string) | null>(null)
   const viewportHandleRef = useRef<VisibilityHandle | null>(null)
   const registerViewport = useViewportPriority()
@@ -205,8 +207,8 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       if (Number.isFinite(contentHeight) && contentHeight > 0) {
         const height = nextExpanded ? contentHeight : Math.min(contentHeight, maxHeight)
         host.style.height = `${Math.ceil(Math.max(120, height))}px`
-        view.layout?.()
       }
+      view.layout?.()
     }
     catch {}
   }, [getMaxHeightValue, useFallback])
@@ -221,6 +223,19 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
 
   const latestNodeRef = useRef(node)
   latestNodeRef.current = node
+
+  const resetEditorInstance = useCallback(() => {
+    editorLifecycleIdRef.current += 1
+    try {
+      cleanupRef.current?.()
+    }
+    catch {}
+    createEditorPromiseRef.current = null
+    editorKindRef.current = null
+    editorMountElRef.current = null
+    setEditorReady(false)
+    setEditorCreated(false)
+  }, [])
 
   const syncEditorCssVars = useCallback(() => {
     const editorEl = editorHostRef.current
@@ -247,10 +262,12 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
 
   useEffect(() => {
     return () => {
+      editorLifecycleIdRef.current += 1
       cleanupRef.current?.()
       cleanupRef.current = null
       createEditorPromiseRef.current = null
       editorKindRef.current = null
+      editorMountElRef.current = null
       detectLanguageRef.current = null
       viewportHandleRef.current?.destroy?.()
       viewportHandleRef.current = null
@@ -416,6 +433,8 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
   const ensureEditorCreation = useCallback(async (): Promise<void | null> => {
     if (useFallback)
       return null
+    if (!viewportReady)
+      return null
     if (collapsed)
       return null
     if (shouldDelayEditor)
@@ -427,16 +446,24 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
 
     const currentNode = latestNodeRef.current
     const desiredKind: 'diff' | 'single' = currentNode.diff ? 'diff' : 'single'
-    if (editorKindRef.current === desiredKind)
+    const attachedEl = editorMountElRef.current
+    const hasExpectedView = desiredKind === 'diff'
+      ? Boolean(helpers.getDiffEditorView?.())
+      : Boolean(helpers.getEditorView?.())
+    const shouldRecreate = editorKindRef.current !== desiredKind || attachedEl !== el || !hasExpectedView
+    if (!shouldRecreate)
       return null
     if (createEditorPromiseRef.current)
       return createEditorPromiseRef.current
 
+    editorLifecycleIdRef.current += 1
+    const creationId = editorLifecycleIdRef.current
     setEditorCreated(true)
     const pending = (async () => {
       try {
         cleanupRef.current?.()
         editorKindRef.current = null
+        editorMountElRef.current = null
         setEditorReady(false)
 
         const lang = monacoLanguage
@@ -459,6 +486,10 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
           editorKindRef.current = 'single'
           await helpers.createEditor(el, String(currentNode.code ?? ''), lang)
         }
+        editorMountElRef.current = el
+
+        if (editorLifecycleIdRef.current !== creationId)
+          return
 
         const initialFontSize = Number((monacoOptionsRef.current as any)?.fontSize)
         if (Number.isFinite(initialFontSize) && initialFontSize > 0) {
@@ -479,17 +510,34 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
         setEditorReady(true)
       }
       catch {
-        setUseFallback(true)
+        if (editorLifecycleIdRef.current === creationId)
+          setUseFallback(true)
       }
     })()
 
-    createEditorPromiseRef.current = pending.finally(() => {
-      createEditorPromiseRef.current = null
+    const tracked = pending.finally(() => {
+      if (createEditorPromiseRef.current === tracked)
+        createEditorPromiseRef.current = null
     })
-    return createEditorPromiseRef.current
-  }, [applyEditorHeight, collapsed, expanded, monacoLanguage, shouldDelayEditor, syncEditorCssVars, useFallback])
+    createEditorPromiseRef.current = tracked
+    return tracked
+  }, [applyEditorHeight, collapsed, expanded, monacoLanguage, shouldDelayEditor, syncEditorCssVars, useFallback, viewportReady])
 
   const isMermaid = canonicalLanguage === 'mermaid'
+
+  useEffect(() => {
+    if (useFallback)
+      return
+    if (!monacoReady)
+      return
+    if (!viewportReady)
+      return
+    if (collapsed || shouldDelayEditor || isMermaid) {
+      resetEditorInstance()
+      return
+    }
+    void ensureEditorCreation()
+  }, [collapsed, ensureEditorCreation, isMermaid, monacoReady, resetEditorInstance, shouldDelayEditor, useFallback, viewportReady])
 
   useEffect(() => {
     if (useFallback)
@@ -501,22 +549,6 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     if (collapsed)
       return
     if (shouldDelayEditor)
-      return
-    if (isMermaid) {
-      cleanupRef.current?.()
-      return
-    }
-    void ensureEditorCreation()
-  }, [collapsed, ensureEditorCreation, isMermaid, monacoReady, shouldDelayEditor, useFallback, viewportReady])
-
-  useEffect(() => {
-    if (props.stream === false)
-      return
-    if (useFallback)
-      return
-    if (!monacoReady)
-      return
-    if (collapsed)
       return
     if (isMermaid)
       return
@@ -538,11 +570,18 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       }
       const lang = resolveMonacoLanguageId(langToken || canonicalLanguage)
 
-      if (helpers.createEditor && !editorCreated && editorHostRef.current) {
+      if (helpers.createEditor && editorHostRef.current) {
         try {
-          await ensureEditorCreation()
+          await Promise.resolve(ensureEditorCreation())
         }
         catch {}
+        const pending = createEditorPromiseRef.current
+        if (pending) {
+          try {
+            await pending
+          }
+          catch {}
+        }
       }
 
       try {
@@ -573,8 +612,9 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     node.diff,
     node.originalCode,
     node.updatedCode,
-    props.stream,
+    shouldDelayEditor,
     useFallback,
+    viewportReady,
   ])
 
   useEffect(() => {

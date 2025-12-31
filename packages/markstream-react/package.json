@@ -23,7 +23,8 @@
     "dev": "vite dev",
     "build": "vite build --mode npm",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "release": "bumpp && npm publish --access public"
   },
   "peerDependencies": {
     "katex": ">=0.16.22",
