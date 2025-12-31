@@ -325,6 +325,7 @@ li .paragraph-node {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .table-node {
@@ -332,6 +333,14 @@ li .paragraph-node {
   width: max-content;
   min-width: 100%;
   border-collapse: collapse;
+}
+
+.table-node--loading {
+  /* Streaming updates can mutate cell content, which triggers column reflow
+     with `table-layout: auto` and causes visible jitter. Keep a stable
+     layout while loading, then fall back to auto sizing once complete. */
+  table-layout: fixed;
+  width: 100%;
 }
 
 .table-node th,
@@ -375,7 +384,7 @@ li .paragraph-node {
 }
 
 .table-node__loading {
-  position: relative;
+  position: absolute;
   inset: 0;
   display: flex;
   align-items: center;

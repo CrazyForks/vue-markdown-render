@@ -127,6 +127,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .table-node {
@@ -139,6 +140,14 @@ const bodyRows = computed(() => props.node.rows ?? [])
 .table-node :deep(th),
 .table-node :deep(td) {
   white-space: nowrap;
+}
+
+.table-node--loading {
+  /* Streaming updates can mutate cell content, which triggers column reflow
+     with `table-layout: auto` and causes visible jitter. Keep a stable
+     layout while loading, then fall back to auto sizing once complete. */
+  table-layout: fixed;
+  width: 100%;
 }
 
 .table-node--loading tbody td {
@@ -167,7 +176,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
 }
 
 .table-node__loading {
-  position: relative;
+  position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
