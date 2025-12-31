@@ -1,3 +1,39 @@
+## [0.0.4-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.52...v0.0.4-beta.6) (2025-12-31)
+
+
+### Bug Fixes
+
+* update packageManager version to pnpm@10.27.0 in package.json files ([1e94070](https://github.com/Simon-He95/markstream-vue/commit/1e94070bec2bffc4f2cb14902435535426f069b4))
+
+
+
+## [0.0.52](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.6...v0.0.52) (2025-12-31)
+
+
+### Bug Fixes
+
+* add missing release script to package.json for markdown-parser ([72ef4d3](https://github.com/Simon-He95/markstream-vue/commit/72ef4d3fc1487c2d8955a9670bb645737be5846a))
+* add missing release script to package.json for markstream-react and markstream-vue2 ([2e8a717](https://github.com/Simon-He95/markstream-vue/commit/2e8a7174d765ad5bf5a2d4d42567efeb84136f15))
+
+
+### Features
+
+* preserve complex JSON attributes in vmr_container ([639956b](https://github.com/Simon-He95/markstream-vue/commit/639956b9b2b45648108c36809247ccc80e63ca27))
+
+
+
+## [0.0.4-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.5...v0.0.4-beta.6) (2025-12-30)
+
+
+### Features
+
+* add renderer context and improve custom components management ([2ffebe1](https://github.com/Simon-He95/markstream-vue/commit/2ffebe10b2d0956f772cf846e9f15a59b542f5cf))
+* **CodeBlockNode:** enhance viewport handling and loading state management; refactor MathBlockNode rendering logic ([1391759](https://github.com/Simon-He95/markstream-vue/commit/1391759cb12206629c171dc87d79c784361705d8))
+* enhance code block rendering with pre fallback and improved table layout ([39256c6](https://github.com/Simon-He95/markstream-vue/commit/39256c65fdd6ef06781ff4805017f5c2dc9ff47e))
+* **playground-react:** initialize React playground with Vite and Tailwind CSS ([0e2d463](https://github.com/Simon-He95/markstream-vue/commit/0e2d463192dc19f7f868a11e2eb28b1e4627bc64))
+
+
+
 ## [0.0.4-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.4...v0.0.4-beta.5) (2025-12-27)
 
 
