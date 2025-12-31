@@ -9,8 +9,8 @@ This page explains how each renderer fits together, what peer dependencies or CS
 | `MarkdownRender` | Rendering full AST trees (default export) | `content`, `custom-id`, `setCustomComponents`, `beforeRender`, `afterRender` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Add `custom-id="docs"` to scope overrides; standalone node components need a `.markstream-vue` wrapper; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; slots `header-left` / `header-right` | Install `stream-monaco` (peer) + bundle Monaco workers | Blank editor ⇒ check worker bundling + SSR guards |
 | `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `stream`, `loading`; slots `header-left` / `header-right` | Requires `shiki` + `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
-| `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `id`, `theme`, `onRender` | Peer `mermaid` ≥ 11; import `mermaid/dist/mermaid.css` for theme | For async errors see `/guide/mermaid` |
-| `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node`, `displayMode`, `macros` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
+| `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` ≥ 11; import `mermaid/dist/mermaid.css` | For async errors see `/guide/mermaid` |
+| `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
 | `ImageNode` | Custom previews/lightboxes | Emits `click`, `load`, `error`; accepts `lazy` props via `node.props` | None, but respects global CSS | Wrap in custom component + `setCustomComponents` to intercept events |
 | `LinkNode` | Animated underline, tooltips | `color`, `underlineHeight`, `showTooltip` | No extra CSS | Browser defaults can override `a` styles; import reset |
 | `VmrContainerNode` | Custom `:::` containers with JSON attrs | `node` (`name`, `attrs`, `children`) | Minimal base CSS; override via `setCustomComponents` | Unknown node type → check `FallbackComponent`; invalid JSON → check `data-attrs` fallback |
@@ -219,22 +219,28 @@ Troubleshooting:
 ### Quick reference
 - **Peer**: `mermaid` ≥ 11 (tree-shakable ESM build recommended).
 - **CSS**: import `mermaid/dist/mermaid.css` after your reset.
-- **Props**: `node`, `theme`, `isStrict`, `mermaidOptions`, `onRender`, `custom-id`.
+- **Props**: `node`, `isDark`, `isStrict`, `maxHeight`, timeouts, header/button toggles.
+- **Emits**: `copy`, `export`, `openModal`, `toggleMode` (call `ev.preventDefault()` to stop the default action).
 
 ### Usage
 
 ```ts
-import { MermaidBlockNode, setCustomComponents } from 'markstream-vue'
+import { MermaidBlockNode } from 'markstream-vue'
 import 'mermaid/dist/mermaid.css'
 ```
 
 ```vue
+<script setup lang="ts">
+function onExport(ev: any) {
+  // `ev.svgString` is available when the export button is clicked.
+  console.log(ev.svgString)
+}
+</script>
+
 <MermaidBlockNode
-  custom-id="docs"
   :node="node"
   :is-strict="true"
-  theme="forest"
-  @render="handleMermaidRender"
+  @export="onExport"
 />
 ```
 
@@ -250,7 +256,7 @@ Troubleshooting:
 ### Quick reference
 - **Peer**: `katex`.
 - **CSS**: `import 'katex/dist/katex.min.css'`.
-- **Props**: `node`, `displayMode`, `macros`, `throwOnError`.
+- **Props**: `node`.
 
 ### Usage
 
@@ -259,14 +265,14 @@ import 'katex/dist/katex.min.css'
 ```
 
 ```vue
-<MathBlockNode :node="node" :display-mode="true" :macros="{ '\\RR': '\\mathbb{R}' }" />
+<MathBlockNode :node="node" />
 
 <MathInlineNode :node="inlineNode" />
 ```
 
 Troubleshooting:
 - Missing CSS → blank formulas or fallback text.
-- Nuxt SSR needs `<ClientOnly>` or `client:only` since KaTeX touches DOM APIs.
+- Nuxt SSR needs `<ClientOnly>` or `client:only` since math rendering is client-only.
 - To override styling, scope selectors using `[data-custom-id]` rather than editing KaTeX globals directly.
 
 ## ImageNode — Custom preview handling

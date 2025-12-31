@@ -169,9 +169,6 @@ export default {
   <div class="markstream-vue">
     <MathBlockNode
       :node="mathNode"
-      :display-mode="true"
-      :macros="{ '\\RR': '\\mathbb{R}' }"
-      :throw-on-error="false"
     />
   </div>
 </template>
@@ -224,8 +221,9 @@ export default {
   data() {
     return {
       mermaidNode: {
-        type: 'mermaid_block',
-        content: `graph TD
+        type: 'code_block',
+        language: 'mermaid',
+        code: `graph TD
     A[开始] --> B{能用吗？}
     B -->|是| C[太好了！]`,
         raw: ''
@@ -233,8 +231,8 @@ export default {
     }
   },
   methods: {
-    handleMermaidRender(svg) {
-      console.log('Mermaid 图表已渲染：', svg)
+    onExport(ev) {
+      console.log('Mermaid SVG：', ev.svgString)
     }
   }
 }
@@ -244,9 +242,8 @@ export default {
   <div class="markstream-vue">
     <MermaidBlockNode
       :node="mermaidNode"
-      theme="forest"
       :is-strict="true"
-      @render="handleMermaidRender"
+      @export="onExport"
     />
   </div>
 </template>

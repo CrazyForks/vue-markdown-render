@@ -9,8 +9,8 @@
 | `MarkdownRender` | 渲染完整 AST（默认导出） | `content`、`custom-id`、`setCustomComponents`、生命周期钩子 | 在 reset 之后引入 `markstream-vue/index.css`（CSS 已被限定在内部 `.markstream-vue` 容器中），并放入受控 layer | 给 `MarkdownRender` 添加 `custom-id`，独立使用节点组件需包一层 `.markstream-vue`；配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`stream`、`loading`；插槽 `header-left` / `header-right` | 安装 `stream-monaco`（peer）并打包 Monaco workers | 空白编辑器 → 优先检查 worker 打包与 SSR |
 | `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`stream`、`loading`；插槽 `header-left` / `header-right` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
-| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`theme`、`onRender` | `mermaid` ≥ 11 & `mermaid/dist/mermaid.css` | 详见 `/zh/guide/mermaid` |
-| `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node`、`displayMode`、`macros` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
+| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` ≥ 11；引入 `mermaid/dist/mermaid.css` | 详见 `/zh/guide/mermaid` |
+| `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
 | `ImageNode` | 自定义图片预览 / 懒加载 | 触发 `click` / `load` / `error` 事件 | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
 | `LinkNode` | 下划线动画、颜色自定义 | `color`、`underlineHeight`、`showTooltip` | 无 | 浏览器默认 `a` 样式可通过 reset 解决 |
 | `VmrContainerNode` | 带 JSON 属性的自定义 `:::` 容器 | `node`（`name`、`attrs`、`children`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | 未知节点类型 → 检查 `FallbackComponent`；JSON 无效 → 检查 `data-attrs` 回退 |
@@ -219,7 +219,8 @@ const node = {
 ### 快速要点
 - **依赖**：`mermaid` ≥ 11（推荐 ESM 构建）。
 - **CSS**：`import 'mermaid/dist/mermaid.css'`。
-- **Props**：`node`、`theme`、`isStrict`、`mermaidOptions`、`onRender`、`custom-id`。
+- **Props**：`node`、`isDark`、`isStrict`、`maxHeight`、超时参数、Header/按钮开关等。
+- **事件**：`copy`、`export`、`openModal`、`toggleMode`（可通过 `ev.preventDefault()` 阻止默认行为）。
 
 ### 示例
 
@@ -228,12 +229,17 @@ import 'mermaid/dist/mermaid.css'
 ```
 
 ```vue
+<script setup lang="ts">
+function onExport(ev: any) {
+  // 点击导出按钮时可拿到 `ev.svgString`
+  console.log(ev.svgString)
+}
+</script>
+
 <MermaidBlockNode
-  custom-id="docs"
   :node="node"
   :is-strict="true"
-  theme="forest"
-  @render="handleMermaidRender"
+  @export="onExport"
 />
 ```
 
@@ -249,7 +255,7 @@ import 'mermaid/dist/mermaid.css'
 ### 快速要点
 - **依赖**：`katex`
 - **CSS**：`import 'katex/dist/katex.min.css'`
-- **Props**：`displayMode`、`macros`、`throwOnError`
+- **Props**：`node`
 
 ### 示例
 
@@ -258,14 +264,14 @@ import 'katex/dist/katex.min.css'
 ```
 
 ```vue
-<MathBlockNode :node="node" :display-mode="true" :macros="{ '\\RR': '\\mathbb{R}' }" />
+<MathBlockNode :node="node" />
 
 <MathInlineNode :node="inlineNode" />
 ```
 
 排障：
 - 缺少 CSS 会导致公式不可见。
-- Nuxt SSR 需要 `<ClientOnly>` 或 `client:only`，以防 KaTeX 访问 DOM。
+- Nuxt SSR 需要 `<ClientOnly>` 或 `client:only`，因为公式渲染只在客户端进行。
 - 如需自定义样式，请配合 `[data-custom-id]` 定位，勿直接修改 KaTeX 全局样式。
 
 ## ImageNode — 自定义预览

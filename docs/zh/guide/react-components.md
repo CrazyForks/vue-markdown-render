@@ -135,12 +135,7 @@ function MathBlock() {
 
   return (
     <div className="markstream-react">
-      <MathBlockNode
-        node={mathNode}
-        displayMode={true}
-        macros={{ '\\RR': '\\mathbb{R}' }}
-        throwOnError={false}
-      />
+      <MathBlockNode node={mathNode} />
     </div>
   )
 }
@@ -183,24 +178,24 @@ import { MermaidBlockNode } from 'markstream-react'
 
 function MermaidDiagram() {
   const mermaidNode = {
-    type: 'mermaid_block',
-    content: `graph TD
+    type: 'code_block',
+    language: 'mermaid',
+    code: `graph TD
     A[开始] --> B{能用吗？}
     B -->|是| C[太好了！]`,
     raw: ''
   }
 
-  const handleMermaidRender = (svg: string) => {
-    console.log('Mermaid 图表已渲染：', svg)
+  const handleExport = (ev: any) => {
+    console.log('Mermaid SVG：', ev.svgString)
   }
 
   return (
     <div className="markstream-react">
       <MermaidBlockNode
         node={mermaidNode}
-        theme="forest"
         isStrict={true}
-        onRender={handleMermaidRender}
+        onExport={handleExport}
       />
     </div>
   )
