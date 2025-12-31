@@ -1,6 +1,5 @@
 import type { NodeComponentProps } from 'markstream-react'
 import { NodeRenderer } from 'markstream-react'
-import React from 'react'
 
 interface ThinkingNodeData {
   node: {

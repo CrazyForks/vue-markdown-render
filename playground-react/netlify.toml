@@ -1,6 +1,6 @@
 [build]
 publish = "dist"
-command = "npx pnpm i && npm run build"
+command = "npx pnpm i && pnpm --filter markstream-react build && npm run build"
 
 [build.environment]
 NPM_FLAGS = "--version"

@@ -1,6 +1,6 @@
 [build]
 publish = ".output/public"
-command = "npx pnpm i && nuxt build"
+command = "npx pnpm i && pnpm --filter markstream-vue build && nuxt build"
 
 [build.environment]
 NPM_FLAGS = "--version"
