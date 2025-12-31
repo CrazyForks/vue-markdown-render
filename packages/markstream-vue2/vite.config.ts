@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import vue2 from '@vitejs/plugin-vue2'
+import { minify as terserMinify } from 'terser'
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
 
@@ -32,6 +33,48 @@ export default defineConfig(({ mode }) => {
       }),
     )
   }
+
+  plugins.push({
+    name: 'markstream-vue2:minify-worker-bundles',
+    apply: 'build',
+    async generateBundle(_, bundle) {
+      const terserOptions = {
+        module: true,
+        compress: {
+          ecma: 2015,
+          drop_console: false,
+          drop_debugger: true,
+          pure_funcs: ['console.log'],
+          passes: 2,
+        },
+        mangle: {
+          safari10: true,
+        },
+        format: {
+          comments: false,
+          ecma: 2015,
+        },
+      } as const
+
+      for (const [fileName, output] of Object.entries(bundle)) {
+        if (!fileName.startsWith('workers/'))
+          continue
+
+        if (output.type === 'chunk') {
+          const result = await terserMinify(output.code, terserOptions)
+          if (result.code)
+            output.code = result.code.endsWith('\n') ? result.code : `${result.code}\n`
+          continue
+        }
+
+        if (output.type === 'asset' && typeof output.source === 'string') {
+          const result = await terserMinify(output.source, terserOptions)
+          if (result.code)
+            output.source = result.code.endsWith('\n') ? result.code : `${result.code}\n`
+        }
+      }
+    },
+  })
 
   return {
     plugins,

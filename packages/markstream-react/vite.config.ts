@@ -33,6 +33,23 @@ export default defineConfig(({ mode }) => {
       target: 'es2019',
       cssTarget: 'chrome80',
       sourcemap: false,
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          ecma: 2019,
+          drop_console: false,
+          drop_debugger: true,
+          pure_funcs: ['console.log'],
+          passes: 2,
+        },
+        mangle: {
+          safari10: true,
+        },
+        format: {
+          comments: false,
+          ecma: 2019,
+        },
+      },
       lib: {
         entry: resolve(__dirname, 'src/index.ts'),
         name,
