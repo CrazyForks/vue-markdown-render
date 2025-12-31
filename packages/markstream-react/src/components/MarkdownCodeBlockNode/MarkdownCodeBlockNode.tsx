@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
 import { getLanguageIcon, languageMap, normalizeLanguageIdentifier } from '../../utils/languageIcon'
-import { MermaidBlockNode } from '../MermaidBlockNode/MermaidBlockNode'
 
 export interface MarkdownCodeBlockNodeProps {
   node: {
@@ -88,7 +87,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const codeLanguage = useMemo(() => String(props.node.language ?? ''), [props.node.language])
   const normalizedLanguage = useMemo(() => normalizeRendererLanguage(codeLanguage), [codeLanguage])
   const canonicalLanguage = useMemo(() => normalizeLanguageIdentifier(codeLanguage), [codeLanguage])
-  const isMermaid = canonicalLanguage === 'mermaid'
   const displayLanguage = useMemo(() => {
     const label = languageMap[canonicalLanguage] || canonicalLanguage
     if (!label)
@@ -169,13 +167,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [])
 
   const initRenderer = useCallback(async () => {
-    if (isMermaid) {
-      rendererRef.current?.dispose()
-      rendererRef.current = null
-      setRendererReady(false)
-      return
-    }
-
     await ensureStreamMarkdownLoaded()
 
     if (!codeBlockContentRef.current || !rendererTargetRef.current) {
@@ -209,7 +200,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     catch {
       // keep fallback
     }
-  }, [clearFallback, ensureStreamMarkdownLoaded, getPreferredColorScheme, isMermaid, normalizedLanguage, props.loading, props.node.code, props.stream, props.themes, renderFallback])
+  }, [clearFallback, ensureStreamMarkdownLoaded, getPreferredColorScheme, normalizedLanguage, props.loading, props.node.code, props.stream, props.themes, renderFallback])
 
   useEffect(() => {
     void initRenderer()
@@ -278,16 +269,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     setDefaultFontSize(initial)
     setFontSize(initial)
   }, [])
-
-  if (isMermaid) {
-    return (
-      <MermaidBlockNode
-        node={props.node as any}
-        isDark={props.isDark}
-        loading={props.loading}
-      />
-    )
-  }
 
   return (
     <div

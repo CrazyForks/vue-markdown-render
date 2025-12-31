@@ -9,47 +9,6 @@ import { HtmlPreviewFrame } from './HtmlPreviewFrame'
 import { getUseMonaco } from './monaco'
 import { PreCodeNode } from './PreCodeNode'
 
-const STREAM_MONACO_DEFAULT_LANGUAGES: string[] = [
-  'jsx',
-  'tsx',
-  'vue',
-  'csharp',
-  'python',
-  'java',
-  'c',
-  'cpp',
-  'rust',
-  'go',
-  'powershell',
-  'sql',
-  'json',
-  'html',
-  'javascript',
-  'typescript',
-  'css',
-  'markdown',
-  'xml',
-  'yaml',
-  'toml',
-  'dockerfile',
-  'kotlin',
-  'objective-c',
-  'objective-cpp',
-  'php',
-  'ruby',
-  'scala',
-  'svelte',
-  'swift',
-  'erlang',
-  'angular-html',
-  'angular-ts',
-  'dart',
-  'lua',
-  'mermaid',
-  'cmake',
-  'nginx',
-]
-
 export interface CodeBlockPreviewPayload {
   node: CodeBlockNodeProps['node']
   artifactType: 'text/html' | 'image/svg+xml'
@@ -321,12 +280,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
         }
         const themeToUse = isDark ? darkTheme : lightTheme
         const rawOptions = { ...(initMonacoOptionsRef.current || {}) } as any
-        const normalizedInitialLanguage = normalizeLanguageIdentifier((node as any)?.language)
-        if (normalizedInitialLanguage === 'shell') {
-          const userLanguages = Array.isArray(rawOptions.languages) ? rawOptions.languages.map(String) : null
-          const base = userLanguages ?? STREAM_MONACO_DEFAULT_LANGUAGES
-          rawOptions.languages = Array.from(new Set([...base, 'shell']))
-        }
+
         const helpers = useMonaco({
           wordWrap: 'on',
           wrappingIndent: 'same',
@@ -523,8 +477,6 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     return tracked
   }, [applyEditorHeight, collapsed, expanded, monacoLanguage, shouldDelayEditor, syncEditorCssVars, useFallback, viewportReady])
 
-  const isMermaid = canonicalLanguage === 'mermaid'
-
   useEffect(() => {
     if (useFallback)
       return
@@ -532,12 +484,12 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       return
     if (!viewportReady)
       return
-    if (collapsed || shouldDelayEditor || isMermaid) {
+    if (collapsed || shouldDelayEditor) {
       resetEditorInstance()
       return
     }
     void ensureEditorCreation()
-  }, [collapsed, ensureEditorCreation, isMermaid, monacoReady, resetEditorInstance, shouldDelayEditor, useFallback, viewportReady])
+  }, [collapsed, ensureEditorCreation, monacoReady, resetEditorInstance, shouldDelayEditor, useFallback, viewportReady])
 
   useEffect(() => {
     if (useFallback)
@@ -549,8 +501,6 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     if (collapsed)
       return
     if (shouldDelayEditor)
-      return
-    if (isMermaid)
       return
 
     const helpers = helpersRef.current
@@ -606,7 +556,6 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     editorCreated,
     ensureEditorCreation,
     expanded,
-    isMermaid,
     monacoReady,
     node.code,
     node.diff,

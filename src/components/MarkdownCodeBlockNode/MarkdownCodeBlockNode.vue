@@ -3,7 +3,6 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { getLanguageIcon, languageMap } from '../../utils'
-import MermaidBlockNode from '../MermaidBlockNode'
 
 const props = withDefaults(
   defineProps<{
@@ -94,10 +93,6 @@ const displayLanguage = computed(() => {
   const lang = codeLanguage.value.trim().toLowerCase()
   return languageMap[lang] || lang.charAt(0).toUpperCase() + lang.slice(1)
 })
-
-const isMermaid = computed(
-  () => codeLanguage.value.trim().toLowerCase() === 'mermaid',
-)
 
 // Computed property for language icon
 const languageIcon = computed(() => {
@@ -205,7 +200,6 @@ let createShikiRenderer:
   | undefined
 
 let registerHighlight
-let disposeHighlighter = () => {}
 let registeredHighlightLanguages: Set<string> | undefined
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
@@ -252,7 +246,6 @@ async function ensureStreamMarkdownLoaded() {
     const mod = await import('stream-markdown')
     createShikiRenderer = mod.createShikiStreamRenderer
     registerHighlight = mod.registerHighlight
-    disposeHighlighter = mod.disposeHighlighter
     const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
     registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
     registerHighlight?.({ themes: props.themes })
@@ -264,14 +257,6 @@ async function ensureStreamMarkdownLoaded() {
 }
 
 async function initRenderer() {
-  if (isMermaid.value) {
-    disposeHighlighter()
-    renderer?.dispose()
-    renderer = undefined
-    rendererReady.value = false
-    return
-  }
-
   await ensureStreamMarkdownLoaded()
 
   if (!codeBlockContent.value || !rendererTarget.value) {
@@ -325,11 +310,6 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
     renderFallback(code)
     return
   }
-  if (isMermaid.value) {
-    disposeHighlighter()
-    renderer?.dispose()
-    return
-  }
 
   if (!renderer) {
     renderFallback(code)
@@ -346,16 +326,11 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   await clearFallbackWhenRendererReady()
 })
 
-const watchTheme = watch(
+watch(
   () => [props.darkTheme, props.lightTheme],
   async () => {
     if (!codeBlockContent.value || !rendererTarget.value)
       return
-    if (isMermaid.value) {
-      disposeHighlighter()
-      renderer?.dispose()
-      return watchTheme()
-    }
     if (!renderer)
       await initRenderer()
     renderer?.setTheme(getPreferredColorScheme())
@@ -517,9 +492,7 @@ function previewCode() {
 </script>
 
 <template>
-  <MermaidBlockNode v-if="isMermaid" :node="(node as any)" :is-dark="props.isDark" :loading="props.loading" />
   <div
-    v-else
     :style="containerStyle"
     class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     :class="[props.isDark ? 'border-gray-700/30 bg-gray-900' : 'border-gray-200 bg-white', props.isDark ? 'is-dark' : '']"

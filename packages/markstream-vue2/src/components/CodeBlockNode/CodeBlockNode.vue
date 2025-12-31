@@ -571,9 +571,6 @@ function getMaxHeightValue(): number {
 // Check if the language is previewable (HTML or SVG)
 const isPreviewable = computed(() => props.isShowPreview && (codeLanguage.value === 'html' || codeLanguage.value === 'svg'))
 
-// Check if the code block is a Mermaid diagram
-const isMermaid = computed(() => codeLanguage.value === 'mermaid')
-
 watch(
   () => props.node.language,
   (newLanguage) => {
@@ -857,10 +854,10 @@ function ensureEditorCreation(el: HTMLElement) {
   return createEditorPromise
 }
 
-// 延迟创建编辑器：仅当不是 Mermaid 时才创建，避免无意义的初始化
+// 延迟创建编辑器：仅在可见且准备就绪时创建，避免无意义的初始化
 const stopCreateEditorWatch = watch(
-  () => [codeEditor.value, isMermaid.value, isDiff.value, props.stream, props.loading, monacoReady.value, viewportReady.value] as const,
-  async ([el, _isMermaid, _isDiff, stream, loading, _monacoReady, visible]) => {
+  () => [codeEditor.value, isDiff.value, props.stream, props.loading, monacoReady.value, viewportReady.value] as const,
+  async ([el, _isDiff, stream, loading, _monacoReady, visible]) => {
     if (!el || !createEditor)
       return
     if (!visible)
@@ -869,12 +866,6 @@ const stopCreateEditorWatch = watch(
     // If streaming is disabled, defer editor creation until loading is finished
     if (stream === false && loading !== false)
       return
-
-    if (isMermaid.value) {
-      cleanupEditor()
-      stopCreateEditorWatch()
-      return
-    }
 
     const creation = ensureEditorCreation(el as HTMLElement)
     if (!creation)
@@ -886,14 +877,11 @@ const stopCreateEditorWatch = watch(
   },
 )
 
-const watchTheme = watch(
+watch(
   () => [props.darkTheme, props.lightTheme, editorCreated.value, viewportReady.value],
   () => {
     if (!editorCreated.value || !viewportReady.value)
       return
-    if (isMermaid.value) {
-      return watchTheme()
-    }
 
     themeUpdate()
   },
@@ -911,14 +899,11 @@ function themeUpdate() {
 
 // Watch for monacoOptions changes (deep) and try to update editor options or
 // recreate the editor when necessary.
-const watchMonacoOptions = watch(
+watch(
   () => [props.monacoOptions, viewportReady.value],
   () => {
     if (!createEditor || !viewportReady.value)
       return
-    if (isMermaid.value) {
-      return watchMonacoOptions()
-    }
 
     const ed = isDiff.value ? getDiffEditorView() : getEditorView()
     const applying = typeof props.monacoOptions?.fontSize === 'number'
@@ -942,12 +927,6 @@ const stopLoadingWatch = watch(
   async ([loaded, visible]) => {
     if (!visible)
       return
-    if (isMermaid.value) {
-      nextTick(() => {
-        stopLoadingWatch?.()
-      })
-      return
-    }
     if (loaded)
       return
     await nextTick()
