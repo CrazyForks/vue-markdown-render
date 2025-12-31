@@ -137,7 +137,28 @@ describe('vmr_container fallback', () => {
     expect(nodes[0]?.type).toBe('vmr_container')
     expect(nodes[0]?.name).toBe('viewcode:complex')
     expect(nodes[0]?.attrs?.devId).toBe('abc')
-    expect(nodes[0]?.attrs?.meta).toBe('{"foo":1,"bar":{"baz":[1,2,{"x":3}]}}')
-    expect(nodes[0]?.attrs?.arr).toBe('[1,"2",{"k":true}]')
+    expect(nodes[0]?.attrs?.meta).toMatchInlineSnapshot(`
+      {
+        "bar": {
+          "baz": [
+            1,
+            2,
+            {
+              "x": 3,
+            },
+          ],
+        },
+        "foo": 1,
+      }
+    `)
+    expect(nodes[0]?.attrs?.arr).toMatchInlineSnapshot(`
+      [
+        1,
+        "2",
+        {
+          "k": true,
+        },
+      ]
+    `)
   })
 })
