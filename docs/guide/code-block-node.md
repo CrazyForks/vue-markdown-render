@@ -60,7 +60,7 @@ pnpm add stream-monaco
 
 ## Notes
 - The CodeBlock header API is documented in `docs/guide/codeblock-header.md` (examples for replacing header and custom loading placeholder).
-- If you'd like `copy`/`previewCode` to use the same `MermaidBlockEvent` wrapper with `preventDefault()` semantics, I can update the component and docs accordingly — this enables consumers to intercept and cancel default behaviors.
+- `CodeBlockNode` and `MermaidBlockNode` intentionally use different `copy` event payloads: `CodeBlockNode` emits `copy(text: string)`, while `MermaidBlockNode` emits `copy(ev: MermaidBlockEvent<{ type: 'copy'; text: string }>)` (supports `preventDefault()`).
 
 Try this — simple snapshot example (inline usage):
 

@@ -8,6 +8,7 @@ import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomCo
 import { renderNode } from '../renderers/renderNode'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { getUseMonaco } from './CodeBlockNode/monaco'
+import { setDesiredMonacoTheme } from './CodeBlockNode/monacoThemeRegistry'
 
 const DEFAULT_PROPS: Required<Pick<NodeRendererProps, 'codeBlockStream'
   | 'typewriter'
@@ -619,9 +620,42 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
   )
 }
 
+function areNodeRendererInnerPropsEqual(prev: NodeRendererInnerProps, next: NodeRendererInnerProps) {
+  if (prev.parsedNodes !== next.parsedNodes)
+    return false
+  if (prev.renderCtx !== next.renderCtx)
+    return false
+  if (prev.indexPrefix !== next.indexPrefix)
+    return false
+  if (prev.containerRef !== next.containerRef)
+    return false
+
+  const a = prev.props
+  const b = next.props
+  return a.isDark === b.isDark
+    && a.typewriter === b.typewriter
+    && a.batchRendering === b.batchRendering
+    && a.initialRenderBatchSize === b.initialRenderBatchSize
+    && a.renderBatchSize === b.renderBatchSize
+    && a.renderBatchDelay === b.renderBatchDelay
+    && a.renderBatchBudgetMs === b.renderBatchBudgetMs
+    && a.renderBatchIdleTimeoutMs === b.renderBatchIdleTimeoutMs
+    && a.deferNodesUntilVisible === b.deferNodesUntilVisible
+    && a.maxLiveNodes === b.maxLiveNodes
+    && a.liveNodeBuffer === b.liveNodeBuffer
+    && a.viewportPriority === b.viewportPriority
+    && a.indexKey === b.indexKey
+    && a.onClick === b.onClick
+    && a.onMouseOver === b.onMouseOver
+    && a.onMouseOut === b.onMouseOut
+}
+
+const MemoNodeRendererInner = React.memo(NodeRendererInner, areNodeRendererInnerPropsEqual)
+
 export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const props = { ...DEFAULT_PROPS, ...rawProps } as ResolvedProps
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const desiredThemeKeyRef = useRef<string | null>(null)
 
   const customComponentsRevision = useSyncExternalStore(
     subscribeCustomComponents,
@@ -754,6 +788,17 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     return () => cancelIdle(id)
   }, [parsedNodes, props.renderCodeBlocksAsPre])
 
+  if (typeof window !== 'undefined' && !props.renderCodeBlocksAsPre) {
+    const theme = props.isDark ? props.codeBlockDarkTheme : props.codeBlockLightTheme
+    const nextKey = typeof theme === 'string'
+      ? theme
+      : (typeof theme === 'object' && theme && 'name' in (theme as any) ? String((theme as any).name) : null)
+    if (nextKey && desiredThemeKeyRef.current !== nextKey) {
+      desiredThemeKeyRef.current = nextKey
+      setDesiredMonacoTheme(theme)
+    }
+  }
+
   const indexPrefix = useMemo(() => {
     return props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'
   }, [props.indexKey])
@@ -768,8 +813,6 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     codeBlockProps: props.codeBlockProps,
     codeBlockThemes: {
       themes: props.themes,
-      darkTheme: props.codeBlockDarkTheme,
-      lightTheme: props.codeBlockLightTheme,
       monacoOptions: props.codeBlockMonacoOptions,
       minWidth: props.codeBlockMinWidth,
       maxWidth: props.codeBlockMaxWidth,
@@ -787,8 +830,6 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.codeBlockStream,
     props.codeBlockProps,
     props.themes,
-    props.codeBlockDarkTheme,
-    props.codeBlockLightTheme,
     props.codeBlockMonacoOptions,
     props.codeBlockMinWidth,
     props.codeBlockMaxWidth,
@@ -801,7 +842,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
       getRoot={() => containerRef.current}
       enabled={props.viewportPriority !== false}
     >
-      <NodeRendererInner
+      <MemoNodeRendererInner
         props={props}
         parsedNodes={parsedNodes}
         renderCtx={renderCtx}

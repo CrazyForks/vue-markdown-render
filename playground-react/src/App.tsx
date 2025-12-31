@@ -80,7 +80,7 @@ const THEMES = [
 
 const STREAM_DELAY_KEY = 'vmr-settings-stream-delay'
 const STREAM_CHUNK_KEY = 'vmr-settings-stream-chunk-size'
-const THEME_KEY = 'vmr-settings-selected-theme'
+const THEME_KEYS = ['vmr-settings-selected-theme', 'vmv-settings-selected-theme'] as const
 const DARK_MODE_KEY = 'vueuse-color-scheme'
 
 function clampDelay(value: number) {
@@ -112,16 +112,21 @@ function readNumber(key: string, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
-function readString(key: string, fallback: string) {
+function readThemeFromStorage(fallback: string) {
   if (typeof window === 'undefined')
     return fallback
-  return window.localStorage.getItem(key) ?? fallback
+  for (const key of THEME_KEYS) {
+    const raw = window.localStorage.getItem(key)
+    if (raw && raw.trim())
+      return raw
+  }
+  return fallback
 }
 
 export default function App() {
   const [content, setContent] = useState('')
   const [showSettings, setShowSettings] = useState(false)
-  const [selectedTheme, setSelectedTheme] = useState(() => readString(THEME_KEY, 'vitesse-dark'))
+  const [selectedTheme, setSelectedTheme] = useState(() => readThemeFromStorage('vitesse-dark'))
   const [streamDelay, setStreamDelay] = useState(() => clampDelay(readNumber(STREAM_DELAY_KEY, 16)))
   const [streamChunkSize, setStreamChunkSize] = useState(() => clampChunk(readNumber(STREAM_CHUNK_KEY, 1)))
   const [isDark, setIsDark] = useState(() => {
@@ -168,8 +173,10 @@ export default function App() {
   }, [streamChunkSize])
 
   useEffect(() => {
-    if (typeof window !== 'undefined')
-      window.localStorage.setItem(THEME_KEY, selectedTheme)
+    if (typeof window === 'undefined')
+      return
+    for (const key of THEME_KEYS)
+      window.localStorage.setItem(key, selectedTheme)
   }, [selectedTheme])
 
   const scheduleCheckMinHeight = useCallback(() => {
@@ -205,10 +212,14 @@ export default function App() {
     roContainer.observe(container)
 
     let roContent: ResizeObserver | null = null
+    let lastRenderer: Element | null = null
     const observeContent = () => {
       const renderer = container.querySelector('.markdown-renderer')
       if (!renderer)
         return
+      if (renderer === lastRenderer && roContent)
+        return
+      lastRenderer = renderer
       if (roContent)
         roContent.disconnect()
       roContent = new ResizeObserver(scheduleCheckMinHeight)
@@ -216,9 +227,15 @@ export default function App() {
     }
     observeContent()
 
+    let mutationFrame: number | null = null
     const mo = new MutationObserver(() => {
-      observeContent()
-      scheduleCheckMinHeight()
+      if (mutationFrame != null)
+        return
+      mutationFrame = window.requestAnimationFrame(() => {
+        mutationFrame = null
+        observeContent()
+        scheduleCheckMinHeight()
+      })
     })
     mo.observe(container, { childList: true, subtree: true })
 
@@ -226,6 +243,8 @@ export default function App() {
       roContainer.disconnect()
       roContent?.disconnect()
       mo.disconnect()
+      if (mutationFrame != null)
+        window.cancelAnimationFrame(mutationFrame)
     }
   }, [scheduleCheckMinHeight])
 

@@ -84,8 +84,6 @@ function renderCodeBlock(node: any, key: React.Key, ctx: RenderContext) {
       node={node}
       loading={Boolean(node.loading)}
       stream={ctx.codeBlockStream}
-      darkTheme={ctx.codeBlockThemes?.darkTheme}
-      lightTheme={ctx.codeBlockThemes?.lightTheme}
       monacoOptions={ctx.codeBlockThemes?.monacoOptions}
       themes={ctx.codeBlockThemes?.themes}
       minWidth={ctx.codeBlockThemes?.minWidth}

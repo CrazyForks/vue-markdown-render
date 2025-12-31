@@ -11,6 +11,13 @@ import { h } from 'vue'
 setCustomComponents('playground-demo', {
   mermaid: (props: any) => h(MermaidBlockNode, {
     ...props,
+    onCopy: async (ev: any) => {
+      // Optional: take over the copy behavior (clipboard + toast/analytics)
+      ev.preventDefault()
+      const text = ev.payload?.text ?? ''
+      if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function')
+        await navigator.clipboard.writeText(text)
+    },
     onExport: (ev: any) => {
       // read the rendered svg from ev.svgElement and upload or save
       const svgEl = ev.svgElement as SVGElement | null
@@ -28,7 +35,7 @@ Key points:
 - Use `onExport` / `onCopy` (camelCase) when passing listeners via `h()`.
 - Call `ev.preventDefault()` to prevent the default behavior inside `MermaidBlockNode`.
 - `ev.svgElement` (if present) gives direct access to the rendered SVG DOM node.
-- `ev.svgElement` gives direct access to the rendered SVG DOM node and `ev.svgString` contains a serialized string of the SVG (ready to upload or send to an API).
+- `ev.svgString` (if present) contains a serialized string of the SVG (ready to upload or send to an API).
 
 Quick try — test the override by mounting the custom renderer inside your app's client entry and interacting with onExport in the playground.
 

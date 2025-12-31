@@ -19,7 +19,7 @@
 ## Emits
 The component emits events using a unified `MermaidBlockEvent` object. Listeners can call `preventDefault()` on the event to stop the component's default behavior:
 
-- `copy` — copy event (component retains default copy behavior unless prevented)
+- `copy` — copy button clicked, signature: `(ev: MermaidBlockEvent<{ type: 'copy'; text: string }>)` (call `ev.preventDefault()` to stop the built-in clipboard write + "Copied" state)
 - `export` — export button clicked, signature: `(ev: MermaidBlockEvent<{ type: 'export' }>)`
 - `openModal` — request to open the pseudo-fullscreen modal, signature: `(ev: MermaidBlockEvent<{ type: 'openModal' }>)`
 - `toggleMode` — toggle between `source` and `preview`, signature: `(target: 'source' | 'preview', ev: MermaidBlockEvent<{ type: 'toggleMode'; target: 'source' | 'preview' }>)`

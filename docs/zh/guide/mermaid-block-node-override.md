@@ -26,7 +26,9 @@ setCustomComponents('playground-demo', {
     },
     onCopy: (ev: any) => {
       ev.preventDefault()
-      console.log('MermaidBlockNode copy event:', ev)
+      // 复制文本在 ev.payload.text 中（你也可以在这里做埋点/自定义 toast）
+      const text = ev.payload?.text ?? ''
+      console.log('MermaidBlockNode copy text:', text)
     },
   }),
 })

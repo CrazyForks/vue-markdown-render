@@ -157,6 +157,68 @@ let safeClean = () => {}
 let createEditorPromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
 let setTheme: (theme: any) => Promise<void> = async () => {}
+
+let themeApplyPromise: Promise<void> | null = null
+let inFlightThemeKey: string | null = null
+let pendingTheme: any = null
+let pendingThemeKey: string | null = null
+let lastAppliedThemeKey: string | null = null
+
+function getThemeKey(theme: any): string | null {
+  if (theme == null)
+    return null
+  if (typeof theme === 'string')
+    return theme
+  if (typeof theme === 'object' && 'name' in theme)
+    return String((theme as any).name)
+  try {
+    return JSON.stringify(theme)
+  }
+  catch {
+    return String(theme)
+  }
+}
+
+function scheduleThemeUpdate(theme: any) {
+  const key = getThemeKey(theme)
+  if (!key)
+    return Promise.resolve()
+  if (!themeApplyPromise && lastAppliedThemeKey === key)
+    return Promise.resolve()
+
+  if (themeApplyPromise) {
+    if (pendingThemeKey === key || inFlightThemeKey === key)
+      return themeApplyPromise
+    pendingTheme = theme
+    pendingThemeKey = key
+    return themeApplyPromise
+  }
+
+  pendingTheme = theme
+  pendingThemeKey = key
+
+  themeApplyPromise = (async () => {
+    while (pendingThemeKey && pendingTheme != null) {
+      const nextTheme = pendingTheme
+      const nextKey = pendingThemeKey
+      pendingTheme = null
+      pendingThemeKey = null
+      if (lastAppliedThemeKey === nextKey)
+        continue
+      try {
+        inFlightThemeKey = nextKey
+        await setTheme(nextTheme)
+        lastAppliedThemeKey = nextKey
+      }
+      catch {}
+    }
+  })().finally(() => {
+    themeApplyPromise = null
+    inFlightThemeKey = null
+  })
+
+  return themeApplyPromise
+}
 const isDiff = computed(() => props.node.diff)
 const usePreCodeRender = ref(false)
 const preFallbackWrap = computed(() => {
@@ -946,7 +1008,7 @@ function getPreferredColorScheme() {
 function themeUpdate() {
   const themeToSet: any = getPreferredColorScheme()
   if (themeToSet)
-    setTheme(themeToSet)
+    void scheduleThemeUpdate(themeToSet)
 }
 
 // Watch for monacoOptions changes (deep) and try to update editor options or

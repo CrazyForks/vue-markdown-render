@@ -916,11 +916,23 @@ function handleWheel(event: WheelEvent) {
 // Copy functionality
 async function copy() {
   try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-      await navigator.clipboard.writeText(baseFixedCode.value)
+    const text = baseFixedCode.value
+    const ev: MermaidBlockEvent<{ type: 'copy', text: string }> = {
+      payload: { type: 'copy', text },
+      defaultPrevented: false,
+      preventDefault() {
+        this.defaultPrevented = true
+      },
     }
+    emits('copy', ev)
+    if (ev.defaultPrevented)
+      return
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text)
+    }
+
     copyText.value = true
-    emits('copy', baseFixedCode.value)
     setTimeout(() => {
       copyText.value = false
     }, 1000)

@@ -19,7 +19,7 @@
 ## Emits
 组件发出的事件都使用统一的 `MermaidBlockEvent` 对象，支持 `preventDefault()` 来阻止组件默认行为：
 
-- `copy` — 复制事件（保留默认复制逻辑）
+- `copy` — 点击复制按钮，处理签名：`(ev: MermaidBlockEvent<{ type: 'copy'; text: string }>)`（调用 `ev.preventDefault()` 可阻止组件默认的复制到剪贴板与 “Copied” 状态）
 - `export` — 导出按钮点击，处理签名：`(ev: MermaidBlockEvent<{ type: 'export' }>)`
 - `openModal` — 请求打开 pseudo-fullscreen，处理签名：`(ev: MermaidBlockEvent<{ type: 'openModal' }>)`（组件内部 emit 名称为 `openModal`）
 - `toggleMode` — 切换 `source | preview`，处理签名：`(target: 'source' | 'preview', ev: MermaidBlockEvent<{ type: 'toggleMode'; target: 'source' | 'preview' }>)`（组件内部 emit 名称为 `toggleMode`）

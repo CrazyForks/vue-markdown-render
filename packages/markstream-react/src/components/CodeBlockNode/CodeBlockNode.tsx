@@ -7,6 +7,8 @@ import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonToolti
 import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils/languageIcon'
 import { HtmlPreviewFrame } from './HtmlPreviewFrame'
 import { getUseMonaco } from './monaco'
+import { getDesiredMonacoTheme, registerMonacoThemeSetter, subscribeMonacoThemeApplied } from './monacoThemeRegistry'
+import { scheduleMonacoThemeUpdate } from './monacoThemeScheduler'
 import { PreCodeNode } from './PreCodeNode'
 
 export interface CodeBlockPreviewPayload {
@@ -207,7 +209,9 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
         ? window.getComputedStyle(src)
         : null
       const fg = String(styles?.getPropertyValue('--vscode-editor-foreground') ?? '').trim()
+        || String((styles as any)?.color ?? '').trim()
       const bg = String(styles?.getPropertyValue('--vscode-editor-background') ?? '').trim()
+        || String((styles as any)?.backgroundColor ?? '').trim()
       const sel = String(styles?.getPropertyValue('--vscode-editor-selectionBackground') ?? '').trim()
       if (fg)
         rootEl.style.setProperty('--vscode-editor-foreground', fg)
@@ -278,7 +282,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
           setUseFallback(true)
           return
         }
-        const themeToUse = isDark ? darkTheme : lightTheme
+        const themeToUse = (isDark ? darkTheme : lightTheme) ?? getDesiredMonacoTheme()
         const rawOptions = { ...(initMonacoOptionsRef.current || {}) } as any
 
         const helpers = useMonaco({
@@ -292,6 +296,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
           },
         })
         helpersRef.current = helpers
+        registerMonacoThemeSetter(helpers.setTheme)
         cleanupRef.current = typeof helpers.safeClean === 'function'
           ? () => helpers.safeClean()
           : (typeof helpers.cleanupEditor === 'function' ? () => helpers.cleanupEditor() : null)
@@ -379,10 +384,18 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       return
     if (!preferredTheme)
       return
-    void Promise.resolve(helpers.setTheme(preferredTheme))
-      .then(() => syncEditorCssVars())
+    void scheduleMonacoThemeUpdate(preferredTheme, helpers.setTheme)
+      .then(syncEditorCssVars)
       .catch(() => {})
   }, [editorCreated, preferredTheme, syncEditorCssVars, useFallback, viewportReady])
+
+  useEffect(() => {
+    if (typeof window === 'undefined')
+      return
+    return subscribeMonacoThemeApplied(() => {
+      syncEditorCssVars()
+    })
+  }, [syncEditorCssVars])
 
   const ensureEditorCreation = useCallback(async (): Promise<void | null> => {
     if (useFallback)
@@ -667,7 +680,10 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       {showHeader && (
         <div
           className="code-block-header flex justify-between items-center px-4 py-2.5 border-b border-gray-400/5"
-          style={{ color: 'var(--vscode-editor-foreground)', backgroundColor: 'var(--vscode-editor-background)' }}
+          style={{
+            color: `var(--vscode-editor-foreground, ${isDark ? '#e5e7eb' : '#111827'})`,
+            backgroundColor: `var(--vscode-editor-background, ${isDark ? '#111827' : '#ffffff'})`,
+          }}
         >
           <div className="flex items-center space-x-2 flex-1 overflow-hidden">
             <span
