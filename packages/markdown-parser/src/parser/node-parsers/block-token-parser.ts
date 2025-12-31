@@ -37,7 +37,13 @@ function parseVmrContainer(
       else if (key.startsWith('data-')) {
         // Extract data attributes (e.g., "data-devId" -> "devId")
         const attrName = key.slice(5)
-        containerAttrs[attrName] = value
+        // Try to parse JSON values; fallback to raw string if parsing fails
+        try {
+          containerAttrs[attrName] = JSON.parse(value)
+        }
+        catch {
+          containerAttrs[attrName] = value
+        }
       }
     }
   }
