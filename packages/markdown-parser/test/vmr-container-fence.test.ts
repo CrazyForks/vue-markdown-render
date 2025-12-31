@@ -124,4 +124,20 @@ describe('vmr_container fallback', () => {
       expect(String(children[0]?.children?.[0]?.content ?? '')).toContain('Inside text')
     }
   })
+
+  it('preserves complex JSON attrs (nested object/array)', () => {
+    const md = getMarkdown('vmr_container_complex_attrs')
+    const markdown = [
+      '::: viewcode:complex {"devId":"abc","meta":{"foo":1,"bar":{"baz":[1,2,{"x":3}]}},"arr":[1,"2",{"k":true}]}',
+      'Inside',
+      ':::',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md) as any[]
+    expect(nodes[0]?.type).toBe('vmr_container')
+    expect(nodes[0]?.name).toBe('viewcode:complex')
+    expect(nodes[0]?.attrs?.devId).toBe('abc')
+    expect(nodes[0]?.attrs?.meta).toBe('{"foo":1,"bar":{"baz":[1,2,{"x":3}]}}')
+    expect(nodes[0]?.attrs?.arr).toBe('[1,"2",{"k":true}]')
+  })
 })

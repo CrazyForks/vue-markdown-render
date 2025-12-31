@@ -110,7 +110,11 @@ export function applyContainers(md: MarkdownIt) {
         try {
           const attrs = JSON.parse(jsonStr)
           for (const [key, value] of Object.entries(attrs)) {
-            tokenOpen.attrSet(`data-${key}`, String(value))
+            const isComplexValue = value != null && typeof value === 'object'
+            tokenOpen.attrSet(
+              `data-${key}`,
+              isComplexValue ? JSON.stringify(value) : String(value),
+            )
           }
         }
         catch {
