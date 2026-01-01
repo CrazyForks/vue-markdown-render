@@ -908,7 +908,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
         </div>
       )}
 
-      <div className={`code-block-body${expanded ? ' code-block-body--expanded' : ''}`}>
+      <div className={`code-block-body${collapsed ? ' code-block-body--collapsed' : ''}${expanded ? ' code-block-body--expanded' : ''}`}>
         {!collapsed && (stream ? true : !loading) && (
           useFallback
             ? <PreCodeNode node={node as any} />

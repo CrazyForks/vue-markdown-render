@@ -526,6 +526,12 @@ li .paragraph-node {
   max-height: none;
 }
 
+.code-block-body--collapsed {
+  min-height: 0;
+  height: 0;
+  overflow: hidden;
+}
+
 .code-block-monaco {
   min-height: 120px;
 }
