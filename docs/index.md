@@ -1,22 +1,113 @@
+---
+hero:
+  name: markstream
+  text: Streaming-friendly Markdown renderer
+  tagline: Vue 3 • Vue 2 • React • Nuxt
+  actions:
+    - theme: brand
+      text: Get Started
+      link: /guide/quick-start
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/Simon-He95/markstream-vue
+---
+
 # markstream-vue
 
 A streaming-friendly, Vue 3 markdown renderer with progressive Mermaid support, streaming diff code blocks and high-performance handling of large documents.
 
-- Live demo: https://markstream-vue.simonhe.me/
+## Choose Your Framework
 
-## Quick links
+markstream is available for multiple frameworks. Select your preferred framework to view the specific documentation and examples:
 
-- Get started: [/guide/quick-start](/guide/quick-start)
-- Installation & optional peers: [/guide/installation](/guide/installation)
-- Components & node renderers: [/guide/components](/guide/components)
-- Troubleshooting (CSS/reset order, peers): [/guide/troubleshooting](/guide/troubleshooting)
-- Nuxt SSR: [/nuxt-ssr](/nuxt-ssr)
-- AI/LLM context: [/llms](/llms)
-- AI/LLM context (中文): [/llms.zh-CN](/llms.zh-CN)
-- Playground (Vue 3): https://markstream-vue.simonhe.me/
-- Playground (React): https://markstream-react.netlify.app/
-- Playground (Nuxt): https://markstream-nuxt.netlify.app/
-- Playground (Vue 2): https://markstream-vue2.netlify.app/
+::: tip Framework Support
+All versions share the same core features with framework-optimized APIs.
+:::
+
+### Vue 3 (markstream-vue) ⭐ Recommended
+
+The latest version with full Vue 3 Composition API support.
+
+- **Documentation**: [/guide/](/guide/)
+- **Installation**: [/guide/installation](/guide/installation)
+- **Quick Start**: [/guide/quick-start](/guide/quick-start)
+- **Components API**: [/guide/components](/guide/components)
+- **Live Demo**: https://markstream-vue.simonhe.me/
+
+```vue
+<script setup>
+import MarkdownRender from 'markstream-vue'
+
+const md = '# Hello Vue 3!'
+</script>
+
+<template>
+  <MarkdownRender :content="md" />
+</template>
+```
+
+### Vue 2 (markstream-vue2)
+
+Full support for Vue 2.6+ (with Composition API) and Vue 2.7+.
+
+- **Documentation**: [/guide/vue2-quick-start](/guide/vue2-quick-start)
+- **Installation**: [/guide/vue2-installation](/guide/vue2-installation)
+- **Quick Start**: [/guide/vue2-quick-start](/guide/vue2-quick-start)
+- **Components API**: [/guide/vue2-components](/guide/vue2-components)
+- **Live Demo**: https://markstream-vue2.netlify.app/
+
+```vue
+<script>
+import MarkdownRender from 'markstream-vue2'
+
+export default {
+  components: { MarkdownRender },
+  data() {
+    return { markdown: '# Hello Vue 2!' }
+  }
+}
+</script>
+
+<template>
+  <MarkdownRender :content="markdown" />
+</template>
+```
+
+### React (markstream-react)
+
+React 18+ with hooks support and full TypeScript.
+
+- **Documentation**: [/guide/react-quick-start](/guide/react-quick-start)
+- **Installation**: [/guide/react-installation](/guide/react-installation)
+- **Quick Start**: [/guide/react-quick-start](/guide/react-quick-start)
+- **Components API**: [/guide/react-components](/guide/react-components)
+- **Live Demo**: https://markstream-react.netlify.app/
+
+```tsx
+import MarkdownRender from 'markstream-react'
+
+function App() {
+  return <MarkdownRender content="# Hello React!" />
+}
+```
+
+### Nuxt (markstream-vue)
+
+Server-side rendering support for Nuxt 3.
+
+- **Documentation**: [/nuxt-ssr](/nuxt-ssr)
+- **Live Demo**: https://markstream-nuxt.netlify.app/
+
+## Quick Links
+
+**Common Resources**
+- [Troubleshooting](/guide/troubleshooting) - CSS/reset order, peers, and common issues
+- [Parser API](/guide/parser-api) - Advanced parsing and AST manipulation
+- [Features](/guide/features) - Streaming, Mermaid, Monaco, and more
+
+**AI/LLM Integration**
+- [AI/LLM Context](/llms) (English)
+- [AI/LLM 上下文](/llms.zh-CN) (中文)
 
 ## Why move from README to a docs site
 

@@ -45,31 +45,55 @@ export default defineConfig({
           { text: 'Vue 2', link: 'https://markstream-vue2.netlify.app/' },
         ],
       },
-      { text: 'Search', link: '/guide/search' },
       { text: 'GitHub', link: 'https://github.com/Simon-He95/markstream-vue' },
-      {
-        text: 'Languages',
-        items: [
-          { text: 'English', link: '/guide/' },
-          { text: '简体中文', link: '/zh/guide/' },
-        ],
-      },
+
     ],
     sidebar: {
       '/guide/': [
         {
-          text: 'User Guide',
+          text: 'Frameworks',
+          items: [
+            {
+              text: 'Vue 3 (markstream-vue) ⭐',
+              items: [
+                { text: 'Quick Start', link: '/guide/quick-start' },
+                { text: 'Installation', link: '/guide/installation' },
+                { text: 'Components API', link: '/guide/components' },
+                { text: 'Usage & API', link: '/guide/usage' },
+                { text: 'Features', link: '/guide/features' },
+              ],
+              collapsed: false,
+            },
+            {
+              text: 'Vue 2 (markstream-vue2)',
+              items: [
+                { text: 'Quick Start', link: '/guide/vue2-quick-start' },
+                { text: 'Installation', link: '/guide/vue2-installation' },
+                { text: 'Components & API', link: '/guide/vue2-components' },
+              ],
+              collapsed: false,
+            },
+            {
+              text: 'React (markstream-react)',
+              items: [
+                { text: 'Quick Start', link: '/guide/react-quick-start' },
+                { text: 'Installation', link: '/guide/react-installation' },
+                { text: 'Components & API', link: '/guide/react-components' },
+              ],
+              collapsed: false,
+            },
+            { text: 'Nuxt SSR', link: '/nuxt-ssr' },
+          ],
+        },
+        {
+          text: 'Vue 3 Guide',
           items: [
             { text: 'Introduction', link: '/guide/' },
-            { text: 'Installation', link: '/guide/installation' },
-            { text: 'Quick Start', link: '/guide/quick-start' },
             { text: 'Why use it?', link: '/guide/why' },
             { text: 'Compared', link: '/guide/compared' },
-            { text: 'Usage & API', link: '/guide/usage' },
+            { text: 'Props & Options', link: '/guide/props' },
             { text: 'Parser & API', link: '/guide/parser' },
             { text: 'Parser API (deep-dive)', link: '/guide/parser-api' },
-            { text: 'Features', link: '/guide/features' },
-            { text: 'Props & Options', link: '/guide/props' },
             { text: 'Code block header', link: '/guide/codeblock-header' },
             { text: 'Examples', link: '/guide/examples' },
             { text: 'Playground', link: '/guide/playground' },
@@ -78,7 +102,6 @@ export default defineConfig({
             { text: 'Contributing', link: '/guide/contributing' },
             { text: 'Translation guide', link: '/guide/translation' },
             { text: 'Deploy docs', link: '/guide/deploy' },
-            { text: 'API Reference', link: '/guide/components' },
             { text: 'Advanced', link: '/guide/advanced' },
             { text: 'Monaco Internals', link: '/guide/monaco-internals' },
             { text: 'Math', link: '/guide/math' },
@@ -89,22 +112,6 @@ export default defineConfig({
             { text: 'Tailwind', link: '/guide/tailwind' },
             { text: 'Legacy builds & iOS regex compatibility', link: '/guide/legacy-builds' },
             { text: 'Thanks', link: '/guide/thanks' },
-          ],
-        },
-        {
-          text: 'Vue 2 (markstream-vue2)',
-          items: [
-            { text: 'Installation', link: '/guide/vue2-installation' },
-            { text: 'Quick Start', link: '/guide/vue2-quick-start' },
-            { text: 'Components & API', link: '/guide/vue2-components' },
-          ],
-        },
-        {
-          text: 'React (markstream-react)',
-          items: [
-            { text: 'Installation', link: '/guide/react-installation' },
-            { text: 'Quick Start', link: '/guide/react-quick-start' },
-            { text: 'Components & API', link: '/guide/react-components' },
           ],
         },
         {
@@ -121,13 +128,11 @@ export default defineConfig({
                 { text: 'Vue 2', link: 'https://markstream-vue2.netlify.app/' },
               ],
             },
+            { text: 'Performance', link: '/guide/performance' },
+            { text: 'Monaco', link: '/guide/monaco' },
             { text: 'Troubleshooting', link: '/guide/troubleshooting' },
           ],
         },
-        { text: 'Nuxt SSR', link: '/nuxt-ssr' },
-        { text: 'Performance', link: '/guide/performance' },
-        { text: 'Monaco', link: '/guide/monaco' },
-        { text: 'Troubleshooting', link: '/guide/troubleshooting' },
         {
           text: 'Investigations',
           items: [
@@ -139,18 +144,49 @@ export default defineConfig({
       ],
       '/zh/guide/': [
         {
-          text: '指南',
+          text: '框架',
+          items: [
+            {
+              text: 'Vue 3 (markstream-vue) ⭐',
+              items: [
+                { text: '快速开始', link: '/zh/guide/quick-start' },
+                { text: '安装', link: '/zh/guide/installation' },
+                { text: '组件 API', link: '/zh/guide/components' },
+                { text: '使用与 API', link: '/zh/guide/usage' },
+                { text: '功能', link: '/zh/guide/features' },
+              ],
+              collapsed: false,
+            },
+            {
+              text: 'Vue 2 (markstream-vue2)',
+              items: [
+                { text: '快速开始', link: '/zh/guide/vue2-quick-start' },
+                { text: '安装', link: '/zh/guide/vue2-installation' },
+                { text: '组件与 API', link: '/zh/guide/vue2-components' },
+              ],
+              collapsed: false,
+            },
+            {
+              text: 'React (markstream-react)',
+              items: [
+                { text: '快速开始', link: '/zh/guide/react-quick-start' },
+                { text: '安装', link: '/zh/guide/react-installation' },
+                { text: '组件与 API', link: '/zh/guide/react-components' },
+              ],
+              collapsed: false,
+            },
+            { text: 'Nuxt SSR', link: '/nuxt-ssr' },
+          ],
+        },
+        {
+          text: 'Vue 3 指南',
           items: [
             { text: '简介', link: '/zh/guide/' },
-            { text: '安装', link: '/zh/guide/installation' },
-            { text: '快速开始', link: '/zh/guide/quick-start' },
             { text: '为什么使用？', link: '/zh/guide/why' },
             { text: '对比', link: '/zh/guide/compared' },
-            { text: '使用与 API', link: '/zh/guide/usage' },
+            { text: 'Props 与 Options', link: '/zh/guide/props' },
             { text: '解析器概览', link: '/zh/guide/parser' },
             { text: '解析器 API 深入', link: '/zh/guide/parser-api' },
-            { text: '功能', link: '/zh/guide/features' },
-            { text: 'Props 与 Options', link: '/zh/guide/props' },
             { text: '代码块头部', link: '/zh/guide/codeblock-header' },
             { text: '示例', link: '/zh/guide/examples' },
             { text: 'Playground', link: '/zh/guide/playground' },
@@ -159,7 +195,6 @@ export default defineConfig({
             { text: '贡献指南', link: '/zh/guide/contributing' },
             { text: '翻译指南', link: '/zh/guide/translation' },
             { text: '部署文档', link: '/zh/guide/deploy' },
-            { text: 'API 参考', link: '/zh/guide/components' },
             { text: '高级', link: '/zh/guide/advanced' },
             { text: 'Monaco 内部', link: '/zh/guide/monaco-internals' },
             { text: 'Math', link: '/zh/guide/math' },
@@ -170,47 +205,81 @@ export default defineConfig({
             { text: 'Tailwind', link: '/zh/guide/tailwind' },
             { text: 'Legacy 构建与 iOS 正则兼容', link: '/zh/guide/legacy-builds' },
             { text: '致谢', link: '/zh/guide/thanks' },
+          ],
+        },
+        {
+          text: '快速链接',
+          items: [
+            { text: '示例', link: '/zh/guide/examples' },
+            { text: 'API 参考', link: '/zh/guide/components' },
             {
-              text: '研究与调查',
+              text: '演示',
               items: [
-                { text: 'e2e 测试与分析', link: '/zh/guide/e2e-testing-report' },
-                { text: 'KaTeX Worker 性能', link: '/zh/guide/katex-worker-performance-analysis' },
-                { text: 'Monorepo 迁移', link: '/zh/guide/monorepo-migration' },
+                { text: 'Vue 3', link: 'https://markstream-vue.simonhe.me/' },
+                { text: 'React', link: 'https://markstream-react.netlify.app/' },
+                { text: 'Nuxt', link: 'https://markstream-nuxt.netlify.app/' },
+                { text: 'Vue 2', link: 'https://markstream-vue2.netlify.app/' },
               ],
             },
+            { text: '性能', link: '/guide/performance' },
+            { text: 'Monaco', link: '/guide/monaco' },
+            { text: '故障排除', link: '/guide/troubleshooting' },
           ],
         },
         {
-          text: 'Vue 2 (markstream-vue2)',
+          text: '研究与调查',
           items: [
-            { text: '安装', link: '/zh/guide/vue2-installation' },
-            { text: '快速开始', link: '/zh/guide/vue2-quick-start' },
-            { text: '组件与 API', link: '/zh/guide/vue2-components' },
-          ],
-        },
-        {
-          text: 'React (markstream-react)',
-          items: [
-            { text: '安装', link: '/zh/guide/react-installation' },
-            { text: '快速开始', link: '/zh/guide/react-quick-start' },
-            { text: '组件与 API', link: '/zh/guide/react-components' },
+            { text: 'e2e 测试与分析', link: '/zh/guide/e2e-testing-report' },
+            { text: 'KaTeX Worker 性能', link: '/zh/guide/katex-worker-performance-analysis' },
+            { text: 'Monorepo 迁移', link: '/zh/guide/monorepo-migration' },
           ],
         },
       ],
       '/': [
         {
-          text: 'User Guide',
+          text: 'Frameworks',
+          items: [
+            {
+              text: 'Vue 3 (markstream-vue) ⭐',
+              items: [
+                { text: 'Quick Start', link: '/guide/quick-start' },
+                { text: 'Installation', link: '/guide/installation' },
+                { text: 'Components API', link: '/guide/components' },
+                { text: 'Usage & API', link: '/guide/usage' },
+                { text: 'Features', link: '/guide/features' },
+              ],
+              collapsed: false,
+            },
+            {
+              text: 'Vue 2 (markstream-vue2)',
+              items: [
+                { text: 'Quick Start', link: '/guide/vue2-quick-start' },
+                { text: 'Installation', link: '/guide/vue2-installation' },
+                { text: 'Components & API', link: '/guide/vue2-components' },
+              ],
+              collapsed: false,
+            },
+            {
+              text: 'React (markstream-react)',
+              items: [
+                { text: 'Quick Start', link: '/guide/react-quick-start' },
+                { text: 'Installation', link: '/guide/react-installation' },
+                { text: 'Components & API', link: '/guide/react-components' },
+              ],
+              collapsed: false,
+            },
+            { text: 'Nuxt SSR', link: '/nuxt-ssr' },
+          ],
+        },
+        {
+          text: 'Vue 3 Guide',
           items: [
             { text: 'Introduction', link: '/guide/' },
-            { text: 'Installation', link: '/guide/installation' },
-            { text: 'Quick Start', link: '/guide/quick-start' },
             { text: 'Why use it?', link: '/guide/why' },
             { text: 'Compared', link: '/guide/compared' },
-            { text: 'Usage & API', link: '/guide/usage' },
+            { text: 'Props & Options', link: '/guide/props' },
             { text: 'Parser & API', link: '/guide/parser' },
             { text: 'Parser API (deep-dive)', link: '/guide/parser-api' },
-            { text: 'Features', link: '/guide/features' },
-            { text: 'Props & Options', link: '/guide/props' },
             { text: 'Code block header', link: '/guide/codeblock-header' },
             { text: 'Examples', link: '/guide/examples' },
             { text: 'Playground', link: '/guide/playground' },
@@ -219,7 +288,6 @@ export default defineConfig({
             { text: 'Contributing', link: '/guide/contributing' },
             { text: 'Translation guide', link: '/guide/translation' },
             { text: 'Deploy docs', link: '/guide/deploy' },
-            { text: 'API Reference', link: '/guide/components' },
             { text: 'Advanced', link: '/guide/advanced' },
             { text: 'Monaco Internals', link: '/guide/monaco-internals' },
             { text: 'Math', link: '/guide/math' },
@@ -232,25 +300,24 @@ export default defineConfig({
           ],
         },
         {
-          text: 'Vue 2 (markstream-vue2)',
+          text: 'Quick links',
           items: [
-            { text: 'Installation', link: '/guide/vue2-installation' },
-            { text: 'Quick Start', link: '/guide/vue2-quick-start' },
-            { text: 'Components & API', link: '/guide/vue2-components' },
+            { text: 'Examples', link: '/guide/examples' },
+            { text: 'API Reference', link: '/guide/components' },
+            {
+              text: 'Playground',
+              items: [
+                { text: 'Vue 3', link: 'https://markstream-vue.simonhe.me/' },
+                { text: 'React', link: 'https://markstream-react.netlify.app/' },
+                { text: 'Nuxt', link: 'https://markstream-nuxt.netlify.app/' },
+                { text: 'Vue 2', link: 'https://markstream-vue2.netlify.app/' },
+              ],
+            },
+            { text: 'Performance', link: '/guide/performance' },
+            { text: 'Monaco', link: '/guide/monaco' },
+            { text: 'Troubleshooting', link: '/guide/troubleshooting' },
           ],
         },
-        {
-          text: 'React (markstream-react)',
-          items: [
-            { text: 'Installation', link: '/guide/react-installation' },
-            { text: 'Quick Start', link: '/guide/react-quick-start' },
-            { text: 'Components & API', link: '/guide/react-components' },
-          ],
-        },
-        { text: 'Nuxt SSR', link: '/nuxt-ssr' },
-        { text: 'Performance', link: '/guide/performance' },
-        { text: 'Monaco', link: '/guide/monaco' },
-        { text: 'Troubleshooting', link: '/guide/troubleshooting' },
         {
           text: 'Investigations',
           items: [
@@ -271,7 +338,6 @@ export default defineConfig({
           { text: 'Examples', link: '/guide/examples' },
           { text: 'API', link: '/guide/components' },
           { text: 'Playground', link: 'https://markstream-vue.simonhe.me/' },
-          { text: 'Search', link: '/guide/search' },
           { text: 'GitHub', link: 'https://github.com/Simon-He95/markstream-vue' },
         ],
       },
