@@ -2,6 +2,12 @@
 
 适用于 Vue 3 的流式 Markdown 渲染器，支持 Mermaid 图表、流式代码块对比和高性能大文档处理。
 
+<div class="star-reminder-inline">
+
+如果你觉得 markstream-vue 对你有帮助，请考虑在 GitHub 上<a href="https://github.com/Simon-He95/markstream-vue" target="_blank" rel="noopener noreferrer">给我们一个 star ⭐</a>！
+
+</div>
+
 ## 选择你的框架
 
 markstream 支持多种框架。选择你偏好的框架查看对应文档和示例：

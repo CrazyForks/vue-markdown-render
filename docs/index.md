@@ -8,13 +8,19 @@ hero:
       text: Get Started
       link: /guide/quick-start
     - theme: alt
-      text: View on GitHub
+      text: '⭐ Star on GitHub'
       link: https://github.com/Simon-He95/markstream-vue
 ---
 
 # markstream-vue
 
 A streaming-friendly, Vue 3 markdown renderer with progressive Mermaid support, streaming diff code blocks and high-performance handling of large documents.
+
+<div class="star-reminder-inline">
+
+If you find markstream-vue helpful, please consider <a href="https://github.com/Simon-He95/markstream-vue" target="_blank" rel="noopener noreferrer">giving us a star ⭐</a> on GitHub!
+
+</div>
 
 ## Choose Your Framework
 

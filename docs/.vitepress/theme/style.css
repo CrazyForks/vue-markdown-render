@@ -1,0 +1,30 @@
+/* Custom styles for markstream-vue theme */
+
+/* Star reminder inline styles */
+.star-reminder-inline {
+  margin: 1.5rem 0 2rem;
+  padding: 0.875rem 1.25rem;
+  background: linear-gradient(135deg, rgba(35, 134, 54, 0.08) 0%, rgba(35, 134, 54, 0.04) 100%);
+  border: 1px solid rgba(35, 134, 54, 0.2);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.dark .star-reminder-inline {
+  background: linear-gradient(135deg, rgba(35, 134, 54, 0.12) 0%, rgba(35, 134, 54, 0.06) 100%);
+  border-color: rgba(35, 134, 54, 0.3);
+}
+
+.star-reminder-inline a {
+  color: var(--vp-c-brand);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.2s ease;
+}
+
+.star-reminder-inline a:hover {
+  border-bottom-color: var(--vp-c-brand);
+}
+
