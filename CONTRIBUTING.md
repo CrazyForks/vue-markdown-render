@@ -33,3 +33,20 @@ Thanks for helping improve the project! This guide keeps contributions fast and 
 
 - Vue 3 + TypeScript-first, 2-space indent, LF endings (see `.editorconfig`).
 - Components in `src/components` use PascalCase directories/files; utils are camel/kebab as existing.
+
+## Releases & tags (monorepo)
+
+This repository publishes multiple packages (`markstream-vue`, `markstream-vue2`, `markstream-react`, `stream-markdown-parser`). To keep tags unambiguous, we use **namespaced tags**:
+
+- `markstream-vue@<version>`
+- `markstream-vue2@<version>`
+- `markstream-react@<version>`
+- `stream-markdown-parser@<version>`
+
+Avoid creating bare `v<version>` tags (they mix different package versions in a monorepo).
+
+### Common commands
+
+- Tag current version of a package: `pnpm tag:vue3` / `pnpm tag:vue2` / `pnpm tag:react` / `pnpm tag:parser`
+- Backfill namespaced tags from existing legacy `v*` tags (dry run): `pnpm tag:backfill:dry`
+- Apply backfill locally: `pnpm tag:backfill` (add `-- --push` to also push tags)

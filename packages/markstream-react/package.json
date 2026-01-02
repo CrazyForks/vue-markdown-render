@@ -23,7 +23,7 @@
     "build": "vite build --mode npm",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "release": "bumpp && npm publish --access public"
+    "release": "bumpp --commit --no-tag --no-push && npm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {
     "katex": ">=0.16.22",

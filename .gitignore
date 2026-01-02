@@ -6,6 +6,7 @@ node_modules
 .eslintcache
 .history
 .DS_Store
+.tmp
 
 # vite press
 cache

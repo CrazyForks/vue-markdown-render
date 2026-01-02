@@ -28,7 +28,7 @@
     "build": "vite build -c vite.config.ts --mode npm && pnpm run build:dts && pnpm run copy:css",
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
     "copy:css": "node ./scripts/copy-css.mjs",
-    "release": "bumpp && npm publish --access public"
+    "release": "bumpp --commit --no-tag --no-push && npm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {
     "@vue/composition-api": ">=1.7.2",
