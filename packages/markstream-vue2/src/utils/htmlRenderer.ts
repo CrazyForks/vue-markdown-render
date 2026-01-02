@@ -1,10 +1,8 @@
-import type { ComponentType } from 'react'
-import type { NodeComponentProps } from '../../types/node-component'
-import React, { useEffect, useRef, useState } from 'react'
-import { getCustomNodeComponents } from '../../customComponents'
+import type { Component } from 'vue'
+import { h } from 'vue'
 
 // HTML Parser Token type
-interface HtmlToken {
+export interface HtmlToken {
   type: 'text' | 'tag_open' | 'tag_close' | 'self_closing'
   tagName?: string
   attrs?: Record<string, string>
@@ -44,64 +42,6 @@ const DANGEROUS_ATTRS = new Set([
   'onsearch',
   'onsubmit',
 ])
-
-const BLOCKED_TAGS = new Set(['script'])
-
-const URL_ATTRS = new Set([
-  'href',
-  'src',
-  'srcset',
-  'xlink:href',
-  'formaction',
-])
-
-const SHOULD_LOG = (() => {
-  try {
-    return Boolean((import.meta as any).env?.DEV)
-  }
-  catch {}
-  return false
-})()
-
-function warn(message: string) {
-  if (SHOULD_LOG)
-    console.warn(message)
-}
-
-function logError(message: string, err: unknown) {
-  if (SHOULD_LOG)
-    console.error(message, err)
-}
-
-function stripControlAndWhitespace(value: string): string {
-  let out = ''
-  for (const ch of value) {
-    const code = ch.charCodeAt(0)
-    if (code <= 0x1F || code === 0x7F)
-      continue
-    if (/\s/u.test(ch))
-      continue
-    out += ch
-  }
-  return out
-}
-
-function isUnsafeUrl(value: string): boolean {
-  const normalized = stripControlAndWhitespace(value).toLowerCase()
-
-  if (normalized.startsWith('javascript:') || normalized.startsWith('vbscript:'))
-    return true
-
-  if (normalized.startsWith('data:')) {
-    return !(
-      normalized.startsWith('data:image/')
-      || normalized.startsWith('data:video/')
-      || normalized.startsWith('data:audio/')
-    )
-  }
-
-  return false
-}
 
 // Standard HTML void elements (self-closing)
 const VOID_ELEMENTS = new Set([
@@ -236,59 +176,74 @@ const STANDARD_HTML_TAGS = new Set([
   'wbr',
 ])
 
-function normalizeCssPropName(prop: string): string {
-  if (prop.startsWith('--'))
-    return prop
-  return prop.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
+const BLOCKED_TAGS = new Set(['script'])
+
+const URL_ATTRS = new Set([
+  'href',
+  'src',
+  'srcset',
+  'xlink:href',
+  'formaction',
+])
+
+const SHOULD_LOG = (() => {
+  try {
+    return Boolean((import.meta as any).env?.DEV)
+  }
+  catch {}
+  return false
+})()
+
+function warn(message: string) {
+  if (SHOULD_LOG)
+    console.warn(message)
 }
 
-function parseInlineStyle(style: string): Record<string, string> | undefined {
-  const input = style.trim()
-  if (!input)
-    return undefined
-
-  const out: Record<string, string> = {}
-  for (const part of input.split(';')) {
-    const chunk = part.trim()
-    if (!chunk)
-      continue
-    const idx = chunk.indexOf(':')
-    if (idx === -1)
-      continue
-    const key = normalizeCssPropName(chunk.slice(0, idx).trim())
-    const value = chunk.slice(idx + 1).trim()
-    if (key)
-      out[key] = value
-  }
-  return Object.keys(out).length ? out : undefined
+function logError(message: string, err: unknown) {
+  if (SHOULD_LOG)
+    console.error(message, err)
 }
 
-function normalizeDomAttrs(attrs: Record<string, string>): Record<string, any> {
-  const next: Record<string, any> = { ...attrs }
-  if (Object.prototype.hasOwnProperty.call(next, 'class')) {
-    next.className = next.class
-    delete next.class
+function stripControlAndWhitespace(value: string): string {
+  let out = ''
+  for (const ch of value) {
+    const code = ch.charCodeAt(0)
+    if (code <= 0x1F || code === 0x7F)
+      continue
+    if (/\s/u.test(ch))
+      continue
+    out += ch
   }
-  if (Object.prototype.hasOwnProperty.call(next, 'for')) {
-    next.htmlFor = next.for
-    delete next.for
+  return out
+}
+
+function isUnsafeUrl(value: string): boolean {
+  const normalized = stripControlAndWhitespace(value).toLowerCase()
+
+  if (normalized.startsWith('javascript:') || normalized.startsWith('vbscript:'))
+    return true
+
+  if (normalized.startsWith('data:')) {
+    return !(
+      normalized.startsWith('data:image/')
+      || normalized.startsWith('data:video/')
+      || normalized.startsWith('data:audio/')
+    )
   }
-  if (typeof next.style === 'string') {
-    const parsed = parseInlineStyle(next.style)
-    if (parsed)
-      next.style = parsed
-    else
-      delete next.style
-  }
-  return next
+
+  return false
+}
+
+function hasOwn(obj: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key)
 }
 
 /**
- * Check if a tag name is a custom React component
+ * Check if a tag name is a custom Vue component
  */
-function isCustomComponent(
+export function isCustomComponent(
   tagName: string,
-  customComponents: Record<string, ComponentType<any>>,
+  customComponents: Record<string, Component>,
 ): boolean {
   const lowerTag = tagName.toLowerCase()
 
@@ -297,14 +252,13 @@ function isCustomComponent(
     return false
 
   // Check if it's registered in custom components (case-insensitive)
-  return Object.prototype.hasOwnProperty.call(customComponents, lowerTag)
-    || Object.prototype.hasOwnProperty.call(customComponents, tagName)
+  return hasOwn(customComponents as any, lowerTag) || hasOwn(customComponents as any, tagName)
 }
 
 /**
  * Sanitize attributes to remove XSS-prone event handlers
  */
-function sanitizeAttrs(attrs: Record<string, string>): Record<string, string> {
+export function sanitizeAttrs(attrs: Record<string, string>): Record<string, string> {
   const clean: Record<string, string> = {}
   for (const [key, value] of Object.entries(attrs)) {
     const lowerKey = key.toLowerCase()
@@ -320,7 +274,7 @@ function sanitizeAttrs(attrs: Record<string, string>): Record<string, string> {
 /**
  * Convert attribute value to appropriate type
  */
-function convertPropValue(value: string, key: string): any {
+export function convertPropValue(value: string, key: string): any {
   const lowerKey = key.toLowerCase()
 
   // Boolean attributes - HTML5 spec
@@ -340,7 +294,7 @@ function convertPropValue(value: string, key: string): any {
 /**
  * Convert all attribute values to appropriate types
  */
-function convertAttrsToProps(attrs: Record<string, string>): Record<string, any> {
+export function convertAttrsToProps(attrs: Record<string, string>): Record<string, any> {
   const result: Record<string, any> = {}
   for (const [key, value] of Object.entries(attrs))
     result[key] = convertPropValue(value, key)
@@ -356,8 +310,10 @@ function isMeaningfulText(text: string): boolean {
 
 /**
  * Simple HTML tokenizer
+ * Note: This is a basic implementation. For production use with complex HTML,
+ * consider using a proper HTML parser library like htmlparser2.
  */
-function tokenizeHtml(html: string): HtmlToken[] {
+export function tokenizeHtml(html: string): HtmlToken[] {
   const tokens: HtmlToken[] = []
   let pos = 0
 
@@ -471,14 +427,14 @@ function tokenizeHtml(html: string): HtmlToken[] {
 }
 
 /**
- * Build React element tree from tokens
+ * Build VNode tree from tokens
  */
-function buildReactElementTree(
+export function buildVNodeTree(
   tokens: HtmlToken[],
-  customComponents: Record<string, ComponentType<any>>,
-): React.ReactNode[] {
-  const stack: Array<{ tagName: string, children: React.ReactNode[], attrs?: Record<string, string> }> = []
-  const rootNodes: React.ReactNode[] = []
+  customComponents: Record<string, Component>,
+): any[] {
+  const stack: Array<{ tagName: string, children: any[], attrs?: Record<string, string> }> = []
+  const rootNodes: any[] = []
 
   for (const token of tokens) {
     if (token.type === 'text') {
@@ -486,9 +442,9 @@ function buildReactElementTree(
       target.push(token.content!)
     }
     else if (token.type === 'self_closing') {
-      const element = createReactElement(token.tagName!, token.attrs || {}, [], customComponents)
+      const vnode = createVNode(token.tagName!, token.attrs || {}, [], customComponents)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
-      element != null && target.push(element)
+      vnode != null && target.push(vnode)
     }
     else if (token.type === 'tag_open') {
       stack.push({ tagName: token.tagName!, children: [], attrs: token.attrs })
@@ -509,12 +465,12 @@ function buildReactElementTree(
         // Pop all tags until the matched one (auto-closing intermediate tags)
         while (stack.length > matchedIndex) {
           const opening = stack.pop()!
-          const element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents)
+          const vnode = createVNode(opening.tagName, opening.attrs || {}, opening.children, customComponents)
 
           if (stack.length > 0)
-            element != null && stack[stack.length - 1].children.push(element)
+            vnode != null && stack[stack.length - 1].children.push(vnode)
           else
-            element != null && rootNodes.push(element)
+            vnode != null && rootNodes.push(vnode)
 
           // Warn if auto-closing tags
           if (opening.tagName.toLowerCase() !== closingTag && stack.length > matchedIndex) {
@@ -532,8 +488,8 @@ function buildReactElementTree(
   // Handle any remaining unclosed tags
   while (stack.length > 0) {
     const unclosed = stack.pop()!
-    const element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents)
-    element != null && rootNodes.push(element)
+    const vnode = createVNode(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents)
+    vnode != null && rootNodes.push(vnode)
     warn(`Auto-closing unclosed tag: <${unclosed.tagName}>`)
   }
 
@@ -541,37 +497,38 @@ function buildReactElementTree(
 }
 
 /**
- * Create React element for a tag
+ * Create VNode for a tag
  */
-function createReactElement(
+function createVNode(
   tagName: string,
   attrs: Record<string, string>,
-  children: React.ReactNode[],
-  customComponents: Record<string, ComponentType<any>>,
-): React.ReactNode {
+  children: any[],
+  customComponents: Record<string, Component>,
+): any {
   if (BLOCKED_TAGS.has(tagName.toLowerCase()))
     return null
 
   const sanitizedAttrs = sanitizeAttrs(attrs)
 
   if (isCustomComponent(tagName, customComponents)) {
-    // It's a custom React component
+    // It's a custom Vue component
     const component = customComponents[tagName] || customComponents[tagName.toLowerCase()]
     const convertedAttrs = convertAttrsToProps(sanitizedAttrs)
-    return React.createElement(component as ComponentType<any>, convertedAttrs, ...children)
+    return h(component as Component, convertedAttrs, children.length > 0 ? children : undefined)
   }
   else {
     // It's a standard HTML element
-    return React.createElement(tagName, normalizeDomAttrs(sanitizedAttrs), ...children)
+    const { innerHTML, ...validAttrs } = sanitizedAttrs as any
+    return h(tagName, validAttrs, children.length > 0 ? children : undefined)
   }
 }
 
 /**
  * Check if HTML content contains custom components
  */
-function hasCustomComponents(
+export function hasCustomComponents(
   content: string,
-  customComponents: Record<string, ComponentType<any>>,
+  customComponents: Record<string, Component>,
 ): boolean {
   // Fast path: check for any non-standard tags
   const tagRegex = /<([a-z][a-z0-9-]*)\b[^>]*>/gi
@@ -584,102 +541,22 @@ function hasCustomComponents(
 }
 
 /**
- * Parse HTML content to React elements
+ * Parse HTML content to VNodes
  */
-function parseHtmlToReactNodes(
+export function parseHtmlToVNodes(
   content: string,
-  customComponents: Record<string, ComponentType<any>>,
-): React.ReactNode[] | null {
+  customComponents: Record<string, Component>,
+): any[] | null {
   if (!content)
     return []
 
   try {
     const tokens = tokenizeHtml(content)
-    const nodes = buildReactElementTree(tokens, customComponents)
+    const nodes = buildVNodeTree(tokens, customComponents)
     return nodes
   }
   catch (error) {
-    logError('Failed to parse HTML to React nodes:', error)
+    logError('Failed to parse HTML to VNodes:', error)
     return null
   }
 }
-
-export function HtmlInlineNode(props: NodeComponentProps<{
-  type: 'html_inline'
-  content: string
-  loading?: boolean
-  autoClosed?: boolean
-}>) {
-  const { node, customId } = props
-  const containerRef = useRef<HTMLSpanElement>(null)
-  const [isClient, setIsClient] = useState(false)
-
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  // Get custom components from global registry
-  const customComponents = getCustomNodeComponents(customId)
-
-  // Computed property to determine render mode and content
-  const renderMode = React.useMemo(() => {
-    const content = node.content
-    if (!content)
-      return { mode: 'html', content: '' }
-
-    // Check if content contains custom components
-    if (!hasCustomComponents(content, customComponents))
-      return { mode: 'html', content }
-
-    // Parse and build React element tree
-    const nodes = parseHtmlToReactNodes(content, customComponents)
-    if (nodes === null)
-      return { mode: 'html', content } // Fallback to dangerouslySetInnerHTML if parsing fails
-
-    return { mode: 'dynamic', nodes }
-  }, [node.content, customComponents])
-
-  // Use DOM manipulation for pure HTML (mode: 'html')
-  useEffect(() => {
-    if (!isClient || !containerRef.current || renderMode.mode !== 'html')
-      return
-
-    const host = containerRef.current
-    host.innerHTML = ''
-    const template = document.createElement('template')
-    template.innerHTML = node.content ?? ''
-    host.appendChild(template.content.cloneNode(true))
-  }, [node.content, renderMode.mode, isClient])
-
-  // Loading state handling
-  if (node.loading && !node.autoClosed) {
-    return (
-      <span className="html-inline-node html-inline-node--loading">
-        {node.content}
-      </span>
-    )
-  }
-
-  // Dynamic rendering for custom components
-  if (renderMode.mode === 'dynamic') {
-    return (
-      <span
-        className="html-inline-node"
-        style={{ display: 'inline' }}
-      >
-        {renderMode.nodes}
-      </span>
-    )
-  }
-
-  // Fallback to DOM rendering for standard HTML
-  return (
-    <span
-      ref={containerRef}
-      className="html-inline-node"
-      style={{ display: 'inline' }}
-    />
-  )
-}
-
-export default HtmlInlineNode

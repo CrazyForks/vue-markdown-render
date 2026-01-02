@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
+import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
+import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 
 const props = defineProps<{
   node: {
@@ -8,6 +10,7 @@ const props = defineProps<{
     attrs?: [string, string][] | null
     loading?: boolean
   }
+  customId?: string
 }>()
 
 // The parser produces attrs as an array of [key, value] tuples.
@@ -31,9 +34,53 @@ const boundAttrs = computed(() => {
   return a
 })
 
+// Get custom components from global registry
+const customComponents = computed(() => {
+  // Track revision so we re-parse when mappings change.
+  void customComponentsRevision.value
+  return getCustomNodeComponents(props.customId)
+})
+
+// Dynamic wrapper component for rendering VNodes
+const DynamicRenderer = defineComponent({
+  name: 'DynamicRenderer',
+  props: {
+    nodes: {
+      type: Array as () => any[],
+      required: true,
+    },
+  },
+  render() {
+    return this.nodes
+  },
+})
+
 const htmlRef = ref<HTMLElement | null>(null)
 const shouldRender = ref(typeof window === 'undefined')
 const renderContent = ref(props.node.content)
+
+// Computed property to determine render mode and content
+const renderMode = computed(() => {
+  // Avoid parsing until the node is actually going to render (deferred rendering path).
+  if (!shouldRender.value)
+    return { mode: 'html', content: renderContent.value ?? '' }
+
+  const content = props.node.content
+  if (!content)
+    return { mode: 'html', content: '' }
+
+  // Check if content contains custom components
+  if (!hasCustomComponents(content, customComponents.value))
+    return { mode: 'html', content }
+
+  // Parse and build VNode tree
+  const nodes = parseHtmlToVNodes(content, customComponents.value)
+  if (nodes === null)
+    return { mode: 'html', content } // Fallback to v-html if parsing fails
+
+  return { mode: 'dynamic', nodes }
+})
+
 const registerVisibility = useViewportPriority()
 const visibilityHandle = ref<ReturnType<typeof registerVisibility> | null>(null)
 const isDeferred = !!props.node.loading
@@ -84,7 +131,12 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="htmlRef" class="html-block-node" v-bind="boundAttrs">
-    <div v-if="shouldRender" v-memo="[renderContent]" v-html="renderContent" />
+    <template v-if="shouldRender">
+      <!-- Use dynamic rendering for custom components -->
+      <DynamicRenderer v-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />
+      <!-- Fallback to v-html for standard HTML -->
+      <div v-else v-memo="[renderContent]" v-html="renderContent" />
+    </template>
     <div v-else class="html-block-node__placeholder">
       <slot name="placeholder" :node="node">
         <span class="html-block-node__placeholder-bar" />

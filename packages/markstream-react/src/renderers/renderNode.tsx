@@ -237,8 +237,8 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
     case 'html_block':
     case 'html_inline':
       return node.type === 'html_block'
-        ? <HtmlBlockNode key={key} node={node as any} typewriter={ctx.typewriter} />
-        : <HtmlInlineNode key={key} node={node as any} typewriter={ctx.typewriter} />
+        ? <HtmlBlockNode key={key} node={node as any} typewriter={ctx.typewriter} customId={ctx.customId} />
+        : <HtmlInlineNode key={key} node={node as any} typewriter={ctx.typewriter} customId={ctx.customId} />
     case 'vmr_container':
       return <VmrContainerNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} />
     case 'label_open':
