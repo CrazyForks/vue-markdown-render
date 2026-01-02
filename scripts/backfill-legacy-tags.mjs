@@ -26,11 +26,21 @@ function parseArgs(argv) {
   }
   for (let i = 0; i < argv.length; i++) {
     const cur = argv[i]
-    if (cur === '--legacy-prefix') args.legacyPrefix = argv[++i]
-    else if (cur === '--remote') args.remote = argv[++i]
-    else if (cur === '--apply') args.dryRun = false
-    else if (cur === '--dry-run') args.dryRun = true
-    else if (cur === '--push') args.push = true
+    if (cur === '--legacy-prefix') {
+      args.legacyPrefix = argv[++i]
+    }
+    else if (cur === '--remote') {
+      args.remote = argv[++i]
+    }
+    else if (cur === '--apply') {
+      args.dryRun = false
+    }
+    else if (cur === '--dry-run') {
+      args.dryRun = true
+    }
+    else if (cur === '--push') {
+      args.push = true
+    }
     else if (cur === '--rename') {
       const raw = String(argv[++i] ?? '')
       const [from, to] = raw.split('=')
@@ -39,7 +49,6 @@ function parseArgs(argv) {
       args.rename[from.trim()] = to.trim()
     }
     else if (cur === '--help' || cur === '-h') {
-      // eslint-disable-next-line no-console
       console.log(`
 Usage:
   node scripts/backfill-legacy-tags.mjs [options]
@@ -107,7 +116,6 @@ async function main() {
     .filter(Boolean)
 
   if (!legacyTags.length) {
-    // eslint-disable-next-line no-console
     console.log(`[backfill] No legacy tags found for pattern: ${legacyPattern}`)
     return
   }
@@ -156,7 +164,6 @@ async function main() {
 
     const tagArgs = ['tag', '-a', newTag, legacyTag, '-m', `Backfill from ${legacyTag}`]
     if (args.dryRun) {
-      // eslint-disable-next-line no-console
       console.log(`[backfill][dry-run] git ${tagArgs.join(' ')}`)
     }
     else {
@@ -166,7 +173,6 @@ async function main() {
     if (args.push) {
       const pushArgs = ['push', args.remote, newTag]
       if (args.dryRun) {
-        // eslint-disable-next-line no-console
         console.log(`[backfill][dry-run] git ${pushArgs.join(' ')}`)
       }
       else {
@@ -177,12 +183,10 @@ async function main() {
     created.push({ legacyTag, newTag })
   }
 
-  // eslint-disable-next-line no-console
   console.log(`[backfill] Done. created=${created.length} skipped=${skipped.length}`)
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err?.message || err)
   process.exit(1)
 })

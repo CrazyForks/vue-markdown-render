@@ -1,0 +1,80 @@
+name: Release (Nightly)
+
+on:
+  schedule:
+    # 02:15 UTC daily
+    - cron: '15 2 * * *'
+  workflow_dispatch:
+    inputs:
+      all:
+        description: Tag all packages even if unchanged
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.nightly.outputs.created }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure git identity (annotated tags)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create nightly tags (if needed)
+        id: nightly
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ARGS=(--push --remote origin)
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.all }}" == "true" ]]; then
+            ARGS+=(--all)
+          fi
+
+          OUT="$(node scripts/create-nightly-tags.mjs "${ARGS[@]}")"
+          echo "${OUT}"
+          CREATED_JSON="$(node -e 'const s=process.argv[1]; const j=JSON.parse(s); console.log(JSON.stringify(j.created||[]))' "${OUT}")"
+          echo "created=${CREATED_JSON}" >> "${GITHUB_OUTPUT}"
+
+  release:
+    needs: tag
+    if: ${{ needs.tag.outputs.created != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: ${{ fromJson(needs.tag.outputs.created) }}
+    steps:
+      - name: Parse tag
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ matrix.tag }}"
+          PKG="${TAG%@*}"
+          ID="${TAG##*@}"
+          echo "name=[${PKG}] ${ID}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create GitHub Pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ matrix.tag }}
+          name: ${{ steps.meta.outputs.name }}
+          prerelease: true
+          generate_release_notes: true

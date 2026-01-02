@@ -45,8 +45,16 @@ This repository publishes multiple packages (`markstream-vue`, `markstream-vue2`
 
 Avoid creating bare `v<version>` tags (they mix different package versions in a monorepo).
 
+### Stable vs Nightly
+
+- **Stable**: tags are semver-based (`<pkg>@<version>`) and should match npm releases.
+- **Nightly**: tags are commit snapshots (`<pkg>@nightly-YYYYMMDD-<sha>`) and are published as GitHub **Pre-releases**.
+
+Nightly tags can be **dependency-driven**: when `stream-markdown-parser` changes, nightly tags are also created for `markstream-vue`, `markstream-vue2`, and `markstream-react` so consumers can test the whole stack against the latest parser.
+
 ### Common commands
 
 - Tag current version of a package: `pnpm tag:vue3` / `pnpm tag:vue2` / `pnpm tag:react` / `pnpm tag:parser`
+- Tag + push to remote: `pnpm tag:vue3:push` / `pnpm tag:vue2:push` / `pnpm tag:react:push` / `pnpm tag:parser:push`
 - Backfill namespaced tags from existing legacy `v*` tags (dry run): `pnpm tag:backfill:dry`
 - Apply backfill locally: `pnpm tag:backfill` (add `-- --push` to also push tags)

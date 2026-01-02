@@ -1,7 +1,7 @@
+import { execFileSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
-import { execFileSync } from 'node:child_process'
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -31,18 +31,37 @@ function parseArgs(argv) {
 
   for (let i = 0; i < argv.length; i++) {
     const cur = argv[i]
-    if (cur === '--package-json') args.packageJson = argv[++i]
-    else if (cur === '--ref') args.ref = argv[++i]
-    else if (cur === '--tag') args.tag = argv[++i]
-    else if (cur === '--message') args.message = argv[++i]
-    else if (cur === '--remote') args.remote = argv[++i]
-    else if (cur === '--push') args.push = true
-    else if (cur === '--push-tag-only') args.pushTagOnly = true
-    else if (cur === '--allow-dirty') args.allowDirty = true
-    else if (cur === '--dry-run') args.dryRun = true
-    else if (cur === '--force') args.force = true
+    if (cur === '--package-json') {
+      args.packageJson = argv[++i]
+    }
+    else if (cur === '--ref') {
+      args.ref = argv[++i]
+    }
+    else if (cur === '--tag') {
+      args.tag = argv[++i]
+    }
+    else if (cur === '--message') {
+      args.message = argv[++i]
+    }
+    else if (cur === '--remote') {
+      args.remote = argv[++i]
+    }
+    else if (cur === '--push') {
+      args.push = true
+    }
+    else if (cur === '--push-tag-only') {
+      args.pushTagOnly = true
+    }
+    else if (cur === '--allow-dirty') {
+      args.allowDirty = true
+    }
+    else if (cur === '--dry-run') {
+      args.dryRun = true
+    }
+    else if (cur === '--force') {
+      args.force = true
+    }
     else if (cur === '--help' || cur === '-h') {
-      // eslint-disable-next-line no-console
       console.log(`
 Usage:
   node scripts/tag-package.mjs [options]
@@ -105,7 +124,6 @@ async function main() {
   const existingCommit = getCommitForTag(tagName)
 
   if (existingCommit && existingCommit === refCommit) {
-    // eslint-disable-next-line no-console
     console.log(`[tag-package] Tag already exists: ${tagName} -> ${existingCommit}`)
     return
   }
@@ -118,7 +136,6 @@ async function main() {
     tagArgs.splice(2, 0, '-f')
 
   if (args.dryRun) {
-    // eslint-disable-next-line no-console
     console.log(`[tag-package][dry-run] git ${tagArgs.join(' ')}`)
   }
   else {
@@ -130,7 +147,6 @@ async function main() {
 
   if (!args.pushTagOnly) {
     if (args.dryRun) {
-      // eslint-disable-next-line no-console
       console.log('[tag-package][dry-run] git push')
     }
     else {
@@ -139,7 +155,6 @@ async function main() {
   }
 
   if (args.dryRun) {
-    // eslint-disable-next-line no-console
     console.log(`[tag-package][dry-run] git push ${args.remote} ${tagName}`)
   }
   else {
@@ -148,8 +163,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err?.message || err)
   process.exit(1)
 })
-

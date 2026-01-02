@@ -24,14 +24,25 @@ function parseArgs(argv) {
 
   for (let i = 0; i < argv.length; i++) {
     const cur = argv[i]
-    if (cur === '--pattern') args.pattern = argv[++i]
-    else if (cur === '--remote') args.remote = argv[++i]
-    else if (cur === '--apply') args.dryRun = false
-    else if (cur === '--dry-run') args.dryRun = true
-    else if (cur === '--local') args.deleteLocal = true
-    else if (cur === '--remote-delete') args.deleteRemote = true
+    if (cur === '--pattern') {
+      args.pattern = argv[++i]
+    }
+    else if (cur === '--remote') {
+      args.remote = argv[++i]
+    }
+    else if (cur === '--apply') {
+      args.dryRun = false
+    }
+    else if (cur === '--dry-run') {
+      args.dryRun = true
+    }
+    else if (cur === '--local') {
+      args.deleteLocal = true
+    }
+    else if (cur === '--remote-delete') {
+      args.deleteRemote = true
+    }
     else if (cur === '--help' || cur === '-h') {
-      // eslint-disable-next-line no-console
       console.log(`
 Usage:
   node scripts/prune-tags.mjs [options]
@@ -70,19 +81,16 @@ async function main() {
     .filter(Boolean)
 
   if (!tags.length) {
-    // eslint-disable-next-line no-console
     console.log(`[prune-tags] No tags match: ${args.pattern}`)
     return
   }
 
-  // eslint-disable-next-line no-console
   console.log(`[prune-tags] matched=${tags.length} pattern=${args.pattern} dryRun=${args.dryRun}`)
 
   for (const tag of tags) {
     if (args.deleteLocal) {
       const cmd = ['tag', '-d', tag]
       if (args.dryRun) {
-        // eslint-disable-next-line no-console
         console.log(`[prune-tags][dry-run] git ${cmd.join(' ')}`)
       }
       else {
@@ -95,7 +103,6 @@ async function main() {
     for (const tag of tags) {
       const cmd = ['push', args.remote, `:refs/tags/${tag}`]
       if (args.dryRun) {
-        // eslint-disable-next-line no-console
         console.log(`[prune-tags][dry-run] git ${cmd.join(' ')}`)
       }
       else {
@@ -106,8 +113,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err?.message || err)
   process.exit(1)
 })
-

@@ -1,0 +1,47 @@
+name: Release (Stable)
+
+on:
+  push:
+    tags:
+      # Stable package tags: <pkg>@<semver>
+      # e.g. markstream-vue@0.0.4, markstream-react@0.0.3-beta.2
+      - '*@[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse tag
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          PKG="${TAG%@*}"
+          VERSION="${TAG##*@}"
+
+          if [[ -z "${PKG}" || -z "${VERSION}" ]]; then
+            echo "Invalid tag: ${TAG}"
+            exit 1
+          fi
+
+          PRERELEASE=false
+          if [[ "${VERSION}" == *-* ]]; then
+            PRERELEASE=true
+          fi
+
+          echo "pkg=${PKG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${PRERELEASE}" >> "${GITHUB_OUTPUT}"
+          echo "name=[${PKG}] ${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ steps.meta.outputs.name }}
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+          generate_release_notes: true
