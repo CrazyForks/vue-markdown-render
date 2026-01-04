@@ -133,7 +133,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Portal to="body">
-    <div class="markstream-vue">
+    <div class="markstream-vue2">
       <transition name="tooltip" appear>
         <div
           v-show="visible && ready"

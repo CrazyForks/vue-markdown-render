@@ -36,7 +36,7 @@ export async function MathInlineNodeAsync() {
   }
   catch (e) {
     console.warn(
-      '[markstream-vue] Optional peer dependencies for MathInlineNode are missing. Falling back to text rendering. To enable full math rendering features, please install "katex".',
+      '[markstream-vue2] Optional peer dependencies for MathInlineNode are missing. Falling back to text rendering. To enable full math rendering features, please install "katex".',
       e,
     )
   }
@@ -53,7 +53,7 @@ export async function MathBlockNodeAsync() {
   }
   catch (e) {
     console.warn(
-      '[markstream-vue] Optional peer dependencies for MathBlockNode are missing. Falling back to text rendering. To enable full math rendering features, please install "katex".',
+      '[markstream-vue2] Optional peer dependencies for MathBlockNode are missing. Falling back to text rendering. To enable full math rendering features, please install "katex".',
       e,
     )
   }

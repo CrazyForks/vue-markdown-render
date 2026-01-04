@@ -28,6 +28,25 @@ new Vue({
 }).$mount('#app')
 ```
 
+## Tailwind
+
+If your app uses Tailwind and you want to avoid shipping duplicated utility CSS, import the Tailwind-ready output instead:
+
+```ts
+import 'markstream-vue2/index.tailwind.css'
+```
+
+Then include the extracted class list in `tailwind.config.js`:
+
+```js
+module.exports = {
+  content: [
+    './src/**/*.{js,ts,vue}',
+    require('markstream-vue2/tailwind'),
+  ],
+}
+```
+
 ## Notes
 
 - This is a baseline Vue 2 port focused on correct rendering.

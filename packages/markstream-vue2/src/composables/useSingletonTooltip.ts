@@ -63,7 +63,7 @@ function ensureMounted() {
     .catch((err) => {
       mountPromise = null
       mounted = false
-      console.warn('[markstream-vue] Failed to load Tooltip component. Tooltips will be disabled.', err)
+      console.warn('[markstream-vue2] Failed to load Tooltip component. Tooltips will be disabled.', err)
     })
 }
 

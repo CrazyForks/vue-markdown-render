@@ -228,7 +228,7 @@ if (typeof window !== 'undefined') {
     }
     catch (err) {
       mermaidAvailable.value = false
-      console.warn('[markstream-vue] Failed to initialize mermaid renderer. Call enableMermaid() to configure a loader.', err)
+      console.warn('[markstream-vue2] Failed to initialize mermaid renderer. Call enableMermaid() to configure a loader.', err)
     }
   })()
 }
@@ -1149,7 +1149,7 @@ async function initMermaid() {
         const backoff = Math.min(1200, 600 * nextAttempt)
         scheduleRenderRetry(backoff)
         if (typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV)
-          console.warn('[markstream-vue] Mermaid render timed out, retry scheduled:', nextAttempt)
+          console.warn('[markstream-vue2] Mermaid render timed out, retry scheduled:', nextAttempt)
       }
       else {
         consecutiveRenderTimeouts = 0
@@ -1836,7 +1836,7 @@ const computedButtonStyle = computed(() => {
         </div>
         <!-- Modal pseudo-fullscreen overlay (teleported to body) -->
         <Portal to="body">
-          <div class="markstream-vue">
+          <div class="markstream-vue2">
             <transition name="mermaid-dialog" appear>
               <div
                 v-if="isModalOpen"

@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import vue2 from '@vitejs/plugin-vue2'
 import { minify as terserMinify } from 'terser'
+import UnpluginClassExtractor from 'unplugin-class-extractor/vite'
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
 
@@ -31,6 +32,10 @@ export default defineConfig(({ mode }) => {
         insertTypesEntry: true,
         tsconfigPath: './tsconfig.build.json',
       }),
+      UnpluginClassExtractor({
+        output: 'dist/tailwind.ts',
+        include: [/\/src\/components\/(?:[^/]+\/)*[^/]+\.vue(\?.*)?$/],
+      }) as any,
     )
   }
 
@@ -153,6 +158,9 @@ export default defineConfig(({ mode }) => {
           assetFileNames: 'workers/[name][extname]',
         },
       },
+    },
+    css: {
+      postcss: './postcss.config.cjs',
     },
   }
 })

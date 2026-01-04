@@ -65,7 +65,24 @@ import 'mermaid/dist/mermaid.css'
 
 Monaco (`stream-monaco`) does not require a separate CSS import.
 
-Note: `markstream-vue2/index.css` is scoped under an internal `.markstream-vue` container to reduce global style conflicts. `MarkdownRender` renders inside that container by default. If you render node components standalone, wrap them with `<div class="markstream-vue">...</div>`.
+Note: `markstream-vue2/index.css` is scoped under an internal `.markstream-vue2` container to reduce global style conflicts. `MarkdownRender` renders inside that container by default. If you render node components standalone, wrap them with `<div class="markstream-vue2">...</div>`.
+
+If your app uses Tailwind and you want to avoid duplicate utility CSS, import the Tailwind-ready output instead:
+
+```ts
+import 'markstream-vue2/index.tailwind.css'
+```
+
+And include the extracted class list in `tailwind.config.js`:
+
+```js
+module.exports = {
+  content: [
+    './src/**/*.{js,ts,vue}',
+    require('markstream-vue2/tailwind'),
+  ],
+}
+```
 
 ### Quick Install: All Features
 

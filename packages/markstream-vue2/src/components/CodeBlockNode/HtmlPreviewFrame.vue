@@ -64,7 +64,7 @@ onUnmounted(() => {
 
 <template>
   <Portal to="body">
-    <div class="markstream-vue">
+    <div class="markstream-vue2">
       <div class="html-preview-frame__backdrop" :class="{ 'html-preview-frame__backdrop--dark': props.isDark }" @click="props.onClose?.()">
         <div class="html-preview-frame" :class="{ 'html-preview-frame--dark': props.isDark }" @click.stop>
           <div class="html-preview-frame__header">

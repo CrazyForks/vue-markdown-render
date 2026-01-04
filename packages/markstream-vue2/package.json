@@ -15,6 +15,8 @@
       "require": "./dist/index.cjs"
     },
     "./index.css": "./dist/index.css",
+    "./index.tailwind.css": "./dist/index.tailwind.css",
+    "./tailwind": "./dist/tailwind.ts",
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
     "./workers/mermaidParser.worker": "./dist/workers/mermaidParser.worker.js"
   },
@@ -25,9 +27,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build -c vite.config.ts --mode npm && pnpm run build:dts && pnpm run copy:css",
+    "build": "vite build -c vite.config.ts --mode npm && vite build -c vite.config.tailwind.ts --mode npm && node ./scripts/copy-tailwind-css.mjs && pnpm run build:dts",
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
-    "copy:css": "node ./scripts/copy-css.mjs",
     "release": "bumpp --commit --no-tag --no-push && npm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {

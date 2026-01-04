@@ -1,7 +1,4 @@
-@tailwind components;
-@tailwind utilities;
-
-/* Theme variables for renderer colors */
+/* Tailwind-ready stylesheet (no embedded utilities) */
 .markstream-vue2 {
   --border: 214.3 31.8% 91.4%;
   --background: 0 0% 100%;
@@ -21,7 +18,6 @@
   --muted-foreground: 215 20.2% 65.1%;
 }
 
-/* Reset button defaults so utilities control appearance. */
 .markstream-vue2 button {
   appearance: none;
   -webkit-appearance: none;

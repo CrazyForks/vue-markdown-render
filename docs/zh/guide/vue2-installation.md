@@ -65,7 +65,24 @@ import 'mermaid/dist/mermaid.css'
 
 Monaco（`stream-monaco`）不需要单独导入 CSS。
 
-注意：`markstream-vue2/index.css` 的样式被限制在内部的 `.markstream-vue` 容器下，以减少全局样式冲突。`MarkdownRender` 默认在该容器内渲染。如果你单独渲染节点组件，请用 `<div class="markstream-vue">...</div>` 包裹它们。
+注意：`markstream-vue2/index.css` 的样式被限制在内部的 `.markstream-vue2` 容器下，以减少全局样式冲突。`MarkdownRender` 默认在该容器内渲染。如果你单独渲染节点组件，请用 `<div class="markstream-vue2">...</div>` 包裹它们。
+
+如果你的项目使用 Tailwind，并希望避免重复注入 Tailwind utilities，请改用 Tailwind-ready 输出：
+
+```ts
+import 'markstream-vue2/index.tailwind.css'
+```
+
+并在 `tailwind.config.js` 的 `content` 中加入该包导出的 class 列表：
+
+```js
+module.exports = {
+  content: [
+    './src/**/*.{js,ts,vue}',
+    require('markstream-vue2/tailwind'),
+  ],
+}
+```
 
 ### 快速安装：所有功能
 

@@ -35,8 +35,8 @@ const ariaLabel = computed(() => {
 
 <style>
 /* Minimal, safe defaults to reduce flicker during frequent text updates */
-.markstream-vue pre[class^='language-'],
-.markstream-vue pre[class*=' language-'] {
+.markstream-vue2 pre[class^='language-'],
+.markstream-vue2 pre[class*=' language-'] {
   /* Ensure code layout is stable */
   white-space: pre;
   overflow: auto;
@@ -49,14 +49,14 @@ const ariaLabel = computed(() => {
   transform: translateZ(0);
   -webkit-font-smoothing: antialiased;
 }
-.markstream-vue pre[class^='language-'] > code,
-.markstream-vue pre[class*=' language-'] > code {
+.markstream-vue2 pre[class^='language-'] > code,
+.markstream-vue2 pre[class*=' language-'] > code {
   display: block;
 }
 
 /* Keyboard accessibility: visible focus when scroll container is focused */
-.markstream-vue pre[class^='language-']:focus,
-.markstream-vue pre[class*=' language-']:focus {
+.markstream-vue2 pre[class^='language-']:focus,
+.markstream-vue2 pre[class*=' language-']:focus {
   outline: 2px solid var(--vmdr-focus, #3b82f6);
   outline-offset: 2px;
 }

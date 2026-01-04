@@ -59,6 +59,18 @@ export default defineConfig({
         replacement: vueRuntime,
       },
       {
+        find: /^markstream-vue2\/index\.css$/,
+        replacement: resolve(__dirname, '../packages/markstream-vue2/dist/index.css'),
+      },
+      {
+        find: /^markstream-vue2\/index\.tailwind\.css$/,
+        replacement: resolve(__dirname, '../packages/markstream-vue2/dist/index.tailwind.css'),
+      },
+      {
+        find: /^markstream-vue2\/tailwind$/,
+        replacement: resolve(__dirname, '../packages/markstream-vue2/dist/tailwind.ts'),
+      },
+      {
         find: /^markstream-vue2$/,
         replacement: resolve(__dirname, '../packages/markstream-vue2/src'),
       },

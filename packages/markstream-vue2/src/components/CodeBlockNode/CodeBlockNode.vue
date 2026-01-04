@@ -239,7 +239,7 @@ if (typeof window !== 'undefined') {
       if (!mod) {
         // Only log warning in development mode
         if (isDevEnv) {
-          console.warn('[markstream-vue] stream-monaco is not installed. Code blocks will use basic rendering. Install stream-monaco for enhanced code editor features.')
+          console.warn('[markstream-vue2] stream-monaco is not installed. Code blocks will use basic rendering. Install stream-monaco for enhanced code editor features.')
         }
         usePreCodeRender.value = true
         return
@@ -283,7 +283,7 @@ if (typeof window !== 'undefined') {
     catch (err) {
       // Only log warning in development mode
       if (isDevEnv) {
-        console.warn('[markstream-vue] Failed to initialize Monaco editor:', err)
+        console.warn('[markstream-vue2] Failed to initialize Monaco editor:', err)
       }
       // Use PreCodeNode for rendering
       usePreCodeRender.value = true

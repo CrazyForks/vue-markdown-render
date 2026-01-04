@@ -140,7 +140,7 @@ const debugPerformanceEnabled = computed(() => props.debugPerformance && isClien
 function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)
     return
-  console.info(`[markstream-vue][perf] ${label}`, data)
+  console.info(`[markstream-vue2][perf] ${label}`, data)
 }
 
 function resolveViewportRoot(node?: HTMLElement | null) {
@@ -893,7 +893,7 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
     return
   viewportPriorityAutoDisabled.value = true
   if (typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV && typeof console !== 'undefined')
-    console.warn('[markstream-vue] viewportPriority auto-disabled:', reason)
+    console.warn('[markstream-vue2] viewportPriority auto-disabled:', reason)
 
   for (const handle of nodeVisibilityHandles.values())
     handle.destroy()
@@ -1239,7 +1239,7 @@ async function CodeBlockNodeAsync() {
   }
   catch (e) {
     console.warn(
-      '[markstream-vue] Optional peer dependencies for CodeBlockNode are missing. Falling back to inline-code rendering (no Monaco). To enable full code block features, please install "stream-monaco".',
+      '[markstream-vue2] Optional peer dependencies for CodeBlockNode are missing. Falling back to inline-code rendering (no Monaco). To enable full code block features, please install "stream-monaco".',
       e,
     )
     return PreCodeNode
@@ -1253,7 +1253,7 @@ async function MermaidBlockNodeAsync() {
   }
   catch (e) {
     console.warn(
-      '[markstream-vue] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
+      '[markstream-vue2] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
       e,
     )
     return PreCodeNode
@@ -1381,7 +1381,7 @@ function handleContainerMouseout(event: MouseEvent) {
 <template>
   <div
     ref="containerRef"
-    class="markstream-vue markdown-renderer"
+    class="markstream-vue2 markdown-renderer"
     :class="[{ dark: props.isDark }, { virtualized: virtualizationEnabled }]"
     @click="handleContainerClick"
     @mouseover="handleContainerMouseover"
@@ -1516,15 +1516,15 @@ function handleContainerMouseout(event: MouseEvent) {
 
 <style>
 /* Global (unscoped) CSS for TransitionGroup enter animations */
-.markstream-vue .typewriter-enter-from {
+.markstream-vue2 .typewriter-enter-from {
   opacity: 0;
 }
-.markstream-vue .typewriter-enter-active {
+.markstream-vue2 .typewriter-enter-active {
   transition: opacity var(--typewriter-fade-duration, 900ms)
     var(--typewriter-fade-ease, ease-out);
   will-change: opacity;
 }
-.markstream-vue .typewriter-enter-to {
+.markstream-vue2 .typewriter-enter-to {
   opacity: 1;
 }
 </style>
