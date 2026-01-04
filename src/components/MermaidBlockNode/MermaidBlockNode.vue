@@ -1653,7 +1653,7 @@ const computedButtonStyle = computed(() => {
       <div v-if="$slots['header-left']">
         <slot name="header-left" />
       </div>
-      <div v-else class="flex items-center space-x-2 overflow-hidden">
+      <div v-else class="flex items-center gap-x-2 overflow-hidden">
         <img :src="mermaidIconUrl" class="w-4 h-4 my-0" alt="Mermaid">
         <span class="text-sm font-medium font-mono truncate" :class="props.isDark ? 'text-gray-400' : 'text-gray-600'">Mermaid</span>
       </div>
@@ -1662,7 +1662,7 @@ const computedButtonStyle = computed(() => {
       <div v-if="$slots['header-center']">
         <slot name="header-center" />
       </div>
-      <div v-else-if="props.showModeToggle && mermaidAvailable" class="flex items-center space-x-1 rounded-md p-0.5" :class="props.isDark ? 'bg-gray-700' : 'bg-gray-100'">
+      <div v-else-if="props.showModeToggle && mermaidAvailable" class="flex items-center gap-x-1 rounded-md p-0.5" :class="props.isDark ? 'bg-gray-700' : 'bg-gray-100'">
         <button
           class="px-2.5 py-1 text-xs rounded transition-colors"
           :class="[
@@ -1676,7 +1676,7 @@ const computedButtonStyle = computed(() => {
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <div class="flex items-center space-x-1">
+          <div class="flex items-center gap-x-1">
             <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></g></svg>
             <span>{{ t('common.preview') || 'Preview' }}</span>
           </div>
@@ -1694,7 +1694,7 @@ const computedButtonStyle = computed(() => {
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <div class="flex items-center space-x-1">
+          <div class="flex items-center gap-x-1">
             <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16 18l6-6l-6-6M8 6l-6 6l6 6" /></svg>
             <span>{{ t('common.source') || 'Source' }}</span>
           </div>
@@ -1705,7 +1705,7 @@ const computedButtonStyle = computed(() => {
       <div v-if="$slots['header-right']">
         <slot name="header-right" />
       </div>
-      <div v-else class="flex items-center space-x-1">
+      <div v-else class="flex items-center gap-x-1">
         <button
           v-if="props.showCollapseButton"
           :class="computedButtonStyle"
