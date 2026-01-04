@@ -235,6 +235,27 @@ function findNextCustomHtmlBlockFromSource(
   return { raw: source.slice(openStart), end: source.length }
 }
 
+function clampNonNegative(n: number) {
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+function lineToIndex(source: string, line: number) {
+  // markdown-it token.map uses 0-based line numbers.
+  const targetLine = clampNonNegative(line)
+  if (!source || targetLine <= 0)
+    return 0
+
+  let currentLine = 0
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] === '\n') {
+      currentLine++
+      if (currentLine === targetLine)
+        return i + 1
+    }
+  }
+  return source.length
+}
+
 export function parseBasicBlockToken(
   tokens: MarkdownToken[],
   index: number,
@@ -272,7 +293,16 @@ export function parseBasicBlockToken(
           // Re-extract the next full <tag>...</tag> block from the original source.
           const source = String((options as any)?.__sourceMarkdown ?? '')
           const cursor = Number((options as any)?.__customHtmlBlockCursor ?? 0)
-          const fromSource = findNextCustomHtmlBlockFromSource(source, tag, cursor)
+
+          // If markdown-it provides a source map for this token, prefer anchoring the
+          // re-extraction to that line range. This avoids accidentally matching an
+          // earlier occurrence of the same custom tag that was tokenized as inline.
+          const mappedLineStart = Array.isArray((token as any).map)
+            ? lineToIndex(source, Number((token as any).map?.[0] ?? 0))
+            : 0
+          const searchStart = Math.max(clampNonNegative(cursor), clampNonNegative(mappedLineStart))
+
+          const fromSource = findNextCustomHtmlBlockFromSource(source, tag, searchStart)
           if (fromSource)
             (options as any).__customHtmlBlockCursor = fromSource.end
 

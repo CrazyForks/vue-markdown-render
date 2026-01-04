@@ -1,7 +1,13 @@
+/**
+ * @vitest-environment jsdom
+ */
+
 import type { VueWrapper } from '@vue/test-utils'
 import { mount } from '@vue/test-utils'
 import { full as markdownItEmoji } from 'markdown-it-emoji'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
+import { removeCustomComponents, setCustomComponents } from '../../src/utils/nodeComponents'
 import { flushAll } from '../setup/flush-all'
 
 interface Scenario {
@@ -441,4 +447,207 @@ describe('markdownRender node e2e coverage', () => {
       }
     }, 20000)
   }
+
+  it('renders repeated custom components without slot content reuse', async () => {
+    const scopeId = 'custom-components-repeat'
+    const NewQuestion = defineComponent({
+      name: 'NewQuestion',
+      setup(_, { slots }) {
+        return () => h('div', { class: 'new-question' }, slots.default?.())
+      },
+    })
+    const SubQuestion = defineComponent({
+      name: 'SubQuestion',
+      setup(_, { slots }) {
+        return () => h('div', { class: 'sub-question' }, slots.default?.())
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      'new-question': NewQuestion,
+      'sub-question': SubQuestion,
+    })
+
+    try {
+      const markdown = `<new-question>A</new-question>
+<sub-question>
+B
+</sub-question>
+
+<sub-question>
+C
+</sub-question>`
+      const wrapper = await mountMarkdown(markdown, {
+        customId: scopeId,
+        final: true,
+      })
+      try {
+        expect(normalizeText(wrapper.text())).toContain('A B C')
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('renders nested repeated custom components without content bleed', async () => {
+    const scopeId = 'custom-components-nested-repeat'
+    const NewQuestion = defineComponent({
+      name: 'NewQuestion',
+      setup(_, { slots }) {
+        return () => h('div', { class: 'new-question' }, slots.default?.())
+      },
+    })
+    const SubQuestion = defineComponent({
+      name: 'SubQuestion',
+      setup(_, { slots }) {
+        return () => h('div', { class: 'sub-question' }, slots.default?.())
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      'new-question': NewQuestion,
+      'sub-question': SubQuestion,
+    })
+
+    try {
+      const markdown = `<sub-question>
+  <new-question>A</new-question>
+  <sub-question>Inner-1</sub-question>
+</sub-question>
+
+<sub-question>
+  <new-question>B</new-question>
+  <sub-question>Inner-2</sub-question>
+</sub-question>`
+      const wrapper = await mountMarkdown(markdown, { customId: scopeId, final: true })
+      try {
+        expect(normalizeText(wrapper.text())).toMatch(/A\s*Inner-1\s*B\s*Inner-2/)
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('renders repeated custom components with different attrs and explicit keys', async () => {
+    const scopeId = 'custom-components-attrs-repeat'
+    const SubQuestion = defineComponent({
+      name: 'SubQuestion',
+      setup(_, { slots, attrs }) {
+        const id = attrs['data-id'] == null ? '' : String(attrs['data-id'])
+        return () => h('div', { class: 'sub-question' }, [
+          h('span', { class: 'sub-question__id' }, id),
+          slots.default?.(),
+        ])
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      'sub-question': SubQuestion,
+    })
+
+    try {
+      const markdown = `<sub-question key="k1" data-id="1">B</sub-question>
+<sub-question key="k2" data-id="2">C</sub-question>`
+      const wrapper = await mountMarkdown(markdown, { customId: scopeId, final: true })
+      try {
+        expect(normalizeText(wrapper.text())).toMatch(/1\s*B\s*2\s*C/)
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('renders custom components interleaved with markdown blocks', async () => {
+    const scopeId = 'custom-components-mixed-markdown'
+    const NewQuestion = defineComponent({
+      name: 'NewQuestion',
+      setup(_, { slots }) {
+        return () => h('div', { class: 'new-question' }, slots.default?.())
+      },
+    })
+    const SubQuestion = defineComponent({
+      name: 'SubQuestion',
+      setup(_, { slots }) {
+        return () => h('div', { class: 'sub-question' }, slots.default?.())
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      'new-question': NewQuestion,
+      'sub-question': SubQuestion,
+    })
+
+    try {
+      const markdown = `<div><new-question>A</new-question></div>
+
+Normal paragraph between.
+
+- item-1
+- item-2
+
+<div><sub-question>B</sub-question></div>
+
+Another paragraph.
+
+<div><sub-question>C</sub-question></div>`
+      const wrapper = await mountMarkdown(markdown, { customId: scopeId, final: true })
+      try {
+        const text = normalizeText(wrapper.text())
+        expect(text).toContain('A')
+        expect(text).toContain('Normal paragraph between.')
+        expect(text).toMatch(/item-1\s*item-2/)
+        expect(text).toMatch(/A[^B]*B[\s\S]*C/)
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('renders repeated custom components mixed with standard HTML inside one block', async () => {
+    const scopeId = 'custom-components-mixed-html'
+    const SubQuestion = defineComponent({
+      name: 'SubQuestion',
+      setup(_, { slots }) {
+        return () => h('div', { class: 'sub-question' }, slots.default?.())
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      'sub-question': SubQuestion,
+    })
+
+    try {
+      const markdown = `<div>
+  <sub-question>First <strong>X</strong></sub-question>
+  <span>middle</span>
+  <sub-question>Second <em>Y</em></sub-question>
+</div>`
+      const wrapper = await mountMarkdown(markdown, { customId: scopeId, final: true })
+      try {
+        expect(normalizeText(wrapper.text())).toMatch(/First\s*X\s*middle\s*Second\s*Y/)
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
 })

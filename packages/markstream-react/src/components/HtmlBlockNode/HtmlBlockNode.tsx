@@ -360,6 +360,7 @@ function parseHtmlToReactNodes(
 
   try {
     const tokens = tokenizeHtml(content)
+    let autoKeySeed = 0
     const stack: Array<{ tagName: string, children: React.ReactNode[], attrs?: Record<string, string>, blocked?: boolean }> = []
     const rootNodes: React.ReactNode[] = []
 
@@ -374,17 +375,20 @@ function parseHtmlToReactNodes(
         if (BLOCKED_TAGS.has(token.tagName!.toLowerCase()))
           continue
         const attrs = sanitizeAttrs(token.attrs || {})
+        const explicitKey = (attrs as any).key
+        const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
         const Comp = isCustomComponent(token.tagName, customComponents)
           ? (customComponents[token.tagName] || customComponents[token.tagName.toLowerCase()])
           : undefined
         if (Comp) {
           const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
-          target.push(React.createElement(Comp, attrs))
+          target.push(React.createElement(Comp, { ...attrs, key: elementKey }))
         }
         else {
           const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
           target.push(React.createElement(token.tagName, {
             ...normalizeDomAttrs(attrs),
+            key: elementKey,
             suppressHydrationWarning: true,
           }))
         }
@@ -403,13 +407,16 @@ function parseHtmlToReactNodes(
           if (opening.blocked)
             continue
           const attrs = sanitizeAttrs(opening.attrs || {})
+          const explicitKey = (attrs as any).key
+          const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
           const Comp = isCustomComponent(opening.tagName, customComponents)
             ? (customComponents[opening.tagName] || customComponents[opening.tagName.toLowerCase()])
             : undefined
           const element = Comp
-            ? React.createElement(Comp, attrs, ...opening.children)
+            ? React.createElement(Comp, { ...attrs, key: elementKey }, ...opening.children)
             : React.createElement(opening.tagName, {
                 ...normalizeDomAttrs(attrs),
+                key: elementKey,
                 suppressHydrationWarning: true,
               }, ...opening.children)
 
@@ -426,13 +433,16 @@ function parseHtmlToReactNodes(
       if (unclosed.blocked)
         continue
       const attrs = sanitizeAttrs(unclosed.attrs || {})
+      const explicitKey = (attrs as any).key
+      const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
       const Comp = isCustomComponent(unclosed.tagName, customComponents)
         ? (customComponents[unclosed.tagName] || customComponents[unclosed.tagName.toLowerCase()])
         : undefined
       const element = Comp
-        ? React.createElement(Comp, attrs, ...unclosed.children)
+        ? React.createElement(Comp, { ...attrs, key: elementKey }, ...unclosed.children)
         : React.createElement(unclosed.tagName, {
             ...normalizeDomAttrs(attrs),
+            key: elementKey,
             suppressHydrationWarning: true,
           }, ...unclosed.children)
       rootNodes.push(element)

@@ -477,6 +477,7 @@ function buildReactElementTree(
   tokens: HtmlToken[],
   customComponents: Record<string, ComponentType<any>>,
 ): React.ReactNode[] {
+  let autoKeySeed = 0
   const stack: Array<{ tagName: string, children: React.ReactNode[], attrs?: Record<string, string> }> = []
   const rootNodes: React.ReactNode[] = []
 
@@ -486,7 +487,7 @@ function buildReactElementTree(
       target.push(token.content!)
     }
     else if (token.type === 'self_closing') {
-      const element = createReactElement(token.tagName!, token.attrs || {}, [], customComponents)
+      const element = createReactElement(token.tagName!, token.attrs || {}, [], customComponents, `ms-html-${autoKeySeed++}`)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       element != null && target.push(element)
     }
@@ -509,7 +510,7 @@ function buildReactElementTree(
         // Pop all tags until the matched one (auto-closing intermediate tags)
         while (stack.length > matchedIndex) {
           const opening = stack.pop()!
-          const element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents)
+          const element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `ms-html-${autoKeySeed++}`)
 
           if (stack.length > 0)
             element != null && stack[stack.length - 1].children.push(element)
@@ -532,7 +533,7 @@ function buildReactElementTree(
   // Handle any remaining unclosed tags
   while (stack.length > 0) {
     const unclosed = stack.pop()!
-    const element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents)
+    const element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `ms-html-${autoKeySeed++}`)
     element != null && rootNodes.push(element)
     warn(`Auto-closing unclosed tag: <${unclosed.tagName}>`)
   }
@@ -548,21 +549,24 @@ function createReactElement(
   attrs: Record<string, string>,
   children: React.ReactNode[],
   customComponents: Record<string, ComponentType<any>>,
+  autoKey: string,
 ): React.ReactNode {
   if (BLOCKED_TAGS.has(tagName.toLowerCase()))
     return null
 
   const sanitizedAttrs = sanitizeAttrs(attrs)
+  const explicitKey = (sanitizedAttrs as any).key
+  const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : autoKey
 
   if (isCustomComponent(tagName, customComponents)) {
     // It's a custom React component
     const component = customComponents[tagName] || customComponents[tagName.toLowerCase()]
     const convertedAttrs = convertAttrsToProps(sanitizedAttrs)
-    return React.createElement(component as ComponentType<any>, convertedAttrs, ...children)
+    return React.createElement(component as ComponentType<any>, { ...convertedAttrs, key: elementKey }, ...children)
   }
   else {
     // It's a standard HTML element
-    return React.createElement(tagName, normalizeDomAttrs(sanitizedAttrs), ...children)
+    return React.createElement(tagName, { ...normalizeDomAttrs(sanitizedAttrs), key: elementKey }, ...children)
   }
 }
 

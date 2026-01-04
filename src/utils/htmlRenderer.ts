@@ -434,6 +434,7 @@ export function buildVNodeTree(
   tokens: HtmlToken[],
   customComponents: Record<string, Component>,
 ): any[] {
+  let autoKeySeed = 0
   const stack: Array<{ tagName: string, children: any[], attrs?: Record<string, string> }> = []
   const rootNodes: any[] = []
 
@@ -443,7 +444,7 @@ export function buildVNodeTree(
       target.push(token.content!)
     }
     else if (token.type === 'self_closing') {
-      const vnode = createVNode(token.tagName!, token.attrs || {}, [], customComponents)
+      const vnode = createVNode(token.tagName!, token.attrs || {}, [], customComponents, `ms-html-${autoKeySeed++}`)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       vnode != null && target.push(vnode)
     }
@@ -466,7 +467,7 @@ export function buildVNodeTree(
         // Pop all tags until the matched one (auto-closing intermediate tags)
         while (stack.length > matchedIndex) {
           const opening = stack.pop()!
-          const vnode = createVNode(opening.tagName, opening.attrs || {}, opening.children, customComponents)
+          const vnode = createVNode(opening.tagName, opening.attrs || {}, opening.children, customComponents, `ms-html-${autoKeySeed++}`)
 
           if (stack.length > 0)
             vnode != null && stack[stack.length - 1].children.push(vnode)
@@ -489,7 +490,7 @@ export function buildVNodeTree(
   // Handle any remaining unclosed tags
   while (stack.length > 0) {
     const unclosed = stack.pop()!
-    const vnode = createVNode(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents)
+    const vnode = createVNode(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `ms-html-${autoKeySeed++}`)
     vnode != null && rootNodes.push(vnode)
     warn(`Auto-closing unclosed tag: <${unclosed.tagName}>`)
   }
@@ -505,21 +506,24 @@ function createVNode(
   attrs: Record<string, string>,
   children: any[],
   customComponents: Record<string, Component>,
+  autoKey: string,
 ): any {
   if (BLOCKED_TAGS.has(tagName.toLowerCase()))
     return null
 
   const sanitizedAttrs = sanitizeAttrs(attrs)
+  const explicitKey = (sanitizedAttrs as any).key
+  const vnodeKey = explicitKey != null && explicitKey !== '' ? explicitKey : autoKey
 
   if (isCustomComponent(tagName, customComponents)) {
     // It's a custom Vue component
     const component = customComponents[tagName] || customComponents[tagName.toLowerCase()]
     const convertedAttrs = convertAttrsToProps(sanitizedAttrs)
-    return h(component as Component, convertedAttrs, children.length > 0 ? children : undefined)
+    return h(component as Component, { ...convertedAttrs, key: vnodeKey }, children.length > 0 ? children : undefined)
   }
   else {
     // It's a standard HTML element
-    return h(tagName, { ...sanitizedAttrs, innerHTML: undefined }, children.length > 0 ? children : undefined)
+    return h(tagName, { ...sanitizedAttrs, innerHTML: undefined, key: vnodeKey }, children.length > 0 ? children : undefined)
   }
 }
 
