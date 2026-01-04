@@ -1,197 +1,182 @@
 import { describe, expect, it } from 'vitest'
-import { getMarkdown, parseMarkdownToStructure } from '../src'
 import { textIncludes } from '../../../test/utils/midstate-utils'
+import { getMarkdown, parseMarkdownToStructure } from '../src'
 
 const md = getMarkdown('test')
 
 describe('special link cases', () => {
-    it('parses link with numeric brackets in link text: [[8]](url)', () => {
-        const markdown = '建议采用以下接口方案：[[8]](https://markstream-vue-docs.simonhe.me/)'
-        const nodes = parseMarkdownToStructure(markdown, md)
+  it('parses link with numeric brackets in link text: [[8]](url)', () => {
+    const markdown = '建议采用以下接口方案：[[8]](https://markstream-vue-docs.simonhe.me/)'
+    const nodes = parseMarkdownToStructure(markdown, md)
 
-        // Collect all link nodes
-        const links: any[] = []
-        const walk = (n: any) => {
-            if (!n)
-                return
-            if (n.type === 'link')
-                links.push(n)
-            if (Array.isArray(n.children))
-                n.children.forEach(walk)
-            if (Array.isArray(n.items))
-                n.items.forEach(walk)
-        }
-        nodes.forEach(walk)
+    // Collect all link nodes
+    const links: any[] = []
+    const walk = (n: any) => {
+      if (!n)
+        return
+      if (n.type === 'link')
+        links.push(n)
+      if (Array.isArray(n.children))
+        n.children.forEach(walk)
+      if (Array.isArray(n.items))
+        n.items.forEach(walk)
+    }
+    nodes.forEach(walk)
 
-        // Should have exactly one link
-        expect(links.length).toBe(1)
-        const link = links[0]
+    // Should have exactly one link
+    expect(links.length).toBe(1)
+    const link = links[0]
 
-        // Verify link properties
-        expect(link.href).toBe('https://markstream-vue-docs.simonhe.me/')
-        expect(link.loading).toBe(false)
+    // Verify link properties
+    expect(link.href).toBe('https://markstream-vue-docs.simonhe.me/')
+    expect(link.loading).toBe(false)
 
-        // Verify link text contains [8]
-        // The link text should be "[8]" (the brackets are part of the link text)
-        const linkText = link.text || ''
-        const childText = (link.children || [])
-            .map((c: any) => (c.content ?? c.text ?? ''))
-            .join('')
-        const fullText = linkText || childText
+    // Verify link text contains [8]
+    // The link text should be "[8]" (the brackets are part of the link text)
+    const linkText = link.text || ''
+    const childText = (link.children || [])
+      .map((c: any) => (c.content ?? c.text ?? ''))
+      .join('')
+    const fullText = linkText || childText
 
-        expect(fullText).toBe('[8]')
+    expect(fullText).toBe('[8]')
 
-        // Verify the paragraph contains both the prefix text and the link
-        const para = nodes.find((n: any) => n.type === 'paragraph') as any
-        expect(para).toBeTruthy()
-        expect(textIncludes(para, '建议采用以下接口方案：')).toBe(true)
-        expect(para.children.some((c: any) => c.type === 'link')).toBe(true)
-    })
+    // Verify the paragraph contains both the prefix text and the link
+    const para = nodes.find((n: any) => n.type === 'paragraph') as any
+    expect(para).toBeTruthy()
+    expect(textIncludes(para, '建议采用以下接口方案：')).toBe(true)
+    expect(para.children.some((c: any) => c.type === 'link')).toBe(true)
+  })
 
-    it('parses link with emphasis markers in link text: [DR **(Danmarks Radio)](url)', () => {
-        const markdown = '[DR **(Danmarks Radio)](https://www.dr.dk/nyheder)'
-        const nodes = parseMarkdownToStructure(markdown, md)
+  it('parses link with emphasis markers in link text: [DR **(Danmarks Radio)](url)', () => {
+    const markdown = '[DR **(Danmarks Radio)](https://www.dr.dk/nyheder)'
+    const nodes = parseMarkdownToStructure(markdown, md)
 
-        // Collect all link nodes
-        const links: any[] = []
-        const walk = (n: any) => {
-            if (!n)
-                return
-            if (n.type === 'link')
-                links.push(n)
-            if (Array.isArray(n.children))
-                n.children.forEach(walk)
-            if (Array.isArray(n.items))
-                n.items.forEach(walk)
-        }
-        nodes.forEach(walk)
+    // Collect all link nodes
+    const links: any[] = []
+    const walk = (n: any) => {
+      if (!n)
+        return
+      if (n.type === 'link')
+        links.push(n)
+      if (Array.isArray(n.children))
+        n.children.forEach(walk)
+      if (Array.isArray(n.items))
+        n.items.forEach(walk)
+    }
+    nodes.forEach(walk)
 
-        // Should have exactly one link
-        expect(links.length).toBe(1)
-        const link = links[0]
+    // Should have exactly one link
+    expect(links.length).toBe(1)
+    const link = links[0]
 
-        // Verify link properties
-        expect(link.href).toBe('https://www.dr.dk/nyheder')
-        expect(link.loading).toBe(false)
+    // Verify link properties
+    expect(link.href).toBe('https://www.dr.dk/nyheder')
+    expect(link.loading).toBe(false)
 
-        // Verify link text contains "DR" and "(Danmarks Radio)"
-        // The link may have nested strong/emphasis nodes or plain text
-        const linkText = link.text || ''
-        const childText = (link.children || [])
-            .map((c: any) => {
-                if (c.type === 'text')
-                    return c.content || ''
-                if (c.type === 'strong')
-                    return (c.children || []).map((cc: any) => cc.content || '').join('')
-                return c.content || c.text || ''
-            })
-            .join('')
-        const fullText = linkText || childText
+    // Should contain "DR" and "Danmarks Radio"
+    expect(textIncludes(link, 'DR')).toBe(true)
+    expect(textIncludes(link, 'Danmarks Radio')).toBe(true)
+    expect(textIncludes(link, '(Danmarks Radio)')).toBe(true)
 
-        // Should contain "DR" and "Danmarks Radio"
-        expect(textIncludes(link, 'DR')).toBe(true)
-        expect(textIncludes(link, 'Danmarks Radio')).toBe(true)
-        expect(textIncludes(link, '(Danmarks Radio)')).toBe(true)
+    // Verify the paragraph contains the link
+    const para = nodes.find((n: any) => n.type === 'paragraph') as any
+    expect(para).toBeTruthy()
+    expect(para.children.some((c: any) => c.type === 'link')).toBe(true)
+  })
 
-        // Verify the paragraph contains the link
-        const para = nodes.find((n: any) => n.type === 'paragraph') as any
-        expect(para).toBeTruthy()
-        expect(para.children.some((c: any) => c.type === 'link')).toBe(true)
-    })
+  it('parses multiple links with special characters in same paragraph', () => {
+    const markdown = '建议采用以下接口方案：[[8]](https://markstream-vue-docs.simonhe.me/)\n\n[DR **(Danmarks Radio)](https://www.dr.dk/nyheder)'
+    const nodes = parseMarkdownToStructure(markdown, md)
 
-    it('parses multiple links with special characters in same paragraph', () => {
-        const markdown = '建议采用以下接口方案：[[8]](https://markstream-vue-docs.simonhe.me/)\n\n[DR **(Danmarks Radio)](https://www.dr.dk/nyheder)'
-        const nodes = parseMarkdownToStructure(markdown, md)
+    // Collect all link nodes
+    const links: any[] = []
+    const walk = (n: any) => {
+      if (!n)
+        return
+      if (n.type === 'link')
+        links.push(n)
+      if (Array.isArray(n.children))
+        n.children.forEach(walk)
+      if (Array.isArray(n.items))
+        n.items.forEach(walk)
+    }
+    nodes.forEach(walk)
 
-        // Collect all link nodes
-        const links: any[] = []
-        const walk = (n: any) => {
-            if (!n)
-                return
-            if (n.type === 'link')
-                links.push(n)
-            if (Array.isArray(n.children))
-                n.children.forEach(walk)
-            if (Array.isArray(n.items))
-                n.items.forEach(walk)
-        }
-        nodes.forEach(walk)
+    // Should have exactly two links
+    expect(links.length).toBe(2)
 
-        // Should have exactly two links
-        expect(links.length).toBe(2)
+    // First link: [[8]](url)
+    const firstLink = links.find(l => l.href === 'https://markstream-vue-docs.simonhe.me/')
+    expect(firstLink).toBeDefined()
+    expect(firstLink?.loading).toBe(false)
+    const firstLinkText = firstLink?.text || (firstLink?.children || []).map((c: any) => c.content || '').join('')
+    expect(firstLinkText).toBe('[8]')
 
-        // First link: [[8]](url)
-        const firstLink = links.find(l => l.href === 'https://markstream-vue-docs.simonhe.me/')
-        expect(firstLink).toBeDefined()
-        expect(firstLink?.loading).toBe(false)
-        const firstLinkText = firstLink?.text || (firstLink?.children || []).map((c: any) => c.content || '').join('')
-        expect(firstLinkText).toBe('[8]')
+    // Second link: [DR **(Danmarks Radio)](url)
+    const secondLink = links.find(l => l.href === 'https://www.dr.dk/nyheder')
+    expect(secondLink).toBeDefined()
+    expect(secondLink?.loading).toBe(false)
+    expect(textIncludes(secondLink, 'DR')).toBe(true)
+    expect(textIncludes(secondLink, 'Danmarks Radio')).toBe(true)
+  })
 
-        // Second link: [DR **(Danmarks Radio)](url)
-        const secondLink = links.find(l => l.href === 'https://www.dr.dk/nyheder')
-        expect(secondLink).toBeDefined()
-        expect(secondLink?.loading).toBe(false)
-        expect(textIncludes(secondLink, 'DR')).toBe(true)
-        expect(textIncludes(secondLink, 'Danmarks Radio')).toBe(true)
-    })
+  it('parses standalone numeric bracket link without prefix text', () => {
+    const markdown = '[[8]](https://example.com)'
+    const nodes = parseMarkdownToStructure(markdown, md)
 
-    it('parses standalone numeric bracket link without prefix text', () => {
-        const markdown = '[[8]](https://example.com)'
-        const nodes = parseMarkdownToStructure(markdown, md)
+    const links: any[] = []
+    const walk = (n: any) => {
+      if (!n)
+        return
+      if (n.type === 'link')
+        links.push(n)
+      if (Array.isArray(n.children))
+        n.children.forEach(walk)
+    }
+    nodes.forEach(walk)
 
-        const links: any[] = []
-        const walk = (n: any) => {
-            if (!n)
-                return
-            if (n.type === 'link')
-                links.push(n)
-            if (Array.isArray(n.children))
-                n.children.forEach(walk)
-        }
-        nodes.forEach(walk)
+    expect(links.length).toBe(1)
+    expect(links[0].href).toBe('https://example.com')
+    expect(links[0].text || links[0].children?.map((c: any) => c.content || '').join('')).toBe('[8]')
+  })
 
-        expect(links.length).toBe(1)
-        expect(links[0].href).toBe('https://example.com')
-        expect(links[0].text || links[0].children?.map((c: any) => c.content || '').join('')).toBe('[8]')
-    })
+  it('distinguishes between reference [8] and link [[8]](url)', () => {
+    // Standalone [8] should be a reference
+    const referenceMarkdown = '请参考 [8] 了解更多信息'
+    const referenceNodes = parseMarkdownToStructure(referenceMarkdown, md)
 
-    it('distinguishes between reference [8] and link [[8]](url)', () => {
-        // Standalone [8] should be a reference
-        const referenceMarkdown = '请参考 [8] 了解更多信息'
-        const referenceNodes = parseMarkdownToStructure(referenceMarkdown, md)
+    const references: any[] = []
+    const walkRef = (n: any) => {
+      if (!n)
+        return
+      if (n.type === 'reference')
+        references.push(n)
+      if (Array.isArray(n.children))
+        n.children.forEach(walkRef)
+    }
+    referenceNodes.forEach(walkRef)
 
-        const references: any[] = []
-        const walkRef = (n: any) => {
-            if (!n)
-                return
-            if (n.type === 'reference')
-                references.push(n)
-            if (Array.isArray(n.children))
-                n.children.forEach(walkRef)
-        }
-        referenceNodes.forEach(walkRef)
+    // [8] as standalone should be parsed as reference (if reference rule matches)
+    // But if it's followed by ](, it should be a link
+    const linkMarkdown = '请参考 [[8]](https://example.com) 了解更多信息'
+    const linkNodes = parseMarkdownToStructure(linkMarkdown, md)
 
-        // [8] as standalone should be parsed as reference (if reference rule matches)
-        // But if it's followed by ](, it should be a link
-        const linkMarkdown = '请参考 [[8]](https://example.com) 了解更多信息'
-        const linkNodes = parseMarkdownToStructure(linkMarkdown, md)
+    const links: any[] = []
+    const walkLink = (n: any) => {
+      if (!n)
+        return
+      if (n.type === 'link')
+        links.push(n)
+      if (Array.isArray(n.children))
+        n.children.forEach(walkLink)
+    }
+    linkNodes.forEach(walkLink)
 
-        const links: any[] = []
-        const walkLink = (n: any) => {
-            if (!n)
-                return
-            if (n.type === 'link')
-                links.push(n)
-            if (Array.isArray(n.children))
-                n.children.forEach(walkLink)
-        }
-        linkNodes.forEach(walkLink)
-
-        // The link version should have a link node
-        expect(links.length).toBeGreaterThan(0)
-        const link = links.find(l => l.href === 'https://example.com')
-        expect(link).toBeDefined()
-        expect(link?.text || link?.children?.map((c: any) => c.content || '').join('')).toBe('[8]')
-    })
+    // The link version should have a link node
+    expect(links.length).toBeGreaterThan(0)
+    const link = links.find(l => l.href === 'https://example.com')
+    expect(link).toBeDefined()
+    expect(link?.text || link?.children?.map((c: any) => c.content || '').join('')).toBe('[8]')
+  })
 })
-
