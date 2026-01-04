@@ -169,9 +169,9 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
       const closed = envFinal ? true : (endLine > openLine + 1 && count >= minLen && j === line.length)
       const tokenShape = token as unknown as { meta?: Record<string, unknown> }
       tokenShape.meta = tokenShape.meta ?? {}
-      ; (tokenShape.meta as Record<string, unknown>).unclosed = !closed
-      // also set a explicit `closed` boolean for compatibility with plugins/tests
-      ; (tokenShape.meta as Record<string, unknown>).closed = !!closed
+        ; (tokenShape.meta as Record<string, unknown>).unclosed = !closed
+        // also set a explicit `closed` boolean for compatibility with plugins/tests
+        ; (tokenShape.meta as Record<string, unknown>).closed = !!closed
     }
   })
 
@@ -211,8 +211,8 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
       <div class="code-header">
         <span class="code-lang">${language.toUpperCase()}</span>
         <button class="copy-button" data-code="${encodedCode}">${t(
-          'common.copy',
-        )}</button>
+      'common.copy',
+    )}</button>
       </div>
       <div class="code-editor"></div>
     </div>`
@@ -227,6 +227,11 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
     const match = RE_REFERENCE.exec(s.src.slice(s.pos))
     if (!match)
       return false
+    // Check if this is part of a link: if followed by '](', it's a link text, not a reference
+    const afterMatch = s.src.slice(s.pos + match[0].length)
+    if (afterMatch.startsWith('](')) {
+      return false
+    }
     if (!silent) {
       const id = match[1]
       const token = s.push('reference', 'span', 0)
