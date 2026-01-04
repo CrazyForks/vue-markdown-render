@@ -2,7 +2,7 @@
 
 说明：
 - Vue 源码在 `src/components/*`，React 源码在 `packages/markstream-react/src/components/*`。
-- React 组件统一从 `packages/markstream-react/src/index.ts` 导出；样式来自 `markstream-react/index.css`（选择器前缀 `.markstream-vue` 与 Vue 保持一致）。
+- React 组件统一从 `packages/markstream-react/src/index.ts` 导出；样式来自 `markstream-react/index.css`（选择器前缀 `.markstream-react`）。
 - 绝大多数“节点组件”在两端都是同名组件：输入 `node`（以及 renderer 透传的 `ctx` / `indexKey` / `customId` / `isDark` / `typewriter`），无额外 API 差异。
 
 ## 组件映射

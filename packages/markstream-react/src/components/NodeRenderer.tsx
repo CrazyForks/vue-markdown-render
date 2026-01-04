@@ -577,7 +577,7 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`markstream-vue markdown-renderer${props.isDark ? ' dark' : ''}${virtualizationEnabled ? ' virtualized' : ''}`}
+      className={`markstream-react markdown-renderer${props.isDark ? ' dark' : ''}${virtualizationEnabled ? ' virtualized' : ''}`}
       onClick={props.onClick}
       onMouseOver={handleMouseEvent(props.onMouseOver)}
       onMouseOut={handleMouseEvent(props.onMouseOut)}

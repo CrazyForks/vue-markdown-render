@@ -1,13 +1,23 @@
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react-swc'
+import UnpluginClassExtractor from 'unplugin-class-extractor/vite'
 import { defineConfig } from 'vite'
 import { name } from './package.json'
 
 export default defineConfig(({ mode }) => {
   const base = mode === 'npm' ? '' : '/'
+  const plugins = [react()]
+  if (mode === 'npm') {
+    plugins.push(
+      UnpluginClassExtractor({
+        output: 'dist/tailwind.ts',
+        include: [/\/src\/.*\.(?:ts|tsx)(\?.*)?$/],
+      }) as any,
+    )
+  }
   return {
     base,
-    plugins: [react()],
+    plugins,
     css: {
       postcss: './postcss.config.cjs',
     },

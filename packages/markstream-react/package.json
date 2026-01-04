@@ -3,12 +3,17 @@
   "type": "module",
   "version": "0.0.3-beta.2",
   "description": "React renderer for stream-markdown based AST output used in markstream-vue.",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./index.css": "./dist/index.css",
+    "./index.tailwind.css": "./dist/index.tailwind.css",
+    "./tailwind": "./dist/tailwind.ts",
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
     "./workers/mermaidParser.worker": "./dist/workers/mermaidParser.worker.js"
   },
@@ -20,7 +25,7 @@
   ],
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build --mode npm",
+    "build": "vite build --mode npm && vite build -c vite.config.tailwind.ts --mode npm && node ./scripts/copy-tailwind-css.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "release": "bumpp --commit --no-tag --no-push && npm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"

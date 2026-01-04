@@ -29,6 +29,11 @@ export default function Article({ markdown }: { markdown: string }) {
 
 You can also pass a pre-parsed `nodes` array if you already have AST data.
 
+## Tailwind
+
+- Non-Tailwind projects: keep importing `markstream-react/index.css` (includes precompiled utilities for the renderer).
+- Tailwind projects (avoid duplicate utilities): import `markstream-react/index.tailwind.css` and add `require('markstream-react/tailwind')` to your `tailwind.config.js` `content`.
+
 ## Custom components (e.g. `<thinking>`)
 
 Custom tag-like blocks are exposed as nodes with `type: '<tag>'` (for example `type: 'thinking'`) when you register the tag in `customHtmlTags` or register a custom component mapping for it.

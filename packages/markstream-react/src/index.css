@@ -1,7 +1,7 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+.markstream-react {
   --border: 214.3 31.8% 91.4%;
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
@@ -10,16 +10,7 @@
   --muted-foreground: 215.4 16.3% 46.9%;
 }
 
-.markstream-vue {
-  --border: 214.3 31.8% 91.4%;
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --secondary: 210 40% 96%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-}
-
-.markstream-vue button {
+.markstream-react button {
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
@@ -28,17 +19,8 @@
   color: inherit;
 }
 
-.dark {
-  --border: 217.2 32.6% 17.5%;
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --secondary: 217.2 32.6% 17.5%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-}
-
-.dark .markstream-vue,
-.markstream-vue.dark {
+.dark .markstream-react,
+.markstream-react.dark {
   --border: 217.2 32.6% 17.5%;
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
@@ -1088,8 +1070,8 @@ li .paragraph-node {
   100% { background-position: 0 0; }
 }
 
-.markstream-vue pre[class^='language-'],
-.markstream-vue pre[class*=' language-'] {
+.markstream-react pre[class^='language-'],
+.markstream-react pre[class*=' language-'] {
   white-space: pre;
   overflow: auto;
   tab-size: 2;
@@ -1100,13 +1082,13 @@ li .paragraph-node {
   -webkit-font-smoothing: antialiased;
 }
 
-.markstream-vue pre[class^='language-'] > code,
-.markstream-vue pre[class*=' language-'] > code {
+.markstream-react pre[class^='language-'] > code,
+.markstream-react pre[class*=' language-'] > code {
   display: block;
 }
 
-.markstream-vue pre[class^='language-']:focus,
-.markstream-vue pre[class*=' language-']:focus {
+.markstream-react pre[class^='language-']:focus,
+.markstream-react pre[class*=' language-']:focus {
   outline: 2px solid var(--vmdr-focus, #3b82f6);
   outline-offset: 2px;
 }
@@ -1257,7 +1239,7 @@ li .paragraph-node {
   }
 }
 
-.sr-only {
+.markstream-react .sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
