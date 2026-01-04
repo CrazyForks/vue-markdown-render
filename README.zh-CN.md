@@ -3,6 +3,7 @@
 > 针对 Vue 3 的高性能、流式友好型 Markdown 渲染组件 — 支持渐进式 Mermaid、流式 diff 代码块以及为大文档优化的实时预览。
 
 [![NPM version](https://img.shields.io/npm/v/markstream-vue?color=a1b858&label=)](https://www.npmjs.com/package/markstream-vue)
+[![English](https://img.shields.io/badge/docs-English-blue)](README.md)
 [![Docs](https://img.shields.io/badge/docs-中文文档-blue)](https://markstream-vue-docs.simonhe.me/zh/guide/)
 [![Playground](https://img.shields.io/badge/playground-在线体验-34c759)](https://markstream-vue.simonhe.me/)
 [![Test page](https://img.shields.io/badge/test-可分享复现-0A84FF)](https://markstream-vue.simonhe.me/test)
@@ -16,12 +17,16 @@
 [![CI](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml/badge.svg)](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/markstream-vue)](./license)
 
-需要 Vue 2.6 版本？请使用 [`markstream-vue2`](./packages/markstream-vue2/README.md)（基础移植版，功能更精简）。
+需要其他框架/版本？
+
+- Vue 2.6：请使用 [`markstream-vue2`](./packages/markstream-vue2/README.md)（基础移植版，功能更精简）
+- React：请参考 `packages/markstream-react` 的说明 [`packages/markstream-react/README.md`](./packages/markstream-react/README.md)（初步移植版）
 
 ## 目录
 
 - [速览](#速览)
 - [立即试用](#-立即试用)
+- [社区与支持](#-社区与支持)
 - [快速上手](#-快速上手)
 - [常用命令](#-常用命令)
 - [30 秒流式接入](#-30-秒流式接入)
@@ -30,11 +35,17 @@
 - [适用场景](#-适用场景)
 - [快问快答](#-快问快答)
 - [为什么选择 markstream-vue](#-为什么选择-markstream-vue而不是普通-markdown-渲染器)
+- [Roadmap](#-roadmap快照)
 - [发布](#-发布)
 - [案例与展示](#-案例与展示)
+- [介绍视频](#介绍视频)
+- [核心特性](#核心特性)
 - [贡献与社区](#-贡献与社区)
-- [社区与支持](#-社区与支持)
 - [故障排查](#故障排查--常见问题)
+- [鸣谢](#鸣谢)
+- [Star 历史](#star-历史)
+- [许可](#许可)
+
 > 📖 所有详细文档、API、示例和高级用法已迁移至 VitePress 中文文档站点：
 > https://markstream-vue-docs.simonhe.me/zh/guide/
 
@@ -107,6 +118,9 @@ enableMermaid()
 enableKatex()
 ```
 
+<details>
+<summary>可选：CDN Worker（KaTeX / Mermaid）</summary>
+
 如果你是用 CDN 引入 KaTeX，并且希望公式在 Web Worker 中渲染（不打包 / 不安装可选 peer），可以注入一个“CDN 加载 KaTeX”的 worker：
 
 ```ts
@@ -139,7 +153,10 @@ if (worker)
   setMermaidWorker(worker)
 ```
 
-### Nuxt 快速接入
+</details>
+
+<details>
+<summary>Nuxt 快速接入</summary>
 
 ```ts
 // plugins/markstream-vue.client.ts
@@ -153,6 +170,8 @@ export default defineNuxtPlugin((nuxtApp) => {
 ```
 
 然后在页面中直接使用 `<MarkdownRender :content=\"md\" />`。
+
+</details>
 
 ## 🛠️ 常用命令
 
@@ -168,11 +187,7 @@ export default defineNuxtPlugin((nuxtApp) => {
 
 ```ts
 import type { ParsedNode } from 'markstream-vue'
-import MarkdownRender, {
-  getMarkdown,
-
-  parseMarkdownToStructure
-} from 'markstream-vue'
+import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 import { ref } from 'vue'
 
 const nodes = ref<ParsedNode[]>([])
@@ -202,6 +217,9 @@ eventSource.onmessage = event => addChunk(event.data)
 
 - 虚拟化窗口（默认）：长文档滚动平稳、内存稳定。
 - 增量批次：将 `:max-live-nodes="0"`，获得更明显的“打字机”体验与轻量占位。
+
+<details>
+<summary>进阶：SSR / Worker / 流式续写</summary>
 
 ### SSR / Worker（确定性输出）
 
@@ -246,6 +264,8 @@ function addChunk(chunk: string) {
 这样无需重新解析 SSR 内容，同时还能通过 SSE/WebSocket 持续追加后续片段。
 
 > 提示：当你明确知道流已结束（消息已完整）时，建议用 `parseMarkdownToStructure(buffer.value, md, { final: true })` 或在组件上设置 `:final="true"`，以关闭解析器的中间态（loading）策略，避免末尾残留分隔符（如 `$$`、未闭合 code fence）导致永久 loading。
+
+</details>
 
 ## ⚙️ 性能模式
 

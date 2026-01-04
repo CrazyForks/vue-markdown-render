@@ -17,12 +17,16 @@
 [![CI](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml/badge.svg)](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/markstream-vue)](./license)
 
-Looking for Vue 2.6? Use [`markstream-vue2`](./packages/markstream-vue2/README.md) (a baseline port with fewer advanced features).
+Looking for other frameworks?
+
+- Vue 2.6: use [`markstream-vue2`](./packages/markstream-vue2/README.md) (a baseline port with fewer advanced features)
+- React: see `packages/markstream-react` at [`packages/markstream-react/README.md`](./packages/markstream-react/README.md) (first-pass port)
 
 ## Contents
 
 - [TL;DR Highlights](#tldr-highlights)
 - [Try It Now](#-try-it-now)
+- [Community & support](#-community--support)
 - [Quick Start](#-quick-start)
 - [Common commands](#-common-commands)
 - [Streaming in 30 seconds](#-streaming-in-30-seconds)
@@ -31,17 +35,18 @@ Looking for Vue 2.6? Use [`markstream-vue2`](./packages/markstream-vue2/README.m
 - [Where it shines](#-where-it-shines)
 - [FAQ](#-faq-quick-answers)
 - [Why markstream-vue](#-why-markstream-vue-over-a-typical-markdown-renderer)
+- [Roadmap](#-roadmap-snapshot)
 - [Releases](#-releases)
 - [Showcase](#-showcase--examples)
+- [Introduction Video](#-introduction-video)
+- [Features](#features)
 - [Contributing & community](#-contributing--community)
-- [Community & support](#-community--support)
 - [Troubleshooting](#troubleshooting--common-issues)
-> 📖 All detailed documentation, API, examples, and advanced usage have been migrated to the VitePress documentation site:
-> https://markstream-vue-docs.simonhe.me/guide/
+- [Thanks](#thanks)
+- [Star History](#star-history)
+- [License](#license)
 
-> ✅ Looking for a React renderer? A first-pass port now lives under `packages/markstream-react`. See `packages/markstream-react/README.md` for usage instructions while its documentation is fleshed out.
-
-> ✅ Looking for a React renderer? A first-pass port now lives under `packages/markstream-react`. See `packages/markstream-react/README.md` for usage instructions while its documentation is fleshed out.
+> 📖 Detailed docs, API, and advanced usage: https://markstream-vue-docs.simonhe.me/guide/
 
 ## TL;DR Highlights
 
@@ -112,6 +117,9 @@ enableMermaid()
 enableKatex()
 ```
 
+<details>
+<summary>Optional: CDN-backed workers (KaTeX / Mermaid)</summary>
+
 If you load KaTeX via CDN and want KaTeX rendering in a Web Worker (no bundler / optional peer not installed), inject a CDN-backed worker:
 
 ```ts
@@ -144,7 +152,10 @@ if (worker)
   setMermaidWorker(worker)
 ```
 
-### Nuxt quick drop-in
+</details>
+
+<details>
+<summary>Nuxt quick drop-in</summary>
 
 ```ts
 // plugins/markstream-vue.client.ts
@@ -158,6 +169,8 @@ export default defineNuxtPlugin((nuxtApp) => {
 ```
 
 Then use `<MarkdownRender :content="md" />` in your pages.
+
+</details>
 
 ## 🛠️ Common commands
 
@@ -173,11 +186,7 @@ Render streamed Markdown (SSE/websocket) with incremental updates:
 
 ```ts
 import type { ParsedNode } from 'markstream-vue'
-import MarkdownRender, {
-  getMarkdown,
-
-  parseMarkdownToStructure
-} from 'markstream-vue'
+import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 import { ref } from 'vue'
 
 const nodes = ref<ParsedNode[]>([])
@@ -207,6 +216,9 @@ Switch rendering style per surface:
 
 - Virtualized window (default): steady scrolling and memory usage for long docs.
 - Incremental batches: set `:max-live-nodes="0"` for AI-like “typing” with lightweight placeholders.
+
+<details>
+<summary>Advanced: SSR / worker / streaming handoff</summary>
 
 ### SSR / Worker usage (deterministic output)
 
@@ -251,6 +263,8 @@ function addChunk(chunk: string) {
 This avoids re-parsing SSR content while letting later SSE/WebSocket chunks continue the stream.
 
 > Tip: when you know the stream has ended (the message is complete), use `parseMarkdownToStructure(buffer.value, md, { final: true })` or pass `:final="true"` to the component. This disables mid-state (`loading`) parsing so trailing delimiters (like `$$` or an unclosed code fence) won’t get stuck showing perpetual loading.
+
+</details>
 
 ## ⚙️ Performance presets
 
