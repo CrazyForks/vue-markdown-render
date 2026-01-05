@@ -47,6 +47,7 @@ const CodeBlockNode = defineAsyncComponent(() => import('./components/CodeBlockN
 const MathBlockNode = defineAsyncComponent(() => import('./components/MathBlockNode'))
 const MathInlineNode = defineAsyncComponent(() => import('./components/MathInlineNode'))
 const MermaidBlockNode = defineAsyncComponent(() => import('./components/MermaidBlockNode'))
+const InfographicBlockNode = defineAsyncComponent(() => import('./components/InfographicBlockNode'))
 
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
@@ -81,6 +82,7 @@ export {
   HighlightNode,
   HtmlInlineNode,
   ImageNode,
+  InfographicBlockNode,
   InlineCodeNode,
   InsertNode,
   isKatexEnabled,
@@ -127,6 +129,7 @@ const componentMap: Record<string, Component> = {
   HtmlInlineNode,
   HighlightNode,
   ImageNode,
+  InfographicBlockNode,
   InlineCodeNode,
   PreCodeNode,
   InsertNode,

@@ -29,6 +29,7 @@ export { MarkdownCodeBlockNode } from './components/MarkdownCodeBlockNode/Markdo
 export { MathBlockNode } from './components/MathBlockNode/MathBlockNode'
 export { MathInlineNode } from './components/MathInlineNode/MathInlineNode'
 export { MermaidBlockNode } from './components/MermaidBlockNode/MermaidBlockNode'
+export { InfographicBlockNode } from './components/InfographicBlockNode/InfographicBlockNode'
 export { NodeRenderer } from './components/NodeRenderer'
 export { FallbackComponent } from './components/NodeRenderer/FallbackComponent'
 export { ParagraphNode } from './components/ParagraphNode/ParagraphNode'

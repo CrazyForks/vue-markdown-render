@@ -1,8 +1,10 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "rootDir": "./src",
     "paths": {
+      "@/*": ["src/*"],
       "stream-markdown-parser": ["../markdown-parser/dist/index.d.ts"],
       "stream-markdown-parser/*": ["../markdown-parser/dist/*"]
     },

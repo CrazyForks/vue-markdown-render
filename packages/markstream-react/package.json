@@ -36,7 +36,8 @@
     "react": ">=18",
     "react-dom": ">=18",
     "stream-markdown": ">=0.0.10",
-    "stream-monaco": ">=0.0.7"
+    "stream-monaco": ">=0.0.7",
+    "@antv/infographic": "^0.2.3"
   },
   "peerDependenciesMeta": {
     "katex": {
@@ -49,6 +50,9 @@
       "optional": true
     },
     "stream-monaco": {
+      "optional": true
+    },
+    "@antv/infographic": {
       "optional": true
     }
   },

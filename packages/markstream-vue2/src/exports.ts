@@ -24,6 +24,7 @@ import MathBlockNode from './components/MathBlockNode'
 import MathInlineNode from './components/MathInlineNode'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import MermaidBlockNode from './components/MermaidBlockNode'
+import InfographicBlockNode from './components/InfographicBlockNode'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
 import MarkdownRender from './components/NodeRenderer'
 import ParagraphNode from './components/ParagraphNode'
@@ -86,6 +87,7 @@ export {
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
+  InfographicBlockNode,
   ParagraphNode,
   PreCodeNode,
   ReferenceNode,
@@ -130,6 +132,7 @@ const componentMap: Record<string, any> = {
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
+  InfographicBlockNode,
   ParagraphNode,
   StrikethroughNode,
   StrongNode,
