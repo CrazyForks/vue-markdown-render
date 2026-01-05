@@ -67,6 +67,8 @@ Monaco（`stream-monaco`）不需要单独导入 CSS。
 
 注意：`markstream-vue2/index.css` 的样式被限制在内部的 `.markstream-vue2` 容器下，以减少全局样式冲突。`MarkdownRender` 默认在该容器内渲染。如果你单独渲染节点组件，请用 `<div class="markstream-vue2">...</div>` 包裹它们。
 
+## Tailwind CSS 支持
+
 如果你的项目使用 Tailwind，并希望避免重复注入 Tailwind utilities，请改用 Tailwind-ready 输出：
 
 ```ts
@@ -83,6 +85,8 @@ module.exports = {
   ],
 }
 ```
+
+这种方式可以确保 Tailwind 在清除未使用的样式时包含 markstream-vue2 使用的所有工具类，从而获得更小的最终打包体积。
 
 ### 快速安装：所有功能
 

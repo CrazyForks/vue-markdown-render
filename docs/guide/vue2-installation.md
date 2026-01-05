@@ -67,6 +67,8 @@ Monaco (`stream-monaco`) does not require a separate CSS import.
 
 Note: `markstream-vue2/index.css` is scoped under an internal `.markstream-vue2` container to reduce global style conflicts. `MarkdownRender` renders inside that container by default. If you render node components standalone, wrap them with `<div class="markstream-vue2">...</div>`.
 
+## Tailwind CSS Support
+
 If your app uses Tailwind and you want to avoid duplicate utility CSS, import the Tailwind-ready output instead:
 
 ```ts
@@ -83,6 +85,8 @@ module.exports = {
   ],
 }
 ```
+
+This approach ensures that Tailwind includes all the utility classes used by markstream-vue2 in its purge process, resulting in a smaller final bundle size.
 
 ### Quick Install: All Features
 

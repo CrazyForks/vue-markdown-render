@@ -50,6 +50,27 @@ Monaco (`stream-monaco`) does not require a separate CSS import.
 
 Note: `markstream-react/index.css` is scoped under an internal `.markstream-react` container to reduce global style conflicts. `MarkdownRender` renders inside that container by default. If you render node components standalone, wrap them with `<div className="markstream-react">...</div>`.
 
+## Tailwind CSS Support
+
+If your app uses Tailwind and you want to avoid duplicate utility CSS, import the Tailwind-ready output instead:
+
+```tsx
+import 'markstream-react/index.tailwind.css'
+```
+
+And include the extracted class list in your `tailwind.config.js`:
+
+```js
+module.exports = {
+  content: [
+    './src/**/*.{js,ts,jsx,tsx}',
+    require('markstream-react/tailwind'),
+  ],
+}
+```
+
+This approach ensures that Tailwind includes all the utility classes used by markstream-react in its purge process, resulting in a smaller final bundle size.
+
 ### Quick Install: All Features
 
 To enable all features at once:
