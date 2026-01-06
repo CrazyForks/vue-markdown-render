@@ -32,6 +32,7 @@
     "release": "bumpp --commit --no-tag --no-push && npm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {
+    "@antv/infographic": "^0.2.3",
     "@vue/composition-api": ">=1.7.2",
     "katex": ">=0.16.22",
     "mermaid": ">=11",
@@ -42,6 +43,9 @@
     "vue-i18n": ">=9"
   },
   "peerDependenciesMeta": {
+    "@antv/infographic": {
+      "optional": true
+    },
     "@vue/composition-api": {
       "optional": true
     },

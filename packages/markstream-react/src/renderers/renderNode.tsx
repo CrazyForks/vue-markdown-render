@@ -18,6 +18,7 @@ import { HighlightNode } from '../components/HighlightNode/HighlightNode'
 import { HtmlBlockNode } from '../components/HtmlBlockNode/HtmlBlockNode'
 import { HtmlInlineNode } from '../components/HtmlInlineNode/HtmlInlineNode'
 import { ImageNode } from '../components/ImageNode/ImageNode'
+import { InfographicBlockNode } from '../components/InfographicBlockNode/InfographicBlockNode'
 import { InlineCodeNode } from '../components/InlineCodeNode/InlineCodeNode'
 import { InsertNode } from '../components/InsertNode/InsertNode'
 import { LinkNode } from '../components/LinkNode/LinkNode'
@@ -72,6 +73,21 @@ function renderCodeBlock(node: any, key: React.Key, ctx: RenderContext) {
         />
       )
     }
+  }
+
+  if (language === 'infographic') {
+    const customInfographic = getCustomNodeComponents(ctx.customId).infographic
+    if (customInfographic)
+      return React.createElement(customInfographic as any, { key, node, isDark: ctx.isDark })
+
+    return (
+      <InfographicBlockNode
+        key={key}
+        node={node as any}
+        isDark={ctx.isDark}
+        loading={Boolean(node.loading)}
+      />
+    )
   }
 
   if (ctx.renderCodeBlocksAsPre || language === 'mermaid') {

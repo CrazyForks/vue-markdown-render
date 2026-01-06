@@ -1,19 +1,25 @@
 <script setup lang="ts">
 import { useLocalStorage } from '@vueuse/core'
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
+import MarkdownRender, {
+  CodeBlockNode,
+  disableKatex,
+  disableMermaid,
+  enableKatex,
+  enableMermaid,
+  getUseMonaco,
+  isKatexEnabled,
+  isMermaidEnabled,
+  MarkdownCodeBlockNode,
+  PreCodeNode,
+  setCustomComponents,
+  setKaTeXWorker,
+  setMermaidWorker,
+} from 'markstream-vue'
+import KatexWorker from 'markstream-vue/workers/katexRenderer.worker?worker&inline'
+
+import MermaidWorker from 'markstream-vue/workers/mermaidParser.worker?worker&inline'
 import { onMounted, ref, watch } from 'vue'
-import CodeBlockNode from '../../../src/components/CodeBlockNode'
-import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
-import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
-import { disableKatex, enableKatex, isKatexEnabled } from '../../../src/components/MathInlineNode/katex'
-import { disableMermaid, enableMermaid, isMermaidEnabled } from '../../../src/components/MermaidBlockNode/mermaid'
-import MarkdownRender from '../../../src/components/NodeRenderer'
-import PreCodeNode from '../../../src/components/PreCodeNode'
-import { setCustomComponents } from '../../../src/utils/nodeComponents'
-import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline'
-import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
-import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
-import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
 import 'katex/dist/katex.min.css'
 
 // 用户输入（直接作为 preview 的内容）
@@ -78,9 +84,11 @@ const mathEnabled = useLocalStorage<boolean>('vmr-test-math-enabled', isKatexEna
 const mermaidEnabled = useLocalStorage<boolean>('vmr-test-mermaid-enabled', isMermaidEnabled())
 
 // 预加载 Monaco 编辑器和 worker
-getUseMonaco()
-setKaTeXWorker(new KatexWorker())
-setMermaidWorker(new MermaidWorker())
+if (process.client) {
+  getUseMonaco()
+  setKaTeXWorker(new KatexWorker())
+  setMermaidWorker(new MermaidWorker())
+}
 
 // 分享链接相关
 const shareUrl = ref<string>('')
@@ -237,8 +245,10 @@ function restoreFromUrl() {
 }
 
 onMounted(() => {
-  restoreFromUrl()
-  shareUrl.value = window.location.href
+  if (process.client) {
+    restoreFromUrl()
+    shareUrl.value = window.location.href
+  }
 })
 
 watch(() => renderMode.value, (mode: string) => {
@@ -323,7 +333,7 @@ function toggleStreamSettings() {
     <div class="max-w-6xl mx-auto h-full overflow-hidden flex flex-col">
       <div class="mb-4 flex items-center justify-between">
         <h2 class="text-lg font-semibold">
-          Markdown 输入 & 实时渲染
+          Markdown 输入 & 实时渲染 (Nuxt)
         </h2>
         <div class="text-sm text-gray-500 flex items-center gap-3">
           <span>左侧输入，右侧预览</span>
@@ -454,7 +464,7 @@ function toggleStreamSettings() {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-hidden">
         <div>
           <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">输入</label>
-          <textarea v-model="input" rows="18" class="w-full p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 resize-none" />
+          <textarea v-model="input" rows="18" class="w-full p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 resize-none h-[calc(100%-2rem)]" />
         </div>
 
         <div class="h-full overflow-hidden flex-col flex">
@@ -465,14 +475,16 @@ function toggleStreamSettings() {
             </span>
           </label>
           <div class="max-w-none p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 min-h-[14rem] overflow-auto flex-1">
-            <MarkdownRender
-              :content="streamContent || input"
-              :viewport-priority="viewportPriority"
-              :batch-rendering="batchRendering"
-              :typewriter="typewriter"
-              :code-block-stream="codeBlockStream"
-              :parse-options="{ debug: debugParse }"
-            />
+            <ClientOnly>
+              <MarkdownRender
+                :content="streamContent || input"
+                :viewport-priority="viewportPriority"
+                :batch-rendering="batchRendering"
+                :typewriter="typewriter"
+                :code-block-stream="codeBlockStream"
+                :parse-options="{ debug: debugParse }"
+              />
+            </ClientOnly>
           </div>
           <div class="mt-2 text-xs text-gray-500 break-words shrink-0">
             <template v-if="tooLong">
@@ -507,78 +519,8 @@ function toggleStreamSettings() {
   overflow: hidden;
 }
 
-.chatbot-container {
-  transition: all 0.3s ease;
-  overscroll-behavior: contain;
-  height: calc(var(--app-viewport-vh, 1vh) * 100 - 2rem);
-  max-height: calc(var(--app-viewport-vh, 1vh) * 100 - 2rem);
-}
-
-.github-star-btn:active {
-  transform: scale(0.95);
-}
-
-.chatbot-messages {
-  scroll-behavior: smooth;
-  overscroll-behavior: contain;
-}
-
-.chatbot-messages::-webkit-scrollbar {
-  width: 8px;
-}
-
-.chatbot-messages::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.chatbot-messages::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-
-.dark .chatbot-messages::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-
-.chatbot-messages::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-.dark .chatbot-messages::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
-
-.settings-toggle {
-  backdrop-filter: blur(8px);
-}
-
-.settings-toggle:active {
-  transform: scale(0.95);
-}
-
-/* 主题选择器自定义样式 */
-.theme-selector select:focus {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.theme-selector select option {
-  padding: 8px 12px;
-  background-color: white;
-  color: #374151;
-}
-
-.dark .theme-selector select option {
-  background-color: #1f2937;
-  color: #f3f4f6;
-}
-
-/* 设置面板动画 */
-.settings-panel {
-  transform-origin: top right;
-}
-
-/* 代码块加载时的流光闪烁效果 */
-:deep(.code-block-container.is-rendering) {
+/* Mermaid 块加载时的流光闪烁效果 */
+:deep(.is-rendering) {
   position: relative;
   animation: renderingGlow 2s ease-in-out infinite;
 }
@@ -609,12 +551,6 @@ function toggleStreamSettings() {
       0 0 10px rgba(59, 130, 246, 0.4),
       0 0 20px rgba(59, 130, 246, 0.2);
   }
-}
-
-/* Mermaid 块加载时的流光闪烁效果 */
-:deep(.is-rendering) {
-  position: relative;
-  animation: renderingGlow 2s ease-in-out infinite;
 }
 
 /* 滑块样式优化 */

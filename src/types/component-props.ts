@@ -105,6 +105,25 @@ export interface MermaidBlockEvent<TPayload = any> {
   svgString?: string | null
 }
 
+export interface InfographicBlockNodeProps {
+  node: {
+    type: 'infographic_block'
+    code: string
+    raw: string
+    loading?: boolean
+  }
+  maxHeight?: string | null
+  loading?: boolean
+  isDark?: boolean
+  showHeader?: boolean
+  showModeToggle?: boolean
+  showCopyButton?: boolean
+  showCollapseButton?: boolean
+  showExportButton?: boolean
+  showFullscreenButton?: boolean
+  showZoomControls?: boolean
+}
+
 export interface MathBlockNodeProps {
   node: {
     type: 'math_block'

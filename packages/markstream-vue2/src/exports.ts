@@ -14,6 +14,7 @@ import HeadingNode from './components/HeadingNode'
 import HighlightNode from './components/HighlightNode'
 import HtmlInlineNode from './components/HtmlInlineNode'
 import ImageNode from './components/ImageNode'
+import InfographicBlockNode from './components/InfographicBlockNode'
 import InlineCodeNode from './components/InlineCodeNode'
 import InsertNode from './components/InsertNode'
 import LinkNode from './components/LinkNode'
@@ -74,6 +75,7 @@ export {
   HighlightNode,
   HtmlInlineNode,
   ImageNode,
+  InfographicBlockNode,
   InlineCodeNode,
   InsertNode,
   isKatexEnabled,
@@ -130,6 +132,7 @@ const componentMap: Record<string, any> = {
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
+  InfographicBlockNode,
   ParagraphNode,
   StrikethroughNode,
   StrongNode,

@@ -122,3 +122,17 @@ export interface MathInlineNodeProps {
     loading?: boolean
   }
 }
+
+export interface InfographicBlockNodeProps {
+  node: any
+  maxHeight?: string | null
+  loading?: boolean
+  isDark?: boolean
+  showHeader?: boolean
+  showModeToggle?: boolean
+  showCopyButton?: boolean
+  showExportButton?: boolean
+  showFullscreenButton?: boolean
+  showCollapseButton?: boolean
+  showZoomControls?: boolean
+}

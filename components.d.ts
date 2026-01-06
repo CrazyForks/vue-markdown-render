@@ -28,6 +28,7 @@ declare module 'vue' {
     HtmlInlineNode: typeof import('./src/components/HtmlInlineNode/HtmlInlineNode.vue')['default']
     HtmlPreviewFrame: typeof import('./src/components/CodeBlockNode/HtmlPreviewFrame.vue')['default']
     ImageNode: typeof import('./src/components/ImageNode/ImageNode.vue')['default']
+    InfographicBlockNode: typeof import('./src/components/InfographicBlockNode/InfographicBlockNode.vue')['default']
     InlineCodeNode: typeof import('./src/components/InlineCodeNode/InlineCodeNode.vue')['default']
     InsertNode: typeof import('./src/components/InsertNode/InsertNode.vue')['default']
     LinkNode: typeof import('./src/components/LinkNode/LinkNode.vue')['default']

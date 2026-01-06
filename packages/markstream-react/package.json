@@ -31,6 +31,7 @@
     "release": "bumpp --commit --no-tag --no-push && npm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {
+    "@antv/infographic": "^0.2.3",
     "katex": ">=0.16.22",
     "mermaid": ">=11",
     "react": ">=18",
@@ -39,6 +40,9 @@
     "stream-monaco": ">=0.0.7"
   },
   "peerDependenciesMeta": {
+    "@antv/infographic": {
+      "optional": true
+    },
     "katex": {
       "optional": true
     },

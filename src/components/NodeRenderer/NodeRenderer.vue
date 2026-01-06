@@ -1215,6 +1215,20 @@ const MermaidBlockNodeAsync = defineAsyncComponent(async () => {
   }
 })
 
+const InfographicBlockNodeAsync = defineAsyncComponent(async () => {
+  try {
+    const mod = await import('../../components/InfographicBlockNode')
+    return mod.default
+  }
+  catch (e) {
+    console.warn(
+      '[markstream-vue] Optional peer dependencies for InfographicBlockNode are missing. Falling back to preformatted code rendering. To enable Infographic rendering, please install "@antv/infographic".',
+      e,
+    )
+    return PreCodeNode
+  }
+})
+
 // 组件映射表
 const codeBlockComponent = computed(() => props.renderCodeBlocksAsPre ? PreCodeNode : CodeBlockNodeAsync)
 const nodeComponents = {
@@ -1272,6 +1286,13 @@ function getNodeComponent(node: ParsedNode) {
       return customMermaid || MermaidBlockNodeAsync
     }
 
+    // Keep Infographic blocks routed to InfographicBlockNode unless a specific
+    // `infographic` override is provided.
+    if (lang === 'infographic') {
+      const customInfographic = (customComponents as any).infographic
+      return customInfographic || InfographicBlockNodeAsync
+    }
+
     if (customForType)
       return customForType
 
@@ -1291,8 +1312,9 @@ function getNodeComponent(node: ParsedNode) {
 }
 
 function getBindingsFor(node: ParsedNode) {
-  // For mermaid blocks we don't forward CodeBlock-specific props
-  if (node?.type === 'code_block' && String((node as any).language ?? '').trim().toLowerCase() === 'mermaid')
+  // For mermaid and infographic blocks we don't forward CodeBlock-specific props
+  const lang = node?.type === 'code_block' ? String((node as any).language ?? '').trim().toLowerCase() : ''
+  if (lang === 'mermaid' || lang === 'infographic')
     return {}
 
   return node.type === 'code_block'
