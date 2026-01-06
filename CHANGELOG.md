@@ -1,8 +1,9 @@
-## [0.0.5-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.5-beta.0) (2026-01-06)
+## [0.0.5-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.5-beta.1) (2026-01-06)
 
 
 ### Bug Fixes
 
+* **changelog:** update release date and add missing bug fix entries ([6f453dc](https://github.com/Simon-He95/markstream-vue/commit/6f453dc8d158b2de24176c783860a3d6f5476d10))
 * **customBlock:** render wrong ([dc32504](https://github.com/Simon-He95/markstream-vue/commit/dc325044a95970f7173a9adbd7ebe0f6d4b2e7be)), closes [#225](https://github.com/Simon-He95/markstream-vue/issues/225)
 * improve reference detection in markdown parser and add related tests ([31e5b6e](https://github.com/Simon-He95/markstream-vue/commit/31e5b6eee57b85a838b0bdb2f71c29453c8d8902)), closes [#231](https://github.com/Simon-He95/markstream-vue/issues/231)
 * **markstream-react:** codeBlockNode collpase ([709460a](https://github.com/Simon-He95/markstream-vue/commit/709460a38fbf0130c9774f544fde6c10943d3c5f))
