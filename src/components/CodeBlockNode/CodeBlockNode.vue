@@ -12,6 +12,7 @@ import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
 import { getUseMonaco } from './monaco'
+import { scheduleGlobalMonacoTheme } from './monacoThemeScheduler'
 
 const props = withDefaults(
   defineProps<CodeBlockNodeProps>(),
@@ -157,68 +158,6 @@ let safeClean = () => {}
 let createEditorPromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
 let setTheme: (theme: any) => Promise<void> = async () => {}
-
-let themeApplyPromise: Promise<void> | null = null
-let inFlightThemeKey: string | null = null
-let pendingTheme: any = null
-let pendingThemeKey: string | null = null
-let lastAppliedThemeKey: string | null = null
-
-function getThemeKey(theme: any): string | null {
-  if (theme == null)
-    return null
-  if (typeof theme === 'string')
-    return theme
-  if (typeof theme === 'object' && 'name' in theme)
-    return String((theme as any).name)
-  try {
-    return JSON.stringify(theme)
-  }
-  catch {
-    return String(theme)
-  }
-}
-
-function scheduleThemeUpdate(theme: any) {
-  const key = getThemeKey(theme)
-  if (!key)
-    return Promise.resolve()
-  if (!themeApplyPromise && lastAppliedThemeKey === key)
-    return Promise.resolve()
-
-  if (themeApplyPromise) {
-    if (pendingThemeKey === key || inFlightThemeKey === key)
-      return themeApplyPromise
-    pendingTheme = theme
-    pendingThemeKey = key
-    return themeApplyPromise
-  }
-
-  pendingTheme = theme
-  pendingThemeKey = key
-
-  themeApplyPromise = (async () => {
-    while (pendingThemeKey && pendingTheme != null) {
-      const nextTheme = pendingTheme
-      const nextKey = pendingThemeKey
-      pendingTheme = null
-      pendingThemeKey = null
-      if (lastAppliedThemeKey === nextKey)
-        continue
-      try {
-        inFlightThemeKey = nextKey
-        await setTheme(nextTheme)
-        lastAppliedThemeKey = nextKey
-      }
-      catch {}
-    }
-  })().finally(() => {
-    themeApplyPromise = null
-    inFlightThemeKey = null
-  })
-
-  return themeApplyPromise
-}
 const isDiff = computed(() => props.node.diff)
 const usePreCodeRender = ref(false)
 const preFallbackWrap = computed(() => {
@@ -509,27 +448,44 @@ function syncEditorCssVars() {
   const rootEl = container.value as HTMLElement | null
   if (!editorEl || !rootEl)
     return
-    // Monaco usually applies theme variables on an element with class
-    // 'monaco-editor' or on the editor root; try to read from either.
-  const src = editorEl.querySelector('.monaco-editor') || editorEl
-  let styles: CSSStyleDeclaration | null = null
+  // Monaco usually applies theme variables on an element with class
+  // 'monaco-editor' or on the editor root; try to read from either.
+  const editorRoot = (editorEl.querySelector('.monaco-editor') || editorEl) as HTMLElement
+  const bgEl = (editorRoot.querySelector('.monaco-editor-background') || editorRoot) as HTMLElement
+  const fgEl = (editorRoot.querySelector('.view-lines') || editorRoot) as HTMLElement
+
+  let rootStyles: CSSStyleDeclaration | null = null
+  let bgStyles: CSSStyleDeclaration | null = null
+  let fgStyles: CSSStyleDeclaration | null = null
   try {
     if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
-      styles = window.getComputedStyle(src as Element)
+      rootStyles = window.getComputedStyle(editorRoot)
+      bgStyles = bgEl === editorRoot ? rootStyles : window.getComputedStyle(bgEl)
+      fgStyles = fgEl === editorRoot ? rootStyles : window.getComputedStyle(fgEl)
     }
   }
   catch {
-    styles = null
+    rootStyles = null
+    bgStyles = null
+    fgStyles = null
   }
-  const fg = String(styles?.getPropertyValue('--vscode-editor-foreground') ?? '')
-  const bg = String(styles?.getPropertyValue('--vscode-editor-background') ?? '')
-  const hoverBg = String(styles?.getPropertyValue('--vscode-editor-hoverHighlightBackground') ?? '')
-  if (fg && bg) {
-    rootEl.style.setProperty('--vscode-editor-foreground', fg.trim())
-    rootEl.style.setProperty('--vscode-editor-background', bg.trim())
-    rootEl.style.setProperty('--vscode-editor-selectionBackground', hoverBg.trim())
-    return true
-  }
+  const fgVar = String(rootStyles?.getPropertyValue('--vscode-editor-foreground') ?? '').trim()
+  const bgVar = String(rootStyles?.getPropertyValue('--vscode-editor-background') ?? '').trim()
+  const selVar = String(
+    rootStyles?.getPropertyValue('--vscode-editor-selectionBackground')
+    ?? rootStyles?.getPropertyValue('--vscode-editor-hoverHighlightBackground')
+    ?? '',
+  ).trim()
+
+  const fg = fgVar || String(fgStyles?.color ?? rootStyles?.color ?? '').trim()
+  const bg = bgVar || String(bgStyles?.backgroundColor ?? rootStyles?.backgroundColor ?? '').trim()
+
+  if (fg)
+    rootEl.style.setProperty('--vscode-editor-foreground', fg)
+  if (bg)
+    rootEl.style.setProperty('--vscode-editor-background', bg)
+  if (selVar)
+    rootEl.style.setProperty('--vscode-editor-selectionBackground', selVar)
 }
 
 let resizeSyncHandler: (() => void) | null = null
@@ -992,9 +948,9 @@ const stopCreateEditorWatch = watch(
 )
 
 watch(
-  () => [props.darkTheme, props.lightTheme, editorCreated.value, viewportReady.value],
+  () => [props.isDark, props.darkTheme, props.lightTheme, monacoReady.value],
   () => {
-    if (!editorCreated.value || !viewportReady.value)
+    if (!monacoReady.value)
       return
 
     themeUpdate()
@@ -1007,8 +963,12 @@ function getPreferredColorScheme() {
 
 function themeUpdate() {
   const themeToSet: any = getPreferredColorScheme()
-  if (themeToSet)
-    void scheduleThemeUpdate(themeToSet)
+  if (!themeToSet)
+    return
+  void scheduleGlobalMonacoTheme(setTheme, themeToSet).then(() => {
+    if (editorMounted.value)
+      safeRaf(() => syncEditorCssVars())
+  })
 }
 
 // Watch for monacoOptions changes (deep) and try to update editor options or
@@ -1097,7 +1057,7 @@ onUnmounted(() => {
     <div
       v-if="props.showHeader"
       class="code-block-header flex justify-between items-center px-4 py-2.5 border-b border-gray-400/5"
-      style="color: var(--vscode-editor-foreground);background-color: var(--vscode-editor-background);"
+      style="color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg));background-color: var(--vscode-editor-background, var(--markstream-code-fallback-bg));"
     >
       <!-- left slot / fallback language label -->
       <slot name="header-left">
@@ -1249,6 +1209,16 @@ onUnmounted(() => {
     /* 新增：显著减少离屏 codeblock 的布局/绘制与样式计算 */
   content-visibility: auto;
   contain-intrinsic-size: 320px 180px;
+  --markstream-code-fallback-bg: #ffffff;
+  --markstream-code-fallback-fg: #111827;
+  --vscode-editor-selectionBackground: var(--markstream-code-fallback-selection-bg);
+  --markstream-code-fallback-selection-bg: rgba(0, 0, 0, 0.06);
+}
+
+.code-block-container.is-dark {
+  --markstream-code-fallback-bg: #111827;
+  --markstream-code-fallback-fg: #e5e7eb;
+  --markstream-code-fallback-selection-bg: rgba(255, 255, 255, 0.08);
 }
 
 .code-editor-container {

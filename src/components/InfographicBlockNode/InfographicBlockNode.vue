@@ -285,8 +285,6 @@ async function renderInfographic() {
     // Clear container
     infographicContainer.value.innerHTML = ''
 
-    console.log('InfographicClass', InfographicClass)
-
     // Create new instance
     infographicInstance = new InfographicClass({
       container: infographicContainer.value,

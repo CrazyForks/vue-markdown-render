@@ -1,18 +1,16 @@
-type MonacoTheme = any
-type SetThemeFn = (theme: MonacoTheme, force?: boolean) => Promise<void> | void
+type SetTheme = (theme: any) => Promise<void>
 
-let setThemeImpl: SetThemeFn | null = null
-let applying = false
-let inFlight: Promise<void> | null = null
+let applyPromise: Promise<void> | null = null
 let inFlightKey: string | null = null
-let pendingTheme: MonacoTheme | null = null
+let pendingTheme: any = null
 let pendingKey: string | null = null
 let lastAppliedKey: string | null = null
+let currentSetTheme: SetTheme | null = null
 
 const themeKeyCache = new WeakMap<object, string>()
 let themeKeySeq = 0
 
-function themeKey(theme: MonacoTheme): string | null {
+function getThemeKey(theme: any): string | null {
   if (theme == null)
     return null
   if (typeof theme === 'string')
@@ -38,50 +36,48 @@ function themeKey(theme: MonacoTheme): string | null {
   return String(theme)
 }
 
-export function scheduleMonacoThemeUpdate(theme: MonacoTheme, setTheme: SetThemeFn): Promise<void> {
-  const key = themeKey(theme)
+export function scheduleGlobalMonacoTheme(setTheme: SetTheme, theme: any): Promise<void> {
+  const key = getThemeKey(theme)
   if (!key)
     return Promise.resolve()
 
-  if (setThemeImpl !== setTheme)
-    setThemeImpl = setTheme
+  currentSetTheme = setTheme
 
-  if (!applying && lastAppliedKey === key)
+  if (!applyPromise && lastAppliedKey === key)
     return Promise.resolve()
 
-  if (inFlight && (pendingKey === key || inFlightKey === key))
-    return inFlight
+  if (applyPromise) {
+    if (pendingKey === key || inFlightKey === key)
+      return applyPromise
+    pendingTheme = theme
+    pendingKey = key
+    return applyPromise
+  }
 
   pendingTheme = theme
   pendingKey = key
 
-  if (inFlight)
-    return inFlight
-
-  applying = true
-  inFlight = (async () => {
-    while (pendingTheme != null && pendingKey != null) {
+  applyPromise = (async () => {
+    while (pendingKey && pendingTheme != null) {
       const nextTheme = pendingTheme
       const nextKey = pendingKey
       pendingTheme = null
       pendingKey = null
+
       if (lastAppliedKey === nextKey)
         continue
-      const impl = setThemeImpl
-      if (!impl)
-        break
+
       try {
         inFlightKey = nextKey
-        await Promise.resolve(impl(nextTheme))
+        await (currentSetTheme ?? setTheme)(nextTheme)
         lastAppliedKey = nextKey
       }
       catch {}
     }
   })().finally(() => {
-    applying = false
-    inFlight = null
+    applyPromise = null
     inFlightKey = null
   })
 
-  return inFlight
+  return applyPromise
 }

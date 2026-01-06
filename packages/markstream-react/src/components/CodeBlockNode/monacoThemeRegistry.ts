@@ -8,19 +8,33 @@ let desiredKey: string | null = null
 let setThemeImpl: SetThemeFn | null = null
 const listeners = new Set<() => void>()
 
+const themeKeyCache = new WeakMap<object, string>()
+let themeKeySeq = 0
+
 function themeKey(theme: MonacoTheme): string | null {
   if (theme == null)
     return null
   if (typeof theme === 'string')
     return theme
-  if (typeof theme === 'object' && 'name' in theme)
+  if (typeof theme === 'object' && theme && 'name' in theme)
     return String((theme as any).name)
-  try {
-    return JSON.stringify(theme)
+  if (typeof theme === 'object') {
+    const cached = themeKeyCache.get(theme)
+    if (cached)
+      return cached
+    try {
+      const str = JSON.stringify(theme)
+      if (str) {
+        themeKeyCache.set(theme, str)
+        return str
+      }
+    }
+    catch {}
+    const id = `__theme_${++themeKeySeq}`
+    themeKeyCache.set(theme, id)
+    return id
   }
-  catch {
-    return String(theme)
-  }
+  return String(theme)
 }
 
 function notify() {
