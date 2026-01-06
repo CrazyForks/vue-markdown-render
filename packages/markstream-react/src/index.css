@@ -1,3 +1,17 @@
+/*
+ * Keep button defaults minimal, but don't override Tailwind utilities.
+ * Use :where() to keep specificity low so `.markstream-react .<utility>` wins.
+ */
+:where(.markstream-react) button {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  color: inherit;
+}
+
 @tailwind components;
 @tailwind utilities;
 
@@ -10,14 +24,7 @@
   --muted-foreground: 215.4 16.3% 46.9%;
 }
 
-.markstream-react button {
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  border: 0;
-  font: inherit;
-  color: inherit;
-}
+
 
 .dark .markstream-react,
 .markstream-react.dark {

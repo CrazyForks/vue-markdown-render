@@ -18,9 +18,10 @@
   --muted-foreground: 215 20.2% 65.1%;
 }
 
-.markstream-vue2 button {
+:where(.markstream-vue2) button {
   appearance: none;
   -webkit-appearance: none;
+  -moz-appearance: none;
   background: transparent;
   border: 0;
   font: inherit;
