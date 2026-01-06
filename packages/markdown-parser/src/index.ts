@@ -227,11 +227,17 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
     const match = RE_REFERENCE.exec(s.src.slice(s.pos))
     if (!match)
       return false
-    // Check if this is part of a link: if followed by '](', it's a link text, not a reference
-    const afterMatch = s.src.slice(s.pos + match[0].length)
-    if (afterMatch.startsWith('](')) {
+    // Avoid false positives in JSON-like snippets, e.g. `"pages": [14]`
+    const lookbehind = s.src.slice(Math.max(0, s.pos - 120), s.pos)
+    if (/"[^"\n]{1,80}"\s*:\s*$/.test(lookbehind))
       return false
-    }
+
+    // Check if this is part of a link: `[text](...)`, `[[text]](...)`, or `[text][id]`
+    const afterMatch = s.src.slice(s.pos + match[0].length)
+    // `](` handles nested-bracket link text, e.g. `[[8]](url)` where the inner `[8]`
+    // must stay as text for the outer link parser to succeed.
+    if (afterMatch.startsWith('](') || afterMatch.startsWith('(') || afterMatch.startsWith('['))
+      return false
     if (!silent) {
       const id = match[1]
       const token = s.push('reference', 'span', 0)

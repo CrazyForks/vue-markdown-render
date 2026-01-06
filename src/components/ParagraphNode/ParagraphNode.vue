@@ -8,6 +8,7 @@ import FootnoteAnchorNode from '../FootnoteAnchorNode'
 import FootnoteReferenceNode from '../FootnoteReferenceNode'
 import HardBreakNode from '../HardBreakNode'
 import HighlightNode from '../HighlightNode'
+import HtmlBlockNode from '../HtmlBlockNode'
 import HtmlInlineNode from '../HtmlInlineNode'
 import ImageNode from '../ImageNode'
 import InlineCodeNode from '../InlineCodeNode'
@@ -51,6 +52,7 @@ const nodeComponents = {
   subscript: SubscriptNode,
   superscript: SuperscriptNode,
   html_inline: HtmlInlineNode,
+  html_block: HtmlBlockNode,
   emoji: EmojiNode,
   checkbox: CheckboxNode,
   math_inline: MathInlineNodeAsync,

@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { RenderContext, RenderNodeFn } from '../types'
-import React from 'react'
 
 export const BLOCK_LEVEL_TYPES = new Set([
   'image',
   'table',
   'code_block',
   'html_block',
+  'html_inline',
   'blockquote',
   'list',
   'list_item',
