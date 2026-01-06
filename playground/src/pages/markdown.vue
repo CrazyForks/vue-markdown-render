@@ -194,7 +194,9 @@ const showSettings = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 
 // 性能友好的监听：使用 ResizeObserver 监听容器和渲染内容变化，
-// 当内容高度超过容器可见高度时，为 `.markdown-renderer` 添加 `disable-min-height` 类以移除 min-height。
+// 当内容高度超过容器可见高度时，在滚动容器上添加 `disable-min-height` 类以移除渲染器的 min-height。
+// 注意：不要直接对 `.markdown-renderer` 做 `classList.add()`，因为它的 class 由 Vue patch，
+// 在切换模式/主题等触发更新时会被覆盖，导致 `disable-min-height` 丢失。
 let __roContainer: ResizeObserver | null = null
 let __roContent: ResizeObserver | null = null
 let __mo: MutationObserver | null = null
@@ -210,12 +212,10 @@ function scheduleCheckMinHeight() {
     const container = messagesContainer.value
     if (!container)
       return
-    const contentEl = container.querySelector('.markdown-renderer') as HTMLElement | null
-    if (!contentEl)
-      return
-    const shouldRemove = contentEl.scrollHeight > container.clientHeight
+    container.classList.add('disable-min-height')
+    const containerDelta = container.scrollHeight - container.clientHeight
+    const shouldRemove = containerDelta > 1
     if (shouldRemove) {
-      contentEl.classList.add('disable-min-height')
       // 内容已超出：不再需要继续监听，断开所有 observer 以节省开销
       try {
         __roContainer?.disconnect()
@@ -229,7 +229,7 @@ function scheduleCheckMinHeight() {
       }
     }
     else {
-      contentEl.classList.remove('disable-min-height')
+      container.classList.remove('disable-min-height')
     }
   })
 }
@@ -561,10 +561,10 @@ onBeforeUnmount(() => {
   min-height: 100%;
 }
 
-/* 当真实内容高度超出容器时，移除默认 min-height（由 JS 切换类名） */
-.chatbot-messages > .markdown-renderer.disable-min-height {
-  min-height: unset !important;
-}
+	/* 当真实内容高度超出容器时，移除默认 min-height（由 JS 切换类名） */
+	.chatbot-messages.disable-min-height > .markdown-renderer {
+	  min-height: unset !important;
+	}
 
 .chatbot-messages::-webkit-scrollbar {
   width: 8px;
