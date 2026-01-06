@@ -1,6 +1,6 @@
 import type { InfographicBlockNodeProps, MermaidBlockEvent } from '../../types/component-props'
 import clsx from 'clsx'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
@@ -49,7 +49,7 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   const [showSource, setShowSource] = useState(false)
   const [containerHeight, setContainerHeight] = useState('360px')
   const [modalOpen, setModalOpen] = useState(false)
-  
+
   // Zoom
   const [zoom, setZoom] = useState(1)
   const [translate, setTranslate] = useState({ x: 0, y: 0 })
@@ -74,9 +74,10 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   }, [baseCode, props])
 
   const renderInfographic = useCallback(async () => {
-    if (!containerRef.current) return
+    if (!containerRef.current)
+      return
     const el = containerRef.current
-    
+
     try {
       const InfographicClass = await getInfographic()
       if (!InfographicClass) {
@@ -90,7 +91,7 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
       }
 
       el.innerHTML = ''
-      
+
       const instance = new InfographicClass({
         container: el,
         width: '100%',
@@ -108,24 +109,25 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
           }
         }
       }, 0)
-    } catch (error) {
-       console.error('Failed to render infographic:', error)
-       el.innerHTML = `<div class="text-red-500 p-4">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
+    }
+    catch (error) {
+      console.error('Failed to render infographic:', error)
+      el.innerHTML = `<div class="text-red-500 p-4">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
     }
   }, [baseCode])
 
   // Effects
   useEffect(() => {
     if (!showSource && !isCollapsed) {
-       renderInfographic()
+      renderInfographic()
     }
   }, [baseCode, showSource, isCollapsed, renderInfographic])
 
   useEffect(() => {
     return () => {
       if (instanceRef.current) {
-         instanceRef.current.destroy?.()
-         instanceRef.current = null
+        instanceRef.current.destroy?.()
+        instanceRef.current = null
       }
     }
   }, [])
@@ -133,7 +135,8 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   // Modal logic matching Vue implementation
   const closeModal = useCallback(() => {
     setModalOpen(false)
-    if (modalContentRef.current) modalContentRef.current.innerHTML = ''
+    if (modalContentRef.current)
+      modalContentRef.current.innerHTML = ''
     modalCloneWrapperRef.current = null
     document.body.style.overflow = ''
   }, [])
@@ -144,18 +147,21 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   }, [])
 
   useEffect(() => {
-    if (!modalOpen) return
-    
+    if (!modalOpen)
+      return
+
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeModal()
+      if (e.key === 'Escape')
+        closeModal()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [modalOpen, closeModal])
 
   useEffect(() => {
-    if (!modalOpen) return
-    
+    if (!modalOpen)
+      return
+
     // Defer to allow portal to mount
     setTimeout(() => {
       if (containerRef.current && modalContentRef.current) {
@@ -170,15 +176,15 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
           alignItems: 'center',
           justifyContent: 'center',
         })
-        
+
         const clone = containerRef.current.cloneNode(true) as HTMLElement
         clone.classList.add('fullscreen')
         clone.style.height = 'auto'
-        
+
         wrapper.appendChild(clone)
         modalContentRef.current.appendChild(wrapper)
         modalCloneWrapperRef.current = wrapper
-        
+
         wrapper.style.transform = `translate(${translate.x}px, ${translate.y}px) scale(${zoom})`
       }
     }, 0)
@@ -192,18 +198,19 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   }, [modalOpen, translate, zoom])
 
   const handleExport = useCallback(() => {
-     const svg = containerRef.current?.querySelector('svg')
-     if (!svg) return
-     const data = new XMLSerializer().serializeToString(svg)
-     const blob = new Blob([data], { type: 'image/svg+xml;charset=utf-8' })
-     const url = URL.createObjectURL(blob)
-     const link = document.createElement('a')
-     link.href = url
-     link.download = `infographic-${Date.now()}.svg`
-     document.body.appendChild(link)
-     link.click()
-     document.body.removeChild(link)
-     URL.revokeObjectURL(url)     
+    const svg = containerRef.current?.querySelector('svg')
+    if (!svg)
+      return
+    const data = new XMLSerializer().serializeToString(svg)
+    const blob = new Blob([data], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `infographic-${Date.now()}.svg`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }, [])
 
   // Drag logic
@@ -215,21 +222,22 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   }
 
   const onMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDragging) return
+    if (!isDragging)
+      return
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY
     setTranslate({
       x: clientX - dragStartRef.current.x,
-      y: clientY - dragStartRef.current.y
+      y: clientY - dragStartRef.current.y,
     })
   }
 
   const stopDrag = () => setIsDragging(false)
-  
+
   const computedButtonClass = props.isDark
-      ? 'p-2 text-xs rounded text-gray-400 hover:bg-gray-700 hover:text-gray-200'
-      : 'p-2 text-xs rounded text-gray-600 hover:bg-gray-200 hover:text-gray-700'
-  
+    ? 'p-2 text-xs rounded text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+    : 'p-2 text-xs rounded text-gray-600 hover:bg-gray-200 hover:text-gray-700'
+
   const isFullscreenDisabled = showSource || isCollapsed
 
   // JSX Structure mirroring Vue template
@@ -238,156 +246,202 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
       <div className={clsx('my-4 rounded-lg border overflow-hidden shadow-sm', props.isDark ? 'border-gray-700/30' : 'border-gray-200', { 'is-rendering': props.loading })}>
         {props.showHeader && (
           <div className={clsx('flex justify-between items-center px-4 py-2.5 border-b', props.isDark ? 'bg-gray-800 border-gray-700/30' : 'bg-gray-50 border-gray-200')}>
-             <div className="flex items-center gap-x-2 overflow-hidden">
-                {INFOGRAPHIC_ICON}
-                <span className={clsx('text-sm font-medium font-mono truncate', props.isDark ? 'text-gray-400' : 'text-gray-600')}>Infographic</span>
-             </div>
-             
-             {/* Center Mode Toggle */}
-             {props.showModeToggle && (
-               <div className={clsx('flex items-center gap-x-1 rounded-md p-0.5', props.isDark ? 'bg-gray-700' : 'bg-gray-100')}>
-                 <button
-                   className={clsx('px-2.5 py-1 text-xs rounded transition-colors', !showSource ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm') : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'))}
-                   onClick={() => setShowSource(false)}
-                   onMouseEnter={e => showTooltipForAnchor(e.currentTarget, t('common.preview') || 'Preview', 'top', false, undefined, props.isDark)}
-                   onMouseLeave={() => hideTooltip()}
-                 >
-                   <div className="flex items-center gap-x-1">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></g></svg>
-                     <span>{t('common.preview') || 'Preview'}</span>
-                   </div>
-                 </button>
-                 <button
-                   className={clsx('px-2.5 py-1 text-xs rounded transition-colors', showSource ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm') : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'))}
-                   onClick={() => setShowSource(true)}
-                   onMouseEnter={e => showTooltipForAnchor(e.currentTarget, t('common.source') || 'Source', 'top', false, undefined, props.isDark)}
-                   onMouseLeave={() => hideTooltip()}
-                 >
-                    <div className="flex items-center gap-x-1">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m16 18l6-6l-6-6M8 6l-6 6l6 6" /></svg>
-                     <span>{t('common.source') || 'Source'}</span>
-                   </div>
-                 </button>
-               </div>
-             )}
-             
-             {/* Right Actions */}
-             <div className="flex items-center gap-x-1">
-               {props.showCollapseButton && (
-                 <button
-                   className={computedButtonClass}
-                   onClick={() => setIsCollapsed(!isCollapsed)}
-                   onMouseEnter={e => showTooltipForAnchor(e.currentTarget, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'), 'top', false, undefined, props.isDark)}
-                   onMouseLeave={() => hideTooltip()}
-                 >
-                    <svg style={{ rotate: isCollapsed ? '0deg' : '90deg' }} xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 18l6-6l-6-6" /></svg>
-                 </button>
-               )}
-               {props.showCopyButton && (
-                  <button
-                   className={computedButtonClass}
-                   onClick={handleCopy}
-                   onMouseEnter={e => showTooltipForAnchor(e.currentTarget, copying ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy'), 'top', false, undefined, props.isDark)}
-                   onMouseLeave={() => hideTooltip()}
-                 >
-                    {!copying ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 6L9 17l-5-5" /></svg>
-                    )}
-                 </button>
-               )}
-               {props.showExportButton && (
-                  <button
-                    className={clsx(computedButtonClass, isFullscreenDisabled && 'opacity-50 cursor-not-allowed')}
-                    disabled={isFullscreenDisabled}
-                    onClick={handleExport}
-                    onMouseEnter={e => showTooltipForAnchor(e.currentTarget, t('common.export') || 'Export', 'top', false, undefined, props.isDark)}
-                    onMouseLeave={() => hideTooltip()}
-                  >
-                   <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"><path d="M12 15V3m9 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10l5 5l5-5" /></g></svg>
-                  </button>
-               )}
-               {props.showFullscreenButton && (
-                  <button
-                    className={clsx(computedButtonClass, isFullscreenDisabled && 'opacity-50 cursor-not-allowed')}
-                    disabled={isFullscreenDisabled}
-                    onClick={handleOpenModal}
-                    onMouseEnter={e => showTooltipForAnchor(e.currentTarget, modalOpen ? (t('common.minimize') || 'Minimize') : (t('common.open') || 'Open'), 'top', false, undefined, props.isDark)}
-                    onMouseLeave={() => hideTooltip()}
-                  >
-                    {!modalOpen ? 
-                      <svg xmlns="http://www.w3.org/2000/svg" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" /></svg> :
-                      <svg xmlns="http://www.w3.org/2000/svg" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" /></svg>
-                    }
-                  </button>
-               )}
-             </div>
+            <div className="flex items-center gap-x-2 overflow-hidden">
+              {INFOGRAPHIC_ICON}
+              <span className={clsx('text-sm font-medium font-mono truncate', props.isDark ? 'text-gray-400' : 'text-gray-600')}>Infographic</span>
+            </div>
+
+            {/* Center Mode Toggle */}
+            {props.showModeToggle && (
+              <div className={clsx('flex items-center gap-x-1 rounded-md p-0.5', props.isDark ? 'bg-gray-700' : 'bg-gray-100')}>
+                <button
+                  className={clsx('px-2.5 py-1 text-xs rounded transition-colors', !showSource ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm') : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'))}
+                  onClick={() => setShowSource(false)}
+                  onMouseEnter={e => showTooltipForAnchor(e.currentTarget, t('common.preview') || 'Preview', 'top', false, undefined, props.isDark)}
+                  onMouseLeave={() => hideTooltip()}
+                >
+                  <div className="flex items-center gap-x-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+                      <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+                        <path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" />
+                        <circle cx="12" cy="12" r="3" />
+                      </g>
+                    </svg>
+                    <span>{t('common.preview') || 'Preview'}</span>
+                  </div>
+                </button>
+                <button
+                  className={clsx('px-2.5 py-1 text-xs rounded transition-colors', showSource ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm') : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'))}
+                  onClick={() => setShowSource(true)}
+                  onMouseEnter={e => showTooltipForAnchor(e.currentTarget, t('common.source') || 'Source', 'top', false, undefined, props.isDark)}
+                  onMouseLeave={() => hideTooltip()}
+                >
+                  <div className="flex items-center gap-x-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m16 18l6-6l-6-6M8 6l-6 6l6 6" /></svg>
+                    <span>{t('common.source') || 'Source'}</span>
+                  </div>
+                </button>
+              </div>
+            )}
+
+            {/* Right Actions */}
+            <div className="flex items-center gap-x-1">
+              {props.showCollapseButton && (
+                <button
+                  className={computedButtonClass}
+                  onClick={() => setIsCollapsed(!isCollapsed)}
+                  onMouseEnter={e => showTooltipForAnchor(e.currentTarget, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'), 'top', false, undefined, props.isDark)}
+                  onMouseLeave={() => hideTooltip()}
+                >
+                  <svg style={{ rotate: isCollapsed ? '0deg' : '90deg' }} xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 18l6-6l-6-6" /></svg>
+                </button>
+              )}
+              {props.showCopyButton && (
+                <button
+                  className={computedButtonClass}
+                  onClick={handleCopy}
+                  onMouseEnter={e => showTooltipForAnchor(e.currentTarget, copying ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy'), 'top', false, undefined, props.isDark)}
+                  onMouseLeave={() => hideTooltip()}
+                >
+                  {!copying
+                    ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+                          <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                          </g>
+                        </svg>
+                      )
+                    : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 6L9 17l-5-5" /></svg>
+                      )}
+                </button>
+              )}
+              {props.showExportButton && (
+                <button
+                  className={clsx(computedButtonClass, isFullscreenDisabled && 'opacity-50 cursor-not-allowed')}
+                  disabled={isFullscreenDisabled}
+                  onClick={handleExport}
+                  onMouseEnter={e => showTooltipForAnchor(e.currentTarget, t('common.export') || 'Export', 'top', false, undefined, props.isDark)}
+                  onMouseLeave={() => hideTooltip()}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+                    <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+                      <path d="M12 15V3m9 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <path d="m7 10l5 5l5-5" />
+                    </g>
+                  </svg>
+                </button>
+              )}
+              {props.showFullscreenButton && (
+                <button
+                  className={clsx(computedButtonClass, isFullscreenDisabled && 'opacity-50 cursor-not-allowed')}
+                  disabled={isFullscreenDisabled}
+                  onClick={handleOpenModal}
+                  onMouseEnter={e => showTooltipForAnchor(e.currentTarget, modalOpen ? (t('common.minimize') || 'Minimize') : (t('common.open') || 'Open'), 'top', false, undefined, props.isDark)}
+                  onMouseLeave={() => hideTooltip()}
+                >
+                  {!modalOpen
+                    ? <svg xmlns="http://www.w3.org/2000/svg" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" /></svg>
+                    : <svg xmlns="http://www.w3.org/2000/svg" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" /></svg>}
+                </button>
+              )}
+            </div>
           </div>
         )}
-        
+
         {!isCollapsed && (
           <div>
-             {showSource ? (
-                <div className={clsx('p-4', props.isDark ? 'bg-gray-900' : 'bg-gray-50')}>
-                  <pre className={clsx('text-sm font-mono whitespace-pre-wrap', props.isDark ? 'text-gray-300' : 'text-gray-700')}>{baseCode}</pre>
-                </div>
-             ) : (
-                <div className="relative">
-                   {props.showZoomControls && (
-                     <div className="absolute top-2 right-2 z-10 rounded-lg">
-                       <div className="flex items-center gap-2 backdrop-blur rounded-lg">
-                          <button className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')} onClick={() => setZoom(Math.min(zoom + 0.1, 3))}>+</button>
-                          <button className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')} onClick={() => setZoom(Math.max(zoom - 0.1, 0.5))}>-</button>
-                          <button className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')} onClick={() => { setZoom(1); setTranslate({x:0,y:0}) }}>{Math.round(zoom * 100)}%</button>
-                       </div>
-                     </div>
-                   )}
-                   <div 
-                     className={clsx('min-h-[360px] relative transition-all duration-100 overflow-hidden block', props.isDark ? 'bg-gray-900' : 'bg-gray-50')}
-                     style={{ height: containerHeight }}
-                     onMouseDown={onMouseDown}
-                     onMouseMove={onMouseMove}
-                     onMouseUp={stopDrag}
-                     onMouseLeave={stopDrag}
-                     onTouchStart={onMouseDown}
-                     onTouchMove={onMouseMove}
-                     onTouchEnd={stopDrag}
-                   >
-                      <div className={clsx('absolute inset-0 cursor-grab', isDragging && 'cursor-grabbing')} style={{ transform: `translate(${translate.x}px, ${translate.y}px) scale(${zoom})` }}>
-                         <div ref={containerRef} className="w-full text-center flex items-center justify-center min-h-full" />
+            {showSource
+              ? (
+                  <div className={clsx('p-4', props.isDark ? 'bg-gray-900' : 'bg-gray-50')}>
+                    <pre className={clsx('text-sm font-mono whitespace-pre-wrap', props.isDark ? 'text-gray-300' : 'text-gray-700')}>{baseCode}</pre>
+                  </div>
+                )
+              : (
+                  <div className="relative">
+                    {props.showZoomControls && (
+                      <div className="absolute top-2 right-2 z-10 rounded-lg">
+                        <div className="flex items-center gap-2 backdrop-blur rounded-lg">
+                          <button
+                            className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')}
+                            onClick={() => setZoom(Math.min(zoom + 0.1, 3))}
+                          >
+                            +
+                          </button>
+                          <button
+                            className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')}
+                            onClick={() => setZoom(Math.max(zoom - 0.1, 0.5))}
+                          >
+                            -
+                          </button>
+                          <button
+                            className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')}
+                            onClick={() => {
+                              setZoom(1)
+                              setTranslate({ x: 0, y: 0 })
+                            }}
+                          >
+                            {Math.round(zoom * 100)}
+                            %
+                          </button>
+                        </div>
                       </div>
-                   </div>
-                </div>
-             )}
+                    )}
+                    <div
+                      className={clsx('min-h-[360px] relative transition-all duration-100 overflow-hidden block', props.isDark ? 'bg-gray-900' : 'bg-gray-50')}
+                      style={{ height: containerHeight }}
+                      onMouseDown={onMouseDown}
+                      onMouseMove={onMouseMove}
+                      onMouseUp={stopDrag}
+                      onMouseLeave={stopDrag}
+                      onTouchStart={onMouseDown}
+                      onTouchMove={onMouseMove}
+                      onTouchEnd={stopDrag}
+                    >
+                      <div className={clsx('absolute inset-0 cursor-grab', isDragging && 'cursor-grabbing')} style={{ transform: `translate(${translate.x}px, ${translate.y}px) scale(${zoom})` }}>
+                        <div ref={containerRef} className="w-full text-center flex items-center justify-center min-h-full" />
+                      </div>
+                    </div>
+                  </div>
+                )}
           </div>
         )}
       </div>
-      
+
       {modalOpen && typeof document !== 'undefined' && createPortal(
-         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={closeModal} role="dialog" aria-modal="true">
-            <div className={clsx('dialog-panel relative w-full h-full max-w-full max-h-full rounded shadow-lg overflow-hidden', props.isDark ? 'bg-gray-900' : 'bg-white')} onClick={e => e.stopPropagation()}>
-               <div className="absolute top-6 right-6 z-50 flex items-center gap-2">
-                 {/* Zoom controls in modal */}
-                  <button className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')} onClick={() => setZoom(Math.min(zoom + 0.1, 3))}>+</button>
-                  <button className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')} onClick={() => setZoom(Math.max(zoom - 0.1, 0.5))}>-</button>
-                  <button className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')} onClick={() => { setZoom(1); setTranslate({x:0,y:0}) }}>{Math.round(zoom * 100)}%</button>
-                  <button className={clsx('inline-flex items-center justify-center p-2 rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')} onClick={closeModal}>X</button>
-               </div>
-               <div 
-                 ref={modalContentRef} 
-                 className={clsx('w-full h-full flex items-center justify-center p-4 overflow-hidden', !isDragging && 'cursor-grab', isDragging && 'cursor-grabbing')}
-                 onMouseDown={onMouseDown}
-                 onMouseMove={onMouseMove}
-                 onMouseUp={stopDrag}
-                 onMouseLeave={stopDrag}
-                 onTouchStart={onMouseDown}
-                 onTouchMove={onMouseMove}
-                 onTouchEnd={stopDrag}
-               />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={closeModal} role="dialog" aria-modal="true">
+          <div className={clsx('dialog-panel relative w-full h-full max-w-full max-h-full rounded shadow-lg overflow-hidden', props.isDark ? 'bg-gray-900' : 'bg-white')} onClick={e => e.stopPropagation()}>
+            <div className="absolute top-6 right-6 z-50 flex items-center gap-2">
+              {/* Zoom controls in modal */}
+              <button className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')} onClick={() => setZoom(Math.min(zoom + 0.1, 3))}>+</button>
+              <button className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')} onClick={() => setZoom(Math.max(zoom - 0.1, 0.5))}>-</button>
+              <button
+                className={clsx('p-2 text-xs rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')}
+                onClick={() => {
+                  setZoom(1)
+                  setTranslate({ x: 0, y: 0 })
+                }}
+              >
+                {Math.round(zoom * 100)}
+                %
+              </button>
+              <button className={clsx('inline-flex items-center justify-center p-2 rounded transition-colors', props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200')} onClick={closeModal}>X</button>
             </div>
-         </div>,
-         document.body
+            <div
+              ref={modalContentRef}
+              className={clsx('w-full h-full flex items-center justify-center p-4 overflow-hidden', !isDragging && 'cursor-grab', isDragging && 'cursor-grabbing')}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={stopDrag}
+              onMouseLeave={stopDrag}
+              onTouchStart={onMouseDown}
+              onTouchMove={onMouseMove}
+              onTouchEnd={stopDrag}
+            />
+          </div>
+        </div>,
+        document.body,
       )}
     </>
   )

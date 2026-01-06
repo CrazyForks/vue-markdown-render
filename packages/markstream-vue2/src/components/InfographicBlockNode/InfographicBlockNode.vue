@@ -36,7 +36,7 @@ const props = withDefaults(
   },
 )
 
-const emits = defineEmits(['copy', 'export', 'openModal'])
+const _emits = defineEmits(['copy', 'export', 'openModal'])
 
 const { t } = useSafeI18n()
 
@@ -164,7 +164,7 @@ function openModal() {
     if (infographicContainer.value && modalContent.value) {
       // Clear previous
       modalContent.value.innerHTML = ''
-      
+
       // Create a wrapper for transform
       const wrapper = document.createElement('div')
       wrapper.style.transition = 'transform 0.1s ease'
@@ -174,18 +174,18 @@ function openModal() {
       wrapper.style.display = 'flex'
       wrapper.style.alignItems = 'center'
       wrapper.style.justifyContent = 'center'
-      
+
       // Clone the content
       const clone = infographicContainer.value.cloneNode(true) as HTMLElement
       clone.classList.add('fullscreen')
       // Remove any fixed height from the clone to allow it to scale properly in flex
       clone.style.height = 'auto'
-      
+
       wrapper.appendChild(clone)
       modalContent.value.appendChild(wrapper)
-      
+
       modalCloneWrapper.value = wrapper
-      
+
       // Sync initial transform
       wrapper.style.transform = `translate(${translateX.value}px, ${translateY.value}px) scale(${zoom.value})`
     }
@@ -213,7 +213,6 @@ function closeModal() {
 }
 
 // Keep modal clone in sync with transform changes
-
 
 function handleOpenModalClick() {
   openModal()

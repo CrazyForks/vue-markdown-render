@@ -60,8 +60,6 @@ data
 \`\`\`
 `)
 
-
-
 // 流式渲染相关状态
 const streamContent = ref<string>('')
 const isStreaming = ref(false)

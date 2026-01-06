@@ -37,7 +37,7 @@ export async function getInfographic() {
   // Normalize module
   // Handle ESM default export or named export
   const defaultExport = (mod && (mod as any).default) ? (mod as any).default : mod
-  
+
   // If default export is the class itself
   if (typeof defaultExport === 'function' && defaultExport.prototype && defaultExport.prototype.render) {
     cachedInfographic = defaultExport
@@ -45,9 +45,11 @@ export async function getInfographic() {
   // If it's a named export { Infographic }
   else if (mod.Infographic) {
     cachedInfographic = mod.Infographic
-  } else if (defaultExport && defaultExport.Infographic) {
+  }
+  else if (defaultExport && defaultExport.Infographic) {
     cachedInfographic = defaultExport.Infographic
-  } else {
+  }
+  else {
     // Fallback
     cachedInfographic = defaultExport
   }

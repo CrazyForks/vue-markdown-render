@@ -11,15 +11,16 @@ export async function getInfographic() {
     .then((mod) => {
       // Normalize module
       const defaultExport = (mod && (mod as any).default) ? (mod as any).default : mod
-      
+
       let resolved = defaultExport
-      
+
       if (typeof defaultExport === 'function' && defaultExport.prototype && defaultExport.prototype.render) {
         resolved = defaultExport
       }
       else if (mod.Infographic) {
         resolved = mod.Infographic
-      } else if (defaultExport && defaultExport.Infographic) {
+      }
+      else if (defaultExport && defaultExport.Infographic) {
         resolved = defaultExport.Infographic
       }
 

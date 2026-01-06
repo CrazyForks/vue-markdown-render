@@ -14,6 +14,7 @@ import HeadingNode from './components/HeadingNode'
 import HighlightNode from './components/HighlightNode'
 import HtmlInlineNode from './components/HtmlInlineNode'
 import ImageNode from './components/ImageNode'
+import InfographicBlockNode from './components/InfographicBlockNode'
 import InlineCodeNode from './components/InlineCodeNode'
 import InsertNode from './components/InsertNode'
 import LinkNode from './components/LinkNode'
@@ -24,7 +25,6 @@ import MathBlockNode from './components/MathBlockNode'
 import MathInlineNode from './components/MathInlineNode'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import MermaidBlockNode from './components/MermaidBlockNode'
-import InfographicBlockNode from './components/InfographicBlockNode'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
 import MarkdownRender from './components/NodeRenderer'
 import ParagraphNode from './components/ParagraphNode'
@@ -75,6 +75,7 @@ export {
   HighlightNode,
   HtmlInlineNode,
   ImageNode,
+  InfographicBlockNode,
   InlineCodeNode,
   InsertNode,
   isKatexEnabled,
@@ -87,7 +88,6 @@ export {
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
-  InfographicBlockNode,
   ParagraphNode,
   PreCodeNode,
   ReferenceNode,

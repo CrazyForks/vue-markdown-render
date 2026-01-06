@@ -129,6 +129,9 @@
     "vue-i18n": ">=9"
   },
   "peerDependenciesMeta": {
+    "@antv/infographic": {
+      "optional": true
+    },
     "katex": {
       "optional": true
     },
@@ -145,9 +148,6 @@
       "optional": true
     },
     "vue-i18n": {
-      "optional": true
-    },
-    "@antv/infographic": {
       "optional": true
     }
   },
