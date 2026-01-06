@@ -129,6 +129,7 @@ export default defineConfig(({ mode }) => {
             'stream-monaco',
             'stream-markdown',
             'stream-markdown-parser',
+            '@antv/infographic',
             'monaco-editor',
             'shiki',
           ].includes(id)

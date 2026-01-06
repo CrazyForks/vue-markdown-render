@@ -76,6 +76,7 @@ export default defineConfig(({ mode }) => {
           'stream-monaco',
           'stream-markdown',
           'stream-markdown-parser',
+          '@antv/infographic',
           '@floating-ui/dom',
         ],
       },
