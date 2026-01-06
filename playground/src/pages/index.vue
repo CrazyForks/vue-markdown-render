@@ -595,10 +595,10 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
 }
 
-	/* 当真实内容高度超出容器时，移除默认 min-height（由 JS 切换类名） */
-	.chatbot-messages.disable-min-height > .markdown-renderer {
-	  min-height: unset !important;
-	}
+/* 当真实内容高度超出容器时，移除默认 min-height（由 JS 切换类名） */
+.chatbot-messages.disable-min-height > .markdown-renderer {
+  min-height: unset !important;
+}
 
 .chatbot-messages::-webkit-scrollbar {
   width: 8px;
