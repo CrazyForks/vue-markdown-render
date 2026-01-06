@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { getMarkdown, parseMarkdownToStructure } from '../src'
 
 describe('vmr_container fallback', () => {
+  it('preserves args after container name as attrs', () => {
+    const md = getMarkdown('vmr_container_args')
+    const markdown = [
+      ':::test 1944565882923520000;tag;2',
+      ':::',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md) as any[]
+    expect(nodes[0]?.type).toBe('vmr_container')
+    expect(nodes[0]?.name).toBe('test')
+    expect(nodes[0]?.attrs?.args).toBe('1944565882923520000;tag;2')
+  })
+
   it('parses fenced code blocks inside ::: containers', () => {
     const md = getMarkdown('vmr_container_fence')
     const markdown = [

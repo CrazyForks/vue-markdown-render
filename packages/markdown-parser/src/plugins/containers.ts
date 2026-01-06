@@ -63,24 +63,42 @@ export function applyContainers(md: MarkdownIt) {
         return false
 
       const rest = line.slice(nameMatch[0].length)
-      // Improved JSON matching: find balanced braces instead of simple non-greedy match
-      let jsonStr: string | undefined
       const trimmedRest = rest.trim()
-      if (trimmedRest.startsWith('{')) {
-        let depth = 0
-        let jsonEnd = -1
-        for (let i = 0; i < trimmedRest.length; i++) {
-          if (trimmedRest[i] === '{')
-            depth++
-          else if (trimmedRest[i] === '}')
-            depth--
-          if (depth === 0) {
-            jsonEnd = i + 1
-            break
+
+      // Support both:
+      // - ::: name {"json"}
+      // - :::name args {"json"}
+      // - :::name args
+      let argsStr: string | undefined
+      let jsonStr: string | undefined
+
+      const jsonStart = trimmedRest.indexOf('{')
+      const jsonCandidate = jsonStart >= 0 ? trimmedRest.slice(jsonStart).trimStart() : undefined
+
+      if (jsonStart === -1) {
+        argsStr = trimmedRest || undefined
+      }
+      else {
+        const before = trimmedRest.slice(0, jsonStart).trim()
+        argsStr = before || undefined
+
+        // Improved JSON matching: find balanced braces instead of simple non-greedy match
+        if (jsonCandidate?.startsWith('{')) {
+          let depth = 0
+          let jsonEnd = -1
+          for (let i = 0; i < jsonCandidate.length; i++) {
+            if (jsonCandidate[i] === '{')
+              depth++
+            else if (jsonCandidate[i] === '}')
+              depth--
+            if (depth === 0) {
+              jsonEnd = i + 1
+              break
+            }
           }
-        }
-        if (jsonEnd > 0) {
-          jsonStr = trimmedRest.slice(0, jsonEnd)
+          if (jsonEnd > 0) {
+            jsonStr = jsonCandidate.slice(0, jsonEnd)
+          }
         }
       }
 
@@ -104,6 +122,10 @@ export function applyContainers(md: MarkdownIt) {
       const tokenOpen = s.push('vmr_container_open', 'div', 1)
       // `tokenOpen` is runtime token object; keep using runtime helpers but avoid casting `s` to `any`.
       tokenOpen.attrSet('class', `vmr-container vmr-container-${name}`)
+
+      // If args are present (non-JSON payload right after the name), preserve them as a data attribute.
+      if (argsStr)
+        tokenOpen.attrSet('data-args', argsStr)
 
       // If JSON attributes are present, store them as data attributes
       if (jsonStr) {
