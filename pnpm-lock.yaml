@@ -37,8 +37,8 @@ importers:
         specifier: workspace:*
         version: link:packages/markdown-parser
       stream-monaco:
-        specifier: '>=0.0.12'
-        version: 0.0.12(monaco-editor@0.52.2)
+        specifier: '>=0.0.13'
+        version: 0.0.13(monaco-editor@0.52.2)
       vue-i18n:
         specifier: '>=9'
         version: 11.2.2(vue@3.5.25(typescript@5.9.3))
@@ -210,8 +210,8 @@ importers:
         specifier: workspace:*
         version: link:../markdown-parser
       stream-monaco:
-        specifier: '>=0.0.12'
-        version: 0.0.12(monaco-editor@0.52.2)
+        specifier: '>=0.0.13'
+        version: 0.0.13(monaco-editor@0.52.2)
     devDependencies:
       '@types/react':
         specifier: ^18.3.27
@@ -262,8 +262,8 @@ importers:
         specifier: workspace:*
         version: link:../markdown-parser
       stream-monaco:
-        specifier: '>=0.0.12'
-        version: 0.0.12(monaco-editor@0.52.2)
+        specifier: '>=0.0.13'
+        version: 0.0.13(monaco-editor@0.52.2)
       vue:
         specifier: 2.7.16
         version: 2.7.16
@@ -6835,8 +6835,8 @@ packages:
     peerDependencies:
       monaco-editor: ^0.52.2
 
-  stream-monaco@0.0.12:
-    resolution: {integrity: sha512-B7JitKOtHWbp/nKUIXk6qs16NH+Kd2X/+X/itWullKsqUhBxj6hluw2GQ7VTeBUf8xB5RZ8RUtOOBFk5etjSNQ==}
+  stream-monaco@0.0.13:
+    resolution: {integrity: sha512-KauXeGV2iLV90QoZjOmP8arCb2KLVK4nykmdNAJOdziGYsp3KsA7tkyeHo7xnGIHKHIB6vUBOfxnZU0nm7IYyQ==}
     hasBin: true
     peerDependencies:
       monaco-editor: ^0.52.2
@@ -15053,7 +15053,7 @@ snapshots:
       monaco-editor: 0.52.2
       shiki: 3.20.0
 
-  stream-monaco@0.0.12(monaco-editor@0.52.2):
+  stream-monaco@0.0.13(monaco-editor@0.52.2):
     dependencies:
       '@shikijs/monaco': 3.19.0
       alien-signals: 2.0.8
