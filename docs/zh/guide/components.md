@@ -13,7 +13,7 @@
 | `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
 | `ImageNode` | 自定义图片预览 / 懒加载 | 触发 `click` / `load` / `error` 事件 | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
 | `LinkNode` | 下划线动画、颜色自定义 | `color`、`underlineHeight`、`showTooltip` | 无 | 浏览器默认 `a` 样式可通过 reset 解决 |
-| `VmrContainerNode` | 带 JSON 属性的自定义 `:::` 容器 | `node`（`name`、`attrs`、`children`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | 未知节点类型 → 检查 `FallbackComponent`；JSON 无效 → 检查 `data-attrs` 回退 |
+| `VmrContainerNode` | 带 JSON 属性的自定义 `:::` 容器 | `node`（`name`、`attrs`、`loading`、`children`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | 未知节点类型 → 检查 `FallbackComponent`；JSON 无效 → 检查 `data-attrs` 回退；流式场景下 attrs 不完整 → 临时存储在 `attrs.args` |
 
 ## MarkdownRender
 
@@ -362,9 +362,34 @@ interface VmrContainerNode {
   type: 'vmr_container'
   name: string // 来自 ::: name 的容器名称
   attrs?: Record<string, string> // 解析后的 JSON 属性
+  loading?: boolean // 流式中间态：容器未闭合时为 true
   children: ParsedNode[] // 子节点
   raw: string // 原始 markdown 源文本
 }
+```
+
+### 流式行为
+
+在流式场景（如 LLM 输出）中渲染容器时，解析器会优雅地处理不完整的 JSON 属性：
+
+- **Loading 状态**：当 `:::` 容器已打开但尚未闭合时，`loading` 会被设置为 `true`。这允许你的组件在内容流式传输时显示中间状态（如骨架屏）。
+
+- **不完整 JSON 处理**：在流式场景中，token 到达时 JSON 属性可能不完整。解析器使用回退策略：
+  1. 首先尝试对属性字符串进行标准的 `JSON.parse()`
+  2. 如果失败，尝试使用宽松的对象解析器处理 `{key:value}` 语法
+  3. 如果两者都失败，则将整个字符串作为普通的 `attrs.args` 参数存储
+
+  这意味着在流式传输期间，你可能会暂时看到 `{"incomplete` 作为 `attrs.args`，直到完整的 `{"key":"value"}` 到达并能够正确解析。
+
+流式传输进度示例：
+```markdown
+# 初始状态（中间态）
+::: viewcode:stream {"incomplete
+# → attrs.args = '{"incomplete', loading = true
+
+# 更多内容到达后
+::: viewcode:stream {"devId":"abc"}
+# → attrs.devId = "abc", loading = false（如果存在闭合 :::）
 ```
 
 ### 默认渲染
@@ -538,6 +563,7 @@ setCustomComponents('docs', {
 - **看到原始文本**：说明你使用的是默认渲染器。请通过 `setCustomComponents` 注册自定义组件。
 - **Attrs 为 undefined**：请确保 JSON 语法正确。无效的 JSON 会回退到 `data-attrs` 并存储原始字符串。
 - **组件未收到 props**：请确保你的组件正确接受 `node` prop 且类型匹配。
+- **流式场景下 attrs 不完整**：在 LLM/流式传输场景中，你可能会暂时看到 `attrs.args` 包含部分 JSON，如 `{"incomplete`。这是正常现象 —— 解析器会将不完整的 JSON 作为普通 args 存储，直到完整语法到达并能够正确解析。可以通过检查 `node.loading` 来检测这种中间态。
 
 ## 工具函数
 

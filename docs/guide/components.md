@@ -13,7 +13,7 @@ This page explains how each renderer fits together, what peer dependencies or CS
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
 | `ImageNode` | Custom previews/lightboxes | Emits `click`, `load`, `error`; accepts `lazy` props via `node.props` | None, but respects global CSS | Wrap in custom component + `setCustomComponents` to intercept events |
 | `LinkNode` | Animated underline, tooltips | `color`, `underlineHeight`, `showTooltip` | No extra CSS | Browser defaults can override `a` styles; import reset |
-| `VmrContainerNode` | Custom `:::` containers with JSON attrs | `node` (`name`, `attrs`, `children`) | Minimal base CSS; override via `setCustomComponents` | Unknown node type → check `FallbackComponent`; invalid JSON → check `data-attrs` fallback |
+| `VmrContainerNode` | Custom `:::` containers with JSON attrs | `node` (`name`, `attrs`, `loading`, `children`) | Minimal base CSS; override via `setCustomComponents` | Unknown node type → check `FallbackComponent`; invalid JSON → check `data-attrs` fallback; streaming mid-state with incomplete attrs → temporarily stored in `attrs.args` |
 
 ## MarkdownRender
 
@@ -363,9 +363,34 @@ interface VmrContainerNode {
   type: 'vmr_container'
   name: string // Container name from ::: name
   attrs?: Record<string, string> // Parsed JSON attributes
+  loading?: boolean // Streaming mid-state: true when container is not closed
   children: ParsedNode[] // Child nodes
   raw: string // Raw markdown source
 }
+```
+
+### Streaming behavior
+
+When rendering containers in a streaming context (e.g., LLM output), the parser handles incomplete JSON attributes gracefully:
+
+- **Loading state**: When a `:::` container is opened but not yet closed, `loading` is set to `true`. This allows your component to show an intermediate state (like a skeleton loader) while content is streaming.
+
+- **Incomplete JSON handling**: In streaming scenarios, the JSON attributes may be incomplete when tokens arrive. The parser uses a fallback strategy:
+  1. First attempts standard `JSON.parse()` on the attribute string
+  2. If that fails, tries a loose object parser for `{key:value}` syntax
+  3. If both fail, stores the entire string as a plain `attrs.args` parameter
+
+  This means during streaming you might temporarily see `{"incomplete` as `attrs.args` until the full `{"key":"value"}` arrives and can be properly parsed.
+
+Example streaming progression:
+```markdown
+# Initially (mid-state)
+::: viewcode:stream {"incomplete
+# → attrs.args = '{"incomplete', loading = true
+
+# After more content
+::: viewcode:stream {"devId":"abc"}
+# → attrs.devId = "abc", loading = false (if closing ::: present)
 ```
 
 ### Default rendering
@@ -539,6 +564,7 @@ setCustomComponents('docs', {
 - **Raw text visible**: You're seeing the default renderer. Register a custom component via `setCustomComponents`.
 - **Attrs undefined**: Ensure your JSON syntax is valid. Invalid JSON falls back to `data-attrs` with the raw string.
 - **Component not receiving props**: Make sure your component accepts the `node` prop with the correct type.
+- **Streaming with incomplete attrs**: In LLM/streaming scenarios, you may temporarily see `attrs.args` containing partial JSON like `{"incomplete`. This is normal — the parser stores incomplete JSON as plain args until the full syntax arrives and can be properly parsed. Check `node.loading` to detect this mid-state.
 
 ## Utility helpers
 
