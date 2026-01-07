@@ -526,6 +526,7 @@ onBeforeUnmount(() => {
           :code-block-dark-theme="selectedTheme || undefined"
           :code-block-light-theme="selectedTheme || undefined"
           :themes="themes"
+          :custom-html-tags="['thinking']"
           :is-dark="isDark"
           :parse-options="parseOptions"
           custom-id="playground-demo"

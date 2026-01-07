@@ -295,6 +295,20 @@ export function parseMarkdownToStructure(
       .filter(Boolean)
 
     if (tags.length) {
+      // markdown-it doesn't always treat custom tags as html_block when the opening
+      // tag and the first content token live on the same line (e.g. "<thinking> foo").
+      // That causes the tag to be parsed as inline HTML and breaks custom block parsing.
+      // Normalize "<tag> ..." (line-start only) into "<tag>\n..." so it becomes a block.
+      for (const tag of tags) {
+        const re = new RegExp(
+          // Only rewrite when the opening tag starts the line and the closing tag
+          // does NOT also appear on the same line.
+          String.raw`(^[\t ]*<\s*${tag}\b[^>]*>)(?![^\r\n]*<\s*\/\s*${tag}\s*>)[\t ]*([^\r\n]+)`,
+          'gim',
+        )
+        safeMarkdown = safeMarkdown.replace(re, '$1\n$2')
+      }
+
       // Fast path: no closing tag marker at all.
       if (!safeMarkdown.includes('</')) {
         // no-op
