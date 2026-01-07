@@ -24,6 +24,7 @@ import TextNode from '../TextNode'
 interface VmrContainerNode {
   type: 'vmr_container'
   name: string
+  loading?: boolean
   attrs?: Record<string, string>
   children: { type: string, raw: string }[]
   raw: string

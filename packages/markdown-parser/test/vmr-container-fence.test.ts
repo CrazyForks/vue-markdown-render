@@ -174,4 +174,82 @@ describe('vmr_container fallback', () => {
       ]
     `)
   })
+
+  it('emits loading=true when ::: container is not closed (streaming mid-state)', () => {
+    const md = getMarkdown('vmr_container_loading_mid')
+    const markdown = [
+      '::: viewcode:stream',
+      'partial line',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false }) as any[]
+    expect(nodes[0]?.type).toBe('vmr_container')
+    expect(nodes[0]?.name).toBe('viewcode:stream')
+    expect(nodes[0]?.loading).toBe(true)
+  })
+
+  it('sets loading=false once closing ::: is present', () => {
+    const md = getMarkdown('vmr_container_loading_closed')
+    const markdown = [
+      '::: viewcode:stream',
+      'content',
+      ':::',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false }) as any[]
+    expect(nodes[0]?.type).toBe('vmr_container')
+    expect(nodes[0]?.loading).toBe(false)
+  })
+
+  it('forces loading=false when final=true even if closing ::: is missing', () => {
+    const md = getMarkdown('vmr_container_loading_final')
+    const markdown = [
+      '::: viewcode:stream',
+      'content',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+    expect(nodes[0]?.type).toBe('vmr_container')
+    expect(nodes[0]?.loading).toBe(false)
+  })
+
+  it('parses attrs args payload in streaming mid-state (no closing :::)', () => {
+    const md = getMarkdown('vmr_container_attrs_args_payload')
+    const markdown = [
+      '::: viewcode:stream xxx;yyy;ddd',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false }) as any[]
+    expect(nodes[0]?.type).toBe('vmr_container')
+    expect(nodes[0]?.name).toBe('viewcode:stream')
+    expect(nodes[0]?.attrs?.args).toBe('xxx;yyy;ddd')
+    expect(nodes[0]?.loading).toBe(true)
+  })
+
+  it('parses loose attrs payload in streaming mid-state (no closing :::)', () => {
+    const md = getMarkdown('vmr_container_attrs_loose_object')
+    const markdown = [
+      '::: viewcode:stream {xxx:yyy}',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false }) as any[]
+    expect(nodes[0]?.type).toBe('vmr_container')
+    expect(nodes[0]?.name).toBe('viewcode:stream')
+    expect(nodes[0]?.attrs?.xxx).toBe('yyy')
+    expect(nodes[0]?.loading).toBe(true)
+  })
+
+  it('downgrades incomplete attrs payload to args in streaming mid-state attr', () => {
+    const md = getMarkdown('vmr_container_attrs_loose_object')
+    const markdown = [
+      '::: viewcode:stream {xxx:yyy',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false }) as any[]
+
+    expect(nodes[0]?.type).toBe('vmr_container')
+    expect(nodes[0]?.name).toBe('viewcode:stream')
+    expect(nodes[0]?.attrs?.args).toBe('{xxx:yyy')
+    expect(nodes[0]?.loading).toBe(true)
+  })
 })

@@ -97,6 +97,9 @@ function parseVmrContainer(
     }
   }
 
+  const hasCloseToken = j < tokens.length && tokens[j].type === 'vmr_container_close'
+  const closed = hasCloseToken || !!options?.final
+
   // Build raw content
   let raw = `::: ${name}`
   if (Object.keys(containerAttrs).length > 0) {
@@ -112,13 +115,14 @@ function parseVmrContainer(
   const containerNode: VmrContainerNode = {
     type: 'vmr_container',
     name,
+    loading: !closed,
     attrs: Object.keys(containerAttrs).length > 0 ? containerAttrs : undefined,
     children,
     raw,
   }
 
-  // Skip the closing token
-  return [containerNode, j + 1]
+  // Skip the closing token when present; otherwise we're already at the end.
+  return [containerNode, hasCloseToken ? (j + 1) : j]
 }
 
 function findTagCloseIndexOutsideQuotes(input: string) {

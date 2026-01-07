@@ -213,6 +213,8 @@ export interface AdmonitionNode extends BaseNode {
 export interface VmrContainerNode extends BaseNode {
   type: 'vmr_container'
   name: string
+  /** True while the opening `:::` has been seen but the closing `:::` hasn't (streaming mid-state). */
+  loading?: boolean
   attrs?: Record<string, string>
   children: ParsedNode[]
 }
