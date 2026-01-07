@@ -1,4 +1,4 @@
-## [0.0.5-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.5-beta.2) (2026-01-06)
+## [0.0.5-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.5-beta.2) (2026-01-07)
 
 
 ### Bug Fixes
@@ -7,6 +7,7 @@
 * **changelog:** update release date and add missing bug fix entries ([6f453dc](https://github.com/Simon-He95/markstream-vue/commit/6f453dc8d158b2de24176c783860a3d6f5476d10))
 * **changelog:** update version to 0.0.5-beta.1 and add missing bug fix entries ([b300251](https://github.com/Simon-He95/markstream-vue/commit/b30025199eeb80d4d5dfd81390d299ca41c4024c))
 * **changelog:** update version to 0.0.5-beta.1 and add missing bug fix entries ([058730c](https://github.com/Simon-He95/markstream-vue/commit/058730c942c0bf16c2294fdaa07dc90f9784a7f4))
+* **changelog:** update version to 0.0.5-beta.2 and add missing bug fix entries ([84f7824](https://github.com/Simon-He95/markstream-vue/commit/84f7824c4f7cd9ba3d50e805d9c2db15b232bd0d))
 * **customBlock:** render wrong ([dc32504](https://github.com/Simon-He95/markstream-vue/commit/dc325044a95970f7173a9adbd7ebe0f6d4b2e7be)), closes [#225](https://github.com/Simon-He95/markstream-vue/issues/225)
 * **dependencies:** update stream-markdown and stream-monaco versions to 0.0.13 and 0.0.10 respectively ([e363e3a](https://github.com/Simon-He95/markstream-vue/commit/e363e3afbdc86e76ab3d0727e3859eaed661b623))
 * **dependencies:** update stream-monaco version to 0.0.12 across all packages ([b1b3097](https://github.com/Simon-He95/markstream-vue/commit/b1b309767dc19765b4b0915b17b48798b94143bc))
@@ -20,6 +21,8 @@
 * **netlify.toml:** update publish path to correct directory ([6bf3710](https://github.com/Simon-He95/markstream-vue/commit/6bf371089e06bf740ec64e71839999c76c7b3ce6))
 * **nuxt.config.ts:** set nitro preset to static ([580e83e](https://github.com/Simon-He95/markstream-vue/commit/580e83e34487446d423e11b403c8f270240f70ac))
 * **theme:** toggle fail ([39cd71a](https://github.com/Simon-He95/markstream-vue/commit/39cd71af0c499c95d9c50b9770972540ac83c3ef)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
+* update stream-monaco version to 0.0.14 in package.json and pnpm-lock.yaml ([47fcf1a](https://github.com/Simon-He95/markstream-vue/commit/47fcf1a816eeebcba5356e90f4c7a390f6f3a67b))
+* update stream-monaco version to 0.0.15 in package.json and pnpm-lock.yaml; enhance CodeBlockNode to handle dynamic editor kind switching in streaming scenarios ([1cae7e0](https://github.com/Simon-He95/markstream-vue/commit/1cae7e029e3f9174e9ebc9eaaab47f48d212b4c4))
 * update vue-i18n to version 11.2.8 in package.json and pnpm-lock.yaml ([9bf1d0f](https://github.com/Simon-He95/markstream-vue/commit/9bf1d0fb914dfc4a8e7f8bb28e855667616e1b70))
 * **vite.config.ts:** adjust alias resolution for development mode only ([7530877](https://github.com/Simon-He95/markstream-vue/commit/7530877c3773c59cdc623816cd3f25f75daa6e40))
 
@@ -46,6 +49,8 @@
 * update CHANGELOG for v0.0.4 release with bug fixes and new features ([5f79584](https://github.com/Simon-He95/markstream-vue/commit/5f79584012639f042543508170af66a9cb631934))
 * update CHANGELOG for v0.0.4 release with bug fixes and new features ([4835a8f](https://github.com/Simon-He95/markstream-vue/commit/4835a8fbcfb15fbc654a849f5017f04b5a824b59))
 * update CHANGELOG with new features and enhancements for release process ([e98336b](https://github.com/Simon-He95/markstream-vue/commit/e98336b0f26efab73985120c37c1a017c6606b61))
+* **VmrContainerNode:** add mid-state loading ([016f1ed](https://github.com/Simon-He95/markstream-vue/commit/016f1ed37f25e9f6f74856d385aa62514d556f32))
+* **VmrContainerNode:** enhance streaming behavior with loading state and incomplete JSON handling ([beef82b](https://github.com/Simon-He95/markstream-vue/commit/beef82bcdc5fb78d2d9c7d3becc70cb075d1d380))
 
 
 
