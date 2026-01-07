@@ -113,6 +113,23 @@ describe('html inline streaming mid-states', () => {
     expect(thinking.content).toContain('hi')
   })
 
+  it('normalizes line-start "<thinking> ..." into a block custom node', () => {
+    const markdown = `<thinking> hello
+world
+</thinking>
+
+- item`
+    const nodes = parseMarkdownToStructure(markdown, mdCustom, { customHtmlTags: ['thinking'] }) as any
+    expect(nodes.length).toBeGreaterThan(1)
+    expect(nodes[0]?.type).toBe('thinking')
+    expect((nodes[0] as any).loading).toBe(false)
+
+    const inner = parseMarkdownToStructure(String((nodes[0] as any).content ?? ''), md)
+    expect(textIncludes(inner as any, 'hello')).toBe(true)
+    expect(textIncludes(inner as any, 'world')).toBe(true)
+    expect(hasNode(nodes as any, 'list')).toBe(true)
+  })
+
   it('suppresses partial opening tag when adjacent to text', () => {
     const nodes = parseMarkdownToStructure('x<span class="a"', md)
     expect(textIncludes(nodes, 'x')).toBe(true)

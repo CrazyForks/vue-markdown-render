@@ -863,11 +863,12 @@ async function runEditorCreation(el: HTMLElement) {
 
   if (isDiff.value) {
     safeClean()
-    if (createDiffEditor){
+    if (createDiffEditor) {
       await createDiffEditor(el as HTMLElement, String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), monacoLanguage.value)
     }
-    else
+    else {
       await createEditor(el as HTMLElement, props.node.code, monacoLanguage.value)
+    }
   }
   else {
     await createEditor(el as HTMLElement, props.node.code, monacoLanguage.value)

@@ -234,6 +234,133 @@ function stripDanglingHtmlLikeTail(markdown: string) {
   return s.slice(0, lastLt)
 }
 
+function normalizeCustomHtmlOpeningTagSameLine(markdown: string, tags: string[]) {
+  if (!markdown || !tags.length)
+    return markdown
+
+  const tagSet = new Set(tags.map(t => String(t ?? '').toLowerCase()))
+  if (!tagSet.size)
+    return markdown
+
+  const isIndentWs = (ch: string) => ch === ' ' || ch === '\t'
+  const isNameChar = (ch: string) => {
+    const c = ch.charCodeAt(0)
+    return (
+      (c >= 65 && c <= 90) // A-Z
+      || (c >= 97 && c <= 122) // a-z
+      || (c >= 48 && c <= 57) // 0-9
+      || ch === '_'
+      || ch === '-'
+    )
+  }
+
+  const trimStartIndentWs = (s: string) => {
+    let i = 0
+    while (i < s.length && isIndentWs(s[i])) i++
+    return s.slice(i)
+  }
+
+  const hasClosingTagOnLine = (line: string, from: number, tag: string) => {
+    const lowerTag = tag.toLowerCase()
+    let pos = line.indexOf('<', from)
+    while (pos !== -1) {
+      let i = pos + 1
+      while (i < line.length && isIndentWs(line[i])) i++
+      if (i >= line.length || line[i] !== '/') {
+        pos = line.indexOf('<', pos + 1)
+        continue
+      }
+      i++
+      while (i < line.length && isIndentWs(line[i])) i++
+      if (i + lowerTag.length > line.length) {
+        pos = line.indexOf('<', pos + 1)
+        continue
+      }
+
+      // Case-insensitive match for the closing tag name.
+      let matched = true
+      for (let j = 0; j < lowerTag.length; j++) {
+        const ch = line[i + j]
+        const lc = ch >= 'A' && ch <= 'Z' ? String.fromCharCode(ch.charCodeAt(0) + 32) : ch
+        if (lc !== lowerTag[j]) {
+          matched = false
+          break
+        }
+      }
+      if (!matched) {
+        pos = line.indexOf('<', pos + 1)
+        continue
+      }
+
+      let k = i + lowerTag.length
+      // Ensure exact tag name (no extra name characters).
+      if (k < line.length && isNameChar(line[k])) {
+        pos = line.indexOf('<', pos + 1)
+        continue
+      }
+      while (k < line.length && isIndentWs(line[k])) k++
+      if (k < line.length && line[k] === '>')
+        return true
+
+      pos = line.indexOf('<', pos + 1)
+    }
+    return false
+  }
+
+  const normalizeLine = (line: string) => {
+    let i = 0
+    while (i < line.length && isIndentWs(line[i])) i++
+    if (i >= line.length || line[i] !== '<')
+      return line
+
+    i++
+    while (i < line.length && isIndentWs(line[i])) i++
+    if (i >= line.length || line[i] === '/')
+      return line
+
+    const nameStart = i
+    while (i < line.length && isNameChar(line[i])) i++
+    if (i === nameStart)
+      return line
+
+    const tagName = line.slice(nameStart, i).toLowerCase()
+    if (!tagSet.has(tagName))
+      return line
+
+    const gt = line.indexOf('>', i)
+    if (gt === -1)
+      return line
+
+    if (hasClosingTagOnLine(line, gt + 1, tagName))
+      return line
+
+    const rest = trimStartIndentWs(line.slice(gt + 1))
+    if (!rest)
+      return line
+
+    return `${line.slice(0, gt + 1)}\n${rest}`
+  }
+
+  let out = ''
+  let idx = 0
+  while (idx < markdown.length) {
+    const nl = markdown.indexOf('\n', idx)
+    if (nl === -1) {
+      out += normalizeLine(markdown.slice(idx))
+      break
+    }
+
+    const isCrlf = nl > idx && markdown[nl - 1] === '\r'
+    const lineEnd = isCrlf ? nl - 1 : nl
+    const line = markdown.slice(idx, lineEnd)
+    out += normalizeLine(line)
+    out += isCrlf ? '\r\n' : '\n'
+    idx = nl + 1
+  }
+
+  return out
+}
+
 export function parseMarkdownToStructure(
   markdown: string,
   md: MarkdownIt,
@@ -299,15 +426,7 @@ export function parseMarkdownToStructure(
       // tag and the first content token live on the same line (e.g. "<thinking> foo").
       // That causes the tag to be parsed as inline HTML and breaks custom block parsing.
       // Normalize "<tag> ..." (line-start only) into "<tag>\n..." so it becomes a block.
-      for (const tag of tags) {
-        const re = new RegExp(
-          // Only rewrite when the opening tag starts the line and the closing tag
-          // does NOT also appear on the same line.
-          String.raw`(^[\t ]*<\s*${tag}\b[^>]*>)(?![^\r\n]*<\s*\/\s*${tag}\s*>)[\t ]*([^\r\n]+)`,
-          'gim',
-        )
-        safeMarkdown = safeMarkdown.replace(re, '$1\n$2')
-      }
+      safeMarkdown = normalizeCustomHtmlOpeningTagSameLine(safeMarkdown, tags)
 
       // Fast path: no closing tag marker at all.
       if (!safeMarkdown.includes('</')) {
