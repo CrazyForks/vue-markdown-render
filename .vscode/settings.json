@@ -1,6 +1,5 @@
 {
-  "unot.switchMagic": true,
-  "i18n-ally.localesPaths": [
-    "packages/markstream-react/src/i18n"
-  ]
+    "i18n-ally.localesPaths": [
+        "packages/markstream-react/src/i18n"
+    ]
 }
