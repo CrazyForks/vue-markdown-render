@@ -472,6 +472,27 @@ alpha
     expect(textIncludes(inner as any, 'alpha')).toBe(true)
   })
 
+  it('parses <thinking> blocks even when first content is on the same line', () => {
+    const markdown = `<thinking> alpha
+
+- item 1
+- item 2
+</thinking>`
+
+    const nodes = parseMarkdownToStructure(markdown, mdCustom, { customHtmlTags: ['thinking'] })
+    expect(nodes.length).toBe(1)
+    expect(nodes[0]?.type).toBe('thinking')
+    const thinking = nodes[0] as any
+    expect(String(thinking.content ?? '')).not.toContain('<thinking')
+    expect(String(thinking.raw ?? '')).toContain('<thinking')
+    expect(String(thinking.content ?? '')).toContain('alpha')
+
+    const inner = parseMarkdownToStructure(String(thinking.content ?? ''), md)
+    expect(hasNode(inner as any, 'list')).toBe(true)
+    expect(textIncludes(inner as any, 'item 1')).toBe(true)
+    expect(textIncludes(inner as any, 'item 2')).toBe(true)
+  })
+
   it('does not merge following block into <thinking> (playground regression)', () => {
     const markdown = `<thinking>
 - markstream-vue playground
