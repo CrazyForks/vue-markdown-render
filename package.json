@@ -124,7 +124,7 @@
     "mermaid": ">=11",
     "shiki": "^3.13.0",
     "stream-markdown": ">=0.0.13",
-    "stream-monaco": ">=0.0.14",
+    "stream-monaco": ">=0.0.15",
     "vue": ">=3.0.0",
     "vue-i18n": ">=9"
   },

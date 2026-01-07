@@ -159,6 +159,13 @@ let createEditorPromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
 let setTheme: (theme: any) => Promise<void> = async () => {}
 const isDiff = computed(() => props.node.diff)
+
+// In streaming scenarios, the opening fence info string can arrive in chunks
+// (e.g. "```d" then "iff json:..."), which means a block may flip between
+// single <-> diff after the component has mounted. Monaco editors can't switch
+// kind in-place, so we recreate the editor when the kind changes.
+const desiredEditorKind = computed<'diff' | 'single'>(() => (isDiff.value ? 'diff' : 'single'))
+const currentEditorKind = ref<'diff' | 'single'>(desiredEditorKind.value)
 const usePreCodeRender = ref(false)
 const preFallbackWrap = computed(() => {
   const wordWrap = (props.monacoOptions as any)?.wordWrap
@@ -856,8 +863,9 @@ async function runEditorCreation(el: HTMLElement) {
 
   if (isDiff.value) {
     safeClean()
-    if (createDiffEditor)
+    if (createDiffEditor){
       await createDiffEditor(el as HTMLElement, String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), monacoLanguage.value)
+    }
     else
       await createEditor(el as HTMLElement, props.node.code, monacoLanguage.value)
   }
@@ -944,6 +952,41 @@ const stopCreateEditorWatch = watch(
     }
 
     stopCreateEditorWatch()
+  },
+)
+
+watch(
+  desiredEditorKind,
+  async (nextKind, prevKind) => {
+    if (nextKind === prevKind)
+      return
+    currentEditorKind.value = nextKind
+
+    // If Monaco isn't mounted yet (or not available), just let the normal
+    // creation path pick up the latest kind.
+    if (!createEditor || !codeEditor.value)
+      return
+    if (!editorCreated.value)
+      return
+
+    // If streaming is disabled, we still respect the "wait until loaded" rule.
+    if (props.stream === false && props.loading !== false)
+      return
+    if (!viewportReady.value)
+      return
+
+    try {
+      editorMounted.value = false
+      editorCreated.value = false
+      createEditorPromise = null
+      safeClean()
+      await nextTick()
+      await ensureEditorCreation(codeEditor.value as HTMLElement)
+    }
+    catch {
+      // Keep fallback rendering if recreation fails.
+      editorMounted.value = false
+    }
   },
 )
 
