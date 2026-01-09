@@ -101,7 +101,7 @@ export default defineConfig({
   css: {
     postcss: {
       plugins: [
-        // 不使用 tailwindcss 插件，这样 @apply 指令就不会被处理
+        // Do not run Tailwind here; this build produces the Tailwind-ready CSS.
         autoprefixer,
       ],
     },

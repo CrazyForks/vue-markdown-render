@@ -8,8 +8,6 @@
 pnpm add mermaid
 ```
 
-
-
 在使用 Tailwind/UnoCSS 时，请在 reset 之后、`@layer components` 中导入 Mermaid 与库的 CSS，避免 utilities 覆盖：
 
 ```css

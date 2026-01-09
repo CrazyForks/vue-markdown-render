@@ -8,7 +8,6 @@ Mermaid diagrams stream progressively in `markstream-vue`: as soon as the syntax
 pnpm add mermaid
 ```
 
-
 Keep the CSS import after your reset and inside `@layer components` when using Tailwind/UnoCSS so utility layers do not override Mermaid styles.
 
 ```css

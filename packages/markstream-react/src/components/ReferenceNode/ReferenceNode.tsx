@@ -19,7 +19,7 @@ export function ReferenceNode(
 
   return (
     <span
-      className="reference-node cursor-pointer bg-accent text-xs rounded-md px-1.5 mx-0.5 hover:bg-secondary"
+      className="reference-node cursor-pointer bg-[hsl(var(--muted))] text-xs rounded-md px-1.5 mx-0.5 hover:bg-[hsl(var(--secondary))]"
       role="button"
       tabIndex={0}
       onClick={handleClick}

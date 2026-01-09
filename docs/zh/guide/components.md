@@ -223,8 +223,6 @@ const node = {
 
 ### 示例
 
-
-
 ```vue
 <script setup lang="ts">
 function onExport(ev: any) {
