@@ -60,7 +60,6 @@ Also remember required CSS:
 ```ts
 import 'markstream-vue2/index.css'
 import 'katex/dist/katex.min.css'
-import 'mermaid/dist/mermaid.css'
 ```
 
 Monaco (`stream-monaco`) does not require a separate CSS import.

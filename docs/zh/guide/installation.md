@@ -37,7 +37,6 @@ enableKatex()
 ```ts
 import 'markstream-vue/index.css'
 import 'katex/dist/katex.min.css'
-import 'mermaid/dist/mermaid.css'
 ```
 
 ### 快速安装：全部功能

@@ -226,7 +226,6 @@ Troubleshooting:
 
 ```ts
 import { MermaidBlockNode } from 'markstream-vue'
-import 'mermaid/dist/mermaid.css'
 ```
 
 ```vue

@@ -43,7 +43,6 @@ Also remember required CSS:
 ```tsx
 import 'markstream-react/index.css'
 import 'katex/dist/katex.min.css'
-import 'mermaid/dist/mermaid.css'
 ```
 
 Monaco (`stream-monaco`) does not require a separate CSS import.
