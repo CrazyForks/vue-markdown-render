@@ -177,7 +177,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
               i = replacerTokens.length - 1
             }
             else {
-              i -= (replacerTokens.length - 1)
+              i -= (replacerTokens.length + 1)
             }
             continue
           }
@@ -197,7 +197,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
             tokens.splice(i, 4, ...replacerTokens)
           }
         }
-        i -= (replacerTokens.length - 1)
+        i -= (replacerTokens.length + 1)
         continue
       }
     }
@@ -321,7 +321,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         pushEmClose(replacerTokens, type)
       }
       tokens.splice(i - deleteCount, count, ...replacerTokens)
-      i -= (replacerTokens.length - 1)
+      i -= (replacerTokens.length + 1)
       continue
     }
     else if (curToken.content?.startsWith('](') && tokens[i - 1].markup?.includes('*') && tokens[i - 4]?.type === 'text' && tokens[i - 4].content?.endsWith('[')) {
@@ -357,7 +357,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       else {
         tokens.splice(i - 4, 7, ...replacerTokens)
       }
-      i -= (replacerTokens.length - 1)
+      i -= (replacerTokens.length + 1)
       continue
     }
     else if (curToken.content?.startsWith('](') && tokens[i - 1].type === 'strong_close' && tokens[i - 4]?.type === 'text' && tokens[i - 4]?.content?.includes('**[')) {
@@ -393,7 +393,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       else {
         tokens.splice(i - 4, 7, ...replacerTokens)
       }
-      i -= (replacerTokens.length - 1)
+      i -= (replacerTokens.length + 1)
       continue
     }
     else if (curToken.type === 'strong_close' && tokens[i + 1]?.type === 'text' && tokens[i + 1].content?.includes('](') && tokens[i - 1].type === 'text' && /\[.*$/.test(tokens[i - 1].content || '')) {
@@ -467,5 +467,6 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       }
     }
   }
+
   return tokens
 }

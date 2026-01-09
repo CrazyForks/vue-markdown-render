@@ -984,26 +984,5 @@ export function parseInlineTokens(
     return false
   }
 
-  return normalizeSingleLinkResult(raw, result)
-}
-
-// If the raw text is exactly a single Markdown link like "[label](href)",
-// ensure we return exactly one link node and drop any accidental duplicates
-// produced by fallback heuristics.
-function normalizeSingleLinkResult(raw: string | undefined, nodes: ParsedNode[]): ParsedNode[] {
-  if (!raw)
-    return nodes
-  const trimmed = raw.trim()
-  const m = /^\[([\s\S]+?)\]\(([^)]+)\)$/.exec(trimmed)
-  if (!m)
-    return nodes
-  const label = m[1]
-  const href = m[2]
-  // Find a link node with matching href; prefer the one whose text equals the label
-  const candidates = nodes.filter(n => n.type === 'link') as any[]
-  const preferred = candidates.find(n => String(n.href || '') === href && String(n.text || '') === label)
-    || candidates.find(n => String(n.href || '') === href)
-  if (preferred)
-    return [preferred]
-  return nodes
+  return result
 }

@@ -542,4 +542,34 @@ describe('inline parser fixes (link mid-states)', () => {
     expect(String(headerTexts)).toContain('Service')
     expect(String(headerTexts)).toContain('URL')
   })
+
+  it('parses 3 adjacent links on the same line as 3 link nodes', () => {
+    const markdown = '[citation](http://url1)  [citation](http://url1) [citation](http://url1)'
+    const nodes = parseMarkdownToStructure(markdown, md)
+    const links = collectLinks(nodes as any[])
+    expect(links).toHaveLength(3)
+    expect(links.map((l: any) => l.href)).toEqual(['http://url1', 'http://url1', 'http://url1'])
+  })
+
+  it('does not leak partial href like "(htt" into text nodes in streaming mid-state', () => {
+    const markdown = '[citation](htt'
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+    const links = collectLinks(nodes as any[])
+    expect(links.length).toBeGreaterThan(0)
+    expect(Boolean(links[0].loading)).toBe(true)
+
+    const texts = collectTarget(nodes as any[], 'text').map((t: any) => String(t.content ?? ''))
+    expect(texts.join('')).not.toContain('(htt')
+  })
+
+  it('never renders "(http" as text during char-by-char streaming for multiple links', () => {
+    const full = '[citation](http://url1)  [citation](http://url1) [citation](http://url1)'
+    for (let i = 1; i <= full.length; i++) {
+      const chunk = full.slice(0, i)
+      const nodes = parseMarkdownToStructure(chunk, md, { final: false })
+      const texts = collectTarget(nodes as any[], 'text').map((t: any) => String(t.content ?? '')).join('')
+      // If this fails, include the chunk to make the failing prefix obvious.
+      expect(texts, `prefix(${i}): ${chunk}`).not.toContain('(http')
+    }
+  })
 })
