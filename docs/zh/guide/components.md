@@ -218,15 +218,12 @@ const node = {
 
 ### 快速要点
 - **依赖**：`mermaid` ≥ 11（推荐 ESM 构建）。
-- **CSS**：`import 'mermaid/dist/mermaid.css'`。
 - **Props**：`node`、`isDark`、`isStrict`、`maxHeight`、超时参数、Header/按钮开关等。
 - **事件**：`copy`、`export`、`openModal`、`toggleMode`（可通过 `ev.preventDefault()` 阻止默认行为）。
 
 ### 示例
 
-```ts
-import 'mermaid/dist/mermaid.css'
-```
+
 
 ```vue
 <script setup lang="ts">

@@ -185,7 +185,7 @@ pnpm add mermaid
 import { enableMermaid } from 'markstream-react'
 import { useEffect } from 'react'
 import 'markstream-react/index.css'
-import 'mermaid/dist/mermaid.css'
+
 
 enableMermaid()
 

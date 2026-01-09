@@ -199,7 +199,7 @@ import { enableMermaid } from 'markstream-vue2'
 // main.js
 import 'markstream-vue2/index.css'
 
-import 'mermaid/dist/mermaid.css'
+
 
 enableMermaid()
 ```

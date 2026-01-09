@@ -60,7 +60,6 @@ enableKatex()
 ```ts
 import 'markstream-vue2/index.css'
 import 'katex/dist/katex.min.css'
-import 'mermaid/dist/mermaid.css'
 ```
 
 Monaco（`stream-monaco`）不需要单独导入 CSS。

@@ -8,10 +8,7 @@
 pnpm add mermaid
 ```
 
-```ts
-// main.ts / 入口
-import 'mermaid/dist/mermaid.css'
-```
+
 
 在使用 Tailwind/UnoCSS 时，请在 reset 之后、`@layer components` 中导入 Mermaid 与库的 CSS，避免 utilities 覆盖：
 
@@ -19,7 +16,6 @@ import 'mermaid/dist/mermaid.css'
 @import 'modern-css-reset';
 
 @layer components {
-  @import 'mermaid/dist/mermaid.css';
   @import 'markstream-vue/index.css';
 }
 ```
