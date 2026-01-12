@@ -316,6 +316,57 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         if (!text)
           return
 
+        // Check if text contains image syntax ![...](...)
+        // If so, parse and push the image token manually
+        const imageStart = text.indexOf('![')
+        if (imageStart !== -1) {
+          // Push text before the image syntax
+          if (imageStart > 0) {
+            const beforeImage = text.slice(0, imageStart)
+            const t = s.push('text', '', 0)
+            t.content = beforeImage
+            s.pos = s.pos + beforeImage.length
+            searchPos = s.pos
+          }
+
+          // Try to parse the image syntax: ![alt](src "title")
+          const imageText = text.slice(imageStart)
+          const imageMatch = imageText.match(/^!\[([^\]]*)\]\(([^)]+)\)/)
+          if (imageMatch) {
+            const [, alt, srcAndTitle] = imageMatch
+            // Parse src and optional title
+            const srcMatch = srcAndTitle.match(/^(\S+)(?:\s+"([^"]+)")?\s*$/)
+            const src = srcMatch ? srcMatch[1] : srcAndTitle
+            const title = srcMatch && srcMatch[2] ? srcMatch[2] : null
+
+            // Create image token
+            const token = s.push('image', 'img', 0)
+            token.attrs = [['src', src], ['alt', alt]]
+            if (title) {
+              token.attrs.push(['title', title])
+            }
+            token.content = alt
+            token.children = [{ type: 'text', content: alt, tag: '' }]
+            s.pos = s.pos + imageMatch[0].length
+            searchPos = s.pos
+
+            // Continue processing the remaining text after the image
+            const remainingText = text.slice(imageStart + imageMatch[0].length)
+            if (remainingText) {
+              // Recursively process the remaining text
+              pushText(remainingText)
+            }
+            return
+          }
+
+          // If image syntax is incomplete, push it as text and continue
+          const t = s.push('text', '', 0)
+          t.content = text
+          s.pos = s.pos + text.length
+          searchPos = s.pos
+          return
+        }
+
         const t = s.push('text', '', 0)
         t.content = text
         s.pos = s.pos + text.length
