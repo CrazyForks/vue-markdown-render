@@ -106,8 +106,43 @@ const md = getMarkdown('editor-1', {
 })
 ```
 
+**全局覆盖默认文案：**
+
+如果你只是想修改一些默认 UI 文案（例如 "Copy" → "复制"），而不需要完整的 i18n 功能，可以使用 `setDefaultI18nMap` 来替换默认的翻译映射：
+
+```ts
+import { setDefaultI18nMap } from 'markstream-vue'
+
+setDefaultI18nMap({
+  'common.copy': '复制',
+  'common.copySuccess': '已复制',
+  'common.decrease': '减少',
+  'common.reset': '重置',
+  'common.increase': '增加',
+  'common.expand': '展开',
+  'common.collapse': '收起',
+  'common.preview': '预览',
+  'common.source': '源码',
+  'common.export': '导出',
+  'common.open': '打开',
+  'common.zoomIn': '放大',
+  'common.zoomOut': '缩小',
+  'common.resetZoom': '重置缩放',
+  'image.loadError': '图片加载失败',
+  'image.loading': '图片加载中...',
+})
+```
+
+这个功能适合以下场景：
+- 不需要语言切换，只是觉得默认文案不合适
+- 希望默认使用中文（或其他语言）UI
+- 没有使用 `vue-i18n`，但仍想自定义 UI 文案
+
 **默认翻译键：**
 
 - `common.copy`：代码块复制按钮文本
+- `common.copySuccess`：复制成功后的提示文本
+- `image.loadError`：图片加载失败的提示
+- `image.loading`：图片加载中的提示
 
 该设计保证 markdown 工具函数纯净，无全局副作用，可与任意 i18n 方案集成或直接传入静态翻译。

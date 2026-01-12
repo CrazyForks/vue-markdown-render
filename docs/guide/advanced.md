@@ -106,9 +106,44 @@ const md = getMarkdown('editor-1', {
 })
 ```
 
+**Overriding default texts globally:**
+
+If you just want to change some default UI texts (e.g., "Copy" → "复制") without setting up full i18n, use `setDefaultI18nMap` to replace the fallback translations:
+
+```ts
+import { setDefaultI18nMap } from 'markstream-vue'
+
+setDefaultI18nMap({
+  'common.copy': '复制',
+  'common.copySuccess': '已复制',
+  'common.decrease': '减少',
+  'common.reset': '重置',
+  'common.increase': '增加',
+  'common.expand': '展开',
+  'common.collapse': '收起',
+  'common.preview': '预览',
+  'common.source': '源码',
+  'common.export': '导出',
+  'common.open': '打开',
+  'common.zoomIn': '放大',
+  'common.zoomOut': '缩小',
+  'common.resetZoom': '重置缩放',
+  'image.loadError': '图片加载失败',
+  'image.loading': '图片加载中...',
+})
+```
+
+This is useful when:
+- You don't need language switching but prefer different wording
+- You want Chinese (or other language) UI by default
+- You're not using `vue-i18n` but still want custom UI texts
+
 **Default translations:**
 
 - `common.copy`: "Copy" — Used in code block copy buttons
+- `common.copySuccess`: "Copied" — Shown after copying
+- `image.loadError`: "Image failed to load" — Image fallback text
+- `image.loading`: "Loading image..." — Shown while loading
 
 This design keeps the markdown utilities pure and free from global side effects, allowing you to integrate with any i18n solution or provide static translations.
 
