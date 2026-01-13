@@ -1,25 +1,15 @@
 # Cloudflare Pages 配置
 # https://developers.cloudflare.com/pages/functions/wrangler-configuration/
+# 注意：Cloudflare Pages 不支持在 wrangler.toml 中配置构建命令
+# 构建配置需要在 Cloudflare Dashboard 中设置
 
 name = "markstream-vue"
 compatibility_date = "2024-01-01"
 
-# 生产环境构建配置
-[env.production]
-# VitePress 文档站点构建
-command = "pnpm docs:build"
-cwd = "."
-# 构建输出目录
+# Pages 项目配置（仅用于 Functions，不用于构建）
 pages_build_output_dir = "docs/.vitepress/dist"
 
-# 预览环境构建配置 (PR 预览等)
-[env.preview]
-# Playground 构建
-command = "pnpm run play:build"
-cwd = "."
-pages_build_output_dir = "playground/dist"
-
-# 环境变量
+# 环境变量（会被 Dashboard 配置覆盖）
 [vars]
 NODE_VERSION = "22"
 VITEPRESS_BASE = "/"
