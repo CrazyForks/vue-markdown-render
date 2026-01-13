@@ -5,6 +5,13 @@ import { defineConfig } from 'vitepress'
 // Cast to `any` to avoid strict type errors in the docs config while keeping intellisense.
 export default defineConfig({
   title: 'markstream-vue',
+  vite: {
+    resolve: {
+      alias: {
+        'markstream-vue': '/src', // adjust path to your library's source entry
+      },
+    },
+  },
   description: 'Streaming-friendly Markdown renderer for Vue 3 — progressive Mermaid, streaming diff code blocks',
   // Support deploying under a sub-path (for GitHub Pages like /username/repo/)
   base: process.env.VITEPRESS_BASE || '/',
