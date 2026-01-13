@@ -1,7 +1,7 @@
 {
   "name": "markstream-vue",
   "type": "module",
-  "version": "0.0.5-beta.6",
+  "version": "0.0.5",
   "packageManager": "pnpm@10.28.0",
   "description": "Vue 3 Markdown renderer optimized for large docs: progressive Mermaid, streaming diff code blocks, and fast real-time preview.",
   "author": "Simon He",
