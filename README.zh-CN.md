@@ -426,6 +426,14 @@ https://github.com/Simon-He95/markstream-vue/issues
 
 ## 鸣谢
 
+### 贡献者
+
+感谢所有为项目做出贡献的开发者！
+
+[![Contributors](https://contrib.rocks/image?repo=Simon-He95/markstream-vue)](https://github.com/Simon-He95/markstream-vue/graphs/contributors)
+
+### 依赖项目
+
 本项目使用并受益于：
 
 - [stream-monaco](https://github.com/Simon-He95/stream-monaco)

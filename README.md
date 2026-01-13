@@ -425,6 +425,14 @@ https://github.com/Simon-He95/markstream-vue/issues
 
 ## Thanks
 
+### Contributors
+
+Thanks to all the people who have contributed to this project!
+
+[![Contributors](https://contrib.rocks/image?repo=Simon-He95/markstream-vue)](https://github.com/Simon-He95/markstream-vue/graphs/contributors)
+
+### Dependencies
+
 This project uses and benefits from:
 - [stream-monaco](https://github.com/Simon-He95/stream-monaco)
 - [stream-markdown](https://github.com/Simon-He95/stream-markdown)
