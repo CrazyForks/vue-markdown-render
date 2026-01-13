@@ -60,6 +60,81 @@ export default {
 />
 ```
 
+## VitePress dark mode integration
+
+For VitePress, use the built-in `isDark` from VitePress's `useData()` to sync with the theme switcher. The library provides a `useDark()` composable specifically for VitePress:
+
+```ts
+// docs/.vitepress/theme/index.ts
+import type { EnhanceAppContext } from 'vitepress'
+import MarkdownRender from 'markstream-vue'
+import Theme from 'vitepress/theme'
+import 'markstream-vue/index.css'
+
+export default {
+  extends: Theme,
+  enhanceApp({ app }: EnhanceAppContext) {
+    app.component('MarkdownRender', MarkdownRender)
+  },
+}
+
+// Export for use in markdown files
+export { useDark } from './composables/useDark'
+```
+
+```ts
+// docs/.vitepress/theme/composables/useDark.ts
+import { useData } from 'vitepress'
+
+/**
+ * VitePress theme composable for dark mode
+ * Uses VitePress's built-in isDark from useData()
+ */
+export function useDark() {
+  const { isDark } = useData()
+  return isDark
+}
+```
+
+```vue
+<!-- In any .md file or component -->
+<script setup>
+import MarkdownRender from 'markstream-vue'
+import { useDark } from '../../.vitepress/theme'
+
+const isDark = useDark()
+const content = '# Example\n\n```js\nconsole.log("dark mode")\n```'
+</script>
+
+<template>
+  <MarkdownRender :is-dark="isDark" :content="content" />
+</template>
+```
+
+**Key differences for CodeBlockNode:**
+
+| Prop | Direct CodeBlockNode | Via MarkdownRender |
+|------|---------------------|-------------------|
+| `isDark` | Passed directly to `<CodeBlockNode :is-dark="isDark" />` | Passed via `<MarkdownRender :is-dark="isDark" />` and automatically forwarded |
+| Theme props | `:dark-theme="theme"` `:light-theme="theme"` | `:code-block-dark-theme="theme"` `:code-block-light-theme="theme"` |
+
+**Using @vueuse/core in standalone apps:**
+
+For non-VitePress Vue apps, use `@vueuse/core`'s `useDark()`:
+
+```vue
+<script setup>
+import { useDark } from '@vueuse/core'
+import MarkdownRender from 'markstream-vue'
+
+const isDark = useDark() // Ref<boolean> reactive to system/theme preference
+</script>
+
+<template>
+  <MarkdownRender :is-dark="isDark" :content="markdown" />
+</template>
+```
+
 ## Parser pipeline
 
 ```ts
