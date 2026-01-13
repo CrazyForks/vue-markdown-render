@@ -758,7 +758,12 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if ((!allowLoading || strict) && !found)
       return false
     // 追加检测内容是否是 math
-    const looksMath = openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content)
+    // For explicit $$ delimiters, skip the isMathLike check since $$ is already
+    // a clear math marker. This allows spaced subscript formats like "f _ { x }"
+    // to be correctly recognized as math.
+    // However, if the content starts with markdown special syntax like ![, skip.
+    const hasMarkdownPrefix = /^\s*!\[/.test(content)
+    const looksMath = openDelim === '$$' ? !hasMarkdownPrefix : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
     if (!looksMath)
       return false
 
