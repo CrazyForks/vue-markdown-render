@@ -1,0 +1,12 @@
+# Cloudflare Pages 重定向规则
+# 替代 Netlify 的 [[redirects]] 配置
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# 根路径重定向到 /guide/ (替代 Netlify 的 from = "/" to = "/guide/")
+/index.html 302 /guide/

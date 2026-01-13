@@ -1,0 +1,25 @@
+# Cloudflare Pages 配置
+# https://developers.cloudflare.com/pages/functions/wrangler-configuration/
+
+name = "markstream-vue"
+compatibility_date = "2024-01-01"
+
+# 生产环境构建配置
+[env.production]
+# VitePress 文档站点构建
+command = "pnpm docs:build"
+cwd = "."
+# 构建输出目录
+pages_build_output_dir = "docs/.vitepress/dist"
+
+# 预览环境构建配置 (PR 预览等)
+[env.preview]
+# Playground 构建
+command = "pnpm run play:build"
+cwd = "."
+pages_build_output_dir = "playground/dist"
+
+# 环境变量
+[vars]
+NODE_VERSION = "22"
+VITEPRESS_BASE = "/"
