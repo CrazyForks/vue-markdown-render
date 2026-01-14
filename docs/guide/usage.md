@@ -2,14 +2,6 @@
 
 This page shows how to wire `markstream-vue` into common stacks, how the parser fits into the renderer, and which docs to visit when something looks odd (reset order, Tailwind/UnoCSS layers, VitePress integration).
 
-## Choose your entry point
-
-- **VitePress** — use `MarkdownRender` + `setCustomComponents` inside `enhanceApp`. Follow the [VitePress docs playbook](/guide/vitepress-docs) for component sections and troubleshooting tips.
-- **Vite/Nuxt apps** — import `MarkdownRender` in a page/component, remember to include `markstream-vue/index.css` after a reset and inside a `@layer components` block when Tailwind/UnoCSS is present.
-- **Parser-only** — call `getMarkdown()` and `parseMarkdownToStructure()` to build custom render pipelines or run pre-processing before rendering.
-
-Whenever you show markdown content inside an existing design system, add `custom-id` to scope overrides and consult the [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) for reset/layer order.
-
 ## Minimal render
 
 ```vue

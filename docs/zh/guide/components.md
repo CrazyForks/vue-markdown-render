@@ -1,7 +1,3 @@
-# 组件与节点渲染器
-
-本页说明各个渲染器之间的关系、所需的同伴依赖与 CSS，并列出常见的排障提示。编写或更新文档时，可以结合 [VitePress 文档指南](/zh/guide/vitepress-docs) 一起使用。
-
 ## 快速参考
 
 | 组件 | 推荐场景 | 关键 props / 事件 | 额外 CSS / 同伴依赖 | 排障提示 |
@@ -565,5 +561,3 @@ setCustomComponents('docs', {
 - `getMarkdown()` — 返回预设好的 `markdown-it-ts` 实例。
 - `parseMarkdownToStructure()` — 将 Markdown 字符串解析成 AST，可直接传给 `MarkdownRender`。
 - `setCustomComponents(id?, mapping)` — 为指定 `custom-id` 替换任何节点渲染器。
-
-若新增组件或修改行为，请同步更新本页与 [VitePress 文档指南](/zh/guide/vitepress-docs)，确保贡献者能够沿用相同结构。

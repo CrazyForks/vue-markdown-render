@@ -6,7 +6,6 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'markstream-vue',
   description: 'Streaming-friendly Markdown renderer for Vue 3 — progressive Mermaid, streaming diff code blocks',
-  // Support deploying under a sub-path (for GitHub Pages like /username/repo/)
   base: process.env.VITEPRESS_BASE || '/',
   locales: {
     root: {
@@ -98,10 +97,8 @@ export default defineConfig({
             { text: 'Examples', link: '/guide/examples' },
             { text: 'Playground', link: '/guide/playground' },
             { text: 'Docs assets', link: '/guide/docs-style' },
-            { text: 'VitePress docs playbook', link: '/guide/vitepress-docs' },
             { text: 'Contributing', link: '/guide/contributing' },
             { text: 'Translation guide', link: '/guide/translation' },
-            { text: 'Deploy docs', link: '/guide/deploy' },
             { text: 'Advanced', link: '/guide/advanced' },
             { text: 'Monaco Internals', link: '/guide/monaco-internals' },
             { text: 'Math', link: '/guide/math' },
@@ -193,10 +190,8 @@ export default defineConfig({
             { text: '示例', link: '/zh/guide/examples' },
             { text: 'Playground', link: '/zh/guide/playground' },
             { text: 'Docs 资源', link: '/zh/guide/docs-style' },
-            { text: 'VitePress 文档指南', link: '/zh/guide/vitepress-docs' },
             { text: '贡献指南', link: '/zh/guide/contributing' },
             { text: '翻译指南', link: '/zh/guide/translation' },
-            { text: '部署文档', link: '/zh/guide/deploy' },
             { text: '高级', link: '/zh/guide/advanced' },
             { text: 'Monaco 内部', link: '/zh/guide/monaco-internals' },
             { text: 'Math', link: '/zh/guide/math' },
@@ -288,10 +283,8 @@ export default defineConfig({
             { text: 'Examples', link: '/guide/examples' },
             { text: 'Playground', link: '/guide/playground' },
             { text: 'Docs assets', link: '/guide/docs-style' },
-            { text: 'VitePress docs playbook', link: '/guide/vitepress-docs' },
             { text: 'Contributing', link: '/guide/contributing' },
             { text: 'Translation guide', link: '/guide/translation' },
-            { text: 'Deploy docs', link: '/guide/deploy' },
             { text: 'Advanced', link: '/guide/advanced' },
             { text: 'Monaco Internals', link: '/guide/monaco-internals' },
             { text: 'Math', link: '/guide/math' },

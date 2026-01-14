@@ -1,7 +1,3 @@
-# Components & Node renderers
-
-This page explains how each renderer fits together, what peer dependencies or CSS are required, and the typical issues you should check before filing a bug. Pair it with the [VitePress docs playbook](/guide/vitepress-docs) when adding new sections.
-
 ## Quick reference
 
 | Component | Best for | Key props/events | Extra CSS / peers | Troubleshooting hooks |
@@ -570,5 +566,3 @@ setCustomComponents('docs', {
 - `getMarkdown()` — configured `markdown-it-ts` instance with the parser plugins this package expects.
 - `parseMarkdownToStructure()` — convert Markdown strings into the AST consumed by `MarkdownRender`.
 - `setCustomComponents(id?, mapping)` — swap any node renderer for a specific `custom-id`.
-
-Whenever you add new components or change behavior, update this page *and* the [VitePress docs playbook](/guide/vitepress-docs) so contributors know how to follow the same structure.

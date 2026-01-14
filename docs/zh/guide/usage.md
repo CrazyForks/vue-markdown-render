@@ -2,12 +2,6 @@
 
 本页聚焦三个问题：如何在 Vite/VitePress/Nuxt 中集成、解析器如何配合渲染器、样式出错时去哪查看 reset 与 Tailwind/UnoCSS 排障指南。
 
-## 选择入口
-
-- **VitePress** — 在 `enhanceApp` 中注册 `MarkdownRender` 与 `setCustomComponents`，并参考 [VitePress 文档指南](/zh/guide/vitepress-docs)。
-- **Vite/Nuxt 应用** — 在组件中引入 `MarkdownRender`，记得在 reset 之后、`@layer components` 中导入 `markstream-vue/index.css`。
-- **仅解析器** — 使用 `getMarkdown()` 与 `parseMarkdownToStructure()` 构建自定义渲染流程或在渲染前做 AST 处理。
-
 如果需要在既有设计系统里覆盖样式，务必传入 `custom-id` 并阅读 [样式排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here)。
 
 ## 最小渲染示例
