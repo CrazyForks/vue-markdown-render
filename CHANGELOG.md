@@ -1,10 +1,11 @@
-## [0.0.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.5) (2026-01-13)
+## [0.0.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.5) (2026-01-14)
 
 
 ### Bug Fixes
 
 * **buttons:** update button styles to use :where() for better specificity and maintain Tailwind utilities ([314ec46](https://github.com/Simon-He95/markstream-vue/commit/314ec466f2f360037a5d71503f4ca5edc8487278))
 * **changelog:** update release date and add missing bug fix entries ([6f453dc](https://github.com/Simon-He95/markstream-vue/commit/6f453dc8d158b2de24176c783860a3d6f5476d10))
+* **changelog:** update version to 0.0.5 and add edge case render handling for math ([e75fed0](https://github.com/Simon-He95/markstream-vue/commit/e75fed0701a4a590328c623bc2dd656f6946f504))
 * **changelog:** update version to 0.0.5-beta.1 and add missing bug fix entries ([b300251](https://github.com/Simon-He95/markstream-vue/commit/b30025199eeb80d4d5dfd81390d299ca41c4024c))
 * **changelog:** update version to 0.0.5-beta.1 and add missing bug fix entries ([058730c](https://github.com/Simon-He95/markstream-vue/commit/058730c942c0bf16c2294fdaa07dc90f9784a7f4))
 * **changelog:** update version to 0.0.5-beta.2 and add missing bug fix entries ([84f7824](https://github.com/Simon-He95/markstream-vue/commit/84f7824c4f7cd9ba3d50e805d9c2db15b232bd0d))
@@ -27,6 +28,9 @@
 * **nuxt.config.ts:** set nitro preset to static ([580e83e](https://github.com/Simon-He95/markstream-vue/commit/580e83e34487446d423e11b403c8f270240f70ac))
 * remove unnecessary blank lines in documentation and component files ([5f877e6](https://github.com/Simon-He95/markstream-vue/commit/5f877e61079b95ef3a78f1c8de7fe12328d85133)), closes [#243](https://github.com/Simon-He95/markstream-vue/issues/243)
 * **theme:** toggle fail ([39cd71a](https://github.com/Simon-He95/markstream-vue/commit/39cd71af0c499c95d9c50b9770972540ac83c3ef)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
+* update demo links for Nuxt and Vue 2 in documentation ([c8a9b52](https://github.com/Simon-He95/markstream-vue/commit/c8a9b528eeeb64e9c34d1a86dd74dcbbe32fa6dd))
+* update demo links for React and Nuxt in documentation ([d6f76e0](https://github.com/Simon-He95/markstream-vue/commit/d6f76e0656cd09ec4dd6ce3b77dcc815089ef29a))
+* update docs build process to include parser build step ([66195fa](https://github.com/Simon-He95/markstream-vue/commit/66195fa122ff537744244cd311b73f787f16608f))
 * update snapshot styles for inline and reference nodes to use consistent background colors ([a62b67d](https://github.com/Simon-He95/markstream-vue/commit/a62b67d4b6174d5aeda86253f568986a51f742f9))
 * update stream-monaco version to 0.0.14 in package.json and pnpm-lock.yaml ([47fcf1a](https://github.com/Simon-He95/markstream-vue/commit/47fcf1a816eeebcba5356e90f4c7a390f6f3a67b))
 * update stream-monaco version to 0.0.15 in package.json and pnpm-lock.yaml; enhance CodeBlockNode to handle dynamic editor kind switching in streaming scenarios ([1cae7e0](https://github.com/Simon-He95/markstream-vue/commit/1cae7e029e3f9174e9ebc9eaaab47f48d212b4c4))
@@ -1226,7 +1230,7 @@
 
 ### Features
 
-* add PreCodeNode component for rendering code blocks as plain &lt;pre&gt;&lt;code&gt; elements; update NodeRenderer to support new rendering option ([3cc460c](https://github.com/Simon-He95/markstream-vue/commit/3cc460c620983f3b6c3ac74bf6faa89b04eefb2a))
+* add PreCodeNode component for rendering code blocks as plain <pre><code> elements; update NodeRenderer to support new rendering option ([3cc460c](https://github.com/Simon-He95/markstream-vue/commit/3cc460c620983f3b6c3ac74bf6faa89b04eefb2a))
 * add Tooltip component to GlobalComponents; refactor MathBlockNode and MathInlineNode for improved rendering and cleanup ([14b4e98](https://github.com/Simon-He95/markstream-vue/commit/14b4e981ce0468ac45a5b069304eb1155675d607))
 * enhance admonition support with error type and collapsible feature; improve markdown parsing safety ([8feb7cc](https://github.com/Simon-He95/markstream-vue/commit/8feb7cc65fb90c551ece05494ae15287ece2c68c))
 * **ImageNode:** enhance image loading with fallback support and loading state; update i18n for load error message ([7dddce1](https://github.com/Simon-He95/markstream-vue/commit/7dddce1330033ab43f995192b52f02c15d385e27))
