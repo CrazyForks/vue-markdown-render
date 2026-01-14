@@ -6,8 +6,8 @@
 
 - Vue 3: https://markstream-vue.simonhe.me/
 - React: https://markstream-react.netlify.app/
-- Nuxt: https://markstream-nuxt.netlify.app/
-- Vue 2: https://markstream-vue2.netlify.app/
+- Nuxt: https://markstream-nuxt.simonhe.me/
+- Vue 2: https://markstream-vue2.pages.dev/
 
 ## 本地运行
 

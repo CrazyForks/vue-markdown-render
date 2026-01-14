@@ -46,7 +46,7 @@ const md = '# Hello Vue 3!'
 - **安装**：[/zh/guide/vue2-installation](/zh/guide/vue2-installation)
 - **快速开始**：[/zh/guide/vue2-quick-start](/zh/guide/vue2-quick-start)
 - **组件与 API**：[/zh/guide/vue2-components](/zh/guide/vue2-components)
-- **在线演示**：https://markstream-vue2.netlify.app/
+- **在线演示**：https://markstream-vue2.pages.dev/
 
 ```vue
 <script>
@@ -88,7 +88,7 @@ function App() {
 支持 Nuxt 3 服务端渲染。
 
 - **文档**：[/nuxt-ssr](/nuxt-ssr)
-- **在线演示**：https://markstream-nuxt.netlify.app/
+- **在线演示**：https://markstream-nuxt.simonhe.me/
 
 ## 快速链接
 

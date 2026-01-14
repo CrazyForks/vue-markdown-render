@@ -62,7 +62,6 @@ export function scheduleGlobalMonacoTheme(setTheme: SetTheme, theme: any): Promi
         continue
 
       try {
-        inFlightKey = nextKey
         await (currentSetTheme ?? setTheme)(nextTheme)
         lastAppliedKey = nextKey
       }
@@ -70,7 +69,6 @@ export function scheduleGlobalMonacoTheme(setTheme: SetTheme, theme: any): Promi
     }
   })().finally(() => {
     applyPromise = null
-    inFlightKey = null
   })
 
   return applyPromise

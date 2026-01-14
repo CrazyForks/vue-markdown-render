@@ -60,7 +60,7 @@ Full support for Vue 2.6+ (with Composition API) and Vue 2.7+.
 - **Installation**: [/guide/vue2-installation](/guide/vue2-installation)
 - **Quick Start**: [/guide/vue2-quick-start](/guide/vue2-quick-start)
 - **Components API**: [/guide/vue2-components](/guide/vue2-components)
-- **Live Demo**: https://markstream-vue2.netlify.app/
+- **Live Demo**: https://markstream-vue2.pages.dev/
 
 ```vue
 <script>
@@ -102,7 +102,7 @@ function App() {
 Server-side rendering support for Nuxt 3.
 
 - **Documentation**: [/nuxt-ssr](/nuxt-ssr)
-- **Live Demo**: https://markstream-nuxt.netlify.app/
+- **Live Demo**: https://markstream-nuxt.simonhe.me/
 
 ## Quick Links
 
