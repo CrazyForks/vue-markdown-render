@@ -87,7 +87,7 @@ React 18+ with hooks support and full TypeScript.
 - **Installation**: [/guide/react-installation](/guide/react-installation)
 - **Quick Start**: [/guide/react-quick-start](/guide/react-quick-start)
 - **Components API**: [/guide/react-components](/guide/react-components)
-- **Live Demo**: https://markstream-react.netlify.app/
+- **Live Demo**: https://markstream-react.pages.dev/
 
 ```tsx
 import MarkdownRender from 'markstream-react'
@@ -102,7 +102,7 @@ function App() {
 Server-side rendering support for Nuxt 3.
 
 - **Documentation**: [/nuxt-ssr](/nuxt-ssr)
-- **Live Demo**: https://markstream-nuxt.simonhe.me/
+- **Live Demo**: https://markstream-nuxt.pages.dev/
 
 ## Quick Links
 

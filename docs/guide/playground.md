@@ -5,8 +5,8 @@ This repository includes a playable demo under `/playground` that helps you test
 ## Online Playgrounds
 
 - Vue 3: https://markstream-vue.simonhe.me/
-- React: https://markstream-react.netlify.app/
-- Nuxt: https://markstream-nuxt.simonhe.me/
+- React: https://markstream-react.pages.dev/
+- Nuxt: https://markstream-nuxt.pages.dev/
 - Vue 2: https://markstream-vue2.pages.dev/
 
 ## Running Locally

@@ -73,7 +73,7 @@ export default {
 - **安装**：[/zh/guide/react-installation](/zh/guide/react-installation)
 - **快速开始**：[/zh/guide/react-quick-start](/zh/guide/react-quick-start)
 - **组件与 API**：[/zh/guide/react-components](/zh/guide/react-components)
-- **在线演示**：https://markstream-react.netlify.app/
+- **在线演示**：https://markstream-react.pages.dev/
 
 ```tsx
 import MarkdownRender from 'markstream-react'
@@ -88,7 +88,7 @@ function App() {
 支持 Nuxt 3 服务端渲染。
 
 - **文档**：[/nuxt-ssr](/nuxt-ssr)
-- **在线演示**：https://markstream-nuxt.simonhe.me/
+- **在线演示**：https://markstream-nuxt.pages.dev/
 
 ## 快速链接
 
