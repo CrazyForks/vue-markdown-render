@@ -64,6 +64,109 @@ pnpm add stream-monaco
 </CodeBlockNode>
 ```
 
+## 主题切换
+
+`CodeBlockNode` 支持基于深色/浅色模式的自动主题切换。使用 `@vueuse/core` 的 `useDark` composable 来追踪主题状态，并将主题名称传递给 `MarkdownRender` 或 `CodeBlockNode`。
+
+### 在独立的 Vue 应用中使用 @vueuse/core
+
+```vue
+<script setup>
+import { toggleDark, useDark } from '@vueuse/core'
+import MarkdownRender from 'markstream-vue'
+
+const isDark = useDark() // Ref<boolean> 响应式系统/主题偏好
+const content = '# 示例\n\n```js\nconsole.log("深色模式")\n```'
+
+// 可用主题（必须包含你想要使用的主题）
+const themes = [
+  'vitesse-dark',
+  'vitesse-light',
+  'github-dark',
+  'github-light',
+  // ... 更多主题
+]
+</script>
+
+<template>
+  <div>
+    <button @click="toggleDark()">
+      切换主题
+    </button>
+    <MarkdownRender
+      :is-dark="isDark"
+      code-block-dark-theme="vitesse-dark"
+      code-block-light-theme="vitesse-light"
+      :themes="themes"
+      :content="content"
+    />
+  </div>
+</template>
+```
+
+### VitePress 集成
+
+对于 VitePress，使用 VitePress 内置的 `useData()` 中的 `isDark`：
+
+```ts
+// docs/.vitepress/theme/composables/useDark.ts
+import { useData } from 'vitepress'
+
+/**
+ * VitePress 主题 composable 用于深色模式
+ * 使用 VitePress 内置的 useData() 获取 isDark
+ */
+export function useDark() {
+  const { isDark } = useData()
+  return isDark
+}
+```
+
+```vue
+<!-- 在任意 .md 文件或组件中 -->
+<script setup>
+import MarkdownRender from 'markstream-vue'
+import { useDark } from '../../.vitepress/theme'
+
+const isDark = useDark()
+const content = '# 示例\n\n```js\nconsole.log("深色模式")\n```'
+
+const themes = [
+  'vitesse-dark',
+  'vitesse-light',
+  'github-dark',
+  'github-light',
+  // ... 更多主题
+]
+</script>
+
+<template>
+  <MarkdownRender
+    :is-dark="isDark"
+    code-block-dark-theme="vitesse-dark"
+    code-block-light-theme="vitesse-light"
+    :themes="themes"
+    :content="content"
+  />
+</template>
+```
+
+**工作原理：**
+
+当 `isDark` 变化时，`CodeBlockNode` 会自动切换到对应的主题：
+- 当 `isDark` 为 `true` → 使用 `codeBlockDarkTheme`（如 `'vitesse-dark'`）
+- 当 `isDark` 为 `false` → 使用 `codeBlockLightTheme`（如 `'vitesse-light'`）
+
+`themes` prop 用于注册可用主题，以便 Monaco 可以按需懒加载它们。
+
+**CodeBlockNode 的关键差异：**
+
+| Prop | 直接使用 CodeBlockNode | 通过 MarkdownRender |
+|------|---------------------|-------------------|
+| `isDark` | 直接传给 `<CodeBlockNode :is-dark="isDark" />` | 通过 `<MarkdownRender :is-dark="isDark" />` 传入并自动转发 |
+| 主题 props | `:dark-theme="'vitesse-dark'"` `:light-theme="'vitesse-light'"` | `:code-block-dark-theme="'vitesse-dark'"` `:code-block-light-theme="'vitesse-light'"` |
+| 主题列表 | `:themes="['vitesse-dark', 'vitesse-light', ...]"` | `:themes="['vitesse-dark', 'vitesse-light', ...]"` |
+
 ## 注意事项
 
 - CodeBlock 头部 API 在 [codeblock-header](/zh/guide/codeblock-header) 中有文档说明（包含替换头部和自定义加载占位符的示例）。

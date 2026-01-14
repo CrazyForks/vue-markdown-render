@@ -58,6 +58,109 @@ pnpm add stream-monaco
 </CodeBlockNode>
 ```
 
+## Theme Switching
+
+`CodeBlockNode` supports automatic theme switching based on dark/light mode. Use `@vueuse/core`'s `useDark` composable to track the theme state and pass theme names to `MarkdownRender` or `CodeBlockNode`.
+
+### Using @vueuse/core in standalone Vue apps
+
+```vue
+<script setup>
+import { toggleDark, useDark } from '@vueuse/core'
+import MarkdownRender from 'markstream-vue'
+
+const isDark = useDark() // Ref<boolean> reactive to system/theme preference
+const content = '# Example\n\n```js\nconsole.log("dark mode")\n```'
+
+// Available themes (must include the themes you want to use)
+const themes = [
+  'vitesse-dark',
+  'vitesse-light',
+  'github-dark',
+  'github-light',
+  // ... more themes
+]
+</script>
+
+<template>
+  <div>
+    <button @click="toggleDark()">
+      Toggle Theme
+    </button>
+    <MarkdownRender
+      :is-dark="isDark"
+      code-block-dark-theme="vitesse-dark"
+      code-block-light-theme="vitesse-light"
+      :themes="themes"
+      :content="content"
+    />
+  </div>
+</template>
+```
+
+### VitePress integration
+
+For VitePress, use the built-in `isDark` from VitePress's `useData()`:
+
+```ts
+// docs/.vitepress/theme/composables/useDark.ts
+import { useData } from 'vitepress'
+
+/**
+ * VitePress theme composable for dark mode
+ * Uses VitePress's built-in isDark from useData()
+ */
+export function useDark() {
+  const { isDark } = useData()
+  return isDark
+}
+```
+
+```vue
+<!-- In any .md file or component -->
+<script setup>
+import MarkdownRender from 'markstream-vue'
+import { useDark } from '../../.vitepress/theme'
+
+const isDark = useDark()
+const content = '# Example\n\n```js\nconsole.log("dark mode")\n```'
+
+const themes = [
+  'vitesse-dark',
+  'vitesse-light',
+  'github-dark',
+  'github-light',
+  // ... more themes
+]
+</script>
+
+<template>
+  <MarkdownRender
+    :is-dark="isDark"
+    code-block-dark-theme="vitesse-dark"
+    code-block-light-theme="vitesse-light"
+    :themes="themes"
+    :content="content"
+  />
+</template>
+```
+
+**How it works:**
+
+When `isDark` changes, `CodeBlockNode` automatically switches to the corresponding theme:
+- When `isDark` is `true` → uses `codeBlockDarkTheme` (e.g., `'vitesse-dark'`)
+- When `isDark` is `false` → uses `codeBlockLightTheme` (e.g., `'vitesse-light'`)
+
+The `themes` prop registers the available themes so Monaco can lazy-load them on demand.
+
+**Key differences for CodeBlockNode:**
+
+| Prop | Direct CodeBlockNode | Via MarkdownRender |
+|------|---------------------|-------------------|
+| `isDark` | Passed directly to `<CodeBlockNode :is-dark="isDark" />` | Passed via `<MarkdownRender :is-dark="isDark" />` and automatically forwarded |
+| Theme props | `:dark-theme="'vitesse-dark'"` `:light-theme="'vitesse-light'"` | `:code-block-dark-theme="'vitesse-dark'"` `:code-block-light-theme="'vitesse-light'"` |
+| Themes list | `:themes="['vitesse-dark', 'vitesse-light', ...]"` | `:themes="['vitesse-dark', 'vitesse-light', ...]"` |
+
 ## Notes
 - The CodeBlock header API is documented in `docs/guide/codeblock-header.md` (examples for replacing header and custom loading placeholder).
 - `CodeBlockNode` and `MermaidBlockNode` intentionally use different `copy` event payloads: `CodeBlockNode` emits `copy(text: string)`, while `MermaidBlockNode` emits `copy(ev: MermaidBlockEvent<{ type: 'copy'; text: string }>)` (supports `preventDefault()`).
