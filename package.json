@@ -96,6 +96,7 @@
     "docs:build": "vitepress build docs",
     "docs:build:ci": "pnpm run build && vitepress build docs",
     "docs:build:netlify": "VITEPRESS_BASE=/ pnpm docs:build",
+    "docs:build:gh": "VITEPRESS_BASE=/markstream-vue/ pnpm docs:build",
     "docs:serve": "vitepress serve docs",
     "docs:deploy": "VITEPRESS_BASE=/markstream-vue/ pnpm docs:build && pnpm docs:serve",
     "docs:deploy:netlify": "pnpm docs:build && echo 'Docs built to docs/.vitepress/dist'",

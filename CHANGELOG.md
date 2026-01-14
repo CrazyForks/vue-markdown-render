@@ -1226,7 +1226,7 @@
 
 ### Features
 
-* add PreCodeNode component for rendering code blocks as plain <pre><code> elements; update NodeRenderer to support new rendering option ([3cc460c](https://github.com/Simon-He95/markstream-vue/commit/3cc460c620983f3b6c3ac74bf6faa89b04eefb2a))
+* add PreCodeNode component for rendering code blocks as plain &lt;pre&gt;&lt;code&gt; elements; update NodeRenderer to support new rendering option ([3cc460c](https://github.com/Simon-He95/markstream-vue/commit/3cc460c620983f3b6c3ac74bf6faa89b04eefb2a))
 * add Tooltip component to GlobalComponents; refactor MathBlockNode and MathInlineNode for improved rendering and cleanup ([14b4e98](https://github.com/Simon-He95/markstream-vue/commit/14b4e981ce0468ac45a5b069304eb1155675d607))
 * enhance admonition support with error type and collapsible feature; improve markdown parsing safety ([8feb7cc](https://github.com/Simon-He95/markstream-vue/commit/8feb7cc65fb90c551ece05494ae15287ece2c68c))
 * **ImageNode:** enhance image loading with fallback support and loading state; update i18n for load error message ([7dddce1](https://github.com/Simon-He95/markstream-vue/commit/7dddce1330033ab43f995192b52f02c15d385e27))
