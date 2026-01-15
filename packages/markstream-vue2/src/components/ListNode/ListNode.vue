@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import ListItemNode from '../ListItemNode'
+import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 
 // 节点子元素类型
 interface NodeChild {
@@ -29,6 +31,12 @@ const { node, customId, indexKey, typewriter } = defineProps<{
 }>()
 
 defineEmits(['copy'])
+
+const listItemComponent = computed(() => {
+  void customComponentsRevision.value
+  const customComponents = getCustomNodeComponents(customId)
+  return (customComponents as any).list_item || ListItemNode
+})
 </script>
 
 <template>
@@ -37,10 +45,11 @@ defineEmits(['copy'])
     class="list-node"
     :class="{ 'list-decimal': node.ordered, 'list-disc': !node.ordered }"
   >
-    <ListItemNode
+    <component
+      :is="listItemComponent"
       v-for="(item, index) in node.items"
       :key="`${indexKey || 'list'}-${index}`"
-      :item="item"
+      :node="item"
       :custom-id="customId"
       :index-key="`${indexKey || 'list'}-${index}`"
       :typewriter="typewriter"

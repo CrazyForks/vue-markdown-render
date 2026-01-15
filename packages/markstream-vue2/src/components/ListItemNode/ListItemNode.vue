@@ -17,7 +17,12 @@ interface ListItem {
 }
 
 const props = defineProps<{
-  item: ListItem
+  /**
+   * Preferred prop name for consistency with other node components.
+   * `item` is kept for backward compatibility.
+   */
+  node?: ListItem
+  item?: ListItem
   indexKey?: number | string
   value?: number
   customId?: string
@@ -29,6 +34,8 @@ defineEmits<{
   copy: [text: string]
 }>()
 
+const itemNode = computed(() => props.node ?? props.item)
+
 const liValueAttr = computed(() =>
   props.value == null ? {} : { value: props.value },
 )
@@ -38,7 +45,7 @@ const liValueAttr = computed(() =>
   <li class="list-item pl-1.5 my-2" dir="auto" v-bind="liValueAttr">
     <NodeRenderer
       :index-key="`list-item-${props.indexKey}`"
-      :nodes="props.item.children"
+      :nodes="itemNode?.children ?? []"
       :custom-id="props.customId"
       :typewriter="props.typewriter"
       :batch-rendering="false"

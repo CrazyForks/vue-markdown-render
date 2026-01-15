@@ -1,12 +1,14 @@
 import type { NodeComponentProps } from '../../types/node-component'
 import clsx from 'clsx'
 import React from 'react'
+import { getCustomNodeComponents } from '../../customComponents'
 import { ListItemNode } from '../ListItemNode/ListItemNode'
 
 export function ListNode(props: NodeComponentProps<{ type: 'list', ordered?: boolean, start?: number, items?: any[] }>) {
   const { node, ctx, renderNode, indexKey } = props
   const Tag = node.ordered ? 'ol' : 'ul'
   const startAttr = node.ordered && node.start ? node.start : undefined
+  const ListItemComponent = ((ctx && getCustomNodeComponents(ctx.customId).list_item) || ListItemNode) as any
   return (
     <Tag
       className={clsx(
@@ -16,13 +18,16 @@ export function ListNode(props: NodeComponentProps<{ type: 'list', ordered?: boo
       start={startAttr}
     >
       {node.items?.map((item: any, idx: number) => (
-        <ListItemNode
+        <ListItemComponent
           key={`${String(indexKey ?? 'list')}-${idx}`}
           node={item}
           value={node.ordered ? (node.start ?? 1) + idx : undefined}
           ctx={ctx}
           renderNode={renderNode}
           indexKey={`${String(indexKey ?? 'list')}-${idx}`}
+          customId={ctx?.customId}
+          isDark={ctx?.isDark}
+          typewriter={ctx?.typewriter}
         />
       ))}
     </Tag>

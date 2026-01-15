@@ -131,23 +131,21 @@ const bodyRows = computed(() => props.node.rows ?? [])
 }
 
 .table-node {
-  table-layout: auto;
-  width: max-content;
-  min-width: 100%;
+  /* Use a stable layout to prevent column reflow jitter during streaming/typewriter updates. */
+  table-layout: fixed;
+  width: 100%;
   border-collapse: collapse;
 }
 
 .table-node :deep(th),
 .table-node :deep(td) {
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .table-node--loading {
-  /* Streaming updates can mutate cell content, which triggers column reflow
-     with `table-layout: auto` and causes visible jitter. Keep a stable
-     layout while loading, then fall back to auto sizing once complete. */
-  table-layout: fixed;
-  width: 100%;
+  /* Loading state keeps the skeleton shimmer; layout is already fixed above. */
 }
 
 .table-node--loading tbody td {
@@ -226,9 +224,9 @@ const bodyRows = computed(() => props.node.rows ?? [])
    dense tables don't turn into vertical glyph stacks. */
 :deep(.table-node .text-node),
 :deep(.table-node code) {
-  white-space: nowrap;
-  overflow-wrap: normal;
-  word-break: normal;
+  white-space: inherit;
+  overflow-wrap: inherit;
+  word-break: inherit;
   max-width: none;
 }
 

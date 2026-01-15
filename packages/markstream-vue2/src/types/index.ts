@@ -306,6 +306,7 @@ export interface CustomComponents {
   heading: any
   code_block: any
   list: any
+  list_item: any
   blockquote: any
   table: any
   definition_list: any
