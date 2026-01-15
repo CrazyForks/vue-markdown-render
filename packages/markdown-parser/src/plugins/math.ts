@@ -391,17 +391,22 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           lastIndex = index
           lastSearchPos = searchPos
         }
-        // If the delimiter is immediately preceded by a ']' (possibly with
-        // intervening spaces), it's likely part of a markdown link like
-        // `[text](...)`, so we should not treat this '(' as the start of
-        // an inline math span. Also guard the index to avoid OOB access.
-        if (index > 0) {
+        // NOTE: historically this math rule also supported plain parentheses
+        // delimiters, so we avoided matching a "(" right after a link label
+        // like `[text](...)`. We no longer treat parentheses as math delimiters,
+        // and this rule scans the whole inline source (not only `state.pos`),
+        // so returning `false` here can break markdown-it's invariants and hang
+        // the parser after we already emitted tokens/advanced `state.pos`.
+        //
+        // Keep the link-guard only for the legacy "(" delimiter (currently unused).
+        if (open === '(' && index > 0) {
           let i = index - 1
-          // skip spaces between ']' and the delimiter
           while (i >= 0 && src[i] === ' ')
             i--
-          if (i >= 0 && src[i] === ']')
-            return false
+          if (i >= 0 && src[i] === ']') {
+            searchPos = index + open.length
+            continue
+          }
         }
         // 有可能遇到 \((\operatorname{span}\\{\boldsymbol{\alpha}\\})^\perp\)
         // 这种情况，前面的 \( 是数学公式的开始，后面的 ( 是普通括号
