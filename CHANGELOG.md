@@ -3,6 +3,7 @@
 
 ### Bug Fixes
 
+* add regression tests for html_block splitting and update math plugin for legacy parentheses ([da4f46c](https://github.com/Simon-He95/markstream-vue/commit/da4f46c89135a1e7259a1bf4f71ad74e0750addb))
 * add test for html_block splitting after `<br/>` ([f040f6c](https://github.com/Simon-He95/markstream-vue/commit/f040f6cb9bc35445bac17ced88c178c8ed8b642e)), closes [#251](https://github.com/Simon-He95/markstream-vue/issues/251)
 * **buttons:** update button styles to use :where() for better specificity and maintain Tailwind utilities ([314ec46](https://github.com/Simon-He95/markstream-vue/commit/314ec466f2f360037a5d71503f4ca5edc8487278))
 * **changelog:** update release date and add missing bug fix entries ([6f453dc](https://github.com/Simon-He95/markstream-vue/commit/6f453dc8d158b2de24176c783860a3d6f5476d10))
