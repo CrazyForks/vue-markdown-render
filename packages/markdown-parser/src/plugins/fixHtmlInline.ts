@@ -507,6 +507,12 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
         const tag = (rawContent.match(/<\s*(?:\/\s*)?([^\s>/]+)/)?.[1] ?? '').toLowerCase()
         const isClosingTag = /^\s*<\s*\//.test(rawContent)
 
+        // Only apply the "merge everything into an unclosed html_block" behavior
+        // for configured custom tags. Applying it to normal HTML (e.g. <br/>) can
+        // incorrectly swallow following Markdown blocks into the html_block.
+        if (!tag || !customTagSet.has(tag))
+          continue
+
         if (!isClosingTag) {
           // 开始标签，入栈
           if (tag) {
@@ -514,7 +520,8 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
             // push it onto the stack; otherwise we'd incorrectly merge the
             // following blocks into this html_block.
             const closeRe = new RegExp(`<\\s*\\/\\s*${tag}\\s*>`, 'i')
-            if (!closeRe.test(rawContent))
+            const selfClosingRe = new RegExp(`^\\s*<\\s*${tag}\\b[^>]*\\/\\s*>`, 'i')
+            if (!selfClosingRe.test(rawContent) && !closeRe.test(rawContent))
               tagStack.push([tag, i])
           }
         }
