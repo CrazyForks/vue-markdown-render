@@ -448,6 +448,50 @@ describe('markdownRender node e2e coverage', () => {
     }, 20000)
   }
 
+  it('allows overriding `list_item` via customComponents', async () => {
+    const scopeId = 'custom-components-list-item'
+    const CustomListItem = defineComponent({
+      name: 'CustomListItem',
+      props: {
+        node: { type: Object, required: true },
+        indexKey: [String, Number],
+        value: Number,
+        customId: String,
+        typewriter: Boolean,
+      },
+      setup(props) {
+        return () => h('li', { class: 'custom-list-item', 'data-value': props.value == null ? '' : String(props.value) }, [
+          h(MarkdownRender, {
+            nodes: (props.node as any).children || [],
+            customId: props.customId,
+            indexKey: `custom-list-item-${String(props.indexKey ?? '')}`,
+            typewriter: props.typewriter,
+            batchRendering: false,
+          }),
+        ])
+      },
+    })
+
+    setCustomComponents(scopeId, { list_item: CustomListItem })
+
+    try {
+      const wrapper = await mountMarkdown('1. First entry\n2. Second entry', { customId: scopeId, final: true })
+      try {
+        const items = wrapper.findAll('li.custom-list-item')
+        expect(items).toHaveLength(2)
+        expect(items[0].attributes('data-value')).toBe('1')
+        expect(items[1].attributes('data-value')).toBe('2')
+        expect(normalizeText(wrapper.text())).toMatch(/First entry\s*Second entry/)
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
   it('renders repeated custom components without slot content reuse', async () => {
     const scopeId = 'custom-components-repeat'
     const NewQuestion = defineComponent({

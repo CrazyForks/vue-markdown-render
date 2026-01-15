@@ -20,6 +20,7 @@ import InlineCodeNode from '../../components/InlineCodeNode'
 import InsertNode from '../../components/InsertNode'
 import LinkNode from '../../components/LinkNode'
 import ListNode from '../../components/ListNode'
+import ListItemNode from '../../components/ListItemNode'
 import ParagraphNode from '../../components/ParagraphNode'
 import PreCodeNode from '../../components/PreCodeNode'
 import ReferenceNode from '../../components/ReferenceNode'
@@ -32,7 +33,7 @@ import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
 import { provideViewportPriority } from '../../composables/viewportPriority'
-import { getCustomNodeComponents } from '../../utils/nodeComponents'
+import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
@@ -1237,6 +1238,7 @@ const nodeComponents = {
   heading: HeadingNode,
   code_block: CodeBlockNodeAsync,
   list: ListNode,
+  list_item: ListItemNode,
   blockquote: BlockquoteNode,
   table: TableNode,
   definition_list: DefinitionListNode,
@@ -1275,6 +1277,7 @@ const nodeComponents = {
 function getNodeComponent(node: ParsedNode) {
   if (!node)
     return FallbackComponent
+  void customComponentsRevision.value
   const customComponents = getCustomNodeComponents(props.customId)
   const customForType = (customComponents as any)[String((node as any).type)]
   if (node.type === 'code_block') {
