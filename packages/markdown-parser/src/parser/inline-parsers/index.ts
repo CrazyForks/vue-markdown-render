@@ -61,6 +61,23 @@ export function parseInlineTokens(
   }
 
   function handleEmphasisAndStrikethrough(content: string, token: MarkdownToken): boolean {
+    // Helper: count unescaped asterisks in raw markdown
+    // Escaped asterisks like \* should not count toward strong/emphasis matching
+    const countUnescapedAsterisks = (str: string): number => {
+      let count = 0
+      let i = 0
+      while (i < str.length) {
+        if (str[i] === '\\' && i + 1 < str.length && str[i + 1] === '*') {
+          i += 2 // skip escaped asterisk
+          continue
+        }
+        if (str[i] === '*')
+          count++
+        i++
+      }
+      return count
+    }
+
     // strikethrough (~~)
     if (/[^~]*~{2,}[^~]+/.test(content)) {
       let idx = content.indexOf('~~')
@@ -109,6 +126,62 @@ export function parseInlineTokens(
         return true
       }
 
+      // Check if the leading ** are from escaped asterisks
+      // by checking if the raw markdown has \* at the corresponding position
+      if (raw && openIdx === 0) {
+        // Find where this content would start in raw
+        // We need to check if the position in raw has \*
+        let rawHasEscapedAsteriskAtStart = false
+        let asteriskCount = 0
+        let rawIdx = 0
+        // Count how many asterisks are at the start of content
+        while (asteriskCount < content.length && content[asteriskCount] === '*') {
+          asteriskCount++
+        }
+        // Check if raw has \* at the beginning (accounting for escaped backslashes)
+        if (raw.startsWith('\\*')) {
+          rawHasEscapedAsteriskAtStart = true
+        }
+
+        // If raw starts with escaped asterisks, don't parse as strong
+        if (rawHasEscapedAsteriskAtStart) {
+          // Check if all asterisks in content prefix are escaped in raw
+          let escapedCount = 0
+          let j = 0
+          while (j < raw.length && escapedCount < asteriskCount) {
+            if (raw[j] === '\\' && j + 1 < raw.length && raw[j + 1] === '*') {
+              escapedCount += 1
+              j += 2
+            }
+            else if (raw[j] === '*') {
+              // Found unescaped asterisk, stop checking
+              break
+            }
+            else {
+              j++
+            }
+          }
+          // If all leading asterisks in content are escaped in raw, treat as text
+          if (escapedCount >= 2) {
+            pushText(content, content)
+            i++
+            return true
+          }
+        }
+      }
+
+      // Fallback check: count asterisks in content vs unescaped asterisks in raw
+      // This handles cases like `需方：\*\*\*\*\*\*有限公司`
+      if (raw) {
+        const contentAsteriskCount = (content.match(/\*/g) || []).length
+        const rawAsteriskCount = countUnescapedAsterisks(raw)
+        if (contentAsteriskCount > rawAsteriskCount) {
+          pushText(content.slice(beforeText.length), content.slice(beforeText.length))
+          i++
+          return true
+        }
+      }
+
       // find the first matching closing ** pair in the content
       const exec = STRONG_PAIR_RE.exec(content)
       let inner = ''
@@ -128,6 +201,16 @@ export function parseInlineTokens(
         // 非严格模式（原行为）：mid-state, take rest as inner
         inner = content.slice(openIdx + 2)
         after = ''
+      }
+
+      // Special case: if the matched strong is empty (e.g., `****`) and the
+      // remaining content is also just asterisks, treat the entire thing as text
+      // to avoid creating empty strong nodes from escaped asterisks.
+      if (!inner && /^\*+$/.test(after)) {
+        // The entire content is just asterisks, treat as text
+        pushText(content, content)
+        i++
+        return true
       }
 
       const { node } = parseStrongToken([
