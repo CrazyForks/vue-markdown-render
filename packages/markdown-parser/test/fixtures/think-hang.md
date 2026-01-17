@@ -2,14 +2,11 @@
 
 I've begun by dissecting the core requirements of this translation task. My focus is on synthesizing the Chinese structural elucidation paragraph into a concise, SCI-paper-ready English version. The expert role helps me tailor the language appropriately, and I'm aware of the final format requirements. Next, I need to understand the nuances of the Chinese text.
 
-
 **Evaluating Initial Approaches**
 
 \\n\\n
 
 My current thinking revolves around the initial approach to this translation. I'm prioritizing accuracy, which means a deep dive into the source text to extract the core scientific meaning. I plan to use my expertise to identify key terms and phrasing to ensure the English version is clear and meets journal standards. Considering Compound 3 requires specialized knowledge.
-
-
 
 </think>
 Here is the translation of the structural elucidation for Compound 3, following standard SCI journal formatting and terminology.
@@ -25,4 +22,3 @@ To precisely elucidate the structure, the NMR data of **3** were compared with t
 The NOESY spectrum (Fig. 2) exhibited correlations of H-4 ($\\delta_{\\text{H}}$ 4.00) with H-2a ($\\delta_{\\text{H}}$ 2.32) and H-5 ($\\delta_{\\text{H}}$ 5.75), as well as H-3 ($\\delta_{\\text{H}}$ 4.12) with H-2b ($\\delta_{\\text{H}}$ 2.79). These correlations indicated that H-3 is <i>cis</i>-oriented relative to the 4-OH and 5-OH groups. The absolute configuration was further determined as (3$R$, 4$S$, 5$R$) by calculated electronic circular dichroism (ECD) analysis (Fig. 4).
 
 Based on the comprehensive spectroscopic analysis and comparison with 5-$O$-galloyl-(–)-shikimic acid, the structure of **3** was identified as methyl 5-$O$-galloyl-(–)-shikimate.
-

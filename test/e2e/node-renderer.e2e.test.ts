@@ -460,7 +460,7 @@ describe('markdownRender node e2e coverage', () => {
         typewriter: Boolean,
       },
       setup(props) {
-        return () => h('li', { class: 'custom-list-item', 'data-value': props.value == null ? '' : String(props.value) }, [
+        return () => h('li', { 'class': 'custom-list-item', 'data-value': props.value == null ? '' : String(props.value) }, [
           h(MarkdownRender, {
             nodes: (props.node as any).children || [],
             customId: props.customId,

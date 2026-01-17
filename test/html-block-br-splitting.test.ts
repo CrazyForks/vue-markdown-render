@@ -20,4 +20,3 @@ The easiest way to start the Dify server is through [Docker Compose](docker/dock
     expect(String(nodes[1].raw ?? '')).toContain('The easiest way to start the Dify server')
   })
 })
-

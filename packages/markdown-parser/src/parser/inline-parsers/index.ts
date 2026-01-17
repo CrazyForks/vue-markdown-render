@@ -133,7 +133,6 @@ export function parseInlineTokens(
         // We need to check if the position in raw has \*
         let rawHasEscapedAsteriskAtStart = false
         let asteriskCount = 0
-        let rawIdx = 0
         // Count how many asterisks are at the start of content
         while (asteriskCount < content.length && content[asteriskCount] === '*') {
           asteriskCount++

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import ListItemNode from '../ListItemNode'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
+import ListItemNode from '../ListItemNode'
 
 // 节点子元素类型
 interface NodeChild {

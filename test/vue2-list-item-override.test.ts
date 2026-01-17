@@ -5,6 +5,8 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
+import ListNode from '../packages/markstream-vue2/src/components/ListNode/ListNode.vue'
+
 import { removeCustomComponents, setCustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
 
 vi.mock('../packages/markstream-vue2/src/components/ListItemNode', () => {
@@ -13,13 +15,11 @@ vi.mock('../packages/markstream-vue2/src/components/ListItemNode', () => {
       name: 'MockListItemNode',
       props: ['node', 'value'],
       setup(props) {
-        return () => h('li', { class: 'mock-list-item', 'data-value': props.value }, (props as any).node?.children?.[0]?.content ?? '')
+        return () => h('li', { 'class': 'mock-list-item', 'data-value': props.value }, (props as any).node?.children?.[0]?.content ?? '')
       },
     }),
   }
 })
-
-import ListNode from '../packages/markstream-vue2/src/components/ListNode/ListNode.vue'
 
 describe('vue 2 - customComponents can override list_item', () => {
   it('renders list items with the custom component', () => {
@@ -28,7 +28,7 @@ describe('vue 2 - customComponents can override list_item', () => {
       name: 'CustomListItem',
       props: ['node', 'value'],
       setup(props) {
-        return () => h('li', { class: 'custom-list-item', 'data-value': props.value }, (props as any).node?.children?.[0]?.content ?? '')
+        return () => h('li', { 'class': 'custom-list-item', 'data-value': props.value }, (props as any).node?.children?.[0]?.content ?? '')
       },
     })
 

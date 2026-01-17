@@ -9,7 +9,7 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
-    "@iconify-json/carbon": "^1.2.16",
+    "@iconify-json/carbon": "^1.2.18",
     "@iconify/vue": "^5.0.0",
     "@nuxtjs/tailwindcss": "^6.14.0",
     "@unocss/reset": "^0.61.9",
