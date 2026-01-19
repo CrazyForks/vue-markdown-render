@@ -270,8 +270,9 @@ export function parseBasicBlockToken(
     case 'heading_open':
       return [parseHeading(tokens, index, options), index + 3]
 
-    case 'code_block':
+    case 'code_block': {
       return [parseCodeBlock(token), index + 1]
+    }
 
     case 'fence':
       return [parseFenceToken(token), index + 1]

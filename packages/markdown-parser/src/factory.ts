@@ -3,6 +3,7 @@ import MarkdownIt from 'markdown-it-ts'
 import { getDefaultMathOptions } from './config'
 import { applyContainers } from './plugins/containers'
 import { applyFixHtmlInlineTokens } from './plugins/fixHtmlInline'
+import { applyFixIndentedCodeBlock } from './plugins/fixIndentedCodeBlock'
 import { applyFixLinkTokens } from './plugins/fixLinkTokens'
 import { applyFixListItem } from './plugins/fixListItem'
 import { applyFixStrongTokens } from './plugins/fixStrongTokens'
@@ -20,6 +21,11 @@ export interface FactoryOptions extends Record<string, unknown> {
    * suppression and be emitted as custom nodes (e.g. ['thinking']).
    */
   customHtmlTags?: readonly string[]
+  /**
+   * Whether to enable the fix for indented code blocks that should be paragraphs.
+   * Default: true
+   */
+  enableFixIndentedCodeBlock?: boolean
 }
 
 export function factory(opts: FactoryOptions = {}) {
@@ -37,6 +43,9 @@ export function factory(opts: FactoryOptions = {}) {
   }
   if (opts.enableContainers ?? true)
     applyContainers(md)
+  // Fix indented code blocks that should be paragraphs (streaming scenario)
+  if (opts.enableFixIndentedCodeBlock !== false)
+    applyFixIndentedCodeBlock(md)
   // Retain the core-stage fix as a fallback for any cases the inline
   // tokenizer does not handle.
   applyFixLinkTokens(md)

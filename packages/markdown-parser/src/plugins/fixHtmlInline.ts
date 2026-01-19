@@ -729,8 +729,16 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
       if (t.type === 'html_block') {
         const rawTag = t.content?.match(/<([^\s>/]+)/)?.[1] ?? ''
         const tag = rawTag.toLowerCase()
-        // Keep custom tags as html_block so block-level custom components work.
 
+        // Special tags: comments, doctypes, processing instructions
+        // These should not be modified
+        if (tag.startsWith('!') || tag.startsWith('?')) {
+          t.loading = false
+          continue
+        }
+
+        // Custom tags (configured by user): keep as html_block
+        // These are handled specially to support streaming and structured nodes
         if (customTagSet.has(tag)) {
           const raw = String(t.content ?? '')
           const closeRe = new RegExp(`<\\/\\s*${tag}\\s*>`, 'i')
@@ -742,10 +750,31 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
           const closeLen = closeMatch ? closeMatch[0].length : 0
 
           if (endTagIndex !== -1) {
+            // Found a closing tag - extract inner content and trim
             const rawForNode = raw.slice(0, endTagIndex + closeLen)
+            let inner = ''
+            const openEnd = findTagCloseIndexOutsideQuotes(raw)
+            if (openEnd !== -1 && openEnd < endTagIndex) {
+              inner = raw.slice(openEnd + 1, endTagIndex)
+            }
+
+            // Create structured node with inner content
+            t.children = [
+              {
+                type: tag,
+                content: inner,
+                raw: rawForNode,
+                attrs: [],
+                tag,
+                loading: false,
+              },
+            ] as any[]
+
+            // Update token content
             t.content = rawForNode
             ;(t as any).raw = rawForNode
 
+            // Insert trailing content as a new token if present
             const afterContent = raw.slice(endTagIndex + closeLen) || ''
             const afterTrimmed = afterContent.replace(/^\s+/, '')
             if (afterTrimmed) {
@@ -754,23 +783,31 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
                 : ({ type: 'text', content: afterTrimmed, raw: afterTrimmed } as any))
             }
           }
+          else {
+            // No closing tag yet (streaming mid-state)
+            t.children = [
+              {
+                type: tag,
+                content: '',
+                raw,
+                attrs: [],
+                tag,
+                loading: true,
+              },
+            ] as any[]
+          }
 
           continue
         }
 
-        // Do not attempt to convert or close comments/doctypes/processing-instructions
-        if (tag.startsWith('!') || tag.startsWith('?')) {
-          t.loading = false
-          continue
-        }
-        // 如果是常见的 block 标签，则跳过，否则转换成 inline 处理
+        // Common block tags: skip conversion to inline
         if (['br', 'hr', 'img', 'input', 'link', 'meta', 'div', 'p', 'ul', 'li'].includes(tag))
           continue
+
+        // Other HTML tags: convert to inline type for better handling
+        // Parse attributes and check for closing tag
         t.type = 'inline'
-        const hasClose = new RegExp(`<\\/\\s*${tag}\\s*>`, 'i').test(String(t.content ?? ''))
-        const loading = hasClose ? false : t.loading !== undefined ? t.loading : true
         const attrs: [string, string][] = []
-        // 解析属性
         const attrRegex = /\s([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
         let match
         while ((match = attrRegex.exec(t.content || '')) !== null) {
@@ -778,63 +815,48 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
           const attrValue = match[2] || match[3] || match[4] || ''
           attrs.push([attrName, attrValue])
         }
-        if (customTagSet.has(tag)) {
-          const raw = String(t.content ?? '')
-          const closeRe = new RegExp(`<\\/\\s*${tag}\\s*>`, 'i')
-          const closeMatch = closeRe.exec(raw)
-          const endTagIndex = closeMatch ? closeMatch.index : -1
-          const closeLen = closeMatch ? closeMatch[0].length : 0
 
-          const rawForNode = endTagIndex !== -1
-            ? raw.slice(0, endTagIndex + closeLen)
-            : raw
+        const raw = String(t.content ?? '')
+        const closeRe = new RegExp(`<\\/\\s*${tag}\\s*>`, 'i')
+        const closeMatch = closeRe.exec(raw)
+        const endTagIndex = closeMatch ? closeMatch.index : -1
+        const closeLen = closeMatch ? closeMatch[0].length : 0
 
-          // Extract inner content between the first opening '>' and the closing tag.
-          let inner = ''
-          const openEnd = findTagCloseIndexOutsideQuotes(raw)
-          if (openEnd !== -1) {
-            if (endTagIndex !== -1 && openEnd < endTagIndex) {
-              inner = raw.slice(openEnd + 1, endTagIndex)
-            }
-            else if (endTagIndex === -1) {
-              // Streaming mid-state: trim any trailing partial tag fragment.
-              inner = raw.slice(openEnd + 1).replace(/<.*$/, '')
-            }
-          }
+        if (endTagIndex !== -1) {
+          // Found a closing tag - split content
+          const rawForNode = raw.slice(0, endTagIndex + closeLen)
+          const afterContent = raw.slice(endTagIndex + closeLen) || ''
+          const afterTrimmed = afterContent.replace(/^\s+/, '')
 
+          // Create html_block child node
           t.children = [
             {
-              type: tag,
-              content: inner,
-              raw: rawForNode,
-              attrs,
+              type: 'html_block',
+              content: rawForNode,
               tag,
-              loading,
+              loading: false,
             },
           ] as any[]
-          if (endTagIndex !== -1) {
-            // Always trim current token to the end of the closing tag.
-            // This prevents later blocks (e.g. another custom tag) from being
-            // included in the custom tag node's raw/content.
-            t.content = rawForNode
-            ;(t as any).raw = rawForNode
 
-            const afterContent = raw.slice(endTagIndex + closeLen) || ''
-            const afterTrimmed = afterContent.replace(/^\s+/, '')
-            if (afterTrimmed) {
-              toks.splice(i + 1, 0, afterTrimmed.startsWith('<')
-                ? ({ type: 'html_block', content: afterTrimmed } as any)
-                : ({ type: 'text', content: afterTrimmed, raw: afterTrimmed } as any))
-            }
+          // Update token content
+          t.content = rawForNode
+          ;(t as any).raw = rawForNode
+
+          // Insert trailing content as a new token if present
+          if (afterTrimmed) {
+            toks.splice(i + 1, 0, afterTrimmed.startsWith('<')
+              ? ({ type: 'html_block', content: afterTrimmed } as any)
+              : ({ type: 'text', content: afterTrimmed, raw: afterTrimmed } as any))
           }
         }
         else {
+          // No closing tag - streaming mid-state
           t.children = [
             {
               type: 'html_block',
               content: t.content,
               tag,
-              loading,
+              loading: true,
             },
           ] as any[]
         }
