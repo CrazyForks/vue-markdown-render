@@ -1,4 +1,4 @@
-import type { LinkNode, MarkdownToken, ParsedNode, TextNode } from '../../types'
+import type { MarkdownToken, ParsedNode, TextNode } from '../../types'
 import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
@@ -21,11 +21,6 @@ import { parseTextToken } from './text-parser'
 
 // Precompiled regexes used frequently in inline parsing
 const STRONG_PAIR_RE = /\*\*([\s\S]*?)\*\*/
-
-// Shared helper for building safe dynamic regex parts
-function escapeRegExp(str: string) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
 
 // Helper: detect likely URLs/hrefs (autolinks). Extracted so the
 // detection logic is easy to tweak and test.
@@ -723,7 +718,6 @@ export function parseInlineTokens(
   function handleLinkOpen(token: MarkdownToken) {
     // mirror logic previously in the switch-case for 'link_open'
     resetCurrentTextNode()
-    const href = token.attrs?.find(([name]) => name === 'href')?.[1]
 
     // 直接使用 parseLinkToken 来解析链接及其子节点，这能正确处理包含 code_inline 等复杂内容的链接
     const { node, nextIndex } = parseLinkToken(tokens, i, { requireClosingStrong })

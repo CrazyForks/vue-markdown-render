@@ -3,6 +3,7 @@
 import type { LinkNodeProps } from '../../types/component-props'
 import { computed, useAttrs } from 'vue'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
+import { getCustomNodeComponents } from '../../utils/nodeComponents'
 import EmphasisNode from '../EmphasisNode/EmphasisNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode'
 import ImageNode from '../ImageNode'
@@ -10,7 +11,6 @@ import InlineCodeNode from '../InlineCodeNode'
 import StrikethroughNode from '../StrikethroughNode'
 import StrongNode from '../StrongNode'
 import TextNode from '../TextNode'
-import { getCustomNodeComponents } from '../../utils/nodeComponents'
 
 // 接收props — 把动画/颜色相关配置暴露为props，并通过CSS变量注入样式
 const props = withDefaults(defineProps<LinkNodeProps>(), {
