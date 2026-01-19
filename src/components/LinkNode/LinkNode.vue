@@ -6,10 +6,11 @@ import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingleto
 import EmphasisNode from '../EmphasisNode/EmphasisNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode'
 import ImageNode from '../ImageNode'
+import InlineCodeNode from '../InlineCodeNode'
 import StrikethroughNode from '../StrikethroughNode'
-
 import StrongNode from '../StrongNode'
 import TextNode from '../TextNode'
+import { getCustomNodeComponents } from '../../utils/nodeComponents'
 
 // 接收props — 把动画/颜色相关配置暴露为props，并通过CSS变量注入样式
 const props = withDefaults(defineProps<LinkNodeProps>(), {
@@ -40,6 +41,17 @@ const nodeComponents = {
   emphasis: EmphasisNode,
   image: ImageNode,
   html_inline: HtmlInlineNode,
+  inline_code: InlineCodeNode,
+}
+
+// 获取子节点组件，优先使用用户自定义组件
+function getChildComponent(child: any) {
+  const customComponents = getCustomNodeComponents(props.customId)
+  const customComponent = customComponents[child.type]
+  if (customComponent)
+    return customComponent
+
+  return nodeComponents[child.type] || null
 }
 
 // forward any non-prop attributes (e.g. custom-id) to the rendered element
@@ -80,7 +92,7 @@ const title = computed(() => String(props.node.title ?? props.node.href ?? ''))
     @mouseleave="onAnchorLeave"
   >
     <component
-      :is="nodeComponents[child.type]"
+      :is="getChildComponent(child)"
       v-for="(child, index) in node.children"
       :key="`${indexKey || 'emphasis'}-${index}`"
       :node="child"

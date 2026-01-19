@@ -90,6 +90,10 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
   if (tokens.length < 4)
     return tokens
 
+  // 如果包含 code_inline 类型的 token，说明是包含内联代码的链接，直接返回原样，避免错误处理
+  if (tokens.some(token => token.type === 'code_inline'))
+    return tokens
+
   for (let i = 0; i <= tokens.length - 1; i++) {
     if (i < 0) {
       i = 0
