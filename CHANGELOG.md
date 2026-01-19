@@ -1,4 +1,4 @@
-## [0.0.6-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.6-beta.4) (2026-01-19)
+## [0.0.6-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.6-beta.5) (2026-01-19)
 
 
 ### Bug Fixes
@@ -58,6 +58,7 @@
 * Add InfographicBlockNode component and integrate  rendering for code blocks. ([1c0e74d](https://github.com/Simon-He95/markstream-vue/commit/1c0e74d21ad9f6940699358d3e3d1db41b4009de))
 * add normalization for custom HTML opening tags at line start ([aafd530](https://github.com/Simon-He95/markstream-vue/commit/aafd530d372b15888e72a960a5cff7d6c8e27f37))
 * add push options for tagging scripts in package.json ([9e46cb1](https://github.com/Simon-He95/markstream-vue/commit/9e46cb10a7f062bc2679648e61639f065e30a9dd))
+* add support for fixing indented code blocks and enhance HTML inline handling ([733bf40](https://github.com/Simon-He95/markstream-vue/commit/733bf409f05de3704199f9274a62f48ea5d0f4e4)), closes [#257](https://github.com/Simon-He95/markstream-vue/issues/257)
 * add Tailwind CSS support to markstream-vue2 ([b6a8b20](https://github.com/Simon-He95/markstream-vue/commit/b6a8b20c65a451eb684c80b238149320f208799f))
 * delete temporary patch file ([e931d8b](https://github.com/Simon-He95/markstream-vue/commit/e931d8bc414833194aebebe23fafa8379d7bde41))
 * **docs:** update playground links and add local running instructions ([2ec2745](https://github.com/Simon-He95/markstream-vue/commit/2ec27456fed6b0b0432e92b67753d51bbf42ad89))
