@@ -319,8 +319,8 @@ function toggleStreamSettings() {
 </script>
 
 <template>
-  <div class="p-4 app-container h-full bg-gray-50 dark:bg-gray-900">
-    <div class="max-w-6xl mx-auto h-full overflow-hidden flex flex-col">
+  <div class="p-4 app-container min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div class="max-w-6xl mx-auto flex flex-col">
       <div class="mb-4 flex items-center justify-between">
         <h2 class="text-lg font-semibold">
           Markdown 输入 & 实时渲染
@@ -451,13 +451,13 @@ function toggleStreamSettings() {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
         <div>
           <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">输入</label>
           <textarea v-model="input" rows="18" class="w-full p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 resize-none" />
         </div>
 
-        <div class="h-full overflow-hidden flex-col flex">
+        <div class="flex flex-col">
           <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200 shrink-0">
             预览
             <span v-if="streamContent" class="ml-2 text-xs text-purple-600 dark:text-purple-400">
@@ -504,7 +504,6 @@ function toggleStreamSettings() {
 <style scoped>
 .app-container {
   transition: background-color 0.3s ease;
-  overflow: hidden;
 }
 
 .chatbot-container {
