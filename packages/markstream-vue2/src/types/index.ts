@@ -23,6 +23,7 @@ export interface HeadingNode extends BaseNode {
   type: 'heading'
   level: number
   text: string
+  attrs?: Record<string, string | boolean>
   children: ParsedNode[]
 }
 

@@ -30,6 +30,7 @@ const props = defineProps<{
     type: 'heading'
     level: number
     text: string
+    attrs?: Record<string, string | boolean>
     children: NodeChild[]
     raw: string
   }
@@ -65,10 +66,11 @@ const nodeComponents = {
 <template>
   <component
     :is="`h${node.level}`"
-    v-memo="[node.children]"
+    v-memo="[node.level, node.children, node.attrs]"
     class="heading-node"
     :class="[`heading-${node.level}`]"
     dir="auto"
+    v-bind="node.attrs"
   >
     <component
       :is="nodeComponents[child.type]"
