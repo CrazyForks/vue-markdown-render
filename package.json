@@ -2,7 +2,7 @@
   "name": "markstream-vue",
   "type": "module",
   "version": "0.0.6-beta.5",
-  "packageManager": "pnpm@10.28.0",
+  "packageManager": "pnpm@10.28.1",
   "description": "Vue 3 Markdown renderer optimized for large docs: progressive Mermaid, streaming diff code blocks, and fast real-time preview.",
   "author": "Simon He",
   "license": "MIT",
@@ -189,7 +189,7 @@
     "vite-svg-loader": "^5.1.0",
     "vitepress": "^1.6.4",
     "vitest": "^4.0.17",
-    "vue": "^3.5.26",
+    "vue": "^3.5.27",
     "vue-tsc": "^2.2.12"
   },
   "pnpm": {
