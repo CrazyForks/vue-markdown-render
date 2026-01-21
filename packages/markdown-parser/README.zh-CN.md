@@ -253,10 +253,14 @@ interface ParseOptions {
   preTransformTokens?: (tokens: Token[]) => Token[]
   postTransformTokens?: (tokens: Token[]) => Token[]
   postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]
+  // 自定义 HTML 类标签，作为自定义节点输出（如 ['thinking']）
+  customHtmlTags?: string[]
+  // 强制指定标签渲染为纯文本（如 ['question', 'answer']）
+  escapeHtmlTags?: string[]
 }
 ```
 
-示例 —— 标记 AI “思考” 块：
+示例 —— 标记 AI "思考" 块：
 
 ```ts
 const parseOptions = {
@@ -271,6 +275,21 @@ const parseOptions = {
 ```
 
 在渲染器中读取 `node.meta` 即可渲染自定义 UI，而无需直接修改 Markdown 文本。
+
+示例 —— 将占位符标签转义为纯文本：
+
+```ts
+// 如果上游内容包含占位符标签如 <question> 或 <analysis>，
+// 希望将它们显示为纯文本而不是被解释为 HTML：
+const nodes = parseMarkdownToStructure('<question>2+2 等于几？</question>', md, {
+  escapeHtmlTags: ['question', 'answer']
+})
+// 渲染为纯文本："<question>2+2 等于几？</question>"
+```
+
+注意：
+- 如果一个标签名同时存在于 `customHtmlTags` 和 `escapeHtmlTags`，`escapeHtmlTags` 优先
+- 标签名不区分大小写（会规范化为小写）
 
 ### 工具函数
 

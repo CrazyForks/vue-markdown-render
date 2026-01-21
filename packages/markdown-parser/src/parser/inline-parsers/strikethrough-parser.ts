@@ -30,6 +30,7 @@ export function parseStrikethroughToken(
   children.push(...parseInlineTokens(innerTokens, undefined, undefined, {
     requireClosingStrong: options?.requireClosingStrong,
     customHtmlTags: options?.customHtmlTags,
+    escapeHtmlTags: options?.escapeHtmlTags,
   }))
 
   const node: StrikethroughNode = {

@@ -711,18 +711,26 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const mergedParseOptions = useMemo(() => {
     const base = props.parseOptions ?? {}
     const resolvedFinal = props.final ?? (base as any).final
-    const merged = effectiveCustomHtmlTags
-    if (!merged.length) {
-      if (resolvedFinal == null)
-        return base
-      return { ...(base as any), final: resolvedFinal }
-    }
+    const propEscapeTags = props.escapeHtmlTags ?? []
+    const optionEscapeTags = (base as any).escapeHtmlTags ?? []
+    const mergedEscape = [...propEscapeTags, ...(Array.isArray(optionEscapeTags) ? optionEscapeTags : [])]
+      .map(normalizeCustomTag)
+      .filter(Boolean)
+
+    const hasFinal = resolvedFinal != null
+    const hasCustom = effectiveCustomHtmlTags.length > 0
+    const hasEscape = mergedEscape.length > 0
+
+    if (!hasFinal && !hasCustom && !hasEscape)
+      return base
+
     return {
-      ...base,
-      final: resolvedFinal,
-      customHtmlTags: merged,
+      ...(base as any),
+      ...(hasFinal ? { final: resolvedFinal } : {}),
+      ...(hasCustom ? { customHtmlTags: effectiveCustomHtmlTags } : {}),
+      ...(hasEscape ? { escapeHtmlTags: Array.from(new Set(mergedEscape)) } : {}),
     } as any
-  }, [effectiveCustomHtmlTags, props.final, props.parseOptions])
+  }, [effectiveCustomHtmlTags, props.escapeHtmlTags, props.final, props.parseOptions])
 
   const parsedNodes = useMemo<ParsedNode[]>(() => {
     const debugEnabled = Boolean(props.debugPerformance)

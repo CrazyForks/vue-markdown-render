@@ -4,7 +4,7 @@ type ParseInlineTokensFn = (
   tokens: MarkdownToken[],
   raw?: string,
   pPreToken?: MarkdownToken,
-  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[] },
+  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[], escapeHtmlTags?: readonly string[] },
 ) => ParsedNode[]
 
 const VOID_TAGS = new Set([
@@ -38,6 +38,14 @@ function isSelfClosing(tag: string, html: string) {
 }
 
 function normalizeCustomTag(t: unknown) {
+  const raw = String(t ?? '').trim()
+  if (!raw)
+    return ''
+  const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
+  return m ? m[1].toLowerCase() : ''
+}
+
+function normalizeTagName(t: unknown) {
   const raw = String(t ?? '').trim()
   if (!raw)
     return ''
@@ -117,13 +125,17 @@ export function parseHtmlInlineCodeToken(
   parseInlineTokens: ParseInlineTokensFn,
   raw?: string,
   pPreToken?: MarkdownToken,
-  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[] },
+  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[], escapeHtmlTags?: readonly string[] },
 ): [ParsedNode, number] {
   const code = String(token.content ?? '')
   const tag = getTagName(code)
   const customTags = options?.customHtmlTags
   const customTagSet = customTags && customTags.length
     ? new Set(customTags.map(normalizeCustomTag).filter(Boolean))
+    : null
+  const escapeTags = options?.escapeHtmlTags
+  const escapeTagSet = escapeTags && escapeTags.length
+    ? new Set(escapeTags.map(normalizeTagName).filter(Boolean))
     : null
 
   if (!tag) {
@@ -133,6 +145,20 @@ export function parseHtmlInlineCodeToken(
         code,
         raw: code,
       } as InlineCodeNode,
+      i + 1,
+    ]
+  }
+
+  // Allow callers to force specific tags (e.g. <question>) to render as literal
+  // text, even when markdown-it emits them as html_inline tokens.
+  if (escapeTagSet?.has(tag)) {
+    const content = tokenToRaw(token)
+    return [
+      {
+        type: 'text',
+        content,
+        raw: content,
+      } as ParsedNode,
       i + 1,
     ]
   }

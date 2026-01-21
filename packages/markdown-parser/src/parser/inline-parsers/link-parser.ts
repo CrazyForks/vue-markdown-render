@@ -33,6 +33,7 @@ export function parseLinkToken(
   const children = parseInlineTokens(linkTokens, undefined, undefined, {
     requireClosingStrong: options?.requireClosingStrong,
     customHtmlTags: options?.customHtmlTags,
+    escapeHtmlTags: options?.escapeHtmlTags,
   })
   const linkText = children
     .map((node) => {

@@ -8,6 +8,128 @@ import { parseHardBreak } from './node-parsers/hardbreak-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
 
+function normalizeTagName(t: unknown) {
+  const raw = String(t ?? '').trim()
+  if (!raw)
+    return ''
+  const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
+  return m ? m[1].toLowerCase() : ''
+}
+
+function applyEscapeHtmlTags(nodes: ParsedNode[], options?: ParseOptions): ParsedNode[] {
+  const escapeTags = options?.escapeHtmlTags
+  if (!escapeTags?.length)
+    return nodes
+
+  const escapeTagSet = new Set(escapeTags.map(normalizeTagName).filter(Boolean))
+  if (!escapeTagSet.size)
+    return nodes
+
+  const INLINE_CHILD_CONTAINERS = new Set<string>([
+    'paragraph',
+    'heading',
+    'inline',
+    'link',
+    'strong',
+    'emphasis',
+    'strikethrough',
+    'highlight',
+    'insert',
+    'subscript',
+    'superscript',
+    'table_cell',
+  ])
+
+  const toInlineText = (raw: string) => {
+    const content = raw.replace(/\n+$/, '')
+    return { type: 'text', content, raw: content } as ParsedNode
+  }
+
+  const toParagraphText = (raw: string) => {
+    const content = raw.replace(/\n+$/, '')
+    return {
+      type: 'paragraph',
+      raw: content,
+      children: content ? [toInlineText(content)] : [],
+    } as ParsedNode
+  }
+
+  const transformNode = (node: ParsedNode, context: 'block' | 'inline'): ParsedNode => {
+    const n = node as any
+    const tag = typeof n?.tag === 'string' ? String(n.tag).toLowerCase() : ''
+
+    // Escape target tags regardless of whether they were parsed as html_* nodes
+    // or custom component nodes (type === tag).
+    if (tag && escapeTagSet.has(tag)) {
+      const raw = String(n?.raw ?? n?.content ?? '')
+      return context === 'inline' ? toInlineText(raw) : toParagraphText(raw)
+    }
+
+    // Also handle cases where a node doesn't carry `tag` but is an html_* node.
+    if ((n?.type === 'html_inline' || n?.type === 'html_block') && typeof n?.tag === 'string') {
+      const htmlTag = String(n.tag).toLowerCase()
+      if (htmlTag && escapeTagSet.has(htmlTag)) {
+        const raw = String(n?.raw ?? n?.content ?? '')
+        return n.type === 'html_inline' ? toInlineText(raw) : toParagraphText(raw)
+      }
+    }
+
+    const nextContextForChildren = context === 'inline' || INLINE_CHILD_CONTAINERS.has(String(n?.type))
+      ? 'inline'
+      : 'block'
+
+    if (Array.isArray(n?.children)) {
+      const nextChildren = (n.children as ParsedNode[]).map(child => transformNode(child, nextContextForChildren))
+      if (nextChildren !== n.children)
+        n.children = nextChildren
+    }
+
+    if (n?.type === 'list' && Array.isArray(n.items)) {
+      n.items = n.items.map((item: ParsedNode) => transformNode(item, 'block'))
+    }
+    else if (n?.type === 'list_item' && Array.isArray(n.children)) {
+      n.children = n.children.map((child: ParsedNode) => transformNode(child, 'block'))
+    }
+    else if (n?.type === 'blockquote' && Array.isArray(n.children)) {
+      n.children = n.children.map((child: ParsedNode) => transformNode(child, 'block'))
+    }
+    else if (n?.type === 'table') {
+      if (n.header)
+        n.header = transformNode(n.header, 'block')
+      if (Array.isArray(n.rows))
+        n.rows = n.rows.map((row: ParsedNode) => transformNode(row, 'block'))
+    }
+    else if (n?.type === 'table_row' && Array.isArray(n.cells)) {
+      n.cells = n.cells.map((cell: ParsedNode) => transformNode(cell, 'block'))
+    }
+    else if (n?.type === 'table_cell' && Array.isArray(n.children)) {
+      n.children = n.children.map((child: ParsedNode) => transformNode(child, 'inline'))
+    }
+    else if (n?.type === 'definition_list' && Array.isArray(n.items)) {
+      n.items = n.items.map((item: ParsedNode) => transformNode(item, 'block'))
+    }
+    else if (n?.type === 'definition_item') {
+      if (Array.isArray(n.term))
+        n.term = n.term.map((child: ParsedNode) => transformNode(child, 'inline'))
+      if (Array.isArray(n.definition))
+        n.definition = n.definition.map((child: ParsedNode) => transformNode(child, 'block'))
+    }
+    else if (n?.type === 'footnote' && Array.isArray(n.children)) {
+      n.children = n.children.map((child: ParsedNode) => transformNode(child, 'block'))
+    }
+    else if (n?.type === 'admonition' && Array.isArray(n.children)) {
+      n.children = n.children.map((child: ParsedNode) => transformNode(child, 'block'))
+    }
+    else if (n?.type === 'vmr_container' && Array.isArray(n.children)) {
+      n.children = n.children.map((child: ParsedNode) => transformNode(child, 'block'))
+    }
+
+    return node
+  }
+
+  return nodes.map(node => transformNode(node, 'block'))
+}
+
 function stripDanglingHtmlLikeTail(markdown: string) {
   const isWs = (ch: string) => ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r'
 
@@ -803,6 +925,9 @@ export function parseMarkdownToStructure(
       }
     }
   }
+
+  result = applyEscapeHtmlTags(result, options)
+
   if (options.debug) {
     console.log('Parsed Markdown Tree Structure:', result)
   }
@@ -890,6 +1015,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         result.push(...parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, {
           requireClosingStrong: options?.requireClosingStrong,
           customHtmlTags: options?.customHtmlTags,
+          escapeHtmlTags: options?.escapeHtmlTags,
         }))
         i += 1
         break
@@ -900,7 +1026,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
     }
   }
 
-  return result
+  return applyEscapeHtmlTags(result, options)
 }
 
 export { parseInlineTokens }

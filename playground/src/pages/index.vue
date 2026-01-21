@@ -560,6 +560,7 @@ onBeforeUnmount(() => {
           :code-block-light-theme="selectedTheme || undefined"
           :themes="themes"
           :custom-html-tags="['thinking']"
+          :escape-html-tags="['question', 'answer']"
           :is-dark="isDark"
           custom-id="playground-demo"
           class="p-6"

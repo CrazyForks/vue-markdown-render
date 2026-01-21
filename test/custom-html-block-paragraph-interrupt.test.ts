@@ -119,7 +119,7 @@ x
     const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
 
     expect(nodes[0]?.type).toBe('code_block')
-    expect(String(nodes[0]?.code ?? '')).toContain("console.log('x')\n<RadioBtn>")
-    expect(String(nodes[0]?.code ?? '')).not.toContain("console.log('x')\n\n<RadioBtn>")
+    expect(String(nodes[0]?.code ?? '')).toContain('console.log(\'x\')\n<RadioBtn>')
+    expect(String(nodes[0]?.code ?? '')).not.toContain('console.log(\'x\')\n\n<RadioBtn>')
   })
 })

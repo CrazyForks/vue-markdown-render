@@ -25,6 +25,7 @@ export function parseSubscriptToken(
   children.push(...parseInlineTokens(innerTokens, undefined, undefined, {
     requireClosingStrong: options?.requireClosingStrong,
     customHtmlTags: options?.customHtmlTags,
+    escapeHtmlTags: options?.escapeHtmlTags,
   }))
 
   const startContent = String(tokens[startIndex].content ?? '')

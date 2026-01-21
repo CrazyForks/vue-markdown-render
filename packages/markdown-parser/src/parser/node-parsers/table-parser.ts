@@ -67,6 +67,7 @@ export function parseTable(
             children: parseInlineTokens(contentToken.children || [], content, undefined, {
               requireClosingStrong: options?.requireClosingStrong,
               customHtmlTags: options?.customHtmlTags,
+              escapeHtmlTags: options?.escapeHtmlTags,
             }),
             raw: content,
             align,

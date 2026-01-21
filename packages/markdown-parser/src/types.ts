@@ -405,6 +405,19 @@ export interface ParseOptions {
    * to enable mid-state suppression for the same tags during streaming.
    */
   customHtmlTags?: string[]
+  /**
+   * HTML-like tag names that should be rendered as literal text instead of
+   * `html_inline`/`html_block` nodes (e.g. ['question', 'analysis']).
+   *
+   * Useful when upstream content may contain placeholder tags like `<question>`
+   * but you want them to display as plain text rather than being interpreted
+   * as HTML.
+   *
+   * Note: this applies to both inline and block HTML tokens. If a tag name is
+   * present in both `customHtmlTags` and `escapeHtmlTags`, `escapeHtmlTags`
+   * takes precedence.
+   */
+  escapeHtmlTags?: string[]
   // When true, log the parsed tree structure for debugging
   debug?: boolean
 }

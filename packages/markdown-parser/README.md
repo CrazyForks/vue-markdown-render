@@ -254,6 +254,10 @@ interface ParseOptions {
   preTransformTokens?: (tokens: Token[]) => Token[]
   postTransformTokens?: (tokens: Token[]) => Token[]
   postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]
+  // Custom HTML-like tags to emit as custom nodes (e.g. ['thinking'])
+  customHtmlTags?: string[]
+  // Force specific tags to render as literal text (e.g. ['question', 'answer'])
+  escapeHtmlTags?: string[]
 }
 ```
 
@@ -272,6 +276,21 @@ const parseOptions = {
 ```
 
 Use the metadata in your renderer to show custom UI without mangling the original Markdown.
+
+Example — escape placeholder tags as literal text:
+
+```ts
+// If upstream content contains placeholder tags like <question> or <analysis>
+// that should be displayed as plain text instead of being interpreted as HTML:
+const nodes = parseMarkdownToStructure('<question>What is 2+2?</question>', md, {
+  escapeHtmlTags: ['question', 'answer']
+})
+// Renders as literal text: "<question>What is 2+2?</question>"
+```
+
+Notes:
+- If a tag name is present in both `customHtmlTags` and `escapeHtmlTags`, `escapeHtmlTags` takes precedence
+- Tag names are case-insensitive (normalized to lowercase)
 
 ### Utility Functions
 

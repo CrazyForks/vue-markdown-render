@@ -72,6 +72,7 @@ export function parseContainer(
           children: parseInlineTokens(_children || [], undefined, undefined, {
             requireClosingStrong: options?.requireClosingStrong,
             customHtmlTags: options?.customHtmlTags,
+            escapeHtmlTags: options?.escapeHtmlTags,
           }),
           raw: String(contentToken.content ?? '').replace(/\n:+$/, '').replace(/\n\s*:::\s*$/, ''),
         })

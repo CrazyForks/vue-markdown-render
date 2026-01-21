@@ -64,6 +64,13 @@ export interface NodeRendererProps {
    * and are emitted as custom nodes (e.g. ['thinking']). Forwarded to `getMarkdown()`.
    */
   customHtmlTags?: readonly string[]
+  /**
+   * HTML-like tag names that should be rendered as literal text instead of
+   * `html_inline`/`html_block` nodes (e.g. ['question', 'answer']).
+   *
+   * This is forwarded to `parseMarkdownToStructure()` via `parseOptions.escapeHtmlTags`.
+   */
+  escapeHtmlTags?: readonly string[]
   /** Enable priority rendering for visible viewport area */
   viewportPriority?: boolean
   /**
@@ -198,18 +205,24 @@ const mergedParseOptions = computed(() => {
   const merged = [...propTags, ...optionTags]
     .map(normalizeCustomTag)
     .filter(Boolean)
-  if (!merged.length) {
-    if (resolvedFinal == null)
-      return base
-    return {
-      ...(base as any),
-      final: resolvedFinal,
-    } as ParseOptions
-  }
+  const propEscapeTags = props.escapeHtmlTags ?? []
+  const optionEscapeTags = (base as any).escapeHtmlTags ?? []
+  const mergedEscape = [...propEscapeTags, ...optionEscapeTags]
+    .map(normalizeCustomTag)
+    .filter(Boolean)
+
+  const hasFinal = resolvedFinal != null
+  const hasCustom = merged.length > 0
+  const hasEscape = mergedEscape.length > 0
+
+  if (!hasFinal && !hasCustom && !hasEscape)
+    return base
+
   return {
-    ...base,
-    final: resolvedFinal,
-    customHtmlTags: Array.from(new Set(merged)),
+    ...(base as any),
+    ...(hasFinal ? { final: resolvedFinal } : {}),
+    ...(hasCustom ? { customHtmlTags: Array.from(new Set(merged)) } : {}),
+    ...(hasEscape ? { escapeHtmlTags: Array.from(new Set(mergedEscape)) } : {}),
   } as ParseOptions
 })
 

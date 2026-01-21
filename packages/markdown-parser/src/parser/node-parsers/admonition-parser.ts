@@ -24,6 +24,7 @@ export function parseAdmonition(
           children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), undefined, {
             requireClosingStrong: options?.requireClosingStrong,
             customHtmlTags: options?.customHtmlTags,
+            escapeHtmlTags: options?.escapeHtmlTags,
           }),
           raw: String(contentToken.content ?? ''),
         })
