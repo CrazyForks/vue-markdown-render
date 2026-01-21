@@ -361,6 +361,306 @@ function normalizeCustomHtmlOpeningTagSameLine(markdown: string, tags: string[])
   return out
 }
 
+function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[]) {
+  if (!markdown || !tags.length)
+    return markdown
+
+  const tagSet = new Set(tags.map(t => String(t ?? '').toLowerCase()))
+  if (!tagSet.size)
+    return markdown
+
+  const isIndentWs = (ch: string) => ch === ' ' || ch === '\t'
+  const isIndentedCodeLine = (line: string) => {
+    if (!line)
+      return false
+    if (line[0] === '\t')
+      return true
+    let spaces = 0
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch === ' ') {
+        spaces++
+        if (spaces >= 4)
+          return true
+        continue
+      }
+      if (ch === '\t')
+        return true
+      break
+    }
+    return false
+  }
+  const isNameChar = (ch: string) => {
+    const c = ch.charCodeAt(0)
+    return (
+      (c >= 65 && c <= 90) // A-Z
+      || (c >= 97 && c <= 122) // a-z
+      || (c >= 48 && c <= 57) // 0-9
+      || ch === '_'
+      || ch === '-'
+      || ch === ':'
+    )
+  }
+
+  const trimStartIndentWs = (s: string) => {
+    let i = 0
+    while (i < s.length && isIndentWs(s[i])) i++
+    return s.slice(i)
+  }
+
+  const parseBlockquotePrefix = (rawLine: string) => {
+    let i = 0
+    let saw = false
+    let prefixEnd = 0
+
+    while (i < rawLine.length) {
+      // allow indentation before every marker
+      while (i < rawLine.length && isIndentWs(rawLine[i])) i++
+      if (i >= rawLine.length || rawLine[i] !== '>')
+        break
+      saw = true
+      i++ // consume '>'
+      while (i < rawLine.length && isIndentWs(rawLine[i])) i++
+      prefixEnd = i
+    }
+
+    if (!saw)
+      return null
+
+    const prefix = rawLine.slice(0, prefixEnd)
+    const key = prefix.replace(/[ \t]+$/, '')
+    return {
+      prefix,
+      key,
+      content: rawLine.slice(prefixEnd),
+    }
+  }
+
+  // Keep behavior conservative: only insert a blank line before a custom tag
+  // when it follows a non-blank, non-HTML-ish line. This fixes the common case:
+  //
+  //   paragraph text
+  //   <CustomTag>...</CustomTag>
+  //
+  // Without the blank line, CommonMark HTML block type 7 cannot interrupt a
+  // paragraph, so markdown-it tokenizes the tag as inline HTML inside the
+  // paragraph.
+  const previousLineLooksHtmlish = (line: string) => {
+    const trimmed = trimStartIndentWs(line)
+    return trimmed.startsWith('<')
+  }
+
+  const lineIsBlank = (line: string) => {
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch !== ' ' && ch !== '\t')
+        return false
+    }
+    return true
+  }
+
+  const parseOpeningCustomTagName = (line: string) => {
+    if (isIndentedCodeLine(line))
+      return ''
+    const trimmed = trimStartIndentWs(line)
+    if (!trimmed.startsWith('<'))
+      return ''
+
+    let i = 1
+    while (i < trimmed.length && isIndentWs(trimmed[i])) i++
+    if (i >= trimmed.length)
+      return ''
+    if (trimmed[i] === '/' || trimmed[i] === '!' || trimmed[i] === '?')
+      return ''
+
+    const nameStart = i
+    while (i < trimmed.length && isNameChar(trimmed[i])) i++
+    if (i === nameStart)
+      return ''
+
+    const name = trimmed.slice(nameStart, i).toLowerCase()
+    if (!tagSet.has(name))
+      return ''
+
+    // Require a boundary after tag name to avoid matching prefixes.
+    const next = trimmed[i]
+    if (next && next !== ' ' && next !== '\t' && next !== '>' && next !== '/')
+      return ''
+
+    return name
+  }
+
+  const parseLineStartCustomTag = (line: string) => {
+    if (isIndentedCodeLine(line))
+      return null
+    const trimmed = trimStartIndentWs(line)
+    if (!trimmed.startsWith('<'))
+      return null
+
+    let i = 1
+    while (i < trimmed.length && isIndentWs(trimmed[i])) i++
+    if (i >= trimmed.length)
+      return null
+
+    const isClose = trimmed[i] === '/'
+    if (isClose) {
+      i++
+      while (i < trimmed.length && isIndentWs(trimmed[i])) i++
+    }
+    // Ignore non-element markup (comments/doctypes/pi)
+    const next = trimmed[i]
+    if (!next || next === '!' || next === '?')
+      return null
+
+    const nameStart = i
+    while (i < trimmed.length && isNameChar(trimmed[i])) i++
+    if (i === nameStart)
+      return null
+
+    const name = trimmed.slice(nameStart, i).toLowerCase()
+    if (!tagSet.has(name))
+      return null
+
+    // Require boundary after name so we don't match prefixes
+    const boundary = trimmed[i]
+    if (boundary && boundary !== ' ' && boundary !== '\t' && boundary !== '>' && boundary !== '/')
+      return null
+
+    if (isClose)
+      return { type: 'close' as const, name }
+
+    // opening tag: treat "<tag .../>" as complete on one line
+    if (/\/\s*>\s*$/.test(trimmed))
+      return { type: 'open' as const, name, complete: true as const }
+
+    const gt = trimmed.indexOf('>', i)
+    if (gt !== -1) {
+      const after = trimmed.slice(gt + 1)
+      const closeRe = new RegExp(`<\\s*\\/\\s*${name}\\s*>`, 'i')
+      if (closeRe.test(after))
+        return { type: 'open' as const, name, complete: true as const }
+    }
+
+    return { type: 'open' as const, name, complete: false as const }
+  }
+
+  // Track fenced code blocks so we don't touch their contents.
+  let inFence = false
+  let fenceChar: '`' | '~' | '' = ''
+  let fenceLen = 0
+
+  const parseFenceMarker = (line: string) => {
+    let i = 0
+    while (i < line.length && isIndentWs(line[i])) i++
+    const ch = line[i]
+    if (ch !== '`' && ch !== '~')
+      return null
+    let j = i
+    while (j < line.length && line[j] === ch) j++
+    const len = j - i
+    if (len < 3)
+      return null
+    return { markerChar: ch as '`' | '~', markerLen: len, rest: line.slice(j) }
+  }
+
+  const fenceMatchLine = (rawLine: string) => parseFenceMarker(rawLine)
+
+  let out = ''
+  let idx = 0
+  let prevLineBlank = true
+  let prevLineHtmlish = false
+  // Use the last seen newline sequence to insert a blank line that matches the file.
+  let lastNewline = '\n'
+  const customBlockStack: string[] = []
+  let prevQuoteKey = ''
+
+  while (idx < markdown.length) {
+    const nl = markdown.indexOf('\n', idx)
+    const hasNl = nl !== -1
+    const isCrlf = hasNl && nl > idx && markdown[nl - 1] === '\r'
+    const lineEnd = hasNl ? (isCrlf ? nl - 1 : nl) : markdown.length
+    const line = markdown.slice(idx, lineEnd)
+    const newline = hasNl ? (isCrlf ? '\r\n' : '\n') : ''
+
+    const blockquote = parseBlockquotePrefix(line)
+    const quoteKey = blockquote?.key ?? ''
+    const contentLine = blockquote?.content ?? line
+
+    // Maintain fence state based on the original line.
+    const fenceMatch = fenceMatchLine(contentLine)
+    if (fenceMatch) {
+      if (inFence) {
+        if (fenceMatch.markerChar === fenceChar && fenceMatch.markerLen >= fenceLen) {
+          if (/^\s*$/.test(fenceMatch.rest)) {
+            inFence = false
+            fenceChar = ''
+            fenceLen = 0
+          }
+        }
+      }
+      else {
+        inFence = true
+        fenceChar = fenceMatch.markerChar
+        fenceLen = fenceMatch.markerLen
+      }
+    }
+
+    const insideCustomBlock = customBlockStack.length > 0
+    if (!inFence && !insideCustomBlock) {
+      const opening = parseOpeningCustomTagName(contentLine)
+      if (opening && !prevLineBlank && !prevLineHtmlish) {
+        // Insert a blank line boundary between the previous paragraph line and the custom block.
+        // In blockquotes, the blank line must also carry the `>` markers, otherwise the
+        // blockquote would end and the tag would escape the quote.
+        if (quoteKey && prevQuoteKey && quoteKey === prevQuoteKey) {
+          out += `${quoteKey}${lastNewline}`
+        }
+        else if (!quoteKey) {
+          out += lastNewline
+        }
+      }
+    }
+
+    out += line
+    out += newline
+
+    if (newline)
+      lastNewline = newline
+
+    // Maintain custom-tag "block stack" only when not inside fenced code.
+    // This avoids accidentally inserting blank lines inside <CustomTag> blocks
+    // which would mutate their captured inner content.
+    if (!inFence) {
+      const tag = parseLineStartCustomTag(contentLine)
+      if (tag) {
+        if (tag.type === 'open') {
+          if (!tag.complete)
+            customBlockStack.push(tag.name)
+        }
+        else {
+          // Close: pop matching tag (or unwind to it if nesting is malformed)
+          for (let j = customBlockStack.length - 1; j >= 0; j--) {
+            if (customBlockStack[j] === tag.name) {
+              customBlockStack.length = j
+              break
+            }
+          }
+        }
+      }
+    }
+
+    // Update "previous line" info for the next iteration (based on the original line).
+    const blank = lineIsBlank(contentLine)
+    prevLineBlank = blank
+    prevLineHtmlish = !blank && previousLineLooksHtmlish(contentLine)
+    prevQuoteKey = quoteKey
+
+    idx = hasNl ? nl + 1 : markdown.length
+  }
+
+  return out
+}
+
 export function parseMarkdownToStructure(
   markdown: string,
   md: MarkdownIt,
@@ -427,6 +727,11 @@ export function parseMarkdownToStructure(
       // That causes the tag to be parsed as inline HTML and breaks custom block parsing.
       // Normalize "<tag> ..." (line-start only) into "<tag>\n..." so it becomes a block.
       safeMarkdown = normalizeCustomHtmlOpeningTagSameLine(safeMarkdown, tags)
+      // CommonMark HTML blocks of type 7 cannot interrupt paragraphs. When a custom
+      // tag line (e.g. "<RadioBtn>") immediately follows paragraph text, markdown-it
+      // will tokenize it as inline HTML and merge it into the paragraph. Insert a
+      // blank line boundary before custom tags that follow non-HTML-ish text lines.
+      safeMarkdown = ensureBlankLineBeforeCustomHtmlBlocks(safeMarkdown, tags)
 
       // Fast path: no closing tag marker at all.
       if (!safeMarkdown.includes('</')) {
