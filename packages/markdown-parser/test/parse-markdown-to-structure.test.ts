@@ -5,9 +5,9 @@ describe('parseMarkdownToStructure - duplicate question rendering', () => {
   it('does not duplicate the question text when parsing mixed math/ce commands', () => {
     const md = getMarkdown()
 
-    const markdown = `**当堂检测**：  
-1. 下列物质属于酚的是（ ）  
-   A. $\ce{CH3CH2OH}$  B. $\ce{C6H5CH2OH}$  C. $\ce{}$  D. $\ce{HO-CH2-CH2OH}$  
+    const markdown = `**当堂检测**：
+1. 下列物质属于酚的是（ ）
+   A. $\ce{CH3CH2OH}$  B. $\ce{C6H5CH2OH}$  C. $\ce{}$  D. $\ce{HO-CH2-CH2OH}$
    **答案**：C`
 
     const nodes = parseMarkdownToStructure(markdown, md)
@@ -30,6 +30,7 @@ describe('parseMarkdownToStructure - duplicate question rendering', () => {
     }
 
     const allTexts = collectTexts(nodes).join('\n')
+    console.log('All texts:', JSON.stringify(allTexts, null, 2))
     // Count occurrences of the core question string
     const needle = '下列物质属于酚的是'
     const occurrences = (allTexts.match(new RegExp(needle, 'g')) || []).length

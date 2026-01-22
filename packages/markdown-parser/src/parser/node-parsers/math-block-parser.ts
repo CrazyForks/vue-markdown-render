@@ -9,5 +9,6 @@ export function parseMathBlock(token: MarkdownToken): MathBlockNode {
     content,
     loading: !!token.loading,
     raw,
+    markup: token.markup,
   }
 }

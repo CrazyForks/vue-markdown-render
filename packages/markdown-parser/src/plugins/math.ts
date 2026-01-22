@@ -270,6 +270,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       return false
     }
     const delimiters: [string, string][] = [
+      ['$$', '$$'],
       ['$', '$'],
       // Support explicit TeX inline delimiters only: `\\(...\\)`
       // NOTE: in source text authors must write the backslashes literally
@@ -283,11 +284,19 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
     let searchPos = 0
     let preMathPos = 0
+    // Save the initial position so $$ can scan from the beginning
+    // even after $ rule has advanced s.pos
+    const initialPos = s.pos
     // use findMatchingClose from util
     for (const [open, close] of delimiters) {
       // We'll scan the entire inline source and tokenize all occurrences
       const src = s.src
       let foundAny = false
+      // Reset searchPos for $$ to allow it to scan the full content
+      // even after $ rule has processed some text
+      if (open === '$$' && searchPos !== initialPos) {
+        searchPos = initialPos
+      }
       // Guard against non-advancing loops: if we ever end up repeatedly
       // matching the same opener at the same position, force `searchPos`
       // to advance so the inline rule can't hang the UI.
@@ -315,6 +324,83 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
         if (!text)
           return
+
+        // When scanning $$...$$, also parse any single-dollar $...$ math
+        // segments that appear in the surrounding text. Without this, mixing
+        // $ and $$ in one line can cause the $ segments to be emitted as plain
+        // text because this rule returns after the first successful delimiter
+        // pass.
+        if (open === '$$' && text.includes('$')) {
+          let localPos = 0
+          while (localPos < text.length) {
+            const dollarIndex = text.indexOf('$', localPos)
+            if (dollarIndex === -1) {
+              const rest = text.slice(localPos)
+              if (rest) {
+                const t = s.push('text', '', 0)
+                t.content = rest
+                s.pos = s.pos + rest.length
+                searchPos = s.pos
+              }
+              break
+            }
+
+            // Skip "$$" occurrences; they belong to the $$ scanner.
+            if ((dollarIndex > 0 && text[dollarIndex - 1] === '$') || (dollarIndex + 1 < text.length && text[dollarIndex + 1] === '$')) {
+              const beforeSkip = text.slice(localPos, dollarIndex + 1)
+              if (beforeSkip) {
+                const t = s.push('text', '', 0)
+                t.content = beforeSkip
+                s.pos = s.pos + beforeSkip.length
+                searchPos = s.pos
+              }
+              localPos = dollarIndex + 1
+              continue
+            }
+
+            const before = text.slice(localPos, dollarIndex)
+            if (before) {
+              const t = s.push('text', '', 0)
+              t.content = before
+              s.pos = s.pos + before.length
+              searchPos = s.pos
+            }
+
+            const closingDollarIndex = text.indexOf('$', dollarIndex + 1)
+            if (closingDollarIndex === -1) {
+              // No closing delimiter; treat the rest as text.
+              const rest = text.slice(dollarIndex)
+              const t = s.push('text', '', 0)
+              t.content = rest
+              s.pos = s.pos + rest.length
+              searchPos = s.pos
+              break
+            }
+
+            const content = text.slice(dollarIndex + 1, closingDollarIndex)
+            const hasBacktick = content.includes('`')
+            const isEmpty = !content || !content.trim()
+            if (!hasBacktick && !isEmpty) {
+              const token = s.push('math_inline', 'math', 0)
+              token.content = normalizeStandaloneBackslashT(content, mathOpts)
+              token.markup = '$'
+              token.raw = `$${content}$`
+              token.loading = false
+              s.pos = s.pos + (closingDollarIndex - dollarIndex + 1)
+              searchPos = s.pos
+              localPos = closingDollarIndex + 1
+              continue
+            }
+
+            // Not valid math; emit '$' as text and continue.
+            const t = s.push('text', '', 0)
+            t.content = '$'
+            s.pos = s.pos + 1
+            searchPos = s.pos
+            localPos = dollarIndex + 1
+          }
+          return
+        }
 
         // Check if text contains image syntax ![...](...)
         // If so, parse and push the image token manually
@@ -407,6 +493,17 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
             searchPos = index + open.length
             continue
           }
+        }
+
+        // Skip $$ delimiters when processing $ delimiter to avoid conflicts
+        // The $$ rule will handle these separately
+        if (open === '$' && index > 0 && src[index - 1] === '$') {
+          searchPos = index + 1
+          continue
+        }
+        if (open === '$' && index < src.length - 1 && src[index + 1] === '$') {
+          searchPos = index + 2
+          continue
         }
         // 有可能遇到 \((\operatorname{span}\\{\boldsymbol{\alpha}\\})^\perp\)
         // 这种情况，前面的 \( 是数学公式的开始，后面的 ( 是普通括号
@@ -575,9 +672,79 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
       if (foundAny) {
         if (!silent) {
-          // push remaining text after last match
-          if (searchPos < src.length)
-            pushText(src.slice(searchPos))
+          // Special handling for $$ rule: process remaining $ delimiters before pushing text
+          // This is needed because the $ rule won't run after we return true
+          if (open === '$$' && searchPos < src.length && src.slice(searchPos).includes('$')) {
+            // Find and process all $...$ patterns in the remaining text
+            let remainingPos = searchPos
+            while (true) {
+              if (remainingPos >= src.length)
+                break
+              const dollarIndex = src.indexOf('$', remainingPos)
+              if (dollarIndex === -1)
+                break
+
+              // Skip $$ patterns
+              if (dollarIndex + 1 < src.length && src[dollarIndex + 1] === '$') {
+                remainingPos = dollarIndex + 2
+                continue
+              }
+              if (dollarIndex > 0 && src[dollarIndex - 1] === '$') {
+                remainingPos = dollarIndex + 1
+                continue
+              }
+
+              // Find matching closing $
+              const closingDollarIndex = src.indexOf('$', dollarIndex + 1)
+              if (closingDollarIndex === -1)
+                break
+
+              // Skip if closing $ is part of $$
+              if (closingDollarIndex + 1 < src.length && src[closingDollarIndex + 1] === '$') {
+                remainingPos = dollarIndex + 1
+                continue
+              }
+
+              // Valid $...$ pattern
+              const content = src.slice(dollarIndex + 1, closingDollarIndex)
+              const hasBacktick = content.includes('`')
+              const isEmpty = !content || !content.trim()
+              // For explicit $...$ delimiters, accept any non-empty content
+              // (e.g. "$H$", "$1$") even if the heuristic doesn't classify it
+              // as "math-like".
+              if (!hasBacktick && !isEmpty) {
+                // Push text before this $...$
+                const before = src.slice(searchPos, dollarIndex)
+                if (before) {
+                  pushText(before)
+                }
+                // Push the $ math token
+                const token = s.push('math_inline', 'math', 0)
+                token.content = normalizeStandaloneBackslashT(content, mathOpts)
+                token.markup = '$'
+                token.raw = `$${content}$`
+                token.loading = false
+                searchPos = closingDollarIndex + 1
+                remainingPos = closingDollarIndex + 1
+              }
+              else {
+                // Not valid math; emit '$' and continue scanning.
+                pushText('$')
+                remainingPos = dollarIndex + 1
+              }
+            }
+
+            // Push any remaining text after all $...$ patterns
+            if (remainingPos < src.length) {
+              pushText(src.slice(remainingPos))
+            }
+          }
+          else {
+            // push remaining text after last match
+            if (searchPos < src.length)
+              pushText(src.slice(searchPos))
+          }
+
           // consume the full inline source
           s.pos = src.length
         }

@@ -9,5 +9,6 @@ export function parseMathInlineToken(token: MarkdownToken): MathInlineNode {
     content,
     loading: !!token.loading,
     raw,
+    markup: token.markup,
   }
 }

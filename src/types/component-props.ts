@@ -139,5 +139,6 @@ export interface MathInlineNodeProps {
     content: string
     raw: string
     loading?: boolean
+    markup?: string
   }
 }

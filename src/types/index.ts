@@ -237,11 +237,13 @@ export interface HardBreakNode extends BaseNode {
 export interface MathInlineNode extends BaseNode {
   type: 'math_inline'
   content: string
+  markup?: string
 }
 
 export interface MathBlockNode extends BaseNode {
   type: 'math_block'
   content: string
+  markup?: string
 }
 
 export interface ReferenceNode extends BaseNode {

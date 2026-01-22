@@ -19,7 +19,8 @@ export function MathInlineNode({ node }: MathInlineNodeProps) {
       return () => controller.abort()
     }
 
-    renderKaTeXWithBackpressure(content, false, {
+    const displayMode = node.markup === '$$'
+    renderKaTeXWithBackpressure(content, displayMode, {
       timeout: 1500,
       waitTimeout: 0,
       maxRetries: 0,
@@ -47,12 +48,12 @@ export function MathInlineNode({ node }: MathInlineNodeProps) {
             try {
               const html = katex.renderToString(content, {
                 throwOnError: node.loading,
-                displayMode: false,
+                displayMode,
               })
               if (!aborted && renderId === renderIdRef.current && mathRef.current) {
                 mathRef.current.innerHTML = html
                 setLoading(false)
-                setKaTeXCache(content, false, html)
+                setKaTeXCache(content, displayMode, html)
               }
               return
             }
@@ -69,7 +70,7 @@ export function MathInlineNode({ node }: MathInlineNodeProps) {
       aborted = true
       controller.abort()
     }
-  }, [node.content, node.loading, node.raw])
+  }, [node.content, node.loading, node.raw, node.markup])
 
   return (
     <span ref={containerRef} className="math-inline-wrapper">

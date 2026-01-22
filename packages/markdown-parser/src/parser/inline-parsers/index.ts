@@ -646,7 +646,12 @@ export function parseInlineTokens(
       const item = result[index]
       if (item.type === 'text') {
         currentTextNode = null
-        content = item.content + content
+        // Avoid duplicating text when the incoming token content already
+        // includes the previous text node (can happen with certain mid-state
+        // token streams).
+        const itemContent = String((item as any).content ?? '')
+        if (!content.startsWith(itemContent))
+          content = itemContent + content
         continue
       }
       break

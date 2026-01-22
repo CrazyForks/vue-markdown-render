@@ -11,6 +11,7 @@ interface MathInlineNodeProps {
     content: string
     raw: string
     loading?: boolean
+    markup?: string
   }
 }
 
@@ -57,7 +58,8 @@ async function renderMath() {
     catch {}
   }
 
-  renderKaTeXWithBackpressure(props.node.content, false, {
+  const displayMode = props.node.markup === '$$'
+  renderKaTeXWithBackpressure(props.node.content, displayMode, {
     // Inline math should not wait on worker slots; fallback to sync render immediately
     timeout: 1500,
     waitTimeout: 0,
@@ -91,12 +93,13 @@ async function renderMath() {
         const katex = await getKatex()
         if (katex) {
           try {
-            const html = katex.renderToString(props.node.content, { throwOnError: props.node.loading, displayMode: false })
+            const displayMode = props.node.markup === '$$'
+            const html = katex.renderToString(props.node.content, { throwOnError: props.node.loading, displayMode })
             renderingLoading.value = false
             mathElement.value.innerHTML = html
             hasRenderedOnce = true
             // populate worker client cache for inline as well
-            setKaTeXCache(props.node.content, false, html)
+            setKaTeXCache(props.node.content, displayMode, html)
           }
           catch {
           }
