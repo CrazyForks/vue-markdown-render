@@ -1,4 +1,4 @@
-## [0.0.6-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.6-beta.6) (2026-01-21)
+## [0.0.6-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.6-beta.7) (2026-01-22)
 
 
 ### Bug Fixes
@@ -55,6 +55,7 @@
 * add AntV Infographic guide pages and update navigation configuration. ([0b64836](https://github.com/Simon-He95/markstream-vue/commit/0b64836068def70cadea54a27df06ec40ab47ca4))
 * add attrs support to HeadingNode components and tests ([b148aea](https://github.com/Simon-He95/markstream-vue/commit/b148aea52265a204ef4d043d99b13d313c048a78))
 * add ECharts integration documentation in English and Chinese ([b39a993](https://github.com/Simon-He95/markstream-vue/commit/b39a99399f74244e2acada3e3a96fee9ce5a52c0))
+* add escapeHtmlTags option to render specific HTML-like tags as literal text ([74f2798](https://github.com/Simon-He95/markstream-vue/commit/74f2798f19e27926933eab30c36fd44bb71141eb)), closes [#261](https://github.com/Simon-He95/markstream-vue/issues/261)
 * add GitHub star badge component and update documentation to encourage starring the project ([63d5e9a](https://github.com/Simon-He95/markstream-vue/commit/63d5e9a7185c79b5bbade651ef5b9c3e29c40712))
 * Add InfographicBlockNode component and integrate  rendering for code blocks. ([1c0e74d](https://github.com/Simon-He95/markstream-vue/commit/1c0e74d21ad9f6940699358d3e3d1db41b4009de))
 * add normalization for custom HTML opening tags at line start ([aafd530](https://github.com/Simon-He95/markstream-vue/commit/aafd530d372b15888e72a960a5cff7d6c8e27f37))
