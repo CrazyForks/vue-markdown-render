@@ -21,7 +21,7 @@ function walkNodes(nodes: any[], visit: (node: any) => void) {
   }
 }
 
-describe('HTML allowlist (方案 A)', () => {
+describe('hTML allowlist (方案 A)', () => {
   it('renders unknown tag <question> as literal text by default', () => {
     const md = getMarkdown()
     const nodes = parseMarkdownToStructure('Hello <question> world', md, { final: true })
@@ -69,4 +69,3 @@ describe('HTML allowlist (方案 A)', () => {
     expect(htmlInlineQuestion.length).toBe(0)
   })
 })
-

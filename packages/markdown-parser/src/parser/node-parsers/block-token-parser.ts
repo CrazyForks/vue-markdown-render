@@ -1,4 +1,5 @@
 import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions, VmrContainerNode } from '../../types'
+import { buildAllowedHtmlTagSet } from '../index'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseFenceToken } from '../inline-parsers/fence-parser'
 import { parseBlockquote } from './blockquote-parser'
@@ -11,7 +12,6 @@ import { parseList } from './list-parser'
 import { parseMathBlock } from './math-block-parser'
 import { parseTable } from './table-parser'
 import { parseThematicBreak } from './thematic-break-parser'
-import { buildAllowedHtmlTagSet } from '../index'
 
 function parseVmrContainer(
   tokens: MarkdownToken[],
