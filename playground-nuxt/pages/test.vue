@@ -43,7 +43,7 @@ const input = ref<string>(`# Hello
 console.log('hello')
 \`\`\`
 
-数学：$$E=mc^2$$
+数学：$E=mc^2$
 Mermaid 示例：
 
 \`\`\`mermaid
