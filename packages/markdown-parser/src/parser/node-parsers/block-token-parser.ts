@@ -11,6 +11,7 @@ import { parseList } from './list-parser'
 import { parseMathBlock } from './math-block-parser'
 import { parseTable } from './table-parser'
 import { parseThematicBreak } from './thematic-break-parser'
+import { buildAllowedHtmlTagSet } from '../index'
 
 function parseVmrContainer(
   tokens: MarkdownToken[],
@@ -63,7 +64,6 @@ function parseVmrContainer(
           children: parseInlineTokens(childrenArr || [], undefined, undefined, {
             requireClosingStrong: options?.requireClosingStrong,
             customHtmlTags: options?.customHtmlTags,
-            escapeHtmlTags: options?.escapeHtmlTags,
           }),
           raw: String(contentToken.content ?? ''),
         })
@@ -283,34 +283,17 @@ export function parseBasicBlockToken(
 
     case 'html_block': {
       const htmlBlockNode = parseHtmlBlock(token)
-      const escapeTags = options?.escapeHtmlTags
-      if (escapeTags?.length && htmlBlockNode.tag) {
-        const normalizeTagName = (t: unknown) => {
-          const raw = String(t ?? '').trim()
-          if (!raw)
-            return ''
-          const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
-          return m ? m[1].toLowerCase() : ''
-        }
-        const escapeTagSet = new Set(escapeTags.map(normalizeTagName).filter(Boolean))
-        if (escapeTagSet.has(htmlBlockNode.tag)) {
-          const raw = String((token as any)?.content ?? '')
-          const content = raw.replace(/\n+$/, '')
-          return [
-            {
-              type: 'paragraph',
-              children: [
-                {
-                  type: 'text',
-                  content,
-                  raw: content,
-                },
-              ],
-              raw: content,
-            } as any,
-            index + 1,
-          ]
-        }
+      if (htmlBlockNode.tag && !buildAllowedHtmlTagSet(options).has(htmlBlockNode.tag) && htmlBlockNode.loading) {
+        const raw = String((token as any)?.content ?? '')
+        const content = raw.replace(/\n+$/, '')
+        return [
+          {
+            type: 'paragraph',
+            children: content ? [{ type: 'text', content, raw: content }] : [],
+            raw: content,
+          } as any,
+          index + 1,
+        ]
       }
       if (options?.customHtmlTags && htmlBlockNode.tag) {
         const set = new Set(

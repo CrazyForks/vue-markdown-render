@@ -12,7 +12,6 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 | `final` | `boolean` | `false` | Marks the input as end-of-stream. Disables streaming mid-state (loading) parsing so trailing delimiters (like `$$` or an unclosed code fence) won’t get stuck in a perpetual loading state. |
 | `parse-options` | `ParseOptions` | – | Token hooks (`preTransformTokens`, `postTransformTokens`, `postTransformNodes`). Applies only when `content` is provided. |
 | `custom-html-tags` | `string[]` | – | Extra HTML-like tags treated as common during streaming mid‑states and emitted as custom nodes (`type: <tag>`) for `setCustomComponents` mapping (forwarded to `getMarkdown`, e.g. `['thinking']`). |
-| `escape-html-tags` | `string[]` | – | Force specific HTML-like tags to render as literal text instead of `html_inline/html_block` (merged into `parseOptions.escapeHtmlTags`, e.g. `['question', 'answer']`). |
 | `custom-markdown-it` | `(md: MarkdownIt) => MarkdownIt` | – | Customize the internal MarkdownIt instance (add plugins, tweak options). |
 | `debug-performance` | `boolean` | `false` | Logs parse/render timing and virtualization stats (dev only). |
 | `typewriter` | `boolean` | `true` | Enables the subtle enter animation. Disable if you need zero animation for SSR snapshots. |

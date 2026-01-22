@@ -38,7 +38,7 @@ export function parseInlineTokens(
   tokens: MarkdownToken[],
   raw?: string,
   pPreToken?: MarkdownToken,
-  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[], escapeHtmlTags?: readonly string[] },
+  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[] },
 ): ParsedNode[] {
   if (!tokens || tokens.length === 0)
     return []

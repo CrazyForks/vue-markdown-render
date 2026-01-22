@@ -18,13 +18,6 @@ export interface NodeRendererProps {
    * Forwarded to `getMarkdown()` and merged into parseOptions.
    */
   customHtmlTags?: readonly string[]
-  /**
-   * HTML-like tag names that should be rendered as literal text instead of
-   * `html_inline`/`html_block` nodes (e.g. ['question', 'answer']).
-   *
-   * This is merged into `parseOptions.escapeHtmlTags`.
-   */
-  escapeHtmlTags?: readonly string[]
   viewportPriority?: boolean
   codeBlockStream?: boolean
   codeBlockDarkTheme?: any

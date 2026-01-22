@@ -1,10 +1,11 @@
 import type { InlineCodeNode, MarkdownToken, ParsedNode } from '../../types'
+import { buildAllowedHtmlTagSet } from '../index'
 
 type ParseInlineTokensFn = (
   tokens: MarkdownToken[],
   raw?: string,
   pPreToken?: MarkdownToken,
-  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[], escapeHtmlTags?: readonly string[] },
+  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[] },
 ) => ParsedNode[]
 
 const VOID_TAGS = new Set([
@@ -38,14 +39,6 @@ function isSelfClosing(tag: string, html: string) {
 }
 
 function normalizeCustomTag(t: unknown) {
-  const raw = String(t ?? '').trim()
-  if (!raw)
-    return ''
-  const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
-  return m ? m[1].toLowerCase() : ''
-}
-
-function normalizeTagName(t: unknown) {
   const raw = String(t ?? '').trim()
   if (!raw)
     return ''
@@ -125,17 +118,13 @@ export function parseHtmlInlineCodeToken(
   parseInlineTokens: ParseInlineTokensFn,
   raw?: string,
   pPreToken?: MarkdownToken,
-  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[], escapeHtmlTags?: readonly string[] },
+  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[] },
 ): [ParsedNode, number] {
   const code = String(token.content ?? '')
   const tag = getTagName(code)
   const customTags = options?.customHtmlTags
   const customTagSet = customTags && customTags.length
     ? new Set(customTags.map(normalizeCustomTag).filter(Boolean))
-    : null
-  const escapeTags = options?.escapeHtmlTags
-  const escapeTagSet = escapeTags && escapeTags.length
-    ? new Set(escapeTags.map(normalizeTagName).filter(Boolean))
     : null
 
   if (!tag) {
@@ -149,18 +138,17 @@ export function parseHtmlInlineCodeToken(
     ]
   }
 
-  // Allow callers to force specific tags (e.g. <question>) to render as literal
-  // text, even when markdown-it emits them as html_inline tokens.
-  if (escapeTagSet?.has(tag)) {
-    const content = tokenToRaw(token)
-    return [
-      {
-        type: 'text',
-        content,
-        raw: content,
-      } as ParsedNode,
-      i + 1,
-    ]
+  // If it's not a standard HTML tag and not in customHtmlTags, default to
+  // rendering it as literal text (方案 A). However, if the tag is already
+  // properly closed within the inline token stream, keep it as HTML so
+  // HtmlInlineNode can still render custom components via HTML parsing.
+  const allowedTagSet = buildAllowedHtmlTagSet({ customHtmlTags: options?.customHtmlTags as any })
+  if (!allowedTagSet.has(tag)) {
+    const fragment = collectHtmlFragment(tokens, i, tag)
+    if (!fragment.closed) {
+      const content = tokenToRaw(token)
+      return [{ type: 'text', content, raw: content } as ParsedNode, i + 1]
+    }
   }
 
   if (tag === 'br') {

@@ -37,7 +37,7 @@ defineProps<{ node: {
         <span v-if="node.loading" class="sr-only" aria-live="polite">Thinking…</span>
         <transition name="fade" mode="out-in">
           <div key="{{ node.loading ? 'loading' : 'ready' }}" class="content-area">
-            <MarkdownRender :content="node.content" :escape-html-tags="['question', 'answer']" />
+            <MarkdownRender :content="node.content" />
           </div>
         </transition>
       </div>

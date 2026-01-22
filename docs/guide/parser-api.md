@@ -77,25 +77,11 @@ When calling `parseMarkdownToStructure` you can pass `ParseOptions` with these h
 
 These hooks are also available via `parseOptions` prop on the `MarkdownRender` component (applies only when using `content` instead of `nodes`).
 
-### ParseOptions: `escapeHtmlTags`
+### Unknown HTML-like tags (default behavior)
 
-`escapeHtmlTags` (string[] | optional) forces specific HTML-like tag names to be rendered as literal text instead of `html_inline`/`html_block` nodes.
+Non-standard HTML-like tags (for example `<question>`) are rendered as **literal text** by default.
 
-For example, if your upstream content contains placeholder tags like `<question>` or `<analysis>` that should be displayed as plain text rather than interpreted as HTML:
-
-```ts
-import { parseMarkdownToStructure } from 'stream-markdown-parser'
-
-const nodes = parseMarkdownToStructure('<question>What is 2+2?</question>', undefined, {
-  escapeHtmlTags: ['question', 'answer']
-})
-// Renders as literal text: "<question>What is 2+2?</question>"
-```
-
-Notes:
-- Applies to both inline and block HTML tokens
-- If a tag name is present in both `customHtmlTags` and `escapeHtmlTags`, `escapeHtmlTags` takes precedence
-- Tag names are case-insensitive (normalized to lowercase)
+If you want a custom tag to be parsed as a custom node (so it can be mapped via `setCustomComponents`), add it to `customHtmlTags`.
 
 ### ParseOptions: `requireClosingStrong`
 

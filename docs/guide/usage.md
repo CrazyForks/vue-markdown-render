@@ -52,6 +52,8 @@ export default {
 />
 ```
 
+Tip: unknown HTML-like tags (such as `<question>`) render as plain text by default. Add the tag name to `custom-html-tags` only when you want it parsed as a custom node.
+
 ## Parser pipeline
 
 ```ts

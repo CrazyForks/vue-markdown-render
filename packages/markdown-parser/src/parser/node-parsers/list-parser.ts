@@ -46,7 +46,6 @@ export function parseList(
             children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken, {
               requireClosingStrong: options?.requireClosingStrong,
               customHtmlTags: options?.customHtmlTags,
-              escapeHtmlTags: options?.escapeHtmlTags,
             }),
             raw: String(contentToken.content ?? ''),
           })

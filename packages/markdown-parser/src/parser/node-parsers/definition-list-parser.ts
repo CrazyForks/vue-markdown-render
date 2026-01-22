@@ -24,7 +24,6 @@ export function parseDefinitionList(
       termNodes = parseInlineTokens(termToken.children || [], undefined, undefined, {
         requireClosingStrong: options?.requireClosingStrong,
         customHtmlTags: options?.customHtmlTags,
-        escapeHtmlTags: options?.escapeHtmlTags,
       })
       j += 3 // Skip dt_open, inline, dt_close
     }
@@ -41,7 +40,6 @@ export function parseDefinitionList(
             children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), undefined, {
               requireClosingStrong: options?.requireClosingStrong,
               customHtmlTags: options?.customHtmlTags,
-              escapeHtmlTags: options?.escapeHtmlTags,
             }),
             raw: String(contentToken.content ?? ''),
           })

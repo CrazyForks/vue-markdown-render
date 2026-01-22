@@ -68,25 +68,11 @@ setDefaultMathOptions({
 
 这些钩子也可通过 `MarkdownRender` 组件传入 `parseOptions` prop（仅当使用 `content` prop 时生效）。
 
-### ParseOptions: `escapeHtmlTags`
+### 未知 HTML 类标签（默认行为）
 
-`escapeHtmlTags`（string[]，可选）强制将指定的 HTML 类标签名渲染为纯文本，而不是 `html_inline`/`html_block` 节点。
+默认情况下，非标准的 HTML 类标签（例如 `<question>`）会被当作**纯文本**输出。
 
-例如，如果上游内容包含占位符标签如 `<question>` 或 `<analysis>`，希望将它们显示为纯文本而不是被解释为 HTML：
-
-```ts
-import { parseMarkdownToStructure } from 'stream-markdown-parser'
-
-const nodes = parseMarkdownToStructure('<question>2+2 等于几？</question>', undefined, {
-  escapeHtmlTags: ['question', 'answer']
-})
-// 渲染为纯文本："<question>2+2 等于几？</question>"
-```
-
-注意：
-- 适用于内联和块级 HTML token
-- 如果一个标签名同时存在于 `customHtmlTags` 和 `escapeHtmlTags`，`escapeHtmlTags` 优先
-- 标签名不区分大小写（会规范化为小写）
+如果你希望某个自定义标签参与解析并产出自定义节点（以便 `setCustomComponents` 映射），请将其加入 `customHtmlTags`。
 
 ### ParseOptions: `requireClosingStrong`
 

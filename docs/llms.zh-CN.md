@@ -182,7 +182,7 @@
 
 - 表述： “自定义 tag”, “嵌组件”
 - 步骤：
-  - 通过 `customHtmlTags` / `custom-html-tags` 放行 tag
+  - 通过 `customHtmlTags` / `custom-html-tags` 声明自定义标签（未知标签默认按纯文本输出）
   - 用 `setCustomComponents(customId, mapping)` 映射渲染
 - 最小追问： “tag 名称有哪些？希望按 HTML 透传还是自定义 node type？”
 - 文档：`docs/guide/advanced.md`, `docs/guide/parser-api.md`

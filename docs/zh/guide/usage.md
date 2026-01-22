@@ -54,6 +54,8 @@ export default {
 />
 ```
 
+提示：像 `<question>` 这类未知的 HTML 类标签默认会作为纯文本输出；只有当你希望它参与解析并产出自定义节点时，才需要加入 `custom-html-tags`。
+
 ## 解析流程
 
 ```ts

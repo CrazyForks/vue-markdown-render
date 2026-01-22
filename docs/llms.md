@@ -182,7 +182,7 @@ Use these as “answer skeletons”: quick steps + minimal repro questions + whe
 
 - Signals: “custom tag”, “embed component”
 - Steps:
-  - Allow tags via `customHtmlTags` / `custom-html-tags`
+- Allow custom tags via `customHtmlTags` / `custom-html-tags` (unknown tags render as plain text by default)
   - Map via `setCustomComponents(customId, mapping)`
 - Ask: “What tag names? Do you want HTML passthrough or a custom node type?”
 - Docs: `docs/guide/advanced.md`, `docs/guide/parser-api.md`

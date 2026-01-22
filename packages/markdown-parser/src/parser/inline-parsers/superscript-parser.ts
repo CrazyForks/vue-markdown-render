@@ -25,7 +25,6 @@ export function parseSuperscriptToken(
   children.push(...parseInlineTokens(innerTokens, undefined, undefined, {
     requireClosingStrong: options?.requireClosingStrong,
     customHtmlTags: options?.customHtmlTags,
-    escapeHtmlTags: options?.escapeHtmlTags,
   }))
 
   const node: SuperscriptNode = {
