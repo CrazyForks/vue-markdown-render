@@ -1,4 +1,4 @@
-## [0.0.6-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.6-beta.7) (2026-01-22)
+## [0.0.6-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.6-beta.8) (2026-01-22)
 
 
 ### Bug Fixes
@@ -12,6 +12,7 @@
 * **changelog:** update version to 0.0.5-beta.1 and add missing bug fix entries ([b300251](https://github.com/Simon-He95/markstream-vue/commit/b30025199eeb80d4d5dfd81390d299ca41c4024c))
 * **changelog:** update version to 0.0.5-beta.1 and add missing bug fix entries ([058730c](https://github.com/Simon-He95/markstream-vue/commit/058730c942c0bf16c2294fdaa07dc90f9784a7f4))
 * **changelog:** update version to 0.0.5-beta.2 and add missing bug fix entries ([84f7824](https://github.com/Simon-He95/markstream-vue/commit/84f7824c4f7cd9ba3d50e805d9c2db15b232bd0d))
+* correct math rendering syntax in test.vue ([a1c01e3](https://github.com/Simon-He95/markstream-vue/commit/a1c01e38c3ea3aa4b8a75354356774d703af3884))
 * custom_html_tag 开头与内容未换行会导致格式错乱 [#236](https://github.com/Simon-He95/markstream-vue/issues/236) ([9141f75](https://github.com/Simon-He95/markstream-vue/commit/9141f75a209662bf8dc089dab2e499307a2842f3))
 * **customBlock:** render wrong ([dc32504](https://github.com/Simon-He95/markstream-vue/commit/dc325044a95970f7173a9adbd7ebe0f6d4b2e7be)), closes [#225](https://github.com/Simon-He95/markstream-vue/issues/225)
 * **dependencies:** update stream-markdown and stream-monaco versions to 0.0.13 and 0.0.10 respectively ([e363e3a](https://github.com/Simon-He95/markstream-vue/commit/e363e3afbdc86e76ab3d0727e3859eaed661b623))
@@ -67,6 +68,7 @@
 * enhance ::: container syntax to support args and improve JSON matching ([4b3bbf7](https://github.com/Simon-He95/markstream-vue/commit/4b3bbf707e7f58e9b2f935ac58d353567eeebb0d)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
 * enhance documentation structure and content for multiple frameworks ([293511d](https://github.com/Simon-He95/markstream-vue/commit/293511d0226c353f8e7874d69a58daa17cbc1d4a))
 * enhance ListNode and ListItemNode to support custom components and improve rendering logic ([db4139b](https://github.com/Simon-He95/markstream-vue/commit/db4139b74688327d65e1769f2b2ab06cf47338a4))
+* enhance math parsing to support mixed $ and $$ delimiters ([1c41182](https://github.com/Simon-He95/markstream-vue/commit/1c41182cf4c9c8c40a466be5c43ed1bcbb5d459a)), closes [#263](https://github.com/Simon-He95/markstream-vue/issues/263)
 * enhance package.json with detailed descriptions, author info, repository links, and keywords for markstream-react and markstream-vue2 ([adff129](https://github.com/Simon-He95/markstream-vue/commit/adff129f5597a480b13058e84c2019807d556c8a))
 * enhance README with framework options and additional sections for community support ([bc1f872](https://github.com/Simon-He95/markstream-vue/commit/bc1f872e7da55e35bebb9e34e00ea7543b59aa20))
 * enhance release process with tagging scripts and update .gitignore ([37add6a](https://github.com/Simon-He95/markstream-vue/commit/37add6a316072380d45c837d94fe00d1709c58f5))
