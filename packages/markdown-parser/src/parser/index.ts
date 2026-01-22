@@ -869,7 +869,6 @@ export function parseMarkdownToStructure(
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
     return []
-
   // Allow consumers to transform tokens before processing
   const pre = options.preTransformTokens
   const post = options.postTransformTokens

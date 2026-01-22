@@ -244,8 +244,16 @@ function isPlainBracketMathLike(content: string) {
   if (!isMathLike(stripped))
     return false
 
+  // Avoid false positives for JSON / structured data inside brackets.
+  // Example:
+  // [
+  //   { "a": 1 }
+  // ]
+  // Quotes + colon is a strong indicator it's not math.
+  if (/"[^"\n]{1,80}"\s*:\s*/.test(stripped))
+    return false
+
   const hasStrongSignal = /\\[a-z]+/i.test(stripped)
-    || /\d/.test(stripped)
     || /[=+*/^<>]|\\times|\\pm|\\cdot|\\le|\\ge|\\neq/.test(stripped)
     || /[_^]/.test(stripped)
 
@@ -843,21 +851,20 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           break
         }
       }
-      // 这里可能 ai 返回的格式有问题 $$ 跟在文本的最后，而不是单独一行，此时匹配是否有下一行，把它当作块级公式处理
-      else if (lineText.endsWith(open) && !lineText.slice(0, lineText.length - open.length).trim().includes(open) && startLine + 1 < endLine) {
+      // 这里可能 ai 返回的格式有问题：`$$` 跟在文本的最后，而不是单独一行。
+      // 仅对 `$$` 启用该容错；对 `[` 之类的分隔符启用会误伤 JSON/数组等普通文本。
+      else if (open === '$$' && lineText.endsWith(open) && !lineText.slice(0, lineText.length - open.length).trim().includes(open) && startLine + 1 < endLine) {
         // lineText 要变成下一行的内容，把之前lineText的内容当作普通文本处理
         s.push('text', '', 0).content = lineText.slice(0, lineText.length - open.length)
         const nextLineStartPos = s.bMarks[startLine + 1] + s.tShift[startLine + 1]
         const nextLineText = s.src.slice(nextLineStartPos, s.eMarks[startLine + 1]).trim()
         lineText = nextLineText
         // 更新 endLine
-        if (open === '$$') {
-          skipFirstLine = true
-          matched = true
-          openDelim = open
-          closeDelim = close
-          break
-        }
+        skipFirstLine = true
+        matched = true
+        openDelim = open
+        closeDelim = close
+        break
       }
     }
 
