@@ -80,7 +80,7 @@
   "scripts": {
     "build": "vite build -c vite.config.ts --mode npm && vite build -c vite.config.tailwind.ts --mode npm && node ./scripts/copy-tailwind-css.mjs && pnpm run build:dts",
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
-    "release": "bumpp --commit --no-tag --no-push && npm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
+    "release": "bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {
     "@antv/infographic": "^0.2.3",
