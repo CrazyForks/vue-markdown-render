@@ -16,6 +16,10 @@ pnpm add stream-monaco
 
 更多细节参见 `/zh/guide/monaco-internals`。
 
+### Webpack & MonacoWebpackPlugin
+
+如果你的项目使用 `monaco-editor-webpack-plugin` 来打包 Monaco，请让该插件通过 `globalThis.MonacoEnvironment` 接管 worker 的解析与路径。`markstream-vue` 在检测到 `MonacoEnvironment.getWorker/getWorkerUrl` 已存在时，不会再覆盖它们。
+
 ### 添加更多语言与主题
 
 为了保持初始化速度，默认只注册了一小部分 Monaco 语言。如果你的文档需要 Rust、Go、Bash 等额外语法，或希望注入自定义主题，可以将它们通过 `monacoOptions` 传给 `CodeBlockNode`，或者在 `MarkdownRender` 上使用 `codeBlockMonacoOptions` 统一下发。该对象会原样透传给 `useMonaco()`。

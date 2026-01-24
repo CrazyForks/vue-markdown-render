@@ -55,6 +55,10 @@ getUseMonaco()
 
 `getUseMonaco` attempts to dynamically import `stream-monaco` and call its helper to register workers; if not available it fails gracefully and the code block falls back to a lightweight rendering.
 
+### Webpack & MonacoWebpackPlugin
+
+If your app bundles Monaco with `monaco-editor-webpack-plugin`, let the plugin own worker resolution via `globalThis.MonacoEnvironment`. `markstream-vue` will not override `MonacoEnvironment.getWorker/getWorkerUrl` when they already exist.
+
 Quick try — Render a monaco-enabled code block (after installing `stream-monaco`):
 
 ```vue
