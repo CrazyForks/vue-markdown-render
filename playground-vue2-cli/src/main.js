@@ -1,10 +1,10 @@
 import {
   createKaTeXWorkerFromCDN,
   createMermaidWorkerFromCDN,
-  setKaTeXWorker,
-  setMermaidWorker,
   MarkdownCodeBlockNode,
   setCustomComponents,
+  setKaTeXWorker,
+  setMermaidWorker,
   VueRendererMarkdown,
 } from 'markstream-vue2'
 import Vue from 'vue'

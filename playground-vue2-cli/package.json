@@ -8,7 +8,6 @@
   "dependencies": {
     "katex": "^0.16.25",
     "markstream-vue2": "workspace:*",
-    "stream-monaco": "file:../../stream-monaco",
     "stream-markdown": ">=0.0.13",
     "vue": "2.7.16"
   },
@@ -16,7 +15,6 @@
     "@vue/cli-plugin-babel": "^4.5.19",
     "@vue/cli-service": "^4.5.19",
     "core-js": "^3.41.0",
-    "monaco-editor": "^0.52.2",
     "vue-template-compiler": "2.7.16"
   }
 }

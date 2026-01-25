@@ -24,11 +24,11 @@ export default {
       <MarkdownRender
         :content="content"
         :final="true"
-        :deferNodesUntilVisible="false"
-        :batchRendering="false"
-        :viewportPriority="false"
+        :defer-nodes-until-visible="false"
+        :batch-rendering="false"
+        :viewport-priority="false"
         :themes="['vitesse-dark', 'vitesse-light']"
-        :isDark="false"
+        :is-dark="false"
       />
     </div>
   </div>

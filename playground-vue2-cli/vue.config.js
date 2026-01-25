@@ -1,7 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
-const webpack = require('webpack')
 const CopyWebpackPlugin = require('copy-webpack-plugin')
+const webpack = require('webpack')
 
 function tryResolve(specifier) {
   try {
