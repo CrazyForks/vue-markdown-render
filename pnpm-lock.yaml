@@ -514,9 +514,6 @@ importers:
       stream-markdown:
         specifier: '>=0.0.13'
         version: 0.0.13(shiki@3.21.0)
-      stream-monaco:
-        specifier: file:../../stream-monaco
-        version: file:../stream-monaco(monaco-editor@0.52.2)
       vue:
         specifier: 2.7.16
         version: 2.7.16
@@ -530,9 +527,6 @@ importers:
       core-js:
         specifier: ^3.41.0
         version: 3.48.0
-      monaco-editor:
-        specifier: ^0.52.2
-        version: 0.52.2
       vue-template-compiler:
         specifier: 2.7.16
         version: 2.7.16
@@ -10168,12 +10162,6 @@ packages:
 
   stream-monaco@0.0.8:
     resolution: {integrity: sha512-IWhndT7/s8NoQvW0aahKYj33Mh7zb++KSuhSty2bnAR86DfjsuQq4T82iQm0oqNl2S5WdnxZmi7Ll3pccLFRvA==}
-    hasBin: true
-    peerDependencies:
-      monaco-editor: ^0.52.2
-
-  stream-monaco@file:../stream-monaco:
-    resolution: {directory: ../stream-monaco, type: directory}
     hasBin: true
     peerDependencies:
       monaco-editor: ^0.52.2
@@ -23150,13 +23138,6 @@ snapshots:
       shiki: 3.21.0
 
   stream-monaco@0.0.8(monaco-editor@0.52.2):
-    dependencies:
-      '@shikijs/monaco': 3.19.0
-      alien-signals: 2.0.8
-      monaco-editor: 0.52.2
-      shiki: 3.21.0
-
-  stream-monaco@file:../stream-monaco(monaco-editor@0.52.2):
     dependencies:
       '@shikijs/monaco': 3.19.0
       alien-signals: 2.0.8
