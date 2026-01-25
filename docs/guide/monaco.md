@@ -17,6 +17,27 @@ Tips:
 
 ![Monaco demo](/screenshots/codeblock-demo.svg)
 
+## Vue CLI (Webpack 4) limitation
+
+`stream-monaco` relies on `import.meta.url` to locate Monaco worker assets, which **Webpack 4** cannot compile reliably. For Vue CLI 4 (Webpack 4):
+
+- Prefer upgrading to Webpack 5 or migrating to Vite for the best Monaco experience.
+- If you must stay on Webpack 4, prefer switching code blocks to the Shiki-based renderer (`stream-markdown`) by overriding `code_block` (see [/guide/code-blocks](/guide/code-blocks)). You can also explicitly ignore Monaco deps in `vue.config.js`:
+
+```js
+// vue.config.js
+const webpack = require('webpack')
+
+module.exports = {
+  configureWebpack: {
+    plugins: [
+      new webpack.IgnorePlugin({ resourceRegExp: /^stream-monaco$/ }),
+      new webpack.IgnorePlugin({ resourceRegExp: /^monaco-editor$/ }),
+    ],
+  },
+}
+```
+
 ### Vite & worker setup
 
 Monaco requires worker packaging for production builds. Use `vite-plugin-monaco-editor-esm` to ensure workers are bundled into your app's build output. Example config:

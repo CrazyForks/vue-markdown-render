@@ -63,6 +63,16 @@ const streamMonacoHelpers = {
 vi.mock('stream-monaco', () => ({
   useMonaco: () => streamMonacoHelpers,
   preloadMonacoWorkers: vi.fn(async () => {}),
+  getOrCreateHighlighter: vi.fn(async () => ({
+    codeToTokens: vi.fn(() => ({
+      tokens: [],
+      fg: '#000000',
+      bg: '#ffffff',
+      themeName: 'vitesse-dark',
+      rootStyle: {},
+      grammarState: null,
+    })),
+  })),
   detectLanguage: () => 'plaintext',
 }))
 

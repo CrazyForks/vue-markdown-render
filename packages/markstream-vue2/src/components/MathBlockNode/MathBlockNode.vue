@@ -135,10 +135,8 @@ async function renderMath() {
 }
 
 watch(
-  () => props.node.content,
-  () => {
-    renderMath()
-  },
+  () => [props.node.content, props.node.loading, props.node.raw],
+  () => renderMath(),
 )
 onMounted(() => {
   renderMath()

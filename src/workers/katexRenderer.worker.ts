@@ -1,5 +1,5 @@
 import katex from 'katex'
-import 'katex/contrib/mhchem'
+import 'katex/dist/contrib/mhchem'
 
 interface MessageIn {
   // supports two shapes: init messages and render messages

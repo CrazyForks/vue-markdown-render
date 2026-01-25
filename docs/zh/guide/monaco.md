@@ -16,6 +16,27 @@ pnpm add stream-monaco
 
 更多细节参见 `/zh/guide/monaco-internals`。
 
+## Vue CLI（Webpack 4）限制
+
+`stream-monaco` 内部会使用 `import.meta.url` 来定位 Monaco worker 资源，这在 **Webpack 4** 中无法正确编译/解析。对于 Vue CLI 4（Webpack 4）项目：
+
+- 建议升级到 Webpack 5 或迁移到 Vite，以获得最稳定的 Monaco 体验。
+- 如果必须停留在 Webpack 4：更推荐把 `code_block` 切到基于 Shiki 的渲染（`stream-markdown`），通过覆盖 `code_block` 来实现（见 [/zh/guide/code-blocks](/zh/guide/code-blocks)）。也可以在 `vue.config.js` 中显式忽略 Monaco 相关依赖：
+
+```js
+// vue.config.js
+const webpack = require('webpack')
+
+module.exports = {
+  configureWebpack: {
+    plugins: [
+      new webpack.IgnorePlugin({ resourceRegExp: /^stream-monaco$/ }),
+      new webpack.IgnorePlugin({ resourceRegExp: /^monaco-editor$/ }),
+    ],
+  },
+}
+```
+
 ### Webpack & MonacoWebpackPlugin
 
 如果你的项目使用 `monaco-editor-webpack-plugin` 来打包 Monaco，请让该插件通过 `globalThis.MonacoEnvironment` 接管 worker 的解析与路径。`markstream-vue` 在检测到 `MonacoEnvironment.getWorker/getWorkerUrl` 已存在时，不会再覆盖它们。

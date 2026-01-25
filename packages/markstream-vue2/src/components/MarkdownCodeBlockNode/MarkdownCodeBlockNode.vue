@@ -618,14 +618,14 @@ function previewCode() {
   min-height: 1px;
 }
 
-:deep(.code-block-render pre),
-:deep(.code-block-content .shiki) {
+.code-block-container ::v-deep .code-block-render pre,
+.code-block-container ::v-deep .code-block-content .shiki {
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
 }
 
-:deep(.code-block-content .shiki-fallback) {
+.code-block-container ::v-deep .code-block-content .shiki-fallback {
   padding: 1rem;
   margin: 0;
   background: transparent;
@@ -646,7 +646,7 @@ function previewCode() {
   font-family: inherit;
 }
 
-:deep(.code-block-content pre){
+.code-block-container ::v-deep .code-block-content pre {
   padding: 1rem;
 }
 

@@ -44,6 +44,16 @@ setCustomComponents({ code_block: MyMarkdownCodeBlock })
 
 Once set, Markdown-based renderers (from `stream-markdown` or your own component) will be used for `code_block` nodes.
 
+### Vue CLI 4 (Webpack 4) notes
+
+If you use Vue CLI 4 (Webpack 4), it’s recommended to use Markdown mode for code blocks (Shiki) and **override** `code_block` to avoid Monaco + legacy-bundler edge cases.
+
+Key pitfalls and fixes (see `playground-vue2-cli`):
+
+- Webpack 4 doesn’t support `package.json#exports` → prefer `dist/*` paths via `resolve.alias`.
+- ESM-only packages (like `stream-markdown`) may not be discoverable via `require.resolve()` inside `vue.config.js` (CJS) → use a filesystem fallback to find `node_modules/stream-markdown`, and alias it to `dist/index.js`.
+- If you use `IgnorePlugin` to skip optional deps, don’t accidentally ignore `stream-markdown` (otherwise you’ll get `webpackMissingModule` at runtime).
+
 ## Fallback
 
 If you don't install either optional package the renderer falls back to a simple `pre`/`code` representation.

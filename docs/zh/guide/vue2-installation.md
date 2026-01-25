@@ -66,6 +66,78 @@ Monaco（`stream-monaco`）不需要单独导入 CSS。
 
 注意：`markstream-vue2/index.css` 的样式被限制在内部的 `.markstream-vue2` 容器下，以减少全局样式冲突。`MarkdownRender` 默认在该容器内渲染。如果你单独渲染节点组件，请用 `<div class="markstream-vue2">...</div>` 包裹它们。
 
+## Vue CLI（Webpack 4）特别说明
+
+Vue CLI 4 默认使用 **Webpack 4**，它不支持 `package.json#exports`，因此以下写法会在 Webpack 4 下解析失败：
+
+- `import 'markstream-vue2/index.css'`
+- `import('mermaid')`
+- Vite 风格的 worker 导入：`?worker` / `?worker&inline`
+
+推荐做法（可直接参考 `playground-vue2-cli`）：
+
+1) CSS 改用真实路径（不依赖 `exports`）：
+
+```ts
+import 'markstream-vue2/dist/index.css'
+```
+
+2) Mermaid 推荐使用 CDN 的全局构建（避免 Webpack 4 解析 `exports` / ESM 依赖链）：
+
+```html
+<!-- public/index.html -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+```
+
+3) KaTeX / Mermaid worker 推荐使用 CDN worker（避免 Webpack 4 worker 限制）：
+
+```ts
+import { createKaTeXWorkerFromCDN, createMermaidWorkerFromCDN, setKaTeXWorker, setMermaidWorker } from 'markstream-vue2'
+
+const { worker: katexWorker } = createKaTeXWorkerFromCDN({
+  mode: 'classic',
+  katexUrl: 'https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.js',
+  mhchemUrl: 'https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/contrib/mhchem.min.js',
+})
+if (katexWorker)
+  setKaTeXWorker(katexWorker)
+
+const { worker: mermaidWorker } = createMermaidWorkerFromCDN({
+  mode: 'classic',
+  mermaidUrl: 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js',
+})
+if (mermaidWorker)
+  setMermaidWorker(mermaidWorker)
+```
+
+如果你希望继续使用 `markstream-vue2/index.css` 这类导入路径，需要在 `vue.config.js` 里做 `resolve.alias` 映射（见 `playground-vue2-cli/vue.config.js`）。
+
+### 代码块：推荐用 stream-markdown 覆盖
+
+在 Webpack 4 下，Monaco 集成（`stream-monaco`）很容易踩到边角问题（worker 定位、ESM 入口、service 注册、以及 Shiki/TextMate regex engine 初始化等）。如果你的目标是“让代码块正确高亮渲染”，更稳妥的方案是：
+
+1) 安装 Shiki 渲染依赖：
+
+```bash
+pnpm add shiki stream-markdown
+```
+
+2) 覆盖 `code_block`，直接使用 `MarkdownCodeBlockNode`（或你自己的组件）：
+
+```ts
+import { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue2'
+
+setCustomComponents({ code_block: MarkdownCodeBlockNode })
+```
+
+3) Webpack 配置踩坑：
+
+- 如果你使用 `webpack.IgnorePlugin` 忽略可选依赖，确保不要把 `stream-markdown` 忽略掉。
+- `stream-markdown` 是 ESM-only 包，在 CJS 的 `vue.config.js` 里即便已安装，`require.resolve('stream-markdown')` 也可能失败；建议用文件系统兜底定位 `node_modules/stream-markdown` 并 alias 到 `dist/index.js`。可参考 `playground-vue2-cli/vue.config.js`。
+
+另外，如果你的项目是 monorepo/workspace（pnpm 常见），请确保整个应用只使用 **同一份 Vue 2 runtime**。否则会出现类似：
+`provide() can only be used inside setup()` / `onMounted is called when there is no active component instance` 的运行时警告（本质是重复 Vue 实例导致 Composition API 上下文不一致）。解决方式是在 Webpack 中固定 `vue$` 指向项目内的 Vue 2 runtime（见 `playground-vue2-cli/vue.config.js`）。
+
 ## Tailwind CSS 支持
 
 如果你的项目使用 Tailwind，并希望避免重复注入 Tailwind utilities，请改用 Tailwind-ready 输出：

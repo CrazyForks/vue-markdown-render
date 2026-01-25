@@ -1904,7 +1904,7 @@ const computedButtonStyle = computed(() => {
   contain-intrinsic-size: 360px 240px;
 }
 
-._mermaid :deep(svg) {
+._mermaid ::v-deep svg {
   width: 100%;
   height: auto;
   display: block;

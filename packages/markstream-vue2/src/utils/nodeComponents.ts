@@ -5,7 +5,7 @@ import { shallowRef } from 'vue'
 const GLOBAL_KEY = '__global__'
 interface CustomComponentsStore {
   scopedCustomComponents: Record<string, Partial<CustomComponents>>
-  revision: ReturnType<typeof shallowRef<number>>
+  revision: ReturnType<typeof shallowRef<any>>
 }
 
 const STORE_KEY = '__MARKSTREAM_VUE2_CUSTOM_COMPONENTS_STORE__'

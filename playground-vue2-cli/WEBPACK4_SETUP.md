@@ -8,7 +8,19 @@ Many modern npm packages (like `@antv/infographic`, `measury`, `shiki`) use the 
 
 ## Solution
 
-The `vue.config.js` file contains the necessary configuration to work around these Webpack 4 limitations:
+This playground includes a working `vue.config.js` and app entry that address the most common Webpack 4 issues:
+
+1) Subpath imports like `markstream-vue2/index.css` fail because Webpack 4 ignores `exports`.
+2) Worker imports like `?worker` are Vite-specific and won’t work in Vue CLI (Webpack 4).
+3) Some peers (e.g. `mermaid`) have `exports` and no `main` entry; Webpack 4 can’t resolve them.
+
+### `vue.config.js` (resolver + aliases)
+
+The `vue.config.js` file contains the necessary configuration to work around these Webpack 4 limitations. Key differences from the older “hardcoded .pnpm path” approach:
+
+- Use `require.resolve()` to resolve the *real* file paths at install time (no version pinning in aliases).
+- Use the resolved package entry to locate `markstream-vue2/dist/*` files.
+- Force a single Vue runtime instance via `alias: { 'vue$': ... }` to avoid Composition API runtime warnings caused by duplicated Vue copies in workspace setups.
 
 ```js
 const path = require('node:path')
@@ -31,11 +43,7 @@ module.exports = {
       ],
       alias: {
         // Webpack 4 doesn't support package.json exports field.
-        // These aliases help resolve subpath exports.
-        'measury/fonts/AlibabaPuHuiTi-Regular': path.resolve(__dirname, '../node_modules/.pnpm/measury@0.1.4/node_modules/measury/lib/fonts/AlibabaPuHuiTi-Regular.js'),
-        '@antv/infographic/jsx-runtime': path.resolve(__dirname, '../node_modules/.pnpm/@antv+infographic@0.2.3/node_modules/@antv/infographic/esm/jsx-runtime.js'),
-        '@antv/infographic/jsx-dev-runtime': path.resolve(__dirname, '../node_modules/.pnpm/@antv+infographic@0.2.3/node_modules/@antv/infographic/esm/jsx-dev-runtime.js'),
-        '@mermaid-js/parser': path.resolve(__dirname, '../node_modules/.pnpm/@mermaid-js+parser@0.6.3/node_modules/@mermaid-js/parser')
+        // Prefer `require.resolve()` based aliases (see the repo's vue.config.js).
       },
       symlinks: false
     }
@@ -47,6 +55,15 @@ module.exports = {
 }
 ```
 
+### App entry: CDN workers + explicit mermaid loader
+
+In `src/main.js`, this playground avoids Webpack 4 worker import limitations by using the built-in CDN worker helpers:
+
+- `createKaTeXWorkerFromCDN()` + `setKaTeXWorker()`
+- `createMermaidWorkerFromCDN()` + `setMermaidWorker()`
+
+Also, this playground loads Mermaid via a global CDN build (see `public/index.html`) to avoid pulling Mermaid's modern ESM dependency graph into a Webpack 4 bundle.
+
 ## Key Points
 
 1. **`transpileDependencies`**: Add packages that use ES2020+ syntax (like `??`, optional chaining) so Babel can transpile them for older browsers.
@@ -56,6 +73,8 @@ module.exports = {
 3. **`resolve.alias`**: Manually map subpath exports to their actual file locations since Webpack 4 can't resolve them through `package.json` exports.
 
 4. **`resolve.symlinks: false`**: This helps Webpack resolve pnpm's symlink structure correctly.
+
+5. **Optional features**: On Webpack 4, some optional integrations can pull in `exports`-heavy or modern syntax graphs (e.g. Shiki languages, Monaco worker helpers). This playground keeps the core renderer usable by ignoring those modules in `vue.config.js` via `IgnorePlugin`.
 
 ## Recommended Approach
 

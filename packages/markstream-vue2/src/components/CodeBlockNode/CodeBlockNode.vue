@@ -1264,13 +1264,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
 }
-.icon-slot :deep(svg),
-.icon-slot :deep(img) {
+.icon-slot ::v-deep svg,
+.icon-slot ::v-deep img {
   display: block;
   width: 100%;
   height: 100%;
 }
-:deep(.monaco-diff-editor .diffOverview){
+
+.code-block-container ::v-deep .monaco-diff-editor .diffOverview {
   background-color: var(--vscode-editor-background);
 }
 </style>

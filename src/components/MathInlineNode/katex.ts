@@ -29,7 +29,9 @@ function defaultKatexLoader() {
 
     const mod = await import('katex')
     try {
-      await import('katex/contrib/mhchem')
+      // Webpack 4 does not support `package.json#exports`, so `katex/contrib/mhchem`
+      // resolves to a directory and fails. Use a real file path instead.
+      await import('katex/dist/contrib/mhchem')
     }
     catch {
       // ignore missing optional contrib bundle

@@ -66,6 +66,78 @@ Monaco (`stream-monaco`) does not require a separate CSS import.
 
 Note: `markstream-vue2/index.css` is scoped under an internal `.markstream-vue2` container to reduce global style conflicts. `MarkdownRender` renders inside that container by default. If you render node components standalone, wrap them with `<div class="markstream-vue2">...</div>`.
 
+## Vue CLI (Webpack 4) Notes
+
+Vue CLI 4 uses **Webpack 4** by default, and Webpack 4 doesn't support `package.json#exports`. That commonly breaks:
+
+- `import 'markstream-vue2/index.css'`
+- `import('mermaid')`
+- Vite-style worker imports: `?worker` / `?worker&inline`
+
+Recommended setup (see `playground-vue2-cli`):
+
+1) Import CSS via the real file path (no `exports` needed):
+
+```ts
+import 'markstream-vue2/dist/index.css'
+```
+
+2) For Mermaid, prefer the CDN global build (avoids Webpack 4 `exports` / ESM chains):
+
+```html
+<!-- public/index.html -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+```
+
+3) For KaTeX / Mermaid workers, prefer CDN workers to avoid Webpack 4 worker limitations:
+
+```ts
+import { createKaTeXWorkerFromCDN, createMermaidWorkerFromCDN, setKaTeXWorker, setMermaidWorker } from 'markstream-vue2'
+
+const { worker: katexWorker } = createKaTeXWorkerFromCDN({
+  mode: 'classic',
+  katexUrl: 'https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/katex.min.js',
+  mhchemUrl: 'https://cdn.jsdelivr.net/npm/katex@0.16.25/dist/contrib/mhchem.min.js',
+})
+if (katexWorker)
+  setKaTeXWorker(katexWorker)
+
+const { worker: mermaidWorker } = createMermaidWorkerFromCDN({
+  mode: 'classic',
+  mermaidUrl: 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js',
+})
+if (mermaidWorker)
+  setMermaidWorker(mermaidWorker)
+```
+
+If you want to keep using subpath imports like `markstream-vue2/index.css`, add `resolve.alias` mappings in `vue.config.js` (see `playground-vue2-cli/vue.config.js`).
+
+### Code blocks: prefer stream-markdown override
+
+In Webpack 4, Monaco integration (`stream-monaco`) is prone to edge cases (worker resolution, ESM entrypoints, service registration, and Shiki/TextMate regex engine init issues). If your goal is “render code blocks with highlighting”, the most reliable approach is:
+
+1) Install Shiki renderer deps:
+
+```bash
+pnpm add shiki stream-markdown
+```
+
+2) Override `code_block` to use `MarkdownCodeBlockNode` (or your own component):
+
+```ts
+import { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue2'
+
+setCustomComponents({ code_block: MarkdownCodeBlockNode })
+```
+
+3) Webpack config pitfalls:
+
+- If you use `webpack.IgnorePlugin` for optional dependencies, ensure `stream-markdown` is **not** ignored.
+- `stream-markdown` is ESM-only. In a CJS `vue.config.js`, `require.resolve('stream-markdown')` can fail even when installed. Use a filesystem fallback (check `node_modules/stream-markdown`) and alias it to `dist/index.js`. See `playground-vue2-cli/vue.config.js`.
+
+If you're in a monorepo/workspace (common with pnpm), make sure your app uses a **single Vue 2 runtime instance**. Otherwise you may see runtime warnings like:
+`provide() can only be used inside setup()` / `onMounted is called when there is no active component instance` (caused by duplicated Vue copies and mismatched Composition API context). Fix this by pinning `vue$` to your project's Vue 2 runtime in Webpack (see `playground-vue2-cli/vue.config.js`).
+
 ## Tailwind CSS Support
 
 If your app uses Tailwind and you want to avoid duplicate utility CSS, import the Tailwind-ready output instead:

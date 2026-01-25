@@ -64,7 +64,7 @@ ul > .list-item::marker{
 }
 
 /* 大列表滚动到视口时，嵌套 NodeRenderer 需要立即绘制内容，避免空白 */
-.list-item :deep(.markdown-renderer) {
+.list-item ::v-deep .markdown-renderer {
   content-visibility: visible;
   contain-intrinsic-size: 0px 0px;
   contain: none;

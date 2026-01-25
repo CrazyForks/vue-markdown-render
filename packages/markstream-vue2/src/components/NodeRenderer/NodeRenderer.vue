@@ -1234,7 +1234,7 @@ onBeforeUnmount(() => {
 async function CodeBlockNodeAsync() {
   try {
     const mod = await import('../../components/CodeBlockNode')
-    return mod.default
+    return (mod as any).default ?? mod
   }
   catch (e) {
     console.warn(
@@ -1248,7 +1248,7 @@ async function CodeBlockNodeAsync() {
 async function MermaidBlockNodeAsync() {
   try {
     const mod = await import('../../components/MermaidBlockNode')
-    return mod.default
+    return (mod as any).default ?? mod
   }
   catch (e) {
     console.warn(
@@ -1262,7 +1262,7 @@ async function MermaidBlockNodeAsync() {
 async function InfographicBlockNodeAsync() {
   try {
     const mod = await import('../../components/InfographicBlockNode')
-    return mod.default
+    return (mod as any).default ?? mod
   }
   catch (e) {
     console.warn(

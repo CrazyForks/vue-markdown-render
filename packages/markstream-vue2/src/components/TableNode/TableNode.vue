@@ -137,8 +137,8 @@ const bodyRows = computed(() => props.node.rows ?? [])
   border-collapse: collapse;
 }
 
-.table-node :deep(th),
-.table-node :deep(td) {
+.table-node ::v-deep th,
+.table-node ::v-deep td {
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
@@ -202,7 +202,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
 }
 
 /* 表格单元格内的 NodeRenderer 禁用 content-visibility 的占位行为，避免“高但空”的问题 */
-:deep(.table-node .markdown-renderer) {
+.table-node ::v-deep .markdown-renderer {
   /* Make the NodeRenderer wrapper behave as if it's not there so
      table cells keep their expected inline/flow layout. */
   display: contents;
@@ -213,17 +213,17 @@ const bodyRows = computed(() => props.node.rows ?? [])
 
 /* Also make internal NodeRenderer wrapper elements layout-transparent
    so they don't introduce block-level boxes inside table cells. */
-:deep(.table-node .markdown-renderer .node-slot),
-:deep(.table-node .markdown-renderer .node-content),
-:deep(.table-node .markdown-renderer .node-space)
+.table-node ::v-deep .markdown-renderer .node-slot,
+.table-node ::v-deep .markdown-renderer .node-content,
+.table-node ::v-deep .markdown-renderer .node-space
 {
   display: contents;
 }
 
 /* Override the default `break-words` / pre-wrap text styles inside tables so
    dense tables don't turn into vertical glyph stacks. */
-:deep(.table-node .text-node),
-:deep(.table-node code) {
+.table-node ::v-deep .text-node,
+.table-node ::v-deep code {
   white-space: inherit;
   overflow-wrap: inherit;
   word-break: inherit;

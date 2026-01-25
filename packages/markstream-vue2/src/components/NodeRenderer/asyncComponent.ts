@@ -31,7 +31,7 @@ export async function MathInlineNodeAsync() {
     const katex = await getKatex()
     if (katex) {
       const mod = await import('../../components/MathInlineNode')
-      return mod.default
+      return (mod as any).default ?? mod
     }
   }
   catch (e) {
@@ -48,7 +48,7 @@ export async function MathBlockNodeAsync() {
     const katex = await getKatex()
     if (katex) {
       const mod = await import('../../components/MathBlockNode')
-      return mod.default
+      return (mod as any).default ?? mod
     }
   }
   catch (e) {

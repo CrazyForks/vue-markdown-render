@@ -44,6 +44,16 @@ setCustomComponents({ code_block: MyMarkdownCodeBlock })
 
 设置后，基于 Markdown 的渲染器（来自 `stream-markdown` 或你自定义的组件）将用于 `code_block` 节点。
 
+### Vue CLI 4（Webpack 4）注意事项
+
+如果你使用 Vue CLI 4（Webpack 4），更推荐把代码块切到 Markdown 模式（Shiki），并通过覆盖 `code_block` 来避免 Monaco 在 legacy bundler 下的一些兼容性问题。
+
+踩坑与解决（可直接参考 `playground-vue2-cli`）：
+
+- Webpack 4 不支持 `package.json#exports`：建议通过 `resolve.alias` 指向真实的 `dist/*` 文件路径。
+- `stream-markdown` 属于 ESM-only 包，在 `vue.config.js`（CJS）里可能无法用 `require.resolve('stream-markdown')` 找到：需要用文件系统兜底去定位 `node_modules/stream-markdown`，并 alias 到 `dist/index.js`。
+- 如果你用 `IgnorePlugin` 忽略可选依赖，注意不要误伤 `stream-markdown`，否则运行时会出现 `webpackMissingModule`（表现为 “Cannot find module 'stream-markdown'”）。
+
 ## 回退
 
 若未安装上述任一可选包，渲染器会回退为简单的 `pre`/`code` 表现。

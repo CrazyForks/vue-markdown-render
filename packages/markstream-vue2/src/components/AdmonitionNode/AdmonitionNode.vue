@@ -194,7 +194,7 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
    内部 NodeRenderer（.markdown-renderer）使用 content-visibility: auto
    可能导致占位高度很高但未及时绘制。这里在告示块内部禁用该优化，
    保证内容按时渲染，避免“空白但很高”的现象。*/
-.admonition-content :deep(.markdown-renderer) {
+.admonition-content ::v-deep .markdown-renderer {
   content-visibility: visible;
   contain: content;
   contain-intrinsic-size: 0px 0px;

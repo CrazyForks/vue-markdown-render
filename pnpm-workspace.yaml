@@ -1,6 +1,7 @@
 packages:
   - playground
   - playground-vue2
+  - playground-vue2-cli
   - playground-nuxt
   - playground-react
   - packages/*

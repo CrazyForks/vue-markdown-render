@@ -1,4 +1,28 @@
-import Vue, { ref } from 'vue'
+import * as VueModule from 'vue'
+import { ref } from 'vue'
+
+function getVueCtor() {
+  // Vue 2 interop differs across bundlers:
+  // - `require('vue')` may return the constructor
+  // - or a module-like object with `.default` pointing to the constructor
+  // - or even nested `.default.default` in some CJS/ESM bridges
+  const anyMod = VueModule as any
+  const isVueCtor = (candidate: any) => typeof candidate === 'function' && typeof candidate.extend === 'function'
+  const candidates = [
+    anyMod,
+    anyMod?.default,
+    anyMod?.default?.default,
+    (anyMod?.default ?? anyMod)?.default,
+    anyMod?.Vue,
+  ]
+  for (const candidate of candidates) {
+    if (isVueCtor(candidate))
+      return candidate
+    if (isVueCtor(candidate?.default))
+      return candidate.default
+  }
+  return (anyMod?.default ?? anyMod) as any
+}
 
 const visible = ref(false)
 const content = ref('')
@@ -35,13 +59,15 @@ function ensureMounted() {
     return
 
   mountPromise = import('../components/Tooltip/Tooltip.vue')
-    .then(({ default: Tooltip }) => {
+    .then((mod) => {
       mounted = true
+      const Tooltip = (mod as any)?.default ?? (mod as any)
       const container = document.createElement('div')
       container.setAttribute('data-singleton-tooltip', '1')
       document.body.appendChild(container)
 
-      const App = Vue.extend({
+      const VueCtor = getVueCtor()
+      const App = VueCtor.extend({
         render(createElement) {
           return createElement(Tooltip as any, {
             props: {

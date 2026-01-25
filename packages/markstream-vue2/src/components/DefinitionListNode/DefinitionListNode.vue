@@ -75,7 +75,7 @@ defineEmits(['copy'])
 }
 
 /* 避免列表中嵌套 NodeRenderer 的 content-visibility 导致空白占位 */
-.definition-list :deep(.markdown-renderer) {
+.definition-list ::v-deep .markdown-renderer {
   content-visibility: visible;
   contain: content;
   contain-intrinsic-size: 0px 0px;
