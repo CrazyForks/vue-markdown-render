@@ -1,4 +1,4 @@
-## [0.0.6-beta.9](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.6-beta.9) (2026-01-22)
+## [0.0.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.6) (2026-01-25)
 
 
 ### Bug Fixes
@@ -6,6 +6,7 @@
 * add regression tests for html_block splitting and update math plugin for legacy parentheses ([da4f46c](https://github.com/Simon-He95/markstream-vue/commit/da4f46c89135a1e7259a1bf4f71ad74e0750addb))
 * add test for html_block splitting after `<br/>` ([f040f6c](https://github.com/Simon-He95/markstream-vue/commit/f040f6cb9bc35445bac17ced88c178c8ed8b642e)), closes [#251](https://github.com/Simon-He95/markstream-vue/issues/251)
 * add type declarations for markdown-it plugins ([ec1517c](https://github.com/Simon-He95/markstream-vue/commit/ec1517c852d74df04c5632b42cebe89607027060))
+* allow vertical scroll chain in table ([3716491](https://github.com/Simon-He95/markstream-vue/commit/3716491080c513dda1a3b79df2911f02c2395e96)), closes [#271](https://github.com/Simon-He95/markstream-vue/issues/271)
 * **buttons:** update button styles to use :where() for better specificity and maintain Tailwind utilities ([314ec46](https://github.com/Simon-He95/markstream-vue/commit/314ec466f2f360037a5d71503f4ca5edc8487278))
 * **changelog:** update release date and add missing bug fix entries ([6f453dc](https://github.com/Simon-He95/markstream-vue/commit/6f453dc8d158b2de24176c783860a3d6f5476d10))
 * **changelog:** update version to 0.0.5 and add edge case render handling for math ([e75fed0](https://github.com/Simon-He95/markstream-vue/commit/e75fed0701a4a590328c623bc2dd656f6946f504))
@@ -61,6 +62,7 @@
 * add GitHub star badge component and update documentation to encourage starring the project ([63d5e9a](https://github.com/Simon-He95/markstream-vue/commit/63d5e9a7185c79b5bbade651ef5b9c3e29c40712))
 * Add InfographicBlockNode component and integrate  rendering for code blocks. ([1c0e74d](https://github.com/Simon-He95/markstream-vue/commit/1c0e74d21ad9f6940699358d3e3d1db41b4009de))
 * add normalization for custom HTML opening tags at line start ([aafd530](https://github.com/Simon-He95/markstream-vue/commit/aafd530d372b15888e72a960a5cff7d6c8e27f37))
+* add playground-vue2-cli to pnpm workspace ([36d4101](https://github.com/Simon-He95/markstream-vue/commit/36d410125346b62f7e8d68d327b9ec923bbe31f7))
 * add push options for tagging scripts in package.json ([9e46cb1](https://github.com/Simon-He95/markstream-vue/commit/9e46cb10a7f062bc2679648e61639f065e30a9dd))
 * add support for fixing indented code blocks and enhance HTML inline handling ([733bf40](https://github.com/Simon-He95/markstream-vue/commit/733bf409f05de3704199f9274a62f48ea5d0f4e4)), closes [#257](https://github.com/Simon-He95/markstream-vue/issues/257)
 * add Tailwind CSS support to markstream-vue2 ([b6a8b20](https://github.com/Simon-He95/markstream-vue/commit/b6a8b20c65a451eb684c80b238149320f208799f))
@@ -70,6 +72,7 @@
 * enhance documentation structure and content for multiple frameworks ([293511d](https://github.com/Simon-He95/markstream-vue/commit/293511d0226c353f8e7874d69a58daa17cbc1d4a))
 * enhance ListNode and ListItemNode to support custom components and improve rendering logic ([db4139b](https://github.com/Simon-He95/markstream-vue/commit/db4139b74688327d65e1769f2b2ab06cf47338a4))
 * enhance math parsing to support mixed $ and $$ delimiters ([1c41182](https://github.com/Simon-He95/markstream-vue/commit/1c41182cf4c9c8c40a466be5c43ed1bcbb5d459a)), closes [#263](https://github.com/Simon-He95/markstream-vue/issues/263)
+* enhance Monaco integration with Webpack support and add tests ([e2868d8](https://github.com/Simon-He95/markstream-vue/commit/e2868d8cc04521e9775004687549cc98a90784d5)), closes [#269](https://github.com/Simon-He95/markstream-vue/issues/269)
 * enhance package.json with detailed descriptions, author info, repository links, and keywords for markstream-react and markstream-vue2 ([adff129](https://github.com/Simon-He95/markstream-vue/commit/adff129f5597a480b13058e84c2019807d556c8a))
 * enhance README with framework options and additional sections for community support ([bc1f872](https://github.com/Simon-He95/markstream-vue/commit/bc1f872e7da55e35bebb9e34e00ea7543b59aa20))
 * enhance release process with tagging scripts and update .gitignore ([37add6a](https://github.com/Simon-He95/markstream-vue/commit/37add6a316072380d45c837d94fe00d1709c58f5))
