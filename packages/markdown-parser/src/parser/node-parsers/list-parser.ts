@@ -122,7 +122,6 @@ export function parseList(
           const preToken = tokens[k - 1]
           stripLeakedOrderedListMarkerSuffix(contentToken)
           trimInlineTokenTail(contentToken)
-          const contentStr = String(contentToken.content ?? '')
           itemChildren.push({
             type: 'paragraph',
             children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken, {
