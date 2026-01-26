@@ -14,4 +14,3 @@ if (fs.existsSync(typesDir)) {
     process.exit(1)
   }
 }
-

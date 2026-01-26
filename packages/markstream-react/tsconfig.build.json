@@ -7,11 +7,11 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "types": ["vite/client", "react", "react-dom"],
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "dist/types",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
     "isolatedModules": true,
     "skipLibCheck": true
   },
