@@ -52,6 +52,7 @@ export default defineConfig({
         'vue-i18n',
         'katex',
         'katex/contrib/mhchem',
+        'katex/dist/contrib/mhchem',
         // syntax highlighting / editor libs that previously caused
         // many language/theme chunks to be emitted
         'shiki',

@@ -88,6 +88,11 @@ export default defineConfig(({ mode }) => {
           // also match resolved node_modules paths that include /node_modules/mermaid
           if (/node_modules\/mermaid(?:\/|$)/.test(id))
             return true
+          if (id === 'katex' || id.startsWith('katex/'))
+            return true
+          // also match resolved node_modules paths that include /node_modules/katex
+          if (/node_modules\/katex(?:\/|$)/.test(id))
+            return true
           return [
             'vue',
             'vue-i18n',
@@ -95,6 +100,7 @@ export default defineConfig(({ mode }) => {
             'mermaid',
             '@antv/infographic',
             'katex/contrib/mhchem',
+            'katex/dist/contrib/mhchem',
             'stream-monaco',
             'stream-markdown',
             'stream-markdown-parser',
