@@ -7,6 +7,8 @@ import { customComponentsRevision, getCustomNodeComponents } from '../../utils/n
 const props = defineProps<{
   node: {
     content: string
+    raw?: string
+    tag?: string
     attrs?: [string, string][] | null
     loading?: boolean
   }
@@ -65,9 +67,19 @@ const renderMode = computed(() => {
   if (!shouldRender.value)
     return { mode: 'html', content: renderContent.value ?? '' }
 
-  const content = props.node.content
+  const content = renderContent.value ?? props.node.content
   if (!content)
     return { mode: 'html', content: '' }
+
+  // Streaming HTML blocks are expensive to re-render via `innerHTML` because it
+  // replaces the whole subtree on every tick. Prefer the VNode parser while
+  // the node is still in a loading mid-state to keep DOM stable.
+  if (props.node.loading) {
+    const nodes = parseHtmlToVNodes(content, customComponents.value)
+    if (nodes === null)
+      return { mode: 'text', content: props.node.raw ?? content }
+    return { mode: 'dynamic', nodes }
+  }
 
   // Check if content contains custom components
   if (!hasCustomComponents(content, customComponents.value))
@@ -134,6 +146,7 @@ onBeforeUnmount(() => {
     <template v-if="shouldRender">
       <!-- Use dynamic rendering for custom components -->
       <DynamicRenderer v-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />
+      <pre v-else-if="renderMode.mode === 'text'" class="html-block-node__raw">{{ renderMode.content }}</pre>
       <!-- Fallback to v-html for standard HTML -->
       <div v-else v-memo="[renderContent]" v-html="renderContent" />
     </template>
@@ -148,6 +161,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.html-block-node__raw {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  opacity: 0.85;
+}
+
 .html-block-node__placeholder {
   display: flex;
   flex-direction: column;

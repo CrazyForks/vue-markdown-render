@@ -41,6 +41,15 @@ const renderMode = computed(() => {
   if (!content)
     return { mode: 'html', content: '' }
 
+  // When the inline HTML node is in a streaming mid-state and the parser has
+  // auto-closed it for rendering (`autoClosed: true`), prefer VNode rendering.
+  // Using `innerHTML` repeatedly replaces the subtree and can cause flicker.
+  if (props.node.loading && props.node.autoClosed) {
+    const nodes = parseHtmlToVNodes(content, customComponents.value)
+    if (nodes !== null)
+      return { mode: 'dynamic', nodes }
+  }
+
   // Check if content contains custom components
   if (!hasCustomComponents(content, customComponents.value))
     return { mode: 'html', content }

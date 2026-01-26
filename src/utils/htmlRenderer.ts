@@ -435,7 +435,7 @@ export function buildVNodeTree(
   customComponents: Record<string, Component>,
 ): any[] {
   let autoKeySeed = 0
-  const stack: Array<{ tagName: string, children: any[], attrs?: Record<string, string> }> = []
+  const stack: Array<{ tagName: string, children: any[], attrs?: Record<string, string>, autoKey: string }> = []
   const rootNodes: any[] = []
 
   for (const token of tokens) {
@@ -449,7 +449,14 @@ export function buildVNodeTree(
       vnode != null && target.push(vnode)
     }
     else if (token.type === 'tag_open') {
-      stack.push({ tagName: token.tagName!, children: [], attrs: token.attrs })
+      // Assign an auto-key at open time so outer node keys stay stable while
+      // streaming content grows (otherwise keys shift based on close order).
+      stack.push({
+        tagName: token.tagName!,
+        children: [],
+        attrs: token.attrs,
+        autoKey: `ms-html-${autoKeySeed++}`,
+      })
     }
     else if (token.type === 'tag_close') {
       const closingTag = token.tagName!.toLowerCase()
@@ -467,7 +474,7 @@ export function buildVNodeTree(
         // Pop all tags until the matched one (auto-closing intermediate tags)
         while (stack.length > matchedIndex) {
           const opening = stack.pop()!
-          const vnode = createVNode(opening.tagName, opening.attrs || {}, opening.children, customComponents, `ms-html-${autoKeySeed++}`)
+          const vnode = createVNode(opening.tagName, opening.attrs || {}, opening.children, customComponents, opening.autoKey)
 
           if (stack.length > 0)
             vnode != null && stack[stack.length - 1].children.push(vnode)
@@ -490,8 +497,11 @@ export function buildVNodeTree(
   // Handle any remaining unclosed tags
   while (stack.length > 0) {
     const unclosed = stack.pop()!
-    const vnode = createVNode(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `ms-html-${autoKeySeed++}`)
-    vnode != null && rootNodes.push(vnode)
+    const vnode = createVNode(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, unclosed.autoKey)
+    if (stack.length > 0)
+      vnode != null && stack[stack.length - 1].children.push(vnode)
+    else
+      vnode != null && rootNodes.push(vnode)
     warn(`Auto-closing unclosed tag: <${unclosed.tagName}>`)
   }
 
