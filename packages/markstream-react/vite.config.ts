@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react-swc'
 import UnpluginClassExtractor from 'unplugin-class-extractor/vite'
 import { defineConfig } from 'vite'
+import dts from 'vite-plugin-dts'
 import { name } from './package.json'
 
 export default defineConfig(({ mode }) => {
@@ -9,6 +10,13 @@ export default defineConfig(({ mode }) => {
   const plugins = [react()]
   if (mode === 'npm') {
     plugins.push(
+      dts({
+        outDir: 'dist/types',
+        insertTypesEntry: true,
+        // Use a build-only tsconfig without workspace path aliases, otherwise
+        // declaration output can rewrite workspace deps into relative paths.
+        tsconfigPath: './tsconfig.build.json',
+      }),
       UnpluginClassExtractor({
         output: 'dist/tailwind.ts',
         include: [/\/src\/.*\.(?:ts|tsx)(\?.*)?$/],
