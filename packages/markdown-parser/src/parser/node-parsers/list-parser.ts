@@ -10,6 +10,90 @@ import { parseCommonBlockToken } from './block-token-parser'
 import { parseBlockquote } from './blockquote-parser'
 import { containerTokenHandlers } from './container-token-handlers'
 
+function trimInlineTokenTail(token: MarkdownToken) {
+  const rawContent = String(token.content ?? '')
+  const trimmed = rawContent.replace(/[ \t\r\n]+$/g, '')
+  if (trimmed === rawContent)
+    return
+
+  token.content = trimmed
+
+  const children = token.children as MarkdownToken[] | undefined
+  if (!Array.isArray(children) || children.length === 0)
+    return
+
+  while (children.length) {
+    const last = children[children.length - 1]
+    if (!last) {
+      children.pop()
+      continue
+    }
+    if (last.type === 'softbreak' || last.type === 'hardbreak') {
+      children.pop()
+      continue
+    }
+    if (last.type === 'text') {
+      const lastContent = String(last.content ?? '')
+      const next = lastContent.replace(/[ \t\r\n]+$/g, '')
+      if (next === lastContent)
+        break
+      if (next) {
+        last.content = next
+        break
+      }
+      children.pop()
+      continue
+    }
+    break
+  }
+}
+
+function stripLeakedOrderedListMarkerSuffix(token: MarkdownToken) {
+  // In streaming mode markdown-it can occasionally leak the next ordered-list
+  // marker (e.g. "\n\n2" or "\n\n2.") into the previous list item's paragraph
+  // content. Because our renderer uses `whitespace-pre-wrap`, those leaked
+  // newlines can create a large blank vertical gap until the next parse tick.
+  const rawContent = String(token.content ?? '')
+  const leak = rawContent.match(/\r?\n\s*\d+[.)]?\s*$/)
+  if (!leak || typeof leak.index !== 'number')
+    return
+
+  token.content = rawContent.slice(0, leak.index)
+
+  const children = token.children as MarkdownToken[] | undefined
+  if (!Array.isArray(children) || children.length === 0)
+    return
+
+  // Best-effort sync: drop trailing text/break tokens that likely correspond
+  // to the leaked marker and whitespace.
+  while (children.length) {
+    const last = children[children.length - 1]
+    if (!last) {
+      children.pop()
+      continue
+    }
+    if (last.type === 'softbreak' || last.type === 'hardbreak') {
+      children.pop()
+      continue
+    }
+    if (last.type === 'text') {
+      const lastContent = String(last.content ?? '')
+      if (/^[ \t\r\n\d.)]*$/.test(lastContent)) {
+        children.pop()
+        continue
+      }
+      const next = lastContent.replace(/[ \t\r\n\d.)]+$/g, '')
+      if (next !== lastContent) {
+        if (next)
+          last.content = next
+        else
+          children.pop()
+      }
+    }
+    break
+  }
+}
+
 export function parseList(
   tokens: MarkdownToken[],
   index: number,
@@ -36,11 +120,9 @@ export function parseList(
         if (tokens[k].type === 'paragraph_open') {
           const contentToken = tokens[k + 1]
           const preToken = tokens[k - 1]
+          stripLeakedOrderedListMarkerSuffix(contentToken)
+          trimInlineTokenTail(contentToken)
           const contentStr = String(contentToken.content ?? '')
-          if (/\n\d+$/.test(contentStr)) {
-            contentToken.content = contentStr.replace(/\n\d+$/, '')
-            contentToken.children?.splice(-1, 1)
-          }
           itemChildren.push({
             type: 'paragraph',
             children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken, {

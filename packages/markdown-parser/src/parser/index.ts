@@ -803,6 +803,30 @@ export function parseMarkdownToStructure(
       // streaming 中间态：单独的 "*"/"+" 行会被识别成空的 list item，导致 UI 闪出一个圆点
       safeMarkdown = safeMarkdown.replace(/\n\s*[*+]\s*$/, '\n')
     }
+    else if (/(?:^|\n)\s*\d+\s*$/.test(safeMarkdown)) {
+      // streaming 中间态：单独的 "2" / "10" 行常是有序列表 marker 的前缀（下一字符才到 "." / ")"）。
+      // 在此状态下 markdown-it 会把它解析成 paragraph/text，导致先撑开一段空白再被下一次解析替换，形成抖动。
+      // 只裁剪末尾这一行，等 marker 完整或有内容后再正常解析。
+      safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*\d+\s*$/, (m) => {
+        return m.startsWith('\n') ? '\n' : ''
+      })
+    }
+    else if (/(?:^|\n)\s*\d+[.)]\s+\*{1,3}\s*$/.test(safeMarkdown)) {
+      // streaming 中间态：有序列表项刚开始输出 "**"（粗体）时，常会经历 "1. *" / "1. **" 等尾部状态。
+      // markdown-it 在这些状态下可能把 "*" 当作空的 bullet list marker（嵌套列表），导致 UI 先闪一个圆点/空块再恢复。
+      // 将尾部孤立的星号临时转义，避免被当作列表 marker。
+      safeMarkdown = safeMarkdown.replace(
+        /((?:^|\n)\s*\d+[.)]\s+)(\*{1,3})\s*$/,
+        (_, prefix: string, stars: string) => `${prefix}${stars.split('').map(() => '\\*').join('')}`,
+      )
+    }
+    else if (/(?:^|\n)\s*\d+[.)]\s*$/.test(safeMarkdown)) {
+      // streaming 中间态：单独的 "2." / "3)" 行会先被渲染成列表/段落占位，随后合并成真正的 list item，导致抖动。
+      // 裁剪末尾这一个 marker，等后续内容到齐再正常解析。
+      safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*\d+[.)]\s*$/, (m) => {
+        return m.startsWith('\n') ? '\n' : ''
+      })
+    }
     else if (/\n[[(]\n*$/.test(safeMarkdown)) {
       // 此时 markdown 解析会出错要跳过
       safeMarkdown = safeMarkdown.replace(/(\n\[|\n\()+\n*$/g, '\n')
