@@ -807,9 +807,13 @@ export function parseMarkdownToStructure(
       // streaming 中间态：单独的 "2" / "10" 行常是有序列表 marker 的前缀（下一字符才到 "." / ")"）。
       // 在此状态下 markdown-it 会把它解析成 paragraph/text，导致先撑开一段空白再被下一次解析替换，形成抖动。
       // 只裁剪末尾这一行，等 marker 完整或有内容后再正常解析。
-      safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*\d+\s*$/, (m) => {
-        return m.startsWith('\n') ? '\n' : ''
-      })
+      // 但当整个文档本身就是纯数字（例如 "1234567"）时，这不是列表前缀，而是正常文本内容，
+      // 不应被裁剪为空，否则会导致 parse 结果一直为空。
+      if (!/^\d+$/.test(safeMarkdown.trim())) {
+        safeMarkdown = safeMarkdown.replace(/(?:^|\n)\s*\d+\s*$/, (m) => {
+          return m.startsWith('\n') ? '\n' : ''
+        })
+      }
     }
     else if (/(?:^|\n)\s*\d+[.)]\s+\*{1,3}\s*$/.test(safeMarkdown)) {
       // streaming 中间态：有序列表项刚开始输出 "**"（粗体）时，常会经历 "1. *" / "1. **" 等尾部状态。
