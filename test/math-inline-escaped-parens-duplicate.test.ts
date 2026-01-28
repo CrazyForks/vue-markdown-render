@@ -46,4 +46,3 @@ describe('math inline - avoid duplicated text around \\( \\)', () => {
     expect(text.split(needle).length - 1).toBe(1)
   })
 })
-
