@@ -103,6 +103,36 @@ describe('fixStrongTokens plugin (parse-token assertions)', () => {
     expect(strong.children?.[0].content).toBe('bold')
   })
 
+  it('should keep strong intact around inline math in ordered list', () => {
+    const md = getMarkdown('t')
+    const content = '1. **化简集合\\( P \\)并求补集**：\n测试啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊'
+    const nodes = parseMarkdownToStructure(content, md, { final: true })
+
+    const list = nodes[0] as any
+    expect(list?.type).toBe('list')
+    expect(list.ordered).toBe(true)
+
+    const li = list.items?.[0]
+    expect(li?.type).toBe('list_item')
+
+    const para = li.children?.[0]
+    expect(para?.type).toBe('paragraph')
+
+    const strongs = (para.children ?? []).filter((c: any) => c.type === 'strong')
+    expect(strongs.length).toBe(1)
+
+    const strong = strongs[0]
+    const strongText = (strong.children ?? [])
+      .filter((c: any) => c.type === 'text')
+      .map((c: any) => c.content)
+      .join('')
+    expect(strongText).toBe('化简集合并求补集')
+    expect((strong.children ?? []).some((c: any) => c.type === 'math_inline')).toBe(true)
+
+    const afterText = (para.children ?? []).find((c: any) => c.type === 'text') as any
+    expect(afterText?.content).toBe('：\n测试啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊')
+  })
+
   describe('escaped characters ($, [, -, _) should be treated as literal text', () => {
     it('should treat escaped dollar signs as text: `\\$\\$`', () => {
       const md = getMarkdown('t')
