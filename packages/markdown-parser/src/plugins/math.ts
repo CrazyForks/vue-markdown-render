@@ -587,8 +587,12 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           // not math-like; skip this match and continue scanning
           searchPos = endIdx + close.length
           const text = src.slice(s.pos, searchPos)
-          if (!s.pending)
+          if (!s.pending) {
             pushText(text)
+            // We consumed the skipped span as plain text; advance the "consumed"
+            // cursor so subsequent matches don't re-push this prefix.
+            preMathPos = searchPos
+          }
           continue
         }
         foundAny = true
