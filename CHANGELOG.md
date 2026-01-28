@@ -1,4 +1,4 @@
-## [0.0.7-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.7-beta.1) (2026-01-26)
+## [0.0.7-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.7-beta.2) (2026-01-28)
 
 
 ### Bug Fixes
@@ -25,9 +25,11 @@
 * **image:** inline with math parse wrong ([edc7a44](https://github.com/Simon-He95/markstream-vue/commit/edc7a44d36598bb2ee2c0d3061a62c1201293646)), closes [#246](https://github.com/Simon-He95/markstream-vue/issues/246)
 * improve reference detection in markdown parser and add related tests ([31e5b6e](https://github.com/Simon-He95/markstream-vue/commit/31e5b6eee57b85a838b0bdb2f71c29453c8d8902)), closes [#231](https://github.com/Simon-He95/markstream-vue/issues/231)
 * **link:** inline code inside links rendering nested elements ([4f85231](https://github.com/Simon-He95/markstream-vue/commit/4f85231ef551391d1eb34f573e9a17563fe16c68)), closes [#256](https://github.com/Simon-He95/markstream-vue/issues/256)
+* **markdown:** ensure strong tokens remain intact around inline math ([211aa48](https://github.com/Simon-He95/markstream-vue/commit/211aa482a0e506f288c0e7d86ada2f8cdf74bd7d)), closes [#276](https://github.com/Simon-He95/markstream-vue/issues/276)
 * **markstream-react:** codeBlockNode collpase ([709460a](https://github.com/Simon-He95/markstream-vue/commit/709460a38fbf0130c9774f544fde6c10943d3c5f))
 * **math:** add edge case render handling ([edbb347](https://github.com/Simon-He95/markstream-vue/commit/edbb3471f3b457c70fc35c924e384ebb1b014efc))
 * **math:** edge case render ([e07cf4b](https://github.com/Simon-He95/markstream-vue/commit/e07cf4b3ae44aeeaeee9f93f4a6fb188ca12deda)), closes [#249](https://github.com/Simon-He95/markstream-vue/issues/249)
+* **math:** prevent text duplication around escaped parentheses in inline math ([e80ac37](https://github.com/Simon-He95/markstream-vue/commit/e80ac37160b5782632d56391080b0f6f63618951)), closes [#277](https://github.com/Simon-He95/markstream-vue/issues/277)
 * **netlify.toml:** correct publish path and set base directory for build ([4c3e566](https://github.com/Simon-He95/markstream-vue/commit/4c3e5661d40dbf68f8b18398f38ece958505c41c))
 * **netlify.toml:** remove base directory from build configuration ([41475ae](https://github.com/Simon-He95/markstream-vue/commit/41475aef2480f145ef057e0a9e7a19ef16502f58))
 * **netlify.toml:** remove playground-nuxt from build command ([28e22ea](https://github.com/Simon-He95/markstream-vue/commit/28e22eac3832f269acf7387f090fea62bfce82b1))
@@ -35,6 +37,7 @@
 * **netlify.toml:** update publish path to correct directory ([6bf3710](https://github.com/Simon-He95/markstream-vue/commit/6bf371089e06bf740ec64e71839999c76c7b3ce6))
 * **nuxt.config.ts:** set nitro preset to static ([580e83e](https://github.com/Simon-He95/markstream-vue/commit/580e83e34487446d423e11b403c8f270240f70ac))
 * prevent false positives for JSON in math parsing and add tests ([0fb4e82](https://github.com/Simon-He95/markstream-vue/commit/0fb4e8291c092288e563f1289dbff4e94f90a7f1)), closes [#264](https://github.com/Simon-He95/markstream-vue/issues/264)
+* **react:** generate bundled d.ts on build ([fb5c88b](https://github.com/Simon-He95/markstream-vue/commit/fb5c88b345eeec857e4aa5a95e3592659d2fa491))
 * remove unnecessary blank lines in documentation and component files ([5f877e6](https://github.com/Simon-He95/markstream-vue/commit/5f877e61079b95ef3a78f1c8de7fe12328d85133)), closes [#243](https://github.com/Simon-He95/markstream-vue/issues/243)
 * standardize class attribute syntax in list item components and tests ([71af12b](https://github.com/Simon-He95/markstream-vue/commit/71af12b1638456fdbaf809849f3f230ea9505de0))
 * **theme:** toggle fail ([39cd71a](https://github.com/Simon-He95/markstream-vue/commit/39cd71af0c499c95d9c50b9770972540ac83c3ef)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
