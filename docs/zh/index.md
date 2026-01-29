@@ -87,15 +87,16 @@ function App() {
 
 支持 Nuxt 3 服务端渲染。
 
-- **文档**：[/nuxt-ssr](/nuxt-ssr)
+- **文档**：[/zh/nuxt-ssr](/zh/nuxt-ssr)
 - **在线演示**：https://markstream-nuxt.pages.dev/
 
 ## 快速链接
 
 **通用资源**
-- [故障排除](/guide/troubleshooting) - CSS/reset 顺序、依赖项和常见问题
-- [解析器 API](/guide/parser-api) - 高级解析和 AST 操作
-- [功能特性](/guide/features) - 流式渲染、Mermaid、Monaco 等
+- [故障排除](/zh/guide/troubleshooting) - CSS/reset 顺序、依赖项和常见问题
+- [解析器 API](/zh/guide/parser-api) - 高级解析和 AST 操作
+- [功能特性](/zh/guide/features) - 流式渲染、Mermaid、Monaco 等
+- [站内搜索](/zh/guide/search) - 使用顶部搜索快速定位文档
 
 **AI/LLM 集成**
 - [AI/LLM 上下文](/llms.zh-CN)（中文）

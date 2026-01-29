@@ -243,4 +243,4 @@ module.exports = {
 
 ## 自定义组件设置
 
-要使用自定义节点组件，你需要创建自定义渲染器。详情请参阅 [组件文档](/guide/react-components)。
+要使用自定义节点组件，你需要创建自定义渲染器。详情请参阅 [组件文档](/zh/guide/react-components)。

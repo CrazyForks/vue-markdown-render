@@ -5,8 +5,8 @@
 ## 快速概览
 
 - Monaco 模式（安装 `stream-monaco`）— 类编辑器渲染，带 worker 支持
-- Markdown 模式（安装 `stream-markdown`）— 替代的 markdown 驱动渲染器
-- 降级模式 — 当没有可选依赖时，使用纯 `<pre><code>` 渲染
+- 降级模式 — 未安装 `stream-monaco` 时会回退为纯 `<pre><code>` 渲染
+- 如果你希望用 Shiki（不引入 Monaco），请使用 `MarkdownCodeBlockNode`（同伴依赖：`shiki` + `stream-markdown`）
 
 ## Props
 
@@ -25,7 +25,7 @@
 ## Emits 事件
 
 - `copy(text: string)` — 点击复制时触发
-- `previewCode(payload)` — 预览操作触发时；payload 包含 `{ type, content, title }`
+- `previewCode(payload)` — 仅在你监听 `@preview-code` 时才会触发；payload 为 `{ node, artifactType, artifactTitle, id }`
 
 ## 示例
 

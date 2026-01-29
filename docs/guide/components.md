@@ -2,14 +2,14 @@
 
 | Component | Best for | Key props/events | Extra CSS / peers | Troubleshooting hooks |
 | --------- | -------- | ---------------- | ----------------- | --------------------- |
-| `MarkdownRender` | Rendering full AST trees (default export) | `content`, `custom-id`, `setCustomComponents`; events: `copy`, `handleArtifactClick`, `click`, `mouseover`, `mouseout` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Add `custom-id="docs"` to scope overrides; standalone node components need a `.markstream-vue` wrapper; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
+| `MarkdownRender` | Rendering full AST trees (default export) | Props: `content` / `nodes`, `custom-id`, `final`, `parse-options`, `custom-html-tags`, `is-dark`; events: `copy`, `handleArtifactClick`, `click`, `mouseover`, `mouseout` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Use `setCustomComponents(customId, mapping)` + `custom-id` to scope overrides; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; events: `copy`, `previewCode`; slots `header-left` / `header-right` | Install `stream-monaco` (peer) + bundle Monaco workers | Blank editor ⇒ check worker bundling + SSR guards |
 | `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `stream`, `loading`; slots `header-left` / `header-right` | Requires `shiki` + `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
 | `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` ≥ 11; import `mermaid/dist/mermaid.css` | For async errors see `/guide/mermaid` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
-| `ImageNode` | Custom previews/lightboxes | Emits `click`, `load`, `error`; accepts `lazy` props via `node.props` | None, but respects global CSS | Wrap in custom component + `setCustomComponents` to intercept events |
+| `ImageNode` | Custom previews/lightboxes | Props: `fallback-src`, `show-caption`, `lazy`, `svg-min-height`, `use-placeholder`; emits `click`, `load`, `error` | None, but respects global CSS | Wrap in a custom component + `setCustomComponents` to intercept events |
 | `LinkNode` | Animated underline, tooltips | `color`, `underlineHeight`, `showTooltip` | No extra CSS | Browser defaults can override `a` styles; import reset |
-| `VmrContainerNode` | Custom `:::` containers with JSON attrs | `node` (`name`, `attrs`, `loading`, `children`) | Minimal base CSS; override via `setCustomComponents` | Unknown node type → check `FallbackComponent`; invalid JSON → check `data-attrs` fallback; streaming mid-state with incomplete attrs → temporarily stored in `attrs.args` |
+| `VmrContainerNode` | Custom `:::` containers | `node` (`name`, `attrs`, `loading`, `children`) | Minimal base CSS; override via `setCustomComponents` | JSON attrs become `data-*` strings (e.g. `data-devId`); invalid/incomplete JSON falls back to `data-attrs` (raw string); args after name stored in `data-args` |
 
 ## MarkdownRender
 
@@ -17,7 +17,7 @@
 
 ### Quick reference
 - **Best for**: full markdown documents in Vite, Nuxt, VitePress.
-- **Key props**: `content`, `custom-id`, `setCustomComponents` |
+- **Key props**: `content` / `nodes`, `custom-id`, `final`, `parse-options`, `custom-html-tags` |
 - **CSS**: include a reset (`modern-css-reset`, `@unocss/reset`, or `@tailwind base`) before `markstream-vue/index.css`. Wrap import with `@layer components` when using Tailwind/UnoCSS.
 
 ### CSS scoping
@@ -127,8 +127,9 @@ const node = {
 ```
 
 ### HTML/SVG preview dialog
-- When `node.language` is `html` or `svg` (and `isShowPreview` stays `true`), the toolbar exposes a Preview button. Without any listener, clicking it opens the built-in iframe dialog (`HtmlPreviewFrame`) that renders your code inside a sandboxed `<iframe>`.
-- Attach `@preview-code` to fully override the dialog. The emitted payload contains `{ node, artifactType, artifactTitle, id }`, so you can decide whether to spin up your own modal, route the HTML into a playground, or log artifacts elsewhere. Returning a listener automatically disables the default iframe overlay.
+- When `node.language` is `html` or `svg` (and `isShowPreview` stays `true`), the toolbar exposes a Preview button.
+- Without a `@preview-code` listener, the built-in preview dialog is available for **HTML only**.
+- Attach `@preview-code` to handle **HTML and SVG** yourself. The emitted payload contains `{ node, artifactType, artifactTitle, id }`. Returning a listener automatically disables the built-in HTML preview overlay.
 
 ```vue
 <script setup lang="ts">
@@ -183,6 +184,7 @@ function closePreview() {
 ### Quick reference
 - **Peers**: `shiki` + `stream-markdown`.
 - **Props**: similar to `CodeBlockNode` (streaming + header controls); lazy-loads `stream-markdown` for Shiki rendering.
+- **Emits**: `copy` (payload: copied text), `previewCode` (payload: `{ type, content, title }`).
 - **When to choose it**: VitePress, Nuxt content sites, or anywhere Monaco would be overkill.
 
 ### Usage
@@ -276,7 +278,7 @@ Troubleshooting:
 
 ```vue
 <template>
-  <ImageNode :node="node" @click="open(node.props.src)" />
+  <ImageNode :node="node" @click="([_ev, src]) => open(src)" />
 </template>
 ```
 
@@ -370,22 +372,20 @@ When rendering containers in a streaming context (e.g., LLM output), the parser 
 
 - **Loading state**: When a `:::` container is opened but not yet closed, `loading` is set to `true`. This allows your component to show an intermediate state (like a skeleton loader) while content is streaming.
 
-- **Incomplete JSON handling**: In streaming scenarios, the JSON attributes may be incomplete when tokens arrive. The parser uses a fallback strategy:
-  1. First attempts standard `JSON.parse()` on the attribute string
-  2. If that fails, tries a loose object parser for `{key:value}` syntax
-  3. If both fail, stores the entire string as a plain `attrs.args` parameter
-
-  This means during streaming you might temporarily see `{"incomplete` as `attrs.args` until the full `{"key":"value"}` arrives and can be properly parsed.
+- **Attribute handling**:
+  - Args right after the container name are stored as `data-args` (string).
+  - JSON attributes are converted to `data-*` attributes (strings), e.g. `{"devId":"abc"}` → `data-devId="abc"`.
+  - If JSON parsing fails (invalid or partial JSON), the raw string is preserved in `data-attrs`.
 
 Example streaming progression:
 ```markdown
 # Initially (mid-state)
 ::: viewcode:stream {"incomplete
-# → attrs.args = '{"incomplete', loading = true
+# → attrs['data-attrs'] = '{"incomplete', loading = true
 
 # After more content
 ::: viewcode:stream {"devId":"abc"}
-# → attrs.devId = "abc", loading = false (if closing ::: present)
+# → attrs['data-devId'] = "abc", loading = false (if closing ::: present)
 ```
 
 ### Default rendering
@@ -442,7 +442,7 @@ Here's a complete example that renders a custom `viewcode:*` container:
 ```vue
 <!-- components/ViewCodeContainer.vue -->
 <script setup lang="ts">
-import NodeRenderer from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
 import { computed } from 'vue'
 
 interface Props {
@@ -460,7 +460,8 @@ interface Props {
 const props = defineProps<Props>()
 
 // Extract devId from attrs
-const devId = computed(() => props.node.attrs?.devId || '')
+const devId = computed(() => props.node.attrs?.['data-devId'] || '')
+const args = computed(() => props.node.attrs?.['data-args'] || '')
 
 // Check if this is a viewcode container
 const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
@@ -471,10 +472,10 @@ const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
   <div v-if="isViewCode" class="viewcode-wrapper">
     <div class="viewcode-header">
       <span class="viewcode-title">{{ node.name }}</span>
-      <span class="viewcode-dev-id">{{ devId }}</span>
+      <span class="viewcode-dev-id">{{ devId || args }}</span>
     </div>
     <div class="viewcode-content">
-      <NodeRenderer
+      <MarkdownRender
         :nodes="node.children"
         :custom-id="customId"
         :index-key="`${indexKey}-viewcode`"
@@ -484,7 +485,7 @@ const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
 
   <!-- Fallback rendering for other containers -->
   <div v-else class="vmr-container" :class="`vmr-container-${node.name}`">
-    <NodeRenderer
+    <MarkdownRender
       :nodes="node.children"
       :custom-id="customId"
       :index-key="`${indexKey}-fallback`"
@@ -557,9 +558,9 @@ setCustomComponents('docs', {
 
 ### Troubleshooting
 - **Raw text visible**: You're seeing the default renderer. Register a custom component via `setCustomComponents`.
-- **Attrs undefined**: Ensure your JSON syntax is valid. Invalid JSON falls back to `data-attrs` with the raw string.
+- **Attrs undefined**: This is normal when you didn't pass any args/JSON. Invalid/partial JSON falls back to `data-attrs` with the raw string.
 - **Component not receiving props**: Make sure your component accepts the `node` prop with the correct type.
-- **Streaming with incomplete attrs**: In LLM/streaming scenarios, you may temporarily see `attrs.args` containing partial JSON like `{"incomplete`. This is normal — the parser stores incomplete JSON as plain args until the full syntax arrives and can be properly parsed. Check `node.loading` to detect this mid-state.
+- **Streaming with incomplete attrs**: In streaming scenarios you may temporarily see `attrs['data-attrs']` containing partial JSON like `{"incomplete` until the full syntax arrives. Check `node.loading` to detect this mid-state.
 
 ## Utility helpers
 

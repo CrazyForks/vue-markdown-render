@@ -70,6 +70,6 @@
 事件与注意事项
 
 - 组件在复制操作时会触发 `copy` 事件（事件回调接收复制的文本）；使用 `@copy="onCopy"` 监听。
-- 组件在预览操作触发时会触发 `previewCode` 事件；负载为 `{ type, content, title }`，其中 `type` 为 MIME 类型（例如 `text/html`）。
+- 组件仅在你监听 `@preview-code` 时才会触发 `previewCode` 事件；负载为 `{ node, artifactType, artifactTitle, id }`。（不监听时，内置预览弹窗仅支持 HTML。）
 - 若要隐藏某类默认按钮，可使用布尔 props：`showCopyButton`、`showExpandButton`、`showPreviewButton`、`showFontSizeButtons`。
 - `showHeader` 控制是否渲染头部栏。

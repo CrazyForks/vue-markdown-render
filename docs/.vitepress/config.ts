@@ -174,7 +174,7 @@ export default defineConfig({
               ],
               collapsed: false,
             },
-            { text: 'Nuxt SSR', link: '/nuxt-ssr' },
+            { text: 'Nuxt SSR', link: '/zh/nuxt-ssr' },
           ],
         },
         {
@@ -220,9 +220,10 @@ export default defineConfig({
                 { text: 'Vue 2', link: 'https://markstream-vue2.pages.dev/' },
               ],
             },
-            { text: '性能', link: '/guide/performance' },
-            { text: 'Monaco', link: '/guide/monaco' },
-            { text: '故障排除', link: '/guide/troubleshooting' },
+            { text: '搜索', link: '/zh/guide/search' },
+            { text: '性能', link: '/zh/guide/performance' },
+            { text: 'Monaco', link: '/zh/guide/monaco' },
+            { text: '故障排除', link: '/zh/guide/troubleshooting' },
           ],
         },
         {

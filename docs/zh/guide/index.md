@@ -40,7 +40,7 @@
 
 适用于 Nuxt 3 SSR 应用程序。
 
-- [Nuxt SSR 指南](/nuxt-ssr) - 服务端渲染配置
+- [Nuxt SSR 指南](/zh/nuxt-ssr) - 服务端渲染配置
 
 ---
 

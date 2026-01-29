@@ -618,6 +618,6 @@ function SafeMarkdown({ content }: { content: string }) {
 
 ## 下一步
 
-- 查看 [React 快速开始](/guide/react-quick-start) 获取设置示例
-- 探索 [Vue 3 组件](/guide/components) 获取更多组件示例（API 类似）
-- 查看 [使用与 API](/guide/usage) 获取高级模式
+- 查看 [React 快速开始](/zh/guide/react-quick-start) 获取设置示例
+- 探索 [Vue 3 组件](/zh/guide/components) 获取更多组件示例（API 类似）
+- 查看 [使用与 API](/zh/guide/usage) 获取高级模式

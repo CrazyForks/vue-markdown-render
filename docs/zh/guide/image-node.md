@@ -11,7 +11,7 @@
 
 ```vue
 <script setup lang="ts">
-import ImageNode from 'markstream-vue'
+import { ImageNode } from 'markstream-vue'
 
 const emit = defineEmits(['load', 'error', 'click'])
 
@@ -30,17 +30,17 @@ function onImageClick(payload: [Event, string]) {
 </template>
 ```
 
-2) 在 VitePress 客户端增强（`docs/.vitepress/clientAppEnhance.ts`）中注册自定义组件：
+2) 在 VitePress 主题增强（`docs/.vitepress/theme/index.ts` 的 `enhanceApp`）中注册自定义组件：
 
 ```ts
 import { setCustomComponents } from 'markstream-vue'
-// .vitepress/clientAppEnhance.ts
+// docs/.vitepress/theme/index.ts
 import CustomImageNode from './components/CustomImageNode.vue'
 
 export default ({ app }) => {
   // setCustomComponents 接受一个 id（任意字符串，用于区分不同注册）和组件映射
   // 通过这种方式，库在渲染 ImageNode 时会使用你提供的组件
-  setCustomComponents('vitepress-image-preview', { ImageNode: CustomImageNode })
+  setCustomComponents('vitepress-image-preview', { image: CustomImageNode })
 }
 ```
 

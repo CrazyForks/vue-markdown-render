@@ -4,8 +4,8 @@
 
 ## Quick summary
 - Monaco mode (install `stream-monaco`) — editor-like rendering with workers
-- Markdown mode (install `stream-markdown`) — alternative markdown-driven renderer
-- Fallback — plain `<pre><code>` when no optional deps present
+- Fallback — plain `<pre><code>` when `stream-monaco` is not installed
+- If you want Shiki-based highlighting (no Monaco), use `MarkdownCodeBlockNode` (peers: `shiki` + `stream-markdown`)
 
 ## Props
 Refer to `src/types/component-props.ts` for full signature. Key props:
@@ -20,7 +20,7 @@ Refer to `src/types/component-props.ts` for full signature. Key props:
 
 ## Emits
 - `copy(text: string)` — when copy pressed
-- `previewCode(payload)` — when preview action triggers; payload contains `{ type, content, title }`
+- `previewCode(payload)` — only emitted when you attach a `@preview-code` listener; payload is `{ node, artifactType, artifactTitle, id }`
 
 ## Examples
 ### Install and run (Monaco)

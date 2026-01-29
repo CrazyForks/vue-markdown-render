@@ -2,14 +2,14 @@
 
 | 组件 | 推荐场景 | 关键 props / 事件 | 额外 CSS / 同伴依赖 | 排障提示 |
 | ---- | -------- | ---------------- | ------------------- | -------- |
-| `MarkdownRender` | 渲染完整 AST（默认导出） | `content`、`custom-id`、`setCustomComponents`；事件：`copy`、`handleArtifactClick`、`click`、`mouseover`、`mouseout` | 在 reset 之后引入 `markstream-vue/index.css`（CSS 已被限定在内部 `.markstream-vue` 容器中），并放入受控 layer | 给 `MarkdownRender` 添加 `custom-id`，独立使用节点组件需包一层 `.markstream-vue`；配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
+| `MarkdownRender` | 渲染完整 AST（默认导出） | Props：`content` / `nodes`、`custom-id`、`final`、`parse-options`、`custom-html-tags`、`is-dark`；事件：`copy`、`handleArtifactClick`、`click`、`mouseover`、`mouseout` | 在 reset 之后引入 `markstream-vue/index.css`（CSS 已被限定在内部 `.markstream-vue` 容器中），并放入受控 layer | 用 `setCustomComponents(customId, mapping)` + `custom-id` 限定覆盖范围；配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`stream`、`loading`；事件：`copy`、`previewCode`；插槽 `header-left` / `header-right` | 安装 `stream-monaco`（peer）并打包 Monaco workers | 空白编辑器 → 优先检查 worker 打包与 SSR |
 | `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`stream`、`loading`；插槽 `header-left` / `header-right` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
 | `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` ≥ 11；引入 `mermaid/dist/mermaid.css` | 详见 `/zh/guide/mermaid` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
-| `ImageNode` | 自定义图片预览 / 懒加载 | 触发 `click` / `load` / `error` 事件 | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
+| `ImageNode` | 自定义图片预览 / 懒加载 | Props：`fallback-src`、`show-caption`、`lazy`、`svg-min-height`、`use-placeholder`；事件：`click` / `load` / `error` | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
 | `LinkNode` | 下划线动画、颜色自定义 | `color`、`underlineHeight`、`showTooltip` | 无 | 浏览器默认 `a` 样式可通过 reset 解决 |
-| `VmrContainerNode` | 带 JSON 属性的自定义 `:::` 容器 | `node`（`name`、`attrs`、`loading`、`children`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | 未知节点类型 → 检查 `FallbackComponent`；JSON 无效 → 检查 `data-attrs` 回退；流式场景下 attrs 不完整 → 临时存储在 `attrs.args` |
+| `VmrContainerNode` | 自定义 `:::` 容器 | `node`（`name`、`attrs`、`loading`、`children`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | JSON attrs 会变成 `data-*` 字符串（如 `data-devId`）；无效/不完整 JSON 回退到 `data-attrs`（原始字符串）；name 后面的 args 存到 `data-args` |
 
 ## MarkdownRender
 
@@ -17,7 +17,7 @@
 
 ### 快速要点
 - **适用**：Vite/Nuxt/VitePress 中渲染整篇 Markdown。
-- **关键 props**：`content`、`custom-id`、`setCustomComponents` |
+- **关键 props**：`content` / `nodes`、`custom-id`、`final`、`parse-options`、`custom-html-tags` |
 - **CSS 顺序**：先引入 reset（`modern-css-reset`、`@unocss/reset`、`@tailwind base`），再在 `@layer components` 中导入 `markstream-vue/index.css`。
 
 ### CSS 作用域
@@ -127,8 +127,9 @@ const node = {
 ```
 
 ### HTML/SVG 预览对话框
-- 当 `node.language` 为 `html` 或 `svg`（且 `isShowPreview` 保持 `true`）时，工具栏会显示 Preview 按钮。不监听 `@preview-code` 的情况下，点击会调用内置的 iframe 弹窗（`HtmlPreviewFrame`），并在沙箱 `<iframe>` 中渲染你的代码。
-- 监听 `@preview-code` 即可完全接管预览。事件会携带 `{ node, artifactType, artifactTitle, id }`，你可以用它来打开自研弹窗、把 HTML 注入到 playground，或记录埋点。一旦存在监听器，默认弹窗会被自动禁用。
+- 当 `node.language` 为 `html` 或 `svg`（且 `isShowPreview` 保持 `true`）时，工具栏会显示 Preview 按钮。
+- 不监听 `@preview-code` 的情况下，内置预览弹窗仅支持 **HTML**。
+- 监听 `@preview-code` 可自行处理 **HTML 与 SVG**。事件会携带 `{ node, artifactType, artifactTitle, id }`；一旦存在监听器，默认 HTML 预览弹窗会被自动禁用。
 
 ```vue
 <script setup lang="ts">
@@ -183,6 +184,7 @@ function closePreview() {
 ### 快速要点
 - **依赖**：`shiki` + `stream-markdown`。
 - **Props**：与 `CodeBlockNode` 类似（streaming + 头部控制）；内部会懒加载 `stream-markdown` 来做 Shiki 渲染。
+- **事件**：`copy`（负载：复制的文本）、`previewCode`（负载：`{ type, content, title }`）。
 - **适用场景**：VitePress、内容站点或无需 Monaco 的应用。
 
 ### 示例
@@ -271,7 +273,7 @@ import 'katex/dist/katex.min.css'
 
 ```vue
 <template>
-  <ImageNode :node="node" @click="open(node.props.src)" />
+  <ImageNode :node="node" @click="([_ev, src]) => open(src)" />
 </template>
 ```
 
@@ -361,26 +363,24 @@ interface VmrContainerNode {
 
 ### 流式行为
 
-在流式场景（如 LLM 输出）中渲染容器时，解析器会优雅地处理不完整的 JSON 属性：
+在流式场景（如 LLM 输出）中渲染容器时，解析器会优雅地处理 attrs：
 
 - **Loading 状态**：当 `:::` 容器已打开但尚未闭合时，`loading` 会被设置为 `true`。这允许你的组件在内容流式传输时显示中间状态（如骨架屏）。
 
-- **不完整 JSON 处理**：在流式场景中，token 到达时 JSON 属性可能不完整。解析器使用回退策略：
-  1. 首先尝试对属性字符串进行标准的 `JSON.parse()`
-  2. 如果失败，尝试使用宽松的对象解析器处理 `{key:value}` 语法
-  3. 如果两者都失败，则将整个字符串作为普通的 `attrs.args` 参数存储
-
-  这意味着在流式传输期间，你可能会暂时看到 `{"incomplete` 作为 `attrs.args`，直到完整的 `{"key":"value"}` 到达并能够正确解析。
+- **attrs 处理规则**：
+  - 容器名后面的 args 会存到 `data-args`（字符串）。
+  - JSON attrs 会转换成 `data-*` 属性（字符串），例如 `{"devId":"abc"}` → `data-devId="abc"`。
+  - JSON 解析失败（无效或不完整）时，原始字符串会回退保存到 `data-attrs`。
 
 流式传输进度示例：
 ```markdown
 # 初始状态（中间态）
 ::: viewcode:stream {"incomplete
-# → attrs.args = '{"incomplete', loading = true
+# → attrs['data-attrs'] = '{"incomplete', loading = true
 
 # 更多内容到达后
 ::: viewcode:stream {"devId":"abc"}
-# → attrs.devId = "abc", loading = false（如果存在闭合 :::）
+# → attrs['data-devId'] = "abc", loading = false（如果存在闭合 :::）
 ```
 
 ### 默认渲染
@@ -437,7 +437,7 @@ setCustomComponents('docs', {
 ```vue
 <!-- components/ViewCodeContainer.vue -->
 <script setup lang="ts">
-import NodeRenderer from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
 import { computed } from 'vue'
 
 interface Props {
@@ -454,8 +454,9 @@ interface Props {
 
 const props = defineProps<Props>()
 
-// 从 attrs 提取 devId
-const devId = computed(() => props.node.attrs?.devId || '')
+// 从 attrs 提取 devId / args（JSON attrs 会以 data-* 字符串形式存储）
+const devId = computed(() => props.node.attrs?.['data-devId'] || '')
+const args = computed(() => props.node.attrs?.['data-args'] || '')
 
 // 检查是否为 viewcode 容器
 const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
@@ -466,10 +467,10 @@ const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
   <div v-if="isViewCode" class="viewcode-wrapper">
     <div class="viewcode-header">
       <span class="viewcode-title">{{ node.name }}</span>
-      <span class="viewcode-dev-id">{{ devId }}</span>
+      <span class="viewcode-dev-id">{{ devId || args }}</span>
     </div>
     <div class="viewcode-content">
-      <NodeRenderer
+      <MarkdownRender
         :nodes="node.children"
         :custom-id="customId"
         :index-key="`${indexKey}-viewcode`"
@@ -479,7 +480,7 @@ const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
 
   <!-- 其他容器的回退渲染 -->
   <div v-else class="vmr-container" :class="`vmr-container-${node.name}`">
-    <NodeRenderer
+    <MarkdownRender
       :nodes="node.children"
       :custom-id="customId"
       :index-key="`${indexKey}-fallback`"
@@ -552,9 +553,9 @@ setCustomComponents('docs', {
 
 ### 排障
 - **看到原始文本**：说明你使用的是默认渲染器。请通过 `setCustomComponents` 注册自定义组件。
-- **Attrs 为 undefined**：请确保 JSON 语法正确。无效的 JSON 会回退到 `data-attrs` 并存储原始字符串。
+- **Attrs 为 undefined**：如果你没传 args/JSON，这是正常的；无效/不完整 JSON 会回退到 `data-attrs`（原始字符串）。
 - **组件未收到 props**：请确保你的组件正确接受 `node` prop 且类型匹配。
-- **流式场景下 attrs 不完整**：在 LLM/流式传输场景中，你可能会暂时看到 `attrs.args` 包含部分 JSON，如 `{"incomplete`。这是正常现象 —— 解析器会将不完整的 JSON 作为普通 args 存储，直到完整语法到达并能够正确解析。可以通过检查 `node.loading` 来检测这种中间态。
+- **流式场景下 attrs 不完整**：在流式传输中你可能会暂时看到 `attrs['data-attrs']` 包含部分 JSON（如 `{"incomplete`），直到完整语法到达。可通过 `node.loading` 判断中间态。
 
 ## 工具函数
 

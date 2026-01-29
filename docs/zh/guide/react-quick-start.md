@@ -444,6 +444,6 @@ function App() {
 
 ## 下一步
 
-- 探索 [React 组件文档](/guide/react-components) 了解所有可用组件
-- 查看 [示例](/guide/examples) 获取更多使用示例
-- 查看 [API 参考](/guide/components) 获取详细 API 文档
+- 探索 [React 组件文档](/zh/guide/react-components) 了解所有可用组件
+- 查看 [示例](/zh/guide/examples) 获取更多使用示例
+- 查看 [API 参考](/zh/guide/components) 获取详细 API 文档
