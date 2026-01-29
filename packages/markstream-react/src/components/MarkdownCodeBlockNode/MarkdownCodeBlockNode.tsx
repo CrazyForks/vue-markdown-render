@@ -522,7 +522,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
           style={{
             ...contentStyle,
             maxHeight: isExpanded ? 'none' : '500px',
-            overflow: isExpanded ? 'visible' : 'auto',
+            overflowY: isExpanded ? 'visible' : 'auto',
+            overflowX: 'auto',
           }}
         >
           <div ref={rendererTargetRef} className="code-block-render" />

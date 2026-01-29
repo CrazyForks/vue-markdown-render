@@ -401,7 +401,8 @@ function toggleExpand() {
 
   if (isExpanded.value) {
     content.style.maxHeight = 'none'
-    content.style.overflow = 'visible'
+    content.style["overflow-y"] = 'visible'
+    content.style["overflow-x"] = 'auto'
   }
   else {
     content.style.maxHeight = '500px'
