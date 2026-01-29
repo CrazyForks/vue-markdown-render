@@ -11,4 +11,3 @@
 
 - 搜不到时先确认语言是否正确（中英文内容分别在 `/` 与 `/zh/`）
 - 搜索对组件名/函数名很友好，建议直接搜 `MarkdownRender`、`enableMermaid`、`enableKatex` 等关键字
-

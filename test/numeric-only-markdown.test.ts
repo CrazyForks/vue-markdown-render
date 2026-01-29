@@ -16,4 +16,3 @@ describe('parseMarkdownToStructure - numeric-only markdown', () => {
     expect(JSON.stringify(nodes)).toContain('1234567')
   })
 })
-
