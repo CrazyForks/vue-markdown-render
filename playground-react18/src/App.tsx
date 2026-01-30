@@ -437,7 +437,7 @@ export default function App() {
                 </div>
                 <div>
                   <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
-                    markstream-react
+                    markstream-react18
                   </h1>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Streaming markdown demo

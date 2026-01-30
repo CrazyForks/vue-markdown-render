@@ -1,0 +1,35 @@
+{
+  "name": "vite-react-typescript-starter",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b --noEmit && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@iconify/react": "^4.1.1",
+    "markstream-react": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/node": "^24.10.9",
+    "@types/react": "^19.2.9",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react-swc": "^3.11.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.25",
+    "globals": "^17.1.0",
+    "monaco-editor": "^0.52.2",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.53.1",
+    "vite": "^7.3.1",
+    "vite-plugin-monaco-editor-esm": "^2.0.2"
+  }
+}

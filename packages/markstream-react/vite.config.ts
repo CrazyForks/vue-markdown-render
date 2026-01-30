@@ -65,6 +65,8 @@ export default defineConfig(({ mode }) => {
         },
         format: {
           comments: false,
+          // Strip /*#__PURE__*/ annotations to avoid Rollup warnings in consumers.
+          preserve_annotations: false,
           ecma: 2019,
         },
       },
@@ -78,6 +80,8 @@ export default defineConfig(({ mode }) => {
         external: [
           'react',
           'react-dom',
+          'react/jsx-runtime',
+          'react/jsx-dev-runtime',
           'katex',
           'katex/contrib/mhchem',
           'mermaid',
