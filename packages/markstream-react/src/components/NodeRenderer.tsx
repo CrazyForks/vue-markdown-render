@@ -122,6 +122,8 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
   const nodeVisibilityStateRef = useRef<Record<number, boolean>>({})
   const nodeVisibilityHandlesRef = useRef(new Map<number, VisibilityHandle>())
   const nodeSlotElementsRef = useRef(new Map<number, HTMLElement | null>())
+  const nodeSlotRefCallbacksRef = useRef(new Map<number, (el: HTMLElement | null) => void>())
+  const nodeContentRefCallbacksRef = useRef(new Map<number, (el: HTMLDivElement | null) => void>())
   const nodeSeenRef = useRef(new Set<number>())
   const prevRenderedRef = useRef(renderedCount)
   const batchRafRef = useRef<number | null>(null)
@@ -426,6 +428,8 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
         nodeVisibilityHandlesRef.current.delete(index)
         delete nodeVisibilityStateRef.current[index]
         nodeSlotElementsRef.current.delete(index)
+        nodeSlotRefCallbacksRef.current.delete(index)
+        nodeContentRefCallbacksRef.current.delete(index)
       }
     }
   }, [])
@@ -509,6 +513,15 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
     virtualizationEnabled,
   ])
 
+  const getNodeSlotRef = useCallback((index: number) => {
+    const existing = nodeSlotRefCallbacksRef.current.get(index)
+    if (existing)
+      return existing
+    const cb = (el: HTMLElement | null) => setNodeSlotElement(index, el)
+    nodeSlotRefCallbacksRef.current.set(index, cb)
+    return cb
+  }, [setNodeSlotElement])
+
   const setNodeContentRef = useCallback((index: number, el: HTMLDivElement | null) => {
     if (!el) {
       if (nodeHeightsRef.current.has(index)) {
@@ -532,6 +545,15 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
     else
       Promise.resolve().then(measure)
   }, [])
+
+  const getNodeContentRef = useCallback((index: number) => {
+    const existing = nodeContentRefCallbacksRef.current.get(index)
+    if (existing)
+      return existing
+    const cb = (el: HTMLDivElement | null) => setNodeContentRef(index, el)
+    nodeContentRefCallbacksRef.current.set(index, cb)
+    return cb
+  }, [setNodeContentRef])
 
   const shouldRenderNode = useCallback((index: number) => {
     if (incrementalRenderingActive && index >= renderedCountRef.current)
@@ -595,7 +617,7 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
         return (
           <div
             key={`${indexPrefix}-${index}`}
-            ref={el => setNodeSlotElement(index, el)}
+            ref={getNodeSlotRef(index)}
             className="node-slot"
             data-node-index={index}
             data-node-type={node.type}
@@ -603,7 +625,7 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
             {canRender
               ? (
                   <div
-                    ref={el => setNodeContentRef(index, el)}
+                    ref={getNodeContentRef(index)}
                     className={`node-content${shouldAnimate ? ' typewriter-node' : ''}`}
                   >
                     {renderNode(node, `${indexPrefix}-${index}`, renderCtx)}
@@ -788,7 +810,11 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     return () => cancelIdle(id)
   }, [parsedNodes, props.renderCodeBlocksAsPre])
 
-  if (typeof window !== 'undefined' && !props.renderCodeBlocksAsPre) {
+  useEffect(() => {
+    if (typeof window === 'undefined')
+      return
+    if (props.renderCodeBlocksAsPre)
+      return
     const theme = props.isDark ? props.codeBlockDarkTheme : props.codeBlockLightTheme
     const nextKey = typeof theme === 'string'
       ? theme
@@ -797,7 +823,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
       desiredThemeKeyRef.current = nextKey
       setDesiredMonacoTheme(theme)
     }
-  }
+  }, [props.codeBlockDarkTheme, props.codeBlockLightTheme, props.isDark, props.renderCodeBlocksAsPre])
 
   const indexPrefix = useMemo(() => {
     return props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'
