@@ -234,11 +234,13 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       return {
         startOnLoad: false,
         securityLevel: 'loose',
+        suppressErrorRendering: true,
       }
     }
     return {
       startOnLoad: false,
       securityLevel: 'strict',
+      suppressErrorRendering: true,
       dompurifyConfig: DOMPURIFY_CONFIG,
       flowchart: { htmlLabels: false },
     }
