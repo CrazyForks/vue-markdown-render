@@ -6,15 +6,15 @@
     "build": "vue-cli-service build"
   },
   "dependencies": {
-    "katex": "^0.16.25",
+    "katex": "^0.16.28",
     "markstream-vue2": "workspace:*",
-    "stream-markdown": ">=0.0.13",
+    "stream-markdown": "latest",
     "vue": "2.7.16"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^4.5.19",
     "@vue/cli-service": "^4.5.19",
-    "core-js": "^3.41.0",
+    "core-js": "^3.48.0",
     "vue-template-compiler": "2.7.16"
   }
 }
