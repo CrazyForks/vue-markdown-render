@@ -968,7 +968,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
         )}
       >
         {header}
-        <div ref={modeContainerRef} style={{ display: isCollapsed ? 'none' : 'block' }}>
+        <div ref={modeContainerRef} style={{ display: isCollapsed ? 'none' : '' }}>
           {body}
         </div>
       </div>
