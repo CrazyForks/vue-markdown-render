@@ -32,7 +32,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 ### 3. 使用组件
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function App() {
   const markdown = `# Hello React!
@@ -67,7 +67,7 @@ markstream-react 使用 TypeScript 构建，包含完整的类型定义：
 
 ```tsx
 import type { NodeRendererProps } from 'markstream-react'
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 const props: NodeRendererProps = {
   content: '# Hello TypeScript!',
@@ -85,7 +85,7 @@ function App() {
 ```tsx
 'use client'
 
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useEffect, useState } from 'react'
 
 export default function MarkdownPage() {
@@ -110,7 +110,7 @@ export default function MarkdownPage() {
 ### Pages Router
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useEffect, useState } from 'react'
 import 'markstream-react/index.css'
 
@@ -137,7 +137,7 @@ import dynamic from 'next/dynamic'
 import 'markstream-react/index.css'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.NodeRenderer),
+  () => import('markstream-react').then(mod => mod.default),
   { ssr: false }
 )
 
@@ -159,7 +159,7 @@ pnpm add shiki stream-markdown
 ```
 
 ```tsx
-import { MarkdownCodeBlockNode, NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-react'
 
 // 在 MarkdownRender 中使用 Shiki 代码块
 setCustomComponents({
@@ -244,7 +244,7 @@ $$`
 你可以通过传递自定义组件映射来自定义特定节点的渲染方式：
 
 ```tsx
-import { NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+import MarkdownRender, { setCustomComponents } from 'markstream-react'
 
 // 自定义标题组件
 function CustomHeading({ node, customId }: any) {
@@ -278,7 +278,7 @@ function App() {
 markstream-react 支持流式 markdown 内容，适用于 AI 生成的内容：
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useState } from 'react'
 
 function StreamingDemo() {
@@ -335,7 +335,7 @@ console.log('流式传输已启用:', streaming)
 
 ```tsx
 import type { ChangeEvent } from 'react'
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useCallback, useEffect, useState } from 'react'
 
 function MarkdownEditor() {
@@ -367,7 +367,7 @@ function MarkdownEditor() {
 对于大型 markdown 文档，可以使用虚拟化：
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function LongDocument() {
   // 你的很长的 markdown 内容
@@ -426,7 +426,7 @@ function LongDocument() {
 ## 使用 Tailwind CSS
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import 'markstream-react/index.css'
 import './output.css' // 你的 Tailwind 输出
 

@@ -76,7 +76,7 @@ export default {
 - **在线演示**：https://markstream-react.pages.dev/
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function App() {
   return <MarkdownRender content="# Hello React!" />

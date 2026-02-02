@@ -95,7 +95,7 @@ pnpm add shiki stream-markdown
 These packages power the Shiki-based `MarkdownCodeBlockNode`. To use Shiki inside `MarkdownRender`, override the `code_block` renderer (or render `MarkdownCodeBlockNode` directly).
 
 ```tsx
-import { MarkdownCodeBlockNode, NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-react'
 
 setCustomComponents({
   code_block: ({ node, isDark, ctx }: any) => (
@@ -146,7 +146,7 @@ import 'katex/dist/katex.min.css'
 Import and render a simple markdown string:
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import 'markstream-react/index.css'
 
 function App() {
@@ -164,7 +164,7 @@ markstream-react is written in TypeScript and includes full type definitions out
 
 ```tsx
 import type { NodeRendererProps } from 'markstream-react'
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 const props: NodeRendererProps = {
   content: '# Hello TypeScript!',
@@ -182,7 +182,7 @@ For Next.js projects, you need to ensure components only render on the client si
 ```tsx
 'use client'
 
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useEffect, useState } from 'react'
 import 'markstream-react/index.css'
 
@@ -207,7 +207,7 @@ Or use the `'use client'` directive with dynamic imports:
 import dynamic from 'next/dynamic'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.NodeRenderer),
+  () => import('markstream-react').then(mod => mod.default),
   { ssr: false }
 )
 
@@ -236,7 +236,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 ```tsx
 // src/App.tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function App() {
   const content = `# Hello Vite!

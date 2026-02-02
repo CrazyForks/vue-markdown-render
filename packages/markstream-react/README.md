@@ -17,7 +17,7 @@ pnpm --filter markstream-react build
 ## Usage
 
 ```tsx
-import { NodeRenderer } from 'markstream-react'
+import NodeRenderer from 'markstream-react'
 import 'markstream-react/index.css'
 
 export default function Article({ markdown }: { markdown: string }) {
@@ -40,7 +40,7 @@ Custom tag-like blocks are exposed as nodes with `type: 'thinking'` (the tag nam
 
 ```tsx
 import type { NodeComponentProps } from 'markstream-react'
-import { NodeRenderer, setCustomComponents } from 'markstream-react'
+import NodeRenderer, { setCustomComponents } from 'markstream-react'
 
 function ThinkingNode(props: NodeComponentProps<{ type: 'thinking', content: string }>) {
   const { node, ctx } = props

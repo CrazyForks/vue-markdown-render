@@ -73,7 +73,7 @@ The primary component for rendering markdown content in React.
 ### Usage
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function App() {
   const markdown = `# Hello React!
@@ -490,7 +490,7 @@ function App() {
 You can use React Context inside custom node components, while still registering them via `setCustomComponents`:
 
 ```tsx
-import { NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+import MarkdownRender, { setCustomComponents } from 'markstream-react'
 import React, { createContext, useContext } from 'react'
 
 const ThemeContext = createContext<'light' | 'dark'>('light')
@@ -530,7 +530,7 @@ This uses a custom heading component.
 markstream-react supports streaming markdown content:
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useEffect, useState } from 'react'
 
 function StreamingDemo() {
@@ -566,7 +566,7 @@ markstream-react includes full TypeScript definitions:
 ```tsx
 import type { NodeComponentProps, NodeRendererProps } from 'markstream-react'
 import type { ParsedNode } from 'stream-markdown-parser'
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function App() {
   const markdown = '# Hello TypeScript!'
@@ -585,7 +585,7 @@ Code block prop interfaces (`CodeBlockNodeProps`, `MermaidBlockNodeProps`, `Info
 ```tsx
 'use client'
 
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useEffect, useState } from 'react'
 
 export default function MarkdownPage() {
@@ -609,7 +609,7 @@ export default function MarkdownPage() {
 import dynamic from 'next/dynamic'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.NodeRenderer),
+  () => import('markstream-react').then(mod => mod.default),
   {
     ssr: false,
     loading: () => <div>Loading markdown...</div>
@@ -627,7 +627,7 @@ You can easily integrate with React hooks:
 
 ```tsx
 import type { ChangeEvent } from 'react'
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useCallback, useMemo, useState } from 'react'
 
 function MarkdownEditor() {
@@ -655,7 +655,7 @@ function MarkdownEditor() {
 ## Error Handling
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useState } from 'react'
 
 function SafeMarkdown({ content }: { content: string }) {

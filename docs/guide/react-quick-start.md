@@ -32,7 +32,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 ### 3. Use the Component
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function App() {
   const markdown = `# Hello React!
@@ -67,7 +67,7 @@ markstream-react is built with TypeScript and includes full type definitions:
 
 ```tsx
 import type { NodeRendererProps } from 'markstream-react'
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 const props: NodeRendererProps = {
   content: '# Hello TypeScript!',
@@ -85,7 +85,7 @@ function App() {
 ```tsx
 'use client'
 
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useEffect, useState } from 'react'
 
 export default function MarkdownPage() {
@@ -110,7 +110,7 @@ This works with Next.js App Router.
 ### Pages Router
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useEffect, useState } from 'react'
 import 'markstream-react/index.css'
 
@@ -137,7 +137,7 @@ import dynamic from 'next/dynamic'
 import 'markstream-react/index.css'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.NodeRenderer),
+  () => import('markstream-react').then(mod => mod.default),
   { ssr: false }
 )
 
@@ -159,7 +159,7 @@ pnpm add shiki stream-markdown
 ```
 
 ```tsx
-import { MarkdownCodeBlockNode, NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-react'
 
 // Use Shiki-based code blocks inside MarkdownRender
 setCustomComponents({
@@ -244,7 +244,7 @@ $$`
 You can customize how specific nodes are rendered by passing custom component mappings:
 
 ```tsx
-import { NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+import MarkdownRender, { setCustomComponents } from 'markstream-react'
 
 // Custom heading component
 function CustomHeading({ node, customId }: any) {
@@ -278,7 +278,7 @@ This heading is rendered with a custom component.
 markstream-react supports streaming markdown content, which is useful for AI-generated content:
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useState } from 'react'
 
 function StreamingDemo() {
@@ -335,7 +335,7 @@ console.log('Streaming enabled:', streaming)
 
 ```tsx
 import type { ChangeEvent } from 'react'
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useCallback, useEffect, useState } from 'react'
 
 function MarkdownEditor() {
@@ -367,7 +367,7 @@ function MarkdownEditor() {
 For large markdown documents, you can use virtualization:
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function LongDocument() {
   // Your very long markdown content
@@ -426,7 +426,7 @@ The default styles are scoped under `.markstream-react` class. You can override 
 ## Using with Tailwind CSS
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import 'markstream-react/index.css'
 import './output.css' // Your Tailwind output
 

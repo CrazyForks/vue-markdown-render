@@ -73,7 +73,7 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 ### 使用
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function App() {
   const markdown = `# Hello React!
@@ -490,7 +490,7 @@ function App() {
 可以在自定义节点组件内部使用 React Context，同时通过 `setCustomComponents` 注册组件：
 
 ```tsx
-import { NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+import MarkdownRender, { setCustomComponents } from 'markstream-react'
 import React, { createContext, useContext } from 'react'
 
 const ThemeContext = createContext<'light' | 'dark'>('light')
@@ -530,7 +530,7 @@ function App() {
 markstream-react 支持流式 markdown 内容：
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useEffect, useState } from 'react'
 
 function StreamingDemo() {
@@ -566,7 +566,7 @@ markstream-react 包含完整的 TypeScript 类型定义：
 ```tsx
 import type { NodeComponentProps, NodeRendererProps } from 'markstream-react'
 import type { ParsedNode } from 'stream-markdown-parser'
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function App() {
   const markdown = '# Hello TypeScript!'
@@ -585,7 +585,7 @@ function App() {
 ```tsx
 'use client'
 
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useEffect, useState } from 'react'
 
 export default function MarkdownPage() {
@@ -609,7 +609,7 @@ export default function MarkdownPage() {
 import dynamic from 'next/dynamic'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.NodeRenderer),
+  () => import('markstream-react').then(mod => mod.default),
   {
     ssr: false,
     loading: () => <div>加载 markdown 中...</div>
@@ -627,7 +627,7 @@ export default function MarkdownPage() {
 
 ```tsx
 import type { ChangeEvent } from 'react'
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useCallback, useMemo, useState } from 'react'
 
 function MarkdownEditor() {
@@ -655,7 +655,7 @@ function MarkdownEditor() {
 ## 错误处理
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useState } from 'react'
 
 function SafeMarkdown({ content }: { content: string }) {

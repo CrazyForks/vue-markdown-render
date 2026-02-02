@@ -95,7 +95,7 @@ pnpm add shiki stream-markdown
 这些包用于 Shiki 版的 `MarkdownCodeBlockNode`。若要在 `MarkdownRender` 中使用 Shiki，请覆盖 `code_block` 渲染器（或直接使用 `MarkdownCodeBlockNode`）。
 
 ```tsx
-import { MarkdownCodeBlockNode, NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-react'
 
 setCustomComponents({
   code_block: ({ node, isDark, ctx }: any) => (
@@ -146,7 +146,7 @@ import 'katex/dist/katex.min.css'
 导入并渲染一个简单的 markdown 字符串：
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import 'markstream-react/index.css'
 
 function App() {
@@ -164,7 +164,7 @@ markstream-react 使用 TypeScript 编写，并包含完整的类型定义，无
 
 ```tsx
 import type { NodeRendererProps } from 'markstream-react'
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 const props: NodeRendererProps = {
   content: '# Hello TypeScript!',
@@ -182,7 +182,7 @@ function App() {
 ```tsx
 'use client'
 
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import { useEffect, useState } from 'react'
 import 'markstream-react/index.css'
 
@@ -207,7 +207,7 @@ export default function MarkdownPage() {
 import dynamic from 'next/dynamic'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.NodeRenderer),
+  () => import('markstream-react').then(mod => mod.default),
   { ssr: false }
 )
 
@@ -236,7 +236,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 ```tsx
 // src/App.tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function App() {
   const content = `# Hello Vite!
