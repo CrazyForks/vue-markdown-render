@@ -968,11 +968,9 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
         )}
       >
         {header}
-        {!isCollapsed && (
-          <div ref={modeContainerRef}>
-            {body}
-          </div>
-        )}
+        <div ref={modeContainerRef} style={{ display: isCollapsed ? 'none' : 'block' }}>
+          {body}
+        </div>
       </div>
       {modalOpen && typeof document !== 'undefined' && createPortal(
         <div
