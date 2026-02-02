@@ -159,7 +159,19 @@ pnpm add shiki stream-markdown
 ```
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import { MarkdownCodeBlockNode, NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+
+// 在 MarkdownRender 中使用 Shiki 代码块
+setCustomComponents({
+  code_block: ({ node, isDark, ctx }: any) => (
+    <MarkdownCodeBlockNode
+      node={node}
+      isDark={isDark}
+      stream={ctx?.codeBlockStream}
+      {...(ctx?.codeBlockProps || {})}
+    />
+  ),
+})
 
 function App() {
   const markdown = `\`\`\`javascript
@@ -183,7 +195,6 @@ pnpm add mermaid
 
 ```tsx
 import 'markstream-react/index.css'
-import 'mermaid/dist/mermaid.css'
 
 function App() {
   const markdown = `#### Mermaid 图表
@@ -323,6 +334,7 @@ console.log('流式传输已启用:', streaming)
 ## 使用 React Hooks
 
 ```tsx
+import type { ChangeEvent } from 'react'
 import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -330,7 +342,7 @@ function MarkdownEditor() {
   const [content, setContent] = useState('# 编辑我！')
   const [html, setHtml] = useState('')
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value)
   }, [])
 
@@ -384,7 +396,7 @@ function LongDocument() {
 | `liveNodeBuffer` | `number` | `60` | 过扫描缓冲区 |
 | `batchRendering` | `boolean` | `true` | 启用批处理渲染 |
 | `deferNodesUntilVisible` | `boolean` | `true` | 延迟重型节点 |
-| `renderCodeBlocksAsPre` | `boolean` | `false` | 使用 `<pre><code>` 回退 |
+| `renderCodeBlocksAsPre` | `boolean` | `false` | 使用 `<pre><code>` 回退（Mermaid 也会回退） |
 
 ## 样式
 

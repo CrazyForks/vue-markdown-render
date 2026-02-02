@@ -6,12 +6,14 @@ import CheckboxNode from './components/CheckboxNode'
 import CodeBlockNode from './components/CodeBlockNode'
 import DefinitionListNode from './components/DefinitionListNode'
 import EmojiNode from './components/EmojiNode'
+import EmphasisNode from './components/EmphasisNode'
 import FootnoteAnchorNode from './components/FootnoteAnchorNode'
 import FootnoteNode from './components/FootnoteNode'
 import FootnoteReferenceNode from './components/FootnoteReferenceNode'
 import HardBreakNode from './components/HardBreakNode'
 import HeadingNode from './components/HeadingNode'
 import HighlightNode from './components/HighlightNode'
+import HtmlBlockNode from './components/HtmlBlockNode'
 import HtmlInlineNode from './components/HtmlInlineNode'
 import ImageNode from './components/ImageNode'
 import InfographicBlockNode from './components/InfographicBlockNode'
@@ -37,6 +39,8 @@ import SuperscriptNode from './components/SuperscriptNode'
 import TableNode from './components/TableNode'
 import TextNode from './components/TextNode'
 import ThematicBreakNode from './components/ThematicBreakNode'
+import Tooltip from './components/Tooltip'
+import VmrContainerNode from './components/VmrContainerNode'
 import { setDefaultI18nMap } from './composables/useSafeI18n'
 import { setLanguageIconResolver } from './utils/languageIcon'
 import { clearGlobalCustomComponents, getCustomNodeComponents, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
@@ -46,6 +50,18 @@ import './index.css'
 
 export type { KatexLoader } from './components/MathInlineNode/katex'
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
+export type { NodeRendererProps } from './components/NodeRenderer/NodeRenderer.vue'
+export type {
+  CodeBlockNodeProps,
+  ImageNodeProps,
+  InfographicBlockNodeProps,
+  LinkNodeProps,
+  MathBlockNodeProps,
+  MathInlineNodeProps,
+  MermaidBlockEvent,
+  MermaidBlockNodeProps,
+  PreCodeNodeProps,
+} from './types/component-props'
 export * from './utils'
 export * from './workers/katexCdnWorker'
 export * from './workers/katexWorkerClient'
@@ -64,6 +80,7 @@ export {
   disableKatex,
   disableMermaid,
   EmojiNode,
+  EmphasisNode,
   enableKatex,
   enableMermaid,
   FootnoteAnchorNode,
@@ -73,6 +90,7 @@ export {
   HardBreakNode,
   HeadingNode,
   HighlightNode,
+  HtmlBlockNode,
   HtmlInlineNode,
   ImageNode,
   InfographicBlockNode,
@@ -103,6 +121,8 @@ export {
   TableNode,
   TextNode,
   ThematicBreakNode,
+  Tooltip,
+  VmrContainerNode,
 }
 
 export default MarkdownRender
@@ -114,11 +134,13 @@ const componentMap: Record<string, any> = {
   CodeBlockNode,
   DefinitionListNode,
   EmojiNode,
+  EmphasisNode,
   FootnoteNode,
   FootnoteReferenceNode,
   FootnoteAnchorNode,
   HardBreakNode,
   HeadingNode,
+  HtmlBlockNode,
   HtmlInlineNode,
   HighlightNode,
   ImageNode,
@@ -141,6 +163,7 @@ const componentMap: Record<string, any> = {
   TableNode,
   TextNode,
   ThematicBreakNode,
+  VmrContainerNode,
   ReferenceNode,
 }
 

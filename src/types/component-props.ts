@@ -1,15 +1,8 @@
 // Centralized exported props interfaces for components
+import type { CodeBlockNode } from 'stream-markdown-parser'
 
 export interface CodeBlockNodeProps {
-  node: {
-    type: 'code_block'
-    language: string
-    code: string
-    raw: string
-    diff?: boolean
-    originalCode?: string
-    updatedCode?: string
-  }
+  node: CodeBlockNode
   isDark?: boolean
   loading?: boolean
   stream?: boolean
@@ -68,11 +61,11 @@ export interface LinkNodeProps {
 }
 
 export interface PreCodeNodeProps {
-  node: any
+  node: CodeBlockNode
 }
 
 export interface MermaidBlockNodeProps {
-  node: any
+  node: CodeBlockNode
   maxHeight?: string | null
   loading?: boolean
   isDark?: boolean
@@ -106,12 +99,7 @@ export interface MermaidBlockEvent<TPayload = any> {
 }
 
 export interface InfographicBlockNodeProps {
-  node: {
-    type: 'infographic_block'
-    code: string
-    raw: string
-    loading?: boolean
-  }
+  node: CodeBlockNode
   maxHeight?: string | null
   loading?: boolean
   isDark?: boolean

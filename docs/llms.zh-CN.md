@@ -80,8 +80,8 @@
 
 1) **CSS 顺序/Reset**：先 reset，再 `markstream-vue/index.css`（Tailwind 通常放进 `@layer components`）。
 2) **可选 peer 是否安装**（Mermaid/KaTeX/Monaco/Shiki）。
-3) **是否显式启用**（需要时）：`enableMermaid()` / `enableKatex()`。
-4) **peer CSS 是否导入**（需要时）：`katex/dist/katex.min.css`, `mermaid/dist/mermaid.css`。
+3) **是否启用 loader**（仅在你手动关闭/覆盖时需要）：`enableMermaid()` / `enableKatex()`。
+4) **peer CSS 是否导入**（需要时）：`katex/dist/katex.min.css`（Mermaid 不需要额外 CSS）。
 5) **单独节点组件 wrapper**：单独用节点组件时，外层需要 `.markstream-vue`。
 6) **SSR（Nuxt）**：用 `&lt;client-only&gt;` 包裹，并确保重 peer/worker 仅浏览器初始化。
 
@@ -143,9 +143,9 @@
 - 表述： “mermaid 空白”
 - 步骤：
   - 安装 `mermaid` peer
-  - 客户端调用 `enableMermaid()`
+  - 若手动关闭/覆盖过 loader，客户端调用 `enableMermaid()`（或设置自定义 loader）
   - 复查 CSS 顺序/reset
-- 最小追问： “你在哪调用 `enableMermaid()`？是否 SSR？fence 是否是 ```mermaid？”
+- 最小追问： “是否关闭过 loader？是否 SSR？fence 是否是 ```mermaid？”
 - 文档：`docs/guide/mermaid.md`, `docs/guide/troubleshooting.md`
 - 源码：`src/components/MermaidBlockNode/mermaid.ts`
 
@@ -155,8 +155,8 @@
 - 步骤：
   - 安装 `katex` peer
   - 导入 `katex/dist/katex.min.css`
-  - 客户端调用 `enableKatex()`
-- 最小追问： “是否导入 KaTeX CSS？`$...$` 还是 `$$...$$`？是否 SSR？”
+  - 若手动关闭/覆盖过 loader，客户端调用 `enableKatex()`（或设置自定义 loader）
+- 最小追问： “是否导入 KaTeX CSS？`$...$` 还是 `$$...$$`？是否 SSR？是否关闭过 loader？”
 - 文档：`docs/guide/math.md`, `docs/guide/installation.md`
 - 源码：`src/components/MathInlineNode/katex.ts`
 

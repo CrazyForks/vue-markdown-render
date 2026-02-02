@@ -5,7 +5,7 @@
 Code blocks can be rendered in three ways depending on which optional dependencies you install and how you configure the library:
 
 - Monaco (recommended for large/interactive code blocks): installs and uses `stream-monaco` to provide an editor-like, incremental rendering experience. The library lazy-loads `stream-monaco` at runtime when available.
-- Markdown mode (streaming Markdown-based renderer): install `stream-markdown` and override the `code_block` node via `setCustomComponents` to provide a Markdown-driven code block renderer.
+- Shiki (MarkdownCodeBlockNode): install `shiki` + `stream-markdown` and override the `code_block` node via `setCustomComponents` to use a lightweight Markdown-driven renderer.
 - Fallback (no extra deps): if neither optional package is installed, code blocks render as plain `<pre><code>` blocks (basic styling / no Monaco features).
 
 ## Monaco (recommended)
@@ -21,32 +21,31 @@ npm i stream-monaco
 - Behavior: when `stream-monaco` is present the built-in `CodeBlockNode` will use Monaco-based streaming updates for large or frequently-updated code blocks.
 
 - Vite worker note: Monaco and some worker-backed features require appropriate worker bundling configuration in your bundler (Vite) so the editor/workers are available at runtime. See [/nuxt-ssr](/nuxt-ssr) for guidance and examples of configuring workers and client-only initialization.
-- See also: [/guide/monaco](/guide/monaco) for Vite `?worker` examples and explicit worker registration snippets.
+- See also: [/guide/monaco](/guide/monaco) for worker bundling tips and preload snippets.
 
-## Markdown mode (use stream-markdown)
+## Shiki mode (MarkdownCodeBlockNode)
 
 - Install:
 
 ```bash
-pnpm add stream-markdown
+pnpm add shiki stream-markdown
 # or
-npm i stream-markdown
+npm i shiki stream-markdown
 ```
 
-- Override the `code_block` node via `setCustomComponents` to register a Markdown-style code block renderer. Example:
+- Override the `code_block` node via `setCustomComponents` to register the Shiki-based renderer:
 
 ```ts
-import { setCustomComponents } from 'markstream-vue'
-import MyMarkdownCodeBlock from './MyMarkdownCodeBlock.vue'
+import { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue'
 
-setCustomComponents({ code_block: MyMarkdownCodeBlock })
+setCustomComponents({ code_block: MarkdownCodeBlockNode })
 ```
 
-Once set, Markdown-based renderers (from `stream-markdown` or your own component) will be used for `code_block` nodes.
+Once set, `MarkdownCodeBlockNode` (powered by Shiki via `stream-markdown`) will be used for `code_block` nodes. You can also supply your own component that uses `stream-markdown` directly.
 
 ### Vue CLI 4 (Webpack 4) notes
 
-If you use Vue CLI 4 (Webpack 4), it’s recommended to use Markdown mode for code blocks (Shiki) and **override** `code_block` to avoid Monaco + legacy-bundler edge cases.
+If you use Vue CLI 4 (Webpack 4), it’s recommended to use the Shiki mode for code blocks and **override** `code_block` to avoid Monaco + legacy-bundler edge cases.
 
 Key pitfalls and fixes (see `playground-vue2-cli`):
 

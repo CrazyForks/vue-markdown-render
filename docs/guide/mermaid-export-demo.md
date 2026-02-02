@@ -18,8 +18,7 @@ You can copy the following single-file component into your app or into the playg
 
 ```vue
 <script setup lang="ts">
-import { setCustomComponents } from 'markstream-vue'
-import MermaidBlockNode from 'markstream-vue/src/components/MermaidBlockNode'
+import MarkdownRender, { MermaidBlockNode, setCustomComponents } from 'markstream-vue'
 import { h } from 'vue'
 
 // minimal uploader helper (replace with real upload)

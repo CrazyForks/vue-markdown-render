@@ -12,6 +12,7 @@ pnpm add stream-monaco
 - Monaco requires worker configuration for production builds. Use `vite-plugin-monaco-editor-esm` or `vite-plugin-monaco-editor`.
 - In Vite config:
   ```ts
+  import { defineConfig } from 'vite'
   import monacoEditorPlugin from 'vite-plugin-monaco-editor'
 
   export default defineConfig({ plugins: [monacoEditorPlugin()] })

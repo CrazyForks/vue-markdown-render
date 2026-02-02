@@ -44,6 +44,7 @@ Monaco requires worker packaging for production builds. Use `vite-plugin-monaco-
 
 ```ts
 import path from 'node:path'
+import { defineConfig } from 'vite'
 import monacoEditorPlugin from 'vite-plugin-monaco-editor-esm'
 
 export default defineConfig({
@@ -84,6 +85,8 @@ Quick try — Render a monaco-enabled code block (after installing `stream-monac
 
 ```vue
 <script setup>
+import { CodeBlockNode } from 'markstream-vue'
+
 const node = { type: 'code_block', language: 'js', raw: 'console.log(123)', code: 'console.log(123)' }
 </script>
 

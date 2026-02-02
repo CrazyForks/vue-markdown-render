@@ -22,7 +22,7 @@ markstream-react supports various features through optional peer dependencies. I
 
 | Feature | Required Packages | Install Command |
 |---------|------------------|-----------------|
-| Code Syntax Highlighting | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
+| Shiki code blocks (`MarkdownCodeBlockNode`) | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
 | Monaco Editor (full code block features) | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid Diagrams | `mermaid` | `pnpm add mermaid` |
 | Math Rendering (KaTeX) | `katex` | `pnpm add katex` |
@@ -45,7 +45,6 @@ Required CSS:
 ```tsx
 import 'markstream-react/index.css'
 import 'katex/dist/katex.min.css'
-import 'mermaid/dist/mermaid.css'
 ```
 
 Monaco (`stream-monaco`) does not require a separate CSS import.
@@ -93,7 +92,22 @@ Requires both `shiki` and `stream-markdown`:
 pnpm add shiki stream-markdown
 ```
 
-This enables syntax highlighting in code blocks using Shiki.
+These packages power the Shiki-based `MarkdownCodeBlockNode`. To use Shiki inside `MarkdownRender`, override the `code_block` renderer (or render `MarkdownCodeBlockNode` directly).
+
+```tsx
+import { MarkdownCodeBlockNode, NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+
+setCustomComponents({
+  code_block: ({ node, isDark, ctx }: any) => (
+    <MarkdownCodeBlockNode
+      node={node}
+      isDark={isDark}
+      stream={ctx?.codeBlockStream}
+      {...(ctx?.codeBlockProps || {})}
+    />
+  ),
+})
+```
 
 #### Monaco Editor
 

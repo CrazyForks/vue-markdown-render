@@ -2,6 +2,25 @@
 
 markstream-vue2 provides the same powerful components as markstream-vue, but built for Vue 2. All components are compatible with Vue 2.6+ (with `@vue/composition-api`) and Vue 2.7+.
 
+## TypeScript exports
+
+`markstream-vue2` exports renderer and component prop interfaces:
+
+```ts
+import type {
+  CodeBlockNodeProps,
+  InfographicBlockNodeProps,
+  MermaidBlockNodeProps,
+  NodeRendererProps,
+  PreCodeNodeProps,
+} from 'markstream-vue2'
+import type { CodeBlockNode } from 'stream-markdown-parser'
+```
+
+Notes:
+- `NodeRendererProps` matches `<MarkdownRender>` props.
+- `CodeBlockNodeProps`, `MermaidBlockNodeProps`, `InfographicBlockNodeProps`, and `PreCodeNodeProps` all use `CodeBlockNode` for `node` (use `language: 'mermaid'` / `language: 'infographic'` to route specialized renderers).
+
 ## Main Component: MarkdownRender
 
 The primary component for rendering markdown content in Vue 2.
@@ -353,10 +372,10 @@ const nodes = parseMarkdownToStructure('# Title\n\nContent here...', md)
 ```js
 import { enableKatex, enableMermaid } from 'markstream-vue2'
 
-// Enable KaTeX worker
+// Enable KaTeX loader
 enableKatex()
 
-// Enable Mermaid worker
+// Enable Mermaid loader
 enableMermaid()
 ```
 
@@ -372,7 +391,7 @@ interface NodeComponentProps {
   indexKey: number | string // Unique key for the node
   customId?: string // Custom ID for scoping
   isDark?: boolean // Forwarded theme flag (from MarkdownRender)
-  typewriter?: boolean // Forwarded typewriter flag (non-code nodes)
+  typewriter?: boolean // Forwarded typewriter flag (non-code nodes only)
   loading?: boolean // Streaming/loading state (from node.loading)
 }
 ```
@@ -394,7 +413,7 @@ export default {
     },
     customId: {
       type: String,
-      default: 'default'
+      default: ''
     }
   },
   computed: {
@@ -513,7 +532,7 @@ import type { ParsedNode } from 'markstream-vue2'
 import MarkdownRender from 'markstream-vue2'
 
 // Your component with proper typing
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 
 export default defineComponent({
   components: { MarkdownRender },

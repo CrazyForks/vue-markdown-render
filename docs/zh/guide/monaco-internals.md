@@ -15,6 +15,7 @@ pnpm add stream-monaco
 示例：
 
 ```ts
+import { defineConfig } from 'vite'
 import monacoEditorPlugin from 'vite-plugin-monaco-editor'
 
 export default defineConfig({ plugins: [monacoEditorPlugin()] })
@@ -32,7 +33,7 @@ export default defineConfig({ plugins: [monacoEditorPlugin()] })
 
 ## 打包到库的注意事项
 - 当把本库打包进其他项目时，请在目标项目中正确配置 worker 路径或使用插件的选项来重新定位。
-- 考虑使用 `preload` 或 `getUseMonaco()` 在页面需要时预加载 Monaco，这样能改善用户首次打开大型文档时的响应。
+- 可在页面需要时调用 `getUseMonaco()` 预加载 Monaco，以改善首次打开大型文档时的响应。
 
 ## 常见故障排查
 - 如果看到 `Failed to load Monaco worker`，先在浏览器网络面板（Network）中检查 worker 文件的请求与响应；资源 404 或路径不正确通常就是问题所在。

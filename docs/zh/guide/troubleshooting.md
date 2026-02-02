@@ -91,7 +91,7 @@ export default defineConfig({
 })
 ```
 
-3. **确认同伴 CSS** —— Monaco、KaTeX、Mermaid 都有自己的样式文件。缺少时会表现为空白编辑器或无样式公式。对照组件指南确认已引入对应 CSS。
+3. **确认同伴 CSS** —— KaTeX 有独立样式文件，缺失时会表现为公式空白。Mermaid 不需要额外 CSS。
 
 4. **用 `custom-id` 限定覆盖范围** —— 集成到大型设计系统时，其他全局样式可能影响渲染器。给 `MarkdownRender` 传 `custom-id="docs"`，再通过 `[data-custom-id="docs"]` 编写覆盖，可避免污染其它页面。
 

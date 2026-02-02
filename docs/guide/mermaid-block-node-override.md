@@ -41,7 +41,8 @@ Quick try — test the override by mounting the custom renderer inside your app'
 
 ```ts
 // .vitepress/clientAppEnhance.ts or playground client entry
-import { setCustomComponents } from 'markstream-vue'
+import { MermaidBlockNode, setCustomComponents } from 'markstream-vue'
+import { h } from 'vue'
 
 setCustomComponents('playground-demo', {
   mermaid: (props: any) => h(MermaidBlockNode, { ...props, onExport: (ev) => {

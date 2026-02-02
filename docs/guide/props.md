@@ -50,6 +50,8 @@ These props are forwarded to `CodeBlockNode` / `MarkdownCodeBlockNode` (but **no
 - `code-block-props` (escape hatch to forward any extra CodeBlock props)
 - `themes` (theme list forwarded to `stream-monaco` when present)
 
+Note: `code-block-monaco-options` is only used by the Monaco-backed `CodeBlockNode`. If you override `code_block` with `MarkdownCodeBlockNode`, treat `code-block-dark-theme` / `code-block-light-theme` as Shiki theme names, and `themes` as the Shiki theme list to preload.
+
 ## Code block header controls
 
 Pass these props directly to `CodeBlockNode` / `MarkdownCodeBlockNode`, or globally via `code-block-props` on `MarkdownRender`:

@@ -5,11 +5,30 @@
 | `MarkdownRender` | Rendering full AST trees (default export) | Props: `content` / `nodes`, `custom-id`, `final`, `parse-options`, `custom-html-tags`, `is-dark`; events: `copy`, `handleArtifactClick`, `click`, `mouseover`, `mouseout` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Use `setCustomComponents(customId, mapping)` + `custom-id` to scope overrides; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; events: `copy`, `previewCode`; slots `header-left` / `header-right` | Install `stream-monaco` (peer) + bundle Monaco workers | Blank editor ⇒ check worker bundling + SSR guards |
 | `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `stream`, `loading`; slots `header-left` / `header-right` | Requires `shiki` + `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
-| `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` ≥ 11; import `mermaid/dist/mermaid.css` | For async errors see `/guide/mermaid` |
+| `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` ≥ 11; no extra CSS required | For async errors see `/guide/mermaid` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
 | `ImageNode` | Custom previews/lightboxes | Props: `fallback-src`, `show-caption`, `lazy`, `svg-min-height`, `use-placeholder`; emits `click`, `load`, `error` | None, but respects global CSS | Wrap in a custom component + `setCustomComponents` to intercept events |
 | `LinkNode` | Animated underline, tooltips | `color`, `underlineHeight`, `showTooltip` | No extra CSS | Browser defaults can override `a` styles; import reset |
 | `VmrContainerNode` | Custom `:::` containers | `node` (`name`, `attrs`, `loading`, `children`) | Minimal base CSS; override via `setCustomComponents` | JSON attrs are normalized onto `node.attrs` (keys without `data-`); invalid/partial JSON becomes `attrs.attrs`; args after name stored in `attrs.args` |
+
+## TypeScript exports
+
+`markstream-vue` exports renderer and component prop interfaces:
+
+```ts
+import type {
+  CodeBlockNodeProps,
+  InfographicBlockNodeProps,
+  MermaidBlockNodeProps,
+  NodeRendererProps,
+  PreCodeNodeProps,
+} from 'markstream-vue'
+import type { CodeBlockNode } from 'stream-markdown-parser'
+```
+
+Notes:
+- `NodeRendererProps` matches `<MarkdownRender>` props.
+- `CodeBlockNodeProps`, `MermaidBlockNodeProps`, `InfographicBlockNodeProps`, and `PreCodeNodeProps` all use `CodeBlockNode` for `node` (use `language: 'mermaid'` / `language: 'infographic'` to route specialized renderers).
 
 ## MarkdownRender
 
@@ -175,7 +194,7 @@ function closePreview() {
 ### Common pitfalls
 - **Editor invisible**: worker registration missing or blocked by SSR.
 - **Tailwind overriding fonts**: wrap imports in `@layer components`.
-- **SSR**: Monaco requires browser APIs; use lazy mounts (`client-only`) or `visibility-wrapper`.
+- **SSR**: Monaco requires browser APIs; use lazy mounts (`client-only`) or guard with `onMounted`.
 
 ## MarkdownCodeBlockNode
 
@@ -216,7 +235,7 @@ Troubleshooting:
 
 ### Quick reference
 - **Peer**: `mermaid` ≥ 11 (tree-shakable ESM build recommended).
-- **CSS**: import `mermaid/dist/mermaid.css` after your reset.
+- **CSS**: no extra Mermaid CSS import is required; keep `markstream-vue/index.css` after your reset.
 - **Props**: `node`, `isDark`, `isStrict`, `maxHeight`, timeouts, header/button toggles, `enableWheelZoom`.
 - **Emits**: `copy`, `export`, `openModal`, `toggleMode` (call `ev.preventDefault()` to stop the default action).
 
@@ -534,6 +553,7 @@ You can also render different components based on the container name:
 ```vue
 <script setup lang="ts">
 import { setCustomComponents } from 'markstream-vue'
+import { h } from 'vue'
 import AlertContainer from './AlertContainer.vue'
 import ChartContainer from './ChartContainer.vue'
 import GenericContainer from './GenericContainer.vue'

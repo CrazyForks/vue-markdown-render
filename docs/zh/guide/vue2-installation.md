@@ -22,7 +22,7 @@ markstream-vue2 通过可选的对等依赖支持各种功能。只安装你需�
 
 | 功能 | 所需包 | 安装命令 |
 |---------|------------------|-----------------|
-| 代码语法高亮 | `shiki`、`stream-markdown` | `pnpm add shiki stream-markdown` |
+| Shiki 代码块（`MarkdownCodeBlockNode`） | `shiki`、`stream-markdown` | `pnpm add shiki stream-markdown` |
 | Monaco 编辑器（完整代码块功能） | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid 图表 | `mermaid` | `pnpm add mermaid` |
 | 数学公式渲染（KaTeX） | `katex` | `pnpm add katex` |
@@ -56,7 +56,7 @@ enableMermaid()
 enableKatex()
 ```
 
-同时记得导入必需的 CSS：
+同时记得导入必需的 CSS（按需使用）：
 
 ```ts
 import 'markstream-vue2/index.css'
@@ -180,7 +180,13 @@ npm install shiki stream-markdown stream-monaco mermaid katex
 pnpm add shiki stream-markdown
 ```
 
-这将使用 Shiki 启用代码块的语法高亮。
+这些包用于 Shiki 版的 `MarkdownCodeBlockNode`。若要在 `MarkdownRender` 中使用 Shiki，请覆盖 `code_block` 渲染器（或直接使用 `MarkdownCodeBlockNode`）。
+
+```js
+import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue2'
+
+setCustomComponents({ code_block: MarkdownCodeBlockNode })
+```
 
 #### Monaco 编辑器
 

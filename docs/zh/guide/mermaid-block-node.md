@@ -32,6 +32,7 @@
 ```vue
 <script setup lang="ts">
 import type { MermaidBlockEvent } from 'markstream-vue'
+import { MermaidBlockNode } from 'markstream-vue'
 
 function onExport(ev: any /* MermaidBlockEvent */) {
   ev.preventDefault()

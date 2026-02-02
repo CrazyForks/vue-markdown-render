@@ -30,7 +30,7 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 
 When `custom-html-tags` includes a tag name, the parser:
 - suppresses streaming mid‑states until `<tag ...>` is complete,
-- emits a `CustomComponentNode` with `type: 'tag'` (for example `type: 'thinking'`), plus `content`, optional `attrs`, and `loading/autoClosed` flags.
+- emits a `CustomComponentNode` with `type: 'thinking'` (the tag name, no angle brackets), plus `content`, optional `attrs`, and `loading/autoClosed` flags.
 
 ## Custom component parsing
 

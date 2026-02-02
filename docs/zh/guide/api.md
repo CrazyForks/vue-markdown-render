@@ -44,7 +44,7 @@ setCustomComponents('docs', {
 
 提示：
 - 使用语义化 ID（如 `docs`、`playground`）方便排查。
-- `setCustomComponents(undefined, mapping)` 会注册全局映射；更推荐按 ID 作用域隔离。
+- `setCustomComponents(mapping)` 会注册全局映射；更推荐按 ID 作用域隔离。
 - 在 SPA 中按需注册/卸载时，记得在路由切换时清理。
 
 ## 解析钩子与节点变换
@@ -83,7 +83,7 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 ## 样式 & 排障提醒
 
 - 先引入 reset，再在 `@layer components` 导入 `markstream-vue/index.css`，防止 Tailwind/UnoCSS 覆盖。参考 [Tailwind 指南](/zh/guide/tailwind)。
-- 各个同伴依赖（Monaco、Shiki、Mermaid、KaTeX）都需要自己的 CSS；缺失时通常表现为空白渲染。
+- 同伴依赖中，KaTeX 需要自己的 CSS；Mermaid 不需要。缺失 KaTeX 样式时通常表现为空白公式。
 - 使用 `custom-id` + `[data-custom-id="docs"]` 来局部覆盖样式。
 - 遇到样式异常时，依照 [排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) 逐项检查。
 

@@ -25,8 +25,7 @@ graph LR
 
 ```vue
 <script setup lang="ts">
-import { setCustomComponents } from 'markstream-vue'
-import MermaidBlockNode from 'markstream-vue/src/components/MermaidBlockNode'
+import MarkdownRender, { MermaidBlockNode, setCustomComponents } from 'markstream-vue'
 import { h } from 'vue'
 
 async function uploadSvgToServer(svgString: string) {

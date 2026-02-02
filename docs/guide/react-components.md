@@ -30,7 +30,7 @@ The primary component for rendering markdown content in React.
 
 | Prop | Default | Description |
 |------|---------|-------------|
-| `renderCodeBlocksAsPre` | `false` | Render non-Mermaid/Infographic code blocks as `<pre><code>` |
+| `renderCodeBlocksAsPre` | `false` | Render code blocks as `<pre><code>` (Mermaid blocks will also fall back) |
 | `codeBlockStream` | `true` | Stream code block updates as content arrives |
 | `viewportPriority` | `true` | Defer heavy work (Monaco/Mermaid/KaTeX) until near viewport |
 | `deferNodesUntilVisible` | `true` | Render heavy nodes as placeholders until visible (non-virtualized mode only) |
@@ -245,6 +245,11 @@ function MermaidDiagram() {
 }
 ```
 
+Event notes:
+- `onCopy(code: string)` receives the source text directly (no `MermaidBlockEvent` wrapper in React).
+- `onExport`, `onOpenModal`, `onToggleMode` receive `MermaidBlockEvent` and support `ev.preventDefault()` to stop the default behavior.
+- `onToggleMode` signature: `(target: 'source' | 'preview', ev)`.
+
 ## Other Node Components
 
 ### HeadingNode
@@ -423,7 +428,7 @@ setKaTeXWorker(new KatexWorker())
 All custom node components receive these props:
 
 ```tsx
-interface NodeComponentProps<TNode = ParsedNode> {
+interface NodeComponentProps<TNode = unknown> {
   node: TNode // The parsed node data
   ctx?: RenderContext // Renderer context (themes, events, flags)
   renderNode?: RenderNodeFn // Helper to render child nodes
@@ -526,7 +531,7 @@ markstream-react supports streaming markdown content:
 
 ```tsx
 import { NodeRenderer as MarkdownRender } from 'markstream-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 function StreamingDemo() {
   const [content, setContent] = useState('')
@@ -535,7 +540,7 @@ function StreamingDemo() {
 This content streams in **small chunks**.
 `
 
-  React.useEffect(() => {
+  useEffect(() => {
     let i = 0
     const interval = setInterval(() => {
       if (i < fullContent.length) {
@@ -570,6 +575,8 @@ function App() {
   return <MarkdownRender content={markdown} nodes={nodes} />
 }
 ```
+
+Code block prop interfaces (`CodeBlockNodeProps`, `MermaidBlockNodeProps`, `InfographicBlockNodeProps`, `PreCodeNodeProps`) all use `node: CodeBlockNode` from `stream-markdown-parser` (use `language: 'mermaid'` / `language: 'infographic'` when targeting specialized renderers).
 
 ## Next.js Best Practices
 
@@ -619,6 +626,7 @@ export default function MarkdownPage() {
 You can easily integrate with React hooks:
 
 ```tsx
+import type { ChangeEvent } from 'react'
 import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useCallback, useMemo, useState } from 'react'
 
@@ -628,7 +636,7 @@ function MarkdownEditor() {
 
   const memoizedContent = useMemo(() => content, [content])
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value)
   }, [])
 
@@ -648,9 +656,10 @@ function MarkdownEditor() {
 
 ```tsx
 import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import { useState } from 'react'
 
 function SafeMarkdown({ content }: { content: string }) {
-  const [error, setError] = React.useState<Error | null>(null)
+  const [error, setError] = useState<Error | null>(null)
 
   if (error) {
     return (

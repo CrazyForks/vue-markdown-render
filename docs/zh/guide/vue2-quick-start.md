@@ -164,7 +164,10 @@ pnpm add shiki stream-markdown
 
 ```vue
 <script>
-import MarkdownRender from 'markstream-vue2'
+import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue2'
+
+// 在 MarkdownRender 中使用 Shiki 代码块
+setCustomComponents({ code_block: MarkdownCodeBlockNode })
 
 export default {
   components: { MarkdownRender },

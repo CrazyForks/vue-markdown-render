@@ -159,7 +159,19 @@ pnpm add shiki stream-markdown
 ```
 
 ```tsx
-import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import { MarkdownCodeBlockNode, NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+
+// Use Shiki-based code blocks inside MarkdownRender
+setCustomComponents({
+  code_block: ({ node, isDark, ctx }: any) => (
+    <MarkdownCodeBlockNode
+      node={node}
+      isDark={isDark}
+      stream={ctx?.codeBlockStream}
+      {...(ctx?.codeBlockProps || {})}
+    />
+  ),
+})
 
 function App() {
   const markdown = `\`\`\`javascript
@@ -183,7 +195,6 @@ Import styles (Mermaid auto-loads when installed):
 
 ```tsx
 import 'markstream-react/index.css'
-import 'mermaid/dist/mermaid.css'
 
 function App() {
   const markdown = `#### Mermaid Diagram
@@ -323,6 +334,7 @@ console.log('Streaming enabled:', streaming)
 ## Using with React Hooks
 
 ```tsx
+import type { ChangeEvent } from 'react'
 import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -330,7 +342,7 @@ function MarkdownEditor() {
   const [content, setContent] = useState('# Edit me!')
   const [html, setHtml] = useState('')
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value)
   }, [])
 
@@ -384,7 +396,7 @@ Below are the most commonly used props. For the full list, see [React Components
 | `liveNodeBuffer` | `number` | `60` | Buffer for overscan |
 | `batchRendering` | `boolean` | `true` | Enable batched rendering |
 | `deferNodesUntilVisible` | `boolean` | `true` | Defer heavy nodes |
-| `renderCodeBlocksAsPre` | `boolean` | `false` | Use `<pre><code>` fallback |
+| `renderCodeBlocksAsPre` | `boolean` | `false` | Use `<pre><code>` fallback (Mermaid blocks will also fall back) |
 
 ## Styling
 

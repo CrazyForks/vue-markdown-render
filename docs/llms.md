@@ -80,8 +80,8 @@ When “it doesn’t render” or “looks wrong”, check these in order:
 
 1) **CSS order/reset**: reset first, then `markstream-vue/index.css` (Tailwind usually inside `@layer components`).
 2) **Optional peer installed** (Mermaid/KaTeX/Monaco/Shiki).
-3) **Feature enabled** where required: `enableMermaid()` / `enableKatex()`.
-4) **Peer CSS imported** where required: `katex/dist/katex.min.css`, `mermaid/dist/mermaid.css`.
+3) **Loader enabled** if you disabled or override it: `enableMermaid()` / `enableKatex()`.
+4) **Peer CSS imported** where required: `katex/dist/katex.min.css` (Mermaid does not require extra CSS).
 5) **Standalone node wrapper**: standalone node components need a `.markstream-vue` wrapper for scoped styles/vars.
 6) **SSR**: in Nuxt, wrap with `&lt;client-only&gt;` when using browser-only peers/workers.
 
@@ -143,9 +143,9 @@ Use these as “answer skeletons”: quick steps + minimal repro questions + whe
 - Signals: “mermaid blank”
 - Steps:
   - Install peer `mermaid`
-  - Call `enableMermaid()` on the client
+  - If you disabled/overrode the loader, call `enableMermaid()` on the client (or set a custom loader)
   - Re-check CSS order/reset
-- Ask: “Where do you call `enableMermaid()`? Any SSR? Is the fence ```mermaid?”
+- Ask: “Did you disable the loader? Any SSR? Is the fence ```mermaid?”
 - Docs: `docs/guide/mermaid.md`, `docs/guide/troubleshooting.md`
 - Code: `src/components/MermaidBlockNode/mermaid.ts`
 
@@ -155,8 +155,8 @@ Use these as “answer skeletons”: quick steps + minimal repro questions + whe
 - Steps:
   - Install peer `katex`
   - Import `katex/dist/katex.min.css`
-  - Call `enableKatex()` on the client
-- Ask: “Is KaTeX CSS imported? `$...$` or `$$...$$`? Any SSR?”
+  - If you disabled/overrode the loader, call `enableKatex()` on the client (or set a custom loader)
+- Ask: “Is KaTeX CSS imported? `$...$` or `$$...$$`? Any SSR? Did you disable the loader?”
 - Docs: `docs/guide/math.md`, `docs/guide/installation.md`
 - Code: `src/components/MathInlineNode/katex.ts`
 

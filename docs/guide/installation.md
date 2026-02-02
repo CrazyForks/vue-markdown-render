@@ -16,7 +16,7 @@ markstream-vue supports various features through optional peer dependencies. Ins
 
 | Feature | Required Packages | Install Command |
 |---------|------------------|-----------------|
-| Code Syntax Highlighting | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
+| Shiki code blocks (`MarkdownCodeBlockNode`) | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
 | Monaco Editor (full code block features) | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid Diagrams | `mermaid` | `pnpm add mermaid` |
 | Math Rendering (KaTeX) | `katex` | `pnpm add katex` |
@@ -33,7 +33,7 @@ enableMermaid()
 enableKatex()
 ```
 
-Also remember required CSS:
+Also remember required CSS (when the feature is used):
 
 ```ts
 import 'markstream-vue/index.css'
@@ -64,7 +64,13 @@ Requires both `shiki` and `stream-markdown`:
 pnpm add shiki stream-markdown
 ```
 
-This enables syntax highlighting in code blocks using Shiki.
+These packages power the Shiki-based `MarkdownCodeBlockNode`. To use Shiki inside `MarkdownRender`, override the `code_block` renderer (or render `MarkdownCodeBlockNode` directly).
+
+```ts
+import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue'
+
+setCustomComponents({ code_block: MarkdownCodeBlockNode })
+```
 
 #### Monaco Editor
 

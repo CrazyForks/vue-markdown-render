@@ -16,7 +16,7 @@ markstream-vue 通过可选的 peer 依赖支持各种功能。按需安装：
 
 | 功能 | 需要的包 | 安装命令 |
 |------|---------|---------|
-| 代码语法高亮 | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
+| Shiki 代码块（`MarkdownCodeBlockNode`） | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
 | Monaco 编辑器（完整代码块功能） | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid 图表 | `mermaid` | `pnpm add mermaid` |
 | 数学公式渲染（KaTeX） | `katex` | `pnpm add katex` |
@@ -33,7 +33,7 @@ enableMermaid()
 enableKatex()
 ```
 
-同时别忘了导入必需的 CSS（Monaco 不需要额外导入 CSS）：
+同时别忘了导入必需的 CSS（按需使用，Monaco 不需要额外导入 CSS）：
 
 ```ts
 import 'markstream-vue/index.css'
@@ -60,7 +60,13 @@ npm install shiki stream-markdown stream-monaco mermaid katex
 pnpm add shiki stream-markdown
 ```
 
-这将使用 Shiki 在代码块中启用语法高亮。
+这些包用于 Shiki 版的 `MarkdownCodeBlockNode`。若要在 `MarkdownRender` 中使用 Shiki，请覆盖 `code_block` 渲染器（或直接使用 `MarkdownCodeBlockNode`）。
+
+```ts
+import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue'
+
+setCustomComponents({ code_block: MarkdownCodeBlockNode })
+```
 
 #### Monaco 编辑器
 

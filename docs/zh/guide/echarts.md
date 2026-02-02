@@ -172,11 +172,11 @@ npm install echarts
 ### 2.1 配置自定义 HTML 标签
 
 ```ts
-// parser 配置
-import { createMarkdownParser } from 'markstream-vue/parser'
+// 解析器配置（或在 MarkdownRender 上直接传 `custom-html-tags`）
+import { getMarkdown } from 'markstream-vue'
 
-const parser = createMarkdownParser({
-  customHtmlTags: ['echarts', 'chart']
+const md = getMarkdown('echarts', {
+  customHtmlTags: ['echarts', 'chart'],
 })
 ```
 
@@ -446,9 +446,11 @@ ECharts 需要 DOM 环境，不支持服务端渲染。请使用以下策略之�
 
 ```vue
 <script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
 import { onMounted, ref } from 'vue'
 
 const isClient = ref(false)
+const markdown = '# ECharts 示例'
 
 onMounted(() => {
   isClient.value = true
@@ -466,6 +468,8 @@ onMounted(() => {
 ### 组件内检查 window
 
 ```ts
+import { computed } from 'vue'
+
 const canRender = computed(() => typeof window !== 'undefined' && isECharts.value)
 ```
 
@@ -510,6 +514,7 @@ function exportChart() {
 
 ```ts
 import dark from 'echarts/theme/dark'
+import { computed } from 'vue'
 
 const theme = computed(() => props.isDark ? 'dark' : undefined)
 chartInstance = echarts.init(chartRef.value, theme.value)

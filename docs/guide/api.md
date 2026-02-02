@@ -44,7 +44,7 @@ setCustomComponents('docs', {
 
 Tips:
 - Use descriptive IDs (`docs`, `playground`, `pdf-export`) for tracing.
-- Call `setCustomComponents(undefined, mapping)` to set globals, but prefer scoped IDs to avoid surprises in multi-instance apps.
+- Call `setCustomComponents(mapping)` to set globals, but prefer scoped IDs to avoid surprises in multi-instance apps.
 - Clean up mappings in SPA routers if you register them dynamically.
 
 ## Parse hooks & transforms
@@ -88,7 +88,7 @@ For parser types and hooks, see [/guide/parser-api](/guide/parser-api) (or the `
 ## Styling + troubleshooting reminders
 
 - Always include a reset before `markstream-vue/index.css` and wrap it with `@layer components` when using Tailwind or UnoCSS. See the [Tailwind guide](/guide/tailwind) and the [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here).
-- Code/graph peers (Monaco, Shiki, Mermaid, KaTeX) each need their own CSS imports. Missing styles often manifest as blank editors or invisible formulas.
+- Code/graph peers: KaTeX needs its own CSS import; Mermaid does not. Missing KaTeX styles often manifest as invisible formulas.
 - Use `custom-id` to scope overrides and avoid global selector conflicts.
 
 Need more examples? Jump into the [Playground](/guide/playground) or run `pnpm play` locally to experiment with custom parsers and renderers.

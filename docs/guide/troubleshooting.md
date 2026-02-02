@@ -91,7 +91,7 @@ export default defineConfig({
 })
 ```
 
-3. **Double-check peer CSS** — Monaco, KaTeX, and Mermaid each ship CSS. Missing imports show up as invisible editors or unstyled formulas. Confirm the component guide you are following calls out the extra stylesheet.
+3. **Double-check peer CSS** — KaTeX ships CSS. Missing imports show up as invisible formulas. Mermaid does not require extra CSS.
 
 4. **Scope overrides via `custom-id`** — When integrating with larger design systems, renderers can stomp on each other. Add `custom-id="docs"` to `MarkdownRender` and apply overrides scoped to `[data-custom-id="docs"]` so other layouts stay untouched.
 

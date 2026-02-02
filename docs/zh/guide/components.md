@@ -5,11 +5,30 @@
 | `MarkdownRender` | 渲染完整 AST（默认导出） | Props：`content` / `nodes`、`custom-id`、`final`、`parse-options`、`custom-html-tags`、`is-dark`；事件：`copy`、`handleArtifactClick`、`click`、`mouseover`、`mouseout` | 在 reset 之后引入 `markstream-vue/index.css`（CSS 已被限定在内部 `.markstream-vue` 容器中），并放入受控 layer | 用 `setCustomComponents(customId, mapping)` + `custom-id` 限定覆盖范围；配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`stream`、`loading`；事件：`copy`、`previewCode`；插槽 `header-left` / `header-right` | 安装 `stream-monaco`（peer）并打包 Monaco workers | 空白编辑器 → 优先检查 worker 打包与 SSR |
 | `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`stream`、`loading`；插槽 `header-left` / `header-right` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
-| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` ≥ 11；引入 `mermaid/dist/mermaid.css` | 详见 `/zh/guide/mermaid` |
+| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` ≥ 11；无需额外 CSS | 详见 `/zh/guide/mermaid` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
 | `ImageNode` | 自定义图片预览 / 懒加载 | Props：`fallback-src`、`show-caption`、`lazy`、`svg-min-height`、`use-placeholder`；事件：`click` / `load` / `error` | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
 | `LinkNode` | 下划线动画、颜色自定义 | `color`、`underlineHeight`、`showTooltip` | 无 | 浏览器默认 `a` 样式可通过 reset 解决 |
 | `VmrContainerNode` | 自定义 `:::` 容器 | `node`（`name`、`attrs`、`loading`、`children`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | JSON attrs 会规范到 `node.attrs`（去掉 `data-` 前缀）；无效/不完整 JSON 存到 `attrs.attrs`；name 后面的 args 存到 `attrs.args` |
+
+## TypeScript 类型导出
+
+`markstream-vue` 同步导出渲染器与组件 props 类型：
+
+```ts
+import type {
+  CodeBlockNodeProps,
+  InfographicBlockNodeProps,
+  MermaidBlockNodeProps,
+  NodeRendererProps,
+  PreCodeNodeProps,
+} from 'markstream-vue'
+import type { CodeBlockNode } from 'stream-markdown-parser'
+```
+
+说明：
+- `NodeRendererProps` 对应 `<MarkdownRender>` props。
+- `CodeBlockNodeProps` / `MermaidBlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps` 的 `node` 统一为 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'infographic'` 区分渲染器）。
 
 ## MarkdownRender
 
@@ -529,6 +548,7 @@ const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
 ```vue
 <script setup lang="ts">
 import { setCustomComponents } from 'markstream-vue'
+import { h } from 'vue'
 import AlertContainer from './AlertContainer.vue'
 import ChartContainer from './ChartContainer.vue'
 import GenericContainer from './GenericContainer.vue'

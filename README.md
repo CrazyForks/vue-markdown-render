@@ -100,7 +100,7 @@ createApp({
 }).mount('#app')
 ```
 
-Import `markstream-vue/index.css` after your reset (e.g., Tailwind `@layer components`) so renderer styles win over utility classes. Install optional peers such as `stream-monaco`, `shiki`, `mermaid`, and `katex` only when you need Monaco code blocks, Shiki highlighting, diagrams, or math.
+Import `markstream-vue/index.css` after your reset (e.g., Tailwind `@layer components`) so renderer styles win over utility classes. Install optional peers such as `stream-monaco`, `shiki`, `stream-markdown`, `mermaid`, and `katex` only when you need Monaco code blocks, Shiki highlighting, diagrams, or math.
 
 Renderer CSS is scoped under an internal `.markstream-vue` container to minimize global style conflicts. If you render exported node components outside of `MarkdownRender`, wrap them in an element with class `markstream-vue`.
 
@@ -111,6 +111,7 @@ Enable heavy peers only when needed:
 ```ts
 import { enableKatex, enableMermaid } from 'markstream-vue'
 import 'markstream-vue/index.css'
+import 'katex/dist/katex.min.css'
 
 // after you install `mermaid` / `katex` peers
 enableMermaid()

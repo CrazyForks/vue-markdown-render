@@ -30,7 +30,7 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 
 当 `custom-html-tags` 包含某个标签名时，解析器会：
 - 在流式场景下吞并未闭合中间态，直到 `<tag ...>` 完整出现；
-- 输出 `CustomComponentNode`（`type: 'tag'`，例如 `type: 'thinking'`），并带上 `content`、可选 `attrs` 与 `loading/autoClosed` 标记。
+- 输出 `CustomComponentNode`（`type: 'thinking'`，即标签名本身，不含尖括号），并带上 `content`、可选 `attrs` 与 `loading/autoClosed` 标记。
 
 ## 自定义组件解析示例
 

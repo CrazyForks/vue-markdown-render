@@ -50,6 +50,8 @@
 - `code-block-props`（兜底：转发任意 CodeBlock props）
 - `themes`（在安装 `stream-monaco` 时，会转发给其主题系统）
 
+注意：`code-block-monaco-options` 仅作用于 Monaco 版 `CodeBlockNode`。如果你把 `code_block` 覆盖成 `MarkdownCodeBlockNode`，此时 `code-block-dark-theme` / `code-block-light-theme` 应填写 Shiki 主题名，`themes` 为需要预加载的 Shiki 主题列表。
+
 ## 代码块头部控制
 
 可直接传给 `CodeBlockNode` / `MarkdownCodeBlockNode`，或在 `MarkdownRender` 上用 `code-block-props` 统一下发：

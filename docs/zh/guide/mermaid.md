@@ -8,7 +8,7 @@
 pnpm add mermaid
 ```
 
-在使用 Tailwind/UnoCSS 时，请在 reset 之后、`@layer components` 中导入 Mermaid 与库的 CSS，避免 utilities 覆盖：
+Mermaid 不需要额外的 CSS 文件。使用 Tailwind/UnoCSS 时，请在 reset 之后、`@layer components` 中导入库的 CSS，避免 utilities 覆盖：
 
 ```css
 @import 'modern-css-reset';
@@ -70,10 +70,9 @@ B-->C[End]
 ## 4. 常见问题排查
 
 1. **未安装依赖**：确保执行 `pnpm add mermaid`。缺失时组件会退回显示原始文本。
-2. **缺少 CSS**：导入 `mermaid/dist/mermaid.css`，并在 Tailwind/UnoCSS 项目中用 `@layer components` 包裹，缺失时会出现空白。
-3. **版本过旧**：请使用 `mermaid` ≥ 11，旧版本无法兼容异步渲染。
-4. **SSR 报错**：Mermaid 依赖 DOM。Nuxt 请包裹 `<ClientOnly>`，Vite SSR 请在 `onMounted` 中渲染。
-5. **图表过大**：考虑在服务端预渲染或缓存 SVG，`MermaidBlockNode` 导出事件中提供 `svgString` 可直接上传或持久化。
+2. **版本过旧**：请使用 `mermaid` ≥ 11，旧版本无法兼容异步渲染。
+3. **SSR 报错**：Mermaid 依赖 DOM。Nuxt 请包裹 `<ClientOnly>`，Vite SSR 请在 `onMounted` 中渲染。
+4. **图表过大**：考虑在服务端预渲染或缓存 SVG，`MermaidBlockNode` 导出事件中提供 `svgString` 可直接上传或持久化。
 
 若问题仍存在，请在 playground (`pnpm play`) 中构造最小示例并附带链接提交 issue，方便复现与定位。
 

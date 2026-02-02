@@ -22,7 +22,7 @@ Create `EChartsBlockNode.vue`:
 ```vue
 <script setup lang="ts">
 import * as echarts from 'echarts'
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 interface Props {
   node: {
@@ -170,11 +170,11 @@ Use a custom HTML-like tag for ECharts charts, providing clearer separation from
 ### 2.1 Configure custom HTML tags
 
 ```ts
-// parser configuration
-import { createMarkdownParser } from 'markstream-vue/parser'
+// parser configuration (or pass `custom-html-tags` to MarkdownRender)
+import { getMarkdown } from 'markstream-vue'
 
-const parser = createMarkdownParser({
-  customHtmlTags: ['echarts', 'chart']
+const md = getMarkdown('echarts', {
+  customHtmlTags: ['echarts', 'chart'],
 })
 ```
 
@@ -195,7 +195,7 @@ setCustomComponents({
 ```vue
 <script setup lang="ts">
 import * as echarts from 'echarts'
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 interface Props {
   node: {
@@ -311,7 +311,7 @@ setCustomComponents({
 ```vue
 <script setup lang="ts">
 import * as echarts from 'echarts'
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 interface Props {
   node: {
@@ -444,9 +444,11 @@ ECharts requires the DOM and doesn't support server-side rendering. Use one of t
 
 ```vue
 <script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
 import { onMounted, ref } from 'vue'
 
 const isClient = ref(false)
+const markdown = '# ECharts demo'
 
 onMounted(() => {
   isClient.value = true
@@ -464,6 +466,8 @@ onMounted(() => {
 ### Check for window in component
 
 ```ts
+import { computed } from 'vue'
+
 const canRender = computed(() => typeof window !== 'undefined' && isECharts.value)
 ```
 
@@ -508,6 +512,7 @@ function exportChart() {
 
 ```ts
 import dark from 'echarts/theme/dark'
+import { computed } from 'vue'
 
 const theme = computed(() => props.isDark ? 'dark' : undefined)
 chartInstance = echarts.init(chartRef.value, theme.value)

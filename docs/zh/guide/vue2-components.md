@@ -2,6 +2,25 @@
 
 markstream-vue2 提供与 markstream-vue 相同强大的组件，但专为 Vue 2 构建。所有组件都兼容 Vue 2.6+（配合 `@vue/composition-api`）和 Vue 2.7+。
 
+## TypeScript 类型导出
+
+`markstream-vue2` 同步导出渲染器与组件 props 类型：
+
+```ts
+import type {
+  CodeBlockNodeProps,
+  InfographicBlockNodeProps,
+  MermaidBlockNodeProps,
+  NodeRendererProps,
+  PreCodeNodeProps,
+} from 'markstream-vue2'
+import type { CodeBlockNode } from 'stream-markdown-parser'
+```
+
+说明：
+- `NodeRendererProps` 对应 `<MarkdownRender>` props。
+- `CodeBlockNodeProps` / `MermaidBlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps` 的 `node` 统一为 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'infographic'` 区分渲染器）。
+
 ## 主组件：MarkdownRender
 
 在 Vue 2 中渲染 markdown 内容的主要组件。
@@ -353,10 +372,10 @@ const nodes = parseMarkdownToStructure('# 标题\n\n这里的内容...', md)
 ```js
 import { enableKatex, enableMermaid } from 'markstream-vue2'
 
-// 启用 KaTeX worker
+// 启用 KaTeX loader
 enableKatex()
 
-// 启用 Mermaid worker
+// 启用 Mermaid loader
 enableMermaid()
 ```
 
@@ -372,7 +391,7 @@ interface NodeComponentProps {
   indexKey: number | string // 节点的唯一键
   customId?: string // 用于作用域的自定义 ID
   isDark?: boolean // 主题标记（来自 MarkdownRender）
-  typewriter?: boolean // 进入动画标记（非 code 节点）
+  typewriter?: boolean // 进入动画标记（仅非 code 节点）
   loading?: boolean // 流式中间态（来自 node.loading）
 }
 ```
@@ -394,7 +413,7 @@ export default {
     },
     customId: {
       type: String,
-      default: 'default'
+      default: ''
     }
   },
   computed: {
@@ -513,7 +532,7 @@ import type { ParsedNode } from 'markstream-vue2'
 import MarkdownRender from 'markstream-vue2'
 
 // 你的组件具有适当的类型
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 
 export default defineComponent({
   components: { MarkdownRender },

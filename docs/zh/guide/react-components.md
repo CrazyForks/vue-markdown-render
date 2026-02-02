@@ -30,7 +30,7 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 
 | 属性 | 默认值 | 描述 |
 |------|---------|-------------|
-| `renderCodeBlocksAsPre` | `false` | 将非 Mermaid/Infographic 的 `code_block` 渲染为 `<pre><code>` |
+| `renderCodeBlocksAsPre` | `false` | 将 `code_block` 渲染为 `<pre><code>`（Mermaid 也会随之回退） |
 | `codeBlockStream` | `true` | 随内容到达流式更新代码块 |
 | `viewportPriority` | `true` | 将 Monaco/Mermaid/KaTeX 等重型工作延迟到接近视口时 |
 | `deferNodesUntilVisible` | `true` | 重型节点先占位，接近可视区再渲染（仅非虚拟化模式） |
@@ -245,6 +245,11 @@ function MermaidDiagram() {
 }
 ```
 
+事件说明：
+- `onCopy(code: string)` 直接收到源码字符串（React 版本没有 `MermaidBlockEvent` 包装）。
+- `onExport` / `onOpenModal` / `onToggleMode` 接收 `MermaidBlockEvent`，可用 `ev.preventDefault()` 阻止默认行为。
+- `onToggleMode` 签名：`(target: 'source' | 'preview', ev)`。
+
 ## 其他节点组件
 
 ### HeadingNode
@@ -423,7 +428,7 @@ setKaTeXWorker(new KatexWorker())
 所有自定义节点组件都接收这些 props：
 
 ```tsx
-interface NodeComponentProps<TNode = ParsedNode> {
+interface NodeComponentProps<TNode = unknown> {
   node: TNode // 解析后的节点数据
   ctx?: RenderContext // 渲染上下文（主题、事件、开关）
   renderNode?: RenderNodeFn // 子节点渲染助手
@@ -526,7 +531,7 @@ markstream-react 支持流式 markdown 内容：
 
 ```tsx
 import { NodeRenderer as MarkdownRender } from 'markstream-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 function StreamingDemo() {
   const [content, setContent] = useState('')
@@ -535,7 +540,7 @@ function StreamingDemo() {
 此内容正在**逐步**流式传输。
 `
 
-  React.useEffect(() => {
+  useEffect(() => {
     let i = 0
     const interval = setInterval(() => {
       if (i < fullContent.length) {
@@ -570,6 +575,8 @@ function App() {
   return <MarkdownRender content={markdown} nodes={nodes} />
 }
 ```
+
+代码块相关的 props 类型（`CodeBlockNodeProps` / `MermaidBlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps`）统一使用 `stream-markdown-parser` 的 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'infographic'` 区分渲染器）。
 
 ## Next.js 最佳实践
 
@@ -619,6 +626,7 @@ export default function MarkdownPage() {
 你可以轻松地与 React hooks 集成：
 
 ```tsx
+import type { ChangeEvent } from 'react'
 import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useCallback, useMemo, useState } from 'react'
 
@@ -628,7 +636,7 @@ function MarkdownEditor() {
 
   const memoizedContent = useMemo(() => content, [content])
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value)
   }, [])
 
@@ -648,9 +656,10 @@ function MarkdownEditor() {
 
 ```tsx
 import { NodeRenderer as MarkdownRender } from 'markstream-react'
+import { useState } from 'react'
 
 function SafeMarkdown({ content }: { content: string }) {
-  const [error, setError] = React.useState<Error | null>(null)
+  const [error, setError] = useState<Error | null>(null)
 
   if (error) {
     return (

@@ -22,7 +22,7 @@ markstream-react 通过可选的对等依赖支持各种功能。只安装你需
 
 | 功能 | 所需包 | 安装命令 |
 |---------|------------------|-----------------|
-| 代码语法高亮 | `shiki`、`stream-markdown` | `pnpm add shiki stream-markdown` |
+| Shiki 代码块（`MarkdownCodeBlockNode`） | `shiki`、`stream-markdown` | `pnpm add shiki stream-markdown` |
 | Monaco 编辑器（完整代码块功能） | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid 图表 | `mermaid` | `pnpm add mermaid` |
 | 数学公式渲染（KaTeX） | `katex` | `pnpm add katex` |
@@ -45,7 +45,6 @@ setKaTeXWorker(new KatexWorker())
 ```tsx
 import 'markstream-react/index.css'
 import 'katex/dist/katex.min.css'
-import 'mermaid/dist/mermaid.css'
 ```
 
 Monaco（`stream-monaco`）不需要单独导入 CSS。
@@ -93,7 +92,22 @@ npm install shiki stream-markdown stream-monaco mermaid katex
 pnpm add shiki stream-markdown
 ```
 
-这将使用 Shiki 启用代码块的语法高亮。
+这些包用于 Shiki 版的 `MarkdownCodeBlockNode`。若要在 `MarkdownRender` 中使用 Shiki，请覆盖 `code_block` 渲染器（或直接使用 `MarkdownCodeBlockNode`）。
+
+```tsx
+import { MarkdownCodeBlockNode, NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
+
+setCustomComponents({
+  code_block: ({ node, isDark, ctx }: any) => (
+    <MarkdownCodeBlockNode
+      node={node}
+      isDark={isDark}
+      stream={ctx?.codeBlockStream}
+      {...(ctx?.codeBlockProps || {})}
+    />
+  ),
+})
+```
 
 #### Monaco 编辑器
 

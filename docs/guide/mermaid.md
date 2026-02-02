@@ -8,7 +8,7 @@ Mermaid diagrams stream progressively in `markstream-vue`: as soon as the syntax
 pnpm add mermaid
 ```
 
-Keep the CSS import after your reset and inside `@layer components` when using Tailwind/UnoCSS so utility layers do not override Mermaid styles.
+No extra Mermaid CSS import is required. Keep `markstream-vue/index.css` after your reset and inside `@layer components` when using Tailwind/UnoCSS so utility layers do not override the renderer styles.
 
 ```css
 @import 'modern-css-reset';
@@ -72,10 +72,9 @@ If diagrams come from untrusted users/LLMs, pass `:is-strict="true"` to enable M
 ## 4. Troubleshooting checklist
 
 1. **Peer not installed** — run `pnpm add mermaid`. Without it the renderer falls back to showing source text.
-2. **CSS missing** — import `mermaid/dist/mermaid.css` after your reset (and wrap it in `@layer components` when Tailwind/UnoCSS is present). Missing CSS manifests as invisible diagrams.
-3. **Async errors** — check the browser console for Mermaid logs. Versions prior to 11 are unsupported; upgrade to ≥ 11.
-4. **SSR guard** — Mermaid needs the DOM. Wrap the component in `<ClientOnly>` for Nuxt or check `typeof window !== 'undefined'` before mounting in SSR contexts.
-5. **Heavy graphs** — consider pre-rendering server-side (mermaid CLI) or caching SVG output; the component exposes `svgString` when using `MermaidBlockNode` export events.
+2. **Async errors** — check the browser console for Mermaid logs. Versions prior to 11 are unsupported; upgrade to ≥ 11.
+3. **SSR guard** — Mermaid needs the DOM. Wrap the component in `<ClientOnly>` for Nuxt or check `typeof window !== 'undefined'` before mounting in SSR contexts.
+4. **Heavy graphs** — consider pre-rendering server-side (mermaid CLI) or caching SVG output; the component exposes `svgString` when using `MermaidBlockNode` export events.
 
 Still stuck? Reproduce the issue in the playground (`pnpm play`) with a minimal Markdown sample and link it when opening a bug report.
 
