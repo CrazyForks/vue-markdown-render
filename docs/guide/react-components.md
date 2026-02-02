@@ -8,21 +8,72 @@ The primary component for rendering markdown content in React.
 
 ### Props
 
+`MarkdownRender` uses the `NodeRendererProps` interface from `markstream-react`.
+
+#### Core props
+
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `content` | `string` | - | Markdown content to render |
-| `nodes` | `ParsedNode[]` | - | Pre-parsed AST nodes (alternative to `content`) |
-| `customId` | `string` | `'default'` | Identifier for custom component scoping |
-| `maxLiveNodes` | `number` | `100` | Max number of rendered nodes for virtualization |
-| `liveNodeBuffer` | `number` | `5` | Buffer for overscan in virtualization |
-| `batchRendering` | `boolean` | `false` | Enable incremental batched rendering |
-| `deferNodesUntilVisible` | `boolean` | `true` | Defer heavy nodes until visible |
-| `renderCodeBlocksAsPre` | `boolean` | `false` | Fall back to `<pre><code>` for code blocks |
+| `nodes` | `BaseNode[]` | - | Pre-parsed AST nodes (typically `ParsedNode[]` from the parser) |
+| `customId` | `string` | - | Identifier for scoping custom components and CSS |
+| `final` | `boolean` | `false` | Marks end-of-stream; stops emitting streaming `loading` nodes |
+| `parseOptions` | `ParseOptions` | - | Parser options and token hooks (only when `content` is provided) |
+| `customHtmlTags` | `readonly string[]` | - | HTML-like tags emitted as custom nodes (e.g. `thinking`) |
+| `customMarkdownIt` | `(md: MarkdownIt) => MarkdownIt` | - | Customize the internal MarkdownIt instance |
+| `debugPerformance` | `boolean` | `false` | Log parse/render timing and virtualization stats (dev only) |
+| `isDark` | `boolean` | `false` | Theme flag forwarded to heavy nodes; adds `.dark` to the root container |
+| `indexKey` | `number \| string` | - | Key prefix when rendering multiple instances in lists |
+| `typewriter` | `boolean` | `true` | Enable the non-code-node enter transition |
+
+#### Streaming & heavy-node toggles
+
+| Prop | Default | Description |
+|------|---------|-------------|
+| `renderCodeBlocksAsPre` | `false` | Render non-Mermaid/Infographic code blocks as `<pre><code>` |
+| `codeBlockStream` | `true` | Stream code block updates as content arrives |
+| `viewportPriority` | `true` | Defer heavy work (Monaco/Mermaid/KaTeX) until near viewport |
+| `deferNodesUntilVisible` | `true` | Render heavy nodes as placeholders until visible (non-virtualized mode only) |
+
+#### Performance (virtualization & batching)
+
+| Prop | Default | Description |
+|------|---------|-------------|
+| `maxLiveNodes` | `320` | Max fully rendered nodes kept in DOM (set `0` to disable virtualization) |
+| `liveNodeBuffer` | `60` | Overscan buffer around the focus range |
+| `batchRendering` | `true` | Incremental batch rendering when virtualization is disabled |
+| `initialRenderBatchSize` | `40` | Nodes rendered immediately before batching starts |
+| `renderBatchSize` | `80` | Nodes rendered per batch tick |
+| `renderBatchDelay` | `16` | Extra delay (ms) before each batch after rAF |
+| `renderBatchBudgetMs` | `6` | Time budget (ms) before adaptive batch sizes shrink |
+| `renderBatchIdleTimeoutMs` | `120` | Timeout (ms) for `requestIdleCallback` slices |
+
+#### Global code block options
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `codeBlockDarkTheme` | `any` | Monaco dark theme object forwarded to every `CodeBlockNode` |
+| `codeBlockLightTheme` | `any` | Monaco light theme object forwarded to every `CodeBlockNode` |
+| `codeBlockMonacoOptions` | `Record<string, any>` | Options forwarded to `stream-monaco` |
+| `codeBlockMinWidth` | `string \| number` | Min width forwarded to `CodeBlockNode` |
+| `codeBlockMaxWidth` | `string \| number` | Max width forwarded to `CodeBlockNode` |
+| `codeBlockProps` | `Record<string, any>` | Extra props forwarded to every `CodeBlockNode` |
+| `themes` | `string[]` | Theme list forwarded to `stream-monaco` |
+
+#### Events
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `onCopy` | `(code: string) => void` | Fired when code blocks emit copy events |
+| `onHandleArtifactClick` | `(payload: any) => void` | Fired on artifact/preview clicks |
+| `onClick` | `(event: React.MouseEvent<HTMLDivElement>) => void` | Click handler for the renderer root |
+| `onMouseOver` | `(event: React.MouseEvent<HTMLElement>) => void` | Mouseover handler for the renderer root |
+| `onMouseOut` | `(event: React.MouseEvent<HTMLElement>) => void` | Mouseout handler for the renderer root |
 
 ### Usage
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   const markdown = `# Hello React!
@@ -66,7 +117,6 @@ function CodeBlock() {
         node={codeNode}
         showCopyButton={true}
         onCopy={handleCopy}
-        headerRight={<span className="lang-badge">{codeNode.language}</span>}
       />
     </div>
   )
@@ -205,11 +255,10 @@ import { HeadingNode } from 'markstream-react'
 function CustomHeading() {
   const headingNode = {
     type: 'heading',
-    level: 1,
-    children: [{ type: 'text', content: 'Hello World' }]
+    level: 1
   }
 
-  return <HeadingNode node={headingNode} />
+  return <HeadingNode node={headingNode}>Hello World</HeadingNode>
 }
 ```
 
@@ -220,28 +269,31 @@ import { ParagraphNode } from 'markstream-react'
 
 function CustomParagraph() {
   const paragraphNode = {
-    type: 'paragraph',
-    children: [
-      { type: 'text', content: 'This is a ' },
-      { type: 'strong', children: [{ type: 'text', content: 'bold' }] },
-      { type: 'text', content: ' word.' }
-    ]
+    type: 'paragraph'
   }
 
-  return <ParagraphNode node={paragraphNode} />
+  return (
+    <ParagraphNode node={paragraphNode}>
+      This is a
+      {' '}
+      <strong>bold</strong>
+      {' '}
+      word.
+    </ParagraphNode>
+  )
 }
 ```
 
 ### ListNode
 
 ```tsx
-import { ListNode } from 'markstream-react'
+import { ListNode, renderNode } from 'markstream-react'
 
 function CustomList() {
   const listNode = {
     type: 'list',
     ordered: false,
-    children: [
+    items: [
       {
         type: 'list_item',
         children: [
@@ -257,7 +309,9 @@ function CustomList() {
     ]
   }
 
-  return <ListNode node={listNode} />
+  const ctx = { events: {} }
+
+  return <ListNode node={listNode} ctx={ctx} renderNode={renderNode} />
 }
 ```
 
@@ -269,9 +323,9 @@ import { LinkNode } from 'markstream-react'
 function CustomLink() {
   const linkNode = {
     type: 'link',
-    url: 'https://example.com',
+    href: 'https://example.com',
     title: 'Example',
-    children: [{ type: 'text', content: 'Click me' }]
+    text: 'Click me'
   }
 
   return (
@@ -295,7 +349,8 @@ function CustomImage() {
     type: 'image',
     src: 'https://example.com/image.jpg',
     alt: 'Example image',
-    title: 'Example'
+    title: 'Example',
+    raw: '![Example image](https://example.com/image.jpg)'
   }
 
   const handleClick = () => {
@@ -323,7 +378,7 @@ function CustomImage() {
 Get a configured markdown-it instance.
 
 ```tsx
-import { getMarkdown } from 'markstream-react'
+import { getMarkdown } from 'stream-markdown-parser'
 
 const md = getMarkdown('my-msg-id', {
   html: true,
@@ -339,7 +394,7 @@ const tokens = md.parse('# Hello World')
 Parse markdown string to AST structure.
 
 ```tsx
-import { getMarkdown, parseMarkdownToStructure } from 'markstream-react'
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
 const md = getMarkdown()
 const nodes = parseMarkdownToStructure('# Title\n\nContent here...', md)
@@ -348,18 +403,17 @@ const nodes = parseMarkdownToStructure('# Title\n\nContent here...', md)
 // <MarkdownRender nodes={nodes} />
 ```
 
-### enableKatex / enableMermaid
+### Optional workers (Mermaid / KaTeX)
 
-Enable feature loaders for KaTeX and Mermaid.
+Mermaid/KaTeX auto-load when installed. If you want off‑thread parsing/rendering, inject workers:
 
 ```tsx
-import { enableKatex, enableMermaid } from 'markstream-react'
+import { setKaTeXWorker, setMermaidWorker } from 'markstream-react'
+import KatexWorker from 'markstream-react/workers/katexRenderer.worker?worker'
+import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker'
 
-// Enable KaTeX worker
-enableKatex()
-
-// Enable Mermaid worker
-enableMermaid()
+setMermaidWorker(new MermaidWorker())
+setKaTeXWorker(new KatexWorker())
 ```
 
 ## Custom Component API
@@ -369,10 +423,15 @@ enableMermaid()
 All custom node components receive these props:
 
 ```tsx
-interface NodeComponentProps {
-  node: ParsedNode // The parsed node data
-  indexKey: number | string // Unique key for the node
+interface NodeComponentProps<TNode = ParsedNode> {
+  node: TNode // The parsed node data
+  ctx?: RenderContext // Renderer context (themes, events, flags)
+  renderNode?: RenderNodeFn // Helper to render child nodes
+  indexKey?: React.Key // Unique key for the node
   customId?: string // Custom ID for scoping
+  isDark?: boolean
+  typewriter?: boolean
+  children?: React.ReactNode
 }
 ```
 
@@ -421,26 +480,23 @@ function App() {
 }
 ```
 
-## Context-Based Custom Rendering
+## Context + Custom Components
 
-For more complex custom rendering scenarios, you can use React Context:
+You can use React Context inside custom node components, while still registering them via `setCustomComponents`:
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
 import React, { createContext, useContext } from 'react'
 
-interface CustomComponentsContextType {
-  [key: string]: React.ComponentType<any>
-}
+const ThemeContext = createContext<'light' | 'dark'>('light')
 
-const CustomComponentsContext = createContext<CustomComponentsContextType>({})
-
-function CustomHeading({ node, indexKey, customId }: any) {
+function CustomHeading({ node, customId }: any) {
+  const theme = useContext(ThemeContext)
   const level = node.level || 1
   const Tag = `h${level}` as keyof JSX.IntrinsicElements
 
   return (
-    <Tag className="custom-heading" data-custom-id={customId}>
+    <Tag className={`custom-heading ${theme}`} data-custom-id={customId}>
       {node.children?.map((child: any, i: number) => (
         <span key={i}>{child.content || ''}</span>
       ))}
@@ -448,20 +504,18 @@ function CustomHeading({ node, indexKey, customId }: any) {
   )
 }
 
+setCustomComponents('docs', { heading: CustomHeading })
+
 function App() {
   const markdown = `# Custom Heading
 
 This uses a custom heading component.
 `
 
-  const customComponents = {
-    heading: CustomHeading
-  }
-
   return (
-    <CustomComponentsContext.Provider value={customComponents}>
-      <MarkdownRender content={markdown} />
-    </CustomComponentsContext.Provider>
+    <ThemeContext.Provider value="dark">
+      <MarkdownRender customId="docs" content={markdown} />
+    </ThemeContext.Provider>
   )
 }
 ```
@@ -471,14 +525,14 @@ This uses a custom heading component.
 markstream-react supports streaming markdown content:
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useState } from 'react'
 
 function StreamingDemo() {
   const [content, setContent] = useState('')
   const fullContent = `# Streaming Demo
 
-This content streams in **character by character**.
+This content streams in **small chunks**.
 `
 
   React.useEffect(() => {
@@ -505,8 +559,9 @@ This content streams in **character by character**.
 markstream-react includes full TypeScript definitions:
 
 ```tsx
-import type { MarkdownRenderProps, NodeComponentProps, ParsedNode } from 'markstream-react'
-import MarkdownRender from 'markstream-react'
+import type { NodeComponentProps, NodeRendererProps } from 'markstream-react'
+import type { ParsedNode } from 'stream-markdown-parser'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   const markdown = '# Hello TypeScript!'
@@ -523,7 +578,7 @@ function App() {
 ```tsx
 'use client'
 
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useEffect, useState } from 'react'
 
 export default function MarkdownPage() {
@@ -547,7 +602,7 @@ export default function MarkdownPage() {
 import dynamic from 'next/dynamic'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
+  () => import('markstream-react').then(mod => mod.NodeRenderer),
   {
     ssr: false,
     loading: () => <div>Loading markdown...</div>
@@ -564,7 +619,7 @@ export default function MarkdownPage() {
 You can easily integrate with React hooks:
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useCallback, useMemo, useState } from 'react'
 
 function MarkdownEditor() {
@@ -592,7 +647,7 @@ function MarkdownEditor() {
 ## Error Handling
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function SafeMarkdown({ content }: { content: string }) {
   const [error, setError] = React.useState<Error | null>(null)

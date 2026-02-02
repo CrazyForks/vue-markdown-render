@@ -21,13 +21,14 @@ markstream-vue 通过可选的 peer 依赖支持各种功能。按需安装：
 | Mermaid 图表 | `mermaid` | `pnpm add mermaid` |
 | 数学公式渲染（KaTeX） | `katex` | `pnpm add katex` |
 
-## 启用功能加载器（Mermaid / KaTeX）
+## 功能加载器（Mermaid / KaTeX）
 
-安装可选 peer 后，需要在客户端入口显式启用 loader：
+安装可选 peer 后，默认 loader 已经启用。仅当你之前手动关闭，或需要自定义 loader（例如使用 CDN 版本）时才需要调用：
 
 ```ts
 import { enableKatex, enableMermaid } from 'markstream-vue'
 
+// 可选：重新启用或覆盖 loader
 enableMermaid()
 enableKatex()
 ```

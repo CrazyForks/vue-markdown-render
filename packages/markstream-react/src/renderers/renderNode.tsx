@@ -57,10 +57,15 @@ function stripCustomHtmlWrapper(html: unknown, tag: string) {
   return raw.replace(openRe, '').replace(closeRe, '')
 }
 
-function renderCodeBlock(node: any, key: React.Key, ctx: RenderContext) {
+function renderCodeBlock(
+  node: any,
+  key: React.Key,
+  ctx: RenderContext,
+  customComponents: Record<string, any>,
+) {
   const language = normalizeLanguageIdentifier(String(node.language || ''))
   if (language === 'mermaid') {
-    const customMermaid = getCustomNodeComponents(ctx.customId).mermaid
+    const customMermaid = customComponents.mermaid
     if (customMermaid)
       return React.createElement(customMermaid as any, { key, node, isDark: ctx.isDark })
     if (!ctx.renderCodeBlocksAsPre) {
@@ -76,7 +81,7 @@ function renderCodeBlock(node: any, key: React.Key, ctx: RenderContext) {
   }
 
   if (language === 'infographic') {
-    const customInfographic = getCustomNodeComponents(ctx.customId).infographic
+    const customInfographic = customComponents.infographic
     if (customInfographic)
       return React.createElement(customInfographic as any, { key, node, isDark: ctx.isDark })
 
@@ -112,7 +117,7 @@ function renderCodeBlock(node: any, key: React.Key, ctx: RenderContext) {
 }
 
 export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext) {
-  const customComponents = getCustomNodeComponents(ctx.customId)
+  const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
   const custom = (customComponents as Record<string, any>)[node.type]
   if (custom) {
     return React.createElement(custom, {
@@ -191,7 +196,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
     case 'inline_code':
       return <InlineCodeNode key={key} node={node as any} typewriter={ctx.typewriter} />
     case 'code_block':
-      return renderCodeBlock(node, key, ctx)
+      return renderCodeBlock(node, key, ctx, customComponents)
     case 'strong':
       return (
         <StrongNode

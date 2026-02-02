@@ -12,7 +12,7 @@ import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
 
 const content = ref('')
-const fullContent = `# Streaming Content\n\nThis text appears character by character...`
+const fullContent = `# Streaming Content\n\nThis text appears progressively...`
 let i = 0
 const interval = setInterval(() => {
   if (i < fullContent.length) {
@@ -35,9 +35,10 @@ const interval = setInterval(() => {
 如果你想跳过字符串解析阶段，可直接传入解析后的节点：
 
 ```ts
-import { parseMarkdownToStructure } from 'stream-markdown-parser'
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-const nodes = parseMarkdownToStructure('# Hello')
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure('# Hello', md)
 // 在 Vue 中传入 nodes 而不是 content
 ```
 

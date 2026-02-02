@@ -42,7 +42,7 @@ There are two layers:
 
 1) **Parser layer** (`stream-markdown-parser`)
    - `getMarkdown()` creates a configured `markdown-it-ts` instance
-   - `parseMarkdownToStructure()` turns Markdown into a node tree (`ParsedNode[]`)
+   - `parseMarkdownToStructure(content, md)` turns Markdown into a node tree (`ParsedNode[]`)
    - Streaming mid-states reduce flicker (unclosed fences / `$$` / partial inline HTML)
 
 2) **Renderer layer** (`markstream-vue`)
@@ -60,7 +60,7 @@ There are two layers:
 From `markstream-vue` (`src/exports.ts`):
 
 - Component: `MarkdownRender` (default export)
-- Parser helpers (re-exported): `getMarkdown()`, `parseMarkdownToStructure()`, `setDefaultMathOptions()`
+- Parser helpers (re-exported): `getMarkdown()`, `parseMarkdownToStructure(content, md)`, `setDefaultMathOptions()`
 - Custom node renderers: `setCustomComponents()`, `removeCustomComponents()`, `clearGlobalCustomComponents()`
 - Feature toggles: `enableMermaid()`, `disableMermaid()`, `enableKatex()`, `disableKatex()`
 - Worker injection:
@@ -69,7 +69,7 @@ From `markstream-vue` (`src/exports.ts`):
 
 From `stream-markdown-parser` (`packages/markdown-parser/src/index.ts`):
 
-- `getMarkdown()`, `parseMarkdownToStructure()`, `ParseOptions` hooks
+- `getMarkdown()`, `parseMarkdownToStructure(content, md)`, `ParseOptions` hooks
 - Streaming mid-state behavior and `final: true` end-of-stream mode
 
 ---
@@ -182,7 +182,7 @@ Use these as “answer skeletons”: quick steps + minimal repro questions + whe
 
 - Signals: “custom tag”, “embed component”
 - Steps:
-- Allow custom tags via `customHtmlTags` / `custom-html-tags` (unknown tags render as plain text by default)
+- Allow custom tags via `customHtmlTags` / `custom-html-tags` (unknown tags render as raw HTML when closed; partial streaming fragments stay as text)
   - Map via `setCustomComponents(customId, mapping)`
 - Ask: “What tag names? Do you want HTML passthrough or a custom node type?”
 - Docs: `docs/guide/advanced.md`, `docs/guide/parser-api.md`

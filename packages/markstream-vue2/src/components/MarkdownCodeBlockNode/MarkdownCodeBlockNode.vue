@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { getLanguageIcon, languageMap } from '../../utils'
@@ -256,6 +256,10 @@ initRenderer()
 onMounted(() => {
   initRenderer()
 })
+onBeforeUnmount(() => {
+  renderObserver?.disconnect()
+  renderObserver = undefined
+})
 
 watch(() => props.themes, async () => {
   if (registerHighlight)
@@ -401,8 +405,8 @@ function toggleExpand() {
 
   if (isExpanded.value) {
     content.style.maxHeight = 'none'
-    content.style["overflow-y"] = 'visible'
-    content.style["overflow-x"] = 'auto'
+    content.style['overflow-y'] = 'visible'
+    content.style['overflow-x'] = 'auto'
   }
   else {
     content.style.maxHeight = '500px'

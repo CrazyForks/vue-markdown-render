@@ -53,6 +53,7 @@ export interface RenderContext {
   isDark?: boolean
   indexKey?: string
   typewriter?: boolean
+  customComponents?: Record<string, React.ComponentType<any>>
   codeBlockProps?: Record<string, any>
   codeBlockStream?: boolean
   renderCodeBlocksAsPre?: boolean

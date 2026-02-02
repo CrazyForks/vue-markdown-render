@@ -9,9 +9,11 @@
 | `content` | `string` | – | 原始 Markdown 字符串（除非提供 `nodes`，否则必填）。 |
 | `nodes` | `BaseNode[]` | – | 预解析后的 AST（通常为 `parseMarkdownToStructure` 返回的 `ParsedNode[]`）。 |
 | `custom-id` | `string` | – | 作用域键，可在 `setCustomComponents` 注册映射并用 `[data-custom-id="docs"]` 做样式覆盖。 |
+| `is-dark` | `boolean` | `false` | 主题标记，会透传给 Mermaid/KaTeX/CodeBlock，并在根容器上添加 `.dark`。 |
+| `index-key` | `number \| string` | – | 内部节点 key 前缀；嵌套渲染或列表中渲染多实例时建议显式传入。 |
 | `final` | `boolean` | `false` | 是否为“流结束/最终态”。开启后会关闭解析器的中间态（loading）行为，避免末尾残留分隔符（如 `$$`、未闭合 code fence）永远停留在 loading。 |
-| `parse-options` | `ParseOptions` | – | Token/节点级钩子（`preTransformTokens`、`postTransformTokens`、`postTransformNodes`），仅在传入 `content` 时生效。 |
-| `custom-html-tags` | `string[]` | – | 扩展流式内联 HTML 中间态白名单，并将这些标签直接输出为自定义节点（`type: <tag>`）以便 `setCustomComponents` 映射（会传给 `getMarkdown`，如 `['thinking']`）。 |
+| `parse-options` | `ParseOptions` | – | Token 级钩子（`preTransformTokens`、`postTransformTokens`），仅在传入 `content` 时生效。 |
+| `custom-html-tags` | `string[]` | – | 扩展流式内联 HTML 中间态白名单，并将这些标签直接输出为自定义节点（如 `type: 'thinking'`）以便 `setCustomComponents` 映射（会传给 `getMarkdown`，如 `['thinking']`）。 |
 | `custom-markdown-it` | `(md: MarkdownIt) => MarkdownIt` | – | 自定义内部 MarkdownIt 实例（加插件、改配置）。 |
 | `debug-performance` | `boolean` | `false` | 打印解析/渲染耗时与虚拟化统计（仅 dev）。 |
 | `typewriter` | `boolean` | `true` | 控制轻量进入动画。生成静态截图或 SSR 输出时可关闭。 |
@@ -20,7 +22,7 @@
 
 | Flag | 默认值 | 功能 |
 | ---- | ------ | ---- |
-| `render-code-blocks-as-pre` | `false` | 将所有 `code_block` 渲染为 `<pre><code>`，适合仅查看或排查 Monaco/Tailwind 样式问题。 |
+| `render-code-blocks-as-pre` | `false` | 将非 Mermaid/Infographic 的 `code_block` 渲染为 `<pre><code>`，适合仅查看或排查 Monaco/Tailwind 样式问题。Mermaid/infographic 仍会路由到各自组件，除非用 `setCustomComponents` 覆盖。 |
 | `code-block-stream` | `true` | 启用流式代码块更新；关闭后会保持加载态直到完整文本就绪，避免频繁初始化 Monaco。 |
 | `viewport-priority` | `true` | 优先渲染视窗内的 Mermaid/Monaco 等重节点，延迟离屏渲染以提升交互体验。 |
 | `defer-nodes-until-visible` | `true` | 启用后，重节点在接近视口前可先渲染为占位（仅在非虚拟化模式生效）。 |

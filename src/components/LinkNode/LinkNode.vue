@@ -3,7 +3,7 @@
 import type { LinkNodeProps } from '../../types/component-props'
 import { computed, useAttrs } from 'vue'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { getCustomNodeComponents } from '../../utils/nodeComponents'
+import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import EmphasisNode from '../EmphasisNode/EmphasisNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode'
 import ImageNode from '../ImageNode'
@@ -44,10 +44,14 @@ const nodeComponents = {
   inline_code: InlineCodeNode,
 }
 
+const customComponents = computed(() => {
+  void customComponentsRevision.value
+  return getCustomNodeComponents(props.customId)
+})
+
 // 获取子节点组件，优先使用用户自定义组件
 function getChildComponent(child: any) {
-  const customComponents = getCustomNodeComponents(props.customId)
-  const customComponent = customComponents[child.type]
+  const customComponent = customComponents.value[child.type]
   if (customComponent)
     return customComponent
 

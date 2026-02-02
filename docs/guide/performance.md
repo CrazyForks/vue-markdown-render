@@ -18,13 +18,13 @@ Performance tips:
 
 Some AI or LLM sources send content in large bursts, which can feel like the preview is freezing and then dumping a whole block. To keep the UI feeling like a smooth, continuous typewriter:
 
-- **Keep `typewriter` enabled** on `NodeRenderer` (default) so non-code nodes animate in character-by-character instead of appearing instantly.
+- **Keep `typewriter` enabled** on `MarkdownRender` (default) so non-code nodes fade/slide in instead of popping instantly.
 - **Tune the batching props**: drop `initialRenderBatchSize`/`renderBatchSize` (for example `12`/`24`), and add a small `renderBatchDelay` (20–30 ms). Even if the model sends a huge chunk, the renderer then inserts tiny slices each frame, producing a stable flow.
 - **Throttle upstream updates** if possible: instead of replacing `content` on every incoming hunk, debounce (50–100 ms) or split into smaller paragraphs so each render cycle operates on a “bite-sized” diff.
 - **Defer heavy nodes** by keeping `deferNodesUntilVisible`/`viewportPriority` turned on; expensive blocks (Mermaid/Monaco) will wait until they are near the viewport so the stream of text is never blocked.
 - **Fall back for code blocks** when a burst happens: disable `codeBlockStream` or temporarily use `renderCodeBlocksAsPre` during streaming so that syntax-highlighting work does not stall text updates.
 
-These knobs keep DOM work under a predictable budget, so users perceive a calm, steady flow of characters even when the backend sends data in erratic bursts.
+These knobs keep DOM work under a predictable budget, so users perceive a calm, steady flow of content even when the backend sends data in erratic bursts.
 
 Try this — tune rendering performance by enabling `viewportPriority`:
 
@@ -34,7 +34,7 @@ Try this — tune rendering performance by enabling `viewportPriority`:
 
 ## Virtualization & DOM windows
 
-`NodeRenderer` keeps a moving window of nodes in memory so extremely long documents stay responsive:
+`MarkdownRender` keeps a moving window of nodes in memory so extremely long documents stay responsive:
 
 - `maxLiveNodes` (default `320`) caps how many fully rendered nodes remain in the DOM. Tune this based on your layout — lower values reduce memory but require slightly more placeholder churn; higher values prioritise scrollback.
 - `liveNodeBuffer` controls overscan on both sides of the focus window (default `60`). Increase it when nodes vary wildly in height to avoid visible pop-in while scrolling fast.

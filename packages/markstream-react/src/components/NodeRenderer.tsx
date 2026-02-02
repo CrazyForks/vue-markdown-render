@@ -600,6 +600,7 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
     <div
       ref={containerRef}
       className={`markstream-react markdown-renderer${props.isDark ? ' dark' : ''}${virtualizationEnabled ? ' virtualized' : ''}`}
+      data-custom-id={props.customId}
       onClick={props.onClick}
       onMouseOver={handleMouseEvent(props.onMouseOver)}
       onMouseOut={handleMouseEvent(props.onMouseOut)}
@@ -684,6 +685,9 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     getCustomComponentsRevision,
     getCustomComponentsRevision,
   )
+  const customComponents = useMemo(() => {
+    return getCustomNodeComponents(props.customId)
+  }, [props.customId, customComponentsRevision])
 
   const instanceMsgId = useMemo(() => {
     return props.customId
@@ -692,12 +696,11 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   }, [props.customId])
 
   const inferredCustomHtmlTags = useMemo(() => {
-    const customComponents = getCustomNodeComponents(props.customId)
     return Object.keys(customComponents)
       .map(String)
       .map(s => s.trim().toLowerCase())
       .filter(isHtmlLikeTagName)
-  }, [props.customId, customComponentsRevision])
+  }, [customComponents])
 
   const effectiveCustomHtmlTags = useMemo(() => {
     const base = props.parseOptions ?? {}
@@ -834,6 +837,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     isDark: props.isDark,
     indexKey: indexPrefix,
     typewriter: props.typewriter,
+    customComponents,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
     codeBlockStream: props.codeBlockStream,
     codeBlockProps: props.codeBlockProps,
@@ -861,6 +865,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.codeBlockMaxWidth,
     props.onCopy,
     props.onHandleArtifactClick,
+    customComponents,
   ])
 
   return (

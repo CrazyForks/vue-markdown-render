@@ -36,7 +36,7 @@ You can also pass a pre-parsed `nodes` array if you already have AST data.
 
 ## Custom components (e.g. `<thinking>`)
 
-Custom tag-like blocks are exposed as nodes with `type: '<tag>'` (for example `type: 'thinking'`) when you register the tag in `customHtmlTags` or register a custom component mapping for it.
+Custom tag-like blocks are exposed as nodes with `type: 'thinking'` (the tag name, no angle brackets) when you register the tag in `customHtmlTags` or register a custom component mapping for it.
 
 ```tsx
 import type { NodeComponentProps } from 'markstream-react'

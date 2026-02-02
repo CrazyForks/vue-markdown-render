@@ -17,7 +17,7 @@
 - `i18n`：翻译映射或函数
 - `customHtmlTags`：流式内联 HTML 中间态白名单扩展（如 `['thinking']`）
 
-### `parseMarkdownToStructure(content, md?, options?)`
+### `parseMarkdownToStructure(content, md, options?)`
 将 Markdown 字符串解析为供渲染器使用的节点树（AST）。
 
 > 提示：对于 `<thinking>` 等简单自定义标签，推荐使用内置的 `customHtmlTags` / `custom-html-tags` 白名单让解析器直接输出自定义节点；只有在需要手动重写 `content/attrs` 时再用 `preTransformTokens`。参见 [自定义组件解析示例](/zh/guide/advanced#自定义组件解析示例)。
@@ -33,6 +33,9 @@
 这样做能让 UI 在内容尚未到齐时也能稳定渲染。但当你 **明确知道内容已经结束**（流已结束、消息已完整），应该将解析切换到最终态：
 
 ```ts
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = getMarkdown()
 const nodes = parseMarkdownToStructure(buffer, md, { final: true })
 ```
 
@@ -42,7 +45,7 @@ const nodes = parseMarkdownToStructure(buffer, md, { final: true })
 
 ### 其他有用函数
 - `processTokens(tokens)` — 将原始 token 处理为可用于构建节点列表的结构
-- `parseInlineTokens(tokens, md)` — 解析 inline tokens
+- `parseInlineTokens(tokens, content?, preToken?, options?)` — 解析 inline tokens
 
 ## 配置与工具
 
@@ -64,36 +67,42 @@ setDefaultMathOptions({
 
 ## 解析钩子（高级）
 传入 `ParseOptions` 可使用以下钩子：
-- `preTransformTokens`、`postTransformTokens`、`postTransformNodes`。
+- `preTransformTokens`、`postTransformTokens`。
+
+如需改造 AST，可在 `parseMarkdownToStructure` 返回后自行处理 `ParsedNode[]`，再通过 `MarkdownRender` 的 `nodes` 传入。
 
 这些钩子也可通过 `MarkdownRender` 组件传入 `parseOptions` prop（仅当使用 `content` prop 时生效）。
 
 ### 未知 HTML 类标签（默认行为）
 
-默认情况下，非标准的 HTML 类标签（例如 `<question>`）会被当作**纯文本**输出。
+默认情况下，非标准的 HTML 类标签（例如 `<question>`）在完整闭合后会按原生 HTML 渲染；流式场景下未闭合片段会先按**纯文本**处理以避免闪烁。
 
-如果你希望某个自定义标签参与解析并产出自定义节点（以便 `setCustomComponents` 映射），请将其加入 `customHtmlTags`。
+如果你希望某个自定义标签参与解析并产出自定义节点（以便 `setCustomComponents` 映射，并携带 attrs/content），请将其加入 `customHtmlTags`。
 
 ### ParseOptions: `requireClosingStrong`
 
-`requireClosingStrong`（boolean，可选）控制解析器在解析 inline 内容时如何处理未闭合的 `**` 加粗分隔符。默认值：`true`。
+`requireClosingStrong`（boolean，可选）控制解析器在解析 inline 内容时如何处理未闭合的 `**` 加粗分隔符。默认值：`false`（更贴合流式场景）。
 
 - **true**：要求存在匹配的关闭 `**` 才会生成加粗（strong）节点。未闭合的 `**` 会被保留为普通文本。这是非交互渲染（例如静态页面或服务器端渲染）推荐的严格模式，可以避免像 `[**cxx](xxx)` 这类在链接文本中错误地解析出 dangling strong 的问题。
 - **false**：允许中间态/未完成的 `**`（适用于编辑器的实时预览），解析器会在某些未闭合情况下仍生成临时的加粗节点。
 
-示例 — 严格模式（默认）：
+示例 — 严格模式（建议用于非流式场景）：
 
 ```ts
-import { parseMarkdownToStructure } from 'packages/markdown-parser'
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: true })
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure('[**cxx](xxx)', md, { requireClosingStrong: true })
 // 文本 `[**cxx](xxx)` 将被保留，不会创建不完整的加粗节点
 ```
 
 示例 — 编辑器友好模式：
 
 ```ts
-const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: false })
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure('[**cxx](xxx)', md, { requireClosingStrong: false })
 // 允许在实时预览中创建临时/中间态的加粗节点
 ```
 
@@ -132,6 +141,9 @@ const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
 如果希望这些标签直接产出自定义节点类型（便于 `setCustomComponents` 直接按 `type` 映射），可在 `ParseOptions` 中同时传入 `customHtmlTags`，或在 `MarkdownRender` 上使用 `custom-html-tags`（组件会自动透传）：
 
 ```ts
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
 const nodes = parseMarkdownToStructure(source, md, { customHtmlTags: ['thinking'] })
 ```
 
@@ -180,9 +192,10 @@ function enableEmoji(md: MarkdownIt) {
 快速测试 `parseOptions`：
 
 ```ts
-import { parseMarkdownToStructure } from 'markstream-vue'
+import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
-const nodes = parseMarkdownToStructure('Hello **world**')
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure('Hello **world**', md)
 console.log(nodes)
 // 渲染：<MarkdownRender :nodes="nodes" />
 ```
@@ -199,6 +212,8 @@ console.log(nodes)
 示例（简化版）：
 
 ```ts
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
 // 1) 提取自定义标签
 const extracted = new Map<string, string>()
 let id = 1
@@ -209,7 +224,8 @@ const contentWithPlaceholders = source.replace(/<MyWidget[\s\S]*?<\/MyWidget>/g,
 })
 
 // 2) 用占位符内容做 Markdown 解析
-const nodes = parseMarkdownToStructure(contentWithPlaceholders)
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure(contentWithPlaceholders, md)
 
 // 3) 渲染时替换占位符
 // if (node.type === 'text' && extracted.has(node.content)) {
@@ -219,4 +235,4 @@ const nodes = parseMarkdownToStructure(contentWithPlaceholders)
 
 ### thinking 片段
 
-针对短小的 “thinking” 片段（如 AI 思考过程），可以用 `parseOptions` 或 `preTransformTokens` 标记该区域，再用内置的 `MarkdownRenderer` 轻量渲染，同时对复杂的自定义组件仍采用上面的提取占位方案。这样避免对 AST 做易碎的字符串拼接，也便于控制自定义组件的挂载范围。
+针对短小的 “thinking” 片段（如 AI 思考过程），可先抽取该片段并单独解析，再用一个独立的 `MarkdownRender` 渲染；复杂的自定义组件仍按上面的提取占位方案处理。这样避免对 AST 做易碎的字符串拼接，也便于控制自定义组件的挂载范围。

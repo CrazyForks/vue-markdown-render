@@ -45,7 +45,7 @@ yarn add stream-markdown-parser
 - `getMarkdown(msgId?, options?)` — 返回一个预配置的 `markdown-it-ts` 实例；支持 `plugin`、`apply`、`i18n` 等选项（内置任务列表、上下标、数学等插件）。
 - `registerMarkdownPlugin(plugin)` / `clearRegisteredMarkdownPlugins()` — 全局注册/清除插件，在所有 `getMarkdown()` 调用中生效（适合特性开关或测试环境）。
 - `parseMarkdownToStructure(markdown, md, parseOptions)` — 将 Markdown 转换为可供 `markstream-vue` 等渲染器使用的 AST。
-- `processTokens(tokens)` / `parseInlineTokens(children, content)` — 更底层的 token → 节点工具，方便自定义管线。
+- `processTokens(tokens)` / `parseInlineTokens(children, content?, preToken?, options?)` — 更底层的 token → 节点工具，方便自定义管线。
 - `applyMath`、`applyContainers`、`normalizeStandaloneBackslashT`、`findMatchingClose` 等 — 用于构建自定义解析、lint 或内容清洗流程。
 
 ## 使用
@@ -55,7 +55,7 @@ yarn add stream-markdown-parser
 ```
 Markdown 字符串
    ↓ getMarkdown() → 带插件的 markdown-it-ts 实例
-parseMarkdownToStructure() → AST (ParsedNode[])
+parseMarkdownToStructure(markdown, md) → AST (ParsedNode[])
    ↓ 交给你的渲染器（markstream-vue、自定义 UI、Worker 等）
 ```
 
@@ -209,13 +209,13 @@ interface GetMarkdownOptions {
 }
 ```
 
-#### `parseMarkdownToStructure(content, md?, options?)`
+#### `parseMarkdownToStructure(content, md, options?)`
 
 将 Markdown 内容解析为结构化节点树。
 
 **参数：**
 - `content` (string): 要解析的 Markdown 内容
-- `md` (MarkdownItCore, 可选): markdown-it-ts 实例。如果未提供，则使用 `getMarkdown()` 创建
+- `md` (MarkdownItCore): 由 `getMarkdown()` 创建的 markdown-it-ts 实例
 - `options` (ParseOptions, 可选): 带有钩子的解析选项
 
 **返回值：** `ParsedNode[]` - 解析后的节点数组
@@ -224,9 +224,9 @@ interface GetMarkdownOptions {
 
 将原始 markdown-it tokens 处理为扁平数组。
 
-#### `parseInlineTokens(tokens, md)`
+#### `parseInlineTokens(tokens, content?, preToken?, options?)`
 
-解析内联 markdown-it-ts tokens。
+解析内联 markdown-it-ts tokens 并产出节点。可传入原始 `content`（来自父 token）、可选的前一个 token，以及 inline 解析选项（`requireClosingStrong`、`customHtmlTags`）。
 
 ### 配置函数
 
@@ -246,15 +246,18 @@ interface MathOptions {
 
 ### 解析钩子（精细化变换）
 
-`parseMarkdownToStructure()` 与 `<MarkdownRender :parse-options>` 可使用相同的钩子：
+ParseOptions 支持以下钩子与标志：
 
 ```ts
 interface ParseOptions {
   preTransformTokens?: (tokens: Token[]) => Token[]
   postTransformTokens?: (tokens: Token[]) => Token[]
-  postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]
   // 自定义 HTML 类标签，作为自定义节点输出（如 ['thinking']）
   customHtmlTags?: string[]
+  // true 表示输入已结束（end-of-stream）
+  final?: boolean
+  // 解析 strong 时要求闭合 `**`（默认 false）
+  requireClosingStrong?: boolean
 }
 ```
 
@@ -262,21 +265,22 @@ interface ParseOptions {
 
 ```ts
 const parseOptions = {
-  postTransformNodes(nodes) {
-    return nodes.map(node =>
-      node.type === 'html_block' && /<thinking>/.test(node.value)
-        ? { ...node, meta: { type: 'thinking' } }
-        : node,
-    )
-  },
+  customHtmlTags: ['thinking'],
 }
+
+const nodes = parseMarkdownToStructure(markdown, md, parseOptions)
+const tagged = nodes.map(node =>
+  node.type === 'html_block' && /<thinking>/.test((node as any).content ?? '')
+    ? { ...node, meta: { type: 'thinking' } }
+    : node,
+)
 ```
 
 在渲染器中读取 `node.meta` 即可渲染自定义 UI，而无需直接修改 Markdown 文本。
 
 ### 未知 HTML 类标签
 
-默认情况下，非标准的 HTML 类标签（例如 `<question>`）会被当作**纯文本**输出；只有在 `customHtmlTags` 中显式声明后，才会作为自定义节点参与解析与渲染。
+默认情况下，非标准的 HTML 类标签（例如 `<question>`）在完整闭合时会按原生 HTML 渲染（作为自定义元素输出）；流式场景下未闭合的片段会先按**纯文本**处理以避免闪烁。若希望它们作为自定义节点输出（`type: 'question'`，携带 attrs/content），需要在 `customHtmlTags` 中显式声明。
 
 ### 工具函数
 

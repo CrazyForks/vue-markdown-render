@@ -100,14 +100,14 @@ function normalizeTagName(t: unknown) {
 }
 
 export function buildAllowedHtmlTagSet(options?: ParseOptions) {
-  const set = new Set<string>(STANDARD_HTML_TAGS)
   const custom = options?.customHtmlTags
-  if (Array.isArray(custom)) {
-    for (const t of custom) {
-      const name = normalizeTagName(t)
-      if (name)
-        set.add(name)
-    }
+  if (!Array.isArray(custom) || custom.length === 0)
+    return STANDARD_HTML_TAGS
+  const set = new Set<string>(STANDARD_HTML_TAGS)
+  for (const t of custom) {
+    const name = normalizeTagName(t)
+    if (name)
+      set.add(name)
   }
   return set
 }
@@ -843,7 +843,7 @@ export function parseMarkdownToStructure(
   // (like a list/table/blockquote/fence) is parsed as Markdown blocks, insert
   // a single empty line after the closing tag when the next line begins with a
   // block-level marker.
-  if (options.customHtmlTags?.length) {
+  if (options.customHtmlTags?.length && safeMarkdown.includes('<')) {
     const tags = options.customHtmlTags
       .map(t => String(t ?? '').trim())
       .filter(Boolean)

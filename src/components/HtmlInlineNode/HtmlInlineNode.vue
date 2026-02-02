@@ -64,23 +64,56 @@ const renderMode = computed(() => {
 
 const containerRef = ref<HTMLElement | null>(null)
 const isClient = typeof window !== 'undefined'
+type DomRenderMode = 'html' | 'text'
+const lastDomRender = ref<{ mode: DomRenderMode | '', content: string, el: HTMLElement | null }>({
+  mode: '',
+  content: '',
+  el: null,
+})
+let templateEl: HTMLTemplateElement | null = null
 
-function renderHtmlContent() {
+function getTemplateEl() {
+  if (!templateEl && isClient)
+    templateEl = document.createElement('template')
+  return templateEl
+}
+
+function commitDomRender(mode: DomRenderMode, content: string) {
   if (!isClient || !containerRef.value)
     return
   const host = containerRef.value
-  host.innerHTML = ''
-  const template = document.createElement('template')
-  template.innerHTML = props.node.content
-  host.appendChild(template.content.cloneNode(true))
+  const last = lastDomRender.value
+  if (last.el === host && last.mode === mode && last.content === content)
+    return
+  if (mode === 'text') {
+    host.textContent = content
+  }
+  else {
+    const template = getTemplateEl()
+    if (template) {
+      template.innerHTML = content
+      const fragment = template.content.cloneNode(true)
+      if (typeof host.replaceChildren === 'function') {
+        host.replaceChildren(fragment)
+      }
+      else {
+        host.innerHTML = ''
+        host.appendChild(fragment)
+      }
+    }
+    else {
+      host.innerHTML = content
+    }
+  }
+  lastDomRender.value = { mode, content, el: host }
+}
+
+function renderHtmlContent() {
+  commitDomRender('html', props.node.content)
 }
 
 function renderLoadingContent() {
-  if (!containerRef.value)
-    return
-  const host = containerRef.value
-  host.innerHTML = ''
-  host.textContent = props.node.content
+  commitDomRender('text', props.node.content)
 }
 
 watch(
@@ -110,6 +143,7 @@ onBeforeUnmount(() => {
   if (!containerRef.value)
     return
   containerRef.value.innerHTML = ''
+  lastDomRender.value = { mode: '', content: '', el: null }
 })
 </script>
 

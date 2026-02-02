@@ -44,13 +44,14 @@ import Vue from 'vue'
 Vue.use(VueCompositionAPI)
 ```
 
-## 启用功能加载器（Mermaid / KaTeX）
+## 功能加载器（Mermaid / KaTeX）
 
-安装可选的对等依赖后，在客户端入口文件中选择性启用：
+安装可选对等依赖后，默认 loader 已经启用。仅当你之前手动关闭，或需要自定义 loader（例如使用 CDN 版本）时才需要调用：
 
 ```ts
 import { enableKatex, enableMermaid } from 'markstream-vue2'
 
+// 可选：重新启用或覆盖 loader
 enableMermaid()
 enableKatex()
 ```

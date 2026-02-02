@@ -13,6 +13,52 @@ import { parseMathBlock } from './math-block-parser'
 import { parseTable } from './table-parser'
 import { parseThematicBreak } from './thematic-break-parser'
 
+interface HtmlTagSetCacheEntry {
+  allowedTagSet: Set<string>
+  customTagSet: Set<string> | null
+}
+
+let emptyHtmlTagSets: HtmlTagSetCacheEntry | null = null
+const HTML_TAG_SET_CACHE = new WeakMap<readonly string[], HtmlTagSetCacheEntry>()
+
+function getEmptyHtmlTagSets() {
+  if (!emptyHtmlTagSets) {
+    emptyHtmlTagSets = {
+      allowedTagSet: buildAllowedHtmlTagSet(),
+      customTagSet: null,
+    }
+  }
+  return emptyHtmlTagSets
+}
+
+function normalizeCustomTag(t: unknown) {
+  const raw = String(t ?? '').trim()
+  if (!raw)
+    return ''
+  const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
+  return m ? m[1].toLowerCase() : ''
+}
+
+function getHtmlTagSets(customTags?: readonly string[]) {
+  if (!customTags || customTags.length === 0)
+    return getEmptyHtmlTagSets()
+  const cached = HTML_TAG_SET_CACHE.get(customTags)
+  if (cached)
+    return cached
+  const normalized = customTags.map(normalizeCustomTag).filter(Boolean)
+  if (!normalized.length) {
+    const entry = getEmptyHtmlTagSets()
+    HTML_TAG_SET_CACHE.set(customTags, entry)
+    return entry
+  }
+  const entry = {
+    allowedTagSet: buildAllowedHtmlTagSet({ customHtmlTags: customTags as any }),
+    customTagSet: new Set(normalized),
+  }
+  HTML_TAG_SET_CACHE.set(customTags, entry)
+  return entry
+}
+
 function parseVmrContainer(
   tokens: MarkdownToken[],
   index: number,
@@ -283,7 +329,8 @@ export function parseBasicBlockToken(
 
     case 'html_block': {
       const htmlBlockNode = parseHtmlBlock(token)
-      if (htmlBlockNode.tag && !buildAllowedHtmlTagSet(options).has(htmlBlockNode.tag) && htmlBlockNode.loading) {
+      const tagSets = htmlBlockNode.tag ? getHtmlTagSets(options?.customHtmlTags) : null
+      if (htmlBlockNode.tag && htmlBlockNode.loading && tagSets && !tagSets.allowedTagSet.has(htmlBlockNode.tag)) {
         const raw = String((token as any)?.content ?? '')
         const content = raw.replace(/\n+$/, '')
         return [
@@ -295,80 +342,69 @@ export function parseBasicBlockToken(
           index + 1,
         ]
       }
-      if (options?.customHtmlTags && htmlBlockNode.tag) {
-        const set = new Set(
-          options.customHtmlTags
-            .map((t) => {
-              const raw = String(t ?? '').trim()
-              const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
-              return m ? m[1].toLowerCase() : ''
-            })
-            .filter(Boolean),
-        )
-        if (set.has(htmlBlockNode.tag)) {
-          const tag = htmlBlockNode.tag
-          // markdown-it can normalize html_block token.content and lose original lines.
-          // Re-extract the next full <tag>...</tag> block from the original source.
-          const source = String((options as any)?.__sourceMarkdown ?? '')
-          const cursor = Number((options as any)?.__customHtmlBlockCursor ?? 0)
+      if (htmlBlockNode.tag && tagSets?.customTagSet?.has(htmlBlockNode.tag)) {
+        const tag = htmlBlockNode.tag
+        // markdown-it can normalize html_block token.content and lose original lines.
+        // Re-extract the next full <tag>...</tag> block from the original source.
+        const source = String((options as any)?.__sourceMarkdown ?? '')
+        const cursor = Number((options as any)?.__customHtmlBlockCursor ?? 0)
 
-          // If markdown-it provides a source map for this token, prefer anchoring the
-          // re-extraction to that line range. This avoids accidentally matching an
-          // earlier occurrence of the same custom tag that was tokenized as inline.
-          const mappedLineStart = Array.isArray((token as any).map)
-            ? lineToIndex(source, Number((token as any).map?.[0] ?? 0))
-            : 0
-          const searchStart = Math.max(clampNonNegative(cursor), clampNonNegative(mappedLineStart))
+        // If markdown-it provides a source map for this token, prefer anchoring the
+        // re-extraction to that line range. This avoids accidentally matching an
+        // earlier occurrence of the same custom tag that was tokenized as inline.
+        const mappedLineStart = Array.isArray((token as any).map)
+          ? lineToIndex(source, Number((token as any).map?.[0] ?? 0))
+          : 0
+        const searchStart = Math.max(clampNonNegative(cursor), clampNonNegative(mappedLineStart))
 
-          const fromSource = findNextCustomHtmlBlockFromSource(source, tag, searchStart)
-          if (fromSource)
-            (options as any).__customHtmlBlockCursor = fromSource.end
+        const fromSource = findNextCustomHtmlBlockFromSource(source, tag, searchStart)
+        if (fromSource)
+          (options as any).__customHtmlBlockCursor = fromSource.end
 
-          const rawHtml = String(fromSource?.raw ?? htmlBlockNode.content ?? '')
+        const rawHtml = String(fromSource?.raw ?? htmlBlockNode.content ?? '')
 
-          const openEnd = findTagCloseIndexOutsideQuotes(rawHtml)
-          const closeRe = new RegExp(`<\\s*\\/\\s*${tag}\\s*>`, 'i')
-          const closeMatch = closeRe.exec(rawHtml)
-          const closeIndex = closeMatch ? closeMatch.index : -1
+        const openEnd = findTagCloseIndexOutsideQuotes(rawHtml)
+        const closeRe = new RegExp(`<\\s*\\/\\s*${tag}\\s*>`, 'i')
+        const closeMatch = closeRe.exec(rawHtml)
+        const closeIndex = closeMatch ? closeMatch.index : -1
 
-          let inner = ''
-          if (openEnd !== -1) {
-            if (closeIndex !== -1 && openEnd < closeIndex)
-              inner = rawHtml.slice(openEnd + 1, closeIndex)
-            else
-              inner = rawHtml.slice(openEnd + 1)
-          }
-
-          // Streaming mid-state: if the closing tag is being typed but not yet
-          // complete, don't leak the partial `</tag` into content.
-          if (closeIndex === -1)
-            inner = stripTrailingPartialClosingTag(inner, tag)
-
-          // Parse attrs from the opening tag only
-          const attrs: [string, string][] = []
-          const openTag = openEnd !== -1 ? rawHtml.slice(0, openEnd + 1) : rawHtml
-          const attrRegex = /\s([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
-          let m
-          while ((m = attrRegex.exec(openTag)) !== null) {
-            const name = m[1]
-            if (!name || name.toLowerCase() === tag)
-              continue
-            const value = m[2] || m[3] || m[4] || ''
-            attrs.push([name, value])
-          }
-
-          return [
-            {
-              type: tag,
-              tag,
-              content: stripWrapperNewlines(inner),
-              raw: String(fromSource?.raw ?? htmlBlockNode.raw ?? rawHtml),
-              loading: htmlBlockNode.loading,
-              attrs: attrs.length ? attrs : undefined,
-            } as ParsedNode,
-            index + 1,
-          ]
+        let inner = ''
+        if (openEnd !== -1) {
+          if (closeIndex !== -1 && openEnd < closeIndex)
+            inner = rawHtml.slice(openEnd + 1, closeIndex)
+          else
+            inner = rawHtml.slice(openEnd + 1)
         }
+
+        // Streaming mid-state: if the closing tag is being typed but not yet
+        // complete, don't leak the partial `</tag` into content.
+        if (closeIndex === -1)
+          inner = stripTrailingPartialClosingTag(inner, tag)
+
+        // Parse attrs from the opening tag only
+        const attrs: [string, string][] = []
+        const openTag = openEnd !== -1 ? rawHtml.slice(0, openEnd + 1) : rawHtml
+        const attrRegex = /\s([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
+        let m
+        while ((m = attrRegex.exec(openTag)) !== null) {
+          const name = m[1]
+          if (!name || name.toLowerCase() === tag)
+            continue
+          const value = m[2] || m[3] || m[4] || ''
+          attrs.push([name, value])
+        }
+
+        return [
+          {
+            type: tag,
+            tag,
+            content: stripWrapperNewlines(inner),
+            raw: String(fromSource?.raw ?? htmlBlockNode.raw ?? rawHtml),
+            loading: htmlBlockNode.loading,
+            attrs: attrs.length ? attrs : undefined,
+          } as ParsedNode,
+          index + 1,
+        ]
       }
       return [htmlBlockNode, index + 1]
     }

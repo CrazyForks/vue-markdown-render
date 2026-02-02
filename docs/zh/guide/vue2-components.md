@@ -8,16 +8,61 @@ markstream-vue2 提供与 markstream-vue 相同强大的组件，但专为 Vue 2
 
 ### Props
 
+`MarkdownRender` 在 Vue 2 中的 props 与 Vue 3 版本一致；模板中使用 kebab-case。
+
+#### 核心 props
+
 | 属性 | 类型 | 默认值 | 描述 |
 |------|------|---------|-------------|
 | `content` | `string` | - | 要渲染的 Markdown 内容 |
-| `nodes` | `ParsedNode[]` | - | 预解析的 AST 节点（`content` 的替代方案） |
-| `custom-id` | `string` | `'default'` | 自定义组件作用域标识符 |
-| `max-live-nodes` | `number` | `100` | 虚拟化最大渲染节点数 |
-| `live-node-buffer` | `number` | `5` | 虚拟化过扫描缓冲区 |
-| `batch-rendering` | `boolean` | `false` | 启用增量批处理渲染 |
-| `defer-nodes-until-visible` | `boolean` | `true` | 延迟渲染重型节点直到可见 |
-| `render-code-blocks-as-pre` | `boolean` | `false` | 将代码块回退为 `<pre><code>` |
+| `nodes` | `BaseNode[]` | - | 预解析的 AST 节点（通常为 `ParsedNode[]`） |
+| `custom-id` | `string` | - | 作用域标识，用于 `setCustomComponents` 与 `[data-custom-id="..."]` |
+| `final` | `boolean` | `false` | 标记输入结束，停止输出 streaming `loading` 节点 |
+| `parse-options` | `ParseOptions` | - | 解析选项与 token hooks（仅在传入 `content` 时生效） |
+| `custom-html-tags` | `string[]` | - | 作为自定义节点输出的 HTML-like 标签（如 `thinking`） |
+| `custom-markdown-it` | `(md: MarkdownIt) => MarkdownIt` | - | 自定义 MarkdownIt 实例 |
+| `debug-performance` | `boolean` | `false` | 输出解析/渲染耗时与虚拟化统计（仅 dev） |
+| `is-dark` | `boolean` | `false` | 暗色主题标记，转发给重型节点并在根容器加 `.dark` |
+| `index-key` | `number \| string` | - | 列表渲染时的 key 前缀 |
+| `typewriter` | `boolean` | `true` | 非代码节点进入动画 |
+
+#### 流式与重节点开关
+
+| 属性 | 默认值 | 描述 |
+|------|---------|-------------|
+| `render-code-blocks-as-pre` | `false` | 将非 Mermaid/Infographic 的 `code_block` 渲染为 `<pre><code>` |
+| `code-block-stream` | `true` | 随内容到达流式更新代码块 |
+| `viewport-priority` | `true` | 将 Monaco/Mermaid/KaTeX 等重型工作延迟到接近视口时 |
+| `defer-nodes-until-visible` | `true` | 重型节点先占位，接近可视区再渲染（仅非虚拟化模式） |
+
+#### 性能（虚拟化与批次渲染）
+
+| 属性 | 默认值 | 描述 |
+|------|---------|-------------|
+| `max-live-nodes` | `320` | DOM 最大保留节点数（设为 `0` 关闭虚拟化） |
+| `live-node-buffer` | `60` | 视窗前后 overscan 缓冲 |
+| `batch-rendering` | `true` | 在关闭虚拟化时启用批次渲染 |
+| `initial-render-batch-size` | `40` | 批次渲染前先渲染的节点数量 |
+| `render-batch-size` | `80` | 每个批次渲染的节点数量 |
+| `render-batch-delay` | `16` | 每次批次前的额外延迟（ms） |
+| `render-batch-budget-ms` | `6` | 自适应批次缩小前的预算（ms） |
+| `render-batch-idle-timeout-ms` | `120` | `requestIdleCallback` 超时（ms） |
+
+#### 代码块全局配置
+
+| 属性 | 类型 | 描述 |
+|------|------|-------------|
+| `code-block-dark-theme` | `any` | 转发到每个 `CodeBlockNode` 的 Monaco 深色主题 |
+| `code-block-light-theme` | `any` | 转发到每个 `CodeBlockNode` 的 Monaco 浅色主题 |
+| `code-block-monaco-options` | `Record<string, any>` | 转发到 `stream-monaco` 的选项 |
+| `code-block-min-width` | `string \| number` | 转发到 `CodeBlockNode` 的最小宽度 |
+| `code-block-max-width` | `string \| number` | 转发到 `CodeBlockNode` 的最大宽度 |
+| `code-block-props` | `Record<string, any>` | 额外转发到每个 `CodeBlockNode` 的 props |
+| `themes` | `string[]` | 转发到 `stream-monaco` 的主题列表 |
+
+#### 事件
+
+- `@copy`, `@handleArtifactClick`, `@click`, `@mouseover`, `@mouseout`
 
 ### 使用
 
@@ -303,7 +348,7 @@ const nodes = parseMarkdownToStructure('# 标题\n\n这里的内容...', md)
 
 ### enableKatex / enableMermaid
 
-为 KaTeX 和 Mermaid 启用功能加载器。
+（重新）启用 KaTeX 与 Mermaid 的功能加载器。默认 loader 已经启用，仅在你手动关闭过或需要自定义 loader（如 CDN 版本）时调用。
 
 ```js
 import { enableKatex, enableMermaid } from 'markstream-vue2'
@@ -326,6 +371,9 @@ interface NodeComponentProps {
   node: ParsedNode // 解析后的节点数据
   indexKey: number | string // 节点的唯一键
   customId?: string // 用于作用域的自定义 ID
+  isDark?: boolean // 主题标记（来自 MarkdownRender）
+  typewriter?: boolean // 进入动画标记（非 code 节点）
+  loading?: boolean // 流式中间态（来自 node.loading）
 }
 ```
 
@@ -409,7 +457,7 @@ export default {
       streamingContent: '',
       fullContent: `# 流式传输演示
 
-此内容正在**逐字符**流式传输。
+此内容正在**逐步**流式传输。
 
 \`\`\`javascript
 console.log('流式传输中...')
@@ -462,7 +510,7 @@ markstream-vue2 包含完整的 TypeScript 类型定义。对于 Vue 2.6.x，配
 
 ```ts
 import type { ParsedNode } from 'markstream-vue2'
-import MarkdownRender, { MarkdownRenderProps } from 'markstream-vue2'
+import MarkdownRender from 'markstream-vue2'
 
 // 你的组件具有适当的类型
 import { defineComponent } from 'vue'

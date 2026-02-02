@@ -44,13 +44,14 @@ import Vue from 'vue'
 Vue.use(VueCompositionAPI)
 ```
 
-## Enable feature loaders (Mermaid / KaTeX)
+## Feature loaders (Mermaid / KaTeX)
 
-After installing optional peers, opt-in loaders in your client entry:
+After installing optional peers, the default loaders are already enabled. Only call these helpers if you disabled them earlier or need a custom loader (for example, a CDN build):
 
 ```ts
 import { enableKatex, enableMermaid } from 'markstream-vue2'
 
+// optional: re-enable or override loaders
 enableMermaid()
 enableKatex()
 ```

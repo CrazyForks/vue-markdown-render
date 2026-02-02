@@ -21,11 +21,28 @@ import { parseTextToken } from './text-parser'
 
 // Precompiled regexes used frequently in inline parsing
 const STRONG_PAIR_RE = /\*\*([\s\S]*?)\*\*/
+const STRIKETHROUGH_RE = /[^~]*~{2,}[^~]+/
+const HAS_STRONG_RE = /\*\*/
 
 // Helper: detect likely URLs/hrefs (autolinks). Extracted so the
 // detection logic is easy to tweak and test.
 const AUTOLINK_PROTOCOL_RE = /^(?:https?:\/\/|mailto:|ftp:\/\/)/i
 const AUTOLINK_GENERIC_RE = /:\/\//
+
+function countUnescapedAsterisks(str: string): number {
+  let count = 0
+  let i = 0
+  while (i < str.length) {
+    if (str[i] === '\\' && i + 1 < str.length && str[i + 1] === '*') {
+      i += 2 // skip escaped asterisk
+      continue
+    }
+    if (str[i] === '*')
+      count++
+    i++
+  }
+  return count
+}
 
 export function isLikelyUrl(href?: string) {
   if (!href)
@@ -56,25 +73,8 @@ export function parseInlineTokens(
   }
 
   function handleEmphasisAndStrikethrough(content: string, token: MarkdownToken): boolean {
-    // Helper: count unescaped asterisks in raw markdown
-    // Escaped asterisks like \* should not count toward strong/emphasis matching
-    const countUnescapedAsterisks = (str: string): number => {
-      let count = 0
-      let i = 0
-      while (i < str.length) {
-        if (str[i] === '\\' && i + 1 < str.length && str[i + 1] === '*') {
-          i += 2 // skip escaped asterisk
-          continue
-        }
-        if (str[i] === '*')
-          count++
-        i++
-      }
-      return count
-    }
-
     // strikethrough (~~)
-    if (/[^~]*~{2,}[^~]+/.test(content)) {
+    if (STRIKETHROUGH_RE.test(content)) {
       let idx = content.indexOf('~~')
       if (idx === -1)
         idx = 0
@@ -109,7 +109,7 @@ export function parseInlineTokens(
     // Note: markdown-it may sometimes leave `**...**` as a plain text token
     // (e.g. when wrapping inline HTML like `<font>...</font>`). In that case,
     // we still want to recognize and parse the first strong pair.
-    if (/\*\*/.test(content)) {
+    if (HAS_STRONG_RE.test(content)) {
       const openIdx = content.indexOf('**')
       const beforeText = openIdx > -1 ? content.slice(0, openIdx) : ''
       if (beforeText) {
@@ -623,10 +623,32 @@ export function parseInlineTokens(
     }
   }
 
+  function commitTextNode(content: string, token: MarkdownToken, preToken?: MarkdownToken, nextToken?: MarkdownToken) {
+    const textNode = parseTextToken({ ...token, content })
+
+    if (currentTextNode) {
+      // Merge with the previous text node
+      currentTextNode.content += textNode.content.replace(/(\*+|\(|\\)$/, '')
+      currentTextNode.raw += textNode.raw
+      return
+    }
+
+    const maybeMath = preToken?.tag === 'br' && tokens[i - 2]?.content === '['
+    if (!nextToken)
+      textNode.content = textNode.content.replace(/(\*+|\(|\\)$/, '')
+
+    currentTextNode = textNode
+    currentTextNode.center = maybeMath
+    result.push(currentTextNode)
+  }
+
   function handleTextToken(token: MarkdownToken) {
     // 合并连续的 text 节点
     let index = result.length - 1
-    let content = String(token.content ?? '').replace(/\\/g, '')
+    const rawContent = String(token.content ?? '')
+    let content = rawContent
+    if (rawContent.includes('\\'))
+      content = rawContent.replace(/\\/g, '')
 
     if (token.content === '<' || (content === '1' && tokens[i - 1]?.tag === 'br')) {
       i++
@@ -634,7 +656,8 @@ export function parseInlineTokens(
     }
 
     // math 公式 $ 只出现一个并且在末尾，优化掉
-    if (Array.from(content.matchAll(/\$/g)).length === 1 && content.endsWith('$')) {
+    const dollarIndex = content.indexOf('$')
+    if (dollarIndex !== -1 && dollarIndex === content.lastIndexOf('$') && content.endsWith('$')) {
       content = content.slice(0, -1)
     }
 
@@ -658,7 +681,7 @@ export function parseInlineTokens(
     }
 
     if (index < result.length - 1)
-      result.splice(index + 1)
+      result.length = index + 1
 
     const nextToken = tokens[i + 1]
     if (pPreToken?.type === 'list_item_open' && /^\d$/.test(content)) {
@@ -672,6 +695,27 @@ export function parseInlineTokens(
     if (!nextToken && /[^\]]\s*\(\s*$/.test(content)) {
       content = content.replace(/\(\s*$/, '')
     }
+    if (!content) {
+      i++
+      return
+    }
+
+    const hasInlineCandidates = (
+      content.includes('*')
+      || content.includes('~')
+      || content.includes('`')
+      || content.includes('[')
+      || content.includes('!')
+      || content.includes('$')
+      || content.includes('|')
+      || content.includes('(')
+    )
+    if (!hasInlineCandidates) {
+      commitTextNode(content, token, tokens[i - 1], nextToken)
+      i++
+      return
+    }
+
     if (handleCheckboxLike(content))
       return
     const preToken = tokens[i - 1]
@@ -694,29 +738,8 @@ export function parseInlineTokens(
     if (handleEmphasisAndStrikethrough(content, token))
       return
 
-    // Drop empty text tokens to avoid spurious empty nodes before emphasis
-    if (!content) {
-      i++
-      return
-    }
-    const textNode = parseTextToken({ ...token, content })
-
-    if (currentTextNode) {
-      // Merge with the previous text node
-      currentTextNode.content += textNode.content.replace(/(\*+|\(|\\)$/, '')
-      currentTextNode.raw += textNode.raw
-    }
-    else {
-      const maybeMath = preToken?.tag === 'br' && tokens[i - 2]?.content === '['
-      // Start a new text node
-      const nextToken = tokens[i + 1]
-      if (!nextToken)
-        textNode.content = textNode.content.replace(/(\*+|\(|\\)$/, '')
-
-      currentTextNode = textNode
-      currentTextNode.center = maybeMath
-      result.push(currentTextNode)
-    }
+    // Emit remaining text token
+    commitTextNode(content, token, preToken, nextToken)
     i++
   }
 

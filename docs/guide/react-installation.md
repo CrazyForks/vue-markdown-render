@@ -27,22 +27,25 @@ markstream-react supports various features through optional peer dependencies. I
 | Mermaid Diagrams | `mermaid` | `pnpm add mermaid` |
 | Math Rendering (KaTeX) | `katex` | `pnpm add katex` |
 
-## Enable feature loaders (Mermaid / KaTeX)
+## Optional: off-thread workers (Mermaid / KaTeX)
 
-After installing optional peers, opt-in loaders in your client entry:
+Mermaid/KaTeX auto-load when installed. If you want off‑thread parsing/rendering, inject the workers:
 
 ```tsx
-import { enableKatex, enableMermaid } from 'markstream-react'
+import { setKaTeXWorker, setMermaidWorker } from 'markstream-react'
+import KatexWorker from 'markstream-react/workers/katexRenderer.worker?worker'
+import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker'
 
-enableMermaid()
-enableKatex()
+setMermaidWorker(new MermaidWorker())
+setKaTeXWorker(new KatexWorker())
 ```
 
-Also remember required CSS:
+Required CSS:
 
 ```tsx
 import 'markstream-react/index.css'
 import 'katex/dist/katex.min.css'
+import 'mermaid/dist/mermaid.css'
 ```
 
 Monaco (`stream-monaco`) does not require a separate CSS import.
@@ -129,7 +132,7 @@ import 'katex/dist/katex.min.css'
 Import and render a simple markdown string:
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import 'markstream-react/index.css'
 
 function App() {
@@ -146,8 +149,16 @@ export default App
 markstream-react is written in TypeScript and includes full type definitions out of the box. No additional configuration is needed:
 
 ```tsx
-import type { MarkdownRenderProps, ParsedNode } from 'markstream-react'
-import MarkdownRender from 'markstream-react'
+import type { NodeRendererProps } from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
+
+const props: NodeRendererProps = {
+  content: '# Hello TypeScript!',
+}
+
+function App() {
+  return <MarkdownRender {...props} />
+}
 ```
 
 ## Next.js Integration
@@ -157,7 +168,7 @@ For Next.js projects, you need to ensure components only render on the client si
 ```tsx
 'use client'
 
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useEffect, useState } from 'react'
 import 'markstream-react/index.css'
 
@@ -182,7 +193,7 @@ Or use the `'use client'` directive with dynamic imports:
 import dynamic from 'next/dynamic'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
+  () => import('markstream-react').then(mod => mod.NodeRenderer),
   { ssr: false }
 )
 
@@ -211,7 +222,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 ```tsx
 // src/App.tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   const content = `# Hello Vite!

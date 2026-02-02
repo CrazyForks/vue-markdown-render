@@ -281,32 +281,30 @@ function addChunk(chunk: string) {
 - `content` 与 `nodes`：传原始 Markdown 或预解析节点（来自 `parseMarkdownToStructure`）。
 - `max-live-nodes`：`320`（默认虚拟化）或 `0`（增量批次）。
 - `batchRendering`：用 `initialRenderBatchSize`、`renderBatchSize`、`renderBatchDelay`、`renderBatchBudgetMs` 微调批次。
-- `enableMermaid` / `enableKatex` / `enableMonaco`：按需启用重型依赖。
+- `enableMermaid` / `enableKatex`：用于（重新）启用重型依赖或自定义 loader（可与 `disableMermaid` / `disableKatex` 配合）。
 - `parse-options`：在组件上复用解析钩子（如 `preTransformTokens`、`requireClosingStrong`）。
 - `final`：标记“最终态/流结束”，关闭中间态 loading 解析并强制收敛未闭合结构。
 - `custom-html-tags`：扩展流式 HTML 白名单并将这些标签输出为自定义节点，便于 `setCustomComponents` 直接映射（如 `['thinking']`）。
-- `custom-components`：为自定义标签/标记注册内嵌 Vue 组件。
+- `setCustomComponents(customId?, mapping)`：为自定义标签/标记注册内嵌 Vue 组件（传 `custom-id` 可限定作用域）。
 
-示例：将 Markdown 占位符映射到 Vue 组件
+示例：将 Markdown 占位符映射到 Vue 组件（作用域）
 
 ```ts
 import { setCustomComponents } from 'markstream-vue'
 
-setCustomComponents({
+setCustomComponents('docs', {
   CALLOUT: () => import('./components/Callout.vue'),
 })
 
 // Markdown: [[CALLOUT:warning title="提示" body="具体内容"]]
 ```
 
-或在组件上按需传入：
+渲染时使用同一个 `custom-id`：
 
 ```vue
 <MarkdownRender
   :content="doc"
-  :custom-components="{
-    CALLOUT: () => import('./components/Callout.vue'),
-  }"
+  custom-id="docs"
 />
 ```
 
@@ -335,7 +333,7 @@ setCustomComponents({
 - Mermaid / KaTeX 不显示？安装对应 peer（`mermaid` / `katex`），并传入 `:enable-mermaid="true"` / `:enable-katex="true"` 或调用 loader 设置函数。如果你是用 CDN `<script>` 引入，库也会自动读取 `window.mermaid` / `window.katex`。
 - CDN + KaTeX worker：如果你不打包 `katex` 但仍希望公式在 worker 中渲染（不占主线程），可以用 `createKaTeXWorkerFromCDN()` 创建一个“CDN 加载 KaTeX”的 worker，然后通过 `setKaTeXWorker()` 注入。
 - 体积问题：可选 peer 不会被打包，CSS 只需导入一次；对代码块可用 Shiki（`MarkdownCodeBlockNode`）替代 Monaco 以减轻体积。
-- 自定义 UI：通过 `setCustomComponents`（全局）或 `custom-components` prop 注册组件，在 Markdown 中放置占位标记并映射到 Vue 组件。
+- 自定义 UI：通过 `setCustomComponents`（全局或作用域）注册组件，在 Markdown 中放置占位标记并映射到 Vue 组件。
 
 ## 🆚 为什么选择 markstream-vue，而不是普通 Markdown 渲染器？
 

@@ -72,10 +72,11 @@ pnpm add stream-monaco
 
 ```vue
 <script setup>
-import { toggleDark, useDark } from '@vueuse/core'
+import { useDark, useToggle } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 
 const isDark = useDark() // Ref<boolean> 响应式系统/主题偏好
+const toggleDark = useToggle(isDark)
 const content = '# 示例\n\n```js\nconsole.log("深色模式")\n```'
 
 // 可用主题（必须包含你想要使用的主题）

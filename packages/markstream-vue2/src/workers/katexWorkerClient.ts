@@ -362,6 +362,7 @@ const defaultBackpressure = {
   backoffMs: 30,
   maxRetries: 1,
 }
+const MAX_BACKPRESSURE_RETRIES = 8
 
 export function setKaTeXBackpressureDefaults(opts: Partial<typeof defaultBackpressure>) {
   if (opts.timeout != null)
@@ -397,7 +398,10 @@ export async function renderKaTeXWithBackpressure(
   const timeout = opts.timeout ?? defaultBackpressure.timeout
   const waitTimeout = opts.waitTimeout ?? defaultBackpressure.waitTimeout
   const backoffMs = opts.backoffMs ?? defaultBackpressure.backoffMs
-  const maxRetries = opts.maxRetries ?? defaultBackpressure.maxRetries
+  const rawMaxRetries = opts.maxRetries ?? defaultBackpressure.maxRetries
+  const maxRetries = Number.isFinite(rawMaxRetries)
+    ? Math.max(0, Math.min(Math.floor(rawMaxRetries), MAX_BACKPRESSURE_RETRIES))
+    : defaultBackpressure.maxRetries
   const signal = opts.signal
 
   let attempt = 0

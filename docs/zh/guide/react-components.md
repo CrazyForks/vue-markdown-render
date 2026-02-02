@@ -8,21 +8,72 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 
 ### Props
 
+`MarkdownRender` 使用 `markstream-react` 的 `NodeRendererProps`。
+
+#### 核心 props
+
 | 属性 | 类型 | 默认值 | 描述 |
 |------|------|---------|-------------|
 | `content` | `string` | - | 要渲染的 Markdown 内容 |
-| `nodes` | `ParsedNode[]` | - | 预解析的 AST 节点（`content` 的替代方案） |
-| `customId` | `string` | `'default'` | 自定义组件作用域标识符 |
-| `maxLiveNodes` | `number` | `100` | 虚拟化最大渲染节点数 |
-| `liveNodeBuffer` | `number` | `5` | 虚拟化过扫描缓冲区 |
-| `batchRendering` | `boolean` | `false` | 启用增量批处理渲染 |
-| `deferNodesUntilVisible` | `boolean` | `true` | 延迟渲染重型节点直到可见 |
-| `renderCodeBlocksAsPre` | `boolean` | `false` | 将代码块回退为 `<pre><code>` |
+| `nodes` | `BaseNode[]` | - | 预解析的 AST 节点（通常为 `ParsedNode[]`） |
+| `customId` | `string` | - | 作用域标识，用于 `setCustomComponents` 与样式隔离 |
+| `final` | `boolean` | `false` | 标记输入结束，停止输出 streaming `loading` 节点 |
+| `parseOptions` | `ParseOptions` | - | 解析选项与 token hooks（仅在传入 `content` 时生效） |
+| `customHtmlTags` | `readonly string[]` | - | 作为自定义节点输出的 HTML-like 标签（如 `thinking`） |
+| `customMarkdownIt` | `(md: MarkdownIt) => MarkdownIt` | - | 自定义 MarkdownIt 实例 |
+| `debugPerformance` | `boolean` | `false` | 输出解析/渲染耗时与虚拟化统计（仅 dev） |
+| `isDark` | `boolean` | `false` | 暗色主题标记，转发给重型节点并在根容器加 `.dark` |
+| `indexKey` | `number \| string` | - | 列表渲染时的 key 前缀 |
+| `typewriter` | `boolean` | `true` | 非代码节点进入动画 |
+
+#### 流式与重节点开关
+
+| 属性 | 默认值 | 描述 |
+|------|---------|-------------|
+| `renderCodeBlocksAsPre` | `false` | 将非 Mermaid/Infographic 的 `code_block` 渲染为 `<pre><code>` |
+| `codeBlockStream` | `true` | 随内容到达流式更新代码块 |
+| `viewportPriority` | `true` | 将 Monaco/Mermaid/KaTeX 等重型工作延迟到接近视口时 |
+| `deferNodesUntilVisible` | `true` | 重型节点先占位，接近可视区再渲染（仅非虚拟化模式） |
+
+#### 性能（虚拟化与批次渲染）
+
+| 属性 | 默认值 | 描述 |
+|------|---------|-------------|
+| `maxLiveNodes` | `320` | DOM 最大保留节点数（设为 `0` 关闭虚拟化） |
+| `liveNodeBuffer` | `60` | 视窗前后 overscan 缓冲 |
+| `batchRendering` | `true` | 在关闭虚拟化时启用批次渲染 |
+| `initialRenderBatchSize` | `40` | 批次渲染前先渲染的节点数量 |
+| `renderBatchSize` | `80` | 每个批次渲染的节点数量 |
+| `renderBatchDelay` | `16` | 每次批次前的额外延迟（ms） |
+| `renderBatchBudgetMs` | `6` | 自适应批次缩小前的预算（ms） |
+| `renderBatchIdleTimeoutMs` | `120` | `requestIdleCallback` 超时（ms） |
+
+#### 代码块全局配置
+
+| 属性 | 类型 | 描述 |
+|------|------|-------------|
+| `codeBlockDarkTheme` | `any` | 转发到每个 `CodeBlockNode` 的 Monaco 深色主题 |
+| `codeBlockLightTheme` | `any` | 转发到每个 `CodeBlockNode` 的 Monaco 浅色主题 |
+| `codeBlockMonacoOptions` | `Record<string, any>` | 转发到 `stream-monaco` 的选项 |
+| `codeBlockMinWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最小宽度 |
+| `codeBlockMaxWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最大宽度 |
+| `codeBlockProps` | `Record<string, any>` | 额外转发到每个 `CodeBlockNode` 的 props |
+| `themes` | `string[]` | 转发到 `stream-monaco` 的主题列表 |
+
+#### 事件
+
+| 属性 | 类型 | 描述 |
+|------|------|-------------|
+| `onCopy` | `(code: string) => void` | 代码块复制事件 |
+| `onHandleArtifactClick` | `(payload: any) => void` | 预览/制品点击事件 |
+| `onClick` | `(event: React.MouseEvent<HTMLDivElement>) => void` | 根容器点击事件 |
+| `onMouseOver` | `(event: React.MouseEvent<HTMLElement>) => void` | 根容器鼠标悬停事件 |
+| `onMouseOut` | `(event: React.MouseEvent<HTMLElement>) => void` | 根容器鼠标移出事件 |
 
 ### 使用
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   const markdown = `# Hello React!
@@ -66,7 +117,6 @@ function CodeBlock() {
         node={codeNode}
         showCopyButton={true}
         onCopy={handleCopy}
-        headerRight={<span className="lang-badge">{codeNode.language}</span>}
       />
     </div>
   )
@@ -205,11 +255,10 @@ import { HeadingNode } from 'markstream-react'
 function CustomHeading() {
   const headingNode = {
     type: 'heading',
-    level: 1,
-    children: [{ type: 'text', content: 'Hello World' }]
+    level: 1
   }
 
-  return <HeadingNode node={headingNode} />
+  return <HeadingNode node={headingNode}>Hello World</HeadingNode>
 }
 ```
 
@@ -220,28 +269,31 @@ import { ParagraphNode } from 'markstream-react'
 
 function CustomParagraph() {
   const paragraphNode = {
-    type: 'paragraph',
-    children: [
-      { type: 'text', content: '这是一个 ' },
-      { type: 'strong', children: [{ type: 'text', content: '粗体' }] },
-      { type: 'text', content: ' 单词。' }
-    ]
+    type: 'paragraph'
   }
 
-  return <ParagraphNode node={paragraphNode} />
+  return (
+    <ParagraphNode node={paragraphNode}>
+      这是一个
+      {' '}
+      <strong>粗体</strong>
+      {' '}
+      单词。
+    </ParagraphNode>
+  )
 }
 ```
 
 ### ListNode
 
 ```tsx
-import { ListNode } from 'markstream-react'
+import { ListNode, renderNode } from 'markstream-react'
 
 function CustomList() {
   const listNode = {
     type: 'list',
     ordered: false,
-    children: [
+    items: [
       {
         type: 'list_item',
         children: [
@@ -257,7 +309,9 @@ function CustomList() {
     ]
   }
 
-  return <ListNode node={listNode} />
+  const ctx = { events: {} }
+
+  return <ListNode node={listNode} ctx={ctx} renderNode={renderNode} />
 }
 ```
 
@@ -269,9 +323,9 @@ import { LinkNode } from 'markstream-react'
 function CustomLink() {
   const linkNode = {
     type: 'link',
-    url: 'https://example.com',
+    href: 'https://example.com',
     title: '示例',
-    children: [{ type: 'text', content: '点击我' }]
+    text: '点击我'
   }
 
   return (
@@ -295,7 +349,8 @@ function CustomImage() {
     type: 'image',
     src: 'https://example.com/image.jpg',
     alt: '示例图片',
-    title: '示例'
+    title: '示例',
+    raw: '![示例图片](https://example.com/image.jpg)'
   }
 
   const handleClick = () => {
@@ -323,7 +378,7 @@ function CustomImage() {
 获取配置好的 markdown-it 实例。
 
 ```tsx
-import { getMarkdown } from 'markstream-react'
+import { getMarkdown } from 'stream-markdown-parser'
 
 const md = getMarkdown('my-msg-id', {
   html: true,
@@ -339,7 +394,7 @@ const tokens = md.parse('# Hello World')
 将 markdown 字符串解析为 AST 结构。
 
 ```tsx
-import { getMarkdown, parseMarkdownToStructure } from 'markstream-react'
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
 const md = getMarkdown()
 const nodes = parseMarkdownToStructure('# 标题\n\n这里的内容...', md)
@@ -348,18 +403,17 @@ const nodes = parseMarkdownToStructure('# 标题\n\n这里的内容...', md)
 // <MarkdownRender nodes={nodes} />
 ```
 
-### enableKatex / enableMermaid
+### 可选 Worker（Mermaid / KaTeX）
 
-为 KaTeX 和 Mermaid 启用功能加载器。
+安装后会自动加载 Mermaid/KaTeX。如需线程外解析/渲染，可注入 Worker：
 
 ```tsx
-import { enableKatex, enableMermaid } from 'markstream-react'
+import { setKaTeXWorker, setMermaidWorker } from 'markstream-react'
+import KatexWorker from 'markstream-react/workers/katexRenderer.worker?worker'
+import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker'
 
-// 启用 KaTeX worker
-enableKatex()
-
-// 启用 Mermaid worker
-enableMermaid()
+setMermaidWorker(new MermaidWorker())
+setKaTeXWorker(new KatexWorker())
 ```
 
 ## 自定义组件 API
@@ -369,10 +423,15 @@ enableMermaid()
 所有自定义节点组件都接收这些 props：
 
 ```tsx
-interface NodeComponentProps {
-  node: ParsedNode // 解析后的节点数据
-  indexKey: number | string // 节点的唯一键
+interface NodeComponentProps<TNode = ParsedNode> {
+  node: TNode // 解析后的节点数据
+  ctx?: RenderContext // 渲染上下文（主题、事件、开关）
+  renderNode?: RenderNodeFn // 子节点渲染助手
+  indexKey?: React.Key // 节点的唯一键
   customId?: string // 作用域标识符
+  isDark?: boolean
+  typewriter?: boolean
+  children?: React.ReactNode
 }
 ```
 
@@ -421,26 +480,23 @@ function App() {
 }
 ```
 
-## 基于上下文的自定义渲染
+## Context + 自定义组件
 
-对于更复杂的自定义渲染场景，你可以使用 React Context：
+可以在自定义节点组件内部使用 React Context，同时通过 `setCustomComponents` 注册组件：
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
 import React, { createContext, useContext } from 'react'
 
-interface CustomComponentsContextType {
-  [key: string]: React.ComponentType<any>
-}
+const ThemeContext = createContext<'light' | 'dark'>('light')
 
-const CustomComponentsContext = createContext<CustomComponentsContextType>({})
-
-function CustomHeading({ node, indexKey, customId }: any) {
+function CustomHeading({ node, customId }: any) {
+  const theme = useContext(ThemeContext)
   const level = node.level || 1
   const Tag = `h${level}` as keyof JSX.IntrinsicElements
 
   return (
-    <Tag className="custom-heading" data-custom-id={customId}>
+    <Tag className={`custom-heading ${theme}`} data-custom-id={customId}>
       {node.children?.map((child: any, i: number) => (
         <span key={i}>{child.content || ''}</span>
       ))}
@@ -448,20 +504,18 @@ function CustomHeading({ node, indexKey, customId }: any) {
   )
 }
 
+setCustomComponents('docs', { heading: CustomHeading })
+
 function App() {
   const markdown = `# 自定义标题
 
 这使用了自定义标题组件。
 `
 
-  const customComponents = {
-    heading: CustomHeading
-  }
-
   return (
-    <CustomComponentsContext.Provider value={customComponents}>
-      <MarkdownRender content={markdown} />
-    </CustomComponentsContext.Provider>
+    <ThemeContext.Provider value="dark">
+      <MarkdownRender customId="docs" content={markdown} />
+    </ThemeContext.Provider>
   )
 }
 ```
@@ -471,14 +525,14 @@ function App() {
 markstream-react 支持流式 markdown 内容：
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useState } from 'react'
 
 function StreamingDemo() {
   const [content, setContent] = useState('')
   const fullContent = `# 流式传输演示
 
-此内容正在**逐字符**流式传输。
+此内容正在**逐步**流式传输。
 `
 
   React.useEffect(() => {
@@ -505,8 +559,9 @@ function StreamingDemo() {
 markstream-react 包含完整的 TypeScript 类型定义：
 
 ```tsx
-import type { MarkdownRenderProps, NodeComponentProps, ParsedNode } from 'markstream-react'
-import MarkdownRender from 'markstream-react'
+import type { NodeComponentProps, NodeRendererProps } from 'markstream-react'
+import type { ParsedNode } from 'stream-markdown-parser'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   const markdown = '# Hello TypeScript!'
@@ -523,7 +578,7 @@ function App() {
 ```tsx
 'use client'
 
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useEffect, useState } from 'react'
 
 export default function MarkdownPage() {
@@ -547,7 +602,7 @@ export default function MarkdownPage() {
 import dynamic from 'next/dynamic'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
+  () => import('markstream-react').then(mod => mod.NodeRenderer),
   {
     ssr: false,
     loading: () => <div>加载 markdown 中...</div>
@@ -564,7 +619,7 @@ export default function MarkdownPage() {
 你可以轻松地与 React hooks 集成：
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useCallback, useMemo, useState } from 'react'
 
 function MarkdownEditor() {
@@ -592,7 +647,7 @@ function MarkdownEditor() {
 ## 错误处理
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function SafeMarkdown({ content }: { content: string }) {
   const [error, setError] = React.useState<Error | null>(null)

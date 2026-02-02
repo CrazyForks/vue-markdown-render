@@ -27,15 +27,17 @@ markstream-react 通过可选的对等依赖支持各种功能。只安装你需
 | Mermaid 图表 | `mermaid` | `pnpm add mermaid` |
 | 数学公式渲染（KaTeX） | `katex` | `pnpm add katex` |
 
-## 启用功能加载器（Mermaid / KaTeX）
+## 可选：启用线程外 Worker（Mermaid / KaTeX）
 
-安装可选的对等依赖后，在客户端入口文件中选择性启用：
+安装后会自动加载 Mermaid/KaTeX。如需线程外解析/渲染，可在入口注入 Worker：
 
 ```tsx
-import { enableKatex, enableMermaid } from 'markstream-react'
+import { setKaTeXWorker, setMermaidWorker } from 'markstream-react'
+import KatexWorker from 'markstream-react/workers/katexRenderer.worker?worker'
+import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker'
 
-enableMermaid()
-enableKatex()
+setMermaidWorker(new MermaidWorker())
+setKaTeXWorker(new KatexWorker())
 ```
 
 同时记得导入必需的 CSS：
@@ -43,6 +45,7 @@ enableKatex()
 ```tsx
 import 'markstream-react/index.css'
 import 'katex/dist/katex.min.css'
+import 'mermaid/dist/mermaid.css'
 ```
 
 Monaco（`stream-monaco`）不需要单独导入 CSS。
@@ -129,7 +132,7 @@ import 'katex/dist/katex.min.css'
 导入并渲染一个简单的 markdown 字符串：
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import 'markstream-react/index.css'
 
 function App() {
@@ -146,8 +149,16 @@ export default App
 markstream-react 使用 TypeScript 编写，并包含完整的类型定义，无需额外配置：
 
 ```tsx
-import type { MarkdownRenderProps, ParsedNode } from 'markstream-react'
-import MarkdownRender from 'markstream-react'
+import type { NodeRendererProps } from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
+
+const props: NodeRendererProps = {
+  content: '# Hello TypeScript!',
+}
+
+function App() {
+  return <MarkdownRender {...props} />
+}
 ```
 
 ## Next.js 集成
@@ -157,7 +168,7 @@ import MarkdownRender from 'markstream-react'
 ```tsx
 'use client'
 
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useEffect, useState } from 'react'
 import 'markstream-react/index.css'
 
@@ -182,7 +193,7 @@ export default function MarkdownPage() {
 import dynamic from 'next/dynamic'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
+  () => import('markstream-react').then(mod => mod.NodeRenderer),
   { ssr: false }
 )
 
@@ -211,7 +222,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 ```tsx
 // src/App.tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   const content = `# Hello Vite!

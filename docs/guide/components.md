@@ -9,7 +9,7 @@
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
 | `ImageNode` | Custom previews/lightboxes | Props: `fallback-src`, `show-caption`, `lazy`, `svg-min-height`, `use-placeholder`; emits `click`, `load`, `error` | None, but respects global CSS | Wrap in a custom component + `setCustomComponents` to intercept events |
 | `LinkNode` | Animated underline, tooltips | `color`, `underlineHeight`, `showTooltip` | No extra CSS | Browser defaults can override `a` styles; import reset |
-| `VmrContainerNode` | Custom `:::` containers | `node` (`name`, `attrs`, `loading`, `children`) | Minimal base CSS; override via `setCustomComponents` | JSON attrs become `data-*` strings (e.g. `data-devId`); invalid/incomplete JSON falls back to `data-attrs` (raw string); args after name stored in `data-args` |
+| `VmrContainerNode` | Custom `:::` containers | `node` (`name`, `attrs`, `loading`, `children`) | Minimal base CSS; override via `setCustomComponents` | JSON attrs are normalized onto `node.attrs` (keys without `data-`); invalid/partial JSON becomes `attrs.attrs`; args after name stored in `attrs.args` |
 
 ## MarkdownRender
 
@@ -70,7 +70,7 @@ setCustomComponents('docs', {
 - **Batching** — `batchRendering`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, and `renderBatchBudgetMs` define how many nodes transition from placeholders to full components per frame. This incremental mode runs only when virtualization is disabled (`:max-live-nodes="0"`); with virtualization on, the renderer favours instant paint plus DOM windowing over skeleton placeholders.
 - **Deferred nodes** — keep `deferNodesUntilVisible` + `viewportPriority` enabled to let heavy blocks (Mermaid, Monaco, KaTeX) yield until they approach the viewport. Disable only when you explicitly want every node to render eagerly.
 - **Virtualization window** — `maxLiveNodes` caps how many fully rendered nodes stay mounted; `liveNodeBuffer` controls overscan to avoid pop-in. Tuning these lets long docs stay responsive without sacrificing scrollback. See [Performance tips](/guide/performance) for sample values.
-- **Code block fallbacks** — `renderCodeBlocksAsPre` + `codeBlockStream` let you fall back to lightweight `<pre><code>` blocks or pause Monaco streaming when throughput takes priority over tooling.
+- **Code block fallbacks** — `renderCodeBlocksAsPre` + `codeBlockStream` let you fall back to lightweight `<pre><code>` blocks for non‑Mermaid/Infographic code blocks or pause Monaco streaming when throughput takes priority over tooling.
 
 Combine these props with `custom-id` scoped styles and global parser options (`setDefaultMathOptions`, custom MarkdownIt plugins) to match the latency and UX expectations of your app.
 
@@ -170,7 +170,7 @@ function closePreview() {
 </template>
 ```
 
-> Tip: hide the toolbar control entirely with `:show-preview-button="false"` or globally disable previews via `:is-show-preview="false"` when your docs never need this dialog.
+> Tip: hide the toolbar control entirely with `:show-preview-button="false"`. To disable previews globally, pass `:code-block-props="{ isShowPreview: false }"` to `MarkdownRender`.
 
 ### Common pitfalls
 - **Editor invisible**: worker registration missing or blocked by SSR.
@@ -217,7 +217,7 @@ Troubleshooting:
 ### Quick reference
 - **Peer**: `mermaid` ≥ 11 (tree-shakable ESM build recommended).
 - **CSS**: import `mermaid/dist/mermaid.css` after your reset.
-- **Props**: `node`, `isDark`, `isStrict`, `maxHeight`, timeouts, header/button toggles.
+- **Props**: `node`, `isDark`, `isStrict`, `maxHeight`, timeouts, header/button toggles, `enableWheelZoom`.
 - **Emits**: `copy`, `export`, `openModal`, `toggleMode` (call `ev.preventDefault()` to stop the default action).
 
 ### Usage
@@ -335,7 +335,7 @@ Streaming behavior:
 
 The component supports the following block-level nodes inside containers:
 - **Inline nodes** (inside paragraphs): text, strong, emphasis, link, image, inline_code, etc.
-- **Block nodes**: paragraph, heading, list, blockquote, code_block, fence, math_block, table
+- **Block nodes**: paragraph, heading, list, blockquote, code_block, math_block, table
 
 Unknown node types fall back to `FallbackComponent`, which displays the node type and raw content for debugging.
 
@@ -349,7 +349,7 @@ Content here...
 
 The parser extracts:
 - `name` — the container name (e.g., `viewcode:topo-test-001`)
-- `attrs` — JSON attributes parsed as data attributes
+- `attrs` — parsed attributes (keys normalized from `data-*` to plain keys)
 - `children` — child nodes (parsed markdown content)
 - `raw` — the original raw markdown string
 
@@ -359,7 +359,7 @@ The parser extracts:
 interface VmrContainerNode {
   type: 'vmr_container'
   name: string // Container name from ::: name
-  attrs?: Record<string, string> // Parsed JSON attributes
+  attrs?: Record<string, unknown> // Parsed attributes (values may be strings, numbers, or booleans)
   loading?: boolean // Streaming mid-state: true when container is not closed
   children: ParsedNode[] // Child nodes
   raw: string // Raw markdown source
@@ -373,19 +373,19 @@ When rendering containers in a streaming context (e.g., LLM output), the parser 
 - **Loading state**: When a `:::` container is opened but not yet closed, `loading` is set to `true`. This allows your component to show an intermediate state (like a skeleton loader) while content is streaming.
 
 - **Attribute handling**:
-  - Args right after the container name are stored as `data-args` (string).
-  - JSON attributes are converted to `data-*` attributes (strings), e.g. `{"devId":"abc"}` → `data-devId="abc"`.
-  - If JSON parsing fails (invalid or partial JSON), the raw string is preserved in `data-attrs`.
+  - Args right after the container name are stored as `attrs.args` (string).
+  - JSON attributes are normalized onto `attrs` (keys without the `data-` prefix), e.g. `{"devId":"abc"}` → `attrs.devId = "abc"`.
+  - If JSON parsing fails (invalid or partial JSON), the raw string is preserved in `attrs.attrs`.
 
 Example streaming progression:
 ```markdown
 # Initially (mid-state)
 ::: viewcode:stream {"incomplete
-# → attrs['data-attrs'] = '{"incomplete', loading = true
+# → attrs.attrs = '{"incomplete', loading = true
 
 # After more content
 ::: viewcode:stream {"devId":"abc"}
-# → attrs['data-devId'] = "abc", loading = false (if closing ::: present)
+# → attrs.devId = "abc", loading = false (if closing ::: present)
 ```
 
 ### Default rendering
@@ -394,7 +394,7 @@ The default component recursively renders all child nodes:
 
 ```vue
 <!-- Default VmrContainerNode output -->
-<div class="vmr-container vmr-container-container-name" data-key="value">
+<div class="vmr-container vmr-container-container-name" v-bind="node.attrs">
   <!-- Child nodes rendered here (paragraphs, lists, code blocks, etc.) -->
 </div>
 ```
@@ -449,7 +449,7 @@ interface Props {
   node: {
     type: 'vmr_container'
     name: string
-    attrs?: Record<string, string>
+    attrs?: Record<string, unknown>
     children: any[]
     raw: string
   }
@@ -460,8 +460,8 @@ interface Props {
 const props = defineProps<Props>()
 
 // Extract devId from attrs
-const devId = computed(() => props.node.attrs?.['data-devId'] || '')
-const args = computed(() => props.node.attrs?.['data-args'] || '')
+const devId = computed(() => String(props.node.attrs?.devId ?? ''))
+const args = computed(() => String(props.node.attrs?.args ?? ''))
 
 // Check if this is a viewcode container
 const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
@@ -558,12 +558,12 @@ setCustomComponents('docs', {
 
 ### Troubleshooting
 - **Raw text visible**: You're seeing the default renderer. Register a custom component via `setCustomComponents`.
-- **Attrs undefined**: This is normal when you didn't pass any args/JSON. Invalid/partial JSON falls back to `data-attrs` with the raw string.
+- **Attrs undefined**: This is normal when you didn't pass any args/JSON. Invalid/partial JSON falls back to `attrs.attrs` with the raw string.
 - **Component not receiving props**: Make sure your component accepts the `node` prop with the correct type.
-- **Streaming with incomplete attrs**: In streaming scenarios you may temporarily see `attrs['data-attrs']` containing partial JSON like `{"incomplete` until the full syntax arrives. Check `node.loading` to detect this mid-state.
+- **Streaming with incomplete attrs**: In streaming scenarios you may temporarily see `attrs.attrs` containing partial JSON like `{"incomplete` until the full syntax arrives. Check `node.loading` to detect this mid-state.
 
 ## Utility helpers
 
 - `getMarkdown()` — configured `markdown-it-ts` instance with the parser plugins this package expects.
-- `parseMarkdownToStructure()` — convert Markdown strings into the AST consumed by `MarkdownRender`.
+- `parseMarkdownToStructure(content, md)` — convert Markdown strings into the AST consumed by `MarkdownRender`.
 - `setCustomComponents(id?, mapping)` — swap any node renderer for a specific `custom-id`.

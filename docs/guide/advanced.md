@@ -7,7 +7,8 @@ This page explains how to customize parsing and provide scoped custom components
 
 - `preTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — mutate tokens immediately after the `markdown-it` parse
 - `postTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — further token transforms
-- `postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]` — manipulate final node tree
+
+If you need to reshape the AST, post-process the returned `ParsedNode[]` and pass it to `MarkdownRender` via the `nodes` prop.
 
 ### Example: custom HTML-like tags (recommended)
 For simple custom tags like `<thinking>...</thinking>`, you no longer need to normalize the source or rewrite tokens. Just opt the tag into the allowlist and register a component:
@@ -29,7 +30,7 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 
 When `custom-html-tags` includes a tag name, the parser:
 - suppresses streaming mid‑states until `<tag ...>` is complete,
-- emits a `CustomComponentNode` with `type: '<tag>'`, `content`, optional `attrs`, and `loading/autoClosed` flags.
+- emits a `CustomComponentNode` with `type: 'tag'` (for example `type: 'thinking'`), plus `content`, optional `attrs`, and `loading/autoClosed` flags.
 
 ## Custom component parsing
 
@@ -37,6 +38,8 @@ The built‑in custom tag pipeline above handles most “component‑like” tag
 Hooks are still useful when you need to reshape the node — for example, to strip wrappers, merge adjacent blocks, or map attributes:
 
 ```ts
+import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+
 function preTransformTokens(tokens: MarkdownToken[]) {
   return tokens.map((t) => {
     if (t.type === 'html_block' && t.tag === 'thinking')
@@ -45,6 +48,7 @@ function preTransformTokens(tokens: MarkdownToken[]) {
   })
 }
 
+const md = getMarkdown()
 const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens })
 ```
 
@@ -150,8 +154,9 @@ This design keeps the markdown utilities pure and free from global side effects,
 Try this — minimal example using parseOptions and a custom component registration:
 
 ```ts
-import { parseMarkdownToStructure, setCustomComponents } from 'markstream-vue'
+import { getMarkdown, parseMarkdownToStructure, setCustomComponents } from 'markstream-vue'
 
+const md = getMarkdown()
 setCustomComponents('docs', { thinking: ThinkingNode })
-const nodes = parseMarkdownToStructure('[[CUSTOM:1]]')
+const nodes = parseMarkdownToStructure('[[CUSTOM:1]]', md)
 ```

@@ -192,13 +192,14 @@ console.log(hello)
 pnpm add mermaid
 ```
 
-导入样式并启用加载器：
+导入样式。默认 loader 已经启用，只有在你手动关闭或需要自定义 loader 时才需要调用 `enableMermaid()`：
 
 ```js
 import { enableMermaid } from 'markstream-vue2'
 // main.js
 import 'markstream-vue2/index.css'
 
+// 可选：重新启用或覆盖 loader
 enableMermaid()
 ```
 
@@ -236,7 +237,7 @@ graph TD
 pnpm add katex
 ```
 
-导入样式并启用加载器：
+导入样式。默认 loader 已经启用，只有在你手动关闭或需要自定义 loader 时才需要调用 `enableKatex()`：
 
 ```js
 import { enableKatex } from 'markstream-vue2'
@@ -245,6 +246,7 @@ import 'markstream-vue2/index.css'
 
 import 'katex/dist/katex.min.css'
 
+// 可选：重新启用或覆盖 loader
 enableKatex()
 ```
 
@@ -346,7 +348,7 @@ export default {
       markdown: '',
       fullText: `# 流式传输演示
 
-此内容正在**逐字符**流式传输。
+此内容正在**逐步**流式传输。
 
 ## 功能
 

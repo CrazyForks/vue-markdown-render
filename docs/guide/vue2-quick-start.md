@@ -192,13 +192,14 @@ Install mermaid:
 pnpm add mermaid
 ```
 
-Import styles and enable the loader:
+Import styles. The loader is enabled by default; call `enableMermaid()` only if you disabled it or need a custom loader:
 
 ```js
 import { enableMermaid } from 'markstream-vue2'
 // main.js
 import 'markstream-vue2/index.css'
 
+// optional: re-enable or override loader
 enableMermaid()
 ```
 
@@ -236,7 +237,7 @@ Install katex:
 pnpm add katex
 ```
 
-Import styles and enable the loader:
+Import styles. The loader is enabled by default; call `enableKatex()` only if you disabled it or need a custom loader:
 
 ```js
 import { enableKatex } from 'markstream-vue2'
@@ -245,6 +246,7 @@ import 'markstream-vue2/index.css'
 
 import 'katex/dist/katex.min.css'
 
+// optional: re-enable or override loader
 enableKatex()
 ```
 
@@ -346,7 +348,7 @@ export default {
       markdown: '',
       fullText: `# Streaming Demo
 
-This content is being streamed **character by character**.
+This content is being streamed **in small chunks**.
 
 ## Features
 

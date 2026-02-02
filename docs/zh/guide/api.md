@@ -7,7 +7,7 @@
 ```
 Markdown 字符串 → getMarkdown() → markdown-it-ts 实例
             ↓
-   parseMarkdownToStructure() → AST (BaseNode[])
+   parseMarkdownToStructure(content, md) → AST (BaseNode[])
             ↓
    <MarkdownRender> → 节点组件（CodeBlockNode、ImageNode 等）
 ```
@@ -21,7 +21,7 @@ Markdown 字符串 → getMarkdown() → markdown-it-ts 实例
 | Helper | 作用 | 适用场景 |
 | ------ | ---- | -------- |
 | `getMarkdown(msgId?, options?)` | 返回预配置的 `markdown-it-ts` 实例。 | 需调整 parser 选项（HTML、插件）或复用实例时。 |
-| `parseMarkdownToStructure(content, md?)` | 生成渲染器使用的 AST。 | 服务端预解析、静态导出、或需在渲染前做校验时。 |
+| `parseMarkdownToStructure(content, md)` | 生成渲染器使用的 AST。 | 服务端预解析、静态导出、或需在渲染前做校验时。 |
 
 两者均可在 Node/浏览器使用。处理大文档时可复用 `md` 实例避免重复初始化插件。
 
@@ -53,7 +53,8 @@ setCustomComponents('docs', {
 
 - `preTransformTokens(tokens)` — 生成节点前预处理 token。
 - `postTransformTokens(tokens)` — 在默认处理后继续调整。
-- `postTransformNodes(nodes)` — 最终 AST 可在此注入元数据或拆分合并节点。
+
+如需改造 AST，可在 `parseMarkdownToStructure` 返回后自行处理，再通过 `MarkdownRender` 的 `nodes` 传入。
 
 示例：把 AI “thinking” 标签直接渲染成自定义组件（无需钩子）
 
@@ -72,12 +73,12 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 />
 ```
 
-如果你需要进一步改造 `thinking` 节点（剥掉包裹、重映射 attrs、合并分段等），再使用上述 hooks。
+如果你需要进一步改造 `thinking` 节点（剥掉包裹、重映射 attrs、合并分段等），可使用上述 hooks，或在解析后自行处理 AST。
 
 ## 其他导出
 
 - 节点组件：`CodeBlockNode`、`MarkdownCodeBlockNode`、`MermaidBlockNode`、`MathBlockNode`、`ImageNode` 等（详见 [组件与节点渲染器](/zh/guide/components)）。
-- 工具：`VisibilityWrapper`、`NodeRenderer`、类型定义（参考 [/zh/guide/parser-api](/zh/guide/parser-api) 或 npm 上的 `stream-markdown-parser` README）。
+- 工具：`VueRendererMarkdown`（全局组件插件）与共享类型定义（组件 props/解析器类型；参考 [/zh/guide/parser-api](/zh/guide/parser-api) 或 npm 上的 `stream-markdown-parser` README）。
 
 ## 样式 & 排障提醒
 

@@ -9,7 +9,7 @@ import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
 
 const content = ref('')
-const fullContent = `# Streaming Content\n\nThis text appears character by character...`
+const fullContent = `# Streaming Content\n\nThis text appears progressively...`
 let i = 0
 const interval = setInterval(() => {
   if (i < fullContent.length) {
@@ -39,7 +39,7 @@ Try this — quickly stream a Markdown string with `typewriter` enabled:
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
-const md = '# Streaming test\n\nThis text appears with a typewriter effect.'
+const md = '# Streaming test\n\nThis text appears with a subtle enter animation.'
 </script>
 
 <template>

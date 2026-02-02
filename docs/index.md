@@ -90,7 +90,7 @@ React 18+ with hooks support and full TypeScript.
 - **Live Demo**: https://markstream-react.pages.dev/
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   return <MarkdownRender content="# Hello React!" />

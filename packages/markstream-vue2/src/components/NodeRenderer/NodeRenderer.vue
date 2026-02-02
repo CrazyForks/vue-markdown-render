@@ -169,11 +169,17 @@ const instanceMsgId = props.customId
   ? `renderer-${props.customId}`
   : `renderer-${Date.now()}-${Math.random().toString(36).slice(2)}`
 const defaultMd = getMarkdown(instanceMsgId)
+const customTagCache = new Map<string, MarkdownIt>()
 const mdBase = computed(() => {
-  const tags = props.customHtmlTags
-  if (!tags || tags.length === 0)
+  const { key, tags } = resolveCustomHtmlTags(props.customHtmlTags)
+  if (!key)
     return defaultMd
-  return getMarkdown(instanceMsgId, { customHtmlTags: tags })
+  const cached = customTagCache.get(key)
+  if (cached)
+    return cached
+  const md = getMarkdown(instanceMsgId, { customHtmlTags: tags })
+  customTagCache.set(key, md)
+  return md
 })
 const mdInstance = computed(() => {
   const base = mdBase.value
@@ -188,6 +194,23 @@ function normalizeCustomTag(t: unknown) {
     return ''
   const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
   return m ? m[1].toLowerCase() : ''
+}
+
+function resolveCustomHtmlTags(tags?: readonly string[]) {
+  if (!tags || tags.length === 0)
+    return { key: '', tags: [] as string[] }
+  const seen = new Set<string>()
+  const normalized: string[] = []
+  for (const tag of tags) {
+    const value = normalizeCustomTag(tag)
+    if (!value || seen.has(value))
+      continue
+    seen.add(value)
+    normalized.push(value)
+  }
+  if (normalized.length === 0)
+    return { key: '', tags: [] as string[] }
+  return { key: normalized.join(','), tags: normalized }
 }
 
 const mergedParseOptions = computed(() => {
@@ -289,6 +312,12 @@ const nodeVisibilityState = reactive<Record<number, boolean>>({})
 const nodeVisibilityHandles = new Map<number, VisibilityHandle>()
 const nodeVisibilityFallbackTimers = new Map<number, number>()
 const nodeSlotElements = new Map<number, HTMLElement | null>()
+const nodeSlotVersion = ref(0)
+const sortedNodeSlots = computed(() => {
+  // Track a manual version so we only rebuild when slots change.
+  void nodeSlotVersion.value
+  return Array.from(nodeSlotElements.entries()).sort((a, b) => a[0] - b[0])
+})
 const scrollRootElement = ref<HTMLElement | null>(null)
 let detachScrollHandler: (() => void) | null = null
 let pendingFocusSync: { id: number | ReturnType<typeof setTimeout>, viaTimeout: boolean } | null = null
@@ -511,7 +540,7 @@ function syncFocusToScroll(force = false) {
   const viewportBottom = isViewportRoot
     ? (view?.innerHeight ?? root.clientHeight ?? 0)
     : rootRect!.bottom
-  const entries = Array.from(nodeSlotElements.entries()).sort((a, b) => a[0] - b[0])
+  const entries = sortedNodeSlots.value
   let firstVisible: number | null = null
   let lastVisible: number | null = null
   for (const [index, el] of entries) {
@@ -575,6 +604,48 @@ function updateLiveRange() {
 
 const nodeHeights = reactive<Record<number, number>>({})
 const heightStats = reactive({ total: 0, count: 0 })
+const heightTreeSize = ref(0)
+const heightSumTree = ref<number[]>([])
+const heightKnownTree = ref<number[]>([])
+
+function fenwickUpdate(tree: number[], index: number, delta: number) {
+  for (let i = index + 1; i < tree.length; i += i & -i)
+    tree[i] += delta
+}
+
+function fenwickQuery(tree: number[], index: number) {
+  let sum = 0
+  for (let i = index + 1; i > 0; i -= i & -i)
+    sum += tree[i]
+  return sum
+}
+
+function fenwickRangeSum(tree: number[], start: number, end: number) {
+  if (end <= start)
+    return 0
+  const endSum = fenwickQuery(tree, end - 1)
+  if (start <= 0)
+    return endSum
+  return endSum - fenwickQuery(tree, start - 1)
+}
+
+function rebuildHeightTrees(size: number) {
+  heightTreeSize.value = size
+  const sumTree = new Array(size + 1).fill(0)
+  const countTree = new Array(size + 1).fill(0)
+  for (const [rawIndex, rawHeight] of Object.entries(nodeHeights)) {
+    const index = Number(rawIndex)
+    const height = Number(rawHeight)
+    if (!Number.isFinite(index) || index < 0 || index >= size)
+      continue
+    if (!Number.isFinite(height) || height <= 0)
+      continue
+    fenwickUpdate(sumTree, index, height)
+    fenwickUpdate(countTree, index, 1)
+  }
+  heightSumTree.value = sumTree
+  heightKnownTree.value = countTree
+}
 
 function recordNodeHeight(index: number, height: number) {
   if (!Number.isFinite(height) || height <= 0)
@@ -588,19 +659,63 @@ function recordNodeHeight(index: number, height: number) {
     heightStats.total += height
     heightStats.count++
   }
+  if (heightTreeSize.value > index) {
+    const sumTree = heightSumTree.value
+    const countTree = heightKnownTree.value
+    if (sumTree.length && countTree.length) {
+      if (previous) {
+        const delta = height - previous
+        if (delta !== 0)
+          fenwickUpdate(sumTree, index, delta)
+      }
+      else {
+        fenwickUpdate(sumTree, index, height)
+        fenwickUpdate(countTree, index, 1)
+      }
+    }
+  }
 }
 
 const averageNodeHeight = computed(() => {
   return heightStats.count > 0 ? Math.max(12, heightStats.total / heightStats.count) : 32
 })
 
+watch(
+  () => parsedNodes.value.length,
+  (length) => {
+    if (length <= 0) {
+      heightTreeSize.value = 0
+      heightSumTree.value = []
+      heightKnownTree.value = []
+      return
+    }
+    if (length !== heightTreeSize.value)
+      rebuildHeightTrees(length)
+  },
+  { immediate: true },
+)
+
 function estimateHeightRange(start: number, end: number) {
   if (start >= end)
     return 0
-  let total = 0
-  for (let i = start; i < end; i++)
-    total += nodeHeights[i] ?? averageNodeHeight.value
-  return total
+  if (heightTreeSize.value !== parsedNodes.value.length) {
+    let total = 0
+    for (let i = start; i < end; i++)
+      total += nodeHeights[i] ?? averageNodeHeight.value
+    return total
+  }
+  const sumTree = heightSumTree.value
+  const countTree = heightKnownTree.value
+  if (!sumTree.length || !countTree.length) {
+    let total = 0
+    for (let i = start; i < end; i++)
+      total += nodeHeights[i] ?? averageNodeHeight.value
+    return total
+  }
+  const sumKnown = fenwickRangeSum(sumTree, start, end)
+  const countKnown = fenwickRangeSum(countTree, start, end)
+  const unknownCount = (end - start) - countKnown
+  return sumKnown + unknownCount * averageNodeHeight.value
 }
 
 const topSpacerHeight = computed(() => {
@@ -645,8 +760,35 @@ watch(virtualizationEnabled, () => {
 function estimateIndexForOffset(offsetPx: number) {
   if (offsetPx <= 0)
     return 0
-  let remaining = offsetPx
   const nodes = parsedNodes.value
+  if (heightTreeSize.value === nodes.length && heightSumTree.value.length && heightKnownTree.value.length) {
+    const avg = averageNodeHeight.value
+    const sumTree = heightSumTree.value
+    const countTree = heightKnownTree.value
+    const prefix = (endExclusive: number) => {
+      if (endExclusive <= 0)
+        return 0
+      const sumKnown = fenwickQuery(sumTree, endExclusive - 1)
+      const countKnown = fenwickQuery(countTree, endExclusive - 1)
+      return sumKnown + (endExclusive - countKnown) * avg
+    }
+    let low = 0
+    let high = nodes.length - 1
+    let ans = nodes.length - 1
+    while (low <= high) {
+      const mid = (low + high) >> 1
+      const height = prefix(mid + 1)
+      if (height >= offsetPx) {
+        ans = mid
+        high = mid - 1
+      }
+      else {
+        low = mid + 1
+      }
+    }
+    return ans
+  }
+  let remaining = offsetPx
   for (let i = 0; i < nodes.length; i++) {
     const height = nodeHeights[i] ?? averageNodeHeight.value
     if (remaining <= height)
@@ -662,6 +804,11 @@ function estimateIndexForOffsetFromEnd(offsetPx: number) {
     return 0
   if (offsetPx <= 0)
     return Math.max(0, nodes.length - 1)
+  if (heightTreeSize.value === nodes.length) {
+    const totalHeight = estimateHeightRange(0, nodes.length)
+    const target = Math.max(0, totalHeight - offsetPx)
+    return estimateIndexForOffset(target)
+  }
   let remaining = offsetPx
   for (let i = nodes.length - 1; i >= 0; i--) {
     const height = nodeHeights[i] ?? averageNodeHeight.value
@@ -679,6 +826,7 @@ function cleanupNodeVisibility(maxIndex: number) {
   // observers intact; they will be cleaned up when the slot unmounts.
   if (!virtualizationEnabled.value)
     return
+  let slotsChanged = false
   for (const [index, handle] of nodeVisibilityHandles) {
     if (index >= maxIndex) {
       handle.destroy()
@@ -686,9 +834,12 @@ function cleanupNodeVisibility(maxIndex: number) {
       if (deferNodes.value)
         delete nodeVisibilityState[index]
       clearVisibilityFallback(index)
-      nodeSlotElements.delete(index)
+      if (nodeSlotElements.delete(index))
+        slotsChanged = true
     }
   }
+  if (slotsChanged)
+    bumpNodeSlotVersion()
 }
 
 function markNodeVisible(index: number, visible: boolean) {
@@ -724,10 +875,18 @@ function destroyNodeHandle(index: number) {
 }
 
 function setNodeSlotElement(index: number, el: HTMLElement | null) {
-  if (el)
+  let slotsChanged = false
+  if (el) {
+    const prev = nodeSlotElements.get(index)
     nodeSlotElements.set(index, el)
-  else
-    nodeSlotElements.delete(index)
+    if (prev !== el)
+      slotsChanged = true
+  }
+  else if (nodeSlotElements.delete(index)) {
+    slotsChanged = true
+  }
+  if (slotsChanged)
+    bumpNodeSlotVersion()
   if (!el)
     clearVisibilityFallback(index)
 
@@ -797,6 +956,10 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
 
   if (virtualizationEnabled.value)
     scheduleFocusSync()
+}
+
+function bumpNodeSlotVersion() {
+  nodeSlotVersion.value += 1
 }
 
 function setNodeContentRef(index: number, el: HTMLElement | null) {
@@ -1313,18 +1476,57 @@ const nodeComponents = {
   // 可以添加更多节点类型
   // 例如:custom_node: CustomNode,
 }
+const customComponentsMap = computed(() => {
+  void customComponentsRevision.value
+  return getCustomNodeComponents(props.customId)
+})
+const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'))
+const emptyBindings = {}
+const codeBlockBindings = computed(() => ({
+  // streaming behavior control for CodeBlockNode
+  stream: props.codeBlockStream,
+  darkTheme: props.codeBlockDarkTheme,
+  lightTheme: props.codeBlockLightTheme,
+  monacoOptions: props.codeBlockMonacoOptions,
+  themes: props.themes,
+  minWidth: props.codeBlockMinWidth,
+  maxWidth: props.codeBlockMaxWidth,
+  ...(props.codeBlockProps || {}),
+}))
+const nonCodeBindings = computed(() => ({
+  // Forward `typewriter` flag to non-code node components so they can
+  // opt in/out of enter transitions or other typewriter-like behaviour.
+  typewriter: props.typewriter,
+}))
+const renderedItems = computed(() => {
+  return visibleNodes.value.map((item) => {
+    const language = getCodeBlockLanguage(item.node)
+    return {
+      ...item,
+      component: getNodeComponent(item.node, language),
+      bindings: getBindingsFor(item.node, language),
+      isCodeBlock: item.node.type === 'code_block',
+      indexKey: `${indexPrefix.value}-${item.index}`,
+    }
+  })
+})
+
+function getCodeBlockLanguage(node: ParsedNode) {
+  return node?.type === 'code_block'
+    ? String((node as any).language ?? '').trim().toLowerCase()
+    : ''
+}
 
 // Decide which component to use for a given node. Ensure that code blocks
 // with language `mermaid` are rendered with `MermaidBlockNode` (unless a
 // custom component named `mermaid` is registered for the given customId).
-function getNodeComponent(node: ParsedNode) {
+function getNodeComponent(node: ParsedNode, language?: string) {
   if (!node)
     return FallbackComponent
-  void customComponentsRevision.value
-  const customComponents = getCustomNodeComponents(props.customId)
+  const customComponents = customComponentsMap.value
   const customForType = (customComponents as any)[String((node as any).type)]
   if (node.type === 'code_block') {
-    const lang = String((node as any).language ?? '').trim().toLowerCase()
+    const lang = language ?? getCodeBlockLanguage(node)
     // Keep Mermaid blocks routed to MermaidBlockNode unless a specific
     // `mermaid` override is provided.
     if (lang === 'mermaid') {
@@ -1355,29 +1557,15 @@ function getNodeComponent(node: ParsedNode) {
   return (nodeComponents as any)[String((node as any).type)] || FallbackComponent
 }
 
-function getBindingsFor(node: ParsedNode) {
+function getBindingsFor(node: ParsedNode, language?: string) {
   // For mermaid/infographic blocks we don't forward CodeBlock-specific props
-  const lang = node?.type === 'code_block' ? String((node as any).language ?? '').trim().toLowerCase() : ''
+  const lang = language ?? getCodeBlockLanguage(node)
   if (lang === 'mermaid' || lang === 'infographic')
-    return {}
+    return emptyBindings
 
   return node.type === 'code_block'
-    ? {
-        // streaming behavior control for CodeBlockNode
-        stream: props.codeBlockStream,
-        darkTheme: props.codeBlockDarkTheme,
-        lightTheme: props.codeBlockLightTheme,
-        monacoOptions: props.codeBlockMonacoOptions,
-        themes: props.themes,
-        minWidth: props.codeBlockMinWidth,
-        maxWidth: props.codeBlockMaxWidth,
-        ...(props.codeBlockProps || {}),
-      }
-    : {
-        // Forward `typewriter` flag to non-code node components so they can
-        // opt in/out of enter transitions or other typewriter-like behaviour.
-        typewriter: props.typewriter,
-      }
+    ? codeBlockBindings.value
+    : nonCodeBindings.value
 }
 
 function handleContainerClick(event: MouseEvent) {
@@ -1404,6 +1592,7 @@ function handleContainerMouseout(event: MouseEvent) {
     ref="containerRef"
     class="markstream-vue2 markdown-renderer"
     :class="[{ dark: props.isDark }, { virtualized: virtualizationEnabled }]"
+    :data-custom-id="props.customId"
     @click="handleContainerClick"
     @mouseover="handleContainerMouseover"
     @mouseout="handleContainerMouseout"
@@ -1415,7 +1604,7 @@ function handleContainerMouseout(event: MouseEvent) {
       aria-hidden="true"
     />
     <div
-      v-for="item in visibleNodes"
+      v-for="item in renderedItems"
       :key="item.index"
       :ref="`node-slot-${item.index}`"
       class="node-slot"
@@ -1429,16 +1618,16 @@ function handleContainerMouseout(event: MouseEvent) {
       >
         <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
         <transition
-          v-if="item.node.type !== 'code_block' && props.typewriter !== false"
+          v-if="!item.isCodeBlock && props.typewriter !== false"
           name="typewriter"
           appear
         >
           <component
-            :is="getNodeComponent(item.node)"
+            :is="item.component"
             :node="item.node"
             :loading="item.node.loading"
-            :index-key="`${indexKey || 'markdown-renderer'}-${item.index}`"
-            v-bind="getBindingsFor(item.node)"
+            :index-key="item.indexKey"
+            v-bind="item.bindings"
             :custom-id="props.customId"
             :is-dark="props.isDark"
             @copy="emit('copy', $event)"
@@ -1447,12 +1636,12 @@ function handleContainerMouseout(event: MouseEvent) {
         </transition>
 
         <component
-          :is="getNodeComponent(item.node)"
+          :is="item.component"
           v-else
           :node="item.node"
           :loading="item.node.loading"
-          :index-key="`${indexKey || 'markdown-renderer'}-${item.index}`"
-          v-bind="getBindingsFor(item.node)"
+          :index-key="item.indexKey"
+          v-bind="item.bindings"
           :custom-id="props.customId"
           :is-dark="props.isDark"
           @copy="emit('copy', $event)"

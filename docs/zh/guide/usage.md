@@ -54,7 +54,7 @@ export default {
 />
 ```
 
-提示：像 `<question>` 这类未知的 HTML 类标签默认会作为纯文本输出；只有当你希望它参与解析并产出自定义节点时，才需要加入 `custom-html-tags`。
+提示：像 `<question>` 这类未知的 HTML 类标签在完整闭合后会按原生 HTML 渲染；流式场景下未闭合片段会先作为纯文本输出以避免闪烁。只有当你希望它参与解析并产出自定义节点（type + attrs/content）时，才需要加入 `custom-html-tags`。
 
 ## 解析流程
 
@@ -68,7 +68,7 @@ const nodes = parseMarkdownToStructure('# 标题', md)
 ```
 
 - `getMarkdown(msgId?, options?)` 返回预设配置的 `markdown-it-ts`。
-- `parseMarkdownToStructure()` 将 Markdown 字符串/Token 转为渲染器使用的 AST。
+- `parseMarkdownToStructure(content, md)` 将 Markdown 字符串转为渲染器使用的 AST。
 - 可搭配 `setCustomComponents(id?, mapping)` 为特定 `custom-id` 替换节点渲染器。
 
 ## 组件速览

@@ -7,7 +7,7 @@ This page connects the parser helpers, renderer props, and customization hooks e
 ```
 Markdown string → getMarkdown() → markdown-it-ts instance
             ↓
-   parseMarkdownToStructure() → AST (BaseNode[])
+   parseMarkdownToStructure(content, md) → AST (BaseNode[])
             ↓
    <MarkdownRender> → node components (CodeBlockNode, ImageNode, …)
 ```
@@ -21,7 +21,7 @@ You can jump in at any stage:
 | Helper | Purpose | When to use |
 | ------ | ------- | ----------- |
 | `getMarkdown(msgId?, options?)` | Returns a configured `markdown-it-ts` instance with the plugins this package expects. | Customize parser options (HTML toggles, additional plugins) before transforming tokens. |
-| `parseMarkdownToStructure(content, md?)` | Generates the AST consumed by `MarkdownRender`. Accepts either a markdown string or tokens. | Pre-parse on the server, run validations, or reuse the AST across renders. |
+| `parseMarkdownToStructure(content, md)` | Generates the AST consumed by `MarkdownRender` from a Markdown string. | Pre-parse on the server, run validations, or reuse the AST across renders. |
 
 Both helpers are framework-agnostic and can run in Node or the browser. For large documents you can reuse the `md` instance between parses to avoid re-initializing plugins.
 
@@ -54,7 +54,8 @@ When passing `content`, you can intercept parser stages through `parse-options` 
 Hooks:
 - `preTransformTokens(tokens)` — mutate tokens before default handling.
 - `postTransformTokens(tokens)` — inspect/adjust tokens before node generation.
-- `postTransformNodes(nodes)` — modify the AST right before rendering.
+
+If you need to reshape the AST, post-process the returned nodes and pass them to `MarkdownRender` via `nodes`.
 
 Example: render AI “thinking” tags as custom components (no hooks needed):
 
@@ -73,14 +74,14 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 />
 ```
 
-Hooks remain useful if you want to reshape the emitted `thinking` node (strip wrappers, remap attrs, merge blocks, etc.).
+Hooks remain useful if you want to reshape the emitted `thinking` node (strip wrappers, remap attrs, merge blocks, etc.), or post-process the parsed nodes before rendering.
 
 ## Utility exports
 
 Besides the core renderer and parser helpers, the package exposes:
 
 - `CodeBlockNode`, `MarkdownCodeBlockNode`, `MermaidBlockNode`, `MathBlockNode`, `ImageNode`, etc. — see [Components](/guide/components) for their props and CSS requirements.
-- `VisibilityWrapper`, `NodeRenderer`, and type exports under `types`.
+- `VueRendererMarkdown` (global component plugin) and shared type exports (component prop interfaces, parser types).
 
 For parser types and hooks, see [/guide/parser-api](/guide/parser-api) (or the `stream-markdown-parser` README on npm).
 

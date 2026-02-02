@@ -52,6 +52,17 @@ const InfographicBlockNode = defineAsyncComponent(() => import('./components/Inf
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
+export type {
+  CodeBlockNodeProps,
+  ImageNodeProps,
+  InfographicBlockNodeProps,
+  LinkNodeProps,
+  MathBlockNodeProps,
+  MathInlineNodeProps,
+  MermaidBlockEvent,
+  MermaidBlockNodeProps,
+  PreCodeNodeProps,
+} from './types/component-props'
 // Export centralized props interfaces so they appear in package d.ts
 export * from './utils'
 export * from './workers/katexCdnWorker'

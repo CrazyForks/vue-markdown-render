@@ -45,7 +45,7 @@ yarn add stream-markdown-parser
 - `getMarkdown(msgId?, options?)` — create a `markdown-it-ts` instance with built-in plugins (task lists, sub/sup, math helpers, etc.). Also accepts `plugin`, `apply`, and `i18n` options.
 - `registerMarkdownPlugin(plugin)` / `clearRegisteredMarkdownPlugins()` — add or remove global plugins that run for every `getMarkdown()` call (useful for feature flags or tests).
 - `parseMarkdownToStructure(markdown, md, parseOptions)` — convert Markdown into the streaming-friendly AST consumed by `markstream-vue` and other renderers.
-- `processTokens(tokens)` / `parseInlineTokens(children, content)` — low-level helpers if you want to bypass the built-in AST pipeline.
+- `processTokens(tokens)` / `parseInlineTokens(children, content?, preToken?, options?)` — low-level helpers if you want to bypass the built-in AST pipeline.
 - `applyMath`, `applyContainers`, `normalizeStandaloneBackslashT`, `findMatchingClose`, etc. — utilities for custom parsing or linting workflows.
 
 ## Usage
@@ -55,7 +55,7 @@ yarn add stream-markdown-parser
 ```
 Markdown string
    ↓ getMarkdown() → markdown-it-ts instance with plugins
-parseMarkdownToStructure() → AST (ParsedNode[])
+parseMarkdownToStructure(markdown, md) → AST (ParsedNode[])
    ↓ feed into your renderer (markstream-vue, custom UI, workers)
 ```
 
@@ -210,13 +210,13 @@ interface GetMarkdownOptions {
 }
 ```
 
-#### `parseMarkdownToStructure(content, md?, options?)`
+#### `parseMarkdownToStructure(content, md, options?)`
 
 Parses markdown content into a structured node tree.
 
 **Parameters:**
 - `content` (string): The markdown content to parse
-- `md` (MarkdownItCore, optional): A markdown-it-ts instance. If not provided, creates one using `getMarkdown()`
+- `md` (MarkdownItCore): A markdown-it-ts instance created with `getMarkdown()`
 - `options` (ParseOptions, optional): Parsing options with hooks
 
 **Returns:** `ParsedNode[]` - An array of parsed nodes
@@ -225,9 +225,9 @@ Parses markdown content into a structured node tree.
 
 Processes raw markdown-it tokens into a flat array.
 
-#### `parseInlineTokens(tokens, md)`
+#### `parseInlineTokens(tokens, content?, preToken?, options?)`
 
-Parses inline markdown-it-ts tokens.
+Parses inline markdown-it-ts tokens into renderer nodes. Pass the inline token array plus the optional raw `content` string (from the parent token), an optional previous token, and inline parse options (`requireClosingStrong`, `customHtmlTags`).
 
 ### Configuration Functions
 
@@ -247,15 +247,18 @@ interface MathOptions {
 
 ### Parse hooks (fine-grained transforms)
 
-Both `parseMarkdownToStructure()` and `<MarkdownRender :parse-options>` accept the same hook signature:
+ParseOptions supports the following hooks and flags:
 
 ```ts
 interface ParseOptions {
   preTransformTokens?: (tokens: Token[]) => Token[]
   postTransformTokens?: (tokens: Token[]) => Token[]
-  postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]
   // Custom HTML-like tags to emit as custom nodes (e.g. ['thinking'])
   customHtmlTags?: string[]
+  // When true, treats the input as complete (end-of-stream)
+  final?: boolean
+  // Require closing `**` for strong parsing (default: false)
+  requireClosingStrong?: boolean
 }
 ```
 
@@ -263,21 +266,22 @@ Example — flag AI “thinking” blocks:
 
 ```ts
 const parseOptions = {
-  postTransformNodes(nodes) {
-    return nodes.map(node =>
-      node.type === 'html_block' && /<thinking>/.test(node.value)
-        ? { ...node, meta: { type: 'thinking' } }
-        : node,
-    )
-  },
+  customHtmlTags: ['thinking'],
 }
+
+const nodes = parseMarkdownToStructure(markdown, md, parseOptions)
+const tagged = nodes.map(node =>
+  node.type === 'html_block' && /<thinking>/.test((node as any).content ?? '')
+    ? { ...node, meta: { type: 'thinking' } }
+    : node,
+)
 ```
 
 Use the metadata in your renderer to show custom UI without mangling the original Markdown.
 
 ### Unknown HTML-like tags
 
-By default, non-standard HTML-like tags (for example `<question>`) are rendered as **literal text** unless you opt in via `customHtmlTags`.
+By default, non-standard HTML-like tags (for example `<question>`) are rendered as raw HTML elements once they are complete; during streaming, partial tags are kept as **literal text** to avoid flicker. If you want them emitted as custom nodes (`type: 'question'` with parsed attrs/content), opt in via `customHtmlTags`.
 
 ### Utility Functions
 

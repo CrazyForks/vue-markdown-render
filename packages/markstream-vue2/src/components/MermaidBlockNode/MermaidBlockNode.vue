@@ -358,6 +358,8 @@ let previewPollDelay = 800
 let previewPollController: AbortController | null = null
 let lastPreviewStopAt = 0
 let allowPartialPreview = true
+const PREVIEW_POLL_MAX_ATTEMPTS = 12
+let previewPollAttempts = 0
 
 if (typeof window !== 'undefined') {
   watch(
@@ -1342,6 +1344,10 @@ function cleanupAfterLoadingSettled() {
 function scheduleNextPreviewPoll(delay = 800) {
   if (!isPreviewPolling)
     return
+  if (previewPollAttempts >= PREVIEW_POLL_MAX_ATTEMPTS) {
+    stopPreviewPolling()
+    return
+  }
   if (previewPollTimeoutId)
     (globalThis as any).clearTimeout(previewPollTimeoutId)
   previewPollTimeoutId = (globalThis as any).setTimeout(() => {
@@ -1355,7 +1361,16 @@ function scheduleNextPreviewPoll(delay = 800) {
       const theme = props.isDark ? 'dark' : 'light'
       const base = baseFixedCode.value
       if (!base.trim()) {
+        if (props.loading === false) {
+          stopPreviewPolling()
+          return
+        }
         scheduleNextPreviewPoll(previewPollDelay)
+        return
+      }
+      previewPollAttempts++
+      if (previewPollAttempts > PREVIEW_POLL_MAX_ATTEMPTS) {
+        stopPreviewPolling()
         return
       }
       // abort previous poll try
@@ -1389,6 +1404,7 @@ function startPreviewPolling() {
   isPreviewPolling = true
   lastPreviewStopAt = 0
   allowPartialPreview = true
+  previewPollAttempts = 0
   scheduleNextPreviewPoll(500)
 }
 

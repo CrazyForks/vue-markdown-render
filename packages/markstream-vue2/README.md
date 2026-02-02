@@ -49,6 +49,6 @@ module.exports = {
 
 ## Notes
 
-- This is a baseline Vue 2 port focused on correct rendering.
-- Advanced Vue 3 optimizations (virtualization, streaming code blocks, Monaco, Mermaid, KaTeX renderers, tooltip singleton) are not included yet.
+- The Vue 2 package mirrors the Vue 3 renderer feature set where possible (virtualization, streaming code blocks, Monaco, Mermaid, KaTeX, tooltip singleton).
+- Optional peers are still required for those features (`stream-monaco`, `stream-markdown`, `mermaid`, `katex`, etc.).
 - Custom node components are supported via `setCustomComponents` from `markstream-vue2`.

@@ -9,7 +9,7 @@ For the full parser API reference, see:
 Highlights:
 
 - `getMarkdown()` — create and configure a `markdown-it-ts` instance
-- `parseMarkdownToStructure()` — turn a Markdown string into parsed nodes used by `MarkdownRender`
+- `parseMarkdownToStructure(content, md)` — turn a Markdown string into parsed nodes used by `MarkdownRender`
 - `setDefaultMathOptions()` — global math options
 - Streaming inline HTML mid-states (`html_inline`) — suppress partial tags and auto-close unclosed inline HTML for flicker-free streaming.
 
@@ -18,8 +18,9 @@ If you only need the parser (no Vue), install and import from `stream-markdown-p
 Try this quickly — parse a small string and render the result in your app:
 
 ```ts
-import { parseMarkdownToStructure } from 'markstream-vue'
+import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
-const nodes = parseMarkdownToStructure('# Hello\n\nThis is a test')
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure('# Hello\n\nThis is a test', md)
 // Render nodes with <MarkdownRender :nodes="nodes" />
 ```

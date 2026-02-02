@@ -9,9 +9,11 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 | `content` | `string` | – | Raw Markdown string (required unless `nodes` is provided). |
 | `nodes` | `BaseNode[]` | – | Pre-parsed AST structure (typically `ParsedNode[]` from `parseMarkdownToStructure`). Skip this when you want the component to parse internally. |
 | `custom-id` | `string` | – | Scopes `setCustomComponents` mappings and lets you target CSS via `[data-custom-id="..."]`. |
+| `is-dark` | `boolean` | `false` | Theme flag forwarded to heavy nodes (Mermaid/KaTeX/CodeBlock). Also adds `.dark` on the root container. |
+| `index-key` | `number \| string` | – | Key prefix for internal node keys; set this when nesting or rendering multiple MarkdownRender instances in the same list. |
 | `final` | `boolean` | `false` | Marks the input as end-of-stream. Disables streaming mid-state (loading) parsing so trailing delimiters (like `$$` or an unclosed code fence) won’t get stuck in a perpetual loading state. |
-| `parse-options` | `ParseOptions` | – | Token hooks (`preTransformTokens`, `postTransformTokens`, `postTransformNodes`). Applies only when `content` is provided. |
-| `custom-html-tags` | `string[]` | – | Extra HTML-like tags treated as common during streaming mid‑states and emitted as custom nodes (`type: <tag>`) for `setCustomComponents` mapping (forwarded to `getMarkdown`, e.g. `['thinking']`). |
+| `parse-options` | `ParseOptions` | – | Token hooks (`preTransformTokens`, `postTransformTokens`). Applies only when `content` is provided. |
+| `custom-html-tags` | `string[]` | – | Extra HTML-like tags treated as common during streaming mid‑states and emitted as custom nodes (`type: 'thinking'`, etc.) for `setCustomComponents` mapping (forwarded to `getMarkdown`, e.g. `['thinking']`). |
 | `custom-markdown-it` | `(md: MarkdownIt) => MarkdownIt` | – | Customize the internal MarkdownIt instance (add plugins, tweak options). |
 | `debug-performance` | `boolean` | `false` | Logs parse/render timing and virtualization stats (dev only). |
 | `typewriter` | `boolean` | `true` | Enables the subtle enter animation. Disable if you need zero animation for SSR snapshots. |
@@ -20,7 +22,7 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 
 | Flag | Default | What it does |
 | ---- | ------- | ------------ |
-| `render-code-blocks-as-pre` | `false` | Render all `code_block` nodes as `<pre><code>` (uses `PreCodeNode`). Helpful when you want to avoid optional peers like Monaco or are debugging CSS collisions. |
+| `render-code-blocks-as-pre` | `false` | Render non‑Mermaid/Infographic `code_block` nodes as `<pre><code>` (uses `PreCodeNode`). Mermaid/infographic blocks still route to their dedicated nodes unless you override them via `setCustomComponents`. |
 | `code-block-stream` | `true` | Stream code blocks as content arrives. Disable to keep Monaco in a loading state until the final chunk lands—useful when incomplete code causes parser hiccups. |
 | `viewport-priority` | `true` | Defers heavy work (Monaco, Mermaid) when elements are offscreen. Turn off if you need deterministic renders for PDF/print pipelines. |
 | `defer-nodes-until-visible` | `true` | When enabled, heavy nodes can render as placeholders until they approach the viewport (non-virtualized mode only). |

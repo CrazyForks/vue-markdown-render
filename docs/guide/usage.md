@@ -52,7 +52,7 @@ export default {
 />
 ```
 
-Tip: unknown HTML-like tags (such as `<question>`) render as plain text by default. Add the tag name to `custom-html-tags` only when you want it parsed as a custom node.
+Tip: unknown HTML-like tags (such as `<question>`) render as raw HTML elements once closed; during streaming, partial tags stay as plain text to avoid flicker. Add the tag name to `custom-html-tags` when you want custom node output (type + attrs/content).
 
 ## Parser pipeline
 
@@ -66,7 +66,7 @@ const nodes = parseMarkdownToStructure('# Title', md)
 ```
 
 - `getMarkdown(msgId?, options?)` returns a configured `markdown-it-ts` instance.
-- `parseMarkdownToStructure()` transforms the Markdown string/tokens to the AST consumed by the renderer.
+- `parseMarkdownToStructure(content, md)` transforms a Markdown string into the AST consumed by the renderer.
 - Combine with `setCustomComponents(id?, mapping)` to swap node renderers for a given `custom-id`.
 
 ## Component matrix

@@ -42,7 +42,7 @@
 
 1) **解析层**（`stream-markdown-parser`）
    - `getMarkdown()`：创建并配置 `markdown-it-ts` 实例
-   - `parseMarkdownToStructure()`：Markdown → `ParsedNode[]`
+   - `parseMarkdownToStructure(content, md)`：Markdown → `ParsedNode[]`
    - 流式 mid-state：未闭合 fence / 未闭合 `$$` / 分段 inline HTML，减少闪烁
 
 2) **渲染层**（`markstream-vue`）
@@ -60,7 +60,7 @@
 来自 `markstream-vue`（`src/exports.ts`）：
 
 - 组件：`MarkdownRender`（默认导出）
-- 解析辅助（re-export）：`getMarkdown()`, `parseMarkdownToStructure()`, `setDefaultMathOptions()`
+- 解析辅助（re-export）：`getMarkdown()`, `parseMarkdownToStructure(content, md)`, `setDefaultMathOptions()`
 - 自定义节点映射：`setCustomComponents()`, `removeCustomComponents()`, `clearGlobalCustomComponents()`
 - 功能开关：`enableMermaid()`, `disableMermaid()`, `enableKatex()`, `disableKatex()`
 - Worker 注入：
@@ -69,7 +69,7 @@
 
 来自 `stream-markdown-parser`（`packages/markdown-parser/src/index.ts`）：
 
-- `getMarkdown()`, `parseMarkdownToStructure()`, `ParseOptions` hooks
+- `getMarkdown()`, `parseMarkdownToStructure(content, md)`, `ParseOptions` hooks
 - Streaming mid-state 与流结束 `final: true`
 
 ---
@@ -182,7 +182,7 @@
 
 - 表述： “自定义 tag”, “嵌组件”
 - 步骤：
-  - 通过 `customHtmlTags` / `custom-html-tags` 声明自定义标签（未知标签默认按纯文本输出）
+  - 通过 `customHtmlTags` / `custom-html-tags` 声明自定义标签（未知标签闭合后按原生 HTML 渲染；流式未闭合片段按纯文本）
   - 用 `setCustomComponents(customId, mapping)` 映射渲染
 - 最小追问： “tag 名称有哪些？希望按 HTML 透传还是自定义 node type？”
 - 文档：`docs/guide/advanced.md`, `docs/guide/parser-api.md`

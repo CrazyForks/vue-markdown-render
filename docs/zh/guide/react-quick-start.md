@@ -32,7 +32,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 ### 3. 使用组件
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   const markdown = `# Hello React!
@@ -66,15 +66,15 @@ export default App
 markstream-react 使用 TypeScript 构建，包含完整的类型定义：
 
 ```tsx
-import type { ParsedNode } from 'markstream-react'
-import MarkdownRender from 'markstream-react'
+import type { NodeRendererProps } from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
+
+const props: NodeRendererProps = {
+  content: '# Hello TypeScript!',
+}
 
 function App() {
-  const markdown = '# Hello TypeScript!'
-
-  return (
-    <MarkdownRender content={markdown} />
-  )
+  return <MarkdownRender {...props} />
 }
 ```
 
@@ -85,7 +85,7 @@ function App() {
 ```tsx
 'use client'
 
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useEffect, useState } from 'react'
 
 export default function MarkdownPage() {
@@ -110,7 +110,7 @@ export default function MarkdownPage() {
 ### Pages Router
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useEffect, useState } from 'react'
 import 'markstream-react/index.css'
 
@@ -137,7 +137,7 @@ import dynamic from 'next/dynamic'
 import 'markstream-react/index.css'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
+  () => import('markstream-react').then(mod => mod.NodeRenderer),
   { ssr: false }
 )
 
@@ -159,7 +159,7 @@ pnpm add shiki stream-markdown
 ```
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   const markdown = `\`\`\`javascript
@@ -179,14 +179,11 @@ console.log(hello)
 pnpm add mermaid
 ```
 
-导入样式并启用加载器：
+导入样式（安装后会自动加载 Mermaid）：
 
 ```tsx
-import { enableMermaid } from 'markstream-react'
-import { useEffect } from 'react'
 import 'markstream-react/index.css'
-
-enableMermaid()
+import 'mermaid/dist/mermaid.css'
 
 function App() {
   const markdown = `#### Mermaid 图表
@@ -210,14 +207,11 @@ graph TD
 pnpm add katex
 ```
 
-导入样式并启用加载器：
+导入样式（安装后会自动加载 KaTeX）：
 
 ```tsx
-import { enableKatex } from 'markstream-react'
 import 'markstream-react/index.css'
 import 'katex/dist/katex.min.css'
-
-enableKatex()
 
 function App() {
   const markdown = `#### 数学示例
@@ -239,14 +233,10 @@ $$`
 你可以通过传递自定义组件映射来自定义特定节点的渲染方式：
 
 ```tsx
-import MarkdownRender, { renderNode } from 'markstream-react'
-import { createContext, useContext } from 'react'
-
-// 创建自定义组件的上下文
-const CustomComponentsContext = createContext<Record<string, any>>({})
+import { NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
 
 // 自定义标题组件
-function CustomHeading({ node, indexKey, customId }: any) {
+function CustomHeading({ node, customId }: any) {
   const level = node.level || 1
   const Tag = `h${level}` as keyof JSX.IntrinsicElements
 
@@ -259,21 +249,16 @@ function CustomHeading({ node, indexKey, customId }: any) {
   )
 }
 
+// 挂载到指定的 customId 作用域
+setCustomComponents('docs', { heading: CustomHeading })
+
 function App() {
   const markdown = `# 自定义标题
 
 此标题使用自定义组件渲染。
 `
 
-  const customComponents = {
-    heading: CustomHeading
-  }
-
-  return (
-    <CustomComponentsContext.Provider value={customComponents}>
-      <MarkdownRender content={markdown} />
-    </CustomComponentsContext.Provider>
-  )
+  return <MarkdownRender customId="docs" content={markdown} />
 }
 ```
 
@@ -282,7 +267,7 @@ function App() {
 markstream-react 支持流式 markdown 内容，适用于 AI 生成的内容：
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useState } from 'react'
 
 function StreamingDemo() {
@@ -291,7 +276,7 @@ function StreamingDemo() {
 
   const fullText = `# 流式传输演示
 
-此内容正在**逐字符**流式传输。
+此内容正在**逐步**流式传输。
 
 ## 功能
 
@@ -338,7 +323,7 @@ console.log('流式传输已启用:', streaming)
 ## 使用 React Hooks
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useCallback, useEffect, useState } from 'react'
 
 function MarkdownEditor() {
@@ -370,7 +355,7 @@ function MarkdownEditor() {
 对于大型 markdown 文档，可以使用虚拟化：
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function LongDocument() {
   // 你的很长的 markdown 内容
@@ -386,18 +371,18 @@ function LongDocument() {
 }
 ```
 
-## Props 参考
+## 常用 Props
 
-### MarkdownRender Props
+以下仅列出常用 props。完整列表请参考 [React Components](/guide/react-components)。
 
 | 属性 | 类型 | 默认值 | 描述 |
 |------|------|---------|-------------|
 | `content` | `string` | - | 要渲染的 Markdown 内容 |
-| `nodes` | `ParsedNode[]` | - | 预解析的 AST 节点 |
-| `customId` | `string` | `'default'` | 作用域标识符 |
-| `maxLiveNodes` | `number` | `100` | 虚拟化最大节点数 |
-| `liveNodeBuffer` | `number` | `5` | 过扫描缓冲区 |
-| `batchRendering` | `boolean` | `false` | 启用批处理渲染 |
+| `nodes` | `BaseNode[]` | - | 预解析的 AST 节点（通常为 `ParsedNode[]`） |
+| `customId` | `string` | - | 作用域标识符 |
+| `maxLiveNodes` | `number` | `320` | 虚拟化最大节点数 |
+| `liveNodeBuffer` | `number` | `60` | 过扫描缓冲区 |
+| `batchRendering` | `boolean` | `true` | 启用批处理渲染 |
 | `deferNodesUntilVisible` | `boolean` | `true` | 延迟重型节点 |
 | `renderCodeBlocksAsPre` | `boolean` | `false` | 使用 `<pre><code>` 回退 |
 
@@ -429,7 +414,7 @@ function LongDocument() {
 ## 使用 Tailwind CSS
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import 'markstream-react/index.css'
 import './output.css' // 你的 Tailwind 输出
 

@@ -66,10 +66,11 @@ pnpm add stream-monaco
 
 ```vue
 <script setup>
-import { toggleDark, useDark } from '@vueuse/core'
+import { useDark, useToggle } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 
 const isDark = useDark() // Ref<boolean> reactive to system/theme preference
+const toggleDark = useToggle(isDark)
 const content = '# Example\n\n```js\nconsole.log("dark mode")\n```'
 
 // Available themes (must include the themes you want to use)

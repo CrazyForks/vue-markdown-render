@@ -176,6 +176,8 @@ const STANDARD_HTML_TAGS = new Set([
   'wbr',
 ])
 
+const CUSTOM_TAG_REGEX = /<([a-z][a-z0-9-]*)\b[^>]*>/gi
+
 const BLOCKED_TAGS = new Set(['script'])
 
 const URL_ATTRS = new Set([
@@ -544,10 +546,14 @@ export function hasCustomComponents(
   content: string,
   customComponents: Record<string, Component>,
 ): boolean {
+  if (!content || !content.includes('<'))
+    return false
+  if (!customComponents || Object.keys(customComponents).length === 0)
+    return false
   // Fast path: check for any non-standard tags
-  const tagRegex = /<([a-z][a-z0-9-]*)\b[^>]*>/gi
+  CUSTOM_TAG_REGEX.lastIndex = 0
   let match: RegExpExecArray | null
-  while ((match = tagRegex.exec(content)) !== null) {
+  while ((match = CUSTOM_TAG_REGEX.exec(content)) !== null) {
     if (isCustomComponent(match[1], customComponents))
       return true
   }

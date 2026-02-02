@@ -280,32 +280,30 @@ Pick one mode per surface: virtualization for best scrollback and steady memory 
 - `content` vs `nodes`: pass raw Markdown or pre-parsed nodes (from `parseMarkdownToStructure`).
 - `max-live-nodes`: `320` (default virtualization) or `0` (incremental batches).
 - `batchRendering`: fine-tune batches with `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, `renderBatchBudgetMs`.
-- `enableMermaid` / `enableKatex` / `enableMonaco`: opt-in heavy deps when needed.
+- `enableMermaid` / `enableKatex`: (re)enable heavy peers or custom loaders when needed (pairs with `disableMermaid` / `disableKatex`).
 - `parse-options`: reuse parser hooks (e.g., `preTransformTokens`, `requireClosingStrong`) on the component.
 - `final`: marks end-of-stream; disables mid-state loading parsing and forces unfinished constructs to settle.
 - `custom-html-tags`: extend streaming HTML allowlist for custom tags and emit them as custom nodes for `setCustomComponents` (e.g., `['thinking']`).
-- `custom-components`: register inline Vue components for custom tags/markers.
+- `setCustomComponents(customId?, mapping)`: register inline Vue components for custom tags/markers (scoped by `custom-id` when provided).
 
-Example: map Markdown placeholders to Vue components
+Example: map Markdown placeholders to Vue components (scoped)
 
 ```ts
 import { setCustomComponents } from 'markstream-vue'
 
-setCustomComponents({
+setCustomComponents('docs', {
   CALLOUT: () => import('./components/Callout.vue'),
 })
 
 // Markdown: [[CALLOUT:warning title="Heads up" body="Details here"]]
 ```
 
-Or pass per-renderer:
+Use the same `custom-id` on the renderer:
 
 ```vue
 <MarkdownRender
   :content="doc"
-  :custom-components="{
-    CALLOUT: () => import('./components/Callout.vue'),
-  }"
+  custom-id="docs"
 />
 ```
 
@@ -334,7 +332,7 @@ Parse hooks example (match server + client):
 - Mermaid/KaTeX not rendering? Install the peer (`mermaid` / `katex`) and pass `:enable-mermaid="true"` / `:enable-katex="true"` or call the loader setters. If you load them via CDN script tags, the library will also pick up `window.mermaid` / `window.katex`.
 - CDN + KaTeX worker: if you don't bundle `katex` but still want off-main-thread rendering, create and inject a worker that loads KaTeX via CDN (UMD) using `createKaTeXWorkerFromCDN()` + `setKaTeXWorker()`.
 - Bundle size: peers are optional and not bundled; import only `markstream-vue/index.css` once. Use Shiki (`MarkdownCodeBlockNode`) when Monaco is too heavy.
-- Custom UI: register components via `setCustomComponents` (global) or `custom-components` prop, then emit markers/placeholders in Markdown and map them to Vue components.
+- Custom UI: register components via `setCustomComponents` (global or scoped), then emit markers/placeholders in Markdown and map them to Vue components.
 
 ## 🆚 Why markstream-vue over a typical Markdown renderer?
 

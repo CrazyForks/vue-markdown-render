@@ -32,7 +32,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 ### 3. Use the Component
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   const markdown = `# Hello React!
@@ -66,13 +66,15 @@ export default App
 markstream-react is built with TypeScript and includes full type definitions:
 
 ```tsx
-import type { ParsedNode } from 'markstream-react'
-import MarkdownRender from 'markstream-react'
+import type { NodeRendererProps } from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
+
+const props: NodeRendererProps = {
+  content: '# Hello TypeScript!',
+}
 
 function App() {
-  const markdown = '# Hello TypeScript!'
-
-  return <MarkdownRender content={markdown} />
+  return <MarkdownRender {...props} />
 }
 ```
 
@@ -83,7 +85,7 @@ function App() {
 ```tsx
 'use client'
 
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useEffect, useState } from 'react'
 
 export default function MarkdownPage() {
@@ -108,7 +110,7 @@ This works with Next.js App Router.
 ### Pages Router
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useEffect, useState } from 'react'
 import 'markstream-react/index.css'
 
@@ -135,7 +137,7 @@ import dynamic from 'next/dynamic'
 import 'markstream-react/index.css'
 
 const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
+  () => import('markstream-react').then(mod => mod.NodeRenderer),
   { ssr: false }
 )
 
@@ -157,7 +159,7 @@ pnpm add shiki stream-markdown
 ```
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function App() {
   const markdown = `\`\`\`javascript
@@ -177,14 +179,11 @@ Install mermaid:
 pnpm add mermaid
 ```
 
-Import styles and enable the loader:
+Import styles (Mermaid auto-loads when installed):
 
 ```tsx
-import { enableMermaid } from 'markstream-react'
-import { useEffect } from 'react'
 import 'markstream-react/index.css'
-
-enableMermaid()
+import 'mermaid/dist/mermaid.css'
 
 function App() {
   const markdown = `#### Mermaid Diagram
@@ -208,14 +207,11 @@ Install katex:
 pnpm add katex
 ```
 
-Import styles and enable the loader:
+Import styles (KaTeX auto-loads when installed):
 
 ```tsx
-import { enableKatex } from 'markstream-react'
 import 'markstream-react/index.css'
 import 'katex/dist/katex.min.css'
-
-enableKatex()
 
 function App() {
   const markdown = `#### Math Example
@@ -237,14 +233,10 @@ $$`
 You can customize how specific nodes are rendered by passing custom component mappings:
 
 ```tsx
-import MarkdownRender, { renderNode } from 'markstream-react'
-import { createContext, useContext } from 'react'
-
-// Create a context for custom components
-const CustomComponentsContext = createContext<Record<string, any>>({})
+import { NodeRenderer as MarkdownRender, setCustomComponents } from 'markstream-react'
 
 // Custom heading component
-function CustomHeading({ node, indexKey, customId }: any) {
+function CustomHeading({ node, customId }: any) {
   const level = node.level || 1
   const Tag = `h${level}` as keyof JSX.IntrinsicElements
 
@@ -257,21 +249,16 @@ function CustomHeading({ node, indexKey, customId }: any) {
   )
 }
 
+// Register for a scoped customId
+setCustomComponents('docs', { heading: CustomHeading })
+
 function App() {
   const markdown = `# Custom Heading
 
 This heading is rendered with a custom component.
 `
 
-  const customComponents = {
-    heading: CustomHeading
-  }
-
-  return (
-    <CustomComponentsContext.Provider value={customComponents}>
-      <MarkdownRender content={markdown} />
-    </CustomComponentsContext.Provider>
-  )
+  return <MarkdownRender customId="docs" content={markdown} />
 }
 ```
 
@@ -280,7 +267,7 @@ This heading is rendered with a custom component.
 markstream-react supports streaming markdown content, which is useful for AI-generated content:
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useState } from 'react'
 
 function StreamingDemo() {
@@ -289,7 +276,7 @@ function StreamingDemo() {
 
   const fullText = `# Streaming Demo
 
-This content is being streamed **character by character**.
+This content is being streamed **in small chunks**.
 
 ## Features
 
@@ -336,7 +323,7 @@ console.log('Streaming enabled:', streaming)
 ## Using with React Hooks
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import { useCallback, useEffect, useState } from 'react'
 
 function MarkdownEditor() {
@@ -368,7 +355,7 @@ function MarkdownEditor() {
 For large markdown documents, you can use virtualization:
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 
 function LongDocument() {
   // Your very long markdown content
@@ -384,18 +371,18 @@ function LongDocument() {
 }
 ```
 
-## Props Reference
+## Common Props
 
-### MarkdownRender Props
+Below are the most commonly used props. For the full list, see [React Components](/guide/react-components).
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `content` | `string` | - | Markdown content to render |
-| `nodes` | `ParsedNode[]` | - | Pre-parsed AST nodes |
-| `customId` | `string` | `'default'` | Identifier for scoping |
-| `maxLiveNodes` | `number` | `100` | Max nodes for virtualization |
-| `liveNodeBuffer` | `number` | `5` | Buffer for overscan |
-| `batchRendering` | `boolean` | `false` | Enable batched rendering |
+| `nodes` | `BaseNode[]` | - | Pre-parsed AST nodes (typically `ParsedNode[]`) |
+| `customId` | `string` | - | Identifier for scoping |
+| `maxLiveNodes` | `number` | `320` | Max nodes for virtualization |
+| `liveNodeBuffer` | `number` | `60` | Buffer for overscan |
+| `batchRendering` | `boolean` | `true` | Enable batched rendering |
 | `deferNodesUntilVisible` | `boolean` | `true` | Defer heavy nodes |
 | `renderCodeBlocksAsPre` | `boolean` | `false` | Use `<pre><code>` fallback |
 
@@ -427,7 +414,7 @@ The default styles are scoped under `.markstream-react` class. You can override 
 ## Using with Tailwind CSS
 
 ```tsx
-import MarkdownRender from 'markstream-react'
+import { NodeRenderer as MarkdownRender } from 'markstream-react'
 import 'markstream-react/index.css'
 import './output.css' // Your Tailwind output
 

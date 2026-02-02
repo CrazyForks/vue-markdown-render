@@ -8,16 +8,61 @@ The primary component for rendering markdown content in Vue 2.
 
 ### Props
 
+`MarkdownRender` in Vue 2 mirrors the Vue 3 renderer props. In templates, use kebab-case.
+
+#### Core props
+
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `content` | `string` | - | Markdown content to render |
-| `nodes` | `ParsedNode[]` | - | Pre-parsed AST nodes (alternative to `content`) |
-| `custom-id` | `string` | `'default'` | Identifier for custom component scoping |
-| `max-live-nodes` | `number` | `100` | Max number of rendered nodes for virtualization |
-| `live-node-buffer` | `number` | `5` | Buffer for overscan in virtualization |
-| `batch-rendering` | `boolean` | `false` | Enable incremental batched rendering |
-| `defer-nodes-until-visible` | `boolean` | `true` | Defer heavy nodes until visible |
-| `render-code-blocks-as-pre` | `boolean` | `false` | Fall back to `<pre><code>` for code blocks |
+| `nodes` | `BaseNode[]` | - | Pre-parsed AST nodes (typically `ParsedNode[]` from the parser) |
+| `custom-id` | `string` | - | Identifier for scoping custom components and CSS (`[data-custom-id="..."]`) |
+| `final` | `boolean` | `false` | Marks the input as end-of-stream; stops emitting streaming `loading` nodes |
+| `parse-options` | `ParseOptions` | - | Parser options and token hooks (only when `content` is provided) |
+| `custom-html-tags` | `string[]` | - | HTML-like tags emitted as custom nodes (e.g. `thinking`) |
+| `custom-markdown-it` | `(md: MarkdownIt) => MarkdownIt` | - | Customize the internal MarkdownIt instance |
+| `debug-performance` | `boolean` | `false` | Log parse/render timing and virtualization stats (dev only) |
+| `is-dark` | `boolean` | `false` | Theme flag forwarded to heavy nodes; adds `.dark` to the root container |
+| `index-key` | `number \| string` | - | Key prefix when rendering multiple instances in lists |
+| `typewriter` | `boolean` | `true` | Enable the non-code-node enter transition |
+
+#### Streaming & heavy-node toggles
+
+| Prop | Default | Description |
+|------|---------|-------------|
+| `render-code-blocks-as-pre` | `false` | Render non-Mermaid/Infographic code blocks as `<pre><code>` |
+| `code-block-stream` | `true` | Stream code block updates as content arrives |
+| `viewport-priority` | `true` | Defer heavy work (Monaco/Mermaid/KaTeX) until near viewport |
+| `defer-nodes-until-visible` | `true` | Render heavy nodes as placeholders until visible (non-virtualized mode only) |
+
+#### Performance (virtualization & batching)
+
+| Prop | Default | Description |
+|------|---------|-------------|
+| `max-live-nodes` | `320` | Max fully rendered nodes kept in DOM (set `0` to disable virtualization) |
+| `live-node-buffer` | `60` | Overscan buffer around the focus range |
+| `batch-rendering` | `true` | Incremental batch rendering when virtualization is disabled |
+| `initial-render-batch-size` | `40` | Nodes rendered immediately before batching starts |
+| `render-batch-size` | `80` | Nodes rendered per batch tick |
+| `render-batch-delay` | `16` | Extra delay (ms) before each batch after rAF |
+| `render-batch-budget-ms` | `6` | Time budget (ms) before adaptive batch sizes shrink |
+| `render-batch-idle-timeout-ms` | `120` | Timeout (ms) for `requestIdleCallback` slices |
+
+#### Global code block options
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `code-block-dark-theme` | `any` | Monaco dark theme object forwarded to every `CodeBlockNode` |
+| `code-block-light-theme` | `any` | Monaco light theme object forwarded to every `CodeBlockNode` |
+| `code-block-monaco-options` | `Record<string, any>` | Options forwarded to `stream-monaco` |
+| `code-block-min-width` | `string \| number` | Min width forwarded to `CodeBlockNode` |
+| `code-block-max-width` | `string \| number` | Max width forwarded to `CodeBlockNode` |
+| `code-block-props` | `Record<string, any>` | Extra props forwarded to every `CodeBlockNode` |
+| `themes` | `string[]` | Theme list forwarded to `stream-monaco` |
+
+#### Events
+
+- `@copy`, `@handleArtifactClick`, `@click`, `@mouseover`, `@mouseout`
 
 ### Usage
 
@@ -303,7 +348,7 @@ const nodes = parseMarkdownToStructure('# Title\n\nContent here...', md)
 
 ### enableKatex / enableMermaid
 
-Enable feature loaders for KaTeX and Mermaid.
+(Re)enable feature loaders for KaTeX and Mermaid. Default loaders are already on; call these only if you disabled them earlier or want to override the loader (for example, using a CDN build).
 
 ```js
 import { enableKatex, enableMermaid } from 'markstream-vue2'
@@ -326,6 +371,9 @@ interface NodeComponentProps {
   node: ParsedNode // The parsed node data
   indexKey: number | string // Unique key for the node
   customId?: string // Custom ID for scoping
+  isDark?: boolean // Forwarded theme flag (from MarkdownRender)
+  typewriter?: boolean // Forwarded typewriter flag (non-code nodes)
+  loading?: boolean // Streaming/loading state (from node.loading)
 }
 ```
 
@@ -409,7 +457,7 @@ export default {
       streamingContent: '',
       fullContent: `# Streaming Demo
 
-This content streams in **character by character**.
+This content streams in **small chunks**.
 
 \`\`\`javascript
 console.log('Streaming...')
@@ -462,7 +510,7 @@ For Vue 2.7+, types are included automatically:
 
 ```ts
 import type { ParsedNode } from 'markstream-vue2'
-import MarkdownRender, { MarkdownRenderProps } from 'markstream-vue2'
+import MarkdownRender from 'markstream-vue2'
 
 // Your component with proper typing
 import { defineComponent } from 'vue'

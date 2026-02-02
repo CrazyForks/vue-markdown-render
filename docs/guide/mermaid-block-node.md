@@ -10,6 +10,8 @@
 - `isStrict?: boolean` — run Mermaid in `securityLevel: 'strict'` with DOMPurify + HTML-label hardening; use this when rendering untrusted diagrams to strip inline scripts/`javascript:` URLs that could otherwise leak into the SVG
 - Header / control props (all optional, default `true`):
   - `showHeader`, `showModeToggle`, `showCopyButton`, `showExportButton`, `showFullscreenButton`, `showCollapseButton`, `showZoomControls`
+- `enableWheelZoom?: boolean` — enable Ctrl/Cmd + wheel zoom in the canvas (default `false`)
+- Timeouts (ms): `workerTimeoutMs`, `parseTimeoutMs`, `renderTimeoutMs`, `fullRenderTimeoutMs` (defaults: `1400/1800/2500/4000`)
 
 ## Slots
 - `header-left` — replace the left area (defaults to Mermaid icon + label)
@@ -21,15 +23,15 @@ The component emits events using a unified `MermaidBlockEvent` object. Listeners
 
 - `copy` — copy button clicked, signature: `(ev: MermaidBlockEvent<{ type: 'copy'; text: string }>)` (call `ev.preventDefault()` to stop the built-in clipboard write + "Copied" state)
 - `export` — export button clicked, signature: `(ev: MermaidBlockEvent<{ type: 'export' }>)`
-- `openModal` — request to open the pseudo-fullscreen modal, signature: `(ev: MermaidBlockEvent<{ type: 'openModal' }>)`
-- `toggleMode` — toggle between `source` and `preview`, signature: `(target: 'source' | 'preview', ev: MermaidBlockEvent<{ type: 'toggleMode'; target: 'source' | 'preview' }>)`
+- `openModal` — request to open the pseudo-fullscreen modal, signature: `(ev: MermaidBlockEvent<{ type: 'open-modal' }>)`
+- `toggleMode` — toggle between `source` and `preview`, signature: `(target: 'source' | 'preview', ev: MermaidBlockEvent<{ type: 'toggle-mode'; target: 'source' | 'preview' }>)`
 
 ### Intercept example
 Completely override the component's default export behavior:
 
 ```vue
 <script setup lang="ts">
-import type { MermaidBlockEvent } from '../../types/component-props'
+import type { MermaidBlockEvent } from 'markstream-vue'
 
 function onExport(ev: any /* MermaidBlockEvent */) {
   ev.preventDefault()

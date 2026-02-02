@@ -17,12 +17,12 @@ Options include:
 - `i18n`: translator map or function
 - `customHtmlTags`: custom HTML-like tags treated as common during streaming mid‑state handling (e.g. `['thinking']`)
 
-### `parseMarkdownToStructure(content, md?, options?)`
+### `parseMarkdownToStructure(content, md, options?)`
 Parse a Markdown string into a streaming-friendly AST used by the renderer.
 
 Parameters:
 - `content` (string): markdown to parse
-- `md` (MarkdownItCore, optional): a markdown-it-ts instance — created if not provided
+- `md` (MarkdownItCore): a markdown-it-ts instance created by `getMarkdown()`
 - `options` (ParseOptions, optional): contains transform hooks described below
 
 > Tip for custom components: for simple HTML‑like tags such as `<thinking>`, prefer the built‑in `customHtmlTags` / `custom-html-tags` allowlist so the parser emits custom nodes directly. Use `preTransformTokens` only when you need to reshape `content`/`attrs`. See [custom component parsing](/guide/advanced#custom-component-parsing) for details.
@@ -38,6 +38,9 @@ In streaming contexts (SSE / AI chat), the parser intentionally emits some **mid
 When you know the message is complete, switch the parser to “final” mode:
 
 ```ts
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = getMarkdown()
 const nodes = parseMarkdownToStructure(buffer, md, { final: true })
 ```
 
@@ -48,7 +51,7 @@ What `final: true` does:
 ### `processTokens(tokens)`
 Converts raw markdown-it tokens into a processed token list ready for the AST phase.
 
-### `parseInlineTokens(tokens, md)`
+### `parseInlineTokens(tokens, content?, preToken?, options?)`
 Parse inline tokens into inline nodes usable by the renderer.
 
 ## Configuration & helpers
@@ -73,36 +76,41 @@ setDefaultMathOptions({
 When calling `parseMarkdownToStructure` you can pass `ParseOptions` with these hooks:
 - `preTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — operate immediately after the `markdown-it` parser runs
 - `postTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — transform tokens after internal fixes
-- `postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]` — operate on the node tree before rendering
+
+If you need to reshape the AST, post-process the returned `ParsedNode[]` and pass it to `MarkdownRender` via the `nodes` prop.
 
 These hooks are also available via `parseOptions` prop on the `MarkdownRender` component (applies only when using `content` instead of `nodes`).
 
 ### Unknown HTML-like tags (default behavior)
 
-Non-standard HTML-like tags (for example `<question>`) are rendered as **literal text** by default.
+Non-standard HTML-like tags (for example `<question>`) render as raw HTML elements once complete; during streaming, partial tags are kept as **literal text** to avoid flicker.
 
-If you want a custom tag to be parsed as a custom node (so it can be mapped via `setCustomComponents`), add it to `customHtmlTags`.
+If you want a custom tag to be emitted as a custom node (so it can be mapped via `setCustomComponents` with parsed attrs/content), add it to `customHtmlTags`.
 
 ### ParseOptions: `requireClosingStrong`
 
-`requireClosingStrong` (boolean | optional) controls how the parser treats unmatched `**` strong delimiters inside inline content. Default: `true`.
+`requireClosingStrong` (boolean | optional) controls how the parser treats unmatched `**` strong delimiters inside inline content. Default: `false` (streaming-friendly).
 
 - **true**: The parser requires a matching closing `**` to create a strong node. Unclosed `**` are left as plain text. This is the recommended, strict mode for non-interactive rendering and avoids incorrect strong parsing inside constructs like link text (for example, `[**cxx](xxx)`).
 - **false**: The parser allows mid-state/unfinished `**` (useful for editor live-preview scenarios), which can produce a temporary strong node even when the closing `**` is missing.
 
-Example — strict parsing (default):
+Example — strict parsing (recommended for non-streaming):
 
 ```ts
-import { parseMarkdownToStructure } from 'stream-markdown-parser'
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: true })
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure('[**cxx](xxx)', md, { requireClosingStrong: true })
 // the text `[**cxx](xxx)` will be preserved without creating a dangling strong node
 ```
 
 Example — editor-friendly parsing:
 
 ```ts
-const nodes = parseMarkdownToStructure('[**cxx](xxx)', undefined, { requireClosingStrong: false })
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure('[**cxx](xxx)', md, { requireClosingStrong: false })
 // allows creating a temporary/"mid-state" strong node for live-edit previews
 ```
 
@@ -141,6 +149,9 @@ Emitting custom nodes:
 If you want those tags to become custom node types (so `setCustomComponents` can map them directly), also pass `customHtmlTags` in `ParseOptions` or use the `custom-html-tags` prop on `MarkdownRender` (which wires this automatically):
 
 ```ts
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
 const nodes = parseMarkdownToStructure(source, md, { customHtmlTags: ['thinking'] })
 ```
 
@@ -190,9 +201,10 @@ For full details and more examples, see `packages/markdown-parser/README.md` in 
 Try this — quick test of a parse option:
 
 ```ts
-import { parseMarkdownToStructure } from 'markstream-vue'
+import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
-const nodes = parseMarkdownToStructure('Hello **world**')
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure('Hello **world**', md)
 console.log(nodes)
 // Render with <MarkdownRender :nodes="nodes" />
 ```
@@ -215,6 +227,8 @@ Benefits:
 Example (simple sketch):
 
 ```ts
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
 // 1) extract custom tags
 const extracted = new Map<string, string>()
 let id = 1
@@ -225,7 +239,8 @@ const contentWithPlaceholders = source.replace(/<MyWidget[\s\S]*?<\/MyWidget>/g,
 })
 
 // 2) parse the markdown with placeholders
-const nodes = parseMarkdownToStructure(contentWithPlaceholders)
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure(contentWithPlaceholders, md)
 
 // 3) render: when you encounter a placeholder node, mount your extracted component
 // Example pseudo-Vue render logic:
@@ -234,7 +249,8 @@ const nodes = parseMarkdownToStructure(contentWithPlaceholders)
 // }
 ```
 
-Thinking blocks and small inline-rich fragments
--- If you only need a lightweight rendering for short "thinking" fragments (for example AI assistant thinking traces), the library's `MarkdownRenderer` (used internally by `MarkdownRender`) supports stream-friendly rendering hooks and is lighter to reuse than reassembling the AST into component trees yourself. Use `parseOptions` or preTransform hooks to identify thinking regions and render them with the lighter-weight renderer while keeping complex tag-like custom components extracted and rendered separately.
+### Thinking blocks and small inline-rich fragments
+
+If you only need lightweight rendering for short "thinking" fragments (for example AI assistant thinking traces), extract those fragments and parse them separately, then render with a dedicated `MarkdownRender` instance. Keep complex tag-like custom components extracted as shown above so they don’t get mixed into the main AST.
 
 This hybrid approach minimizes fragile string-manipulation of the Markdown AST while giving you full control over custom component hydration and rendering scope.

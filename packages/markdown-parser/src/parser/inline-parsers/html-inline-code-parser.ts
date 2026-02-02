@@ -25,6 +25,24 @@ const VOID_TAGS = new Set([
   'wbr',
 ])
 
+interface TagSetCacheEntry {
+  customTagSet: Set<string> | null
+  allowedTagSet: Set<string>
+}
+
+let emptyTagSets: TagSetCacheEntry | null = null
+const TAG_SET_CACHE = new WeakMap<readonly string[], TagSetCacheEntry>()
+
+function getEmptyTagSets() {
+  if (!emptyTagSets) {
+    emptyTagSets = {
+      customTagSet: null,
+      allowedTagSet: buildAllowedHtmlTagSet(),
+    }
+  }
+  return emptyTagSets
+}
+
 function getTagName(html: string) {
   const match = html.match(/^<\s*(?:\/\s*)?([\w-]+)/)
   return match ? match[1].toLowerCase() : ''
@@ -44,6 +62,26 @@ function normalizeCustomTag(t: unknown) {
     return ''
   const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
   return m ? m[1].toLowerCase() : ''
+}
+
+function getTagSets(customTags?: readonly string[]) {
+  if (!customTags || customTags.length === 0)
+    return getEmptyTagSets()
+  const cached = TAG_SET_CACHE.get(customTags)
+  if (cached)
+    return cached
+  const normalized = customTags.map(normalizeCustomTag).filter(Boolean)
+  if (!normalized.length) {
+    const entry = getEmptyTagSets()
+    TAG_SET_CACHE.set(customTags, entry)
+    return entry
+  }
+  const entry = {
+    customTagSet: new Set(normalized),
+    allowedTagSet: buildAllowedHtmlTagSet({ customHtmlTags: customTags as any }),
+  }
+  TAG_SET_CACHE.set(customTags, entry)
+  return entry
 }
 
 function tokenToRaw(token: MarkdownToken) {
@@ -122,10 +160,7 @@ export function parseHtmlInlineCodeToken(
 ): [ParsedNode, number] {
   const code = String(token.content ?? '')
   const tag = getTagName(code)
-  const customTags = options?.customHtmlTags
-  const customTagSet = customTags && customTags.length
-    ? new Set(customTags.map(normalizeCustomTag).filter(Boolean))
-    : null
+  const { customTagSet, allowedTagSet } = getTagSets(options?.customHtmlTags)
 
   if (!tag) {
     return [
@@ -142,7 +177,6 @@ export function parseHtmlInlineCodeToken(
   // rendering it as literal text (方案 A). However, if the tag is already
   // properly closed within the inline token stream, keep it as HTML so
   // HtmlInlineNode can still render custom components via HTML parsing.
-  const allowedTagSet = buildAllowedHtmlTagSet({ customHtmlTags: options?.customHtmlTags as any })
   if (!allowedTagSet.has(tag)) {
     const fragment = collectHtmlFragment(tokens, i, tag)
     if (!fragment.closed) {

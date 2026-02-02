@@ -9,7 +9,7 @@
 | `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
 | `ImageNode` | 自定义图片预览 / 懒加载 | Props：`fallback-src`、`show-caption`、`lazy`、`svg-min-height`、`use-placeholder`；事件：`click` / `load` / `error` | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
 | `LinkNode` | 下划线动画、颜色自定义 | `color`、`underlineHeight`、`showTooltip` | 无 | 浏览器默认 `a` 样式可通过 reset 解决 |
-| `VmrContainerNode` | 自定义 `:::` 容器 | `node`（`name`、`attrs`、`loading`、`children`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | JSON attrs 会变成 `data-*` 字符串（如 `data-devId`）；无效/不完整 JSON 回退到 `data-attrs`（原始字符串）；name 后面的 args 存到 `data-args` |
+| `VmrContainerNode` | 自定义 `:::` 容器 | `node`（`name`、`attrs`、`loading`、`children`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | JSON attrs 会规范到 `node.attrs`（去掉 `data-` 前缀）；无效/不完整 JSON 存到 `attrs.attrs`；name 后面的 args 存到 `attrs.args` |
 
 ## MarkdownRender
 
@@ -70,7 +70,7 @@ setCustomComponents('docs', {
 - **批量渲染** —— `batchRendering`、`initialRenderBatchSize`、`renderBatchSize`、`renderBatchDelay`、`renderBatchBudgetMs` 控制每一帧有多少节点从占位骨架切换为真实组件。仅在关闭虚拟化（`:max-live-nodes="0"`）时会启用增量骨架模式；默认启用虚拟化时会直接渲染当前窗口的节点。
 - **延迟可见节点** —— `deferNodesUntilVisible` 与 `viewportPriority` 默认开启，让 Mermaid、Monaco、KaTeX 等重型节点只有在接近视口时才加载。除非明确需要一次性渲染所有节点，否则不建议关闭。
 - **虚拟化窗口** —— `maxLiveNodes` 限制 DOM 中最多保留多少个已渲染节点，`liveNodeBuffer` 控制超前/超后范围。合理设置可在保持可滚动回溯的同时，避免大文档拖慢页面。详见 [性能指南](/zh/guide/performance)。
-- **代码块降级** —— 通过 `renderCodeBlocksAsPre` 与 `codeBlockStream` 可以改用 `<pre><code>` 简化渲染，或在高负载时临时关闭 Monaco 流式更新。
+- **代码块降级** —— 通过 `renderCodeBlocksAsPre` 与 `codeBlockStream` 可将非 Mermaid/Infographic 代码块切换为 `<pre><code>` 简化渲染，或在高负载时临时关闭 Monaco 流式更新。
 
 结合这些 props，再配合 `custom-id` 作用域样式与全局解析设置（`setDefaultMathOptions`、自定义 MarkdownIt 插件），即可针对不同项目调出最适合的性能与体验平衡。
 
@@ -170,7 +170,7 @@ function closePreview() {
 </template>
 ```
 
-> 小贴士：可以通过 `:show-preview-button="false"` 隐藏按钮，或者直接传入 `:is-show-preview="false"`，让所有 CodeBlock 都跳过预览逻辑。
+> 小贴士：可以通过 `:show-preview-button="false"` 隐藏按钮；若要全局禁用预览，可在 `MarkdownRender` 上传入 `:code-block-props="{ isShowPreview: false }"`。
 
 ### 常见问题
 - **编辑器空白**：worker 未注册或 SSR 环境下提前执行。
@@ -216,7 +216,7 @@ const node = {
 
 ### 快速要点
 - **依赖**：`mermaid` ≥ 11（推荐 ESM 构建）。
-- **Props**：`node`、`isDark`、`isStrict`、`maxHeight`、超时参数、Header/按钮开关等。
+- **Props**：`node`、`isDark`、`isStrict`、`maxHeight`、超时参数、Header/按钮开关、`enableWheelZoom` 等。
 - **事件**：`copy`、`export`、`openModal`、`toggleMode`（可通过 `ev.preventDefault()` 阻止默认行为）。
 
 ### 示例
@@ -330,7 +330,7 @@ setCustomComponents('docs', { image: ImagePreview })
 
 组件支持以下块级节点：
 - **内联节点**（段落内）：text、strong、emphasis、link、image、inline_code 等
-- **块级节点**：paragraph、heading、list、blockquote、code_block、fence、math_block、table
+- **块级节点**：paragraph、heading、list、blockquote、code_block、math_block、table
 
 未知节点类型会回退到 `FallbackComponent`，显示节点类型和原始内容用于调试。
 
@@ -344,7 +344,7 @@ setCustomComponents('docs', { image: ImagePreview })
 
 解析器会提取：
 - `name` — 容器名称（例如 `viewcode:topo-test-001`）
-- `attrs` — JSON 属性，解析为 data 属性
+- `attrs` — 解析后的属性（`data-*` 前缀会被规范成普通 key）
 - `children` — 子节点（解析后的 markdown 内容）
 - `raw` — 原始 markdown 源文本
 
@@ -354,7 +354,7 @@ setCustomComponents('docs', { image: ImagePreview })
 interface VmrContainerNode {
   type: 'vmr_container'
   name: string // 来自 ::: name 的容器名称
-  attrs?: Record<string, string> // 解析后的 JSON 属性
+  attrs?: Record<string, unknown> // 解析后的属性（值可能是 string/number/boolean）
   loading?: boolean // 流式中间态：容器未闭合时为 true
   children: ParsedNode[] // 子节点
   raw: string // 原始 markdown 源文本
@@ -368,19 +368,19 @@ interface VmrContainerNode {
 - **Loading 状态**：当 `:::` 容器已打开但尚未闭合时，`loading` 会被设置为 `true`。这允许你的组件在内容流式传输时显示中间状态（如骨架屏）。
 
 - **attrs 处理规则**：
-  - 容器名后面的 args 会存到 `data-args`（字符串）。
-  - JSON attrs 会转换成 `data-*` 属性（字符串），例如 `{"devId":"abc"}` → `data-devId="abc"`。
-  - JSON 解析失败（无效或不完整）时，原始字符串会回退保存到 `data-attrs`。
+  - 容器名后面的 args 会存到 `attrs.args`（字符串）。
+  - JSON attrs 会规范到 `attrs`（去掉 `data-` 前缀），例如 `{"devId":"abc"}` → `attrs.devId = "abc"`。
+  - JSON 解析失败（无效或不完整）时，原始字符串会保存到 `attrs.attrs`。
 
 流式传输进度示例：
 ```markdown
 # 初始状态（中间态）
 ::: viewcode:stream {"incomplete
-# → attrs['data-attrs'] = '{"incomplete', loading = true
+# → attrs.attrs = '{"incomplete', loading = true
 
 # 更多内容到达后
 ::: viewcode:stream {"devId":"abc"}
-# → attrs['data-devId'] = "abc", loading = false（如果存在闭合 :::）
+# → attrs.devId = "abc", loading = false（如果存在闭合 :::）
 ```
 
 ### 默认渲染
@@ -389,7 +389,7 @@ interface VmrContainerNode {
 
 ```vue
 <!-- 默认 VmrContainerNode 输出 -->
-<div class="vmr-container vmr-container-container-name" data-key="value">
+<div class="vmr-container vmr-container-container-name" v-bind="node.attrs">
   <!-- 子节点在这里渲染（段落、列表、代码块等） -->
 </div>
 ```
@@ -444,7 +444,7 @@ interface Props {
   node: {
     type: 'vmr_container'
     name: string
-    attrs?: Record<string, string>
+    attrs?: Record<string, unknown>
     children: any[]
     raw: string
   }
@@ -454,9 +454,9 @@ interface Props {
 
 const props = defineProps<Props>()
 
-// 从 attrs 提取 devId / args（JSON attrs 会以 data-* 字符串形式存储）
-const devId = computed(() => props.node.attrs?.['data-devId'] || '')
-const args = computed(() => props.node.attrs?.['data-args'] || '')
+// 从 attrs 提取 devId / args
+const devId = computed(() => String(props.node.attrs?.devId ?? ''))
+const args = computed(() => String(props.node.attrs?.args ?? ''))
 
 // 检查是否为 viewcode 容器
 const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
@@ -553,12 +553,12 @@ setCustomComponents('docs', {
 
 ### 排障
 - **看到原始文本**：说明你使用的是默认渲染器。请通过 `setCustomComponents` 注册自定义组件。
-- **Attrs 为 undefined**：如果你没传 args/JSON，这是正常的；无效/不完整 JSON 会回退到 `data-attrs`（原始字符串）。
+- **Attrs 为 undefined**：如果你没传 args/JSON，这是正常的；无效/不完整 JSON 会回退到 `attrs.attrs`（原始字符串）。
 - **组件未收到 props**：请确保你的组件正确接受 `node` prop 且类型匹配。
-- **流式场景下 attrs 不完整**：在流式传输中你可能会暂时看到 `attrs['data-attrs']` 包含部分 JSON（如 `{"incomplete`），直到完整语法到达。可通过 `node.loading` 判断中间态。
+- **流式场景下 attrs 不完整**：在流式传输中你可能会暂时看到 `attrs.attrs` 包含部分 JSON（如 `{"incomplete`），直到完整语法到达。可通过 `node.loading` 判断中间态。
 
 ## 工具函数
 
 - `getMarkdown()` — 返回预设好的 `markdown-it-ts` 实例。
-- `parseMarkdownToStructure()` — 将 Markdown 字符串解析成 AST，可直接传给 `MarkdownRender`。
+- `parseMarkdownToStructure(content, md)` — 将 Markdown 字符串解析成 AST，可直接传给 `MarkdownRender`。
 - `setCustomComponents(id?, mapping)` — 为指定 `custom-id` 替换任何节点渲染器。
