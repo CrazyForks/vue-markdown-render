@@ -357,6 +357,14 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     }
   }, [])
 
+  // Restore cached SVG when switching from source to preview
+  useLayoutEffect(() => {
+    if (!showSource && contentRef.current && svgCacheRef.current[theme]) {
+      contentRef.current.innerHTML = svgCacheRef.current[theme]!
+      updateContainerHeight()
+    }
+  }, [showSource, theme, updateContainerHeight])
+
   const renderFull = useCallback(async (code: string, t: Theme, signal?: AbortSignal) => {
     if (!mermaidRef.current || !contentRef.current)
       return false
@@ -599,13 +607,6 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       setZoom(saved.zoom)
       setTranslate({ x: saved.translateX, y: saved.translateY })
       setContainerHeight(saved.containerHeight)
-      if (hasRenderedOnceRef.current && svgCacheRef.current[theme] && contentRef.current) {
-        contentRef.current.innerHTML = svgCacheRef.current[theme]!
-        updateContainerHeight()
-      }
-      else {
-        progressiveRender(baseFixedCode)
-      }
     }
     else {
       savedTransformRef.current = {
