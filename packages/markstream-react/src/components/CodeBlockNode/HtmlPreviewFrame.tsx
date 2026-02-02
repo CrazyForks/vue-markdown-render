@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useSafeI18n } from '../../i18n/useSafeI18n'
 
 export interface HtmlPreviewFrameProps {
   code: string
@@ -9,6 +10,7 @@ export interface HtmlPreviewFrameProps {
 }
 
 export function HtmlPreviewFrame(props: HtmlPreviewFrameProps) {
+  const { t } = useSafeI18n()
   const srcdoc = useMemo(() => {
     const base = props.code || ''
     const lowered = base.trim().toLowerCase()
@@ -62,7 +64,7 @@ export function HtmlPreviewFrame(props: HtmlPreviewFrameProps) {
         <div className="html-preview-frame__header">
           <div className="html-preview-frame__title">
             <span className="html-preview-frame__dot" />
-            <span className="html-preview-frame__label">{props.title || 'Preview'}</span>
+            <span className="html-preview-frame__label">{props.title || `HTML ${t('common.preview')}`}</span>
           </div>
           <button
             type="button"
