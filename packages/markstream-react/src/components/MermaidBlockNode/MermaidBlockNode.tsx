@@ -985,8 +985,10 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
             onClick={event => event.stopPropagation()}
           >
             <div className="mermaid-modal-header">
-              <span className="mermaid-modal-title">Mermaid Preview</span>
-              <button type="button" className="mermaid-modal-close" onClick={closeModal}>Close</button>
+              <span className="mermaid-modal-title">
+                {`Mermaid ${t('common.preview')}`}
+              </span>
+              <button type="button" className="mermaid-modal-close" onClick={closeModal}>{t('common.close')}</button>
             </div>
             <div className="mermaid-modal-body">
               <div ref={modalContentRef} className="mermaid-modal-content" />
