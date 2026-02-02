@@ -20,6 +20,7 @@ const defaultMap: Record<string, string> = {
   'common.source': 'Source',
   'common.export': 'Export',
   'common.open': 'Open',
+  'common.close': 'Close',
   'common.zoomIn': 'Zoom in',
   'common.zoomOut': 'Zoom out',
   'common.resetZoom': 'Reset zoom',
