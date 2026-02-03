@@ -464,10 +464,12 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   useEffect(() => {
     if (!viewportReady || showSource || isCollapsed)
       return
+    if (!mermaidRef.current)
+      return
     const controller = new AbortController()
     progressiveRender(baseFixedCode, controller.signal)
     return () => controller.abort()
-  }, [baseFixedCode, isCollapsed, progressiveRender, showSource, viewportReady])
+  }, [baseFixedCode, isCollapsed, progressiveRender, showSource, viewportReady, mermaidAvailable])
 
   const handleTooltip = useCallback((event: React.MouseEvent<HTMLElement>, text: string) => {
     const origin = { x: event.clientX, y: event.clientY }
@@ -722,13 +724,13 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
           </div>
         </div>
       )}
-      <div
-        ref={containerRef}
-        className={clsx(
-          'min-h-[360px] relative transition-all duration-100 overflow-hidden block',
-          props.isDark ? 'bg-gray-900' : 'bg-gray-50',
-        )}
-        style={{ height: containerHeight, maxHeight: props.maxHeight ?? undefined }}
+        <div
+          ref={containerRef}
+          className={clsx(
+            'min-h-[360px] relative transition-all duration-100 overflow-hidden block',
+            props.isDark ? 'bg-gray-900' : 'bg-gray-50',
+          )}
+          style={{ height: containerHeight, maxHeight: props.maxHeight ?? undefined }}
         onWheel={handleWheel}
         onMouseDown={(event) => {
           if (event.button !== 0)
