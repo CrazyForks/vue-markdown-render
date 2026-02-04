@@ -1019,10 +1019,35 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
       }
 
       case 'inline':
-        result.push(...parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, {
-          requireClosingStrong: options?.requireClosingStrong,
-          customHtmlTags: options?.customHtmlTags,
-        }))
+        // In stream mode and after token-fix plugins (e.g. custom HTML blocks),
+        // markdown-it can occasionally emit a root-level `inline` token (not
+        // wrapped in paragraph_open/close).
+        //
+        // - If it expands to inline siblings like "我是" + "**strong**", renderers
+        //   that virtualize/wrap each top-level node in a block container will
+        //   introduce unintended line breaks between those inline siblings.
+        // - If it expands to one or more standalone `html_block` nodes, keep the
+        //   historical behavior and emit them as top-level blocks (not wrapped in
+        //   a paragraph), since they represent block-like HTML structures.
+        {
+          const parsed = parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, {
+            requireClosingStrong: options?.requireClosingStrong,
+            customHtmlTags: options?.customHtmlTags,
+          })
+          if (parsed.length === 0) {
+            // no-op (matches previous behavior)
+          }
+          else if (parsed.every(n => n.type === 'html_block')) {
+            result.push(...parsed)
+          }
+          else {
+            result.push({
+              type: 'paragraph',
+              raw: String(token.content ?? ''),
+              children: parsed,
+            } as ParsedNode)
+          }
+        }
         i += 1
         break
       default:
