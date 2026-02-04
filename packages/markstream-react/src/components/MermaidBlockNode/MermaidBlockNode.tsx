@@ -724,13 +724,13 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
           </div>
         </div>
       )}
-        <div
-          ref={containerRef}
-          className={clsx(
-            'min-h-[360px] relative transition-all duration-100 overflow-hidden block',
-            props.isDark ? 'bg-gray-900' : 'bg-gray-50',
-          )}
-          style={{ height: containerHeight, maxHeight: props.maxHeight ?? undefined }}
+      <div
+        ref={containerRef}
+        className={clsx(
+          'min-h-[360px] relative transition-all duration-100 overflow-hidden block',
+          props.isDark ? 'bg-gray-900' : 'bg-gray-50',
+        )}
+        style={{ height: containerHeight, maxHeight: props.maxHeight ?? undefined }}
         onWheel={handleWheel}
         onMouseDown={(event) => {
           if (event.button !== 0)
