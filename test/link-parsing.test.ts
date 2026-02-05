@@ -1,6 +1,6 @@
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
-import { textIncludes } from './utils/midstate-utils'
+import { links, textIncludes } from './utils/midstate-utils'
 
 const md = getMarkdown('t')
 
@@ -328,5 +328,49 @@ http://127.0.0.1:8001/upload/20251118/4737bbe0-c42e-11f0-8471-37360564882d.docx 
     const afterFull = afterTokens.join('').trim()
     const expectedAfter = ') – her beskrives, hvordan værktøjet automatisk markerer fejl, giver fejltyper, leverer farvekodet feedback, giver lærerne et samlet overblik og muligheden for at tilpasse, hvilke fejl eleven skal se.'
     expect(afterFull).toBe(expectedAfter)
+  })
+
+  it('does not include ！ suffix in linkify/autolink bare URLs', () => {
+    const cjkBang = '图表URL: https://www.baidu.com/img/flexible/logo/pc/result.png！文字文字'
+    const nodes1 = parseMarkdownToStructure(cjkBang, md)
+    const l1 = links(nodes1)
+    expect(l1.length).toBe(1)
+    expect(l1[0].href).toBe('https://www.baidu.com/img/flexible/logo/pc/result.png')
+    expect(l1[0].text).toBe('https://www.baidu.com/img/flexible/logo/pc/result.png')
+    expect(textIncludes(nodes1, '！文字文字')).toBe(true)
+    expect(textIncludes(l1[0], '！')).toBe(false)
+
+    const angle = '<https://www.baidu.com/img/flexible/logo/pc/result.png！文字文字>'
+    const nodes3 = parseMarkdownToStructure(angle, md)
+    const l3 = links(nodes3)
+    expect(l3.length).toBe(1)
+    expect(l3[0].href).toBe('https://www.baidu.com/img/flexible/logo/pc/result.png')
+    expect(l3[0].text).toBe('https://www.baidu.com/img/flexible/logo/pc/result.png')
+    expect(textIncludes(nodes3, '！文字文字')).toBe(true)
+    expect(textIncludes(l3[0], '！')).toBe(false)
+  })
+
+  it('keeps ASCII ! when it is part of the URL', () => {
+    const mdText = [
+      'https://example.com/a!b',
+      'https://example.com/?q=!',
+      'https://example.com/#!',
+      '<https://example.com/a!b>',
+    ].join('\n')
+    const nodes = parseMarkdownToStructure(mdText, md)
+    const ls = links(nodes)
+    const hrefs = ls.map((l: any) => String(l.href || ''))
+    expect(hrefs).toContain('https://example.com/a!b')
+    expect(hrefs).toContain('https://example.com/?q=!')
+    expect(hrefs).toContain('https://example.com/#!')
+  })
+
+  it('does not merge punctuation ! into explicit markdown links', () => {
+    const nodes = parseMarkdownToStructure('[x](https://example.com/#)!', md)
+    const ls = links(nodes)
+    expect(ls.length).toBe(1)
+    expect(ls[0].href).toBe('https://example.com/#')
+    expect(ls[0].text).toBe('x')
+    expect(textIncludes(nodes, '!')).toBe(true)
   })
 })

@@ -1,6 +1,10 @@
 import type { MarkdownIt } from 'markdown-it-ts'
 import type { MarkdownToken } from '../types'
 
+// We hard-stop FULLWIDTH exclamation mark used as CJK punctuation.
+// ASCII `!` is valid in URLs (path/query/fragment), so do not stop on it.
+const LINKIFY_HARD_STOP_CHARS = ['！'] as const
+
 // Small helpers to reduce repetition when building token fragments
 function textToken(content: string) {
   return {
@@ -60,6 +64,50 @@ function createLinkToken(text: string, href: string, loading: boolean) {
   }
 }
 
+function appendToLinkToken(link: any, suffix: string) {
+  if (!link || !suffix)
+    return
+  link.href = String(link.href ?? '') + suffix
+  link.text = String(link.text ?? '') + suffix
+  link.raw = String(`[${link.text}](${link.href})`)
+  if (Array.isArray(link.children) && link.children.length) {
+    const last = link.children[link.children.length - 1]
+    if (last?.type === 'text') {
+      last.content = String(last.content ?? '') + suffix
+      last.raw = String(last.raw ?? '') + suffix
+    }
+    else {
+      link.children.push(textToken(suffix))
+    }
+  }
+}
+
+function firstIndexOfAny(input: string, chars: readonly string[]) {
+  let first = -1
+  for (const ch of chars) {
+    const idx = input.indexOf(ch)
+    if (idx !== -1 && (first === -1 || idx < first))
+      first = idx
+  }
+  return first
+}
+
+function getHrefFromLinkOpen(token: any) {
+  const href = token?.attrs?.find((attr: any) => attr?.[0] === 'href')?.[1]
+  return typeof href === 'string' ? href : ''
+}
+
+function setHrefOnLinkOpen(token: any, href: string) {
+  if (!token)
+    return
+  token.attrs = Array.isArray(token.attrs) ? token.attrs : []
+  const idx = token.attrs.findIndex((attr: any) => attr?.[0] === 'href')
+  if (idx >= 0)
+    token.attrs[idx][1] = href
+  else
+    token.attrs.push(['href', href])
+}
+
 export function applyFixLinkTokens(md: MarkdownIt) {
   // Run after the inline rule so markdown-it has produced inline tokens
   // for block-level tokens; we then adjust each inline token's children
@@ -87,7 +135,9 @@ export function applyFixLinkTokens(md: MarkdownIt) {
 }
 
 function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
-  if (tokens.length < 4)
+  // Need at least `link_open + text + link_close` for linkify/autolink fixes.
+  // Keep this low to allow fixing `<https://...！suffix>` cases where inline children length is 3.
+  if (tokens.length < 3)
     return tokens
 
   // 如果包含 code_inline 类型的 token，说明是包含内联代码的链接，直接返回原样，避免错误处理
@@ -101,6 +151,75 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
     const curToken = tokens[i]
     if (!curToken)
       break
+    // Hard-stop certain punctuation for linkify-generated bare URLs.
+    // Example: `https://a.com/x.png！文字` should become link `https://a.com/x.png` + text `！文字`.
+    if (curToken.type === 'link_open' && (curToken.markup === 'linkify' || curToken.markup === 'autolink')) {
+      let closeIdx = -1
+      for (let j = i + 1; j < tokens.length; j++) {
+        if (tokens[j]?.type === 'link_close') {
+          closeIdx = j
+          break
+        }
+      }
+      if (closeIdx !== -1) {
+        const href = getHrefFromLinkOpen(curToken as any)
+        const hrefStop = firstIndexOfAny(href, LINKIFY_HARD_STOP_CHARS)
+        // Prefer splitting by the visible text token, but also trim href if it contains stop chars.
+        for (let j = i + 1; j < closeIdx; j++) {
+          const t = tokens[j]
+          if (t?.type !== 'text' || typeof t.content !== 'string')
+            continue
+          const stopAt = firstIndexOfAny(t.content, LINKIFY_HARD_STOP_CHARS)
+          if (stopAt === -1)
+            continue
+
+          const stopChar = t.content[stopAt]
+          const before = t.content.slice(0, stopAt)
+          let tail = t.content.slice(stopAt)
+          // Move any remaining text tokens that were inside the linkify span to the tail.
+          for (let k = j + 1; k < closeIdx; k++) {
+            const tk = tokens[k]
+            if (tk?.type === 'text' && typeof tk.content === 'string')
+              tail += tk.content
+          }
+
+          t.content = before
+          ;(t as any).raw = before
+
+          const removeCount = closeIdx - (j + 1)
+          if (removeCount > 0) {
+            tokens.splice(j + 1, removeCount)
+            closeIdx = j + 1
+          }
+
+          let newHref = href
+          if (hrefStop !== -1) {
+            newHref = href.slice(0, hrefStop)
+          }
+          else if (tail) {
+            // linkify-it may percent-encode non-ASCII, so use encoded tail / stop-char to locate split point.
+            const encodedTail = encodeURI(tail)
+            if (encodedTail && href.endsWith(encodedTail)) {
+              newHref = href.slice(0, href.length - encodedTail.length)
+            }
+            else {
+              const encodedStop = stopChar ? encodeURI(stopChar) : ''
+              const idx = encodedStop ? href.indexOf(encodedStop) : -1
+              if (idx !== -1)
+                newHref = href.slice(0, idx)
+            }
+          }
+          if (newHref !== href)
+            setHrefOnLinkOpen(curToken as any, newHref)
+
+          if (tail) {
+            tokens.splice(closeIdx + 1, 0, textToken(tail) as any)
+          }
+
+          break
+        }
+      }
+    }
     if (curToken?.type === 'em_open' && tokens[i - 1]?.type === 'text' && tokens[i - 1].content?.endsWith('*')) {
       const beforeText = tokens[i - 1].content?.replace(/(\*+)$/, '') || ''
       tokens[i - 1].content = beforeText
@@ -469,6 +588,36 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         i -= (out.length - 1)
         continue
       }
+    }
+  }
+
+  // Post-pass: linkify-it strips trailing ASCII punctuation like `!`, but in some URLs
+  // it's meaningful (e.g. `?q=!`, `#!`). Merge a standalone leading `!` text token
+  // back into the preceding autolink/linkify link when it ends with `=` or `#`.
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const t = tokens[i] as any
+    const next = tokens[i + 1] as any
+    if (t?.type !== 'link' || next?.type !== 'text' || typeof next.content !== 'string')
+      continue
+    if (!next.content.startsWith('!'))
+      continue
+    const href = String(t.href ?? '')
+    const text = String(t.text ?? '')
+    // Only merge for bare URLs (where visible text equals href) to avoid
+    // changing explicit Markdown links like `[label](https://a/#)!`.
+    if (text !== href)
+      continue
+    if (!href.endsWith('=') && !href.endsWith('#'))
+      continue
+
+    appendToLinkToken(t, '!')
+    const rest = next.content.slice(1)
+    if (rest) {
+      next.content = rest
+      next.raw = rest
+    }
+    else {
+      tokens.splice(i + 1, 1)
     }
   }
 
