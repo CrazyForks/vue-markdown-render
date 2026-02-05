@@ -465,6 +465,122 @@ function normalizeCustomHtmlOpeningTagSameLine(markdown: string, tags: string[])
   return out
 }
 
+function ensureBlankLineAfterCustomHtmlCloseBeforeBlockMarkerSameLine(markdown: string, tags: string[]) {
+  if (!markdown || !tags.length)
+    return markdown
+
+  const tagSet = new Set(tags.map(t => String(t ?? '').toLowerCase()))
+  if (!tagSet.size)
+    return markdown
+
+  const isIndentWs = (ch: string) => ch === ' ' || ch === '\t'
+
+  const parseBlockquotePrefix = (rawLine: string) => {
+    let i = 0
+    let saw = false
+    let prefixEnd = 0
+
+    while (i < rawLine.length) {
+      while (i < rawLine.length && isIndentWs(rawLine[i])) i++
+      if (i >= rawLine.length || rawLine[i] !== '>')
+        break
+      saw = true
+      i++
+      while (i < rawLine.length && isIndentWs(rawLine[i])) i++
+      prefixEnd = i
+    }
+
+    if (!saw)
+      return null
+
+    const prefix = rawLine.slice(0, prefixEnd)
+    return { prefix, content: rawLine.slice(prefixEnd) }
+  }
+
+  const parseFenceMarker = (line: string) => {
+    let i = 0
+    while (i < line.length && isIndentWs(line[i])) i++
+    const ch = line[i]
+    if (ch !== '`' && ch !== '~')
+      return null
+    let j = i
+    while (j < line.length && line[j] === ch) j++
+    const len = j - i
+    if (len < 3)
+      return null
+    return { markerChar: ch as '`' | '~', markerLen: len, rest: line.slice(j) }
+  }
+
+  const closeTagRes = Array.from(tagSet).map((tag) => {
+    // Insert a blank line after the close tag when the remaining same-line
+    // content begins with a block-level marker (e.g. "## ", "- ", "> ", "```", "|", "$$", ":::").
+    //
+    // Note: this is intentionally conservative and only targets constructs that
+    // require line-start to be recognized by markdown-it.
+    const blockMarkerLookahead = '(?=[\\t ]*(?:#{1,6}[\\t ]+|>|(?:[*+-]|\\d+[.)])[\\t ]+|(?:`{3,}|~{3,})|\\||\\$\\$|:{3,}|\\[\\^[^\\]]+\\]:|(?:-{3,}|\\*{3,}|_{3,})))'
+    return new RegExp(String.raw`(<\s*\/\s*${tag}\s*>)${blockMarkerLookahead}`, 'ig')
+  })
+
+  let inFence = false
+  let fenceChar: '`' | '~' | '' = ''
+  let fenceLen = 0
+
+  let out = ''
+  let idx = 0
+
+  while (idx < markdown.length) {
+    const nl = markdown.indexOf('\n', idx)
+    const hasNl = nl !== -1
+    const isCrlf = hasNl && nl > idx && markdown[nl - 1] === '\r'
+    const lineEnd = hasNl ? (isCrlf ? nl - 1 : nl) : markdown.length
+    const rawLine = markdown.slice(idx, lineEnd)
+    const newline = hasNl ? (isCrlf ? '\r\n' : '\n') : ''
+
+    const bq = parseBlockquotePrefix(rawLine)
+    const prefix = bq?.prefix ?? ''
+    const contentLine = bq?.content ?? rawLine
+
+    // Track fenced code blocks (including those nested in blockquotes) so we
+    // don't mutate their contents.
+    const fenceMatch = parseFenceMarker(contentLine)
+    if (fenceMatch) {
+      if (inFence) {
+        if (fenceMatch.markerChar === fenceChar && fenceMatch.markerLen >= fenceLen) {
+          if (/^\s*$/.test(fenceMatch.rest)) {
+            inFence = false
+            fenceChar = ''
+            fenceLen = 0
+          }
+        }
+      }
+      else {
+        inFence = true
+        fenceChar = fenceMatch.markerChar
+        fenceLen = fenceMatch.markerLen
+      }
+    }
+
+    let nextContent = contentLine
+    if (!inFence && nextContent.includes('</')) {
+      for (const re of closeTagRes)
+        nextContent = nextContent.replace(re, '$1\n\n')
+    }
+
+    if (prefix) {
+      const withPrefix = prefix + nextContent.split('\n').join(`\n${prefix}`)
+      out += withPrefix
+    }
+    else {
+      out += nextContent
+    }
+
+    out += newline
+    idx = hasNl ? nl + 1 : markdown.length
+  }
+
+  return out
+}
+
 function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[]) {
   if (!markdown || !tags.length)
     return markdown
@@ -864,6 +980,10 @@ export function parseMarkdownToStructure(
       // will tokenize it as inline HTML and merge it into the paragraph. Insert a
       // blank line boundary before custom tags that follow non-HTML-ish text lines.
       safeMarkdown = ensureBlankLineBeforeCustomHtmlBlocks(safeMarkdown, tags)
+      // In streaming output, models sometimes emit "</tag>## Heading" without a
+      // newline after the custom block close. Split it into separate lines so the
+      // "##" can be parsed as a heading (and to avoid being swallowed by HTML block parsing).
+      safeMarkdown = ensureBlankLineAfterCustomHtmlCloseBeforeBlockMarkerSameLine(safeMarkdown, tags)
 
       // Fast path: no closing tag marker at all.
       if (!safeMarkdown.includes('</')) {
