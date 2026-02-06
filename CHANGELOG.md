@@ -1,4 +1,4 @@
-## [0.0.7-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.7-beta.5) (2026-02-04)
+## [0.0.7-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.7-beta.6) (2026-02-06)
 
 
 ### Bug Fixes
@@ -75,6 +75,7 @@
 * add playground-vue2-cli to pnpm workspace ([36d4101](https://github.com/Simon-He95/markstream-vue/commit/36d410125346b62f7e8d68d327b9ec923bbe31f7))
 * add push options for tagging scripts in package.json ([9e46cb1](https://github.com/Simon-He95/markstream-vue/commit/9e46cb10a7f062bc2679648e61639f065e30a9dd))
 * add settings panel for theme selection, stream delay, and chunk size adjustments ([01129ee](https://github.com/Simon-He95/markstream-vue/commit/01129ee6a0d86ac0d364471683f5c6b282a9219e)), closes [#282](https://github.com/Simon-He95/markstream-vue/issues/282)
+* add support for blank line after custom HTML close before block marker ([4e4e31b](https://github.com/Simon-He95/markstream-vue/commit/4e4e31bb804fe76401c9283f215c6e43135f362c)), closes [#295](https://github.com/Simon-He95/markstream-vue/issues/295)
 * add support for fixing indented code blocks and enhance HTML inline handling ([733bf40](https://github.com/Simon-He95/markstream-vue/commit/733bf409f05de3704199f9274a62f48ea5d0f4e4)), closes [#257](https://github.com/Simon-He95/markstream-vue/issues/257)
 * add Tailwind CSS support to markstream-vue2 ([b6a8b20](https://github.com/Simon-He95/markstream-vue/commit/b6a8b20c65a451eb684c80b238149320f208799f))
 * delete temporary patch file ([e931d8b](https://github.com/Simon-He95/markstream-vue/commit/e931d8bc414833194aebebe23fafa8379d7bde41))
@@ -84,6 +85,7 @@
 * enhance documentation structure and content for multiple frameworks ([293511d](https://github.com/Simon-He95/markstream-vue/commit/293511d0226c353f8e7874d69a58daa17cbc1d4a))
 * enhance HTML rendering and custom component handling ([005b325](https://github.com/Simon-He95/markstream-vue/commit/005b325cc20450b327537884e3a275d3f03a8749))
 * enhance HtmlBlockNode and HtmlInlineNode for improved streaming stability and add tests ([28b408f](https://github.com/Simon-He95/markstream-vue/commit/28b408f8f491aff4cdab4f18bea1ed8dd4c6e4f7)), closes [#273](https://github.com/Simon-He95/markstream-vue/issues/273)
+* enhance link parsing to handle CJK punctuation and ASCII correctly ([ac7ee04](https://github.com/Simon-He95/markstream-vue/commit/ac7ee047575aae014ae13a01b59e83010aa8a8fd)), closes [#296](https://github.com/Simon-He95/markstream-vue/issues/296)
 * enhance ListNode and ListItemNode to support custom components and improve rendering logic ([db4139b](https://github.com/Simon-He95/markstream-vue/commit/db4139b74688327d65e1769f2b2ab06cf47338a4))
 * enhance math parsing to support mixed $ and $$ delimiters ([1c41182](https://github.com/Simon-He95/markstream-vue/commit/1c41182cf4c9c8c40a466be5c43ed1bcbb5d459a)), closes [#263](https://github.com/Simon-He95/markstream-vue/issues/263)
 * enhance Monaco integration with Webpack support and add tests ([e2868d8](https://github.com/Simon-He95/markstream-vue/commit/e2868d8cc04521e9775004687549cc98a90784d5)), closes [#269](https://github.com/Simon-He95/markstream-vue/issues/269)
