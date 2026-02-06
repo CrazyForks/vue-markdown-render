@@ -6,9 +6,9 @@ describe('custom html close followed by block markers (same line)', () => {
   const md = getMarkdown('custom-html-close-followed-by-block-markers', { customHtmlTags: tags })
   const prefix = '<think>t</think>'
 
-  type Case =
-    | { label: string, suffix: string, expectedType: string }
-    | { label: string, markdown: string, expectedType: string }
+  type Case
+    = | { label: string, suffix: string, expectedType: string }
+      | { label: string, markdown: string, expectedType: string }
 
   const cases: Case[] = [
     { label: 'heading', suffix: '## h', expectedType: 'heading' },

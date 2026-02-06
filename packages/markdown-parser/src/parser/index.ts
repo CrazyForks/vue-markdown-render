@@ -518,7 +518,7 @@ function ensureBlankLineAfterCustomHtmlCloseBeforeBlockMarkerSameLine(markdown: 
     // Note: this is intentionally conservative and only targets constructs that
     // require line-start to be recognized by markdown-it.
     const blockMarkerLookahead = '(?=[\\t ]*(?:#{1,6}[\\t ]+|>|(?:[*+-]|\\d+[.)])[\\t ]+|(?:`{3,}|~{3,})|\\||\\$\\$|:{3,}|\\[\\^[^\\]]+\\]:|(?:-{3,}|\\*{3,}|_{3,})))'
-    return new RegExp(String.raw`(<\s*\/\s*${tag}\s*>)${blockMarkerLookahead}`, 'ig')
+    return new RegExp(String.raw`(<\s*\/\s*${tag}\s*>)${blockMarkerLookahead}`, 'gi')
   })
 
   let inFence = false
