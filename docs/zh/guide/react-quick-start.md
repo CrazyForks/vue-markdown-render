@@ -210,6 +210,32 @@ graph TD
 }
 ```
 
+### D2 图表
+
+安装 D2：
+
+```bash
+pnpm add @terrastruct/d2
+```
+
+```tsx
+import 'markstream-react/index.css'
+
+function App() {
+  const markdown = `#### D2 图表
+
+\`\`\`d2
+direction: right
+Client -> API: request
+API -> DB: query
+DB -> API: rows
+API -> Client: response
+\`\`\``
+
+  return <MarkdownRender content={markdown} />
+}
+```
+
 ### 数学公式（KaTeX）
 
 安装 katex：
@@ -396,7 +422,7 @@ function LongDocument() {
 | `liveNodeBuffer` | `number` | `60` | 过扫描缓冲区 |
 | `batchRendering` | `boolean` | `true` | 启用批处理渲染 |
 | `deferNodesUntilVisible` | `boolean` | `true` | 延迟重型节点 |
-| `renderCodeBlocksAsPre` | `boolean` | `false` | 使用 `<pre><code>` 回退（Mermaid 也会回退） |
+| `renderCodeBlocksAsPre` | `boolean` | `false` | 使用 `<pre><code>` 回退（Mermaid/D2/Infographic 也会回退） |
 
 ## 样式
 

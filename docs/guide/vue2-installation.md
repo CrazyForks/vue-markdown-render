@@ -25,6 +25,7 @@ markstream-vue2 supports various features through optional peer dependencies. In
 | Shiki code blocks (`MarkdownCodeBlockNode`) | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
 | Monaco Editor (full code block features) | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid Diagrams | `mermaid` | `pnpm add mermaid` |
+| D2 Diagrams | `@terrastruct/d2` | `pnpm add @terrastruct/d2` |
 | Math Rendering (KaTeX) | `katex` | `pnpm add katex` |
 
 ## Vue 2.6.x Setup
@@ -44,16 +45,17 @@ import Vue from 'vue'
 Vue.use(VueCompositionAPI)
 ```
 
-## Feature loaders (Mermaid / KaTeX)
+## Feature loaders (Mermaid / KaTeX / D2)
 
 After installing optional peers, the default loaders are already enabled. Only call these helpers if you disabled them earlier or need a custom loader (for example, a CDN build):
 
 ```ts
-import { enableKatex, enableMermaid } from 'markstream-vue2'
+import { enableD2, enableKatex, enableMermaid } from 'markstream-vue2'
 
 // optional: re-enable or override loaders
 enableMermaid()
 enableKatex()
+enableD2()
 ```
 
 Also remember required CSS (when the feature is used):
@@ -165,9 +167,9 @@ This approach ensures that Tailwind includes all the utility classes used by mar
 To enable all features at once:
 
 ```bash
-pnpm add shiki stream-markdown stream-monaco mermaid katex
+pnpm add shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 # or
-npm install shiki stream-markdown stream-monaco mermaid katex
+npm install shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 ```
 
 ### Feature Details
@@ -204,6 +206,14 @@ For rendering Mermaid diagrams:
 
 ```bash
 pnpm add mermaid
+```
+
+#### D2 Diagrams
+
+For rendering D2 diagrams:
+
+```bash
+pnpm add @terrastruct/d2
 ```
 
 #### KaTeX Math Rendering

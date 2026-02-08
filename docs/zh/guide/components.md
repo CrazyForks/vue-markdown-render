@@ -6,6 +6,7 @@
 | `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`stream`、`loading`；事件：`copy`、`previewCode`；插槽 `header-left` / `header-right` | 安装 `stream-monaco`（peer）并打包 Monaco workers | 空白编辑器 → 优先检查 worker 打包与 SSR |
 | `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`stream`、`loading`；插槽 `header-left` / `header-right` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
 | `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` ≥ 11；无需额外 CSS | 详见 `/zh/guide/mermaid` |
+| `D2BlockNode` | 渐进式 D2 图 | `node`、`isDark`、`maxHeight`、`progressiveRender`、`progressiveIntervalMs`；工具栏开关 | `@terrastruct/d2`；无需额外 CSS | 缺少依赖会回退到源码；详见 `/zh/guide/d2` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
 | `ImageNode` | 自定义图片预览 / 懒加载 | Props：`fallback-src`、`show-caption`、`lazy`、`svg-min-height`、`use-placeholder`；事件：`click` / `load` / `error` | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
 | `LinkNode` | 下划线动画、颜色自定义 | `color`、`underlineHeight`、`showTooltip` | 无 | 浏览器默认 `a` 样式可通过 reset 解决 |
@@ -18,6 +19,7 @@
 ```ts
 import type {
   CodeBlockNodeProps,
+  D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,
   NodeRendererProps,
@@ -28,7 +30,7 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 
 说明：
 - `NodeRendererProps` 对应 `<MarkdownRender>` props。
-- `CodeBlockNodeProps` / `MermaidBlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps` 的 `node` 统一为 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'infographic'` 区分渲染器）。
+- `CodeBlockNodeProps` / `MermaidBlockNodeProps` / `D2BlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps` 的 `node` 统一为 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'd2'` / `language: 'd2lang'` / `language: 'infographic'` 区分渲染器）。
 
 ## MarkdownRender
 
@@ -87,16 +89,16 @@ setCustomComponents('docs', {
 ### 性能相关 props
 
 - **批量渲染** —— `batchRendering`、`initialRenderBatchSize`、`renderBatchSize`、`renderBatchDelay`、`renderBatchBudgetMs` 控制每一帧有多少节点从占位骨架切换为真实组件。仅在关闭虚拟化（`:max-live-nodes="0"`）时会启用增量骨架模式；默认启用虚拟化时会直接渲染当前窗口的节点。
-- **延迟可见节点** —— `deferNodesUntilVisible` 与 `viewportPriority` 默认开启，让 Mermaid、Monaco、KaTeX 等重型节点只有在接近视口时才加载。除非明确需要一次性渲染所有节点，否则不建议关闭。
+- **延迟可见节点** —— `deferNodesUntilVisible` 与 `viewportPriority` 默认开启，让 Mermaid、D2、Monaco、KaTeX 等重型节点只有在接近视口时才加载。除非明确需要一次性渲染所有节点，否则不建议关闭。
 - **虚拟化窗口** —— `maxLiveNodes` 限制 DOM 中最多保留多少个已渲染节点，`liveNodeBuffer` 控制超前/超后范围。合理设置可在保持可滚动回溯的同时，避免大文档拖慢页面。详见 [性能指南](/zh/guide/performance)。
-- **代码块降级** —— 通过 `renderCodeBlocksAsPre` 与 `codeBlockStream` 可将非 Mermaid/Infographic 代码块切换为 `<pre><code>` 简化渲染，或在高负载时临时关闭 Monaco 流式更新。
+- **代码块降级** —— 通过 `renderCodeBlocksAsPre` 与 `codeBlockStream` 可将非 Mermaid/Infographic/D2 代码块切换为 `<pre><code>` 简化渲染，或在高负载时临时关闭 Monaco 流式更新。
 
 结合这些 props，再配合 `custom-id` 作用域样式与全局解析设置（`setDefaultMathOptions`、自定义 MarkdownIt 插件），即可针对不同项目调出最适合的性能与体验平衡。
 
 ### 常见问题
 - **样式错乱**：先检查 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here)（reset、layer 顺序、同伴 CSS）。
 - **工具类覆盖**：传入 `custom-id` 并使用 `[data-custom-id="docs"]` 限定样式。
-- **SSR 报错**：对只在浏览器可用的同伴依赖（Mermaid、Monaco）使用 `<ClientOnly>` 或 `onMounted`。
+- **SSR 报错**：对只在浏览器可用的同伴依赖（Mermaid、D2、Monaco）使用 `<ClientOnly>` 或 `onMounted`。
 
 ## CodeBlockNode
 
@@ -259,6 +261,39 @@ function onExport(ev: any) {
 - 若出现空白，请查看控制台日志（多数为 CSS 漏引或语法不兼容）。
 - 渲染不可信来源（用户/LLM 等）的 Mermaid 时，建议开启 `isStrict`，组件会对 SVG 进行清理并禁用 HTML labels，避免 `javascript:` 链接或内联事件混入渲染结果。
 - SSR/Nuxt 环境需要 `onMounted` 或 `<ClientOnly>` 避免在服务端执行 mermaid。
+
+## D2BlockNode
+
+> 渐进式 D2 渲染，失败时保留上一次成功的预览并回退到源码。
+
+### 快速要点
+- **依赖**：`@terrastruct/d2`。
+- **CSS**：无需额外 CSS；保持 `markstream-vue/index.css` 在 reset 之后。
+- **Props**：`node`、`isDark`、`maxHeight`、`progressiveRender`、`progressiveIntervalMs`、`themeId`、`darkThemeId`、Header/按钮开关等。
+
+### 示例
+
+```vue
+<script setup lang="ts">
+import { D2BlockNode } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'd2',
+  code: 'direction: right\\nClient -> API: request\\nAPI -> DB: query',
+  raw: 'direction: right\\nClient -> API: request\\nAPI -> DB: query',
+}
+</script>
+
+<template>
+  <D2BlockNode :node="node" :progressive-interval-ms="600" />
+</template>
+```
+
+排障：
+- 未安装 `@terrastruct/d2` 时会回退成源码展示，安装后自动切换预览。
+- 使用 `:is-dark=\"true\"` 或外层 `.dark` 控制深色主题。
+- SSR 场景需要 `onMounted` / `<ClientOnly>` 保护。
 
 ## MathBlockNode / MathInlineNode
 

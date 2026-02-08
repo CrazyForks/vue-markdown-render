@@ -335,6 +335,8 @@ export interface CustomComponents {
   html_inline: any
   reference: any
   mermaid: any
+  infographic: any
+  d2: any
   [key: string]: any
 }
 

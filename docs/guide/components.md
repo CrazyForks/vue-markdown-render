@@ -6,6 +6,7 @@
 | `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; events: `copy`, `previewCode`; slots `header-left` / `header-right` | Install `stream-monaco` (peer) + bundle Monaco workers | Blank editor ⇒ check worker bundling + SSR guards |
 | `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `stream`, `loading`; slots `header-left` / `header-right` | Requires `shiki` + `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
 | `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` ≥ 11; no extra CSS required | For async errors see `/guide/mermaid` |
+| `D2BlockNode` | Progressive D2 diagrams | `node`, `isDark`, `maxHeight`, `progressiveRender`, `progressiveIntervalMs`; toolbar toggles | Peer `@terrastruct/d2`; no extra CSS | Missing peer falls back to source; see `/guide/d2` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
 | `ImageNode` | Custom previews/lightboxes | Props: `fallback-src`, `show-caption`, `lazy`, `svg-min-height`, `use-placeholder`; emits `click`, `load`, `error` | None, but respects global CSS | Wrap in a custom component + `setCustomComponents` to intercept events |
 | `LinkNode` | Animated underline, tooltips | `color`, `underlineHeight`, `showTooltip` | No extra CSS | Browser defaults can override `a` styles; import reset |
@@ -18,6 +19,7 @@
 ```ts
 import type {
   CodeBlockNodeProps,
+  D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,
   NodeRendererProps,
@@ -28,7 +30,7 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 
 Notes:
 - `NodeRendererProps` matches `<MarkdownRender>` props.
-- `CodeBlockNodeProps`, `MermaidBlockNodeProps`, `InfographicBlockNodeProps`, and `PreCodeNodeProps` all use `CodeBlockNode` for `node` (use `language: 'mermaid'` / `language: 'infographic'` to route specialized renderers).
+- `CodeBlockNodeProps`, `MermaidBlockNodeProps`, `D2BlockNodeProps`, `InfographicBlockNodeProps`, and `PreCodeNodeProps` all use `CodeBlockNode` for `node` (use `language: 'mermaid'` / `language: 'd2'` / `language: 'd2lang'` / `language: 'infographic'` to route specialized renderers).
 
 ## MarkdownRender
 
@@ -264,6 +266,39 @@ Troubleshooting:
 - Async errors usually stem from missing CSS or unsupported syntax. Check browser console for Mermaid logs.
 - When diagrams come from untrusted sources (user/LLM), enable `isStrict` to sanitize the SVG and disable HTML labels—this closes holes where `javascript:` URLs or inline handlers could slip into the render.
 - When diagrams are blank in SSR, guard rendering with `onMounted` or `<ClientOnly>` and ensure Mermaid is initialized on the client.
+
+## D2BlockNode
+
+> Progressive D2 rendering with source fallback; keeps the last successful preview if a render fails.
+
+### Quick reference
+- **Peer**: `@terrastruct/d2`.
+- **CSS**: no extra CSS required; keep `markstream-vue/index.css` after your reset.
+- **Props**: `node`, `isDark`, `maxHeight`, `progressiveRender`, `progressiveIntervalMs`, `themeId`, `darkThemeId`, header/button toggles.
+
+### Usage
+
+```vue
+<script setup lang="ts">
+import { D2BlockNode } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'd2',
+  code: 'direction: right\\nClient -> API: request\\nAPI -> DB: query',
+  raw: 'direction: right\\nClient -> API: request\\nAPI -> DB: query',
+}
+</script>
+
+<template>
+  <D2BlockNode :node="node" :progressive-interval-ms="600" />
+</template>
+```
+
+Troubleshooting:
+- If `@terrastruct/d2` is missing, the component falls back to showing source until the peer is installed.
+- Use `:is-dark="true"` or a `.dark` ancestor to control D2 theme rendering.
+- For SSR, render on the client (`onMounted` / `<ClientOnly>`) since D2 relies on the DOM.
 
 ## MathBlockNode / MathInlineNode
 

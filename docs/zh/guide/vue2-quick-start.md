@@ -232,6 +232,52 @@ graph TD
 </template>
 ```
 
+### D2 图表
+
+安装 D2：
+
+```bash
+pnpm add @terrastruct/d2
+```
+
+导入样式。默认 loader 已经启用，只有在你手动关闭或需要自定义 loader 时才需要调用 `enableD2()`：
+
+```js
+import { enableD2 } from 'markstream-vue2'
+// main.js
+import 'markstream-vue2/index.css'
+
+// 可选：重新启用或覆盖 loader
+enableD2()
+```
+
+```vue
+<script>
+import MarkdownRender from 'markstream-vue2'
+
+export default {
+  components: { MarkdownRender },
+  data() {
+    return {
+      markdown: `#### D2 图表
+
+\`\`\`d2
+direction: right
+Client -> API: request
+API -> DB: query
+DB -> API: rows
+API -> Client: response
+\`\`\``
+    }
+  }
+}
+</script>
+
+<template>
+  <MarkdownRender :content="markdown" />
+</template>
+```
+
 ### 数学公式（KaTeX）
 
 安装 katex：

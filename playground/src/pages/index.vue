@@ -13,6 +13,21 @@ import { streamContent } from '../const/markdown'
 import 'katex/dist/katex.min.css'
 // import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
 
+const d2Demo = `
+
+## D2 Diagram
+
+\`\`\`d2
+direction: right
+
+Client -> API: request
+API -> DB: query
+DB -> API: rows
+API -> Client: response
+\`\`\`
+`
+const fullStreamContent = `${d2Demo}`
+
 // 每隔 10 毫秒输出一部分内容
 const content = ref<string>('')
 const streamDelay = useLocalStorage<number>('vmr-settings-stream-delay', 16)
@@ -62,10 +77,10 @@ watchEffect(() => {
 useInterval(streamDelay, {
   callback() {
     const cur = content.value.length
-    if (cur >= streamContent.length)
+    if (cur >= fullStreamContent.length)
       return
     const chunkSize = normalizedChunkSize.value
-    const nextChunk = streamContent.slice(cur, cur + chunkSize)
+    const nextChunk = fullStreamContent.slice(cur, cur + chunkSize)
     // Append chunk-sized slices so users can preview larger batches while streaming.
     content.value += nextChunk
   },

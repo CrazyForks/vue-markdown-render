@@ -9,7 +9,7 @@
 | `content` | `string` | – | 原始 Markdown 字符串（除非提供 `nodes`，否则必填）。 |
 | `nodes` | `BaseNode[]` | – | 预解析后的 AST（通常为 `parseMarkdownToStructure` 返回的 `ParsedNode[]`）。 |
 | `custom-id` | `string` | – | 作用域键，可在 `setCustomComponents` 注册映射并用 `[data-custom-id="docs"]` 做样式覆盖。 |
-| `is-dark` | `boolean` | `false` | 主题标记，会透传给 Mermaid/KaTeX/CodeBlock，并在根容器上添加 `.dark`。 |
+| `is-dark` | `boolean` | `false` | 主题标记，会透传给 Mermaid/D2/KaTeX/CodeBlock，并在根容器上添加 `.dark`。 |
 | `index-key` | `number \| string` | – | 内部节点 key 前缀；嵌套渲染或列表中渲染多实例时建议显式传入。 |
 | `final` | `boolean` | `false` | 是否为“流结束/最终态”。开启后会关闭解析器的中间态（loading）行为，避免末尾残留分隔符（如 `$$`、未闭合 code fence）永远停留在 loading。 |
 | `parse-options` | `ParseOptions` | – | Token 级钩子（`preTransformTokens`、`postTransformTokens`），仅在传入 `content` 时生效。 |
@@ -22,9 +22,9 @@
 
 | Flag | 默认值 | 功能 |
 | ---- | ------ | ---- |
-| `render-code-blocks-as-pre` | `false` | 将非 Mermaid/Infographic 的 `code_block` 渲染为 `<pre><code>`，适合仅查看或排查 Monaco/Tailwind 样式问题。Mermaid/infographic 仍会路由到各自组件，除非用 `setCustomComponents` 覆盖。 |
+| `render-code-blocks-as-pre` | `false` | 将非 Mermaid/Infographic/D2 的 `code_block` 渲染为 `<pre><code>`，适合仅查看或排查 Monaco/Tailwind 样式问题。Mermaid/infographic/D2 仍会路由到各自组件，除非用 `setCustomComponents` 覆盖。 |
 | `code-block-stream` | `true` | 启用流式代码块更新；关闭后会保持加载态直到完整文本就绪，避免频繁初始化 Monaco。 |
-| `viewport-priority` | `true` | 优先渲染视窗内的 Mermaid/Monaco 等重节点，延迟离屏渲染以提升交互体验。 |
+| `viewport-priority` | `true` | 优先渲染视窗内的 Mermaid/D2/Monaco/KaTeX 等重节点，延迟离屏渲染以提升交互体验。 |
 | `defer-nodes-until-visible` | `true` | 启用后，重节点在接近视口前可先渲染为占位（仅在非虚拟化模式生效）。 |
 
 ## 渲染性能（虚拟化 & 分批渲染）
@@ -42,7 +42,7 @@
 
 ## 代码块全局选项（由 `MarkdownRender` 下发）
 
-这些 props 会被转发到 `CodeBlockNode` / `MarkdownCodeBlockNode`（但 **不会** 转发到 Mermaid 代码块，因为 Mermaid 会路由到 `MermaidBlockNode`）：
+这些 props 会被转发到 `CodeBlockNode` / `MarkdownCodeBlockNode`（但 **不会** 转发到 Mermaid/D2/Infographic 代码块，因为它们会路由到各自组件）：
 
 - `code-block-dark-theme`, `code-block-light-theme`
 - `code-block-monaco-options`
@@ -98,5 +98,5 @@ const md = '# 标题\n\n演示 props 用法。'
 
 1. **先引入 reset**（`modern-css-reset`、`@tailwind base`、`@unocss/reset`），再在 `@layer components` 中导入 `markstream-vue/index.css`，避免被 utilities 覆盖。详见 [Tailwind 指南](/zh/guide/tailwind)。
 2. **使用 `custom-id`** 与 `[data-custom-id="docs"]` 限定覆盖范围。
-3. **检查同伴 CSS** 是否导入（Mermaid、KaTeX），缺失时会出现空白渲染。
+3. **检查同伴 CSS** 是否导入（KaTeX），Mermaid/D2 不需要额外 CSS。
 4. **查阅 [样式排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here)**，确保 reset、layer、Uno/Tailwind 配置正确。

@@ -25,6 +25,7 @@ markstream-react supports various features through optional peer dependencies. I
 | Shiki code blocks (`MarkdownCodeBlockNode`) | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
 | Monaco Editor (full code block features) | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid Diagrams | `mermaid` | `pnpm add mermaid` |
+| D2 Diagrams | `@terrastruct/d2` | `pnpm add @terrastruct/d2` |
 | Math Rendering (KaTeX) | `katex` | `pnpm add katex` |
 
 ## Optional: off-thread workers (Mermaid / KaTeX)
@@ -77,9 +78,9 @@ This approach ensures that Tailwind includes all the utility classes used by mar
 To enable all features at once:
 
 ```bash
-pnpm add shiki stream-markdown stream-monaco mermaid katex
+pnpm add shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 # or
-npm install shiki stream-markdown stream-monaco mermaid katex
+npm install shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 ```
 
 ### Feature Details
@@ -125,6 +126,14 @@ For rendering Mermaid diagrams:
 
 ```bash
 pnpm add mermaid
+```
+
+#### D2 Diagrams
+
+For rendering D2 diagrams:
+
+```bash
+pnpm add @terrastruct/d2
 ```
 
 #### KaTeX Math Rendering

@@ -9,7 +9,7 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 | `content` | `string` | – | Raw Markdown string (required unless `nodes` is provided). |
 | `nodes` | `BaseNode[]` | – | Pre-parsed AST structure (typically `ParsedNode[]` from `parseMarkdownToStructure`). Skip this when you want the component to parse internally. |
 | `custom-id` | `string` | – | Scopes `setCustomComponents` mappings and lets you target CSS via `[data-custom-id="..."]`. |
-| `is-dark` | `boolean` | `false` | Theme flag forwarded to heavy nodes (Mermaid/KaTeX/CodeBlock). Also adds `.dark` on the root container. |
+| `is-dark` | `boolean` | `false` | Theme flag forwarded to heavy nodes (Mermaid/D2/KaTeX/CodeBlock). Also adds `.dark` on the root container. |
 | `index-key` | `number \| string` | – | Key prefix for internal node keys; set this when nesting or rendering multiple MarkdownRender instances in the same list. |
 | `final` | `boolean` | `false` | Marks the input as end-of-stream. Disables streaming mid-state (loading) parsing so trailing delimiters (like `$$` or an unclosed code fence) won’t get stuck in a perpetual loading state. |
 | `parse-options` | `ParseOptions` | – | Token hooks (`preTransformTokens`, `postTransformTokens`). Applies only when `content` is provided. |
@@ -22,9 +22,9 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 
 | Flag | Default | What it does |
 | ---- | ------- | ------------ |
-| `render-code-blocks-as-pre` | `false` | Render non‑Mermaid/Infographic `code_block` nodes as `<pre><code>` (uses `PreCodeNode`). Mermaid/infographic blocks still route to their dedicated nodes unless you override them via `setCustomComponents`. |
+| `render-code-blocks-as-pre` | `false` | Render non‑Mermaid/Infographic/D2 `code_block` nodes as `<pre><code>` (uses `PreCodeNode`). Mermaid/infographic/D2 blocks still route to their dedicated nodes unless you override them via `setCustomComponents`. |
 | `code-block-stream` | `true` | Stream code blocks as content arrives. Disable to keep Monaco in a loading state until the final chunk lands—useful when incomplete code causes parser hiccups. |
-| `viewport-priority` | `true` | Defers heavy work (Monaco, Mermaid) when elements are offscreen. Turn off if you need deterministic renders for PDF/print pipelines. |
+| `viewport-priority` | `true` | Defers heavy work (Monaco, Mermaid, D2, KaTeX) when elements are offscreen. Turn off if you need deterministic renders for PDF/print pipelines. |
 | `defer-nodes-until-visible` | `true` | When enabled, heavy nodes can render as placeholders until they approach the viewport (non-virtualized mode only). |
 
 ## Rendering performance (virtualization & batching)
@@ -42,7 +42,7 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 
 ## Global code block options (forwarded from `MarkdownRender`)
 
-These props are forwarded to `CodeBlockNode` / `MarkdownCodeBlockNode` (but **not** to Mermaid blocks, which route to `MermaidBlockNode`):
+These props are forwarded to `CodeBlockNode` / `MarkdownCodeBlockNode` (but **not** to Mermaid/D2/Infographic blocks, which route to their dedicated nodes):
 
 - `code-block-dark-theme`, `code-block-light-theme`
 - `code-block-monaco-options`
@@ -98,5 +98,5 @@ const md = '# Title\n\nSome content here.'
 
 1. **Import a reset first** (`modern-css-reset`, `@tailwind base`, or `@unocss/reset`), then wrap `markstream-vue/index.css` inside `@layer components` so Tailwind/Uno utilities don’t override node styles. See the [Tailwind guide](/guide/tailwind) for concrete snippets.
 2. **Scope overrides** with `custom-id` and `[data-custom-id="docs"]` selectors.
-3. **Confirm peer CSS** (Mermaid, KaTeX) is imported; missing styles produce blank renders.
+3. **Confirm peer CSS** (KaTeX) is imported; Mermaid/D2 do not require extra CSS.
 4. **Check the [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here)** whenever visuals look off.

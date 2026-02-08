@@ -30,9 +30,9 @@ The primary component for rendering markdown content in React.
 
 | Prop | Default | Description |
 |------|---------|-------------|
-| `renderCodeBlocksAsPre` | `false` | Render code blocks as `<pre><code>` (Mermaid blocks will also fall back) |
+| `renderCodeBlocksAsPre` | `false` | Render code blocks as `<pre><code>` (Mermaid/D2/Infographic blocks will also fall back) |
 | `codeBlockStream` | `true` | Stream code block updates as content arrives |
-| `viewportPriority` | `true` | Defer heavy work (Monaco/Mermaid/KaTeX) until near viewport |
+| `viewportPriority` | `true` | Defer heavy work (Monaco/Mermaid/D2/KaTeX) until near viewport |
 | `deferNodesUntilVisible` | `true` | Render heavy nodes as placeholders until visible (non-virtualized mode only) |
 
 #### Performance (virtualization & batching)
@@ -249,6 +249,36 @@ Event notes:
 - `onCopy(code: string)` receives the source text directly (no `MermaidBlockEvent` wrapper in React).
 - `onExport`, `onOpenModal`, `onToggleMode` receive `MermaidBlockEvent` and support `ev.preventDefault()` to stop the default behavior.
 - `onToggleMode` signature: `(target: 'source' | 'preview', ev)`.
+
+## D2 Diagrams
+
+### D2BlockNode
+
+Progressive D2 diagram rendering with source fallback.
+
+```tsx
+import { D2BlockNode } from 'markstream-react'
+
+function D2Diagram() {
+  const d2Node = {
+    type: 'code_block',
+    language: 'd2',
+    code: `direction: right
+Client -> API: request
+API -> DB: query`,
+    raw: ''
+  }
+
+  return (
+    <div className="markstream-react">
+      <D2BlockNode
+        node={d2Node}
+        progressiveIntervalMs={600}
+      />
+    </div>
+  )
+}
+```
 
 ## Other Node Components
 
@@ -576,7 +606,7 @@ function App() {
 }
 ```
 
-Code block prop interfaces (`CodeBlockNodeProps`, `MermaidBlockNodeProps`, `InfographicBlockNodeProps`, `PreCodeNodeProps`) all use `node: CodeBlockNode` from `stream-markdown-parser` (use `language: 'mermaid'` / `language: 'infographic'` when targeting specialized renderers).
+Code block prop interfaces (`CodeBlockNodeProps`, `MermaidBlockNodeProps`, `D2BlockNodeProps`, `InfographicBlockNodeProps`, `PreCodeNodeProps`) all use `node: CodeBlockNode` from `stream-markdown-parser` (use `language: 'mermaid'` / `language: 'd2'` / `language: 'd2lang'` / `language: 'infographic'` when targeting specialized renderers).
 
 ## Next.js Best Practices
 

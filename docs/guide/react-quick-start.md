@@ -210,6 +210,32 @@ graph TD
 }
 ```
 
+### D2 Diagrams
+
+Install D2:
+
+```bash
+pnpm add @terrastruct/d2
+```
+
+```tsx
+import 'markstream-react/index.css'
+
+function App() {
+  const markdown = `#### D2 Diagram
+
+\`\`\`d2
+direction: right
+Client -> API: request
+API -> DB: query
+DB -> API: rows
+API -> Client: response
+\`\`\``
+
+  return <MarkdownRender content={markdown} />
+}
+```
+
 ### Math Formulas (KaTeX)
 
 Install katex:

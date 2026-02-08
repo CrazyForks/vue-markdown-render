@@ -1391,6 +1391,20 @@ const InfographicBlockNodeAsync = defineAsyncComponent(async () => {
   }
 })
 
+const D2BlockNodeAsync = defineAsyncComponent(async () => {
+  try {
+    const mod = await import('../../components/D2BlockNode')
+    return mod.default
+  }
+  catch (e) {
+    console.warn(
+      '[markstream-vue] Optional peer dependencies for D2BlockNode are missing. Falling back to preformatted code rendering. To enable D2 rendering, please install "@terrastruct/d2".',
+      e,
+    )
+    return PreCodeNode
+  }
+})
+
 // 组件映射表
 const codeBlockComponent = computed(() => props.renderCodeBlocksAsPre ? PreCodeNode : CodeBlockNodeAsync)
 const nodeComponents = {
@@ -1496,6 +1510,11 @@ function getNodeComponent(node: ParsedNode, language?: string) {
       return customInfographic || InfographicBlockNodeAsync
     }
 
+    if (lang === 'd2' || lang === 'd2lang') {
+      const customD2 = (customComponents as any).d2
+      return customD2 || D2BlockNodeAsync
+    }
+
     if (customForType)
       return customForType
 
@@ -1515,9 +1534,9 @@ function getNodeComponent(node: ParsedNode, language?: string) {
 }
 
 function getBindingsFor(node: ParsedNode, language?: string) {
-  // For mermaid and infographic blocks we don't forward CodeBlock-specific props
+  // For mermaid/infographic/d2 blocks we don't forward CodeBlock-specific props
   const lang = language ?? getCodeBlockLanguage(node)
-  if (lang === 'mermaid' || lang === 'infographic')
+  if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
     return emptyBindings
 
   return node.type === 'code_block'

@@ -123,6 +123,7 @@
   },
   "peerDependencies": {
     "@antv/infographic": "^0.2.3",
+    "@terrastruct/d2": ">=0.1.33",
     "katex": ">=0.16.22",
     "mermaid": ">=11",
     "shiki": "^3.13.0",
@@ -133,6 +134,9 @@
   },
   "peerDependenciesMeta": {
     "@antv/infographic": {
+      "optional": true
+    },
+    "@terrastruct/d2": {
       "optional": true
     },
     "katex": {

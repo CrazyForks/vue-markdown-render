@@ -19,18 +19,20 @@ markstream-vue 通过可选的 peer 依赖支持各种功能。按需安装：
 | Shiki 代码块（`MarkdownCodeBlockNode`） | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
 | Monaco 编辑器（完整代码块功能） | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid 图表 | `mermaid` | `pnpm add mermaid` |
+| D2 图表 | `@terrastruct/d2` | `pnpm add @terrastruct/d2` |
 | 数学公式渲染（KaTeX） | `katex` | `pnpm add katex` |
 
-## 功能加载器（Mermaid / KaTeX）
+## 功能加载器（Mermaid / KaTeX / D2）
 
 安装可选 peer 后，默认 loader 已经启用。仅当你之前手动关闭，或需要自定义 loader（例如使用 CDN 版本）时才需要调用：
 
 ```ts
-import { enableKatex, enableMermaid } from 'markstream-vue'
+import { enableD2, enableKatex, enableMermaid } from 'markstream-vue'
 
 // 可选：重新启用或覆盖 loader
 enableMermaid()
 enableKatex()
+enableD2()
 ```
 
 同时别忘了导入必需的 CSS（按需使用，Monaco 不需要额外导入 CSS）：
@@ -45,9 +47,9 @@ import 'katex/dist/katex.min.css'
 一次性启用所有功能：
 
 ```bash
-pnpm add shiki stream-markdown stream-monaco mermaid katex
+pnpm add shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 # 或
-npm install shiki stream-markdown stream-monaco mermaid katex
+npm install shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 ```
 
 ### 功能详情
@@ -84,6 +86,14 @@ pnpm add stream-monaco
 
 ```bash
 pnpm add mermaid
+```
+
+#### D2 图表
+
+渲染 D2 图表：
+
+```bash
+pnpm add @terrastruct/d2
 ```
 
 #### KaTeX 数学公式渲染

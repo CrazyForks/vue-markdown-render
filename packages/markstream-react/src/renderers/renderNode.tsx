@@ -6,6 +6,7 @@ import { BlockquoteNode } from '../components/BlockquoteNode/BlockquoteNode'
 import { CheckboxNode } from '../components/CheckboxNode/CheckboxNode'
 import { CodeBlockNode as MonacoCodeBlockNode } from '../components/CodeBlockNode/CodeBlockNode'
 import { PreCodeNode } from '../components/CodeBlockNode/PreCodeNode'
+import { D2BlockNode } from '../components/D2BlockNode/D2BlockNode'
 import { DefinitionListNode } from '../components/DefinitionListNode/DefinitionListNode'
 import { EmojiNode } from '../components/EmojiNode/EmojiNode'
 import { EmphasisNode } from '../components/EmphasisNode/EmphasisNode'
@@ -87,6 +88,21 @@ function renderCodeBlock(
 
     return (
       <InfographicBlockNode
+        key={key}
+        node={node as any}
+        isDark={ctx.isDark}
+        loading={Boolean(node.loading)}
+      />
+    )
+  }
+
+  if (language === 'd2' || language === 'd2lang') {
+    const customD2 = customComponents.d2
+    if (customD2)
+      return React.createElement(customD2 as any, { key, node, isDark: ctx.isDark })
+
+    return (
+      <D2BlockNode
         key={key}
         node={node as any}
         isDark={ctx.isDark}

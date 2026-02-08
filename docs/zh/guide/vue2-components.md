@@ -9,6 +9,7 @@ markstream-vue2 提供与 markstream-vue 相同强大的组件，但专为 Vue 2
 ```ts
 import type {
   CodeBlockNodeProps,
+  D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,
   NodeRendererProps,
@@ -19,7 +20,7 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 
 说明：
 - `NodeRendererProps` 对应 `<MarkdownRender>` props。
-- `CodeBlockNodeProps` / `MermaidBlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps` 的 `node` 统一为 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'infographic'` 区分渲染器）。
+- `CodeBlockNodeProps` / `MermaidBlockNodeProps` / `D2BlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps` 的 `node` 统一为 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'd2'` / `language: 'd2lang'` / `language: 'infographic'` 区分渲染器）。
 
 ## 主组件：MarkdownRender
 
@@ -49,9 +50,9 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 
 | 属性 | 默认值 | 描述 |
 |------|---------|-------------|
-| `render-code-blocks-as-pre` | `false` | 将非 Mermaid/Infographic 的 `code_block` 渲染为 `<pre><code>` |
+| `render-code-blocks-as-pre` | `false` | 将非 Mermaid/Infographic/D2 的 `code_block` 渲染为 `<pre><code>` |
 | `code-block-stream` | `true` | 随内容到达流式更新代码块 |
-| `viewport-priority` | `true` | 将 Monaco/Mermaid/KaTeX 等重型工作延迟到接近视口时 |
+| `viewport-priority` | `true` | 将 Monaco/Mermaid/D2/KaTeX 等重型工作延迟到接近视口时 |
 | `defer-nodes-until-visible` | `true` | 重型节点先占位，接近可视区再渲染（仅非虚拟化模式） |
 
 #### 性能（虚拟化与批次渲染）
@@ -307,6 +308,43 @@ export default {
 </template>
 ```
 
+## D2 图表
+
+### D2BlockNode
+
+渐进式 D2 图表渲染，失败时保留上次成功的预览。
+
+```vue
+<script>
+import { D2BlockNode } from 'markstream-vue2'
+
+export default {
+  components: { D2BlockNode },
+  data() {
+    return {
+      d2Node: {
+        type: 'code_block',
+        language: 'd2',
+        code: `direction: right
+Client -> API: request
+API -> DB: query`,
+        raw: ''
+      }
+    }
+  }
+}
+</script>
+
+<template>
+  <div class="markstream-vue">
+    <D2BlockNode
+      :node="d2Node"
+      :progressive-interval-ms="600"
+    />
+  </div>
+</template>
+```
+
 ## 工具函数
 
 ### setCustomComponents
@@ -365,18 +403,21 @@ const nodes = parseMarkdownToStructure('# 标题\n\n这里的内容...', md)
 // <MarkdownRender :nodes="nodes" />
 ```
 
-### enableKatex / enableMermaid
+### enableKatex / enableMermaid / enableD2
 
-（重新）启用 KaTeX 与 Mermaid 的功能加载器。默认 loader 已经启用，仅在你手动关闭过或需要自定义 loader（如 CDN 版本）时调用。
+（重新）启用 KaTeX、Mermaid、D2 的功能加载器。默认 loader 已经启用，仅在你手动关闭过或需要自定义 loader（如 CDN 版本）时调用。
 
 ```js
-import { enableKatex, enableMermaid } from 'markstream-vue2'
+import { enableD2, enableKatex, enableMermaid } from 'markstream-vue2'
 
 // 启用 KaTeX loader
 enableKatex()
 
 // 启用 Mermaid loader
 enableMermaid()
+
+// 启用 D2 loader
+enableD2()
 ```
 
 ## 自定义组件 API

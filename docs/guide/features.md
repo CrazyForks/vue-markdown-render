@@ -1,6 +1,7 @@
 # Features
 
 - Progressive Mermaid: diagrams render incrementally
+- Progressive D2: diagrams render incrementally with source fallback
 - Streaming-first rendering: handle tokenized and partial markdown
 - Monaco streaming integration: efficient updates for large code blocks
 - Streaming diff code blocks: show diffs as they are generated

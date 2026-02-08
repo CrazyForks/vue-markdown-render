@@ -232,6 +232,52 @@ graph TD
 </template>
 ```
 
+### D2 Diagrams
+
+Install D2:
+
+```bash
+pnpm add @terrastruct/d2
+```
+
+Import styles. The loader is enabled by default; call `enableD2()` only if you disabled it or need a custom loader:
+
+```js
+import { enableD2 } from 'markstream-vue2'
+// main.js
+import 'markstream-vue2/index.css'
+
+// optional: re-enable or override loader
+enableD2()
+```
+
+```vue
+<script>
+import MarkdownRender from 'markstream-vue2'
+
+export default {
+  components: { MarkdownRender },
+  data() {
+    return {
+      markdown: `#### D2 Diagram
+
+\`\`\`d2
+direction: right
+Client -> API: request
+API -> DB: query
+DB -> API: rows
+API -> Client: response
+\`\`\``
+    }
+  }
+}
+</script>
+
+<template>
+  <MarkdownRender :content="markdown" />
+</template>
+```
+
 ### Math Formulas (KaTeX)
 
 Install katex:

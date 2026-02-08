@@ -93,6 +93,22 @@ export interface MermaidBlockEvent<TPayload = any> {
   svgString?: string | null
 }
 
+export interface D2BlockNodeProps {
+  node: CodeBlockNode
+  maxHeight?: string | null
+  loading?: boolean
+  isDark?: boolean
+  progressiveRender?: boolean
+  progressiveIntervalMs?: number
+  themeId?: number | null
+  darkThemeId?: number | null
+  showHeader?: boolean
+  showModeToggle?: boolean
+  showCopyButton?: boolean
+  showExportButton?: boolean
+  showCollapseButton?: boolean
+}
+
 export interface MathBlockNodeProps {
   node: {
     type: 'math_block'

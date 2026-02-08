@@ -30,10 +30,12 @@ Try this quickly in your app:
 import MarkdownRender from 'markstream-vue'
 import 'markstream-vue/index.css'
 
-const md = `# Hello world\n\nTry a simple Mermaid:\n\n\`\`\`mermaid\ngraph LR\nA-->B\n\`\`\`\n`
+const md = `# Hello world\n\nTry a simple Mermaid:\n\n\`\`\`mermaid\ngraph LR\nA-->B\n\`\`\`\n\nTry a simple D2:\n\n\`\`\`d2\ndirection: right\nClient -> API: request\nAPI -> DB: query\nDB -> API: rows\nAPI -> Client: response\n\`\`\`\n`
 </script>
 
 <template>
   <MarkdownRender :content="md" />
 </template>
 ```
+
+Install `mermaid` or `@terrastruct/d2` to render those diagrams; without them the renderer falls back to showing source text.

@@ -19,18 +19,20 @@ markstream-vue supports various features through optional peer dependencies. Ins
 | Shiki code blocks (`MarkdownCodeBlockNode`) | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
 | Monaco Editor (full code block features) | `stream-monaco` | `pnpm add stream-monaco` |
 | Mermaid Diagrams | `mermaid` | `pnpm add mermaid` |
+| D2 Diagrams | `@terrastruct/d2` | `pnpm add @terrastruct/d2` |
 | Math Rendering (KaTeX) | `katex` | `pnpm add katex` |
 
-## Feature loaders (Mermaid / KaTeX)
+## Feature loaders (Mermaid / KaTeX / D2)
 
 After installing optional peers, the default loaders are already enabled. Only call these helpers if you previously disabled them or need a custom loader (for example, when using a CDN build):
 
 ```ts
-import { enableKatex, enableMermaid } from 'markstream-vue'
+import { enableD2, enableKatex, enableMermaid } from 'markstream-vue'
 
 // optional: re-enable or override loaders
 enableMermaid()
 enableKatex()
+enableD2()
 ```
 
 Also remember required CSS (when the feature is used):
@@ -49,9 +51,9 @@ Note: `markstream-vue/index.css` is scoped under an internal `.markstream-vue` c
 To enable all features at once:
 
 ```bash
-pnpm add shiki stream-markdown stream-monaco mermaid katex
+pnpm add shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 # or
-npm install shiki stream-markdown stream-monaco mermaid katex
+npm install shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
 ```
 
 ### Feature Details
@@ -88,6 +90,14 @@ For rendering Mermaid diagrams:
 
 ```bash
 pnpm add mermaid
+```
+
+#### D2 Diagrams
+
+For rendering D2 diagrams:
+
+```bash
+pnpm add @terrastruct/d2
 ```
 
 #### KaTeX Math Rendering

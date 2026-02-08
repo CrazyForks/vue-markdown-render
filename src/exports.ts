@@ -24,6 +24,7 @@ import LinkNode from './components/LinkNode'
 import ListItemNode from './components/ListItemNode'
 import ListNode from './components/ListNode'
 import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
+import { disableD2, enableD2, isD2Enabled, setD2Loader } from './components/D2BlockNode/d2'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
 import MarkdownRender from './components/NodeRenderer'
@@ -52,13 +53,16 @@ const MathBlockNode = defineAsyncComponent(() => import('./components/MathBlockN
 const MathInlineNode = defineAsyncComponent(() => import('./components/MathInlineNode'))
 const MermaidBlockNode = defineAsyncComponent(() => import('./components/MermaidBlockNode'))
 const InfographicBlockNode = defineAsyncComponent(() => import('./components/InfographicBlockNode'))
+const D2BlockNode = defineAsyncComponent(() => import('./components/D2BlockNode'))
 
+export type { D2Loader } from './components/D2BlockNode/d2'
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
 export type { NodeRendererProps } from './components/NodeRenderer/NodeRenderer.vue'
 export type {
   CodeBlockNodeProps,
+  D2BlockNodeProps,
   ImageNodeProps,
   InfographicBlockNodeProps,
   LinkNodeProps,
@@ -83,11 +87,14 @@ export {
   CheckboxNode,
   clearGlobalCustomComponents,
   CodeBlockNode,
+  D2BlockNode,
   DefinitionListNode,
+  disableD2,
   disableKatex,
   disableMermaid,
   EmojiNode,
   EmphasisNode,
+  enableD2,
   enableKatex,
   enableMermaid,
   FootnoteAnchorNode,
@@ -103,6 +110,7 @@ export {
   InfographicBlockNode,
   InlineCodeNode,
   InsertNode,
+  isD2Enabled,
   isKatexEnabled,
   isMermaidEnabled,
   LinkNode,
@@ -119,6 +127,7 @@ export {
   removeCustomComponents,
   setCustomComponents,
   setDefaultI18nMap,
+  setD2Loader,
   setKatexLoader,
   setMermaidLoader,
   StrikethroughNode,
@@ -151,6 +160,7 @@ const componentMap: Record<string, Component> = {
   HtmlInlineNode,
   HighlightNode,
   ImageNode,
+  D2BlockNode,
   InfographicBlockNode,
   InlineCodeNode,
   PreCodeNode,

@@ -302,6 +302,8 @@ export const languageMap: Record<string, string> = {
   'sql': 'SQL',
   'yaml': 'YAML',
   'md': 'Markdown',
+  'd2': 'D2',
+  'd2lang': 'D2',
   '': 'Plain Text',
   'plain': 'Plain Text',
 }

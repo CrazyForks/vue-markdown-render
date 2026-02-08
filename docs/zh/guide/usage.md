@@ -78,6 +78,7 @@ const nodes = parseMarkdownToStructure('# 标题', md)
 - `CodeBlockNode` — Monaco 代码块（需要安装 `stream-monaco`）。
 - `MarkdownCodeBlockNode` — 基于 Shiki，适合轻量场景。
 - `MermaidBlockNode` — 需要 `mermaid` ≥ 11（无需额外 CSS）。
+- `D2BlockNode` — 需要 `@terrastruct/d2`（无需额外 CSS）。
 - `ImageNode` — 通过 `click`/`load`/`error` 事件接管图片预览。
 
 ## 样式提醒
@@ -85,7 +86,7 @@ const nodes = parseMarkdownToStructure('# 标题', md)
 1. **先 reset** —— `modern-css-reset`、`@tailwind base` 或 `@unocss/reset`，之后再导入库的 CSS。
 2. **使用 CSS layer** —— Tailwind/UnoCSS 项目请在 `@layer components { ... }` 中导入 `markstream-vue/index.css`。
 3. **处理 Uno/Tailwind 冲突** —— 参见 [Tailwind 指南](/zh/guide/tailwind)（包含 UnoCSS 示例）。
-4. **同伴 CSS** —— KaTeX 需要对应的 CSS；Mermaid 不需要。Monaco 不需要额外导入 CSS。
+4. **同伴 CSS** —— KaTeX 需要对应的 CSS；Mermaid/D2 不需要。Monaco 不需要额外导入 CSS。
 
 ## CSS 作用域（重要）
 

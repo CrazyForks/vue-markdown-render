@@ -30,9 +30,9 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 
 | 属性 | 默认值 | 描述 |
 |------|---------|-------------|
-| `renderCodeBlocksAsPre` | `false` | 将 `code_block` 渲染为 `<pre><code>`（Mermaid 也会随之回退） |
+| `renderCodeBlocksAsPre` | `false` | 将 `code_block` 渲染为 `<pre><code>`（Mermaid/D2/Infographic 也会随之回退） |
 | `codeBlockStream` | `true` | 随内容到达流式更新代码块 |
-| `viewportPriority` | `true` | 将 Monaco/Mermaid/KaTeX 等重型工作延迟到接近视口时 |
+| `viewportPriority` | `true` | 将 Monaco/Mermaid/D2/KaTeX 等重型工作延迟到接近视口时 |
 | `deferNodesUntilVisible` | `true` | 重型节点先占位，接近可视区再渲染（仅非虚拟化模式） |
 
 #### 性能（虚拟化与批次渲染）
@@ -249,6 +249,36 @@ function MermaidDiagram() {
 - `onCopy(code: string)` 直接收到源码字符串（React 版本没有 `MermaidBlockEvent` 包装）。
 - `onExport` / `onOpenModal` / `onToggleMode` 接收 `MermaidBlockEvent`，可用 `ev.preventDefault()` 阻止默认行为。
 - `onToggleMode` 签名：`(target: 'source' | 'preview', ev)`。
+
+## D2 图表
+
+### D2BlockNode
+
+渐进式 D2 图表渲染，失败时保留上次成功的预览。
+
+```tsx
+import { D2BlockNode } from 'markstream-react'
+
+function D2Diagram() {
+  const d2Node = {
+    type: 'code_block',
+    language: 'd2',
+    code: `direction: right
+Client -> API: request
+API -> DB: query`,
+    raw: ''
+  }
+
+  return (
+    <div className="markstream-react">
+      <D2BlockNode
+        node={d2Node}
+        progressiveIntervalMs={600}
+      />
+    </div>
+  )
+}
+```
 
 ## 其他节点组件
 
@@ -576,7 +606,7 @@ function App() {
 }
 ```
 
-代码块相关的 props 类型（`CodeBlockNodeProps` / `MermaidBlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps`）统一使用 `stream-markdown-parser` 的 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'infographic'` 区分渲染器）。
+代码块相关的 props 类型（`CodeBlockNodeProps` / `MermaidBlockNodeProps` / `D2BlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps`）统一使用 `stream-markdown-parser` 的 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'd2'` / `language: 'd2lang'` / `language: 'infographic'` 区分渲染器）。
 
 ## Next.js 最佳实践
 

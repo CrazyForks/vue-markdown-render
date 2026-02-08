@@ -1258,3 +1258,55 @@ li .paragraph-node {
     transform: rotate(360deg);
   }
 }
+
+.d2-block-body {
+  position: relative;
+}
+
+.d2-source {
+  font-family: var(--vscode-editor-font-family, 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
+}
+
+.d2-code {
+  white-space: pre;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.d2-render {
+  overflow: auto;
+}
+
+.d2-svg svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.mode-btn {
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.mode-btn.is-active {
+  opacity: 1;
+  font-weight: 600;
+}
+
+.d2-action-btn {
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.d2-action-btn:hover {
+  opacity: 1;
+}
+
+.d2-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.d2-error {
+  color: #dc2626;
+}

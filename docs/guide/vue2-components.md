@@ -9,6 +9,7 @@ markstream-vue2 provides the same powerful components as markstream-vue, but bui
 ```ts
 import type {
   CodeBlockNodeProps,
+  D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,
   NodeRendererProps,
@@ -19,7 +20,7 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 
 Notes:
 - `NodeRendererProps` matches `<MarkdownRender>` props.
-- `CodeBlockNodeProps`, `MermaidBlockNodeProps`, `InfographicBlockNodeProps`, and `PreCodeNodeProps` all use `CodeBlockNode` for `node` (use `language: 'mermaid'` / `language: 'infographic'` to route specialized renderers).
+- `CodeBlockNodeProps`, `MermaidBlockNodeProps`, `D2BlockNodeProps`, `InfographicBlockNodeProps`, and `PreCodeNodeProps` all use `CodeBlockNode` for `node` (use `language: 'mermaid'` / `language: 'd2'` / `language: 'd2lang'` / `language: 'infographic'` to route specialized renderers).
 
 ## Main Component: MarkdownRender
 
@@ -49,9 +50,9 @@ The primary component for rendering markdown content in Vue 2.
 
 | Prop | Default | Description |
 |------|---------|-------------|
-| `render-code-blocks-as-pre` | `false` | Render non-Mermaid/Infographic code blocks as `<pre><code>` |
+| `render-code-blocks-as-pre` | `false` | Render non-Mermaid/Infographic/D2 code blocks as `<pre><code>` |
 | `code-block-stream` | `true` | Stream code block updates as content arrives |
-| `viewport-priority` | `true` | Defer heavy work (Monaco/Mermaid/KaTeX) until near viewport |
+| `viewport-priority` | `true` | Defer heavy work (Monaco/Mermaid/D2/KaTeX) until near viewport |
 | `defer-nodes-until-visible` | `true` | Render heavy nodes as placeholders until visible (non-virtualized mode only) |
 
 #### Performance (virtualization & batching)
@@ -307,6 +308,43 @@ export default {
 </template>
 ```
 
+## D2 Diagrams
+
+### D2BlockNode
+
+Progressive D2 diagram rendering with source fallback.
+
+```vue
+<script>
+import { D2BlockNode } from 'markstream-vue2'
+
+export default {
+  components: { D2BlockNode },
+  data() {
+    return {
+      d2Node: {
+        type: 'code_block',
+        language: 'd2',
+        code: `direction: right
+Client -> API: request
+API -> DB: query`,
+        raw: ''
+      }
+    }
+  }
+}
+</script>
+
+<template>
+  <div class="markstream-vue">
+    <D2BlockNode
+      :node="d2Node"
+      :progressive-interval-ms="600"
+    />
+  </div>
+</template>
+```
+
 ## Utility Functions
 
 ### setCustomComponents
@@ -365,18 +403,21 @@ const nodes = parseMarkdownToStructure('# Title\n\nContent here...', md)
 // <MarkdownRender :nodes="nodes" />
 ```
 
-### enableKatex / enableMermaid
+### enableKatex / enableMermaid / enableD2
 
-(Re)enable feature loaders for KaTeX and Mermaid. Default loaders are already on; call these only if you disabled them earlier or want to override the loader (for example, using a CDN build).
+(Re)enable feature loaders for KaTeX, Mermaid, and D2. Default loaders are already on; call these only if you disabled them earlier or want to override the loader (for example, using a CDN build).
 
 ```js
-import { enableKatex, enableMermaid } from 'markstream-vue2'
+import { enableD2, enableKatex, enableMermaid } from 'markstream-vue2'
 
 // Enable KaTeX loader
 enableKatex()
 
 // Enable Mermaid loader
 enableMermaid()
+
+// Enable D2 loader
+enableD2()
 ```
 
 ## Custom Component API

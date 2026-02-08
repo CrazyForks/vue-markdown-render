@@ -39,6 +39,7 @@ const LANGUAGE_ALIAS_MAP: Record<string, string> = {
   'bash': 'shell',
   'zsh': 'shell',
   'shellscript': 'shell',
+  'd2lang': 'd2',
   'plaintext': 'plain',
   'text': 'plain',
   'c++': 'cpp',
@@ -137,4 +138,5 @@ export const languageMap: Record<string, string> = {
   css: 'CSS',
   svg: 'SVG',
   mermaid: 'Mermaid',
+  d2: 'D2',
 }
