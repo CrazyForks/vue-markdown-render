@@ -14,6 +14,7 @@ declare module 'vue' {
     CheckboxNode: typeof import('./src/components/CheckboxNode/CheckboxNode.vue')['default']
     CodeBlockNode: typeof import('./src/components/CodeBlockNode/CodeBlockNode.vue')['default']
     Counter: typeof import('./src/components/Counter.vue')['default']
+    D2BlockNode: typeof import('./src/components/D2BlockNode/D2BlockNode.vue')['default']
     DefinitionListNode: typeof import('./src/components/DefinitionListNode/DefinitionListNode.vue')['default']
     EmojiNode: typeof import('./src/components/EmojiNode/EmojiNode.vue')['default']
     EmphasisNode: typeof import('./src/components/EmphasisNode/EmphasisNode.vue')['default']
