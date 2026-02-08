@@ -84,7 +84,7 @@
   },
   "peerDependencies": {
     "@antv/infographic": "^0.2.3",
-    "@terrastruct/d2": ">=0.6.0",
+    "@terrastruct/d2": ">=0.1.33",
     "@vue/composition-api": ">=1.7.2",
     "katex": ">=0.16.22",
     "mermaid": ">=11",
