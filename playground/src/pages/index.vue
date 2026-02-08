@@ -26,7 +26,7 @@ DB -> API: rows
 API -> Client: response
 \`\`\`
 `
-const fullStreamContent = `${d2Demo}`
+const fullStreamContent = `${streamContent}${d2Demo}`
 
 // 每隔 10 毫秒输出一部分内容
 const content = ref<string>('')
