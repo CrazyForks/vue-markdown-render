@@ -1,7 +1,7 @@
-import type { App } from 'vue'
+import type { VueConstructor } from 'vue'
 import D2BlockNode from './D2BlockNode.vue'
 
-D2BlockNode.install = (app: App) => {
+D2BlockNode.install = (app: VueConstructor) => {
   app.component(D2BlockNode.__name as string, D2BlockNode)
 }
 

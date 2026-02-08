@@ -1,9 +1,26 @@
 <script setup lang="ts">
-import type { D2BlockNodeProps } from '../../types/component-props'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { getD2 } from './d2'
+
+interface D2BlockNodeProps {
+  node: {
+    code?: string
+  }
+  maxHeight?: string | number | null
+  loading?: boolean
+  isDark?: boolean
+  progressiveRender?: boolean
+  progressiveIntervalMs?: number
+  themeId?: number | null
+  darkThemeId?: number | null
+  showHeader?: boolean
+  showModeToggle?: boolean
+  showCopyButton?: boolean
+  showExportButton?: boolean
+  showCollapseButton?: boolean
+}
 
 const props = withDefaults(
   defineProps<D2BlockNodeProps>(),
