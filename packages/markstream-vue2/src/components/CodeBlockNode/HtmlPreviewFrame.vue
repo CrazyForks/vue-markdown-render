@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import Portal from '../Portal'
 

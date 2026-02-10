@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { getD2 } from './d2'
@@ -243,23 +243,23 @@ function extractSvg(renderResult: any) {
 async function ensureD2Instance() {
   if (d2Instance)
     return d2Instance
-  const ctor = await getD2()
-  if (!ctor)
+  const D2Ctor = await getD2()
+  if (!D2Ctor)
     return null
-  if (typeof ctor === 'function') {
-    const inst = new ctor()
+  if (typeof D2Ctor === 'function') {
+    const inst = new D2Ctor()
     if (inst && typeof inst.compile === 'function')
       d2Instance = inst
-    else if (typeof (ctor as any).compile === 'function')
-      d2Instance = ctor
+    else if (typeof (D2Ctor as any).compile === 'function')
+      d2Instance = D2Ctor
     return d2Instance
   }
-  if (ctor?.D2 && typeof ctor.D2 === 'function') {
-    d2Instance = new ctor.D2()
+  if (D2Ctor?.D2 && typeof D2Ctor.D2 === 'function') {
+    d2Instance = new D2Ctor.D2()
     return d2Instance
   }
-  if (typeof ctor.compile === 'function')
-    d2Instance = ctor
+  if (typeof D2Ctor.compile === 'function')
+    d2Instance = D2Ctor
   return d2Instance
 }
 
@@ -289,7 +289,7 @@ async function renderDiagram() {
       return
     }
     if (typeof instance.compile !== 'function' || typeof instance.render !== 'function') {
-      throw new Error('D2 instance is missing compile/render methods.')
+      throw new TypeError('D2 instance is missing compile/render methods.')
     }
     d2Available.value = true
 
@@ -563,16 +563,22 @@ onBeforeUnmount(() => {
     <div v-show="!isCollapsed" ref="bodyRef" class="d2-block-body" :style="bodyStyle">
       <div v-if="props.loading && !hasPreview" class="d2-source px-4 py-4">
         <pre class="d2-code"><code>{{ baseCode }}</code></pre>
-        <p v-if="renderError" class="d2-error mt-2 text-xs">{{ renderError }}</p>
+        <p v-if="renderError" class="d2-error mt-2 text-xs">
+          {{ renderError }}
+        </p>
       </div>
       <div v-else>
         <div v-if="showSourceFallback" class="d2-source px-4 py-4">
           <pre class="d2-code"><code>{{ baseCode }}</code></pre>
-          <p v-if="renderError" class="d2-error mt-2 text-xs">{{ renderError }}</p>
+          <p v-if="renderError" class="d2-error mt-2 text-xs">
+            {{ renderError }}
+          </p>
         </div>
         <div v-else class="d2-render" :style="renderStyle">
           <div class="d2-svg" v-html="svgMarkup" />
-          <p v-if="renderError" class="d2-error px-4 pb-3 text-xs">{{ renderError }}</p>
+          <p v-if="renderError" class="d2-error px-4 pb-3 text-xs">
+            {{ renderError }}
+          </p>
         </div>
       </div>
     </div>

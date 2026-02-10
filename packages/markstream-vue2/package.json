@@ -125,7 +125,8 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.7.5",
-    "stream-markdown-parser": "workspace:*"
+    "stream-markdown-parser": "workspace:*",
+    "vue-demi": "^0.14.7"
   },
   "devDependencies": {
     "@vitejs/plugin-vue2": "^2.3.4",

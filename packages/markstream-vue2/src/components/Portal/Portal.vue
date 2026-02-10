@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
 
 const props = defineProps<{ to?: string }>()
 const rootRef = ref<HTMLElement | null>(null)

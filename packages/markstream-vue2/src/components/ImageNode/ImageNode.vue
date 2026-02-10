@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 定义图片节点类型
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 
 import { useViewportPriority } from '../../composables/viewportPriority'

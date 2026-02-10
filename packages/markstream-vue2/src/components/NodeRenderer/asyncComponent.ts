@@ -1,4 +1,4 @@
-import { h } from 'vue'
+import { h } from 'vue-demi'
 import { getKatex } from '../MathInlineNode/katex'
 import TextNode from '../TextNode'
 

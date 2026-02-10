@@ -1,5 +1,5 @@
-import * as VueModule from 'vue'
-import { ref } from 'vue'
+import * as VueModule from 'vue-demi'
+import { ref } from 'vue-demi'
 
 function getVueCtor() {
   // Vue 2 interop differs across bundlers:
@@ -13,6 +13,7 @@ function getVueCtor() {
     anyMod?.default,
     anyMod?.default?.default,
     (anyMod?.default ?? anyMod)?.default,
+    anyMod?.Vue2,
     anyMod?.Vue,
   ]
   for (const candidate of candidates) {

@@ -78,6 +78,7 @@
     "prepublishOnly": "npm run build",
     "play": "pnpm run -C playground dev",
     "play:vue2": "pnpm run -C playground-vue2 dev",
+    "play:vue2-cli": "pnpm run -C playground-vue2-cli dev",
     "play:build": "pnpm run -C playground build",
     "play:vue2:build": "pnpm run -C playground-vue2 build",
     "play:vue2:preview": "pnpm run -C playground-vue2 preview",
@@ -197,11 +198,26 @@
     "vue-tsc": "^2.2.12"
   },
   "pnpm": {
+    "packageExtensions": {
+      "vue-template-compiler@2.6.14": {
+        "dependencies": {
+          "vue": "2.6.14"
+        }
+      },
+      "vue-template-compiler@2.7.16": {
+        "dependencies": {
+          "vue": "2.7.16"
+        }
+      }
+    },
     "overrides": {
       "@vue/reactivity": "3.5.25",
       "@vue/runtime-core": "3.5.25",
       "@vue/runtime-dom": "3.5.25",
-      "vue@^2": "2.7.16",
+      "playground-vue2-cli>vue": "2.6.14",
+      "playground-vue2-cli>vue-template-compiler": "2.6.14",
+      "playground-vue2>vue": "2.7.16",
+      "playground-vue2>vue-template-compiler": "2.7.16",
       "vue@^3": "3.5.25"
     }
   },

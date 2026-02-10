@@ -148,6 +148,7 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const bodyObserverRef = useRef<ResizeObserver | null>(null)
   const isRenderingRef = useRef(false)
+  const renderDiagramRef = useRef<() => void>(() => {})
 
   const baseCode = props.node?.code ?? ''
   const showSourceFallback = showSource || !d2Available || !svgMarkup
@@ -176,7 +177,7 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
       return
     const height = el.getBoundingClientRect().height
     if (height > 0) {
-      setBodyMinHeight((prev) => (prev !== height ? height : prev))
+      setBodyMinHeight(prev => (prev !== height ? height : prev))
     }
   }, [])
 
@@ -209,7 +210,7 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
     const runner = () => {
       scheduledRef.current = false
       lastRenderAtRef.current = Date.now()
-      renderDiagram()
+      renderDiagramRef.current()
     }
     if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
       window.requestAnimationFrame(runner)
@@ -220,23 +221,23 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
   const ensureD2Instance = useCallback(async () => {
     if (d2InstanceRef.current)
       return d2InstanceRef.current
-    const ctor = await getD2()
-    if (!ctor)
+    const D2Ctor = await getD2()
+    if (!D2Ctor)
       return null
-    if (typeof ctor === 'function') {
-      const inst = new ctor()
+    if (typeof D2Ctor === 'function') {
+      const inst = new D2Ctor()
       if (inst && typeof inst.compile === 'function')
         d2InstanceRef.current = inst
-      else if (typeof (ctor as any).compile === 'function')
-        d2InstanceRef.current = ctor
+      else if (typeof (D2Ctor as any).compile === 'function')
+        d2InstanceRef.current = D2Ctor
       return d2InstanceRef.current
     }
-    if (ctor?.D2 && typeof ctor.D2 === 'function') {
-      d2InstanceRef.current = new ctor.D2()
+    if (D2Ctor?.D2 && typeof D2Ctor.D2 === 'function') {
+      d2InstanceRef.current = new D2Ctor.D2()
       return d2InstanceRef.current
     }
-    if (typeof ctor.compile === 'function')
-      d2InstanceRef.current = ctor
+    if (typeof D2Ctor.compile === 'function')
+      d2InstanceRef.current = D2Ctor
     return d2InstanceRef.current
   }, [])
 
@@ -327,6 +328,10 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
       }
     }
   }, [baseCode, ensureD2Instance, props.darkThemeId, props.isDark, props.loading, props.progressiveRender, props.themeId, scheduleRender])
+
+  useEffect(() => {
+    renderDiagramRef.current = renderDiagram
+  }, [renderDiagram])
 
   const handleCopy = useCallback(async () => {
     try {
@@ -427,8 +432,8 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
                   type="button"
                   className={clsx('mode-btn px-2 py-1 text-xs rounded', !showSource && 'is-active')}
                   onClick={() => setShowSource(false)}
-                  onMouseEnter={(e) => onBtnHover(e, t('common.preview') || 'Preview')}
-                  onFocus={(e) => onBtnHover(e as any, t('common.preview') || 'Preview')}
+                  onMouseEnter={e => onBtnHover(e, t('common.preview') || 'Preview')}
+                  onFocus={e => onBtnHover(e as any, t('common.preview') || 'Preview')}
                   onMouseLeave={onBtnLeave}
                   onBlur={onBtnLeave}
                 >
@@ -438,8 +443,8 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
                   type="button"
                   className={clsx('mode-btn px-2 py-1 text-xs rounded', showSource && 'is-active')}
                   onClick={() => setShowSource(true)}
-                  onMouseEnter={(e) => onBtnHover(e, t('common.source') || 'Source')}
-                  onFocus={(e) => onBtnHover(e as any, t('common.source') || 'Source')}
+                  onMouseEnter={e => onBtnHover(e, t('common.source') || 'Source')}
+                  onFocus={e => onBtnHover(e as any, t('common.source') || 'Source')}
                   onMouseLeave={onBtnLeave}
                   onBlur={onBtnLeave}
                 >
@@ -454,16 +459,23 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
                 className="d2-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
                 aria-label={copying ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')}
                 onClick={handleCopy}
-                onMouseEnter={(e) => onBtnHover(e, copying ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy'))}
-                onFocus={(e) => onBtnHover(e as any, copying ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy'))}
+                onMouseEnter={e => onBtnHover(e, copying ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy'))}
+                onFocus={e => onBtnHover(e as any, copying ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy'))}
                 onMouseLeave={onBtnLeave}
                 onBlur={onBtnLeave}
               >
-                {!copying ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 6L9 17l-5-5" /></svg>
-                )}
+                {!copying
+                  ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3">
+                        <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+                          <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                        </g>
+                      </svg>
+                    )
+                  : (
+                      <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" className="w-3 h-3"><path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 6L9 17l-5-5" /></svg>
+                    )}
               </button>
             )}
 
@@ -473,8 +485,8 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
                 className="d2-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
                 aria-label={t('common.export') || 'Export'}
                 onClick={handleExport}
-                onMouseEnter={(e) => onBtnHover(e, t('common.export') || 'Export')}
-                onFocus={(e) => onBtnHover(e as any, t('common.export') || 'Export')}
+                onMouseEnter={e => onBtnHover(e, t('common.export') || 'Export')}
+                onFocus={e => onBtnHover(e as any, t('common.export') || 'Export')}
                 onMouseLeave={onBtnLeave}
                 onBlur={onBtnLeave}
               >
@@ -487,9 +499,9 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
                 type="button"
                 className="d2-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
                 aria-pressed={isCollapsed}
-                onClick={() => setIsCollapsed((prev) => !prev)}
-                onMouseEnter={(e) => onBtnHover(e, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
-                onFocus={(e) => onBtnHover(e as any, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
+                onClick={() => setIsCollapsed(prev => !prev)}
+                onMouseEnter={e => onBtnHover(e, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
+                onFocus={e => onBtnHover(e as any, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
                 onMouseLeave={onBtnLeave}
                 onBlur={onBtnLeave}
               >
@@ -502,26 +514,30 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
 
       {!isCollapsed && (
         <div ref={bodyRef} className="d2-block-body" style={bodyStyle}>
-          {props.loading && !hasPreview ? (
-            <div className="d2-source px-4 py-4">
-              <pre className="d2-code"><code>{baseCode}</code></pre>
-              {renderError && <p className="d2-error mt-2 text-xs">{renderError}</p>}
-            </div>
-          ) : (
-            <>
-              {showSourceFallback ? (
+          {props.loading && !hasPreview
+            ? (
                 <div className="d2-source px-4 py-4">
                   <pre className="d2-code"><code>{baseCode}</code></pre>
                   {renderError && <p className="d2-error mt-2 text-xs">{renderError}</p>}
                 </div>
-              ) : (
-                <div className="d2-render" style={renderStyle}>
-                  <div className="d2-svg" dangerouslySetInnerHTML={{ __html: svgMarkup }} />
-                  {renderError && <p className="d2-error px-4 pb-3 text-xs">{renderError}</p>}
-                </div>
+              )
+            : (
+                <>
+                  {showSourceFallback
+                    ? (
+                        <div className="d2-source px-4 py-4">
+                          <pre className="d2-code"><code>{baseCode}</code></pre>
+                          {renderError && <p className="d2-error mt-2 text-xs">{renderError}</p>}
+                        </div>
+                      )
+                    : (
+                        <div className="d2-render" style={renderStyle}>
+                          <div className="d2-svg" dangerouslySetInnerHTML={{ __html: svgMarkup }} />
+                          {renderError && <p className="d2-error px-4 pb-3 text-xs">{renderError}</p>}
+                        </div>
+                      )}
+                </>
               )}
-            </>
-          )}
         </div>
       )}
     </div>

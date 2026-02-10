@@ -83,6 +83,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins,
+    resolve: {
+      alias: {
+        vue: 'vue-demi',
+      },
+    },
     build: {
       target: 'es2015',
       cssTarget: 'chrome61',
@@ -120,7 +125,7 @@ export default defineConfig(({ mode }) => {
           if (/node_modules\/mermaid(?:\/|$)/.test(id))
             return true
           return [
-            'vue',
+            'vue-demi',
             '@vue/composition-api',
             'vue-i18n',
             'katex',

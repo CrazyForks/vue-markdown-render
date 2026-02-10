@@ -16,6 +16,150 @@ markstream-vue2 requires:
 - **Vue 2.6.14+** (Vue 2.7 is recommended for better TypeScript support)
 - **@vue/composition-api** (if using Vue 2.6.x)
 
+## Composition API compatibility (Vue 2.6 / 2.7 / 3.x)
+
+| Vue version | Composition API availability | What to install | How to import |
+|-------------|------------------------------|-----------------|---------------|
+| **2.6.x** | Not built-in | `@vue/composition-api` | `import { ref, computed, defineComponent } from '@vue/composition-api'` |
+| **2.7.x** | Built-in | None | `import { ref, computed, defineComponent } from 'vue'` |
+| **3.x** | Built-in | None | `import { ref, computed, defineComponent } from 'vue'` |
+
+Notes:
+- For **Vue 2.6.x**, you must install and **register the plugin** (`Vue.use(@vue/composition-api)`), otherwise you will get runtime errors.
+- For **Vue 2.7.x**, **do not** install `@vue/composition-api` — it is already included in Vue 2.7.
+- For **Vue 3.x**, use **markstream-vue** (not markstream-vue2).
+
+## Quick start by version (dependencies + entry)
+
+### Vue 2.6.x
+
+Dependencies:
+
+```bash
+pnpm add markstream-vue2 vue@2.6.14 vue-template-compiler@2.6.14 @vue/composition-api
+```
+
+App entry:
+
+```ts
+import VueCompositionAPI from '@vue/composition-api'
+import MarkdownRender, { VueRendererMarkdown } from 'markstream-vue2'
+import Vue from 'vue'
+import 'markstream-vue2/index.css'
+
+Vue.use(VueCompositionAPI)
+Vue.use(VueRendererMarkdown)
+
+new Vue({
+  render: h => h(MarkdownRender, { props: { content: '# Vue 2.6' } }),
+}).$mount('#app')
+```
+
+Composition API usage in components:
+
+```ts
+import { defineComponent, ref } from '@vue/composition-api'
+```
+
+Example in this repo:
+- `playground-vue2-cli` (Vue 2.6 + Vue CLI / Webpack 4)
+
+Path and start command:
+
+```bash
+pnpm -C playground-vue2-cli dev
+```
+
+From repo root you can also run:
+
+```bash
+pnpm play:vue2-cli
+```
+
+### Vue 2.7.x
+
+Dependencies:
+
+```bash
+pnpm add markstream-vue2 vue@2.7.16 vue-template-compiler@2.7.16
+```
+
+App entry:
+
+```ts
+import MarkdownRender, { VueRendererMarkdown } from 'markstream-vue2'
+import Vue from 'vue'
+import 'markstream-vue2/index.css'
+
+Vue.use(VueRendererMarkdown)
+
+new Vue({
+  render: h => h(MarkdownRender, { props: { content: '# Vue 2.7' } }),
+}).$mount('#app')
+```
+
+Composition API usage in components:
+
+```ts
+import { defineComponent, ref } from 'vue'
+```
+
+Example in this repo:
+- `playground-vue2` (Vue 2.7 + Vite)
+
+Path and start command:
+
+```bash
+pnpm -C playground-vue2 dev
+```
+
+From repo root you can also run:
+
+```bash
+pnpm play:vue2
+```
+
+### Vue 3.x (use markstream-vue)
+
+Dependencies:
+
+```bash
+pnpm add markstream-vue vue@^3
+```
+
+App entry:
+
+```ts
+import MarkdownRender from 'markstream-vue'
+import { createApp, h } from 'vue'
+import 'markstream-vue/index.css'
+
+createApp({
+  render: () => h(MarkdownRender, { content: '# Vue 3' }),
+}).mount('#app')
+```
+
+If your workspace also installs Vue 3, make sure `vue-demi` targets Vue 2:
+
+```bash
+pnpm vue-demi-switch 2
+```
+
+If you cannot run `vue-demi-switch` (or want a per-app fix), alias `vue-demi` to the Vue 2 build in your bundler config. This avoids errors like `defineComponent is not a function`:
+
+```js
+// vue.config.js / webpack config
+module.exports = {
+  configureWebpack: {
+    resolve: {
+      alias: {
+        'vue-demi$': 'vue-demi/lib/v2/index.cjs',
+      },
+    },
+  },
+}
+```
+
 ## Optional Peer Dependencies
 
 markstream-vue2 supports various features through optional peer dependencies. Install only what you need:
@@ -43,6 +187,20 @@ import VueCompositionAPI from '@vue/composition-api'
 import Vue from 'vue'
 
 Vue.use(VueCompositionAPI)
+```
+
+Using Composition API in Vue 2.6 components:
+
+```ts
+import { defineComponent, ref } from '@vue/composition-api'
+```
+
+## Vue 2.7.x Setup (no plugin required)
+
+Vue 2.7 has Composition API built-in. Do **not** install `@vue/composition-api`.
+
+```ts
+import { defineComponent, ref } from 'vue'
 ```
 
 ## Feature loaders (Mermaid / KaTeX / D2)
@@ -161,6 +319,30 @@ module.exports = {
 ```
 
 This approach ensures that Tailwind includes all the utility classes used by markstream-vue2 in its purge process, resulting in a smaller final bundle size.
+
+## Troubleshooting (Common Runtime Errors)
+
+### `defineComponent is not a function`
+Cause: `vue-demi` is in Vue 3 mode but the app runs Vue 2.x.
+Fix (pick one):
+- Run `pnpm vue-demi-switch 2`.
+- Or alias `vue-demi$` to `vue-demi/lib/v2/index.cjs` in your bundler config (see above).
+
+### `provide() can only be used inside setup()` / `onMounted is called when there is no active component instance`
+Cause: duplicate Vue 2 runtime instances in monorepo/pnpm workspace.
+Fix: ensure a **single Vue 2 instance** is used across the app and linked packages:
+- Alias `vue$` to your app's Vue 2 runtime (see `playground-vue2-cli/vue.config.js`).
+- In pnpm workspaces, add `overrides` for `playground-vue2-cli>vue` to pin Vue 2.
+
+### `Vue packages version mismatch`
+Cause: `vue` and `vue-template-compiler` versions differ.
+Fix: align them (e.g. both `2.6.14` or both `2.7.16`). In pnpm, you can use `packageExtensions` or `overrides`.
+
+### `Cannot read properties of undefined (reading 'props')`
+Cause: Vue 2.6 + Composition API missing `_setupProxy` patch, or Composition API not installed.
+Fix:
+- Ensure `@vue/composition-api` is installed and `Vue.use(VueCompositionAPI)` is executed before using markstream-vue2.
+- Upgrade to the latest `markstream-vue2` build in this repo (it patches `_setupProxy` for Vue 2.6).
 
 ### Quick Install: All Features
 

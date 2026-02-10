@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue-demi'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'

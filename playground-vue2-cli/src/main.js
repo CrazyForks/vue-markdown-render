@@ -9,6 +9,7 @@ import {
 } from 'markstream-vue2'
 import Vue from 'vue'
 import App from './App.vue'
+import './vue2-composition-api-shim'
 import 'markstream-vue2/dist/index.css'
 import 'katex/dist/katex.min.css'
 

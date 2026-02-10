@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Exported props interface for MermaidBlockNode
 import type { MermaidBlockEvent } from '../../types/component-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'

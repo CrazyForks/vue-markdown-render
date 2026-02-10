@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
-import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onUnmounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onUnmounted, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'

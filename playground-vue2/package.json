@@ -12,7 +12,8 @@
     "markstream-vue2": "workspace:*",
     "mermaid": "^11.12.2",
     "stream-monaco": "latest",
-    "vue": "2.7.16"
+    "vue": "2.7.16",
+    "vue-demi": "^0.14.7"
   },
   "devDependencies": {
     "@unocss/reset": "^0.61.9",

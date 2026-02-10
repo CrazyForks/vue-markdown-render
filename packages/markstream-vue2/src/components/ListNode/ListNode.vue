@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed } from 'vue-demi'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import ListItemNode from '../ListItemNode'
 

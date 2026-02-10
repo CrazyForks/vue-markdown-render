@@ -16,6 +16,150 @@ markstream-vue2 需要：
 - **Vue 2.6.14+**（推荐使用 Vue 2.7 以获得更好的 TypeScript 支持）
 - **@vue/composition-api**（如果使用 Vue 2.6.x）
 
+## Composition API 版本兼容（Vue 2.6 / 2.7 / 3.x）
+
+| Vue 版本 | Composition API 状态 | 需要安装 | 如何导入 |
+|---------|----------------------|---------|---------|
+| **2.6.x** | 不内置 | `@vue/composition-api` | `import { ref, computed, defineComponent } from '@vue/composition-api'` |
+| **2.7.x** | 内置 | 无 | `import { ref, computed, defineComponent } from 'vue'` |
+| **3.x** | 内置 | 无 | `import { ref, computed, defineComponent } from 'vue'` |
+
+注意：
+- **Vue 2.6.x** 必须安装并 **Vue.use(@vue/composition-api)**，否则会出现运行时报错。
+- **Vue 2.7.x** **不需要** 安装 `@vue/composition-api`（内置）。
+- **Vue 3.x** 请使用 **markstream-vue**（不是 markstream-vue2）。
+
+## 按版本快速开始（依赖 + 入口）
+
+### Vue 2.6.x
+
+依赖：
+
+```bash
+pnpm add markstream-vue2 vue@2.6.14 vue-template-compiler@2.6.14 @vue/composition-api
+```
+
+入口文件：
+
+```ts
+import VueCompositionAPI from '@vue/composition-api'
+import MarkdownRender, { VueRendererMarkdown } from 'markstream-vue2'
+import Vue from 'vue'
+import 'markstream-vue2/index.css'
+
+Vue.use(VueCompositionAPI)
+Vue.use(VueRendererMarkdown)
+
+new Vue({
+  render: h => h(MarkdownRender, { props: { content: '# Vue 2.6' } }),
+}).$mount('#app')
+```
+
+在组件里使用 Composition API：
+
+```ts
+import { defineComponent, ref } from '@vue/composition-api'
+```
+
+仓库示例：
+- `playground-vue2-cli`（Vue 2.6 + Vue CLI / Webpack 4）
+
+路径与启动命令：
+
+```bash
+pnpm -C playground-vue2-cli dev
+```
+
+也可以在仓库根目录直接运行：
+
+```bash
+pnpm play:vue2-cli
+```
+
+### Vue 2.7.x
+
+依赖：
+
+```bash
+pnpm add markstream-vue2 vue@2.7.16 vue-template-compiler@2.7.16
+```
+
+入口文件：
+
+```ts
+import MarkdownRender, { VueRendererMarkdown } from 'markstream-vue2'
+import Vue from 'vue'
+import 'markstream-vue2/index.css'
+
+Vue.use(VueRendererMarkdown)
+
+new Vue({
+  render: h => h(MarkdownRender, { props: { content: '# Vue 2.7' } }),
+}).$mount('#app')
+```
+
+在组件里使用 Composition API：
+
+```ts
+import { defineComponent, ref } from 'vue'
+```
+
+仓库示例：
+- `playground-vue2`（Vue 2.7 + Vite）
+
+路径与启动命令：
+
+```bash
+pnpm -C playground-vue2 dev
+```
+
+也可以在仓库根目录直接运行：
+
+```bash
+pnpm play:vue2
+```
+
+### Vue 3.x（使用 markstream-vue）
+
+依赖：
+
+```bash
+pnpm add markstream-vue vue@^3
+```
+
+入口文件：
+
+```ts
+import MarkdownRender from 'markstream-vue'
+import { createApp, h } from 'vue'
+import 'markstream-vue/index.css'
+
+createApp({
+  render: () => h(MarkdownRender, { content: '# Vue 3' }),
+}).mount('#app')
+```
+
+如果你的工作区同时安装了 Vue 3，请确保 `vue-demi` 指向 Vue 2：
+
+```bash
+pnpm vue-demi-switch 2
+```
+
+如果无法运行 `vue-demi-switch`（或希望只在某个应用里处理），可以在打包配置里强制把 `vue-demi` 指向 Vue 2 版本，避免出现 `defineComponent is not a function`：
+
+```js
+// vue.config.js / webpack 配置
+module.exports = {
+  configureWebpack: {
+    resolve: {
+      alias: {
+        'vue-demi$': 'vue-demi/lib/v2/index.cjs',
+      },
+    },
+  },
+}
+```
+
 ## 可选的对等依赖
 
 markstream-vue2 通过可选的对等依赖支持各种功能。只安装你需要的功能：
@@ -43,6 +187,20 @@ import VueCompositionAPI from '@vue/composition-api'
 import Vue from 'vue'
 
 Vue.use(VueCompositionAPI)
+```
+
+在 Vue 2.6 组件里使用 Composition API：
+
+```ts
+import { defineComponent, ref } from '@vue/composition-api'
+```
+
+## Vue 2.7.x 设置（无需插件）
+
+Vue 2.7 已内置 Composition API，**不要** 安装 `@vue/composition-api`：
+
+```ts
+import { defineComponent, ref } from 'vue'
 ```
 
 ## 功能加载器（Mermaid / KaTeX / D2）
@@ -140,6 +298,30 @@ setCustomComponents({ code_block: MarkdownCodeBlockNode })
 
 另外，如果你的项目是 monorepo/workspace（pnpm 常见），请确保整个应用只使用 **同一份 Vue 2 runtime**。否则会出现类似：
 `provide() can only be used inside setup()` / `onMounted is called when there is no active component instance` 的运行时警告（本质是重复 Vue 实例导致 Composition API 上下文不一致）。解决方式是在 Webpack 中固定 `vue$` 指向项目内的 Vue 2 runtime（见 `playground-vue2-cli/vue.config.js`）。
+
+## 常见运行时报错排查
+
+### `defineComponent is not a function`
+原因：`vue-demi` 处于 Vue 3 模式，但应用实际运行在 Vue 2.x。
+解决（任选其一）：
+- 运行 `pnpm vue-demi-switch 2`
+- 或在打包配置里把 `vue-demi$` alias 到 `vue-demi/lib/v2/index.cjs`（见上文）
+
+### `provide() can only be used inside setup()` / `onMounted is called when there is no active component instance`
+原因：monorepo/pnpm 工作区出现重复的 Vue 2 运行时实例。
+解决：确保全项目只使用 **一个 Vue 2 实例**：
+- 在打包配置里将 `vue$` alias 到应用自身的 Vue 2 运行时（参考 `playground-vue2-cli/vue.config.js`）
+- 在 pnpm workspace 中用 `overrides` 固定 `playground-vue2-cli>vue` 为 Vue 2 版本
+
+### `Vue packages version mismatch`
+原因：`vue` 与 `vue-template-compiler` 版本不一致。
+解决：对齐版本（例如都用 `2.6.14` 或都用 `2.7.16`），pnpm 可以用 `packageExtensions` / `overrides` 处理。
+
+### `Cannot read properties of undefined (reading 'props')`
+原因：Vue 2.6 + Composition API 缺少 `_setupProxy` patch，或 Composition API 未安装。
+解决：
+- 确保已安装 `@vue/composition-api` 并在入口执行 `Vue.use(VueCompositionAPI)`
+- 升级到本仓库最新的 `markstream-vue2` 构建（已对 Vue 2.6 补丁 `_setupProxy`）
 
 ## Tailwind CSS 支持
 

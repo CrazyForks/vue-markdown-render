@@ -1,5 +1,5 @@
 import type { CustomComponents } from '../types'
-import { shallowRef } from 'vue'
+import { shallowRef } from 'vue-demi'
 
 // Store mappings per scope id. A special key is kept for the legacy/global mapping.
 const GLOBAL_KEY = '__global__'

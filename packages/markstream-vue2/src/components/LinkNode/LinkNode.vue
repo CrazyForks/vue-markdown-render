@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 定义链接节点
-import { computed, useAttrs } from 'vue'
+import { computed, useAttrs } from 'vue-demi'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import EmphasisNode from '../EmphasisNode/EmphasisNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode'

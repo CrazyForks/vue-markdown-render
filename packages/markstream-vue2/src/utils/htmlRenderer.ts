@@ -1,5 +1,5 @@
-import type { Component } from 'vue'
-import { h } from 'vue'
+import type { Component } from 'vue-demi'
+import { h } from 'vue-demi'
 
 // HTML Parser Token type
 export interface HtmlToken {

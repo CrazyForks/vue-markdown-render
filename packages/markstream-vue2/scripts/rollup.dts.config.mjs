@@ -20,12 +20,26 @@ export default [
   {
     input: inputPath,
     plugins: [
+      {
+        name: 'normalize-vue-demi-imports',
+        transform(code, id) {
+          if (!id.endsWith('.d.ts'))
+            return null
+          const rewritten = code
+            .replace(/from\s+['"](?:\.\.\/)+vue-demi['"]/g, 'from \'vue-demi\'')
+            .replace(/import\(\s*['"](?:\.\.\/)+vue-demi['"]\s*\)/g, 'import(\'vue-demi\')')
+          if (rewritten === code)
+            return null
+          return { code: rewritten, map: null }
+        },
+      },
       dts({
         respectExternal: false,
       }),
     ],
     external: [
       /^stream-markdown-parser(?:\/.*)?$/,
+      /^vue-demi(?:\/.*)?$/,
     ],
     output: [
       {

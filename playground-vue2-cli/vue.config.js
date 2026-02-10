@@ -110,7 +110,11 @@ function loadPlaygroundMarkdown() {
 // Important: ensure the entire app (including workspace-linked packages) uses a
 // single Vue 2 runtime instance. Otherwise you will see Composition API warnings
 // like "provide() can only be used inside setup()" due to duplicate Vue copies.
-setAliasIfResolved(alias, 'vue$', 'vue/dist/vue.runtime.esm.js')
+// Use the CJS runtime so CommonJS bundles (like markstream-vue2/dist/index.cjs)
+// can access Vue static helpers (e.g. defineComponent) without ESM interop issues.
+setAliasIfResolved(alias, 'vue$', 'vue/dist/vue.runtime.common.js')
+// Force vue-demi into Vue 2 mode so defineComponent comes from @vue/composition-api.
+setAliasIfResolved(alias, 'vue-demi$', 'vue-demi/lib/v2/index.cjs')
 
 // Force Webpack 4 to use the CJS entry. The ESM entry (`dist/index.js`) is
 // currently not compatible with Webpack 4 consumption in this playground.

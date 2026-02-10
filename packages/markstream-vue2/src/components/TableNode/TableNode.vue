@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed } from 'vue-demi'
 import NodeRenderer from '../NodeRenderer'
 
 // 定义单元格节点

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom'
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue-demi'
 import Portal from '../Portal'
 
 const props = defineProps<{

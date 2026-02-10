@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed } from 'vue-demi'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmphasisNode from '../EmphasisNode'

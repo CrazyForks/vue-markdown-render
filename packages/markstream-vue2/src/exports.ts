@@ -4,6 +4,8 @@ import AdmonitionNode from './components/AdmonitionNode'
 import BlockquoteNode from './components/BlockquoteNode'
 import CheckboxNode from './components/CheckboxNode'
 import CodeBlockNode from './components/CodeBlockNode'
+import D2BlockNode from './components/D2BlockNode'
+import { disableD2, enableD2, isD2Enabled, setD2Loader } from './components/D2BlockNode/d2'
 import DefinitionListNode from './components/DefinitionListNode'
 import EmojiNode from './components/EmojiNode'
 import EmphasisNode from './components/EmphasisNode'
@@ -16,7 +18,6 @@ import HighlightNode from './components/HighlightNode'
 import HtmlBlockNode from './components/HtmlBlockNode'
 import HtmlInlineNode from './components/HtmlInlineNode'
 import ImageNode from './components/ImageNode'
-import D2BlockNode from './components/D2BlockNode'
 import InfographicBlockNode from './components/InfographicBlockNode'
 import InlineCodeNode from './components/InlineCodeNode'
 import InsertNode from './components/InsertNode'
@@ -26,7 +27,6 @@ import ListNode from './components/ListNode'
 import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
 import MathBlockNode from './components/MathBlockNode'
 import MathInlineNode from './components/MathInlineNode'
-import { disableD2, enableD2, isD2Enabled, setD2Loader } from './components/D2BlockNode/d2'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import MermaidBlockNode from './components/MermaidBlockNode'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
@@ -119,8 +119,8 @@ export {
   ReferenceNode,
   removeCustomComponents,
   setCustomComponents,
-  setDefaultI18nMap,
   setD2Loader,
+  setDefaultI18nMap,
   setKatexLoader,
   setMermaidLoader,
   StrikethroughNode,
@@ -135,6 +135,63 @@ export {
 }
 
 export default MarkdownRender
+
+function getVue2MinorVersion(Vue: any) {
+  const version = typeof Vue?.version === 'string' ? Vue.version : ''
+  const [major, minor] = version.split('.').map(Number)
+  if (!Number.isFinite(major) || !Number.isFinite(minor) || major !== 2)
+    return null
+  return minor
+}
+
+function ensureVue2CompositionApi(Vue: any) {
+  const minor = getVue2MinorVersion(Vue)
+  if (minor == null || minor >= 7)
+    return
+  const compositionInstalled = Vue?.__composition_api_installed__ || Vue?.__compositionApiInstalled
+  if (!compositionInstalled) {
+    throw new Error(
+      '[markstream-vue2] Vue 2.6.x requires @vue/composition-api. Install it and call Vue.use(VueCompositionAPI) before using markstream-vue2.',
+    )
+  }
+}
+
+function ensureVue2SetupProxy(Vue: any) {
+  const minor = getVue2MinorVersion(Vue)
+  if (minor == null || minor >= 7)
+    return
+  if (Vue?.__markstreamVue2SetupProxyPatched)
+    return
+  Vue.__markstreamVue2SetupProxyPatched = true
+  // Provide a fallback _setupProxy for Vue 2.6 + composition-api
+  // so <script setup> render helpers can access `props` and bindings.
+  const proto = Vue.prototype
+  if (!Object.prototype.hasOwnProperty.call(proto, '_setupProxy')) {
+    Object.defineProperty(proto, '_setupProxy', {
+      configurable: true,
+      get() {
+        return this
+      },
+      set(value) {
+        Object.defineProperty(this, '_setupProxy', {
+          value,
+          configurable: true,
+          writable: true,
+        })
+      },
+    })
+  }
+  Vue.mixin({
+    beforeCreate() {
+      if (!this._setupProxy) {
+        try {
+          this._setupProxy = this
+        }
+        catch {}
+      }
+    },
+  })
+}
 
 const componentMap: Record<string, any> = {
   AdmonitionNode,
@@ -179,6 +236,8 @@ const componentMap: Record<string, any> = {
 
 export const VueRendererMarkdown = {
   install(Vue: any, options?: { getLanguageIcon?: LanguageIconResolver, mathOptions?: any }) {
+    ensureVue2CompositionApi(Vue)
+    ensureVue2SetupProxy(Vue)
     Object.entries(componentMap).forEach(([name, component]) => {
       Vue.component(name, component)
     })

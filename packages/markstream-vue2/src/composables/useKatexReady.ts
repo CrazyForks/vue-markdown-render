@@ -1,4 +1,4 @@
-import { readonly, shallowRef } from 'vue'
+import { readonly, shallowRef } from 'vue-demi'
 import { getKatex } from '../components/MathInlineNode/katex'
 
 const katexReadyState = shallowRef(false)

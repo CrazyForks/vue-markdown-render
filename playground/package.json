@@ -13,6 +13,7 @@
     "@iconify-json/carbon": "^1.2.18",
     "@iconify/vue": "^5.0.0",
     "@tailwindcss/typography": "^0.5.19",
+    "@terrastruct/d2": ">=0.1.33",
     "@vueuse/core": "^13.9.0",
     "katex": "^0.16.28",
     "markstream-vue": "latest",
@@ -22,8 +23,7 @@
     "vite": "^7.3.1",
     "vue": "^3.5.27",
     "vue-i18n": "^11.2.8",
-    "vue-router": "^4.6.4",
-    "@terrastruct/d2": ">=0.1.33"
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@types/node": "^20.19.30",

@@ -1,5 +1,5 @@
-import type { Ref } from 'vue'
-import { inject, provide, ref } from 'vue'
+import type { Ref } from 'vue-demi'
+import { inject, provide, ref } from 'vue-demi'
 
 // Injection key for viewport-priority registration
 const ViewportPriorityKey = Symbol('ViewportPriority') as unknown as InjectionKey<RegisterFn>

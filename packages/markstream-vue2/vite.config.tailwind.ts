@@ -20,6 +20,11 @@ catch {
 
 export default defineConfig({
   plugins: [vue2({ compiler: vueCompiler, script: { babelParserPlugins: ['typescript'] } })],
+  resolve: {
+    alias: {
+      vue: 'vue-demi',
+    },
+  },
   build: {
     target: 'es2015',
     cssTarget: 'chrome61',
@@ -39,7 +44,7 @@ export default defineConfig({
         if (/node_modules\/mermaid(?:\/|$)/.test(id))
           return true
         return [
-          'vue',
+          'vue-demi',
           '@vue/composition-api',
           'vue-i18n',
           'katex',

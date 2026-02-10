@@ -6,6 +6,7 @@ import AdmonitionNode from './components/AdmonitionNode'
 
 import BlockquoteNode from './components/BlockquoteNode'
 import CheckboxNode from './components/CheckboxNode'
+import { disableD2, enableD2, isD2Enabled, setD2Loader } from './components/D2BlockNode/d2'
 import DefinitionListNode from './components/DefinitionListNode'
 import EmojiNode from './components/EmojiNode'
 import EmphasisNode from './components/EmphasisNode'
@@ -24,7 +25,6 @@ import LinkNode from './components/LinkNode'
 import ListItemNode from './components/ListItemNode'
 import ListNode from './components/ListNode'
 import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
-import { disableD2, enableD2, isD2Enabled, setD2Loader } from './components/D2BlockNode/d2'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
 import MarkdownRender from './components/NodeRenderer'
@@ -126,8 +126,8 @@ export {
   ReferenceNode,
   removeCustomComponents,
   setCustomComponents,
-  setDefaultI18nMap,
   setD2Loader,
+  setDefaultI18nMap,
   setKatexLoader,
   setMermaidLoader,
   StrikethroughNode,

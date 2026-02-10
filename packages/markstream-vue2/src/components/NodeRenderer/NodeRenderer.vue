@@ -2,7 +2,7 @@
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
-import { computed, getCurrentInstance, markRaw, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, getCurrentInstance, markRaw, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
