@@ -23,13 +23,18 @@ const customComponents = computed(() => {
 const DynamicRenderer = defineComponent({
   name: 'DynamicRenderer',
   props: {
-    nodes: {
-      type: Array as () => any[],
+    content: {
+      type: String,
+      required: true,
+    },
+    customComponents: {
+      type: Object as () => Record<string, any>,
       required: true,
     },
   },
   render() {
-    return this.nodes
+    const nodes = parseHtmlToVNodes(this.content, this.customComponents)
+    return (nodes || []) as any
   },
 })
 
@@ -43,12 +48,7 @@ const renderMode = computed(() => {
   if (!hasCustomComponents(content, customComponents.value))
     return { mode: 'html', content }
 
-  // Parse and build VNode tree
-  const nodes = parseHtmlToVNodes(content, customComponents.value)
-  if (nodes === null)
-    return { mode: 'html', content } // Fallback to DOM rendering if parsing fails
-
-  return { mode: 'dynamic', nodes }
+  return { mode: 'dynamic', content }
 })
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
     class="html-inline-node"
     :class="{ 'html-inline-node--loading': props.node.loading }"
   >
-    <DynamicRenderer :nodes="renderMode.nodes" />
+    <DynamicRenderer :content="renderMode.content" :custom-components="customComponents" />
   </span>
   <span
     v-else

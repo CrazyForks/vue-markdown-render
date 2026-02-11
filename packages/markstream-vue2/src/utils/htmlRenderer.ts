@@ -1,5 +1,7 @@
 import type { Component } from 'vue-demi'
-import { h } from 'vue-demi'
+import { h as vueH } from 'vue'
+import * as VueModule from 'vue-demi'
+import { h as demiH } from 'vue-demi'
 
 // HTML Parser Token type
 export interface HtmlToken {
@@ -7,6 +9,61 @@ export interface HtmlToken {
   tagName?: string
   attrs?: Record<string, string>
   content?: string
+}
+
+type CreateElementLike = (tag: any, attrs?: Record<string, any>, children?: any[] | undefined) => any
+
+function getVue2CreateElementFallback(): CreateElementLike | null {
+  const anyMod = VueModule as any
+  const isVueCtor = (candidate: any) => typeof candidate === 'function' && typeof candidate.extend === 'function'
+  const candidates = [
+    anyMod,
+    anyMod?.default,
+    anyMod?.default?.default,
+    (anyMod?.default ?? anyMod)?.default,
+    anyMod?.Vue2,
+    anyMod?.Vue,
+  ]
+  for (const candidate of candidates) {
+    const ctor = isVueCtor(candidate) ? candidate : (isVueCtor(candidate?.default) ? candidate.default : null)
+    if (!ctor)
+      continue
+    try {
+      // eslint-disable-next-line new-cap
+      const vm = new ctor()
+      if (typeof vm.$createElement === 'function')
+        return vm.$createElement.bind(vm) as CreateElementLike
+    }
+    catch {}
+  }
+  return null
+}
+
+const vue2CreateElementFallback = getVue2CreateElementFallback()
+
+function safeRender(
+  createElement: CreateElementLike | undefined,
+  tag: any,
+  attrs?: Record<string, any>,
+  children?: any[] | undefined,
+) {
+  if (createElement)
+    return createElement(tag, attrs, children)
+
+  try {
+    return vueH(tag as any, attrs as any, children as any)
+  }
+  catch {}
+
+  try {
+    return demiH(tag, attrs, children)
+  }
+  catch {}
+
+  if (vue2CreateElementFallback)
+    return vue2CreateElementFallback(tag, attrs, children)
+
+  return null
 }
 
 // Dangerous attributes that should be filtered out for XSS protection
@@ -434,6 +491,7 @@ export function tokenizeHtml(html: string): HtmlToken[] {
 export function buildVNodeTree(
   tokens: HtmlToken[],
   customComponents: Record<string, Component>,
+  createElement?: CreateElementLike,
 ): any[] {
   const stack: Array<{ tagName: string, children: any[], attrs?: Record<string, string> }> = []
   const rootNodes: any[] = []
@@ -444,7 +502,7 @@ export function buildVNodeTree(
       target.push(token.content!)
     }
     else if (token.type === 'self_closing') {
-      const vnode = createVNode(token.tagName!, token.attrs || {}, [], customComponents)
+      const vnode = createVNode(token.tagName!, token.attrs || {}, [], customComponents, createElement)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       vnode != null && target.push(vnode)
     }
@@ -467,7 +525,7 @@ export function buildVNodeTree(
         // Pop all tags until the matched one (auto-closing intermediate tags)
         while (stack.length > matchedIndex) {
           const opening = stack.pop()!
-          const vnode = createVNode(opening.tagName, opening.attrs || {}, opening.children, customComponents)
+          const vnode = createVNode(opening.tagName, opening.attrs || {}, opening.children, customComponents, createElement)
 
           if (stack.length > 0)
             vnode != null && stack[stack.length - 1].children.push(vnode)
@@ -490,7 +548,7 @@ export function buildVNodeTree(
   // Handle any remaining unclosed tags
   while (stack.length > 0) {
     const unclosed = stack.pop()!
-    const vnode = createVNode(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents)
+    const vnode = createVNode(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, createElement)
     vnode != null && rootNodes.push(vnode)
     warn(`Auto-closing unclosed tag: <${unclosed.tagName}>`)
   }
@@ -506,6 +564,7 @@ function createVNode(
   attrs: Record<string, string>,
   children: any[],
   customComponents: Record<string, Component>,
+  createElement?: CreateElementLike,
 ): any {
   if (BLOCKED_TAGS.has(tagName.toLowerCase()))
     return null
@@ -516,12 +575,12 @@ function createVNode(
     // It's a custom Vue component
     const component = customComponents[tagName] || customComponents[tagName.toLowerCase()]
     const convertedAttrs = convertAttrsToProps(sanitizedAttrs)
-    return h(component as Component, convertedAttrs, children.length > 0 ? children : undefined)
+    return safeRender(createElement, component as Component, convertedAttrs, children.length > 0 ? children : undefined)
   }
   else {
     // It's a standard HTML element
     const { innerHTML, ...validAttrs } = sanitizedAttrs as any
-    return h(tagName, validAttrs, children.length > 0 ? children : undefined)
+    return safeRender(createElement, tagName, validAttrs, children.length > 0 ? children : undefined)
   }
 }
 
@@ -552,13 +611,14 @@ export function hasCustomComponents(
 export function parseHtmlToVNodes(
   content: string,
   customComponents: Record<string, Component>,
+  createElement?: CreateElementLike,
 ): any[] | null {
   if (!content)
     return []
 
   try {
     const tokens = tokenizeHtml(content)
-    const nodes = buildVNodeTree(tokens, customComponents)
+    const nodes = buildVNodeTree(tokens, customComponents, createElement)
     return nodes
   }
   catch (error) {

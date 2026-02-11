@@ -43,13 +43,18 @@ const customComponents = computed(() => {
 const DynamicRenderer = defineComponent({
   name: 'DynamicRenderer',
   props: {
-    nodes: {
-      type: Array as () => any[],
+    content: {
+      type: String,
+      required: true,
+    },
+    customComponents: {
+      type: Object as () => Record<string, any>,
       required: true,
     },
   },
   render() {
-    return this.nodes
+    const nodes = parseHtmlToVNodes(this.content, this.customComponents)
+    return (nodes || []) as any
   },
 })
 
@@ -63,12 +68,7 @@ const renderMode = computed(() => {
   if (!hasCustomComponents(content, customComponents.value))
     return { mode: 'html', content }
 
-  // Parse and build VNode tree
-  const nodes = parseHtmlToVNodes(content, customComponents.value)
-  if (nodes === null)
-    return { mode: 'html', content } // Fallback to v-html if parsing fails
-
-  return { mode: 'dynamic', nodes }
+  return { mode: 'dynamic', content }
 })
 
 const htmlRef = ref<HTMLElement | null>(null)
@@ -126,7 +126,7 @@ onBeforeUnmount(() => {
   <div ref="htmlRef" class="html-block-node" v-bind="boundAttrs">
     <template v-if="shouldRender">
       <!-- Use dynamic rendering for custom components -->
-      <DynamicRenderer v-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />
+      <DynamicRenderer v-if="renderMode.mode === 'dynamic'" :content="renderMode.content" :custom-components="customComponents" />
       <!-- Fallback to v-html for standard HTML -->
       <div v-else v-html="renderContent" />
     </template>
