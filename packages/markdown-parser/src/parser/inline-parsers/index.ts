@@ -44,6 +44,35 @@ function countUnescapedAsterisks(str: string): number {
   return count
 }
 
+const WORD_CHAR_RE = /[\p{L}\p{N}]/u
+const WORD_ONLY_RE = /^[\p{L}\p{N}]+$/u
+
+function isWordChar(ch?: string) {
+  if (!ch)
+    return false
+  return WORD_CHAR_RE.test(ch)
+}
+
+function isWordOnly(text: string) {
+  if (!text)
+    return false
+  return WORD_ONLY_RE.test(text)
+}
+
+function getAsteriskRunInfo(content: string, start: number) {
+  let end = start
+  while (end < content.length && content[end] === '*')
+    end++
+  const prev = start > 0 ? content[start - 1] : undefined
+  const next = end < content.length ? content[end] : undefined
+  return {
+    len: end - start,
+    prev,
+    next,
+    intraword: isWordChar(prev) && isWordChar(next),
+  }
+}
+
 export function isLikelyUrl(href?: string) {
   if (!href)
     return false
@@ -176,6 +205,7 @@ export function parseInlineTokens(
         }
       }
 
+      const runInfo = getAsteriskRunInfo(content, openIdx)
       // find the first matching closing ** pair in the content
       const exec = STRONG_PAIR_RE.exec(content)
       let inner = ''
@@ -183,12 +213,33 @@ export function parseInlineTokens(
       if (exec && typeof exec.index === 'number') {
         inner = exec[1]
         after = content.slice(exec.index + exec[0].length)
+        const closeIdx = exec.index + exec[0].length - 2
+        const closeRunInfo = getAsteriskRunInfo(content, closeIdx)
+        if (
+          runInfo.intraword
+          && closeRunInfo.intraword
+          && !isWordOnly(inner)
+        ) {
+          pushText(content.slice(beforeText.length), content.slice(beforeText.length))
+          i++
+          return true
+        }
+        if (!inner && runInfo.len >= 4 && runInfo.intraword) {
+          pushText(content.slice(beforeText.length), content.slice(beforeText.length))
+          i++
+          return true
+        }
       }
       else {
         // no closing pair found: decide behavior based on strict option
         if (requireClosingStrong) {
           // 严格模式：不要硬匹配 strong，保留原文为普通文本
-          pushText(content, content)
+          pushText(content.slice(beforeText.length), content.slice(beforeText.length))
+          i++
+          return true
+        }
+        if (runInfo.intraword) {
+          pushText(content.slice(beforeText.length), content.slice(beforeText.length))
           i++
           return true
         }
@@ -245,7 +296,13 @@ export function parseInlineTokens(
           result.push(currentTextNode)
         }
       }
+      const runInfo = getAsteriskRunInfo(content, idx)
       const closeIndex = content.indexOf('*', idx + 1)
+      if (closeIndex === -1 && runInfo.intraword) {
+        pushText(content.slice(idx), content.slice(idx))
+        i++
+        return true
+      }
       const emphasisContent = content.slice(idx, closeIndex > -1 ? closeIndex + 1 : undefined)
       const { node } = parseEmphasisToken([
         { type: 'em_open', tag: 'em', content: '', markup: '*', info: '', meta: null },
