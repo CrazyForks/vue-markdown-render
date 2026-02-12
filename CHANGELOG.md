@@ -1,4 +1,4 @@
-## [0.0.7-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.7-beta.7) (2026-02-09)
+## [0.0.7-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.7-beta.8) (2026-02-12)
 
 
 ### Bug Fixes
@@ -24,12 +24,14 @@
 * **image:** inline with math parse wrong ([6a1c0fa](https://github.com/Simon-He95/markstream-vue/commit/6a1c0fa732da53b0d586d5d054aa9101730ac186))
 * **image:** inline with math parse wrong ([edc7a44](https://github.com/Simon-He95/markstream-vue/commit/edc7a44d36598bb2ee2c0d3061a62c1201293646)), closes [#246](https://github.com/Simon-He95/markstream-vue/issues/246)
 * improve reference detection in markdown parser and add related tests ([31e5b6e](https://github.com/Simon-He95/markstream-vue/commit/31e5b6eee57b85a838b0bdb2f71c29453c8d8902)), closes [#231](https://github.com/Simon-He95/markstream-vue/issues/231)
+* improve vue2 compatibility ([6e58454](https://github.com/Simon-He95/markstream-vue/commit/6e58454bf178f33c2b1e5dff468dba97c0cd0cfc))
 * **link:** inline code inside links rendering nested elements ([4f85231](https://github.com/Simon-He95/markstream-vue/commit/4f85231ef551391d1eb34f573e9a17563fe16c68)), closes [#256](https://github.com/Simon-He95/markstream-vue/issues/256)
 * **markdown:** ensure strong tokens remain intact around inline math ([211aa48](https://github.com/Simon-He95/markstream-vue/commit/211aa482a0e506f288c0e7d86ada2f8cdf74bd7d)), closes [#276](https://github.com/Simon-He95/markstream-vue/issues/276)
 * **markstream-react:** codeBlockNode collpase ([709460a](https://github.com/Simon-He95/markstream-vue/commit/709460a38fbf0130c9774f544fde6c10943d3c5f))
 * **markstream-react:** HtmlPreviewFrame component use localized string for preview title ([903238c](https://github.com/Simon-He95/markstream-vue/commit/903238cd0e1d82c0729caad62bce19d7a62ff897))
 * **markstream-react:** Restore cached SVG when switching from source to preview ([b2e294f](https://github.com/Simon-He95/markstream-vue/commit/b2e294f2e2c588d393755a0a8bcc1846fcd247f2))
 * **markstream-react:** update mermaid modal titles to use localized strings ([852278a](https://github.com/Simon-He95/markstream-vue/commit/852278a3b53f211542e75b2329abb65a13429d41))
+* **markstream-vue2:** test ([535a254](https://github.com/Simon-He95/markstream-vue/commit/535a254f408886a42898da26793db1e30dbdc912))
 * **math:** add edge case render handling ([edbb347](https://github.com/Simon-He95/markstream-vue/commit/edbb3471f3b457c70fc35c924e384ebb1b014efc))
 * **math:** edge case render ([e07cf4b](https://github.com/Simon-He95/markstream-vue/commit/e07cf4b3ae44aeeaeee9f93f4a6fb188ca12deda)), closes [#249](https://github.com/Simon-He95/markstream-vue/issues/249)
 * **math:** prevent text duplication around escaped parentheses in inline math ([e80ac37](https://github.com/Simon-He95/markstream-vue/commit/e80ac37160b5782632d56391080b0f6f63618951)), closes [#277](https://github.com/Simon-He95/markstream-vue/issues/277)
@@ -40,6 +42,7 @@
 * **netlify.toml:** update build command to include markstream-vue ([91ecf00](https://github.com/Simon-He95/markstream-vue/commit/91ecf00642e350b0b7a8074aa71aae902ba8837d))
 * **netlify.toml:** update publish path to correct directory ([6bf3710](https://github.com/Simon-He95/markstream-vue/commit/6bf371089e06bf740ec64e71839999c76c7b3ce6))
 * **nuxt.config.ts:** set nitro preset to static ([580e83e](https://github.com/Simon-He95/markstream-vue/commit/580e83e34487446d423e11b403c8f270240f70ac))
+* **parser:** handle intraword asterisks and strict unmatched strong ([08ee3db](https://github.com/Simon-He95/markstream-vue/commit/08ee3db0aba56d650604be46eb406ff6b45351bb))
 * prevent dropping numeric-only documents in parseMarkdownToStructure ([bba733c](https://github.com/Simon-He95/markstream-vue/commit/bba733c9a8d4b77f0fbd0560d695a611e0822eef)), closes [#278](https://github.com/Simon-He95/markstream-vue/issues/278)
 * prevent false positives for JSON in math parsing and add tests ([0fb4e82](https://github.com/Simon-He95/markstream-vue/commit/0fb4e8291c092288e563f1289dbff4e94f90a7f1)), closes [#264](https://github.com/Simon-He95/markstream-vue/issues/264)
 * **react:** generate bundled d.ts on build ([fb5c88b](https://github.com/Simon-He95/markstream-vue/commit/fb5c88b345eeec857e4aa5a95e3592659d2fa491))
