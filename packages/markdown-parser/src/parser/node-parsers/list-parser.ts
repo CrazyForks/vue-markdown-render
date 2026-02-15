@@ -127,6 +127,7 @@ export function parseList(
             children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken, {
               requireClosingStrong: options?.requireClosingStrong,
               customHtmlTags: options?.customHtmlTags,
+              validateLink: options?.validateLink,
             }),
             raw: String(contentToken.content ?? ''),
           })

@@ -110,6 +110,7 @@ function parseVmrContainer(
           children: parseInlineTokens(childrenArr || [], undefined, undefined, {
             requireClosingStrong: options?.requireClosingStrong,
             customHtmlTags: options?.customHtmlTags,
+            validateLink: options?.validateLink,
           }),
           raw: String(contentToken.content ?? ''),
         })

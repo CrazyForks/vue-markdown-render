@@ -28,6 +28,7 @@ export function parseHeading(
     children: parseInlineTokens(headingContentToken.children || [], headingContent, undefined, {
       requireClosingStrong: options?.requireClosingStrong,
       customHtmlTags: options?.customHtmlTags,
+      validateLink: options?.validateLink,
     }),
     raw: headingContent,
   }

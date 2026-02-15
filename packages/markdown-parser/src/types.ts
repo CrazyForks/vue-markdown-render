@@ -407,6 +407,14 @@ export interface ParseOptions {
    * to enable mid-state suppression for the same tags during streaming.
    */
   customHtmlTags?: string[]
+  /**
+   * If provided, link nodes are only emitted when this returns true for the href.
+   * When it returns false, the link is rendered as plain text (the link text only).
+   * Typically set from the MarkdownIt instance (e.g. md.options.validateLink or
+   * md.set({ validateLink })) so that unsafe URLs (e.g. javascript:) are not
+   * output as links.
+   */
+  validateLink?: (url: string) => boolean
   // When true, log the parsed tree structure for debugging
   debug?: boolean
 }

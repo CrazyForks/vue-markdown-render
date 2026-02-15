@@ -36,6 +36,7 @@ export function parseStrongToken(
   children.push(...parseInlineTokens(innerTokens, raw, undefined, {
     requireClosingStrong: options?.requireClosingStrong,
     customHtmlTags: options?.customHtmlTags,
+    validateLink: options?.validateLink,
   }))
 
   const node: StrongNode = {

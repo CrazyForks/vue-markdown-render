@@ -1029,8 +1029,14 @@ export function parseMarkdownToStructure(
   // Note: markdown-it's `html_block` token.content can be normalized in ways
   // that drop some original lines. Keep the original source around so block
   // parsers can reconstruct raw slices using token.map when needed.
+  // Respect link validation from the md instance so customMarkdownIt(md) with
+  // md.set({ validateLink }) is applied when we emit link nodes (tokens may
+  // bypass the tokenizer's link rule, e.g. synthetic links from fixLinkTokens).
+  const mdAny = md as { options?: { validateLink?: (url: string) => boolean }, validateLink?: (url: string) => boolean }
+  const validateLink = options.validateLink ?? mdAny.options?.validateLink ?? (typeof mdAny.validateLink === 'function' ? mdAny.validateLink : undefined)
   const internalOptions = {
     ...options,
+    validateLink,
     __sourceMarkdown: safeMarkdown,
     __customHtmlBlockCursor: 0,
   } as any
@@ -1153,6 +1159,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
           const parsed = parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, {
             requireClosingStrong: options?.requireClosingStrong,
             customHtmlTags: options?.customHtmlTags,
+            validateLink: options?.validateLink,
           })
           if (parsed.length === 0) {
             // no-op (matches previous behavior)

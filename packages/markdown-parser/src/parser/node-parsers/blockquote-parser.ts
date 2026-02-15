@@ -23,6 +23,7 @@ export function parseBlockquote(
           children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), undefined, {
             requireClosingStrong: options?.requireClosingStrong,
             customHtmlTags: options?.customHtmlTags,
+            validateLink: options?.validateLink,
           }),
           raw: String(contentToken.content ?? ''),
         })

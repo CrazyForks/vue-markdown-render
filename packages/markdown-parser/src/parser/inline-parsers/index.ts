@@ -84,7 +84,7 @@ export function parseInlineTokens(
   tokens: MarkdownToken[],
   raw?: string,
   pPreToken?: MarkdownToken,
-  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[] },
+  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[], validateLink?: (url: string) => boolean },
 ): ParsedNode[] {
   if (!tokens || tokens.length === 0)
     return []
@@ -673,8 +673,16 @@ export function parseInlineTokens(
       }
 
       default:
-        // Skip unknown token types, ensure text merging stops
-        pushToken(token)
+        // Skip unknown token types, ensure text merging stops.
+        // Synthetic 'link' tokens (from fixLinkTokens) must respect validateLink.
+        if (token.type === 'link' && (token as any).href != null && options?.validateLink && !options.validateLink((token as any).href)) {
+          resetCurrentTextNode()
+          const displayText = String((token as any).text ?? '')
+          pushText(displayText, displayText)
+        }
+        else {
+          pushToken(token)
+        }
         i++
         break
     }
@@ -808,6 +816,12 @@ export function parseInlineTokens(
     const { node, nextIndex } = parseLinkToken(tokens, i, { requireClosingStrong })
     i = nextIndex
 
+    // Respect consumer link validation (e.g. md.set({ validateLink }) so javascript: is not output as link
+    if (options?.validateLink && !options.validateLink(node.href)) {
+      pushText(node.text, node.text)
+      return
+    }
+
     // Determine loading state conservatively: if the link token parser
     // marked it as loading already, keep it; otherwise compute from raw
     // and href as a fallback so unclosed links remain marked as loading.
@@ -899,14 +913,20 @@ export function parseInlineTokens(
         if (textNodeContent) {
           pushText(textNodeContent, textNodeContent)
         }
-        pushParsed({
-          type: 'link',
-          href: String(textToken.content ?? ''),
-          title: null,
-          text,
-          children: [{ type: 'text', content: text, raw: text }],
-          loading,
-        } as ParsedNode)
+        const hrefFromToken = String(textToken.content ?? '')
+        if (options?.validateLink && !options.validateLink(hrefFromToken)) {
+          pushText(text, text)
+        }
+        else {
+          pushParsed({
+            type: 'link',
+            href: hrefFromToken,
+            title: null,
+            text,
+            children: [{ type: 'text', content: text, raw: text }],
+            loading,
+          } as ParsedNode)
+        }
         i += index
         return true
       }
@@ -967,14 +987,19 @@ export function parseInlineTokens(
         }
       }
       else {
-        pushParsed({
-          type: 'link',
-          href,
-          title: null,
-          text,
-          children: [{ type: 'text', content: text, raw: text }],
-          loading,
-        } as ParsedNode)
+        if (options?.validateLink && !options.validateLink(href)) {
+          pushText(text, text)
+        }
+        else {
+          pushParsed({
+            type: 'link',
+            href,
+            title: null,
+            text,
+            children: [{ type: 'text', content: text, raw: text }],
+            loading,
+          } as ParsedNode)
+        }
       }
 
       const afterText = linkContentEnd !== -1 ? content.slice(linkContentEnd + 1) : ''
