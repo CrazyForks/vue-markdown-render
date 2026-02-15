@@ -114,6 +114,35 @@ const nodes = parseMarkdownToStructure('[**cxx](xxx)', md, { requireClosingStron
 // allows creating a temporary/"mid-state" strong node for live-edit previews
 ```
 
+### ParseOptions: `validateLink`
+
+`validateLink` (`(url: string) => boolean` | optional) controls whether a parsed link is emitted as a `link` node.
+
+- Returns **true**: emit a normal `link` node.
+- Returns **false**: downgrade the link to plain text (keep link text only).
+
+Priority and integration:
+- `parseMarkdownToStructure(..., { validateLink })` has highest priority.
+- If omitted, the parser reuses the rule from the MarkdownIt instance when available (for example via `md.set({ validateLink })` or `md.options.validateLink`).
+
+Example — block unsafe schemes while keeping normal https links:
+
+```ts
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = getMarkdown('safe-links')
+md.set?.({
+  validateLink: (url: string) => !/^\s*javascript:/i.test(url.trim()),
+})
+
+const nodes = parseMarkdownToStructure(
+  '[safe](https://example.com) [unsafe](javascript:alert(1))',
+  md,
+  { final: true },
+)
+// "safe" is emitted as a link node; "unsafe" is emitted as plain text
+```
+
 ### Stray `$$` delimiters (empty math)
 
 Sometimes streams contain an accidental `$$` sequence, e.g.

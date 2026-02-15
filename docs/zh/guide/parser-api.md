@@ -106,6 +106,35 @@ const nodes = parseMarkdownToStructure('[**cxx](xxx)', md, { requireClosingStron
 // 允许在实时预览中创建临时/中间态的加粗节点
 ```
 
+### ParseOptions: `validateLink`
+
+`validateLink`（`(url: string) => boolean`，可选）用于控制链接是否输出为 `link` 节点。
+
+- 返回 **true**：正常输出 `link` 节点。
+- 返回 **false**：降级为纯文本（仅保留链接文本）。
+
+优先级与集成方式：
+- `parseMarkdownToStructure(..., { validateLink })` 优先级最高。
+- 如果未传入，解析器会复用 MarkdownIt 实例上的规则（例如通过 `md.set({ validateLink })` 或 `md.options.validateLink` 设置）。
+
+示例 —— 拦截不安全协议，同时保留正常 https 链接：
+
+```ts
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = getMarkdown('safe-links')
+md.set?.({
+  validateLink: (url: string) => !/^\s*javascript:/i.test(url.trim()),
+})
+
+const nodes = parseMarkdownToStructure(
+  '[safe](https://example.com) [unsafe](javascript:alert(1))',
+  md,
+  { final: true },
+)
+// "safe" 会输出为 link 节点；"unsafe" 会降级为纯文本
+```
+
 ### `$$` 异常分隔符（空公式/误触发）的解释
 
 有些内容会出现“奇怪的 `$$`”，例如：

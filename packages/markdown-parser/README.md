@@ -227,7 +227,7 @@ Processes raw markdown-it tokens into a flat array.
 
 #### `parseInlineTokens(tokens, content?, preToken?, options?)`
 
-Parses inline markdown-it-ts tokens into renderer nodes. Pass the inline token array plus the optional raw `content` string (from the parent token), an optional previous token, and inline parse options (`requireClosingStrong`, `customHtmlTags`).
+Parses inline markdown-it-ts tokens into renderer nodes. Pass the inline token array plus the optional raw `content` string (from the parent token), an optional previous token, and inline parse options (`requireClosingStrong`, `customHtmlTags`, `validateLink`).
 
 ### Configuration Functions
 
@@ -255,6 +255,8 @@ interface ParseOptions {
   postTransformTokens?: (tokens: Token[]) => Token[]
   // Custom HTML-like tags to emit as custom nodes (e.g. ['thinking'])
   customHtmlTags?: string[]
+  // Validate link href before emitting a `link` node; false -> plain text
+  validateLink?: (url: string) => boolean
   // When true, treats the input as complete (end-of-stream)
   final?: boolean
   // Require closing `**` for strong parsing (default: false)
@@ -278,6 +280,22 @@ const tagged = nodes.map(node =>
 ```
 
 Use the metadata in your renderer to show custom UI without mangling the original Markdown.
+
+Example — enforce safe link protocols:
+
+```ts
+const md = getMarkdown('safe-links')
+md.set?.({
+  validateLink: (url: string) => !/^\s*javascript:/i.test(url.trim()),
+})
+
+const nodes = parseMarkdownToStructure(
+  '[ok](https://example.com) [bad](javascript:alert(1))',
+  md,
+  { final: true },
+)
+// "ok" stays a link node; "bad" is downgraded to plain text
+```
 
 ### Unknown HTML-like tags
 

@@ -226,7 +226,7 @@ interface GetMarkdownOptions {
 
 #### `parseInlineTokens(tokens, content?, preToken?, options?)`
 
-解析内联 markdown-it-ts tokens 并产出节点。可传入原始 `content`（来自父 token）、可选的前一个 token，以及 inline 解析选项（`requireClosingStrong`、`customHtmlTags`）。
+解析内联 markdown-it-ts tokens 并产出节点。可传入原始 `content`（来自父 token）、可选的前一个 token，以及 inline 解析选项（`requireClosingStrong`、`customHtmlTags`、`validateLink`）。
 
 ### 配置函数
 
@@ -254,6 +254,8 @@ interface ParseOptions {
   postTransformTokens?: (tokens: Token[]) => Token[]
   // 自定义 HTML 类标签，作为自定义节点输出（如 ['thinking']）
   customHtmlTags?: string[]
+  // 输出 link 节点前校验 href；返回 false 时降级为纯文本
+  validateLink?: (url: string) => boolean
   // true 表示输入已结束（end-of-stream）
   final?: boolean
   // 解析 strong 时要求闭合 `**`（默认 false）
@@ -277,6 +279,22 @@ const tagged = nodes.map(node =>
 ```
 
 在渲染器中读取 `node.meta` 即可渲染自定义 UI，而无需直接修改 Markdown 文本。
+
+示例 —— 限制链接协议，拦截不安全链接：
+
+```ts
+const md = getMarkdown('safe-links')
+md.set?.({
+  validateLink: (url: string) => !/^\s*javascript:/i.test(url.trim()),
+})
+
+const nodes = parseMarkdownToStructure(
+  '[ok](https://example.com) [bad](javascript:alert(1))',
+  md,
+  { final: true },
+)
+// "ok" 保持为 link 节点；"bad" 会降级为纯文本
+```
 
 ### 未知 HTML 类标签
 
