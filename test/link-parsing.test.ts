@@ -373,4 +373,27 @@ http://127.0.0.1:8001/upload/20251118/4737bbe0-c42e-11f0-8471-37360564882d.docx 
     expect(ls[0].text).toBe('x')
     expect(textIncludes(nodes, '!')).toBe(true)
   })
+
+  it('respects customMarkdownIt validateLink: rejects javascript: and renders as plain text', () => {
+    const mdSafe = getMarkdown('validate-link-test')
+    mdSafe.set?.({ validateLink: (url: string) => !/^\s*javascript:/i.test(url.trim()) })
+    const nodes = parseMarkdownToStructure('[click me](javascript:alert(1))', mdSafe, { final: true })
+    const ls = links(nodes)
+    expect(ls.length).toBe(0)
+    expect(textIncludes(nodes, 'click me')).toBe(true)
+    // No link node may have javascript: href (paragraph.raw may still hold original source)
+    const anyBadHref = ls.some((l: any) => String(l.href || '').toLowerCase().includes('javascript:'))
+    expect(anyBadHref).toBe(false)
+  })
+
+  it('respects customMarkdownIt validateLink: allows https when validateLink returns true', () => {
+    const mdSafe = getMarkdown('validate-link-allow')
+    mdSafe.set?.({ validateLink: (url: string) => url.startsWith('https://') })
+    const nodes = parseMarkdownToStructure('[safe](https://example.com) [unsafe](http://example.com)', mdSafe, { final: true })
+    const ls = links(nodes)
+    expect(ls.length).toBe(1)
+    expect(ls[0].href).toBe('https://example.com')
+    expect(ls[0].text).toBe('safe')
+    expect(textIncludes(nodes, 'unsafe')).toBe(true)
+  })
 })
