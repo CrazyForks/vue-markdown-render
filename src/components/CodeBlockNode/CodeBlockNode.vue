@@ -700,6 +700,7 @@ const containerStyle = computed(() => {
     s.maxWidth = max
   return s
 })
+const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
 // 复制代码
 async function copy() {
@@ -719,31 +720,46 @@ async function copy() {
 }
 
 // Tooltip helpers: use the global singleton tooltip so there's only one DOM node
-function shouldSkipEventTarget(el: EventTarget | null) {
-  const btn = el as HTMLButtonElement | null
-  return !btn || btn.disabled
+watch(tooltipsEnabled, (enabled) => {
+  if (!enabled)
+    hideTooltip()
+})
+
+function resolveTooltipTarget(e: Event) {
+  const btn = (e.currentTarget || e.target) as HTMLButtonElement | null
+  if (!btn || btn.disabled)
+    return null
+  return btn
 }
 
 type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right'
 function onBtnHover(e: Event, text: string, place: TooltipPlacement = 'top') {
-  if (shouldSkipEventTarget(e.currentTarget))
+  if (!tooltipsEnabled.value)
+    return
+  const target = resolveTooltipTarget(e)
+  if (!target)
     return
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(e.currentTarget as HTMLElement, text, place, false, origin, props.isDark)
+  showTooltipForAnchor(target, text, place, false, origin, props.isDark)
 }
 
 function onBtnLeave() {
+  if (!tooltipsEnabled.value)
+    return
   hideTooltip()
 }
 
 function onCopyHover(e: Event) {
-  if (shouldSkipEventTarget(e.currentTarget))
+  if (!tooltipsEnabled.value)
+    return
+  const target = resolveTooltipTarget(e)
+  if (!target)
     return
   const txt = copyText.value ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(e.currentTarget as HTMLElement, txt, 'top', false, origin, props.isDark)
+  showTooltipForAnchor(target, txt, 'top', false, origin, props.isDark)
 }
 
 function toggleExpand() {

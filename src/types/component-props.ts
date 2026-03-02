@@ -19,6 +19,7 @@ export interface CodeBlockNodeProps {
   showExpandButton?: boolean
   showPreviewButton?: boolean
   showFontSizeButtons?: boolean
+  showTooltips?: boolean
   customId?: string
 }
 

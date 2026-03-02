@@ -28,6 +28,7 @@ export interface MarkdownCodeBlockNodeProps {
   showExpandButton?: boolean
   showPreviewButton?: boolean
   showFontSizeButtons?: boolean
+  showTooltips?: boolean
   onCopy?: (code: string) => void
   onPreviewCode?: (payload: { type: string, content: string, title: string }) => void
 }
@@ -127,6 +128,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
 
   const [defaultFontSize, setDefaultFontSize] = useState<number>(14)
   const [fontSize, setFontSize] = useState<number>(defaultFontSize)
+  const tooltipsEnabled = useMemo(() => props.showTooltips !== false, [props.showTooltips])
 
   const codeBlockContentRef = useRef<HTMLDivElement | null>(null)
   const rendererTargetRef = useRef<HTMLDivElement | null>(null)
@@ -227,12 +229,28 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       .catch(() => {})
   }, [clearFallback, normalizedLanguage, props.loading, props.node.code, props.stream, renderFallback])
 
-  const onBtnHover = useCallback((event: React.MouseEvent, text: string) => {
-    const btn = event.currentTarget as unknown as HTMLElement
-    showTooltipForAnchor(btn, text, 'top', false, { x: event.clientX, y: event.clientY }, props.isDark)
-  }, [props.isDark])
+  useEffect(() => {
+    if (!tooltipsEnabled)
+      hideTooltip(true)
+  }, [tooltipsEnabled])
 
-  const onBtnLeave = useCallback(() => hideTooltip(), [])
+  const onBtnHover = useCallback((event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>, text: string) => {
+    if (!tooltipsEnabled)
+      return
+    const btn = event.currentTarget as unknown as HTMLElement
+    if (!btn || (btn as HTMLButtonElement).disabled)
+      return
+    const origin = 'clientX' in event
+      ? { x: event.clientX, y: event.clientY }
+      : undefined
+    showTooltipForAnchor(btn, text, 'top', false, origin, props.isDark)
+  }, [props.isDark, tooltipsEnabled])
+
+  const onBtnLeave = useCallback(() => {
+    if (!tooltipsEnabled)
+      return
+    hideTooltip()
+  }, [tooltipsEnabled])
 
   const copy = useCallback(async () => {
     try {

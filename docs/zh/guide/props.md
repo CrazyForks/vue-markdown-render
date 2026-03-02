@@ -61,7 +61,7 @@
 - `show-expand-button`
 - `show-preview-button`
 - `show-font-size-buttons`
-- `show-tooltips`（仅 MarkdownCodeBlockNode，别名：`show-tooltip`）
+- `show-tooltips`（全局控制 `LinkNode` + 代码块节点的 tooltip）
 
 更多细节请参考 `/zh/guide/codeblock-header` 及类型定义。
 

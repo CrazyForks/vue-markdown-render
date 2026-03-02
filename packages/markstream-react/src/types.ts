@@ -27,6 +27,7 @@ export interface NodeRendererProps {
   codeBlockMinWidth?: string | number
   codeBlockMaxWidth?: string | number
   codeBlockProps?: Record<string, any>
+  showTooltips?: boolean
   themes?: string[]
   isDark?: boolean
   customId?: string
@@ -55,6 +56,7 @@ export interface RenderContext {
   typewriter?: boolean
   customComponents?: Record<string, React.ComponentType<any>>
   codeBlockProps?: Record<string, any>
+  showTooltips?: boolean
   codeBlockStream?: boolean
   renderCodeBlocksAsPre?: boolean
   codeBlockThemes?: {

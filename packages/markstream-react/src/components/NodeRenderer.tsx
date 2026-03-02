@@ -832,15 +832,23 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     return props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'
   }, [props.indexKey])
 
+  const mergedCodeBlockProps = useMemo(() => {
+    return {
+      ...(typeof props.showTooltips === 'boolean' ? { showTooltips: props.showTooltips } : {}),
+      ...(props.codeBlockProps || {}),
+    }
+  }, [props.codeBlockProps, props.showTooltips])
+
   const renderCtx = useMemo<RenderContext>(() => ({
     customId: props.customId,
     isDark: props.isDark,
     indexKey: indexPrefix,
     typewriter: props.typewriter,
     customComponents,
+    showTooltips: props.showTooltips,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
     codeBlockStream: props.codeBlockStream,
-    codeBlockProps: props.codeBlockProps,
+    codeBlockProps: mergedCodeBlockProps,
     codeBlockThemes: {
       themes: props.themes,
       monacoOptions: props.codeBlockMonacoOptions,
@@ -856,9 +864,10 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.isDark,
     indexPrefix,
     props.typewriter,
+    props.showTooltips,
     props.renderCodeBlocksAsPre,
     props.codeBlockStream,
-    props.codeBlockProps,
+    mergedCodeBlockProps,
     props.themes,
     props.codeBlockMonacoOptions,
     props.codeBlockMinWidth,

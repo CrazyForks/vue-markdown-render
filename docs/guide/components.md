@@ -205,7 +205,7 @@ function closePreview() {
 ### Quick reference
 - **Peers**: `shiki` + `stream-markdown`.
 - **Props**: similar to `CodeBlockNode` (streaming + header controls); lazy-loads `stream-markdown` for Shiki rendering.
-- **Tooltip control**: `showTooltips` (alias `showTooltip`) defaults to `true`; set `false` to disable header action tooltips.
+- **Tooltip control**: `showTooltips` defaults to `true`; set `false` to disable header action tooltips.
 - **Emits**: `copy` (payload: copied text), `previewCode` (payload: `{ type, content, title }`).
 - **When to choose it**: VitePress, Nuxt content sites, or anywhere Monaco would be overkill.
 

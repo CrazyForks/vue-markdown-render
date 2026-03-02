@@ -61,12 +61,12 @@ describe('markdownCodeBlockNode tooltip toggles', () => {
     wrapper.unmount()
   })
 
-  it('accepts showTooltip alias to disable tooltips', async () => {
+  it('disables tooltips when showTooltips is false', async () => {
     const wrapper = mount(MarkdownCodeBlockNode, {
       props: {
         loading: false,
         node: makeNode(),
-        showTooltip: false,
+        showTooltips: false,
       },
     })
 

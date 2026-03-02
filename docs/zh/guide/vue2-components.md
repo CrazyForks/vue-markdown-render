@@ -45,6 +45,7 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 | `is-dark` | `boolean` | `false` | 暗色主题标记，转发给重型节点并在根容器加 `.dark` |
 | `index-key` | `number \| string` | - | 列表渲染时的 key 前缀 |
 | `typewriter` | `boolean` | `true` | 非代码节点进入动画 |
+| `show-tooltips` | `boolean` | `true` | 全局控制 `LinkNode` 与代码块节点 tooltip |
 
 #### 流式与重节点开关
 

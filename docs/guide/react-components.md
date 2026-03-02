@@ -25,6 +25,7 @@ The primary component for rendering markdown content in React.
 | `isDark` | `boolean` | `false` | Theme flag forwarded to heavy nodes; adds `.dark` to the root container |
 | `indexKey` | `number \| string` | - | Key prefix when rendering multiple instances in lists |
 | `typewriter` | `boolean` | `true` | Enable the non-code-node enter transition |
+| `showTooltips` | `boolean` | `true` | Global tooltip switch for `LinkNode` and code block nodes |
 
 #### Streaming & heavy-node toggles
 

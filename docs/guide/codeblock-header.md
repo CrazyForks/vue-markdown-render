@@ -72,6 +72,7 @@ Events and notes
 - The component emits `copy` when the copy button is clicked (the copy text is supplied as the event payload). Use `@copy="onCopy"` to listen for it.
 - The component emits `previewCode` only when you attach a `@preview-code` listener; payload is `{ node, artifactType, artifactTitle, id }`. (Without a listener, the built-in preview overlay is available for HTML only.)
 - To hide a specific toolbar button set, use the boolean props `showCopyButton`, `showExpandButton`, `showPreviewButton`, `showFontSizeButtons`.
+- Use `showTooltips` to toggle header action tooltips globally for this block.
 - The `showHeader` prop controls whether the header is rendered at all.
 
 Try this — replace the header in a small example:

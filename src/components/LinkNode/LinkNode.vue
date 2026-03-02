@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 定义链接节点
 import type { LinkNodeProps } from '../../types/component-props'
-import { computed, useAttrs } from 'vue'
+import { computed, inject, useAttrs } from 'vue'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { sanitizeAttrs } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
@@ -16,6 +16,13 @@ import TextNode from '../TextNode'
 // 接收props — 把动画/颜色相关配置暴露为props，并通过CSS变量注入样式
 const props = withDefaults(defineProps<LinkNodeProps>(), {
   showTooltip: true,
+})
+const inheritedShowTooltips = inject<{ value?: boolean } | undefined>('markstreamShowTooltips', undefined)
+const tooltipEnabled = computed(() => {
+  const inherited = inheritedShowTooltips?.value
+  if (typeof inherited === 'boolean')
+    return inherited
+  return props.showTooltip
 })
 
 const cssVars = computed(() => {
@@ -92,7 +99,7 @@ const anchorAttrs = computed(() => ({
 
 // Tooltip handlers using singleton tooltip
 function onAnchorEnter(e: Event) {
-  if (!props.showTooltip)
+  if (!tooltipEnabled.value)
     return
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
@@ -102,7 +109,7 @@ function onAnchorEnter(e: Event) {
 }
 
 function onAnchorLeave() {
-  if (!props.showTooltip)
+  if (!tooltipEnabled.value)
     return
   hideTooltip()
 }
@@ -114,7 +121,7 @@ const title = computed(() => String(props.node.title ?? props.node.href ?? ''))
     v-if="!node.loading"
     class="link-node"
     :href="node.href"
-    :title="showTooltip ? '' : title"
+    :title="tooltipEnabled ? '' : title"
     :aria-label="`Link: ${title}`"
     :aria-hidden="node.loading ? 'true' : 'false'"
     target="_blank"

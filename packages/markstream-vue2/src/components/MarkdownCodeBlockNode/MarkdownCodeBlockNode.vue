@@ -21,6 +21,7 @@ const props = defineProps({
   showExpandButton: { type: Boolean, default: true },
   showPreviewButton: { type: Boolean, default: true },
   showFontSizeButtons: { type: Boolean, default: true },
+  showTooltips: { type: Boolean, default: undefined },
 })
 
 const emits = defineEmits(['previewCode', 'copy'])
@@ -94,6 +95,7 @@ const contentStyle = computed(() => {
     fontSize: `${codeFontSize.value}px`,
   }
 })
+const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
 function getPreferredColorScheme() {
   return props.isDark ? props.darkTheme : props.lightTheme
@@ -272,6 +274,11 @@ watch(() => props.loading, (loading) => {
   initRenderer()
 })
 
+watch(tooltipsEnabled, (enabled) => {
+  if (!enabled)
+    hideTooltip()
+})
+
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   if (lang !== codeLanguage.value)
     codeLanguage.value = lang.trim()
@@ -369,31 +376,41 @@ async function copy() {
 }
 
 // Tooltip helpers
-function shouldSkipEventTarget(el: EventTarget | null) {
-  const btn = el as HTMLButtonElement | null
-  return !btn || btn.disabled
+function resolveTooltipTarget(e: Event) {
+  const btn = (e.currentTarget || e.target) as HTMLButtonElement | null
+  if (!btn || btn.disabled)
+    return null
+  return btn
 }
 
 type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right'
 function onBtnHover(e: Event, text: string, place: TooltipPlacement = 'top') {
-  if (shouldSkipEventTarget(e.currentTarget))
+  if (!tooltipsEnabled.value)
+    return
+  const target = resolveTooltipTarget(e)
+  if (!target)
     return
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(e.currentTarget as HTMLElement, text, place, false, origin, props.isDark)
+  showTooltipForAnchor(target, text, place, false, origin, props.isDark)
 }
 
 function onBtnLeave() {
+  if (!tooltipsEnabled.value)
+    return
   hideTooltip()
 }
 
 function onCopyHover(e: Event) {
-  if (shouldSkipEventTarget(e.currentTarget))
+  if (!tooltipsEnabled.value)
+    return
+  const target = resolveTooltipTarget(e)
+  if (!target)
     return
   const txt = copyText.value ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(e.currentTarget as HTMLElement, txt, 'top', false, origin, props.isDark)
+  showTooltipForAnchor(target, txt, 'top', false, origin, props.isDark)
 }
 
 // Expand/collapse functionality

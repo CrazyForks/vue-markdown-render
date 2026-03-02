@@ -79,6 +79,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     showExpandButton,
     showPreviewButton,
     showFontSizeButtons,
+    showTooltips,
   } = props
 
   const editorHostRef = useRef<HTMLDivElement | null>(null)
@@ -115,6 +116,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     return Number.isFinite(initial) && initial > 0 ? initial : 14
   })
   const [fontSize, setFontSize] = useState(defaultFontSize)
+  const tooltipsEnabled = useMemo(() => showTooltips !== false, [showTooltips])
 
   const getMaxHeightValue = useCallback((): number => {
     const raw = (monacoOptionsRef.current as any)?.MAX_HEIGHT ?? 500
@@ -623,14 +625,28 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     applyEditorHeight(expanded)
   }, [applyEditorHeight, enableFontSizeControl, expanded, fontSize, node.diff, useFallback])
 
-  const onBtnHover = useCallback((event: React.MouseEvent, text: string) => {
+  useEffect(() => {
+    if (!tooltipsEnabled)
+      hideTooltip(true)
+  }, [tooltipsEnabled])
+
+  const onBtnHover = useCallback((event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>, text: string) => {
+    if (!tooltipsEnabled)
+      return
     const btn = event.currentTarget as unknown as HTMLElement
-    showTooltipForAnchor(btn, text, 'top', false, { x: event.clientX, y: event.clientY }, isDark)
-  }, [isDark])
+    if (!btn || (btn as HTMLButtonElement).disabled)
+      return
+    const origin = 'clientX' in event
+      ? { x: event.clientX, y: event.clientY }
+      : undefined
+    showTooltipForAnchor(btn, text, 'top', false, origin, isDark)
+  }, [isDark, tooltipsEnabled])
 
   const onBtnLeave = useCallback(() => {
+    if (!tooltipsEnabled)
+      return
     hideTooltip()
-  }, [])
+  }, [tooltipsEnabled])
 
   const copy = useCallback(async () => {
     try {

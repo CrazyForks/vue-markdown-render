@@ -39,8 +39,6 @@ const props = withDefaults(
     showFontSizeButtons?: boolean
     /** Toggle singleton tooltips for header action buttons */
     showTooltips?: boolean
-    /** Alias for showTooltips */
-    showTooltip?: boolean
   }>(),
   {
     isShowPreview: true,
@@ -133,7 +131,7 @@ const contentStyle = computed(() => {
     fontSize: `${codeFontSize.value}px`,
   }
 })
-const tooltipsEnabled = computed(() => props.showTooltips ?? props.showTooltip ?? true)
+const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
 function getPreferredColorScheme() {
   return props.isDark ? props.darkTheme : props.lightTheme

@@ -201,7 +201,18 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
     case 'hardbreak':
       return <HardBreakNode key={key} node={node as any} typewriter={ctx.typewriter} />
     case 'link':
-      return <LinkNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} isDark={ctx.isDark} typewriter={ctx.typewriter} />
+      return (
+        <LinkNode
+          key={key}
+          node={node as any}
+          ctx={ctx}
+          renderNode={renderNode}
+          indexKey={key}
+          isDark={ctx.isDark}
+          showTooltip={typeof ctx.showTooltips === 'boolean' ? ctx.showTooltips : undefined}
+          typewriter={ctx.typewriter}
+        />
+      )
     case 'image':
       return (
         <ImageNode

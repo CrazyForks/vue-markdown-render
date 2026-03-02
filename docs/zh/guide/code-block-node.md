@@ -14,7 +14,7 @@
 
 - `node` — code_block 节点（必需）
 - `loading`、`stream`、`isShowPreview`
-- 头部控制：`showHeader`、`showCopyButton`、`showExpandButton`、`showPreviewButton`、`showFontSizeButtons`
+- 头部控制：`showHeader`、`showCopyButton`、`showExpandButton`、`showPreviewButton`、`showFontSizeButtons`、`showTooltips`
 
 ## Slots 插槽
 

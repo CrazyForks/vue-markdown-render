@@ -85,6 +85,8 @@ export interface NodeRendererProps {
   codeBlockMaxWidth?: string | number
   /** Arbitrary props to forward to every CodeBlockNode */
   codeBlockProps?: Record<string, any>
+  /** Global tooltip toggle for link/code-block renderers (default: true) */
+  showTooltips?: boolean
   themes?: string[]
   isDark?: boolean
   customId?: string
@@ -113,6 +115,7 @@ export interface NodeRendererProps {
 
 const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
+  showTooltips: true,
   typewriter: true,
   batchRendering: true,
   debugPerformance: false,
@@ -1505,12 +1508,17 @@ const codeBlockBindings = computed(() => ({
   themes: props.themes,
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
+  ...(typeof props.showTooltips === 'boolean' ? { showTooltips: props.showTooltips } : {}),
   ...(props.codeBlockProps || {}),
 }))
 const nonCodeBindings = computed(() => ({
   // Forward `typewriter` flag to non-code node components so they can
   // opt in/out of enter transitions or other typewriter-like behaviour.
   typewriter: props.typewriter,
+}))
+const linkBindings = computed(() => ({
+  ...nonCodeBindings.value,
+  ...(typeof props.showTooltips === 'boolean' ? { showTooltip: props.showTooltips } : {}),
 }))
 const renderedItems = computed(() => {
   return visibleNodes.value.map((item) => {
@@ -1581,6 +1589,9 @@ function getBindingsFor(node: ParsedNode, language?: string) {
   const lang = language ?? getCodeBlockLanguage(node)
   if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
     return emptyBindings
+
+  if (node.type === 'link')
+    return linkBindings.value
 
   return node.type === 'code_block'
     ? codeBlockBindings.value

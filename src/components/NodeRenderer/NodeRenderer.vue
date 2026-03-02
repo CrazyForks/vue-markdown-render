@@ -2,7 +2,7 @@
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
-import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -85,6 +85,8 @@ export interface NodeRendererProps {
   codeBlockMaxWidth?: string | number
   /** Arbitrary props to forward to every CodeBlockNode */
   codeBlockProps?: Record<string, any>
+  /** Global tooltip toggle for link/code-block renderers (default: true) */
+  showTooltips?: boolean
   themes?: string[]
   isDark?: boolean
   customId?: string
@@ -113,6 +115,7 @@ export interface NodeRendererProps {
 
 const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
+  showTooltips: true,
   typewriter: true,
   batchRendering: true,
   debugPerformance: false,
@@ -137,6 +140,18 @@ const viewportPriorityAutoDisabled = ref(false)
 const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 const isClient = typeof window !== 'undefined'
 const debugPerformanceEnabled = computed(() => props.debugPerformance && isClient && typeof console !== 'undefined')
+const attrs = useAttrs()
+const resolvedShowTooltips = computed<boolean | undefined>(() => {
+  if (typeof props.showTooltips === 'boolean')
+    return props.showTooltips
+  const raw = (attrs as any).showTooltips ?? (attrs as any)['show-tooltips']
+  if (raw === '' || raw === true || raw === 'true')
+    return true
+  if (raw === false || raw === 'false')
+    return false
+  return undefined
+})
+provide('markstreamShowTooltips', resolvedShowTooltips)
 
 function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)
@@ -1460,12 +1475,17 @@ const codeBlockBindings = computed(() => ({
   themes: props.themes,
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
+  ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
   ...(props.codeBlockProps || {}),
 }))
 const nonCodeBindings = computed(() => ({
   // Forward `typewriter` flag to non-code node components so they can
   // opt in/out of enter transitions or other typewriter-like behaviour.
   typewriter: props.typewriter,
+}))
+const linkBindings = computed(() => ({
+  ...nonCodeBindings.value,
+  ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltip: resolvedShowTooltips.value } : {}),
 }))
 const renderedItems = computed(() => {
   return visibleNodes.value.map((item) => {
@@ -1538,6 +1558,9 @@ function getBindingsFor(node: ParsedNode, language?: string) {
   const lang = language ?? getCodeBlockLanguage(node)
   if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
     return emptyBindings
+
+  if (node.type === 'link')
+    return linkBindings.value
 
   return node.type === 'code_block'
     ? codeBlockBindings.value

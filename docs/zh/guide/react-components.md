@@ -25,6 +25,7 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 | `isDark` | `boolean` | `false` | 暗色主题标记，转发给重型节点并在根容器加 `.dark` |
 | `indexKey` | `number \| string` | - | 列表渲染时的 key 前缀 |
 | `typewriter` | `boolean` | `true` | 非代码节点进入动画 |
+| `showTooltips` | `boolean` | `true` | 全局控制 `LinkNode` 与代码块节点 tooltip |
 
 #### 流式与重节点开关
 
