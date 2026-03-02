@@ -8,6 +8,7 @@ describe('markdownCodeBlockNode props and features', () => {
       'showExpandButton',
       'showPreviewButton',
       'showFontSizeButtons',
+      'showTooltips',
       'enableFontSizeControl',
     ]
 

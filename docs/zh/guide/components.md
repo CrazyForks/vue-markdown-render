@@ -205,6 +205,7 @@ function closePreview() {
 ### 快速要点
 - **依赖**：`shiki` + `stream-markdown`。
 - **Props**：与 `CodeBlockNode` 类似（streaming + 头部控制）；内部会懒加载 `stream-markdown` 来做 Shiki 渲染。
+- **Tooltip 控制**：`showTooltips`（别名 `showTooltip`）默认 `true`；设为 `false` 可关闭头部按钮 tooltip。
 - **事件**：`copy`（负载：复制的文本）、`previewCode`（负载：`{ type, content, title }`）。
 - **适用场景**：VitePress、内容站点或无需 Monaco 的应用。
 

@@ -329,7 +329,7 @@ function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
   // Currency ranges like "$2000~$5000" should remain plain text.
   // We only gate when the content before closing "$" ends with a range marker
   // and the following character continues with digits.
-  if (!/^\d[\d,.]*(?:\s*[~～-]\s*)$/.test(stripped))
+  if (!/^\d[\d,.]*\s*[~～-]\s*$/.test(stripped))
     return false
   return /\d/.test(String(nextChar ?? ''))
 }
@@ -370,7 +370,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // Save the initial position so $$ can scan from the beginning
     // even after $ rule has advanced s.pos
     const initialPos = s.pos
-      // use findMatchingClose from util
+    // use findMatchingClose from util
     for (const [open, close] of delimiters) {
       // We'll scan the entire inline source and tokenize all occurrences
       const src = s.src

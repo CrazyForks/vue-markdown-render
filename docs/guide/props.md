@@ -61,6 +61,7 @@ Pass these props directly to `CodeBlockNode` / `MarkdownCodeBlockNode`, or globa
 - `show-expand-button`
 - `show-preview-button`
 - `show-font-size-buttons`
+- `show-tooltips` (MarkdownCodeBlockNode only, alias: `show-tooltip`)
 
 See `/guide/codeblock-header` and the `CodeBlockNode` types for the exhaustive list.
 
