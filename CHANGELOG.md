@@ -1,4 +1,4 @@
-## [0.0.8-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.8-beta.0) (2026-03-01)
+## [0.0.8-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.8-beta.1) (2026-03-03)
 
 
 ### Bug Fixes
@@ -6,6 +6,7 @@
 * add missing katex paths to configuration for proper module resolution ([b063980](https://github.com/Simon-He95/markstream-vue/commit/b06398058f71681571a0e948b045a10b31599c96))
 * add regression tests for html_block splitting and update math plugin for legacy parentheses ([da4f46c](https://github.com/Simon-He95/markstream-vue/commit/da4f46c89135a1e7259a1bf4f71ad74e0750addb))
 * add test for html_block splitting after `<br/>` ([f040f6c](https://github.com/Simon-He95/markstream-vue/commit/f040f6cb9bc35445bac17ced88c178c8ed8b642e)), closes [#251](https://github.com/Simon-He95/markstream-vue/issues/251)
+* add tooltip toggle for MarkdownCodeBlockNode ([#307](https://github.com/Simon-He95/markstream-vue/issues/307)) ([c9321f1](https://github.com/Simon-He95/markstream-vue/commit/c9321f1c41ca54cf2d85355720ee2ad78f1658cb))
 * add type declarations for markdown-it plugins ([ec1517c](https://github.com/Simon-He95/markstream-vue/commit/ec1517c852d74df04c5632b42cebe89607027060))
 * allow vertical scroll chain in table ([3716491](https://github.com/Simon-He95/markstream-vue/commit/3716491080c513dda1a3b79df2911f02c2395e96)), closes [#271](https://github.com/Simon-He95/markstream-vue/issues/271)
 * **buttons:** update button styles to use :where() for better specificity and maintain Tailwind utilities ([314ec46](https://github.com/Simon-He95/markstream-vue/commit/314ec466f2f360037a5d71503f4ca5edc8487278))
@@ -52,6 +53,7 @@
 * remove unnecessary blank lines in documentation and component files ([5f877e6](https://github.com/Simon-He95/markstream-vue/commit/5f877e61079b95ef3a78f1c8de7fe12328d85133)), closes [#243](https://github.com/Simon-He95/markstream-vue/issues/243)
 * standardize class attribute syntax in list item components and tests ([71af12b](https://github.com/Simon-He95/markstream-vue/commit/71af12b1638456fdbaf809849f3f230ea9505de0))
 * **theme:** toggle fail ([39cd71a](https://github.com/Simon-He95/markstream-vue/commit/39cd71af0c499c95d9c50b9770972540ac83c3ef)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
+* unify showTooltips behavior across renderers ([d84f755](https://github.com/Simon-He95/markstream-vue/commit/d84f7557a797eb1f0e05b2e1cffeef055780e5af))
 * update changelog to include regression tests for html_block splitting and math plugin updates ([64008d6](https://github.com/Simon-He95/markstream-vue/commit/64008d6e81031a7504c9945ab0186e46f646bc2a))
 * update changelog to include regression tests for html_block splitting and math plugin updates ([f676144](https://github.com/Simon-He95/markstream-vue/commit/f67614451b14201e5e816b414ecc70a89cb65dea))
 * update changelog with new bug fixes and enhancements ([0e2f703](https://github.com/Simon-He95/markstream-vue/commit/0e2f703d74f13066bd613d82b01ccb371a1f2301))
@@ -82,6 +84,7 @@
 * add normalization for custom HTML opening tags at line start ([aafd530](https://github.com/Simon-He95/markstream-vue/commit/aafd530d372b15888e72a960a5cff7d6c8e27f37))
 * add playground-vue2-cli to pnpm workspace ([36d4101](https://github.com/Simon-He95/markstream-vue/commit/36d410125346b62f7e8d68d327b9ec923bbe31f7))
 * add push options for tagging scripts in package.json ([9e46cb1](https://github.com/Simon-He95/markstream-vue/commit/9e46cb10a7f062bc2679648e61639f065e30a9dd))
+* add px css build output ([d477cef](https://github.com/Simon-He95/markstream-vue/commit/d477cef48c36d9761e8cd5457a5cd0e9f60f4910))
 * add settings panel for theme selection, stream delay, and chunk size adjustments ([01129ee](https://github.com/Simon-He95/markstream-vue/commit/01129ee6a0d86ac0d364471683f5c6b282a9219e)), closes [#282](https://github.com/Simon-He95/markstream-vue/issues/282)
 * add support for blank line after custom HTML close before block marker ([4e4e31b](https://github.com/Simon-He95/markstream-vue/commit/4e4e31bb804fe76401c9283f215c6e43135f362c)), closes [#295](https://github.com/Simon-He95/markstream-vue/issues/295)
 * add support for fixing indented code blocks and enhance HTML inline handling ([733bf40](https://github.com/Simon-He95/markstream-vue/commit/733bf409f05de3704199f9274a62f48ea5d0f4e4)), closes [#257](https://github.com/Simon-He95/markstream-vue/issues/257)
@@ -115,6 +118,11 @@
 * update CHANGELOG with new features and enhancements for release process ([e98336b](https://github.com/Simon-He95/markstream-vue/commit/e98336b0f26efab73985120c37c1a017c6606b61))
 * **VmrContainerNode:** add mid-state loading ([016f1ed](https://github.com/Simon-He95/markstream-vue/commit/016f1ed37f25e9f6f74856d385aa62514d556f32))
 * **VmrContainerNode:** enhance streaming behavior with loading state and incomplete JSON handling ([beef82b](https://github.com/Simon-He95/markstream-vue/commit/beef82bcdc5fb78d2d9c7d3becc70cb075d1d380))
+
+
+### Performance Improvements
+
+* optimize bundle size and sync docs across vue/react/vue2 ([08fef7b](https://github.com/Simon-He95/markstream-vue/commit/08fef7b5eea18d7f4aaa106fb30c22f52912ebdb))
 
 
 
