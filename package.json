@@ -54,6 +54,7 @@
       "require": "./dist/index.js"
     },
     "./index.css": "./dist/index.css",
+    "./index.px.css": "./dist/index.px.css",
     "./index.tailwind.css": "./dist/index.tailwind.css",
     "./tailwind": "./dist/tailwind.ts",
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
@@ -90,7 +91,7 @@
     "play:react:preview": "pnpm run -C playground-react preview",
     "preview": "pnpm run -C playground preview",
     "build:parser": "pnpm run -C packages/markdown-parser build",
-    "build": "vite build --mode npm && vite build --config vite.config.tailwind.ts --mode npm && node scripts/copy-tailwind-css.mjs && pnpm run build:dts",
+    "build": "vite build --mode npm && vite build --config vite.config.tailwind.ts --mode npm && node scripts/copy-tailwind-css.mjs && node scripts/generate-px-css.mjs && pnpm run build:dts",
     "build:analyze": "ANALYZE=true pnpm build",
     "size:check": "node scripts/check-package-size.mjs",
     "docs:dev": "vitepress dev docs",

@@ -101,6 +101,7 @@ createApp({
 ```
 
 Import `markstream-vue/index.css` after your reset (e.g., Tailwind `@layer components`) so renderer styles win over utility classes. Install optional peers such as `stream-monaco`, `shiki`, `stream-markdown`, `mermaid`, and `katex` only when you need Monaco code blocks, Shiki highlighting, diagrams, or math.
+If your app intentionally scales root font size on mobile, use `markstream-vue/index.px.css` to avoid `rem`-based global scaling side effects.
 
 Renderer CSS is scoped under an internal `.markstream-vue` container to minimize global style conflicts. If you render exported node components outside of `MarkdownRender`, wrap them in an element with class `markstream-vue`.
 
