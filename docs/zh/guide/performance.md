@@ -18,6 +18,14 @@
 
 更多详细信息见 `/zh/guide/performance`。
 
+## 包体积优化流程（维护者）
+
+当你修改可能影响构建体积的路径（渲染器、代码块、可选 peer）时，建议在合并前执行：
+
+- `pnpm build:analyze`：生成可视化报告（`bundle-visualizer.html`、`bundle-visualizer-tailwind.html`），确认体积变化是“落在哪个 chunk”。
+- `pnpm size:check`：本地执行体积预算守卫，覆盖 `dist` 总量、最大 JS chunk，以及 `npm pack --dry-run` 的 tarball/unpacked 体积。
+- 可选：通过环境变量收紧预算（`MAX_DIST_BYTES`、`MAX_JS_CHUNK_BYTES`、`MAX_PACK_TGZ_BYTES`、`MAX_PACK_UNPACKED_BYTES`）。
+
 ## 让渲染保持稳定的“逐步更新”
 
 有些 LLM 会一次推送大量文本，导致前端表现为“卡顿一会儿再一次性显示”。想让用户始终看到稳定、连续的输出，可以：

@@ -43,6 +43,21 @@ setCustomComponents({ code_block: MarkdownCodeBlockNode })
 
 Once set, `MarkdownCodeBlockNode` (powered by Shiki via `stream-markdown`) will be used for `code_block` nodes. You can also supply your own component that uses `stream-markdown` directly.
 
+### Language icon lazy loading
+
+To keep the main bundle smaller, infrequent language icons are split into an async chunk:
+
+- Common languages (JS/TS/HTML/CSS/JSON/Python/etc.) stay in the main bundle.
+- Rare languages load on demand and will update icon output automatically after the async chunk resolves.
+- If you prefer to avoid first-hit fallback icons, preload once during app idle:
+
+```ts
+import { preloadExtendedLanguageIcons } from 'markstream-vue'
+
+if (typeof window !== 'undefined')
+  void preloadExtendedLanguageIcons()
+```
+
 ### Vue CLI 4 (Webpack 4) notes
 
 If you use Vue CLI 4 (Webpack 4), it’s recommended to use the Shiki mode for code blocks and **override** `code_block` to avoid Monaco + legacy-bundler edge cases.

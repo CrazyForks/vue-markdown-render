@@ -1,7 +1,9 @@
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import process from 'node:process'
 import vue2 from '@vitejs/plugin-vue2'
 import autoprefixer from 'autoprefixer'
+import { visualizer } from 'rollup-plugin-visualizer'
 import { defineConfig } from 'vite'
 
 const require = createRequire(import.meta.url)
@@ -18,8 +20,13 @@ catch {
   }
 }
 
+const pluginsArr: any[] = [vue2({ compiler: vueCompiler, script: { babelParserPlugins: ['typescript'] } })]
+
+if (process.env.ANALYZE === 'true')
+  pluginsArr.push(visualizer({ filename: 'bundle-visualizer-tailwind.html', gzipSize: true }) as any)
+
 export default defineConfig({
-  plugins: [vue2({ compiler: vueCompiler, script: { babelParserPlugins: ['typescript'] } })],
+  plugins: pluginsArr,
   resolve: {
     alias: {
       vue: 'vue-demi',
@@ -56,6 +63,7 @@ export default defineConfig({
           'monaco-editor',
           'shiki',
           '@floating-ui/dom',
+          '@terrastruct/d2',
         ].includes(id)
       },
       output: {

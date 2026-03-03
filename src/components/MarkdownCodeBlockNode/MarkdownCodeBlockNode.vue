@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { getLanguageIcon, languageMap } from '../../utils'
+import { getLanguageIcon, languageIconsRevision, languageMap } from '../../utils'
 
 const props = withDefaults(
   defineProps<{
@@ -98,6 +98,7 @@ const displayLanguage = computed(() => {
 
 // Computed property for language icon
 const languageIcon = computed(() => {
+  void languageIconsRevision.value
   const lang = codeLanguage.value.trim().toLowerCase()
   return getLanguageIcon(lang.split(':')[0])
 })

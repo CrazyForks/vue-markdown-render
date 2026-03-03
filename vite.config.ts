@@ -46,8 +46,8 @@ export default defineConfig(({ mode }) => {
     // Add optional bundle visualizer when ANALYZE=true
     if (process.env.ANALYZE === 'true') {
       plugins.push(
-        // write interactive treemap to `dist/bundle-visualizer.html`
-        visualizer({ filename: 'dist/bundle-visualizer.html', gzipSize: true, brotliSize: true }) as any,
+        // write interactive treemap to project root to avoid polluting npm package files
+        visualizer({ filename: 'bundle-visualizer.html', gzipSize: true, brotliSize: true }) as any,
       )
     }
     build = {
@@ -83,6 +83,16 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         external: (id: string) => {
+          if (id === '@terrastruct/d2' || id.startsWith('@terrastruct/d2/'))
+            return true
+          // also match resolved node_modules paths that include /node_modules/@terrastruct/d2
+          if (/node_modules\/@terrastruct\/d2(?:\/|$)/.test(id))
+            return true
+          if (id === '@floating-ui/dom' || id.startsWith('@floating-ui/dom/'))
+            return true
+          // also match resolved node_modules paths that include /node_modules/@floating-ui/dom
+          if (/node_modules\/@floating-ui\/dom(?:\/|$)/.test(id))
+            return true
           if (id === 'mermaid' || id.startsWith('mermaid/'))
             return true
           // also match resolved node_modules paths that include /node_modules/mermaid
@@ -99,6 +109,8 @@ export default defineConfig(({ mode }) => {
             'katex',
             'mermaid',
             '@antv/infographic',
+            '@terrastruct/d2',
+            '@floating-ui/dom',
             'katex/contrib/mhchem',
             'katex/dist/contrib/mhchem',
             'stream-monaco',

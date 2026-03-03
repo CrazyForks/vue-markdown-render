@@ -14,6 +14,14 @@ Performance tips:
 - Scope custom components to enable GC
 - Use `setDefaultMathOptions` at bootstrap
 
+## Bundle size workflow (maintainers)
+
+If you are changing code paths that can impact build size (renderers, code blocks, optional peers), run this flow before merging:
+
+- `pnpm build:analyze` to produce visual reports (`bundle-visualizer.html` and `bundle-visualizer-tailwind.html`) and confirm what actually moved between chunks.
+- `pnpm size:check` to enforce local size budgets for `dist`, largest JS chunk, and `npm pack --dry-run` output.
+- Optional: tighten budgets in CI/locally with env vars like `MAX_DIST_BYTES`, `MAX_JS_CHUNK_BYTES`, `MAX_PACK_TGZ_BYTES`, `MAX_PACK_UNPACKED_BYTES`.
+
 ## Keeping a Steady, Typewriter-Style Stream
 
 Some AI or LLM sources send content in large bursts, which can feel like the preview is freezing and then dumping a whole block. To keep the UI feeling like a smooth, continuous typewriter:

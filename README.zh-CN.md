@@ -179,6 +179,8 @@ export default defineNuxtPlugin((nuxtApp) => {
 - `pnpm dev` — playground 开发
 - `pnpm play:nuxt` — Nuxt playground 开发
 - `pnpm build` — 构建库与 CSS
+- `pnpm build:analyze` — 带可视化报告的构建（输出 `bundle-visualizer.html`、`bundle-visualizer-tailwind.html`）
+- `pnpm size:check` — 本地执行 dist + npm 包体积预算检查（与 CI 一致）
 - `pnpm test` — Vitest 测试（快照用 `pnpm test:update`）
 - `pnpm typecheck` / `pnpm lint` — 类型检查与 Lint
 
@@ -333,7 +335,7 @@ setCustomComponents('docs', {
 
 - Mermaid / KaTeX 不显示？安装对应 peer（`mermaid` / `katex`），并传入 `:enable-mermaid="true"` / `:enable-katex="true"` 或调用 loader 设置函数。如果你是用 CDN `<script>` 引入，库也会自动读取 `window.mermaid` / `window.katex`。
 - CDN + KaTeX worker：如果你不打包 `katex` 但仍希望公式在 worker 中渲染（不占主线程），可以用 `createKaTeXWorkerFromCDN()` 创建一个“CDN 加载 KaTeX”的 worker，然后通过 `setKaTeXWorker()` 注入。
-- 体积问题：可选 peer 不会被打包，CSS 只需导入一次；对代码块可用 Shiki（`MarkdownCodeBlockNode`）替代 Monaco 以减轻体积。
+- 体积问题：可选 peer 不会被打包，CSS 只需导入一次；对代码块可用 Shiki（`MarkdownCodeBlockNode`）替代 Monaco。低频语言图标已拆分为异步 chunk 并按需加载；如果希望首屏就避免图标回退，可在空闲时调用 `preloadExtendedLanguageIcons()` 预热。
 - 自定义 UI：通过 `setCustomComponents`（全局或作用域）注册组件，在 Markdown 中放置占位标记并映射到 Vue 组件。
 
 ## 🆚 为什么选择 markstream-vue，而不是普通 Markdown 渲染器？

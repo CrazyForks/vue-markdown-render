@@ -178,6 +178,8 @@ Then use `<MarkdownRender :content="md" />` in your pages.
 - `pnpm dev` — playground dev server
 - `pnpm play:nuxt` — Nuxt playground dev
 - `pnpm build` — library + CSS build
+- `pnpm build:analyze` — build with bundle visualizer reports (`bundle-visualizer.html`, `bundle-visualizer-tailwind.html`)
+- `pnpm size:check` — run dist + npm package size budget checks (same guard used in CI)
 - `pnpm test` — Vitest suite (`pnpm test:update` for snapshots)
 - `pnpm typecheck` / `pnpm lint` — type and lint checks
 
@@ -332,7 +334,7 @@ Parse hooks example (match server + client):
 
 - Mermaid/KaTeX not rendering? Install the peer (`mermaid` / `katex`) and pass `:enable-mermaid="true"` / `:enable-katex="true"` or call the loader setters. If you load them via CDN script tags, the library will also pick up `window.mermaid` / `window.katex`.
 - CDN + KaTeX worker: if you don't bundle `katex` but still want off-main-thread rendering, create and inject a worker that loads KaTeX via CDN (UMD) using `createKaTeXWorkerFromCDN()` + `setKaTeXWorker()`.
-- Bundle size: peers are optional and not bundled; import only `markstream-vue/index.css` once. Use Shiki (`MarkdownCodeBlockNode`) when Monaco is too heavy.
+- Bundle size: peers are optional and not bundled; import only `markstream-vue/index.css` once; use Shiki (`MarkdownCodeBlockNode`) when Monaco is too heavy. Infrequent language icons are split into an async chunk and load on demand; call `preloadExtendedLanguageIcons()` during app idle if you want to avoid first-hit icon fallback.
 - Custom UI: register components via `setCustomComponents` (global or scoped), then emit markers/placeholders in Markdown and map them to Vue components.
 
 ## 🆚 Why markstream-vue over a typical Markdown renderer?

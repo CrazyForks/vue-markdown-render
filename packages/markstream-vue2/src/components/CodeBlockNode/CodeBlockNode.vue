@@ -6,7 +6,7 @@ import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
-import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils'
+import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils'
 import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
@@ -641,7 +641,10 @@ const displayLanguage = computed(() => {
 })
 
 // Computed property for language icon
-const languageIcon = computed(() => getLanguageIcon(codeLanguage.value || ''))
+const languageIcon = computed(() => {
+  void languageIconsRevision.value
+  return getLanguageIcon(codeLanguage.value || '')
+})
 
 // Compute inline style for container to respect optional min/max width
 const containerStyle = computed(() => {

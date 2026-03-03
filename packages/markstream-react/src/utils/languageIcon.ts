@@ -1,4 +1,3 @@
-import CppIcon from '../icon/cpp.svg?raw'
 import CssIcon from '../icon/css.svg?raw'
 import HtmlIcon from '../icon/html.svg?raw'
 import JsxReactIcon from '../icon/javascript-react.svg?raw'
@@ -9,15 +8,20 @@ import MermaidIcon from '../icon/mermaid.svg?raw'
 import PythonIcon from '../icon/python.svg?raw'
 import ShellIcon from '../icon/shell.svg?raw'
 import SquareCodeIcon from '../icon/square-code.svg?raw'
-import SvgIcon from '../icon/svg.svg?raw'
 import TextIcon from '../icon/text.svg?raw'
 import TsReactIcon from '../icon/typescript-react.svg?raw'
 import TsIcon from '../icon/typescript.svg?raw'
-import VueIcon from '../icon/vue.svg?raw'
 
 export type LanguageIconResolver = (lang: string) => string | undefined | null
 
+type LanguageIconMap = Record<string, string>
+
 let userLanguageIconResolver: LanguageIconResolver | null = null
+let extendedLanguageIconMap: LanguageIconMap | null = null
+let extendedLanguageIconPromise: Promise<LanguageIconMap | null> | null = null
+const revisionListeners = new Set<() => void>()
+
+const DEFAULT_LANGUAGE_ICON = SquareCodeIcon
 
 export function setLanguageIconResolver(resolver?: LanguageIconResolver | null) {
   userLanguageIconResolver = resolver ?? null
@@ -44,6 +48,23 @@ const LANGUAGE_ALIAS_MAP: Record<string, string> = {
   'text': 'plain',
   'c++': 'cpp',
   'md': 'markdown',
+}
+
+const CORE_LANGUAGE_ICON_MAP: LanguageIconMap = {
+  '': TextIcon,
+  plain: TextIcon,
+  text: TextIcon,
+  javascript: JsIcon,
+  typescript: TsIcon,
+  jsx: JsxReactIcon,
+  tsx: TsReactIcon,
+  html: HtmlIcon,
+  css: CssIcon,
+  json: JsonIcon,
+  python: PythonIcon,
+  shell: ShellIcon,
+  markdown: MarkdownIcon,
+  mermaid: MermaidIcon,
 }
 
 function extractLanguageToken(lang?: string | null): string {
@@ -78,47 +99,61 @@ export function resolveMonacoLanguageId(lang?: string | null): string {
   }
 }
 
+function emitLanguageIconsRevision() {
+  for (const listener of revisionListeners) {
+    try {
+      listener()
+    }
+    catch {}
+  }
+}
+
+async function loadExtendedLanguageIconMap(): Promise<LanguageIconMap | null> {
+  if (extendedLanguageIconMap)
+    return extendedLanguageIconMap
+
+  if (!extendedLanguageIconPromise) {
+    extendedLanguageIconPromise = import('./languageIconExtended')
+      .then((mod) => {
+        extendedLanguageIconMap = mod.EXTENDED_LANGUAGE_ICON_MAP
+        emitLanguageIconsRevision()
+        return extendedLanguageIconMap
+      })
+      .catch(() => null)
+  }
+
+  return extendedLanguageIconPromise
+}
+
+export async function preloadExtendedLanguageIcons() {
+  await loadExtendedLanguageIconMap()
+}
+
+export function subscribeLanguageIconsRevision(listener: () => void): () => void {
+  revisionListeners.add(listener)
+  return () => {
+    revisionListeners.delete(listener)
+  }
+}
+
 export function getLanguageIcon(lang: string): string {
   if (userLanguageIconResolver) {
     const hit = userLanguageIconResolver(lang)
     if (hit != null && hit !== '')
       return hit
   }
+
   const normalized = normalizeLanguageIdentifier(lang)
-  switch (normalized) {
-    case 'javascript':
-      return JsIcon
-    case 'typescript':
-      return TsIcon
-    case 'jsx':
-      return JsxReactIcon
-    case 'tsx':
-      return TsReactIcon
-    case 'html':
-      return HtmlIcon
-    case 'css':
-      return CssIcon
-    case 'json':
-      return JsonIcon
-    case 'python':
-      return PythonIcon
-    case 'shell':
-      return ShellIcon
-    case 'markdown':
-      return MarkdownIcon
-    case 'mermaid':
-      return MermaidIcon
-    case 'svg':
-      return SvgIcon
-    case 'vue':
-      return VueIcon
-    case 'cpp':
-      return CppIcon
-    case 'plain':
-      return TextIcon
-    default:
-      return SquareCodeIcon
-  }
+  const coreIcon = CORE_LANGUAGE_ICON_MAP[normalized]
+  if (coreIcon)
+    return coreIcon
+
+  const extendedIcon = extendedLanguageIconMap?.[normalized]
+  if (extendedIcon)
+    return extendedIcon
+
+  void loadExtendedLanguageIconMap()
+  return DEFAULT_LANGUAGE_ICON
 }
 
 export const languageMap: Record<string, string> = {

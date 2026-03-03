@@ -11,7 +11,7 @@ import { name } from './package.json'
 const pluginsArr: any[] = [Vue()]
 
 if (process.env.ANALYZE === 'true') {
-  pluginsArr.push(visualizer({ filename: 'dist-tw/bundle-visualizer-tailwind.html', gzipSize: true }) as any)
+  pluginsArr.push(visualizer({ filename: 'bundle-visualizer-tailwind.html', gzipSize: true }) as any)
 }
 
 export default defineConfig({
@@ -51,6 +51,7 @@ export default defineConfig({
         'mermaid',
         'vue-i18n',
         'katex',
+        '@terrastruct/d2',
         'katex/contrib/mhchem',
         'katex/dist/contrib/mhchem',
         // syntax highlighting / editor libs that previously caused
@@ -91,7 +92,7 @@ export default defineConfig({
     format: 'es',
     rollupOptions: {
       // Externalize heavy libs in worker bundling as well
-      external: (id: string) => /(?:^|\/)(?:mermaid|katex|shiki|monaco-editor|vscode-textmate|vscode-oniguruma)(?:\/|$)/.test(id),
+      external: (id: string) => /(?:^|\/)(?:@terrastruct\/d2|mermaid|katex|shiki|monaco-editor|vscode-textmate|vscode-oniguruma)(?:\/|$)/.test(id),
       output: {
         entryFileNames: 'workers/[name].js',
         chunkFileNames: 'workers/[name].js',

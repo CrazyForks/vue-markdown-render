@@ -12,6 +12,8 @@ pnpm --filter markstream-react dev
 
 ```bash
 pnpm --filter markstream-react build
+pnpm --filter markstream-react build:analyze
+pnpm --filter markstream-react size:check
 ```
 
 ## Usage
@@ -28,6 +30,19 @@ export default function Article({ markdown }: { markdown: string }) {
 ```
 
 You can also pass a pre-parsed `nodes` array if you already have AST data.
+
+## Bundle size notes
+
+- Optional peers are not bundled; install only what you use (`stream-monaco`, `stream-markdown`, `mermaid`, `katex`, etc.).
+- Infrequent language icons are split into an async chunk and loaded on demand.
+- To avoid first-hit fallback icons, preload once when the app is idle:
+
+```tsx
+import { preloadExtendedLanguageIcons } from 'markstream-react'
+
+if (typeof window !== 'undefined')
+  void preloadExtendedLanguageIcons()
+```
 
 ## Tailwind
 

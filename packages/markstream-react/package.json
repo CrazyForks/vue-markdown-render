@@ -77,9 +77,11 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build --mode npm && vite build -c vite.config.tailwind.ts --mode npm && node ./scripts/copy-tailwind-css.mjs && pnpm run build:dts",
+    "build:analyze": "ANALYZE=true pnpm build",
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "size:check": "node ../../scripts/check-package-size.mjs",
     "release": "bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {
@@ -124,6 +126,7 @@
     "autoprefixer": "^10.4.24",
     "rollup": "^3.29.5",
     "rollup-plugin-dts": "^5.3.1",
+    "rollup-plugin-visualizer": "^6.0.5",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",

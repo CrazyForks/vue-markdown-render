@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
-import { getLanguageIcon, languageMap, normalizeLanguageIdentifier } from '../../utils/languageIcon'
+import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
 
 export interface MarkdownCodeBlockNodeProps {
   node: {
@@ -88,13 +88,24 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const codeLanguage = useMemo(() => String(props.node.language ?? ''), [props.node.language])
   const normalizedLanguage = useMemo(() => normalizeRendererLanguage(codeLanguage), [codeLanguage])
   const canonicalLanguage = useMemo(() => normalizeLanguageIdentifier(codeLanguage), [codeLanguage])
+  const [languageIconsRevision, setLanguageIconsRevision] = useState(0)
+
+  useEffect(() => {
+    return subscribeLanguageIconsRevision(() => {
+      setLanguageIconsRevision(v => v + 1)
+    })
+  }, [])
+
   const displayLanguage = useMemo(() => {
     const label = languageMap[canonicalLanguage] || canonicalLanguage
     if (!label)
       return 'Text'
     return label.charAt(0).toUpperCase() + label.slice(1)
   }, [canonicalLanguage])
-  const languageIcon = useMemo(() => getLanguageIcon(canonicalLanguage), [canonicalLanguage])
+  const languageIcon = useMemo(
+    () => getLanguageIcon(canonicalLanguage),
+    [canonicalLanguage, languageIconsRevision],
+  )
 
   const { t } = useSafeI18n()
 

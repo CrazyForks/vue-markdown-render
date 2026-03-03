@@ -55,3 +55,11 @@ jobs:
 
       - name: Run SSR check
         run: nr check:ssr
+
+      - name: Build (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm build
+
+      - name: Check package size budget (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm size:check

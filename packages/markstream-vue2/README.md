@@ -137,6 +137,27 @@ new Vue({
 }).$mount('#app')
 ```
 
+## Build and size checks
+
+```bash
+pnpm --filter markstream-vue2 build
+pnpm --filter markstream-vue2 build:analyze
+pnpm --filter markstream-vue2 size:check
+```
+
+## Bundle size notes
+
+- Optional peers are not bundled; install only the features you need.
+- Infrequent language icons are split into an async chunk and loaded on demand.
+- If you want to avoid first-hit fallback icons, preload once when the app is idle:
+
+```ts
+import { preloadExtendedLanguageIcons } from 'markstream-vue2'
+
+if (typeof window !== 'undefined')
+  void preloadExtendedLanguageIcons()
+```
+
 ## Troubleshooting
 
 ### `defineComponent is not a function`

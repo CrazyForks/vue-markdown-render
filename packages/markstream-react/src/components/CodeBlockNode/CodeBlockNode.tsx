@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
-import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils/languageIcon'
+import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
 import { HtmlPreviewFrame } from './HtmlPreviewFrame'
 import { getUseMonaco } from './monaco'
 import { getDesiredMonacoTheme, registerMonacoThemeSetter, subscribeMonacoThemeApplied } from './monacoThemeRegistry'
@@ -108,6 +108,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
   const [expanded, setExpanded] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [inlinePreviewOpen, setInlinePreviewOpen] = useState(false)
+  const [languageIconsRevision, setLanguageIconsRevision] = useState(0)
 
   const { t } = useSafeI18n()
 
@@ -179,6 +180,12 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
   useEffect(() => {
     monacoOptionsRef.current = monacoOptions
   }, [monacoOptions])
+
+  useEffect(() => {
+    return subscribeLanguageIconsRevision(() => {
+      setLanguageIconsRevision(v => v + 1)
+    })
+  }, [])
 
   useEffect(() => {
     setCodeLanguage(normalizeLanguageIdentifier(node.language))
@@ -335,7 +342,10 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
   }, [codeLanguage, detectedLanguage, node.language])
   const canonicalLanguage = useMemo(() => normalizeLanguageIdentifier(rawLanguage), [rawLanguage])
   const monacoLanguage = useMemo(() => resolveMonacoLanguageId(canonicalLanguage), [canonicalLanguage])
-  const languageIcon = useMemo(() => getLanguageIcon(canonicalLanguage), [canonicalLanguage])
+  const languageIcon = useMemo(
+    () => getLanguageIcon(canonicalLanguage),
+    [canonicalLanguage, languageIconsRevision],
+  )
   const isPreviewable = useMemo(() => {
     if (!isShowPreview)
       return false

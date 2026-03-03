@@ -1,6 +1,8 @@
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import process from 'node:process'
 import vue2 from '@vitejs/plugin-vue2'
+import { visualizer } from 'rollup-plugin-visualizer'
 import { minify as terserMinify } from 'terser'
 import UnpluginClassExtractor from 'unplugin-class-extractor/vite'
 import { defineConfig } from 'vite'
@@ -37,6 +39,11 @@ export default defineConfig(({ mode }) => {
         include: [/\/src\/components\/(?:[^/]+\/)*[^/]+\.vue(\?.*)?$/],
       }) as any,
     )
+    if (process.env.ANALYZE === 'true') {
+      plugins.push(
+        visualizer({ filename: 'bundle-visualizer.html', gzipSize: true, brotliSize: true }) as any,
+      )
+    }
   }
 
   plugins.push({
@@ -120,6 +127,14 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         external: (id: string) => {
+          if (id === '@terrastruct/d2' || id.startsWith('@terrastruct/d2/'))
+            return true
+          if (/node_modules\/@terrastruct\/d2(?:\/|$)/.test(id))
+            return true
+          if (id === '@floating-ui/dom' || id.startsWith('@floating-ui/dom/'))
+            return true
+          if (/node_modules\/@floating-ui\/dom(?:\/|$)/.test(id))
+            return true
           if (id === 'mermaid' || id.startsWith('mermaid/'))
             return true
           if (/node_modules\/mermaid(?:\/|$)/.test(id))
@@ -135,6 +150,8 @@ export default defineConfig(({ mode }) => {
             'stream-markdown',
             'stream-markdown-parser',
             '@antv/infographic',
+            '@terrastruct/d2',
+            '@floating-ui/dom',
             'monaco-editor',
             'shiki',
           ].includes(id)

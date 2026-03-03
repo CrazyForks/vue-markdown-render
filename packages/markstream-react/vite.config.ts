@@ -1,5 +1,7 @@
+import process from 'node:process'
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react-swc'
+import { visualizer } from 'rollup-plugin-visualizer'
 import UnpluginClassExtractor from 'unplugin-class-extractor/vite'
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
@@ -22,6 +24,11 @@ export default defineConfig(({ mode }) => {
         include: [/\/src\/.*\.(?:ts|tsx)(\?.*)?$/],
       }) as any,
     )
+    if (process.env.ANALYZE === 'true') {
+      plugins.push(
+        visualizer({ filename: 'bundle-visualizer.html', gzipSize: true, brotliSize: true }) as any,
+      )
+    }
   }
   return {
     base,
@@ -89,6 +96,7 @@ export default defineConfig(({ mode }) => {
           'stream-markdown',
           'stream-markdown-parser',
           '@antv/infographic',
+          '@terrastruct/d2',
           '@floating-ui/dom',
         ],
       },

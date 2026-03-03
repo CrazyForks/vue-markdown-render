@@ -1,9 +1,16 @@
+import process from 'node:process'
 import { resolve } from 'node:path'
 import autoprefixer from 'autoprefixer'
+import { visualizer } from 'rollup-plugin-visualizer'
 import { defineConfig } from 'vite'
 
+const pluginsArr: any[] = []
+
+if (process.env.ANALYZE === 'true')
+  pluginsArr.push(visualizer({ filename: 'bundle-visualizer-tailwind.html', gzipSize: true }) as any)
+
 export default defineConfig({
-  plugins: [],
+  plugins: pluginsArr,
   build: {
     target: 'es2019',
     cssTarget: 'chrome80',

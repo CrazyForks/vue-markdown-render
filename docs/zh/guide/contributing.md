@@ -6,8 +6,17 @@
 
 - `pnpm dev` / `pnpm play` — 启动 playground
 - `pnpm build` — 构建库
+- `pnpm build:analyze` — 生成 bundle 可视化报告
+- `pnpm size:check` — 执行包体积预算检查
 - `pnpm test` — 运行测试
 - `pnpm docs:dev` — 启动文档站点
+
+体积预算环境变量（可选）：
+
+- `MAX_DIST_BYTES`
+- `MAX_JS_CHUNK_BYTES`
+- `MAX_PACK_TGZ_BYTES`
+- `MAX_PACK_UNPACKED_BYTES`
 
 文档贡献：
 

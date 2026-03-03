@@ -43,6 +43,21 @@ setCustomComponents({ code_block: MarkdownCodeBlockNode })
 
 设置后，`code_block` 会使用 `MarkdownCodeBlockNode`（由 `stream-markdown` + Shiki 驱动）。你也可以自定义组件并直接使用 `stream-markdown`。
 
+### 语言图标懒加载
+
+为了减小主包体积，低频语言图标已拆分到异步 chunk：
+
+- 常见语言（JS/TS/HTML/CSS/JSON/Python 等）图标仍在主包内。
+- 低频语言图标按需加载，异步 chunk 返回后会自动刷新图标显示。
+- 如果你希望避免首次命中时的回退图标，可在应用空闲阶段预热一次：
+
+```ts
+import { preloadExtendedLanguageIcons } from 'markstream-vue'
+
+if (typeof window !== 'undefined')
+  void preloadExtendedLanguageIcons()
+```
+
 ### Vue CLI 4（Webpack 4）注意事项
 
 如果你使用 Vue CLI 4（Webpack 4），更推荐把代码块切到 Shiki 模式，并通过覆盖 `code_block` 来避免 Monaco 在 legacy bundler 下的一些兼容性问题。
