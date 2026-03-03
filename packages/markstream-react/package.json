@@ -63,6 +63,7 @@
       "import": "./dist/index.js"
     },
     "./index.css": "./dist/index.css",
+    "./index.px.css": "./dist/index.px.css",
     "./index.tailwind.css": "./dist/index.tailwind.css",
     "./tailwind": "./dist/tailwind.ts",
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
@@ -76,7 +77,7 @@
   ],
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build --mode npm && vite build -c vite.config.tailwind.ts --mode npm && node ./scripts/copy-tailwind-css.mjs && pnpm run build:dts",
+    "build": "vite build --mode npm && vite build -c vite.config.tailwind.ts --mode npm && node ./scripts/copy-tailwind-css.mjs && node ../../scripts/generate-px-css.mjs && pnpm run build:dts",
     "build:analyze": "ANALYZE=true pnpm build",
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
     "preview": "vite preview",

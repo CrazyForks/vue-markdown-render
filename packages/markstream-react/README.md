@@ -29,6 +29,8 @@ export default function Article({ markdown }: { markdown: string }) {
 }
 ```
 
+If your app scales root font size on mobile (`html` / `body`), use `markstream-react/index.px.css` to prevent `rem`-based global scaling side effects.
+
 You can also pass a pre-parsed `nodes` array if you already have AST data.
 
 ## Bundle size notes

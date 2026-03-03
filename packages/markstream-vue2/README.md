@@ -46,6 +46,8 @@ Vue.use(VueCompositionAPI)
 Vue.use(VueRendererMarkdown)
 ```
 
+If your app increases root font size on mobile (`html` / `body`), prefer `markstream-vue2/index.px.css` to avoid `rem`-driven scaling.
+
 Repo example:
 - `playground-vue2-cli` (Vue 2.6 + Vue CLI / Webpack 4)
 
