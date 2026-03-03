@@ -112,6 +112,27 @@ export function buildAllowedHtmlTagSet(options?: ParseOptions) {
   return set
 }
 
+function parseStandaloneHtmlDocument(markdown: string): ParsedNode[] | null {
+  const trimmed = markdown.trim()
+  if (!trimmed)
+    return null
+
+  const startsLikeHtmlDocument = /^(?:<!doctype\s+html[^>]*>\s*)?<html(?:\s[^>]*)?>/i.test(trimmed)
+  const endsWithHtmlClose = /<\/html>\s*$/i.test(trimmed)
+  if (!startsLikeHtmlDocument || !endsWithHtmlClose)
+    return null
+
+  return [
+    {
+      type: 'html_block',
+      tag: 'html',
+      raw: markdown,
+      content: markdown,
+      loading: false,
+    } as ParsedNode,
+  ]
+}
+
 function stripDanglingHtmlLikeTail(markdown: string) {
   const isWs = (ch: string) => ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r'
 
@@ -1037,6 +1058,21 @@ export function parseMarkdownToStructure(
   // 파싱 전에 제거한다.
   if (!isFinal)
     safeMarkdown = stripDanglingHtmlLikeTail(safeMarkdown)
+
+  const standaloneHtmlDocument = parseStandaloneHtmlDocument(safeMarkdown)
+  if (standaloneHtmlDocument) {
+    // Keep pre/post hooks observable for callers that rely on them for
+    // instrumentation, but preserve the full-document html_block shape.
+    const preHook = options.preTransformTokens
+    const postHook = options.postTransformTokens
+    if (typeof preHook === 'function' || typeof postHook === 'function') {
+      const rawTokens = md.parse(safeMarkdown, { __markstreamFinal: isFinal }) as unknown as MarkdownToken[]
+      const hookedTokens = typeof preHook === 'function' ? (preHook(rawTokens) || rawTokens) : rawTokens
+      if (typeof postHook === 'function')
+        postHook(hookedTokens)
+    }
+    return standaloneHtmlDocument
+  }
 
   // Get tokens from markdown-it
   const tokens = md.parse(safeMarkdown, { __markstreamFinal: isFinal })
