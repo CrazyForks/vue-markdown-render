@@ -18,6 +18,7 @@ const props = withDefaults(defineProps<LinkNodeProps>(), {
   showTooltip: true,
 })
 const inheritedShowTooltips = inject<{ value?: boolean } | undefined>('markstreamShowTooltips', undefined)
+
 const tooltipEnabled = computed(() => {
   const inherited = inheritedShowTooltips?.value
   if (typeof inherited === 'boolean')
@@ -92,10 +93,15 @@ const nodeAttrs = computed(() => {
 
   return sanitizeAttrs(normalized)
 })
-const anchorAttrs = computed(() => ({
-  ...(attrs as Record<string, unknown>),
-  ...nodeAttrs.value,
-}))
+const anchorAttrs = computed(() => {
+  const merged = {
+    ...(attrs as Record<string, unknown>),
+    ...nodeAttrs.value,
+  } as Record<string, unknown>
+  // `title` is controlled by `showTooltip` behavior and should not be overridden.
+  delete merged.title
+  return merged
+})
 
 // Tooltip handlers using singleton tooltip
 function onAnchorEnter(e: Event) {
@@ -113,7 +119,12 @@ function onAnchorLeave() {
     return
   hideTooltip()
 }
-const title = computed(() => String(props.node.title ?? props.node.href ?? ''))
+const title = computed(() => {
+  const rawTitle = props.node?.title
+  if (typeof rawTitle === 'string' && rawTitle.trim().length > 0)
+    return rawTitle
+  return String(props.node?.href ?? '')
+})
 </script>
 
 <template>

@@ -30,4 +30,18 @@ describe('nodeRenderer showTooltips prop', () => {
     expect(link.exists()).toBe(true)
     expect(link.attributes('title')).toBe('')
   })
+
+  it('inherits showTooltips=false inside list item nested renderer', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '- Visit [Vue](https://vuejs.org) now.',
+        showTooltips: false,
+      },
+    })
+    await flushAll()
+
+    const link = wrapper.find('a[href=\"https://vuejs.org\"]')
+    expect(link.exists()).toBe(true)
+    expect(link.attributes('title')).toBe('https://vuejs.org')
+  })
 })
