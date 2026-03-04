@@ -1,4 +1,4 @@
-## [0.0.8-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.8-beta.1) (2026-03-03)
+## [0.0.8-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.8-beta.2) (2026-03-04)
 
 
 ### Bug Fixes
@@ -47,8 +47,10 @@
 * **nuxt.config.ts:** set nitro preset to static ([580e83e](https://github.com/Simon-He95/markstream-vue/commit/580e83e34487446d423e11b403c8f270240f70ac))
 * **parser:** handle intraword asterisks and strict unmatched strong ([08ee3db](https://github.com/Simon-He95/markstream-vue/commit/08ee3db0aba56d650604be46eb406ff6b45351bb))
 * **parser:** keep backticked dollars/code literal and skip placeholder $...$ math ([747610c](https://github.com/Simon-He95/markstream-vue/commit/747610c2ba31d853172f80dc870f52cc97647114)), closes [#306](https://github.com/Simon-He95/markstream-vue/issues/306)
+* **parser:** keep complete html document as single html_block ([b376742](https://github.com/Simon-He95/markstream-vue/commit/b37674220c5ef2b1d1f8052a7b9508dadd986b6c))
 * prevent dropping numeric-only documents in parseMarkdownToStructure ([bba733c](https://github.com/Simon-He95/markstream-vue/commit/bba733c9a8d4b77f0fbd0560d695a611e0822eef)), closes [#278](https://github.com/Simon-He95/markstream-vue/issues/278)
 * prevent false positives for JSON in math parsing and add tests ([0fb4e82](https://github.com/Simon-He95/markstream-vue/commit/0fb4e8291c092288e563f1289dbff4e94f90a7f1)), closes [#264](https://github.com/Simon-He95/markstream-vue/issues/264)
+* propagate showTooltips in nested list renderers ([6a8277d](https://github.com/Simon-He95/markstream-vue/commit/6a8277ddaa677c566c91f1dbd93f93c4af8615a7)), closes [#310](https://github.com/Simon-He95/markstream-vue/issues/310)
 * **react:** generate bundled d.ts on build ([fb5c88b](https://github.com/Simon-He95/markstream-vue/commit/fb5c88b345eeec857e4aa5a95e3592659d2fa491))
 * remove unnecessary blank lines in documentation and component files ([5f877e6](https://github.com/Simon-He95/markstream-vue/commit/5f877e61079b95ef3a78f1c8de7fe12328d85133)), closes [#243](https://github.com/Simon-He95/markstream-vue/issues/243)
 * standardize class attribute syntax in list item components and tests ([71af12b](https://github.com/Simon-He95/markstream-vue/commit/71af12b1638456fdbaf809849f3f230ea9505de0))
@@ -85,6 +87,7 @@
 * add playground-vue2-cli to pnpm workspace ([36d4101](https://github.com/Simon-He95/markstream-vue/commit/36d410125346b62f7e8d68d327b9ec923bbe31f7))
 * add push options for tagging scripts in package.json ([9e46cb1](https://github.com/Simon-He95/markstream-vue/commit/9e46cb10a7f062bc2679648e61639f065e30a9dd))
 * add px css build output ([d477cef](https://github.com/Simon-He95/markstream-vue/commit/d477cef48c36d9761e8cd5457a5cd0e9f60f4910))
+* add px css exports for vue2 and react ([67ca274](https://github.com/Simon-He95/markstream-vue/commit/67ca274be5a3e2c25f42bca04decce36a115733c))
 * add settings panel for theme selection, stream delay, and chunk size adjustments ([01129ee](https://github.com/Simon-He95/markstream-vue/commit/01129ee6a0d86ac0d364471683f5c6b282a9219e)), closes [#282](https://github.com/Simon-He95/markstream-vue/issues/282)
 * add support for blank line after custom HTML close before block marker ([4e4e31b](https://github.com/Simon-He95/markstream-vue/commit/4e4e31bb804fe76401c9283f215c6e43135f362c)), closes [#295](https://github.com/Simon-He95/markstream-vue/issues/295)
 * add support for fixing indented code blocks and enhance HTML inline handling ([733bf40](https://github.com/Simon-He95/markstream-vue/commit/733bf409f05de3704199f9274a62f48ea5d0f4e4)), closes [#257](https://github.com/Simon-He95/markstream-vue/issues/257)
