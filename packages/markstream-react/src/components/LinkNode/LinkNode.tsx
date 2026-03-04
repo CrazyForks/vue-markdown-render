@@ -52,7 +52,9 @@ export function LinkNode(props: NodeComponentProps<{
     props.underlineHeight,
   ])
 
-  const title = String(node.title ?? node.href ?? '')
+  const title = typeof node.title === 'string' && node.title.trim().length > 0
+    ? node.title
+    : String(node.href ?? '')
 
   const onAnchorEnter = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
     if (!showTip)

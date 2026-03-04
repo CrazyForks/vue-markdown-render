@@ -65,6 +65,12 @@ const nodeComponents = {
 
 // forward any non-prop attributes (e.g. custom-id) to the rendered element
 const attrs = useAttrs()
+const anchorAttrs = computed(() => {
+  const merged = { ...(attrs as Record<string, unknown>) }
+  // `title` is controlled by `showTooltip` behavior and should not be overridden.
+  delete (merged as Record<string, unknown>).title
+  return merged
+})
 
 // Tooltip handlers using singleton tooltip
 function onAnchorEnter(e: Event) {
@@ -82,7 +88,12 @@ function onAnchorLeave() {
     return
   hideTooltip()
 }
-const title = computed(() => String(props.node.title ?? props.node.href ?? ''))
+const title = computed(() => {
+  const rawTitle = props.node?.title
+  if (typeof rawTitle === 'string' && rawTitle.trim().length > 0)
+    return rawTitle
+  return String(props.node?.href ?? '')
+})
 </script>
 
 <template>
@@ -95,7 +106,7 @@ const title = computed(() => String(props.node.title ?? props.node.href ?? ''))
     :aria-hidden="node.loading ? 'true' : 'false'"
     target="_blank"
     rel="noopener noreferrer"
-    v-bind="attrs"
+    v-bind="anchorAttrs"
     :style="cssVars"
     @mouseenter="(e) => onAnchorEnter(e)"
     @mouseleave="onAnchorLeave"

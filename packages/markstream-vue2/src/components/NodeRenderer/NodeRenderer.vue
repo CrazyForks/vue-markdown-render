@@ -1520,6 +1520,10 @@ const linkBindings = computed(() => ({
   ...nonCodeBindings.value,
   ...(typeof props.showTooltips === 'boolean' ? { showTooltip: props.showTooltips } : {}),
 }))
+const listBindings = computed(() => ({
+  ...nonCodeBindings.value,
+  ...(typeof props.showTooltips === 'boolean' ? { showTooltips: props.showTooltips } : {}),
+}))
 const renderedItems = computed(() => {
   return visibleNodes.value.map((item) => {
     const language = getCodeBlockLanguage(item.node)
@@ -1592,6 +1596,9 @@ function getBindingsFor(node: ParsedNode, language?: string) {
 
   if (node.type === 'link')
     return linkBindings.value
+
+  if (node.type === 'list')
+    return listBindings.value
 
   return node.type === 'code_block'
     ? codeBlockBindings.value

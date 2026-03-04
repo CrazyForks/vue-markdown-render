@@ -28,6 +28,7 @@ const props = defineProps<{
   customId?: string
   /** Forwarded flag to enable/disable non-code node enter transition */
   typewriter?: boolean
+  showTooltips?: boolean
 }>()
 
 defineEmits<{
@@ -44,6 +45,7 @@ const liValueAttr = computed(() =>
 <template>
   <li class="list-item pl-1.5 my-2" dir="auto" v-bind="liValueAttr">
     <NodeRenderer
+      v-bind="{ showTooltips: props.showTooltips }"
       :index-key="`list-item-${props.indexKey}`"
       :nodes="itemNode?.children ?? []"
       :custom-id="props.customId"

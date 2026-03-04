@@ -17,7 +17,7 @@ interface ListItem {
   raw: string
 }
 
-const { node, customId, indexKey, typewriter } = defineProps<{
+const { node, customId, indexKey, typewriter, showTooltips } = defineProps<{
   node: {
     type: 'list'
     ordered: boolean
@@ -28,6 +28,7 @@ const { node, customId, indexKey, typewriter } = defineProps<{
   customId?: string
   indexKey?: number | string
   typewriter?: boolean
+  showTooltips?: boolean
 }>()
 
 defineEmits(['copy'])
@@ -49,6 +50,7 @@ const listItemComponent = computed(() => {
       :is="listItemComponent"
       v-for="(item, index) in node.items"
       :key="`${indexKey || 'list'}-${index}`"
+      v-bind="{ showTooltips }"
       :node="item"
       :custom-id="customId"
       :index-key="`${indexKey || 'list'}-${index}`"
