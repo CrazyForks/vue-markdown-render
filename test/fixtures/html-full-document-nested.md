@@ -40,7 +40,7 @@
 </head>
 <body>
     <h2>卷绕设备异常分析处理汇总</h2>
-    
+
     <table>
         <tr>
             <th>异常类型</th>
@@ -88,7 +88,7 @@
             <td>1. 检查下料夹爪与卷针角度。<br>2. 卷针表面是否有脏污。<br>3. 下料时速度过快，下料夹爪有无晃动。<br>4. 下料时卷针卷针有无解锁。<br>5. 卷针下料夹紧电芯压力。<br>6. 检查卷针内夹针缝隙大小，及内针弹性有无异常。</td>
         </tr>
     </table>
-    
+
     <div class="chart-container">
         <div id="exceptionChart"></div>
     </div>
@@ -97,7 +97,7 @@
         // 初始化ECharts图表
         var chartDom = document.getElementById('exceptionChart');
         var myChart = echarts.init(chartDom);
-        
+
         // 异常类型分布数据（按类型统计条目数量）
         var option = {
             title: { text: '异常类型分布统计' },
@@ -111,7 +111,7 @@
                 data: [8, 8, 4, 12, 8, 6, 5, 6]
             }]
         };
-        
+
         option && myChart.setOption(option);
     </script>
 </body>

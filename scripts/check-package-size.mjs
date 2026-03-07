@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import process from 'node:process'
 
 const root = process.cwd()
 const distDir = join(root, 'dist')

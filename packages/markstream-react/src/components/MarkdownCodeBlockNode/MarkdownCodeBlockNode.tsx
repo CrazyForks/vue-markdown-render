@@ -325,30 +325,30 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
           </div>
           <div className="flex items-center space-x-2">
             {props.showCollapseButton && (
-            <button
-              type="button"
-              className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-              aria-pressed={isCollapsed}
-              onClick={() => setIsCollapsed(v => !v)}
-              onMouseEnter={e => onBtnHover(e, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
-              onFocus={e => onBtnHover(e as any, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
-              onMouseLeave={onBtnLeave}
-              onBlur={onBtnLeave}
-            >
-              <svg
-                style={{ rotate: isCollapsed ? '0deg' : '90deg' }}
-                xmlns="http://www.w3.org/2000/svg"
-                xmlnsXlink="http://www.w3.org/1999/xlink"
-                aria-hidden="true"
-                role="img"
-                width="1em"
-                height="1em"
-                viewBox="0 0 24 24"
-                className="w-3 h-3"
+              <button
+                type="button"
+                className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+                aria-pressed={isCollapsed}
+                onClick={() => setIsCollapsed(v => !v)}
+                onMouseEnter={e => onBtnHover(e, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
+                onFocus={e => onBtnHover(e as any, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))}
+                onMouseLeave={onBtnLeave}
+                onBlur={onBtnLeave}
               >
-                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 18l6-6l-6-6" />
-              </svg>
-            </button>
+                <svg
+                  style={{ rotate: isCollapsed ? '0deg' : '90deg' }}
+                  xmlns="http://www.w3.org/2000/svg"
+                  xmlnsXlink="http://www.w3.org/1999/xlink"
+                  aria-hidden="true"
+                  role="img"
+                  width="1em"
+                  height="1em"
+                  viewBox="0 0 24 24"
+                  className="w-3 h-3"
+                >
+                  <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 18l6-6l-6-6" />
+                </svg>
+              </button>
             )}
 
             {props.showFontSizeButtons && props.enableFontSizeControl && (

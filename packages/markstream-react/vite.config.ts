@@ -1,5 +1,5 @@
-import process from 'node:process'
 import { resolve } from 'node:path'
+import process from 'node:process'
 import react from '@vitejs/plugin-react-swc'
 import { visualizer } from 'rollup-plugin-visualizer'
 import UnpluginClassExtractor from 'unplugin-class-extractor/vite'

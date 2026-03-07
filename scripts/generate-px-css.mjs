@@ -5,7 +5,7 @@ import process from 'node:process'
 const sourceCss = path.resolve('dist/index.css')
 const targetCss = path.resolve('dist/index.px.css')
 const pxPerRem = 16
-const remPattern = /(-?\d*\.?\d+)rem\b/g
+const remPattern = /(-?(?:\d+(?:\.\d+)?|\.\d+))rem\b/g
 
 function formatPx(value) {
   if (value === 0)

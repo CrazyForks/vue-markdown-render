@@ -52,19 +52,19 @@ const LANGUAGE_ALIAS_MAP: Record<string, string> = {
 
 const CORE_LANGUAGE_ICON_MAP: LanguageIconMap = {
   '': TextIcon,
-  plain: TextIcon,
-  text: TextIcon,
-  javascript: JsIcon,
-  typescript: TsIcon,
-  jsx: JsxReactIcon,
-  tsx: TsReactIcon,
-  html: HtmlIcon,
-  css: CssIcon,
-  json: JsonIcon,
-  python: PythonIcon,
-  shell: ShellIcon,
-  markdown: MarkdownIcon,
-  mermaid: MermaidIcon,
+  'plain': TextIcon,
+  'text': TextIcon,
+  'javascript': JsIcon,
+  'typescript': TsIcon,
+  'jsx': JsxReactIcon,
+  'tsx': TsReactIcon,
+  'html': HtmlIcon,
+  'css': CssIcon,
+  'json': JsonIcon,
+  'python': PythonIcon,
+  'shell': ShellIcon,
+  'markdown': MarkdownIcon,
+  'mermaid': MermaidIcon,
 }
 
 function extractLanguageToken(lang?: string | null): string {

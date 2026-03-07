@@ -1,5 +1,5 @@
-import process from 'node:process'
 import { resolve } from 'node:path'
+import process from 'node:process'
 import autoprefixer from 'autoprefixer'
 import { visualizer } from 'rollup-plugin-visualizer'
 import { defineConfig } from 'vite'
