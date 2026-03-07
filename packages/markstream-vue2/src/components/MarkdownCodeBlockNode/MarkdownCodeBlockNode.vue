@@ -20,6 +20,7 @@ const props = defineProps({
   showCopyButton: { type: Boolean, default: true },
   showExpandButton: { type: Boolean, default: true },
   showPreviewButton: { type: Boolean, default: true },
+  showCollapseButton: { type: Boolean, default: true },
   showFontSizeButtons: { type: Boolean, default: true },
   showTooltips: { type: Boolean, default: undefined },
 })
@@ -502,6 +503,7 @@ function previewCode() {
       <slot name="header-right">
         <div class="flex items-center space-x-2">
           <button
+            v-if="props.showCollapseButton"
             type="button"
             class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
             :aria-pressed="isCollapsed"
