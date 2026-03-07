@@ -11,7 +11,7 @@
 Refer to `src/types/component-props.ts` for full signature. Key props:
 - `node` — code_block node (required)
 - `loading`, `stream`, `isShowPreview`
-- Header controls: `showHeader`, `showCopyButton`, `showExpandButton`, `showPreviewButton`, `showFontSizeButtons`, `showTooltips`
+- Header controls: `showHeader`, `showCollapseButton`, `showCopyButton`, `showExpandButton`, `showPreviewButton`, `showFontSizeButtons`, `showTooltips`
 
 ## Slots
 - `header-left` — replace left header

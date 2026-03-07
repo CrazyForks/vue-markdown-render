@@ -33,6 +33,7 @@ type ResolvedProps = Required<Pick<
   | 'showCopyButton'
   | 'showExpandButton'
   | 'showPreviewButton'
+  | 'showCollapseButton'
   | 'showFontSizeButtons'
 >> & CodeBlockNodeProps
 
@@ -46,6 +47,7 @@ const DEFAULTS: Required<Pick<
   | 'showCopyButton'
   | 'showExpandButton'
   | 'showPreviewButton'
+  | 'showCollapseButton'
   | 'showFontSizeButtons'
 >> = {
   isShowPreview: true,
@@ -56,6 +58,7 @@ const DEFAULTS: Required<Pick<
   showCopyButton: true,
   showExpandButton: true,
   showPreviewButton: true,
+  showCollapseButton: true,
   showFontSizeButtons: true,
 }
 
@@ -78,6 +81,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     showCopyButton,
     showExpandButton,
     showPreviewButton,
+    showCollapseButton,
     showFontSizeButtons,
     showTooltips,
   } = props
@@ -720,6 +724,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
             <span className="text-sm font-medium font-mono truncate">{displayLanguage}</span>
           </div>
           <div className="flex items-center space-x-2">
+            {showCollapseButton && (
             <button
               type="button"
               className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
@@ -744,6 +749,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
                 <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 18l6-6l-6-6" />
               </svg>
             </button>
+            )}
 
             {showFontSizeButtons && enableFontSizeControl && (
               <>

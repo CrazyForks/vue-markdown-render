@@ -36,6 +36,7 @@ const props = withDefaults(
     showCopyButton?: boolean
     showExpandButton?: boolean
     showPreviewButton?: boolean
+    showCollapseButton?: boolean
     showFontSizeButtons?: boolean
     /** Toggle singleton tooltips for header action buttons */
     showTooltips?: boolean
@@ -56,6 +57,7 @@ const props = withDefaults(
     showCopyButton: true,
     showExpandButton: true,
     showPreviewButton: true,
+    showCollapseButton: true,
     showFontSizeButtons: true,
   },
 )
@@ -538,6 +540,7 @@ function previewCode() {
       <slot name="header-right">
         <div class="flex items-center gap-x-2">
           <button
+            v-if="props.showCollapseButton"
             type="button"
             class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
             :aria-pressed="isCollapsed"

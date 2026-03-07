@@ -27,6 +27,7 @@ export interface MarkdownCodeBlockNodeProps {
   showCopyButton?: boolean
   showExpandButton?: boolean
   showPreviewButton?: boolean
+  showCollapseButton?: boolean
   showFontSizeButtons?: boolean
   showTooltips?: boolean
   onCopy?: (code: string) => void
@@ -68,6 +69,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     | 'showCopyButton'
     | 'showExpandButton'
     | 'showPreviewButton'
+    | 'showCollapseButton'
     | 'showFontSizeButtons'
   >> & MarkdownCodeBlockNodeProps = {
     loading: true,
@@ -81,6 +83,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     showCopyButton: true,
     showExpandButton: true,
     showPreviewButton: true,
+    showCollapseButton: true,
     showFontSizeButtons: true,
     ...rawProps,
   }
@@ -321,6 +324,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
             <span className="text-sm font-medium font-mono">{displayLanguage}</span>
           </div>
           <div className="flex items-center space-x-2">
+            {props.showCollapseButton && (
             <button
               type="button"
               className="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
@@ -345,6 +349,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
                 <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 18l6-6l-6-6" />
               </svg>
             </button>
+            )}
 
             {props.showFontSizeButtons && props.enableFontSizeControl && (
               <>

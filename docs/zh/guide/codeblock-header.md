@@ -4,9 +4,11 @@
 
 常用 props：
 - `showHeader` — 是否显示头部
+- `showCollapseButton` — 头部折叠按钮
 - `showCopyButton` — 复制按钮
 - `showExpandButton` — 展开/收起按钮
 - `showPreviewButton` — 预览按钮
+- `showFontSizeButtons` — 字号控制按钮组
 
 排查问题
 
@@ -71,6 +73,6 @@
 
 - 组件在复制操作时会触发 `copy` 事件（事件回调接收复制的文本）；使用 `@copy="onCopy"` 监听。
 - 组件仅在你监听 `@preview-code` 时才会触发 `previewCode` 事件；负载为 `{ node, artifactType, artifactTitle, id }`。（不监听时，内置预览弹窗仅支持 HTML。）
-- 若要隐藏某类默认按钮，可使用布尔 props：`showCopyButton`、`showExpandButton`、`showPreviewButton`、`showFontSizeButtons`。
+- 若要隐藏某类默认按钮，可使用布尔 props：`showCollapseButton`、`showCopyButton`、`showExpandButton`、`showPreviewButton`、`showFontSizeButtons`。
 - 可通过 `showTooltips` 控制当前代码块头部按钮 tooltip 的显示。
 - `showHeader` 控制是否渲染头部栏。

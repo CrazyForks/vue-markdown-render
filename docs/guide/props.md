@@ -60,6 +60,7 @@ Pass these props directly to `CodeBlockNode` / `MarkdownCodeBlockNode`, or globa
 - `show-copy-button`
 - `show-expand-button`
 - `show-preview-button`
+- `show-collapse-button`
 - `show-font-size-buttons`
 - `show-tooltips` (global tooltip switch for `LinkNode` + code-block nodes)
 
