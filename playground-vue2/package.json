@@ -8,12 +8,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "katex": "^0.16.28",
+    "katex": "^0.16.37",
     "markstream-vue2": "workspace:*",
-    "mermaid": "^11.12.2",
+    "mermaid": "^11.12.3",
     "stream-monaco": "latest",
     "vue": "2.7.16",
-    "vue-demi": "^0.14.7"
+    "vue-demi": "^0.14.10"
   },
   "devDependencies": {
     "@unocss/reset": "^0.61.9",
