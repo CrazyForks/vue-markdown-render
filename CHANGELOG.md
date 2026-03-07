@@ -1,4 +1,4 @@
-## [0.0.8-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.8-beta.2) (2026-03-04)
+## [0.0.8-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.8-beta.3) (2026-03-07)
 
 
 ### Bug Fixes
@@ -54,6 +54,7 @@
 * **react:** generate bundled d.ts on build ([fb5c88b](https://github.com/Simon-He95/markstream-vue/commit/fb5c88b345eeec857e4aa5a95e3592659d2fa491))
 * remove unnecessary blank lines in documentation and component files ([5f877e6](https://github.com/Simon-He95/markstream-vue/commit/5f877e61079b95ef3a78f1c8de7fe12328d85133)), closes [#243](https://github.com/Simon-He95/markstream-vue/issues/243)
 * standardize class attribute syntax in list item components and tests ([71af12b](https://github.com/Simon-He95/markstream-vue/commit/71af12b1638456fdbaf809849f3f230ea9505de0))
+* sync tooltip propagation to vue2 and react packages ([62f5171](https://github.com/Simon-He95/markstream-vue/commit/62f51711401e8f55b548f6df4fb426f25a32a913)), closes [#310](https://github.com/Simon-He95/markstream-vue/issues/310)
 * **theme:** toggle fail ([39cd71a](https://github.com/Simon-He95/markstream-vue/commit/39cd71af0c499c95d9c50b9770972540ac83c3ef)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
 * unify showTooltips behavior across renderers ([d84f755](https://github.com/Simon-He95/markstream-vue/commit/d84f7557a797eb1f0e05b2e1cffeef055780e5af))
 * update changelog to include regression tests for html_block splitting and math plugin updates ([64008d6](https://github.com/Simon-He95/markstream-vue/commit/64008d6e81031a7504c9945ab0186e46f646bc2a))
@@ -89,6 +90,7 @@
 * add px css build output ([d477cef](https://github.com/Simon-He95/markstream-vue/commit/d477cef48c36d9761e8cd5457a5cd0e9f60f4910))
 * add px css exports for vue2 and react ([67ca274](https://github.com/Simon-He95/markstream-vue/commit/67ca274be5a3e2c25f42bca04decce36a115733c))
 * add settings panel for theme selection, stream delay, and chunk size adjustments ([01129ee](https://github.com/Simon-He95/markstream-vue/commit/01129ee6a0d86ac0d364471683f5c6b282a9219e)), closes [#282](https://github.com/Simon-He95/markstream-vue/issues/282)
+* add showCollapseButton support for all code block renderers ([5a064b8](https://github.com/Simon-He95/markstream-vue/commit/5a064b8a0aeb81361190d40c5bad477a07ea6e7c))
 * add support for blank line after custom HTML close before block marker ([4e4e31b](https://github.com/Simon-He95/markstream-vue/commit/4e4e31bb804fe76401c9283f215c6e43135f362c)), closes [#295](https://github.com/Simon-He95/markstream-vue/issues/295)
 * add support for fixing indented code blocks and enhance HTML inline handling ([733bf40](https://github.com/Simon-He95/markstream-vue/commit/733bf409f05de3704199f9274a62f48ea5d0f4e4)), closes [#257](https://github.com/Simon-He95/markstream-vue/issues/257)
 * add Tailwind CSS support to markstream-vue2 ([b6a8b20](https://github.com/Simon-He95/markstream-vue/commit/b6a8b20c65a451eb684c80b238149320f208799f))
@@ -114,6 +116,7 @@
 * improve handling of ordered lists during streaming to prevent transient gaps and add corresponding tests ([37590a7](https://github.com/Simon-He95/markstream-vue/commit/37590a7ab31611b958b46bac47241f2d0df4a07b))
 * improve link parsing to handle multiple adjacent links correctly ([42ba963](https://github.com/Simon-He95/markstream-vue/commit/42ba963fb1c7d100d5519f213622380255d3d349)), closes [#240](https://github.com/Simon-He95/markstream-vue/issues/240)
 * integrate Tailwind CSS support and update styles for markstream-react ([4e4db11](https://github.com/Simon-He95/markstream-vue/commit/4e4db117f8f951bfa18e852f33cd77748f85d98b))
+* **markdown-code-block:** add showCollapseButton prop ([89a9150](https://github.com/Simon-He95/markstream-vue/commit/89a91509034b0c73c8a755a4882643dc5440b79f))
 * **parser:** enhance link parsing to support custom attributes and improve attribute handling ([c6a1d13](https://github.com/Simon-He95/markstream-vue/commit/c6a1d13236db2424dee7aba214a04aea279ad815)), closes [#216](https://github.com/Simon-He95/markstream-vue/issues/216)
 * replace space-x-* classes with gap-x-* for consistent spacing in header slots ([602baa5](https://github.com/Simon-He95/markstream-vue/commit/602baa5746813309bbe12605469c932d8c832e9c)), closes [#223](https://github.com/Simon-He95/markstream-vue/issues/223)
 * update CHANGELOG for v0.0.4 release with bug fixes and new features ([5f79584](https://github.com/Simon-He95/markstream-vue/commit/5f79584012639f042543508170af66a9cb631934))
