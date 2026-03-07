@@ -4,9 +4,11 @@
 
 常用 props：
 - `showHeader` — 是否显示头部
+- `showCollapseButton` — 头部折叠按钮
 - `showCopyButton` — 复制按钮
 - `showExpandButton` — 展开/收起按钮
 - `showPreviewButton` — 预览按钮
+- `showFontSizeButtons` — 字号控制按钮组
 
 排查问题
 

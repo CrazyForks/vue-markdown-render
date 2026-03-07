@@ -58,7 +58,7 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 | `codeBlockMonacoOptions` | `Record<string, any>` | 转发到 `stream-monaco` 的选项 |
 | `codeBlockMinWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最小宽度 |
 | `codeBlockMaxWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最大宽度 |
-| `codeBlockProps` | `Record<string, any>` | 额外转发到每个 `CodeBlockNode` 的 props |
+| `codeBlockProps` | `Record<string, any>` | 额外转发到每个代码块渲染器（`CodeBlockNode` / `MarkdownCodeBlockNode`）的 props |
 | `themes` | `string[]` | 转发到 `stream-monaco` 的主题列表 |
 
 #### 事件
@@ -117,6 +117,7 @@ function CodeBlock() {
       <MarkdownCodeBlockNode
         node={codeNode}
         showCopyButton={true}
+        showCollapseButton={false}
         onCopy={handleCopy}
       />
     </div>
@@ -153,6 +154,7 @@ function MonacoCodeBlock() {
         node={codeNode}
         monacoOptions={{ fontSize: 14, theme: 'vs-dark' }}
         stream={true}
+        showCollapseButton={false}
         onCopy={handleCopy}
         onPreviewCode={handlePreviewCode}
       />

@@ -58,7 +58,7 @@ The primary component for rendering markdown content in React.
 | `codeBlockMonacoOptions` | `Record<string, any>` | Options forwarded to `stream-monaco` |
 | `codeBlockMinWidth` | `string \| number` | Min width forwarded to `CodeBlockNode` |
 | `codeBlockMaxWidth` | `string \| number` | Max width forwarded to `CodeBlockNode` |
-| `codeBlockProps` | `Record<string, any>` | Extra props forwarded to every `CodeBlockNode` |
+| `codeBlockProps` | `Record<string, any>` | Extra props forwarded to every code-block renderer (`CodeBlockNode` / `MarkdownCodeBlockNode`) |
 | `themes` | `string[]` | Theme list forwarded to `stream-monaco` |
 
 #### Events
@@ -117,6 +117,7 @@ function CodeBlock() {
       <MarkdownCodeBlockNode
         node={codeNode}
         showCopyButton={true}
+        showCollapseButton={false}
         onCopy={handleCopy}
       />
     </div>
@@ -153,6 +154,7 @@ function MonacoCodeBlock() {
         node={codeNode}
         monacoOptions={{ fontSize: 14, theme: 'vs-dark' }}
         stream={true}
+        showCollapseButton={false}
         onCopy={handleCopy}
         onPreviewCode={handlePreviewCode}
       />
