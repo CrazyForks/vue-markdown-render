@@ -154,3 +154,77 @@ fn main() {}
 ```
 
 > Each entry in `languages` can be a Monaco language id string or the loader signature that `stream-monaco` documents (for lazy language bundles). When not using `MarkdownRender`, pass the same `monacoOptions` object directly to `CodeBlockNode` via `:monaco-options`.
+
+### Diff hover actions
+
+Diff code blocks can show hover action buttons for each hunk split (`Revert` / `Stage`). These options are also passed through `monacoOptions` / `codeBlockMonacoOptions`:
+
+```ts
+const monacoOptions = {
+  diffHunkActionsOnHover: true,
+  diffHunkHoverHideDelayMs: 240,
+  onDiffHunkAction(context) {
+    console.log(context.action, context.side, context.lineChange)
+    // Return false to prevent stream-monaco's built-in model edits.
+    return false
+  },
+}
+```
+
+- `diffHunkActionsOnHover`: enable the hover buttons
+- `diffHunkHoverHideDelayMs`: control how long the hover widget stays visible after mouse leave
+- `onDiffHunkAction`: intercept `revert` / `stage` before the default edit runs
+
+#### Full example
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import MarkdownRender from 'markstream-vue'
+
+const actionLogs = ref<string[]>([])
+
+const monacoOptions = {
+  diffHunkActionsOnHover: true,
+  diffHunkHoverHideDelayMs: 240,
+  onDiffHunkAction(context) {
+    actionLogs.value = [
+      `${context.action}:${context.side}`,
+      ...actionLogs.value,
+    ].slice(0, 6)
+    // Prevent built-in edits so the demo stays stable while you inspect events.
+    return false
+  },
+}
+
+const markdown = [
+  '```diff json:package.json',
+  '{',
+  '  "name": "markstream-vue",',
+  '-  "version": "0.0.49",',
+  '+  "version": "0.0.54-beta.1",',
+  '  "packageManager": "pnpm@10.16.1"',
+  '}',
+  '```',
+].join('\\n')
+</script>
+
+<template>
+  <MarkdownRender
+    :content="markdown"
+    :code-block-monaco-options="monacoOptions"
+  />
+
+  <ul>
+    <li v-for="(item, index) in actionLogs" :key="`${item}-${index}`">
+      {{ item }}
+    </li>
+  </ul>
+</template>
+```
+
+Hover the changed red/green hunk area to reveal the `Revert` / `Stage` buttons. Clicking either button will call `onDiffHunkAction`.
+
+> The current action labels are `Revert` and `Stage` (not `Stash`).
+>
+> In `markstream-vue`, these options should be provided in the initial `monacoOptions` object used to create the editor. If you need to toggle them at runtime, remount the code block so the Monaco diff editor is recreated with the new options.

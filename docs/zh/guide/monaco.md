@@ -100,3 +100,77 @@ fn main() {}
 ```
 
 > `languages` 中的每个条目都可以是 Monaco 的语言 ID，或 `stream-monaco` 文档里提到的懒加载函数（用于延迟加载语言包）。如果不是通过 `MarkdownRender`，直接在 `CodeBlockNode` 上使用 `:monaco-options="monacoOptions"` 即可。
+
+### Diff 悬浮操作按钮
+
+对于 diff 代码块，可以在每个 hunk 的上下分段上显示悬浮操作按钮（`Revert` / `Stage`）。这些配置同样通过 `monacoOptions` / `codeBlockMonacoOptions` 透传：
+
+```ts
+const monacoOptions = {
+  diffHunkActionsOnHover: true,
+  diffHunkHoverHideDelayMs: 240,
+  onDiffHunkAction(context) {
+    console.log(context.action, context.side, context.lineChange)
+    // 返回 false 可以阻止 stream-monaco 的内置编辑行为。
+    return false
+  },
+}
+```
+
+- `diffHunkActionsOnHover`：开启 hunk 悬浮按钮
+- `diffHunkHoverHideDelayMs`：控制鼠标移出后悬浮按钮延迟隐藏的时间
+- `onDiffHunkAction`：在默认 `revert` / `stage` 编辑执行前进行拦截
+
+#### 完整示例
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import MarkdownRender from 'markstream-vue'
+
+const actionLogs = ref<string[]>([])
+
+const monacoOptions = {
+  diffHunkActionsOnHover: true,
+  diffHunkHoverHideDelayMs: 240,
+  onDiffHunkAction(context) {
+    actionLogs.value = [
+      `${context.action}:${context.side}`,
+      ...actionLogs.value,
+    ].slice(0, 6)
+    // 阻止内置编辑，方便在示例里稳定观察回调事件。
+    return false
+  },
+}
+
+const markdown = [
+  '```diff json:package.json',
+  '{',
+  '  "name": "markstream-vue",',
+  '-  "version": "0.0.49",',
+  '+  "version": "0.0.54-beta.1",',
+  '  "packageManager": "pnpm@10.16.1"',
+  '}',
+  '```',
+].join('\\n')
+</script>
+
+<template>
+  <MarkdownRender
+    :content="markdown"
+    :code-block-monaco-options="monacoOptions"
+  />
+
+  <ul>
+    <li v-for="(item, index) in actionLogs" :key="`${item}-${index}`">
+      {{ item }}
+    </li>
+  </ul>
+</template>
+```
+
+把鼠标移到红/绿变更 hunk 区域上，就会出现 `Revert` / `Stage` 按钮。点击后会触发 `onDiffHunkAction`。
+
+> 当前按钮文案是 `Revert` 和 `Stage`，不是 `Stash`。
+>
+> 在 `markstream-vue` 里，这组配置应当在首次创建编辑器时通过初始 `monacoOptions` 传入。如果你要在运行时切换它们，请重新挂载代码块，让 Monaco diff editor 按新配置重建。

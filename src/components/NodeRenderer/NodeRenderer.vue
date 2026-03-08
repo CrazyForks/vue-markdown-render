@@ -1493,12 +1493,18 @@ const listBindings = computed(() => ({
 }))
 const renderedItems = computed(() => {
   return visibleNodes.value.map((item) => {
-    const language = getCodeBlockLanguage(item.node)
+    // Streaming parsers mutate code block payloads in place. Clone them here so
+    // CodeBlockNode receives a fresh prop reference and can react to updates.
+    const node = item.node.type === 'code_block'
+      ? { ...item.node }
+      : item.node
+    const language = getCodeBlockLanguage(node)
     return {
       ...item,
-      component: getNodeComponent(item.node, language),
-      bindings: getBindingsFor(item.node, language),
-      isCodeBlock: item.node.type === 'code_block',
+      node,
+      component: getNodeComponent(node, language),
+      bindings: getBindingsFor(node, language),
+      isCodeBlock: node.type === 'code_block',
       indexKey: `${indexPrefix.value}-${item.index}`,
     }
   })

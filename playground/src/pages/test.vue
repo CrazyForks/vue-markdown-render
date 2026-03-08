@@ -16,6 +16,23 @@ import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inli
 import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
 import 'katex/dist/katex.min.css'
 
+const diffHideUnchangedRegions = {
+  enabled: true,
+  contextLineCount: 2,
+  minimumLineCount: 4,
+  revealLineCount: 2,
+} as const
+const testPageMonacoOptions = {
+  renderSideBySide: true,
+  useInlineViewWhenSpaceIsLimited: true,
+  maxComputationTime: 0,
+  ignoreTrimWhitespace: false,
+  renderIndicators: true,
+  diffAlgorithm: 'legacy',
+  diffHideUnchangedRegions,
+  hideUnchangedRegions: diffHideUnchangedRegions,
+} as const
+
 // 用户输入（直接作为 preview 的内容）
 const input = ref<string>(`# Hello
 
@@ -471,6 +488,7 @@ function toggleStreamSettings() {
               :batch-rendering="batchRendering"
               :typewriter="typewriter"
               :code-block-stream="codeBlockStream"
+              :code-block-monaco-options="testPageMonacoOptions"
               :parse-options="{ debug: debugParse }"
             />
           </div>

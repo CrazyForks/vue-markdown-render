@@ -11,6 +11,7 @@
 Refer to `src/types/component-props.ts` for full signature. Key props:
 - `node` — code_block node (required)
 - `loading`, `stream`, `isShowPreview`
+- `monacoOptions` — forwarded to `stream-monaco`; this is where diff hover-action options such as `diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, and `onDiffHunkAction` belong
 - Header controls: `showHeader`, `showCollapseButton`, `showCopyButton`, `showExpandButton`, `showPreviewButton`, `showFontSizeButtons`, `showTooltips`
 
 ## Slots

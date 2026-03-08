@@ -75,7 +75,7 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 |------|------|-------------|
 | `code-block-dark-theme` | `any` | 转发到每个 `CodeBlockNode` 的 Monaco 深色主题 |
 | `code-block-light-theme` | `any` | 转发到每个 `CodeBlockNode` 的 Monaco 浅色主题 |
-| `code-block-monaco-options` | `Record<string, any>` | 转发到 `stream-monaco` 的选项 |
+| `code-block-monaco-options` | `Record<string, any>` | 转发到 `stream-monaco` 的选项，包括 `diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction` 这类 diff 悬浮操作配置 |
 | `code-block-min-width` | `string \| number` | 转发到 `CodeBlockNode` 的最小宽度 |
 | `code-block-max-width` | `string \| number` | 转发到 `CodeBlockNode` 的最大宽度 |
 | `code-block-props` | `Record<string, any>` | 额外转发到每个 `CodeBlockNode` 的 props |

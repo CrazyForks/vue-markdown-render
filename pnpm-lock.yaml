@@ -45,8 +45,8 @@ importers:
         specifier: workspace:*
         version: link:packages/markdown-parser
       stream-monaco:
-        specifier: '>=0.0.17'
-        version: 0.0.17(monaco-editor@0.52.2)
+        specifier: '>=0.0.18'
+        version: 0.0.18(monaco-editor@0.52.2)
       vue-i18n:
         specifier: '>=9'
         version: 11.2.2(vue@3.5.25(typescript@5.9.3))
@@ -93,6 +93,9 @@ importers:
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
+      playwright-core:
+        specifier: ^1.58.2
+        version: 1.58.2
       postcss-cli:
         specifier: ^11.0.1
         version: 11.0.1(jiti@2.6.1)(postcss@8.5.8)(tsx@4.21.0)
@@ -350,7 +353,7 @@ importers:
         version: 0.16.37
       markstream-vue:
         specifier: latest
-        version: 0.0.4(katex@0.16.37)(mermaid@11.12.3)(shiki@3.23.0)(stream-markdown@0.0.11(shiki@3.23.0))(stream-monaco@0.0.8(monaco-editor@0.52.2))(vue-i18n@11.3.0(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3))
+        version: 0.0.4(katex@0.16.37)(mermaid@11.12.3)(shiki@3.23.0)(stream-markdown@0.0.11(shiki@3.23.0))(stream-monaco@0.0.18(monaco-editor@0.52.2))(vue-i18n@11.3.0(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3))
       stream-markdown:
         specifier: latest
         version: 0.0.11(shiki@3.23.0)
@@ -358,8 +361,8 @@ importers:
         specifier: workspace:*
         version: link:../packages/markdown-parser
       stream-monaco:
-        specifier: latest
-        version: 0.0.8(monaco-editor@0.52.2)
+        specifier: 0.0.18
+        version: 0.0.18(monaco-editor@0.52.2)
       vite:
         specifier: ^7.3.1
         version: 7.3.1(@types/node@20.19.37)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
@@ -9527,6 +9530,11 @@ packages:
   pkg-types@2.3.0:
     resolution: {integrity: sha512-SIqCzDRg0s9npO5XQ3tNZioRY1uK06lA41ynBC1YmFTmnY6FjUjVt6s4LoADmwoig1qqD0oK8h1p/8mlMx8Oig==}
 
+  playwright-core@1.58.2:
+    resolution: {integrity: sha512-yZkEtftgwS8CsfYo7nm0KE8jsvm6i/PTgVtB8DL726wNf6H2IMsDuxCpJj59KDaxCtSnrWan2AeDqM7JBaultg==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   pluralize@8.0.0:
     resolution: {integrity: sha512-Nc3IT5yHzflTfbjgqWcCPpo7DaKy4FnpB0l/zCAW0Tc7jxAiuqSxHasntB3D7887LSrA93kDJ9IXovxJYxyLCA==}
     engines: {node: '>=4'}
@@ -10854,8 +10862,8 @@ packages:
     peerDependencies:
       monaco-editor: ^0.52.2
 
-  stream-monaco@0.0.17:
-    resolution: {integrity: sha512-xpMiFAQEDLxRjNOXobomP9vEJmv5tWU8oN54+SHqL+eeHMNugU7fpmUIqZRSh53p+a/ZYt+DE75jgHwlKOXEuQ==}
+  stream-monaco@0.0.18:
+    resolution: {integrity: sha512-YvSw4MrC8VQqKiED38s45AqoptkhWnMuAYhcG0fNPVvTv1iGCEZl7D0uLVY0RM5qBpDqZD2rCUemCF3o3tmt5Q==}
     hasBin: true
     peerDependencies:
       monaco-editor: ^0.52.2
@@ -21466,7 +21474,7 @@ snapshots:
 
   marked@16.4.2: {}
 
-  markstream-vue@0.0.4(katex@0.16.37)(mermaid@11.12.3)(shiki@3.23.0)(stream-markdown@0.0.11(shiki@3.23.0))(stream-monaco@0.0.8(monaco-editor@0.52.2))(vue-i18n@11.3.0(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3)):
+  markstream-vue@0.0.4(katex@0.16.37)(mermaid@11.12.3)(shiki@3.23.0)(stream-markdown@0.0.11(shiki@3.23.0))(stream-monaco@0.0.18(monaco-editor@0.52.2))(vue-i18n@11.3.0(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3)):
     dependencies:
       '@floating-ui/dom': 1.7.6
       stream-markdown-parser: 0.0.53
@@ -21476,7 +21484,7 @@ snapshots:
       mermaid: 11.12.3
       shiki: 3.23.0
       stream-markdown: 0.0.11(shiki@3.23.0)
-      stream-monaco: 0.0.8(monaco-editor@0.52.2)
+      stream-monaco: 0.0.18(monaco-editor@0.52.2)
       vue-i18n: 11.3.0(vue@3.5.25(typescript@5.9.3))
 
   math-intrinsics@1.1.0: {}
@@ -22926,6 +22934,8 @@ snapshots:
       confbox: 0.2.2
       exsolve: 1.0.8
       pathe: 2.0.3
+
+  playwright-core@1.58.2: {}
 
   pluralize@8.0.0: {}
 
@@ -24530,7 +24540,7 @@ snapshots:
       monaco-editor: 0.52.2
       shiki: 3.21.0
 
-  stream-monaco@0.0.17(monaco-editor@0.52.2):
+  stream-monaco@0.0.18(monaco-editor@0.52.2):
     dependencies:
       '@shikijs/monaco': 3.19.0
       alien-signals: 2.0.8

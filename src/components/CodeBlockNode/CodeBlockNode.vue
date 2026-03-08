@@ -114,6 +114,7 @@ const editorCreated = ref(false)
 const editorMounted = ref(false)
 const monacoReady = ref(false)
 let expandRafId: number | null = null
+let deferredHeightSyncRafId: number | null = null
 const heightBeforeCollapse = ref<number | null>(null)
 let resumeGuardFrames = 0
 const registerVisibility = useViewportPriority()
@@ -159,6 +160,8 @@ let safeClean = () => {}
 let createEditorPromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
 let setTheme: (theme: any) => Promise<void> = async () => {}
+const editorHeightSyncDisposables: Array<{ dispose?: () => void }> = []
+const inlineFoldProxyCleanups: Array<() => void> = []
 const isDiff = computed(() => props.node.diff)
 
 // In streaming scenarios, the opening fence info string can arrive in chunks
@@ -511,8 +514,10 @@ function updateExpandedHeight() {
     const h = computeContentHeight()
     if (h != null && h > 0) {
       const oldHeight = containerRect.height
+      container.style.minHeight = '0px'
       container.style.height = `${Math.ceil(h)}px`
       container.style.maxHeight = 'none'
+      container.style.overflow = 'visible'
 
       // 恢复滚动位置：补偿高度变化
       const heightDelta = Math.ceil(h) - oldHeight
@@ -522,6 +527,169 @@ function updateExpandedHeight() {
     }
   }
   catch {}
+}
+
+function clearEditorHeightSyncBindings() {
+  while (editorHeightSyncDisposables.length > 0) {
+    try {
+      editorHeightSyncDisposables.pop()?.dispose?.()
+    }
+    catch {}
+  }
+  if (deferredHeightSyncRafId != null) {
+    safeCancelRaf(deferredHeightSyncRafId)
+    deferredHeightSyncRafId = null
+  }
+}
+
+function clearInlineFoldProxies() {
+  while (inlineFoldProxyCleanups.length > 0) {
+    try {
+      inlineFoldProxyCleanups.pop()?.()
+    }
+    catch {}
+  }
+}
+
+function syncInlineFoldProxies() {
+  clearInlineFoldProxies()
+
+  if (!isDiff.value)
+    return
+
+  const root = codeEditor.value
+  if (!root)
+    return
+
+  const diffRoot = root.querySelector('.monaco-diff-editor') as HTMLElement | null
+  if (!diffRoot || diffRoot.classList.contains('side-by-side'))
+    return
+
+  const originalWidgets = Array.from(diffRoot.querySelectorAll('.editor.original .diff-hidden-lines'))
+  const modifiedWidgets = Array.from(diffRoot.querySelectorAll('.editor.modified .diff-hidden-lines'))
+  const pairCount = Math.min(originalWidgets.length, modifiedWidgets.length)
+
+  for (let i = 0; i < pairCount; i++) {
+    const originalWidget = originalWidgets[i] as HTMLElement
+    const modifiedWidget = modifiedWidgets[i] as HTMLElement
+    const modifiedTrigger = modifiedWidget.querySelector('a') as HTMLElement | null
+    const originalSlot = originalWidget.querySelector('.center > div:first-child') as HTMLElement | null
+
+    if (!modifiedTrigger || !originalSlot)
+      continue
+
+    const proxyButton = document.createElement('button')
+    proxyButton.type = 'button'
+    proxyButton.className = 'markstream-inline-fold-proxy'
+    const label = modifiedTrigger.getAttribute('title') || 'Show Unchanged Region'
+    proxyButton.title = label
+    proxyButton.setAttribute('aria-label', label)
+
+    const sourceIcon = modifiedTrigger.querySelector('.codicon') as HTMLElement | null
+    const icon = document.createElement('span')
+    icon.className = sourceIcon?.className || 'codicon codicon-unfold'
+    proxyButton.append(icon)
+
+    const handlePointerDown = (event: MouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    const handleClick = (event: MouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      modifiedTrigger.click()
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== ' ')
+        return
+      event.preventDefault()
+      event.stopPropagation()
+      modifiedTrigger.click()
+    }
+
+    proxyButton.addEventListener('mousedown', handlePointerDown)
+    proxyButton.addEventListener('click', handleClick)
+    proxyButton.addEventListener('keydown', handleKeyDown)
+    originalSlot.replaceChildren(proxyButton)
+
+    inlineFoldProxyCleanups.push(() => {
+      proxyButton.removeEventListener('mousedown', handlePointerDown)
+      proxyButton.removeEventListener('click', handleClick)
+      proxyButton.removeEventListener('keydown', handleKeyDown)
+      if (originalSlot.contains(proxyButton))
+        originalSlot.replaceChildren()
+    })
+  }
+}
+
+function scheduleEditorHeightSync() {
+  if (deferredHeightSyncRafId != null)
+    return
+  deferredHeightSyncRafId = safeRaf(() => {
+    deferredHeightSyncRafId = null
+    safeRaf(() => {
+      syncInlineFoldProxies()
+      if (isCollapsed.value)
+        return
+      if (isExpanded.value)
+        updateExpandedHeight()
+      else
+        updateCollapsedHeight()
+    })
+  })
+}
+
+function applyCollapsedContainerHeight(container: HTMLElement, contentHeight: number, maxHeight: number) {
+  const cappedHeight = Math.min(contentHeight, maxHeight)
+  const shouldScroll = contentHeight > maxHeight + PIXEL_EPSILON
+  container.style.minHeight = '0px'
+  container.style.height = `${Math.ceil(cappedHeight)}px`
+  container.style.maxHeight = `${Math.ceil(maxHeight)}px`
+  container.style.overflow = shouldScroll ? 'auto' : 'hidden'
+  return Math.ceil(cappedHeight)
+}
+
+function bindEditorHeightSync() {
+  clearEditorHeightSyncBindings()
+
+  if (isDiff.value) {
+    const diff = getDiffEditorView()
+    const originalEditor = diff?.getOriginalEditor?.()
+    const modifiedEditor = diff?.getModifiedEditor?.()
+
+    const bind = (source: any, eventName: string) => {
+      try {
+        const subscribe = source?.[eventName]
+        if (typeof subscribe !== 'function')
+          return
+        const disposable = subscribe.call(source, () => scheduleEditorHeightSync())
+        if (disposable)
+          editorHeightSyncDisposables.push(disposable)
+      }
+      catch {}
+    }
+
+    bind(diff, 'onDidUpdateDiff')
+    bind(originalEditor, 'onDidContentSizeChange')
+    bind(modifiedEditor, 'onDidContentSizeChange')
+    bind(originalEditor, 'onDidLayoutChange')
+    bind(modifiedEditor, 'onDidLayoutChange')
+  }
+  else {
+    const editor = getEditorView()
+    try {
+      const disposable = editor?.onDidContentSizeChange?.(() => scheduleEditorHeightSync())
+      if (disposable)
+        editorHeightSyncDisposables.push(disposable)
+    }
+    catch {}
+    try {
+      const disposable = editor?.onDidLayoutChange?.(() => scheduleEditorHeightSync())
+      if (disposable)
+        editorHeightSyncDisposables.push(disposable)
+    }
+    catch {}
+  }
 }
 
 function updateCollapsedHeight() {
@@ -539,13 +707,10 @@ function updateCollapsedHeight() {
     if (resumeGuardFrames > 0) {
       resumeGuardFrames--
       if (heightBeforeCollapse.value != null) {
-        const h = Math.min(heightBeforeCollapse.value, max)
-        container.style.height = `${Math.ceil(h)}px`
-        container.style.maxHeight = `${Math.ceil(max)}px`
-        container.style.overflow = 'auto'
+        const h = applyCollapsedContainerHeight(container, heightBeforeCollapse.value, max)
 
         // 恢复滚动位置
-        const heightDelta = Math.ceil(h) - oldHeight
+        const heightDelta = h - oldHeight
         if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
           window.scrollBy(0, heightDelta)
         }
@@ -555,13 +720,10 @@ function updateCollapsedHeight() {
     const h0 = computeContentHeight()
     // 1) 有实时内容高度 -> 采用并记忆原始内容高度（未裁剪前），用于下一次恢复
     if (h0 != null && h0 > 0) {
-      const h = Math.min(h0, max)
-      container.style.height = `${Math.ceil(h)}px`
-      container.style.maxHeight = `${Math.ceil(max)}px`
-      container.style.overflow = 'auto'
+      const h = applyCollapsedContainerHeight(container, h0, max)
 
       // 恢复滚动位置
-      const heightDelta = Math.ceil(h) - oldHeight
+      const heightDelta = h - oldHeight
       if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
         window.scrollBy(0, heightDelta)
       }
@@ -570,13 +732,10 @@ function updateCollapsedHeight() {
 
     // 2) 使用折叠前的内容高度（不更新记忆值）
     if (heightBeforeCollapse.value != null) {
-      const h = Math.min(heightBeforeCollapse.value, max)
-      container.style.height = `${Math.ceil(h)}px`
-      container.style.maxHeight = `${Math.ceil(max)}px`
-      container.style.overflow = 'auto'
+      const h = applyCollapsedContainerHeight(container, heightBeforeCollapse.value, max)
 
       // 恢复滚动位置
-      const heightDelta = Math.ceil(h) - oldHeight
+      const heightDelta = h - oldHeight
       if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
         window.scrollBy(0, heightDelta)
       }
@@ -586,13 +745,10 @@ function updateCollapsedHeight() {
     // 3) 使用当前 DOM 高度（不更新记忆值）
     const rectH = Math.ceil((container.getBoundingClientRect?.().height) || 0)
     if (rectH > 0) {
-      const h = Math.min(rectH, max)
-      container.style.height = `${Math.ceil(h)}px`
-      container.style.maxHeight = `${Math.ceil(max)}px`
-      container.style.overflow = 'auto'
+      const h = applyCollapsedContainerHeight(container, rectH, max)
 
       // 恢复滚动位置
-      const heightDelta = Math.ceil(h) - oldHeight
+      const heightDelta = h - oldHeight
       if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
         window.scrollBy(0, heightDelta)
       }
@@ -602,8 +758,7 @@ function updateCollapsedHeight() {
     // 4) 兜底：若有先前行高/字体，可估一个最小高度；否则保持现状，避免强制跳到 MAX
     const prev = Number.parseFloat(container.style.height)
     if (!Number.isNaN(prev) && prev > 0) {
-      const h = Math.ceil(Math.min(prev, max))
-      container.style.height = `${h}px`
+      const h = applyCollapsedContainerHeight(container, prev, max)
 
       // 恢复滚动位置
       const heightDelta = h - oldHeight
@@ -613,8 +768,7 @@ function updateCollapsedHeight() {
     }
     else {
       // 实在没有历史高度，才退到 max（极少数首次场景）
-      const h = Math.ceil(max)
-      container.style.height = `${h}px`
+      const h = applyCollapsedContainerHeight(container, max, max)
 
       // 恢复滚动位置
       const heightDelta = h - oldHeight
@@ -622,8 +776,6 @@ function updateCollapsedHeight() {
         window.scrollBy(0, heightDelta)
       }
     }
-    container.style.maxHeight = `${Math.ceil(max)}px`
-    container.style.overflow = 'auto'
   }
   catch {}
 }
@@ -877,9 +1029,20 @@ function setAutomaticLayout(expanded: boolean) {
   catch {}
 }
 
+function resetEditorHost(el: HTMLElement) {
+  // Monaco diff/single editors should own the host exclusively. Clearing the
+  // host before each creation prevents stale roots from stacking when a block
+  // is recreated at the end of a streaming session.
+  el.replaceChildren()
+}
+
 async function runEditorCreation(el: HTMLElement) {
   if (!createEditor)
     return
+
+  clearEditorHeightSyncBindings()
+  clearInlineFoldProxies()
+  resetEditorHost(el)
 
   if (isDiff.value) {
     safeClean()
@@ -927,7 +1090,10 @@ async function runEditorCreation(el: HTMLElement) {
 
   await nextTick()
   editorMounted.value = true
+  bindEditorHeightSync()
   syncEditorCssVars()
+  syncInlineFoldProxies()
+  scheduleEditorHeightSync()
 }
 
 function ensureEditorCreation(el: HTMLElement) {
@@ -935,6 +1101,8 @@ function ensureEditorCreation(el: HTMLElement) {
     return null
   if (createEditorPromise)
     return createEditorPromise
+  if (editorCreated.value && editorMounted.value)
+    return Promise.resolve()
 
   editorCreated.value = true
   const pending = (async () => {
@@ -1000,6 +1168,8 @@ watch(
       editorMounted.value = false
       editorCreated.value = false
       createEditorPromise = null
+      clearEditorHeightSyncBindings()
+      clearInlineFoldProxies()
       safeClean()
       await nextTick()
       await ensureEditorCreation(codeEditor.value as HTMLElement)
@@ -1069,13 +1239,38 @@ const stopLoadingWatch = watch(
       return
     await nextTick()
     safeRaf(() => {
-      if (!isCollapsed.value) {
-        if (isExpanded.value)
-          updateExpandedHeight()
-        else
-          updateCollapsedHeight()
-      }
-      stopLoadingWatch()
+      void (async () => {
+        if (editorCreated.value) {
+          if (isDiff.value && codeEditor.value) {
+            const pendingCreation = createEditorPromise
+            if (pendingCreation) {
+              try {
+                await pendingCreation
+              }
+              catch {}
+            }
+            editorMounted.value = false
+            editorCreated.value = false
+            createEditorPromise = null
+            clearEditorHeightSyncBindings()
+            clearInlineFoldProxies()
+            safeClean()
+            codeEditor.value.replaceChildren()
+            await nextTick()
+            await ensureEditorCreation(codeEditor.value as HTMLElement)
+          }
+          else {
+            updateCode(String(props.node.code ?? ''), monacoLanguage.value)
+          }
+        }
+        if (!isCollapsed.value) {
+          if (isExpanded.value)
+            updateExpandedHeight()
+          else
+            updateCollapsedHeight()
+        }
+        stopLoadingWatch()
+      })()
     })
     stopExpandAutoResize()
   },
@@ -1092,6 +1287,8 @@ function stopExpandAutoResize() {
 onUnmounted(() => {
   // Ensure any RAF loops are stopped and editor resources are released
   stopExpandAutoResize()
+  clearEditorHeightSyncBindings()
+  clearInlineFoldProxies()
   cleanupEditor()
 
   if (resizeSyncHandler) {
@@ -1411,5 +1608,56 @@ onUnmounted(() => {
 }
 :deep(.monaco-diff-editor .diffOverview){
   background-color: var(--vscode-editor-background);
+}
+
+:deep(.monaco-diff-editor:not(.side-by-side) .editor.original .diff-hidden-lines .center) {
+  align-items: center;
+  justify-content: center;
+}
+
+:deep(.monaco-diff-editor:not(.side-by-side) .editor.original .diff-hidden-lines .center > div:first-child) {
+  align-items: center;
+  display: flex;
+  justify-content: center !important;
+  min-width: 100%;
+  width: 100% !important;
+}
+
+:deep(.monaco-diff-editor:not(.side-by-side) .editor.modified .diff-hidden-lines .center > div:first-child) {
+  display: none !important;
+}
+
+:deep(.markstream-inline-fold-proxy) {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+  color: var(--vscode-diffEditor-unchangedRegionForeground, currentColor);
+  cursor: pointer;
+  display: inline-flex;
+  height: 16px;
+  justify-content: center;
+  padding: 0;
+  width: 16px;
+}
+
+:deep(.markstream-inline-fold-proxy:hover),
+:deep(.markstream-inline-fold-proxy:focus-visible) {
+  color: var(--vscode-editorLink-activeForeground, var(--vscode-diffEditor-unchangedRegionForeground, currentColor));
+}
+
+:deep(.markstream-inline-fold-proxy:focus-visible) {
+  outline: 1px solid var(--vscode-focusBorder, currentColor);
+  outline-offset: 1px;
+}
+
+:deep(.markstream-inline-fold-proxy .codicon) {
+  color: inherit;
+  font-size: 16px;
+  height: 16px;
+  line-height: 16px;
+  width: 16px;
 }
 </style>

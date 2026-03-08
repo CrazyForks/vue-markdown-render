@@ -14,6 +14,7 @@
 
 - `node` — code_block 节点（必需）
 - `loading`、`stream`、`isShowPreview`
+- `monacoOptions` — 会透传给 `stream-monaco`；像 `diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction` 这类 diff 悬浮操作配置都应该放这里
 - 头部控制：`showHeader`、`showCollapseButton`、`showCopyButton`、`showExpandButton`、`showPreviewButton`、`showFontSizeButtons`、`showTooltips`
 
 ## Slots 插槽

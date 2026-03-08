@@ -70,6 +70,7 @@
   "scripts": {
     "dev": "pnpm run -C playground dev",
     "test": "vitest",
+    "test:e2e:diff-folding": "node scripts/e2e-diff-folding.mjs",
     "lint": "eslint . --cache",
     "lint:fix": "pnpm run lint --fix",
     "test:ui": "vitest --ui",
@@ -132,7 +133,7 @@
     "mermaid": ">=11",
     "shiki": "^3.13.0",
     "stream-markdown": ">=0.0.14",
-    "stream-monaco": ">=0.0.17",
+    "stream-monaco": ">=0.0.18",
     "vue": ">=3.0.0",
     "vue-i18n": ">=9"
   },
@@ -181,6 +182,7 @@
     "lz-string": "^1.5.0",
     "markdown-it-emoji": "^3.0.0",
     "picocolors": "^1.1.1",
+    "playwright-core": "^1.58.2",
     "postcss-cli": "^11.0.1",
     "rollup": "^3.30.0",
     "rollup-plugin-dts": "^5.3.1",

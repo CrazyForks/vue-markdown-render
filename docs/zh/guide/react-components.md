@@ -55,7 +55,7 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 |------|------|-------------|
 | `codeBlockDarkTheme` | `any` | 转发到每个 `CodeBlockNode` 的 Monaco 深色主题 |
 | `codeBlockLightTheme` | `any` | 转发到每个 `CodeBlockNode` 的 Monaco 浅色主题 |
-| `codeBlockMonacoOptions` | `Record<string, any>` | 转发到 `stream-monaco` 的选项 |
+| `codeBlockMonacoOptions` | `Record<string, any>` | 转发到 `stream-monaco` 的选项，包括 `diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction` 这类 diff 悬浮操作配置 |
 | `codeBlockMinWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最小宽度 |
 | `codeBlockMaxWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最大宽度 |
 | `codeBlockProps` | `Record<string, any>` | 额外转发到每个代码块渲染器（`CodeBlockNode` / `MarkdownCodeBlockNode`）的 props |

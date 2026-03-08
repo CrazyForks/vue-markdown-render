@@ -23,6 +23,7 @@ import { parseTextToken } from './text-parser'
 const STRONG_PAIR_RE = /\*\*([\s\S]*?)\*\*/
 const STRIKETHROUGH_RE = /[^~]*~{2,}[^~]+/
 const HAS_STRONG_RE = /\*\*/
+const ESCAPED_PUNCTUATION_RE = /\\([\\()[\]`$|*_\-!])/g
 
 // Helper: detect likely URLs/hrefs (autolinks). Extracted so the
 // detection logic is easy to tweak and test.
@@ -450,6 +451,26 @@ export function parseInlineTokens(
     }
   }
 
+  function hasEscapedMarkup(token: MarkdownToken, escapedPrefix: string) {
+    return String(token.markup ?? '').startsWith(escapedPrefix)
+  }
+
+  function stripTrailingMidStateMarker(content: string, token: MarkdownToken) {
+    let nextContent = content
+    const rawTokenContent = String(token.content ?? '')
+
+    if (nextContent.endsWith('\\') && !hasEscapedMarkup(token, '\\\\') && !rawTokenContent.endsWith('\\\\'))
+      nextContent = nextContent.slice(0, -1)
+
+    if (nextContent.endsWith('(') && !hasEscapedMarkup(token, '\\(') && !rawTokenContent.endsWith('\\('))
+      nextContent = nextContent.slice(0, -1)
+
+    if (/\*+$/.test(nextContent) && !hasEscapedMarkup(token, '\\*') && !rawTokenContent.endsWith('\\*'))
+      nextContent = nextContent.replace(/\*+$/, '')
+
+    return nextContent
+  }
+
   while (i < tokens.length) {
     const token = tokens[i] as MarkdownToken
     handleToken(token)
@@ -708,14 +729,14 @@ export function parseInlineTokens(
 
     if (currentTextNode) {
       // Merge with the previous text node
-      currentTextNode.content += textNode.content.replace(/(\*+|\(|\\)$/, '')
+      currentTextNode.content += stripTrailingMidStateMarker(textNode.content, token)
       currentTextNode.raw += textNode.raw
       return
     }
 
     const maybeMath = preToken?.tag === 'br' && tokens[i - 2]?.content === '['
     if (!nextToken)
-      textNode.content = textNode.content.replace(/(\*+|\(|\\)$/, '')
+      textNode.content = stripTrailingMidStateMarker(textNode.content, token)
 
     currentTextNode = textNode
     currentTextNode.center = maybeMath
@@ -726,9 +747,7 @@ export function parseInlineTokens(
     // 合并连续的 text 节点
     let index = result.length - 1
     const rawContent = String(token.content ?? '')
-    let content = rawContent
-    if (rawContent.includes('\\'))
-      content = rawContent.replace(/\\/g, '')
+    let content = rawContent.replace(ESCAPED_PUNCTUATION_RE, '$1')
 
     if (token.content === '<' || (content === '1' && tokens[i - 1]?.tag === 'br')) {
       i++
@@ -768,7 +787,10 @@ export function parseInlineTokens(
       i++
       return
     }
-    if (content === '`' || content === '|' || content === '$' || /^\*+$/.test(content)) {
+    if (
+      ((content === '`' || content === '|' || content === '$') && !hasEscapedMarkup(token, `\\${content}`))
+      || (/^\*+$/.test(content) && !hasEscapedMarkup(token, '\\*'))
+    ) {
       i++
       return
     }

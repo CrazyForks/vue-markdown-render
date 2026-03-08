@@ -75,7 +75,7 @@ The primary component for rendering markdown content in Vue 2.
 |------|------|-------------|
 | `code-block-dark-theme` | `any` | Monaco dark theme object forwarded to every `CodeBlockNode` |
 | `code-block-light-theme` | `any` | Monaco light theme object forwarded to every `CodeBlockNode` |
-| `code-block-monaco-options` | `Record<string, any>` | Options forwarded to `stream-monaco` |
+| `code-block-monaco-options` | `Record<string, any>` | Options forwarded to `stream-monaco`, including diff hover-action settings like `diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, and `onDiffHunkAction` |
 | `code-block-min-width` | `string \| number` | Min width forwarded to `CodeBlockNode` |
 | `code-block-max-width` | `string \| number` | Max width forwarded to `CodeBlockNode` |
 | `code-block-props` | `Record<string, any>` | Extra props forwarded to every `CodeBlockNode` |

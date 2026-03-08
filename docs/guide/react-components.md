@@ -55,7 +55,7 @@ The primary component for rendering markdown content in React.
 |------|------|-------------|
 | `codeBlockDarkTheme` | `any` | Monaco dark theme object forwarded to every `CodeBlockNode` |
 | `codeBlockLightTheme` | `any` | Monaco light theme object forwarded to every `CodeBlockNode` |
-| `codeBlockMonacoOptions` | `Record<string, any>` | Options forwarded to `stream-monaco` |
+| `codeBlockMonacoOptions` | `Record<string, any>` | Options forwarded to `stream-monaco`, including diff hover-action settings like `diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, and `onDiffHunkAction` |
 | `codeBlockMinWidth` | `string \| number` | Min width forwarded to `CodeBlockNode` |
 | `codeBlockMaxWidth` | `string \| number` | Max width forwarded to `CodeBlockNode` |
 | `codeBlockProps` | `Record<string, any>` | Extra props forwarded to every code-block renderer (`CodeBlockNode` / `MarkdownCodeBlockNode`) |

@@ -7,6 +7,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 // import { VueRendererMarkdown } from '../../src/exports'
 import App from './App.vue'
 // import JsLocalIcon from './assets/javascript.svg?raw'
+import 'monaco-editor/min/vs/editor/editor.main.css'
 import '@unocss/reset/tailwind.css'
 import './styles/main.css'
 

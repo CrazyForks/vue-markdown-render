@@ -27,6 +27,22 @@ API -> Client: response
 \`\`\`
 `
 const fullStreamContent = `${streamContent}${d2Demo}`
+const diffHideUnchangedRegions = {
+  enabled: true,
+  contextLineCount: 2,
+  minimumLineCount: 4,
+  revealLineCount: 2,
+} as const
+const playgroundMonacoOptions = {
+  renderSideBySide: true,
+  useInlineViewWhenSpaceIsLimited: true,
+  maxComputationTime: 0,
+  ignoreTrimWhitespace: false,
+  renderIndicators: true,
+  diffAlgorithm: 'legacy',
+  diffHideUnchangedRegions,
+  hideUnchangedRegions: diffHideUnchangedRegions,
+} as const
 
 // 每隔 10 毫秒输出一部分内容
 const content = ref<string>('')
@@ -573,6 +589,7 @@ onBeforeUnmount(() => {
           :content="content"
           :code-block-dark-theme="selectedTheme || undefined"
           :code-block-light-theme="selectedTheme || undefined"
+          :code-block-monaco-options="playgroundMonacoOptions"
           :themes="themes"
           :custom-html-tags="['thinking']"
           :escape-html-tags="['question', 'answer']"
