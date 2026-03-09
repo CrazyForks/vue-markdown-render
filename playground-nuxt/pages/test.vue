@@ -145,7 +145,7 @@ function generateShareLink() {
 }
 
 function buildIssueUrl(text: string) {
-  const base = 'https://github.com/Simon-He95/markstream-vueer/issues/new?template=bug_report.yml'
+  const base = 'https://github.com/Simon-He95/markstream-vue/issues/new?template=bug_report.yml'
   const body = `**Reproduction input**:\n\nPlease find the reproduction input below:\n\n\`\`\`markdown\n${text}\n\`\`\``
   return `${base}&body=${encodeURIComponent(body)}`
 }
