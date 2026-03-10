@@ -811,6 +811,29 @@ function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[])
     return { type: 'open' as const, name, complete: false as const }
   }
 
+  const parseStandaloneCompleteHtmlTagLine = (line: string) => {
+    if (isIndentedCodeLine(line))
+      return null
+
+    const trimmed = trimStartIndentWs(line).replace(/[ \t]+$/, '')
+    if (!trimmed.startsWith('<'))
+      return null
+    if (/^<\s*(?:!--|!doctype\b|\?)/i.test(trimmed))
+      return null
+
+    const selfClosingMatch = trimmed.match(/^<\s*([A-Z][\w:-]*)\b[^>]*\/\s*>\s*$/i)
+    if (selfClosingMatch?.[1])
+      return selfClosingMatch[1].toLowerCase()
+
+    const fullMatch = trimmed.match(/^<\s*([A-Z][\w:-]*)\b[^>]*>[\s\S]*<\s*\/\s*([A-Z][\w:-]*)\s*>\s*$/i)
+    if (!fullMatch?.[1] || !fullMatch[2])
+      return null
+
+    const openTag = fullMatch[1].toLowerCase()
+    const closeTag = fullMatch[2].toLowerCase()
+    return openTag === closeTag ? openTag : null
+  }
+
   // Track fenced code blocks so we don't touch their contents.
   let inFence = false
   let fenceChar: '`' | '~' | '' = ''
@@ -832,10 +855,64 @@ function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[])
 
   const fenceMatchLine = (rawLine: string) => parseFenceMarker(rawLine)
 
+  const lineStartsWithBlockMarker = (line: string) => {
+    const trimmed = trimStartIndentWs(line)
+    if (!trimmed)
+      return false
+    if (isIndentedCodeLine(line))
+      return true
+    return /^(?:#{1,6}[ \t]+|>|[*+-][ \t]+|\d+[.)][ \t]+|`{3,}|~{3,}|\||\$\$|:{3,}|\[\^[^\]]+\]:|-{3,}|\*{3,}|_{3,})/.test(trimmed)
+  }
+
+  const currentCustomBlockNeedsBoundary = (lineStart: number, currentQuoteKey: string, tagName: string) => {
+    let scanIdx = lineStart
+    let depth = 0
+
+    while (scanIdx < markdown.length) {
+      const nl = markdown.indexOf('\n', scanIdx)
+      const hasNl = nl !== -1
+      const isCrlf = hasNl && nl > scanIdx && markdown[nl - 1] === '\r'
+      const lineEnd = hasNl ? (isCrlf ? nl - 1 : nl) : markdown.length
+      const rawLine = markdown.slice(scanIdx, lineEnd)
+
+      const blockquote = parseBlockquotePrefix(rawLine)
+      const quoteKey = blockquote?.key ?? ''
+      if (depth > 0 && currentQuoteKey && quoteKey !== currentQuoteKey)
+        break
+
+      const contentLine = blockquote?.content ?? rawLine
+      const lineTag = parseLineStartCustomTag(contentLine)
+
+      if (lineTag?.name === tagName) {
+        if (lineTag.type === 'open') {
+          if (!lineTag.complete)
+            depth++
+        }
+        else if (depth > 0) {
+          depth--
+          if (depth === 0)
+            return false
+        }
+      }
+      else if (depth > 0) {
+        if (lineIsBlank(contentLine) || lineStartsWithBlockMarker(contentLine))
+          return true
+      }
+
+      if (hasNl)
+        scanIdx = nl + 1
+      else
+        break
+    }
+
+    return false
+  }
+
   let out = ''
   let idx = 0
   let prevLineBlank = true
   let prevLineHtmlish = false
+  let prevLineStandaloneCompleteHtmlTag = false
   // Use the last seen newline sequence to insert a blank line that matches the file.
   let lastNewline = '\n'
   const customBlockStack: string[] = []
@@ -875,7 +952,13 @@ function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[])
     const insideCustomBlock = customBlockStack.length > 0
     if (!inFence && !insideCustomBlock) {
       const opening = parseOpeningCustomTagName(contentLine)
-      if (opening && !prevLineBlank && !prevLineHtmlish) {
+      const needsBoundaryAfterStandaloneHtml
+        = !!opening
+          && !prevLineBlank
+          && prevLineHtmlish
+          && prevLineStandaloneCompleteHtmlTag
+          && currentCustomBlockNeedsBoundary(idx, quoteKey, opening)
+      if (opening && !prevLineBlank && (!prevLineHtmlish || needsBoundaryAfterStandaloneHtml)) {
         // Insert a blank line boundary between the previous paragraph line and the custom block.
         // In blockquotes, the blank line must also carry the `>` markers, otherwise the
         // blockquote would end and the tag would escape the quote.
@@ -920,6 +1003,7 @@ function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[])
     const blank = lineIsBlank(contentLine)
     prevLineBlank = blank
     prevLineHtmlish = !blank && previousLineLooksHtmlish(contentLine)
+    prevLineStandaloneCompleteHtmlTag = !blank && !!parseStandaloneCompleteHtmlTagLine(contentLine)
     prevQuoteKey = quoteKey
 
     idx = hasNl ? nl + 1 : markdown.length

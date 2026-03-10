@@ -122,4 +122,28 @@ x
     expect(String(nodes[0]?.code ?? '')).toContain('console.log(\'x\')\n<RadioBtn>')
     expect(String(nodes[0]?.code ?? '')).not.toContain('console.log(\'x\')\n\n<RadioBtn>')
   })
+
+  it('keeps a trailing paragraph after an html line followed by a custom block with inner lists', () => {
+    const markdown = `<stepstart>开始解答（已查阅9550字资料）</stepstart>
+<thinking>
+我需要回答用户关于"xxx公司旗下的上市公司有哪些？"的问题。
+
+首先，我需要检查提供的知识库信息和公司基本信息，看看是否包含xxx公司旗下的上市公司信息。
+
+从提供的知识库信息中，我看到以下相关内容：
+
+1. "x公司有限公司成立于1988年，由原xxx公司与xx集团重组而成，是xx省属重点企业。...旗下拥有近19家企业，员工总数约1万人，并控股xxxx公司公司、xxx公司、xxx公司等x家上市公司。"
+</thinking>
+xxx公司旗下的上市公司有：`
+
+    for (const tags of [['thinking'], ['stepstart', 'thinking']]) {
+      const md = getMarkdown(`custom-html-paragraph-interrupt-adjacent-complete-tag-${tags.join('-')}`, { customHtmlTags: tags })
+      const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+
+      expect(nodes.map(node => node?.type)).toEqual(['paragraph', 'thinking', 'paragraph'])
+      expect(['stepstart', 'html_block', 'html_inline']).toContain(nodes[0]?.children?.[0]?.type)
+      expect(String(nodes[1]?.content ?? '')).toContain('1. "x公司有限公司成立于1988年')
+      expect(nodes[2]?.raw).toBe('xxx公司旗下的上市公司有：')
+    }
+  })
 })
