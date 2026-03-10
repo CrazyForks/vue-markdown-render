@@ -1,7 +1,7 @@
 {
   "name": "stream-markdown-parser",
   "type": "module",
-  "version": "0.0.67",
+  "version": "0.0.68",
   "packageManager": "pnpm@10.30.3",
   "description": "Pure markdown parser and renderer utilities with streaming support - framework agnostic",
   "author": "Simon He",
