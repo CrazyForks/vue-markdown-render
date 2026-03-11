@@ -873,8 +873,8 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
             type="button"
             className={computedButtonClass}
             onClick={handleCopy}
-            onMouseEnter={event => handleTooltip(event, copying ? t('common.copySuccess') : t('common.copy'))}
-            onFocus={event => handleTooltip(event as any, copying ? t('common.copySuccess') : t('common.copy'))}
+            onMouseEnter={event => handleTooltip(event, copying ? t('common.copied') : t('common.copy'))}
+            onFocus={event => handleTooltip(event as any, copying ? t('common.copied') : t('common.copy'))}
             onMouseLeave={() => hideTooltip()}
             onBlur={() => hideTooltip()}
           >
