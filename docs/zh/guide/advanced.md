@@ -119,7 +119,7 @@ import { setDefaultI18nMap } from 'markstream-vue'
 
 setDefaultI18nMap({
   'common.copy': '复制',
-  'common.copySuccess': '已复制',
+  'common.copied': '已复制',
   'common.decrease': '减少',
   'common.reset': '重置',
   'common.increase': '增加',
@@ -145,7 +145,7 @@ setDefaultI18nMap({
 **默认翻译键：**
 
 - `common.copy`：代码块复制按钮文本
-- `common.copySuccess`：复制成功后的提示文本
+- `common.copied`：复制成功后的提示文本
 - `image.loadError`：图片加载失败的提示
 - `image.loading`：图片加载中的提示
 

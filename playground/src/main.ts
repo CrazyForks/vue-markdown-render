@@ -39,7 +39,7 @@ app.use(router)
 
 // setDefaultI18nMap({
 //   'common.copy': '复制',
-//   'common.copySuccess': '已复制',
+//   'common.copied': '已复制',
 //   'common.decrease': '减少',
 //   'common.reset': '重置',
 //   'common.increase': '增加',

@@ -119,7 +119,7 @@ import { setDefaultI18nMap } from 'markstream-vue'
 
 setDefaultI18nMap({
   'common.copy': '复制',
-  'common.copySuccess': '已复制',
+  'common.copied': '已复制',
   'common.decrease': '减少',
   'common.reset': '重置',
   'common.increase': '增加',
@@ -145,7 +145,7 @@ This is useful when:
 **Default translations:**
 
 - `common.copy`: "Copy" — Used in code block copy buttons
-- `common.copySuccess`: "Copied" — Shown after copying
+- `common.copied`: "Copied" — Shown after copying
 - `image.loadError`: "Image failed to load" — Image fallback text
 - `image.loading`: "Loading image..." — Shown while loading
 

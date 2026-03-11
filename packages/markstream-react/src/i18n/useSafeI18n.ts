@@ -10,7 +10,7 @@ function humanizeKey(key: string) {
 
 const defaultMap: Record<string, string> = {
   'common.copy': 'Copy',
-  'common.copySuccess': 'Copied',
+  'common.copied': 'Copied',
   'common.decrease': 'Decrease',
   'common.reset': 'Reset',
   'common.increase': 'Increase',
