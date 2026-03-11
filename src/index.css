@@ -35,4 +35,13 @@
   --muted-foreground: 215 20.2% 65.1%;
 }
 
-
+/* Prevent mermaid temporary render containers from causing layout shift */
+body > div[id^="dmermaid-"] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
