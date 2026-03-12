@@ -19,6 +19,13 @@ body {
   gap: 0.35rem;
 }
 
+.header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .title {
   font-size: 1.6rem;
   font-weight: 700;
@@ -125,5 +132,10 @@ body {
 @media (max-width: 960px) {
   .layout {
     grid-template-columns: 1fr;
+  }
+
+  .header-main {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

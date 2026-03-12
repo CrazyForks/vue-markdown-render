@@ -8,6 +8,9 @@ export default defineConfig(({ mode }) => ({
   base: './',
   server: {
     port: 4174,
+    fs: {
+      allow: [path.resolve(__dirname, '..')],
+    },
   },
   worker: {
     format: 'es',

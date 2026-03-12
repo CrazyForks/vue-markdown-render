@@ -2,6 +2,7 @@
 import MarkdownRender, { setCustomComponents } from 'markstream-vue2'
 import { streamContent } from '../../playground/src/const/markdown'
 import ThinkingNode from './components/ThinkingNode.vue'
+import TestLab from './components/TestLab.vue'
 
 const markdownSource = typeof streamContent === 'string' ? streamContent : String(streamContent || '')
 setCustomComponents('vue2-demo', { thinking: ThinkingNode })
@@ -10,6 +11,7 @@ export default {
   name: 'Vue2Playground',
   components: {
     MarkdownRender,
+    TestLab,
   },
   data() {
     return {
@@ -18,9 +20,13 @@ export default {
       chunkSize: 2,
       timer: null,
       running: true,
+      currentPath: typeof window !== 'undefined' ? window.location.pathname : '/',
     }
   },
   computed: {
+    isTestPage() {
+      return this.normalizePath(this.currentPath) === '/test'
+    },
     totalLength() {
       return markdownSource.length
     },
@@ -39,17 +45,59 @@ export default {
   },
   watch: {
     delay() {
-      if (this.running)
+      if (this.running && !this.isTestPage)
         this.restartStream()
     },
   },
   mounted() {
-    this.startStream()
+    this.syncPath()
+    window.addEventListener('popstate', this.handlePopState)
+    if (!this.isTestPage)
+      this.startStream()
   },
   beforeUnmount() {
+    window.removeEventListener('popstate', this.handlePopState)
     this.stopStream()
   },
   methods: {
+    normalizePath(path) {
+      if (!path)
+        return '/'
+      const normalized = path.replace(/\/+$/, '')
+      return normalized || '/'
+    },
+    syncPath() {
+      if (typeof window === 'undefined')
+        return
+      this.currentPath = this.normalizePath(window.location.pathname)
+    },
+    handlePopState() {
+      this.syncPath()
+      if (this.isTestPage)
+        this.stopStream()
+      else if (!this.content.length)
+        this.startStream()
+    },
+    navigate(path) {
+      const nextPath = this.normalizePath(path)
+      if (typeof window === 'undefined') {
+        this.currentPath = nextPath
+        return
+      }
+      if (nextPath !== this.normalizePath(window.location.pathname))
+        window.history.pushState({}, '', nextPath)
+      this.currentPath = nextPath
+      if (this.isTestPage)
+        this.stopStream()
+      else if (!this.content.length)
+        this.startStream()
+    },
+    goToTest() {
+      this.navigate('/test')
+    },
+    goHome() {
+      this.navigate('/')
+    },
     tick() {
       if (this.isDone) {
         this.stopStream()
@@ -94,10 +142,17 @@ export default {
 </script>
 
 <template>
-  <div class="page">
+  <TestLab v-if="isTestPage" @navigate-home="goHome" />
+
+  <div v-else class="page">
     <header class="header">
-      <div class="title">
-        markstream-vue2 playground
+      <div class="header-main">
+        <div class="title">
+          markstream-vue2 playground
+        </div>
+        <button type="button" class="btn" @click="goToTest">
+          Open /test
+        </button>
       </div>
       <div class="sub">
         Vue 2.6 demo: streaming markdown into the renderer

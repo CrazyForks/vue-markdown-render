@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useLocalStorage } from '@vueuse/core'
-import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { decodeMarkdownHash, encodeMarkdownPayload, resolveFrameworkTestHref, withMarkdownHash } from '../../../playground-shared/testPageState'
 import CodeBlockNode from '../../../src/components/CodeBlockNode'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
 import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
@@ -16,12 +16,185 @@ import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inli
 import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
 import 'katex/dist/katex.min.css'
 
+type SampleId = 'baseline' | 'diff' | 'stress'
+type FrameworkId = 'vue3' | 'vue2' | 'react'
+
+const CURRENT_FRAMEWORK: FrameworkId = 'vue3'
+
+const frameworkCards = [
+  {
+    id: 'vue3',
+    label: 'Vue 3',
+    note: '当前 playground',
+    origin: 'https://markstream-vue.simonhe.me',
+    localPort: null,
+  },
+  {
+    id: 'vue2',
+    label: 'Vue 2',
+    note: '兼容层与老项目回归',
+    origin: 'https://markstream-vue2.pages.dev',
+    localPort: 3334,
+  },
+  {
+    id: 'react',
+    label: 'React',
+    note: 'hooks / workers / 渲染对照',
+    origin: 'https://markstream-react.pages.dev',
+    localPort: 4174,
+  },
+] as const satisfies ReadonlyArray<{
+  id: FrameworkId
+  label: string
+  note: string
+  origin: string
+  localPort: number | null
+}>
+
+const sampleCards = [
+  {
+    id: 'baseline',
+    title: '基础回归',
+    summary: '标题、强调、数学、Mermaid 和 infographic 一次看全。',
+    content: `# Markstream Test Lab
+
+在这里可以快速验证 **Vue 3 / Vue 2 / React** 三套渲染器的表现是否一致。
+
+## 基础格式
+
+- **加粗**
+- *斜体*
+- \`inline code\`
+- [链接](https://github.com/Simon-He95/markstream-vue)
+
+## 数学
+
+行内公式：$E = mc^2$
+
+块级公式：
+
+$$
+\\int_0^1 x^2 dx = \\frac{1}{3}
+$$
+
+## Mermaid
+
+\`\`\`mermaid
+flowchart LR
+  Prompt --> Parser --> Renderer --> Preview
+\`\`\`
+
+## 代码块
+
+\`\`\`ts
+export function compareFramework(name: string) {
+  return \`\${name} test page is ready.\`
+}
+\`\`\`
+
+## Infographic
+
+\`\`\`infographic
+infographic list-row-simple-horizontal-arrow
+data
+  items
+    - label 输入
+      desc markdown
+    - label 渲染
+      desc 解析与增量更新
+    - label 对照
+      desc 跨框架检查
+\`\`\`
+`,
+  },
+  {
+    id: 'diff',
+    title: 'Diff 与代码流',
+    summary: '观察 diff code block、长文本和流式更新的稳定性。',
+    content: `# Diff Regression
+
+下面这个样例更适合观察 **code block stream** 和折叠逻辑：
+
+\`\`\`diff
+diff --git a/src/render.ts b/src/render.ts
+index 0000000..1111111 100644
+--- a/src/render.ts
++++ b/src/render.ts
+@@ -1,7 +1,12 @@
+-export function render(input) {
+-  return input
++export function render(input: string) {
++  if (!input.trim())
++    return 'empty'
++
++  const normalized = input.replace(/\\r\\n/g, '\\n')
++  return normalized
+ }
+\`\`\`
+
+再加一段普通代码，方便对比 Monaco / MarkdownCodeBlock / PreCodeNode：
+
+\`\`\`tsx
+export function TestHarness() {
+  return (
+    <section>
+      <h2>Regression</h2>
+      <p>Streaming should remain smooth.</p>
+    </section>
+  )
+}
+\`\`\`
+`,
+  },
+  {
+    id: 'stress',
+    title: '结构压力',
+    summary: '列表、表格、引用、HTML 和长段落一起压一遍。',
+    content: `# Structural Stress
+
+> 这个样例用于检查复杂结构在 streaming 中是否抖动、错位或丢节点。
+
+## 列表
+
+1. 第一层
+   - 第二层
+     - 第三层
+2. 继续
+
+## 表格
+
+| Framework | Route | Purpose |
+| --- | --- | --- |
+| Vue 3 | \`/test\` | 主调试台 |
+| Vue 2 | \`/test\` | 兼容回归 |
+| React | \`/test\` | 跨框架对照 |
+
+## HTML
+
+<details>
+  <summary>展开看一段 HTML</summary>
+  <p>如果这里的结构错了，通常说明 HTML block / inline 的边界处理有问题。</p>
+</details>
+
+## 长段落
+
+Markstream 现在不仅要处理单次完整渲染，还要处理 AI 场景下不断追加的 markdown 内容，所以这个页面更像一个回归驾驶舱。你可以一边编辑左侧输入，一边切换 Vue 2 或 React 的 test page，用同一段内容观察差异，判断问题是解析层、组件层，还是框架适配层。
+`,
+  },
+] as const satisfies ReadonlyArray<{
+  id: SampleId
+  title: string
+  summary: string
+  content: string
+}>
+
 const diffHideUnchangedRegions = {
   enabled: true,
   contextLineCount: 2,
   minimumLineCount: 4,
   revealLineCount: 2,
 } as const
+
 const testPageMonacoOptions = {
   renderSideBySide: true,
   useInlineViewWhenSpaceIsLimited: true,
@@ -33,58 +206,14 @@ const testPageMonacoOptions = {
   hideUnchangedRegions: diffHideUnchangedRegions,
 } as const
 
-// 用户输入（直接作为 preview 的内容）
-const input = ref<string>(`# Hello
-
-这是一个测试页面。左侧编辑输入，右侧实时预览渲染结果。
-
-示例包含：
-
-  - **加粗**、*斜体*、` + '`inline code`' + `
-
-强调链接：
-- **[DR (Danmarks Radio)](https://www.dr.dk/nyheder)**
-- **[DR **(Danmarks Radio)](https://www.dr.dk/nyheder)**
-- **[DR (Danmarks Radio)**](https://www.dr.dk/nyheder)**
-- **[DR **(Danmarks Radio)**](https://www.dr.dk/nyheder)**
-
-- 代码块：
-
-\`\`\`js
-console.log('hello')
-\`\`\`
-
-数学：$E=mc^2$
-Mermaid 示例：
-
-\`\`\`mermaid
-graph TD
-  A-->B
-\`\`\`
-
-[AntV Infographic](https://infographic.antv.vision/) 示例：
-
-\`\`\`infographic
-infographic list-row-simple-horizontal-arrow
-data
-  items
-    - label 步骤 1
-      desc 开始
-    - label 步骤 2
-      desc 进行中
-    - label 步骤 3
-      desc 完成
-\`\`\`
-`)
-
-// 流式渲染相关状态
+const selectedSampleId = useLocalStorage<SampleId>('vmr-test-sample', 'baseline')
+const input = ref<string>(sampleCards[0].content)
 const streamContent = ref<string>('')
 const isStreaming = ref(false)
-const streamSpeed = useLocalStorage<number>('vmr-test-stream-speed', 1) // 每次添加的字符数，可调整速度
-const streamInterval = useLocalStorage<number>('vmr-test-stream-interval', 16) // 每次更新的时间间隔（毫秒）
-const showStreamSettings = useLocalStorage<boolean>('vmr-test-show-settings', false) // 是否显示流式渲染设置
+const streamSpeed = useLocalStorage<number>('vmr-test-stream-speed', 4)
+const streamInterval = useLocalStorage<number>('vmr-test-stream-interval', 24)
+const showStreamSettings = useLocalStorage<boolean>('vmr-test-show-settings', true)
 
-// 渲染配置相关（用于测试不同代码块/渲染模式）
 const renderMode = useLocalStorage<'monaco' | 'pre' | 'markdown'>('vmr-test-render-mode', 'monaco')
 const codeBlockStream = useLocalStorage<boolean>('vmr-test-code-stream', true)
 const viewportPriority = useLocalStorage<boolean>('vmr-test-viewport-priority', true)
@@ -94,12 +223,10 @@ const debugParse = useLocalStorage<boolean>('vmr-test-debug-parse', false)
 const mathEnabled = useLocalStorage<boolean>('vmr-test-math-enabled', isKatexEnabled())
 const mermaidEnabled = useLocalStorage<boolean>('vmr-test-mermaid-enabled', isMermaidEnabled())
 
-// 预加载 Monaco 编辑器和 worker
 getUseMonaco()
 setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())
 
-// 分享链接相关
 const shareUrl = ref<string>('')
 const tooLong = ref(false)
 const notice = ref<string>('')
@@ -107,167 +234,244 @@ const noticeType = ref<'success' | 'error' | 'info'>('success')
 const isWorking = ref(false)
 const isCopied = ref(false)
 const issueUrl = ref<string>('')
-const MAX_URL_LEN = 2000 // warning threshold — browsers/servers differ; adjust as needed
+const MAX_URL_LEN = 2000
 
-// Use lz-string to compress to a URL-safe encoded component
-function encodeForUrl(str: string) {
-  try {
-    return compressToEncodedURIComponent(str)
-  }
-  catch {
-    return ''
-  }
+const activeSample = computed(() => sampleCards.find(sample => sample.id === selectedSampleId.value) ?? sampleCards[0])
+const previewContent = computed(() => (isStreaming.value ? streamContent.value : input.value))
+const streamProgress = computed(() => {
+  if (!input.value.length)
+    return 0
+  return Math.min(100, Math.round((previewContent.value.length / input.value.length) * 100))
+})
+const renderModeLabel = computed(() => {
+  if (renderMode.value === 'markdown')
+    return 'MarkdownCodeBlock'
+  if (renderMode.value === 'pre')
+    return 'PreCodeNode'
+  return 'Monaco'
+})
+const charCount = computed(() => input.value.length)
+const lineCount = computed(() => (input.value ? input.value.split('\n').length : 0))
+
+function clampInt(value: number, min: number, max: number, fallback: number) {
+  const normalized = Number.isFinite(value) ? Math.round(value) : fallback
+  return Math.min(max, Math.max(min, normalized))
 }
 
-function decodeFromUrl(s: string) {
-  try {
-    return decompressFromEncodedURIComponent(s) || ''
-  }
-  catch {
-    return ''
-  }
+function basePageUrl() {
+  const url = new URL(window.location.href)
+  url.hash = ''
+  return url.toString()
+}
+
+function buildIssueUrl(text: string) {
+  const base = 'https://github.com/Simon-He95/markstream-vue/issues/new?template=bug_report.yml'
+  const body = `**Reproduction input**:\n\nPlease find the reproduction input below:\n\n\`\`\`markdown\n${text}\n\`\`\``
+  return `${base}&body=${encodeURIComponent(body)}`
 }
 
 function generateShareLink() {
-  const encodedRaw = encodeURIComponent(input.value)
-  const compressed = encodeForUrl(input.value)
-  if (!compressed && !encodedRaw)
+  const payload = encodeMarkdownPayload(input.value)
+  if (!payload)
     return
-  // Choose the shorter representation: compressed (URL-safe) or raw encoded
-  const data = (compressed && compressed.length < encodedRaw.length) ? compressed : `raw:${encodedRaw}`
-  const url = new URL(window.location.href)
-  url.hash = `data=${data}`
-  const full = url.toString()
-  console.log(full.length)
+  const full = withMarkdownHash(basePageUrl(), input.value)
+
   if (full.length > MAX_URL_LEN) {
-    // mark as too long, do not place the huge URL in address bar
     tooLong.value = true
     shareUrl.value = ''
-    // prepare an issue URL so user can open it directly
     issueUrl.value = buildIssueUrl(input.value)
-    showToast('内容过长，无法嵌入到 URL。你可以打开 Issue 并提交。', 'info', 5000)
+    showToast('内容太长，建议直接附到 GitHub Issue。', 'info', 4000)
     return
   }
+
   tooLong.value = false
   shareUrl.value = full
   window.history.replaceState(undefined, '', full)
 }
 
-function buildIssueUrl(text: string) {
-  const base = 'https://github.com/Simon-He95/markstream-vueer/issues/new?template=bug_report.yml'
-  const body = `**Reproduction input**:\n\nPlease find the reproduction input below:\n\n\`\`\`markdown\n${text}\n\`\`\``
-  return `${base}&body=${encodeURIComponent(body)}`
-}
-
 async function copyShareLink() {
-  const u = shareUrl.value || window.location.href
+  const target = shareUrl.value || basePageUrl()
   try {
-    await navigator.clipboard.writeText(u)
+    await navigator.clipboard.writeText(target)
     return true
   }
-  catch (e) {
-    console.warn('copy failed', e)
+  catch (error) {
+    console.warn('copy failed', error)
     return false
   }
 }
 
-function showToast(msg: string, type: 'success' | 'error' | 'info' = 'success', duration = 2000) {
-  notice.value = msg
+function showToast(message: string, type: 'success' | 'error' | 'info' = 'success', duration = 2200) {
+  notice.value = message
   noticeType.value = type
   if (duration > 0)
-    setTimeout(() => (notice.value = ''), duration)
+    window.setTimeout(() => (notice.value = ''), duration)
 }
 
 async function generateAndCopy() {
-  // generate share URL then copy it
   isWorking.value = true
   isCopied.value = false
   generateShareLink()
+
   if (tooLong.value) {
     isWorking.value = false
     return
   }
-  const ok = await copyShareLink()
+
+  const copied = await copyShareLink()
   isWorking.value = false
-  if (ok) {
+
+  if (copied) {
     isCopied.value = true
-    showToast('已复制链接到剪贴板', 'success', 2000)
-    setTimeout(() => (isCopied.value = false), 2000)
+    showToast('分享链接已复制。', 'success', 1800)
+    window.setTimeout(() => (isCopied.value = false), 1800)
   }
   else {
-    showToast('复制链接失败，请手动复制或在 HTTPS/localhost 下重试', 'error', 4000)
+    showToast('复制失败，请手动复制地址栏链接。', 'error', 3000)
   }
 }
 
 async function copyRawInput() {
+  const target = buildIssueUrl(input.value)
+  issueUrl.value = target
+
   try {
-    const url = buildIssueUrl(input.value)
-    issueUrl.value = url
-    await navigator.clipboard.writeText(url)
-    showToast('已复制 issue 链接到剪贴板，打开链接并提交即可。', 'success', 3500)
+    await navigator.clipboard.writeText(target)
+    showToast('Issue 链接已复制。', 'success', 2200)
   }
-  catch (e) {
-    console.warn('copy failed', e)
-    showToast('复制失败，请手动选中并复制输入内容。', 'error', 3500)
+  catch (error) {
+    console.warn('copy failed', error)
+    showToast('复制失败，请手动打开 Issue。', 'error', 3000)
   }
 }
 
 function openIssueInNewTab() {
   if (!issueUrl.value)
     issueUrl.value = buildIssueUrl(input.value)
+
   try {
     window.open(issueUrl.value, '_blank')
   }
   catch {
-    // fallback: set location
     window.location.href = issueUrl.value
   }
 }
 
 function restoreFromUrl() {
-  try {
-    const hash = window.location.hash || ''
-    if (!hash)
-      return
-    const m = hash.match(/data=([^&]+)/)
-    if (m && m[1]) {
-      const payload = m[1]
-      // support `raw:` fallback where we stored uncompressed (encoded) content
-      if (payload.startsWith('raw:')) {
-        try {
-          input.value = decodeURIComponent(payload.slice(4))
-        }
-        catch {
-          // ignore
-        }
-      }
-      else {
-        const decoded = decodeFromUrl(payload)
-        if (decoded)
-          input.value = decoded
-      }
-    }
+  const decoded = decodeMarkdownHash(window.location.hash || '')
+  if (!decoded)
+    return false
+
+  input.value = decoded
+  return true
+}
+
+function applySample(sampleId: SampleId) {
+  const sample = sampleCards.find(item => item.id === sampleId)
+  if (!sample)
+    return
+
+  stopStreamRender()
+  selectedSampleId.value = sample.id
+  input.value = sample.content
+  tooLong.value = false
+  showToast(`已切换到“${sample.title}”样例。`, 'info', 1200)
+}
+
+let streamTimer: number | null = null
+
+function scheduleNextChunk() {
+  if (!isStreaming.value)
+    return
+
+  const nextLength = Math.min(streamContent.value.length + streamSpeed.value, input.value.length)
+  streamContent.value = input.value.slice(0, nextLength)
+
+  if (nextLength >= input.value.length) {
+    stopStreamRender()
+    return
   }
-  catch {
-    // ignore
+
+  streamTimer = window.setTimeout(scheduleNextChunk, streamInterval.value)
+}
+
+function startStreamRender() {
+  if (isStreaming.value) {
+    stopStreamRender()
+    return
   }
+
+  streamContent.value = ''
+  isStreaming.value = true
+  scheduleNextChunk()
+}
+
+function stopStreamRender() {
+  if (streamTimer !== null) {
+    clearTimeout(streamTimer)
+    streamTimer = null
+  }
+  isStreaming.value = false
+}
+
+function resetEditor() {
+  applySample(selectedSampleId.value)
+}
+
+function clearEditor() {
+  stopStreamRender()
+  input.value = ''
+}
+
+function frameworkHref(id: FrameworkId) {
+  const framework = frameworkCards.find(item => item.id === id)
+  if (!framework)
+    return '/test'
+  return resolveFrameworkTestHref(
+    framework,
+    CURRENT_FRAMEWORK,
+    input.value,
+    typeof window !== 'undefined'
+      ? { hostname: window.location.hostname, protocol: window.location.protocol }
+      : undefined,
+  )
 }
 
 onMounted(() => {
-  restoreFromUrl()
-  shareUrl.value = window.location.href
+  const restored = restoreFromUrl()
+  if (!restored) {
+    const sample = sampleCards.find(item => item.id === selectedSampleId.value) ?? sampleCards[0]
+    input.value = sample.content
+  }
+  shareUrl.value = basePageUrl()
 })
 
-watch(() => renderMode.value, (mode: string) => {
-  if (mode === 'pre') {
+watch(streamSpeed, (value) => {
+  const next = clampInt(value, 1, 80, 4)
+  if (next !== value)
+    streamSpeed.value = next
+}, { immediate: true })
+
+watch(streamInterval, (value) => {
+  const next = clampInt(value, 8, 300, 24)
+  if (next !== value)
+    streamInterval.value = next
+}, { immediate: true })
+
+watch(input, () => {
+  tooLong.value = false
+  isCopied.value = false
+  if (!isStreaming.value && typeof window !== 'undefined')
+    shareUrl.value = basePageUrl()
+})
+
+watch(() => renderMode.value, (mode) => {
+  if (mode === 'pre')
     setCustomComponents({ code_block: PreCodeNode })
-  }
-  else if (mode === 'markdown') {
+  else if (mode === 'markdown')
     setCustomComponents({ code_block: MarkdownCodeBlockNode })
-  }
-  else {
+  else
     setCustomComponents({ code_block: CodeBlockNode })
-  }
 }, { immediate: true })
 
 watch(mathEnabled, (enabled) => {
@@ -283,385 +487,803 @@ watch(mermaidEnabled, (enabled) => {
   else
     disableMermaid()
 }, { immediate: true })
-
-// 流式渲染函数
-let streamTimer: number | null = null
-
-function startStreamRender() {
-  if (isStreaming.value) {
-    // 如果正在流式渲染，停止它
-    stopStreamRender()
-    return
-  }
-
-  // 重置流式内容
-  streamContent.value = ''
-  isStreaming.value = true
-  let currentIndex = 0
-  const fullText = input.value
-
-  const streamStep = () => {
-    if (currentIndex >= fullText.length) {
-      // 完成流式渲染
-      stopStreamRender()
-      return
-    }
-
-    // 每次截取指定数量的字符
-    const nextIndex = Math.min(currentIndex + streamSpeed.value, fullText.length)
-    streamContent.value = fullText.slice(0, nextIndex)
-    currentIndex = nextIndex
-
-    // 继续下一次渲染，使用用户设置的时间间隔
-    streamTimer = window.setTimeout(streamStep, streamInterval.value)
-  }
-
-  streamStep()
-}
-
-function stopStreamRender() {
-  if (streamTimer !== null) {
-    clearTimeout(streamTimer)
-    streamTimer = null
-  }
-  isStreaming.value = false
-  // 确保显示完整内容
-  if (streamContent.value && streamContent.value !== input.value)
-    streamContent.value = input.value
-}
-
-function toggleStreamSettings() {
-  showStreamSettings.value = !showStreamSettings.value
-}
 </script>
 
 <template>
-  <div class="p-4 app-container min-h-screen bg-gray-50 dark:bg-gray-900">
-    <div class="max-w-6xl mx-auto flex flex-col">
-      <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-lg font-semibold">
-          Markdown 输入 & 实时渲染
-        </h2>
-        <div class="text-sm text-gray-500 flex items-center gap-3">
-          <span>左侧输入，右侧预览</span>
-          <button
-            class="px-2 py-1 rounded text-sm flex items-center gap-2"
-            :class="isStreaming ? 'bg-red-600 text-white' : 'bg-purple-600 text-white'"
-            @click="startStreamRender"
-          >
-            {{ isStreaming ? '停止流式渲染' : '流式渲染' }}
-          </button>
-          <button
-            class="px-2 py-1 bg-gray-500 text-white rounded text-sm"
-            :class="{ 'bg-gray-700': showStreamSettings }"
-            @click="toggleStreamSettings"
-          >
-            ⚙️ 设置
-          </button>
-          <button :disabled="isWorking" class="px-2 py-1 bg-blue-600 text-white rounded text-sm flex items-center gap-2" @click="generateAndCopy">
-            生成并复制分享链接
-          </button>
-          <button class="bg-green-600 text-white rounded px-2 py-1 text-sm" @click="openIssueInNewTab">
-            打开 Issue
-          </button>
-        </div>
-      </div>
+  <div class="test-lab">
+    <div class="test-lab__glow test-lab__glow--cyan" />
+    <div class="test-lab__glow test-lab__glow--amber" />
 
-      <!-- 设置面板：流式渲染 + 渲染配置 -->
-      <div v-if="showStreamSettings" class="mb-4 p-4 bg-white dark:bg-gray-800 rounded border border-purple-300 dark:border-purple-700 shadow-md space-y-4">
-        <div>
-          <h3 class="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
-            流式渲染设置
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                每次截取字符数: <span class="text-purple-600 dark:text-purple-400 font-semibold">{{ streamSpeed }}</span>
-              </label>
-              <input
-                v-model.number="streamSpeed"
-                type="range"
-                min="1"
-                max="100"
-                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-              >
-              <div class="flex justify-between text-xs text-gray-500 mt-1">
-                <span>1 (慢)</span>
-                <span>100 (快)</span>
-              </div>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                更新间隔(毫秒): <span class="text-purple-600 dark:text-purple-400 font-semibold">{{ streamInterval }}ms</span>
-              </label>
-              <input
-                v-model.number="streamInterval"
-                type="range"
-                min="10"
-                max="500"
-                step="10"
-                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-              >
-              <div class="flex justify-between text-xs text-gray-500 mt-1">
-                <span>10ms (快)</span>
-                <span>500ms (慢)</span>
-              </div>
-            </div>
+    <div class="test-lab__shell">
+      <section class="hero-panel">
+        <div class="hero-panel__copy">
+          <span class="eyebrow">Cross-framework regression lab</span>
+          <h1>Markstream Test Page</h1>
+          <p>
+            用同一份 markdown，快速对照 Vue 3、Vue 2 和 React 的渲染行为。
+            这个页面更像一个调试驾驶舱，而不是单纯的 demo。
+          </p>
+        </div>
+
+        <div class="hero-panel__metrics">
+          <div class="metric-card">
+            <span>当前框架</span>
+            <strong>Vue 3</strong>
           </div>
-          <div class="mt-3 p-2 bg-purple-50 dark:bg-purple-900/20 rounded text-xs text-gray-600 dark:text-gray-400">
-            💡 提示：字符数越大或间隔越小，渲染速度越快
+          <div class="metric-card">
+            <span>字符数</span>
+            <strong>{{ charCount }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>行数</span>
+            <strong>{{ lineCount }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>预览进度</span>
+            <strong>{{ streamProgress }}%</strong>
           </div>
         </div>
 
-        <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <h3 class="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-200">
-            渲染配置（用于调试不同模式）
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div class="space-y-2">
+        <div class="framework-switcher">
+          <a
+            v-for="framework in frameworkCards"
+            :key="framework.id"
+            class="framework-chip"
+            :class="{ 'framework-chip--current': framework.id === CURRENT_FRAMEWORK }"
+            :href="frameworkHref(framework.id)"
+          >
+            <span class="framework-chip__label">{{ framework.label }}</span>
+            <span class="framework-chip__note">{{ framework.note }}</span>
+          </a>
+        </div>
+      </section>
+
+      <div class="lab-layout">
+        <aside class="lab-sidebar">
+          <section class="panel-card">
+            <div class="panel-card__head">
               <div>
-                <label class="block font-medium mb-1 text-gray-700 dark:text-gray-300">代码块模式</label>
-                <select
-                  v-model="renderMode"
-                  class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1"
-                >
+                <h2>样例</h2>
+                <p>快速切换不同的回归场景。</p>
+              </div>
+              <span class="mini-pill">{{ activeSample.title }}</span>
+            </div>
+
+            <div class="sample-list">
+              <button
+                v-for="sample in sampleCards"
+                :key="sample.id"
+                type="button"
+                class="sample-card"
+                :class="{ 'sample-card--active': sample.id === selectedSampleId }"
+                @click="applySample(sample.id)"
+              >
+                <strong>{{ sample.title }}</strong>
+                <span>{{ sample.summary }}</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="panel-card">
+            <div class="panel-card__head">
+              <div>
+                <h2>流式控制</h2>
+                <p>模拟真实增量输出，检查闪烁和中间态。</p>
+              </div>
+              <button type="button" class="ghost-button" @click="showStreamSettings = !showStreamSettings">
+                {{ showStreamSettings ? '收起' : '展开' }}
+              </button>
+            </div>
+
+            <div class="control-actions">
+              <button type="button" class="action-button action-button--primary" @click="startStreamRender">
+                {{ isStreaming ? '停止流式渲染' : '开始流式渲染' }}
+              </button>
+              <button type="button" class="action-button" @click="resetEditor">
+                重置样例
+              </button>
+              <button type="button" class="action-button" @click="clearEditor">
+                清空输入
+              </button>
+            </div>
+
+            <div class="progress-block">
+              <div class="progress-track">
+                <div class="progress-fill" :style="{ width: `${streamProgress}%` }" />
+              </div>
+              <div class="progress-meta">
+                <span>{{ previewContent.length }} / {{ input.length || 0 }}</span>
+                <span>{{ isStreaming ? 'Streaming' : 'Static preview' }}</span>
+              </div>
+            </div>
+
+            <div v-if="showStreamSettings" class="control-stack">
+              <label class="range-control">
+                <span>每次追加字符数</span>
+                <strong>{{ streamSpeed }}</strong>
+                <input v-model.number="streamSpeed" type="range" min="1" max="80">
+              </label>
+
+              <label class="range-control">
+                <span>更新时间间隔</span>
+                <strong>{{ streamInterval }}ms</strong>
+                <input v-model.number="streamInterval" type="range" min="8" max="300" step="4">
+              </label>
+
+              <div class="toggle-grid">
+                <label class="toggle-item">
+                  <span>代码块流式渲染</span>
+                  <input v-model="codeBlockStream" type="checkbox">
+                </label>
+                <label class="toggle-item">
+                  <span>viewportPriority</span>
+                  <input v-model="viewportPriority" type="checkbox">
+                </label>
+                <label class="toggle-item">
+                  <span>batchRendering</span>
+                  <input v-model="batchRendering" type="checkbox">
+                </label>
+                <label class="toggle-item">
+                  <span>typewriter</span>
+                  <input v-model="typewriter" type="checkbox">
+                </label>
+                <label class="toggle-item">
+                  <span>KaTeX</span>
+                  <input v-model="mathEnabled" type="checkbox">
+                </label>
+                <label class="toggle-item">
+                  <span>Mermaid</span>
+                  <input v-model="mermaidEnabled" type="checkbox">
+                </label>
+                <label class="toggle-item">
+                  <span>解析树 debug</span>
+                  <input v-model="debugParse" type="checkbox">
+                </label>
+              </div>
+
+              <label class="select-control">
+                <span>代码块模式</span>
+                <select v-model="renderMode">
                   <option value="monaco">
-                    Monaco 编辑器
+                    Monaco
                   </option>
                   <option value="markdown">
-                    MarkdownCodeBlock (stream-markdown)
+                    MarkdownCodeBlock
                   </option>
                   <option value="pre">
-                    纯 PreCodeNode
+                    PreCodeNode
                   </option>
                 </select>
-              </div>
-              <div class="flex items-center gap-2">
-                <input id="toggle-code-stream" v-model="codeBlockStream" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
-                <label for="toggle-code-stream" class="cursor-pointer">代码块流式渲染</label>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel-card">
+            <div class="panel-card__head">
+              <div>
+                <h2>分享与排障</h2>
+                <p>把当前输入直接带给别人复现。</p>
               </div>
             </div>
 
-            <div class="space-y-2">
-              <div class="flex items-center gap-2">
-                <input id="toggle-viewport" v-model="viewportPriority" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
-                <label for="toggle-viewport" class="cursor-pointer">启用 viewportPriority</label>
+            <div class="share-actions">
+              <button type="button" class="action-button action-button--primary" :disabled="isWorking" @click="generateAndCopy">
+                {{ isCopied ? '已复制分享链接' : (isWorking ? '生成中...' : '复制分享链接') }}
+              </button>
+              <button type="button" class="action-button" @click="copyRawInput">
+                复制 Issue 链接
+              </button>
+              <button type="button" class="action-button" @click="openIssueInNewTab">
+                打开 Issue
+              </button>
+            </div>
+
+            <div class="meta-list">
+              <div class="meta-list__row">
+                <span>当前视图</span>
+                <strong>{{ renderModeLabel }}</strong>
               </div>
-              <div class="flex items-center gap-2">
-                <input id="toggle-batch" v-model="batchRendering" type="checkbox" class="rounded border border-gray-300 dark:border-gray-600">
-                <label for="toggle-batch" class="cursor-pointer">启用批量渲染 (batchRendering)</label>
-              </div>
-              <div class="flex items-center gap-2">
-                <input id="toggle-typewriter" v-model="typewriter" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
-                <label for="toggle-typewriter" class="cursor-pointer">启用打字机过渡 (typewriter)</label>
-              </div>
-              <div class="flex items-center gap-2">
-                <input id="toggle-math" v-model="mathEnabled" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
-                <label for="toggle-math" class="cursor-pointer">启用数学 (KaTeX)</label>
-              </div>
-              <div class="flex items-center gap-2">
-                <input id="toggle-debug-parse" v-model="debugParse" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
-                <label for="toggle-debug-parse" class="cursor-pointer">调试解析树结构（console）</label>
+              <div class="meta-list__row">
+                <span>分享地址</span>
+                <strong>{{ shareUrl || '尚未生成' }}</strong>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
-        <div>
-          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">输入</label>
-          <textarea v-model="input" rows="18" class="w-full p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 resize-none" />
-        </div>
-
-        <div class="flex flex-col">
-          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200 shrink-0">
-            预览
-            <span v-if="streamContent" class="ml-2 text-xs text-purple-600 dark:text-purple-400">
-              (流式渲染模式 {{ isStreaming ? '- 渲染中...' : '- 已完成' }})
-            </span>
-          </label>
-          <div class="max-w-none p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 min-h-[14rem] overflow-auto flex-1">
-            <MarkdownRender
-              :content="streamContent || input"
-              :viewport-priority="viewportPriority"
-              :batch-rendering="batchRendering"
-              :typewriter="typewriter"
-              :code-block-stream="codeBlockStream"
-              :code-block-monaco-options="testPageMonacoOptions"
-              :parse-options="{ debug: debugParse }"
-            />
-          </div>
-          <div class="mt-2 text-xs text-gray-500 break-words shrink-0">
-            <template v-if="tooLong">
-              <div class="mb-2 p-2 rounded bg-yellow-50 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
-                内容过长，无法嵌入到 URL。建议在 issue 中粘贴完整输入以便分享。
-              </div>
-              <div class="flex gap-2 items-center">
-                <button class="px-2 py-1 bg-gray-200 dark:bg-gray-700 text-sm rounded" @click="copyRawInput">
-                  复制 Issue 链接
-                </button>
-                <button class="px-2 py-1 bg-blue-600 text-white text-sm rounded" @click="openIssueInNewTab">
-                  打开 Issue
-                </button>
-                <span class="text-xs text-gray-500">或手动将输入粘贴到 GitHub Issue 中。</span>
-              </div>
-            </template>
-          </div>
-          <div v-if="notice" class="mt-2">
-            <div class="p-2 rounded" :class="[noticeType === 'success' ? 'bg-green-50 text-green-800 dark:bg-green-900 dark:text-green-200' : (noticeType === 'error' ? 'bg-red-50 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-blue-50 text-blue-800 dark:bg-blue-900 dark:text-blue-200')]">
+            <div v-if="tooLong" class="info-banner info-banner--warning">
+              当前内容过长，建议使用 Issue 链接分享完整输入。
+            </div>
+            <div v-if="notice" class="info-banner" :class="`info-banner--${noticeType}`">
               {{ notice }}
             </div>
-          </div>
-        </div>
+          </section>
+        </aside>
+
+        <section class="workspace-grid">
+          <article class="workspace-card">
+            <header class="workspace-card__head">
+              <div>
+                <h2>Markdown 输入</h2>
+                <p>左侧编辑，右侧马上验证渲染结果。</p>
+              </div>
+              <span class="mini-pill">Live editor</span>
+            </header>
+
+            <textarea
+              v-model="input"
+              class="editor-textarea"
+              spellcheck="false"
+              placeholder="在这里粘贴你的复现 markdown..."
+            />
+
+            <footer class="workspace-card__foot">
+              <span>可直接粘贴 issue 复现内容</span>
+              <span>{{ charCount }} chars</span>
+            </footer>
+          </article>
+
+          <article class="workspace-card">
+            <header class="workspace-card__head">
+              <div>
+                <h2>实时预览</h2>
+                <p>当前模式：{{ renderModeLabel }}</p>
+              </div>
+              <span class="mini-pill" :class="{ 'mini-pill--active': isStreaming }">
+                {{ isStreaming ? 'Streaming' : 'Ready' }}
+              </span>
+            </header>
+
+            <div class="preview-surface">
+              <MarkdownRender
+                :content="previewContent"
+                :viewport-priority="viewportPriority"
+                :batch-rendering="batchRendering"
+                :typewriter="typewriter"
+                :code-block-stream="codeBlockStream"
+                :code-block-monaco-options="testPageMonacoOptions"
+                :parse-options="{ debug: debugParse }"
+              />
+            </div>
+
+            <footer class="workspace-card__foot">
+              <span>{{ previewContent.length }} chars rendered</span>
+              <span>{{ isStreaming ? '正在逐步追加中' : '已显示完整输入' }}</span>
+            </footer>
+          </article>
+        </section>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.app-container {
-  transition: background-color 0.3s ease;
+.test-lab {
+  --lab-bg: #f4f7fb;
+  --lab-surface: rgba(255, 255, 255, 0.82);
+  --lab-surface-strong: rgba(255, 255, 255, 0.94);
+  --lab-border: rgba(15, 23, 42, 0.09);
+  --lab-shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
+  --lab-text: #10203a;
+  --lab-muted: #59708f;
+  --lab-accent: #1d4ed8;
+  --lab-accent-soft: rgba(29, 78, 216, 0.12);
+  position: relative;
+  min-height: 100vh;
+  padding: 28px 18px 42px;
+  background:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 30%),
+    radial-gradient(circle at 85% 12%, rgba(251, 191, 36, 0.16), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, var(--lab-bg) 100%);
+  color: var(--lab-text);
+  overflow: hidden;
 }
 
-.chatbot-container {
-  transition: all 0.3s ease;
-  overscroll-behavior: contain;
-  height: calc(var(--app-viewport-vh, 1vh) * 100 - 2rem);
-  max-height: calc(var(--app-viewport-vh, 1vh) * 100 - 2rem);
+.test-lab__shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1480px;
+  margin: 0 auto;
+  display: grid;
+  gap: 22px;
 }
 
-.github-star-btn:active {
-  transform: scale(0.95);
+.test-lab__glow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(80px);
+  opacity: 0.45;
+  pointer-events: none;
 }
 
-.chatbot-messages {
-  scroll-behavior: smooth;
-  overscroll-behavior: contain;
+.test-lab__glow--cyan {
+  top: 40px;
+  left: -80px;
+  width: 280px;
+  height: 280px;
+  background: rgba(34, 211, 238, 0.34);
 }
 
-.chatbot-messages::-webkit-scrollbar {
-  width: 8px;
+.test-lab__glow--amber {
+  right: -60px;
+  bottom: 120px;
+  width: 260px;
+  height: 260px;
+  background: rgba(251, 191, 36, 0.28);
 }
 
-.chatbot-messages::-webkit-scrollbar-track {
-  background: transparent;
+.hero-panel,
+.panel-card,
+.workspace-card {
+  background: var(--lab-surface);
+  border: 1px solid var(--lab-border);
+  border-radius: 28px;
+  box-shadow: var(--lab-shadow);
+  backdrop-filter: blur(18px);
 }
 
-.chatbot-messages::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+.hero-panel {
+  position: relative;
+  overflow: hidden;
+  padding: 28px;
+  display: grid;
+  gap: 22px;
 }
 
-.dark .chatbot-messages::-webkit-scrollbar-thumb {
-  background: #475569;
+.hero-panel::after {
+  content: '';
+  position: absolute;
+  inset: auto -12% -55% auto;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(29, 78, 216, 0.12), transparent 68%);
+  pointer-events: none;
 }
 
-.chatbot-messages::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+.eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(29, 78, 216, 0.14);
+  color: var(--lab-accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.dark .chatbot-messages::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+.hero-panel h1 {
+  margin: 12px 0 10px;
+  font-size: clamp(2.1rem, 4vw, 3.4rem);
+  line-height: 0.94;
 }
 
-.settings-toggle {
-  backdrop-filter: blur(8px);
+.hero-panel p {
+  margin: 0;
+  max-width: 720px;
+  color: var(--lab-muted);
+  font-size: 1rem;
+  line-height: 1.7;
 }
 
-.settings-toggle:active {
-  transform: scale(0.95);
+.hero-panel__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
-/* 主题选择器自定义样式 */
-.theme-selector select:focus {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+.metric-card {
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: var(--lab-surface-strong);
+  border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-.theme-selector select option {
+.metric-card span {
+  display: block;
+  color: var(--lab-muted);
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+}
+
+.metric-card strong {
+  font-size: 1.4rem;
+}
+
+.framework-switcher {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.framework-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 15px 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.framework-chip:hover {
+  transform: translateY(-2px);
+  border-color: rgba(29, 78, 216, 0.28);
+  box-shadow: 0 16px 32px rgba(29, 78, 216, 0.1);
+}
+
+.framework-chip--current {
+  border-color: rgba(29, 78, 216, 0.28);
+  background: linear-gradient(135deg, rgba(29, 78, 216, 0.12), rgba(34, 197, 94, 0.08));
+}
+
+.framework-chip__label {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.framework-chip__note {
+  color: var(--lab-muted);
+  font-size: 0.88rem;
+}
+
+.lab-layout {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.lab-sidebar,
+.workspace-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.panel-card {
+  padding: 20px;
+}
+
+.panel-card__head,
+.workspace-card__head,
+.workspace-card__foot,
+.progress-meta,
+.meta-list__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-card__head h2,
+.workspace-card__head h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.panel-card__head p,
+.workspace-card__head p,
+.workspace-card__foot,
+.progress-meta,
+.meta-list__row,
+.sample-card span {
+  margin: 0;
+  color: var(--lab-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.mini-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
   padding: 8px 12px;
-  background-color: white;
-  color: #374151;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--lab-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
-.dark .theme-selector select option {
-  background-color: #1f2937;
-  color: #f3f4f6;
+.mini-pill--active {
+  background: rgba(29, 78, 216, 0.14);
+  color: var(--lab-accent);
 }
 
-/* 设置面板动画 */
-.settings-panel {
-  transform-origin: top right;
+.sample-list,
+.control-stack,
+.toggle-grid,
+.share-actions,
+.meta-list {
+  display: grid;
+  gap: 12px;
 }
 
-/* 代码块加载时的流光闪烁效果 */
-:deep(.code-block-container.is-rendering) {
-  position: relative;
-  animation: renderingGlow 2s ease-in-out infinite;
-}
-
-@keyframes renderingGlow {
-  0% {
-    box-shadow:
-      0 0 10px rgba(59, 130, 246, 0.4),
-      0 0 20px rgba(59, 130, 246, 0.2);
-  }
-  25% {
-    box-shadow:
-      0 0 15px rgba(139, 92, 246, 0.5),
-      0 0 30px rgba(139, 92, 246, 0.3);
-  }
-  50% {
-    box-shadow:
-      0 0 20px rgba(236, 72, 153, 0.5),
-      0 0 40px rgba(236, 72, 153, 0.3);
-  }
-  75% {
-    box-shadow:
-      0 0 15px rgba(16, 185, 129, 0.5),
-      0 0 30px rgba(16, 185, 129, 0.3);
-  }
-  100% {
-    box-shadow:
-      0 0 10px rgba(59, 130, 246, 0.4),
-      0 0 20px rgba(59, 130, 246, 0.2);
-  }
-}
-
-/* Mermaid 块加载时的流光闪烁效果 */
-:deep(.is-rendering) {
-  position: relative;
-  animation: renderingGlow 2s ease-in-out infinite;
-}
-
-/* 滑块样式优化 */
-input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #9333ea;
+.sample-card {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  text-align: left;
   cursor: pointer;
-  transition: all 0.2s;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
 }
 
-input[type="range"]::-webkit-slider-thumb:hover {
-  background: #7c3aed;
-  transform: scale(1.2);
+.sample-card:hover {
+  transform: translateY(-2px);
 }
 
-input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #9333ea;
+.sample-card strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.98rem;
+}
+
+.sample-card--active {
+  border-color: rgba(29, 78, 216, 0.28);
+  background: linear-gradient(135deg, rgba(29, 78, 216, 0.12), rgba(255, 255, 255, 0.92));
+}
+
+.control-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.action-button,
+.ghost-button {
+  border: 0;
+  border-radius: 16px;
   cursor: pointer;
-  border: none;
-  transition: all 0.2s;
+  font: inherit;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
 }
 
-input[type="range"]::-moz-range-thumb:hover {
-  background: #7c3aed;
-  transform: scale(1.2);
+.action-button {
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--lab-text);
+}
+
+.action-button:hover,
+.ghost-button:hover {
+  transform: translateY(-1px);
+}
+
+.action-button--primary {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
+}
+
+.action-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+
+.ghost-button {
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--lab-muted);
+}
+
+.progress-block {
+  margin-top: 16px;
+}
+
+.progress-track {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #06b6d4, #1d4ed8);
+}
+
+.progress-meta {
+  margin-top: 10px;
+}
+
+.range-control,
+.select-control,
+.toggle-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.range-control span,
+.select-control span {
+  color: var(--lab-muted);
+  font-size: 0.88rem;
+}
+
+.toggle-item {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.range-control input[type='range'] {
+  width: 100%;
+}
+
+.select-control select {
+  border: 0;
+  border-radius: 14px;
+  padding: 11px 12px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--lab-text);
+  font: inherit;
+}
+
+.toggle-item input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+}
+
+.meta-list__row {
+  gap: 16px;
+}
+
+.meta-list__row strong {
+  display: inline-block;
+  max-width: 60%;
+  font-size: 0.84rem;
+  color: var(--lab-text);
+  line-break: anywhere;
+  text-align: right;
+}
+
+.info-banner {
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+  font-size: 0.9rem;
+}
+
+.info-banner--success {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+
+.info-banner--error {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.info-banner--info {
+  background: rgba(29, 78, 216, 0.1);
+  color: #1d4ed8;
+}
+
+.info-banner--warning {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+.workspace-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workspace-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 760px;
+}
+
+.workspace-card__head,
+.workspace-card__foot {
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.workspace-card__foot {
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  border-bottom: 0;
+}
+
+.editor-textarea {
+  width: 100%;
+  min-height: 560px;
+  padding: 22px 20px;
+  border: 0;
+  resize: none;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(255, 255, 255, 0.98));
+  color: #0f172a;
+  font:
+    500 0.95rem/1.7 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.editor-textarea:focus {
+  outline: none;
+}
+
+.preview-surface {
+  min-height: 560px;
+  padding: 22px 20px;
+  overflow: auto;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.92));
+}
+
+.preview-surface :deep(.markdown-renderer) {
+  min-height: 100%;
+}
+
+@media (max-width: 1180px) {
+  .lab-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .test-lab {
+    padding: 18px 12px 28px;
+  }
+
+  .hero-panel,
+  .panel-card,
+  .workspace-card {
+    border-radius: 22px;
+  }
+
+  .hero-panel {
+    padding: 22px 18px;
+  }
+
+  .hero-panel__metrics,
+  .framework-switcher,
+  .control-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-card {
+    min-height: 640px;
+  }
+
+  .editor-textarea,
+  .preview-surface {
+    min-height: 420px;
+  }
+
+  .meta-list__row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .meta-list__row strong {
+    max-width: 100%;
+    text-align: left;
+  }
 }
 </style>

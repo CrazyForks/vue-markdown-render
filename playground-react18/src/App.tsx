@@ -2,9 +2,10 @@ import { Icon } from '@iconify/react'
 import { NodeRenderer, setCustomComponents, setKaTeXWorker, setMermaidWorker } from 'markstream-react'
 import KatexWorker from 'markstream-react/workers/katexRenderer.worker?worker&inline'
 import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker&inline'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ThinkingNode } from './components/ThinkingNode'
 import { streamContent } from './markdown'
+import { TestLab } from './shared/TestLab'
 
 setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())
@@ -123,8 +124,18 @@ function readThemeFromStorage(fallback: string) {
   return fallback
 }
 
+function normalizePath(pathname: string) {
+  const normalized = pathname.replace(/\/+$/, '')
+  return normalized || '/'
+}
+
 export default function App() {
   const [content, setContent] = useState('')
+  const [currentPath, setCurrentPath] = useState(() => {
+    if (typeof window === 'undefined')
+      return '/'
+    return normalizePath(window.location.pathname)
+  })
   const [showSettings, setShowSettings] = useState(false)
   const [selectedTheme, setSelectedTheme] = useState(() => readThemeFromStorage('vitesse-dark'))
   const [streamDelay, setStreamDelay] = useState(() => clampDelay(readNumber(STREAM_DELAY_KEY, 16)))
@@ -143,6 +154,32 @@ export default function App() {
   const messagesRef = useRef<HTMLDivElement | null>(null)
   const frameRef = useRef<number | null>(null)
   const settingsRootRef = useRef<HTMLDivElement | null>(null)
+  const isTestPage = currentPath === '/test'
+
+  const navigate = useCallback((pathname: string) => {
+    if (typeof window === 'undefined')
+      return
+    const nextPath = normalizePath(pathname)
+    if (nextPath !== normalizePath(window.location.pathname))
+      window.history.pushState({}, '', nextPath)
+    startTransition(() => {
+      setCurrentPath(nextPath)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined')
+      return
+    const handlePopState = () => {
+      startTransition(() => {
+        setCurrentPath(normalizePath(window.location.pathname))
+      })
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof document === 'undefined')
@@ -279,7 +316,7 @@ export default function App() {
   }, [showSettings])
 
   useEffect(() => {
-    if (typeof window === 'undefined')
+    if (isTestPage || typeof window === 'undefined')
       return
     let timer: number | null = null
     const startStreaming = () => {
@@ -302,16 +339,14 @@ export default function App() {
       if (timer != null)
         window.clearInterval(timer)
     }
-  }, [streamDelay, normalizedChunkSize])
+  }, [isTestPage, streamDelay, normalizedChunkSize])
 
   const goToTest = () => {
-    try {
-      window.location.href = '/test'
-    }
-    catch {
-      // noop
-    }
+    navigate('/test')
   }
+
+  if (isTestPage)
+    return <TestLab frameworkLabel="React 18" onGoHome={() => navigate('/')} />
 
   return (
     <div className="markstream-vue h-full">

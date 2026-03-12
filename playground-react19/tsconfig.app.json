@@ -5,6 +5,6 @@
     "types": ["vite/client"],
     "allowJs": false
   },
-  "include": ["src"],
+  "include": ["src", "../playground-react18/src/shared/**/*"],
   "exclude": ["src/**/*.test.*", "dist", "node_modules"]
 }
