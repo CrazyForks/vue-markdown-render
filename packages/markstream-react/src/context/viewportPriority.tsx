@@ -15,13 +15,28 @@ const ViewportPriorityContext = createContext<RegisterViewportFn | null>(null)
 
 function createViewportRegistrar(getRoot: GetRootFn, enabled: EnabledFn): RegisterViewportFn {
   const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
-  const observers = new Map<string, {
-    observer: IntersectionObserver
+  interface ObserverConfig {
     root: Element | null
     rootMargin: string
     threshold: number
-    targets: Map<Element, { resolve: () => void, state: { current: boolean } }>
-  }>()
+  }
+
+  let observer: IntersectionObserver | null = null
+  let currentConfig: ObserverConfig | null = null
+  const targets = new Map<Element, { resolve: () => void, state: { current: boolean } }>()
+
+  const normalizeConfig = (rootMargin: string, threshold: number): ObserverConfig => ({
+    root: getRoot() ?? null,
+    rootMargin,
+    threshold,
+  })
+
+  const sameConfig = (a: ObserverConfig | null, b: ObserverConfig) => {
+    return !!a
+      && a.root === b.root
+      && a.rootMargin === b.rootMargin
+      && a.threshold === b.threshold
+  }
 
   const ensureObserver = (rootMargin: string, threshold: number) => {
     if (!isBrowser)
@@ -29,22 +44,18 @@ function createViewportRegistrar(getRoot: GetRootFn, enabled: EnabledFn): Regist
     if (typeof IntersectionObserver === 'undefined')
       return null
 
-    const root = getRoot() ?? null
-    const key = `${rootMargin}::${threshold}`
-    const existing = observers.get(key)
-    if (existing && existing.root === root)
-      return existing
+    const nextConfig = normalizeConfig(rootMargin, threshold)
+    if (observer && sameConfig(currentConfig, nextConfig))
+      return observer
 
-    if (existing) {
+    if (observer) {
       try {
-        existing.observer.disconnect()
+        observer.disconnect()
       }
       catch {}
-      observers.delete(key)
     }
 
-    const targets = existing?.targets ?? new Map<Element, { resolve: () => void, state: { current: boolean } }>()
-    const observer = new IntersectionObserver((entries) => {
+    observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         const target = targets.get(entry.target)
         if (!target)
@@ -64,18 +75,17 @@ function createViewportRegistrar(getRoot: GetRootFn, enabled: EnabledFn): Regist
         targets.delete(entry.target)
       }
     }, {
-      root,
-      rootMargin,
-      threshold,
+      root: nextConfig.root,
+      rootMargin: nextConfig.rootMargin,
+      threshold: nextConfig.threshold,
     })
 
-    const record = { observer, root, rootMargin, threshold, targets }
-    observers.set(key, record)
+    currentConfig = nextConfig
 
     for (const element of targets.keys())
       observer.observe(element)
 
-    return record
+    return observer
   }
 
   const register: RegisterViewportFn = (el, opts) => {
@@ -91,14 +101,20 @@ function createViewportRegistrar(getRoot: GetRootFn, enabled: EnabledFn): Regist
       }
     })
     const destroy = () => {
-      for (const record of observers.values()) {
-        if (!record.targets.has(el))
-          continue
-        record.targets.delete(el)
+      if (targets.has(el)) {
+        targets.delete(el)
         try {
-          record.observer.unobserve(el)
+          observer?.unobserve(el)
         }
         catch {}
+      }
+      if (!targets.size) {
+        try {
+          observer?.disconnect()
+        }
+        catch {}
+        observer = null
+        currentConfig = null
       }
     }
 
@@ -114,8 +130,8 @@ function createViewportRegistrar(getRoot: GetRootFn, enabled: EnabledFn): Regist
 
     const rootMargin = opts?.rootMargin ?? '300px'
     const threshold = opts?.threshold ?? 0
-    const record = ensureObserver(rootMargin, threshold)
-    if (!record) {
+    const nextObserver = ensureObserver(rootMargin, threshold)
+    if (!nextObserver) {
       state.current = true
       resolve()
       return {
@@ -125,8 +141,8 @@ function createViewportRegistrar(getRoot: GetRootFn, enabled: EnabledFn): Regist
       }
     }
 
-    record.targets.set(el, { resolve, state })
-    record.observer.observe(el)
+    targets.set(el, { resolve, state })
+    nextObserver.observe(el)
     return {
       isVisible: () => state.current,
       whenVisible,

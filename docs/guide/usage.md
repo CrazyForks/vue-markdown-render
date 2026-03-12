@@ -69,6 +69,23 @@ const nodes = parseMarkdownToStructure('# Title', md)
 - `parseMarkdownToStructure(content, md)` transforms a Markdown string into the AST consumed by the renderer.
 - Combine with `setCustomComponents(id?, mapping)` to swap node renderers for a given `custom-id`.
 
+## Streaming recommendation
+
+For low-frequency updates, passing `content` directly is convenient. For chat-style token streams or long documents, prefer parsing outside the component and passing `nodes` so Vue only reconciles the AST you hand it:
+
+```ts
+import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+
+const md = getMarkdown('chat')
+const nodes = parseMarkdownToStructure(source, md, { final: isFinalChunk })
+```
+
+```vue
+<MarkdownRender :nodes="nodes" :final="isFinalChunk" />
+```
+
+That avoids reparsing the full Markdown string inside `MarkdownRender` on every tiny content update, which is usually the biggest win for SSE / AI output.
+
 ## Component matrix
 
 For a full list of components and props, visit [Components & node renderers](/guide/components). Highlights:

@@ -456,6 +456,54 @@ function syncEditorCssVars() {
 }
 
 let resizeSyncHandler: (() => void) | null = null
+const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
+
+function resolveScrollRootElement(node?: HTMLElement | null) {
+  if (typeof window === 'undefined')
+    return null
+  const doc = node?.ownerDocument ?? document
+  const scrollRoot = (doc.scrollingElement || doc.documentElement || doc.body) as HTMLElement | null
+  let current = node?.parentElement ?? null
+  while (current) {
+    if (current === doc.body || current === scrollRoot)
+      break
+    const style = window.getComputedStyle(current)
+    const overflowY = (style.overflowY || '').toLowerCase()
+    const overflow = (style.overflow || '').toLowerCase()
+    if (SCROLL_PARENT_OVERFLOW_RE.test(overflowY) || SCROLL_PARENT_OVERFLOW_RE.test(overflow))
+      return current
+    current = current.parentElement
+  }
+  return scrollRoot
+}
+
+function adjustScrollAfterHeightChange(container: HTMLElement, previousHeight: number, nextHeight: number) {
+  if (typeof window === 'undefined')
+    return
+  const roundedPrev = Math.ceil(previousHeight)
+  const roundedNext = Math.ceil(nextHeight)
+  const delta = roundedNext - roundedPrev
+  if (!delta)
+    return
+
+  const root = resolveScrollRootElement(container)
+  if (!root)
+    return
+
+  const doc = container.ownerDocument ?? document
+  const viewportRoot = root === doc.body || root === doc.documentElement || root === doc.scrollingElement
+  const rootTop = viewportRoot ? 0 : root.getBoundingClientRect().top
+  const containerTop = container.getBoundingClientRect().top - rootTop
+  if (containerTop >= 0)
+    return
+
+  if (viewportRoot && typeof window.scrollBy === 'function') {
+    window.scrollBy(0, delta)
+    return
+  }
+
+  root.scrollTop += delta
+}
 
 function updateExpandedHeight() {
   try {
@@ -463,24 +511,28 @@ function updateExpandedHeight() {
     if (!container)
       return
 
-    // 保存当前滚动位置（相对于容器顶部的距离）
-    const containerRect = container.getBoundingClientRect()
-    const scrollAnchor = window.scrollY + containerRect.top
-
+    const oldHeight = container.getBoundingClientRect().height
     const h = computeContentHeight()
     if (h != null && h > 0) {
-      const oldHeight = containerRect.height
-      container.style.height = `${Math.ceil(h)}px`
+      const nextHeight = Math.ceil(h)
+      container.style.minHeight = '0px'
+      container.style.height = `${nextHeight}px`
       container.style.maxHeight = 'none'
-
-      // 恢复滚动位置：补偿高度变化
-      const heightDelta = Math.ceil(h) - oldHeight
-      if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
-        window.scrollBy(0, heightDelta)
-      }
+      container.style.overflow = 'visible'
+      adjustScrollAfterHeightChange(container, oldHeight, nextHeight)
     }
   }
   catch {}
+}
+
+function applyCollapsedContainerHeight(container: HTMLElement, contentHeight: number, maxHeight: number) {
+  const cappedHeight = Math.min(contentHeight, maxHeight)
+  const shouldScroll = contentHeight > maxHeight + PIXEL_EPSILON
+  container.style.minHeight = '0px'
+  container.style.height = `${Math.ceil(cappedHeight)}px`
+  container.style.maxHeight = `${Math.ceil(maxHeight)}px`
+  container.style.overflow = shouldScroll ? 'auto' : 'hidden'
+  return Math.ceil(cappedHeight)
 }
 
 function updateCollapsedHeight() {
@@ -489,100 +541,51 @@ function updateCollapsedHeight() {
     if (!container)
       return
 
-    // 保存当前滚动位置（相对于容器顶部的距离）
-    const containerRect = container.getBoundingClientRect()
-    const scrollAnchor = window.scrollY + containerRect.top
-    const oldHeight = containerRect.height
+    const oldHeight = container.getBoundingClientRect().height
 
     const max = getMaxHeightValue()
     if (resumeGuardFrames > 0) {
       resumeGuardFrames--
       if (heightBeforeCollapse.value != null) {
-        const h = Math.min(heightBeforeCollapse.value, max)
-        container.style.height = `${Math.ceil(h)}px`
-        container.style.maxHeight = `${Math.ceil(max)}px`
-        container.style.overflow = 'auto'
-
-        // 恢复滚动位置
-        const heightDelta = Math.ceil(h) - oldHeight
-        if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
-          window.scrollBy(0, heightDelta)
-        }
+        const h = applyCollapsedContainerHeight(container, heightBeforeCollapse.value, max)
+        adjustScrollAfterHeightChange(container, oldHeight, h)
         return
       }
     }
     const h0 = computeContentHeight()
     // 1) 有实时内容高度 -> 采用并记忆原始内容高度（未裁剪前），用于下一次恢复
     if (h0 != null && h0 > 0) {
-      const h = Math.min(h0, max)
-      container.style.height = `${Math.ceil(h)}px`
-      container.style.maxHeight = `${Math.ceil(max)}px`
-      container.style.overflow = 'auto'
-
-      // 恢复滚动位置
-      const heightDelta = Math.ceil(h) - oldHeight
-      if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
-        window.scrollBy(0, heightDelta)
-      }
+      const h = applyCollapsedContainerHeight(container, h0, max)
+      adjustScrollAfterHeightChange(container, oldHeight, h)
       return
     }
 
     // 2) 使用折叠前的内容高度（不更新记忆值）
     if (heightBeforeCollapse.value != null) {
-      const h = Math.min(heightBeforeCollapse.value, max)
-      container.style.height = `${Math.ceil(h)}px`
-      container.style.maxHeight = `${Math.ceil(max)}px`
-      container.style.overflow = 'auto'
-
-      // 恢复滚动位置
-      const heightDelta = Math.ceil(h) - oldHeight
-      if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
-        window.scrollBy(0, heightDelta)
-      }
+      const h = applyCollapsedContainerHeight(container, heightBeforeCollapse.value, max)
+      adjustScrollAfterHeightChange(container, oldHeight, h)
       return
     }
 
     // 3) 使用当前 DOM 高度（不更新记忆值）
     const rectH = Math.ceil((container.getBoundingClientRect?.().height) || 0)
     if (rectH > 0) {
-      const h = Math.min(rectH, max)
-      container.style.height = `${Math.ceil(h)}px`
-      container.style.maxHeight = `${Math.ceil(max)}px`
-      container.style.overflow = 'auto'
-
-      // 恢复滚动位置
-      const heightDelta = Math.ceil(h) - oldHeight
-      if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
-        window.scrollBy(0, heightDelta)
-      }
+      const h = applyCollapsedContainerHeight(container, rectH, max)
+      adjustScrollAfterHeightChange(container, oldHeight, h)
       return
     }
 
     // 4) 兜底：若有先前行高/字体，可估一个最小高度；否则保持现状，避免强制跳到 MAX
     const prev = Number.parseFloat(container.style.height)
     if (!Number.isNaN(prev) && prev > 0) {
-      const h = Math.ceil(Math.min(prev, max))
-      container.style.height = `${h}px`
-
-      // 恢复滚动位置
-      const heightDelta = h - oldHeight
-      if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
-        window.scrollBy(0, heightDelta)
-      }
+      const h = applyCollapsedContainerHeight(container, prev, max)
+      adjustScrollAfterHeightChange(container, oldHeight, h)
     }
     else {
       // 实在没有历史高度，才退到 max（极少数首次场景）
-      const h = Math.ceil(max)
-      container.style.height = `${h}px`
-
-      // 恢复滚动位置
-      const heightDelta = h - oldHeight
-      if (heightDelta !== 0 && scrollAnchor < window.scrollY) {
-        window.scrollBy(0, heightDelta)
-      }
+      const h = applyCollapsedContainerHeight(container, max, max)
+      adjustScrollAfterHeightChange(container, oldHeight, h)
     }
-    container.style.maxHeight = `${Math.ceil(max)}px`
-    container.style.overflow = 'auto'
   }
   catch {}
 }

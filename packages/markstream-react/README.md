@@ -33,6 +33,57 @@ If your app scales root font size on mobile (`html` / `body`), use `markstream-r
 
 You can also pass a pre-parsed `nodes` array if you already have AST data.
 
+## Streaming best practices
+
+- For high-frequency SSE / token streaming, prefer parsing outside the component and pass `nodes` instead of reparsing the full `content` string every chunk.
+- Keep `viewportPriority` enabled unless you explicitly want eager rendering. Mermaid / Monaco / D2 blocks now stay idle while offscreen and resume when they approach the viewport.
+
+```tsx
+import NodeRenderer from 'markstream-react'
+
+export default function StreamView({ nodes, final }: { nodes: any[], final: boolean }) {
+  return (
+    <NodeRenderer
+      nodes={nodes}
+      final={final}
+      viewportPriority
+      deferNodesUntilVisible
+    />
+  )
+}
+```
+
+## Heavy-node prop forwarding
+
+`NodeRenderer` can forward renderer-level props directly into Mermaid / D2 / Infographic blocks:
+
+```tsx
+<NodeRenderer
+  content={markdown}
+  mermaidProps={{
+    showHeader: false,
+    renderDebounceMs: 180,
+    previewPollDelayMs: 500,
+  }}
+  d2Props={{ progressiveIntervalMs: 500 }}
+  infographicProps={{ showHeader: false }}
+/>
+```
+
+Notes:
+- These props are forwarded to the built-in Mermaid / D2 / Infographic blocks and to custom `mermaid` / `d2` / `infographic` overrides registered with `setCustomComponents(...)`.
+- `viewportPriority` applies to those heavy nodes too, so offscreen graphs will not keep doing background work while the text stream is still updating.
+
+## Mermaid tuning
+
+Common `mermaidProps` keys for streaming scenarios:
+
+- `renderDebounceMs`: delay progressive work during rapid token bursts.
+- `contentStableDelayMs`: how long source mode waits before auto-switching back to preview when content stabilizes.
+- `previewPollDelayMs`: initial delay before preview polling tries to upgrade a partial preview into a full render.
+- `previewPollMaxDelayMs`: cap for preview polling backoff.
+- `previewPollMaxAttempts`: maximum retry count while the Mermaid source is still incomplete.
+
 ## Bundle size notes
 
 - Optional peers are not bundled; install only what you use (`stream-monaco`, `stream-markdown`, `mermaid`, `katex`, etc.).

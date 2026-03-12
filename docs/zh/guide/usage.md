@@ -71,6 +71,21 @@ const nodes = parseMarkdownToStructure('# 标题', md)
 - `parseMarkdownToStructure(content, md)` 将 Markdown 字符串转为渲染器使用的 AST。
 - 可搭配 `setCustomComponents(id?, mapping)` 为特定 `custom-id` 替换节点渲染器。
 
+## 流式推荐用法
+
+`content` 模式适合低频更新或一次性渲染；如果你在做 AI Chat、SSE、逐 token 输出，推荐把解析放到外部，然后用 `:nodes` + `:final` 驱动渲染器。这样可以减少整篇重解析、降低重绘次数，也更容易把解析工作放到 Worker 或独立状态层。
+
+```ts
+import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+
+const md = getMarkdown('chat-message')
+const nodes = parseMarkdownToStructure(streamedText, md, { final })
+```
+
+```vue
+<MarkdownRender :nodes="nodes" :final="final" />
+```
+
 ## 组件速览
 
 完整说明参考 [组件与节点渲染器](/zh/guide/components)：

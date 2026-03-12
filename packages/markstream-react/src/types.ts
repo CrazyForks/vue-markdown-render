@@ -1,5 +1,6 @@
 import type React from 'react'
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from './types/component-props'
 
 export interface NodeRendererProps {
   content?: string
@@ -27,6 +28,9 @@ export interface NodeRendererProps {
   codeBlockMinWidth?: string | number
   codeBlockMaxWidth?: string | number
   codeBlockProps?: Record<string, any>
+  mermaidProps?: Partial<Omit<MermaidBlockNodeProps, 'node' | 'loading' | 'isDark'>>
+  d2Props?: Partial<Omit<D2BlockNodeProps, 'node' | 'loading' | 'isDark'>>
+  infographicProps?: Partial<Omit<InfographicBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   showTooltips?: boolean
   themes?: string[]
   isDark?: boolean
@@ -56,6 +60,9 @@ export interface RenderContext {
   typewriter?: boolean
   customComponents?: Record<string, React.ComponentType<any>>
   codeBlockProps?: Record<string, any>
+  mermaidProps?: Partial<Omit<MermaidBlockNodeProps, 'node' | 'loading' | 'isDark'>>
+  d2Props?: Partial<Omit<D2BlockNodeProps, 'node' | 'loading' | 'isDark'>>
+  infographicProps?: Partial<Omit<InfographicBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   showTooltips?: boolean
   codeBlockStream?: boolean
   renderCodeBlocksAsPre?: boolean

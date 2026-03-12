@@ -21,6 +21,11 @@ interface MermaidBlockNodeProps {
   parseTimeoutMs?: number
   renderTimeoutMs?: number
   fullRenderTimeoutMs?: number
+  renderDebounceMs?: number
+  contentStableDelayMs?: number
+  previewPollDelayMs?: number
+  previewPollMaxDelayMs?: number
+  previewPollMaxAttempts?: number
   showHeader?: boolean
   showModeToggle?: boolean
   showCopyButton?: boolean
@@ -42,6 +47,11 @@ const props = withDefaults(
     parseTimeoutMs: 1800,
     renderTimeoutMs: 2500,
     fullRenderTimeoutMs: 4000,
+    renderDebounceMs: 300,
+    contentStableDelayMs: 500,
+    previewPollDelayMs: 800,
+    previewPollMaxDelayMs: 4000,
+    previewPollMaxAttempts: 12,
     // header/button control defaults
     showHeader: true,
     showModeToggle: true,
@@ -271,12 +281,16 @@ const showSource = ref(false)
 const userToggledShowSource = ref(false)
 const isRendering = ref(false)
 const renderQueue = ref<Promise<void> | null>(null)
-const RENDER_DEBOUNCE_DELAY = 300
-const CONTENT_STABLE_DELAY = 500
 const lastContentLength = ref(0)
 const isContentGenerating = ref(false)
+const renderDebounceDelay = computed(() => Math.max(0, props.renderDebounceMs ?? 300))
+const contentStableDelay = computed(() => Math.max(0, props.contentStableDelayMs ?? 500))
+const previewPollInitialDelay = computed(() => Math.max(120, props.previewPollDelayMs ?? 800))
+const previewPollMaxDelay = computed(() => Math.max(previewPollInitialDelay.value, props.previewPollMaxDelayMs ?? 4000))
+const previewPollMaxAttempts = computed(() => Math.max(1, Math.trunc(props.previewPollMaxAttempts ?? 12)))
 let contentStableTimer: number | null = null
 let renderRetryTimer: ReturnType<typeof setTimeout> | null = null
+let progressiveRenderDebounceTimer: number | null = null
 let consecutiveRenderTimeouts = 0
 const MAX_RENDER_TIMEOUT_RETRIES = 3
 // Schedule progressive work in idle time
@@ -284,11 +298,30 @@ const requestIdle
   = (globalThis as any).requestIdleCallback
     ?? ((cb: any, _opts?: any) => setTimeout(() => cb({ didTimeout: true }), 16))
 
-const debouncedProgressiveRender = debounce(() => {
-  requestIdle(() => {
-    progressiveRender()
-  }, { timeout: 500 })
-}, RENDER_DEBOUNCE_DELAY)
+function canScheduleViewportWork() {
+  return viewportReady.value && !isCollapsed.value
+}
+
+function clearProgressiveRenderDebounceTimer() {
+  if (progressiveRenderDebounceTimer != null) {
+    ;(globalThis as any).clearTimeout(progressiveRenderDebounceTimer)
+    progressiveRenderDebounceTimer = null
+  }
+}
+
+function debouncedProgressiveRender() {
+  clearProgressiveRenderDebounceTimer()
+  progressiveRenderDebounceTimer = (globalThis as any).setTimeout(() => {
+    progressiveRenderDebounceTimer = null
+    if (!canScheduleViewportWork())
+      return
+    requestIdle(() => {
+      if (!canScheduleViewportWork())
+        return
+      progressiveRender()
+    }, { timeout: 500 })
+  }, renderDebounceDelay.value)
+}
 
 function clearRenderRetryTimer() {
   if (renderRetryTimer != null) {
@@ -304,7 +337,7 @@ function scheduleRenderRetry(delayMs = 600) {
   clearRenderRetryTimer()
   const run = () => {
     renderRetryTimer = null
-    if (props.loading || isRendering.value || !viewportReady.value) {
+    if (props.loading || isRendering.value || !canScheduleViewportWork()) {
       const nextDelay = Math.min(1200, Math.max(300, safeDelay * 1.2))
       scheduleRenderRetry(nextDelay)
       return
@@ -354,11 +387,10 @@ const cancelIdle
 let previewPollTimeoutId: number | null = null
 let previewPollIdleId: number | null = null
 let isPreviewPolling = false
-let previewPollDelay = 800
+let previewPollDelay = previewPollInitialDelay.value
 let previewPollController: AbortController | null = null
 let lastPreviewStopAt = 0
 let allowPartialPreview = true
-const PREVIEW_POLL_MAX_ATTEMPTS = 12
 let previewPollAttempts = 0
 
 if (typeof window !== 'undefined') {
@@ -385,6 +417,7 @@ if (typeof window !== 'undefined') {
 onBeforeUnmount(() => {
   viewportHandle?.destroy()
   viewportHandle = null
+  clearProgressiveRenderDebounceTimer()
 })
 
 // Helper: wrap an async operation with timeout and AbortSignal support
@@ -786,20 +819,6 @@ function closeModal() {
   }
 }
 
-function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number,
-): (...args: Parameters<T>) => void {
-  let timeout: number | null = null
-
-  return (...args: Parameters<T>) => {
-    if (timeout) {
-      clearTimeout(timeout)
-    }
-    timeout = setTimeout(() => func(...args), wait)
-  }
-}
-
 function checkContentStability() {
   if (!showSource.value) {
     return
@@ -831,7 +850,7 @@ function checkContentStability() {
         // Smoothly switch to Preview when content stabilizes
         switchMode('preview')
       }
-    }, CONTENT_STABLE_DELAY)
+    }, contentStableDelay.value)
   }
 }
 
@@ -1089,10 +1108,6 @@ async function initMermaid() {
   isRendering.value = true
 
   renderQueue.value = (async () => {
-    if (mermaidContent.value) {
-      mermaidContent.value.style.opacity = '0'
-    }
-
     try {
       const mermaidInstance = await resolveMermaidInstance()
       if (!mermaidInstance)
@@ -1162,10 +1177,6 @@ async function initMermaid() {
       }
     }
     finally {
-      await nextTick()
-      if (mermaidContent.value) {
-        mermaidContent.value.style.opacity = '1'
-      }
       isRendering.value = false
       renderQueue.value = null
     }
@@ -1200,8 +1211,6 @@ async function renderPartial(code: string) {
     const safePrefix = getSafePrefixCandidate(code)
     const codeForRender = safePrefix && safePrefix.trim() ? safePrefix : code
     const codeWithTheme = applyThemeTo(codeForRender, theme)
-    if (mermaidContent.value)
-      mermaidContent.value.style.opacity = '0'
 
     const res: any = await withTimeoutSignal(
       () => (mermaidInstance as any).render(id, codeWithTheme),
@@ -1217,9 +1226,6 @@ async function renderPartial(code: string) {
     // swallow partial errors to keep preview resilient
   }
   finally {
-    await nextTick()
-    if (mermaidContent.value)
-      mermaidContent.value.style.opacity = '1'
     isRendering.value = false
   }
 }
@@ -1297,7 +1303,7 @@ function stopPreviewPolling() {
   if (!isPreviewPolling)
     return
   isPreviewPolling = false
-  previewPollDelay = 800
+  previewPollDelay = previewPollInitialDelay.value
   allowPartialPreview = false
   if (previewPollController) {
     previewPollController.abort()
@@ -1319,6 +1325,7 @@ function stopPreviewPolling() {
 function cleanupAfterLoadingSettled() {
   // stop background upgrade/prefix polling
   stopPreviewPolling()
+  clearProgressiveRenderDebounceTimer()
   // abort any in-flight progressive work
   if (currentWorkController) {
     try {
@@ -1341,10 +1348,10 @@ function cleanupAfterLoadingSettled() {
   consecutiveRenderTimeouts = 0
 }
 
-function scheduleNextPreviewPoll(delay = 800) {
+function scheduleNextPreviewPoll(delay = previewPollInitialDelay.value) {
   if (!isPreviewPolling)
     return
-  if (previewPollAttempts >= PREVIEW_POLL_MAX_ATTEMPTS) {
+  if (previewPollAttempts >= previewPollMaxAttempts.value) {
     stopPreviewPolling()
     return
   }
@@ -1354,6 +1361,10 @@ function scheduleNextPreviewPoll(delay = 800) {
     previewPollIdleId = requestIdle(async () => {
       if (!isPreviewPolling)
         return
+      if (!canScheduleViewportWork()) {
+        stopPreviewPolling()
+        return
+      }
       if (showSource.value || hasRenderedOnce.value) {
         stopPreviewPolling()
         return
@@ -1369,7 +1380,7 @@ function scheduleNextPreviewPoll(delay = 800) {
         return
       }
       previewPollAttempts++
-      if (previewPollAttempts > PREVIEW_POLL_MAX_ATTEMPTS) {
+      if (previewPollAttempts > previewPollMaxAttempts.value) {
         stopPreviewPolling()
         return
       }
@@ -1390,7 +1401,7 @@ function scheduleNextPreviewPoll(delay = 800) {
       catch {
         // ignore and keep polling
       }
-      previewPollDelay = Math.min(Math.floor(previewPollDelay * 1.5), 4000)
+      previewPollDelay = Math.min(Math.floor(previewPollDelay * 1.5), previewPollMaxDelay.value)
       scheduleNextPreviewPoll(previewPollDelay)
     }, { timeout: 500 }) as unknown as number
   }, delay)
@@ -1399,13 +1410,18 @@ function scheduleNextPreviewPoll(delay = 800) {
 function startPreviewPolling() {
   if (isPreviewPolling)
     return
+  if (!mermaidAvailable.value)
+    return
+  if (!canScheduleViewportWork())
+    return
   if (showSource.value || hasRenderedOnce.value)
     return
   isPreviewPolling = true
   lastPreviewStopAt = 0
   allowPartialPreview = true
   previewPollAttempts = 0
-  scheduleNextPreviewPoll(500)
+  previewPollDelay = previewPollInitialDelay.value
+  scheduleNextPreviewPoll(previewPollDelay)
 }
 
 // Watch for code changes (only base code, not theme changes)
@@ -1415,10 +1431,13 @@ watch(
     hasRenderedOnce.value = false
     svgCache.value = {}
     // Use idle progressive path; will call initMermaid when full code becomes valid
-    debouncedProgressiveRender()
+    if (canScheduleViewportWork())
+      debouncedProgressiveRender()
     // Ensure background polling while previewing (to upgrade to full render when ready)
-    if (!showSource.value && mermaidAvailable.value)
+    if (!showSource.value && mermaidAvailable.value && canScheduleViewportWork())
       startPreviewPolling()
+    else
+      stopPreviewPolling()
     checkContentStability()
   },
 )
@@ -1490,7 +1509,7 @@ watch(
       }
       await nextTick()
       // If mermaid is not available, do not attempt progressive render or start polling
-      if (!mermaidAvailable.value)
+      if (!mermaidAvailable.value || !canScheduleViewportWork())
         return
       // Use progressive path to avoid throwing on incomplete code
       await progressiveRender()
@@ -1561,11 +1580,9 @@ watch(
       resizeObserver.disconnect()
     }
 
-    if (newEl && !hasRenderedOnce.value && !isThemeRendering.value) {
-      // container resized; schedule height update
-
+    if (newEl) {
       resizeObserver = new ResizeObserver((entries) => {
-        if (entries && entries.length > 0 && !hasRenderedOnce.value && !isThemeRendering.value) {
+        if (entries && entries.length > 0 && !showSource.value && !isCollapsed.value) {
           // 使用 safeRaf 确保在 SSR 环境下不会抛错，同时在浏览器中使用 RAF
           safeRaf(() => {
             const newWidth = entries[0].contentRect.width
@@ -1585,7 +1602,7 @@ onMounted(async () => {
   if (!userToggledShowSource.value) {
     showSource.value = !mermaidAvailable.value
   }
-  if (viewportReady.value) {
+  if (canScheduleViewportWork()) {
     debouncedProgressiveRender()
     lastContentLength.value = baseFixedCode.value.length
   }
@@ -1612,6 +1629,8 @@ watch(
     }
     if (!props.loading && !hasRenderedOnce.value)
       debouncedProgressiveRender()
+    if (!showSource.value && mermaidAvailable.value)
+      startPreviewPolling()
   },
   { immediate: false },
 )
@@ -1620,6 +1639,7 @@ onUnmounted(() => {
   if (contentStableTimer) {
     clearTimeout(contentStableTimer)
   }
+  clearProgressiveRenderDebounceTimer()
   // 在组件卸载时，确保观察者被彻底清理，防止内存泄漏
   if (resizeObserver) {
     resizeObserver.disconnect()
@@ -1642,7 +1662,7 @@ watch(
         currentWorkController.abort()
     }
     else {
-      if (!hasRenderedOnce.value) {
+      if (canScheduleViewportWork() && !hasRenderedOnce.value) {
         await nextTick()
         debouncedProgressiveRender()
         if (!showSource.value)
@@ -1826,7 +1846,7 @@ const computedButtonStyle = computed(() => {
         </div>
         <div
           ref="mermaidContainer"
-          class="min-h-[360px] relative transition-all duration-100 overflow-hidden block"
+          class="min-h-[360px] relative overflow-hidden block transition-[height] duration-150 ease-out"
           :class="props.isDark ? 'bg-gray-900' : 'bg-gray-50'"
           :style="{ height: containerHeight }"
           v-on="wheelListeners"
@@ -1914,7 +1934,6 @@ const computedButtonStyle = computed(() => {
 <style scoped>
 ._mermaid {
   font-family: inherit;
-  transition: opacity 0.2s ease-in-out;
   content-visibility: auto;
   contain: content;
   contain-intrinsic-size: 360px 240px;

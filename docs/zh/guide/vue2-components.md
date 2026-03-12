@@ -79,7 +79,33 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 | `code-block-min-width` | `string \| number` | 转发到 `CodeBlockNode` 的最小宽度 |
 | `code-block-max-width` | `string \| number` | 转发到 `CodeBlockNode` 的最大宽度 |
 | `code-block-props` | `Record<string, any>` | 额外转发到每个 `CodeBlockNode` 的 props |
+| `mermaid-props` | `Partial<Omit<MermaidBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 Mermaid 围栏和自定义 `mermaid` 渲染器的 props |
+| `d2-props` | `Partial<Omit<D2BlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 D2 围栏和自定义 `d2` 渲染器的 props |
+| `infographic-props` | `Partial<Omit<InfographicBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 infographic 围栏和自定义 `infographic` 渲染器的 props |
 | `themes` | `string[]` | 转发到 `stream-monaco` 的主题列表 |
+
+#### 重型渲染器 props 透传
+
+`MarkdownRender` 可以直接给重型图表节点传调优参数：
+
+```vue
+<MarkdownRender
+  :content="markdown"
+  :viewport-priority="true"
+  :mermaid-props="{
+    showHeader: false,
+    renderDebounceMs: 180,
+    previewPollDelayMs: 500
+  }"
+  :d2-props="{ progressiveIntervalMs: 500 }"
+  :infographic-props="{ showHeader: false }"
+/>
+```
+
+流式建议：
+- 保持 `viewport-priority` 开启，避免离屏 Mermaid / Monaco / D2 在文字仍在流式更新时继续做后台工作。
+- 高频 SSE 更推荐直接传 `nodes`，而不是每个 chunk 都重跑整篇 `content` 解析。
+- Mermaid 常用调优项包括：`renderDebounceMs`、`contentStableDelayMs`、`previewPollDelayMs`、`previewPollMaxDelayMs`、`previewPollMaxAttempts`。
 
 #### 事件
 
@@ -303,11 +329,20 @@ export default {
     <MermaidBlockNode
       :node="mermaidNode"
       :is-strict="true"
+      :render-debounce-ms="180"
+      :preview-poll-delay-ms="500"
       @export="onExport"
     />
   </div>
 </template>
 ```
+
+常用流式调优 props：
+- `render-debounce-ms`
+- `content-stable-delay-ms`
+- `preview-poll-delay-ms`
+- `preview-poll-max-delay-ms`
+- `preview-poll-max-attempts`
 
 ## D2 图表
 

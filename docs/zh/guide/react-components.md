@@ -59,7 +59,33 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 | `codeBlockMinWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最小宽度 |
 | `codeBlockMaxWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最大宽度 |
 | `codeBlockProps` | `Record<string, any>` | 额外转发到每个代码块渲染器（`CodeBlockNode` / `MarkdownCodeBlockNode`）的 props |
+| `mermaidProps` | `Partial<Omit<MermaidBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 Mermaid 围栏和自定义 `mermaid` 渲染器的 props |
+| `d2Props` | `Partial<Omit<D2BlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 D2 围栏和自定义 `d2` 渲染器的 props |
+| `infographicProps` | `Partial<Omit<InfographicBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 infographic 围栏和自定义 `infographic` 渲染器的 props |
 | `themes` | `string[]` | 转发到 `stream-monaco` 的主题列表 |
+
+#### 重型渲染器 props 透传
+
+`NodeRenderer` 可以直接给重型图表节点传调优参数：
+
+```tsx
+<MarkdownRender
+  content={markdown}
+  viewportPriority
+  mermaidProps={{
+    showHeader: false,
+    renderDebounceMs: 180,
+    previewPollDelayMs: 500,
+  }}
+  d2Props={{ progressiveIntervalMs: 500 }}
+  infographicProps={{ showHeader: false }}
+/>
+```
+
+流式建议：
+- 保持 `viewportPriority` 开启，避免离屏 Mermaid / Monaco / D2 在文字仍在流式更新时继续做后台工作。
+- 高频 SSE 更推荐直接传 `nodes`，而不是每个 chunk 都重跑整篇 `content` 解析。
+- Mermaid 常用调优项包括：`renderDebounceMs`、`contentStableDelayMs`、`previewPollDelayMs`、`previewPollMaxDelayMs`、`previewPollMaxAttempts`。
 
 #### 事件
 
@@ -252,6 +278,7 @@ function MermaidDiagram() {
 - `onCopy(code: string)` 直接收到源码字符串（React 版本没有 `MermaidBlockEvent` 包装）。
 - `onExport` / `onOpenModal` / `onToggleMode` 接收 `MermaidBlockEvent`，可用 `ev.preventDefault()` 阻止默认行为。
 - `onToggleMode` 签名：`(target: 'source' | 'preview', ev)`。
+- 如果是在 `MarkdownRender` / `NodeRenderer` 中统一使用，优先通过 `mermaidProps` 传这些参数。
 
 ## D2 图表
 

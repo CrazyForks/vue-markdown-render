@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
+import type { D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from '../../types/component-props'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
@@ -85,6 +86,12 @@ export interface NodeRendererProps {
   codeBlockMaxWidth?: string | number
   /** Arbitrary props to forward to every CodeBlockNode */
   codeBlockProps?: Record<string, any>
+  /** Props forwarded to MermaidBlockNode for mermaid fences */
+  mermaidProps?: Partial<Omit<MermaidBlockNodeProps, 'node' | 'loading' | 'isDark'>>
+  /** Props forwarded to D2BlockNode for d2/d2lang fences */
+  d2Props?: Partial<Omit<D2BlockNodeProps, 'node' | 'loading' | 'isDark'>>
+  /** Props forwarded to InfographicBlockNode for infographic fences */
+  infographicProps?: Partial<Omit<InfographicBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   /** Global tooltip toggle for link/code-block renderers (default: true) */
   showTooltips?: boolean
   themes?: string[]
@@ -327,6 +334,7 @@ const nodeVisibilityState = reactive<Record<number, boolean>>({})
 const nodeVisibilityHandles = new Map<number, VisibilityHandle>()
 const nodeVisibilityFallbackTimers = new Map<number, number>()
 const nodeSlotElements = new Map<number, HTMLElement | null>()
+const codeBlockRenderCache = new WeakMap<object, { signature: string, node: ParsedNode }>()
 const nodeSlotVersion = ref(0)
 const sortedNodeSlots = computed(() => {
   // Track a manual version so we only rebuild when slots change.
@@ -583,6 +591,38 @@ function updateLiveRange() {
 const nodeHeights = reactive<Record<number, number>>({})
 const heightStats = reactive({ total: 0, count: 0 })
 
+function resetHeightMeasurements() {
+  for (const key of Object.keys(nodeHeights))
+    delete nodeHeights[Number(key)]
+  heightStats.total = 0
+  heightStats.count = 0
+  heightTreeSize.value = 0
+  heightSumTree.value = []
+  heightKnownTree.value = []
+}
+
+function pruneHeightMeasurements(size: number) {
+  if (size <= 0) {
+    resetHeightMeasurements()
+    return
+  }
+
+  let total = 0
+  let count = 0
+  for (const [rawIndex, rawHeight] of Object.entries(nodeHeights)) {
+    const index = Number(rawIndex)
+    const height = Number(rawHeight)
+    if (!Number.isFinite(index) || index < 0 || index >= size || !Number.isFinite(height) || height <= 0) {
+      delete nodeHeights[index]
+      continue
+    }
+    total += height
+    count++
+  }
+  heightStats.total = total
+  heightStats.count = count
+}
+
 function fenwickUpdate(tree: number[], index: number, delta: number) {
   for (let i = index + 1; i < tree.length; i += i & -i)
     tree[i] += delta
@@ -659,11 +699,11 @@ watch(
   () => parsedNodes.value.length,
   (length) => {
     if (length <= 0) {
-      heightTreeSize.value = 0
-      heightSumTree.value = []
-      heightKnownTree.value = []
+      resetHeightMeasurements()
       return
     }
+    if (length < heightTreeSize.value)
+      pruneHeightMeasurements(length)
     if (length !== heightTreeSize.value)
       rebuildHeightTrees(length)
   },
@@ -1175,6 +1215,11 @@ watch(
       enabled: incrementalRenderingActive.value,
     }
 
+    if (datasetKeyChanged) {
+      resetHeightMeasurements()
+      if (total > 0)
+        rebuildHeightTrees(total)
+    }
     if (datasetChanged || batchConfigChanged || !incrementalRenderingActive.value)
       cancelBatchTimers()
     if (datasetChanged || batchConfigChanged)
@@ -1465,7 +1510,6 @@ const customComponentsMap = computed(() => {
   return getCustomNodeComponents(props.customId)
 })
 const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'))
-const emptyBindings = {}
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode
   stream: props.codeBlockStream,
@@ -1477,6 +1521,15 @@ const codeBlockBindings = computed(() => ({
   maxWidth: props.codeBlockMaxWidth,
   ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
   ...(props.codeBlockProps || {}),
+}))
+const mermaidBindings = computed(() => ({
+  ...(props.mermaidProps || {}),
+}))
+const d2Bindings = computed(() => ({
+  ...(props.d2Props || {}),
+}))
+const infographicBindings = computed(() => ({
+  ...(props.infographicProps || {}),
 }))
 const nonCodeBindings = computed(() => ({
   // Forward `typewriter` flag to non-code node components so they can
@@ -1491,13 +1544,36 @@ const listBindings = computed(() => ({
   ...nonCodeBindings.value,
   ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
 }))
+
+function getCodeBlockRenderNode(node: ParsedNode) {
+  if (node.type !== 'code_block')
+    return node
+
+  const codeBlockNode = node as any
+  const signature = [
+    String(codeBlockNode.language ?? ''),
+    String(codeBlockNode.loading ?? ''),
+    String(codeBlockNode.diff ?? ''),
+    String(codeBlockNode.code ?? ''),
+    String(codeBlockNode.originalCode ?? ''),
+    String(codeBlockNode.updatedCode ?? ''),
+    String(codeBlockNode.raw ?? ''),
+  ].join('\u0000')
+
+  const cached = codeBlockRenderCache.get(codeBlockNode)
+  if (cached && cached.signature === signature)
+    return cached.node
+
+  const cloned = { ...codeBlockNode } as ParsedNode
+  codeBlockRenderCache.set(codeBlockNode, { signature, node: cloned })
+  return cloned
+}
+
 const renderedItems = computed(() => {
   return visibleNodes.value.map((item) => {
-    // Streaming parsers mutate code block payloads in place. Clone them here so
-    // CodeBlockNode receives a fresh prop reference and can react to updates.
-    const node = item.node.type === 'code_block'
-      ? { ...item.node }
-      : item.node
+    // Reuse the previous shallow clone for code blocks unless the visible
+    // payload changed, so parent recomputations do not churn Monaco props.
+    const node = getCodeBlockRenderNode(item.node)
     const language = getCodeBlockLanguage(node)
     return {
       ...item,
@@ -1564,10 +1640,15 @@ function getNodeComponent(node: ParsedNode, language?: string) {
 }
 
 function getBindingsFor(node: ParsedNode, language?: string) {
-  // For mermaid/infographic/d2 blocks we don't forward CodeBlock-specific props
   const lang = language ?? getCodeBlockLanguage(node)
-  if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
-    return emptyBindings
+  if (lang === 'mermaid')
+    return mermaidBindings.value
+
+  if (lang === 'infographic')
+    return infographicBindings.value
+
+  if (lang === 'd2' || lang === 'd2lang')
+    return d2Bindings.value
 
   if (node.type === 'link')
     return linkBindings.value

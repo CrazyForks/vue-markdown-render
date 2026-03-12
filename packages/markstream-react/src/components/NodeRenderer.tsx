@@ -839,6 +839,24 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     }
   }, [props.codeBlockProps, props.showTooltips])
 
+  const mergedMermaidProps = useMemo(() => {
+    return {
+      ...(props.mermaidProps || {}),
+    }
+  }, [props.mermaidProps])
+
+  const mergedD2Props = useMemo(() => {
+    return {
+      ...(props.d2Props || {}),
+    }
+  }, [props.d2Props])
+
+  const mergedInfographicProps = useMemo(() => {
+    return {
+      ...(props.infographicProps || {}),
+    }
+  }, [props.infographicProps])
+
   const renderCtx = useMemo<RenderContext>(() => ({
     customId: props.customId,
     isDark: props.isDark,
@@ -849,6 +867,9 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
     codeBlockStream: props.codeBlockStream,
     codeBlockProps: mergedCodeBlockProps,
+    mermaidProps: mergedMermaidProps,
+    d2Props: mergedD2Props,
+    infographicProps: mergedInfographicProps,
     codeBlockThemes: {
       themes: props.themes,
       monacoOptions: props.codeBlockMonacoOptions,
@@ -868,6 +889,9 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.renderCodeBlocksAsPre,
     props.codeBlockStream,
     mergedCodeBlockProps,
+    mergedMermaidProps,
+    mergedD2Props,
+    mergedInfographicProps,
     props.themes,
     props.codeBlockMonacoOptions,
     props.codeBlockMinWidth,

@@ -84,7 +84,7 @@ export function resolveVueListeners(input: any) {
     if (!/^on[A-Z]/.test(key))
       continue
     if (typeof value === 'function')
-      listeners[normalizeListenerEvent(key)] = value
+      listeners[normalizeListenerEvent(key)] = value as VueListener
     else if (Array.isArray(value) && value.every(item => typeof item === 'function'))
       listeners[normalizeListenerEvent(key)] = value as VueListener[]
   }

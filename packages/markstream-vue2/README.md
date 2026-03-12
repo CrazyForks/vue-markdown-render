@@ -139,6 +139,55 @@ new Vue({
 }).$mount('#app')
 ```
 
+## Streaming best practices
+
+- For high-frequency SSE / token streaming, prefer parsing outside the renderer and pass `nodes` instead of reparsing the whole `content` string every chunk.
+- Keep `viewport-priority` enabled unless you explicitly want eager rendering. Mermaid / Monaco / D2 blocks now stay idle while offscreen and resume when they approach the viewport.
+
+```vue
+<template>
+  <MarkdownRender
+    :nodes="nodes"
+    :final="final"
+    :viewport-priority="true"
+    :defer-nodes-until-visible="true"
+  />
+</template>
+```
+
+## Heavy-node prop forwarding
+
+`MarkdownRender` can forward framework-level props directly into specialized heavy renderers:
+
+```vue
+<template>
+  <MarkdownRender
+    :content="markdown"
+    :mermaid-props="{
+      showHeader: false,
+      renderDebounceMs: 180,
+      previewPollDelayMs: 500
+    }"
+    :d2-props="{ progressiveIntervalMs: 500 }"
+    :infographic-props="{ showHeader: false }"
+  />
+</template>
+```
+
+Notes:
+- Use kebab-case in templates: `mermaid-props`, `d2-props`, `infographic-props`.
+- These props are forwarded to the built-in Mermaid / D2 / Infographic blocks and to custom `mermaid` / `d2` / `infographic` overrides registered with `setCustomComponents(...)`.
+
+## Mermaid tuning
+
+Common `mermaid-props` keys for streaming scenarios:
+
+- `renderDebounceMs`: delay partial/full progressive work during rapid token bursts.
+- `contentStableDelayMs`: how long source mode waits before auto-switching back to preview when content stabilizes.
+- `previewPollDelayMs`: initial delay before preview polling tries to upgrade a partial preview into a full render.
+- `previewPollMaxDelayMs`: cap for preview polling backoff.
+- `previewPollMaxAttempts`: maximum retry count while the Mermaid source is still incomplete.
+
 ## Build and size checks
 
 ```bash

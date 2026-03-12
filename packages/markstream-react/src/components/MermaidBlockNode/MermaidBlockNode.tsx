@@ -149,6 +149,11 @@ const DEFAULTS = {
   parseTimeoutMs: 1800,
   renderTimeoutMs: 2500,
   fullRenderTimeoutMs: 4000,
+  renderDebounceMs: 300,
+  contentStableDelayMs: 500,
+  previewPollDelayMs: 800,
+  previewPollMaxDelayMs: 4000,
+  previewPollMaxAttempts: 12,
   showHeader: true,
   showModeToggle: true,
   showCopyButton: true,
@@ -185,6 +190,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   const parseTimeout = props.parseTimeoutMs ?? DEFAULTS.parseTimeoutMs
   const renderTimeout = props.renderTimeoutMs ?? DEFAULTS.renderTimeoutMs
   const fullRenderTimeout = props.fullRenderTimeoutMs ?? DEFAULTS.fullRenderTimeoutMs
+  const renderDebounceMs = Math.max(0, props.renderDebounceMs ?? DEFAULTS.renderDebounceMs)
 
   const [mermaidAvailable, setMermaidAvailable] = useState(false)
   const [showSource, setShowSource] = useState(false)
@@ -341,6 +347,8 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   useEffect(() => {
     if (!containerRef.current || typeof ResizeObserver === 'undefined')
       return
+    if (showSource || isCollapsed)
+      return
     const observer = new ResizeObserver((entries) => {
       if (!entries.length)
         return
@@ -349,7 +357,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     })
     observer.observe(containerRef.current)
     return () => observer.disconnect()
-  }, [updateContainerHeight])
+  }, [isCollapsed, showSource, updateContainerHeight])
 
   useEffect(() => {
     return () => {
@@ -360,10 +368,10 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   // Restore cached SVG when switching from source to preview
   useLayoutEffect(() => {
     if (!showSource && contentRef.current && svgCacheRef.current[theme]) {
-      contentRef.current.innerHTML = svgCacheRef.current[theme]!
-      updateContainerHeight()
+      renderSvgToTarget(contentRef.current, svgCacheRef.current[theme]!, strictMode)
+      safeRaf(() => updateContainerHeight())
     }
-  }, [showSource, theme, updateContainerHeight])
+  }, [showSource, strictMode, theme, updateContainerHeight])
 
   const renderFull = useCallback(async (code: string, t: Theme, signal?: AbortSignal) => {
     if (!mermaidRef.current || !contentRef.current)
@@ -461,15 +469,26 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     catch {}
   }, [parseTimeout, renderFull, renderPartial, theme, workerTimeout])
 
+  const canScheduleViewportWork = useCallback(() => {
+    return viewportReady && !showSource && !isCollapsed
+  }, [isCollapsed, showSource, viewportReady])
+
   useEffect(() => {
-    if (!viewportReady || showSource || isCollapsed)
+    if (!canScheduleViewportWork())
       return
     if (!mermaidRef.current)
       return
     const controller = new AbortController()
-    progressiveRender(baseFixedCode, controller.signal)
-    return () => controller.abort()
-  }, [baseFixedCode, isCollapsed, progressiveRender, showSource, viewportReady, mermaidAvailable])
+    const timer = window.setTimeout(() => {
+      if (controller.signal.aborted || !canScheduleViewportWork())
+        return
+      void progressiveRender(baseFixedCode, controller.signal)
+    }, renderDebounceMs)
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [baseFixedCode, canScheduleViewportWork, mermaidAvailable, progressiveRender, renderDebounceMs])
 
   const handleTooltip = useCallback((event: React.MouseEvent<HTMLElement>, text: string) => {
     const origin = { x: event.clientX, y: event.clientY }
@@ -727,7 +746,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       <div
         ref={containerRef}
         className={clsx(
-          'min-h-[360px] relative transition-all duration-100 overflow-hidden block',
+          'min-h-[360px] relative overflow-hidden block transition-[height] duration-150 ease-out',
           props.isDark ? 'bg-gray-900' : 'bg-gray-50',
         )}
         style={{ height: containerHeight, maxHeight: props.maxHeight ?? undefined }}

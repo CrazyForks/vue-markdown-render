@@ -52,6 +52,33 @@ These props are forwarded to `CodeBlockNode` / `MarkdownCodeBlockNode` (but **no
 
 Note: `code-block-monaco-options` is only used by the Monaco-backed `CodeBlockNode`. If you override `code_block` with `MarkdownCodeBlockNode`, treat `code-block-dark-theme` / `code-block-light-theme` as Shiki theme names, and `themes` as the Shiki theme list to preload.
 
+## Diagram node props forwarded from `MarkdownRender`
+
+Use these to control specialized block renderers without overriding components manually:
+
+- `mermaid-props` forwards props to `MermaidBlockNode`
+- `d2-props` forwards props to `D2BlockNode`
+- `infographic-props` forwards props to `InfographicBlockNode`
+
+Example:
+
+```vue
+<MarkdownRender
+  :content="md"
+  :mermaid-props="{ showHeader: false, renderDebounceMs: 180, previewPollDelayMs: 500 }"
+  :d2-props="{ progressiveIntervalMs: 450, showCopyButton: false }"
+/>
+```
+
+`mermaid-props` is especially useful for streaming tuning. Common keys include:
+
+- `renderDebounceMs`
+- `contentStableDelayMs`
+- `previewPollDelayMs`
+- `previewPollMaxDelayMs`
+- `previewPollMaxAttempts`
+- toolbar toggles such as `showHeader`, `showModeToggle`, `showExportButton`, `showZoomControls`
+
 ## Code block header controls
 
 Pass these props directly to `CodeBlockNode` / `MarkdownCodeBlockNode`, or globally via `code-block-props` on `MarkdownRender`:

@@ -5,7 +5,6 @@
 ```vue
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
-import 'markstream-vue/index.css'
 
 const md = `# Hello World\n\n这是 **加粗** 的文本。`
 </script>
@@ -15,18 +14,19 @@ const md = `# Hello World\n\n这是 **加粗** 的文本。`
 </template>
 ```
 
-说明：本包的 CSS 会限定在内部 `.markstream-vue` 容器下，以尽量减少对宿主应用全局样式的影响；正常使用 `MarkdownRender` 无需额外处理。
+说明：本包的 CSS 会限定在内部 `.markstream-vue` 容器下，以尽量减少对宿主应用全局样式的影响；主入口已经默认引入样式，正常使用 `MarkdownRender` 无需再额外 `import 'markstream-vue/index.css'`。只有当你需要精确控制 CSS 顺序时，才建议手动单独引入。
 
 暗色变量支持两种方式：给祖先节点加 `.dark`，或给 `MarkdownRender` 传入 `:is-dark="true"`（仅对渲染器生效）。
 
 如果使用 Nuxt 或 SSR，请用 `<client-only>` 包裹。
+
+如果是高频 SSE / token 级流式输出，推荐在外部完成解析后传 `:nodes`，而不是每个 chunk 都让 `MarkdownRender` 重新解析整篇内容。
 
 快速试一下：
 
 ```vue
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
-import 'markstream-vue/index.css'
 
 const md = `# Hello world
 

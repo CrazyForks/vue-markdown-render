@@ -76,6 +76,11 @@ export interface MermaidBlockNodeProps {
   parseTimeoutMs?: number
   renderTimeoutMs?: number
   fullRenderTimeoutMs?: number
+  renderDebounceMs?: number
+  contentStableDelayMs?: number
+  previewPollDelayMs?: number
+  previewPollMaxDelayMs?: number
+  previewPollMaxAttempts?: number
   // header customization
   showHeader?: boolean
   showModeToggle?: boolean

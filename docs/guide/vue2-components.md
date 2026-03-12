@@ -79,7 +79,33 @@ The primary component for rendering markdown content in Vue 2.
 | `code-block-min-width` | `string \| number` | Min width forwarded to `CodeBlockNode` |
 | `code-block-max-width` | `string \| number` | Max width forwarded to `CodeBlockNode` |
 | `code-block-props` | `Record<string, any>` | Extra props forwarded to every `CodeBlockNode` |
+| `mermaid-props` | `Partial<Omit<MermaidBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | Extra props forwarded to Mermaid fences and custom `mermaid` renderers |
+| `d2-props` | `Partial<Omit<D2BlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | Extra props forwarded to D2 fences and custom `d2` renderers |
+| `infographic-props` | `Partial<Omit<InfographicBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | Extra props forwarded to infographic fences and custom `infographic` renderers |
 | `themes` | `string[]` | Theme list forwarded to `stream-monaco` |
+
+#### Heavy renderer prop forwarding
+
+`MarkdownRender` can tune heavy blocks directly:
+
+```vue
+<MarkdownRender
+  :content="markdown"
+  :viewport-priority="true"
+  :mermaid-props="{
+    showHeader: false,
+    renderDebounceMs: 180,
+    previewPollDelayMs: 500
+  }"
+  :d2-props="{ progressiveIntervalMs: 500 }"
+  :infographic-props="{ showHeader: false }"
+/>
+```
+
+Streaming notes:
+- Keep `viewport-priority` enabled to prevent offscreen Mermaid / Monaco / D2 work from running while text is still streaming.
+- For high-frequency SSE, prefer passing `nodes` instead of reparsing the full `content` string every chunk.
+- Common Mermaid tuning keys: `renderDebounceMs`, `contentStableDelayMs`, `previewPollDelayMs`, `previewPollMaxDelayMs`, `previewPollMaxAttempts`.
 
 #### Events
 
@@ -303,11 +329,20 @@ export default {
     <MermaidBlockNode
       :node="mermaidNode"
       :is-strict="true"
+      :render-debounce-ms="180"
+      :preview-poll-delay-ms="500"
       @export="onExport"
     />
   </div>
 </template>
 ```
+
+Useful streaming props:
+- `render-debounce-ms`
+- `content-stable-delay-ms`
+- `preview-poll-delay-ms`
+- `preview-poll-max-delay-ms`
+- `preview-poll-max-attempts`
 
 ## D2 Diagrams
 

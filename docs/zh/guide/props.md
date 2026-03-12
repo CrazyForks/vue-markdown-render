@@ -52,6 +52,33 @@
 
 注意：`code-block-monaco-options` 仅作用于 Monaco 版 `CodeBlockNode`。如果你把 `code_block` 覆盖成 `MarkdownCodeBlockNode`，此时 `code-block-dark-theme` / `code-block-light-theme` 应填写 Shiki 主题名，`themes` 为需要预加载的 Shiki 主题列表。
 
+## 图表节点全局下发参数
+
+如果你希望统一控制 Mermaid / D2 / Infographic 的工具栏、渐进渲染参数或交互细节，而不手动覆盖组件，可直接在 `MarkdownRender` 上传这些对象：
+
+- `mermaid-props`：透传给 `MermaidBlockNode`
+- `d2-props`：透传给 `D2BlockNode`
+- `infographic-props`：透传给 `InfographicBlockNode`
+
+示例：
+
+```vue
+<MarkdownRender
+  :content="md"
+  :mermaid-props="{ showHeader: false, renderDebounceMs: 180, previewPollDelayMs: 500 }"
+  :d2-props="{ progressiveIntervalMs: 450, showCopyButton: false }"
+/>
+```
+
+其中 `mermaid-props` 很适合用于流式调优，常用项包括：
+
+- `renderDebounceMs`
+- `contentStableDelayMs`
+- `previewPollDelayMs`
+- `previewPollMaxDelayMs`
+- `previewPollMaxAttempts`
+- `showHeader`、`showModeToggle`、`showExportButton`、`showZoomControls` 等工具栏开关
+
 ## 代码块头部控制
 
 可直接传给 `CodeBlockNode` / `MarkdownCodeBlockNode`，或在 `MarkdownRender` 上用 `code-block-props` 统一下发：

@@ -25,19 +25,50 @@ export function provideViewportPriority(
   const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
   const enabledRef = typeof enabled === 'boolean' ? ref(enabled) : enabled
 
+  interface ObserverConfig {
+    root: HTMLElement | null
+    rootMargin: string
+    threshold: number
+  }
+
   // Lazily created IO bound to the provided root element
   let io: IntersectionObserver | null = null
-  let observerOptions: { rootMargin?: string, threshold?: number } | null = null
-  const targets = new WeakMap<Element, { resolve: () => void, visible: Ref<boolean> }>()
+  let currentConfig: ObserverConfig | null = null
+  const targets = new Map<Element, { resolve: () => void, visible: Ref<boolean> }>()
 
-  function ensureObserver(target?: HTMLElement) {
-    if (io || !isBrowser)
+  function normalizeConfig(target?: HTMLElement, opts?: { rootMargin?: string, threshold?: number }): ObserverConfig {
+    return {
+      root: getRootEl?.(target ?? null) ?? null,
+      rootMargin: opts?.rootMargin ?? '300px',
+      threshold: opts?.threshold ?? 0,
+    }
+  }
+
+  function sameConfig(a: ObserverConfig | null, b: ObserverConfig) {
+    return !!a
+      && a.root === b.root
+      && a.rootMargin === b.rootMargin
+      && a.threshold === b.threshold
+  }
+
+  function ensureObserver(target?: HTMLElement, opts?: { rootMargin?: string, threshold?: number }) {
+    if (!isBrowser)
       return io
     // Guard: some browser-like environments (e.g., jsdom) don't provide IO
     if (typeof IntersectionObserver === 'undefined')
       return null
-    const root = getRootEl?.(target ?? null) ?? null
-    const opts = observerOptions || {}
+
+    const nextConfig = normalizeConfig(target, opts)
+    if (io && sameConfig(currentConfig, nextConfig))
+      return io
+
+    if (io) {
+      try {
+        io.disconnect()
+      }
+      catch {}
+    }
+
     io = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         const data = targets.get(entry.target)
@@ -58,10 +89,15 @@ export function provideViewportPriority(
         }
       }
     }, {
-      root,
-      rootMargin: opts.rootMargin ?? '300px', // prefetch slightly before entering viewport
-      threshold: opts.threshold ?? 0,
+      root: nextConfig.root,
+      rootMargin: nextConfig.rootMargin, // prefetch slightly before entering viewport
+      threshold: nextConfig.threshold,
     })
+
+    currentConfig = nextConfig
+    for (const el of targets.keys())
+      io.observe(el)
+
     return io
   }
 
@@ -84,6 +120,14 @@ export function provideViewportPriority(
       }
       catch {}
       targets.delete(el)
+      if (!targets.size) {
+        try {
+          io?.disconnect()
+        }
+        catch {}
+        io = null
+        currentConfig = null
+      }
     }
 
     if (!isBrowser || !enabledRef.value) {
@@ -93,10 +137,7 @@ export function provideViewportPriority(
       return { isVisible: visible, whenVisible, destroy: cleanup }
     }
 
-    if (!observerOptions && opts)
-      observerOptions = { ...opts }
-
-    const obs = ensureObserver(el)
+    const obs = ensureObserver(el, opts)
     if (!obs) {
       visible.value = true
       resolve()
