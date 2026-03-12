@@ -19,4 +19,20 @@ describe('inline `text_special` tokens', () => {
 
     expect(text).toBe('Before [brackets] and (parens).')
   })
+
+  it('preserves a visible backslash before escaped punctuation', () => {
+    const md = getMarkdown('text_special-visible-backslash')
+    const markdown = 'Before \\\\[brackets\\] and \\\\*.'
+
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true })
+    expect(nodes[0]?.type).toBe('paragraph')
+
+    const children = (nodes[0] as any).children as any[]
+    const text = children
+      .filter(n => n?.type === 'text')
+      .map(n => String(n.content ?? ''))
+      .join('')
+
+    expect(text).toBe('Before \\[brackets] and \\*.')
+  })
 })

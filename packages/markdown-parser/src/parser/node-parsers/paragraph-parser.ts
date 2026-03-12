@@ -13,6 +13,7 @@ export function parseParagraph(
     type: 'paragraph',
     children: parseInlineTokens(paragraphContentToken.children || [], paragraphContent, undefined, {
       requireClosingStrong: options?.requireClosingStrong,
+      final: options?.final,
       customHtmlTags: options?.customHtmlTags,
       validateLink: options?.validateLink,
     }),

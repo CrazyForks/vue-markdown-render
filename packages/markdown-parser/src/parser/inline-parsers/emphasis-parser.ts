@@ -24,6 +24,7 @@ export function parseEmphasisToken(
   // Parse inner tokens to handle nested elements
   children.push(...parseInlineTokens(innerTokens, undefined, undefined, {
     requireClosingStrong: options?.requireClosingStrong,
+    final: options?.final,
     customHtmlTags: options?.customHtmlTags,
     validateLink: options?.validateLink,
   }))

@@ -66,6 +66,7 @@ export function parseTable(
             header: isHeaderCell || isHeader,
             children: parseInlineTokens(contentToken.children || [], content, undefined, {
               requireClosingStrong: options?.requireClosingStrong,
+              final: options?.final,
               customHtmlTags: options?.customHtmlTags,
               validateLink: options?.validateLink,
             }),

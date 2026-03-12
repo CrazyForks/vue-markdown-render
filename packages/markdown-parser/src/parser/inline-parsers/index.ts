@@ -1,4 +1,4 @@
-import type { MarkdownToken, ParsedNode, TextNode } from '../../types'
+import type { MarkdownToken, ParseOptions, ParsedNode, TextNode } from '../../types'
 import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
@@ -24,6 +24,7 @@ const STRONG_PAIR_RE = /\*\*([\s\S]*?)\*\*/
 const STRIKETHROUGH_RE = /[^~]*~{2,}[^~]+/
 const HAS_STRONG_RE = /\*\*/
 const ESCAPED_PUNCTUATION_RE = /\\([\\()[\]`$|*_\-!])/g
+const ESCAPABLE_PUNCTUATION = new Set(['\\', '(', ')', '[', ']', '`', '$', '|', '*', '_', '-', '!'])
 
 // Helper: detect likely URLs/hrefs (autolinks). Extracted so the
 // detection logic is easy to tweak and test.
@@ -43,6 +44,71 @@ function countUnescapedAsterisks(str: string): number {
     i++
   }
   return count
+}
+
+function findNextUnescapedAsterisk(rawContent: string | undefined, startContentIndex = 0): number {
+  if (!rawContent)
+    return -1
+
+  let contentIndex = 0
+
+  for (let rawIndex = 0; rawIndex < rawContent.length; rawIndex++) {
+    const char = rawContent[rawIndex]
+    const nextChar = rawContent[rawIndex + 1]
+
+    if (char === '\\' && nextChar && ESCAPABLE_PUNCTUATION.has(nextChar)) {
+      if (nextChar === '*' && contentIndex >= startContentIndex) {
+        contentIndex++
+        rawIndex++
+        continue
+      }
+
+      contentIndex++
+      rawIndex++
+      continue
+    }
+
+    if (char === '*' && contentIndex >= startContentIndex)
+      return contentIndex
+
+    contentIndex++
+  }
+
+  return -1
+}
+
+function decodeVisibleTextFromRaw(rawText: string) {
+  let output = ''
+  let index = 0
+
+  while (index < rawText.length) {
+    if (rawText[index] !== '\\') {
+      output += rawText[index]
+      index++
+      continue
+    }
+
+    let slashCount = 0
+    while (index + slashCount < rawText.length && rawText[index + slashCount] === '\\')
+      slashCount++
+
+    const nextChar = rawText[index + slashCount]
+    output += '\\'.repeat(Math.floor(slashCount / 2))
+
+    if (slashCount % 2 === 1) {
+      if (nextChar && ESCAPABLE_PUNCTUATION.has(nextChar)) {
+        output += nextChar
+        index += slashCount + 1
+        continue
+      }
+
+      output += '\\'
+    }
+
+    index += slashCount
+  }
+
+  return output
 }
 
 const WORD_CHAR_RE = /[\p{L}\p{N}]/u
@@ -85,7 +151,7 @@ export function parseInlineTokens(
   tokens: MarkdownToken[],
   raw?: string,
   pPreToken?: MarkdownToken,
-  options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[], validateLink?: (url: string) => boolean },
+  options?: ParseOptions,
 ): ParsedNode[] {
   if (!tokens || tokens.length === 0)
     return []
@@ -283,7 +349,12 @@ export function parseInlineTokens(
 
     // emphasis (*)
     if (/[^*]*\*[^*]+/.test(content)) {
-      let idx = content.indexOf('*')
+      const rawSource = tokens.length === 1 ? raw : String(token.content ?? '')
+      let idx = rawSource
+        ? findNextUnescapedAsterisk(rawSource, 0)
+        : content.indexOf('*')
+      if (rawSource && idx === -1)
+        return false
       if (idx === -1)
         idx = 0
       const _text = content.slice(0, idx)
@@ -298,8 +369,21 @@ export function parseInlineTokens(
         }
       }
       const runInfo = getAsteriskRunInfo(content, idx)
-      const closeIndex = content.indexOf('*', idx + 1)
-      if (closeIndex === -1 && runInfo.intraword) {
+      const closeIndex = rawSource
+        ? findNextUnescapedAsterisk(rawSource, idx + 1)
+        : content.indexOf('*', idx + 1)
+      const nextInlineToken = tokens[i + 1]
+      if (
+        options?.final
+        && nextInlineToken?.type === 'em_open'
+        && closeIndex !== -1
+        && content.slice(idx + 1, closeIndex).trim() !== content.slice(idx + 1, closeIndex)
+      ) {
+        pushText(content.slice(idx), content.slice(idx))
+        i++
+        return true
+      }
+      if (closeIndex === -1 && (options?.final || runInfo.intraword || !isWordChar(content[idx + 1]))) {
         pushText(content.slice(idx), content.slice(idx))
         i++
         return true
@@ -747,7 +831,12 @@ export function parseInlineTokens(
     // 合并连续的 text 节点
     let index = result.length - 1
     const rawContent = String(token.content ?? '')
-    let content = rawContent.replace(ESCAPED_PUNCTUATION_RE, '$1')
+    const rawSource = tokens.length === 1 && rawContent.includes('\\') && typeof raw === 'string'
+      ? String(raw)
+      : ''
+    let content = rawSource
+      ? decodeVisibleTextFromRaw(rawSource)
+      : rawContent.replace(ESCAPED_PUNCTUATION_RE, '$1')
 
     if (token.content === '<' || (content === '1' && tokens[i - 1]?.tag === 'br')) {
       i++
@@ -852,7 +941,7 @@ export function parseInlineTokens(
     resetCurrentTextNode()
 
     // 直接使用 parseLinkToken 来解析链接及其子节点，这能正确处理包含 code_inline 等复杂内容的链接
-    const { node, nextIndex } = parseLinkToken(tokens, i, { requireClosingStrong })
+    const { node, nextIndex } = parseLinkToken(tokens, i, options as any)
     i = nextIndex
 
     // Respect consumer link validation (e.g. md.set({ validateLink }) so javascript: is not output as link

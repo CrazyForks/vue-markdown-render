@@ -71,6 +71,7 @@ export function parseContainer(
           type: 'paragraph',
           children: parseInlineTokens(_children || [], undefined, undefined, {
             requireClosingStrong: options?.requireClosingStrong,
+            final: options?.final,
             customHtmlTags: options?.customHtmlTags,
             validateLink: options?.validateLink,
           }),

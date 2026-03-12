@@ -109,6 +109,7 @@ function parseVmrContainer(
           type: 'paragraph',
           children: parseInlineTokens(childrenArr || [], undefined, undefined, {
             requireClosingStrong: options?.requireClosingStrong,
+            final: options?.final,
             customHtmlTags: options?.customHtmlTags,
             validateLink: options?.validateLink,
           }),

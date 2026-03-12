@@ -1304,6 +1304,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         {
           const parsed = parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, {
             requireClosingStrong: options?.requireClosingStrong,
+            final: options?.final,
             customHtmlTags: options?.customHtmlTags,
             validateLink: options?.validateLink,
           })

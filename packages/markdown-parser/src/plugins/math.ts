@@ -322,6 +322,50 @@ function findCodeSpanRangeAt(ranges: Array<[number, number]>, index: number): [n
   return null
 }
 
+function isEscapedAt(src: string, index: number) {
+  let cursor = index - 1
+  let backslashes = 0
+  while (cursor >= 0 && src[cursor] === '\\') {
+    backslashes++
+    cursor--
+  }
+  return backslashes % 2 === 1
+}
+
+function findNextUnescapedDollar(src: string, startIdx: number) {
+  let searchPos = startIdx
+
+  while (searchPos < src.length) {
+    const index = src.indexOf('$', searchPos)
+    if (index === -1)
+      return -1
+    if (isEscapedAt(src, index)) {
+      searchPos = index + 1
+      continue
+    }
+    return index
+  }
+
+  return -1
+}
+
+function findSingleDollarClose(src: string, startIdx: number) {
+  let searchPos = startIdx
+
+  while (searchPos < src.length) {
+    const index = findNextUnescapedDollar(src, searchPos)
+    if (index === -1)
+      return -1
+    if ((index > 0 && src[index - 1] === '$') || (index + 1 < src.length && src[index + 1] === '$')) {
+      searchPos = index + 1
+      continue
+    }
+    return index
+  }
+
+  return -1
+}
+
 function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
   const stripped = String(content ?? '').trim()
   if (!stripped)
@@ -417,7 +461,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         if (open === '$$' && text.includes('$')) {
           let localPos = 0
           while (localPos < text.length) {
-            const dollarIndex = text.indexOf('$', localPos)
+            const dollarIndex = findNextUnescapedDollar(text, localPos)
             if (dollarIndex === -1) {
               const rest = text.slice(localPos)
               if (rest) {
@@ -450,7 +494,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
               searchPos = s.pos
             }
 
-            const closingDollarIndex = text.indexOf('$', dollarIndex + 1)
+            const closingDollarIndex = findSingleDollarClose(text, dollarIndex + 1)
             if (closingDollarIndex === -1) {
               // No closing delimiter; treat the rest as text.
               const rest = text.slice(dollarIndex)
@@ -552,6 +596,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const index = src.indexOf(open, searchPos)
         if (index === -1)
           break
+        if (isEscapedAt(src, index)) {
+          searchPos = index + Math.max(1, open.length)
+          continue
+        }
 
         const codeSpanAtIndex = findCodeSpanRangeAt(codeSpanRanges, index)
         if (codeSpanAtIndex) {
@@ -603,7 +651,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         // 这种情况，前面的 \( 是数学公式的开始，后面的 ( 是普通括号
         // endIndex 需要找到与 open 对应的 close
         // 不能简单地用 indexOf 找到第一个 close — 需要处理嵌套与转义字符
-        const endIdx = findMatchingClose(src, index + open.length, open, close)
+        const endIdx = open === '$'
+          ? findSingleDollarClose(src, index + open.length)
+          : findMatchingClose(src, index + open.length, open, close)
         if (endIdx === -1) {
           // no matching close for this opener; skip forward
           const content = src.slice(index + open.length)
@@ -781,7 +831,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
             while (true) {
               if (remainingPos >= src.length)
                 break
-              const dollarIndex = src.indexOf('$', remainingPos)
+              const dollarIndex = findNextUnescapedDollar(src, remainingPos)
               if (dollarIndex === -1)
                 break
 
@@ -796,15 +846,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
               }
 
               // Find matching closing $
-              const closingDollarIndex = src.indexOf('$', dollarIndex + 1)
+              const closingDollarIndex = findSingleDollarClose(src, dollarIndex + 1)
               if (closingDollarIndex === -1)
                 break
-
-              // Skip if closing $ is part of $$
-              if (closingDollarIndex + 1 < src.length && src[closingDollarIndex + 1] === '$') {
-                remainingPos = dollarIndex + 1
-                continue
-              }
 
               // Valid $...$ pattern
               const content = src.slice(dollarIndex + 1, closingDollarIndex)

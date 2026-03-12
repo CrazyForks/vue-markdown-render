@@ -23,6 +23,7 @@ export function parseDefinitionList(
       const termToken = tokens[j + 1]
       termNodes = parseInlineTokens(termToken.children || [], undefined, undefined, {
         requireClosingStrong: options?.requireClosingStrong,
+        final: options?.final,
         customHtmlTags: options?.customHtmlTags,
         validateLink: options?.validateLink,
       })
@@ -40,6 +41,7 @@ export function parseDefinitionList(
             type: 'paragraph',
             children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), undefined, {
               requireClosingStrong: options?.requireClosingStrong,
+              final: options?.final,
               customHtmlTags: options?.customHtmlTags,
               validateLink: options?.validateLink,
             }),

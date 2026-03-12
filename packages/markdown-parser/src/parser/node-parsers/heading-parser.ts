@@ -27,6 +27,7 @@ export function parseHeading(
     ...(attrsRecord ? { attrs: attrsRecord } : {}),
     children: parseInlineTokens(headingContentToken.children || [], headingContent, undefined, {
       requireClosingStrong: options?.requireClosingStrong,
+      final: options?.final,
       customHtmlTags: options?.customHtmlTags,
       validateLink: options?.validateLink,
     }),
