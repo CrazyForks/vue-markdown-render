@@ -71,6 +71,7 @@
     "dev": "pnpm run -C playground dev",
     "test": "vitest",
     "test:e2e:diff-folding": "node scripts/e2e-diff-folding.mjs",
+    "test:e2e:codeblock-highlight-stability": "node scripts/e2e-codeblock-highlight-stability.mjs",
     "lint": "eslint . --cache",
     "lint:fix": "pnpm run lint --fix",
     "test:ui": "vitest --ui",
@@ -124,7 +125,10 @@
     "tag:prune:v:dry": "node scripts/prune-tags.mjs --pattern 'v*' --dry-run",
     "tag:prune:v:local": "node scripts/prune-tags.mjs --pattern 'v*' --apply --local",
     "tag:prune:v:all": "node scripts/prune-tags.mjs --pattern 'v*' --apply --local --remote-delete",
-    "check:peer-deps": "node ./scripts/check-peer-deps.cjs"
+    "check:peer-deps": "node ./scripts/check-peer-deps.cjs",
+    "test:e2e:link-tooltip-streaming": "node scripts/e2e-link-tooltip-streaming.mjs",
+    "test:e2e:vue2-cli-smoke": "node scripts/e2e-vue2-cli-smoke.mjs",
+    "test:e2e:math-streaming-stability": "node scripts/e2e-math-streaming-stability.mjs"
   },
   "peerDependencies": {
     "@antv/infographic": "^0.2.3",

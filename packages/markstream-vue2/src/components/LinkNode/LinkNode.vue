@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 定义链接节点
-import { computed, useAttrs } from 'vue-demi'
-import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, useAttrs } from 'vue-demi'
+import { ensureTooltipMounted, hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import EmphasisNode from '../EmphasisNode/EmphasisNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode'
 import ImageNode from '../ImageNode'
@@ -9,6 +9,53 @@ import StrikethroughNode from '../StrikethroughNode'
 
 import StrongNode from '../StrongNode'
 import TextNode from '../TextNode'
+
+// 接收props — 把动画/颜色相关配置暴露为props，并通过CSS变量注入样式
+const props = withDefaults(defineProps<LinkNodeProps>(), {
+  showTooltip: true,
+})
+
+const lastPointerPosition = {
+  x: 0,
+  y: 0,
+  hasValue: false,
+}
+
+let pointerTrackerRefCount = 0
+let pointerTrackerCleanup: (() => void) | null = null
+
+function ensurePointerTracker() {
+  if (pointerTrackerCleanup || typeof window === 'undefined')
+    return
+
+  const updatePosition = (event: MouseEvent | PointerEvent) => {
+    if (typeof event.clientX !== 'number' || typeof event.clientY !== 'number')
+      return
+    lastPointerPosition.x = event.clientX
+    lastPointerPosition.y = event.clientY
+    lastPointerPosition.hasValue = true
+  }
+
+  window.addEventListener('pointermove', updatePosition, true)
+  window.addEventListener('mousemove', updatePosition, true)
+  pointerTrackerCleanup = () => {
+    window.removeEventListener('pointermove', updatePosition, true)
+    window.removeEventListener('mousemove', updatePosition, true)
+  }
+}
+
+function retainPointerTracker() {
+  ensurePointerTracker()
+  pointerTrackerRefCount += 1
+}
+
+function releasePointerTracker() {
+  pointerTrackerRefCount = Math.max(0, pointerTrackerRefCount - 1)
+  if (!pointerTrackerRefCount && pointerTrackerCleanup) {
+    pointerTrackerCleanup()
+    pointerTrackerCleanup = null
+  }
+}
 
 interface LinkNodeProps {
   node: {
@@ -31,11 +78,6 @@ interface LinkNodeProps {
   animationTiming?: string
   animationIteration?: string | number
 }
-
-// 接收props — 把动画/颜色相关配置暴露为props，并通过CSS变量注入样式
-const props = withDefaults(defineProps<LinkNodeProps>(), {
-  showTooltip: true,
-})
 
 const cssVars = computed(() => {
   const bottom = props.underlineBottom !== undefined
@@ -65,6 +107,8 @@ const nodeComponents = {
 
 // forward any non-prop attributes (e.g. custom-id) to the rendered element
 const attrs = useAttrs()
+const anchorEl = ref<HTMLElement | null>(null)
+const isHovering = ref(false)
 const anchorAttrs = computed(() => {
   const merged = { ...(attrs as Record<string, unknown>) }
   // `title` is controlled by `showTooltip` behavior and should not be overridden.
@@ -72,20 +116,50 @@ const anchorAttrs = computed(() => {
   return merged
 })
 
+function getTooltipText() {
+  return props.node?.title || props.node?.href || props.node?.text || ''
+}
+
+function isPointerInsideAnchor(el: HTMLElement | null) {
+  if (!el || !lastPointerPosition.hasValue)
+    return false
+  const rect = el.getBoundingClientRect()
+  return lastPointerPosition.x >= rect.left
+    && lastPointerPosition.x <= rect.right
+    && lastPointerPosition.y >= rect.top
+    && lastPointerPosition.y <= rect.bottom
+}
+
+function syncTooltipForHoveredAnchor() {
+  if (!props.showTooltip || !anchorEl.value || !isPointerInsideAnchor(anchorEl.value))
+    return
+  isHovering.value = true
+  showTooltipForAnchor(
+    anchorEl.value,
+    getTooltipText(),
+    'top',
+    true,
+    {
+      x: lastPointerPosition.x,
+      y: lastPointerPosition.y,
+    },
+  )
+}
+
 // Tooltip handlers using singleton tooltip
 function onAnchorEnter(e: Event) {
   if (!props.showTooltip)
     return
+  isHovering.value = true
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  // show the link href in tooltip; fall back to title/text if href missing
-  const txt = props.node?.title || props.node?.href || props.node?.text || ''
-  showTooltipForAnchor(e.currentTarget as HTMLElement, txt, 'top', false, origin)
+  showTooltipForAnchor(anchorEl.value || (e.currentTarget as HTMLElement), getTooltipText(), 'top', true, origin)
 }
 
 function onAnchorLeave() {
   if (!props.showTooltip)
     return
+  isHovering.value = false
   hideTooltip()
 }
 const title = computed(() => {
@@ -94,11 +168,33 @@ const title = computed(() => {
     return rawTitle
   return String(props.node?.href ?? '')
 })
+
+onMounted(() => {
+  retainPointerTracker()
+  if (props.showTooltip)
+    ensureTooltipMounted()
+  nextTick(() => {
+    syncTooltipForHoveredAnchor()
+  })
+})
+
+onUpdated(() => {
+  syncTooltipForHoveredAnchor()
+})
+
+onBeforeUnmount(() => {
+  releasePointerTracker()
+  if (!isHovering.value)
+    return
+  isHovering.value = false
+  hideTooltip(true)
+})
 </script>
 
 <template>
   <a
     v-if="!node.loading"
+    ref="anchorEl"
     class="link-node"
     :href="node.href"
     :title="showTooltip ? '' : title"

@@ -25,12 +25,13 @@ import LinkNode from './components/LinkNode'
 import ListItemNode from './components/ListItemNode'
 import ListNode from './components/ListNode'
 import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
+import MarkdownRender from './components/MarkdownRenderCompat.vue'
 import MathBlockNode from './components/MathBlockNode'
 import MathInlineNode from './components/MathInlineNode'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import MermaidBlockNode from './components/MermaidBlockNode'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
-import MarkdownRender from './components/NodeRenderer'
+import NestedRenderer from './components/NestedRenderer'
 import ParagraphNode from './components/ParagraphNode'
 import PreCodeNode from './components/PreCodeNode'
 import ReferenceNode from './components/ReferenceNode'
@@ -114,6 +115,7 @@ export {
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
+  NestedRenderer,
   ParagraphNode,
   PreCodeNode,
   ReferenceNode,
@@ -221,6 +223,7 @@ const componentMap: Record<string, any> = {
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
+  NestedRenderer,
   InfographicBlockNode,
   ParagraphNode,
   StrikethroughNode,

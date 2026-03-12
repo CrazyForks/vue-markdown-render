@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue-demi'
+import { computed, getCurrentInstance } from 'vue-demi'
+import { isLegacyVue26Vm } from '../../utils/vue26'
 import NodeRenderer from '../NodeRenderer'
+import LegacyNodesRenderer from '../NodeRenderer/LegacyNodesRenderer.vue'
 
-// 节点子元素类型
 interface NodeChild {
   type: string
   raw: string
   [key: string]: unknown
 }
 
-// 列表项类型
 interface ListItem {
   type: 'list_item'
   children: NodeChild[]
@@ -17,16 +17,11 @@ interface ListItem {
 }
 
 const props = defineProps<{
-  /**
-   * Preferred prop name for consistency with other node components.
-   * `item` is kept for backward compatibility.
-   */
   node?: ListItem
   item?: ListItem
   indexKey?: number | string
   value?: number
   customId?: string
-  /** Forwarded flag to enable/disable non-code node enter transition */
   typewriter?: boolean
   showTooltips?: boolean
 }>()
@@ -36,15 +31,18 @@ defineEmits<{
 }>()
 
 const itemNode = computed(() => props.node ?? props.item)
-
-const liValueAttr = computed(() =>
-  props.value == null ? {} : { value: props.value },
-)
+const liValueAttr = computed(() => (props.value == null ? {} : { value: props.value }))
+const instance = getCurrentInstance()
+const nestedRenderer = computed(() => {
+  const vm = instance?.proxy as any
+  return isLegacyVue26Vm(vm) ? LegacyNodesRenderer : NodeRenderer
+})
 </script>
 
 <template>
   <li class="list-item pl-1.5 my-2" dir="auto" v-bind="liValueAttr">
-    <NodeRenderer
+    <component
+      :is="nestedRenderer"
       v-bind="{ showTooltips: props.showTooltips }"
       :index-key="`list-item-${props.indexKey}`"
       :nodes="itemNode?.children ?? []"
@@ -65,7 +63,6 @@ ul > .list-item::marker{
   color: var(--list-item-marker,#cbd5e1)
 }
 
-/* 大列表滚动到视口时，嵌套 NodeRenderer 需要立即绘制内容，避免空白 */
 .list-item ::v-deep .markdown-renderer {
   content-visibility: visible;
   contain-intrinsic-size: 0px 0px;

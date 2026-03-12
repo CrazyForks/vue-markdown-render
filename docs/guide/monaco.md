@@ -179,8 +179,8 @@ const monacoOptions = {
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue'
 import MarkdownRender from 'markstream-vue'
+import { ref } from 'vue'
 
 const actionLogs = ref<string[]>([])
 

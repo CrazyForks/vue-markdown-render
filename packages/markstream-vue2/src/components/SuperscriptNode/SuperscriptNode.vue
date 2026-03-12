@@ -33,7 +33,6 @@ const props = defineProps<{
 
 const overrides = getCustomNodeComponents(props.customId)
 
-// Available node components for child rendering; prefer custom overrides
 const nodeComponents = {
   text: TextNode,
   inline_code: InlineCodeNode,
@@ -55,22 +54,20 @@ const nodeComponents = {
 
 <template>
   <sup class="superscript-node">
-    <template v-for="(child, index) in node.children">
+    <span
+      v-for="(child, index) in node.children"
+      :key="`${indexKey || 'superscript'}-${index}`"
+      class="superscript-child"
+    >
       <component
         :is="nodeComponents[child.type]"
         v-if="nodeComponents[child.type]"
-        :key="`${indexKey || 'superscript'}-${index}`"
         :node="child"
         :custom-id="props.customId"
         :index-key="`${indexKey || 'superscript'}-${index}`"
       />
-      <span
-        v-else
-        :key="`${indexKey || 'superscript'}-${index}`"
-      >
-        {{ child.content || child.raw }}
-      </span>
-    </template>
+      <span v-else>{{ child.content || child.raw || '' }}</span>
+    </span>
   </sup>
 </template>
 
@@ -78,5 +75,8 @@ const nodeComponents = {
 .superscript-node {
   font-size: 0.8em;
   vertical-align: super;
+}
+.superscript-child {
+  display: contents;
 }
 </style>

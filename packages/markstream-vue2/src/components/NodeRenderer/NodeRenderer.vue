@@ -34,10 +34,12 @@ import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
 import { provideViewportPriority } from '../../composables/viewportPriority'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
+import { isLegacyVue26Vm } from '../../utils/vue26'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import FallbackComponent from './FallbackComponent.vue'
+import LegacyNodesRenderer from './LegacyNodesRenderer.vue'
 
 // 组件接收的 props
 // 增加用于统一设置所有 code_block 主题和 Monaco 选项的外部 API
@@ -139,6 +141,7 @@ const containerRef = ref<HTMLElement>()
 const viewportPriorityAutoDisabled = ref(false)
 const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 const isClient = typeof window !== 'undefined'
+const instance = getCurrentInstance()
 const debugPerformanceEnabled = computed(() => props.debugPerformance && isClient && typeof console !== 'undefined')
 
 function logPerf(label: string, data: Record<string, unknown>) {
@@ -173,6 +176,7 @@ const instanceMsgId = props.customId
   : `renderer-${Date.now()}-${Math.random().toString(36).slice(2)}`
 const defaultMd = getMarkdown(instanceMsgId)
 const customTagCache = new Map<string, MarkdownIt>()
+const EMPTY_PARSED_NODES = markRaw([] as ParsedNode[])
 const mdBase = computed(() => {
   const { key, tags } = resolveCustomHtmlTags(props.customHtmlTags)
   if (!key)
@@ -216,6 +220,21 @@ function resolveCustomHtmlTags(tags?: readonly string[]) {
   return { key: normalized.join(','), tags: normalized }
 }
 
+function cloneNodeValue<T>(value: T): T {
+  if (Array.isArray(value))
+    return Object.freeze(value.map(item => cloneNodeValue(item))) as T
+  if (!value || typeof value !== 'object')
+    return value
+  const output: Record<string, unknown> = {}
+  for (const [key, child] of Object.entries(value as Record<string, unknown>))
+    output[key] = cloneNodeValue(child)
+  return Object.freeze(output) as T
+}
+
+function cloneParsedNodeList(nodes: ParsedNode[]) {
+  return nodes.map(node => cloneNodeValue(node))
+}
+
 const mergedParseOptions = computed(() => {
   const base = props.parseOptions ?? {}
   const resolvedFinal = props.final ?? (base as any).final
@@ -238,6 +257,8 @@ const mergedParseOptions = computed(() => {
 })
 
 const parsedNodes = computed<ParsedNode[]>(() => {
+  if (isLegacyVue26Vm(instance?.proxy as any) && !props.content && Array.isArray(props.nodes))
+    return EMPTY_PARSED_NODES
   // 解析 content 字符串为节点数组
   // If the consumer passed an explicit `nodes` array, return a shallow
   // copy so the computed value has a new identity whenever the caller
@@ -245,7 +266,7 @@ const parsedNodes = computed<ParsedNode[]>(() => {
   // that rely on `parsedNodes` will run and update rendering even when
   // the array length doesn't change.
   if (props.nodes?.length)
-    return markRaw((props.nodes as unknown as ParsedNode[]).slice())
+    return markRaw(cloneParsedNodeList(props.nodes as unknown as ParsedNode[]))
   if (props.content) {
     // Prefer an explicitly passed `markdown` prop, then a globally
     // provided markdown via `setGlobalMarkdown`, otherwise fall back
@@ -259,7 +280,7 @@ const parsedNodes = computed<ParsedNode[]>(() => {
         contentLength: props.content.length,
       })
     }
-    return markRaw(parsed)
+    return markRaw(cloneParsedNodeList(parsed))
   }
   return []
 })
@@ -366,7 +387,16 @@ const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNode
 const liveNodeBufferResolved = computed(() => Math.max(0, props.liveNodeBuffer ?? 60))
 const focusIndex = ref(0)
 const nodeContentElements = new Map<number, HTMLElement | null>()
-const instance = getCurrentInstance()
+const legacyVue26 = computed(() => {
+  const vm = instance?.proxy as any
+  return isLegacyVue26Vm(vm)
+})
+const legacyNodesMode = computed(() => legacyVue26.value && !props.content && Array.isArray(props.nodes))
+const legacyNodeItems = computed<ParsedNode[]>(() => {
+  if (!legacyNodesMode.value)
+    return EMPTY_PARSED_NODES
+  return markRaw(cloneParsedNodeList((props.nodes as unknown as ParsedNode[]) || []))
+})
 
 function syncNodeRefs() {
   const proxy = instance?.proxy as any
@@ -375,8 +405,8 @@ function syncNodeRefs() {
   const refs = proxy.$refs as Record<string, any>
   const seen = new Set<number>()
   for (const item of visibleNodes.value) {
-    const slot = (refs[`node-slot-${item.index}`] as HTMLElement | undefined) ?? null
-    const content = (refs[`node-content-${item.index}`] as HTMLElement | undefined) ?? null
+    const slot = resolveTemplateRef(refs[`node-slot-${item.index}`])
+    const content = resolveTemplateRef(refs[`node-content-${item.index}`])
     if ((nodeSlotElements.get(item.index) ?? null) !== slot)
       setNodeSlotElement(item.index, slot)
     if ((nodeContentElements.get(item.index) ?? null) !== content)
@@ -391,6 +421,17 @@ function syncNodeRefs() {
     if (!seen.has(index))
       setNodeContentRef(index, null)
   }
+}
+
+function resolveTemplateRef<T extends HTMLElement>(value: T | T[] | null | undefined) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (item)
+        return item
+    }
+    return null
+  }
+  return value ?? null
 }
 const desiredRenderedCount = computed(() => {
   if (!virtualizationEnabled.value)
@@ -1218,23 +1259,31 @@ watch(
     const targetCount = desiredRenderedCount.value
 
     if (!total) {
-      renderedCount.value = 0
+      if (renderedCount.value !== 0)
+        renderedCount.value = 0
       cleanupNodeVisibility(0)
       return
     }
 
     if (!incrementalRenderingActive.value) {
-      renderedCount.value = targetCount
+      if (renderedCount.value !== targetCount)
+        renderedCount.value = targetCount
       cleanupNodeVisibility(renderedCount.value)
       return
     }
 
     const shouldResetRenderedCount = datasetKeyChanged || prevCtx.total === 0
 
-    if (shouldResetRenderedCount || batchConfigChanged)
-      renderedCount.value = Math.min(targetCount, resolvedInitialBatch.value)
-    else
-      renderedCount.value = Math.min(renderedCount.value, targetCount)
+    if (shouldResetRenderedCount || batchConfigChanged) {
+      const nextRenderedCount = Math.min(targetCount, resolvedInitialBatch.value)
+      if (renderedCount.value !== nextRenderedCount)
+        renderedCount.value = nextRenderedCount
+    }
+    else {
+      const nextRenderedCount = Math.min(renderedCount.value, targetCount)
+      if (renderedCount.value !== nextRenderedCount)
+        renderedCount.value = nextRenderedCount
+    }
 
     const baseInitial = Math.max(1, resolvedInitialBatch.value || resolvedBatchSize.value || total)
     if (renderedCount.value < targetCount)
@@ -1524,15 +1573,37 @@ const listBindings = computed(() => ({
   ...nonCodeBindings.value,
   ...(typeof props.showTooltips === 'boolean' ? { showTooltips: props.showTooltips } : {}),
 }))
+const legacyRenderedItems = computed(() => {
+  return legacyNodeItems.value.map((node, index) => {
+    const language = getCodeBlockLanguage(node)
+    return {
+      node,
+      component: getNodeComponent(node, language),
+      bindings: getBindingsFor(node, language),
+      isCodeBlock: node.type === 'code_block',
+      index,
+      indexKey: `${indexPrefix.value}-${index}`,
+      renderKey: getRenderKey(node, index),
+    }
+  })
+})
+const legacyStructuredContentMode = computed(() => {
+  if (!legacyVue26.value || !props.content)
+    return false
+  return parsedNodes.value.some(node => isLegacyStructuredNode(node))
+})
 const renderedItems = computed(() => {
   return visibleNodes.value.map((item) => {
-    const language = getCodeBlockLanguage(item.node)
+    const node = item.node
+    const language = getCodeBlockLanguage(node)
     return {
       ...item,
-      component: getNodeComponent(item.node, language),
-      bindings: getBindingsFor(item.node, language),
-      isCodeBlock: item.node.type === 'code_block',
+      node,
+      component: getNodeComponent(node, language),
+      bindings: getBindingsFor(node, language),
+      isCodeBlock: node.type === 'code_block',
       indexKey: `${indexPrefix.value}-${item.index}`,
+      renderKey: getRenderKey(node, item.index),
     }
   })
 })
@@ -1541,6 +1612,49 @@ function getCodeBlockLanguage(node: ParsedNode) {
   return node?.type === 'code_block'
     ? String((node as any).language ?? '').trim().toLowerCase()
     : ''
+}
+
+function isLegacyStructuredNode(node: ParsedNode | null | undefined) {
+  if (!node)
+    return false
+  const type = String((node as any).type || '')
+  if ([
+    'blockquote',
+    'list',
+    'list_item',
+    'table',
+    'definition_list',
+    'footnote',
+    'admonition',
+  ].includes(type)) {
+    return true
+  }
+  return Array.isArray((node as any).items)
+    || Array.isArray((node as any).rows)
+    || (Array.isArray((node as any).children) && ['paragraph', 'heading', 'text'].includes(type) === false)
+}
+
+function getRenderKey(node: ParsedNode, index: number) {
+  const base = `${indexPrefix.value}-${index}`
+  if (!node)
+    return base
+
+  const type = String((node as any).type || 'unknown')
+  const loading = (node as any).loading === true
+  const raw = typeof (node as any).raw === 'string' ? (node as any).raw.length : 0
+  const content = typeof (node as any).content === 'string' ? (node as any).content.length : 0
+  const children = Array.isArray((node as any).children) ? (node as any).children.length : 0
+  const items = Array.isArray((node as any).items) ? (node as any).items.length : 0
+  const rows = Array.isArray((node as any).rows) ? (node as any).rows.length : 0
+
+  if (!legacyVue26.value && !loading)
+    return base
+
+  const hasNestedStructure = children > 0 || items > 0 || rows > 0
+  if (!loading && !hasNestedStructure)
+    return base
+
+  return `${base}-${type}-${loading ? 'l' : 'r'}-${raw}-${content}-${children}-${items}-${rows}`
 }
 
 // Decide which component to use for a given node. Ensure that code blocks
@@ -1634,33 +1748,36 @@ function handleContainerMouseout(event: MouseEvent) {
     @mouseover="handleContainerMouseover"
     @mouseout="handleContainerMouseout"
   >
-    <div
-      v-if="virtualizationEnabled"
-      class="node-spacer"
-      :style="{ height: `${topSpacerHeight}px` }"
-      aria-hidden="true"
-    />
-    <div
-      v-for="item in renderedItems"
-      :key="item.index"
-      :ref="`node-slot-${item.index}`"
-      class="node-slot"
-      :data-node-index="item.index"
-      :data-node-type="item.node.type"
-    >
+    <template v-if="legacyNodesMode">
       <div
-        v-if="shouldRenderNode(item.index)"
-        :ref="`node-content-${item.index}`"
-        class="node-content"
+        v-for="item in legacyRenderedItems"
+        :key="item.renderKey"
+        class="node-slot"
+        :data-node-index="item.index"
+        :data-node-type="item.node.type"
       >
-        <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-        <transition
-          v-if="!item.isCodeBlock && props.typewriter !== false"
-          name="typewriter"
-          appear
-        >
+        <div class="node-content">
+          <transition
+            v-if="!item.isCodeBlock && props.typewriter !== false"
+            name="typewriter"
+            appear
+          >
+            <component
+              :is="item.component"
+              :node="item.node"
+              :loading="item.node.loading"
+              :index-key="item.indexKey"
+              v-bind="item.bindings"
+              :custom-id="props.customId"
+              :is-dark="props.isDark"
+              @copy="emit('copy', $event)"
+              @handle-artifact-click="emit('handleArtifactClick', $event)"
+            />
+          </transition>
+
           <component
             :is="item.component"
+            v-else
             :node="item.node"
             :loading="item.node.loading"
             :index-key="item.indexKey"
@@ -1670,33 +1787,94 @@ function handleContainerMouseout(event: MouseEvent) {
             @copy="emit('copy', $event)"
             @handle-artifact-click="emit('handleArtifactClick', $event)"
           />
-        </transition>
+        </div>
+      </div>
+    </template>
+    <LegacyNodesRenderer
+      v-else-if="legacyStructuredContentMode"
+      :nodes="parsedNodes"
+      :custom-id="props.customId"
+      :index-key="props.indexKey"
+      :typewriter="props.typewriter"
+      :show-tooltips="props.showTooltips"
+      :code-block-stream="props.codeBlockStream"
+      :code-block-dark-theme="props.codeBlockDarkTheme"
+      :code-block-light-theme="props.codeBlockLightTheme"
+      :code-block-monaco-options="props.codeBlockMonacoOptions"
+      :render-code-blocks-as-pre="props.renderCodeBlocksAsPre"
+      :code-block-min-width="props.codeBlockMinWidth"
+      :code-block-max-width="props.codeBlockMaxWidth"
+      :code-block-props="props.codeBlockProps"
+      :themes="props.themes"
+      :is-dark="props.isDark"
+      @copy="emit('copy', $event)"
+      @handle-artifact-click="emit('handleArtifactClick', $event)"
+    />
+    <template v-else>
+      <div
+        v-if="virtualizationEnabled"
+        class="node-spacer"
+        :style="{ height: `${topSpacerHeight}px` }"
+        aria-hidden="true"
+      />
+      <div
+        v-for="item in renderedItems"
+        :key="item.renderKey"
+        :ref="`node-slot-${item.index}`"
+        class="node-slot"
+        :data-node-index="item.index"
+        :data-node-type="item.node.type"
+      >
+        <div
+          v-if="shouldRenderNode(item.index)"
+          :ref="`node-content-${item.index}`"
+          class="node-content"
+        >
+          <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
+          <transition
+            v-if="!item.isCodeBlock && props.typewriter !== false"
+            name="typewriter"
+            appear
+          >
+            <component
+              :is="item.component"
+              :node="item.node"
+              :loading="item.node.loading"
+              :index-key="item.indexKey"
+              v-bind="item.bindings"
+              :custom-id="props.customId"
+              :is-dark="props.isDark"
+              @copy="emit('copy', $event)"
+              @handle-artifact-click="emit('handleArtifactClick', $event)"
+            />
+          </transition>
 
-        <component
-          :is="item.component"
+          <component
+            :is="item.component"
+            v-else
+            :node="item.node"
+            :loading="item.node.loading"
+            :index-key="item.indexKey"
+            v-bind="item.bindings"
+            :custom-id="props.customId"
+            :is-dark="props.isDark"
+            @copy="emit('copy', $event)"
+            @handle-artifact-click="emit('handleArtifactClick', $event)"
+          />
+        </div>
+        <div
           v-else
-          :node="item.node"
-          :loading="item.node.loading"
-          :index-key="item.indexKey"
-          v-bind="item.bindings"
-          :custom-id="props.customId"
-          :is-dark="props.isDark"
-          @copy="emit('copy', $event)"
-          @handle-artifact-click="emit('handleArtifactClick', $event)"
+          class="node-placeholder"
+          :style="{ height: `${nodeHeights[item.index] ?? averageNodeHeight}px` }"
         />
       </div>
       <div
-        v-else
-        class="node-placeholder"
-        :style="{ height: `${nodeHeights[item.index] ?? averageNodeHeight}px` }"
+        v-if="virtualizationEnabled"
+        class="node-spacer"
+        :style="{ height: `${bottomSpacerHeight}px` }"
+        aria-hidden="true"
       />
-    </div>
-    <div
-      v-if="virtualizationEnabled"
-      class="node-spacer"
-      :style="{ height: `${bottomSpacerHeight}px` }"
-      aria-hidden="true"
-    />
+    </template>
   </div>
 </template>
 

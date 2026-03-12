@@ -54,22 +54,20 @@ const nodeComponents = {
 
 <template>
   <sub class="subscript-node">
-    <template v-for="(child, index) in node.children">
+    <span
+      v-for="(child, index) in node.children"
+      :key="`${indexKey || 'subscript'}-${index}`"
+      class="subscript-child"
+    >
       <component
         :is="nodeComponents[child.type]"
         v-if="nodeComponents[child.type]"
-        :key="`${indexKey || 'subscript'}-${index}`"
         :node="child"
         :custom-id="props.customId"
         :index-key="`${indexKey || 'subscript'}-${index}`"
       />
-      <span
-        v-else
-        :key="`${indexKey || 'subscript'}-${index}`"
-      >
-        {{ child.content || child.raw }}
-      </span>
-    </template>
+      <span v-else>{{ child.content || child.raw || '' }}</span>
+    </span>
   </sub>
 </template>
 
@@ -77,5 +75,8 @@ const nodeComponents = {
 .subscript-node {
   font-size: 0.8em;
   vertical-align: sub;
+}
+.subscript-child {
+  display: contents;
 }
 </style>

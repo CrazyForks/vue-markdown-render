@@ -3,14 +3,12 @@ import { computed } from 'vue-demi'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import ListItemNode from '../ListItemNode'
 
-// 节点子元素类型
 interface NodeChild {
   type: string
   raw: string
   [key: string]: unknown
 }
 
-// 列表项类型
 interface ListItem {
   type: 'list_item'
   children: NodeChild[]

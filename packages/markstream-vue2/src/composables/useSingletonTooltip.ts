@@ -51,13 +51,13 @@ function clearTimers() {
 // Mount singleton Tooltip once
 let mounted = false
 let mountPromise: Promise<void> | null = null
-function ensureMounted() {
+export function ensureTooltipMounted() {
   if (mounted)
-    return
+    return Promise.resolve()
   if (typeof document === 'undefined')
-    return
+    return Promise.resolve()
   if (mountPromise)
-    return
+    return mountPromise
 
   mountPromise = import('../components/Tooltip/Tooltip.vue')
     .then((mod) => {
@@ -92,6 +92,8 @@ function ensureMounted() {
       mounted = false
       console.warn('[markstream-vue2] Failed to load Tooltip component. Tooltips will be disabled.', err)
     })
+
+  return mountPromise
 }
 
 export function showTooltipForAnchor(
@@ -104,7 +106,7 @@ export function showTooltipForAnchor(
 ) {
   if (!el)
     return
-  ensureMounted()
+  ensureTooltipMounted()
   clearTimers()
   const doShow = () => {
     tooltipId.value = `tooltip-${Date.now()}-${Math.floor(Math.random() * 1000)}`
@@ -148,6 +150,7 @@ export function hideTooltip(immediate = false) {
 }
 
 export default {
+  ensureTooltipMounted,
   showTooltipForAnchor,
   hideTooltip,
 }

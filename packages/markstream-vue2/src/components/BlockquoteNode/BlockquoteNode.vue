@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed, getCurrentInstance } from 'vue-demi'
+import { isLegacyVue26Vm } from '../../utils/vue26'
 import NodeRenderer from '../NodeRenderer'
+import LegacyNodesRenderer from '../NodeRenderer/LegacyNodesRenderer.vue'
 
-// child node shape used across many node components
 interface NodeChild {
   type: string
   raw: string
@@ -12,7 +14,6 @@ interface BlockquoteNode {
   type: 'blockquote'
   children: NodeChild[]
   raw: string
-  // optional citation/source for the blockquote
   cite?: string
 }
 
@@ -23,15 +24,21 @@ const props = defineProps<{
   customId?: string
 }>()
 
-// typed emit for better DX and type-safety when forwarding copy events
 defineEmits<{
   copy: [text: string]
 }>()
+
+const instance = getCurrentInstance()
+const nestedRenderer = computed(() => {
+  const vm = instance?.proxy as any
+  return isLegacyVue26Vm(vm) ? LegacyNodesRenderer : NodeRenderer
+})
 </script>
 
 <template>
   <blockquote class="blockquote" dir="auto" :cite="node.cite">
-    <NodeRenderer
+    <component
+      :is="nestedRenderer"
       :index-key="`blockquote-${props.indexKey}`"
       :nodes="props.node.children || []"
       :custom-id="props.customId"
@@ -47,12 +54,10 @@ defineEmits<{
   font-style: italic;
   border-left: 0.25rem solid var(--blockquote-border-color,#e2e8f0);
   quotes: "\201C" "\201D" "\2018" "\2019";
-  /* Reset UA default `margin-inline: 40px` so nested blockquotes don't over-indent. */
   margin: 1.6em 0;
   padding-left: 1em;
 }
 
-/* 防止内部 NodeRenderer 使用 content-visibility: auto 时在大文档滚动中出现“高但空白”的占位 */
 .blockquote ::v-deep .markdown-renderer {
   content-visibility: visible;
   contain: content;

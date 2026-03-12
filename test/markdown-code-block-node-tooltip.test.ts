@@ -77,4 +77,34 @@ describe('markdownCodeBlockNode tooltip toggles', () => {
 
     wrapper.unmount()
   })
+
+  it('normalizes streamed language labels in the header', async () => {
+    const jsonWrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: {
+          ...makeNode(),
+          language: 'json:package.json',
+        },
+      },
+    })
+
+    expect(jsonWrapper.text()).toContain('JSON')
+    expect(jsonWrapper.text()).not.toContain('Json:package.json')
+    jsonWrapper.unmount()
+
+    const shellWrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: {
+          ...makeNode(),
+          language: 'shellscript',
+        },
+      },
+    })
+
+    expect(shellWrapper.text()).toContain('Shell')
+    expect(shellWrapper.text()).not.toContain('Shellscript')
+    shellWrapper.unmount()
+  })
 })

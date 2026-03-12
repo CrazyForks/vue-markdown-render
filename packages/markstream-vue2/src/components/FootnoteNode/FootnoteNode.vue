@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { computed, getCurrentInstance } from 'vue-demi'
+import { isLegacyVue26Vm } from '../../utils/vue26'
 import NodeRenderer from '../NodeRenderer'
+import LegacyNodesRenderer from '../NodeRenderer/LegacyNodesRenderer.vue'
 
 // 定义脚注节点
 interface FootnoteNode {
@@ -19,6 +22,11 @@ const props = defineProps<{
 
 // 定义事件
 defineEmits(['copy'])
+const instance = getCurrentInstance()
+const nestedRenderer = computed(() => {
+  const vm = instance?.proxy as any
+  return isLegacyVue26Vm(vm) ? LegacyNodesRenderer : NodeRenderer
+})
 </script>
 
 <template>
@@ -28,7 +36,8 @@ defineEmits(['copy'])
   >
     <!-- <span class="font-semibold mr-2 text-[#0366d6]">[{{ node.id }}]</span> -->
     <div class="flex-1">
-      <NodeRenderer
+      <component
+        :is="nestedRenderer"
         :index-key="`footnote-${props.indexKey}`"
         :nodes="props.node.children"
         :custom-id="props.customId"

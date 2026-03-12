@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue-demi'
+import { computed, getCurrentInstance } from 'vue-demi'
+import { isLegacyVue26Vm } from '../../utils/vue26'
 import NodeRenderer from '../NodeRenderer'
+import LegacyNodesRenderer from '../NodeRenderer/LegacyNodesRenderer.vue'
 
 // 定义单元格节点
 interface TableCellNode {
@@ -44,6 +46,11 @@ defineEmits(['copy'])
 
 const isLoading = computed(() => props.node.loading ?? false)
 const bodyRows = computed(() => props.node.rows ?? [])
+const instance = getCurrentInstance()
+const nestedRenderer = computed(() => {
+  const vm = instance?.proxy as any
+  return isLegacyVue26Vm(vm) ? LegacyNodesRenderer : NodeRenderer
+})
 </script>
 
 <template>
@@ -68,7 +75,8 @@ const bodyRows = computed(() => props.node.rows ?? [])
                   : 'text-left',
             ]"
           >
-            <NodeRenderer
+            <component
+              :is="nestedRenderer"
               :nodes="cell.children"
               :index-key="`table-th-${props.indexKey}`"
               :custom-id="props.customId"
@@ -98,7 +106,8 @@ const bodyRows = computed(() => props.node.rows ?? [])
             ]"
             dir="auto"
           >
-            <NodeRenderer
+            <component
+              :is="nestedRenderer"
               :nodes="cell.children"
               :index-key="`table-td-${props.indexKey}`"
               :custom-id="props.customId"

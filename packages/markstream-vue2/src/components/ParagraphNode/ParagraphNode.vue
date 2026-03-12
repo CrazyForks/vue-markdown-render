@@ -21,7 +21,6 @@ import StrongNode from '../StrongNode'
 import SubscriptNode from '../SubscriptNode'
 import SuperscriptNode from '../SuperscriptNode'
 
-// Define the type for the node children
 interface NodeChild {
   type: string
   raw: string
@@ -37,6 +36,7 @@ const props = defineProps<{
   customId?: string
   indexKey?: number | string
 }>()
+
 const overrides = getCustomNodeComponents(props.customId)
 
 const nodeComponents = {
@@ -62,29 +62,32 @@ const nodeComponents = {
   footnote_reference: FootnoteReferenceNode,
   ...overrides,
 }
+
 const katexReady = useKatexReady()
 </script>
 
 <template>
   <p dir="auto" class="paragraph-node">
-    <template v-for="(child, index) in node.children">
+    <span
+      v-for="(child, index) in node.children"
+      :key="`${indexKey || 'paragraph'}-${index}`"
+      class="paragraph-child"
+    >
       <component
         :is="nodeComponents[child.type]"
-        v-if="child.type !== 'text'"
-        :key="`${indexKey || 'paragraph'}-${index}`"
+        v-if="child.type !== 'text' && nodeComponents[child.type]"
         :node="child"
-        :index-key="`${indexKey}-${index}`"
+        :index-key="`${indexKey ?? 'paragraph'}-${index}`"
         :custom-id="props.customId"
       />
       <span
         v-else
-        :key="`${indexKey || 'paragraph'}-${index}`"
         :class="[katexReady && child.center ? 'text-node-center' : '']"
         class="whitespace-pre-wrap break-words text-node"
       >
-        {{ child.content }}
+        {{ child.content || child.raw || '' }}
       </span>
-    </template>
+    </span>
   </p>
 </template>
 
@@ -94,6 +97,9 @@ const katexReady = useKatexReady()
 }
 li .paragraph-node{
   margin: 0;
+}
+.paragraph-child {
+  display: contents;
 }
 .text-node {
   display: inline;

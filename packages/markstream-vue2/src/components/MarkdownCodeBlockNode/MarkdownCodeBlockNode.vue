@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { getLanguageIcon, languageIconsRevision, languageMap } from '../../utils'
+import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier } from '../../utils'
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -28,14 +28,16 @@ const props = defineProps({
 const emits = defineEmits(['previewCode', 'copy'])
 const { t } = useSafeI18n()
 
-const codeLanguage = ref<string>(String(props.node.language ?? ''))
+const codeLanguage = ref<string>(normalizeLanguageIdentifier(String(props.node.language ?? '')))
 const copyText = ref(false)
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
+const container = ref<HTMLElement | null>(null)
 const codeBlockContent = ref<HTMLElement | null>(null)
 const rendererTarget = ref<HTMLElement | null>(null)
 const fallbackHtml = ref('')
 const rendererReady = ref(false)
+const hasStableRender = ref(false)
 let renderObserver: MutationObserver | undefined
 
 // Auto-scroll state management
@@ -58,6 +60,8 @@ const fontBaselineReady = computed(() => {
 // 计算用于显示的语言名称
 const displayLanguage = computed(() => {
   const lang = codeLanguage.value.trim().toLowerCase()
+  if (!lang)
+    return languageMap[''] || 'Plain Text'
   return languageMap[lang] || lang.charAt(0).toUpperCase() + lang.slice(1)
 })
 
@@ -103,6 +107,78 @@ function getPreferredColorScheme() {
   return props.isDark ? props.darkTheme : props.lightTheme
 }
 
+function getResolvedThemes() {
+  return props.themes as string[] | undefined
+}
+
+function getColorChannels(color: string) {
+  const match = color.match(/\d+(\.\d+)?/g)
+  if (!match || match.length < 3)
+    return null
+  return match.slice(0, 3).map(Number) as [number, number, number]
+}
+
+function getRelativeLuminance(color: string) {
+  const channels = getColorChannels(color)
+  if (!channels)
+    return null
+  const normalized = channels.map((channel) => {
+    const value = channel / 255
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * normalized[0] + 0.7152 * normalized[1] + 0.0722 * normalized[2]
+}
+
+function getContrastRatio(foreground: string, background: string) {
+  const fg = getRelativeLuminance(foreground)
+  const bg = getRelativeLuminance(background)
+  if (fg == null || bg == null)
+    return null
+  const lighter = Math.max(fg, bg)
+  const darker = Math.min(fg, bg)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+function isDarkBackgroundColor(color: string) {
+  const channels = getColorChannels(color)
+  if (!channels)
+    return props.isDark
+  const [r, g, b] = channels
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  return luminance < 140
+}
+
+function syncRenderedCssVars() {
+  if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function')
+    return
+  const rootEl = container.value
+  const target = rendererTarget.value
+  if (!rootEl || !target)
+    return
+
+  const preEl = (target.querySelector('.shiki') || target.querySelector('pre')) as HTMLElement | null
+  if (!preEl)
+    return
+
+  const preStyles = window.getComputedStyle(preEl)
+  const codeEl = (preEl.querySelector('code') || preEl) as HTMLElement
+  const codeStyles = window.getComputedStyle(codeEl)
+  const bg = String(preStyles.backgroundColor || '').trim()
+  const detectedFg = String(codeStyles.color || preStyles.color || '').trim()
+
+  if (bg)
+    rootEl.style.setProperty('--vscode-editor-background', bg)
+
+  const darkBg = bg ? isDarkBackgroundColor(bg) : props.isDark
+  const fallbackFg = darkBg ? 'rgb(229, 231, 235)' : 'rgb(17, 24, 39)'
+  const resolvedFg = bg && detectedFg && (getContrastRatio(detectedFg, bg) ?? 0) >= 3
+    ? detectedFg
+    : fallbackFg
+  rootEl.style.setProperty('--vscode-editor-foreground', resolvedFg)
+  rootEl.style.setProperty('--markstream-code-fallback-selection-bg', darkBg ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)')
+  rootEl.style.setProperty('--vscode-editor-selectionBackground', `var(--markstream-code-fallback-selection-bg)`)
+}
+
 function escapeHtml(str: string) {
   return str
     .replace(/&/g, '&amp;')
@@ -112,12 +188,18 @@ function escapeHtml(str: string) {
     .replace(/'/g, '&#39;')
 }
 
-function renderFallback(code: string) {
+function renderFallback(code: string, force = false) {
   renderObserver?.disconnect()
   renderObserver = undefined
+  if (!force && hasStableRender.value) {
+    fallbackHtml.value = ''
+    rendererReady.value = true
+    return
+  }
   if (!code) {
     fallbackHtml.value = ''
     rendererReady.value = false
+    hasStableRender.value = false
     return
   }
   fallbackHtml.value = `<pre class="shiki shiki-fallback"><code>${escapeHtml(code)}</code></pre>`
@@ -125,6 +207,19 @@ function renderFallback(code: string) {
 }
 
 function clearFallback() {
+  fallbackHtml.value = ''
+  rendererReady.value = true
+  hasStableRender.value = true
+  void nextTick().then(() => {
+    syncRenderedCssVars()
+  })
+}
+
+function keepLastSuccessfulRender() {
+  renderObserver?.disconnect()
+  renderObserver = undefined
+  if (!hasStableRender.value)
+    return
   fallbackHtml.value = ''
   rendererReady.value = true
 }
@@ -175,8 +270,7 @@ const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
 
 function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) {
-  const [baseToken] = String(rawLang ?? '').split(':')
-  const normalized = baseToken?.trim().toLowerCase() ?? ''
+  const normalized = normalizeLanguageIdentifier(String(rawLang ?? ''))
   if (!normalized)
     return 'plaintext'
   if (!registeredHighlightLanguages || registeredHighlightLanguages.has(normalized))
@@ -190,10 +284,11 @@ function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) 
 
 async function updateRendererWithFallback(code: string, rawLang?: string | null) {
   if (!renderer)
-    return
+    return false
   const normalized = normalizeRendererLanguage(rawLang, Boolean(code && code.length))
   try {
     await renderer.updateCode(code, normalized)
+    return true
   }
   catch (err) {
     if (normalized !== 'plaintext') {
@@ -201,11 +296,20 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null)
         warnedRendererErrors.add(normalized)
         console.warn(`[MarkdownCodeBlockNode] Failed to render language "${normalized}", retrying as plaintext.`, err)
       }
-      await renderer.updateCode(code, 'plaintext')
+      try {
+        await renderer.updateCode(code, 'plaintext')
+        return true
+      }
+      catch (plainErr) {
+        if (isDevEnv)
+          console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', plainErr)
+        return false
+      }
     }
     else if (isDevEnv) {
       console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', err)
     }
+    return false
   }
 }
 async function ensureStreamMarkdownLoaded() {
@@ -217,7 +321,7 @@ async function ensureStreamMarkdownLoaded() {
     registerHighlight = mod.registerHighlight
     const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
     registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
-    registerHighlight?.({ themes: props.themes })
+    registerHighlight?.({ themes: getResolvedThemes() })
   }
   catch (e) {
     // stream-markdown is an optional peer; if missing, silently skip highlighting
@@ -229,32 +333,40 @@ async function initRenderer() {
   await ensureStreamMarkdownLoaded()
 
   if (!codeBlockContent.value || !rendererTarget.value) {
-    renderFallback(props.node.code)
+    renderFallback(props.node.code, true)
     return
   }
 
-  registerHighlight?.({ themes: props.themes })
+  registerHighlight?.({ themes: getResolvedThemes() })
 
   if (!renderer && createShikiRenderer) {
     renderer = createShikiRenderer(rendererTarget.value, {
       theme: getPreferredColorScheme(),
+      themes: getResolvedThemes(),
     })
     rendererReady.value = true
   }
 
   if (!renderer) {
-    renderFallback(props.node.code)
+    renderFallback(props.node.code, true)
     return
   }
 
   if (props.stream === false && props.loading) {
-    renderFallback(props.node.code)
+    renderFallback(props.node.code, !hasStableRender.value)
     return
   }
 
-  renderFallback(props.node.code)
-  await updateRendererWithFallback(props.node.code, codeLanguage.value)
-  await clearFallbackWhenRendererReady()
+  renderFallback(props.node.code, !hasStableRender.value)
+  const updated = await updateRendererWithFallback(props.node.code, codeLanguage.value)
+  if (!updated) {
+    keepLastSuccessfulRender()
+    return
+  }
+  if (hasStableRender.value)
+    keepLastSuccessfulRender()
+  else
+    await clearFallbackWhenRendererReady()
 }
 initRenderer()
 onMounted(() => {
@@ -267,7 +379,7 @@ onBeforeUnmount(() => {
 
 watch(() => props.themes, async () => {
   if (registerHighlight)
-    registerHighlight({ themes: props.themes })
+    registerHighlight({ themes: getResolvedThemes() })
 })
 
 watch(() => props.loading, (loading) => {
@@ -282,15 +394,26 @@ watch(tooltipsEnabled, (enabled) => {
 })
 
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
-  if (lang !== codeLanguage.value)
-    codeLanguage.value = lang.trim()
+  const normalizedLang = normalizeLanguageIdentifier(String(lang ?? ''))
+  if (normalizedLang !== codeLanguage.value)
+    codeLanguage.value = normalizedLang
   if (!codeBlockContent.value || !rendererTarget.value) {
-    renderFallback(code)
+    renderFallback(code, true)
+    return
+  }
+
+  if (!code) {
+    renderObserver?.disconnect()
+    renderObserver = undefined
+    rendererTarget.value.innerHTML = ''
+    fallbackHtml.value = ''
+    rendererReady.value = false
+    hasStableRender.value = false
     return
   }
 
   if (!renderer) {
-    renderFallback(code)
+    renderFallback(code, !hasStableRender.value)
     await initRenderer()
   }
   if (!renderer || !code)
@@ -299,9 +422,16 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   if (props.stream === false && props.loading)
     return
 
-  renderFallback(code)
-  await updateRendererWithFallback(code, lang)
-  await clearFallbackWhenRendererReady()
+  renderFallback(code, !hasStableRender.value)
+  const updated = await updateRendererWithFallback(code, normalizedLang)
+  if (!updated) {
+    keepLastSuccessfulRender()
+    return
+  }
+  if (hasStableRender.value)
+    keepLastSuccessfulRender()
+  else
+    await clearFallbackWhenRendererReady()
 })
 
 watch(
@@ -311,7 +441,8 @@ watch(
       return
     if (!renderer)
       await initRenderer()
-    renderer?.setTheme(getPreferredColorScheme())
+    await renderer?.setTheme(getPreferredColorScheme())
+    syncRenderedCssVars()
   },
 )
 
@@ -465,7 +596,7 @@ function previewCode() {
   if (!isPreviewable.value)
     return
 
-  const lowerLang = (codeLanguage.value || props.node.language).toLowerCase()
+  const lowerLang = normalizeLanguageIdentifier(String(codeLanguage.value || props.node.language)).toLowerCase()
   const artifactType = lowerLang === 'html' ? 'text/html' : 'image/svg+xml'
   const artifactTitle
     = lowerLang === 'html'
@@ -482,20 +613,25 @@ function previewCode() {
 
 <template>
   <div
-    :style="containerStyle"
+    ref="container"
+    :style="{
+      ...containerStyle,
+      backgroundColor: 'var(--vscode-editor-background, var(--markstream-code-fallback-bg))',
+      color: 'var(--vscode-editor-foreground, var(--markstream-code-fallback-fg))',
+    }"
     class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     :class="[props.isDark ? 'border-gray-700/30 bg-gray-900' : 'border-gray-200 bg-white', props.isDark ? 'is-dark' : '']"
   >
     <div
       v-if="props.showHeader"
       class="code-block-header flex justify-between items-center px-4 py-2.5 border-b border-gray-400/5"
-      style="color: var(--vscode-editor-foreground);background-color: var(--vscode-editor-background);"
+      style="color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg));background-color: var(--vscode-editor-background, var(--markstream-code-fallback-bg));"
     >
       <!-- left slot / fallback language label -->
       <slot name="header-left">
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-2 flex-1 overflow-hidden">
           <span class="icon-slot h-4 w-4 flex-shrink-0" v-html="languageIcon" />
-          <span class="text-sm font-medium font-mono">{{ displayLanguage }}</span>
+          <span class="text-sm font-medium font-mono truncate">{{ displayLanguage }}</span>
         </div>
       </slot>
 
@@ -629,6 +765,16 @@ function previewCode() {
   /* 新增：显著减少离屏 codeblock 的布局/绘制与样式计算 */
   content-visibility: auto;
   contain-intrinsic-size: 320px 180px;
+  --markstream-code-fallback-bg: #ffffff;
+  --markstream-code-fallback-fg: #111827;
+  --markstream-code-fallback-selection-bg: rgba(0, 0, 0, 0.06);
+  --vscode-editor-selectionBackground: var(--markstream-code-fallback-selection-bg);
+}
+
+.code-block-container.is-dark {
+  --markstream-code-fallback-bg: #111827;
+  --markstream-code-fallback-fg: #e5e7eb;
+  --markstream-code-fallback-selection-bg: rgba(255, 255, 255, 0.08);
 }
 
 .code-block-content {
@@ -648,6 +794,8 @@ function previewCode() {
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
+  margin-top: 0;
+  padding-top:0;
 }
 
 .code-block-container ::v-deep .code-block-content .shiki-fallback {
@@ -672,6 +820,7 @@ function previewCode() {
 }
 
 .code-block-container ::v-deep .code-block-content pre {
+  margin: 0;
   padding: 1rem;
 }
 

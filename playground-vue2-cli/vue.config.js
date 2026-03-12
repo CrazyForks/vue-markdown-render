@@ -65,6 +65,10 @@ function setAliasIfExists(alias, key, filePath) {
 const markstreamVue2Root = resolvePackageRoot('markstream-vue2')
 const streamMonacoRoot = resolvePackageRoot('stream-monaco')
 const streamMarkdownRoot = resolvePackageRoot('stream-markdown') || resolveNodeModulesPackageRoot('stream-markdown')
+const floatingUiDomEntry = tryResolve('@floating-ui/dom')
+const floatingUiDomRoot = resolvePackageRoot('@floating-ui/dom')
+const floatingUiCoreRoot = resolveSiblingPackagePath(floatingUiDomRoot, 'core')
+const floatingUiUtilsRoot = resolveSiblingPackagePath(floatingUiDomRoot, 'utils')
 // `monaco-editor` does not provide a Node `main` entry, so `require.resolve('monaco-editor')`
 // fails even when it is installed. Resolve it via the `stream-monaco` peer location instead.
 const monacoEditorRoot = resolveSiblingPackagePath(streamMonacoRoot, 'monaco-editor')
@@ -130,6 +134,17 @@ setAliasIfExists(alias, 'markstream-vue2/index.css', markstreamVue2Root ? path.j
 setAliasIfExists(alias, 'markstream-vue2/index.tailwind.css', markstreamVue2Root ? path.join(markstreamVue2Root, 'dist/index.tailwind.css') : null)
 setAliasIfExists(alias, 'markstream-vue2/workers/katexRenderer.worker', markstreamVue2Root ? path.join(markstreamVue2Root, 'dist/workers/katexRenderer.worker.js') : null)
 setAliasIfExists(alias, 'markstream-vue2/workers/mermaidParser.worker', markstreamVue2Root ? path.join(markstreamVue2Root, 'dist/workers/mermaidParser.worker.js') : null)
+
+// Force Floating UI to CJS/UMD-compatible entries. Webpack 4 + pnpm otherwise
+// follows the ESM build into symlinked package internals and misses peer deps.
+setAliasIfExists(alias, '@floating-ui/dom$', floatingUiDomEntry)
+setAliasIfExists(alias, '@floating-ui/core$', floatingUiCoreRoot ? path.join(floatingUiCoreRoot, 'dist/floating-ui.core.umd.js') : null)
+setAliasIfExists(alias, '@floating-ui/utils$', floatingUiUtilsRoot ? path.join(floatingUiUtilsRoot, 'dist/floating-ui.utils.umd.js') : null)
+setAliasIfExists(alias, '@floating-ui/utils/dom$', floatingUiUtilsRoot ? path.join(floatingUiUtilsRoot, 'dom/floating-ui.utils.dom.umd.js') : null)
+
+// The CLI demo does not need the full D2 runtime. Use a tiny shim so the
+// optional peer still degrades to source view instead of failing the build.
+setAliasIfExists(alias, '@terrastruct/d2$', path.resolve(__dirname, 'shims/optional-d2.cjs'))
 
 // Webpack 4 doesn't support `package.json#exports`, so subpath imports like
 // `stream-monaco/legacy` won't resolve. Map them to real files in `dist/`.

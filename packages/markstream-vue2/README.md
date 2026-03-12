@@ -174,6 +174,64 @@ Fix: align both to the same version (e.g. `2.6.14` or `2.7.16`).
 Cause: Vue 2.6 + Composition API missing `_setupProxy` patch, or plugin not installed.
 Fix: ensure `@vue/composition-api` is installed + `Vue.use(...)`, and update to the latest markstream-vue2 build.
 
+### Custom node renders trigger `infinite update loop`
+Cause: in Vue 2.6 / Vue CLI 4, recursively mounting another `MarkdownRender` inside a custom node component can create a render loop when the parent renderer is still streaming.
+Fix: prefer `NestedRenderer` for nested streaming content. If you only need static HTML output, `renderNestedMarkdownToHtml(...)` is still available.
+
+```ts
+import { NestedRenderer } from 'markstream-vue2'
+
+export default {
+  components: { NestedRenderer },
+  props: {
+    node: { type: Object, required: true },
+  },
+}
+```
+
+```vue
+<template>
+  <NestedRenderer
+    :node="node"
+    custom-id="chat-demo"
+    :custom-html-tags="['thinking']"
+    :typewriter="false"
+    :batch-rendering="false"
+    :viewport-priority="false"
+    :defer-nodes-until-visible="false"
+  />
+</template>
+```
+
+`NestedRenderer` keeps the inner content streamable, but switches the nested renderer to the `nodes` path so Vue 2.6 does not recurse through a second `content`-driven renderer.
+
+If you cannot mount another renderer and just need a static nested body, use `renderNestedMarkdownToHtml(...)`:
+
+```ts
+import { renderNestedMarkdownToHtml } from 'markstream-vue2'
+
+export default {
+  props: {
+    node: { type: Object, required: true },
+  },
+  computed: {
+    renderedHtml() {
+      return renderNestedMarkdownToHtml(
+        { node: this.node },
+        {
+          customHtmlTags: ['thinking'],
+          customNodeClass(node) {
+            return node.type === 'thinking' ? 'thinking-node__nested' : ''
+          },
+        },
+      )
+    },
+  },
+}
+```
+
+This keeps deeply nested custom content streamable without recursively mounting a second `content`-driven `MarkdownRender` / `NodeRenderer`.
+
 ## Tailwind
 
 If your app uses Tailwind and you want to avoid shipping duplicated utility CSS, import the Tailwind-ready output instead:

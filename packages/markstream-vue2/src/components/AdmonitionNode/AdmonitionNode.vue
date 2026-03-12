@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue-demi'
+import { computed, getCurrentInstance, ref } from 'vue-demi'
+import { isLegacyVue26Vm } from '../../utils/vue26'
 import NodeRenderer from '../NodeRenderer'
+import LegacyNodesRenderer from '../NodeRenderer/LegacyNodesRenderer.vue'
 
 // 定义警告块节点类型
 export type AdmonitionKind = 'note' | 'info' | 'tip' | 'warning' | 'danger' | 'caution' | 'error'
@@ -52,6 +54,11 @@ function toggleCollapse() {
 
 // 为无障碍生成 ID（用于 aria-labelledby）
 const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
+const instance = getCurrentInstance()
+const nestedRenderer = computed(() => {
+  const vm = instance?.proxy as any
+  return isLegacyVue26Vm(vm) ? LegacyNodesRenderer : NodeRenderer
+})
 </script>
 
 <template>
@@ -80,7 +87,8 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
       class="admonition-content"
       :aria-labelledby="headerId"
     >
-      <NodeRenderer
+      <component
+        :is="nestedRenderer"
         :index-key="`admonition-${indexKey}`"
         :nodes="props.node.children"
         :custom-id="props.customId"

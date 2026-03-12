@@ -123,6 +123,7 @@ export interface MathBlockNodeProps {
     raw: string
     loading?: boolean
   }
+  indexKey?: number | string
 }
 
 export interface MathInlineNodeProps {
@@ -133,6 +134,7 @@ export interface MathInlineNodeProps {
     loading?: boolean
     markup?: string
   }
+  indexKey?: number | string
 }
 
 export interface InfographicBlockNodeProps {
