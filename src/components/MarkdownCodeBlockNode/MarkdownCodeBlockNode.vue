@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { getLanguageIcon, languageIconsRevision, languageMap } from '../../utils'
+import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier } from '../../utils'
 
 const props = withDefaults(
   defineProps<{
@@ -65,7 +65,7 @@ const props = withDefaults(
 const emits = defineEmits(['previewCode', 'copy'])
 const { t } = useSafeI18n()
 
-const codeLanguage = ref<string>(String(props.node.language ?? ''))
+const codeLanguage = ref<string>(normalizeLanguageIdentifier(props.node.language))
 const copyText = ref(false)
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
@@ -319,8 +319,9 @@ watch(tooltipsEnabled, (enabled) => {
 })
 
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
-  if (lang !== codeLanguage.value)
-    codeLanguage.value = lang.trim()
+  const normalizedLang = normalizeLanguageIdentifier(lang)
+  if (normalizedLang !== codeLanguage.value)
+    codeLanguage.value = normalizedLang
   if (!codeBlockContent.value || !rendererTarget.value) {
     renderFallback(code)
     return
