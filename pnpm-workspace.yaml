@@ -1,5 +1,6 @@
 packages:
   - playground
+  - playground-angular
   - playground-vue2
   - playground-vue2-cli
   - playground-nuxt

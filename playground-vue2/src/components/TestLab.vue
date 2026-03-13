@@ -1,113 +1,11 @@
 <script>
 import MarkdownRender from 'markstream-vue2'
+import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
 import { decodeMarkdownHash, resolveFrameworkTestHref } from '../../../playground-shared/testPageState'
 
 const CURRENT_FRAMEWORK = 'vue2'
-
-const frameworkCards = Object.freeze([
-  {
-    id: 'vue3',
-    label: 'Vue 3',
-    note: '主 playground',
-    origin: 'https://markstream-vue.simonhe.me',
-    localPort: null,
-  },
-  {
-    id: 'vue2',
-    label: 'Vue 2',
-    note: '当前 test page',
-    origin: 'https://markstream-vue2.pages.dev',
-    localPort: 3334,
-  },
-  {
-    id: 'react',
-    label: 'React',
-    note: '跨框架对照',
-    origin: 'https://markstream-react.pages.dev',
-    localPort: 4174,
-  },
-])
-
-const sampleCards = Object.freeze([
-  {
-    id: 'baseline',
-    title: '基础回归',
-    summary: '标题、数学、Mermaid 和代码块一起测。',
-    content: `# Vue 2 Test Page
-
-用同一份 markdown 和 Vue 3 / React 做对照，快速查兼容问题。
-
-## 基础格式
-
-- **Bold**
-- *Italic*
-- \`inline code\`
-
-## 数学
-
-行内：$a^2 + b^2 = c^2$
-
-## Mermaid
-
-\`\`\`mermaid
-flowchart LR
-  Input --> Parse --> Render
-\`\`\`
-
-## Code
-
-\`\`\`js
-export function helloVue2() {
-  return 'markstream-vue2 /test ready'
-}
-\`\`\`
-`,
-  },
-  {
-    id: 'diff',
-    title: 'Diff',
-    summary: '更适合观察代码块流和折叠变化。',
-    content: `# Diff Regression
-
-\`\`\`diff
---- before.ts
-+++ after.ts
-@@ -1,4 +1,8 @@
--export const value = 1
-+export const value = 2
-+export const status = 'updated'
-\`\`\`
-
-\`\`\`ts
-export const framework = 'vue2'
-export const route = '/test'
-\`\`\`
-`,
-  },
-  {
-    id: 'stress',
-    title: '结构压力',
-    summary: '列表、表格和引用一起看。',
-    content: `# Structural Stress
-
-> 观察 streaming 中间态是否稳定。
-
-## 列表
-
-1. 第一层
-   - 第二层
-     - 第三层
-
-## 表格
-
-| Item | Check |
-| --- | --- |
-| Vue 2 | /test |
-| Vue 3 | /test |
-| React | /test |
-`,
-  },
-])
+const frameworkCards = Object.freeze(TEST_LAB_FRAMEWORKS)
+const sampleCards = Object.freeze(TEST_LAB_SAMPLES)
 
 export default {
   name: 'Vue2TestLab',
@@ -233,7 +131,7 @@ export default {
           <span class="eyebrow">Vue 2 Compatibility Lab</span>
           <h1>markstream-vue2 /test</h1>
           <p>
-            专门用来和 Vue 3、React 的 test page 做横向对照，检查兼容层是否出现偏差。
+            专门用来和 Vue 3、React、Angular 的 test page 做横向对照，检查兼容层是否出现偏差。
           </p>
         </div>
 
@@ -469,7 +367,7 @@ export default {
 
 .framework-switcher {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 

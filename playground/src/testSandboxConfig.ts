@@ -36,6 +36,14 @@ export const testSandboxFrameworks: ReadonlyArray<SandboxFrameworkTarget> = [
     runtimeVersion: '19.2.4',
     supportsWorkspace: false,
   },
+  {
+    id: 'angular',
+    label: 'Angular',
+    packageName: 'markstream-angular',
+    defaultVersion: '0.0.1-alpha.0',
+    runtimeVersion: '20.3.18',
+    supportsWorkspace: true,
+  },
 ] as const
 
 export function getTestSandboxFramework(id: string | null | undefined) {
