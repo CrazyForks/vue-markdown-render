@@ -81,7 +81,7 @@ Example:
 
 ## Code block header controls
 
-Pass these props directly to `CodeBlockNode` / `MarkdownCodeBlockNode`, or globally via `code-block-props` on `MarkdownRender`:
+Pass these props directly to `CodeBlockNode` / `MarkdownCodeBlockNode / MermaidBlockNode`, or globally via `code-block-props` on `MarkdownRender`:
 
 - `show-header`
 - `show-copy-button`
@@ -89,7 +89,7 @@ Pass these props directly to `CodeBlockNode` / `MarkdownCodeBlockNode`, or globa
 - `show-preview-button`
 - `show-collapse-button`
 - `show-font-size-buttons`
-- `show-tooltips` (global tooltip switch for `LinkNode` + code-block nodes)
+- `show-tooltips` (global tooltip switch for `LinkNode` + code-block nodes + mermaid-block nodes)
 
 See `/guide/codeblock-header` and the `CodeBlockNode` types for the exhaustive list.
 

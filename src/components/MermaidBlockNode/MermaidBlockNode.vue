@@ -36,6 +36,7 @@ const props = withDefaults(
     showZoomControls: true,
     enableWheelZoom: false,
     isStrict: false,
+    showTooltips: true
   },
 )
 
@@ -495,6 +496,8 @@ function shouldSkipEventTarget(el: EventTarget | null) {
   return !btn || (btn as HTMLButtonElement).disabled
 }
 function onBtnHover(e: Event, text: string, place: TooltipPlacement = 'top') {
+  if (!tooltipsEnabled.value)
+    return
   if (shouldSkipEventTarget(e.currentTarget))
     return
   const ev = e as MouseEvent
@@ -502,9 +505,13 @@ function onBtnHover(e: Event, text: string, place: TooltipPlacement = 'top') {
   showTooltipForAnchor(e.currentTarget as HTMLElement, text, place, false, origin, props.isDark)
 }
 function onBtnLeave() {
+  if (!tooltipsEnabled.value)
+    return
   hideTooltip()
 }
 function onCopyHover(e: Event) {
+  if (!tooltipsEnabled.value)
+    return
   if (shouldSkipEventTarget(e.currentTarget))
     return
   const txt = copyText.value ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')
@@ -929,6 +936,8 @@ function handleWheel(event: WheelEvent) {
   }
 }
 
+const tooltipsEnabled = computed(() => props.showTooltips !== false)
+
 // Copy functionality
 async function copy() {
   try {
@@ -957,6 +966,11 @@ async function copy() {
     console.error('Failed to copy:', err)
   }
 }
+
+watch(tooltipsEnabled, (enabled) => {
+  if (!enabled)
+    hideTooltip()
+})
 
 // Export SVG
 async function exportSvg(svgElement, svgString = null) {
