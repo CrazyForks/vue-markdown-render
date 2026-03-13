@@ -409,11 +409,14 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       // regular text like "(0 <= t < S-1)", causing false math detection.
     ]
 
-    let searchPos = 0
-    let preMathPos = 0
-    // Save the initial position so $$ can scan from the beginning
-    // even after $ rule has advanced s.pos
-    const initialPos = s.pos
+    const pending = String(s.pending ?? '')
+    const currentStart = Math.max(0, s.pos - pending.length)
+    let searchPos = currentStart
+    let preMathPos = currentStart
+    // Save the initial unconsumed position so $$ can rescan the current
+    // inline segment even after $ handling advances the cursor. Starting
+    // from absolute 0 can duplicate already-emitted text after hardbreaks.
+    const initialPos = currentStart
     // use findMatchingClose from util
     for (const [open, close] of delimiters) {
       // We'll scan the entire inline source and tokenize all occurrences
