@@ -9,7 +9,7 @@
 - `maxHeight?: string | null` — maximum height
 - `isStrict?: boolean` — run Mermaid in `securityLevel: 'strict'` with DOMPurify + HTML-label hardening; use this when rendering untrusted diagrams to strip inline scripts/`javascript:` URLs that could otherwise leak into the SVG
 - Header / control props (all optional, default `true`):
-  - `showHeader`, `showModeToggle`, `showCopyButton`, `showExportButton`, `showFullscreenButton`, `showCollapseButton`, `showZoomControls`
+  - `showHeader`, `showModeToggle`, `showCopyButton`, `showExportButton`, `showFullscreenButton`, `showCollapseButton`, `showZoomControls`, `showTooltips`
 - `enableWheelZoom?: boolean` — enable Ctrl/Cmd + wheel zoom in the canvas (default `false`)
 - Timeouts (ms): `workerTimeoutMs`, `parseTimeoutMs`, `renderTimeoutMs`, `fullRenderTimeoutMs` (defaults: `1400/1800/2500/4000`)
 - Streaming tuning: `renderDebounceMs`, `contentStableDelayMs`, `previewPollDelayMs`, `previewPollMaxDelayMs`, `previewPollMaxAttempts`

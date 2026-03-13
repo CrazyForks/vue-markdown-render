@@ -240,6 +240,7 @@ Troubleshooting:
 - **Peer**: `mermaid` ≥ 11 (tree-shakable ESM build recommended).
 - **CSS**: no extra Mermaid CSS import is required; keep `markstream-vue/index.css` after your reset.
 - **Props**: `node`, `isDark`, `isStrict`, `maxHeight`, timeouts, header/button toggles, `enableWheelZoom`.
+- **Tooltip control**: `showTooltips` defaults to `true`; set `false` to disable header action tooltips.
 - **Emits**: `copy`, `export`, `openModal`, `toggleMode` (call `ev.preventDefault()` to stop the default action).
 
 ### Usage

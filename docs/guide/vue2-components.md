@@ -298,6 +298,9 @@ export default {
 
 Progressive Mermaid diagram rendering.
 
+#### Quick reference
+- **Tooltip control**: `showTooltips` defaults to `true`; set `false` to disable header action tooltips.
+
 ```vue
 <script>
 import { MermaidBlockNode } from 'markstream-vue2'
@@ -332,6 +335,7 @@ export default {
       :render-debounce-ms="180"
       :preview-poll-delay-ms="500"
       @export="onExport"
+      :showTooltips="true"
     />
   </div>
 </template>

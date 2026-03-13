@@ -239,6 +239,7 @@ const node = {
 ### 快速要点
 - **依赖**：`mermaid` ≥ 11（推荐 ESM 构建）。
 - **Props**：`node`、`isDark`、`isStrict`、`maxHeight`、超时参数、Header/按钮开关、`enableWheelZoom` 等。
+- **Tooltip 控制**：`showTooltips` 默认 `true`；设为 `false` 可关闭头部按钮 tooltip。
 - **事件**：`copy`、`export`、`openModal`、`toggleMode`（可通过 `ev.preventDefault()` 阻止默认行为）。
 
 ### 示例

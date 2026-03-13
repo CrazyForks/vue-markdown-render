@@ -81,7 +81,7 @@
 
 ## 代码块头部控制
 
-可直接传给 `CodeBlockNode` / `MarkdownCodeBlockNode`，或在 `MarkdownRender` 上用 `code-block-props` 统一下发：
+可直接传给 `CodeBlockNode` / `MarkdownCodeBlockNode` / `MermaidBlockNode`，或在 `MarkdownRender` 上用 `code-block-props` 统一下发：
 
 - `show-header`
 - `show-copy-button`
@@ -89,7 +89,7 @@
 - `show-preview-button`
 - `show-collapse-button`
 - `show-font-size-buttons`
-- `show-tooltips`（全局控制 `LinkNode` + 代码块节点的 tooltip）
+- `show-tooltips`（全局控制 `LinkNode` + 代码块节点的 tooltip + Mermaid块节点的 tooltip）
 
 更多细节请参考 `/zh/guide/codeblock-header` 及类型定义。
 

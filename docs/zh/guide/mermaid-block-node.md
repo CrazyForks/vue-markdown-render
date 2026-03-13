@@ -9,7 +9,7 @@
 - `maxHeight?: string | null` — 最大高度
 - `isStrict?: boolean` — 开启 `securityLevel: 'strict'` + DOMPurify，并禁用 HTML labels；用于渲染不可信的 Mermaid 输入（例如用户/LLM 生成的内容），防止 `<script>`、`javascript:` 链接或内联事件落入最终 SVG
 - Header/按钮控制（全部可选，默认 `true`）:
-  - `showHeader` / `showModeToggle` / `showCopyButton` / `showExportButton` / `showFullscreenButton` / `showCollapseButton` / `showZoomControls`
+  - `showHeader` / `showModeToggle` / `showCopyButton` / `showExportButton` / `showFullscreenButton` / `showCollapseButton` / `showZoomControls` / `showTooltips`
 - `enableWheelZoom?: boolean` — 开启 Ctrl/Cmd + 滚轮缩放（默认 `false`）
 - 超时（毫秒）：`workerTimeoutMs` / `parseTimeoutMs` / `renderTimeoutMs` / `fullRenderTimeoutMs`（默认 `1400/1800/2500/4000`）
 - 流式调优：`renderDebounceMs` / `contentStableDelayMs` / `previewPollDelayMs` / `previewPollMaxDelayMs` / `previewPollMaxAttempts`

@@ -245,6 +245,9 @@ function MathInline() {
 
 Progressive Mermaid diagram rendering.
 
+#### Quick reference
+- **Tooltip control**: `showTooltips` defaults to `true`; set `false` to disable header action tooltips.
+
 ```tsx
 import { MermaidBlockNode } from 'markstream-react'
 
@@ -268,6 +271,7 @@ function MermaidDiagram() {
         node={mermaidNode}
         isStrict={true}
         onExport={handleExport}
+        showTooltips={true}
       />
     </div>
   )
