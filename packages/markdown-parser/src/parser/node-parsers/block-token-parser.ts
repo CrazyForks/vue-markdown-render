@@ -156,7 +156,8 @@ function parseVmrContainer(
   }
   raw += '\n'
   if (children.length > 0) {
-    raw += children.map(c => c.raw).join('\n')
+    // Prefer original Markdown (openToken.raw); rebuilding from tokens may lose formatting.
+    raw += openToken.raw ?? children.map(c => c.raw).join('\n')
     raw += '\n'
   }
   raw += ':::'
