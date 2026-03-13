@@ -245,6 +245,9 @@ function MathInline() {
 
 渐进式 Mermaid 图表渲染。
 
+#### 快速要点
+- **Tooltip 控制**：`showTooltips` 默认 `true`；设为 `false` 可关闭头部按钮 tooltip。
+
 ```tsx
 import { MermaidBlockNode } from 'markstream-react'
 
@@ -268,6 +271,7 @@ function MermaidDiagram() {
         node={mermaidNode}
         isStrict={true}
         onExport={handleExport}
+        showTooltips={true}
       />
     </div>
   )

@@ -298,6 +298,9 @@ export default {
 
 渐进式 Mermaid 图表渲染。
 
+#### 快速要点
+- **Tooltip 控制**：`showTooltips` 默认 `true`；设为 `false` 可关闭头部按钮 tooltip。
+
 ```vue
 <script>
 import { MermaidBlockNode } from 'markstream-vue2'
