@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createMarkdownHash, decodeMarkdownHash, resolveFrameworkTestHref, withMarkdownHash } from '../playground-shared/testPageState'
+import { buildTestSandboxHref, resolveSandboxSelection } from '../playground-shared/versionSandbox'
 
 describe('playground test page state helpers', () => {
   it('round-trips markdown through hash payloads', () => {
@@ -31,5 +32,60 @@ describe('playground test page state helpers', () => {
     )
 
     expect(href).toMatch(/^http:\/\/localhost:4174\/test#data=/)
+  })
+
+  it('normalizes unsupported workspace selections to npm for version sandboxes', () => {
+    const selection = resolveSandboxSelection([
+      {
+        id: 'vue3',
+        label: 'Vue 3',
+        packageName: 'markstream-vue',
+        defaultVersion: '0.0.9-beta.0',
+        runtimeVersion: '3.5.29',
+        supportsWorkspace: true,
+      },
+      {
+        id: 'react18',
+        label: 'React 18',
+        packageName: 'markstream-react',
+        defaultVersion: '0.0.25',
+        runtimeVersion: '18.3.1',
+        supportsWorkspace: false,
+      },
+    ], {
+      frameworkId: 'react18',
+      source: 'workspace',
+      version: '0.0.24',
+    })
+
+    expect(selection.frameworkId).toBe('react18')
+    expect(selection.source).toBe('npm')
+    expect(selection.version).toBe('0.0.24')
+  })
+
+  it('builds version sandbox urls with query params and markdown hashes', () => {
+    const selection = resolveSandboxSelection([
+      {
+        id: 'vue3',
+        label: 'Vue 3',
+        packageName: 'markstream-vue',
+        defaultVersion: '0.0.9-beta.0',
+        runtimeVersion: '3.5.29',
+        supportsWorkspace: true,
+      },
+    ], {
+      frameworkId: 'vue3',
+      source: 'workspace',
+      version: '0.0.9-beta.0',
+    })
+
+    const href = buildTestSandboxHref(selection, '# sandbox content')
+    const url = new URL(href, 'https://markstream.local')
+
+    expect(url.pathname).toBe('/test-sandbox')
+    expect(url.searchParams.get('framework')).toBe('vue3')
+    expect(url.searchParams.get('source')).toBe('workspace')
+    expect(url.searchParams.get('version')).toBe('0.0.9-beta.0')
+    expect(decodeMarkdownHash(url.hash)).toBe('# sandbox content')
   })
 })

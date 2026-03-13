@@ -97,6 +97,8 @@ describe('playground /test smoke', () => {
 
     expect(wrapper.text()).toContain('Markstream Test Page')
     expect(wrapper.text()).toContain('Cross-framework regression lab')
+    expect(wrapper.text()).toContain('版本沙箱')
+    expect(wrapper.get('iframe').attributes('src')).toContain('/test-sandbox?framework=vue3')
 
     wrapper.unmount()
   })

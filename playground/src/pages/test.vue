@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { useLocalStorage } from '@vueuse/core'
+import { useDebounceFn, useLocalStorage } from '@vueuse/core'
 import { computed, onMounted, ref, watch } from 'vue'
 import { decodeMarkdownHash, encodeMarkdownPayload, resolveFrameworkTestHref, withMarkdownHash } from '../../../playground-shared/testPageState'
+import {
+  buildTestSandboxHref,
+  normalizeSandboxSource,
+  resolveSandboxSelection,
+  type SandboxFrameworkId,
+  type SandboxRenderSource,
+} from '../../../playground-shared/versionSandbox'
 import CodeBlockNode from '../../../src/components/CodeBlockNode'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
 import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
@@ -15,6 +22,7 @@ import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
 import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
 import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
 import 'katex/dist/katex.min.css'
+import { testSandboxFrameworks } from '../testSandboxConfig'
 
 type SampleId = 'baseline' | 'diff' | 'stress'
 type FrameworkId = 'vue3' | 'vue2' | 'react'
@@ -253,9 +261,71 @@ const renderModeLabel = computed(() => {
 const charCount = computed(() => input.value.length)
 const lineCount = computed(() => (input.value ? input.value.split('\n').length : 0))
 
+const sandboxFrameworkId = useLocalStorage<SandboxFrameworkId>('vmr-test-sandbox-framework', 'vue3')
+const sandboxSource = useLocalStorage<SandboxRenderSource>('vmr-test-sandbox-source', 'workspace')
+const sandboxVersion = useLocalStorage<string>('vmr-test-sandbox-version', testSandboxFrameworks[0].defaultVersion)
+const sandboxAutoSync = useLocalStorage<boolean>('vmr-test-sandbox-auto-sync', false)
+const sandboxSnapshot = ref<string>(sampleCards[0].content)
+const sandboxFrameKey = ref(0)
+
+const activeSandbox = computed(() => resolveSandboxSelection(testSandboxFrameworks, {
+  frameworkId: sandboxFrameworkId.value,
+  source: sandboxSource.value,
+  version: sandboxVersion.value,
+}))
+const activeSandboxFramework = computed(() => activeSandbox.value.framework)
+const sandboxHref = computed(() => buildTestSandboxHref(activeSandbox.value, sandboxSnapshot.value))
+const sandboxDirty = computed(() => sandboxSnapshot.value !== input.value)
+const sandboxQuickVersions = computed(() => Array.from(new Set([
+  activeSandboxFramework.value.defaultVersion,
+  'latest',
+])))
+const sandboxVersionPlaceholder = computed(() => `例如 ${activeSandboxFramework.value.defaultVersion} 或 latest`)
+const sandboxPackageLabel = computed(() => {
+  if (activeSandbox.value.source === 'workspace')
+    return `${activeSandboxFramework.value.packageName} (workspace)`
+  return `${activeSandboxFramework.value.packageName}@${activeSandbox.value.version}`
+})
+const sandboxRuntimeLabel = computed(() => {
+  if (activeSandbox.value.source === 'workspace')
+    return `${activeSandboxFramework.value.label} local runtime`
+  return `${activeSandboxFramework.value.label} runtime ${activeSandboxFramework.value.runtimeVersion}`
+})
+const sandboxStatusLabel = computed(() => {
+  if (sandboxDirty.value)
+    return '待同步'
+  return '已同步'
+})
+
 function clampInt(value: number, min: number, max: number, fallback: number) {
   const normalized = Number.isFinite(value) ? Math.round(value) : fallback
   return Math.min(max, Math.max(min, normalized))
+}
+
+function syncSandbox() {
+  sandboxSnapshot.value = input.value
+  sandboxFrameKey.value += 1
+}
+
+const syncSandboxDebounced = useDebounceFn(() => {
+  syncSandbox()
+}, 420)
+
+function chooseSandboxSource(source: SandboxRenderSource) {
+  sandboxSource.value = normalizeSandboxSource(activeSandboxFramework.value, source)
+}
+
+function chooseSandboxVersion(version: string) {
+  sandboxVersion.value = version
+}
+
+function openSandboxInNewTab() {
+  try {
+    window.open(sandboxHref.value, '_blank', 'noopener')
+  }
+  catch {
+    window.location.href = sandboxHref.value
+  }
 }
 
 function basePageUrl() {
@@ -444,6 +514,7 @@ onMounted(() => {
     input.value = sample.content
   }
   shareUrl.value = basePageUrl()
+  sandboxSnapshot.value = input.value
 })
 
 watch(streamSpeed, (value) => {
@@ -463,6 +534,33 @@ watch(input, () => {
   isCopied.value = false
   if (!isStreaming.value && typeof window !== 'undefined')
     shareUrl.value = basePageUrl()
+  if (sandboxAutoSync.value)
+    syncSandboxDebounced()
+})
+
+watch(sandboxAutoSync, (enabled) => {
+  if (enabled)
+    syncSandbox()
+})
+
+watch(() => sandboxFrameworkId.value, () => {
+  const framework = testSandboxFrameworks.find(item => item.id === sandboxFrameworkId.value) ?? testSandboxFrameworks[0]
+  sandboxSource.value = normalizeSandboxSource(framework, sandboxSource.value)
+  sandboxVersion.value = framework.defaultVersion
+  syncSandboxDebounced()
+})
+
+watch(() => sandboxSource.value, (source) => {
+  const normalized = normalizeSandboxSource(activeSandboxFramework.value, source)
+  if (normalized !== source) {
+    sandboxSource.value = normalized
+    return
+  }
+  syncSandboxDebounced()
+})
+
+watch(() => sandboxVersion.value, () => {
+  syncSandboxDebounced()
 })
 
 watch(() => renderMode.value, (mode) => {
@@ -661,6 +759,105 @@ watch(mermaidEnabled, (enabled) => {
           <section class="panel-card">
             <div class="panel-card__head">
               <div>
+                <h2>版本沙箱</h2>
+                <p>指定 framework、source 和包版本，在独立 iframe 里对照渲染。</p>
+              </div>
+              <span class="mini-pill">{{ sandboxStatusLabel }}</span>
+            </div>
+
+            <div class="control-stack">
+              <label class="select-control">
+                <span>目标框架</span>
+                <select v-model="sandboxFrameworkId">
+                  <option
+                    v-for="framework in testSandboxFrameworks"
+                    :key="framework.id"
+                    :value="framework.id"
+                  >
+                    {{ framework.label }}
+                  </option>
+                </select>
+              </label>
+
+              <div class="segmented-control">
+                <button
+                  type="button"
+                  class="segmented-control__button"
+                  :class="{ 'segmented-control__button--active': activeSandbox.source === 'workspace' }"
+                  :disabled="!activeSandboxFramework.supportsWorkspace"
+                  @click="chooseSandboxSource('workspace')"
+                >
+                  workspace
+                </button>
+                <button
+                  type="button"
+                  class="segmented-control__button"
+                  :class="{ 'segmented-control__button--active': activeSandbox.source === 'npm' }"
+                  @click="chooseSandboxSource('npm')"
+                >
+                  npm
+                </button>
+              </div>
+
+              <div class="preset-list">
+                <button
+                  v-for="version in sandboxQuickVersions"
+                  :key="version"
+                  type="button"
+                  class="preset-chip"
+                  :class="{ 'preset-chip--active': sandboxVersion === version }"
+                  @click="chooseSandboxVersion(version)"
+                >
+                  {{ version }}
+                </button>
+              </div>
+
+              <label class="text-control">
+                <span>包版本</span>
+                <input
+                  v-model="sandboxVersion"
+                  type="text"
+                  :placeholder="sandboxVersionPlaceholder"
+                >
+              </label>
+
+              <label class="toggle-item">
+                <span>输入变化自动同步到 iframe</span>
+                <input v-model="sandboxAutoSync" type="checkbox">
+              </label>
+            </div>
+
+            <div class="control-actions control-actions--stacked">
+              <button type="button" class="action-button action-button--primary" @click="syncSandbox">
+                刷新沙箱
+              </button>
+              <button type="button" class="action-button" @click="openSandboxInNewTab">
+                独立打开
+              </button>
+            </div>
+
+            <div class="meta-list">
+              <div class="meta-list__row">
+                <span>渲染目标</span>
+                <strong>{{ sandboxPackageLabel }}</strong>
+              </div>
+              <div class="meta-list__row">
+                <span>运行时</span>
+                <strong>{{ sandboxRuntimeLabel }}</strong>
+              </div>
+            </div>
+
+            <div v-if="!activeSandboxFramework.supportsWorkspace" class="info-banner info-banner--info">
+              {{ activeSandboxFramework.label }} 在这个沙箱里先走 npm 包模式；本地 workspace 对照仍可用上方 framework 切页。
+            </div>
+            <div v-if="sandboxDirty" class="info-banner info-banner--warning">
+              右侧 iframe 还没同步最新输入，点“刷新沙箱”即可用当前 markdown 重载。
+            </div>
+          </section>
+
+          <section class="panel-card">
+            <div class="panel-card__head">
+              <div>
                 <h2>分享与排障</h2>
                 <p>把当前输入直接带给别人复现。</p>
               </div>
@@ -747,6 +944,33 @@ watch(mermaidEnabled, (enabled) => {
             <footer class="workspace-card__foot">
               <span>{{ previewContent.length }} chars rendered</span>
               <span>{{ isStreaming ? '正在逐步追加中' : '已显示完整输入' }}</span>
+            </footer>
+          </article>
+
+          <article class="workspace-card workspace-card--full">
+            <header class="workspace-card__head">
+              <div>
+                <h2>版本沙箱预览</h2>
+                <p>独立 iframe，真正按 framework 与版本重新挂载渲染器。</p>
+              </div>
+              <span class="mini-pill" :class="{ 'mini-pill--active': !sandboxDirty }">
+                {{ sandboxStatusLabel }}
+              </span>
+            </header>
+
+            <div class="sandbox-frame-shell">
+              <iframe
+                :key="sandboxFrameKey"
+                class="sandbox-frame"
+                :src="sandboxHref"
+                title="Markstream version sandbox"
+                loading="lazy"
+              />
+            </div>
+
+            <footer class="workspace-card__foot">
+              <span>{{ sandboxPackageLabel }}</span>
+              <span>{{ sandboxDirty ? '等待手动同步' : '已加载当前输入快照' }}</span>
             </footer>
           </article>
         </section>
@@ -1042,6 +1266,10 @@ watch(mermaidEnabled, (enabled) => {
   margin-top: 16px;
 }
 
+.control-actions--stacked {
+  margin-top: 14px;
+}
+
 .action-button,
 .ghost-button {
   border: 0;
@@ -1140,6 +1368,85 @@ watch(mermaidEnabled, (enabled) => {
   font: inherit;
 }
 
+.text-control {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.text-control span {
+  color: var(--lab-muted);
+  font-size: 0.88rem;
+}
+
+.text-control input {
+  border: 0;
+  border-radius: 14px;
+  padding: 11px 12px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--lab-text);
+  font: inherit;
+}
+
+.text-control input:focus {
+  outline: none;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.segmented-control__button,
+.preset-chip {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--lab-text);
+  border-radius: 16px;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.segmented-control__button {
+  padding: 11px 12px;
+}
+
+.preset-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.preset-chip {
+  padding: 8px 12px;
+}
+
+.segmented-control__button:hover,
+.preset-chip:hover {
+  transform: translateY(-1px);
+}
+
+.segmented-control__button--active,
+.preset-chip--active {
+  border-color: rgba(29, 78, 216, 0.28);
+  background: rgba(29, 78, 216, 0.12);
+  color: var(--lab-accent);
+}
+
+.segmented-control__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .toggle-item input[type='checkbox'] {
   width: 18px;
   height: 18px;
@@ -1196,6 +1503,11 @@ watch(mermaidEnabled, (enabled) => {
   min-height: 760px;
 }
 
+.workspace-card--full {
+  grid-column: 1 / -1;
+  min-height: 720px;
+}
+
 .workspace-card__head,
 .workspace-card__foot {
   padding: 18px 20px;
@@ -1231,6 +1543,20 @@ watch(mermaidEnabled, (enabled) => {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.92));
 }
+
+.sandbox-frame-shell {
+  min-height: 620px;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(239, 246, 255, 0.9));
+}
+
+.sandbox-frame {
+  display: block;
+  width: 100%;
+  min-height: 620px;
+  border: 0;
+  background: transparent;
+ }
 
 .preview-surface :deep(.markdown-renderer) {
   min-height: 100%;
@@ -1269,6 +1595,12 @@ watch(mermaidEnabled, (enabled) => {
 
   .workspace-card {
     min-height: 640px;
+  }
+
+  .workspace-card--full,
+  .sandbox-frame,
+  .sandbox-frame-shell {
+    min-height: 540px;
   }
 
   .editor-textarea,
