@@ -316,6 +316,15 @@ export function applyContainers(md: MarkdownIt) {
           innerSrc += '\n'
         if (!innerSrc.endsWith('\n\n'))
           innerSrc += '\n'
+
+        // The last token should be the current vm_container_open token
+        const prevToken = s.tokens[s.tokens.length - 1]
+
+        // Save the inner Markdown content as raw
+        if (prevToken) {
+          prevToken.raw = innerSrc
+        }
+
         const innerTokens: any[] = []
         // Use the same env as the parent block parser to ensure all block rules are available
         s.md.block.parse(innerSrc, s.md, s.env, innerTokens)
