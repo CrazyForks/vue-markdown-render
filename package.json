@@ -150,7 +150,7 @@
     "docs:sync-zh": "node scripts/sync-zh-docs.mjs",
     "docs:check-zh": "node scripts/check-zh-parity.mjs",
     "docs:build": "vitepress build docs",
-    "docs:build:ci": "pnpm run build && vitepress build docs",
+    "docs:build:ci": "pnpm run build:parser && pnpm run build && pnpm docs:build",
     "docs:build:netlify": "VITEPRESS_BASE=/ pnpm docs:build",
     "docs:build:gh": "VITEPRESS_BASE=/markstream-vue/ pnpm docs:build",
     "docs:serve": "vitepress serve docs",

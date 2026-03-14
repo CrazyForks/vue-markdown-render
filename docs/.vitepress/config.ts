@@ -1,12 +1,34 @@
+import path from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitepress'
 
 // TypeScript sometimes rejects VitePress site locales on the `Config` type.
 // Cast to `any` to avoid strict type errors in the docs config while keeping intellisense.
+const markdownParserSrc = fileURLToPath(new URL('../../packages/markdown-parser/src/index.ts', import.meta.url))
+const markdownParserSrcDir = path.dirname(markdownParserSrc)
+
 export default defineConfig({
   title: 'markstream-vue',
   description: 'Streaming-friendly Markdown renderer for Vue 3, Vue 2, React, and Angular',
   base: process.env.VITEPRESS_BASE || '/',
+  vite: {
+    resolve: {
+      // Docs import the built `markstream-vue` package, which keeps
+      // `stream-markdown-parser` external. Point VitePress at the workspace
+      // source so clean CI checkouts don't need a prebuilt parser dist.
+      alias: [
+        {
+          find: /^stream-markdown-parser$/,
+          replacement: markdownParserSrc,
+        },
+        {
+          find: /^stream-markdown-parser\//,
+          replacement: `${markdownParserSrcDir}/`,
+        },
+      ],
+    },
+  },
   locales: {
     root: {
       label: 'English',
