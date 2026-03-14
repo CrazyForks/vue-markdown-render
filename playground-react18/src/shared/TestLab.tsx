@@ -1,126 +1,15 @@
 import { NodeRenderer } from 'markstream-react'
 import { useDeferredValue, useEffect, useState } from 'react'
+import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES, type TestLabFrameworkId, type TestLabSampleId } from '../../../playground-shared/testLabFixtures'
 import { decodeMarkdownHash, resolveFrameworkTestHref } from '../../../playground-shared/testPageState'
 
-type SampleId = 'baseline' | 'diff' | 'stress'
-type FrameworkId = 'vue3' | 'vue2' | 'react'
+type SampleId = TestLabSampleId
+type FrameworkId = TestLabFrameworkId
 
 const CURRENT_FRAMEWORK: FrameworkId = 'react'
 
-const frameworkCards: ReadonlyArray<{
-  id: FrameworkId
-  label: string
-  note: string
-  origin: string
-  localPort: number | null
-}> = [
-  {
-    id: 'vue3',
-    label: 'Vue 3',
-    note: '主 playground',
-    origin: 'https://markstream-vue.simonhe.me',
-    localPort: null,
-  },
-  {
-    id: 'vue2',
-    label: 'Vue 2',
-    note: '兼容回归',
-    origin: 'https://markstream-vue2.pages.dev',
-    localPort: 3334,
-  },
-  {
-    id: 'react',
-    label: 'React',
-    note: '当前 test page',
-    origin: 'https://markstream-react.pages.dev',
-    localPort: 4174,
-  },
-]
-
-const sampleCards: ReadonlyArray<{
-  id: SampleId
-  title: string
-  summary: string
-  content: string
-}> = [
-  {
-    id: 'baseline',
-    title: '基础回归',
-    summary: '标题、数学、Mermaid 和代码块一起看。',
-    content: `# React Test Page
-
-这页用来和 Vue 3 / Vue 2 的 \`/test\` 做横向对照。
-
-## Basics
-
-- **bold**
-- *italic*
-- \`inline code\`
-
-## Math
-
-Inline: $E = mc^2$
-
-## Mermaid
-
-\`\`\`mermaid
-flowchart LR
-  Prompt --> Parser --> ReactRenderer
-\`\`\`
-
-## Code
-
-\`\`\`tsx
-export function ReactTestPage() {
-  return <div>markstream-react /test ready</div>
-}
-\`\`\`
-`,
-  },
-  {
-    id: 'diff',
-    title: 'Diff',
-    summary: '更适合观察代码流和中间态。',
-    content: `# Diff Regression
-
-\`\`\`diff
---- before.ts
-+++ after.ts
-@@ -1,2 +1,4 @@
--export const version = 1
-+export const version = 2
-+export const framework = 'react'
-\`\`\`
-
-\`\`\`ts
-export const route = '/test'
-\`\`\`
-`,
-  },
-  {
-    id: 'stress',
-    title: '结构压力',
-    summary: '列表、表格和引用一起压一遍。',
-    content: `# Structural Stress
-
-> 检查复杂节点在 streaming 下是否闪烁或错位。
-
-## List
-
-1. Layer one
-   - Layer two
-     - Layer three
-
-## Table
-
-| Framework | Route |
-| --- | --- |
-| Vue 3 | /test |
-| Vue 2 | /test |
-| React | /test |
-`,
-  },
-]
+const frameworkCards = TEST_LAB_FRAMEWORKS
+const sampleCards = TEST_LAB_SAMPLES
 
 function clampInt(value: number, min: number, max: number, fallback: number) {
   const normalized = Number.isFinite(value) ? Math.round(value) : fallback
@@ -226,7 +115,7 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
           <div className="hero-copy">
             <span className="eyebrow">{frameworkLabel} Regression Lab</span>
             <h1>markstream-react /test</h1>
-            <p>专门用来和 Vue 3、Vue 2 的 test page 做对照，快速定位框架层差异。</p>
+            <p>专门用来和 Vue 3、Vue 2、Angular 的 test page 做对照，快速定位框架层差异。</p>
           </div>
 
           <div className="hero-metrics">

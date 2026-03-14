@@ -88,4 +88,25 @@ describe('playground test page state helpers', () => {
     expect(url.searchParams.get('version')).toBe('0.0.9-beta.0')
     expect(decodeMarkdownHash(url.hash)).toBe('# sandbox content')
   })
+
+  it('keeps workspace selection for angular sandbox targets', () => {
+    const selection = resolveSandboxSelection([
+      {
+        id: 'angular',
+        label: 'Angular',
+        packageName: 'markstream-angular',
+        defaultVersion: '0.0.1-alpha.0',
+        runtimeVersion: '20.0.0',
+        supportsWorkspace: true,
+      },
+    ], {
+      frameworkId: 'angular',
+      source: 'workspace',
+      version: '0.0.1-alpha.0',
+    })
+
+    expect(selection.frameworkId).toBe('angular')
+    expect(selection.source).toBe('workspace')
+    expect(selection.version).toBe('0.0.1-alpha.0')
+  })
 })

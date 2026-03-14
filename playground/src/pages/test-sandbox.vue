@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, createApp as createVue3RuntimeApp, h as vue3H, onBeforeUnmount, onMounted, ref } from 'vue'
+import '../../../packages/markstream-angular/src/index.css'
 import { decodeMarkdownHash } from '../../../playground-shared/testPageState'
 import { parseSandboxSelection, type SandboxSelection } from '../../../playground-shared/versionSandbox'
 import {
@@ -269,12 +270,53 @@ async function mountReactSandbox(current: SandboxSelection, content: string, mou
   }
 }
 
+async function mountAngularSandbox(current: SandboxSelection, content: string, mountPoint: HTMLElement) {
+  const runtimeVersion = current.framework.runtimeVersion
+  const rendererModule = current.source === 'workspace'
+    ? await import('markstream-angular')
+    : await importRemote<any>(createEsmPackageUrl(
+        current.framework.packageName,
+        current.version,
+        [`@angular/common@${runtimeVersion}`, `@angular/core@${runtimeVersion}`],
+      ))
+
+  const renderMarkdownToHtml = rendererModule.renderMarkdownToHtml
+  const enhanceRenderedHtml = rendererModule.enhanceRenderedHtml
+  if (typeof renderMarkdownToHtml !== 'function')
+    throw new Error('无法找到 Angular 渲染器入口。')
+
+  const host = document.createElement('div')
+  host.className = 'sandbox-canvas__host'
+
+  const shell = document.createElement('div')
+  shell.className = 'markstream-angular markdown-renderer'
+  shell.innerHTML = renderMarkdownToHtml({
+    content,
+    final: true,
+    allowHtml: true,
+  })
+  const enhancementHandle = await enhanceRenderedHtml?.(shell, {
+    final: true,
+  })
+
+  host.replaceChildren(shell)
+  mountPoint.replaceChildren(host)
+
+  return () => {
+    enhancementHandle?.dispose?.()
+    mountPoint.replaceChildren()
+  }
+}
+
 async function mountSandbox(current: SandboxSelection, content: string, mountPoint: HTMLElement) {
   if (current.frameworkId === 'vue3')
     return await mountVue3Sandbox(current, content, mountPoint)
 
   if (current.frameworkId === 'vue2')
     return await mountVue2Sandbox(current, content, mountPoint)
+
+  if (current.frameworkId === 'angular')
+    return await mountAngularSandbox(current, content, mountPoint)
 
   return await mountReactSandbox(current, content, mountPoint)
 }

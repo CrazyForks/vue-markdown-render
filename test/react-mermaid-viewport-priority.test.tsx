@@ -60,10 +60,21 @@ describe('markstream-react mermaid viewport priority', () => {
 
     const canParseOffthread = vi.fn(async () => true)
     const findPrefixOffthread = vi.fn(async () => null)
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      parse: vi.fn(async () => true),
+      render: vi.fn(async () => ({
+        svg: '<svg viewBox="0 0 10 10"><g /></svg>',
+        bindFunctions: vi.fn(),
+      })),
+    }
     vi.doMock('../packages/markstream-react/src/workers/mermaidWorkerClient', () => ({
       canParseOffthread,
       findPrefixOffthread,
       terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../packages/markstream-react/src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
     }))
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
 
@@ -85,7 +96,9 @@ describe('markstream-react mermaid viewport priority', () => {
       }))
     })
     await flushReact()
-    await vi.advanceTimersByTimeAsync(400)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400)
+    })
     await flushReact()
 
     expect(canParseOffthread).not.toHaveBeenCalled()
@@ -96,9 +109,13 @@ describe('markstream-react mermaid viewport priority', () => {
     const observedEl = observer ? Array.from(observer.elements)[0] : null
     expect(observedEl).toBeTruthy()
 
-    observer?.trigger(observedEl!, true)
+    await act(async () => {
+      observer?.trigger(observedEl!, true)
+    })
     await flushReact()
-    await vi.advanceTimersByTimeAsync(1200)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1200)
+    })
     await flushReact()
 
     expect(canParseOffthread).toHaveBeenCalled()

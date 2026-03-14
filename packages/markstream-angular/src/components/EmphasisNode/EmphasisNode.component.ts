@@ -1,0 +1,34 @@
+import { CommonModule } from '@angular/common'
+import { ChangeDetectionStrategy, Component, Input, forwardRef } from '@angular/core'
+import { NestedRendererComponent } from '../NestedRenderer/NestedRenderer.component'
+import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
+import { getNodeList } from '../shared/node-helpers'
+
+@Component({
+  selector: 'markstream-angular-emphasis-node',
+  standalone: true,
+  imports: [CommonModule, forwardRef(() => NestedRendererComponent)],
+  template: `
+    <em>
+      <markstream-angular-nested-renderer
+        [nodes]="children"
+        [context]="context"
+        [indexPrefix]="nestedPrefix"
+      />
+    </em>
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class EmphasisNodeComponent {
+  @Input({ required: true }) node!: AngularRenderableNode
+  @Input() context?: AngularRenderContext
+  @Input() indexKey?: string
+
+  get children() {
+    return getNodeList((this.node as any)?.children)
+  }
+
+  get nestedPrefix() {
+    return `${this.indexKey || 'emphasis'}-em`
+  }
+}

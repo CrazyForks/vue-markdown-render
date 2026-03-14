@@ -2,7 +2,7 @@
 hero:
   name: markstream
   text: Streaming-friendly Markdown renderer
-  tagline: Vue 3 • Vue 2 • React • Nuxt
+  tagline: Vue 3 • Vue 2 • React • Angular • Nuxt
   actions:
     - theme: brand
       text: Get Started
@@ -94,6 +94,30 @@ import MarkdownRender from 'markstream-react'
 
 function App() {
   return <MarkdownRender content="# Hello React!" />
+}
+```
+
+### Angular (markstream-angular)
+
+Angular 20+ with standalone components and the same cross-framework regression lab routes.
+
+- **Documentation**: [/guide/angular-quick-start](/guide/angular-quick-start)
+- **Installation**: [/guide/angular-installation](/guide/angular-installation)
+- **Quick Start**: [/guide/angular-quick-start](/guide/angular-quick-start)
+- **Live Demo**: https://markstream-angular.pages.dev/
+
+```ts
+import { Component, signal } from '@angular/core'
+import { MarkstreamAngularComponent } from 'markstream-angular'
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [MarkstreamAngularComponent],
+  template: `<markstream-angular [content]="markdown()" [final]="true" />`,
+})
+export class AppComponent {
+  readonly markdown = signal('# Hello Angular!')
 }
 ```
 
