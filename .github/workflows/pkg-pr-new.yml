@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   publish:
+    # pkg.pr.new requires its GitHub App to be installed on the repository.
+    # Keep previews opt-in so PR CI does not fail before that external setup exists.
+    if: ${{ vars.PKG_PR_NEW_ENABLED == 'true' }}
     name: Publish preview packages
     runs-on: ubuntu-latest
     steps:
@@ -35,4 +38,6 @@ jobs:
           pnpm build
 
       - name: Publish preview packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm dlx pkg-pr-new publish . ./packages/markdown-parser ./packages/markstream-react ./packages/markstream-vue2
