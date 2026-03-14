@@ -59,7 +59,7 @@ export default defineConfig({
       },
       {
         find: /^markstream-vue$/,
-        replacement: path.resolve(__dirname, '../dist/index.js'),
+        replacement: path.resolve(__dirname, '../src/exports.ts'),
       },
       {
         find: /^stream-markdown-parser$/,
