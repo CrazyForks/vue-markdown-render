@@ -15,7 +15,7 @@ import { PreCodeNodeComponent } from '../PreCodeNode/PreCodeNode.component'
 import { HtmlPreviewFrameComponent } from './HtmlPreviewFrame.component'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { getUseMonaco } from '../../optional/monaco'
-import { languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils/languageIcon'
+import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils/languageIcon'
 
 type MonacoHelpers = {
   createEditor?: (container: HTMLElement, code: string, language: string) => Promise<unknown> | unknown
@@ -35,32 +35,30 @@ type MonacoHelpers = {
   imports: [CommonModule, PreCodeNodeComponent, HtmlPreviewFrameComponent],
   template: `
     <div
-      class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+      class="code-block-container"
       [class.is-dark]="resolvedIsDark"
       [class.is-rendering]="resolvedLoading"
-      [class.border-gray-700/30]="resolvedIsDark"
-      [class.bg-gray-900]="resolvedIsDark"
-      [class.border-gray-200]="!resolvedIsDark"
-      [class.bg-white]="!resolvedIsDark"
       [attr.data-markstream-monaco]="editorReady && !useFallback ? '1' : null"
       [attr.data-markstream-monaco-diff]="editorReady && isDiff && !useFallback ? '1' : null"
       [ngStyle]="containerStyle"
     >
       <div
         *ngIf="resolvedShowHeader"
-        class="code-block-header flex justify-between items-center px-4 py-2.5 border-b border-gray-400/5"
+        class="code-block-header"
         [style.color]="headerForeground"
         [style.backgroundColor]="headerBackground"
       >
-        <div class="flex items-center space-x-2 flex-1 overflow-hidden">
-          <span class="icon-slot h-4 min-w-4 flex-shrink-0 code-block-language-chip">{{ languageChip }}</span>
-          <span class="text-sm font-medium font-mono truncate">{{ displayLanguage }}</span>
+        <div class="code-block-header__meta">
+          <span class="icon-slot code-block-language-icon">
+            <img class="code-block-language-icon__image" [src]="languageIconDataUrl" alt="" />
+          </span>
+          <span class="code-block-header__label">{{ displayLanguage }}</span>
         </div>
-        <div class="flex items-center space-x-2">
+        <div class="code-block-header__actions">
           <button
             *ngIf="resolvedShowCollapseButton"
             type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+            class="code-action-btn"
             [attr.title]="tooltipFor(collapsed ? t('common.expand') : t('common.collapse'))"
             [attr.aria-pressed]="collapsed"
             (click)="toggleCollapsed()"
@@ -72,7 +70,7 @@ type MonacoHelpers = {
               width="1em"
               height="1em"
               viewBox="0 0 24 24"
-              class="w-3 h-3"
+              class="code-action-btn__icon"
             >
               <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" />
             </svg>
@@ -81,23 +79,23 @@ type MonacoHelpers = {
           <ng-container *ngIf="resolvedShowFontSizeButtons && resolvedEnableFontSizeControl">
             <button
               type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+              class="code-action-btn"
               [disabled]="fontSize <= 10"
               [attr.title]="tooltipFor(t('common.decrease'))"
               (click)="changeFontSize(-1)"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3">
+              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="code-action-btn__icon">
                 <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14" />
               </svg>
             </button>
             <button
               type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+              class="code-action-btn"
               [disabled]="fontSize === defaultFontSize"
               [attr.title]="tooltipFor(t('common.reset'))"
               (click)="resetFontSize()"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3">
+              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="code-action-btn__icon">
                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
                   <path d="M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8" />
                   <path d="M3 3v5h5" />
@@ -106,12 +104,12 @@ type MonacoHelpers = {
             </button>
             <button
               type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+              class="code-action-btn"
               [disabled]="fontSize >= 36"
               [attr.title]="tooltipFor(t('common.increase'))"
               (click)="changeFontSize(1)"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3">
+              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="code-action-btn__icon">
                 <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7v14" />
               </svg>
             </button>
@@ -120,18 +118,18 @@ type MonacoHelpers = {
           <button
             *ngIf="resolvedShowCopyButton"
             type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+            class="code-action-btn"
             [attr.title]="tooltipFor(copied ? t('common.copied') : t('common.copy'))"
             [attr.aria-label]="copied ? t('common.copied') : t('common.copy')"
             (click)="copyCode()"
           >
-            <svg *ngIf="!copied" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3">
+            <svg *ngIf="!copied" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="code-action-btn__icon">
               <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
                 <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
               </g>
             </svg>
-            <svg *ngIf="copied" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3">
+            <svg *ngIf="copied" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="code-action-btn__icon">
               <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" />
             </svg>
           </button>
@@ -139,15 +137,15 @@ type MonacoHelpers = {
           <button
             *ngIf="resolvedShowExpandButton"
             type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+            class="code-action-btn"
             [attr.title]="tooltipFor(expanded ? t('common.collapse') : t('common.expand'))"
             [attr.aria-pressed]="expanded"
             (click)="toggleExpanded()"
           >
-            <svg *ngIf="expanded" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3">
+            <svg *ngIf="expanded" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="code-action-btn__icon">
               <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" />
             </svg>
-            <svg *ngIf="!expanded" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3">
+            <svg *ngIf="!expanded" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="code-action-btn__icon">
               <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" />
             </svg>
           </button>
@@ -155,12 +153,12 @@ type MonacoHelpers = {
           <button
             *ngIf="resolvedShowPreviewButton && isPreviewable"
             type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+            class="code-action-btn"
             [attr.title]="tooltipFor(t('common.preview'))"
             [attr.aria-label]="t('common.preview')"
             (click)="previewCode()"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" class="code-action-btn__icon">
               <g fill="currentColor" fill-rule="evenodd" clip-rule="evenodd">
                 <path d="M23.628 7.41c-.12-1.172-.08-3.583-.9-4.233c-1.921-1.51-6.143-1.11-8.815-1.19c-3.481-.15-7.193.14-10.625.24a.34.34 0 0 0 0 .67c3.472-.05 7.074-.29 10.575-.09c2.471.15 6.653-.14 8.254 1.16c.4.33.41 2.732.49 3.582a42 42 0 0 1 .08 9.005a13.8 13.8 0 0 1-.45 3.001c-2.42 1.4-19.69 2.381-20.72.55a21 21 0 0 1-.65-4.632a41.5 41.5 0 0 1 .12-7.964c.08 0 7.334.33 12.586.24c2.331 0 4.682-.13 6.764-.21a.33.33 0 0 0 0-.66c-7.714-.16-12.897-.43-19.31.05c.11-1.38.48-3.922.38-4.002a.3.3 0 0 0-.42 0c-.37.41-.29 1.77-.36 2.251s-.14 1.07-.2 1.6a45 45 0 0 0-.36 8.645a21.8 21.8 0 0 0 .66 5.002c1.46 2.702 17.248 1.461 20.95.43c1.45-.4 1.69-.8 1.871-1.95c.575-3.809.602-7.68.08-11.496" />
                 <path d="M4.528 5.237a.84.84 0 0 0-.21-1c-.77-.41-1.71.39-1 1.1a.83.83 0 0 0 1.21-.1m2.632-.25c.14-.14.19-.84-.2-1c-.77-.41-1.71.39-1 1.09a.82.82 0 0 0 1.2-.09m2.88 0a.83.83 0 0 0-.21-1c-.77-.41-1.71.39-1 1.09a.82.82 0 0 0 1.21-.09m-4.29 8.735c0 .08.23 2.471.31 2.561a.371.371 0 0 0 .63-.14c0-.09 0 0 .15-1.72a10 10 0 0 0-.11-2.232a5.3 5.3 0 0 1-.26-1.37a.3.3 0 0 0-.54-.24a6.8 6.8 0 0 0-.2 2.33c-1.281-.38-1.121.13-1.131-.42a15 15 0 0 0-.19-1.93c-.16-.17-.36-.17-.51.14a20 20 0 0 0-.43 3.471c.04.773.18 1.536.42 2.272c.26.4.7.22.7-.1c0-.09-.16-.09 0-1.862c.06-1.18-.23-.3 1.16-.76m5.033-2.552c.32-.07.41-.28.39-.37c0-.55-3.322-.34-3.462-.24s-.2.18-.18.28s0 .11 0 .16a3.8 3.8 0 0 0 1.591.361v.82a15 15 0 0 0-.13 3.132c0 .2-.09.94.17 1.16a.34.34 0 0 0 .48 0c.125-.35.196-.718.21-1.09a8 8 0 0 0 .14-3.232c0-.13.05-.7-.1-.89a8 8 0 0 0 .89-.09m5.544-.181a.69.69 0 0 0-.89-.44a2.8 2.8 0 0 0-1.252 1.001a2.3 2.3 0 0 0-.41-.83a1 1 0 0 0-1.6.27a7 7 0 0 0-.35 2.07c0 .571 0 2.642.06 2.762c.14 1.09 1 .51.63.13a17.6 17.6 0 0 1 .38-3.962c.32-1.18.32.2.39.51s.11 1.081.73 1.081s.48-.93 1.401-1.78q.075 1.345 0 2.69a15 15 0 0 0 0 1.811a.34.34 0 0 0 .68 0q.112-.861.11-1.73a16.7 16.7 0 0 0 .12-3.582m1.441-.201c-.05.16-.3 3.002-.31 3.202a6.3 6.3 0 0 0 .21 1.741c.33 1 1.21 1.07 2.291.82a3.7 3.7 0 0 0 1.14-.23c.21-.22.10-.59-.41-.64q-.817.096-1.64.07c-.44-.07-.34 0-.67-4.442q.015-.185 0-.37a.316.316 0 0 0-.23-.38a.316.316 0 0 0-.38.23" />
@@ -349,9 +347,12 @@ export class CodeBlockNodeComponent implements AfterViewInit, OnChanges, OnDestr
     return label ? label.charAt(0).toUpperCase() + label.slice(1) : 'Text'
   }
 
-  get languageChip() {
-    const token = this.canonicalLanguage || 'text'
-    return token.slice(0, 3).toUpperCase()
+  get languageIconDataUrl() {
+    const icon = getLanguageIcon(this.rawLanguage).trim()
+    const svg = icon.includes('xmlns=')
+      ? icon
+      : icon.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
   }
 
   get resolvedCode() {

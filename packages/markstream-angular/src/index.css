@@ -58,6 +58,18 @@
   width: 100%;
 }
 
+.markstream-angular markstream-angular-blockquote-node,
+.markstream-angular markstream-angular-paragraph-node,
+.markstream-angular markstream-angular-image-node {
+  display: flow-root;
+  width: 100%;
+}
+
+.markstream-angular markstream-angular-nested-renderer,
+.markstream-angular markstream-angular-node-outlet {
+  display: contents;
+}
+
 .markstream-angular .node-placeholder {
   width: 100%;
   min-height: 1rem;
@@ -219,12 +231,26 @@
   font-style: italic;
   border-left: 0.25rem solid var(--blockquote-border-color, #e2e8f0);
   quotes: "\201C" "\201D" "\2018" "\2019";
-  margin-top: 1.6em;
-  margin-bottom: 1.6em;
+  margin: 1.6em 0;
   padding-left: 1em;
   background: transparent;
   border-radius: 0;
   color: inherit;
+}
+
+.markstream-angular .blockquote-node .markstream-angular,
+.markstream-angular blockquote .markstream-angular {
+  content-visibility: visible;
+  contain: content;
+  contain-intrinsic-size: 0 0;
+}
+
+.markstream-angular .blockquote-node > markstream-angular-nested-renderer,
+.markstream-angular blockquote > markstream-angular-nested-renderer,
+.markstream-angular .blockquote-node > markstream-angular-node-outlet,
+.markstream-angular blockquote > markstream-angular-node-outlet {
+  display: block;
+  width: 100%;
 }
 
 .markstream-angular hr {
@@ -259,6 +285,31 @@
   max-width: 100%;
   height: auto;
   border-radius: 0.9rem;
+}
+
+.markstream-angular .image-node {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.markstream-angular .image-node__inner {
+  position: relative;
+  display: inline-block;
+  width: min(100%, 24rem);
+  max-width: 24rem;
+}
+
+.markstream-angular .image-node__img {
+  display: inline-block;
+  width: 100%;
+  max-width: 24rem;
+  height: auto;
+  border-radius: 0.75rem;
+  box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08);
+}
+
+.markstream-angular .image-node__img--svg {
+  box-shadow: none;
 }
 
 .markstream-angular details {
@@ -829,7 +880,82 @@ body > div[id^="dmermaid-"] {
   }
 }
 
-.code-block-body {
+.markstream-angular .code-block-container {
+  margin: 1rem 0;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-shadow: 0 18px 38px -28px rgba(15, 23, 42, 0.45);
+}
+
+.markstream-angular .code-block-container.is-dark,
+.dark .markstream-angular .code-block-container {
+  border-color: rgba(71, 85, 105, 0.55);
+  background: #0f172a;
+  box-shadow: 0 22px 44px -30px rgba(2, 6, 23, 0.95);
+}
+
+.markstream-angular .code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.markstream-angular .code-block-header__meta {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.markstream-angular .code-block-header__label {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font:
+    500 0.95rem/1.2 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.markstream-angular .code-block-header__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.markstream-angular .code-block-language-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 1rem;
+  color: #2563eb;
+}
+
+.markstream-angular.dark .code-block-language-icon,
+.dark .markstream-angular .code-block-language-icon {
+  color: #93c5fd;
+}
+
+.markstream-angular .code-block-language-icon svg,
+.markstream-angular .code-block-language-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.markstream-angular .code-block-language-icon__image {
+  object-fit: contain;
+}
+
+.markstream-angular .code-block-body {
   position: relative;
   min-height: 120px;
 }
@@ -844,21 +970,41 @@ body > div[id^="dmermaid-"] {
   overflow: hidden;
 }
 
-.code-block-language-chip {
-  min-width: 1.5rem;
-  height: 1.5rem;
-  padding: 0 0.35rem;
-  border-radius: 999px;
-  background: rgba(37, 99, 235, 0.12);
-  color: #1d4ed8;
-  font: 700 0.65rem/1 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-  letter-spacing: 0.04em;
+.markstream-angular .code-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 0.375rem;
+  color: inherit;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease, opacity 140ms ease;
 }
 
-.markstream-angular.dark .code-block-language-chip,
-.dark .markstream-angular .code-block-language-chip {
-  background: rgba(96, 165, 250, 0.16);
-  color: #93c5fd;
+.markstream-angular .code-action-btn:hover {
+  background: var(--vscode-editor-selectionBackground, rgba(148, 163, 184, 0.18));
+}
+
+.markstream-angular .code-action-btn__icon,
+.markstream-angular .code-action-btn svg {
+  display: block;
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: 0 0 auto;
+}
+
+.markstream-angular .code-action-btn:active {
+  transform: scale(0.98);
+}
+
+.markstream-angular .code-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.markstream-angular .code-action-btn:disabled:hover {
+  background: transparent;
 }
 
 .html-preview-frame__backdrop {

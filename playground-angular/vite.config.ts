@@ -41,6 +41,7 @@ function d2VendorPlugin(): Plugin {
 
 export default defineConfig({
   base: './',
+  publicDir: path.resolve(__dirname, '../playground/public'),
   worker: {
     format: 'es',
   },
@@ -54,7 +55,7 @@ export default defineConfig({
     alias: [
       {
         find: /^markstream-angular$/,
-        replacement: path.resolve(__dirname, '../packages/markstream-angular/src/index.ts'),
+        replacement: path.resolve(__dirname, './src/vendor/markstream-angular-jit.ts'),
       },
       {
         find: /^markstream-vue$/,
@@ -131,6 +132,9 @@ export default defineConfig({
 
           if (normalized.includes('/node_modules/stream-monaco/'))
             return 'stream-monaco'
+
+          if (normalized.includes('/playground-angular/src/vendor/markstream-angular-jit.ts'))
+            return 'markstream-angular'
 
           if (normalized.includes('/packages/markstream-angular/src/'))
             return 'markstream-angular'
