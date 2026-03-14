@@ -36,6 +36,15 @@
 | [快速开始](/zh/guide/react-quick-start) | React 示例 |
 | [组件与 API](/zh/guide/react-components) | React 组件参考 |
 
+### Angular (markstream-angular)
+
+适用于 Angular 20+ standalone 项目，并带有共享的 Markstream `/test` 回归实验室。
+
+| 页面 | 描述 |
+|------|------|
+| [安装](/zh/guide/angular-installation) | Angular 专用安装 |
+| [快速开始](/zh/guide/angular-quick-start) | standalone Angular 示例 |
+
 ### Nuxt
 
 适用于 Nuxt 3 SSR 应用程序。

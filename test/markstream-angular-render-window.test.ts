@@ -32,6 +32,8 @@ describe('markstream-angular render window helpers', () => {
   it('only defers nodes when virtualization is off and viewport priority is enabled', () => {
     expect(resolveVirtualizationEnabled(500, 320)).toBe(true)
     expect(resolveVirtualizationEnabled(100, 320)).toBe(false)
+    expect(resolveVirtualizationEnabled(500, 0)).toBe(false)
+    expect(resolveVirtualizationEnabled(500, -1)).toBe(false)
 
     expect(resolveDeferNodes({
       parsedNodeCount: 120,
@@ -55,6 +57,14 @@ describe('markstream-angular render window helpers', () => {
       viewportPriority: true,
       deferNodesUntilVisible: true,
       maxLiveNodes: 320,
+    })).toBe(false)
+
+    expect(resolveDeferNodes({
+      parsedNodeCount: 120,
+      virtualizationEnabled: false,
+      viewportPriority: true,
+      deferNodesUntilVisible: true,
+      maxLiveNodes: 0,
     })).toBe(false)
   })
 })

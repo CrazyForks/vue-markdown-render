@@ -57,6 +57,10 @@ export default defineConfig({
         replacement: path.resolve(__dirname, '../packages/markstream-angular/src/index.ts'),
       },
       {
+        find: /^markstream-vue$/,
+        replacement: path.resolve(__dirname, '../dist/index.js'),
+      },
+      {
         find: /^stream-markdown-parser$/,
         replacement: path.resolve(__dirname, '../packages/markdown-parser/src/index.ts'),
       },
@@ -74,6 +78,12 @@ export default defineConfig({
     postcss: path.resolve(__dirname, './postcss.config.cjs'),
   },
   optimizeDeps: {
+    include: [
+      'katex',
+      'katex/contrib/mhchem',
+      'katex/dist/contrib/mhchem',
+      'mermaid',
+    ],
     exclude: ['stream-monaco'],
   },
   plugins: [

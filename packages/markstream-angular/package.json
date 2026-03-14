@@ -30,7 +30,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./index.css": "./dist/index.css"
+    "./index.css": "./dist/index.css",
+    "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
+    "./workers/mermaidParser.worker": "./dist/workers/mermaidParser.worker.js"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -71,6 +73,7 @@
     }
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.7.6",
     "stream-markdown-parser": "workspace:*"
   },
   "devDependencies": {

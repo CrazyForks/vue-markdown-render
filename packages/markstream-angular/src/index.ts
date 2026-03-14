@@ -1,10 +1,14 @@
 import './index.css'
+import './workers/katexRenderer.worker?worker'
+import './workers/mermaidParser.worker?worker'
 
 export { AdmonitionNodeComponent as AdmonitionNode } from './components/AdmonitionNode/AdmonitionNode.component'
 export { BlockquoteNodeComponent as BlockquoteNode } from './components/BlockquoteNode/BlockquoteNode.component'
 export { CheckboxNodeComponent as CheckboxNode } from './components/CheckboxNode/CheckboxNode.component'
 export { CodeBlockNodeComponent as CodeBlockNode } from './components/CodeBlockNode/CodeBlockNode.component'
 export { CodeBlockNodeComponent as AngularCodeBlockNode } from './components/CodeBlockNode/CodeBlockNode.component'
+export { CodeBlockNodeComponent as MarkdownCodeBlockNode } from './components/CodeBlockNode/CodeBlockNode.component'
+export { HtmlPreviewFrameComponent as HtmlPreviewFrame } from './components/CodeBlockNode/HtmlPreviewFrame.component'
 export { D2BlockNodeComponent as D2BlockNode } from './components/D2BlockNode/D2BlockNode.component'
 export { DefinitionListNodeComponent as DefinitionListNode } from './components/DefinitionListNode/DefinitionListNode.component'
 export { EmojiNodeComponent as EmojiNode } from './components/EmojiNode/EmojiNode.component'
@@ -68,6 +72,7 @@ export {
   buildRenderContext,
   resolveParsedNodes,
 } from './components/shared/node-helpers'
+export { setDefaultI18nMap, useSafeI18n } from './i18n/useSafeI18n'
 export {
   renderMarkdownNodeToHtml,
   renderMarkdownNodesToHtml,
@@ -80,6 +85,22 @@ export type {
   NestedMarkdownHtmlOptions,
   RenderableMarkdownNode,
 } from './renderMarkdownHtml'
+export { sanitizeHtmlContent } from './sanitizeHtmlContent'
+export {
+  getLanguageIcon,
+  languageMap,
+  normalizeLanguageIdentifier,
+  resolveMonacoLanguageId,
+  setLanguageIconResolver,
+} from './utils/languageIcon'
+export type { LanguageIconResolver } from './utils/languageIcon'
+export {
+  parseNestedMarkdownToNodes,
+} from './parseNestedMarkdownToNodes'
+export type {
+  NestedMarkdownNodesInput,
+  NestedMarkdownNodesOptions,
+} from './parseNestedMarkdownToNodes'
 export type { D2Loader } from './optional/d2'
 export {
   disableD2,
@@ -103,5 +124,9 @@ export {
   isMermaidEnabled,
   setMermaidLoader,
 } from './optional/mermaid'
+export * from './workers/katexCdnWorker'
+export * from './workers/katexWorkerClient'
+export * from './workers/mermaidCdnWorker'
+export * from './workers/mermaidWorkerClient'
 
 export { MarkstreamAngularComponent as default } from './markstream-angular.component'

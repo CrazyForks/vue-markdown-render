@@ -1,5 +1,7 @@
 import type { BaseNode, CustomComponentAttrs, ParseOptions, ParsedNode } from 'stream-markdown-parser'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import { hydrateCustomTagContent } from './hydrateCustomTagContent'
+import { sanitizeHtmlContent } from './sanitizeHtmlContent'
 
 export type RenderableMarkdownNode = (ParsedNode | BaseNode) & Record<string, unknown>
 
@@ -75,9 +77,13 @@ const KNOWN_NODE_TYPES = new Set([
 ])
 
 export function renderMarkdownToHtml(input: MarkstreamAngularRenderOptions): string {
+  const normalizedTags = normalizeCustomHtmlTags([
+    ...(input.customHtmlTags || []),
+    ...((((input.parseOptions as any)?.customHtmlTags) || []) as string[]),
+  ])
   const ctx = createRenderContext({
     allowHtml: input.allowHtml,
-    customHtmlTags: input.customHtmlTags,
+    customHtmlTags: normalizedTags,
   })
   const nodes = resolveParsedNodes(input, ctx)
   return renderNodesToHtml(nodes, ctx)
@@ -115,13 +121,23 @@ function resolveParsedNodes(input: MarkstreamAngularRenderOptions, ctx: RenderCo
   if (!content)
     return []
 
+  const normalizedTags = normalizeCustomHtmlTags([
+    ...(input.customHtmlTags || []),
+    ...((((input.parseOptions as any)?.customHtmlTags) || []) as string[]),
+  ])
   const mergedParseOptions: ParseOptions = {
     ...(input.parseOptions ?? {}),
   }
   if (typeof input.final === 'boolean')
     mergedParseOptions.final = input.final
+  if (normalizedTags.length > 0)
+    (mergedParseOptions as any).customHtmlTags = normalizedTags
 
-  return parseMarkdownToStructure(content, ctx.markdown, mergedParseOptions)
+  return hydrateCustomTagContent(
+    parseMarkdownToStructure(content, ctx.markdown, mergedParseOptions) as RenderableMarkdownNode[],
+    content,
+    normalizedTags,
+  )
 }
 
 function createRenderContext(options: NestedMarkdownHtmlOptions): RenderContext {
@@ -236,9 +252,9 @@ function renderNodeToHtml(node: RenderableMarkdownNode | null | undefined, ctx: 
     case 'emoji':
       return escapeHtml(getString(node.raw || node.markup || node.content || node.name))
     case 'math_inline':
-      return `<span class="markstream-nested-math" data-display="inline">${escapeHtml(getString(node.content || node.markup || node.raw))}</span>`
+      return renderMathInlineNode(node)
     case 'math_block':
-      return `<pre class="markstream-nested-math-block"><code>${escapeHtml(getString(node.content || node.markup || node.raw))}</code></pre>`
+      return renderMathBlockNode(node)
     case 'reference':
       return `<sup class="markstream-nested-reference">[${escapeHtml(getString(node.id))}]</sup>`
     case 'html_inline':
@@ -258,6 +274,16 @@ function renderLinkNode(node: RenderableMarkdownNode, ctx: RenderContext): strin
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''
   const hrefAttr = href ? ` href="${escapeAttr(href)}"` : ''
   return `<a${hrefAttr}${titleAttr} target="_blank" rel="noreferrer noopener">${content}</a>`
+}
+
+function renderMathInlineNode(node: RenderableMarkdownNode) {
+  const source = escapeHtml(getString(node.content || node.markup || node.raw))
+  return `<span class="markstream-nested-math" data-display="inline"><span class="markstream-nested-math__source">${source}</span><span class="markstream-nested-math__render" aria-hidden="true"></span></span>`
+}
+
+function renderMathBlockNode(node: RenderableMarkdownNode) {
+  const source = escapeHtml(getString(node.content || node.markup || node.raw))
+  return `<div class="markstream-nested-math-block"><pre class="markstream-nested-math-block__source"><code>${source}</code></pre><div class="markstream-nested-math-block__render" aria-hidden="true"></div></div>`
 }
 
 function renderImageNode(node: RenderableMarkdownNode): string {
@@ -350,7 +376,7 @@ function renderHtmlNode(node: RenderableMarkdownNode, ctx: RenderContext): strin
     return escapeHtml(content)
   if (node.loading && !node.autoClosed)
     return escapeHtml(content)
-  return content
+  return sanitizeHtmlContent(content)
 }
 
 function renderCustomOrFallbackNode(node: RenderableMarkdownNode, ctx: RenderContext): string {

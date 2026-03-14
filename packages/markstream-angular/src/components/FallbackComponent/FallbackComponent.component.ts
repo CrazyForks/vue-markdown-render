@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, Input, forwardRef } from '@angular/core'
-import { renderNestedMarkdownToHtml } from '../../renderMarkdownHtml'
 import { NestedRendererComponent } from '../NestedRenderer/NestedRenderer.component'
 import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
 import {
@@ -21,14 +20,18 @@ import {
       [attr.data-markstream-custom-tag]="customTag"
     >
       <markstream-angular-nested-renderer
-        *ngIf="hasChildren; else fallbackBody"
-        [nodes]="children"
+        *ngIf="hasNestedContent; else fallbackBody"
+        [node]="node"
         [context]="context"
         [indexPrefix]="nestedPrefix"
+        [final]="resolvedFinal"
+        [customHtmlTags]="context?.customHtmlTags"
+        [parseOptions]="context?.parseOptions"
+        [customMarkdownIt]="context?.customMarkdownIt"
       />
 
       <ng-template #fallbackBody>
-        <div [innerHTML]="bodyHtml"></div>
+        <div [innerHTML]="rawBodyHtml"></div>
       </ng-template>
     </div>
   `,
@@ -47,6 +50,10 @@ export class FallbackComponent {
     return this.children.length > 0
   }
 
+  get hasNestedContent() {
+    return this.hasChildren || !!getString((this.node as any)?.content)
+  }
+
   get customTag() {
     return getString((this.node as any)?.tag || (this.node as any)?.type)
   }
@@ -56,21 +63,17 @@ export class FallbackComponent {
     return `markstream-nested-custom--${tag}`
   }
 
-  get bodyHtml() {
-    const content = getString((this.node as any)?.content)
-    if (content) {
-      return renderNestedMarkdownToHtml(
-        { content },
-        {
-          customHtmlTags: this.context?.customHtmlTags,
-          allowHtml: this.context?.allowHtml !== false,
-        },
-      )
-    }
+  get rawBodyHtml() {
     return escapeHtml(getString((this.node as any)?.raw))
   }
 
   get nestedPrefix() {
     return `${this.indexKey || 'fallback'}-children`
+  }
+
+  get resolvedFinal() {
+    if (typeof (this.node as any)?.loading === 'boolean')
+      return !(this.node as any).loading
+    return this.context?.final
   }
 }

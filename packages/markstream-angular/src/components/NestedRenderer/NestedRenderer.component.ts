@@ -1,5 +1,7 @@
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, Input, OnChanges, forwardRef } from '@angular/core'
+import type { MarkdownIt, ParseOptions } from 'stream-markdown-parser'
+import { parseNestedMarkdownToNodes } from '../../parseNestedMarkdownToNodes'
 import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
 import { normalizeTokenAttrs } from '../shared/node-helpers'
 import { SafeAttrsDirective } from '../shared/safe-attrs.directive'
@@ -40,14 +42,22 @@ type NestedRenderItem
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NestedRendererComponent implements OnChanges {
+  @Input() node?: AngularRenderableNode | null
   @Input() nodes: readonly AngularRenderableNode[] | null | undefined
+  @Input() content?: string | null
+  @Input() loading?: boolean
+  @Input() final?: boolean
+  @Input() cacheKey?: string
+  @Input() parseOptions?: ParseOptions
+  @Input() customHtmlTags?: readonly string[]
+  @Input() customMarkdownIt?: (markdown: MarkdownIt) => MarkdownIt
   @Input() context?: AngularRenderContext
   @Input() indexPrefix = 'nested'
 
   items: NestedRenderItem[] = []
 
   ngOnChanges() {
-    this.items = this.buildItems(this.nodes)
+    this.items = this.buildItems(this.resolvedNodes)
   }
 
   trackByIndex = (index: number) => {
@@ -56,6 +66,23 @@ export class NestedRendererComponent implements OnChanges {
 
   childPrefix(index: number) {
     return `${this.indexPrefix}-${index}`
+  }
+
+  private get resolvedNodes() {
+    return parseNestedMarkdownToNodes(
+      {
+        node: this.node as any,
+        nodes: this.nodes as any,
+        content: this.content,
+      },
+      {
+        cacheKey: this.cacheKey,
+        final: this.resolveFinal(),
+        parseOptions: this.parseOptions ?? this.context?.parseOptions,
+        customHtmlTags: this.resolveCustomHtmlTags(),
+        customMarkdownIt: this.customMarkdownIt ?? this.context?.customMarkdownIt,
+      },
+    ) as AngularRenderableNode[]
   }
 
   private buildItems(nodes: readonly AngularRenderableNode[] | null | undefined) {
@@ -94,5 +121,27 @@ export class NestedRendererComponent implements OnChanges {
     }
 
     return items
+  }
+
+  private resolveFinal() {
+    if (typeof this.final === 'boolean')
+      return this.final
+    if (typeof this.loading === 'boolean')
+      return !this.loading
+    if (typeof (this.node as any)?.loading === 'boolean')
+      return !(this.node as any).loading
+    return this.context?.final
+  }
+
+  private resolveCustomHtmlTags() {
+    const merged = new Set<string>()
+    for (const list of [this.context?.customHtmlTags, this.customHtmlTags]) {
+      for (const tag of list || []) {
+        const normalized = String(tag || '').trim()
+        if (normalized)
+          merged.add(normalized)
+      }
+    }
+    return Array.from(merged)
   }
 }

@@ -41,7 +41,13 @@ import { TextNodeComponent } from '../TextNode/TextNode.component'
 import { ThematicBreakNodeComponent } from '../ThematicBreakNode/ThematicBreakNode.component'
 import { VmrContainerNodeComponent } from '../VmrContainerNode/VmrContainerNode.component'
 import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
-import { getHtmlTagFromContent, resolveCodeBlockLanguage, stripCustomHtmlWrapper } from '../shared/node-helpers'
+import {
+  coerceBuiltinHtmlNode,
+  coerceCustomHtmlNode,
+  resolveHtmlTag,
+  resolveNodeOutletCodeMode,
+  resolveNodeOutletCustomInputs,
+} from '../shared/node-outlet-helpers'
 
 @Component({
   selector: 'markstream-angular-node-outlet',
@@ -95,6 +101,7 @@ import { getHtmlTagFromContent, resolveCodeBlockLanguage, stripCustomHtmlWrapper
         [node]="customNode"
         [context]="context"
         [indexKey]="indexKey"
+        [inputs]="resolvedComponentInputs"
       />
     </ng-container>
 
@@ -128,8 +135,8 @@ import { getHtmlTagFromContent, resolveCodeBlockLanguage, stripCustomHtmlWrapper
         <markstream-angular-checkbox-node *ngSwitchCase="'checkbox_input'" [node]="node" />
         <markstream-angular-emoji-node *ngSwitchCase="'emoji'" [node]="node" />
         <markstream-angular-reference-node *ngSwitchCase="'reference'" [node]="node" />
-        <markstream-angular-html-block-node *ngSwitchCase="'html_block'" [node]="htmlNode" [context]="context" />
-        <markstream-angular-html-inline-node *ngSwitchCase="'html_inline'" [node]="htmlNode" [context]="context" />
+        <markstream-angular-html-block-node *ngSwitchCase="'html_block'" [node]="htmlRenderNode" [context]="context" />
+        <markstream-angular-html-inline-node *ngSwitchCase="'html_inline'" [node]="htmlRenderNode" [context]="context" />
         <markstream-angular-vmr-container-node *ngSwitchCase="'vmr_container'" [node]="node" [context]="context" [indexKey]="indexKey" />
         <markstream-angular-thematic-break-node *ngSwitchCase="'thematic_break'" />
         <markstream-angular-math-inline-node *ngSwitchCase="'math_inline'" [node]="node" />
@@ -139,17 +146,20 @@ import { getHtmlTagFromContent, resolveCodeBlockLanguage, stripCustomHtmlWrapper
           <markstream-angular-mermaid-block-node
             *ngIf="codeMode === 'mermaid'; else nonMermaidCode"
             [node]="node"
+            [context]="context"
           />
           <ng-template #nonMermaidCode>
             <markstream-angular-d2-block-node
               *ngIf="codeMode === 'd2'; else nonD2Code"
               [node]="node"
+              [context]="context"
             />
           </ng-template>
           <ng-template #nonD2Code>
             <markstream-angular-infographic-block-node
               *ngIf="codeMode === 'infographic'; else genericCode"
               [node]="node"
+              [context]="context"
             />
           </ng-template>
           <ng-template #genericCode>
@@ -159,7 +169,7 @@ import { getHtmlTagFromContent, resolveCodeBlockLanguage, stripCustomHtmlWrapper
             />
           </ng-template>
           <ng-template #enhancedCode>
-            <markstream-angular-code-block-node [node]="node" />
+            <markstream-angular-code-block-node [node]="node" [context]="context" />
           </ng-template>
         </ng-container>
 
@@ -202,37 +212,26 @@ export class NodeOutletComponent {
   }
 
   get customNode() {
-    return this.htmlTag ? this.htmlNode : this.node
+    return coerceCustomHtmlNode(this.node)
   }
 
   get codeMode() {
-    const language = resolveCodeBlockLanguage(this.node)
-    if (language === 'd2' || language === 'd2lang')
-      return 'd2'
-    if (language === 'infographic')
-      return 'infographic'
-    if (language === 'mermaid')
-      return this.context?.renderCodeBlocksAsPre ? 'pre' : 'mermaid'
-    return this.context?.renderCodeBlocksAsPre ? 'pre' : 'code'
+    return resolveNodeOutletCodeMode(this.node, this.context)
   }
 
   get htmlTag() {
-    return String((this.node as any)?.tag || '').trim().toLowerCase() || getHtmlTagFromContent((this.node as any)?.content)
+    return resolveHtmlTag(this.node)
   }
 
-  get htmlNode() {
-    const tag = this.htmlTag
-    if (!tag)
-      return this.node
-    return {
-      ...(this.node as any),
-      type: this.resolvedType,
-      tag,
-      content: stripCustomHtmlWrapper((this.node as any)?.content, tag),
-    } as AngularRenderableNode
+  get htmlRenderNode() {
+    return coerceBuiltinHtmlNode(this.node, this.resolvedType)
   }
 
   get fallbackNode() {
     return this.node
+  }
+
+  get resolvedComponentInputs() {
+    return resolveNodeOutletCustomInputs(this.node, this.context)
   }
 }

@@ -2,7 +2,9 @@ import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, signal } from '@angular/core'
 import { MarkstreamAngularComponent } from 'markstream-angular'
 import { streamContent } from '../../playground/src/const/markdown'
-import { TestLabComponent } from './test-lab.component'
+import { TestPageComponent } from './test-page.component'
+import { TestSandboxComponent } from './test-sandbox.component'
+import { ThinkingNodeComponent } from './thinking-node.component'
 
 const markdownSource = typeof streamContent === 'string' ? streamContent : String(streamContent || '')
 const THINKING_TAGS = ['thinking'] as const
@@ -32,97 +34,106 @@ function readNumericInput(event: Event, fallback: number) {
 @Component({
   selector: 'playground-angular-root',
   standalone: true,
-  imports: [CommonModule, MarkstreamAngularComponent, TestLabComponent],
+  imports: [CommonModule, MarkstreamAngularComponent, TestPageComponent, TestSandboxComponent],
   template: `
-    <app-angular-test-lab
-      *ngIf="isTestPage(); else home"
-      (navigateHome)="goHome()"
-    />
+    <app-angular-test-sandbox *ngIf="isSandboxPage(); else nonSandbox" />
 
-    <ng-template #home>
-      <div class="page">
-        <header class="header">
-          <div class="header-main">
-            <div class="title">markstream-angular playground</div>
-            <button type="button" class="btn" (click)="goToTest()">
-              Open /test
-            </button>
-          </div>
-          <div class="sub">
-            Angular baseline demo: streaming markdown into the renderer with a stable HTML output path.
-          </div>
-        </header>
+    <ng-template #nonSandbox>
+      <app-angular-test-page
+        *ngIf="isTestPage(); else home"
+        (navigateHome)="goHome()"
+      />
 
-        <div class="layout">
-          <section class="panel controls">
-            <h2>Stream controls</h2>
-
-            <div class="field">
-              <label for="delay">Delay (ms)</label>
-              <input
-                id="delay"
-                type="number"
-                min="4"
-                max="200"
-                [value]="delay()"
-                (input)="updateDelay($event)"
-              >
-            </div>
-
-            <div class="field">
-              <label for="chunk">Chunk size</label>
-              <input
-                id="chunk"
-                type="number"
-                min="1"
-                max="16"
-                [value]="chunkSize()"
-                (input)="updateChunkSize($event)"
-              >
-            </div>
-
-            <div class="actions">
-              <button type="button" class="btn" (click)="toggleStream()">
-                {{ running() ? 'Pause' : 'Resume' }}
-              </button>
-              <button type="button" class="btn" (click)="resetStream()">
-                Reset
-              </button>
-              <button type="button" class="btn ghost" (click)="fillAll()">
-                Render all
+      <ng-template #home>
+        <div class="page">
+          <header class="header">
+            <div class="header-main">
+              <div class="title">markstream-angular playground</div>
+              <button type="button" class="btn" (click)="goToTest()">
+                Open /test
               </button>
             </div>
+            <div class="sub">
+              Angular playground with streaming demo, standalone /test regression lab, and isolated /test-sandbox.
+            </div>
+          </header>
 
-            <div class="status">
-              <div class="progress">
-                <div class="bar" [style.width.%]="progress()"></div>
+          <div class="layout">
+            <section class="panel controls">
+              <h2>Stream controls</h2>
+
+              <div class="field">
+                <label for="delay">Delay (ms)</label>
+                <input
+                  id="delay"
+                  type="number"
+                  min="4"
+                  max="200"
+                  [value]="delay()"
+                  (input)="updateDelay($event)"
+                >
               </div>
-              <div class="meta">
-                {{ content().length }} / {{ totalLength }} ({{ progress() }}%)
+
+              <div class="field">
+                <label for="chunk">Chunk size</label>
+                <input
+                  id="chunk"
+                  type="number"
+                  min="1"
+                  max="16"
+                  [value]="chunkSize()"
+                  (input)="updateChunkSize($event)"
+                >
               </div>
-            </div>
 
-            <p class="note">
-              这个 playground 先走 Angular baseline 方案：parser + stable HTML renderer。
-              现在已经补上 Mermaid / KaTeX / Monaco / Infographic / D2，剩下主要是继续打磨交互细节与更深的 parity。
-            </p>
-          </section>
+              <div class="actions">
+                <button type="button" class="btn" (click)="toggleStream()">
+                  {{ running() ? 'Pause' : 'Resume' }}
+                </button>
+                <button type="button" class="btn" (click)="resetStream()">
+                  Reset
+                </button>
+                <button type="button" class="btn ghost" (click)="fillAll()">
+                  Render all
+                </button>
+              </div>
 
-          <section class="panel preview">
-            <markstream-angular
-              [content]="content()"
-              [final]="isDone()"
-              [customHtmlTags]="thinkingTags"
-            />
-          </section>
+              <div class="status">
+                <div class="progress">
+                  <div class="bar" [style.width.%]="progress()"></div>
+                </div>
+                <div class="meta">
+                  {{ content().length }} / {{ totalLength }} ({{ progress() }}%)
+                </div>
+              </div>
+
+              <p class="note">
+                首页保留主 demo；更完整的跨框架回归入口在 <code>/test</code>，隔离版本对照在 <code>/test-sandbox</code>。
+              </p>
+            </section>
+
+            <section class="panel preview">
+              <markstream-angular
+                [content]="content()"
+                [final]="isDone()"
+                [renderCodeBlocksAsPre]="false"
+                [codeBlockStream]="true"
+                [customHtmlTags]="thinkingTags"
+                [customComponents]="customComponents"
+              />
+            </section>
+          </div>
         </div>
-      </div>
+      </ng-template>
     </ng-template>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit, OnDestroy {
   readonly thinkingTags = THINKING_TAGS
+  readonly customComponents = {
+    thinking: ThinkingNodeComponent,
+  }
   readonly totalLength = markdownSource.length
   readonly currentPath = signal(typeof window === 'undefined' ? '/' : normalizePath(window.location.pathname))
   readonly content = signal('')
@@ -137,6 +148,7 @@ export class AppComponent implements OnInit, OnDestroy {
   })
   readonly isDone = computed(() => this.content().length >= this.totalLength)
   readonly isTestPage = computed(() => this.currentPath() === '/test')
+  readonly isSandboxPage = computed(() => this.currentPath() === '/test-sandbox')
 
   private timer: number | null = null
 
@@ -190,7 +202,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private readonly handlePopState = () => {
     this.syncPath()
-    if (this.isTestPage())
+    if (this.isTestPage() || this.isSandboxPage())
       this.stopStream()
     else if (!this.content())
       this.startStream()
@@ -209,7 +221,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.currentPath.set(nextPath)
 
-    if (this.isTestPage())
+    if (this.isTestPage() || this.isSandboxPage())
       this.stopStream()
     else if (!this.content() || this.content().length >= markdownSource.length)
       this.resetStream()

@@ -1,4 +1,4 @@
-export type TestLabSampleId = 'baseline' | 'diff' | 'stress'
+export type TestLabSampleId = 'baseline' | 'thinking' | 'diff' | 'stress'
 export type TestLabFrameworkId = 'vue3' | 'vue2' | 'react' | 'angular'
 
 export interface TestLabFrameworkCard {
@@ -41,7 +41,7 @@ export const TEST_LAB_FRAMEWORKS: ReadonlyArray<TestLabFrameworkCard> = [
   {
     id: 'angular',
     label: 'Angular',
-    note: 'enhanced / experimental',
+    note: 'standalone / parity lab',
     origin: 'https://markstream-angular.pages.dev',
     localPort: 4175,
   },
@@ -112,6 +112,39 @@ Lab: Playground/Test
 
 App -> Parser -> Renderer -> Lab
 \`\`\`
+`,
+  },
+  {
+    id: 'thinking',
+    title: 'Thinking 嵌套重节点',
+    summary: '检查 custom thinking 节点里是否还能稳定渲染 Mermaid、代码块和列表。',
+    content: `# Thinking / Nested Blocks
+
+<thinking>
+在这个 thinking 容器里，我们希望 Angular 和 Vue / React 一样，仍然按正常 markdown 节点树渲染。
+
+## Nested Mermaid
+
+\`\`\`mermaid
+flowchart TD
+  Thinking --> Parse
+  Parse --> Mermaid
+  Parse --> CodeBlock
+\`\`\`
+
+## Nested Code Block
+
+\`\`\`ts
+export function ensureParity(name: string) {
+  return \`nested renderer ok: \${name}\`
+}
+\`\`\`
+
+- nested list item
+- another item
+</thinking>
+
+外层正文不应该被吞掉。
 `,
   },
   {

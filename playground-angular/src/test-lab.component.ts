@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, OnDestroy, OnInit, Ou
 import { MarkstreamAngularComponent } from 'markstream-angular'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES, type TestLabFrameworkId, type TestLabSampleId } from '../../playground-shared/testLabFixtures'
 import { decodeMarkdownHash, resolveFrameworkTestHref } from '../../playground-shared/testPageState'
+import { ThinkingNodeComponent } from './thinking-node.component'
 
 function clampInt(value: number, min: number, max: number, fallback: number) {
   const normalized = Number.isFinite(value) ? Math.round(value) : fallback
@@ -164,6 +165,8 @@ function readTextInput(event: Event, fallback = '') {
                   [content]="previewContent()"
                   [final]="!isStreaming()"
                   [codeBlockStream]="true"
+                  [customHtmlTags]="thinkingTags"
+                  [customComponents]="customComponents"
                 />
               </div>
 
@@ -183,6 +186,10 @@ export class TestLabComponent implements OnInit, OnDestroy {
   @Output() readonly navigateHome = new EventEmitter<void>()
 
   readonly currentFramework: TestLabFrameworkId = 'angular'
+  readonly thinkingTags = ['thinking'] as const
+  readonly customComponents = {
+    thinking: ThinkingNodeComponent,
+  }
   readonly frameworkCards = TEST_LAB_FRAMEWORKS
   readonly sampleCards = TEST_LAB_SAMPLES
   readonly selectedSampleId = signal<TestLabSampleId>('baseline')

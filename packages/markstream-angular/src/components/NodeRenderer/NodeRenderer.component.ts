@@ -198,11 +198,16 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   }
 
   get resolvedMaxLiveNodes() {
-    return Math.max(1, Math.trunc(this.maxLiveNodes || 320))
+    return Math.max(1, Math.trunc(this.maxLiveNodes ?? 320))
   }
 
   get resolvedLiveNodeBuffer() {
-    return Math.max(0, Math.trunc(this.liveNodeBuffer || 60))
+    return Math.max(0, Math.trunc(this.liveNodeBuffer ?? 60))
+  }
+
+  get liveWindowEnabled() {
+    const configuredMaxLiveNodes = Math.trunc(this.maxLiveNodes ?? 320)
+    return Number.isFinite(configuredMaxLiveNodes) && configuredMaxLiveNodes > 0
   }
 
   get viewportPriorityEnabled() {
@@ -210,12 +215,13 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   }
 
   get virtualizationEnabled() {
-    return resolveVirtualizationEnabled(this.parsedNodes.length, this.resolvedMaxLiveNodes)
+    return resolveVirtualizationEnabled(this.parsedNodes.length, this.maxLiveNodes)
   }
 
   get incrementalRenderingActive() {
     return this.batchRendering !== false
       && typeof window !== 'undefined'
+      && !this.liveWindowEnabled
       && !this.virtualizationEnabled
       && this.parsedNodes.length > this.resolvedInitialBatchSize
   }
@@ -223,7 +229,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   get deferNodesActive() {
     return resolveDeferNodes({
       deferNodesUntilVisible: this.deferNodesUntilVisible,
-      maxLiveNodes: this.resolvedMaxLiveNodes,
+      maxLiveNodes: this.maxLiveNodes,
       parsedNodeCount: this.parsedNodes.length,
       viewportPriority: this.viewportPriorityEnabled,
       virtualizationEnabled: this.virtualizationEnabled,
@@ -336,7 +342,6 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
 
   private cleanupTransientState() {
     this.slotElements.clear()
-    this.nodeVisibility.clear()
     this.disconnectObserver()
   }
 
@@ -349,6 +354,10 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     for (const index of Array.from(this.nodeSeen)) {
       if (index >= total)
         this.nodeSeen.delete(index)
+    }
+    for (const index of Array.from(this.nodeVisibility)) {
+      if (index >= total)
+        this.nodeVisibility.delete(index)
     }
   }
 
@@ -719,6 +728,10 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
       d2ThemeId: this.d2Props?.themeId ?? null,
       d2DarkThemeId: this.d2Props?.darkThemeId ?? null,
       showTooltips: this.showTooltips,
+      codeBlockProps: this.codeBlockProps,
+      mermaidProps: this.mermaidProps,
+      d2Props: this.d2Props,
+      infographicProps: this.infographicProps,
       onCopy: code => this.copy.emit(code),
       isCancelled: () => token !== this.enhancementToken,
     })

@@ -4,9 +4,12 @@ import { getKatex } from './optional/katex'
 import { getUseMonaco } from './optional/monaco'
 import { getMermaid } from './optional/mermaid'
 import { extractRenderedSvg, toSafeSvgMarkup } from './sanitizeSvg'
+import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from './workers/katexWorkerClient'
+import { canParseOffthread, findPrefixOffthread } from './workers/mermaidWorkerClient'
 
 let mermaidRenderId = 0
 const rootHandles = new WeakMap<HTMLElement, RenderedHtmlEnhancementHandle>()
+type MermaidTheme = 'light' | 'dark'
 
 const DARK_THEME_OVERRIDES: Record<string, string> = {
   N1: '#E5E7EB',
@@ -55,6 +58,10 @@ export interface EnhanceRenderedHtmlOptions {
   d2ThemeId?: number | null
   d2DarkThemeId?: number | null
   showTooltips?: boolean
+  codeBlockProps?: Record<string, any>
+  mermaidProps?: Record<string, any>
+  d2Props?: Record<string, any>
+  infographicProps?: Record<string, any>
   onCopy?: (code: string) => void
   isCancelled?: () => boolean
 }
@@ -99,7 +106,7 @@ export async function enhanceRenderedHtml(
   if (!isActive())
     return handle
 
-  await renderMermaid(root, isActive)
+  await renderMermaid(root, cleanupFns, options, isActive)
   if (!isActive())
     return handle
 
@@ -126,27 +133,79 @@ export function disposeRenderedHtmlEnhancements(root: HTMLElement | null | undef
   existing?.dispose()
 }
 
-async function renderKatex(root: HTMLElement, isActive: () => boolean) {
-  const katex = await getKatex()
-  if (!katex || !isActive())
-    return
+function readKatexSource(node: HTMLElement, selector: string) {
+  const sourceElement = node.querySelector<HTMLElement>(selector)
+  return {
+    sourceElement,
+    source: (sourceElement?.textContent || (!sourceElement ? node.textContent : '') || '').trim(),
+  }
+}
 
+function resolveKatexRenderTarget(node: HTMLElement, selector: string) {
+  return node.querySelector<HTMLElement>(selector)
+}
+
+function hasRenderedKatex(node: HTMLElement, selector: string) {
+  const renderTarget = resolveKatexRenderTarget(node, selector)
+  const scope = renderTarget || node
+  return !!scope.querySelector('.katex, .katex-display')
+}
+
+function writeKatexMarkup(
+  node: HTMLElement,
+  renderTarget: HTMLElement | null,
+  markup: string,
+  options: { renderedClass?: string } = {},
+) {
+  if (renderTarget)
+    renderTarget.innerHTML = markup
+  else
+    node.innerHTML = markup
+
+  node.dataset.markstreamKatex = '1'
+  if (options.renderedClass)
+    node.classList.add(options.renderedClass)
+}
+
+function clearKatexMarkup(
+  node: HTMLElement,
+  renderTarget: HTMLElement | null,
+  options: { renderedClass?: string } = {},
+) {
+  if (renderTarget)
+    renderTarget.innerHTML = ''
+  delete node.dataset.markstreamKatex
+  delete node.dataset.markstreamKatexSource
+  if (options.renderedClass)
+    node.classList.remove(options.renderedClass)
+}
+
+async function renderKatex(root: HTMLElement, isActive: () => boolean) {
   const inlineNodes = Array.from(root.querySelectorAll<HTMLElement>('.markstream-nested-math'))
   for (const node of inlineNodes) {
     if (!isActive())
       return
-    const source = (node.textContent || '').trim()
-    if (!source)
+    if (node.dataset.markstreamKatexManaged === '1')
       continue
+    const { source } = readKatexSource(node, '.markstream-nested-math__source')
+    const renderTarget = resolveKatexRenderTarget(node, '.markstream-nested-math__render')
+    if (!source) {
+      clearKatexMarkup(node, renderTarget)
+      continue
+    }
+    if (
+      node.dataset.markstreamKatex === '1'
+      && node.dataset.markstreamKatexSource === source
+      && hasRenderedKatex(node, '.markstream-nested-math__render')
+    ) {
+      continue
+    }
     try {
-      node.innerHTML = katex.renderToString(source, {
-        displayMode: node.dataset.display === 'block',
-        throwOnError: false,
-      })
-      node.dataset.markstreamKatex = '1'
+      writeKatexMarkup(node, renderTarget, await renderKatexMarkup(source, node.dataset.display === 'block'))
+      node.dataset.markstreamKatexSource = source
     }
     catch {
-      // Leave the plain source intact if KaTeX fails to render.
+      clearKatexMarkup(node, renderTarget)
     }
   }
 
@@ -154,24 +213,67 @@ async function renderKatex(root: HTMLElement, isActive: () => boolean) {
   for (const node of blockNodes) {
     if (!isActive())
       return
-    const source = (node.textContent || '').trim()
-    if (!source)
+    if (node.dataset.markstreamKatexManaged === '1')
       continue
+    const { source } = readKatexSource(node, '.markstream-nested-math-block__source')
+    const renderTarget = resolveKatexRenderTarget(node, '.markstream-nested-math-block__render')
+    if (!source) {
+      clearKatexMarkup(node, renderTarget, { renderedClass: 'markstream-nested-math-block--rendered' })
+      continue
+    }
+    if (
+      node.dataset.markstreamKatex === '1'
+      && node.dataset.markstreamKatexSource === source
+      && hasRenderedKatex(node, '.markstream-nested-math-block__render')
+    ) {
+      continue
+    }
     try {
-      node.innerHTML = katex.renderToString(source, {
-        displayMode: true,
-        throwOnError: false,
+      writeKatexMarkup(node, renderTarget, await renderKatexMarkup(source, true), {
+        renderedClass: 'markstream-nested-math-block--rendered',
       })
-      node.dataset.markstreamKatex = '1'
-      node.classList.add('markstream-nested-math-block--rendered')
+      node.dataset.markstreamKatexSource = source
     }
     catch {
-      // Leave the plain source intact if KaTeX fails to render.
+      clearKatexMarkup(node, renderTarget, { renderedClass: 'markstream-nested-math-block--rendered' })
     }
   }
 }
 
-async function renderMermaid(root: HTMLElement, isActive: () => boolean) {
+async function renderKatexMarkup(source: string, displayMode: boolean) {
+  try {
+    return await renderKaTeXWithBackpressure(source, displayMode, {
+      timeout: 1500,
+      waitTimeout: 0,
+      maxRetries: 0,
+    })
+  }
+  catch (error: any) {
+    const code = error?.code || error?.name
+    const isWorkerInitFailure = code === 'WORKER_INIT_ERROR' || error?.fallbackToRenderer
+    const isBusyOrTimeout = code === WORKER_BUSY_CODE || code === 'WORKER_TIMEOUT'
+    if (!isWorkerInitFailure && !isBusyOrTimeout)
+      throw error
+  }
+
+  const katex = await getKatex()
+  if (!katex)
+    throw new Error('KaTeX renderer is not available.')
+
+  const html = katex.renderToString(source, {
+    displayMode,
+    throwOnError: false,
+  })
+  setKaTeXCache(source, displayMode, html)
+  return html
+}
+
+async function renderMermaid(
+  root: HTMLElement,
+  cleanupFns: Array<() => void>,
+  options: EnhanceRenderedHtmlOptions,
+  isActive: () => boolean,
+) {
   const mermaid = await getMermaid({
     startOnLoad: false,
     securityLevel: 'loose',
@@ -184,27 +286,176 @@ async function renderMermaid(root: HTMLElement, isActive: () => boolean) {
   for (const codeNode of codeNodes) {
     if (!isActive())
       return
-    const container = codeNode.parentElement
+    const pre = codeNode.parentElement as HTMLElement | null
     const source = (codeNode.textContent || '').trim()
-    if (!container || !source)
+    if (!pre || !source)
       continue
 
+    const originalPre = pre.cloneNode(true) as HTMLElement
+    const shell = createEnhancedBlockShell(
+      'mermaid',
+      'Mermaid',
+      source,
+      true,
+      options,
+      {
+        showHeader: options.mermaidProps?.showHeader !== false,
+      },
+    )
+    pre.replaceWith(shell.wrapper)
+
     try {
+      const theme: MermaidTheme = options.isDark ? 'dark' : 'light'
+      let sourceToRender = source
+      if (options.final === false) {
+        try {
+          await canParseMermaidWithFallback(source, theme, mermaid, options)
+        }
+        catch (error: any) {
+          if (error?.name === 'AbortError')
+            return
+          const prefix = await findMermaidPrefixCandidate(source, theme, options)
+          if (!isActive())
+            return
+          if (!prefix) {
+            shell.wrapper.replaceWith(originalPre)
+            continue
+          }
+          sourceToRender = prefix
+        }
+      }
+
       const renderId = `markstream-angular-mermaid-${++mermaidRenderId}`
-      const rendered = await mermaid.render(renderId, source)
+      const rendered = await withTimeout(
+        () => Promise.resolve(mermaid.render(renderId, applyMermaidThemeTo(sourceToRender, theme))),
+        options.final === false
+          ? Number(options.mermaidProps?.renderTimeoutMs ?? 2500)
+          : Number(options.mermaidProps?.fullRenderTimeoutMs ?? 4000),
+      )
       if (!isActive())
         return
       const svg = typeof rendered === 'string' ? rendered : rendered?.svg
       if (!svg)
         continue
-      container.innerHTML = svg
-      container.classList.add('markstream-angular-mermaid')
-      rendered?.bindFunctions?.(container)
+      shell.body.innerHTML = svg
+      shell.body.classList.add('markstream-angular-mermaid')
+      shell.wrapper.dataset.markstreamMermaid = '1'
+      rendered?.bindFunctions?.(shell.body)
+      cleanupFns.push(() => {
+        if (shell.wrapper.isConnected)
+          shell.wrapper.replaceWith(originalPre.cloneNode(true))
+      })
     }
     catch {
-      // Keep the original <pre><code> when Mermaid cannot render.
+      shell.wrapper.replaceWith(originalPre)
     }
   }
+}
+
+function applyMermaidThemeTo(source: string, theme: MermaidTheme) {
+  const trimmed = source.trimStart()
+  if (trimmed.startsWith('%%{'))
+    return source
+  const themeValue = theme === 'dark' ? 'dark' : 'default'
+  return `%%{init: {"theme": "${themeValue}"}}%%\n${source}`
+}
+
+async function canParseMermaidWithFallback(
+  source: string,
+  theme: MermaidTheme,
+  mermaid: any,
+  options: EnhanceRenderedHtmlOptions,
+) {
+  const workerTimeout = Number(options.mermaidProps?.workerTimeoutMs ?? 1400)
+  const parseTimeout = Number(options.mermaidProps?.parseTimeoutMs ?? 1800)
+  try {
+    const ok = await canParseOffthread(source, theme, workerTimeout)
+    if (ok)
+      return true
+  }
+  catch (error: any) {
+    if (error?.name === 'AbortError')
+      throw error
+  }
+
+  const themedSource = applyMermaidThemeTo(source, theme)
+  if (typeof mermaid?.parse === 'function') {
+    await withTimeout(() => Promise.resolve(mermaid.parse(themedSource)), parseTimeout)
+    return true
+  }
+
+  const renderId = `markstream-angular-mermaid-parse-${++mermaidRenderId}`
+  await withTimeout(() => Promise.resolve(mermaid.render(renderId, themedSource)), parseTimeout)
+  return true
+}
+
+async function findMermaidPrefixCandidate(
+  source: string,
+  theme: MermaidTheme,
+  options: EnhanceRenderedHtmlOptions,
+) {
+  const workerTimeout = Number(options.mermaidProps?.workerTimeoutMs ?? 1400)
+  try {
+    const prefix = await findPrefixOffthread(source, theme, workerTimeout)
+    if (prefix)
+      return prefix
+  }
+  catch (error: any) {
+    if (error?.name === 'AbortError')
+      throw error
+  }
+  return getSafeMermaidPrefixCandidate(source)
+}
+
+function getSafeMermaidPrefixCandidate(source: string) {
+  const lines = source.split('\n')
+  while (lines.length > 0) {
+    const lastRaw = lines[lines.length - 1]
+    const last = lastRaw.trimEnd()
+    if (!last) {
+      lines.pop()
+      continue
+    }
+    const looksDangling = /^[-=~>|<\s]+$/.test(last.trim())
+      || /(?:--|==|~~|->|<-|-\||-\)|-x|o-|\|-|\.-)\s*$/.test(last)
+      || /[-|><]$/.test(last)
+      || /(?:graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt)\s*$/i.test(last)
+    if (!looksDangling)
+      break
+    lines.pop()
+  }
+  return lines.join('\n')
+}
+
+function withTimeout<T>(run: () => Promise<T>, timeoutMs: number) {
+  if (!timeoutMs || timeoutMs <= 0)
+    return run()
+
+  return new Promise<T>((resolve, reject) => {
+    let settled = false
+    const timer = globalThis.setTimeout(() => {
+      if (settled)
+        return
+      settled = true
+      reject(new Error('Operation timed out'))
+    }, timeoutMs)
+
+    run()
+      .then((value) => {
+        if (settled)
+          return
+        settled = true
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        if (settled)
+          return
+        settled = true
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
 }
 
 async function renderInfographic(
@@ -227,7 +478,9 @@ async function renderInfographic(
       continue
 
     const originalPre = pre.cloneNode(true) as HTMLElement
-    const shell = createEnhancedBlockShell('infographic', 'Infographic', source, true, options)
+    const shell = createEnhancedBlockShell('infographic', 'Infographic', source, true, options, {
+      showHeader: options.infographicProps?.showHeader !== false,
+    })
     shell.body.style.minHeight = '320px'
     shell.body.style.height = '360px'
     pre.replaceWith(shell.wrapper)
@@ -284,7 +537,9 @@ async function renderD2(
       continue
 
     const originalPre = pre.cloneNode(true) as HTMLElement
-    const shell = createEnhancedBlockShell('d2', 'D2', source, true, options)
+    const shell = createEnhancedBlockShell('d2', 'D2', source, true, options, {
+      showHeader: options.d2Props?.showHeader !== false,
+    })
     pre.replaceWith(shell.wrapper)
 
     try {
@@ -367,6 +622,9 @@ async function renderMonaco(
       source,
       false,
       options,
+      {
+        showHeader: options.codeBlockProps?.showHeader !== false,
+      },
     )
     shell.body.classList.add('markstream-angular-enhanced-block__body--code')
     shell.body.style.minHeight = `${estimateCodeBlockHeight(diff ? updatedCode || source : source, diff)}px`
@@ -483,25 +741,30 @@ function decodeDataPayload(value: string | null | undefined) {
 }
 
 function createEnhancedBlockShell(
-  kind: 'code' | 'd2' | 'infographic',
+  kind: 'code' | 'd2' | 'infographic' | 'mermaid',
   label: string,
   source: string,
   showSourceDetails: boolean,
   options: EnhanceRenderedHtmlOptions,
+  shellOptions: {
+    showHeader?: boolean
+  } = {},
 ) {
   const wrapper = document.createElement('div')
   wrapper.className = `markstream-angular-enhanced-block markstream-angular-enhanced-block--${kind}`
 
-  const header = document.createElement('div')
-  header.className = 'markstream-angular-enhanced-block__header'
+  if (shellOptions.showHeader !== false) {
+    const header = document.createElement('div')
+    header.className = 'markstream-angular-enhanced-block__header'
 
-  const badge = document.createElement('span')
-  badge.className = 'markstream-angular-enhanced-block__badge'
-  badge.textContent = label
+    const badge = document.createElement('span')
+    badge.className = 'markstream-angular-enhanced-block__badge'
+    badge.textContent = label
 
-  header.appendChild(badge)
-  header.appendChild(createHeaderActions(source, options))
-  wrapper.appendChild(header)
+    header.appendChild(badge)
+    header.appendChild(createHeaderActions(source, options))
+    wrapper.appendChild(header)
+  }
 
   const body = document.createElement('div')
   body.className = 'markstream-angular-enhanced-block__body'

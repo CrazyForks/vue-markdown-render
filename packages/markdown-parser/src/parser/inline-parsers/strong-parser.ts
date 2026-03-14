@@ -1,6 +1,26 @@
 import type { MarkdownToken, ParsedNode, ParseOptions, StrongNode } from '../../types'
 import { parseInlineTokens } from '../index'
 
+const ESCAPED_PUNCTUATION_RE = /\\([\\()[\]`$|*_\-!])/g
+
+function resolveInnerRaw(raw: string | undefined, strongText: string) {
+  if (!raw)
+    return undefined
+
+  const rawText = String(raw)
+  if (!rawText)
+    return undefined
+
+  if (rawText === strongText)
+    return rawText
+
+  const decodedRawText = rawText.replace(ESCAPED_PUNCTUATION_RE, '$1')
+  if (decodedRawText === strongText)
+    return rawText
+
+  return undefined
+}
+
 export function parseStrongToken(
   tokens: MarkdownToken[],
   startIndex: number,
@@ -33,7 +53,7 @@ export function parseStrongToken(
   }
 
   // Parse inner tokens to handle nested elements
-  children.push(...parseInlineTokens(innerTokens, raw, undefined, {
+  children.push(...parseInlineTokens(innerTokens, resolveInnerRaw(raw, strongText), undefined, {
     requireClosingStrong: options?.requireClosingStrong,
     final: options?.final,
     customHtmlTags: options?.customHtmlTags,

@@ -1,6 +1,7 @@
 export type MermaidLoader = () => Promise<any> | any
 
 const defaultMermaidLoader: MermaidLoader = () => import('mermaid')
+const GLOBAL_MERMAID_KEY = '__MARKSTREAM_ANGULAR_MERMAID__'
 
 let cachedMermaid: any = null
 let importAttempted = false
@@ -85,10 +86,19 @@ function ensureInitialized(instance: any, config?: Record<string, any>) {
 function getGlobalMermaid() {
   try {
     const globalStore = globalThis as any
-    return normalizeMermaidModule(globalStore?.mermaid)
+    return normalizeMermaidModule(globalStore?.[GLOBAL_MERMAID_KEY] ?? globalStore?.mermaid)
   }
   catch {
     return null
+  }
+}
+
+function setGlobalMermaid(instance: any) {
+  try {
+    ;(globalThis as any)[GLOBAL_MERMAID_KEY] = instance
+  }
+  catch {
+    // Ignore global cache writes when the host forbids mutation.
   }
 }
 
@@ -97,6 +107,12 @@ function resetCachedMermaid() {
   importAttempted = false
   lastInitKey = null
   pendingImport = null
+  try {
+    delete (globalThis as any)[GLOBAL_MERMAID_KEY]
+  }
+  catch {
+    // Ignore failures when the global object is sealed.
+  }
 }
 
 export function setMermaidLoader(loader: MermaidLoader | null) {
@@ -126,6 +142,7 @@ export async function getMermaid(initConfig?: Record<string, any>) {
   if (globalMermaid) {
     patchInitialize(globalMermaid)
     cachedMermaid = globalMermaid
+    setGlobalMermaid(cachedMermaid)
     ensureInitialized(cachedMermaid, initConfig)
     return cachedMermaid
   }
@@ -156,6 +173,7 @@ export async function getMermaid(initConfig?: Record<string, any>) {
       }
       patchInitialize(instance)
       cachedMermaid = instance
+      setGlobalMermaid(cachedMermaid)
       return cachedMermaid
     }
     catch {

@@ -135,6 +135,53 @@
   text-underline-offset: 0.18em;
 }
 
+.markstream-angular .link-node {
+  color: var(--link-color, #0366d6);
+  text-decoration: none;
+}
+
+.markstream-angular .link-node:hover {
+  text-decoration: underline;
+  text-underline-offset: .2rem;
+}
+
+.markstream-angular .link-loading {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+}
+
+.markstream-angular .link-loading .link-text-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.markstream-angular .link-loading .link-text {
+  position: relative;
+  z-index: 2;
+}
+
+.markstream-angular .underline-anim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--underline-height, 2px);
+  bottom: var(--underline-bottom, -3px);
+  background: currentColor;
+  transform-origin: center center;
+  will-change: transform, opacity;
+  opacity: var(--underline-opacity, 0.9);
+  transform: scaleX(0);
+  animation: underlineLoop var(--underline-duration, 0.8s) var(--underline-timing, linear) var(--underline-iteration, infinite);
+}
+
+@keyframes underlineLoop {
+  0% { transform: scaleX(0); opacity: var(--underline-opacity, 0.9); }
+  75% { transform: scaleX(1); opacity: var(--underline-opacity, 0.9); }
+  99% { transform: scaleX(1); opacity: var(--underline-opacity, 0.9); }
+  100% { transform: scaleX(0); opacity: 0; }
+}
+
 .markstream-angular strong {
   font-weight: 700;
 }
@@ -166,12 +213,18 @@
   color: inherit;
 }
 
-.markstream-angular blockquote {
-  padding: 0.35rem 0 0.35rem 1rem;
-  border-left: 4px solid rgba(37, 99, 235, 0.28);
-  border-radius: 0.85rem;
-  background: rgba(37, 99, 235, 0.05);
-  color: rgba(15, 23, 42, 0.78);
+.markstream-angular blockquote,
+.markstream-angular .blockquote-node {
+  font-weight: 500;
+  font-style: italic;
+  border-left: 0.25rem solid var(--blockquote-border-color, #e2e8f0);
+  quotes: "\201C" "\201D" "\2018" "\2019";
+  margin-top: 1.6em;
+  margin-bottom: 1.6em;
+  padding-left: 1em;
+  background: transparent;
+  border-radius: 0;
+  color: inherit;
 }
 
 .markstream-angular hr {
@@ -305,29 +358,56 @@ body > div[id^="dmermaid-"] {
   background: rgba(16, 185, 129, 0.07);
 }
 
-.markstream-angular .markstream-nested-math,
 .markstream-angular .markstream-nested-reference,
 .markstream-angular .markstream-nested-footnote-ref {
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
-.markstream-angular .markstream-nested-math {
-  padding: 0.1rem 0.35rem;
-  border-radius: 0.4rem;
-  background: rgba(15, 23, 42, 0.05);
+.markstream-angular .math-inline-wrapper {
+  position: relative;
+  display: inline-block;
 }
 
+.markstream-angular .math-inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.markstream-angular .math-inline--hidden {
+  visibility: hidden;
+}
+
+.markstream-angular .math-inline__loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.markstream-angular .math-inline__spinner {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(94, 104, 121, 0.25);
+  border-top-color: rgba(94, 104, 121, 0.8);
+  animation: spin 1s linear infinite;
+}
+
+.markstream-angular .math-block,
 .markstream-angular .markstream-nested-math-block {
-  border-radius: 1rem;
+  position: relative;
+  text-align: center;
+  overflow-x: auto;
+  min-height: 40px;
+  padding: 0.5rem;
 }
 
-.markstream-angular .markstream-nested-math-block--rendered {
-  background: rgba(15, 23, 42, 0.03);
-  color: inherit;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+.markstream-angular .math-rendering {
+  opacity: 0.3;
+  transition: opacity 0.2s ease;
 }
 
-.markstream-angular .markstream-nested-math-block--rendered .katex-display {
+.markstream-angular .markstream-nested-math-block__render .katex-display {
   margin: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -349,6 +429,237 @@ body > div[id^="dmermaid-"] {
   max-width: 100%;
   height: auto;
   margin: 0 auto;
+}
+
+.markstream-angular .mermaid-block {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 1rem;
+  background: #fff;
+  color: #0f172a;
+  margin: 1.25rem 0;
+  overflow: hidden;
+}
+
+.markstream-angular.dark .mermaid-block,
+.dark .markstream-angular .mermaid-block {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+.markstream-angular .mermaid-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.markstream-angular .mermaid-modal-panel {
+  position: relative;
+  width: min(64rem, calc(100% - 2rem));
+  margin: 2rem auto;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+}
+
+.markstream-angular .mermaid-modal-panel.is-dark {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.markstream-angular .mermaid-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.markstream-angular .mermaid-modal-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.markstream-angular .mermaid-modal-close {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.markstream-angular .mermaid-modal-close:hover {
+  opacity: 1;
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.markstream-angular .mermaid-modal-body {
+  padding: 1rem;
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.markstream-angular .mermaid-modal-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  transform-origin: center center;
+}
+
+.markstream-angular .fullscreen {
+  width: 100%;
+  max-height: 100% !important;
+  height: 100% !important;
+}
+
+.markstream-angular .mermaid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(248, 250, 252, 0.85);
+}
+
+.markstream-angular.dark .mermaid-header,
+.dark .markstream-angular .mermaid-header {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(71, 85, 105, 0.6);
+}
+
+.markstream-angular .mermaid-title__text {
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: inherit;
+}
+
+.markstream-angular .mermaid-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.markstream-angular .mermaid-btn {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 0.35rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.markstream-angular .mermaid-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+
+.markstream-angular.dark .mermaid-btn:hover:not(:disabled),
+.dark .markstream-angular .mermaid-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.3);
+  color: #bfdbfe;
+}
+
+.markstream-angular .mermaid-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.markstream-angular .mermaid-toggle {
+  display: inline-flex;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  overflow: hidden;
+}
+
+.markstream-angular .mermaid-toggle-btn {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.65rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.markstream-angular .mermaid-toggle-btn--active {
+  background: rgba(59, 130, 246, 0.18);
+  color: #1d4ed8;
+}
+
+.markstream-angular.dark .mermaid-toggle-btn--active,
+.dark .markstream-angular .mermaid-toggle-btn--active {
+  background: rgba(59, 130, 246, 0.3);
+  color: #bfdbfe;
+}
+
+.markstream-angular .mermaid-body {
+  position: relative;
+  padding: 1rem;
+}
+
+.markstream-angular .mermaid-preview {
+  width: 100%;
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transform-origin: top center;
+}
+
+.markstream-angular .mermaid-preview svg {
+  width: 100%;
+  height: auto;
+}
+
+.markstream-angular .mermaid-source {
+  background: rgba(15, 23, 42, 0.95);
+  color: #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.markstream-angular .mermaid-error {
+  padding: 0.85rem 1rem;
+  color: #b91c1c;
+  background: rgba(248, 113, 113, 0.15);
+  border-top: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.markstream-angular .mermaid-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.markstream-angular.dark .mermaid-loading,
+.dark .markstream-angular .mermaid-loading {
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.markstream-angular .mermaid-spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-top-color: #2563eb;
+  animation: spin 1s linear infinite;
 }
 
 .markstream-angular .markstream-angular-enhanced-block {
@@ -502,6 +813,12 @@ body > div[id^="dmermaid-"] {
   }
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes typewriter-fade {
   from {
     opacity: 0;
@@ -510,4 +827,237 @@ body > div[id^="dmermaid-"] {
   to {
     opacity: 1;
   }
+}
+
+.code-block-body {
+  position: relative;
+  min-height: 120px;
+}
+
+.code-block-body--expanded {
+  max-height: none;
+}
+
+.code-block-body--collapsed {
+  min-height: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.code-block-language-chip {
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+  font: 700 0.65rem/1 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.04em;
+}
+
+.markstream-angular.dark .code-block-language-chip,
+.dark .markstream-angular .code-block-language-chip {
+  background: rgba(96, 165, 250, 0.16);
+  color: #93c5fd;
+}
+
+.html-preview-frame__backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.html-preview-frame__backdrop--dark {
+  background-color: rgba(15, 23, 42, 0.8);
+}
+
+.html-preview-frame {
+  width: 80vw;
+  max-width: 960px;
+  height: 70vh;
+  background-color: #fff;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+
+.html-preview-frame--dark {
+  background-color: #020617;
+  color: #e5e7eb;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.html-preview-frame__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.html-preview-frame--dark .html-preview-frame__header {
+  border-bottom-color: rgba(148, 163, 184, 0.35);
+}
+
+.html-preview-frame__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.html-preview-frame__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background-color: #22c55e;
+}
+
+.html-preview-frame--dark .html-preview-frame__dot {
+  background-color: #4ade80;
+}
+
+.html-preview-frame__label {
+  white-space: nowrap;
+}
+
+.html-preview-frame__close {
+  border: none;
+  background: transparent;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.html-preview-frame__close--dark {
+  color: #e5e7eb;
+}
+
+.html-preview-frame__iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+@media (max-width: 640px) {
+  .html-preview-frame {
+    width: 100vw;
+    height: 80vh;
+    border-radius: 0;
+  }
+}
+
+.ms-tooltip {
+  position: fixed;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  border-width: 1px;
+  border-style: solid;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 120ms linear, transform 220ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.ms-tooltip[data-visible='true'] {
+  opacity: 1;
+}
+
+.ms-tooltip[data-dark='true'] {
+  background-color: #111827;
+  color: #f9fafb;
+  border-color: #374151;
+}
+
+.ms-tooltip[data-dark='false'],
+.ms-tooltip:not([data-dark='true']) {
+  background-color: #ffffff;
+  color: #111827;
+  border-color: #e5e7eb;
+}
+
+.markstream-angular .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.markstream-angular .d2-block-body {
+  position: relative;
+}
+
+.markstream-angular .d2-source {
+  font-family: var(--vscode-editor-font-family, "Fira Code", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+}
+
+.markstream-angular .d2-code {
+  white-space: pre;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.markstream-angular .d2-render {
+  overflow: auto;
+}
+
+.markstream-angular .d2-svg svg,
+.markstream-angular .infographic-render svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.markstream-angular .mode-btn {
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.markstream-angular .mode-btn.is-active {
+  opacity: 1;
+  font-weight: 600;
+}
+
+.markstream-angular .d2-action-btn {
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.markstream-angular .d2-action-btn:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.markstream-angular .d2-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.markstream-angular .d2-error {
+  color: #dc2626;
+  margin-top: 0.75rem;
+}
+
+.markstream-angular .infographic-render {
+  width: 100%;
+  min-height: 320px;
+  overflow: auto;
 }

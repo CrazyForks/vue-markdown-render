@@ -1,6 +1,7 @@
 import type { Type } from '@angular/core'
 import type { BaseNode, MarkdownIt, ParseOptions, ParsedNode } from 'stream-markdown-parser'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import { hydrateCustomTagContent } from '../../hydrateCustomTagContent'
 
 export type AngularRenderableNode = (ParsedNode | BaseNode) & Record<string, unknown>
 
@@ -52,12 +53,15 @@ export interface AngularRenderContext {
   customId?: string
   isDark?: boolean
   indexKey?: string
+  final?: boolean
   typewriter?: boolean
   showTooltips?: boolean
   codeBlockStream?: boolean
   renderCodeBlocksAsPre?: boolean
   allowHtml?: boolean
   customHtmlTags?: readonly string[]
+  parseOptions?: ParseOptions
+  customMarkdownIt?: (md: MarkdownIt) => MarkdownIt
   codeBlockProps?: Record<string, any>
   mermaidProps?: Record<string, any>
   d2Props?: Record<string, any>
@@ -100,16 +104,24 @@ export function buildRenderContext(
   props: NodeRendererProps,
   events: NodeRendererEvents = {},
 ): AngularRenderContext {
+  const customHtmlTags = normalizeCustomHtmlTags([
+    ...(props.customHtmlTags || []),
+    ...((((props.parseOptions as any)?.customHtmlTags) || []) as string[]),
+  ])
+
   return {
     customId: props.customId,
     isDark: props.isDark,
     indexKey: props.indexKey != null ? String(props.indexKey) : undefined,
+    final: props.final,
     typewriter: props.typewriter,
     showTooltips: props.showTooltips,
     codeBlockStream: props.codeBlockStream,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
     allowHtml: props.allowHtml !== false,
-    customHtmlTags: props.customHtmlTags,
+    customHtmlTags,
+    parseOptions: props.parseOptions,
+    customMarkdownIt: props.customMarkdownIt,
     codeBlockProps: props.codeBlockProps,
     mermaidProps: props.mermaidProps,
     d2Props: props.d2Props,
@@ -135,7 +147,10 @@ export function resolveParsedNodes(props: NodeRendererProps): AngularRenderableN
   if (!content)
     return []
 
-  const normalizedTags = normalizeCustomHtmlTags(props.customHtmlTags)
+  const normalizedTags = normalizeCustomHtmlTags([
+    ...(props.customHtmlTags || []),
+    ...((((props.parseOptions as any)?.customHtmlTags) || []) as string[]),
+  ])
   const cacheKey = `${props.customId || 'markstream-angular'}::${normalizedTags.join(',')}`
   let markdown = markdownCache.get(cacheKey)
   if (!markdown) {
@@ -152,8 +167,14 @@ export function resolveParsedNodes(props: NodeRendererProps): AngularRenderableN
   }
   if (typeof props.final === 'boolean')
     options.final = props.final
+  if (normalizedTags.length > 0)
+    (options as any).customHtmlTags = normalizedTags
 
-  return parseMarkdownToStructure(content, parser, options) as AngularRenderableNode[]
+  return hydrateCustomTagContent(
+    parseMarkdownToStructure(content, parser, options) as AngularRenderableNode[],
+    content,
+    normalizedTags,
+  ) as AngularRenderableNode[]
 }
 
 export function getNodeList(value: unknown): AngularRenderableNode[] {

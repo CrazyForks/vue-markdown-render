@@ -83,6 +83,30 @@ function App() {
 }
 ```
 
+### Angular (markstream-angular)
+
+支持 Angular 20+ standalone 组件，并带有同一套跨框架 `/test` 回归实验室。
+
+- **文档入口**：[/zh/guide/angular-quick-start](/zh/guide/angular-quick-start)
+- **安装**：[/zh/guide/angular-installation](/zh/guide/angular-installation)
+- **快速开始**：[/zh/guide/angular-quick-start](/zh/guide/angular-quick-start)
+- **在线演示**：https://markstream-angular.pages.dev/
+
+```ts
+import { Component, signal } from '@angular/core'
+import { MarkstreamAngularComponent } from 'markstream-angular'
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [MarkstreamAngularComponent],
+  template: `<markstream-angular [content]="markdown()" [final]="true" />`,
+})
+export class AppComponent {
+  readonly markdown = signal('# Hello Angular!')
+}
+```
+
 ### Nuxt (markstream-vue)
 
 支持 Nuxt 3 服务端渲染。

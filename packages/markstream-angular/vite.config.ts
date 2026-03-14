@@ -55,6 +55,22 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
+  worker: {
+    format: 'es',
+    rollupOptions: {
+      external: [
+        'katex',
+        'katex/contrib/mhchem',
+        'katex/dist/contrib/mhchem',
+        'mermaid',
+      ],
+      output: {
+        entryFileNames: 'workers/[name].js',
+        chunkFileNames: 'workers/[name].js',
+        assetFileNames: 'workers/[name][extname]',
+      },
+    },
+  },
   css: {
     postcss: path.resolve(__dirname, './postcss.config.cjs'),
   },

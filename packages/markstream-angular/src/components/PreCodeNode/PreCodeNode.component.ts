@@ -5,17 +5,7 @@ import { getString, normalizeCodeLanguage } from '../shared/node-helpers'
 @Component({
   selector: 'markstream-angular-pre-code-node',
   standalone: true,
-  template: `
-    <pre
-      [class]="languageClass"
-      [attr.aria-busy]="loading"
-      [attr.aria-label]="ariaLabel"
-      [attr.data-language]="language"
-      tabindex="0"
-    >
-      <code translate="no">{{ code }}</code>
-    </pre>
-  `,
+  template: `<pre [class]="languageClass" [attr.aria-busy]="loading" [attr.aria-label]="ariaLabel" [attr.data-language]="language" tabindex="0"><code translate="no" [textContent]="code"></code></pre>`,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PreCodeNodeComponent {

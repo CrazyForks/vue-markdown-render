@@ -15,12 +15,18 @@ export interface DeferNodesOptions {
 }
 
 export function resolveVirtualizationEnabled(parsedNodeCount: number, maxLiveNodes?: number) {
-  const resolvedMaxLiveNodes = Math.max(1, Math.trunc(maxLiveNodes ?? 320))
+  const configuredMaxLiveNodes = Math.trunc(maxLiveNodes ?? 320)
+  if (!Number.isFinite(configuredMaxLiveNodes) || configuredMaxLiveNodes <= 0)
+    return false
+  const resolvedMaxLiveNodes = Math.max(1, configuredMaxLiveNodes)
   return parsedNodeCount > resolvedMaxLiveNodes
 }
 
 export function resolveDeferNodes(options: DeferNodesOptions) {
   if (options.deferNodesUntilVisible === false)
+    return false
+  const configuredMaxLiveNodes = Math.trunc(options.maxLiveNodes ?? 320)
+  if (!Number.isFinite(configuredMaxLiveNodes) || configuredMaxLiveNodes <= 0)
     return false
   if (options.virtualizationEnabled)
     return false

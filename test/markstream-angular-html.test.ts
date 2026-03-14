@@ -4,6 +4,7 @@ import {
   renderMarkdownToHtml,
   renderNestedMarkdownToHtml,
 } from '../packages/markstream-angular/src/renderMarkdownHtml'
+import { sanitizeHtmlContent as sanitizeHtmlFragment } from '../packages/markstream-angular/src/sanitizeHtmlContent'
 
 describe('markstream-angular html renderer', () => {
   it('renders markdown content into stable html for baseline blocks', () => {
@@ -84,5 +85,53 @@ describe('markstream-angular html renderer', () => {
     )
 
     expect(html).toBe('&lt;span&gt;partial')
+  })
+
+  it('preserves safe html structures like details and summary', () => {
+    const html = renderMarkdownToHtml({
+      content: `<details>\n<summary>More</summary>\n<p>Body</p>\n</details>`,
+      final: true,
+    })
+
+    expect(html).toContain('<details>')
+    expect(html).toContain('<summary>More</summary>')
+    expect(html).toContain('<p>Body</p>')
+    expect(html).toContain('</details>')
+  })
+
+  it('keeps top-level thinking nodes intact while streaming html output', () => {
+    const html = renderMarkdownToHtml({
+      content: '<thinking>我们需要给出一个全面的回答',
+      final: false,
+      customHtmlTags: ['thinking'],
+    })
+
+    expect(html).toContain('data-markstream-custom-tag="thinking"')
+    expect(html).toContain('全面的回答')
+    expect(html).not.toContain('&lt;thinking&gt;')
+  })
+
+  it('emits math source and render shells so KaTeX can refresh incrementally', () => {
+    const html = renderMarkdownToHtml({
+      content: '$x = a$\n\n$$f(x) = x^2$$',
+      final: true,
+    })
+
+    expect(html).toContain('markstream-nested-math__source')
+    expect(html).toContain('markstream-nested-math__render')
+    expect(html).toContain('markstream-nested-math-block__source')
+    expect(html).toContain('markstream-nested-math-block__render')
+  })
+
+  it('sanitizes dangerous html while preserving safe attributes', () => {
+    const html = sanitizeHtmlFragment('<details open onclick="evil()"><summary>Safe</summary><a href="javascript:alert(1)" title="ok">Link</a><script>alert(1)</script></details>')
+
+    expect(html).toContain('<details open>')
+    expect(html).toContain('<summary>Safe</summary>')
+    expect(html).toContain('<a title="ok">Link</a>')
+    expect(html).not.toContain('onclick')
+    expect(html).not.toContain('javascript:')
+    expect(html).not.toContain('<script')
+    expect(html).not.toContain('alert(1)')
   })
 })

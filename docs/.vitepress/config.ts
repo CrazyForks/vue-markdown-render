@@ -5,14 +5,14 @@ import { defineConfig } from 'vitepress'
 // Cast to `any` to avoid strict type errors in the docs config while keeping intellisense.
 export default defineConfig({
   title: 'markstream-vue',
-  description: 'Streaming-friendly Markdown renderer for Vue 3 — progressive Mermaid, streaming diff code blocks',
+  description: 'Streaming-friendly Markdown renderer for Vue 3, Vue 2, React, and Angular',
   base: process.env.VITEPRESS_BASE || '/',
   locales: {
     root: {
       label: 'English',
       lang: 'en-US',
       title: 'markstream-vue',
-      description: 'Streaming-friendly Markdown renderer for Vue 3',
+      description: 'Streaming-friendly Markdown renderer for Vue 3, Vue 2, React, and Angular',
       link: '/',
     },
     zh: {
@@ -42,6 +42,7 @@ export default defineConfig({
           { text: 'React', link: 'https://markstream-react.pages.dev/' },
           { text: 'Nuxt', link: 'https://markstream-nuxt.pages.dev/' },
           { text: 'Vue 2', link: 'https://markstream-vue2.pages.dev/' },
+          { text: 'Angular', link: 'https://markstream-angular.pages.dev/' },
         ],
       },
       { text: 'GitHub', link: 'https://github.com/Simon-He95/markstream-vue' },
@@ -78,6 +79,14 @@ export default defineConfig({
                 { text: 'Quick Start', link: '/guide/react-quick-start' },
                 { text: 'Installation', link: '/guide/react-installation' },
                 { text: 'Components & API', link: '/guide/react-components' },
+              ],
+              collapsed: false,
+            },
+            {
+              text: 'Angular (markstream-angular)',
+              items: [
+                { text: 'Quick Start', link: '/guide/angular-quick-start' },
+                { text: 'Installation', link: '/guide/angular-installation' },
               ],
               collapsed: false,
             },
@@ -126,6 +135,7 @@ export default defineConfig({
                 { text: 'React', link: 'https://markstream-react.pages.dev/' },
                 { text: 'Nuxt', link: 'https://markstream-nuxt.pages.dev/' },
                 { text: 'Vue 2', link: 'https://markstream-vue2.pages.dev/' },
+                { text: 'Angular', link: 'https://markstream-angular.pages.dev/' },
               ],
             },
             { text: 'Performance', link: '/guide/performance' },
@@ -175,6 +185,14 @@ export default defineConfig({
               ],
               collapsed: false,
             },
+            {
+              text: 'Angular (markstream-angular)',
+              items: [
+                { text: '快速开始', link: '/zh/guide/angular-quick-start' },
+                { text: '安装', link: '/zh/guide/angular-installation' },
+              ],
+              collapsed: false,
+            },
             { text: 'Nuxt SSR', link: '/zh/nuxt-ssr' },
           ],
         },
@@ -220,6 +238,7 @@ export default defineConfig({
                 { text: 'React', link: 'https://markstream-react.pages.dev/' },
                 { text: 'Nuxt', link: 'https://markstream-nuxt.pages.dev/' },
                 { text: 'Vue 2', link: 'https://markstream-vue2.pages.dev/' },
+                { text: 'Angular', link: 'https://markstream-angular.pages.dev/' },
               ],
             },
             { text: '搜索', link: '/zh/guide/search' },
@@ -270,6 +289,14 @@ export default defineConfig({
               ],
               collapsed: false,
             },
+            {
+              text: 'Angular (markstream-angular)',
+              items: [
+                { text: 'Quick Start', link: '/guide/angular-quick-start' },
+                { text: 'Installation', link: '/guide/angular-installation' },
+              ],
+              collapsed: false,
+            },
             { text: 'Nuxt SSR', link: '/nuxt-ssr' },
           ],
         },
@@ -313,6 +340,7 @@ export default defineConfig({
                 { text: 'React', link: 'https://markstream-react.pages.dev/' },
                 { text: 'Nuxt', link: 'https://markstream-nuxt.pages.dev/' },
                 { text: 'Vue 2', link: 'https://markstream-vue2.pages.dev/' },
+                { text: 'Angular', link: 'https://markstream-angular.pages.dev/' },
               ],
             },
             { text: 'Performance', link: '/guide/performance' },
@@ -358,6 +386,7 @@ export default defineConfig({
               { text: 'React', link: 'https://markstream-react.pages.dev/' },
               { text: 'Nuxt', link: 'https://markstream-nuxt.pages.dev/' },
               { text: 'Vue 2', link: 'https://markstream-vue2.pages.dev/' },
+              { text: 'Angular', link: 'https://markstream-angular.pages.dev/' },
             ],
           },
           { text: '搜索', link: '/zh/guide/search' },

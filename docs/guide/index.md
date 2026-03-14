@@ -36,6 +36,15 @@ For React 18+ projects with hooks and TypeScript.
 | [Quick Start](/guide/react-quick-start) | React examples |
 | [Components & API](/guide/react-components) | React component reference |
 
+### Angular (markstream-angular)
+
+For Angular 20+ projects with standalone components and the shared Markstream `/test` lab.
+
+| Page | Description |
+|------|-------------|
+| [Installation](/guide/angular-installation) | Angular specific setup |
+| [Quick Start](/guide/angular-quick-start) | Standalone Angular examples |
+
 ### Nuxt
 
 For Nuxt 3 SSR applications.

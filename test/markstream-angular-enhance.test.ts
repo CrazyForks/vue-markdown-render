@@ -4,6 +4,7 @@ import { enhanceRenderedHtml } from '../packages/markstream-angular/src/enhanceR
 const monacoCleanup = vi.fn()
 
 vi.mock('../packages/markstream-angular/src/optional/katex', () => ({
+  isKatexEnabled: vi.fn(() => true),
   getKatex: vi.fn(async () => ({
     renderToString(source: string, options?: { displayMode?: boolean }) {
       return options?.displayMode
@@ -14,6 +15,7 @@ vi.mock('../packages/markstream-angular/src/optional/katex', () => ({
 }))
 
 vi.mock('../packages/markstream-angular/src/optional/mermaid', () => ({
+  isMermaidEnabled: vi.fn(() => true),
   getMermaid: vi.fn(async () => ({
     render: vi.fn(async (_id: string, source: string) => ({
       svg: `<svg data-mermaid="1">${source}</svg>`,
@@ -72,8 +74,8 @@ describe('markstream-angular enhanceRenderedHtml', () => {
     const root = document.createElement('div')
     root.innerHTML = `
       <div class="markstream-angular markdown-renderer">
-        <span class="markstream-nested-math" data-display="inline">E = mc^2</span>
-        <pre class="markstream-nested-math-block"><code>\\int_0^1 x^2 dx</code></pre>
+        <span class="markstream-nested-math" data-display="inline"><span class="markstream-nested-math__source">E = mc^2</span><span class="markstream-nested-math__render"></span></span>
+        <div class="markstream-nested-math-block"><pre class="markstream-nested-math-block__source"><code>\\int_0^1 x^2 dx</code></pre><div class="markstream-nested-math-block__render"></div></div>
         <pre data-markstream-code-block="1" data-markstream-language="mermaid"><code class="language-mermaid">graph TD; A-->B;</code></pre>
         <pre data-markstream-code-block="1" data-markstream-language="ts"><code class="language-ts">const value = 1</code></pre>
         <pre data-markstream-code-block="1" data-markstream-language="ts" data-markstream-diff="1" data-markstream-original="Y29uc3QgdmFsdWUgPSAx" data-markstream-updated="Y29uc3QgdmFsdWU6IG51bWJlciA9IDE="><code class="language-ts">-const value = 1
@@ -109,7 +111,7 @@ describe('markstream-angular enhanceRenderedHtml', () => {
     const root = document.createElement('div')
     root.innerHTML = `
       <div class="markstream-angular markdown-renderer">
-        <span class="markstream-nested-math" data-display="inline">a+b</span>
+        <span class="markstream-nested-math" data-display="inline"><span class="markstream-nested-math__source">a+b</span><span class="markstream-nested-math__render"></span></span>
         <pre data-markstream-code-block="1" data-markstream-language="ts"><code class="language-ts">const value = 1</code></pre>
         <pre data-markstream-code-block="1" data-markstream-language="d2"><code class="language-d2">a -> b</code></pre>
       </div>
@@ -123,5 +125,53 @@ describe('markstream-angular enhanceRenderedHtml', () => {
     expect(shell.innerHTML).not.toContain('data-monaco="1"')
     expect(shell.innerHTML).not.toContain('data-d2="1"')
     expect(monacoCleanup).not.toHaveBeenCalled()
+  })
+
+  it('does not re-render KaTeX from already-rendered output', async () => {
+    const root = document.createElement('div')
+    root.innerHTML = `
+      <div class="markstream-angular markdown-renderer">
+        <span class="markstream-nested-math" data-display="inline"><span class="markstream-nested-math__source">x = a</span><span class="markstream-nested-math__render"></span></span>
+        <div class="markstream-nested-math-block"><pre class="markstream-nested-math-block__source"><code>f(x) = x^2</code></pre><div class="markstream-nested-math-block__render"></div></div>
+      </div>
+    `
+
+    const shell = root.querySelector('.markstream-angular') as HTMLElement
+    await enhanceRenderedHtml(shell, { final: false })
+    const firstPass = shell.innerHTML
+
+    await enhanceRenderedHtml(shell, { final: false })
+
+    expect(shell.innerHTML).toBe(firstPass)
+    expect(shell.innerHTML).toContain('class="katex"')
+    expect(shell.innerHTML).toContain('class="katex-display"')
+  })
+
+  it('re-renders KaTeX when the source text changes during streaming', async () => {
+    const root = document.createElement('div')
+    root.innerHTML = `
+      <div class="markstream-angular markdown-renderer">
+        <span class="markstream-nested-math" data-display="inline"><span class="markstream-nested-math__source">x = a</span><span class="markstream-nested-math__render"></span></span>
+        <div class="markstream-nested-math-block"><pre class="markstream-nested-math-block__source"><code>f(x) = x^2</code></pre><div class="markstream-nested-math-block__render"></div></div>
+      </div>
+    `
+
+    const shell = root.querySelector('.markstream-angular') as HTMLElement
+    await enhanceRenderedHtml(shell, { final: false })
+
+    expect(shell.innerHTML).toContain('x = a')
+    expect(shell.innerHTML).toContain('f(x) = x^2')
+
+    const inlineSource = shell.querySelector('.markstream-nested-math__source')
+    const blockSource = shell.querySelector('.markstream-nested-math-block__source code')
+    inlineSource!.textContent = 'x = a + b'
+    blockSource!.textContent = 'f(x) = x^3'
+
+    await enhanceRenderedHtml(shell, { final: false })
+
+    expect(shell.innerHTML).toContain('x = a + b')
+    expect(shell.innerHTML).toContain('f(x) = x^3')
+    expect(shell.querySelector('.markstream-nested-math')?.getAttribute('data-markstream-katex-source')).toBe('x = a + b')
+    expect(shell.querySelector('.markstream-nested-math-block')?.getAttribute('data-markstream-katex-source')).toBe('f(x) = x^3')
   })
 })
