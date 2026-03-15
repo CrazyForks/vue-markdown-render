@@ -1,10 +1,12 @@
-## [0.0.9-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.9-beta.0) (2026-03-12)
+## [0.0.9-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.9-beta.1) (2026-03-15)
 
 
 ### Bug Fixes
 
+* add conditional check for pkg.pr.new GitHub App installation in workflow ([4c3c253](https://github.com/Simon-He95/markstream-vue/commit/4c3c253c0fd967ae477a48f95f86e10fa0e06c43))
 * add missing katex paths to configuration for proper module resolution ([b063980](https://github.com/Simon-He95/markstream-vue/commit/b06398058f71681571a0e948b045a10b31599c96))
 * add regression tests for html_block splitting and update math plugin for legacy parentheses ([da4f46c](https://github.com/Simon-He95/markstream-vue/commit/da4f46c89135a1e7259a1bf4f71ad74e0750addb))
+* add showTooltips props to MermaidBlockNode ([ee6ffb7](https://github.com/Simon-He95/markstream-vue/commit/ee6ffb7bd9d4960dedbb176473aaac628922100c))
 * add test for html_block splitting after `<br/>` ([f040f6c](https://github.com/Simon-He95/markstream-vue/commit/f040f6cb9bc35445bac17ced88c178c8ed8b642e)), closes [#251](https://github.com/Simon-He95/markstream-vue/issues/251)
 * add tooltip toggle for MarkdownCodeBlockNode ([#307](https://github.com/Simon-He95/markstream-vue/issues/307)) ([c9321f1](https://github.com/Simon-He95/markstream-vue/commit/c9321f1c41ca54cf2d85355720ee2ad78f1658cb))
 * add type declarations for markdown-it plugins ([ec1517c](https://github.com/Simon-He95/markstream-vue/commit/ec1517c852d74df04c5632b42cebe89607027060))
@@ -16,6 +18,7 @@
 * **changelog:** update version to 0.0.5-beta.1 and add missing bug fix entries ([b300251](https://github.com/Simon-He95/markstream-vue/commit/b30025199eeb80d4d5dfd81390d299ca41c4024c))
 * **changelog:** update version to 0.0.5-beta.1 and add missing bug fix entries ([058730c](https://github.com/Simon-He95/markstream-vue/commit/058730c942c0bf16c2294fdaa07dc90f9784a7f4))
 * **changelog:** update version to 0.0.5-beta.2 and add missing bug fix entries ([84f7824](https://github.com/Simon-He95/markstream-vue/commit/84f7824c4f7cd9ba3d50e805d9c2db15b232bd0d))
+* **container:** preserve original markdown in vm_container raw ([8ae7827](https://github.com/Simon-He95/markstream-vue/commit/8ae782741409ae108f0e665829dc9bb1e467490e))
 * correct i18n key common.copySuccess → common.copied ([2d68630](https://github.com/Simon-He95/markstream-vue/commit/2d68630ee64be4c307cac16ac51d414a05a19adc)), closes [#165](https://github.com/Simon-He95/markstream-vue/issues/165)
 * correct math rendering syntax in test.vue ([a1c01e3](https://github.com/Simon-He95/markstream-vue/commit/a1c01e38c3ea3aa4b8a75354356774d703af3884))
 * custom_html_tag 开头与内容未换行会导致格式错乱 [#236](https://github.com/Simon-He95/markstream-vue/issues/236) ([9141f75](https://github.com/Simon-He95/markstream-vue/commit/9141f75a209662bf8dc089dab2e499307a2842f3))
@@ -48,6 +51,7 @@
 * **netlify.toml:** update publish path to correct directory ([6bf3710](https://github.com/Simon-He95/markstream-vue/commit/6bf371089e06bf740ec64e71839999c76c7b3ce6))
 * normalize markdown code block language labels ([9fcb93c](https://github.com/Simon-He95/markstream-vue/commit/9fcb93cfdcbf5013c390723f267aeb5271c68360))
 * **nuxt.config.ts:** set nitro preset to static ([580e83e](https://github.com/Simon-He95/markstream-vue/commit/580e83e34487446d423e11b403c8f270240f70ac))
+* **parser:** avoid duplicated hardbreak prefix before math ([aa3e434](https://github.com/Simon-He95/markstream-vue/commit/aa3e4344373793f3b0616b570a2e56e61aab08af)), closes [#324](https://github.com/Simon-He95/markstream-vue/issues/324)
 * **parser:** handle intraword asterisks and strict unmatched strong ([08ee3db](https://github.com/Simon-He95/markstream-vue/commit/08ee3db0aba56d650604be46eb406ff6b45351bb))
 * **parser:** keep backticked dollars/code literal and skip placeholder $...$ math ([747610c](https://github.com/Simon-He95/markstream-vue/commit/747610c2ba31d853172f80dc870f52cc97647114)), closes [#306](https://github.com/Simon-He95/markstream-vue/issues/306)
 * **parser:** keep complete html document as single html_block ([b376742](https://github.com/Simon-He95/markstream-vue/commit/b37674220c5ef2b1d1f8052a7b9508dadd986b6c))
@@ -59,6 +63,7 @@
 * propagate showTooltips in nested list renderers ([6a8277d](https://github.com/Simon-He95/markstream-vue/commit/6a8277ddaa677c566c91f1dbd93f93c4af8615a7)), closes [#310](https://github.com/Simon-He95/markstream-vue/issues/310)
 * **react:** generate bundled d.ts on build ([fb5c88b](https://github.com/Simon-He95/markstream-vue/commit/fb5c88b345eeec857e4aa5a95e3592659d2fa491))
 * remove unnecessary blank lines in documentation and component files ([5f877e6](https://github.com/Simon-He95/markstream-vue/commit/5f877e61079b95ef3a78f1c8de7fe12328d85133)), closes [#243](https://github.com/Simon-He95/markstream-vue/issues/243)
+* stabilize angular playground preview rendering ([1c61a62](https://github.com/Simon-He95/markstream-vue/commit/1c61a620a8b9c11cab773abc32b6c8a617f59170))
 * standardize class attribute syntax in list item components and tests ([71af12b](https://github.com/Simon-He95/markstream-vue/commit/71af12b1638456fdbaf809849f3f230ea9505de0))
 * sync tooltip propagation to vue2 and react packages ([62f5171](https://github.com/Simon-He95/markstream-vue/commit/62f51711401e8f55b548f6df4fb426f25a32a913)), closes [#310](https://github.com/Simon-He95/markstream-vue/issues/310)
 * **theme:** toggle fail ([39cd71a](https://github.com/Simon-He95/markstream-vue/commit/39cd71af0c499c95d9c50b9770972540ac83c3ef)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
@@ -70,6 +75,7 @@
 * update demo links for React and Nuxt in documentation ([d6f76e0](https://github.com/Simon-He95/markstream-vue/commit/d6f76e0656cd09ec4dd6ce3b77dcc815089ef29a))
 * update docs build process to include parser build step ([66195fa](https://github.com/Simon-He95/markstream-vue/commit/66195fa122ff537744244cd311b73f787f16608f))
 * update import statements for MarkdownRender to use default export ([e1c6280](https://github.com/Simon-He95/markstream-vue/commit/e1c6280dfebb13010c87ff0c076da9fba419a5eb)), closes [#285](https://github.com/Simon-He95/markstream-vue/issues/285)
+* update markstream-vue alias to point to src/exports.ts ([f164b81](https://github.com/Simon-He95/markstream-vue/commit/f164b815f9f181364bbf8bb99226747b9310e04e))
 * update math plugin to handle legacy parentheses and add regression test for `<think>` blocks ([b04a75d](https://github.com/Simon-He95/markstream-vue/commit/b04a75dfa863fbadf0980b83f79348ccbd79419d)), closes [#252](https://github.com/Simon-He95/markstream-vue/issues/252)
 * update snapshot styles for inline and reference nodes to use consistent background colors ([a62b67d](https://github.com/Simon-He95/markstream-vue/commit/a62b67d4b6174d5aeda86253f568986a51f742f9))
 * update stream-monaco version to 0.0.14 in package.json and pnpm-lock.yaml ([47fcf1a](https://github.com/Simon-He95/markstream-vue/commit/47fcf1a816eeebcba5356e90f4c7a390f6f3a67b))
@@ -83,6 +89,7 @@
 ### Features
 
 * add '@antv/infographic' to dependencies in Vite configuration files ([6063ae4](https://github.com/Simon-He95/markstream-vue/commit/6063ae4826b206673999a43b7482564524204be0))
+* add '@floating-ui/dom' dependency to pnpm-lock.yaml ([6788d43](https://github.com/Simon-He95/markstream-vue/commit/6788d43d5e9b408531a03cf21c8b3d28d031231c))
 * add AntV Infographic guide pages and update navigation configuration. ([0b64836](https://github.com/Simon-He95/markstream-vue/commit/0b64836068def70cadea54a27df06ec40ab47ca4))
 * add attrs support to HeadingNode components and tests ([b148aea](https://github.com/Simon-He95/markstream-vue/commit/b148aea52265a204ef4d043d99b13d313c048a78))
 * add D2 support across packages ([0c0f071](https://github.com/Simon-He95/markstream-vue/commit/0c0f07182b897e596b33f7a5988dcd899e9adfd5))
@@ -103,6 +110,8 @@
 * add support for fixing indented code blocks and enhance HTML inline handling ([733bf40](https://github.com/Simon-He95/markstream-vue/commit/733bf409f05de3704199f9274a62f48ea5d0f4e4)), closes [#257](https://github.com/Simon-He95/markstream-vue/issues/257)
 * add Tailwind CSS support to markstream-vue2 ([b6a8b20](https://github.com/Simon-He95/markstream-vue/commit/b6a8b20c65a451eb684c80b238149320f208799f))
 * add tests for validateLink ([961a914](https://github.com/Simon-He95/markstream-vue/commit/961a914b62ee715b4fd902010d4fb3fa2f7aed7a))
+* add version sandbox to test page ([988b7c4](https://github.com/Simon-He95/markstream-vue/commit/988b7c42c621ec617a3c255991075716a37f89ce))
+* complete markstream angular parity lab ([2798322](https://github.com/Simon-He95/markstream-vue/commit/2798322169b7113c66d503323b866678436d3379))
 * delete temporary patch file ([e931d8b](https://github.com/Simon-He95/markstream-vue/commit/e931d8bc414833194aebebe23fafa8379d7bde41))
 * **docs:** update playground links and add local running instructions ([2ec2745](https://github.com/Simon-He95/markstream-vue/commit/2ec27456fed6b0b0432e92b67753d51bbf42ad89))
 * enhance ::: container syntax to support args and improve JSON matching ([4b3bbf7](https://github.com/Simon-He95/markstream-vue/commit/4b3bbf707e7f58e9b2f935ac58d353567eeebb0d)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
@@ -129,9 +138,13 @@
 * optimize streaming rendering across packages ([fd8975f](https://github.com/Simon-He95/markstream-vue/commit/fd8975f2b07c77f22ebd3c85a92b318aeca1b3a8))
 * **parser:** enhance link parsing to support custom attributes and improve attribute handling ([c6a1d13](https://github.com/Simon-He95/markstream-vue/commit/c6a1d13236db2424dee7aba214a04aea279ad815)), closes [#216](https://github.com/Simon-He95/markstream-vue/issues/216)
 * replace space-x-* classes with gap-x-* for consistent spacing in header slots ([602baa5](https://github.com/Simon-He95/markstream-vue/commit/602baa5746813309bbe12605469c932d8c832e9c)), closes [#223](https://github.com/Simon-He95/markstream-vue/issues/223)
+* scaffold markstream-angular playground and e2e ([e3378f7](https://github.com/Simon-He95/markstream-vue/commit/e3378f7b1cfb4172a7590384379cecaf1a586220))
+* **test:** enhance mermaid viewport priority tests with mock implementations and timer handling ([96ae1fa](https://github.com/Simon-He95/markstream-vue/commit/96ae1faa22253b3bf021f0c25fbc6c91d760df60))
 * update CHANGELOG for v0.0.4 release with bug fixes and new features ([5f79584](https://github.com/Simon-He95/markstream-vue/commit/5f79584012639f042543508170af66a9cb631934))
 * update CHANGELOG for v0.0.4 release with bug fixes and new features ([4835a8f](https://github.com/Simon-He95/markstream-vue/commit/4835a8fbcfb15fbc654a849f5017f04b5a824b59))
 * update CHANGELOG with new features and enhancements for release process ([e98336b](https://github.com/Simon-He95/markstream-vue/commit/e98336b0f26efab73985120c37c1a017c6606b61))
+* update CI build command for documentation to include parser build step ([fcba570](https://github.com/Simon-He95/markstream-vue/commit/fcba570f8ca1010666d60cd24c4afb86b8971dc1))
+* update docs build command and add Vue plugin to Vite config ([45e9a20](https://github.com/Simon-He95/markstream-vue/commit/45e9a20a096fc92c29d8f3874749dc1cc1e4d86b))
 * **VmrContainerNode:** add mid-state loading ([016f1ed](https://github.com/Simon-He95/markstream-vue/commit/016f1ed37f25e9f6f74856d385aa62514d556f32))
 * **VmrContainerNode:** enhance streaming behavior with loading state and incomplete JSON handling ([beef82b](https://github.com/Simon-He95/markstream-vue/commit/beef82bcdc5fb78d2d9c7d3becc70cb075d1d380))
 
