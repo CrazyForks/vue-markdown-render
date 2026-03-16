@@ -4,6 +4,22 @@ import { getMarkdown, parseMarkdownToStructure } from '../src'
 
 const md = getMarkdown('test')
 
+function collectByType(nodes: any[], type: string) {
+  const out: any[] = []
+  const walk = (n: any) => {
+    if (!n)
+      return
+    if (n.type === type)
+      out.push(n)
+    if (Array.isArray(n.children))
+      n.children.forEach(walk)
+    if (Array.isArray(n.items))
+      n.items.forEach(walk)
+  }
+  nodes.forEach(walk)
+  return out
+}
+
 describe('special link cases', () => {
   it('parses link with numeric brackets in link text: [[8]](url)', () => {
     const markdown = '建议采用以下接口方案：[[8]](https://markstream-vue-docs.simonhe.me/)'
@@ -178,5 +194,65 @@ describe('special link cases', () => {
     const link = links.find(l => l.href === 'https://example.com')
     expect(link).toBeDefined()
     expect(link?.text || link?.children?.map((c: any) => c.content || '').join('')).toBe('[8]')
+  })
+
+  it('preserves normal reference-style links when the label is not numeric', () => {
+    const markdown = `请看 [1][source]
+
+[source]: https://example.com`
+    const nodes = parseMarkdownToStructure(markdown, md)
+    const links = collectByType(nodes, 'link')
+    const references = collectByType(nodes, 'reference')
+
+    expect(links).toHaveLength(1)
+    expect(links[0].href).toBe('https://example.com')
+    expect(links[0].text || links[0].children?.map((c: any) => c.content || '').join('')).toBe('1')
+    expect(references).toHaveLength(0)
+  })
+
+  it('parses numeric references when they are adjacent to surrounding text', () => {
+    const cases = [
+      '随便输入一些文字[1]',
+      '随便输入一些文字[1]后面还有文字',
+      '随便输入一些文字[1] ',
+      '随便输入一些文字[1] （空格+文字）',
+    ]
+
+    for (const markdown of cases) {
+      const nodes = parseMarkdownToStructure(markdown, md)
+      const references = collectByType(nodes, 'reference')
+
+      expect(references, markdown).toHaveLength(1)
+      expect(references[0].id).toBe('1')
+      expect(textIncludes(nodes, '随便输入一些文字')).toBe(true)
+    }
+  })
+
+  it('parses a numeric reference immediately followed by a normal inline link', () => {
+    const cases = [
+      '随便输入一些文字 [1][百度](www.baidu.com)',
+      '随便输入一些文字 [1] [百度](www.baidu.com)',
+    ]
+
+    for (const markdown of cases) {
+      const nodes = parseMarkdownToStructure(markdown, md)
+      const references = collectByType(nodes, 'reference')
+      const links = collectByType(nodes, 'link')
+
+      expect(references, markdown).toHaveLength(1)
+      expect(references[0].id).toBe('1')
+      expect(links, markdown).toHaveLength(1)
+      expect(links[0].href).toBe('www.baidu.com')
+      expect(textIncludes(links[0], '百度')).toBe(true)
+    }
+  })
+
+  it('parses chained numeric references without requiring spaces', () => {
+    const nodes = parseMarkdownToStructure('随便输入一些文字[1][2][3]', md)
+    const references = collectByType(nodes, 'reference')
+
+    expect(references).toHaveLength(3)
+    expect(references.map(ref => ref.id)).toEqual(['1', '2', '3'])
+    expect(textIncludes(nodes, '随便输入一些文字')).toBe(true)
   })
 })

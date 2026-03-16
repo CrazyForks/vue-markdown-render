@@ -472,7 +472,7 @@ exports[`markdownRender node e2e coverage > renders reference node 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-        <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">Cite research </span><span data-v-93ee5c2d="" class="reference-node cursor-pointer bg-[hsl(var(--muted))] text-xs rounded-md px-1.5 mx-0.5 hover:bg-[hsl(var(--secondary))]" role="button" tabindex="0" index-key="markdown-renderer-0-1">1</span><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node"> for details.</span></p>
+        <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node">Cite research </span><span data-v-93ee5c2d="" class="reference-node cursor-pointer bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs rounded-md px-1.5 mx-0.5 hover:bg-[hsl(var(--secondary))]" role="button" tabindex="0" index-key="markdown-renderer-0-1">1</span><span data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node"> for details.</span></p>
       </transition-stub>
     </div>
   </div>

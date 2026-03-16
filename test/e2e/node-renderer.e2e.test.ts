@@ -411,6 +411,7 @@ describe('markdownRender node e2e coverage', () => {
         const reference = wrapper.find('span.reference-node')
         expect(reference.exists()).toBe(true)
         expect(reference.text()).toBe('1')
+        expect(reference.classes()).toContain('text-[hsl(var(--muted-foreground))]')
       },
     },
     {

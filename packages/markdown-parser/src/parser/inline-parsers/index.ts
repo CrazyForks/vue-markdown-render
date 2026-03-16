@@ -146,6 +146,17 @@ export function isLikelyUrl(href?: string) {
   return AUTOLINK_PROTOCOL_RE.test(href) || AUTOLINK_GENERIC_RE.test(href)
 }
 
+function recoverTrailingMarkdownLinkLabel(raw?: string, href?: string) {
+  if (!raw || !href)
+    return null
+
+  const match = raw.match(/\[([^\]\n]+)\]\(([^)]*)$/)
+  if (!match)
+    return null
+
+  return match[2] === href ? match[1] : null
+}
+
 // Process inline tokens (for text inside paragraphs, headings, etc.)
 export function parseInlineTokens(
   tokens: MarkdownToken[],
@@ -799,11 +810,15 @@ export function parseInlineTokens(
           resetCurrentTextNode()
           const displayText = String((token as any).text ?? '')
           pushText(displayText, displayText)
+          i++
+        }
+        else if (recoverMarkdownLinkFromTrailingText(token)) {
+          i++
         }
         else {
           pushToken(token)
+          i++
         }
-        i++
         break
     }
   }
@@ -944,6 +959,16 @@ export function parseInlineTokens(
     const { node, nextIndex } = parseLinkToken(tokens, i, options as any)
     i = nextIndex
 
+    const hasSingleTextChild = node.children.length === 1 && node.children[0]?.type === 'text'
+    if (node.loading && raw && node.text === node.href && hasSingleTextChild) {
+      const recoveredLabel = recoverTrailingMarkdownLinkLabel(raw, node.href)
+      if (recoveredLabel) {
+        node.text = recoveredLabel
+        node.children = [{ type: 'text', content: recoveredLabel, raw: recoveredLabel }]
+        node.raw = String(`[${recoveredLabel}](${node.href}${node.title ? ` "${node.title}"` : ''})`)
+      }
+    }
+
     // Respect consumer link validation (e.g. md.set({ validateLink }) so javascript: is not output as link
     if (options?.validateLink && !options.validateLink(node.href)) {
       pushText(node.text, node.text)
@@ -982,30 +1007,57 @@ export function parseInlineTokens(
         }
       }
     }
+
+    if (recoverMarkdownLinkFromTrailingText(node as unknown as MarkdownToken))
+      return
+
     pushParsed(node)
   }
 
   function handleReference(token: MarkdownToken) {
-    // mirror previous in-switch 'reference' handling
     resetCurrentTextNode()
-    const nextToken = tokens[i + 1]
-    const preToken = tokens[i - 1]
-    const preResult = result[result.length - 1]
-
-    const nextIsTextNotStartingParens = nextToken?.type === 'text' && !((String(nextToken.content ?? '')).startsWith('('))
-    const preIsTextEndingBracketOrOnlySpace = preToken?.type === 'text' && /\]$|^\s*$/.test(String(preToken.content ?? ''))
-
-    if (nextIsTextNotStartingParens || preIsTextEndingBracketOrOnlySpace) {
-      pushNode(parseReferenceToken(token))
-    }
-    else if (nextToken && nextToken.type === 'text') {
-      nextToken.content = String(token.markup ?? '') + String(nextToken.content ?? '')
-    }
-    else if (preResult && preResult.type === 'text') {
-      preResult.content = String(preResult.content ?? '') + String(token.markup ?? '')
-      preResult.raw = String(preResult.raw ?? '') + String(token.markup ?? '')
-    }
+    pushNode(parseReferenceToken(token))
     i++
+  }
+
+  function recoverMarkdownLinkFromTrailingText(token: MarkdownToken): boolean {
+    if (token.type !== 'link')
+      return false
+
+    const previous = result[result.length - 1] as TextNode | undefined
+    if (!previous || previous.type !== 'text')
+      return false
+
+    const previousContent = String(previous.content ?? '')
+    const match = previousContent.match(/^(.*)\[([^\]\n]+)\]\($/)
+    if (!match)
+      return false
+
+    const linkToken = token as MarkdownToken & { href?: string, text?: string, title?: string | null }
+    const href = String(linkToken.href ?? '')
+    const linkText = String(linkToken.text ?? '')
+    const label = String(match[2] ?? '')
+    const visibleHref = href.replace(/^(?:https?:\/\/|mailto:|ftp:\/\/)/i, '')
+
+    if (!href || !(linkText === href || linkText === visibleHref || isLikelyUrl(linkText)))
+      return false
+
+    const before = String(match[1] ?? '')
+    if (before) {
+      previous.content = before
+      previous.raw = before
+    }
+    else {
+      result.pop()
+    }
+
+    pushParsed({
+      ...(token as ParsedNode),
+      text: label,
+      children: [{ type: 'text', content: label, raw: label }],
+      raw: String(`[${label}](${href}${linkToken.title ? ` "${linkToken.title}"` : ''})`),
+    } as ParsedNode)
+    return true
   }
 
   function handleInlineLinkContent(content: string, _token: MarkdownToken): boolean {

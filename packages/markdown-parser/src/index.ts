@@ -220,6 +220,28 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
 
   // reference rule (legacy)
   const RE_REFERENCE = /^\[(\d+)\]/
+  const RE_REFERENCE_LABEL = /^\[([^\]\n]+)\]/
+  const shouldPreserveReferenceStyleLink = (afterMatch: string) => {
+    if (!afterMatch.startsWith('['))
+      return false
+
+    const nextLabelMatch = RE_REFERENCE_LABEL.exec(afterMatch)
+    if (!nextLabelMatch)
+      return afterMatch !== '[' && !/^\[\d+$/.test(afterMatch)
+
+    const nextLabel = String(nextLabelMatch[1] ?? '')
+    const remaining = afterMatch.slice(nextLabelMatch[0].length)
+
+    // `[1][label](url)` is two adjacent constructs: a numeric reference
+    // followed by a normal inline link.
+    if (remaining.startsWith('('))
+      return false
+
+    // `[1][2]` and `[1][2][3]` are treated as chained numeric references
+    // in this parser, while non-numeric labels should stay available for
+    // CommonMark reference-style links.
+    return !/^\d+$/.test(nextLabel)
+  }
   const referenceInline = (state: unknown, silent: boolean) => {
     const s = state as unknown as { src: string, pos: number, push: (type: string, tag?: string, nesting?: number) => any }
     if (s.src[s.pos] !== '[')
@@ -236,7 +258,7 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
     const afterMatch = s.src.slice(s.pos + match[0].length)
     // `](` handles nested-bracket link text, e.g. `[[8]](url)` where the inner `[8]`
     // must stay as text for the outer link parser to succeed.
-    if (afterMatch.startsWith('](') || afterMatch.startsWith('(') || afterMatch.startsWith('['))
+    if (afterMatch.startsWith('](') || afterMatch.startsWith('(') || shouldPreserveReferenceStyleLink(afterMatch))
       return false
     if (!silent) {
       const id = match[1]

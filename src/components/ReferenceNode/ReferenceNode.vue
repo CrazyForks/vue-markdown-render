@@ -13,7 +13,7 @@ defineEmits(['click', 'mouseEnter', 'mouseLeave'])
 
 <template>
   <span
-    class="reference-node cursor-pointer bg-[hsl(var(--muted))] text-xs rounded-md px-1.5 mx-0.5 hover:bg-[hsl(var(--secondary))]"
+    class="reference-node cursor-pointer bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs rounded-md px-1.5 mx-0.5 hover:bg-[hsl(var(--secondary))]"
     role="button"
     tabindex="0"
     @click="$emit('click', $event, node.id, messageId, threadId)"

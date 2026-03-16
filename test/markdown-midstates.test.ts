@@ -283,6 +283,28 @@ describe('parseMarkdownToStructure - incremental/mid-typing states', () => {
     })
   })
 
+  describe('numeric reference mid-states', () => {
+    it('keeps completed numeric references stable while the next numeric reference is still incomplete', () => {
+      const mid = parseMarkdownToStructure('引用[1][2', md)
+      const midRefs = collect(mid, 'reference') as any[]
+      expect(midRefs).toHaveLength(1)
+      expect(midRefs[0]?.id).toBe('1')
+      expect(textIncludes(mid, '[2')).toBe(true)
+
+      const full = parseMarkdownToStructure('引用[1][2]', md)
+      const fullRefs = collect(full, 'reference') as any[]
+      expect(fullRefs.map(ref => ref.id)).toEqual(['1', '2'])
+    })
+
+    it('keeps the numeric reference when a following inline link has only opened its href', () => {
+      const nodes = parseMarkdownToStructure('引用 [1][百度](', md)
+      const refs = collect(nodes, 'reference') as any[]
+      expect(refs).toHaveLength(1)
+      expect(refs[0]?.id).toBe('1')
+      expect(textIncludes(nodes, '百度')).toBe(true)
+    })
+  })
+
   describe('fenced code block mid-states', () => {
     it('"```" or "```js" mid-state: accept fence node or paragraph fallback', () => {
       for (const input of ['```', '```js', '```js\nconsole.log(1)']) {
