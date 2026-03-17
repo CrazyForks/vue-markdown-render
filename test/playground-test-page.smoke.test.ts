@@ -143,11 +143,16 @@ describe('playground /test smoke', () => {
     await nextTick()
 
     const preview = wrapper.get('[data-testid="preview"]')
+    expect(preview.text().length).toBeLessThan(fullContent.length)
+
+    await vi.advanceTimersByTimeAsync(800)
+    await nextTick()
+
     const initialLength = preview.text().length
     expect(initialLength).toBeGreaterThan(0)
     expect(initialLength).toBeLessThan(fullContent.length)
 
-    await vi.advanceTimersByTimeAsync(24)
+    await vi.advanceTimersByTimeAsync(600)
     await nextTick()
 
     expect(preview.text().length).toBeGreaterThan(initialLength)

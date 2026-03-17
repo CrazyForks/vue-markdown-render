@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
 import type { SandboxFrameworkId, SandboxRenderSource } from '../../../playground-shared/versionSandbox'
+import type { StreamSliceMode } from '../composables/createLocalTextStream'
+import type { StreamPresetId } from '../composables/streamPresets'
+import type { StreamTransportMode } from '../composables/useStreamSimulator'
 import { useDebounceFn, useLocalStorage } from '@vueuse/core'
 import { computed, onMounted, ref, watch } from 'vue'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
@@ -23,6 +26,8 @@ import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
 import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
 import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
+import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from '../composables/streamPresets'
+import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from '../composables/useStreamSimulator'
 import { testSandboxFrameworks } from '../testSandboxConfig'
 import 'katex/dist/katex.min.css'
 
@@ -54,10 +59,14 @@ const testPageMonacoOptions = {
 
 const selectedSampleId = useLocalStorage<SampleId>('vmr-test-sample', 'baseline')
 const input = ref<string>(sampleCards[0].content)
-const streamContent = ref<string>('')
-const isStreaming = ref(false)
-const streamSpeed = useLocalStorage<number>('vmr-test-stream-speed', 4)
-const streamInterval = useLocalStorage<number>('vmr-test-stream-interval', 24)
+const streamChunkSizeMin = useLocalStorage<number>('vmr-test-stream-chunk-size-min', 2)
+const streamChunkSizeMax = useLocalStorage<number>('vmr-test-stream-chunk-size-max', 7)
+const streamChunkDelayMin = useLocalStorage<number>('vmr-test-stream-delay-min', 14)
+const streamChunkDelayMax = useLocalStorage<number>('vmr-test-stream-delay-max', 34)
+const streamBurstiness = useLocalStorage<number>('vmr-test-stream-burstiness', 35)
+const streamTransportMode = useLocalStorage<StreamTransportMode>('vmr-test-stream-transport-mode', 'readable-stream')
+const streamSliceMode = useLocalStorage<StreamSliceMode>('vmr-test-stream-slice-mode', 'pure-random')
+const streamDebug = useLocalStorage<boolean>('vmr-test-stream-debug', false)
 const showStreamSettings = useLocalStorage<boolean>('vmr-test-show-settings', true)
 
 const renderMode = useLocalStorage<'monaco' | 'pre' | 'markdown'>('vmr-test-render-mode', 'monaco')
@@ -83,12 +92,77 @@ const issueUrl = ref<string>('')
 const MAX_URL_LEN = 2000
 
 const activeSample = computed(() => sampleCards.find(sample => sample.id === selectedSampleId.value) ?? sampleCards[0])
+const normalizedChunkSizeRange = computed(() => normalizeStreamRange(
+  Number(streamChunkSizeMin.value),
+  Number(streamChunkSizeMax.value),
+  1,
+  80,
+  2,
+  7,
+))
+const normalizedChunkDelayRange = computed(() => normalizeStreamRange(
+  Number(streamChunkDelayMin.value),
+  Number(streamChunkDelayMax.value),
+  8,
+  600,
+  14,
+  34,
+))
+const {
+  content: streamContent,
+  chunks: streamChunks,
+  isPaused,
+  isStreaming,
+  lastChunkSize,
+  lastDelayMs,
+  reset: resetStreamState,
+  start: startStreaming,
+  stop: stopStreaming,
+  togglePause: toggleStreamingPause,
+} = useStreamSimulator({
+  source: input,
+  chunkSizeMin: computed(() => normalizedChunkSizeRange.value.min),
+  chunkSizeMax: computed(() => normalizedChunkSizeRange.value.max),
+  chunkDelayMin: computed(() => normalizedChunkDelayRange.value.min),
+  chunkDelayMax: computed(() => normalizedChunkDelayRange.value.max),
+  burstiness: computed(() => streamBurstiness.value / 100),
+  sliceMode: streamSliceMode,
+  transportMode: streamTransportMode,
+})
 const previewContent = computed(() => (isStreaming.value ? streamContent.value : input.value))
 const streamProgress = computed(() => {
   if (!input.value.length)
     return 0
   return Math.min(100, Math.round((previewContent.value.length / input.value.length) * 100))
 })
+const activeStreamPreset = computed(() => findMatchingStreamPreset({
+  chunkDelayMin: normalizedChunkDelayRange.value.min,
+  chunkDelayMax: normalizedChunkDelayRange.value.max,
+  chunkSizeMin: normalizedChunkSizeRange.value.min,
+  chunkSizeMax: normalizedChunkSizeRange.value.max,
+  burstiness: streamBurstiness.value,
+}))
+const selectedStreamPresetId = computed<StreamPresetId>({
+  get: () => activeStreamPreset.value?.id ?? CUSTOM_STREAM_PRESET_ID,
+  set: (presetId) => {
+    if (presetId === CUSTOM_STREAM_PRESET_ID)
+      return
+
+    const preset = getStreamPreset(presetId)
+    if (!preset)
+      return
+
+    streamChunkDelayMin.value = preset.chunkDelayMin
+    streamChunkDelayMax.value = preset.chunkDelayMax
+    streamChunkSizeMin.value = preset.chunkSizeMin
+    streamChunkSizeMax.value = preset.chunkSizeMax
+    streamBurstiness.value = preset.burstiness
+  },
+})
+const streamPresetDescription = computed(() => activeStreamPreset.value?.descriptionZh ?? '当前参数已偏离预设，属于自定义 min/max 流式画像。')
+const streamChunkRangeLabel = computed(() => `${normalizedChunkSizeRange.value.min}-${normalizedChunkSizeRange.value.max} 字`)
+const streamDelayRangeLabel = computed(() => `${normalizedChunkDelayRange.value.min}-${normalizedChunkDelayRange.value.max}ms`)
+const streamModeLabel = computed(() => streamTransportMode.value === 'readable-stream' ? 'ReadableStream' : 'Scheduler')
 const renderModeLabel = computed(() => {
   if (renderMode.value === 'markdown')
     return 'MarkdownCodeBlock'
@@ -134,11 +208,6 @@ const sandboxStatusLabel = computed(() => {
     return '待同步'
   return '已同步'
 })
-
-function clampInt(value: number, min: number, max: number, fallback: number) {
-  const normalized = Number.isFinite(value) ? Math.round(value) : fallback
-  return Math.min(max, Math.max(min, normalized))
-}
 
 function syncSandbox() {
   sandboxSnapshot.value = input.value
@@ -286,40 +355,17 @@ function applySample(sampleId: SampleId) {
   showToast(`已切换到“${sample.title}”样例。`, 'info', 1200)
 }
 
-let streamTimer: number | null = null
-
-function scheduleNextChunk() {
-  if (!isStreaming.value)
-    return
-
-  const nextLength = Math.min(streamContent.value.length + streamSpeed.value, input.value.length)
-  streamContent.value = input.value.slice(0, nextLength)
-
-  if (nextLength >= input.value.length) {
-    stopStreamRender()
-    return
-  }
-
-  streamTimer = window.setTimeout(scheduleNextChunk, streamInterval.value)
-}
-
 function startStreamRender() {
   if (isStreaming.value) {
     stopStreamRender()
     return
   }
 
-  streamContent.value = ''
-  isStreaming.value = true
-  scheduleNextChunk()
+  startStreaming()
 }
 
 function stopStreamRender() {
-  if (streamTimer !== null) {
-    clearTimeout(streamTimer)
-    streamTimer = null
-  }
-  isStreaming.value = false
+  stopStreaming()
 }
 
 function resetEditor() {
@@ -327,7 +373,7 @@ function resetEditor() {
 }
 
 function clearEditor() {
-  stopStreamRender()
+  resetStreamState()
   input.value = ''
 }
 
@@ -355,16 +401,24 @@ onMounted(() => {
   sandboxSnapshot.value = input.value
 })
 
-watch(streamSpeed, (value) => {
-  const next = clampInt(value, 1, 80, 4)
-  if (next !== value)
-    streamSpeed.value = next
+watch(normalizedChunkSizeRange, (range) => {
+  if (streamChunkSizeMin.value !== range.min)
+    streamChunkSizeMin.value = range.min
+  if (streamChunkSizeMax.value !== range.max)
+    streamChunkSizeMax.value = range.max
 }, { immediate: true })
 
-watch(streamInterval, (value) => {
-  const next = clampInt(value, 8, 300, 24)
+watch(normalizedChunkDelayRange, (range) => {
+  if (streamChunkDelayMin.value !== range.min)
+    streamChunkDelayMin.value = range.min
+  if (streamChunkDelayMax.value !== range.max)
+    streamChunkDelayMax.value = range.max
+}, { immediate: true })
+
+watch(streamBurstiness, (value) => {
+  const next = Math.round(clampStreamControl(value, 0, 100, 35))
   if (next !== value)
-    streamInterval.value = next
+    streamBurstiness.value = next
 }, { immediate: true })
 
 watch(input, () => {
@@ -504,7 +558,7 @@ watch(mermaidEnabled, (enabled) => {
             <div class="panel-card__head">
               <div>
                 <h2>流式控制</h2>
-                <p>模拟真实增量输出，检查闪烁和中间态。</p>
+                <p>模拟真实增量输出，把抖动、停顿和 burst 一起带进来。</p>
               </div>
               <button type="button" class="ghost-button" @click="showStreamSettings = !showStreamSettings">
                 {{ showStreamSettings ? '收起' : '展开' }}
@@ -514,6 +568,9 @@ watch(mermaidEnabled, (enabled) => {
             <div class="control-actions">
               <button type="button" class="action-button action-button--primary" @click="startStreamRender">
                 {{ isStreaming ? '停止流式渲染' : '开始流式渲染' }}
+              </button>
+              <button type="button" class="action-button" :disabled="!isStreaming" @click="toggleStreamingPause">
+                {{ isPaused ? '继续流式渲染' : '暂停流式渲染' }}
               </button>
               <button type="button" class="action-button" @click="resetEditor">
                 重置样例
@@ -529,22 +586,92 @@ watch(mermaidEnabled, (enabled) => {
               </div>
               <div class="progress-meta">
                 <span>{{ previewContent.length }} / {{ input.length || 0 }}</span>
-                <span>{{ isStreaming ? 'Streaming' : 'Static preview' }}</span>
+                <span>{{ isStreaming ? `${streamModeLabel} · 最近一次 ${lastChunkSize} 字 / ${lastDelayMs}ms` : 'Static preview' }}</span>
               </div>
             </div>
 
             <div v-if="showStreamSettings" class="control-stack">
+              <label class="select-control">
+                <span>Transport</span>
+                <select v-model="streamTransportMode">
+                  <option value="readable-stream">
+                    ReadableStream
+                  </option>
+                  <option value="scheduler">
+                    Scheduler
+                  </option>
+                </select>
+              </label>
+
+              <label class="select-control">
+                <span>Slice Mode</span>
+                <select v-model="streamSliceMode">
+                  <option value="pure-random">
+                    Pure Random
+                  </option>
+                  <option value="boundary-aware">
+                    Boundary Aware
+                  </option>
+                </select>
+              </label>
+
+              <label class="select-control">
+                <span>流式画像 preset</span>
+                <select v-model="selectedStreamPresetId">
+                  <option v-for="preset in STREAM_PRESETS" :key="preset.id" :value="preset.id">
+                    {{ preset.label }}
+                  </option>
+                  <option :value="CUSTOM_STREAM_PRESET_ID">
+                    Custom
+                  </option>
+                </select>
+              </label>
+
+              <p class="control-note">
+                {{ streamPresetDescription }}
+              </p>
+
               <label class="range-control">
-                <span>每次追加字符数</span>
-                <strong>{{ streamSpeed }}</strong>
-                <input v-model.number="streamSpeed" type="range" min="1" max="80">
+                <span>chunkSizeMin</span>
+                <strong>{{ normalizedChunkSizeRange.min }}</strong>
+                <input v-model.number="streamChunkSizeMin" type="range" min="1" max="80" step="1">
               </label>
 
               <label class="range-control">
-                <span>更新时间间隔</span>
-                <strong>{{ streamInterval }}ms</strong>
-                <input v-model.number="streamInterval" type="range" min="8" max="300" step="4">
+                <span>chunkSizeMax</span>
+                <strong>{{ normalizedChunkSizeRange.max }}</strong>
+                <input v-model.number="streamChunkSizeMax" type="range" min="1" max="80" step="1">
               </label>
+
+              <label class="range-control">
+                <span>chunkDelayMin</span>
+                <strong>{{ normalizedChunkDelayRange.min }}ms</strong>
+                <input v-model.number="streamChunkDelayMin" type="range" min="8" max="600" step="4">
+              </label>
+
+              <label class="range-control">
+                <span>chunkDelayMax</span>
+                <strong>{{ normalizedChunkDelayRange.max }}ms</strong>
+                <input v-model.number="streamChunkDelayMax" type="range" min="8" max="600" step="4">
+              </label>
+
+              <label class="range-control">
+                <span>突发/停顿强度</span>
+                <strong>{{ streamBurstiness }}%</strong>
+                <input v-model.number="streamBurstiness" type="range" min="0" max="100" step="1">
+              </label>
+
+              <p class="control-note">
+                当前窗口：{{ streamChunkRangeLabel }}，{{ streamDelayRangeLabel }}。当 min=max 时就是固定节奏。
+              </p>
+
+              <p class="control-note">
+                `Pure Random` 会直接按随机长度做原始 `slice`；`Boundary Aware` 会尽量贴近单词或标点边界。
+              </p>
+
+              <p class="control-note">
+                `ReadableStream` 更接近真实 reader 消费链路；`Scheduler` 保留我们本地定时调度模型。burstiness 只会影响非纯随机调度。
+              </p>
 
               <div class="toggle-grid">
                 <label class="toggle-item">
@@ -574,6 +701,10 @@ watch(mermaidEnabled, (enabled) => {
                 <label class="toggle-item">
                   <span>解析树 debug</span>
                   <input v-model="debugParse" type="checkbox">
+                </label>
+                <label class="toggle-item">
+                  <span>chunk debug</span>
+                  <input v-model="streamDebug" type="checkbox">
                 </label>
               </div>
 
@@ -781,8 +912,26 @@ watch(mermaidEnabled, (enabled) => {
 
             <footer class="workspace-card__foot">
               <span>{{ previewContent.length }} chars rendered</span>
-              <span>{{ isStreaming ? '正在逐步追加中' : '已显示完整输入' }}</span>
+              <span>{{ isStreaming ? (isPaused ? '流式已暂停' : '正在逐步追加中') : '已显示完整输入' }}</span>
             </footer>
+          </article>
+
+          <article v-if="streamDebug && streamChunks.length" class="workspace-card workspace-card--full">
+            <header class="workspace-card__head">
+              <div>
+                <h2>Chunk Debug</h2>
+                <p>逐块查看 delay、slice 内容和累计节奏。</p>
+              </div>
+              <span class="mini-pill">{{ streamChunks.length }} chunks</span>
+            </header>
+
+            <div class="chunk-log">
+              <div v-for="chunk in streamChunks" :key="chunk.index" class="chunk-log__row">
+                <strong>#{{ chunk.index }}</strong>
+                <span>{{ chunk.delay }}ms</span>
+                <code>{{ JSON.stringify(chunk.content) }}</code>
+              </div>
+            </div>
           </article>
 
           <article class="workspace-card workspace-card--full">
@@ -1195,6 +1344,14 @@ watch(mermaidEnabled, (enabled) => {
 
 .range-control input[type='range'] {
   width: 100%;
+}
+
+.control-note {
+  margin: 0;
+  padding: 0 4px;
+  color: var(--lab-muted);
+  font-size: 0.82rem;
+  line-height: 1.6;
 }
 
 .select-control select {
