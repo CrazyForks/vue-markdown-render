@@ -1,4 +1,4 @@
-## [0.0.9-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.9-beta.1) (2026-03-15)
+## [0.0.9-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.9-beta.2) (2026-03-17)
 
 
 ### Bug Fixes
@@ -63,7 +63,9 @@
 * propagate showTooltips in nested list renderers ([6a8277d](https://github.com/Simon-He95/markstream-vue/commit/6a8277ddaa677c566c91f1dbd93f93c4af8615a7)), closes [#310](https://github.com/Simon-He95/markstream-vue/issues/310)
 * **react:** generate bundled d.ts on build ([fb5c88b](https://github.com/Simon-He95/markstream-vue/commit/fb5c88b345eeec857e4aa5a95e3592659d2fa491))
 * remove unnecessary blank lines in documentation and component files ([5f877e6](https://github.com/Simon-He95/markstream-vue/commit/5f877e61079b95ef3a78f1c8de7fe12328d85133)), closes [#243](https://github.com/Simon-He95/markstream-vue/issues/243)
+* repair package entrypoints ([e2c1c21](https://github.com/Simon-He95/markstream-vue/commit/e2c1c214629f81bfe4ce67823d6d895936c8cfa6))
 * stabilize angular playground preview rendering ([1c61a62](https://github.com/Simon-He95/markstream-vue/commit/1c61a620a8b9c11cab773abc32b6c8a617f59170))
+* stabilize reference parsing and contrast ([357629a](https://github.com/Simon-He95/markstream-vue/commit/357629ad31fc304c2ce9f879bf3a3ddd19997e83)), closes [#327](https://github.com/Simon-He95/markstream-vue/issues/327)
 * standardize class attribute syntax in list item components and tests ([71af12b](https://github.com/Simon-He95/markstream-vue/commit/71af12b1638456fdbaf809849f3f230ea9505de0))
 * sync tooltip propagation to vue2 and react packages ([62f5171](https://github.com/Simon-He95/markstream-vue/commit/62f51711401e8f55b548f6df4fb426f25a32a913)), closes [#310](https://github.com/Simon-He95/markstream-vue/issues/310)
 * **theme:** toggle fail ([39cd71a](https://github.com/Simon-He95/markstream-vue/commit/39cd71af0c499c95d9c50b9770972540ac83c3ef)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
@@ -115,6 +117,7 @@
 * delete temporary patch file ([e931d8b](https://github.com/Simon-He95/markstream-vue/commit/e931d8bc414833194aebebe23fafa8379d7bde41))
 * **docs:** update playground links and add local running instructions ([2ec2745](https://github.com/Simon-He95/markstream-vue/commit/2ec27456fed6b0b0432e92b67753d51bbf42ad89))
 * enhance ::: container syntax to support args and improve JSON matching ([4b3bbf7](https://github.com/Simon-He95/markstream-vue/commit/4b3bbf707e7f58e9b2f935ac58d353567eeebb0d)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
+* enhance CodeBlockNode diff support and update Angular package ([af1f64f](https://github.com/Simon-He95/markstream-vue/commit/af1f64f99751e8082ae8aef8b78eda7a7a241f9c))
 * enhance D2BlockNodeProps interface with additional properties ([9f8ac87](https://github.com/Simon-He95/markstream-vue/commit/9f8ac87ccd1826711119a6842e8f816eeed7da74))
 * enhance documentation and components for Shiki and Monaco integration ([588358c](https://github.com/Simon-He95/markstream-vue/commit/588358cd605b6e529357a410dcc0efb87d3decd7)), closes [#279](https://github.com/Simon-He95/markstream-vue/issues/279)
 * enhance documentation structure and content for multiple frameworks ([293511d](https://github.com/Simon-He95/markstream-vue/commit/293511d0226c353f8e7874d69a58daa17cbc1d4a))
