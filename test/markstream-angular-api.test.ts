@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { resolveParsedNodes } from '../packages/markstream-angular/src/components/shared/node-helpers'
 import {
   clearGlobalCustomComponents,
   getCustomNodeComponents,
   removeCustomComponents,
   setCustomComponents,
 } from '../packages/markstream-angular/src/customComponents'
-import { resolveParsedNodes } from '../packages/markstream-angular/src/components/shared/node-helpers'
 import {
   disableKatex,
   enableKatex,

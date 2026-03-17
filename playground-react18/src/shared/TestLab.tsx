@@ -1,6 +1,7 @@
+import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
 import { NodeRenderer } from 'markstream-react'
 import { useDeferredValue, useEffect, useState } from 'react'
-import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES, type TestLabFrameworkId, type TestLabSampleId } from '../../../playground-shared/testLabFixtures'
+import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
 import { decodeMarkdownHash, resolveFrameworkTestHref } from '../../../playground-shared/testPageState'
 
 type SampleId = TestLabSampleId
@@ -113,7 +114,11 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
       <div className="test-lab__shell">
         <section className="hero-panel">
           <div className="hero-copy">
-            <span className="eyebrow">{frameworkLabel} Regression Lab</span>
+            <span className="eyebrow">
+              {frameworkLabel}
+              {' '}
+              Regression Lab
+            </span>
             <h1>markstream-react /test</h1>
             <p>专门用来和 Vue 3、Vue 2、Angular 的 test page 做对照，快速定位框架层差异。</p>
           </div>
@@ -129,7 +134,10 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
             </div>
             <div className="metric-card">
               <span>进度</span>
-              <strong>{progress}%</strong>
+              <strong>
+                {progress}
+                %
+              </strong>
             </div>
           </div>
 
@@ -235,8 +243,16 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
               />
 
               <footer className="workspace-card__foot">
-                <span>{charCount} chars</span>
-                <span>{lineCount} lines</span>
+                <span>
+                  {charCount}
+                  {' '}
+                  chars
+                </span>
+                <span>
+                  {lineCount}
+                  {' '}
+                  lines
+                </span>
               </footer>
             </article>
 
@@ -246,7 +262,10 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
                   <h2>实时预览</h2>
                   <p>{isStreaming ? 'Streaming 中' : '已显示完整输入'}</p>
                 </div>
-                <span className="mini-pill">{progress}%</span>
+                <span className="mini-pill">
+                  {progress}
+                  %
+                </span>
               </header>
 
               <div className="preview-surface">
@@ -254,7 +273,13 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
               </div>
 
               <footer className="workspace-card__foot">
-                <span>{deferredPreview.length} / {input.length || 0}</span>
+                <span>
+                  {deferredPreview.length}
+                  {' '}
+                  /
+                  {' '}
+                  {input.length || 0}
+                </span>
                 <span>React renderer</span>
               </footer>
             </article>

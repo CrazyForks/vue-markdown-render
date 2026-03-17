@@ -29,8 +29,6 @@ export { InsertNodeComponent as InsertNode } from './components/InsertNode/Inser
 export { LinkNodeComponent as LinkNode } from './components/LinkNode/LinkNode.component'
 export { ListItemNodeComponent as ListItemNode } from './components/ListItemNode/ListItemNode.component'
 export { ListNodeComponent as ListNode } from './components/ListNode/ListNode.component'
-export { MarkstreamAngularComponent } from './markstream-angular.component'
-export { MarkstreamAngularComponent as MarkdownRenderComponent } from './markstream-angular.component'
 export { MathBlockNodeComponent as MathBlockNode } from './components/MathBlockNode/MathBlockNode.component'
 export { MathInlineNodeComponent as MathInlineNode } from './components/MathInlineNode/MathInlineNode.component'
 export { MermaidBlockNodeComponent as MermaidBlockNode } from './components/MermaidBlockNode/MermaidBlockNode.component'
@@ -39,6 +37,16 @@ export { NodeRendererComponent as NodeRenderer } from './components/NodeRenderer
 export { ParagraphNodeComponent as ParagraphNode } from './components/ParagraphNode/ParagraphNode.component'
 export { PreCodeNodeComponent as PreCodeNode } from './components/PreCodeNode/PreCodeNode.component'
 export { ReferenceNodeComponent as ReferenceNode } from './components/ReferenceNode/ReferenceNode.component'
+export type {
+  AngularRenderableNode,
+  AngularRenderContext,
+  NodeRendererEvents,
+  NodeRendererProps,
+} from './components/shared/node-helpers'
+export {
+  buildRenderContext,
+  resolveParsedNodes,
+} from './components/shared/node-helpers'
 export { SafeAttrsDirective } from './components/shared/safe-attrs.directive'
 export { StrikethroughNodeComponent as StrikethroughNode } from './components/StrikethroughNode/StrikethroughNode.component'
 export { StrongNodeComponent as StrongNode } from './components/StrongNode/StrongNode.component'
@@ -62,45 +70,10 @@ export {
   enhanceRenderedHtml,
 } from './enhanceRenderedHtml'
 export type { EnhanceRenderedHtmlOptions, RenderedHtmlEnhancementHandle } from './enhanceRenderedHtml'
-export type {
-  AngularRenderContext,
-  AngularRenderableNode,
-  NodeRendererEvents,
-  NodeRendererProps,
-} from './components/shared/node-helpers'
-export {
-  buildRenderContext,
-  resolveParsedNodes,
-} from './components/shared/node-helpers'
 export { setDefaultI18nMap, useSafeI18n } from './i18n/useSafeI18n'
-export {
-  renderMarkdownNodeToHtml,
-  renderMarkdownNodesToHtml,
-  renderMarkdownToHtml,
-  renderNestedMarkdownToHtml,
-} from './renderMarkdownHtml'
-export type {
-  MarkstreamAngularRenderOptions,
-  NestedMarkdownHtmlInput,
-  NestedMarkdownHtmlOptions,
-  RenderableMarkdownNode,
-} from './renderMarkdownHtml'
-export { sanitizeHtmlContent } from './sanitizeHtmlContent'
-export {
-  getLanguageIcon,
-  languageMap,
-  normalizeLanguageIdentifier,
-  resolveMonacoLanguageId,
-  setLanguageIconResolver,
-} from './utils/languageIcon'
-export type { LanguageIconResolver } from './utils/languageIcon'
-export {
-  parseNestedMarkdownToNodes,
-} from './parseNestedMarkdownToNodes'
-export type {
-  NestedMarkdownNodesInput,
-  NestedMarkdownNodesOptions,
-} from './parseNestedMarkdownToNodes'
+export { MarkstreamAngularComponent } from './markstream-angular.component'
+export { MarkstreamAngularComponent as MarkdownRenderComponent } from './markstream-angular.component'
+export { MarkstreamAngularComponent as default } from './markstream-angular.component'
 export type { D2Loader } from './optional/d2'
 export {
   disableD2,
@@ -124,9 +97,36 @@ export {
   isMermaidEnabled,
   setMermaidLoader,
 } from './optional/mermaid'
+export {
+  parseNestedMarkdownToNodes,
+} from './parseNestedMarkdownToNodes'
+export type {
+  NestedMarkdownNodesInput,
+  NestedMarkdownNodesOptions,
+} from './parseNestedMarkdownToNodes'
+export {
+  renderMarkdownNodesToHtml,
+  renderMarkdownNodeToHtml,
+  renderMarkdownToHtml,
+  renderNestedMarkdownToHtml,
+} from './renderMarkdownHtml'
+export type {
+  MarkstreamAngularRenderOptions,
+  NestedMarkdownHtmlInput,
+  NestedMarkdownHtmlOptions,
+  RenderableMarkdownNode,
+} from './renderMarkdownHtml'
+export { sanitizeHtmlContent } from './sanitizeHtmlContent'
+export {
+  getLanguageIcon,
+  languageMap,
+  normalizeLanguageIdentifier,
+  resolveMonacoLanguageId,
+  setLanguageIconResolver,
+} from './utils/languageIcon'
+export type { LanguageIconResolver } from './utils/languageIcon'
 export * from './workers/katexCdnWorker'
 export * from './workers/katexWorkerClient'
 export * from './workers/mermaidCdnWorker'
-export * from './workers/mermaidWorkerClient'
 
-export { MarkstreamAngularComponent as default } from './markstream-angular.component'
+export * from './workers/mermaidWorkerClient'

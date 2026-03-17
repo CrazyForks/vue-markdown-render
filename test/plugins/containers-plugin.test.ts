@@ -29,17 +29,17 @@ describe('containers plugin', () => {
   })
 
   it('preserves original markdown inside container', () => {
-  const md = getMarkdown('t')
-  const content = `::: note-test \n# head text\n:::`
-  const tokens = parseMarkdownToStructure(content, md)
-  
-  // the raw should contain the markdown `# head text`
-  expect(tokens).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        raw: expect.stringContaining('#')
-      })
-    ])
-  )
-})
+    const md = getMarkdown('t')
+    const content = `::: note-test \n# head text\n:::`
+    const tokens = parseMarkdownToStructure(content, md)
+
+    // the raw should contain the markdown `# head text`
+    expect(tokens).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          raw: expect.stringContaining('#'),
+        }),
+      ]),
+    )
+  })
 })

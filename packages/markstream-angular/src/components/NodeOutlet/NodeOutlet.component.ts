@@ -1,5 +1,6 @@
+import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
-import { ChangeDetectionStrategy, Component, Input, forwardRef } from '@angular/core'
+import { ChangeDetectionStrategy, Component, forwardRef, Input } from '@angular/core'
 import { getCustomNodeComponents } from '../../customComponents'
 import { AdmonitionNodeComponent } from '../AdmonitionNode/AdmonitionNode.component'
 import { BlockquoteNodeComponent } from '../BlockquoteNode/BlockquoteNode.component'
@@ -32,6 +33,13 @@ import { MermaidBlockNodeComponent } from '../MermaidBlockNode/MermaidBlockNode.
 import { ParagraphNodeComponent } from '../ParagraphNode/ParagraphNode.component'
 import { PreCodeNodeComponent } from '../PreCodeNode/PreCodeNode.component'
 import { ReferenceNodeComponent } from '../ReferenceNode/ReferenceNode.component'
+import {
+  coerceBuiltinHtmlNode,
+  coerceCustomHtmlNode,
+  resolveHtmlTag,
+  resolveNodeOutletCodeMode,
+  resolveNodeOutletCustomInputs,
+} from '../shared/node-outlet-helpers'
 import { StrikethroughNodeComponent } from '../StrikethroughNode/StrikethroughNode.component'
 import { StrongNodeComponent } from '../StrongNode/StrongNode.component'
 import { SubscriptNodeComponent } from '../SubscriptNode/SubscriptNode.component'
@@ -40,14 +48,6 @@ import { TableNodeComponent } from '../TableNode/TableNode.component'
 import { TextNodeComponent } from '../TextNode/TextNode.component'
 import { ThematicBreakNodeComponent } from '../ThematicBreakNode/ThematicBreakNode.component'
 import { VmrContainerNodeComponent } from '../VmrContainerNode/VmrContainerNode.component'
-import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
-import {
-  coerceBuiltinHtmlNode,
-  coerceCustomHtmlNode,
-  resolveHtmlTag,
-  resolveNodeOutletCodeMode,
-  resolveNodeOutletCustomInputs,
-} from '../shared/node-outlet-helpers'
 
 @Component({
   selector: 'markstream-angular-node-outlet',
@@ -199,12 +199,12 @@ export class NodeOutletComponent {
       return direct
 
     if (this.resolvedType === 'code_block') {
-      if (this.codeMode === 'mermaid' && customComponents?.['mermaid'])
-        return customComponents['mermaid']
-      if (this.codeMode === 'd2' && customComponents?.['d2'])
-        return customComponents['d2']
-      if (this.codeMode === 'infographic' && customComponents?.['infographic'])
-        return customComponents['infographic']
+      if (this.codeMode === 'mermaid' && customComponents?.mermaid)
+        return customComponents.mermaid
+      if (this.codeMode === 'd2' && customComponents?.d2)
+        return customComponents.d2
+      if (this.codeMode === 'infographic' && customComponents?.infographic)
+        return customComponents.infographic
     }
 
     const tag = this.htmlTag

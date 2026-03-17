@@ -1,15 +1,12 @@
-import type { ComponentRef, Type } from '@angular/core'
+import type { ComponentRef, OnChanges, OnDestroy, SimpleChanges, Type } from '@angular/core'
+import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import {
   ChangeDetectionStrategy,
   Component,
   Input,
-  OnChanges,
-  OnDestroy,
-  SimpleChanges,
   ViewChild,
   ViewContainerRef,
 } from '@angular/core'
-import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
 
 @Component({
   selector: 'markstream-angular-dynamic-node-host',
@@ -33,7 +30,7 @@ export class DynamicNodeHostComponent implements OnChanges, OnDestroy {
     if (!this.containerRef)
       return
 
-    if (changes['component'])
+    if (changes.component)
       this.mountComponent()
 
     this.applyInputs()

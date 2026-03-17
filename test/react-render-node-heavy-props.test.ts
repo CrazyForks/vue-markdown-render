@@ -1,6 +1,6 @@
+import type { RenderContext } from '../packages/markstream-react/src/types'
 import { describe, expect, it } from 'vitest'
 import { renderNode } from '../packages/markstream-react/src/renderers/renderNode'
-import type { RenderContext } from '../packages/markstream-react/src/types'
 
 describe('markstream-react heavy-node prop forwarding', () => {
   it('forwards mermaidProps to MermaidBlockNode render output', () => {

@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed, createApp as createVue3RuntimeApp, h as vue3H, onBeforeUnmount, onMounted, ref } from 'vue'
-import '../../../packages/markstream-angular/src/index.css'
+import type { SandboxSelection } from '../../../playground-shared/versionSandbox'
+import { computed, createApp as createVue3RuntimeApp, onBeforeUnmount, onMounted, ref, h as vue3H } from 'vue'
 import { decodeMarkdownHash } from '../../../playground-shared/testPageState'
-import { parseSandboxSelection, type SandboxSelection } from '../../../playground-shared/versionSandbox'
+import { parseSandboxSelection } from '../../../playground-shared/versionSandbox'
 import {
   TEST_SANDBOX_KATEX_VERSION,
   TEST_SANDBOX_MERMAID_VERSION,
   testSandboxFrameworks,
 } from '../testSandboxConfig'
+import '../../../packages/markstream-angular/src/index.css'
 
 type SandboxStatus = 'idle' | 'loading' | 'ready' | 'error'
 

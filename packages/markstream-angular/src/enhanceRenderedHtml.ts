@@ -1,8 +1,8 @@
 import { getD2 } from './optional/d2'
 import { getInfographic } from './optional/infographic'
 import { getKatex } from './optional/katex'
-import { getUseMonaco } from './optional/monaco'
 import { getMermaid } from './optional/mermaid'
+import { getUseMonaco } from './optional/monaco'
 import { extractRenderedSvg, toSafeSvgMarkup } from './sanitizeSvg'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from './workers/katexWorkerClient'
 import { canParseOffthread, findPrefixOffthread } from './workers/mermaidWorkerClient'
@@ -727,7 +727,7 @@ function decodeDataPayload(value: string | null | undefined) {
   if (!value)
     return ''
 
-  const globalBuffer = (globalThis as any)?.Buffer
+  const globalBuffer = (globalThis as any)?.require?.('buffer')?.Buffer
   if (globalBuffer?.from)
     return globalBuffer.from(value, 'base64').toString('utf8')
 

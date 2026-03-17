@@ -1,7 +1,9 @@
+import type { OnDestroy, OnInit } from '@angular/core'
+import type { TestLabFrameworkId, TestLabSampleId } from '../../playground-shared/testLabFixtures'
 import { CommonModule } from '@angular/common'
-import { ChangeDetectionStrategy, Component, EventEmitter, OnDestroy, OnInit, Output, computed, signal } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, EventEmitter, Output, signal } from '@angular/core'
 import { MarkstreamAngularComponent } from 'markstream-angular'
-import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES, type TestLabFrameworkId, type TestLabSampleId } from '../../playground-shared/testLabFixtures'
+import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../playground-shared/testLabFixtures'
 import { decodeMarkdownHash, resolveFrameworkTestHref } from '../../playground-shared/testPageState'
 import { ThinkingNodeComponent } from './thinking-node.component'
 
@@ -190,6 +192,7 @@ export class TestLabComponent implements OnInit, OnDestroy {
   readonly customComponents = {
     thinking: ThinkingNodeComponent,
   }
+
   readonly frameworkCards = TEST_LAB_FRAMEWORKS
   readonly sampleCards = TEST_LAB_SAMPLES
   readonly selectedSampleId = signal<TestLabSampleId>('baseline')
@@ -205,6 +208,7 @@ export class TestLabComponent implements OnInit, OnDestroy {
       return 0
     return Math.min(100, Math.round((this.previewContent().length / this.input().length) * 100))
   })
+
   readonly charCount = computed(() => this.input().length)
   readonly lineCount = computed(() => this.input() ? this.input().split('\n').length : 0)
 

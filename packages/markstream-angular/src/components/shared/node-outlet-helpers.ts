@@ -1,4 +1,4 @@
-import type { AngularRenderContext, AngularRenderableNode } from './node-helpers'
+import type { AngularRenderableNode, AngularRenderContext } from './node-helpers'
 import { getHtmlTagFromContent, resolveCodeBlockLanguage, stripCustomHtmlWrapper } from './node-helpers'
 
 export type CodeBlockMode = 'mermaid' | 'd2' | 'infographic' | 'pre' | 'code'

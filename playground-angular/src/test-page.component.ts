@@ -1,9 +1,11 @@
+import type { OnDestroy, OnInit, Type } from '@angular/core'
+import type { SafeResourceUrl } from '@angular/platform-browser'
+import type { TestLabFrameworkId, TestLabSampleId } from '../../playground-shared/testLabFixtures'
+import type { SandboxFrameworkId, SandboxRenderSource } from '../../playground-shared/versionSandbox'
 import { CommonModule } from '@angular/common'
-import type { Type } from '@angular/core'
-import { ChangeDetectionStrategy, Component, EventEmitter, OnDestroy, OnInit, Output, computed, inject, signal } from '@angular/core'
-import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser'
+import { ChangeDetectionStrategy, Component, computed, EventEmitter, inject, Output, signal } from '@angular/core'
+import { DomSanitizer } from '@angular/platform-browser'
 import {
-  CodeBlockNode,
   disableKatex,
   disableMermaid,
   enableKatex,
@@ -14,14 +16,13 @@ import {
   MarkstreamAngularComponent,
   PreCodeNode,
 } from 'markstream-angular'
-import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES, type TestLabFrameworkId, type TestLabSampleId } from '../../playground-shared/testLabFixtures'
+import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../playground-shared/testLabFixtures'
 import { decodeMarkdownHash, resolveFrameworkTestHref, withMarkdownHash } from '../../playground-shared/testPageState'
 import {
   buildTestSandboxHref,
   normalizeSandboxSource,
   resolveSandboxSelection,
-  type SandboxFrameworkId,
-  type SandboxRenderSource,
+
 } from '../../playground-shared/versionSandbox'
 import { testSandboxFrameworks } from './testSandboxConfig'
 import { ThinkingNodeComponent } from './thinking-node.component'
@@ -37,7 +38,7 @@ const diffHideUnchangedRegions = {
   enabled: true,
   contextLineCount: 2,
   minimumLineCount: 4,
-  revealLineCount: 2,
+  revealLineCount: 5,
 } as const
 
 const testPageMonacoOptions = {
@@ -564,15 +565,18 @@ export class TestPageComponent implements OnInit, OnDestroy {
     source: readStoredString('vmr-test-sandbox-source', 'workspace'),
     version: readStoredString('vmr-test-sandbox-version', ''),
   }).frameworkId)
+
   readonly sandboxSource = signal<SandboxRenderSource>(resolveSandboxSelection(testSandboxFrameworks, {
     frameworkId: this.sandboxFrameworkId(),
     source: readStoredString('vmr-test-sandbox-source', 'workspace'),
   }).source)
+
   readonly sandboxVersion = signal(resolveSandboxSelection(testSandboxFrameworks, {
     frameworkId: this.sandboxFrameworkId(),
     source: this.sandboxSource(),
     version: readStoredString('vmr-test-sandbox-version', ''),
   }).version)
+
   readonly sandboxAutoSync = signal(readStoredBoolean('vmr-test-sandbox-auto-sync', false))
   readonly sandboxSnapshot = signal(this.input())
   readonly sandboxRefreshNonce = signal(0)
@@ -584,6 +588,7 @@ export class TestPageComponent implements OnInit, OnDestroy {
       return 0
     return Math.min(100, Math.round((this.previewContent().length / this.input().length) * 100))
   })
+
   readonly charCount = computed(() => this.input().length)
   readonly lineCount = computed(() => this.input() ? this.input().split('\n').length : 0)
   readonly renderModeLabel = computed(() => {
@@ -593,6 +598,7 @@ export class TestPageComponent implements OnInit, OnDestroy {
       return 'PreCodeNode'
     return 'Monaco'
   })
+
   readonly parseOptions = computed(() => this.debugParse() ? { debug: true } : undefined)
   readonly customComponents = computed<Record<string, Type<any>>>(() => {
     const components: Record<string, Type<any>> = {
@@ -604,11 +610,13 @@ export class TestPageComponent implements OnInit, OnDestroy {
       components.code_block = MarkdownCodeBlockNode as Type<any>
     return components
   })
+
   readonly activeSandbox = computed(() => resolveSandboxSelection(testSandboxFrameworks, {
     frameworkId: this.sandboxFrameworkId(),
     source: this.sandboxSource(),
     version: this.sandboxVersion(),
   }))
+
   readonly activeSandboxFramework = computed(() => this.activeSandbox().framework)
   readonly sandboxHref = computed(() => buildTestSandboxHref(this.activeSandbox(), this.sandboxSnapshot()))
   readonly sandboxFrameSrc = computed(() => {
@@ -616,12 +624,14 @@ export class TestPageComponent implements OnInit, OnDestroy {
     const separator = href.includes('#') ? '&' : '#'
     return `${href}${separator}refresh=${this.sandboxRefreshNonce()}`
   })
+
   readonly sandboxFrameSrcSafe = computed<SafeResourceUrl>(() => this.domSanitizer.bypassSecurityTrustResourceUrl(this.sandboxFrameSrc()))
   readonly sandboxDirty = computed(() => this.sandboxSnapshot() !== this.input())
   readonly sandboxQuickVersions = computed(() => Array.from(new Set([
     this.activeSandboxFramework().defaultVersion,
     'latest',
   ])))
+
   readonly sandboxVersionPlaceholder = computed(() => `例如 ${this.activeSandboxFramework().defaultVersion} 或 latest`)
   readonly sandboxPackageLabel = computed(() => {
     const active = this.activeSandbox()
@@ -629,12 +639,14 @@ export class TestPageComponent implements OnInit, OnDestroy {
       return `${active.framework.packageName} (workspace)`
     return `${active.framework.packageName}@${active.version}`
   })
+
   readonly sandboxRuntimeLabel = computed(() => {
     const active = this.activeSandbox()
     if (active.source === 'workspace')
       return `${active.framework.label} local runtime`
     return `${active.framework.label} runtime ${active.framework.runtimeVersion}`
   })
+
   readonly sandboxStatusLabel = computed(() => this.sandboxDirty() ? '待同步' : '已同步')
 
   private timer: number | null = null

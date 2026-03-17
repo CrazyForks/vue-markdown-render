@@ -1,17 +1,16 @@
+import type { AfterViewInit, ElementRef, OnChanges, OnDestroy } from '@angular/core'
+import type { AngularRenderableNode } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
-import type { AfterViewInit, OnChanges, OnDestroy } from '@angular/core'
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
-  ElementRef,
+  inject,
   Input,
   ViewChild,
-  inject,
 } from '@angular/core'
 import { getKatex } from '../../optional/katex'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
-import type { AngularRenderableNode } from '../shared/node-helpers'
 import { getString } from '../shared/node-helpers'
 
 @Component({

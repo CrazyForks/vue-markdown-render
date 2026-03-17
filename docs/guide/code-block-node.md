@@ -11,8 +11,23 @@
 Refer to `src/types/component-props.ts` for full signature. Key props:
 - `node` — code_block node (required)
 - `loading`, `stream`, `isShowPreview`
-- `monacoOptions` — forwarded to `stream-monaco`; this is where diff hover-action options such as `diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, and `onDiffHunkAction` belong
+- `monacoOptions` — typed as `CodeBlockMonacoOptions` and forwarded to `stream-monaco`
+  - diff options such as `diffHideUnchangedRegions`, `diffLineStyle`, `diffAppearance`, `diffUnchangedRegionStyle`, `diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, and `onDiffHunkAction` belong here
 - Header controls: `showHeader`, `showCollapseButton`, `showCopyButton`, `showExpandButton`, `showPreviewButton`, `showFontSizeButtons`, `showTooltips`
+
+Default diff UX in Monaco mode:
+
+- `diffHideUnchangedRegions: { enabled: true, contextLineCount: 2, minimumLineCount: 4, revealLineCount: 5 }`
+- `diffLineStyle: 'background'`
+- `diffAppearance: 'auto'`
+- `diffUnchangedRegionStyle: 'line-info'`
+- `diffHunkActionsOnHover: true`
+- `diffHunkHoverHideDelayMs: 160`
+
+You can override any of them through `monacoOptions`.
+When the preset uses `diffAppearance: 'auto'`, `CodeBlockNode` resolves it to the current light/dark surface before passing the options to `stream-monaco`.
+
+Diff blocks also show `- / +` line counts in the built-in header.
 
 ## Slots
 - `header-left` — replace left header

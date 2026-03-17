@@ -1,16 +1,15 @@
+import type { AfterViewInit, ElementRef, OnChanges, OnDestroy } from '@angular/core'
+import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
-import type { AfterViewInit, OnChanges, OnDestroy } from '@angular/core'
 import {
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
+  forwardRef,
   Input,
   ViewChild,
-  forwardRef,
 } from '@angular/core'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
 import { NestedRendererComponent } from '../NestedRenderer/NestedRenderer.component'
-import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
 import { getNodeList, getString } from '../shared/node-helpers'
 
 @Component({

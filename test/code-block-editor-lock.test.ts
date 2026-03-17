@@ -4,6 +4,7 @@ import { nextTick } from 'vue'
 import CodeBlockNode from '../src/components/CodeBlockNode/CodeBlockNode.vue'
 
 interface StreamMonacoHelpers {
+  useMonaco: ReturnType<typeof vi.fn>
   createEditor: ReturnType<typeof vi.fn>
   createDiffEditor: ReturnType<typeof vi.fn>
   updateCode: ReturnType<typeof vi.fn>
@@ -13,6 +14,7 @@ interface StreamMonacoHelpers {
   getDiffEditorView: ReturnType<typeof vi.fn>
   cleanupEditor: ReturnType<typeof vi.fn>
   safeClean: ReturnType<typeof vi.fn>
+  refreshDiffPresentation: ReturnType<typeof vi.fn>
   setTheme: ReturnType<typeof vi.fn>
 }
 
@@ -29,6 +31,7 @@ function resetStreamMonacoHelpers() {
     layout: vi.fn(),
   })
 
+  helpers.useMonaco.mockReset().mockImplementation(() => helpers)
   helpers.createEditor.mockReset().mockImplementation(async () => {})
   helpers.createDiffEditor.mockReset().mockImplementation(async () => {})
   helpers.updateCode.mockReset()
@@ -38,6 +41,7 @@ function resetStreamMonacoHelpers() {
   helpers.getDiffEditorView.mockReset().mockReturnValue(makeEditorView())
   helpers.cleanupEditor.mockReset().mockImplementation(() => {})
   helpers.safeClean.mockReset().mockImplementation(() => {})
+  helpers.refreshDiffPresentation.mockReset().mockImplementation(() => {})
   helpers.setTheme.mockReset().mockImplementation(async () => {})
 }
 
@@ -53,6 +57,15 @@ async function waitForCreateEditorCalls(expected: number, helpers: StreamMonacoH
   while (helpers.createEditor.mock.calls.length < expected) {
     if (Date.now() - start > timeout)
       throw new Error('Timed out waiting for createEditor call')
+    await flushPendingMicrotasks()
+  }
+}
+
+async function waitForCreateDiffEditorCalls(expected: number, helpers: StreamMonacoHelpers, timeout = 1000) {
+  const start = Date.now()
+  while (helpers.createDiffEditor.mock.calls.length < expected) {
+    if (Date.now() - start > timeout)
+      throw new Error('Timed out waiting for createDiffEditor call')
     await flushPendingMicrotasks()
   }
 }
@@ -168,6 +181,238 @@ describe('codeBlockNode language normalization', () => {
 
     const createArgs = helpers.createEditor.mock.calls[0]
     expect(createArgs[2]).toBe('javascript')
+
+    wrapper.unmount()
+  })
+})
+
+describe('codeBlockNode diff defaults', () => {
+  beforeEach(() => {
+    resetStreamMonacoHelpers()
+  })
+
+  it('defaults diff blocks to the line-info collapsed preset', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          originalCode: 'const a = 1\\nconst b = 2\\n',
+          updatedCode: 'const a = 1\\nconst c = 3\\n',
+          raw: '```diff\\n-const b = 2\\n+const c = 3\\n```',
+        },
+        loading: false,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    expect(helpers.useMonaco).toHaveBeenCalled()
+    const monacoOptions = helpers.useMonaco.mock.calls[0]?.[0] ?? {}
+    expect(monacoOptions.diffHideUnchangedRegions).toEqual({
+      enabled: true,
+      contextLineCount: 2,
+      minimumLineCount: 4,
+      revealLineCount: 5,
+    })
+    expect(monacoOptions.diffLineStyle).toBe('background')
+    expect(monacoOptions.diffAppearance).toBe('light')
+    expect(monacoOptions.diffUnchangedRegionStyle).toBe('line-info')
+    expect(monacoOptions.renderLineHighlight).toBe('none')
+    expect(monacoOptions.renderLineHighlightOnlyWhenFocus).toBe(true)
+    expect(monacoOptions.selectionHighlight).toBe(false)
+    expect(monacoOptions.occurrencesHighlight).toBe('off')
+    expect(monacoOptions.matchBrackets).toBe('never')
+    expect(monacoOptions.lineDecorationsWidth).toBe(12)
+    expect(monacoOptions.lineNumbersMinChars).toBe(2)
+    expect(monacoOptions.glyphMargin).toBe(false)
+    expect(monacoOptions.fontSize).toBe(13)
+    expect(monacoOptions.lineHeight).toBe(30)
+    expect(monacoOptions.renderOverviewRuler).toBe(false)
+    expect(monacoOptions.overviewRulerBorder).toBe(false)
+    expect(monacoOptions.hideCursorInOverviewRuler).toBe(true)
+    expect(monacoOptions.scrollBeyondLastLine).toBe(false)
+    expect(monacoOptions.padding).toEqual({ top: 10, bottom: 22 })
+    expect(monacoOptions.diffHunkActionsOnHover).toBe(true)
+    expect(monacoOptions.diffHunkHoverHideDelayMs).toBe(160)
+    expect(monacoOptions.ignoreTrimWhitespace).toBe(false)
+    expect(monacoOptions.renderIndicators).toBe(true)
+    expect(monacoOptions.maxComputationTime).toBe(0)
+    expect(monacoOptions.diffAlgorithm).toBe('legacy')
+    expect(monacoOptions.diffUpdateThrottleMs).toBe(120)
+
+    wrapper.unmount()
+  })
+
+  it('preserves the five-line reveal default when callers pass a partial unchanged-region object', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          originalCode: 'const a = 1\\nconst b = 2\\n',
+          updatedCode: 'const a = 1\\nconst c = 3\\n',
+          raw: '```diff\\n-const b = 2\\n+const c = 3\\n```',
+        },
+        monacoOptions: {
+          diffHideUnchangedRegions: {
+            enabled: true,
+            contextLineCount: 1,
+          },
+        },
+        loading: false,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    const monacoOptions = helpers.useMonaco.mock.calls[0]?.[0] ?? {}
+    expect(monacoOptions.diffHideUnchangedRegions).toEqual({
+      enabled: true,
+      contextLineCount: 1,
+      minimumLineCount: 4,
+      revealLineCount: 5,
+    })
+
+    wrapper.unmount()
+  })
+
+  it('updates diff editors when original or updated sides change even if code stays the same', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: 'const a = 1\\nconst b = 2\\n',
+          updatedCode: 'const a = 1\\nconst b = 2\\n',
+          raw: '```diff\\n@@ -1 +1 @@\\n```',
+        },
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+    helpers.updateDiff.mockClear()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'diff',
+        code: '@@ -1 +1 @@',
+        diff: true,
+        originalCode: 'const a = 1\\nconst b = 2\\n',
+        updatedCode: 'const a = 1\\nconst c = 3\\n',
+        raw: '```diff\\n@@ -1 +1 @@\\n```',
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateDiff).toHaveBeenCalledTimes(1)
+    expect(helpers.updateDiff.mock.calls[0]?.[0]).toBe('const a = 1\\nconst b = 2\\n')
+    expect(helpers.updateDiff.mock.calls[0]?.[1]).toBe('const a = 1\\nconst c = 3\\n')
+
+    wrapper.unmount()
+  })
+})
+
+describe('codeBlockNode theme updates', () => {
+  beforeEach(() => {
+    resetStreamMonacoHelpers()
+  })
+
+  it('updates single-editor themes without recreating the editor when isDark toggles', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'json',
+          code: '{\"hello\": \"world\"}',
+          raw: '```json\n{\"hello\": \"world\"}\n```',
+        },
+        loading: false,
+        showHeader: false,
+        isDark: false,
+        darkTheme: 'vitesse-dark',
+        lightTheme: 'vitesse-light',
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+
+    helpers.createEditor.mockClear()
+    helpers.cleanupEditor.mockClear()
+    helpers.safeClean.mockClear()
+    helpers.setTheme.mockClear()
+
+    await wrapper.setProps({ isDark: true })
+    await flushPendingMicrotasks()
+
+    expect(helpers.createEditor).not.toHaveBeenCalled()
+    expect(helpers.cleanupEditor).not.toHaveBeenCalled()
+    expect(helpers.safeClean).not.toHaveBeenCalled()
+    expect(helpers.setTheme).toHaveBeenCalledTimes(1)
+    expect(helpers.setTheme).toHaveBeenCalledWith('vitesse-dark')
+
+    wrapper.unmount()
+  })
+
+  it('updates diff themes without recreating the diff editor when isDark toggles', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: 'const a = 1\\nconst b = 2\\n',
+          updatedCode: 'const a = 1\\nconst c = 3\\n',
+          raw: '```diff\\n-const b = 2\\n+const c = 3\\n```',
+        },
+        loading: false,
+        showHeader: false,
+        isDark: false,
+        darkTheme: 'vitesse-dark',
+        lightTheme: 'vitesse-light',
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+
+    helpers.createDiffEditor.mockClear()
+    helpers.cleanupEditor.mockClear()
+    helpers.safeClean.mockClear()
+    helpers.refreshDiffPresentation.mockClear()
+    helpers.setTheme.mockClear()
+
+    await wrapper.setProps({ isDark: true })
+    await flushPendingMicrotasks()
+
+    expect(helpers.createDiffEditor).not.toHaveBeenCalled()
+    expect(helpers.cleanupEditor).not.toHaveBeenCalled()
+    expect(helpers.safeClean).not.toHaveBeenCalled()
+    expect(helpers.setTheme).toHaveBeenCalledTimes(1)
+    expect(helpers.setTheme).toHaveBeenCalledWith('vitesse-dark')
+    expect(helpers.refreshDiffPresentation).toHaveBeenCalled()
 
     wrapper.unmount()
   })

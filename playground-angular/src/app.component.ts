@@ -1,5 +1,6 @@
+import type { OnDestroy, OnInit } from '@angular/core'
 import { CommonModule } from '@angular/common'
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, signal } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core'
 import { MarkstreamAngularComponent } from 'markstream-angular'
 import { streamContent } from '../../playground/src/const/markdown'
 import { TestPageComponent } from './test-page.component'
@@ -134,6 +135,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly customComponents = {
     thinking: ThinkingNodeComponent,
   }
+
   readonly totalLength = markdownSource.length
   readonly currentPath = signal(typeof window === 'undefined' ? '/' : normalizePath(window.location.pathname))
   readonly content = signal('')
@@ -146,6 +148,7 @@ export class AppComponent implements OnInit, OnDestroy {
       return 0
     return Math.min(100, Math.round((this.content().length / this.totalLength) * 100))
   })
+
   readonly isDone = computed(() => this.content().length >= this.totalLength)
   readonly isTestPage = computed(() => this.currentPath() === '/test')
   readonly isSandboxPage = computed(() => this.currentPath() === '/test-sandbox')

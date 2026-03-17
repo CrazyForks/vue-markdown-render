@@ -166,7 +166,7 @@ new Vue({
     :mermaid-props="{
       showHeader: false,
       renderDebounceMs: 180,
-      previewPollDelayMs: 500
+      previewPollDelayMs: 500,
     }"
     :d2-props="{ progressiveIntervalMs: 500 }"
     :infographic-props="{ showHeader: false }"

@@ -76,7 +76,7 @@ export class StreamingDemoComponent {
 
 The Angular package supports the same custom HTML tag flow used in the playground `thinking` demos:
 
-```ts
+```html
 <markstream-angular
   [content]="markdown()"
   [customHtmlTags]="['thinking']"

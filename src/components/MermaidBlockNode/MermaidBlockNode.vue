@@ -36,7 +36,7 @@ const props = withDefaults(
     showZoomControls: true,
     enableWheelZoom: false,
     isStrict: false,
-    showTooltips: true
+    showTooltips: true,
   },
 )
 
@@ -489,6 +489,8 @@ function isTimeoutError(error: unknown) {
   return typeof message === 'string' && /timed out/i.test(message)
 }
 
+const tooltipsEnabled = computed(() => props.showTooltips !== false)
+
 // Tooltip helpers (singleton)
 type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right'
 function shouldSkipEventTarget(el: EventTarget | null) {
@@ -935,8 +937,6 @@ function handleWheel(event: WheelEvent) {
     }
   }
 }
-
-const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
 // Copy functionality
 async function copy() {

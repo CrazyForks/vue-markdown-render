@@ -3,9 +3,9 @@ import { NodeRenderer, setCustomComponents, setKaTeXWorker, setMermaidWorker } f
 import KatexWorker from 'markstream-react/workers/katexRenderer.worker?worker&inline'
 import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker&inline'
 import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { TestLab } from '../../playground-react18/src/shared/TestLab'
 import { ThinkingNode } from './components/ThinkingNode'
 import { streamContent } from './markdown'
-import { TestLab } from '../../playground-react18/src/shared/TestLab'
 
 setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())

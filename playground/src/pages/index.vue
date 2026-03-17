@@ -13,7 +13,7 @@ import { streamContent } from '../const/markdown'
 import 'katex/dist/katex.min.css'
 // import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
 
-const d2Demo = `
+const _d2Demo = `
 
 ## D2 Diagram
 
@@ -26,12 +26,12 @@ DB -> API: rows
 API -> Client: response
 \`\`\`
 `
-const fullStreamContent = `${streamContent}${d2Demo}`
+const fullStreamContent = `${streamContent}`
 const diffHideUnchangedRegions = {
   enabled: true,
   contextLineCount: 2,
   minimumLineCount: 4,
-  revealLineCount: 2,
+  revealLineCount: 5,
 } as const
 const playgroundMonacoOptions = {
   renderSideBySide: true,

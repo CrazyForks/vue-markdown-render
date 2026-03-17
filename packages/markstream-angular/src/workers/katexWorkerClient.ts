@@ -1,5 +1,7 @@
 import { isKatexEnabled } from '../optional/katex'
 
+export const WORKER_BUSY_CODE = 'WORKER_BUSY'
+
 interface Pending {
   resolve: (val: string) => void
   reject: (err: any) => void
@@ -196,8 +198,6 @@ export function setKaTeXWorkerMaxConcurrency(value: number) {
   if (Number.isFinite(value) && value > 0)
     maxConcurrency = Math.floor(value)
 }
-
-export const WORKER_BUSY_CODE = 'WORKER_BUSY'
 
 export function isKaTeXWorkerBusy() {
   return pending.size >= maxConcurrency

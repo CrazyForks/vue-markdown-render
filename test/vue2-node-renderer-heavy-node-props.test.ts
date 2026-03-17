@@ -17,7 +17,7 @@ const CustomMermaidProbe = defineComponent({
   },
   render() {
     return h('div', {
-      class: 'custom-mermaid-probe',
+      'class': 'custom-mermaid-probe',
       'data-show-header': String(this.showHeader),
       'data-show-zoom-controls': String(this.showZoomControls),
       'data-render-debounce-ms': String(this.renderDebounceMs),

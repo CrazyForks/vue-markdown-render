@@ -18,8 +18,9 @@ const props = withDefaults(
   defineProps<CodeBlockNodeProps>(),
   {
     isShowPreview: true,
-    darkTheme: undefined,
-    lightTheme: undefined,
+    darkTheme: 'vitesse-dark',
+    lightTheme: 'vitesse-light',
+    isDark: false,
     loading: true,
     stream: true,
     enableFontSizeControl: true,
@@ -157,12 +158,85 @@ let getEditorView: () => any = () => ({ getModel: () => ({ getLineCount: () => 1
 let getDiffEditorView: () => any = () => ({ getModel: () => ({ getLineCount: () => 1 }), getOption: () => 14, updateOptions: () => {} })
 let cleanupEditor: () => void = () => {}
 let safeClean = () => {}
+let refreshDiffPresentation: () => void = () => {}
 let createEditorPromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
 let setTheme: (theme: any) => Promise<void> = async () => {}
 const editorHeightSyncDisposables: Array<{ dispose?: () => void }> = []
 const inlineFoldProxyCleanups: Array<() => void> = []
+let runtimeMonacoOptions: Record<string, any> | null = null
 const isDiff = computed(() => props.node.diff)
+const diffStats = ref({ removed: 0, added: 0 })
+const diffStatsAriaLabel = computed(() => `-${diffStats.value.removed} +${diffStats.value.added}`)
+const defaultDiffHideUnchangedRegions = Object.freeze({
+  enabled: true,
+  contextLineCount: 2,
+  minimumLineCount: 4,
+  revealLineCount: 5,
+})
+function resolveDiffHideUnchangedRegionsOption(value: unknown) {
+  if (typeof value === 'boolean')
+    return value
+  if (value && typeof value === 'object') {
+    const raw = value as Record<string, unknown>
+    return {
+      ...defaultDiffHideUnchangedRegions,
+      ...raw,
+      enabled: raw.enabled ?? true,
+    }
+  }
+  return { ...defaultDiffHideUnchangedRegions }
+}
+const resolvedMonacoOptions = computed(() => {
+  const raw = props.monacoOptions ? { ...props.monacoOptions } : {}
+  if (!isDiff.value)
+    return raw
+  const diffHideUnchangedRegions = raw.diffHideUnchangedRegions === undefined
+    ? { ...defaultDiffHideUnchangedRegions }
+    : resolveDiffHideUnchangedRegionsOption(raw.diffHideUnchangedRegions)
+  const hideUnchangedRegions = raw.hideUnchangedRegions === undefined
+    ? undefined
+    : resolveDiffHideUnchangedRegionsOption(raw.hideUnchangedRegions)
+  const diffUnchangedRegionStyle = raw.diffUnchangedRegionStyle ?? 'line-info'
+  const needsExtraBottomSpace
+    = diffUnchangedRegionStyle === 'line-info'
+      || diffUnchangedRegionStyle === 'line-info-basic'
+      || diffUnchangedRegionStyle === 'metadata'
+  const diffDefaults = {
+    maxComputationTime: 0,
+    diffAlgorithm: 'legacy',
+    ignoreTrimWhitespace: false,
+    renderIndicators: true,
+    diffUpdateThrottleMs: 120,
+    renderLineHighlight: 'none',
+    renderLineHighlightOnlyWhenFocus: true,
+    selectionHighlight: false,
+    occurrencesHighlight: 'off',
+    matchBrackets: 'never',
+    lineDecorationsWidth: 12,
+    lineNumbersMinChars: 2,
+    glyphMargin: false,
+    fontSize: 13,
+    lineHeight: 30,
+    renderOverviewRuler: false,
+    overviewRulerBorder: false,
+    hideCursorInOverviewRuler: true,
+    scrollBeyondLastLine: false,
+    padding: { top: 10, bottom: needsExtraBottomSpace ? 22 : 14 },
+    diffHideUnchangedRegions,
+    diffLineStyle: 'background',
+    diffAppearance: 'auto',
+    diffUnchangedRegionStyle,
+    diffHunkActionsOnHover: true,
+    diffHunkHoverHideDelayMs: 160,
+  }
+  return {
+    ...diffDefaults,
+    ...raw,
+    ...(hideUnchangedRegions === undefined ? {} : { hideUnchangedRegions }),
+    diffHideUnchangedRegions,
+  }
+})
 
 // In streaming scenarios, the opening fence info string can arrive in chunks
 // (e.g. "```d" then "iff json:..."), which means a block may flip between
@@ -209,20 +283,12 @@ if (typeof window !== 'undefined') {
       if (typeof det === 'function')
         detectLanguage = det
       if (typeof useMonaco === 'function') {
-        const theme = getPreferredColorScheme()
+        const theme = resolveRequestedTheme()
         if (theme && props.themes && Array.isArray(props.themes) && !props.themes.includes(theme)) {
           throw new Error('Preferred theme not in provided themes array')
         }
-        const helpers = useMonaco({
-          wordWrap: 'on',
-          wrappingIndent: 'same',
-          themes: props.themes,
-          theme,
-          ...(props.monacoOptions || {}),
-          onThemeChange() {
-            syncEditorCssVars()
-          },
-        })
+        runtimeMonacoOptions = buildRuntimeMonacoOptions()
+        const helpers = useMonaco(runtimeMonacoOptions)
         createEditor = helpers.createEditor || createEditor
         createDiffEditor = helpers.createDiffEditor || createDiffEditor
         updateCode = helpers.updateCode || updateCode
@@ -232,6 +298,7 @@ if (typeof window !== 'undefined') {
         getDiffEditorView = helpers.getDiffEditorView || getDiffEditorView
         cleanupEditor = helpers.cleanupEditor || cleanupEditor
         safeClean = helpers.safeClean || helpers.cleanupEditor || safeClean
+        refreshDiffPresentation = helpers.refreshDiffPresentation || refreshDiffPresentation
         setTheme = helpers.setTheme || setTheme
         monacoReady.value = true
 
@@ -372,6 +439,98 @@ function getLineHeightSafe(editor: any): number {
   // Conservative fallback close to Monaco's default ratio
   return Math.max(12, Math.round(fs * 1.35))
 }
+
+function countChangedLineRange(start: number | undefined, end: number | undefined) {
+  if (typeof start !== 'number' || typeof end !== 'number')
+    return 0
+  if (start < 1 || end < start)
+    return 0
+  return end - start + 1
+}
+
+function splitCodeLines(source: string) {
+  if (!source)
+    return [] as string[]
+  const lines = source.split(/\r?\n/)
+  return lines.length === 1 && lines[0] === '' ? [] : lines
+}
+
+function estimateDiffStats(originalSource: string, modifiedSource: string) {
+  const originalLines = splitCodeLines(originalSource)
+  const modifiedLines = splitCodeLines(modifiedSource)
+  let start = 0
+  let originalEnd = originalLines.length - 1
+  let modifiedEnd = modifiedLines.length - 1
+
+  while (
+    start <= originalEnd
+    && start <= modifiedEnd
+    && originalLines[start] === modifiedLines[start]
+  ) {
+    start++
+  }
+
+  while (
+    originalEnd >= start
+    && modifiedEnd >= start
+    && originalLines[originalEnd] === modifiedLines[modifiedEnd]
+  ) {
+    originalEnd--
+    modifiedEnd--
+  }
+
+  return {
+    removed: Math.max(0, originalEnd - start + 1),
+    added: Math.max(0, modifiedEnd - start + 1),
+  }
+}
+
+function syncEstimatedDiffStats() {
+  if (!isDiff.value) {
+    diffStats.value = { removed: 0, added: 0 }
+    return
+  }
+
+  diffStats.value = estimateDiffStats(
+    String(props.node.originalCode ?? ''),
+    String(props.node.updatedCode ?? ''),
+  )
+}
+
+function refreshDiffStats() {
+  if (!isDiff.value) {
+    diffStats.value = { removed: 0, added: 0 }
+    return
+  }
+
+  try {
+    const diff = getDiffEditorView()
+    const lineChanges = diff?.getLineChanges?.()
+    if (!Array.isArray(lineChanges)) {
+      syncEstimatedDiffStats()
+      return
+    }
+
+    let removed = 0
+    let added = 0
+    for (const change of lineChanges) {
+      removed += countChangedLineRange(
+        change.originalStartLineNumber,
+        change.originalEndLineNumber,
+      )
+      added += countChangedLineRange(
+        change.modifiedStartLineNumber,
+        change.modifiedEndLineNumber,
+      )
+    }
+
+    diffStats.value = { removed, added }
+  }
+  catch {
+    syncEstimatedDiffStats()
+  }
+}
+
 function ensureFontBaseline() {
   if (Number.isFinite(codeFontSize.value) && (codeFontSize.value as number) > 0 && Number.isFinite(defaultCodeFontSize.value))
     return codeFontSize.value as number
@@ -459,6 +618,12 @@ function syncEditorCssVars() {
   const rootEl = container.value as HTMLElement | null
   if (!editorEl || !rootEl)
     return
+  if (isDiff.value) {
+    rootEl.style.removeProperty('--vscode-editor-foreground')
+    rootEl.style.removeProperty('--vscode-editor-background')
+    rootEl.style.removeProperty('--vscode-editor-selectionBackground')
+    return
+  }
   // Monaco usually applies theme variables on an element with class
   // 'monaco-editor' or on the editor root; try to read from either.
   const editorRoot = (editorEl.querySelector('.monaco-editor') || editorEl) as HTMLElement
@@ -709,7 +874,15 @@ function bindEditorHeightSync() {
       catch {}
     }
 
-    bind(diff, 'onDidUpdateDiff')
+    try {
+      const disposable = diff?.onDidUpdateDiff?.(() => {
+        scheduleEditorHeightSync()
+        safeRaf(() => refreshDiffStats())
+      })
+      if (disposable)
+        editorHeightSyncDisposables.push(disposable)
+    }
+    catch {}
     bind(originalEditor, 'onDidContentSizeChange')
     bind(modifiedEditor, 'onDidContentSizeChange')
     bind(originalEditor, 'onDidLayoutChange')
@@ -806,12 +979,49 @@ watch(
 )
 
 watch(
+  () => [props.node.originalCode, props.node.updatedCode, isDiff.value] as const,
+  () => {
+    syncEstimatedDiffStats()
+    safeRaf(() => refreshDiffStats())
+  },
+  { immediate: true },
+)
+
+watch(
+  () => [props.node.originalCode, props.node.updatedCode, monacoLanguage.value, isDiff.value] as const,
+  async ([originalCode, updatedCode, _language, diff]) => {
+    if (props.stream === false || !diff)
+      return
+    // If the editor helpers exist but the editor hasn't been created yet,
+    // ensure creation first so update calls don't get lost.
+    if (createEditor && !editorCreated.value && codeEditor.value) {
+      try {
+        await ensureEditorCreation(codeEditor.value as HTMLElement)
+      }
+      catch {}
+    }
+
+    updateDiffCode(
+      String(originalCode ?? ''),
+      String(updatedCode ?? ''),
+      monacoLanguage.value,
+    )
+
+    if (isExpanded.value) {
+      safeRaf(() => updateExpandedHeight())
+    }
+  },
+)
+
+watch(
   () => props.node.code,
   async (newCode) => {
     if (props.stream === false)
       return
     if (!codeLanguage.value)
       codeLanguage.value = normalizeLanguageIdentifier(detectLanguage(newCode))
+    if (isDiff.value)
+      return
 
     // If the editor helpers exist but the editor hasn't been created yet,
     // ensure creation first so update calls don't get lost.
@@ -822,10 +1032,7 @@ watch(
       catch {}
     }
 
-    if (isDiff.value)
-      updateDiffCode(String(props.node.originalCode ?? ''), String(props.node.updatedCode ?? ''), monacoLanguage.value)
-    else
-      updateCode(newCode, monacoLanguage.value)
+    updateCode(newCode, monacoLanguage.value)
 
     if (isExpanded.value) {
       safeRaf(() => updateExpandedHeight())
@@ -839,6 +1046,52 @@ const displayLanguage = computed(() => {
   if (!lang)
     return languageMap[''] || 'Plain Text'
   return languageMap[lang] || lang.charAt(0).toUpperCase() + lang.slice(1)
+})
+
+function parseCodeFenceInfo(raw: string) {
+  const firstLine = String(raw ?? '').split(/\r?\n/, 1)[0]?.trim() ?? ''
+  if (firstLine.length < 3)
+    return ''
+  const marker = firstLine[0]
+  if ((marker !== '`' && marker !== '~') || firstLine[1] !== marker || firstLine[2] !== marker)
+    return ''
+
+  let index = 3
+  while (firstLine[index] === marker)
+    index += 1
+
+  return firstLine.slice(index).trim()
+}
+
+function extractCodeBlockFileLabel(raw: string) {
+  const info = parseCodeFenceInfo(raw)
+  if (!info)
+    return ''
+
+  const tokens = info.split(/\s+/).filter(Boolean)
+  if (!tokens.length)
+    return ''
+
+  const candidates = tokens[0] === 'diff' ? tokens.slice(1) : tokens
+  for (const token of candidates) {
+    const value = token.includes(':')
+      ? token.slice(token.indexOf(':') + 1)
+      : token
+    if (!value)
+      continue
+    if (/[./\\-]/.test(value))
+      return value
+  }
+
+  return ''
+}
+
+const codeFileLabel = computed(() => extractCodeBlockFileLabel(String(props.node.raw ?? '')))
+const headerTitle = computed(() => codeFileLabel.value || displayLanguage.value)
+const headerCaption = computed(() => {
+  if (!codeFileLabel.value)
+    return ''
+  return isDiff.value ? `Diff / ${displayLanguage.value}` : displayLanguage.value
 })
 
 // Computed property for language icon
@@ -861,7 +1114,24 @@ const containerStyle = computed(() => {
     s.minWidth = min
   if (max)
     s.maxWidth = max
+  if (isDiff.value) {
+    s.color = 'var(--markstream-diff-shell-fg)'
+    s.borderColor = 'var(--markstream-diff-shell-border)'
+  }
+  else {
+    s.color = 'var(--vscode-editor-foreground, var(--markstream-code-fallback-fg))'
+    s.backgroundColor = 'var(--vscode-editor-background, var(--markstream-code-fallback-bg))'
+    s.borderColor = 'var(--markstream-code-border-color)'
+  }
   return s
+})
+const headerStyle = computed<Record<string, string> | undefined>(() => {
+  if (isDiff.value)
+    return undefined
+  return {
+    color: 'var(--vscode-editor-foreground, var(--markstream-code-fallback-fg))',
+    backgroundColor: 'var(--vscode-editor-background, var(--markstream-code-fallback-bg))',
+  }
 })
 const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
@@ -1100,6 +1370,7 @@ async function runEditorCreation(el: HTMLElement) {
   bindEditorHeightSync()
   syncEditorCssVars()
   syncInlineFoldProxies()
+  refreshDiffStats()
   scheduleEditorHeightSync()
 }
 
@@ -1188,35 +1459,159 @@ watch(
   },
 )
 
-watch(
-  () => [props.isDark, props.darkTheme, props.lightTheme, monacoReady.value],
-  () => {
-    if (!monacoReady.value)
-      return
-
-    themeUpdate()
-  },
-)
-
 function getPreferredColorScheme() {
   return props.isDark ? props.darkTheme : props.lightTheme
 }
 
-function themeUpdate() {
-  const themeToSet: any = getPreferredColorScheme()
-  if (!themeToSet)
-    return
-  void scheduleGlobalMonacoTheme(setTheme, themeToSet).then(() => {
-    if (editorMounted.value)
-      safeRaf(() => syncEditorCssVars())
-  })
+function getThemeName(theme: any) {
+  if (typeof theme === 'string')
+    return theme
+  if (theme && typeof theme === 'object' && 'name' in theme)
+    return String((theme as any).name)
+  return null
 }
+
+function resolveRequestedTheme() {
+  const preferred = getPreferredColorScheme()
+  const explicit = resolvedMonacoOptions.value?.theme
+  const requested = preferred ?? explicit
+  const availableThemes = Array.isArray(props.themes) ? props.themes : []
+  if (!availableThemes.length || requested == null)
+    return requested
+
+  const requestedName = getThemeName(requested)
+  const availableNames = availableThemes
+    .map(theme => getThemeName(theme))
+    .filter((name): name is string => !!name)
+  if (!requestedName || availableNames.includes(requestedName))
+    return requested
+
+  const explicitName = getThemeName(explicit)
+  if (explicit != null && explicitName && availableNames.includes(explicitName))
+    return explicit
+
+  return availableThemes[0]
+}
+
+function themeUpdate() {
+  syncRuntimeMonacoOptions()
+
+  const themeToSet = resolveRequestedTheme()
+  const syncPresentation = () => {
+    if (isDiff.value)
+      refreshDiffPresentation()
+    safeRaf(() => {
+      syncEditorCssVars()
+      scheduleEditorHeightSync()
+    })
+  }
+
+  if (!themeToSet) {
+    syncPresentation()
+    return
+  }
+
+  void scheduleGlobalMonacoTheme(setTheme, themeToSet)
+    .then(syncPresentation)
+    .catch(() => {})
+}
+
+function themeLooksDark(theme: any) {
+  const themeName = getThemeName(theme) ?? ''
+  const normalized = themeName.toLowerCase()
+  if (!normalized)
+    return !!props.isDark
+  const darkTokens = [
+    'dark',
+    'night',
+    'moon',
+    'black',
+    'dracula',
+    'mocha',
+    'frappe',
+    'macchiato',
+    'palenight',
+    'ocean',
+    'poimandres',
+    'monokai',
+    'laserwave',
+    'tokyo',
+    'slack-dark',
+    'rose-pine',
+    'github-dark',
+    'material-theme',
+    'one-dark',
+    'catppuccin-mocha',
+    'catppuccin-frappe',
+    'catppuccin-macchiato',
+  ]
+  const lightTokens = ['light', 'latte', 'dawn', 'lotus']
+  return darkTokens.some(token => normalized.includes(token))
+    && !lightTokens.some(token => normalized.includes(token))
+}
+
+const resolvedChromeIsDark = computed(() => themeLooksDark(resolveRequestedTheme()))
+
+const effectiveDiffAppearance = computed<'light' | 'dark'>(() => {
+  if (!isDiff.value)
+    return resolvedChromeIsDark.value ? 'dark' : 'light'
+
+  const explicit = resolvedMonacoOptions.value?.diffAppearance
+  if (explicit === 'light' || explicit === 'dark')
+    return explicit
+
+  return props.isDark ? 'dark' : 'light'
+})
+
+const resolvedSurfaceIsDark = computed(() =>
+  isDiff.value ? effectiveDiffAppearance.value === 'dark' : resolvedChromeIsDark.value,
+)
+
+function buildRuntimeMonacoOptions() {
+  return {
+    wordWrap: 'on',
+    wrappingIndent: 'same',
+    themes: props.themes,
+    ...(resolvedMonacoOptions.value || {}),
+    theme: resolveRequestedTheme(),
+    ...(isDiff.value ? { diffAppearance: effectiveDiffAppearance.value } : {}),
+    onThemeChange() {
+      syncEditorCssVars()
+    },
+  } as Record<string, any>
+}
+
+function syncRuntimeMonacoOptions() {
+  const nextOptions = buildRuntimeMonacoOptions()
+  if (!runtimeMonacoOptions) {
+    runtimeMonacoOptions = nextOptions
+    return runtimeMonacoOptions
+  }
+
+  for (const key of Object.keys(runtimeMonacoOptions)) {
+    if (!(key in nextOptions))
+      delete runtimeMonacoOptions[key]
+  }
+  Object.assign(runtimeMonacoOptions, nextOptions)
+  return runtimeMonacoOptions
+}
+
+const monacoStructuralSignature = computed(() => JSON.stringify({
+  diffLineStyle: resolvedMonacoOptions.value?.diffLineStyle ?? 'background',
+  diffUnchangedRegionStyle: resolvedMonacoOptions.value?.diffUnchangedRegionStyle ?? 'line-info',
+  diffHideUnchangedRegions: resolvedMonacoOptions.value?.diffHideUnchangedRegions ?? true,
+  renderSideBySide: resolvedMonacoOptions.value?.renderSideBySide ?? true,
+  enableSplitViewResizing: resolvedMonacoOptions.value?.enableSplitViewResizing ?? true,
+  ignoreTrimWhitespace: resolvedMonacoOptions.value?.ignoreTrimWhitespace ?? true,
+  originalEditable: resolvedMonacoOptions.value?.originalEditable ?? false,
+}))
 
 // Watch for monacoOptions changes (deep) and try to update editor options or
 // recreate the editor when necessary.
 watch(
   () => [props.monacoOptions, viewportReady.value],
   () => {
+    syncRuntimeMonacoOptions()
     if (!createEditor || !viewportReady.value)
       return
 
@@ -1233,6 +1628,48 @@ watch(
       updateCollapsedHeight()
   },
   { deep: true },
+)
+
+watch(
+  () => [resolveRequestedTheme(), effectiveDiffAppearance.value, monacoReady.value, editorCreated.value, viewportReady.value] as const,
+  () => {
+    if (!monacoReady.value || !editorCreated.value || !viewportReady.value)
+      return
+    themeUpdate()
+  },
+  { flush: 'post' },
+)
+
+watch(
+  () => [monacoStructuralSignature.value, monacoReady.value, viewportReady.value] as const,
+  async ([nextSignature, ready, visible], [prevSignature]) => {
+    syncRuntimeMonacoOptions()
+    if (!ready || !visible)
+      return
+    if (!createEditor || !codeEditor.value)
+      return
+    if (!editorCreated.value)
+      return
+    if (nextSignature === prevSignature)
+      return
+    if (props.stream === false && props.loading !== false)
+      return
+
+    try {
+      editorMounted.value = false
+      editorCreated.value = false
+      createEditorPromise = null
+      clearEditorHeightSyncBindings()
+      clearInlineFoldProxies()
+      safeClean()
+      await nextTick()
+      await ensureEditorCreation(codeEditor.value as HTMLElement)
+    }
+    catch {
+      editorMounted.value = false
+    }
+  },
+  { flush: 'post' },
 )
 
 // 当 loading 变为 false 时：计算并缓存一次展开高度，随后停止观察
@@ -1317,27 +1754,41 @@ onUnmounted(() => {
     :style="containerStyle"
     class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     :class="[
-      props.isDark ? 'border-gray-700/30 bg-gray-900' : 'border-gray-200 bg-white',
-      { 'is-rendering': props.loading, 'is-dark': props.isDark },
+      { 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff },
     ]"
   >
     <!-- Configurable header area: consumers may override via named slots -->
     <div
       v-if="props.showHeader"
       class="code-block-header flex justify-between items-center px-4 py-2.5 border-b border-gray-400/5"
-      style="color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg));background-color: var(--vscode-editor-background, var(--markstream-code-fallback-bg));"
+      :style="headerStyle"
     >
       <!-- left slot / fallback language label -->
       <slot name="header-left">
-        <div class="flex items-center gap-x-2 flex-1 overflow-hidden">
+        <div class="code-header-main">
           <span class="icon-slot h-4 w-4 flex-shrink-0" v-html="languageIcon" />
-          <span class="text-sm font-medium font-mono truncate">{{ displayLanguage }}</span>
+          <div class="code-header-copy">
+            <div class="code-header-title">
+              {{ headerTitle }}
+            </div>
+            <div v-if="headerCaption" class="code-header-caption">
+              {{ headerCaption }}
+            </div>
+          </div>
         </div>
       </slot>
 
       <!-- right slot / fallback action buttons -->
       <slot name="header-right">
         <div class="flex items-center gap-x-2">
+          <div
+            v-if="isDiff"
+            class="code-diff-stats"
+            :aria-label="diffStatsAriaLabel"
+          >
+            <span class="code-diff-stat removed">-{{ diffStats.removed }}</span>
+            <span class="code-diff-stat added">+{{ diffStats.added }}</span>
+          </div>
           <button
             v-if="props.showCollapseButton"
             type="button"
@@ -1478,30 +1929,286 @@ onUnmounted(() => {
     /* 新增：显著减少离屏 codeblock 的布局/绘制与样式计算 */
   content-visibility: auto;
   contain-intrinsic-size: 320px 180px;
+  container-type: inline-size;
   --markstream-code-fallback-bg: #ffffff;
   --markstream-code-fallback-fg: #111827;
+  --markstream-code-border-color: rgb(229 231 235);
   --vscode-editor-selectionBackground: var(--markstream-code-fallback-selection-bg);
   --markstream-code-fallback-selection-bg: rgba(0, 0, 0, 0.06);
+  --markstream-diff-frame-border: rgb(203 213 225 / 0.56);
+  --markstream-diff-frame-shadow: 0 16px 40px -32px rgb(15 23 42 / 0.18);
+  --markstream-diff-shell-fg: #0f172a;
+  --markstream-diff-shell-muted: #64748b;
+  --markstream-diff-shell-border: rgb(148 163 184 / 0.18);
+  --markstream-diff-shell-shadow: 0 30px 70px -48px rgb(15 23 42 / 0.42);
+  --markstream-diff-shell-bg: radial-gradient(
+      circle at top center,
+      rgb(255 255 255 / 0.9),
+      transparent 55%
+    ),
+    linear-gradient(180deg, #fffdfa 0%, #fbfcfe 100%);
+  --markstream-diff-header-border: rgb(226 232 240 / 0.92);
+  --markstream-diff-stage-bg: radial-gradient(
+      circle at top center,
+      rgb(255 255 255 / 0.95),
+      transparent 60%
+    ),
+    linear-gradient(180deg, #fcfdff 0%, #f6f8fb 100%);
+  --markstream-diff-editor-bg: #ffffff;
+  --markstream-diff-editor-fg: #435266;
+  --markstream-diff-unchanged-fg: lab(36.247 0.0071872 -0.000424832);
+  --markstream-diff-unchanged-bg: lab(95.9989 0.0180531 -0.0010643);
+  --markstream-diff-unchanged-divider: rgb(255 255 255 / 0.94);
+  --markstream-diff-focus: rgb(14 165 233 / 0.42);
+  --markstream-diff-widget-shadow: rgb(15 23 42 / 0.26);
+  --markstream-diff-action-hover: rgb(15 23 42 / 0.06);
+  --markstream-diff-panel-bg: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  --markstream-diff-panel-bg-soft: #ffffff;
+  --markstream-diff-panel-bg-strong: #ffffff;
+  --markstream-diff-panel-border: rgb(226 232 240 / 0.3);
+  --markstream-diff-pane-divider: rgb(226 232 240 / 0.42);
+  --markstream-diff-gutter-bg: transparent;
+  --markstream-diff-gutter-guide: transparent;
+  --markstream-diff-gutter-gap: 16px;
+  --markstream-diff-line-number: rgb(82 82 82 / 0.88);
+  --markstream-diff-line-number-active: rgb(82 82 82 / 0.88);
+  --markstream-diff-added-fg: #14b8a6;
+  --markstream-diff-removed-fg: #ff3658;
+  --markstream-diff-added-line: rgb(232 249 245 / 0.98);
+  --markstream-diff-removed-line: rgb(255 241 241 / 0.98);
+  --markstream-diff-added-inline: rgb(197 245 219 / 0.96);
+  --markstream-diff-removed-inline: rgb(255 215 217 / 0.92);
+  --markstream-diff-added-inline-border: transparent;
+  --markstream-diff-removed-inline-border: transparent;
+  --markstream-diff-added-gutter: linear-gradient(
+    90deg,
+    var(--markstream-diff-added-fg) 0 var(--stream-monaco-gutter-marker-width, 4px),
+    rgb(20 184 166 / 0.08) var(--stream-monaco-gutter-marker-width, 4px) 100%
+  );
+  --markstream-diff-removed-gutter: repeating-linear-gradient(
+        180deg,
+        var(--markstream-diff-removed-fg) 0 2px,
+        transparent 2px 4px
+      )
+      left / var(--stream-monaco-gutter-marker-width, 4px) 100% no-repeat,
+    linear-gradient(90deg, rgb(255 54 88 / 0.08) 0 100%);
+  --markstream-diff-added-line-fill: rgb(231 248 244 / 0.96);
+  --markstream-diff-removed-line-fill: rgb(255 241 241 / 0.98);
 }
 
 .code-block-container.is-dark {
   --markstream-code-fallback-bg: #111827;
   --markstream-code-fallback-fg: #e5e7eb;
+  --markstream-code-border-color: rgb(55 65 81 / 0.3);
   --markstream-code-fallback-selection-bg: rgba(255, 255, 255, 0.08);
+  --markstream-diff-frame-border: rgb(82 82 91 / 0.56);
+  --markstream-diff-frame-shadow: 0 18px 40px -30px rgb(0 0 0 / 0.84);
+  --markstream-diff-shell-fg: #e2e8f0;
+  --markstream-diff-shell-muted: #94a3b8;
+  --markstream-diff-shell-border: rgb(82 82 91 / 0.56);
+  --markstream-diff-shell-shadow: 0 34px 80px -52px rgb(0 0 0 / 0.72);
+  --markstream-diff-shell-bg: rgb(10 10 11 / 0.99);
+  --markstream-diff-header-border: rgb(63 63 70 / 0.82);
+  --markstream-diff-stage-bg: rgb(10 10 11 / 0.99);
+  --markstream-diff-editor-bg: rgb(12 12 14 / 0.99);
+  --markstream-diff-editor-fg: #b6c2d3;
+  --markstream-diff-unchanged-fg: #cbd5e1;
+  --markstream-diff-unchanged-bg: rgb(24 24 27 / 0.92);
+  --markstream-diff-unchanged-divider: rgb(255 255 255 / 0.18);
+  --markstream-diff-focus: rgb(96 165 250 / 0.42);
+  --markstream-diff-widget-shadow: rgb(0 0 0 / 0.72);
+  --markstream-diff-action-hover: rgb(255 255 255 / 0.08);
+  --markstream-diff-panel-bg: rgb(10 10 11 / 0.99);
+  --markstream-diff-panel-bg-soft: rgb(10 10 11 / 0.99);
+  --markstream-diff-panel-bg-strong: rgb(10 10 11 / 0.99);
+  --markstream-diff-panel-border: rgb(82 82 91 / 0.3);
+  --markstream-diff-pane-divider: rgb(82 82 91 / 0.34);
+  --markstream-diff-gutter-bg: linear-gradient(
+    180deg,
+    rgb(13 13 15 / 0.94) 0%,
+    rgb(9 9 10 / 0.98) 100%
+  );
+  --markstream-diff-gutter-guide: rgb(161 161 170 / 0.08);
+  --markstream-diff-gutter-gap: 16px;
+  --markstream-diff-line-number: rgb(161 161 170 / 0.68);
+  --markstream-diff-line-number-active: rgb(228 228 231 / 0.82);
+  --markstream-diff-added-fg: #5eead4;
+  --markstream-diff-removed-fg: #fda4af;
+  --markstream-diff-added-line: rgb(13 148 136 / 0.18);
+  --markstream-diff-removed-line: rgb(225 29 72 / 0.18);
+  --markstream-diff-added-inline: rgb(45 212 191 / 0.24);
+  --markstream-diff-removed-inline: rgb(251 113 133 / 0.24);
+  --markstream-diff-added-inline-border: transparent;
+  --markstream-diff-removed-inline-border: transparent;
+  --markstream-diff-added-gutter: linear-gradient(
+    90deg,
+    var(--markstream-diff-added-fg) 0 var(--stream-monaco-gutter-marker-width, 4px),
+    rgb(94 234 212 / 0.2) var(--stream-monaco-gutter-marker-width, 4px) 100%
+  );
+  --markstream-diff-removed-gutter: repeating-linear-gradient(
+        180deg,
+        var(--markstream-diff-removed-fg) 0 2px,
+        transparent 2px 4px
+      )
+      left / var(--stream-monaco-gutter-marker-width, 4px) 100% no-repeat,
+    linear-gradient(90deg, rgb(253 164 175 / 0.18) 0 100%);
+  --markstream-diff-added-line-fill: linear-gradient(
+    90deg,
+    rgb(15 118 110 / 0.38) 0%,
+    rgb(13 148 136 / 0.28) 100%
+  );
+  --markstream-diff-removed-line-fill: linear-gradient(
+    90deg,
+    rgb(159 18 57 / 0.38) 0%,
+    rgb(225 29 72 / 0.28) 100%
+  );
 }
 
 .code-editor-container {
   transition: height 180ms ease, max-height 180ms ease;
 }
 
+.code-block-header {
+  gap: 16px;
+}
+
+.code-header-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.code-header-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.code-header-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.code-header-caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--vscode-editor-foreground, currentColor) 62%, transparent);
+}
+
 .code-editor-layer {
   display: grid;
+  min-width: 0;
 }
 .code-editor-layer > .code-editor-container {
   grid-area: 1 / 1;
 }
 :deep(.code-editor-layer > pre.code-pre-fallback) {
   grid-area: 1 / 1;
+}
+
+.code-block-container.is-diff .code-block-header {
+  padding: 18px 20px 14px;
+  color: var(--markstream-diff-shell-fg);
+  background: transparent;
+  border-bottom-color: var(--markstream-diff-header-border);
+}
+
+.code-block-container.is-diff {
+  background: var(--markstream-diff-shell-bg);
+  box-shadow: var(--markstream-diff-shell-shadow);
+  border-color: var(--markstream-diff-shell-border);
+  --vscode-editor-selectionBackground: var(--markstream-diff-action-hover);
+}
+
+.code-block-container.is-diff .code-header-caption {
+  color: var(--markstream-diff-shell-muted);
+}
+
+.code-block-container.is-diff .code-editor-layer {
+  padding: 4px 4px 8px;
+  background: var(--markstream-diff-stage-bg);
+  --vscode-editor-background: var(--markstream-diff-editor-bg);
+  --vscode-editor-foreground: var(--markstream-diff-editor-fg);
+  --vscode-diffEditor-unchangedRegionForeground: var(--markstream-diff-unchanged-fg);
+  --vscode-diffEditor-unchangedRegionBackground: var(--markstream-diff-unchanged-bg);
+  --vscode-focusBorder: var(--markstream-diff-focus);
+  --vscode-widget-shadow: var(--markstream-diff-widget-shadow);
+  --vscode-editor-selectionBackground: color-mix(
+    in srgb,
+    var(--markstream-diff-editor-bg) 90%,
+    var(--markstream-diff-editor-fg) 10%
+  );
+  --stream-monaco-editor-bg: var(--markstream-diff-editor-bg);
+  --stream-monaco-editor-fg: var(--markstream-diff-editor-fg);
+  --stream-monaco-unchanged-fg: var(--markstream-diff-unchanged-fg);
+  --stream-monaco-unchanged-bg: var(--markstream-diff-unchanged-bg);
+  --stream-monaco-frame-radius: 18px;
+  --stream-monaco-fixed-editor-bg: var(--markstream-diff-panel-bg-strong);
+  --stream-monaco-frame-border: var(--markstream-diff-frame-border);
+  --stream-monaco-frame-shadow: var(--markstream-diff-frame-shadow);
+  --stream-monaco-panel-bg: var(--markstream-diff-panel-bg);
+  --stream-monaco-panel-bg-soft: var(--markstream-diff-panel-bg-soft);
+  --stream-monaco-panel-bg-strong: var(--markstream-diff-panel-bg-strong);
+  --stream-monaco-panel-border: var(--markstream-diff-panel-border);
+  --stream-monaco-pane-divider: var(--markstream-diff-pane-divider);
+  --stream-monaco-gutter-bg: var(--markstream-diff-gutter-bg);
+  --stream-monaco-gutter-guide: var(--markstream-diff-gutter-guide);
+  --stream-monaco-gutter-marker-width: 4px;
+  --stream-monaco-gutter-gap: var(--markstream-diff-gutter-gap);
+  --stream-monaco-line-number: var(--markstream-diff-line-number);
+  --stream-monaco-line-number-active: var(--markstream-diff-line-number-active);
+  --stream-monaco-line-number-left: calc(
+    var(--stream-monaco-gutter-marker-width) + var(--stream-monaco-gutter-gap)
+  );
+  --stream-monaco-line-number-width: 36px;
+  --stream-monaco-line-number-align: center;
+  --stream-monaco-original-margin-width: calc(
+    var(--stream-monaco-gutter-marker-width) +
+      (var(--stream-monaco-gutter-gap) * 2) +
+      var(--stream-monaco-line-number-width)
+  );
+  --stream-monaco-original-scrollable-left: var(--stream-monaco-original-margin-width);
+  --stream-monaco-original-scrollable-width: calc(
+    100% - var(--stream-monaco-original-margin-width)
+  );
+  --stream-monaco-modified-margin-width: calc(
+    var(--stream-monaco-gutter-marker-width) +
+      (var(--stream-monaco-gutter-gap) * 2) +
+      var(--stream-monaco-line-number-width)
+  );
+  --stream-monaco-modified-scrollable-left: var(--stream-monaco-modified-margin-width);
+  --stream-monaco-modified-scrollable-width: calc(
+    100% - var(--stream-monaco-modified-margin-width)
+  );
+  --stream-monaco-added-fg: var(--markstream-diff-added-fg);
+  --stream-monaco-removed-fg: var(--markstream-diff-removed-fg);
+  --stream-monaco-added-line: var(--markstream-diff-added-line);
+  --stream-monaco-removed-line: var(--markstream-diff-removed-line);
+  --stream-monaco-added-inline: var(--markstream-diff-added-inline);
+  --stream-monaco-removed-inline: var(--markstream-diff-removed-inline);
+  --stream-monaco-added-outline: transparent;
+  --stream-monaco-removed-outline: transparent;
+  --stream-monaco-added-inline-border: var(--markstream-diff-added-inline-border);
+  --stream-monaco-removed-inline-border: var(--markstream-diff-removed-inline-border);
+  --stream-monaco-added-line-shadow: none;
+  --stream-monaco-removed-line-shadow: none;
+  --stream-monaco-added-gutter: var(--markstream-diff-added-gutter);
+  --stream-monaco-removed-gutter: var(--markstream-diff-removed-gutter);
+  --stream-monaco-added-line-fill: var(--markstream-diff-added-line-fill);
+  --stream-monaco-removed-line-fill: var(--markstream-diff-removed-line-fill);
+}
+
+.code-block-container.is-diff.is-dark .code-editor-layer {
+  background: var(--markstream-diff-stage-bg);
 }
 
 .code-editor-container.is-hidden {
@@ -1588,6 +2295,65 @@ onUnmounted(() => {
   font-family: inherit;
 }
 
+.code-block-container.is-diff .icon-slot {
+  width: 28px;
+  height: 28px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.7);
+  padding: 5px;
+  color: var(--markstream-diff-added-fg);
+}
+
+.code-block-container.is-diff.is-dark .icon-slot {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 12px 28px -20px rgb(56 189 248 / 0.45);
+}
+
+.code-diff-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.code-diff-stat {
+  display: inline-flex;
+  align-items: center;
+}
+
+.code-diff-stat.removed {
+  color: var(--vscode-diffEditor-removedTextForeground, var(--markstream-diff-removed-fg));
+}
+
+.code-diff-stat.added {
+  color: var(--vscode-diffEditor-insertedTextForeground, var(--markstream-diff-added-fg));
+}
+
+.code-block-container.is-dark .code-diff-stat {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+
+.code-block-container.is-dark .code-diff-stat.removed {
+  color: #fb7185;
+  background: rgb(159 18 57 / 0.16);
+  border-color: rgb(251 113 133 / 0.2);
+}
+
+.code-block-container.is-dark .code-diff-stat.added {
+  color: #2dd4bf;
+  background: rgb(15 118 110 / 0.16);
+  border-color: rgb(45 212 191 / 0.22);
+}
+
 .code-action-btn:active {
   transform: scale(0.98);
 }
@@ -1613,8 +2379,138 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
 }
+
+@container (max-width: 640px) {
+  .code-block-container.is-diff .code-block-header {
+    padding: 16px 16px 12px;
+  }
+
+  .code-block-container.is-diff .code-editor-layer {
+    padding: 4px 4px 8px;
+  }
+
+  .code-diff-stats {
+    gap: 6px;
+    font-size: 12px;
+  }
+}
+
 :deep(.monaco-diff-editor .diffOverview){
   background-color: var(--vscode-editor-background);
+}
+
+:deep(.stream-monaco-diff-root .monaco-diff-editor .diffOverview),
+:deep(.stream-monaco-diff-root .decorationsOverviewRuler) {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
+}
+
+:deep(.code-block-container .stream-monaco-diff-root .monaco-diff-editor) {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+:deep(.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center:not(.stream-monaco-clickable) > *:not(a)) {
+  visibility: hidden !important;
+}
+
+:deep(.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines-compact .text) {
+  opacity: 0 !important;
+}
+
+:deep(.stream-monaco-diff-root) {
+  --stream-monaco-gutter-gap: var(--markstream-diff-gutter-gap) !important;
+  --stream-monaco-line-number: var(--markstream-diff-line-number) !important;
+  --stream-monaco-line-number-active: var(--markstream-diff-line-number-active) !important;
+  --stream-monaco-added-fg: var(--markstream-diff-added-fg) !important;
+  --stream-monaco-removed-fg: var(--markstream-diff-removed-fg) !important;
+  --stream-monaco-added-line: var(--markstream-diff-added-line) !important;
+  --stream-monaco-removed-line: var(--markstream-diff-removed-line) !important;
+  --stream-monaco-added-inline: var(--markstream-diff-added-inline) !important;
+  --stream-monaco-removed-inline: var(--markstream-diff-removed-inline) !important;
+  --stream-monaco-added-inline-border: var(--markstream-diff-added-inline-border) !important;
+  --stream-monaco-removed-inline-border: var(--markstream-diff-removed-inline-border) !important;
+  --stream-monaco-added-line-fill: var(--markstream-diff-added-line-fill) !important;
+  --stream-monaco-removed-line-fill: var(--markstream-diff-removed-line-fill) !important;
+  --stream-monaco-added-gutter: var(--markstream-diff-added-gutter) !important;
+  --stream-monaco-removed-gutter: var(--markstream-diff-removed-gutter) !important;
+  --stream-monaco-added-line-shadow: none !important;
+  --stream-monaco-removed-line-shadow: none !important;
+  --stream-monaco-unchanged-bg: var(--markstream-diff-unchanged-bg) !important;
+  --stream-monaco-unchanged-fg: var(--markstream-diff-unchanged-fg) !important;
+}
+
+:deep(.stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center:not(.stream-monaco-unchanged-bridge-source)),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge) {
+  --stream-monaco-unchanged-bg: var(--markstream-diff-unchanged-bg) !important;
+  --stream-monaco-unchanged-fg: var(--markstream-diff-unchanged-fg) !important;
+  background: var(--stream-monaco-unchanged-bg) !important;
+  color: var(--stream-monaco-unchanged-fg) !important;
+}
+
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge) {
+  right: calc(
+    var(--stream-monaco-gutter-marker-width) - var(--stream-monaco-unchanged-rail-width) / 2 + (var(--stream-monaco-gutter-gap) * 2)
+  ) !important;
+  width: auto !important;
+}
+
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary:hover),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary:focus-visible),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary.stream-monaco-focus-visible) {
+  background: var(--stream-monaco-unchanged-bg) !important;
+  color: var(--markstream-diff-unchanged-fg) !important;
+  padding-left: calc(
+    var(--stream-monaco-gutter-marker-width) + (var(--stream-monaco-gutter-gap) * 2)
+  ) !important;
+  padding-right: calc(
+    var(--stream-monaco-gutter-marker-width) + (var(--stream-monaco-gutter-gap) * 2)
+  ) !important;
+}
+
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge.stream-monaco-diff-unchanged-bridge-line-info .stream-monaco-unchanged-rail),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:hover),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:focus-visible),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal.stream-monaco-focus-visible) {
+  background: var(--stream-monaco-unchanged-bg) !important;
+}
+
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail) {
+  border-right-color: var(--markstream-diff-unchanged-divider) !important;
+}
+
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal) {
+  border-bottom-color: transparent !important;
+}
+
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-both .stream-monaco-unchanged-reveal:first-child) {
+  border-bottom-color: var(--markstream-diff-unchanged-divider) !important;
+}
+
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-top-only .stream-monaco-unchanged-reveal),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-bottom-only .stream-monaco-unchanged-reveal) {
+  border-bottom: 0 !important;
+}
+
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-meta),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-count),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-metadata-label),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:hover),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:focus-visible),
+:deep(.stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal.stream-monaco-focus-visible) {
+  color: var(--markstream-diff-unchanged-fg) !important;
 }
 
 :deep(.monaco-diff-editor:not(.side-by-side) .editor.original .diff-hidden-lines .center) {

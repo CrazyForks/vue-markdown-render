@@ -1,6 +1,6 @@
+import type { AngularRenderableNode } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core'
-import type { AngularRenderableNode } from '../shared/node-helpers'
 import { getString } from '../shared/node-helpers'
 
 @Component({

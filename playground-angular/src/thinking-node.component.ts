@@ -1,6 +1,7 @@
+import type { AngularRenderContext } from 'markstream-angular'
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core'
-import { NestedRenderer, type AngularRenderContext } from 'markstream-angular'
+import { NestedRenderer } from 'markstream-angular'
 
 @Component({
   selector: 'app-angular-thinking-node',

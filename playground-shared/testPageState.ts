@@ -33,7 +33,7 @@ export function createMarkdownHash(markdown: string) {
 }
 
 export function decodeMarkdownHash(hash: string) {
-  const matched = (hash || '').match(/(?:^#?)data=([^&]+)/)
+  const matched = (hash || '').match(/^#?data=([^&]+)/)
   if (!matched?.[1])
     return null
 

@@ -45,6 +45,7 @@ const diffEditorView = {
 }
 
 const streamMonacoHelpers = {
+  useMonaco: vi.fn(() => streamMonacoHelpers),
   createEditor: vi.fn(async () => {}),
   createDiffEditor: vi.fn(async () => {}),
   updateCode: vi.fn(),
@@ -54,6 +55,7 @@ const streamMonacoHelpers = {
   getDiffEditorView: vi.fn(() => diffEditorView),
   cleanupEditor: vi.fn(() => {}),
   safeClean: vi.fn(() => {}),
+  refreshDiffPresentation: vi.fn(() => {}),
   setTheme: vi.fn(async () => {}),
 }
 
@@ -61,7 +63,7 @@ const streamMonacoHelpers = {
 ;(globalThis as any).__streamMonacoHelpers = streamMonacoHelpers
 
 vi.mock('stream-monaco', () => ({
-  useMonaco: () => streamMonacoHelpers,
+  useMonaco: streamMonacoHelpers.useMonaco,
   preloadMonacoWorkers: vi.fn(async () => {}),
   getOrCreateHighlighter: vi.fn(async () => ({
     codeToTokens: vi.fn(() => ({
@@ -75,6 +77,28 @@ vi.mock('stream-monaco', () => ({
   })),
   detectLanguage: () => 'plaintext',
 }))
+
+vi.mock('stream-monaco/legacy', () => {
+  const mod = {
+    useMonaco: streamMonacoHelpers.useMonaco,
+    preloadMonacoWorkers: vi.fn(async () => {}),
+    getOrCreateHighlighter: vi.fn(async () => ({
+      codeToTokens: vi.fn(() => ({
+        tokens: [],
+        fg: '#000000',
+        bg: '#ffffff',
+        themeName: 'vitesse-dark',
+        rootStyle: {},
+        grammarState: null,
+      })),
+    })),
+    detectLanguage: () => 'plaintext',
+  }
+  return {
+    ...mod,
+    default: mod,
+  }
+})
 
 vi.mock('mermaid', () => ({
   default: {

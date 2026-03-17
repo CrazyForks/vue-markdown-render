@@ -1,11 +1,12 @@
-import { CommonModule } from '@angular/common'
-import { ChangeDetectionStrategy, Component, Input, OnChanges, forwardRef } from '@angular/core'
+import type { OnChanges } from '@angular/core'
 import type { MarkdownIt, ParseOptions } from 'stream-markdown-parser'
+import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
+import { CommonModule } from '@angular/common'
+import { ChangeDetectionStrategy, Component, forwardRef, Input } from '@angular/core'
 import { parseNestedMarkdownToNodes } from '../../parseNestedMarkdownToNodes'
-import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
+import { NodeOutletComponent } from '../NodeOutlet/NodeOutlet.component'
 import { normalizeTokenAttrs } from '../shared/node-helpers'
 import { SafeAttrsDirective } from '../shared/safe-attrs.directive'
-import { NodeOutletComponent } from '../NodeOutlet/NodeOutlet.component'
 
 type NestedRenderItem
   = | { kind: 'label', attrs: Record<string, string | true> | null, children: AngularRenderableNode[] }

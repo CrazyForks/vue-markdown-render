@@ -1,19 +1,18 @@
+import type { AfterViewInit, ElementRef, OnChanges, OnDestroy } from '@angular/core'
+import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
-import type { AfterViewInit, OnChanges, OnDestroy } from '@angular/core'
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
-  ElementRef,
   HostListener,
+  inject,
   Input,
   ViewChild,
-  inject,
 } from '@angular/core'
 import { getMermaid } from '../../optional/mermaid'
 import { toSafeSvgMarkup } from '../../sanitizeSvg'
 import { canParseOffthread, findPrefixOffthread } from '../../workers/mermaidWorkerClient'
-import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
 import { getString } from '../shared/node-helpers'
 import {
   clampNumber,

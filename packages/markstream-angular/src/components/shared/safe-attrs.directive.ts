@@ -1,4 +1,5 @@
-import { Directive, ElementRef, Input, OnChanges, Renderer2, inject } from '@angular/core'
+import type { OnChanges } from '@angular/core'
+import { Directive, ElementRef, inject, Input, Renderer2 } from '@angular/core'
 import { isSafeAttrName } from './node-helpers'
 
 @Directive({

@@ -76,7 +76,7 @@ export class StreamingDemoComponent {
 
 Angular 版也支持 playground 里 `thinking` 这类 custom HTML tag 流程：
 
-```ts
+```html
 <markstream-angular
   [content]="markdown()"
   [customHtmlTags]="['thinking']"

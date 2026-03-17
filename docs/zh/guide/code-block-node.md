@@ -14,8 +14,23 @@
 
 - `node` — code_block 节点（必需）
 - `loading`、`stream`、`isShowPreview`
-- `monacoOptions` — 会透传给 `stream-monaco`；像 `diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction` 这类 diff 悬浮操作配置都应该放这里
+- `monacoOptions` — 类型为 `CodeBlockMonacoOptions`，会透传给 `stream-monaco`
+  - `diffHideUnchangedRegions`、`diffLineStyle`、`diffAppearance`、`diffUnchangedRegionStyle`、`diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction` 这类 diff 配置都应该放这里
 - 头部控制：`showHeader`、`showCollapseButton`、`showCopyButton`、`showExpandButton`、`showPreviewButton`、`showFontSizeButtons`、`showTooltips`
+
+Monaco diff 模式下的默认行为：
+
+- `diffHideUnchangedRegions: { enabled: true, contextLineCount: 2, minimumLineCount: 4, revealLineCount: 5 }`
+- `diffLineStyle: 'background'`
+- `diffAppearance: 'auto'`
+- `diffUnchangedRegionStyle: 'line-info'`
+- `diffHunkActionsOnHover: true`
+- `diffHunkHoverHideDelayMs: 160`
+
+你可以通过 `monacoOptions` 覆盖这些默认值。
+当 preset 使用 `diffAppearance: 'auto'` 时，`CodeBlockNode` 会先根据当前明暗外观解析成实际的 light/dark，再传给 `stream-monaco`。
+
+Diff 代码块的内置 header 现在也会显示 `- / +` 行数统计。
 
 ## Slots 插槽
 

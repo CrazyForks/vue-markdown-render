@@ -960,9 +960,143 @@ li .paragraph-node {
   contain: content;
   content-visibility: auto;
   contain-intrinsic-size: 320px 180px;
+  container-type: inline-size;
+  --markstream-code-fallback-bg: #ffffff;
+  --markstream-code-fallback-fg: #111827;
+  --markstream-code-border-color: rgb(229 231 235);
+  --markstream-code-fallback-selection-bg: rgba(0, 0, 0, 0.06);
+  --vscode-editor-selectionBackground: var(--markstream-code-fallback-selection-bg);
+  --markstream-diff-frame-border: rgb(203 213 225 / 0.56);
+  --markstream-diff-frame-shadow: 0 16px 40px -32px rgb(15 23 42 / 0.18);
+  --markstream-diff-shell-fg: #0f172a;
+  --markstream-diff-shell-muted: #64748b;
+  --markstream-diff-shell-border: rgb(148 163 184 / 0.18);
+  --markstream-diff-shell-shadow: 0 30px 70px -48px rgb(15 23 42 / 0.42);
+  --markstream-diff-shell-bg: radial-gradient(
+      circle at top center,
+      rgb(255 255 255 / 0.9),
+      transparent 55%
+    ),
+    linear-gradient(180deg, #fffdfa 0%, #fbfcfe 100%);
+  --markstream-diff-header-border: rgb(226 232 240 / 0.92);
+  --markstream-diff-stage-bg: radial-gradient(
+      circle at top center,
+      rgb(255 255 255 / 0.95),
+      transparent 60%
+    ),
+    linear-gradient(180deg, #fcfdff 0%, #f6f8fb 100%);
+  --markstream-diff-editor-bg: #ffffff;
+  --markstream-diff-editor-fg: #435266;
+  --markstream-diff-unchanged-fg: lab(36.247 0.0071872 -0.000424832);
+  --markstream-diff-unchanged-bg: lab(95.9989 0.0180531 -0.0010643);
+  --markstream-diff-unchanged-divider: rgb(255 255 255 / 0.94);
+  --markstream-diff-focus: rgb(14 165 233 / 0.42);
+  --markstream-diff-widget-shadow: rgb(15 23 42 / 0.26);
+  --markstream-diff-action-hover: rgb(15 23 42 / 0.06);
+  --markstream-diff-panel-bg: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  --markstream-diff-panel-bg-soft: #ffffff;
+  --markstream-diff-panel-bg-strong: #ffffff;
+  --markstream-diff-panel-border: rgb(226 232 240 / 0.3);
+  --markstream-diff-pane-divider: rgb(226 232 240 / 0.42);
+  --markstream-diff-gutter-bg: transparent;
+  --markstream-diff-gutter-guide: transparent;
+  --markstream-diff-gutter-gap: 16px;
+  --markstream-diff-line-number: rgb(82 82 82 / 0.88);
+  --markstream-diff-line-number-active: rgb(82 82 82 / 0.88);
+  --markstream-diff-added-fg: #14b8a6;
+  --markstream-diff-removed-fg: #ff3658;
+  --markstream-diff-added-line: rgb(232 249 245 / 0.98);
+  --markstream-diff-removed-line: rgb(255 241 241 / 0.98);
+  --markstream-diff-added-inline: rgb(197 245 219 / 0.96);
+  --markstream-diff-removed-inline: rgb(255 215 217 / 0.92);
+  --markstream-diff-added-inline-border: transparent;
+  --markstream-diff-removed-inline-border: transparent;
+  --markstream-diff-added-gutter: linear-gradient(
+    90deg,
+    var(--markstream-diff-added-fg) 0 var(--stream-monaco-gutter-marker-width, 4px),
+    rgb(20 184 166 / 0.08) var(--stream-monaco-gutter-marker-width, 4px) 100%
+  );
+  --markstream-diff-removed-gutter: repeating-linear-gradient(
+        180deg,
+        var(--markstream-diff-removed-fg) 0 2px,
+        transparent 2px 4px
+      )
+      left / var(--stream-monaco-gutter-marker-width, 4px) 100% no-repeat,
+    linear-gradient(90deg, rgb(255 54 88 / 0.08) 0 100%);
+  --markstream-diff-added-line-fill: rgb(231 248 244 / 0.96);
+  --markstream-diff-removed-line-fill: rgb(255 241 241 / 0.98);
+}
+
+.code-block-container.is-dark {
+  --markstream-code-fallback-bg: #111827;
+  --markstream-code-fallback-fg: #e5e7eb;
+  --markstream-code-border-color: rgb(55 65 81 / 0.3);
+  --markstream-code-fallback-selection-bg: rgba(255, 255, 255, 0.08);
+  --markstream-diff-frame-border: rgb(82 82 91 / 0.56);
+  --markstream-diff-frame-shadow: 0 18px 40px -30px rgb(0 0 0 / 0.84);
+  --markstream-diff-shell-fg: #e2e8f0;
+  --markstream-diff-shell-muted: #94a3b8;
+  --markstream-diff-shell-border: rgb(82 82 91 / 0.56);
+  --markstream-diff-shell-shadow: 0 34px 80px -52px rgb(0 0 0 / 0.72);
+  --markstream-diff-shell-bg: rgb(10 10 11 / 0.99);
+  --markstream-diff-header-border: rgb(63 63 70 / 0.82);
+  --markstream-diff-stage-bg: rgb(10 10 11 / 0.99);
+  --markstream-diff-editor-bg: rgb(12 12 14 / 0.99);
+  --markstream-diff-editor-fg: #b6c2d3;
+  --markstream-diff-unchanged-fg: #cbd5e1;
+  --markstream-diff-unchanged-bg: rgb(24 24 27 / 0.92);
+  --markstream-diff-unchanged-divider: rgb(255 255 255 / 0.18);
+  --markstream-diff-focus: rgb(96 165 250 / 0.42);
+  --markstream-diff-widget-shadow: rgb(0 0 0 / 0.72);
+  --markstream-diff-action-hover: rgb(255 255 255 / 0.08);
+  --markstream-diff-panel-bg: rgb(10 10 11 / 0.99);
+  --markstream-diff-panel-bg-soft: rgb(10 10 11 / 0.99);
+  --markstream-diff-panel-bg-strong: rgb(10 10 11 / 0.99);
+  --markstream-diff-panel-border: rgb(82 82 91 / 0.3);
+  --markstream-diff-pane-divider: rgb(82 82 91 / 0.34);
+  --markstream-diff-gutter-bg: linear-gradient(
+    180deg,
+    rgb(13 13 15 / 0.94) 0%,
+    rgb(9 9 10 / 0.98) 100%
+  );
+  --markstream-diff-gutter-guide: rgb(161 161 170 / 0.08);
+  --markstream-diff-gutter-gap: 16px;
+  --markstream-diff-line-number: rgb(161 161 170 / 0.68);
+  --markstream-diff-line-number-active: rgb(228 228 231 / 0.82);
+  --markstream-diff-added-fg: #5eead4;
+  --markstream-diff-removed-fg: #fda4af;
+  --markstream-diff-added-line: rgb(13 148 136 / 0.18);
+  --markstream-diff-removed-line: rgb(225 29 72 / 0.18);
+  --markstream-diff-added-inline: rgb(45 212 191 / 0.24);
+  --markstream-diff-removed-inline: rgb(251 113 133 / 0.24);
+  --markstream-diff-added-inline-border: transparent;
+  --markstream-diff-removed-inline-border: transparent;
+  --markstream-diff-added-gutter: linear-gradient(
+    90deg,
+    var(--markstream-diff-added-fg) 0 var(--stream-monaco-gutter-marker-width, 4px),
+    rgb(94 234 212 / 0.2) var(--stream-monaco-gutter-marker-width, 4px) 100%
+  );
+  --markstream-diff-removed-gutter: repeating-linear-gradient(
+        180deg,
+        var(--markstream-diff-removed-fg) 0 2px,
+        transparent 2px 4px
+      )
+      left / var(--stream-monaco-gutter-marker-width, 4px) 100% no-repeat,
+    linear-gradient(90deg, rgb(253 164 175 / 0.18) 0 100%);
+  --markstream-diff-added-line-fill: linear-gradient(
+    90deg,
+    rgb(15 118 110 / 0.38) 0%,
+    rgb(13 148 136 / 0.28) 100%
+  );
+  --markstream-diff-removed-line-fill: linear-gradient(
+    90deg,
+    rgb(159 18 57 / 0.38) 0%,
+    rgb(225 29 72 / 0.28) 100%
+  );
 }
 
 .code-editor-container {
+  transition: height 180ms ease, max-height 180ms ease;
   min-height: 120px;
 }
 
@@ -1003,9 +1137,165 @@ li .paragraph-node {
   height: 100%;
 }
 
-/* Vue parity: diffOverview should blend with editor background (avoids white gutter). */
+.code-editor-layer {
+  display: grid;
+  min-width: 0;
+}
+
+.code-editor-layer > .code-editor-container,
+.code-editor-layer > .code-editor-fallback-surface {
+  grid-area: 1 / 1;
+}
+
+.code-editor-fallback-surface {
+  overflow: auto;
+  padding: 1rem;
+}
+
+.code-block-container.is-diff {
+  background: var(--markstream-diff-shell-bg);
+  box-shadow: var(--markstream-diff-shell-shadow);
+  border-color: var(--markstream-diff-shell-border);
+  --vscode-editor-selectionBackground: var(--markstream-diff-action-hover);
+}
+
+.code-block-container.is-diff .code-block-header {
+  padding: 18px 20px 14px;
+  color: var(--markstream-diff-shell-fg);
+  background: transparent;
+  border-bottom-color: var(--markstream-diff-header-border);
+}
+
+.code-block-container.is-diff .code-editor-layer {
+  padding: 4px 4px 8px;
+  background: var(--markstream-diff-stage-bg);
+  --vscode-editor-background: var(--markstream-diff-editor-bg);
+  --vscode-editor-foreground: var(--markstream-diff-editor-fg);
+  --vscode-diffEditor-unchangedRegionForeground: var(--markstream-diff-unchanged-fg);
+  --vscode-diffEditor-unchangedRegionBackground: var(--markstream-diff-unchanged-bg);
+  --vscode-focusBorder: var(--markstream-diff-focus);
+  --vscode-widget-shadow: var(--markstream-diff-widget-shadow);
+}
+
 .code-block-container .monaco-diff-editor .diffOverview {
   background-color: var(--vscode-editor-background, #111827);
+}
+
+.code-block-container .stream-monaco-diff-root .monaco-diff-editor .diffOverview,
+.code-block-container .stream-monaco-diff-root .decorationsOverviewRuler {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
+}
+
+.code-block-container .stream-monaco-diff-root .monaco-diff-editor {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center:not(.stream-monaco-clickable) > *:not(a) {
+  visibility: hidden !important;
+}
+
+.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines-compact .text {
+  opacity: 0 !important;
+}
+
+.code-block-container .stream-monaco-diff-root {
+  --stream-monaco-gutter-gap: var(--markstream-diff-gutter-gap) !important;
+  --stream-monaco-line-number: var(--markstream-diff-line-number) !important;
+  --stream-monaco-line-number-active: var(--markstream-diff-line-number-active) !important;
+  --stream-monaco-added-fg: var(--markstream-diff-added-fg) !important;
+  --stream-monaco-removed-fg: var(--markstream-diff-removed-fg) !important;
+  --stream-monaco-added-line: var(--markstream-diff-added-line) !important;
+  --stream-monaco-removed-line: var(--markstream-diff-removed-line) !important;
+  --stream-monaco-added-inline: var(--markstream-diff-added-inline) !important;
+  --stream-monaco-removed-inline: var(--markstream-diff-removed-inline) !important;
+  --stream-monaco-added-inline-border: var(--markstream-diff-added-inline-border) !important;
+  --stream-monaco-removed-inline-border: var(--markstream-diff-removed-inline-border) !important;
+  --stream-monaco-added-line-fill: var(--markstream-diff-added-line-fill) !important;
+  --stream-monaco-removed-line-fill: var(--markstream-diff-removed-line-fill) !important;
+  --stream-monaco-added-gutter: var(--markstream-diff-added-gutter) !important;
+  --stream-monaco-removed-gutter: var(--markstream-diff-removed-gutter) !important;
+  --stream-monaco-added-line-shadow: none !important;
+  --stream-monaco-removed-line-shadow: none !important;
+  --stream-monaco-unchanged-bg: var(--markstream-diff-unchanged-bg) !important;
+  --stream-monaco-unchanged-fg: var(--markstream-diff-unchanged-fg) !important;
+}
+
+.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center:not(.stream-monaco-unchanged-bridge-source),
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge {
+  --stream-monaco-unchanged-bg: var(--markstream-diff-unchanged-bg) !important;
+  --stream-monaco-unchanged-fg: var(--markstream-diff-unchanged-fg) !important;
+  background: var(--stream-monaco-unchanged-bg) !important;
+  color: var(--stream-monaco-unchanged-fg) !important;
+}
+
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge {
+  right: calc(
+    var(--stream-monaco-gutter-marker-width) - var(--stream-monaco-unchanged-rail-width) / 2 + (var(--stream-monaco-gutter-gap) * 2)
+  ) !important;
+  width: auto !important;
+}
+
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary:hover,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary:focus-visible,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary.stream-monaco-focus-visible {
+  background: var(--stream-monaco-unchanged-bg) !important;
+  color: var(--markstream-diff-unchanged-fg) !important;
+  padding-left: calc(
+    var(--stream-monaco-gutter-marker-width) + (var(--stream-monaco-gutter-gap) * 2)
+  ) !important;
+  padding-right: calc(
+    var(--stream-monaco-gutter-marker-width) + (var(--stream-monaco-gutter-gap) * 2)
+  ) !important;
+}
+
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge.stream-monaco-diff-unchanged-bridge-line-info .stream-monaco-unchanged-rail,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:hover,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:focus-visible,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal.stream-monaco-focus-visible {
+  background: var(--stream-monaco-unchanged-bg) !important;
+}
+
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail {
+  border-right-color: var(--markstream-diff-unchanged-divider) !important;
+}
+
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal {
+  border-bottom-color: transparent !important;
+}
+
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-both .stream-monaco-unchanged-reveal:first-child {
+  border-bottom-color: var(--markstream-diff-unchanged-divider) !important;
+}
+
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-top-only .stream-monaco-unchanged-reveal,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-bottom-only .stream-monaco-unchanged-reveal {
+  border-bottom: 0 !important;
+}
+
+.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center .stream-monaco-unchanged-meta,
+.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center .stream-monaco-unchanged-count,
+.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center .stream-monaco-unchanged-metadata-label,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-meta,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-count,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-metadata-label,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:hover,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:focus-visible,
+.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal.stream-monaco-focus-visible {
+  color: var(--markstream-diff-unchanged-fg) !important;
 }
 
 .code-block-content {

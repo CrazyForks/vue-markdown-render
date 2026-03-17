@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core'
 import type { AngularRenderableNode } from '../shared/node-helpers'
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core'
 import { getString } from '../shared/node-helpers'
 
 @Component({

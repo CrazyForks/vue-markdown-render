@@ -1,15 +1,16 @@
 <script setup lang="ts">
+import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
+import type { SandboxFrameworkId, SandboxRenderSource } from '../../../playground-shared/versionSandbox'
 import { useDebounceFn, useLocalStorage } from '@vueuse/core'
 import { computed, onMounted, ref, watch } from 'vue'
+import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
 import { decodeMarkdownHash, encodeMarkdownPayload, resolveFrameworkTestHref, withMarkdownHash } from '../../../playground-shared/testPageState'
 import {
   buildTestSandboxHref,
   normalizeSandboxSource,
   resolveSandboxSelection,
-  type SandboxFrameworkId,
-  type SandboxRenderSource,
+
 } from '../../../playground-shared/versionSandbox'
-import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES, type TestLabFrameworkId, type TestLabSampleId } from '../../../playground-shared/testLabFixtures'
 import CodeBlockNode from '../../../src/components/CodeBlockNode'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
 import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
@@ -22,8 +23,8 @@ import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
 import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
 import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
-import 'katex/dist/katex.min.css'
 import { testSandboxFrameworks } from '../testSandboxConfig'
+import 'katex/dist/katex.min.css'
 
 type SampleId = TestLabSampleId
 type FrameworkId = TestLabFrameworkId
@@ -37,7 +38,7 @@ const diffHideUnchangedRegions = {
   enabled: true,
   contextLineCount: 2,
   minimumLineCount: 4,
-  revealLineCount: 2,
+  revealLineCount: 5,
 } as const
 
 const testPageMonacoOptions = {

@@ -1,6 +1,6 @@
+import type { Plugin, PluginOption } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { Plugin, PluginOption } from 'vite'
 import Vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 import monacoEditorPlugin from 'vite-plugin-monaco-editor-esm'

@@ -1,8 +1,9 @@
+import type { OnChanges } from '@angular/core'
+import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
-import { ChangeDetectionStrategy, Component, Input, OnChanges, forwardRef } from '@angular/core'
+import { ChangeDetectionStrategy, Component, forwardRef, Input } from '@angular/core'
 import { NestedRendererComponent } from '../NestedRenderer/NestedRenderer.component'
 import { NodeOutletComponent } from '../NodeOutlet/NodeOutlet.component'
-import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
 import { getNodeList, splitParagraphChildren } from '../shared/node-helpers'
 
 type ParagraphSegment

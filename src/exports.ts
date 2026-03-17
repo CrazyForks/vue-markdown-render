@@ -61,6 +61,11 @@ export type { KatexLoader } from './components/MathInlineNode/katex'
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
 export type { NodeRendererProps } from './components/NodeRenderer/NodeRenderer.vue'
 export type {
+  CodeBlockDiffAppearance,
+  CodeBlockDiffHideUnchangedRegions,
+  CodeBlockDiffLineStyle,
+  CodeBlockDiffUnchangedRegionStyle,
+  CodeBlockMonacoOptions,
   CodeBlockNodeProps,
   D2BlockNodeProps,
   ImageNodeProps,

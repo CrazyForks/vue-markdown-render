@@ -206,7 +206,7 @@ async function readHoverProbe(page) {
 async function readHomeProgress(page) {
   return page.evaluate(() => {
     const text = document.querySelector('.meta')?.textContent?.trim() || ''
-    const match = text.match(/(\d+)\s*\/\s*(\d+).*?(\d+)%/)
+    const match = text.match(/^(\d+)\s*\/\s*(\d+)\s*\((\d+)%\)$/)
     const current = match ? Number.parseInt(match[1], 10) : 0
     const total = match ? Number.parseInt(match[2], 10) : 0
     const percent = match ? Number.parseInt(match[3], 10) : 0
@@ -315,7 +315,7 @@ async function exerciseHomeHoverDuringStreaming(page, selector) {
 async function waitForHomeCompletion(page, timeout = 180000) {
   await page.waitForFunction(() => {
     const text = document.querySelector('.meta')?.textContent?.trim() || ''
-    const match = text.match(/(\d+)\s*\/\s*(\d+).*?(\d+)%/)
+    const match = text.match(/^(\d+)\s*\/\s*(\d+)\s*\((\d+)%\)$/)
     if (!match)
       return false
     const current = Number.parseInt(match[1], 10)
@@ -349,7 +349,7 @@ async function waitForHomeStreamingCodeHighlight(page, timeout = 180000) {
   while (Date.now() - startedAt < timeout) {
     lastSnapshot = await page.evaluate(() => {
       const text = document.querySelector('.meta')?.textContent?.trim() || ''
-      const match = text.match(/(\d+)\s*\/\s*(\d+).*?(\d+)%/)
+      const match = text.match(/^(\d+)\s*\/\s*(\d+)\s*\((\d+)%\)$/)
       const current = match ? Number.parseInt(match[1], 10) : 0
       const total = match ? Number.parseInt(match[2], 10) : 0
       const percent = match ? Number.parseInt(match[3], 10) : 0
@@ -577,8 +577,8 @@ async function collectStressMetrics(page) {
 async function collectStreamingMetrics(page) {
   const progressNode = page.locator('.hero-panel__metrics .metric-card').nth(3).locator('strong')
   const readProgress = async () => {
-    const text = (await progressNode.innerText()).trim()
-    return Number.parseInt(text.replace(/[^\d]/g, ''), 10)
+    const text = (await progressNode.textContent()).trim()
+    return Number.parseInt(text.replace(/\D/g, ''), 10)
   }
 
   await page.getByRole('button', { name: '开始流式渲染' }).click()
@@ -639,7 +639,7 @@ async function collectHomeStreamingHealth(page, initialMetaText) {
 
       await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {})
       await page.waitForSelector('.meta', { timeout: 30000 })
-      previousMetaText = (await page.locator('.meta').innerText().catch(() => initialMetaText)).trim()
+      previousMetaText = (await page.locator('.meta').textContent().catch(() => initialMetaText)).trim()
     }
   }
 
@@ -670,7 +670,7 @@ async function main() {
     await page.waitForSelector('text=markstream-angular playground', { timeout: 30000 })
     await page.waitForSelector('text=Open /test', { timeout: 30000 })
 
-    const homeProgressText = (await page.locator('.meta').innerText()).trim()
+    const homeProgressText = (await page.locator('.meta').textContent()).trim()
     const homeStreamingHealth = await collectHomeStreamingHealth(page, homeProgressText)
     const homeHoverSelector = await waitForHomeHoverTarget(page)
     const homeStreamingCodeHighlight = await waitForHomeStreamingCodeHighlight(page)

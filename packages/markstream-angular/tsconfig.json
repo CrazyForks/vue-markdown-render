@@ -1,15 +1,15 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    "lib": ["DOM", "ES2022"],
+    "useDefineForClassFields": false,
+    "experimentalDecorators": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false,
-    "lib": ["DOM", "ES2022"],
-    "declaration": true,
-    "skipLibCheck": true,
+    "types": ["vite/client"],
     "strict": false,
-    "types": ["vite/client"]
+    "declaration": true,
+    "skipLibCheck": true
   },
   "include": ["src/**/*.ts"]
 }

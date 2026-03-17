@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
-import type { D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from '../../types/component-props'
+import type {
+  CodeBlockMonacoOptions,
+  D2BlockNodeProps,
+  InfographicBlockNodeProps,
+  MermaidBlockNodeProps,
+} from '../../types/component-props'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
@@ -77,7 +82,7 @@ export interface NodeRendererProps {
   codeBlockDarkTheme?: any
   codeBlockLightTheme?: any
   // 传递给 CodeBlockNode 的 monacoOptions（比如 fontSize, MAX_HEIGHT 等）
-  codeBlockMonacoOptions?: Record<string, any>
+  codeBlockMonacoOptions?: CodeBlockMonacoOptions
   /** If true, render all `code_block` nodes as plain <pre><code> blocks instead of the full CodeBlockNode */
   renderCodeBlocksAsPre?: boolean
   /** Minimum width forwarded to CodeBlockNode (px or CSS unit) */

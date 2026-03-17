@@ -1,17 +1,16 @@
+import type { AfterViewInit, ElementRef, OnChanges, OnDestroy } from '@angular/core'
+import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
-import type { AfterViewInit, OnChanges, OnDestroy } from '@angular/core'
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
-  ElementRef,
+  inject,
   Input,
   ViewChild,
-  inject,
 } from '@angular/core'
 import { getD2 } from '../../optional/d2'
 import { extractRenderedSvg, toSafeSvgMarkup } from '../../sanitizeSvg'
-import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
 import { getString } from '../shared/node-helpers'
 import {
   copyTextToClipboard,

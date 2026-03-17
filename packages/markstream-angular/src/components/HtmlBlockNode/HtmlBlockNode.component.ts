@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, ElementRef, Input, ViewChild } from '@angular/core'
+import type { ElementRef } from '@angular/core'
+import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
+import { ChangeDetectionStrategy, Component, Input, ViewChild } from '@angular/core'
 import { sanitizeHtmlContent } from '../../sanitizeHtmlContent'
-import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
 import { getString } from '../shared/node-helpers'
 
 @Component({

@@ -1,5 +1,5 @@
 import type { Type } from '@angular/core'
-import type { BaseNode, MarkdownIt, ParseOptions, ParsedNode } from 'stream-markdown-parser'
+import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { hydrateCustomTagContent } from '../../hydrateCustomTagContent'
 
@@ -273,7 +273,7 @@ export function encodeDataPayload(value: string) {
   if (!value)
     return ''
 
-  const globalBuffer = (globalThis as any)?.Buffer
+  const globalBuffer = (globalThis as any)?.require?.('buffer')?.Buffer
   if (globalBuffer?.from)
     return globalBuffer.from(value, 'utf8').toString('base64')
 

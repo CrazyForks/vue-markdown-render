@@ -20,7 +20,7 @@ function extractThinkingAttrs(rawContent: string) {
 function stripThinkingWrapper(rawContent: string) {
   return rawContent
     .replace(/<thinking[^>]*>/i, '')
-    .replace(/<\/*t*h*i*n*k*i*n*g*>*\n*$/i, '')
+    .replace(/<\/thinking>\s*$/i, '')
 }
 
 export const THINKING_PARSE_OPTIONS = {

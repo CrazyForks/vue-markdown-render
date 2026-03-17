@@ -1,4 +1,4 @@
-import type { MarkdownToken, ParseOptions, ParsedNode, TextNode } from '../../types'
+import type { MarkdownToken, ParsedNode, ParseOptions, TextNode } from '../../types'
 import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
@@ -1029,7 +1029,7 @@ export function parseInlineTokens(
       return false
 
     const previousContent = String(previous.content ?? '')
-    const match = previousContent.match(/^(.*)\[([^\]\n]+)\]\($/)
+    const match = previousContent.match(/^([^[]*)\[([^\]\n]+)\]\($/)
     if (!match)
       return false
 

@@ -1,8 +1,9 @@
+import type { AfterViewInit, ElementRef, OnDestroy } from '@angular/core'
+import type { SandboxSelection } from '../../playground-shared/versionSandbox'
 import { CommonModule } from '@angular/common'
-import type { AfterViewInit, OnDestroy } from '@angular/core'
-import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, signal } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, signal, ViewChild } from '@angular/core'
 import { decodeMarkdownHash } from '../../playground-shared/testPageState'
-import { parseSandboxSelection, type SandboxSelection } from '../../playground-shared/versionSandbox'
+import { parseSandboxSelection } from '../../playground-shared/versionSandbox'
 import {
   TEST_SANDBOX_KATEX_VERSION,
   TEST_SANDBOX_MERMAID_VERSION,
@@ -338,6 +339,7 @@ export class TestSandboxComponent implements AfterViewInit, OnDestroy {
     typeof window === 'undefined' ? '' : window.location.search,
     testSandboxFrameworks,
   ))
+
   readonly markdown = signal(typeof window === 'undefined' ? '' : (decodeMarkdownHash(window.location.hash || '') ?? ''))
   readonly errorMessage = signal('')
   readonly statusLabel = computed(() => {
@@ -349,6 +351,7 @@ export class TestSandboxComponent implements AfterViewInit, OnDestroy {
       return 'Ready'
     return '待命'
   })
+
   readonly selectionSummary = computed(() => {
     const current = this.selection()
     return `${current.framework.label} / ${current.source === 'workspace' ? 'workspace' : 'npm'} / ${current.version}`

@@ -15,7 +15,7 @@ interface CustomTagOpen {
   openEnd: number
 }
 
-const TAG_TOKEN_RE = /<\/?([A-Z][\w:-]*)(?:\s[^<>]*?)?>/gi
+const TAG_TOKEN_RE = /<\/?([A-Z][\w:-]*)(?:\s[^<>]*)?>/gi
 
 export function hydrateCustomTagContent<T extends BaseNode>(
   nodes: readonly T[] | null | undefined,

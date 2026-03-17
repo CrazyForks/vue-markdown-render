@@ -334,8 +334,8 @@ export default {
       :is-strict="true"
       :render-debounce-ms="180"
       :preview-poll-delay-ms="500"
+      :show-tooltips="true"
       @export="onExport"
-      :showTooltips="true"
     />
   </div>
 </template>

@@ -1,4 +1,11 @@
 import type { AfterViewInit, OnChanges, OnDestroy, OnInit } from '@angular/core'
+import type { RenderedHtmlEnhancementHandle } from '../../enhanceRenderedHtml'
+import type {
+  AngularRenderableNode,
+  AngularRenderContext,
+  NodeRendererEvents,
+  NodeRendererProps,
+} from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
 import {
   ChangeDetectionStrategy,
@@ -6,21 +13,14 @@ import {
   Component,
   ElementRef,
   EventEmitter,
+  inject,
   Input,
   Output,
   ViewChild,
-  inject,
 } from '@angular/core'
-import type { RenderedHtmlEnhancementHandle } from '../../enhanceRenderedHtml'
-import { disposeRenderedHtmlEnhancements, enhanceRenderedHtml } from '../../enhanceRenderedHtml'
 import { getCustomNodeComponents, subscribeCustomComponents } from '../../customComponents'
+import { disposeRenderedHtmlEnhancements, enhanceRenderedHtml } from '../../enhanceRenderedHtml'
 import { NodeOutletComponent } from '../NodeOutlet/NodeOutlet.component'
-import type {
-  AngularRenderContext,
-  AngularRenderableNode,
-  NodeRendererEvents,
-  NodeRendererProps,
-} from '../shared/node-helpers'
 import {
   buildRenderContext,
   resolveParsedNodes,
@@ -511,7 +511,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     const currentIndices = new Set<number>()
     const slots = Array.from(root.querySelectorAll<HTMLElement>('.node-slot[data-node-index]'))
     for (const slot of slots) {
-      const index = Number(slot.dataset['nodeIndex'])
+      const index = Number(slot.dataset.nodeIndex)
       if (!Number.isFinite(index))
         continue
       currentIndices.add(index)
@@ -679,7 +679,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     let changed = false
     const contentNodes = Array.from(root.querySelectorAll<HTMLElement>('.node-content[data-node-index]'))
     for (const element of contentNodes) {
-      const index = Number(element.dataset['nodeIndex'])
+      const index = Number(element.dataset.nodeIndex)
       if (!Number.isFinite(index))
         continue
       const height = element.offsetHeight

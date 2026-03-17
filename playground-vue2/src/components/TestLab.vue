@@ -12,6 +12,7 @@ export default {
   components: {
     MarkdownRender,
   },
+  emits: ['navigateHome'],
   data() {
     return {
       selectedSampleId: 'baseline',
@@ -104,7 +105,7 @@ export default {
     },
     goHome() {
       this.stopStreamRender()
-      this.$emit('navigate-home')
+      this.$emit('navigateHome')
     },
     frameworkHref(id) {
       const framework = this.frameworkCards.find(item => item.id === id)

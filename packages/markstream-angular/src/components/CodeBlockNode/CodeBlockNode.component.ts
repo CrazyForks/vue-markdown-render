@@ -1,23 +1,22 @@
+import type { AfterViewInit, ElementRef, OnChanges, OnDestroy } from '@angular/core'
+import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
-import type { AfterViewInit, OnChanges, OnDestroy } from '@angular/core'
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
+  inject,
   Input,
   ViewChild,
-  ElementRef,
-  inject,
 } from '@angular/core'
-import type { AngularRenderContext, AngularRenderableNode } from '../shared/node-helpers'
-import { getString } from '../shared/node-helpers'
-import { PreCodeNodeComponent } from '../PreCodeNode/PreCodeNode.component'
-import { HtmlPreviewFrameComponent } from './HtmlPreviewFrame.component'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { getUseMonaco } from '../../optional/monaco'
 import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils/languageIcon'
+import { PreCodeNodeComponent } from '../PreCodeNode/PreCodeNode.component'
+import { getString } from '../shared/node-helpers'
+import { HtmlPreviewFrameComponent } from './HtmlPreviewFrame.component'
 
-type MonacoHelpers = {
+interface MonacoHelpers {
   createEditor?: (container: HTMLElement, code: string, language: string) => Promise<unknown> | unknown
   createDiffEditor?: (container: HTMLElement, original: string, modified: string, language: string) => Promise<unknown> | unknown
   updateCode?: (code: string, language?: string) => Promise<unknown> | unknown

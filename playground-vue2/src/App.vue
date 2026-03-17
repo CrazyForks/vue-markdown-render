@@ -1,8 +1,8 @@
 <script>
 import MarkdownRender, { setCustomComponents } from 'markstream-vue2'
 import { streamContent } from '../../playground/src/const/markdown'
-import ThinkingNode from './components/ThinkingNode.vue'
 import TestLab from './components/TestLab.vue'
+import ThinkingNode from './components/ThinkingNode.vue'
 
 const markdownSource = typeof streamContent === 'string' ? streamContent : String(streamContent || '')
 setCustomComponents('vue2-demo', { thinking: ThinkingNode })
