@@ -237,6 +237,8 @@ function formatThemeName(themeName: string) {
 
 // 设置面板显示状态
 const showSettings = ref(false)
+const isCompactSettings = useMediaQuery('(max-width: 1023px)')
+const shouldShowSettingsPanel = computed(() => !isCompactSettings.value || showSettings.value)
 
 // Use reversed column layout and let the browser handle native scrolling.
 // Removed custom JS scroll management (observers, programmatic scroll, and
@@ -383,11 +385,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex items-center justify-center p-4 app-container h-full bg-gray-50 dark:bg-gray-900">
+  <div class="flex items-center justify-center p-4 lg:pr-[304px] app-container h-full bg-gray-50 dark:bg-gray-900">
     <!-- 设置按钮和面板 -->
     <div class="fixed top-4 right-4 z-10">
-      <!-- 设置按钮 -->
       <button
+        v-if="isCompactSettings"
         class="
           settings-toggle w-10 h-10 rounded-full
           bg-white/95 dark:bg-gray-800/95
@@ -407,7 +409,6 @@ onBeforeUnmount(() => {
         />
       </button>
 
-      <!-- 设置面板 -->
       <Transition
         enter-active-class="transition ease-out duration-300"
         enter-from-class="opacity-0 scale-95 translate-y-2"
@@ -417,17 +418,27 @@ onBeforeUnmount(() => {
         leave-to-class="opacity-0 scale-95 translate-y-2"
       >
         <div
-          v-if="showSettings"
+          v-if="shouldShowSettingsPanel"
           class="
-            absolute top-12 right-0 mt-2
+            settings-panel
             bg-white/95 dark:bg-gray-800/95
             backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50
             rounded-xl shadow-xl dark:shadow-gray-900/30
-            p-4 space-y-4 min-w-[220px]
+            p-4 space-y-4 min-w-[220px] w-[280px]
+            overflow-y-auto
             origin-top-right
           "
+          :class="isCompactSettings ? 'absolute top-12 right-0 mt-2 max-h-[calc(100vh-5rem)]' : 'max-h-[calc(100vh-2rem)]'"
           @click.stop
         >
+          <div v-if="!isCompactSettings" class="flex items-center gap-2 border-b border-gray-200/70 pb-2 dark:border-gray-700/70">
+            <Icon
+              icon="carbon:settings"
+              class="w-4 h-4 text-gray-500 dark:text-gray-400"
+            />
+            <span class="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Settings</span>
+          </div>
+
           <!-- 主题选择器 -->
           <div class="space-y-2">
             <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
