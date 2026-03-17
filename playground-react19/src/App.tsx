@@ -234,6 +234,9 @@ export default function App() {
   const themeOptions = useMemo(() => Array.from(THEMES), [])
   const messagesRef = useRef<HTMLDivElement | null>(null)
   const frameRef = useRef<number | null>(null)
+  const minHeightDisabledRef = useRef(false)
+  const overflowConfirmationsRef = useRef(0)
+  const clearConfirmationsRef = useRef(0)
   const settingsRootRef = useRef<HTMLDivElement | null>(null)
   const isCompactSettings = useMediaQuery('(max-width: 1023px)')
   const shouldShowSettingsPanel = !isCompactSettings || showSettings
@@ -349,12 +352,47 @@ export default function App() {
       const renderer = container.querySelector('.markdown-renderer') as HTMLElement | null
       if (!renderer)
         return
-      const shouldDisable = renderer.scrollHeight > container.clientHeight
-      if (shouldDisable) {
-        renderer.classList.add('disable-min-height')
+      const hadClass = container.classList.contains('disable-min-height')
+      const requiredOverflowConfirmations = 2
+      const requiredClearConfirmations = 3
+
+      // Probe overflow against the renderer's natural height so short streams
+      // stay visually pinned to the top in the reverse-flex chat surface.
+      if (minHeightDisabledRef.current || hadClass) {
+        container.classList.add('disable-min-height')
+        const containerDelta = container.scrollHeight - container.clientHeight
+        const shouldKeepDisabled = containerDelta > 1
+
+        if (shouldKeepDisabled) {
+          clearConfirmationsRef.current = 0
+          minHeightDisabledRef.current = true
+        }
+        else {
+          clearConfirmationsRef.current += 1
+          if (clearConfirmationsRef.current >= requiredClearConfirmations) {
+            minHeightDisabledRef.current = false
+            overflowConfirmationsRef.current = 0
+            container.classList.remove('disable-min-height')
+          }
+        }
+        return
+      }
+
+      container.classList.add('disable-min-height')
+      const containerDelta = container.scrollHeight - container.clientHeight
+      const hasOverflow = containerDelta > 1
+
+      if (hasOverflow)
+        overflowConfirmationsRef.current += 1
+      else
+        overflowConfirmationsRef.current = 0
+
+      if (overflowConfirmationsRef.current >= requiredOverflowConfirmations) {
+        minHeightDisabledRef.current = true
+        clearConfirmationsRef.current = 0
       }
       else {
-        renderer.classList.remove('disable-min-height')
+        container.classList.remove('disable-min-height')
       }
     })
   }, [])
@@ -789,7 +827,7 @@ export default function App() {
           </div>
 
           <main ref={messagesRef} className="chatbot-messages flex-1 overflow-y-auto mr-[1px] mb-4 flex flex-col-reverse">
-            <div className="p-6">
+            <div className="chatbot-renderer-shell">
               <MemoizedNodeRenderer
                 content={content}
                 codeBlockDarkTheme={selectedTheme}

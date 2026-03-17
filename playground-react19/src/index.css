@@ -45,11 +45,14 @@ html.dark {
   overscroll-behavior: contain;
 }
 
-.chatbot-messages > .markdown-renderer {
+.chatbot-messages > .chatbot-renderer-shell {
   min-height: 100%;
+  box-sizing: border-box;
+  padding: 1.5rem;
+  width: 100%;
 }
 
-.chatbot-messages > .markdown-renderer.disable-min-height {
+.chatbot-messages.disable-min-height > .chatbot-renderer-shell {
   min-height: unset !important;
 }
 
