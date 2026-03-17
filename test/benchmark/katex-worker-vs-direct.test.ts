@@ -159,8 +159,11 @@ describe('kaTeX Worker vs Direct Rendering Benchmark', () => {
   it('should simulate realistic usage patterns', async () => {
     const katex = await import('katex')
 
-    // Simulate a markdown document with repeated formulas
-    const document = [
+    // Simulate a markdown document with repeated formulas.
+    // The base list is intentionally small enough to resemble a real message,
+    // but we repeat it during the benchmark so the timing signal stays larger
+    // than sub-millisecond JIT / scheduler noise on fast machines.
+    const baseDocument = [
       TEST_FORMULAS.simple, // repeated 10x
       TEST_FORMULAS.simple,
       TEST_FORMULAS.simple,
@@ -179,6 +182,12 @@ describe('kaTeX Worker vs Direct Rendering Benchmark', () => {
       TEST_FORMULAS.complex, // unique
       TEST_FORMULAS.veryComplex, // unique
     ]
+    const document = Array.from({ length: 10 }, () => baseDocument).flat()
+
+    // Warm up KaTeX before measuring. Without this, the benchmark can become
+    // flaky because module/JIT startup dominates these very short code paths.
+    for (const formula of Object.values(TEST_FORMULAS))
+      katex.renderToString(formula, { throwOnError: false, displayMode: true })
 
     // Without cache (naive approach)
     const noCacheStart = performance.now()
