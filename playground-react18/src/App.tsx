@@ -1,3 +1,5 @@
+import type { StreamPresetId } from './shared/streamPresets'
+import type { StreamSliceMode, StreamTransportMode } from './shared/useStreamSimulator'
 import { Icon } from '@iconify/react'
 import { NodeRenderer, setCustomComponents, setKaTeXWorker, setMermaidWorker } from 'markstream-react'
 import KatexWorker from 'markstream-react/workers/katexRenderer.worker?worker&inline'
@@ -5,7 +7,9 @@ import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker&
 import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ThinkingNode } from './components/ThinkingNode'
 import { streamContent } from './markdown'
+import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from './shared/streamPresets'
 import { TestLab } from './shared/TestLab'
+import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from './shared/useStreamSimulator'
 
 setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())
@@ -79,22 +83,15 @@ const THEMES = [
   'vitesse-light',
 ] as const
 
-const STREAM_DELAY_KEY = 'vmr-settings-stream-delay'
-const STREAM_CHUNK_KEY = 'vmr-settings-stream-chunk-size'
+const STREAM_DELAY_MIN_KEY = 'vmr-settings-stream-delay-min'
+const STREAM_DELAY_MAX_KEY = 'vmr-settings-stream-delay-max'
+const STREAM_CHUNK_MIN_KEY = 'vmr-settings-stream-chunk-size-min'
+const STREAM_CHUNK_MAX_KEY = 'vmr-settings-stream-chunk-size-max'
+const STREAM_BURSTINESS_KEY = 'vmr-settings-stream-burstiness'
+const STREAM_TRANSPORT_MODE_KEY = 'vmr-settings-stream-transport-mode'
+const STREAM_SLICE_MODE_KEY = 'vmr-settings-stream-slice-mode'
 const THEME_KEYS = ['vmr-settings-selected-theme', 'vmv-settings-selected-theme'] as const
 const DARK_MODE_KEY = 'vueuse-color-scheme'
-
-function clampDelay(value: number) {
-  if (!Number.isFinite(value))
-    return 16
-  return Math.min(200, Math.max(4, Math.round(value)))
-}
-
-function clampChunk(value: number) {
-  if (!Number.isFinite(value))
-    return 1
-  return Math.min(16, Math.max(1, Math.floor(value)))
-}
 
 function formatThemeName(theme: string) {
   return theme
@@ -124,13 +121,48 @@ function readThemeFromStorage(fallback: string) {
   return fallback
 }
 
+function readString(key: string, fallback: string) {
+  if (typeof window === 'undefined')
+    return fallback
+  const raw = window.localStorage.getItem(key)
+  if (!raw || !raw.trim())
+    return fallback
+  return raw
+}
+
 function normalizePath(pathname: string) {
   const normalized = pathname.replace(/\/+$/, '')
   return normalized || '/'
 }
 
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === 'undefined')
+      return false
+    return window.matchMedia(query).matches
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined')
+      return
+
+    const mediaQuery = window.matchMedia(query)
+    const update = () => setMatches(mediaQuery.matches)
+    update()
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', update)
+      return () => mediaQuery.removeEventListener('change', update)
+    }
+
+    mediaQuery.addListener(update)
+    return () => mediaQuery.removeListener(update)
+  }, [query])
+
+  return matches
+}
+
 export default function App() {
-  const [content, setContent] = useState('')
   const [currentPath, setCurrentPath] = useState(() => {
     if (typeof window === 'undefined')
       return '/'
@@ -138,8 +170,13 @@ export default function App() {
   })
   const [showSettings, setShowSettings] = useState(false)
   const [selectedTheme, setSelectedTheme] = useState(() => readThemeFromStorage('vitesse-dark'))
-  const [streamDelay, setStreamDelay] = useState(() => clampDelay(readNumber(STREAM_DELAY_KEY, 16)))
-  const [streamChunkSize, setStreamChunkSize] = useState(() => clampChunk(readNumber(STREAM_CHUNK_KEY, 1)))
+  const [streamChunkDelayMin, setStreamChunkDelayMin] = useState(() => readNumber(STREAM_DELAY_MIN_KEY, 14))
+  const [streamChunkDelayMax, setStreamChunkDelayMax] = useState(() => readNumber(STREAM_DELAY_MAX_KEY, 34))
+  const [streamChunkSizeMin, setStreamChunkSizeMin] = useState(() => readNumber(STREAM_CHUNK_MIN_KEY, 2))
+  const [streamChunkSizeMax, setStreamChunkSizeMax] = useState(() => readNumber(STREAM_CHUNK_MAX_KEY, 7))
+  const [streamBurstiness, setStreamBurstiness] = useState(() => readNumber(STREAM_BURSTINESS_KEY, 35))
+  const [streamTransportMode, setStreamTransportMode] = useState<StreamTransportMode>(() => readString(STREAM_TRANSPORT_MODE_KEY, 'readable-stream') as StreamTransportMode)
+  const [streamSliceMode, setStreamSliceMode] = useState<StreamSliceMode>(() => readString(STREAM_SLICE_MODE_KEY, 'pure-random') as StreamSliceMode)
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined')
       return false
@@ -149,11 +186,57 @@ export default function App() {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
   })
 
-  const normalizedChunkSize = useMemo(() => clampChunk(streamChunkSize), [streamChunkSize])
+  const normalizedChunkDelayRange = useMemo(() => normalizeStreamRange(
+    streamChunkDelayMin,
+    streamChunkDelayMax,
+    8,
+    240,
+    14,
+    34,
+  ), [streamChunkDelayMax, streamChunkDelayMin])
+  const normalizedChunkSizeRange = useMemo(() => normalizeStreamRange(
+    streamChunkSizeMin,
+    streamChunkSizeMax,
+    1,
+    24,
+    2,
+    7,
+  ), [streamChunkSizeMax, streamChunkSizeMin])
+  const normalizedBurstiness = useMemo(
+    () => Math.round(clampStreamControl(streamBurstiness, 0, 100, 35)),
+    [streamBurstiness],
+  )
+  const activeStreamPreset = useMemo(() => findMatchingStreamPreset({
+    chunkDelayMin: normalizedChunkDelayRange.min,
+    chunkDelayMax: normalizedChunkDelayRange.max,
+    chunkSizeMin: normalizedChunkSizeRange.min,
+    chunkSizeMax: normalizedChunkSizeRange.max,
+    burstiness: normalizedBurstiness,
+  }), [normalizedBurstiness, normalizedChunkDelayRange.max, normalizedChunkDelayRange.min, normalizedChunkSizeRange.max, normalizedChunkSizeRange.min])
+  const streamPresetDescription = activeStreamPreset?.description ?? 'Custom min/max window with your own burst profile.'
+  const selectedStreamPresetId = activeStreamPreset?.id ?? CUSTOM_STREAM_PRESET_ID
+  const streamChunkRangeLabel = `${normalizedChunkSizeRange.min}-${normalizedChunkSizeRange.max}`
+  const streamDelayRangeLabel = `${normalizedChunkDelayRange.min}-${normalizedChunkDelayRange.max}ms`
+  const {
+    content,
+    start: startStreamSimulation,
+    stop: stopStreamSimulation,
+  } = useStreamSimulator({
+    source: streamContent,
+    chunkSizeMin: normalizedChunkSizeRange.min,
+    chunkSizeMax: normalizedChunkSizeRange.max,
+    chunkDelayMin: normalizedChunkDelayRange.min,
+    chunkDelayMax: normalizedChunkDelayRange.max,
+    burstiness: normalizedBurstiness / 100,
+    sliceMode: streamSliceMode,
+    transportMode: streamTransportMode,
+  })
   const themeOptions = useMemo(() => Array.from(THEMES), [])
   const messagesRef = useRef<HTMLDivElement | null>(null)
   const frameRef = useRef<number | null>(null)
   const settingsRootRef = useRef<HTMLDivElement | null>(null)
+  const isCompactSettings = useMediaQuery('(max-width: 1023px)')
+  const shouldShowSettingsPanel = !isCompactSettings || showSettings
   const isTestPage = currentPath === '/test'
 
   const navigate = useCallback((pathname: string) => {
@@ -190,24 +273,61 @@ export default function App() {
   }, [isDark])
 
   useEffect(() => {
-    const bounded = clampDelay(streamDelay)
-    if (bounded !== streamDelay) {
-      setStreamDelay(bounded)
+    if (streamChunkDelayMin !== normalizedChunkDelayRange.min) {
+      setStreamChunkDelayMin(normalizedChunkDelayRange.min)
       return
     }
     if (typeof window !== 'undefined')
-      window.localStorage.setItem(STREAM_DELAY_KEY, String(bounded))
-  }, [streamDelay])
+      window.localStorage.setItem(STREAM_DELAY_MIN_KEY, String(normalizedChunkDelayRange.min))
+  }, [normalizedChunkDelayRange.min, streamChunkDelayMin])
 
   useEffect(() => {
-    const bounded = clampChunk(streamChunkSize)
-    if (bounded !== streamChunkSize) {
-      setStreamChunkSize(bounded)
+    if (streamChunkDelayMax !== normalizedChunkDelayRange.max) {
+      setStreamChunkDelayMax(normalizedChunkDelayRange.max)
       return
     }
     if (typeof window !== 'undefined')
-      window.localStorage.setItem(STREAM_CHUNK_KEY, String(bounded))
-  }, [streamChunkSize])
+      window.localStorage.setItem(STREAM_DELAY_MAX_KEY, String(normalizedChunkDelayRange.max))
+  }, [normalizedChunkDelayRange.max, streamChunkDelayMax])
+
+  useEffect(() => {
+    if (streamChunkSizeMin !== normalizedChunkSizeRange.min) {
+      setStreamChunkSizeMin(normalizedChunkSizeRange.min)
+      return
+    }
+    if (typeof window !== 'undefined')
+      window.localStorage.setItem(STREAM_CHUNK_MIN_KEY, String(normalizedChunkSizeRange.min))
+  }, [normalizedChunkSizeRange.min, streamChunkSizeMin])
+
+  useEffect(() => {
+    if (streamChunkSizeMax !== normalizedChunkSizeRange.max) {
+      setStreamChunkSizeMax(normalizedChunkSizeRange.max)
+      return
+    }
+    if (typeof window !== 'undefined')
+      window.localStorage.setItem(STREAM_CHUNK_MAX_KEY, String(normalizedChunkSizeRange.max))
+  }, [normalizedChunkSizeRange.max, streamChunkSizeMax])
+
+  useEffect(() => {
+    if (streamBurstiness !== normalizedBurstiness) {
+      setStreamBurstiness(normalizedBurstiness)
+      return
+    }
+    if (typeof window !== 'undefined')
+      window.localStorage.setItem(STREAM_BURSTINESS_KEY, String(normalizedBurstiness))
+  }, [normalizedBurstiness, streamBurstiness])
+
+  useEffect(() => {
+    if (typeof window === 'undefined')
+      return
+    window.localStorage.setItem(STREAM_TRANSPORT_MODE_KEY, streamTransportMode)
+  }, [streamTransportMode])
+
+  useEffect(() => {
+    if (typeof window === 'undefined')
+      return
+    window.localStorage.setItem(STREAM_SLICE_MODE_KEY, streamSliceMode)
+  }, [streamSliceMode])
 
   useEffect(() => {
     if (typeof window === 'undefined')
@@ -297,7 +417,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!showSettings)
+    if (!showSettings || !isCompactSettings)
       return
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       const root = settingsRootRef.current
@@ -313,36 +433,39 @@ export default function App() {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('touchstart', handlePointerDown)
     }
-  }, [showSettings])
+  }, [isCompactSettings, showSettings])
 
   useEffect(() => {
-    if (isTestPage || typeof window === 'undefined')
+    if (!isCompactSettings)
+      setShowSettings(false)
+  }, [isCompactSettings])
+
+  useEffect(() => {
+    if (isTestPage)
       return
-    let timer: number | null = null
-    const startStreaming = () => {
-      timer = window.setInterval(() => {
-        setContent((current) => {
-          if (current.length >= streamContent.length) {
-            if (timer != null) {
-              window.clearInterval(timer)
-              timer = null
-            }
-            return current
-          }
-          const nextChunk = streamContent.slice(current.length, current.length + normalizedChunkSize)
-          return current + nextChunk
-        })
-      }, streamDelay)
-    }
-    startStreaming()
+    startStreamSimulation()
     return () => {
-      if (timer != null)
-        window.clearInterval(timer)
+      stopStreamSimulation()
     }
-  }, [isTestPage, streamDelay, normalizedChunkSize])
+  }, [isTestPage, startStreamSimulation, stopStreamSimulation])
 
   const goToTest = () => {
     navigate('/test')
+  }
+
+  const handleStreamPresetChange = (presetId: StreamPresetId) => {
+    if (presetId === CUSTOM_STREAM_PRESET_ID)
+      return
+
+    const preset = getStreamPreset(presetId)
+    if (!preset)
+      return
+
+    setStreamChunkDelayMin(preset.chunkDelayMin)
+    setStreamChunkDelayMax(preset.chunkDelayMax)
+    setStreamChunkSizeMin(preset.chunkSizeMin)
+    setStreamChunkSizeMax(preset.chunkSizeMax)
+    setStreamBurstiness(preset.burstiness)
   }
 
   if (isTestPage)
@@ -350,23 +473,34 @@ export default function App() {
 
   return (
     <div className="markstream-vue h-full">
-      <div className="flex items-center justify-center p-4 app-container h-full bg-gray-50 dark:bg-gray-900">
+      <div className="flex items-center justify-center p-4 lg:pr-[304px] app-container h-full bg-gray-50 dark:bg-gray-900">
         <div ref={settingsRootRef} className="fixed top-4 right-4 z-10 pointer-events-none flex flex-col items-end gap-2">
-          <button
-            type="button"
-            className={`pointer-events-auto settings-toggle w-10 h-10 rounded-full bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 shadow-lg dark:shadow-gray-900/20 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${showSettings ? 'ring-2 ring-blue-500/50' : ''}`}
-            onClick={() => setShowSettings(value => !value)}
-          >
-            <Icon
-              icon="carbon:settings"
-              className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${showSettings ? 'rotate-90' : ''}`}
-            />
-          </button>
-
-          {showSettings && (
-            <div
-              className="pointer-events-auto settings-panel absolute top-12 right-0 mt-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-xl shadow-xl dark:shadow-gray-900/30 p-4 space-y-4 min-w-[220px] origin-top-right transition-all duration-200 ease-out"
+          {isCompactSettings && (
+            <button
+              type="button"
+              className={`pointer-events-auto settings-toggle w-10 h-10 rounded-full bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50 shadow-lg dark:shadow-gray-900/20 transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${showSettings ? 'ring-2 ring-blue-500/50' : ''}`}
+              onClick={() => setShowSettings(value => !value)}
             >
+              <Icon
+                icon="carbon:settings"
+                className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${showSettings ? 'rotate-90' : ''}`}
+              />
+            </button>
+          )}
+
+          {shouldShowSettingsPanel && (
+            <div
+              className={`pointer-events-auto settings-panel bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-xl shadow-xl dark:shadow-gray-900/30 p-4 space-y-4 min-w-[220px] w-[280px] overflow-y-auto ${isCompactSettings ? 'absolute top-12 right-0 mt-2 max-h-[calc(100vh-5rem)] origin-top-right transition-all duration-200 ease-out' : 'max-h-[calc(100vh-2rem)]'}`}
+            >
+              {!isCompactSettings && (
+                <div className="flex items-center gap-2 border-b border-gray-200/70 pb-2 dark:border-gray-700/70">
+                  <Icon icon="carbon:settings" className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">
+                    Settings
+                  </span>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
                   Code Theme
@@ -391,20 +525,84 @@ export default function App() {
 
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                  Stream Delay
+                  Stream Profile
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedStreamPresetId}
+                    onChange={event => handleStreamPresetChange(event.target.value as StreamPresetId)}
+                    className="w-full appearance-none px-3 py-2 pr-8 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200 cursor-pointer"
+                  >
+                    {STREAM_PRESETS.map(preset => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.label}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_STREAM_PRESET_ID}>Custom</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                    <Icon icon="carbon:chevron-down" className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  </div>
+                </div>
+                <p className="text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                  {streamPresetDescription}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                  Transport
+                </label>
+                <div className="relative">
+                  <select
+                    value={streamTransportMode}
+                    onChange={event => setStreamTransportMode(event.target.value as StreamTransportMode)}
+                    className="w-full appearance-none px-3 py-2 pr-8 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200 cursor-pointer"
+                  >
+                    <option value="readable-stream">ReadableStream</option>
+                    <option value="scheduler">Scheduler</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                    <Icon icon="carbon:chevron-down" className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                  Slice Mode
+                </label>
+                <div className="relative">
+                  <select
+                    value={streamSliceMode}
+                    onChange={event => setStreamSliceMode(event.target.value as StreamSliceMode)}
+                    className="w-full appearance-none px-3 py-2 pr-8 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200 cursor-pointer"
+                  >
+                    <option value="pure-random">Pure Random</option>
+                    <option value="boundary-aware">Boundary Aware</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                    <Icon icon="carbon:chevron-down" className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                  chunkDelayMin
                 </label>
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
-                    min={4}
-                    max={200}
+                    min={8}
+                    max={240}
                     step={4}
-                    value={streamDelay}
-                    onChange={event => setStreamDelay(Number(event.target.value))}
+                    value={streamChunkDelayMin}
+                    onChange={event => setStreamChunkDelayMin(Number(event.target.value))}
                     className="flex-1 cursor-pointer"
                   />
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-12 text-right">
-                    {streamDelay}
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-14 text-right">
+                    {normalizedChunkDelayRange.min}
                     ms
                   </span>
                 </div>
@@ -412,23 +610,110 @@ export default function App() {
 
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                  Chunk Size
+                  chunkDelayMax
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={8}
+                    max={240}
+                    step={4}
+                    value={streamChunkDelayMax}
+                    onChange={event => setStreamChunkDelayMax(Number(event.target.value))}
+                    className="flex-1 cursor-pointer"
+                  />
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-14 text-right">
+                    {normalizedChunkDelayRange.max}
+                    ms
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                  chunkSizeMin
                 </label>
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
                     min={1}
-                    max={16}
+                    max={24}
                     step={1}
-                    value={streamChunkSize}
-                    onChange={event => setStreamChunkSize(Number(event.target.value))}
+                    value={streamChunkSizeMin}
+                    onChange={event => setStreamChunkSizeMin(Number(event.target.value))}
                     className="flex-1 cursor-pointer"
                   />
-                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-12 text-right">
-                    {normalizedChunkSize}
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-14 text-right">
+                    {normalizedChunkSizeRange.min}
                   </span>
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                  chunkSizeMax
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={1}
+                    max={24}
+                    step={1}
+                    value={streamChunkSizeMax}
+                    onChange={event => setStreamChunkSizeMax(Number(event.target.value))}
+                    className="flex-1 cursor-pointer"
+                  />
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-14 text-right">
+                    {normalizedChunkSizeRange.max}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                  Burstiness
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={streamBurstiness}
+                    onChange={event => setStreamBurstiness(Number(event.target.value))}
+                    className="flex-1 cursor-pointer"
+                  />
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-12 text-right">
+                    {normalizedBurstiness}
+                    %
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                Active window:
+                {' '}
+                {streamChunkRangeLabel}
+                {' '}
+                chars and
+                {' '}
+                {streamDelayRangeLabel}
+                . When min=max, the cadence becomes fixed.
+              </p>
+
+              <p className="text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                <code>Pure Random</code>
+                {' '}
+                uses raw random
+                <code>slice</code>
+                ;
+                <code>Boundary Aware</code>
+                {' '}
+                snaps toward word and punctuation boundaries.
+                <code>ReadableStream</code>
+                {' '}
+                is closest to the real reader path.
+              </p>
 
               <div className="border-t border-gray-200 dark:border-gray-700" />
 

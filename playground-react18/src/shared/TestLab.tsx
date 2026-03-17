@@ -1,8 +1,12 @@
 import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
+import type { StreamPresetId } from './streamPresets'
+import type { StreamSliceMode, StreamTransportMode } from './useStreamSimulator'
 import { NodeRenderer } from 'markstream-react'
-import { useDeferredValue, useEffect, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
 import { decodeMarkdownHash, resolveFrameworkTestHref } from '../../../playground-shared/testPageState'
+import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from './streamPresets'
+import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from './useStreamSimulator'
 
 type SampleId = TestLabSampleId
 type FrameworkId = TestLabFrameworkId
@@ -12,11 +16,6 @@ const CURRENT_FRAMEWORK: FrameworkId = 'react'
 const frameworkCards = TEST_LAB_FRAMEWORKS
 const sampleCards = TEST_LAB_SAMPLES
 
-function clampInt(value: number, min: number, max: number, fallback: number) {
-  const normalized = Number.isFinite(value) ? Math.round(value) : fallback
-  return Math.min(max, Math.max(min, normalized))
-}
-
 interface TestLabProps {
   frameworkLabel: string
   onGoHome: () => void
@@ -25,17 +24,71 @@ interface TestLabProps {
 export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
   const [selectedSampleId, setSelectedSampleId] = useState<SampleId>('baseline')
   const [input, setInput] = useState(sampleCards[0].content)
-  const [streamContent, setStreamContent] = useState('')
-  const [isStreaming, setIsStreaming] = useState(false)
-  const [streamSpeed, setStreamSpeed] = useState(4)
-  const [streamInterval, setStreamInterval] = useState(24)
+  const [streamChunkSizeMin, setStreamChunkSizeMin] = useState(2)
+  const [streamChunkSizeMax, setStreamChunkSizeMax] = useState(7)
+  const [streamChunkDelayMin, setStreamChunkDelayMin] = useState(14)
+  const [streamChunkDelayMax, setStreamChunkDelayMax] = useState(34)
+  const [streamBurstiness, setStreamBurstiness] = useState(35)
+  const [streamTransportMode, setStreamTransportMode] = useState<StreamTransportMode>('readable-stream')
+  const [streamSliceMode, setStreamSliceMode] = useState<StreamSliceMode>('pure-random')
 
   const activeSample = sampleCards.find(sample => sample.id === selectedSampleId) ?? sampleCards[0]
+  const normalizedChunkSizeRange = useMemo(() => normalizeStreamRange(
+    streamChunkSizeMin,
+    streamChunkSizeMax,
+    1,
+    80,
+    2,
+    7,
+  ), [streamChunkSizeMax, streamChunkSizeMin])
+  const normalizedChunkDelayRange = useMemo(() => normalizeStreamRange(
+    streamChunkDelayMin,
+    streamChunkDelayMax,
+    8,
+    600,
+    14,
+    34,
+  ), [streamChunkDelayMax, streamChunkDelayMin])
+  const normalizedBurstiness = useMemo(
+    () => Math.round(clampStreamControl(streamBurstiness, 0, 100, 35)),
+    [streamBurstiness],
+  )
+  const {
+    content: streamContent,
+    isPaused,
+    isStreaming,
+    lastChunkSize,
+    lastDelayMs,
+    reset: resetStreamState,
+    start: startStreaming,
+    stop: stopStreaming,
+    togglePause: toggleStreamingPause,
+  } = useStreamSimulator({
+    source: input,
+    chunkSizeMin: normalizedChunkSizeRange.min,
+    chunkSizeMax: normalizedChunkSizeRange.max,
+    chunkDelayMin: normalizedChunkDelayRange.min,
+    chunkDelayMax: normalizedChunkDelayRange.max,
+    burstiness: normalizedBurstiness / 100,
+    sliceMode: streamSliceMode,
+    transportMode: streamTransportMode,
+  })
   const previewContent = isStreaming ? streamContent : input
   const deferredPreview = useDeferredValue(previewContent)
   const progress = input.length ? Math.min(100, Math.round((previewContent.length / input.length) * 100)) : 0
   const charCount = input.length
   const lineCount = input ? input.split('\n').length : 0
+  const activeStreamPreset = useMemo(() => findMatchingStreamPreset({
+    chunkDelayMin: normalizedChunkDelayRange.min,
+    chunkDelayMax: normalizedChunkDelayRange.max,
+    chunkSizeMin: normalizedChunkSizeRange.min,
+    chunkSizeMax: normalizedChunkSizeRange.max,
+    burstiness: normalizedBurstiness,
+  }), [normalizedBurstiness, normalizedChunkDelayRange.max, normalizedChunkDelayRange.min, normalizedChunkSizeRange.max, normalizedChunkSizeRange.min])
+  const selectedStreamPresetId = activeStreamPreset?.id ?? CUSTOM_STREAM_PRESET_ID
+  const streamPresetDescription = activeStreamPreset?.description ?? 'Current values are outside the built-in presets.'
+  const streamChunkRangeLabel = `${normalizedChunkSizeRange.min}-${normalizedChunkSizeRange.max} chars`
+  const streamDelayRangeLabel = `${normalizedChunkDelayRange.min}-${normalizedChunkDelayRange.max}ms`
 
   useEffect(() => {
     if (typeof window === 'undefined')
@@ -46,43 +99,39 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
   }, [])
 
   useEffect(() => {
-    if (!isStreaming)
-      return
+    if (streamChunkSizeMin !== normalizedChunkSizeRange.min)
+      setStreamChunkSizeMin(normalizedChunkSizeRange.min)
+    if (streamChunkSizeMax !== normalizedChunkSizeRange.max)
+      setStreamChunkSizeMax(normalizedChunkSizeRange.max)
+  }, [normalizedChunkSizeRange.max, normalizedChunkSizeRange.min, streamChunkSizeMax, streamChunkSizeMin])
 
-    const safeSpeed = clampInt(streamSpeed, 1, 80, 4)
-    const safeInterval = clampInt(streamInterval, 8, 300, 24)
-    const timer = window.setTimeout(() => {
-      setStreamContent((current) => {
-        const nextLength = Math.min(current.length + safeSpeed, input.length)
-        const next = input.slice(0, nextLength)
-        if (nextLength >= input.length)
-          setIsStreaming(false)
-        return next
-      })
-    }, safeInterval)
+  useEffect(() => {
+    if (streamChunkDelayMin !== normalizedChunkDelayRange.min)
+      setStreamChunkDelayMin(normalizedChunkDelayRange.min)
+    if (streamChunkDelayMax !== normalizedChunkDelayRange.max)
+      setStreamChunkDelayMax(normalizedChunkDelayRange.max)
+  }, [normalizedChunkDelayRange.max, normalizedChunkDelayRange.min, streamChunkDelayMax, streamChunkDelayMin])
 
-    return () => {
-      window.clearTimeout(timer)
-    }
-  }, [input, isStreaming, streamContent, streamInterval, streamSpeed])
+  useEffect(() => {
+    if (streamBurstiness !== normalizedBurstiness)
+      setStreamBurstiness(normalizedBurstiness)
+  }, [normalizedBurstiness, streamBurstiness])
 
   function applySample(id: SampleId) {
     const sample = sampleCards.find(item => item.id === id)
     if (!sample)
       return
-    setIsStreaming(false)
-    setStreamContent('')
+    resetStreamState()
     setSelectedSampleId(sample.id)
     setInput(sample.content)
   }
 
   function toggleStream() {
     if (isStreaming) {
-      setIsStreaming(false)
+      stopStreaming()
       return
     }
-    setStreamContent('')
-    setIsStreaming(true)
+    startStreaming()
   }
 
   function resetEditor() {
@@ -90,9 +139,23 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
   }
 
   function clearEditor() {
-    setIsStreaming(false)
-    setStreamContent('')
+    resetStreamState()
     setInput('')
+  }
+
+  function handleStreamPresetChange(presetId: StreamPresetId) {
+    if (presetId === CUSTOM_STREAM_PRESET_ID)
+      return
+
+    const preset = getStreamPreset(presetId)
+    if (!preset)
+      return
+
+    setStreamChunkDelayMin(preset.chunkDelayMin)
+    setStreamChunkDelayMax(preset.chunkDelayMax)
+    setStreamChunkSizeMin(preset.chunkSizeMin)
+    setStreamChunkSizeMax(preset.chunkSizeMax)
+    setStreamBurstiness(preset.burstiness)
   }
 
   function frameworkHref(id: FrameworkId) {
@@ -182,36 +245,124 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
             <div className="panel-head panel-head--spaced">
               <div>
                 <h2>流式控制</h2>
-                <p>检查 React 版本在增量更新时的稳定性。</p>
+                <p>检查 React 版本在纯随机 slice、停顿和 burst 下的稳定性。</p>
               </div>
             </div>
 
             <div className="control-grid">
               <label className="input-card">
-                <span>每次追加字符</span>
+                <span>Preset</span>
+                <select
+                  value={selectedStreamPresetId}
+                  onChange={event => handleStreamPresetChange(event.target.value as StreamPresetId)}
+                >
+                  {STREAM_PRESETS.map(preset => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_STREAM_PRESET_ID}>Custom</option>
+                </select>
+              </label>
+              <label className="input-card">
+                <span>Transport</span>
+                <select
+                  value={streamTransportMode}
+                  onChange={event => setStreamTransportMode(event.target.value as StreamTransportMode)}
+                >
+                  <option value="readable-stream">ReadableStream</option>
+                  <option value="scheduler">Scheduler</option>
+                </select>
+              </label>
+              <label className="input-card">
+                <span>Slice Mode</span>
+                <select
+                  value={streamSliceMode}
+                  onChange={event => setStreamSliceMode(event.target.value as StreamSliceMode)}
+                >
+                  <option value="pure-random">Pure Random</option>
+                  <option value="boundary-aware">Boundary Aware</option>
+                </select>
+              </label>
+              <label className="input-card">
+                <span>chunkSizeMin</span>
                 <input
                   type="number"
                   min={1}
                   max={80}
-                  value={streamSpeed}
-                  onChange={event => setStreamSpeed(Number(event.target.value))}
+                  value={streamChunkSizeMin}
+                  onChange={event => setStreamChunkSizeMin(Number(event.target.value))}
                 />
               </label>
               <label className="input-card">
-                <span>更新时间间隔 (ms)</span>
+                <span>chunkSizeMax</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={80}
+                  value={streamChunkSizeMax}
+                  onChange={event => setStreamChunkSizeMax(Number(event.target.value))}
+                />
+              </label>
+              <label className="input-card">
+                <span>chunkDelayMin</span>
                 <input
                   type="number"
                   min={8}
-                  max={300}
-                  value={streamInterval}
-                  onChange={event => setStreamInterval(Number(event.target.value))}
+                  max={600}
+                  value={streamChunkDelayMin}
+                  onChange={event => setStreamChunkDelayMin(Number(event.target.value))}
+                />
+              </label>
+              <label className="input-card">
+                <span>chunkDelayMax</span>
+                <input
+                  type="number"
+                  min={8}
+                  max={600}
+                  value={streamChunkDelayMax}
+                  onChange={event => setStreamChunkDelayMax(Number(event.target.value))}
+                />
+              </label>
+              <label className="input-card">
+                <span>Burstiness (%)</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={streamBurstiness}
+                  onChange={event => setStreamBurstiness(Number(event.target.value))}
                 />
               </label>
             </div>
 
+            <p className="control-note">{streamPresetDescription}</p>
+            <p className="control-note">
+              Active window:
+              {' '}
+              {streamChunkRangeLabel}
+              ,
+              {' '}
+              {streamDelayRangeLabel}
+              . When min=max, the cadence becomes fixed.
+            </p>
+            <p className="control-note">
+              <code>Pure Random</code>
+              {' '}
+              uses raw random
+              <code>slice</code>
+              ;
+              <code>Boundary Aware</code>
+              {' '}
+              snaps toward word and punctuation boundaries.
+            </p>
+
             <div className="button-grid">
               <button type="button" className="testlab-btn testlab-btn--primary" onClick={toggleStream}>
                 {isStreaming ? '停止流式渲染' : '开始流式渲染'}
+              </button>
+              <button type="button" className="testlab-btn" disabled={!isStreaming} onClick={toggleStreamingPause}>
+                {isPaused ? '继续流式渲染' : '暂停流式渲染'}
               </button>
               <button type="button" className="testlab-btn" onClick={resetEditor}>
                 重置样例
@@ -260,7 +411,7 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
               <header className="workspace-card__head">
                 <div>
                   <h2>实时预览</h2>
-                  <p>{isStreaming ? 'Streaming 中' : '已显示完整输入'}</p>
+                  <p>{isStreaming ? (isPaused ? '流式已暂停' : 'Streaming 中') : '已显示完整输入'}</p>
                 </div>
                 <span className="mini-pill">
                   {progress}
@@ -280,7 +431,9 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
                   {' '}
                   {input.length || 0}
                 </span>
-                <span>React renderer</span>
+                <span>
+                  {isStreaming ? `${streamTransportMode} · ${lastChunkSize} chars / ${lastDelayMs}ms` : 'React renderer'}
+                </span>
               </footer>
             </article>
           </section>

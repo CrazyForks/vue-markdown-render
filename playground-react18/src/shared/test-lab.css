@@ -213,6 +213,22 @@
   font: inherit;
 }
 
+.input-card select {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.05);
+  color: #10203a;
+  font: inherit;
+}
+
+.control-note {
+  margin: 12px 0 0;
+  color: #5b6f88;
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
 .button-grid {
   margin-top: 14px;
 }
