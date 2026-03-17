@@ -24,6 +24,24 @@ catch {
 
 export default defineConfig(({ mode }) => {
   const isNpm = mode === 'npm'
+  const assetFileNames = (assetInfo: any) => {
+    try {
+      const fname = (assetInfo && ((assetInfo as any).name || (assetInfo as any).fileName || '')) as string
+      if (fname && fname.endsWith('.css'))
+        return 'index.css'
+    }
+    catch {}
+    return '[name][extname]'
+  }
+  const createChunkOutput = (format: 'es' | 'cjs') => ({
+    format,
+    exports: 'named' as const,
+    entryFileNames: format === 'cjs' ? 'index.cjs' : 'index.js',
+    // Keep ES and CJS chunks in separate namespaces so one format cannot
+    // overwrite the other in `dist/` when both outputs are emitted together.
+    chunkFileNames: format === 'cjs' ? 'chunks/[name]-[hash].cjs' : 'chunks/[name]-[hash].js',
+    assetFileNames,
+  })
   const plugins = [
     vue2({ compiler: vueCompiler, script: { babelParserPlugins: ['typescript'] } }),
   ]
@@ -122,8 +140,6 @@ export default defineConfig(({ mode }) => {
       lib: {
         entry: resolve(__dirname, 'src/exports.ts'),
         name: 'MarkstreamVue2',
-        fileName: format => (format === 'cjs' ? 'index.cjs' : 'index.js'),
-        formats: ['es', 'cjs'],
       },
       rollupOptions: {
         external: (id: string) => {
@@ -156,19 +172,10 @@ export default defineConfig(({ mode }) => {
             'shiki',
           ].includes(id)
         },
-        output: {
-          exports: 'named',
-          chunkFileNames: '[name].js',
-          assetFileNames: (assetInfo: any) => {
-            try {
-              const fname = (assetInfo && ((assetInfo as any).name || (assetInfo as any).fileName || '')) as string
-              if (fname && fname.endsWith('.css'))
-                return 'index.css'
-            }
-            catch {}
-            return '[name][extname]'
-          },
-        },
+        output: [
+          createChunkOutput('es'),
+          createChunkOutput('cjs'),
+        ],
       },
     },
     worker: {

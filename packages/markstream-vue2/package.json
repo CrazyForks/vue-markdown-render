@@ -79,9 +79,10 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build -c vite.config.ts --mode npm && vite build -c vite.config.tailwind.ts --mode npm && node ./scripts/copy-tailwind-css.mjs && node ../../scripts/generate-px-css.mjs && pnpm run build:dts",
+    "build": "vite build -c vite.config.ts --mode npm && vite build -c vite.config.tailwind.ts --mode npm && node ./scripts/copy-tailwind-css.mjs && node ../../scripts/generate-px-css.mjs && pnpm run build:dts && pnpm run validate:dist",
     "build:analyze": "ANALYZE=true pnpm build",
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
+    "validate:dist": "node ./scripts/validate-dist-entries.mjs",
     "size:check": "MAX_PACK_UNPACKED_BYTES=800000 node ../../scripts/check-package-size.mjs",
     "release": "bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
@@ -93,7 +94,7 @@
     "mermaid": ">=11",
     "shiki": "^3.13.0",
     "stream-markdown": ">=0.0.14",
-    "stream-monaco": ">=0.0.16",
+    "stream-monaco": ">=0.0.20",
     "vue": ">=2.6.14 <3",
     "vue-i18n": ">=9"
   },
