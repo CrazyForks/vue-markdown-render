@@ -154,6 +154,7 @@
     "docs:build:ci": "pnpm run build:parser && pnpm run build && pnpm docs:build",
     "docs:build:netlify": "VITEPRESS_BASE=/ pnpm docs:build",
     "docs:build:gh": "VITEPRESS_BASE=/markstream-vue/ pnpm docs:build",
+    "docs:build:gh:ci": "pnpm run build:parser && pnpm run build && pnpm docs:build:gh",
     "docs:serve": "vitepress serve docs",
     "docs:deploy": "VITEPRESS_BASE=/markstream-vue/ pnpm docs:build && pnpm docs:serve",
     "docs:deploy:netlify": "pnpm docs:build && echo 'Docs built to docs/.vitepress/dist'",
