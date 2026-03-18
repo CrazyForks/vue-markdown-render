@@ -55,6 +55,7 @@ export interface AngularRenderContext {
   indexKey?: string
   final?: boolean
   typewriter?: boolean
+  textStreamState?: Map<string, string>
   showTooltips?: boolean
   codeBlockStream?: boolean
   renderCodeBlocksAsPre?: boolean
@@ -103,6 +104,7 @@ export const BLOCK_LEVEL_TYPES = new Set([
 export function buildRenderContext(
   props: NodeRendererProps,
   events: NodeRendererEvents = {},
+  textStreamState?: Map<string, string>,
 ): AngularRenderContext {
   const customHtmlTags = normalizeCustomHtmlTags([
     ...(props.customHtmlTags || []),
@@ -115,6 +117,7 @@ export function buildRenderContext(
     indexKey: props.indexKey != null ? String(props.indexKey) : undefined,
     final: props.final,
     typewriter: props.typewriter,
+    textStreamState,
     showTooltips: props.showTooltips,
     codeBlockStream: props.codeBlockStream,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,

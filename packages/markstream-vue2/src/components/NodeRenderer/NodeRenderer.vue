@@ -3,7 +3,7 @@ import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-mark
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from '../../types/component-props'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
-import { computed, getCurrentInstance, markRaw, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue-demi'
+import { computed, getCurrentInstance, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -150,6 +150,22 @@ const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 const isClient = typeof window !== 'undefined'
 const instance = getCurrentInstance()
 const debugPerformanceEnabled = computed(() => props.debugPerformance && isClient && typeof console !== 'undefined')
+const attrs = computed<Record<string, unknown>>(() => ((instance?.proxy as any)?.$attrs ?? {}) as Record<string, unknown>)
+const textStreamState = new Map<string, string>()
+const resolvedShowTooltips = computed<boolean | undefined>(() => {
+  if (typeof props.showTooltips === 'boolean')
+    return props.showTooltips
+  const raw = attrs.value.showTooltips ?? attrs.value['show-tooltips']
+  if (raw === '' || raw === true || raw === 'true')
+    return true
+  if (raw === false || raw === 'false')
+    return false
+  return undefined
+})
+
+provide('markstreamShowTooltips', resolvedShowTooltips)
+provide('markstreamTypewriter', computed(() => props.typewriter !== false))
+provide('markstreamTextStreamState', textStreamState)
 
 function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)

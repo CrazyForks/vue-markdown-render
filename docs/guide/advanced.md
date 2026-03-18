@@ -79,7 +79,7 @@ Example:
 <MarkdownRender :content="markdown" :typewriter="false" />
 ```
 
-CSS variables: `--typewriter-fade-duration` and `--typewriter-fade-ease` tune the initial enter transition; `--stream-update-fade-duration` and `--stream-update-fade-ease` tune the short replayed fade used for newly appended streamed text.
+CSS variables: `--typewriter-fade-duration` and `--typewriter-fade-ease` tune the initial enter transition; `--stream-update-fade-duration` and `--stream-update-fade-ease` tune the short replayed fade used for newly appended streamed text. When the stream-specific variables are not set, the appended-text fade falls back to the same duration and easing as `typewriter`.
 
 ## Internationalization (i18n)
 

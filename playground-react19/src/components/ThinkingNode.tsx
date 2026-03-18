@@ -16,6 +16,7 @@ export function ThinkingNode(props: NodeComponentProps<ThinkingNodeData['node']>
   const ctx = props.ctx
   const inheritedCustomId = props.customId ?? ctx?.customId
   const inheritedIsDark = props.isDark ?? ctx?.isDark
+  const inheritedTypewriter = props.typewriter ?? ctx?.typewriter ?? true
 
   return (
     <div className="thinking-node p-4 my-4 bg-blue-50 dark:bg-blue-900/40 rounded-md border-l-4 border-blue-400 flex items-start gap-3">
@@ -60,7 +61,7 @@ export function ThinkingNode(props: NodeComponentProps<ThinkingNodeData['node']>
               codeBlockProps={ctx?.codeBlockProps}
               codeBlockStream={ctx?.codeBlockStream}
               renderCodeBlocksAsPre={ctx?.renderCodeBlocksAsPre}
-              typewriter={false}
+              typewriter={inheritedTypewriter}
               viewportPriority={false}
               deferNodesUntilVisible={false}
               batchRendering={false}

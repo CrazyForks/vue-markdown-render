@@ -169,6 +169,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   private readonly nodeHeights = new Map<number, number>()
   private readonly nodeVisibility = new Set<number>()
   private readonly nodeSeen = new Set<number>()
+  private readonly textStreamState = new Map<string, string>()
   private readonly slotElements = new Map<number, HTMLElement>()
   private readonly observedElements = new Map<number, HTMLElement>()
   private observer: IntersectionObserver | null = null
@@ -312,6 +313,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
         customComponents: mergedCustomComponents,
       },
       events,
+      this.textStreamState,
     )
     this.parsedNodes = resolveParsedNodes(this)
     this.trimMeasuredState()

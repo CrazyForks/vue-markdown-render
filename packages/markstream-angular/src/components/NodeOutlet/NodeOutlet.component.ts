@@ -107,8 +107,8 @@ import { VmrContainerNodeComponent } from '../VmrContainerNode/VmrContainerNode.
 
     <ng-template #builtinTemplate>
       <ng-container [ngSwitch]="resolvedType">
-        <markstream-angular-text-node *ngSwitchCase="'text'" [node]="node" />
-        <markstream-angular-text-node *ngSwitchCase="'text_special'" [node]="node" />
+        <markstream-angular-text-node *ngSwitchCase="'text'" [node]="node" [context]="context" [indexKey]="indexKey" />
+        <markstream-angular-text-node *ngSwitchCase="'text_special'" [node]="node" [context]="context" [indexKey]="indexKey" />
         <markstream-angular-paragraph-node *ngSwitchCase="'paragraph'" [node]="node" [context]="context" [indexKey]="indexKey" />
         <markstream-angular-heading-node *ngSwitchCase="'heading'" [node]="node" [context]="context" [indexKey]="indexKey" />
         <markstream-angular-blockquote-node *ngSwitchCase="'blockquote'" [node]="node" [context]="context" [indexKey]="indexKey" />
@@ -123,7 +123,7 @@ import { VmrContainerNodeComponent } from '../VmrContainerNode/VmrContainerNode.
         <markstream-angular-hardbreak-node *ngSwitchCase="'hardbreak'" />
         <markstream-angular-link-node *ngSwitchCase="'link'" [node]="node" [context]="context" [indexKey]="indexKey" />
         <markstream-angular-image-node *ngSwitchCase="'image'" [node]="node" />
-        <markstream-angular-inline-code-node *ngSwitchCase="'inline_code'" [node]="node" />
+        <markstream-angular-inline-code-node *ngSwitchCase="'inline_code'" [node]="node" [context]="context" [indexKey]="indexKey" />
         <markstream-angular-strong-node *ngSwitchCase="'strong'" [node]="node" [context]="context" [indexKey]="indexKey" />
         <markstream-angular-emphasis-node *ngSwitchCase="'emphasis'" [node]="node" [context]="context" [indexKey]="indexKey" />
         <markstream-angular-strikethrough-node *ngSwitchCase="'strikethrough'" [node]="node" [context]="context" [indexKey]="indexKey" />

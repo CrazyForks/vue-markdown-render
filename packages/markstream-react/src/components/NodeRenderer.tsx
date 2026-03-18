@@ -679,6 +679,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const props = { ...DEFAULT_PROPS, ...rawProps } as ResolvedProps
   const containerRef = useRef<HTMLDivElement | null>(null)
   const desiredThemeKeyRef = useRef<string | null>(null)
+  const textStreamStateRef = useRef(new Map<string, string>())
 
   const customComponentsRevision = useSyncExternalStore(
     subscribeCustomComponents,
@@ -862,6 +863,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     isDark: props.isDark,
     indexKey: indexPrefix,
     typewriter: props.typewriter,
+    textStreamState: textStreamStateRef.current,
     customComponents,
     showTooltips: props.showTooltips,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,

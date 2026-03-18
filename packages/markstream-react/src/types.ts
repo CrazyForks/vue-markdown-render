@@ -58,6 +58,7 @@ export interface RenderContext {
   isDark?: boolean
   indexKey?: string
   typewriter?: boolean
+  textStreamState?: Map<string, string>
   customComponents?: Record<string, React.ComponentType<any>>
   codeBlockProps?: Record<string, any>
   mermaidProps?: Partial<Omit<MermaidBlockNodeProps, 'node' | 'loading' | 'isDark'>>

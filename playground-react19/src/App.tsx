@@ -7,6 +7,7 @@ import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker&
 import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from '../../playground-react18/src/shared/streamPresets'
 import { TestLab } from '../../playground-react18/src/shared/TestLab'
+import { useChatAutoScroll } from '../../playground-react18/src/shared/useChatAutoScroll'
 import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from '../../playground-react18/src/shared/useStreamSimulator'
 import { ThinkingNode } from './components/ThinkingNode'
 import { streamContent } from './markdown'
@@ -233,14 +234,12 @@ export default function App() {
   })
   const themeOptions = useMemo(() => Array.from(THEMES), [])
   const messagesRef = useRef<HTMLDivElement | null>(null)
-  const frameRef = useRef<number | null>(null)
-  const minHeightDisabledRef = useRef(false)
-  const overflowConfirmationsRef = useRef(0)
-  const clearConfirmationsRef = useRef(0)
   const settingsRootRef = useRef<HTMLDivElement | null>(null)
   const isCompactSettings = useMediaQuery('(max-width: 1023px)')
   const shouldShowSettingsPanel = !isCompactSettings || showSettings
   const isTestPage = currentPath === '/test'
+
+  useChatAutoScroll(messagesRef, content)
 
   const navigate = useCallback((pathname: string) => {
     if (typeof window === 'undefined')
@@ -338,121 +337,6 @@ export default function App() {
     for (const key of THEME_KEYS)
       window.localStorage.setItem(key, selectedTheme)
   }, [selectedTheme])
-
-  const scheduleCheckMinHeight = useCallback(() => {
-    if (typeof window === 'undefined')
-      return
-    if (frameRef.current != null)
-      return
-    frameRef.current = window.requestAnimationFrame(() => {
-      frameRef.current = null
-      const container = messagesRef.current
-      if (!container)
-        return
-      const renderer = container.querySelector('.markdown-renderer') as HTMLElement | null
-      if (!renderer)
-        return
-      const hadClass = container.classList.contains('disable-min-height')
-      const requiredOverflowConfirmations = 2
-      const requiredClearConfirmations = 3
-
-      // Probe overflow against the renderer's natural height so short streams
-      // stay visually pinned to the top in the reverse-flex chat surface.
-      if (minHeightDisabledRef.current || hadClass) {
-        container.classList.add('disable-min-height')
-        const containerDelta = container.scrollHeight - container.clientHeight
-        const shouldKeepDisabled = containerDelta > 1
-
-        if (shouldKeepDisabled) {
-          clearConfirmationsRef.current = 0
-          minHeightDisabledRef.current = true
-        }
-        else {
-          clearConfirmationsRef.current += 1
-          if (clearConfirmationsRef.current >= requiredClearConfirmations) {
-            minHeightDisabledRef.current = false
-            overflowConfirmationsRef.current = 0
-            container.classList.remove('disable-min-height')
-          }
-        }
-        return
-      }
-
-      container.classList.add('disable-min-height')
-      const containerDelta = container.scrollHeight - container.clientHeight
-      const hasOverflow = containerDelta > 1
-
-      if (hasOverflow)
-        overflowConfirmationsRef.current += 1
-      else
-        overflowConfirmationsRef.current = 0
-
-      if (overflowConfirmationsRef.current >= requiredOverflowConfirmations) {
-        minHeightDisabledRef.current = true
-        clearConfirmationsRef.current = 0
-      }
-      else {
-        container.classList.remove('disable-min-height')
-      }
-    })
-  }, [])
-
-  useEffect(() => {
-    const container = messagesRef.current
-    if (!container)
-      return
-    scheduleCheckMinHeight()
-
-    const roContainer = new ResizeObserver(scheduleCheckMinHeight)
-    roContainer.observe(container)
-
-    let roContent: ResizeObserver | null = null
-    let lastRenderer: Element | null = null
-    const observeContent = () => {
-      const renderer = container.querySelector('.markdown-renderer')
-      if (!renderer)
-        return
-      if (renderer === lastRenderer && roContent)
-        return
-      lastRenderer = renderer
-      if (roContent)
-        roContent.disconnect()
-      roContent = new ResizeObserver(scheduleCheckMinHeight)
-      roContent.observe(renderer)
-    }
-    observeContent()
-
-    let mutationFrame: number | null = null
-    const mo = new MutationObserver(() => {
-      if (mutationFrame != null)
-        return
-      mutationFrame = window.requestAnimationFrame(() => {
-        mutationFrame = null
-        observeContent()
-        scheduleCheckMinHeight()
-      })
-    })
-    mo.observe(container, { childList: true, subtree: true })
-
-    return () => {
-      roContainer.disconnect()
-      roContent?.disconnect()
-      mo.disconnect()
-      if (mutationFrame != null)
-        window.cancelAnimationFrame(mutationFrame)
-    }
-  }, [scheduleCheckMinHeight])
-
-  useEffect(() => {
-    scheduleCheckMinHeight()
-  }, [content, scheduleCheckMinHeight])
-
-  useEffect(() => {
-    return () => {
-      if (frameRef.current != null)
-        window.cancelAnimationFrame(frameRef.current)
-    }
-  }, [])
 
   useEffect(() => {
     if (!showSettings || !isCompactSettings)
@@ -826,7 +710,7 @@ export default function App() {
             </div>
           </div>
 
-          <main ref={messagesRef} className="chatbot-messages flex-1 overflow-y-auto mr-[1px] mb-4 flex flex-col-reverse">
+          <main ref={messagesRef} className="chatbot-messages flex-1 overflow-y-auto mr-[1px] mb-4 flex flex-col">
             <div className="chatbot-renderer-shell">
               <MemoizedNodeRenderer
                 content={content}

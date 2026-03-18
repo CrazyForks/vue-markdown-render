@@ -176,9 +176,9 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
 
   switch (node.type) {
     case 'text':
-      return <TextNode key={key} node={node as any} typewriter={ctx.typewriter} />
+      return <TextNode key={key} node={node as any} ctx={ctx} indexKey={key} typewriter={ctx.typewriter} />
     case 'text_special':
-      return <TextNode key={key} node={{ type: 'text', content: (node as any).content ?? '', center: (node as any).center } as any} typewriter={ctx.typewriter} />
+      return <TextNode key={key} node={{ type: 'text', content: (node as any).content ?? '', center: (node as any).center } as any} ctx={ctx} indexKey={key} typewriter={ctx.typewriter} />
     case 'paragraph':
       return <ParagraphNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} />
     case 'heading':
@@ -224,7 +224,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
         />
       )
     case 'inline_code':
-      return <InlineCodeNode key={key} node={node as any} typewriter={ctx.typewriter} />
+      return <InlineCodeNode key={key} node={node as any} ctx={ctx} indexKey={key} typewriter={ctx.typewriter} />
     case 'code_block':
       return renderCodeBlock(node, key, ctx, customComponents)
     case 'strong':

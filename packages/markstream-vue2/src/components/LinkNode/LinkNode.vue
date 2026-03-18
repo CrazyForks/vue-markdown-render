@@ -222,7 +222,11 @@ onBeforeUnmount(() => {
   <span v-else class="link-loading inline-flex items-baseline gap-1.5" :aria-hidden="!node.loading ? 'true' : 'false'" v-bind="attrs" :style="cssVars">
     <span class="link-text-wrapper relative inline-flex">
       <span class="leading-[normal] link-text">
-        <span class="leading-[normal] link-text">{{ node.text }}</span>
+        <TextNode
+          class="leading-[normal] link-text"
+          :node="{ type: 'text', content: String(node.text ?? ''), raw: String(node.text ?? '') }"
+          :index-key="`${indexKey || 'link-text'}-loading`"
+        />
       </span>
       <span class="link-loading-indicator" aria-hidden="true" />
     </span>

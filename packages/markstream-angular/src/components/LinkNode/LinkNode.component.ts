@@ -11,11 +11,12 @@ import {
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
 import { NestedRendererComponent } from '../NestedRenderer/NestedRenderer.component'
 import { getNodeList, getString } from '../shared/node-helpers'
+import { TextNodeComponent } from '../TextNode/TextNode.component'
 
 @Component({
   selector: 'markstream-angular-link-node',
   standalone: true,
-  imports: [CommonModule, forwardRef(() => NestedRendererComponent)],
+  imports: [CommonModule, forwardRef(() => NestedRendererComponent), forwardRef(() => TextNodeComponent)],
   template: `
     <a
       *ngIf="!loading; else loadingTpl"
@@ -36,13 +37,25 @@ import { getNodeList, getString } from '../shared/node-helpers'
         [context]="context"
         [indexPrefix]="nestedPrefix"
       />
-      <ng-template #fallbackText>{{ fallbackLabel }}</ng-template>
+      <ng-template #fallbackText>
+        <markstream-angular-text-node
+          [node]="{ type: 'text', content: fallbackLabel }"
+          [context]="context"
+          [indexKey]="nestedPrefix + '-fallback'"
+        />
+      </ng-template>
     </a>
 
     <ng-template #loadingTpl>
       <span class="link-loading" [ngStyle]="cssVars" aria-hidden="false">
         <span class="link-text-wrapper">
-          <span class="link-text">{{ fallbackLabel }}</span>
+          <span class="link-text">
+            <markstream-angular-text-node
+              [node]="{ type: 'text', content: fallbackLabel }"
+              [context]="context"
+              [indexKey]="nestedPrefix + '-loading'"
+            />
+          </span>
           <span class="link-loading-indicator" aria-hidden="true"></span>
         </span>
       </span>

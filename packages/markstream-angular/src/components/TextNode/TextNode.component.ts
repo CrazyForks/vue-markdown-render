@@ -1,28 +1,92 @@
-import type { AngularRenderableNode } from '../shared/node-helpers'
+import type { OnChanges } from '@angular/core'
+import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core'
 import { getString } from '../shared/node-helpers'
+import { resolveStreamingTextState } from './streamingTextState'
 
 @Component({
   selector: 'markstream-angular-text-node',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <ng-container *ngIf="!centered; else centeredText">{{ text }}</ng-container>
+    <ng-container *ngIf="!centered; else centeredText">
+      <span *ngIf="settledText">{{ settledText }}</span>
+      <span
+        *ngIf="streamedDelta"
+        [class]="'markstream-angular-text__stream-delta ' + streamedDeltaClass"
+        (animationend)="settleStreamedDelta()"
+      >{{ streamedDelta }}</span>
+    </ng-container>
     <ng-template #centeredText>
-      <span class="markstream-angular-text--centered">{{ text }}</span>
+      <span class="markstream-angular-text--centered">
+        <span *ngIf="settledText">{{ settledText }}</span>
+        <span
+          *ngIf="streamedDelta"
+          [class]="'markstream-angular-text__stream-delta ' + streamedDeltaClass"
+          (animationend)="settleStreamedDelta()"
+        >{{ streamedDelta }}</span>
+      </span>
     </ng-template>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TextNodeComponent {
+export class TextNodeComponent implements OnChanges {
   @Input({ required: true }) node!: AngularRenderableNode
+  @Input() context?: AngularRenderContext
+  @Input() indexKey?: string
+  @Input() typewriter?: boolean
 
-  get text() {
-    return getString((this.node as any)?.content)
+  settledText = ''
+  streamedDelta = ''
+  private streamFadeVersion = 0
+
+  ngOnChanges() {
+    const nextText = getString((this.node as any)?.content)
+    const streamStateKey = getString(this.indexKey).trim()
+    const textStreamState = this.context?.textStreamState
+    const rendered = `${this.settledText}${this.streamedDelta}`
+    const previousPersisted = streamStateKey
+      ? textStreamState?.get(streamStateKey)
+      : undefined
+    const previousText = previousPersisted ?? rendered
+
+    const nextState = resolveStreamingTextState({
+      nextContent: nextText,
+      previousContent: previousText,
+      typewriterEnabled: this.typewriterEnabled,
+    })
+
+    this.settledText = nextState.settledContent
+    this.streamedDelta = nextState.streamedDelta
+    if (nextState.appended)
+      this.streamFadeVersion += 1
+    if (streamStateKey)
+      textStreamState?.set(streamStateKey, nextText)
   }
 
   get centered() {
     return !!(this.node as any)?.center
+  }
+
+  get streamedDeltaClass() {
+    return this.streamFadeVersion % 2 === 0
+      ? 'markstream-angular-text__stream-delta--a'
+      : 'markstream-angular-text__stream-delta--b'
+  }
+
+  get typewriterEnabled() {
+    if (typeof this.typewriter === 'boolean')
+      return this.typewriter
+    if (typeof this.context?.typewriter === 'boolean')
+      return this.context.typewriter
+    return true
+  }
+
+  settleStreamedDelta() {
+    if (!this.streamedDelta)
+      return
+    this.settledText = `${this.settledText}${this.streamedDelta}`
+    this.streamedDelta = ''
   }
 }

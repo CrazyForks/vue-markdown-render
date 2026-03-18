@@ -79,7 +79,7 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 <MarkdownRender :content="markdown" :typewriter="false" />
 ```
 
-CSS 变量：`--typewriter-fade-duration` 和 `--typewriter-fade-ease` 用于首屏 enter 过渡；`--stream-update-fade-duration` 和 `--stream-update-fade-ease` 用于流式追加文本时那段短 fade。
+CSS 变量：`--typewriter-fade-duration` 和 `--typewriter-fade-ease` 用于首屏 enter 过渡；`--stream-update-fade-duration` 和 `--stream-update-fade-ease` 用于流式追加文本时那段短 fade。若不单独覆盖，流式追加的 fade 会默认沿用 `typewriter` 的时长和缓动。
 
 ## 国际化（i18n）
 

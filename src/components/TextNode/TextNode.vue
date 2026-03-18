@@ -141,8 +141,8 @@ const streamedDeltaClass = computed(() => (
   width: 100%;
 }
 .text-node-stream-delta {
-  animation-duration: var(--stream-update-fade-duration, 220ms);
-  animation-timing-function: var(--stream-update-fade-ease, ease-out);
+  animation-duration: var(--stream-update-fade-duration, var(--typewriter-fade-duration, 900ms));
+  animation-timing-function: var(--stream-update-fade-ease, var(--typewriter-fade-ease, ease-out));
   animation-fill-mode: both;
   will-change: opacity;
 }
@@ -155,7 +155,7 @@ const streamedDeltaClass = computed(() => (
 
 @keyframes text-node-stream-update-fade-a {
   from {
-    opacity: 0.35;
+    opacity: 0;
   }
   to {
     opacity: 1;
@@ -164,7 +164,7 @@ const streamedDeltaClass = computed(() => (
 
 @keyframes text-node-stream-update-fade-b {
   from {
-    opacity: 0.35;
+    opacity: 0;
   }
   to {
     opacity: 1;

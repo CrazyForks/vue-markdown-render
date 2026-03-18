@@ -86,7 +86,28 @@
 
 .markstream-angular .typewriter-node {
   opacity: 0;
-  animation: typewriter-fade 0.9s ease-out forwards;
+  animation: typewriter-fade var(--typewriter-fade-duration, 900ms) var(--typewriter-fade-ease, ease-out) forwards;
+}
+
+.markstream-angular .markstream-angular-text--centered {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.markstream-angular .markstream-angular-text__stream-delta {
+  animation-duration: var(--stream-update-fade-duration, var(--typewriter-fade-duration, 900ms));
+  animation-timing-function: var(--stream-update-fade-ease, var(--typewriter-fade-ease, ease-out));
+  animation-fill-mode: both;
+  will-change: opacity;
+}
+
+.markstream-angular .markstream-angular-text__stream-delta--a {
+  animation-name: markstream-angular-text-stream-update-fade-a;
+}
+
+.markstream-angular .markstream-angular-text__stream-delta--b {
+  animation-name: markstream-angular-text-stream-update-fade-b;
 }
 
 .markstream-angular h1,
@@ -192,10 +213,24 @@
   50% { opacity: var(--underline-opacity, 0.35); }
 }
 
+@keyframes markstream-angular-text-stream-update-fade-a {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes markstream-angular-text-stream-update-fade-b {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .markstream-angular .link-loading-indicator {
     animation: none !important;
     opacity: var(--underline-rest-opacity, 0.18);
+  }
+
+  .markstream-angular .markstream-angular-text__stream-delta {
+    animation: none !important;
   }
 }
 

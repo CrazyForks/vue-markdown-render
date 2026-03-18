@@ -41,19 +41,18 @@ html.dark {
 }
 
 .chatbot-messages {
-  scroll-behavior: smooth;
   overscroll-behavior: contain;
 }
 
 .chatbot-messages > .chatbot-renderer-shell {
   min-height: 100%;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  justify-content: flex-end;
   box-sizing: border-box;
   padding: 1.5rem;
   width: 100%;
-}
-
-.chatbot-messages.disable-min-height > .chatbot-renderer-shell {
-  min-height: unset !important;
 }
 
 .chatbot-messages::-webkit-scrollbar {

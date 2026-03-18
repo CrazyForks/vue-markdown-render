@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useKatexReady } from '../../composables/useKatexReady'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmojiNode from '../EmojiNode'
@@ -20,6 +19,7 @@ import StrikethroughNode from '../StrikethroughNode'
 import StrongNode from '../StrongNode'
 import SubscriptNode from '../SubscriptNode'
 import SuperscriptNode from '../SuperscriptNode'
+import TextNode from '../TextNode'
 
 interface NodeChild {
   type: string
@@ -60,34 +60,21 @@ const nodeComponents = {
   reference: ReferenceNode,
   footnote_anchor: FootnoteAnchorNode,
   footnote_reference: FootnoteReferenceNode,
+  text: TextNode,
   ...overrides,
 }
-
-const katexReady = useKatexReady()
 </script>
 
 <template>
   <p dir="auto" class="paragraph-node">
-    <span
+    <component
+      :is="nodeComponents[child.type]"
       v-for="(child, index) in node.children"
       :key="`${indexKey || 'paragraph'}-${index}`"
-      class="paragraph-child"
-    >
-      <component
-        :is="nodeComponents[child.type]"
-        v-if="child.type !== 'text' && nodeComponents[child.type]"
-        :node="child"
-        :index-key="`${indexKey ?? 'paragraph'}-${index}`"
-        :custom-id="props.customId"
-      />
-      <span
-        v-else
-        :class="[katexReady && child.center ? 'text-node-center' : '']"
-        class="whitespace-pre-wrap break-words text-node"
-      >
-        {{ child.content || child.raw || '' }}
-      </span>
-    </span>
+      :node="child"
+      :index-key="`${indexKey ?? 'paragraph'}-${index}`"
+      :custom-id="props.customId"
+    />
   </p>
 </template>
 
@@ -97,18 +84,5 @@ const katexReady = useKatexReady()
 }
 li .paragraph-node{
   margin: 0;
-}
-.paragraph-child {
-  display: contents;
-}
-.text-node {
-  display: inline;
-  font-weight: inherit;
-  vertical-align: baseline;
-}
-.text-node-center {
-  display: inline-flex;
-  justify-content: center;
-  width: 100%;
 }
 </style>

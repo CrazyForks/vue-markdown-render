@@ -3,6 +3,7 @@ import type { NodeComponentProps } from '../../types/node-component'
 import React, { useCallback, useMemo } from 'react'
 import { renderNodeChildren } from '../../renderers/renderChildren'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
+import { TextNode } from '../TextNode/TextNode'
 
 export interface LinkNodeStyleProps {
   showTooltip?: boolean
@@ -82,7 +83,12 @@ export function LinkNode(props: NodeComponentProps<{
       >
         <span className="link-text-wrapper relative inline-flex">
           <span className="leading-[normal] link-text">
-            <span className="leading-[normal] link-text">{node.text ?? ''}</span>
+            <TextNode
+              node={{ type: 'text', content: String(node.text ?? '') }}
+              ctx={ctx}
+              indexKey={`${String(indexKey ?? 'link')}-loading`}
+              typewriter={props.typewriter}
+            />
           </span>
           <span className="link-loading-indicator" aria-hidden="true" />
         </span>
@@ -104,7 +110,14 @@ export function LinkNode(props: NodeComponentProps<{
     >
       {ctx && renderNode
         ? renderNodeChildren(node.children, ctx, String(indexKey ?? 'link'), renderNode)
-        : (node.text ?? null)}
+        : (
+            <TextNode
+              node={{ type: 'text', content: String(node.text ?? '') }}
+              ctx={ctx}
+              indexKey={`${String(indexKey ?? 'link')}-fallback`}
+              typewriter={props.typewriter}
+            />
+          )}
     </a>
   )
 }
