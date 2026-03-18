@@ -6,6 +6,7 @@
 
 - Vue 3: https://markstream-vue.simonhe.me/
 - React: https://markstream-react.pages.dev/
+- React migration demo: https://markstream-react.pages.dev/migration-demo
 - Nuxt: https://markstream-nuxt.pages.dev/
 - Vue 2: https://markstream-vue2.pages.dev/
 
@@ -25,3 +26,7 @@ pnpm play
 - 渐进式 Mermaid
 - 自定义组件映射
 - Monaco 编辑器集成示例
+
+可直接打开的示例页面：
+
+- `https://markstream-react.pages.dev/migration-demo`：面向 `react-markdown` 用户的 before / after 迁移演示

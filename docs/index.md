@@ -86,8 +86,11 @@ React 18+ with hooks support and full TypeScript.
 - **Documentation**: [/guide/react-quick-start](/guide/react-quick-start)
 - **Installation**: [/guide/react-installation](/guide/react-installation)
 - **Quick Start**: [/guide/react-quick-start](/guide/react-quick-start)
+- **Migration from react-markdown**: [/guide/react-markdown-migration](/guide/react-markdown-migration)
+- **Migration Cookbook**: [/guide/react-markdown-migration-cookbook](/guide/react-markdown-migration-cookbook)
 - **Components API**: [/guide/react-components](/guide/react-components)
 - **Live Demo**: https://markstream-react.pages.dev/
+- **Migration Demo**: https://markstream-react.pages.dev/migration-demo
 
 ```tsx
 import MarkdownRender from 'markstream-react'

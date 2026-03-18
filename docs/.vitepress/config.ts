@@ -100,6 +100,8 @@ export default defineConfig({
               items: [
                 { text: 'Quick Start', link: '/guide/react-quick-start' },
                 { text: 'Installation', link: '/guide/react-installation' },
+                { text: 'Migrate from react-markdown', link: '/guide/react-markdown-migration' },
+                { text: 'Migration Cookbook', link: '/guide/react-markdown-migration-cookbook' },
                 { text: 'Components & API', link: '/guide/react-components' },
               ],
               collapsed: false,
@@ -203,6 +205,8 @@ export default defineConfig({
               items: [
                 { text: '快速开始', link: '/zh/guide/react-quick-start' },
                 { text: '安装', link: '/zh/guide/react-installation' },
+                { text: '从 react-markdown 迁移', link: '/zh/guide/react-markdown-migration' },
+                { text: '迁移 Cookbook', link: '/zh/guide/react-markdown-migration-cookbook' },
                 { text: '组件与 API', link: '/zh/guide/react-components' },
               ],
               collapsed: false,

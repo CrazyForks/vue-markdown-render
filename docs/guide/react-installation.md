@@ -2,6 +2,10 @@
 
 Install markstream-react with pnpm, npm or yarn.
 
+::: tip Already on react-markdown?
+See the [migration guide](/guide/react-markdown-migration) for the high-level path and the [migration cookbook](/guide/react-markdown-migration-cookbook) for focused before/after examples.
+:::
+
 ```bash
 pnpm add markstream-react
 # or

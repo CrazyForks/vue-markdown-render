@@ -34,6 +34,9 @@
 |------|------|
 | [安装](/zh/guide/react-installation) | React 专用安装 |
 | [快速开始](/zh/guide/react-quick-start) | React 示例 |
+| [从 react-markdown 迁移](/zh/guide/react-markdown-migration) | 面向现有 React Markdown 项目的迁移路径 |
+| [迁移 Cookbook](/zh/guide/react-markdown-migration-cookbook) | 常见迁移场景的 before/after 示例 |
+| [迁移演示](https://markstream-react.pages.dev/migration-demo) | 在线交互式 before/after 演示 |
 | [组件与 API](/zh/guide/react-components) | React 组件参考 |
 
 ### Angular (markstream-angular)

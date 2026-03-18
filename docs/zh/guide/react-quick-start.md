@@ -2,6 +2,10 @@
 
 在你的 React 项目中开始使用 markstream-react。
 
+::: tip 正在从 react-markdown 迁移？
+如果你的应用已经在使用 `react-markdown`，建议先看[迁移指南](/zh/guide/react-markdown-migration)和[迁移 Cookbook](/zh/guide/react-markdown-migration-cookbook)，再开始手动改代码。
+:::
+
 ## 基础设置
 
 ### 1. 安装

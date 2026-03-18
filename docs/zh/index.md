@@ -72,8 +72,11 @@ export default {
 - **文档入口**：[/zh/guide/react-quick-start](/zh/guide/react-quick-start)
 - **安装**：[/zh/guide/react-installation](/zh/guide/react-installation)
 - **快速开始**：[/zh/guide/react-quick-start](/zh/guide/react-quick-start)
+- **从 react-markdown 迁移**：[/zh/guide/react-markdown-migration](/zh/guide/react-markdown-migration)
+- **迁移 Cookbook**：[/zh/guide/react-markdown-migration-cookbook](/zh/guide/react-markdown-migration-cookbook)
 - **组件与 API**：[/zh/guide/react-components](/zh/guide/react-components)
 - **在线演示**：https://markstream-react.pages.dev/
+- **迁移演示**：https://markstream-react.pages.dev/migration-demo
 
 ```tsx
 import MarkdownRender from 'markstream-react'

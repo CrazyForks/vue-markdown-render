@@ -2,6 +2,10 @@
 
 使用 pnpm、npm 或 yarn 安装 markstream-react。
 
+::: tip 已经在用 react-markdown？
+如果你是从 `react-markdown` 迁过来，先看[迁移指南](/zh/guide/react-markdown-migration)获取整体路径，再看[迁移 Cookbook](/zh/guide/react-markdown-migration-cookbook)查具体场景。
+:::
+
 ```bash
 pnpm add markstream-react
 # 或

@@ -6,6 +6,7 @@ This repository includes a playable demo under `/playground` that helps you test
 
 - Vue 3: https://markstream-vue.simonhe.me/
 - React: https://markstream-react.pages.dev/
+- React migration demo: https://markstream-react.pages.dev/migration-demo
 - Nuxt: https://markstream-nuxt.pages.dev/
 - Vue 2: https://markstream-vue2.pages.dev/
 
@@ -28,6 +29,7 @@ The playground demonstrates:
 Example pages (open from the playground):
 
 - `https://markstream-vue.simonhe.me/test` — shareable repro page for stress-testing streaming features (hosted demo)
+- `https://markstream-react.pages.dev/migration-demo` — hosted before/after migration demo for `react-markdown` users
 - `/markdown` — Markdown vs static rendering comparison
 
 ![Playground demo](/screenshots/playground-demo.svg)

@@ -2,6 +2,10 @@
 
 Get started with markstream-react in your React project.
 
+::: tip Migrating from react-markdown?
+If your app already uses `react-markdown`, start with the [migration guide](/guide/react-markdown-migration) and the [migration cookbook](/guide/react-markdown-migration-cookbook) before wiring new code by hand.
+:::
+
 ## Basic Setup
 
 ### 1. Installation

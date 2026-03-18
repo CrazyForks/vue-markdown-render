@@ -7,6 +7,7 @@ import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker&
 import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ThinkingNode } from './components/ThinkingNode'
 import { streamContent } from './markdown'
+import { MigrationDemoPage } from './shared/MigrationDemoPage'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from './shared/streamPresets'
 import { TestLab } from './shared/TestLab'
 import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from './shared/useStreamSimulator'
@@ -241,6 +242,7 @@ export default function App() {
   const isCompactSettings = useMediaQuery('(max-width: 1023px)')
   const shouldShowSettingsPanel = !isCompactSettings || showSettings
   const isTestPage = currentPath === '/test'
+  const isMigrationDemoPage = currentPath === '/migration-demo'
 
   const navigate = useCallback((pathname: string) => {
     if (typeof window === 'undefined')
@@ -479,16 +481,20 @@ export default function App() {
   }, [isCompactSettings])
 
   useEffect(() => {
-    if (isTestPage)
+    if (isTestPage || isMigrationDemoPage)
       return
     startStreamSimulation()
     return () => {
       stopStreamSimulation()
     }
-  }, [isTestPage, startStreamSimulation, stopStreamSimulation])
+  }, [isMigrationDemoPage, isTestPage, startStreamSimulation, stopStreamSimulation])
 
   const goToTest = () => {
     navigate('/test')
+  }
+
+  const goToMigrationDemo = () => {
+    navigate('/migration-demo')
   }
 
   const handleStreamPresetChange = (presetId: StreamPresetId) => {
@@ -508,6 +514,16 @@ export default function App() {
 
   if (isTestPage)
     return <TestLab frameworkLabel="React 18" onGoHome={() => navigate('/')} />
+
+  if (isMigrationDemoPage) {
+    return (
+      <MigrationDemoPage
+        isDark={isDark}
+        onGoHome={() => navigate('/')}
+        onGoTest={() => navigate('/test')}
+      />
+    )
+  }
 
   return (
     <div className="markstream-vue h-full">
@@ -821,6 +837,15 @@ export default function App() {
                 >
                   <Icon icon="carbon:rocket" className="w-4 h-4" />
                   <span>Test</span>
+                </button>
+                <button
+                  type="button"
+                  className="ml-2 migration-demo-btn flex items-center gap-2 px-3 py-1.5 bg-white text-slate-700 hover:bg-slate-100 text-sm font-medium rounded-lg transition-all duration-200 shadow-md border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  title="Open the react-markdown migration demo"
+                  onClick={goToMigrationDemo}
+                >
+                  <Icon icon="carbon:data-structured" className="w-4 h-4" />
+                  <span>Migration</span>
                 </button>
               </div>
             </div>

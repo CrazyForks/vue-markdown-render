@@ -34,6 +34,9 @@ For React 18+ projects with hooks and TypeScript.
 |------|-------------|
 | [Installation](/guide/react-installation) | React specific setup |
 | [Quick Start](/guide/react-quick-start) | React examples |
+| [Migrate from react-markdown](/guide/react-markdown-migration) | Migration path for existing React Markdown apps |
+| [Migration Cookbook](/guide/react-markdown-migration-cookbook) | Before/after recipes for common migration scenarios |
+| [Migration Demo](https://markstream-react.pages.dev/migration-demo) | Hosted interactive before/after demo |
 | [Components & API](/guide/react-components) | React component reference |
 
 ### Angular (markstream-angular)
