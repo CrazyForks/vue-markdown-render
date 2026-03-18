@@ -493,6 +493,36 @@ describe('markdownRender node e2e coverage', () => {
     }
   })
 
+  it('replays a fade animation when a streamed non-code node updates in place', async () => {
+    const wrapper = await mountMarkdown('Hello')
+    try {
+      const nodeContent = () => wrapper.find('[data-node-index="0"] .node-content')
+      expect(nodeContent().attributes('style') ?? '').toBe('')
+      expect(wrapper.find('.text-node-stream-delta').exists()).toBe(false)
+
+      await wrapper.setProps({ content: 'Hello world' })
+      await flushAll()
+
+      expect(nodeContent().attributes('style') ?? '').toBe('')
+      const firstDelta = wrapper.find('.text-node-stream-delta')
+      expect(firstDelta.exists()).toBe(true)
+      expect(firstDelta.text()).toBe('world')
+      expect(normalizeText(wrapper.text())).toContain('Hello world')
+
+      await wrapper.setProps({ content: 'Hello world again' })
+      await flushAll()
+
+      expect(nodeContent().attributes('style') ?? '').toBe('')
+      const secondDelta = wrapper.find('.text-node-stream-delta')
+      expect(secondDelta.exists()).toBe(true)
+      expect(secondDelta.text()).toBe('again')
+      expect(normalizeText(wrapper.text())).toContain('Hello world again')
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
   it('renders repeated custom components without slot content reuse', async () => {
     const scopeId = 'custom-components-repeat'
     const NewQuestion = defineComponent({

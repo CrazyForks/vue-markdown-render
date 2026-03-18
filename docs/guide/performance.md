@@ -26,7 +26,7 @@ If you are changing code paths that can impact build size (renderers, code block
 
 Some AI or LLM sources send content in large bursts, which can feel like the preview is freezing and then dumping a whole block. To keep the UI feeling like a smooth, continuous typewriter:
 
-- **Keep `typewriter` enabled** on `MarkdownRender` (default) so non-code nodes fade/slide in instead of popping instantly.
+- **Keep `typewriter` enabled** on `MarkdownRender` (default) so non-code nodes fade in instead of popping instantly, and newly appended streamed text can replay a short local fade without dimming the whole block.
 - **Tune the batching props**: drop `initialRenderBatchSize`/`renderBatchSize` (for example `12`/`24`), and add a small `renderBatchDelay` (20–30 ms). Even if the model sends a huge chunk, the renderer then inserts tiny slices each frame, producing a stable flow.
 - **Throttle upstream updates** if possible: instead of replacing `content` on every incoming hunk, debounce (50–100 ms) or split into smaller paragraphs so each render cycle operates on a “bite-sized” diff.
 - **Defer heavy nodes** by keeping `deferNodesUntilVisible`/`viewportPriority` turned on; expensive blocks (Mermaid/Monaco) will wait until they are near the viewport so the stream of text is never blocked.

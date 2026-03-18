@@ -153,6 +153,7 @@ const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 const isClient = typeof window !== 'undefined'
 const debugPerformanceEnabled = computed(() => props.debugPerformance && isClient && typeof console !== 'undefined')
 const attrs = useAttrs()
+const textStreamState = new Map<string, string>()
 const resolvedShowTooltips = computed<boolean | undefined>(() => {
   if (typeof props.showTooltips === 'boolean')
     return props.showTooltips
@@ -164,6 +165,8 @@ const resolvedShowTooltips = computed<boolean | undefined>(() => {
   return undefined
 })
 provide('markstreamShowTooltips', resolvedShowTooltips)
+provide('markstreamTypewriter', computed(() => props.typewriter !== false))
+provide('markstreamTextStreamState', textStreamState)
 
 function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)
