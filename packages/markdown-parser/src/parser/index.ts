@@ -99,6 +99,15 @@ function normalizeTagName(t: unknown) {
   return m ? m[1].toLowerCase() : ''
 }
 
+function getCustomHtmlTagSet(options?: ParseOptions) {
+  const custom = options?.customHtmlTags
+  if (!Array.isArray(custom) || custom.length === 0)
+    return null
+
+  const normalized = custom.map(normalizeTagName).filter(Boolean)
+  return normalized.length ? new Set(normalized) : null
+}
+
 export function buildAllowedHtmlTagSet(options?: ParseOptions) {
   const custom = options?.customHtmlTags
   if (!Array.isArray(custom) || custom.length === 0)
@@ -110,6 +119,80 @@ export function buildAllowedHtmlTagSet(options?: ParseOptions) {
       set.add(name)
   }
   return set
+}
+
+function stringifyInlineNodeRaw(node: ParsedNode) {
+  const raw = (node as any)?.raw
+  if (typeof raw === 'string')
+    return raw
+
+  const content = (node as any)?.content
+  if (typeof content === 'string')
+    return content
+
+  if ((node as any)?.type === 'hardbreak')
+    return '<br>'
+
+  return ''
+}
+
+function buildParagraphFromInlineChildren(children: ParsedNode[]): ParsedNode {
+  return {
+    type: 'paragraph',
+    children,
+    raw: children.map(stringifyInlineNodeRaw).join(''),
+  } as ParsedNode
+}
+
+function maybePromoteCustomNodeFromParagraph(node: ParsedNode, options?: ParseOptions) {
+  if (node.type !== 'paragraph')
+    return null
+
+  const children = Array.isArray((node as any).children) ? ((node as any).children as ParsedNode[]) : []
+  if (children.length === 0)
+    return null
+
+  const customTagSet = getCustomHtmlTagSet(options)
+  if (!customTagSet?.size)
+    return null
+
+  let customIndex = -1
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i]
+    if (!customTagSet.has(String(child?.type ?? '').toLowerCase()))
+      continue
+
+    const prefixChildren = children.slice(0, i)
+    const childContent = String((child as any)?.content ?? '')
+    if (!childContent.trim())
+      continue
+    const prefixHasHardbreak = prefixChildren.some(prefixChild => prefixChild?.type === 'hardbreak')
+    if (!prefixHasHardbreak) {
+      continue
+    }
+
+    customIndex = i
+    break
+  }
+  if (customIndex === -1)
+    return null
+
+  const prefixChildren = children.slice(0, customIndex)
+  const promoted = children[customIndex]
+  if (!promoted)
+    return null
+
+  const result: ParsedNode[] = []
+  if (prefixChildren.length)
+    result.push(buildParagraphFromInlineChildren(prefixChildren))
+
+  result.push(promoted)
+
+  const suffixChildren = children.slice(customIndex + 1)
+  if (suffixChildren.length)
+    result.push(buildParagraphFromInlineChildren(suffixChildren))
+
+  return result
 }
 
 function parseStandaloneHtmlDocument(markdown: string): ParsedNode[] | null {
@@ -357,6 +440,218 @@ function stripDanglingHtmlLikeTail(markdown: string) {
   if (!isLikelyHtmlTagPrefix(tail))
     return s
   return s.slice(0, lastLt)
+}
+
+function ensureBlankLineBeforeInlineMultilineCustomHtmlBlocks(markdown: string, tags: string[]) {
+  if (!markdown || !tags.length)
+    return markdown
+
+  const tagSet = new Set(tags.map(t => String(t ?? '').toLowerCase()).filter(Boolean))
+  if (!tagSet.size)
+    return markdown
+
+  const isIndentWs = (ch: string) => ch === ' ' || ch === '\t'
+  const isNameChar = (ch: string) => {
+    const c = ch.charCodeAt(0)
+    return (
+      (c >= 65 && c <= 90) // A-Z
+      || (c >= 97 && c <= 122) // a-z
+      || (c >= 48 && c <= 57) // 0-9
+      || ch === '_'
+      || ch === '-'
+      || ch === ':'
+    )
+  }
+
+  const isIndentedCodeLine = (line: string) => {
+    if (!line)
+      return false
+    if (line[0] === '\t')
+      return true
+    let spaces = 0
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch === ' ') {
+        spaces++
+        if (spaces >= 4)
+          return true
+        continue
+      }
+      if (ch === '\t')
+        return true
+      break
+    }
+    return false
+  }
+
+  const findTagCloseIndexOutsideQuotes = (input: string) => {
+    let inSingle = false
+    let inDouble = false
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i]
+      if (ch === '\\') {
+        i++
+        continue
+      }
+      if (!inDouble && ch === '\'') {
+        inSingle = !inSingle
+        continue
+      }
+      if (!inSingle && ch === '"') {
+        inDouble = !inDouble
+        continue
+      }
+      if (!inSingle && !inDouble && ch === '>')
+        return i
+    }
+    return -1
+  }
+
+  const parseFenceMarker = (line: string) => {
+    let i = 0
+    while (i < line.length && isIndentWs(line[i])) i++
+    const ch = line[i]
+    if (ch !== '`' && ch !== '~')
+      return null
+    let j = i
+    while (j < line.length && line[j] === ch) j++
+    const len = j - i
+    if (len < 3)
+      return null
+    return { markerChar: ch as '`' | '~', markerLen: len, rest: line.slice(j) }
+  }
+
+  const findInlineCustomBlockSplitIndex = (line: string, lineStart: number) => {
+    if (isIndentedCodeLine(line))
+      return -1
+
+    const trimmed = line.replace(/^[ \t]+/, '')
+    if (!trimmed || trimmed.startsWith('>') || trimmed.startsWith('|') || /^(?:[*+-]|\d+[.)])[\t ]+/.test(trimmed))
+      return -1
+
+    let hasRenderablePrefix = false
+    let i = 0
+    while (i < line.length) {
+      const ch = line[i]
+      if (ch !== '<') {
+        if (!isIndentWs(ch))
+          hasRenderablePrefix = true
+        i++
+        continue
+      }
+
+      const closeIdxRel = findTagCloseIndexOutsideQuotes(line.slice(i))
+      if (closeIdxRel === -1) {
+        hasRenderablePrefix = true
+        i++
+        continue
+      }
+
+      const tagSlice = line.slice(i, i + closeIdxRel + 1)
+      let cursor = 1
+      while (cursor < tagSlice.length && isIndentWs(tagSlice[cursor])) cursor++
+      if (cursor >= tagSlice.length) {
+        hasRenderablePrefix = true
+        i++
+        continue
+      }
+
+      const marker = tagSlice[cursor]
+      if (marker === '!' || marker === '?') {
+        hasRenderablePrefix = true
+        i += closeIdxRel + 1
+        continue
+      }
+
+      const isClosing = marker === '/'
+      if (isClosing) {
+        hasRenderablePrefix = true
+        i += closeIdxRel + 1
+        continue
+      }
+
+      const nameStart = cursor
+      while (cursor < tagSlice.length && isNameChar(tagSlice[cursor])) cursor++
+      if (cursor === nameStart) {
+        hasRenderablePrefix = true
+        i++
+        continue
+      }
+
+      const tagName = tagSlice.slice(nameStart, cursor).toLowerCase()
+      const boundary = tagSlice[cursor]
+      if (boundary && boundary !== ' ' && boundary !== '\t' && boundary !== '>' && boundary !== '/') {
+        hasRenderablePrefix = true
+        i++
+        continue
+      }
+
+      const sameLineCloseRe = new RegExp(String.raw`<\s*\/\s*${tagName}\s*>`, 'i')
+      const selfClosing = /\/\s*>$/.test(tagSlice)
+      const closesOnSameLine = sameLineCloseRe.test(line.slice(i + closeIdxRel + 1))
+      const closesLater = sameLineCloseRe.test(markdown.slice(lineStart + i + closeIdxRel + 1))
+      const continuesOnLaterLine = /[\r\n]/.test(markdown.slice(lineStart + i + closeIdxRel + 1))
+
+      if (hasRenderablePrefix && tagSet.has(tagName) && !selfClosing && !closesOnSameLine && (closesLater || continuesOnLaterLine))
+        return i
+
+      hasRenderablePrefix = true
+      i += closeIdxRel + 1
+    }
+
+    return -1
+  }
+
+  let inFence = false
+  let fenceChar: '`' | '~' | '' = ''
+  let fenceLen = 0
+  let out = ''
+  let idx = 0
+
+  while (idx < markdown.length) {
+    const nl = markdown.indexOf('\n', idx)
+    const hasNl = nl !== -1
+    const isCrlf = hasNl && nl > idx && markdown[nl - 1] === '\r'
+    const lineEnd = hasNl ? (isCrlf ? nl - 1 : nl) : markdown.length
+    const line = markdown.slice(idx, lineEnd)
+    const newline = hasNl ? (isCrlf ? '\r\n' : '\n') : ''
+
+    const fenceMatch = parseFenceMarker(line)
+    let nextLine = line
+    if (!inFence && !fenceMatch) {
+      const splitAt = findInlineCustomBlockSplitIndex(line, idx)
+      if (splitAt !== -1) {
+        const separator = newline || '\n'
+        const before = line.slice(0, splitAt).replace(/[ \t]+$/, '')
+        const after = line.slice(splitAt).replace(/^[ \t]+/, '')
+        nextLine = `${before}${separator}${separator}${after}`
+      }
+    }
+
+    out += nextLine
+    out += newline
+
+    if (fenceMatch) {
+      if (inFence) {
+        if (fenceMatch.markerChar === fenceChar && fenceMatch.markerLen >= fenceLen) {
+          if (/^\s*$/.test(fenceMatch.rest)) {
+            inFence = false
+            fenceChar = ''
+            fenceLen = 0
+          }
+        }
+      }
+      else {
+        inFence = true
+        fenceChar = fenceMatch.markerChar
+        fenceLen = fenceMatch.markerLen
+      }
+    }
+
+    idx = hasNl ? nl + 1 : markdown.length
+  }
+
+  return out
 }
 
 function normalizeCustomHtmlOpeningTagSameLine(markdown: string, tags: string[]) {
@@ -1101,6 +1396,7 @@ export function parseMarkdownToStructure(
       .filter(Boolean)
 
     if (tags.length) {
+      safeMarkdown = ensureBlankLineBeforeInlineMultilineCustomHtmlBlocks(safeMarkdown, tags)
       // markdown-it doesn't always treat custom tags as html_block when the opening
       // tag and the first content token live on the same line (e.g. "<thinking> foo").
       // That causes the tag to be parsed as inline HTML and breaks custom block parsing.
@@ -1237,9 +1533,16 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
     const token = tokens[i]
     switch (token.type) {
       case 'paragraph_open':
-        result.push(parseParagraph(tokens, i, options))
+      {
+        const paragraphNode = parseParagraph(tokens, i, options) as ParsedNode
+        const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
+        if (promoted)
+          result.push(...promoted)
+        else
+          result.push(paragraphNode)
         i += 3 // Skip paragraph_open, inline, paragraph_close
         break
+      }
 
       case 'bullet_list_open':
       case 'ordered_list_open': {
@@ -1315,11 +1618,16 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
             result.push(...parsed)
           }
           else {
-            result.push({
+            const paragraphNode = {
               type: 'paragraph',
               raw: String(token.content ?? ''),
               children: parsed,
-            } as ParsedNode)
+            } as ParsedNode
+            const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
+            if (promoted)
+              result.push(...promoted)
+            else
+              result.push(paragraphNode)
           }
         }
         i += 1
