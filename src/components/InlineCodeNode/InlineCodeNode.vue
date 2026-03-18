@@ -126,6 +126,12 @@ const streamedDeltaClass = computed(() => (
 </template>
 
 <style scoped>
+code {
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border) / 0.9);
+}
+
 .inline-code-stream-delta {
   animation-duration: var(--stream-update-fade-duration, var(--typewriter-fade-duration, 900ms));
   animation-timing-function: var(--stream-update-fade-ease, var(--typewriter-fade-ease, ease-out));
