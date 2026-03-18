@@ -1,12 +1,12 @@
 import type { AngularRenderContext } from 'markstream-angular'
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core'
-import { NestedRenderer } from 'markstream-angular'
+import { NodeRenderer } from 'markstream-angular'
 
 @Component({
   selector: 'app-angular-thinking-node',
   standalone: true,
-  imports: [CommonModule, NestedRenderer],
+  imports: [CommonModule, NodeRenderer],
   template: `
     <div class="thinking-node">
       <div class="thinking-node__icon-shell" aria-hidden="true">
@@ -36,20 +36,52 @@ import { NestedRenderer } from 'markstream-angular'
 
         <div class="thinking-node__content">
           <span *ngIf="node?.loading" class="thinking-node__sr-only" aria-live="polite">Thinking...</span>
-          <markstream-angular-nested-renderer
-            [content]="resolvedContent"
-            [final]="resolvedFinal"
-            [customHtmlTags]="resolvedCustomHtmlTags"
-            [parseOptions]="context?.parseOptions"
-            [customMarkdownIt]="context?.customMarkdownIt"
-            [context]="context"
-            [indexPrefix]="nestedPrefix"
-          />
+          <div
+            class="thinking-node__content-shell"
+            [class.thinking-node__content-shell--loading]="node?.loading"
+            [class.thinking-node__content-shell--ready]="!node?.loading"
+          >
+            <markstream-angular
+              [content]="resolvedContent"
+              [final]="resolvedFinal"
+              [customId]="context?.customId"
+              [isDark]="context?.isDark"
+              [typewriter]="resolvedTypewriter"
+              [showTooltips]="context?.showTooltips"
+              [allowHtml]="context?.allowHtml"
+              [codeBlockStream]="context?.codeBlockStream"
+              [renderCodeBlocksAsPre]="context?.renderCodeBlocksAsPre"
+              [codeBlockProps]="context?.codeBlockProps"
+              [mermaidProps]="context?.mermaidProps"
+              [d2Props]="context?.d2Props"
+              [infographicProps]="context?.infographicProps"
+              [themes]="context?.codeBlockThemes?.themes"
+              [codeBlockDarkTheme]="context?.codeBlockThemes?.darkTheme"
+              [codeBlockLightTheme]="context?.codeBlockThemes?.lightTheme"
+              [codeBlockMonacoOptions]="context?.codeBlockThemes?.monacoOptions"
+              [codeBlockMinWidth]="context?.codeBlockThemes?.minWidth"
+              [codeBlockMaxWidth]="context?.codeBlockThemes?.maxWidth"
+              [customHtmlTags]="resolvedCustomHtmlTags"
+              [customComponents]="context?.customComponents"
+              [parseOptions]="context?.parseOptions"
+              [customMarkdownIt]="context?.customMarkdownIt"
+              [indexKey]="nestedPrefix"
+              [viewportPriority]="false"
+              [deferNodesUntilVisible]="false"
+              [batchRendering]="false"
+              [maxLiveNodes]="0"
+            ></markstream-angular>
+          </div>
         </div>
       </div>
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      width: 100%;
+    }
+
     .thinking-node {
       margin: 1rem 0;
       display: flex;
@@ -115,9 +147,37 @@ import { NestedRenderer } from 'markstream-angular'
 
     .thinking-node__content {
       margin-top: 0.25rem;
-      min-height: 1.25rem;
       font-size: 0.875rem;
       line-height: 1.65;
+    }
+
+    .thinking-node__content-shell {
+      min-height: 1.25rem;
+      width: 100%;
+    }
+
+    .thinking-node__content-shell--loading,
+    .thinking-node__content-shell--ready {
+      animation: thinking-content-fade 160ms ease both;
+    }
+
+    .thinking-node__content-shell--loading {
+      opacity: 0.92;
+    }
+
+    .thinking-node__content-shell--ready {
+      opacity: 1;
+    }
+
+    .thinking-node__content-shell :where(markstream-angular) {
+      display: block;
+      width: 100%;
+    }
+
+    .thinking-node__content-shell :where(.markstream-angular) {
+      content-visibility: visible;
+      contain: content;
+      contain-intrinsic-size: 0 0;
     }
 
     .thinking-dots {
@@ -192,6 +252,16 @@ import { NestedRenderer } from 'markstream-angular'
         opacity: 1;
       }
     }
+
+    @keyframes thinking-content-fade {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -199,6 +269,7 @@ export class ThinkingNodeComponent {
   @Input({ required: true }) node!: Record<string, any>
   @Input() context?: AngularRenderContext
   @Input() indexKey?: string
+  @Input() typewriter?: boolean
 
   private readonly fallbackThinkingTags = ['thinking']
 
@@ -220,5 +291,13 @@ export class ThinkingNodeComponent {
 
   get resolvedContent() {
     return typeof this.node?.content === 'string' ? this.node.content : ''
+  }
+
+  get resolvedTypewriter() {
+    if (typeof this.typewriter === 'boolean')
+      return this.typewriter
+    if (typeof this.context?.typewriter === 'boolean')
+      return this.context.typewriter
+    return true
   }
 }
