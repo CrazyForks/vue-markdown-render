@@ -109,7 +109,7 @@ const streamedDeltaClass = computed(() => (
     <span v-if="settledContent">{{ settledContent }}</span>
     <span
       v-if="streamedDelta"
-      :class="['text-node-stream-delta', streamedDeltaClass]"
+      class="text-node-stream-delta" :class="[streamedDeltaClass]"
       @animationend="settleStreamedDelta"
     >
       {{ streamedDelta }}

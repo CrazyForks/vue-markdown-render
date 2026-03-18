@@ -105,7 +105,7 @@ const streamedDeltaClass = computed(() => (
     <span v-if="settledCode">{{ settledCode }}</span>
     <span
       v-if="streamedDelta"
-      :class="['inline-code-stream-delta', streamedDeltaClass]"
+      class="inline-code-stream-delta" :class="[streamedDeltaClass]"
       @animationend="settleStreamedDelta"
     >
       {{ streamedDelta }}

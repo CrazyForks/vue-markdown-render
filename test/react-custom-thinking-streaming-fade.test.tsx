@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 /* eslint-disable antfu/no-import-node-modules-by-path */
 import React, { act } from '../packages/markstream-react/node_modules/react'
 import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
-import { removeCustomComponents, setCustomComponents } from '../packages/markstream-react/src/customComponents'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
+import { removeCustomComponents, setCustomComponents } from '../packages/markstream-react/src/customComponents'
 
 const scopeId = 'react-thinking-streaming-fade'
 

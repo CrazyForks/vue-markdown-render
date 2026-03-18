@@ -65,13 +65,11 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
 
   return (
     <code className="inline-code inline text-[85%] px-1 py-0.5 rounded font-mono bg-[hsl(var(--secondary))] whitespace-normal break-words max-w-full">
-      {children
-        ? children
-        : (
-            <>
-              {settledContent ? <span>{settledContent}</span> : null}
-              {streamedDelta
-                ? (
+      {children || (
+        <>
+          {settledContent ? <span>{settledContent}</span> : null}
+          {streamedDelta
+            ? (
                 <span
                   className={clsx(
                     'text-node-stream-delta',
@@ -83,10 +81,10 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
                 >
                   {streamedDelta}
                 </span>
-                  )
-                : null}
-            </>
-          )}
+              )
+            : null}
+        </>
+      )}
     </code>
   )
 }

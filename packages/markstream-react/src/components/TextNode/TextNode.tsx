@@ -86,17 +86,17 @@ export function TextNode(props: NodeComponentProps<{ type: 'text', content: stri
       {settledContent ? <span>{settledContent}</span> : null}
       {streamedDelta
         ? (
-        <span
-          className={clsx(
-            'text-node-stream-delta',
-            streamFadeVersion % 2 === 0
-              ? 'text-node-stream-delta--a'
-              : 'text-node-stream-delta--b',
-          )}
-          onAnimationEnd={handleStreamedDeltaAnimationEnd}
-        >
-          {streamedDelta}
-        </span>
+            <span
+              className={clsx(
+                'text-node-stream-delta',
+                streamFadeVersion % 2 === 0
+                  ? 'text-node-stream-delta--a'
+                  : 'text-node-stream-delta--b',
+              )}
+              onAnimationEnd={handleStreamedDeltaAnimationEnd}
+            >
+              {streamedDelta}
+            </span>
           )
         : null}
     </span>

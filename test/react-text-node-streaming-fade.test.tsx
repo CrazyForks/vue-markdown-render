@@ -4,7 +4,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest'
 /* eslint-disable antfu/no-import-node-modules-by-path */
-import React, { StrictMode, act } from '../packages/markstream-react/node_modules/react'
+import React, { act, StrictMode } from '../packages/markstream-react/node_modules/react'
 import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
 import { LinkNode } from '../packages/markstream-react/src/components/LinkNode/LinkNode'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
@@ -31,18 +31,17 @@ describe('markstream-react text streaming fade', () => {
     const root = createRoot(host)
     const textStreamState = new Map<string, string>()
     const renderText = (content: string) =>
-      React.createElement(StrictMode, null,
-        React.createElement(TextNode as any, {
-          node: {
-            type: 'text',
-            content,
-          },
-          ctx: {
-            typewriter: true,
-            textStreamState,
-          },
-          indexKey: 'stream-0',
-        }))
+      React.createElement(StrictMode, null, React.createElement(TextNode as any, {
+        node: {
+          type: 'text',
+          content,
+        },
+        ctx: {
+          typewriter: true,
+          textStreamState,
+        },
+        indexKey: 'stream-0',
+      }))
 
     await act(async () => {
       root.render(renderText('Hello'))
@@ -101,12 +100,11 @@ describe('markstream-react text streaming fade', () => {
     document.body.appendChild(host)
     const root = createRoot(host)
     const renderMarkdown = (content: string) =>
-      React.createElement(StrictMode, null,
-        React.createElement(NodeRenderer as any, {
-          content,
-          deferNodesUntilVisible: false,
-          viewportPriority: false,
-        }))
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        deferNodesUntilVisible: false,
+        viewportPriority: false,
+      }))
 
     await act(async () => {
       root.render(renderMarkdown('Hello'))
@@ -145,12 +143,11 @@ describe('markstream-react text streaming fade', () => {
     document.body.appendChild(host)
     const root = createRoot(host)
     const renderMarkdown = (content: string) =>
-      React.createElement(StrictMode, null,
-        React.createElement(NodeRenderer as any, {
-          content,
-          deferNodesUntilVisible: false,
-          viewportPriority: false,
-        }))
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        deferNodesUntilVisible: false,
+        viewportPriority: false,
+      }))
 
     await act(async () => {
       root.render(renderMarkdown('# Hello'))
@@ -182,12 +179,11 @@ describe('markstream-react text streaming fade', () => {
     document.body.appendChild(host)
     const root = createRoot(host)
     const renderMarkdown = (content: string) =>
-      React.createElement(StrictMode, null,
-        React.createElement(NodeRenderer as any, {
-          content,
-          deferNodesUntilVisible: false,
-          viewportPriority: false,
-        }))
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        deferNodesUntilVisible: false,
+        viewportPriority: false,
+      }))
 
     await act(async () => {
       root.render(renderMarkdown('Use `foo` now'))
@@ -220,21 +216,20 @@ describe('markstream-react text streaming fade', () => {
     const root = createRoot(host)
     const textStreamState = new Map<string, string>()
     const renderLink = (text: string) =>
-      React.createElement(StrictMode, null,
-        React.createElement(LinkNode as any, {
-          node: {
-            type: 'link',
-            href: 'https://example.com',
-            title: null,
-            text,
-            loading: true,
-          },
-          ctx: {
-            typewriter: true,
-            textStreamState,
-          },
-          indexKey: 'link-0',
-        }))
+      React.createElement(StrictMode, null, React.createElement(LinkNode as any, {
+        node: {
+          type: 'link',
+          href: 'https://example.com',
+          title: null,
+          text,
+          loading: true,
+        },
+        ctx: {
+          typewriter: true,
+          textStreamState,
+        },
+        indexKey: 'link-0',
+      }))
 
     await act(async () => {
       root.render(renderLink('Exam'))
@@ -266,12 +261,11 @@ describe('markstream-react text streaming fade', () => {
     document.body.appendChild(host)
     const root = createRoot(host)
     const renderMarkdown = (content: string) =>
-      React.createElement(StrictMode, null,
-        React.createElement(NodeRenderer as any, {
-          content,
-          deferNodesUntilVisible: false,
-          viewportPriority: false,
-        }))
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        deferNodesUntilVisible: false,
+        viewportPriority: false,
+      }))
 
     await act(async () => {
       root.render(renderMarkdown('- Hello'))
