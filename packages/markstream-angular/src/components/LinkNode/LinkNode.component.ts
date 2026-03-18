@@ -43,7 +43,7 @@ import { getNodeList, getString } from '../shared/node-helpers'
       <span class="link-loading" [ngStyle]="cssVars" aria-hidden="false">
         <span class="link-text-wrapper">
           <span class="link-text">{{ fallbackLabel }}</span>
-          <span class="underline-anim" aria-hidden="true"></span>
+          <span class="link-loading-indicator" aria-hidden="true"></span>
         </span>
       </span>
     </ng-template>
@@ -97,9 +97,10 @@ export class LinkNodeComponent implements AfterViewInit, OnChanges, OnDestroy {
       '--link-color': '#0366d6',
       '--underline-height': '2px',
       '--underline-bottom': '-3px',
-      '--underline-opacity': '0.9',
-      '--underline-duration': '0.8s',
-      '--underline-timing': 'linear',
+      '--underline-opacity': '0.35',
+      '--underline-rest-opacity': '0.175',
+      '--underline-duration': '1.6s',
+      '--underline-timing': 'ease-in-out',
       '--underline-iteration': 'infinite',
     } as Record<string, string>
   }

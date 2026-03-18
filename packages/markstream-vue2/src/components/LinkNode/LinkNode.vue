@@ -83,14 +83,17 @@ const cssVars = computed(() => {
   const bottom = props.underlineBottom !== undefined
     ? (typeof props.underlineBottom === 'number' ? `${props.underlineBottom}px` : String(props.underlineBottom))
     : '-3px'
+  const activeOpacity = props.animationOpacity ?? 0.35
+  const restingOpacity = Math.max(0.12, Math.min(activeOpacity * 0.5, activeOpacity))
 
   return {
     '--link-color': props.color ?? '#0366d6',
     '--underline-height': `${props.underlineHeight ?? 2}px`,
     '--underline-bottom': bottom,
-    '--underline-opacity': String(props.animationOpacity ?? 0.9),
-    '--underline-duration': `${props.animationDuration ?? 0.8}s`,
-    '--underline-timing': props.animationTiming ?? 'linear',
+    '--underline-opacity': String(activeOpacity),
+    '--underline-rest-opacity': String(restingOpacity),
+    '--underline-duration': `${props.animationDuration ?? 1.6}s`,
+    '--underline-timing': props.animationTiming ?? 'ease-in-out',
     '--underline-iteration': typeof props.animationIteration === 'number' ? String(props.animationIteration) : (props.animationIteration ?? 'infinite'),
   } as Record<string, string>
 })
@@ -221,7 +224,7 @@ onBeforeUnmount(() => {
       <span class="leading-[normal] link-text">
         <span class="leading-[normal] link-text">{{ node.text }}</span>
       </span>
-      <span class="underline-anim" aria-hidden="true" />
+      <span class="link-loading-indicator" aria-hidden="true" />
     </span>
   </span>
 </template>
@@ -240,33 +243,37 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
+.link-loading {
+  color: var(--link-color, #0366d6);
+}
+
 .link-loading .link-text {
   position: relative;
   z-index: 2;
 }
 
-.underline-anim {
+.link-loading-indicator {
   position: absolute;
   left: 0;
   right: 0;
   height: var(--underline-height, 2px);
-  bottom: var(--underline-bottom, -3px); /* a little below text */
+  bottom: var(--underline-bottom, -3px);
   background: currentColor;
-  /* grow symmetrically from the center */
-  transform-origin: center center;
-  will-change: transform, opacity;
-  opacity: var(--underline-opacity, 0.9);
-  transform: scaleX(0);
-  animation: underlineLoop var(--underline-duration, 0.8s) var(--underline-timing, linear) var(--underline-iteration, infinite);
+  border-radius: 999px;
+  will-change: opacity;
+  opacity: var(--underline-rest-opacity, 0.18);
+  animation: underlinePulse var(--underline-duration, 1.6s) var(--underline-timing, ease-in-out) var(--underline-iteration, infinite);
 }
 
-@keyframes underlineLoop {
-  0% { transform: scaleX(0); opacity: var(--underline-opacity, 0.9); }
-  /* draw to full width by 75% (0.6s) */
-  75% { transform: scaleX(1); opacity: var(--underline-opacity, 0.9); }
-  /* hold at full width until ~99% (~0.2s pause) */
-  99% { transform: scaleX(1); opacity: var(--underline-opacity, 0.9); }
-  /* collapse quickly back to center right at the end */
-  100% { transform: scaleX(0); opacity: 0; }
+@keyframes underlinePulse {
+  0%, 100% { opacity: var(--underline-rest-opacity, 0.18); }
+  50% { opacity: var(--underline-opacity, 0.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link-loading-indicator {
+    animation: none;
+    opacity: var(--underline-rest-opacity, 0.18);
+  }
 }
 </style>
