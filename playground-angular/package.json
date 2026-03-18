@@ -8,15 +8,15 @@
     "preview": "vite preview --host 127.0.0.1 --port 4175"
   },
   "dependencies": {
-    "@angular/common": "^20.0.0",
-    "@angular/compiler": "^20.0.0",
-    "@angular/core": "^20.0.0",
-    "@angular/platform-browser": "^20.0.0",
-    "@antv/infographic": "^0.2.3",
+    "@angular/common": "^20.3.18",
+    "@angular/compiler": "^20.3.18",
+    "@angular/core": "^20.3.18",
+    "@angular/platform-browser": "^20.3.18",
+    "@antv/infographic": "^0.2.16",
     "@terrastruct/d2": "^0.1.33",
-    "katex": "^0.16.25",
+    "katex": "^0.16.38",
     "markstream-angular": "workspace:*",
-    "mermaid": "^11.12.2",
+    "mermaid": "^11.13.0",
     "monaco-editor": "^0.52.2",
     "rxjs": "^7.8.2",
     "stream-monaco": "latest"
