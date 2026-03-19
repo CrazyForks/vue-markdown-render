@@ -1676,15 +1676,17 @@ watch(
 
 const stopLoadingWatch = watch(
   () => [props.loading, viewportReady.value],
-  async ([loaded, visible]) => {
+  async ([loaded, visible], previous) => {
     if (!visible)
       return
     if (loaded)
       return
+    const prevLoaded = previous?.[0]
+    const loadingJustFinished = prevLoaded !== undefined && prevLoaded !== false
     await nextTick()
     safeRaf(() => {
       void (async () => {
-        if (editorCreated.value) {
+        if (loadingJustFinished && editorCreated.value) {
           if (isDiff.value && codeEditor.value) {
             const pendingCreation = createEditorPromise
             if (pendingCreation) {

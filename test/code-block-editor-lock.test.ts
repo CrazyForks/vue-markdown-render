@@ -327,6 +327,39 @@ describe('codeBlockNode diff defaults', () => {
 
     wrapper.unmount()
   })
+
+  it('recreates diff editors when loading transitions from true to false', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: 'const a = 1\\nconst b = 2\\n',
+          updatedCode: 'const a = 1\\nconst c = 3\\n',
+          raw: '```diff\\n-const b = 2\\n+const c = 3\\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+
+    helpers.createDiffEditor.mockClear()
+
+    await wrapper.setProps({ loading: false })
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    expect(helpers.createDiffEditor).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
 })
 
 describe('codeBlockNode theme updates', () => {
