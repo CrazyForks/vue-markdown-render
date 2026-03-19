@@ -1,3 +1,4 @@
+import type { MarkdownIt } from 'markdown-it-ts'
 import type { MarkdownToken, ParsedNode, ParseOptions, TextNode } from '../../types'
 import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
@@ -23,6 +24,7 @@ import { parseTextToken } from './text-parser'
 const STRONG_PAIR_RE = /\*\*([\s\S]*?)\*\*/
 const STRIKETHROUGH_RE = /[^~]*~{2,}[^~]+/
 const HAS_STRONG_RE = /\*\*/
+const INLINE_REPARSE_MARKER_RE = /(?:\*\*\*|___|\*\*|__|\*|_|~~)/
 const ESCAPED_PUNCTUATION_RE = /\\([\\()[\]`$|*_\-!])/g
 const ESCAPABLE_PUNCTUATION = new Set(['\\', '(', ')', '[', ']', '`', '$', '|', '*', '_', '-', '!'])
 
@@ -180,34 +182,84 @@ export function parseInlineTokens(
   }
 
   function handleEmphasisAndStrikethrough(content: string, token: MarkdownToken): boolean {
-    // strikethrough (~~)
+    const rawSource = tokens.length === 1 ? raw : String(token.content ?? '')
+    const markerCandidates: Array<{ type: 'strong' | 'emphasis' | 'strikethrough', index: number }> = []
+
     if (STRIKETHROUGH_RE.test(content)) {
-      let idx = content.indexOf('~~')
-      if (idx === -1)
-        idx = 0
-      const _text = content.slice(0, idx)
-      if (_text) {
-        if (currentTextNode) {
-          currentTextNode.content += _text
-          currentTextNode.raw += _text
-        }
-        else {
-          currentTextNode = {
-            type: 'text',
-            content: String(_text ?? ''),
-            raw: String(token.content ?? ''),
-          }
-          result.push(currentTextNode)
-        }
+      const idx = content.indexOf('~~')
+      if (idx !== -1)
+        markerCandidates.push({ type: 'strikethrough', index: idx })
+    }
+
+    if (HAS_STRONG_RE.test(content)) {
+      const idx = content.indexOf('**')
+      if (idx !== -1)
+        markerCandidates.push({ type: 'strong', index: idx })
+    }
+
+    if (/[^*]*\*[^*]+/.test(content)) {
+      const idx = rawSource
+        ? findNextUnescapedAsterisk(rawSource, 0)
+        : content.indexOf('*')
+      if (rawSource && idx === -1)
+        return false
+      if (idx !== -1)
+        markerCandidates.push({ type: 'emphasis', index: idx })
+    }
+
+    markerCandidates.sort((a, b) => {
+      if (a.index !== b.index)
+        return a.index - b.index
+
+      if (a.type === b.type)
+        return 0
+
+      // Prefer `**` over `*` when both point at the same run.
+      if (a.type === 'strong')
+        return -1
+      if (b.type === 'strong')
+        return 1
+      return 0
+    })
+
+    const nextMarker = markerCandidates[0]
+    if (!nextMarker)
+      return false
+
+    // strikethrough (~~)
+    if (nextMarker.type === 'strikethrough') {
+      const idx = nextMarker.index
+      const beforeText = idx > -1 ? content.slice(0, idx) : ''
+      if (beforeText)
+        pushText(beforeText, beforeText)
+
+      if (idx === -1) {
+        i++
+        return true
       }
-      const strikethroughContent = content.slice(idx)
+
+      const closeIdx = content.indexOf('~~', idx + 2)
+      const inner = closeIdx === -1 ? content.slice(idx + 2) : content.slice(idx + 2, closeIdx)
+      const after = closeIdx === -1 ? '' : content.slice(closeIdx + 2)
+
       const { node } = parseStrikethroughToken([
-        { type: 's_open', tag: 's', content: '', markup: '*', info: '', meta: null },
-        { type: 'text', tag: '', content: strikethroughContent.replace(/~/g, ''), markup: '', info: '', meta: null },
-        { type: 's_close', tag: 's', content: '', markup: '*', info: '', meta: null },
-      ], 0)
+        { type: 's_open', tag: 's', content: '', markup: '~~', info: '', meta: null },
+        { type: 'text', tag: '', content: inner, markup: '', info: '', meta: null },
+        { type: 's_close', tag: 's', content: '', markup: '~~', info: '', meta: null },
+      ], 0, options as any)
+
       resetCurrentTextNode()
       pushNode(node)
+
+      if (after) {
+        handleToken({
+          type: 'text',
+          content: after,
+          raw: after,
+        })
+        i--
+      }
+
       i++
       return true
     }
@@ -216,8 +268,8 @@ export function parseInlineTokens(
     // Note: markdown-it may sometimes leave `**...**` as a plain text token
     // (e.g. when wrapping inline HTML like `<font>...</font>`). In that case,
     // we still want to recognize and parse the first strong pair.
-    if (HAS_STRONG_RE.test(content)) {
-      const openIdx = content.indexOf('**')
+    if (nextMarker.type === 'strong') {
+      const openIdx = nextMarker.index
       const beforeText = openIdx > -1 ? content.slice(0, openIdx) : ''
       if (beforeText) {
         pushText(beforeText, beforeText)
@@ -359,25 +411,13 @@ export function parseInlineTokens(
     }
 
     // emphasis (*)
-    if (/[^*]*\*[^*]+/.test(content)) {
-      const rawSource = tokens.length === 1 ? raw : String(token.content ?? '')
-      let idx = rawSource
-        ? findNextUnescapedAsterisk(rawSource, 0)
-        : content.indexOf('*')
-      if (rawSource && idx === -1)
-        return false
+    if (nextMarker.type === 'emphasis') {
+      let idx = nextMarker.index
       if (idx === -1)
         idx = 0
       const _text = content.slice(0, idx)
       if (_text) {
-        if (currentTextNode) {
-          currentTextNode.content += _text
-          currentTextNode.raw += _text
-        }
-        else {
-          currentTextNode = { type: 'text', content: String(_text ?? ''), raw: String(token.content ?? '') }
-          result.push(currentTextNode)
-        }
+        pushText(_text, _text)
       }
       const runInfo = getAsteriskRunInfo(content, idx)
       const closeIndex = rawSource
@@ -406,14 +446,16 @@ export function parseInlineTokens(
         { type: 'em_close', tag: 'em', content: '', markup: '*', info: '', meta: null },
       ], 0, options as any)
 
+      resetCurrentTextNode()
+      pushNode(node)
+
       if (closeIndex !== -1 && closeIndex < content.length - 1) {
         const afterContent = content.slice(closeIndex + 1)
         if (afterContent) {
           handleToken({ type: 'text', content: afterContent, raw: afterContent } as unknown as MarkdownToken)
+          i--
         }
       }
-      resetCurrentTextNode()
-      pushNode(node)
       i++
       return true
     }
@@ -512,6 +554,34 @@ export function parseInlineTokens(
     }
     i++
     return true
+  }
+
+  function tryReparseCollapsedInlineText(rawContent: string): ParsedNode[] | null {
+    const md = (options as any)?.__markdownIt as MarkdownIt | undefined
+    if (!md || !options?.final)
+      return null
+    if (tokens.length <= 1 || !tokens.some(token => token?.type === 'math_inline'))
+      return null
+    if (!INLINE_REPARSE_MARKER_RE.test(rawContent))
+      return null
+
+    const reparsed = md.parseInline(rawContent, { __markstreamFinal: true }) as unknown as MarkdownToken[]
+    if (!Array.isArray(reparsed) || reparsed.length === 0)
+      return null
+
+    const inlineToken = reparsed.find(token => token?.type === 'inline')
+    const children = (inlineToken?.children ?? [])
+      .filter(child => !(child?.type === 'text' && String(child.content ?? '') === ''))
+
+    if (!children.length)
+      return null
+    if (!children.some(child => child?.type !== 'text'))
+      return null
+    if (children.length === 1 && children[0]?.type === 'text' && String(children[0].content ?? '') === rawContent)
+      return null
+
+    const reparsedNodes = parseInlineTokens(children, rawContent, pPreToken, options)
+    return reparsedNodes.length ? reparsedNodes : null
   }
 
   function pushParsed(node: ParsedNode) {
@@ -908,6 +978,7 @@ export function parseInlineTokens(
 
     const hasInlineCandidates = (
       content.includes('*')
+      || content.includes('_')
       || content.includes('~')
       || content.includes('`')
       || content.includes('[')
@@ -942,6 +1013,15 @@ export function parseInlineTokens(
     // allowing fallback for later tricky links in the same inline run.
     if (tokens[i + 1]?.type !== 'link_open' && handleInlineLinkContent(content, token))
       return
+
+    const reparsedNodes = tryReparseCollapsedInlineText(rawContent)
+    if (reparsedNodes) {
+      resetCurrentTextNode()
+      for (const node of reparsedNodes)
+        pushNode(node)
+      i++
+      return
+    }
 
     if (handleEmphasisAndStrikethrough(content, token))
       return

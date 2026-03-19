@@ -107,12 +107,7 @@ function parseVmrContainer(
         const childrenArr = (contentToken.children as MarkdownToken[]) || []
         children.push({
           type: 'paragraph',
-          children: parseInlineTokens(childrenArr || [], undefined, undefined, {
-            requireClosingStrong: options?.requireClosingStrong,
-            final: options?.final,
-            customHtmlTags: options?.customHtmlTags,
-            validateLink: options?.validateLink,
-          }),
+          children: parseInlineTokens(childrenArr || [], undefined, undefined, options as any),
           raw: String(contentToken.content ?? ''),
         })
       }

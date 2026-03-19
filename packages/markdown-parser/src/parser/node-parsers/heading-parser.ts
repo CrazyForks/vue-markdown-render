@@ -25,12 +25,7 @@ export function parseHeading(
     level: headingLevel,
     text: headingContent,
     ...(attrsRecord ? { attrs: attrsRecord } : {}),
-    children: parseInlineTokens(headingContentToken.children || [], headingContent, undefined, {
-      requireClosingStrong: options?.requireClosingStrong,
-      final: options?.final,
-      customHtmlTags: options?.customHtmlTags,
-      validateLink: options?.validateLink,
-    }),
+    children: parseInlineTokens(headingContentToken.children || [], headingContent, undefined, options as any),
     raw: headingContent,
   }
 }

@@ -11,12 +11,7 @@ export function parseParagraph(
 
   return {
     type: 'paragraph',
-    children: parseInlineTokens(paragraphContentToken.children || [], paragraphContent, undefined, {
-      requireClosingStrong: options?.requireClosingStrong,
-      final: options?.final,
-      customHtmlTags: options?.customHtmlTags,
-      validateLink: options?.validateLink,
-    }),
+    children: parseInlineTokens(paragraphContentToken.children || [], paragraphContent, undefined, options as any),
     raw: paragraphContent,
   }
 }
