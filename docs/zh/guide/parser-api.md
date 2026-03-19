@@ -1,3 +1,7 @@
+---
+description: 使用解析器 API 在 markstream-vue 渲染节点之前接入 token 钩子、AST 变换与 markdown-it 定制。
+---
+
 # 解析器 — API 详解
 
 此页从 `packages/markdown-parser` 提取常用函数、类型与便捷工具，便于构建更高级或自定义的解析流程。

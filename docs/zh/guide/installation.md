@@ -1,6 +1,12 @@
+---
+description: 按文档站、AI 聊天、Mermaid、KaTeX、Monaco 和大文档场景选择正确的 markstream-vue 安装与 peer 依赖组合。
+---
+
 # 安装
 
-使用 `pnpm`, `npm` 或 `yarn`:
+如果你只是想先把渲染器跑起来，先装主包，再按能力补装 peer 依赖就够了。
+
+## 1. 最小安装
 
 ```bash
 pnpm add markstream-vue
@@ -10,114 +16,93 @@ npm install markstream-vue
 yarn add markstream-vue
 ```
 
-## 可选 Peer 依赖
+只需要普通 Markdown 渲染时，装完主包就可以继续看 [快速开始](/zh/guide/quick-start)。
 
-markstream-vue 通过可选的 peer 依赖支持各种功能。按需安装：
+## 2. 按能力选择 peer 依赖
 
-| 功能 | 需要的包 | 安装命令 |
+| 能力 | 需要的包 | 适用场景 |
 |------|---------|---------|
-| Shiki 代码块（`MarkdownCodeBlockNode`） | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
-| Monaco 编辑器（完整代码块功能） | `stream-monaco` | `pnpm add stream-monaco` |
-| Mermaid 图表 | `mermaid` | `pnpm add mermaid` |
-| D2 图表 | `@terrastruct/d2` | `pnpm add @terrastruct/d2` |
-| 数学公式渲染（KaTeX） | `katex` | `pnpm add katex` |
+| 轻量高亮代码块 | `shiki`, `stream-markdown` | 文档站、SSR、包体积敏感场景 |
+| Monaco 代码块 | `stream-monaco` | 需要复制、预览、展开、字体控制等完整代码块体验 |
+| Mermaid 图表 | `mermaid` | 渲染 `mermaid` fenced code block |
+| D2 图表 | `@terrastruct/d2` | 渲染 `d2` / `d2lang` fenced code block |
+| KaTeX 数学公式 | `katex` | 行内或块级公式 |
 
-## 功能加载器（Mermaid / KaTeX / D2）
+## 3. 常见安装配方
 
-安装可选 peer 后，默认 loader 已经启用。仅当你之前手动关闭，或需要自定义 loader（例如使用 CDN 版本）时才需要调用：
+### 文档站 / SSR 优先
+
+```bash
+pnpm add markstream-vue shiki stream-markdown
+```
+
+如果你接下来要做的是文档站、内容站或 VitePress 主题，继续看 [文档站与 VitePress 集成](/zh/guide/vitepress-docs-integration)。
+
+### AI / 聊天 UI，且需要更强的代码块和图表体验
+
+```bash
+pnpm add markstream-vue stream-monaco mermaid katex
+```
+
+然后继续看 [AI 聊天与流式输出](/zh/guide/ai-chat-streaming)，里面会把 `nodes` + `final` 的推荐接法和聊天场景调优串起来。
+
+### 图表型内容较多
+
+```bash
+pnpm add markstream-vue mermaid @terrastruct/d2 katex
+```
+
+### 一次性全开
+
+```bash
+pnpm add markstream-vue shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
+```
+
+## 4. CSS 顺序和安装同样重要
+
+主包入口已经带了默认样式，但如果你的项目有 reset、Tailwind 或 UnoCSS，通常还是建议显式控制 CSS 顺序：
+
+```css
+@import 'modern-css-reset';
+@tailwind base;
+
+@layer components {
+  @import 'markstream-vue/index.css';
+}
+```
+
+如果你使用数学公式，还要额外引入 KaTeX 的 CSS：
+
+```ts
+import 'katex/dist/katex.min.css'
+```
+
+`stream-monaco`、`mermaid` 和 `@terrastruct/d2` 不需要再从本包额外引入 CSS。
+
+## 5. 功能加载器（只在 CDN 或自定义控制时需要）
+
+装好 peers 以后，默认 loader 已经启用。只有当你手动关闭过，或者想切到 CDN / 自定义 loader 时，才需要显式调用：
 
 ```ts
 import { enableD2, enableKatex, enableMermaid } from 'markstream-vue'
 
-// 可选：重新启用或覆盖 loader
 enableMermaid()
 enableKatex()
 enableD2()
 ```
 
-同时别忘了导入必需的 CSS（按需使用，Monaco 不需要额外导入 CSS）：
+## 6. 第一次接入后的检查清单
 
-```ts
-import 'markstream-vue/index.css'
-import 'katex/dist/katex.min.css'
-```
+- 如果你单独使用节点组件，而不是 `MarkdownRender`，请外层包一层 `<div class="markstream-vue">...</div>`。
+- 如果公式不显示，优先检查 `katex` 是否安装、CSS 是否导入。
+- 如果 Monaco 空白，优先检查 worker 打包和浏览器端执行时机。
+- 如果样式错乱，先看 [故障排除](/zh/guide/troubleshooting#css-looks-wrong-start-here)。
 
-### 快速安装：全部功能
-
-一次性启用所有功能：
-
-```bash
-pnpm add shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
-# 或
-npm install shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
-```
-
-### 功能详情
-
-#### 代码语法高亮
-
-需要同时安装 `shiki` 和 `stream-markdown`：
-
-```bash
-pnpm add shiki stream-markdown
-```
-
-这些包用于 Shiki 版的 `MarkdownCodeBlockNode`。若要在 `MarkdownRender` 中使用 Shiki，请覆盖 `code_block` 渲染器（或直接使用 `MarkdownCodeBlockNode`）。
-
-```ts
-import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue'
-
-setCustomComponents({ code_block: MarkdownCodeBlockNode })
-```
-
-#### Monaco 编辑器
-
-获得完整的代码块功能（复制按钮、字体大小控制、展开/折叠）：
-
-```bash
-pnpm add stream-monaco
-```
-
-没有 `stream-monaco`，代码块会渲染但交互按钮可能无法工作。
-
-#### Mermaid 图表
-
-渲染 Mermaid 图表：
-
-```bash
-pnpm add mermaid
-```
-
-#### D2 图表
-
-渲染 D2 图表：
-
-```bash
-pnpm add @terrastruct/d2
-```
-
-#### KaTeX 数学公式渲染
-
-渲染数学公式：
-
-```bash
-pnpm add katex
-```
-
-还需要在应用入口文件（如 `main.ts`）中导入 KaTeX 的 CSS：
-
-```ts
-import 'katex/dist/katex.min.css'
-```
-
-## 快速测试
-
-导入并渲染一个简单的 markdown 字符串：
+## 7. 快速测试
 
 ```vue
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
-import 'markstream-vue/index.css'
 
 const md = '# 你好，markstream-vue！'
 </script>
@@ -127,4 +112,9 @@ const md = '# 你好，markstream-vue！'
 </template>
 ```
 
-补充说明：`markstream-vue/index.css` 已限定在内部 `.markstream-vue` 容器中，用于降低全局样式冲突。`MarkdownRender` 默认渲染在容器内部；如果你独立使用节点组件，请外层包一层 `<div class="markstream-vue">...</div>`。
+下一步建议：
+
+- [快速开始](/zh/guide/quick-start)：最小接入
+- [使用与流式渲染](/zh/guide/usage)：`content` 和 `nodes` 的选择
+- [AI 聊天与流式输出](/zh/guide/ai-chat-streaming)：聊天 UI、SSE 与逐 token 输出的完整路径
+- [覆盖内置组件](/zh/guide/component-overrides)：需要业务定制时再进入

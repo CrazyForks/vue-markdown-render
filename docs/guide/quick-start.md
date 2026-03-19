@@ -1,3 +1,7 @@
+---
+description: Start rendering Markdown with markstream-vue in the smallest possible Vue example, including the default CSS behavior and next steps.
+---
+
 # Quick Start
 
 A minimal example using the library:

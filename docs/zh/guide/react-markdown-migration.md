@@ -1,3 +1,7 @@
+---
+description: 从 react-markdown 迁移到 markstream-react，并了解渲染器替换、插件审计与非 1:1 定制差异。
+---
+
 # 从 react-markdown 迁移
 
 如果你当前使用 `react-markdown` 渲染 Markdown，迁移到 `markstream-react` 通常分两步：

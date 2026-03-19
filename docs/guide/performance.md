@@ -1,3 +1,7 @@
+---
+description: Improve markstream-vue performance for streaming chat UIs, large documents, Monaco code blocks, and heavy Mermaid or KaTeX content.
+---
+
 # Performance Features & Tips
 
 The renderer is optimized for streaming and large docs. Key features:

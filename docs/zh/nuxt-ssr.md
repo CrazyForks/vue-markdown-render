@@ -1,3 +1,7 @@
+---
+description: 在 Nuxt 3 SSR 中安全接入 markstream-vue，处理客户端依赖、浏览器边界与 Worker 初始化问题。
+---
+
 # Nuxt 3 SSR 用法示例
 
 > For the English version, see [nuxt-ssr.md](../nuxt-ssr.md).

@@ -1,6 +1,12 @@
+---
+description: Install markstream-vue with the right peer dependency set for docs sites, AI chat UIs, Mermaid, KaTeX, Monaco, and large documents.
+---
+
 # Installation
 
-Install with pnpm, npm or yarn.
+If you only want the renderer on screen quickly, install the main package first and add peers only for the features you actually use.
+
+## 1. Minimal install
 
 ```bash
 pnpm add markstream-vue
@@ -10,118 +16,93 @@ npm install markstream-vue
 yarn add markstream-vue
 ```
 
-## Optional Peer Dependencies
+Then continue with [Quick Start](/guide/quick-start) if you only need basic Markdown rendering.
 
-markstream-vue supports various features through optional peer dependencies. Install only what you need:
+## 2. Choose peers by capability
 
-| Feature | Required Packages | Install Command |
-|---------|------------------|-----------------|
-| Shiki code blocks (`MarkdownCodeBlockNode`) | `shiki`, `stream-markdown` | `pnpm add shiki stream-markdown` |
-| Monaco Editor (full code block features) | `stream-monaco` | `pnpm add stream-monaco` |
-| Mermaid Diagrams | `mermaid` | `pnpm add mermaid` |
-| D2 Diagrams | `@terrastruct/d2` | `pnpm add @terrastruct/d2` |
-| Math Rendering (KaTeX) | `katex` | `pnpm add katex` |
+| Capability | Packages | When you need it |
+|------------|----------|------------------|
+| Lightweight highlighted code blocks | `shiki`, `stream-markdown` | Docs sites, SSR, lower bundle budgets |
+| Monaco-powered code blocks | `stream-monaco` | Copy/preview/expand controls and richer code UX |
+| Mermaid diagrams | `mermaid` | Fenced `mermaid` blocks |
+| D2 diagrams | `@terrastruct/d2` | Fenced `d2` or `d2lang` blocks |
+| KaTeX math | `katex` | Inline or block math rendering |
 
-## Feature loaders (Mermaid / KaTeX / D2)
+## 3. Common install recipes
 
-After installing optional peers, the default loaders are already enabled. Only call these helpers if you previously disabled them or need a custom loader (for example, when using a CDN build):
+### Docs site or SSR-first app
+
+```bash
+pnpm add markstream-vue shiki stream-markdown
+```
+
+Then continue with [Docs Site & VitePress](/guide/vitepress-docs-integration) if you are wiring a docs site, content hub, or VitePress theme.
+
+### AI / chat UI with richer code blocks and diagrams
+
+```bash
+pnpm add markstream-vue stream-monaco mermaid katex
+```
+
+Then follow [AI Chat & Streaming](/guide/ai-chat-streaming) for the recommended `nodes` + `final` data flow and chat-specific tuning.
+
+### Diagram-heavy content
+
+```bash
+pnpm add markstream-vue mermaid @terrastruct/d2 katex
+```
+
+### Everything enabled
+
+```bash
+pnpm add markstream-vue shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
+```
+
+## 4. CSS order matters as much as installation
+
+The package entry already imports the default stylesheet, but when your app uses reset layers or utility frameworks you usually want explicit control over order.
+
+```css
+@import 'modern-css-reset';
+@tailwind base;
+
+@layer components {
+  @import 'markstream-vue/index.css';
+}
+```
+
+Also import KaTeX CSS when you use math:
+
+```ts
+import 'katex/dist/katex.min.css'
+```
+
+`stream-monaco`, `mermaid`, and `@terrastruct/d2` do not need extra CSS imports from this package.
+
+## 5. Optional loaders (only for CDN or custom control)
+
+After installing peers, default loaders are already enabled. Only call loader helpers if you previously disabled them or want a custom loader, for example with CDN assets:
 
 ```ts
 import { enableD2, enableKatex, enableMermaid } from 'markstream-vue'
 
-// optional: re-enable or override loaders
 enableMermaid()
 enableKatex()
 enableD2()
 ```
 
-Also remember required CSS (when the feature is used):
+## 6. First-run checklist
 
-```ts
-import 'markstream-vue/index.css'
-import 'katex/dist/katex.min.css'
-```
+- If you render standalone node components, wrap them in `<div class="markstream-vue">...</div>`.
+- If math does not render, check that `katex` is installed and its CSS is imported.
+- If Monaco is blank, verify worker bundling and browser-only guards.
+- If styles look wrong, check [Troubleshooting](/guide/troubleshooting#css-looks-wrong-start-here).
 
-Monaco (`stream-monaco`) does not require a separate CSS import.
-
-Note: `markstream-vue/index.css` is scoped under an internal `.markstream-vue` container to reduce global style conflicts. `MarkdownRender` renders inside that container by default. If you render node components standalone, wrap them with `<div class="markstream-vue">...</div>`.
-
-### Quick Install: All Features
-
-To enable all features at once:
-
-```bash
-pnpm add shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
-# or
-npm install shiki stream-markdown stream-monaco mermaid @terrastruct/d2 katex
-```
-
-### Feature Details
-
-#### Code Syntax Highlighting
-
-Requires both `shiki` and `stream-markdown`:
-
-```bash
-pnpm add shiki stream-markdown
-```
-
-These packages power the Shiki-based `MarkdownCodeBlockNode`. To use Shiki inside `MarkdownRender`, override the `code_block` renderer (or render `MarkdownCodeBlockNode` directly).
-
-```ts
-import MarkdownRender, { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue'
-
-setCustomComponents({ code_block: MarkdownCodeBlockNode })
-```
-
-#### Monaco Editor
-
-For full code block functionality (copy button, font size controls, expand/collapse):
-
-```bash
-pnpm add stream-monaco
-```
-
-Without `stream-monaco`, code blocks will render but interactive buttons may not work.
-
-#### Mermaid Diagrams
-
-For rendering Mermaid diagrams:
-
-```bash
-pnpm add mermaid
-```
-
-#### D2 Diagrams
-
-For rendering D2 diagrams:
-
-```bash
-pnpm add @terrastruct/d2
-```
-
-#### KaTeX Math Rendering
-
-For math formula rendering:
-
-```bash
-pnpm add katex
-```
-
-Also import the KaTeX CSS in your app entry (e.g., `main.ts`):
-
-```ts
-import 'katex/dist/katex.min.css'
-```
-
-## Quick Test
-
-Import and render a simple markdown string:
+## 7. Quick test
 
 ```vue
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
-import 'markstream-vue/index.css'
 
 const md = '# Hello from markstream-vue!'
 </script>
@@ -130,3 +111,10 @@ const md = '# Hello from markstream-vue!'
   <MarkdownRender :content="md" />
 </template>
 ```
+
+Next steps:
+
+- [Quick Start](/guide/quick-start) for the smallest integration
+- [Usage & Streaming](/guide/usage) for `content` vs `nodes`
+- [AI Chat & Streaming](/guide/ai-chat-streaming) for chat UIs, SSE, and token streams
+- [Override Built-in Components](/guide/component-overrides) if you need custom rendering

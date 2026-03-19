@@ -1,6 +1,12 @@
-# 高级定制 — parseOptions & 自定义节点
+# 高级解析与低层自定义
 
-本页介绍如何自定义解析流程和提供作用域自定义组件。
+这页面向更底层的解析定制：token 变换、AST 后处理，以及自定义节点管线。
+
+如果你只是要完成这些常见任务，建议先去更直接的页面：
+
+- 替换 `image`、`code_block`、`mermaid` 这类内置渲染器： [覆盖内置组件](/zh/guide/component-overrides)
+- 支持 `thinking` 这类可信标签： [自定义标签与高级组件](/zh/guide/custom-components)
+- 只想调现有行为，不想改解析器： [Props 与选项](/zh/guide/props)
 
 ## parseOptions
 `parseOptions` 可传递给 `MarkdownRender` 或直接用于 `parseMarkdownToStructure`。

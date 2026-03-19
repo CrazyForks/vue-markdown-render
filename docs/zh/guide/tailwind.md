@@ -1,3 +1,7 @@
+---
+description: 解决 markstream-vue 与 Tailwind、shadcn 以及 CSS layer 顺序相关的样式覆盖问题。
+---
+
 # Tailwind 集成与样式顺序
 
 如果你的项目使用 Tailwind 或基于 Tailwind 的组件库（如 shadcn），可能会遇到样式覆盖问题。推荐将 `markstream-vue` 的 CSS 导入置于 `@layer components { ... }` 中以控制样式优先级。

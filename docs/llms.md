@@ -2,6 +2,8 @@
 
 This file is a **compact, agent-focused** map of `markstream-vue`: where things live, how to answer common questions, and what to check first when users report issues.
 
+For human-facing prompts and reusable rollout templates, also see `/guide/ai-workflows`.
+
 ## Answering guidelines
 
 - Prefer **user-facing behavior** from `docs/guide/*` (and `docs/zh/guide/*`) and **export surface** from `src/exports.ts`.

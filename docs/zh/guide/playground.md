@@ -1,3 +1,7 @@
+---
+description: 使用本地和在线 playground 快速复现 markstream-vue 渲染问题、对比框架接入，并验证修复结果。
+---
+
 # Playground（示例演示）
 
 仓库包含一个可交互的 `playground` 演示，用于本地调试和复现渲染问题。

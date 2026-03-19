@@ -1,5 +1,7 @@
 # 排查问题
 
+如果你还不知道问题到底属于 CSS、peer 依赖、SSR，还是自定义标签接法，建议先看 [按症状排查](/zh/guide/troubleshooting-path)。
+
 如果出现问题，请尝试下面这些通用解决方案：
 
 - 在 SSR 中出现 `window is not defined`：在 Nuxt 中将客户端代码包装为 `<client-only>`，在 Vite SSR 场景中用 `onMounted` 延迟初始化。

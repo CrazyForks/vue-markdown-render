@@ -1,6 +1,12 @@
-# Advanced customization — parseOptions & custom nodes
+# Advanced parser hooks & low-level customization
 
-This page explains how to customize parsing and provide scoped custom components.
+This page is for low-level parser work: token transforms, AST reshaping, and custom node pipelines.
+
+If you only need one of these common tasks, start elsewhere first:
+
+- Replace a built-in renderer such as `image`, `code_block`, or `mermaid`: [Override Built-in Components](/guide/component-overrides)
+- Support trusted tags such as `thinking`: [Custom Tags & Advanced Components](/guide/custom-components)
+- Tune behavior without replacing renderers: [Props & Options](/guide/props)
 
 ## parseOptions
 `parseOptions` can be passed to `MarkdownRender` or used directly with `parseMarkdownToStructure`.

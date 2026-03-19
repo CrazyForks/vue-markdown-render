@@ -3,14 +3,13 @@
   "type": "module",
   "version": "0.0.9",
   "packageManager": "pnpm@10.32.1",
-  "description": "Vue 3 Markdown renderer optimized for large docs: progressive Mermaid, streaming diff code blocks, and fast real-time preview.",
+  "description": "Streaming-friendly Vue 3 Markdown renderer for docs sites, AI chat UIs, and large documents.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://github.com/Simon-He95/markstream-vue",
+  "homepage": "https://markstream-vue-docs.simonhe.me/guide/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Simon-He95/markstream-vue.git",
-    "homepage": "https://github.com/Simon-He95/markstream-vue#readme"
+    "url": "git+https://github.com/Simon-He95/markstream-vue.git"
   },
   "bugs": {
     "url": "https://github.com/Simon-He95/markstream-vue/issues"
@@ -21,6 +20,8 @@
     "markdown",
     "markdown-to-html",
     "markdown-renderer",
+    "streaming-markdown",
+    "streaming-renderer",
     "vue-markdown",
     "vue-markdown-renderer",
     "vue-markdown-component",
@@ -28,14 +29,23 @@
     "markdown-viewer",
     "vue-component",
     "nuxt",
+    "vitepress",
     "vite",
     "sse",
+    "sse-markdown",
+    "ai",
     "ai-chat",
-    "streaming-markdown",
+    "chat-ui",
+    "docs-site",
+    "knowledge-base",
     "html",
     "renderer",
     "custom-component",
     "mermaid",
+    "mermaid-diagram",
+    "katex",
+    "shiki",
+    "monaco-editor",
     "progressive-mermaid",
     "streaming-diff",
     "diff-codeblock",
@@ -103,9 +113,15 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "markstream-vue": "./bin/markstream-vue.mjs"
+  },
   "files": [
     "dist",
-    "dist/workers"
+    "dist/workers",
+    "bin",
+    "skills",
+    "prompts"
   ],
   "scripts": {
     "dev": "pnpm run -C playground dev",
@@ -158,6 +174,12 @@
     "docs:serve": "vitepress serve docs",
     "docs:deploy": "VITEPRESS_BASE=/markstream-vue/ pnpm docs:build && pnpm docs:serve",
     "docs:deploy:netlify": "pnpm docs:build && echo 'Docs built to docs/.vitepress/dist'",
+    "skills:list": "node ./bin/markstream-vue.mjs skills list",
+    "skills:install": "node ./bin/markstream-vue.mjs skills install --target agents --mode symlink",
+    "skills:install:copy": "node ./bin/markstream-vue.mjs skills install --target agents --mode copy",
+    "skills:install:codex": "node ./bin/markstream-vue.mjs skills install --target codex --mode symlink",
+    "prompts:list": "node ./bin/markstream-vue.mjs prompts list",
+    "prompts:dir": "node ./bin/markstream-vue.mjs prompts dir",
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
     "build:demo": "vite build",
     "build:view": "vite preview",

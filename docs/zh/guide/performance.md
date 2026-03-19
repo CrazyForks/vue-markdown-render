@@ -1,3 +1,7 @@
+---
+description: 优化 markstream-vue 在流式聊天、大文档、Monaco 代码块以及 Mermaid 和 KaTeX 重内容场景下的性能表现。
+---
+
 # 性能特性与建议
 
 本渲染器针对流式与大型文档进行优化。

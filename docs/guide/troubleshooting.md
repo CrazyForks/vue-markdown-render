@@ -1,5 +1,7 @@
 # Troubleshooting
 
+If you do not yet know whether the issue is CSS, peers, SSR, or custom-tag wiring, start with [Troubleshooting by Symptom](/guide/troubleshooting-path) first.
+
 If something breaks, here are common fixes:
 
 - If you get `window is not defined` during SSR, wrap components in `<client-only>` for Nuxt and use the `onMounted` guard for Vite SSR.

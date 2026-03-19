@@ -1,3 +1,7 @@
+---
+description: Use the parser API to hook into tokens, AST transforms, and markdown-it customization before markstream-vue renders nodes.
+---
+
 # Parser — API Deep Dive
 
 This page extracts the most important functions, types and helpers from `packages/markdown-parser` for a focused API reference.

@@ -1,3 +1,7 @@
+---
+description: 用最小 Vue 示例快速跑起 markstream-vue，并理解默认 CSS 行为与下一步该看哪些页面。
+---
+
 # 快速开始
 
 示例：

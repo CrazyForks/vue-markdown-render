@@ -1,3 +1,7 @@
+---
+description: Migrate from react-markdown to markstream-react with guidance on renderer replacement, plugin audits, and non-1:1 customization gaps.
+---
+
 # Migrate from react-markdown
 
 If your current React Markdown renderer is `react-markdown`, moving to `markstream-react` is usually a two-step change:

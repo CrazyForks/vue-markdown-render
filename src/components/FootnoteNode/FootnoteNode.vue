@@ -42,8 +42,8 @@ defineEmits(['copy'])
 
 <style>
 /* 脚注中嵌套 NodeRenderer 关闭 content-visibility 占位，防止空白内容 */
-.markstream-vue [class*="footnote-"] :deep(.markdown-renderer),
-.markstream-vue .flex-1 :deep(.markdown-renderer) {
+.markstream-vue [class*="footnote-"] .markdown-renderer,
+.markstream-vue .flex-1 .markdown-renderer {
   content-visibility: visible;
   contain: content;
   contain-intrinsic-size: 0px 0px;

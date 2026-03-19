@@ -25,6 +25,7 @@
 ## 目录
 
 - [速览](#速览)
+- [按场景选择入口](#按场景选择入口)
 - [立即试用](#-立即试用)
 - [社区与支持](#-社区与支持)
 - [快速上手](#-快速上手)
@@ -57,6 +58,17 @@
 - 同时支持 **Markdown 字符串或预解析节点**，可在 Markdown 中嵌入 **自定义 Vue 组件**。
 - TypeScript 优先，开箱默认即可上线（导入 CSS 即用）。
 
+## 按场景选择入口
+
+| 如果你现在想做的是... | 先看这里 | 然后看 |
+| --- | --- | --- |
+| 先把第一段渲染跑起来 | [快速上手](#-快速上手) | [安装指南](https://markstream-vue-docs.simonhe.me/zh/guide/installation) |
+| 接到文档站或 VitePress 主题里 | [文档站与 VitePress 集成](https://markstream-vue-docs.simonhe.me/zh/guide/vitepress-docs-integration) | [自定义标签与高级组件](https://markstream-vue-docs.simonhe.me/zh/guide/custom-components) |
+| 做 AI 聊天界面或 SSE 流式输出 | [AI 聊天与流式输出](https://markstream-vue-docs.simonhe.me/zh/guide/ai-chat-streaming) | [性能](https://markstream-vue-docs.simonhe.me/zh/guide/performance) |
+| 替换一个内置节点渲染器 | [覆盖内置组件](https://markstream-vue-docs.simonhe.me/zh/guide/component-overrides) | [渲染器与节点组件](https://markstream-vue-docs.simonhe.me/zh/guide/components) |
+| 增加 `thinking` 这类可信标签 | [自定义标签与高级组件](https://markstream-vue-docs.simonhe.me/zh/guide/custom-components) | [API 参考](https://markstream-vue-docs.simonhe.me/zh/guide/api) |
+| 接入坏了但还不知道原因 | [按症状排查](https://markstream-vue-docs.simonhe.me/zh/guide/troubleshooting-path) | [排查问题](https://markstream-vue-docs.simonhe.me/zh/guide/troubleshooting) |
+
 ## 🚀 立即试用
 
 - Playground（交互演示）： https://markstream-vue.simonhe.me/
@@ -68,6 +80,22 @@
 - 更新日志： [CHANGELOG.md](./CHANGELOG.md)
 - Nuxt playground：`pnpm play:nuxt`
 - Discord： https://discord.gg/vkzdkjeRCW
+
+## skills 和 prompts 的 CLI
+
+如果你想直接拿到打包后的 AI 资产，而不是先克隆仓库：
+
+```bash
+npx markstream-vue skills list
+npx markstream-vue skills install
+npx markstream-vue prompts list
+npx markstream-vue prompts show install-markstream
+```
+
+推荐这样理解：
+
+- `skills install` 会把打包好的 skills 安装到你的 agent skills 目录，默认是 `~/.agents/skills`
+- `prompts list` / `prompts show` 用来发现并直接复制官方维护的 prompt 模板
 
 ## 💬 社区与支持
 

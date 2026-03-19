@@ -1,11 +1,26 @@
+---
+description: Look up MarkdownRender, CodeBlockNode, MermaidBlockNode, ImageNode, LinkNode, and other exported markstream-vue renderer components.
+---
+
+# Renderer & Node Components
+
+Use this page when you already know you need a specific exported component and want the shortest path to its props, events, CSS requirements, and the page that goes deeper.
+
+If you are still deciding where to customize the pipeline, start with:
+
+- Need parser helpers, AST hooks, or `setCustomComponents()` strategy: [API Reference](/guide/api)
+- Need a scoped renderer replacement: [Override Built-in Components](/guide/component-overrides)
+- Need trusted custom tags such as `thinking`: [Custom Tags & Advanced Components](/guide/custom-components)
+- Need configuration, performance, or toolbar tuning: [Props & Options](/guide/props)
+
 ## Quick reference
 
 | Component | Best for | Key props/events | Extra CSS / peers | Troubleshooting hooks |
 | --------- | -------- | ---------------- | ----------------- | --------------------- |
 | `MarkdownRender` | Rendering full AST trees (default export) | Props: `content` / `nodes`, `custom-id`, `final`, `parse-options`, `custom-html-tags`, `is-dark`, `code-block-props`, `mermaid-props`, `d2-props`, `infographic-props`; events: `copy`, `handleArtifactClick`, `click`, `mouseover`, `mouseout` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Use `setCustomComponents(customId, mapping)` + `custom-id` to scope overrides; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
-| `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; events: `copy`, `previewCode`; slots `header-left` / `header-right`; diff hover actions live under `monacoOptions` (`diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, `onDiffHunkAction`) | Install `stream-monaco` (peer) + bundle Monaco workers | Blank editor ⇒ check worker bundling + SSR guards |
+| `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; events: `copy`, `previewCode`; slots `header-left` / `header-right`; diff hover actions live under `monacoOptions` (`diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, `onDiffHunkAction`) | Install `stream-monaco` (peer) + bundle Monaco workers | Blank editor => check worker bundling + SSR guards |
 | `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `stream`, `loading`; slots `header-left` / `header-right` | Requires `shiki` + `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
-| `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` ≥ 11; no extra CSS required | For async errors see `/guide/mermaid` |
+| `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` >= 11; no extra CSS required | For async errors see `/guide/mermaid` |
 | `D2BlockNode` | Progressive D2 diagrams | `node`, `isDark`, `maxHeight`, `progressiveRender`, `progressiveIntervalMs`; toolbar toggles | Peer `@terrastruct/d2`; no extra CSS | Missing peer falls back to source; see `/guide/d2` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX rendering | `node` | Install `katex` and import `katex/dist/katex.min.css` | SSR requires `client-only` in Nuxt |
 | `ImageNode` | Custom previews/lightboxes | Props: `fallback-src`, `show-caption`, `lazy`, `svg-min-height`, `use-placeholder`; emits `click`, `load`, `error` | None, but respects global CSS | Wrap in a custom component + `setCustomComponents` to intercept events |
@@ -29,24 +44,33 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 ```
 
 Notes:
+
 - `NodeRendererProps` matches `<MarkdownRender>` props.
 - `CodeBlockNodeProps`, `MermaidBlockNodeProps`, `D2BlockNodeProps`, `InfographicBlockNodeProps`, and `PreCodeNodeProps` all use `CodeBlockNode` for `node` (use `language: 'mermaid'` / `language: 'd2'` / `language: 'd2lang'` / `language: 'infographic'` to route specialized renderers).
+
+## Pick the right component quickly
+
+- Use `MarkdownRender` for almost every app-level integration.
+- Use `CodeBlockNode`, `MermaidBlockNode`, `D2BlockNode`, or `MathBlockNode` when you are composing lower-level node renderers yourself.
+- Use `ImageNode`, `LinkNode`, or `VmrContainerNode` when you only need to replace one built-in node with custom behavior.
+- If you render node components directly, wrap them in `<div class="markstream-vue">...</div>` so packaged CSS variables and component styles apply.
 
 ## MarkdownRender
 
 > Main entry point that takes Markdown AST content (string or parsed structure) and renders with built-in node components.
 
 ### Quick reference
-- **Best for**: full markdown documents in Vite, Nuxt, VitePress.
-- **Key props**: `content` / `nodes`, `custom-id`, `final`, `parse-options`, `custom-html-tags` |
-- **CSS**: include a reset (`modern-css-reset`, `@unocss/reset`, or `@tailwind base`) before `markstream-vue/index.css`. Wrap import with `@layer components` when using Tailwind/UnoCSS.
 
-### CSS scoping
+- **Best for**: full markdown documents in Vite, Nuxt, VitePress.
+- **Key props**: `content` / `nodes`, `custom-id`, `final`, `parse-options`, `custom-html-tags`
+- **CSS order**: import reset first, then add `markstream-vue/index.css` inside `@layer components`.
+
+### CSS scope
 
 `markstream-vue` scopes its packaged CSS under an internal `.markstream-vue` container to reduce global style conflicts.
 
-- If you use `MarkdownRender`, you normally don't need to do anything—it's already rendered inside that container.
-- If you render node components standalone (e.g., `CodeBlockNode`, `MathBlockNode`), wrap them with `<div class="markstream-vue">...</div>` so the library styles and variables apply.
+- When you use `MarkdownRender`, this container is already present.
+- When you render node components directly, wrap them with `<div class="markstream-vue">...</div>` so theme variables and component styles apply.
 
 ### Usage ladder
 
@@ -54,7 +78,7 @@ Notes:
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
-const md = '# Hello docs\n\nUse `custom-id` to scope styles.'
+const md = '# Hello\n\nUse custom-id to scope styles.'
 </script>
 
 <template>
@@ -63,7 +87,7 @@ const md = '# Hello docs\n\nUse `custom-id` to scope styles.'
 ```
 
 ```ts
-// Register custom node renderers
+// Register custom nodes
 import { setCustomComponents } from 'markstream-vue'
 import CustomImageNode from './CustomImageNode.vue'
 
@@ -86,541 +110,131 @@ setCustomComponents('docs', {
 }
 ```
 
-### Performance knobs
+### Performance props
 
-- **Batching** — `batchRendering`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, and `renderBatchBudgetMs` define how many nodes transition from placeholders to full components per frame. This incremental mode runs only when virtualization is disabled (`:max-live-nodes="0"`); with virtualization on, the renderer favours instant paint plus DOM windowing over skeleton placeholders.
-- **Deferred nodes** — keep `deferNodesUntilVisible` + `viewportPriority` enabled to let heavy blocks (Mermaid, Monaco, KaTeX) yield until they approach the viewport. Disable only when you explicitly want every node to render eagerly.
-- **Virtualization window** — `maxLiveNodes` caps how many fully rendered nodes stay mounted; `liveNodeBuffer` controls overscan to avoid pop-in. Tuning these lets long docs stay responsive without sacrificing scrollback. See [Performance tips](/guide/performance) for sample values.
-- **Code block fallbacks** — `renderCodeBlocksAsPre` + `codeBlockStream` let you fall back to lightweight `<pre><code>` blocks for non‑Mermaid/Infographic code blocks or pause Monaco streaming when throughput takes priority over tooling.
+- **Batch rendering**: `batchRendering`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, and `renderBatchBudgetMs` control how many nodes switch from skeletons to real components per frame. This only activates when virtualization is disabled (`:max-live-nodes="0"`).
+- **Deferred heavy nodes**: `deferNodesUntilVisible` and `viewportPriority` are enabled by default so Mermaid, D2, Monaco, and KaTeX only load near the viewport.
+- **Virtualization window**: `maxLiveNodes` limits how many rendered nodes stay in the DOM, and `liveNodeBuffer` controls overscan. See [Performance](/guide/performance).
+- **Code block fallback**: use `renderCodeBlocksAsPre` and `codeBlockStream` to downgrade standard code fences to `<pre><code>` or disable streaming updates during heavy workloads.
 
-Combine these props with `custom-id` scoped styles and global parser options (`setDefaultMathOptions`, custom MarkdownIt plugins) to match the latency and UX expectations of your app.
+### Common issues
 
-### Common pitfalls
-- **Blank styles**: missing reset or incorrect layer ordering → use the [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here).
-- **Conflicting utility classes**: add `custom-id` and scope overrides to `[data-custom-id="..."]`.
-- **SSR errors**: wrap in `<ClientOnly>` (Nuxt) or guard with `onMounted` when using browser-only peers.
+- **Broken styles**: start with the [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here).
+- **Utility class leakage**: pass `custom-id` and scope overrides with `[data-custom-id="docs"]`.
+- **SSR errors**: wrap browser-only peers such as Mermaid, D2, and Monaco with client-only guards.
+
+### Use this when
+
+- You want the default parser + renderer path with the fewest moving parts.
+- You need one integration point for streaming, virtualization, batching, custom tags, and scoped overrides.
+- You want to choose between `content` and `nodes` without wiring individual node renderers yourself.
+
+### Most common combinations
+
+- `content` + `custom-id`: static or lightly customized documents.
+- `nodes` + `final`: streaming or server-preparsed workflows.
+- `custom-html-tags` + `setCustomComponents(customId, mapping)`: trusted custom tags such as `thinking`.
+- `renderCodeBlocksAsPre`: downgrade heavy code blocks during SSR or constrained environments.
 
 ## CodeBlockNode
 
-> Feature-rich renderer that streams Monaco tokens, supports diff markers, and header slots (`header-left`, `header-right`).
+> Monaco-backed code block renderer with streaming diff support and interactive toolbar actions.
 
-### Quick reference
-- **Best for**: interactive editor-like blocks in docs/playgrounds.
-- **Peers**: `stream-monaco` (core), Monaco worker bundling via Vite, optional `@shikijs/monaco` for highlighting.
-- **CSS**: none (no extra import required).
+- **Best for**: rich code review, diff inspection, live patches, hover actions.
+- **Key props**: `node`, `monacoOptions`, `stream`, `loading`
+- **Events**: `copy`, `previewCode`
+- **Slots**: `header-left`, `header-right`
+- **Peers**: `stream-monaco`, plus Monaco worker setup in your bundler
+- **Common gotcha**: if the editor area is blank, verify worker bundling and SSR guards first
 
-### Usage
+Reach for this when the code block itself is part of the product experience. If you only need syntax highlighting, prefer `MarkdownCodeBlockNode`.
 
-```vue
-<script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
-
-const node = {
-  type: 'code_block',
-  language: 'ts',
-  code: 'const a = 1',
-  raw: 'const a = 1',
-}
-</script>
-
-<template>
-  <div class="markstream-vue">
-    <CodeBlockNode :node="node" :monaco-options="{ fontSize: 14 }" />
-  </div>
-</template>
-```
-
-```vue
-<!-- Advanced: custom header controls -->
-<template>
-  <CodeBlockNode
-    custom-id="docs"
-    :node="node"
-    :show-copy-button="false"
-  >
-    <template #header-right>
-      <span class="tag">
-        Custom
-      </span>
-    </template>
-  </CodeBlockNode>
-</template>
-```
-
-### HTML/SVG preview dialog
-- When `node.language` is `html` or `svg` (and `isShowPreview` stays `true`), the toolbar exposes a Preview button.
-- Without a `@preview-code` listener, the built-in preview dialog is available for **HTML only**.
-- Attach `@preview-code` to handle **HTML and SVG** yourself. The emitted payload contains `{ node, artifactType, artifactTitle, id }`. Returning a listener automatically disables the built-in HTML preview overlay.
-
-```vue
-<script setup lang="ts">
-import { ref } from 'vue'
-
-const preview = ref(null)
-
-function handlePreview(artifact) {
-  preview.value = artifact
-}
-
-function closePreview() {
-  preview.value = null
-}
-</script>
-
-<template>
-  <CodeBlockNode
-    :node="node"
-    show-preview-button
-    @preview-code="handlePreview"
-  />
-
-  <dialog v-if="preview" class="my-preview" open>
-    <header>
-      <strong>{{ preview.artifactTitle }}</strong>
-      <button type="button" @click="closePreview">
-        Close
-      </button>
-    </header>
-    <iframe
-      v-if="preview.artifactType === 'text/html'"
-      :srcdoc="preview.node.code"
-      sandbox="allow-scripts allow-same-origin"
-    />
-    <div v-else v-html="preview.node.code" />
-  </dialog>
-</template>
-```
-
-> Tip: hide the toolbar control entirely with `:show-preview-button="false"`. To disable previews globally, pass `:code-block-props="{ isShowPreview: false }"` to `MarkdownRender`.
-
-### Common pitfalls
-- **Editor invisible**: worker registration missing or blocked by SSR.
-- **Tailwind overriding fonts**: wrap imports in `@layer components`.
-- **SSR**: Monaco requires browser APIs; use lazy mounts (`client-only`) or guard with `onMounted`.
+Deep dive: [CodeBlockNode](/guide/code-block-node), [Monaco](/guide/monaco)
 
 ## MarkdownCodeBlockNode
 
-> Lightweight code blocks using Shiki instead of Monaco — perfect for SSR/static docs or when bundle size matters.
+> Lightweight syntax-highlighted code block renderer powered by `shiki` and `stream-markdown`.
 
-### Quick reference
-- **Peers**: `shiki` + `stream-markdown`.
-- **Props**: similar to `CodeBlockNode` (streaming + header controls); lazy-loads `stream-markdown` for Shiki rendering.
-- **Tooltip control**: `showTooltips` defaults to `true`; set `false` to disable header action tooltips.
-- **Emits**: `copy` (payload: copied text), `previewCode` (payload: `{ type, content, title }`).
-- **When to choose it**: VitePress, Nuxt content sites, or anywhere Monaco would be overkill.
+- **Best for**: SSR-friendly docs, blog-style pages, smaller bundles
+- **Key props**: `node`, `stream`, `loading`
+- **Slots**: `header-left`, `header-right`
+- **Peers**: `shiki`, `stream-markdown`
+- **Common gotcha**: if highlighting never appears, confirm both peers are installed and loaded in the environment where rendering happens
 
-### Usage
-
-```vue
-<script setup lang="ts">
-import { MarkdownCodeBlockNode } from 'markstream-vue'
-
-const node = {
-  type: 'code_block',
-  language: 'vue',
-  code: '<template><p>Hello</p></template>',
-  raw: '<template><p>Hello</p></template>',
-}
-</script>
-
-<template>
-  <MarkdownCodeBlockNode :node="node" />
-</template>
-```
-
-Troubleshooting:
-- Ensure `shiki` is installed and properly bundled; otherwise the component falls back to plain `<pre><code>`.
-- Wrap CSS imports just like the main renderer to avoid Tailwind/Uno overrides.
+Choose this when you do not need Monaco's editing surface or diff interactions.
 
 ## MermaidBlockNode
 
-> Renders Mermaid diagrams progressively, streaming updates as soon as `mermaid` parses the graph.
+> Progressive Mermaid renderer with copy/export/modal hooks.
 
-### Quick reference
-- **Peer**: `mermaid` ≥ 11 (tree-shakable ESM build recommended).
-- **CSS**: no extra Mermaid CSS import is required; keep `markstream-vue/index.css` after your reset.
-- **Props**: `node`, `isDark`, `isStrict`, `maxHeight`, timeouts, header/button toggles, `enableWheelZoom`.
-- **Tooltip control**: `showTooltips` defaults to `true`; set `false` to disable header action tooltips.
-- **Emits**: `copy`, `export`, `openModal`, `toggleMode` (call `ev.preventDefault()` to stop the default action).
+- **Best for**: large Mermaid graphs, AI-generated diagrams, user-triggered export
+- **Key props**: `node`, `isDark`, `isStrict`, `maxHeight`
+- **Events**: `copy`, `export`, `openModal`, `toggleMode`
+- **Peer**: `mermaid` >= 11
+- **Common gotcha**: SSR setups must gate Mermaid initialization to the client
 
-### Usage
-
-```ts
-import { MermaidBlockNode } from 'markstream-vue'
-```
-
-```vue
-<script setup lang="ts">
-function onExport(ev: any) {
-  // `ev.svgString` is available when the export button is clicked.
-  console.log(ev.svgString)
-}
-</script>
-
-<MermaidBlockNode
-  :node="node"
-  :is-strict="true"
-  @export="onExport"
-/>
-```
-
-Troubleshooting:
-- Async errors usually stem from missing CSS or unsupported syntax. Check browser console for Mermaid logs.
-- When diagrams come from untrusted sources (user/LLM), enable `isStrict` to sanitize the SVG and disable HTML labels—this closes holes where `javascript:` URLs or inline handlers could slip into the render.
-- When diagrams are blank in SSR, guard rendering with `onMounted` or `<ClientOnly>` and ensure Mermaid is initialized on the client.
+Deep dive: [Mermaid](/guide/mermaid), [MermaidBlockNode](/guide/mermaid-block-node)
 
 ## D2BlockNode
 
-> Progressive D2 rendering with source fallback; keeps the last successful preview if a render fails.
+> Progressive D2 diagram renderer for structured architecture diagrams and sequence-like layouts.
 
-### Quick reference
-- **Peer**: `@terrastruct/d2`.
-- **CSS**: no extra CSS required; keep `markstream-vue/index.css` after your reset.
-- **Props**: `node`, `isDark`, `maxHeight`, `progressiveRender`, `progressiveIntervalMs`, `themeId`, `darkThemeId`, header/button toggles.
+- **Best for**: D2-driven docs, generated architecture views, progressive rendering
+- **Key props**: `node`, `isDark`, `maxHeight`, `progressiveRender`, `progressiveIntervalMs`
+- **Peer**: `@terrastruct/d2`
+- **Common gotcha**: missing peer falls back to source display instead of the rendered diagram
 
-### Usage
-
-```vue
-<script setup lang="ts">
-import { D2BlockNode } from 'markstream-vue'
-
-const node = {
-  type: 'code_block',
-  language: 'd2',
-  code: 'direction: right\\nClient -> API: request\\nAPI -> DB: query',
-  raw: 'direction: right\\nClient -> API: request\\nAPI -> DB: query',
-}
-</script>
-
-<template>
-  <D2BlockNode :node="node" :progressive-interval-ms="600" />
-</template>
-```
-
-Troubleshooting:
-- If `@terrastruct/d2` is missing, the component falls back to showing source until the peer is installed.
-- Use `:is-dark="true"` or a `.dark` ancestor to control D2 theme rendering.
-- For SSR, render on the client (`onMounted` / `<ClientOnly>`) since D2 relies on the DOM.
+Deep dive: [D2](/guide/d2)
 
 ## MathBlockNode / MathInlineNode
 
-> KaTeX-powered math display for block and inline formulas.
+> KaTeX-backed block and inline math renderers.
 
-### Quick reference
-- **Peer**: `katex`.
-- **CSS**: `import 'katex/dist/katex.min.css'`.
-- **Props**: `node`.
+- **Best for**: technical docs, formulas, AI math responses
+- **Key prop**: `node`
+- **Peer**: `katex`
+- **Required CSS**: `katex/dist/katex.min.css`
+- **Common gotcha**: invisible math usually means KaTeX CSS is missing, not that parsing failed
 
-### Usage
+## ImageNode
 
-```ts
-import 'katex/dist/katex.min.css'
-```
+> Built-in image renderer with sensible defaults for captioning, fallbacks, and lazy behavior.
 
-```vue
-<MathBlockNode :node="node" />
+- **Best for**: custom previews, analytics hooks, lightbox integration
+- **Key props**: `fallback-src`, `show-caption`, `lazy`, `svg-min-height`, `use-placeholder`
+- **Events**: `click`, `load`, `error`
+- **Common pattern**: wrap this with a custom component and register it through `setCustomComponents(customId, { image: CustomImageNode })`
 
-<MathInlineNode :node="inlineNode" />
-```
+Deep dive: [ImageNode](/guide/image-node)
 
-Troubleshooting:
-- Missing CSS → blank formulas or fallback text.
-- Nuxt SSR needs `<ClientOnly>` or `client:only` since math rendering is client-only.
-- To override styling, scope selectors using `[data-custom-id]` rather than editing KaTeX globals directly.
+## LinkNode
 
-## ImageNode — Custom preview handling
+> Link renderer with underline animation and optional tooltip behavior.
 
-`ImageNode` emits `click`, `load`, `error` so you can build lightboxes or lazy loading wrappers.
+- **Best for**: docs sites and chat surfaces where link affordance needs to match your design system
+- **Key props**: `color`, `underlineHeight`, `showTooltip`
+- **Common gotcha**: browser defaults or resets can override anchor styles, so verify CSS order before assuming the component is broken
 
-```vue
-<template>
-  <ImageNode :node="node" @click="([_ev, src]) => open(src)" />
-</template>
-```
+## VmrContainerNode
 
-```ts
-import { setCustomComponents } from 'markstream-vue'
-import CustomImageNode from './ImagePreview.vue'
+> Renderer for `:::` containers and other normalized block containers coming from the parser.
 
-setCustomComponents('docs', { image: CustomImageNode })
-```
+- **Best for**: callouts, notices, AI-specific block types, container-style custom components
+- **Key prop**: `node` with `name`, `attrs`, `loading`, and `children`
+- **Normalization detail**: JSON attrs are normalized onto `node.attrs`; invalid or partial JSON is preserved under `attrs.attrs`; args after the container name are stored in `attrs.args`
+- **Common pattern**: use this together with `custom-html-tags` or parser hooks when you need trusted structured blocks
 
-Common issues:
-- Missing reset causes browser default borders—import a reset before `index.css`.
-- Tailwind `img` utilities overriding widths—scope your overrides within `[data-custom-id]`.
+## Direct node rendering checklist
 
-## LinkNode: underline animation & color customization
+When you bypass `MarkdownRender` and mount node components directly:
 
-`LinkNode` (internal anchor renderer) exposes runtime props (`color`, `underlineHeight`, `showTooltip`, etc.) so you can change the underline animation without CSS hacks.
+- Wrap them in a `.markstream-vue` container.
+- Import the same CSS you would for the full renderer.
+- Install and guard only the peers needed by the nodes you actually render.
+- Scope any replacement styles with a parent selector or `data-custom-id` equivalent.
 
-```vue
-<LinkNode
-  :node="node"
-  color="#e11d48"
-  :underline-height="3"
-  underline-bottom="-4px"
-  :animation-duration="1.2"
-  :show-tooltip="false"
-/>
-```
+## Need a different layer of the stack?
 
-Notes:
-- Underline uses `currentColor`; override via CSS if you need a different color.
-- `showTooltip` toggles the singleton tooltip vs native browser `title`.
-- Browser default anchor styles may conflict; follow the reset guidance above.
-
-## HtmlInlineNode — streaming inline HTML
-
-`HtmlInlineNode` renders `html_inline` nodes produced by the parser (inline HTML like `<span>...</span>`).
-
-Streaming behavior:
-- If the node is a **true mid‑state** (`loading === true` and `autoClosed !== true`), the component renders the literal text to avoid flashing incomplete tags.
-- If the node is **auto‑closed mid‑state** (`autoClosed === true`), the parser has appended a closing tag for stability. The component renders HTML via `innerHTML` but keeps `loading=true` so your app can still treat it as incomplete input.
-- Once the real closing tag arrives, the parser clears `loading` and `autoClosed` and the node renders as normal HTML.
-
-## VmrContainerNode — custom ::: containers
-
-`VmrContainerNode` renders custom `:::` containers with support for nested markdown content.
-
-### Quick reference
-- **Best for**: Custom container blocks like `::: viewcode:topo-test-001 {"devId":"..."}`.
-- **Rendering**: Recursively renders child nodes (paragraphs, lists, code blocks, etc.).
-- **CSS**: Minimal base styles; override via `setCustomComponents`.
-
-### Supported child nodes
-
-The component supports the following block-level nodes inside containers:
-- **Inline nodes** (inside paragraphs): text, strong, emphasis, link, image, inline_code, etc.
-- **Block nodes**: paragraph, heading, list, blockquote, code_block, math_block, table
-
-Unknown node types fall back to `FallbackComponent`, which displays the node type and raw content for debugging.
-
-### Syntax
-
-```markdown
-::: container-name {"key":"value"}
-Content here...
-:::
-```
-
-The parser extracts:
-- `name` — the container name (e.g., `viewcode:topo-test-001`)
-- `attrs` — parsed attributes (keys normalized from `data-*` to plain keys)
-- `children` — child nodes (parsed markdown content)
-- `raw` — the original raw markdown string
-
-### Node type definition
-
-```typescript
-interface VmrContainerNode {
-  type: 'vmr_container'
-  name: string // Container name from ::: name
-  attrs?: Record<string, unknown> // Parsed attributes (values may be strings, numbers, or booleans)
-  loading?: boolean // Streaming mid-state: true when container is not closed
-  children: ParsedNode[] // Child nodes
-  raw: string // Raw markdown source
-}
-```
-
-### Streaming behavior
-
-When rendering containers in a streaming context (e.g., LLM output), the parser handles incomplete JSON attributes gracefully:
-
-- **Loading state**: When a `:::` container is opened but not yet closed, `loading` is set to `true`. This allows your component to show an intermediate state (like a skeleton loader) while content is streaming.
-
-- **Attribute handling**:
-  - Args right after the container name are stored as `attrs.args` (string).
-  - JSON attributes are normalized onto `attrs` (keys without the `data-` prefix), e.g. `{"devId":"abc"}` → `attrs.devId = "abc"`.
-  - If JSON parsing fails (invalid or partial JSON), the raw string is preserved in `attrs.attrs`.
-
-Example streaming progression:
-```markdown
-# Initially (mid-state)
-::: viewcode:stream {"incomplete
-# → attrs.attrs = '{"incomplete', loading = true
-
-# After more content
-::: viewcode:stream {"devId":"abc"}
-# → attrs.devId = "abc", loading = false (if closing ::: present)
-```
-
-### Default rendering
-
-The default component recursively renders all child nodes:
-
-```vue
-<!-- Default VmrContainerNode output -->
-<div class="vmr-container vmr-container-container-name" v-bind="node.attrs">
-  <!-- Child nodes rendered here (paragraphs, lists, code blocks, etc.) -->
-</div>
-```
-
-### Example content inside containers
-
-```markdown
-::: info
-This is a **bold** paragraph with [links](https://example.com).
-
-## Heading inside container
-
-- List item 1
-- List item 2
-
-```js
-console.log('code blocks work too')
-```
-:::
-```
-
-### Custom override
-
-To customize rendering, register your component using `setCustomComponents`:
-
-```vue
-<script setup lang="ts">
-import { setCustomComponents } from 'markstream-vue'
-import MyViewCode from './MyViewCode.vue'
-
-setCustomComponents('docs', {
-  vmr_container: MyViewCode,
-})
-</script>
-
-<template>
-  <MarkdownRender custom-id="docs" :content="markdown" />
-</template>
-```
-
-### Example: ViewCode component
-
-Here's a complete example that renders a custom `viewcode:*` container:
-
-```vue
-<!-- components/ViewCodeContainer.vue -->
-<script setup lang="ts">
-import MarkdownRender from 'markstream-vue'
-import { computed } from 'vue'
-
-interface Props {
-  node: {
-    type: 'vmr_container'
-    name: string
-    attrs?: Record<string, unknown>
-    children: any[]
-    raw: string
-  }
-  indexKey?: number | string
-  customId?: string
-}
-
-const props = defineProps<Props>()
-
-// Extract devId from attrs
-const devId = computed(() => String(props.node.attrs?.devId ?? ''))
-const args = computed(() => String(props.node.attrs?.args ?? ''))
-
-// Check if this is a viewcode container
-const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
-</script>
-
-<template>
-  <!-- Custom rendering for viewcode containers -->
-  <div v-if="isViewCode" class="viewcode-wrapper">
-    <div class="viewcode-header">
-      <span class="viewcode-title">{{ node.name }}</span>
-      <span class="viewcode-dev-id">{{ devId || args }}</span>
-    </div>
-    <div class="viewcode-content">
-      <MarkdownRender
-        :nodes="node.children"
-        :custom-id="customId"
-        :index-key="`${indexKey}-viewcode`"
-      />
-    </div>
-  </div>
-
-  <!-- Fallback rendering for other containers -->
-  <div v-else class="vmr-container" :class="`vmr-container-${node.name}`">
-    <MarkdownRender
-      :nodes="node.children"
-      :custom-id="customId"
-      :index-key="`${indexKey}-fallback`"
-    />
-  </div>
-</template>
-
-<style scoped>
-.viewcode-wrapper {
-  border: 1px solid #eaecef;
-  border-radius: 8px;
-  overflow: hidden;
-  margin: 1rem 0;
-}
-
-.viewcode-header {
-  background: #f8f8f8;
-  padding: 0.5rem 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #eaecef;
-}
-
-.viewcode-title {
-  font-weight: 600;
-  color: #333;
-}
-
-.viewcode-dev-id {
-  font-family: monospace;
-  font-size: 0.875rem;
-  color: #666;
-}
-
-.viewcode-content {
-  padding: 1rem;
-}
-</style>
-```
-
-### Example: Conditional rendering by name
-
-You can also render different components based on the container name:
-
-```vue
-<script setup lang="ts">
-import { setCustomComponents } from 'markstream-vue'
-import { h } from 'vue'
-import AlertContainer from './AlertContainer.vue'
-import ChartContainer from './ChartContainer.vue'
-import GenericContainer from './GenericContainer.vue'
-
-// Mapping of container names to components
-const containerMap = {
-  chart: ChartContainer,
-  alert: AlertContainer,
-}
-
-setCustomComponents('docs', {
-  vmr_container: (node) => {
-    // Select component based on container name
-    const Component = containerMap[node.name as keyof typeof containerMap]
-      || GenericContainer
-
-    return h(Component, { node })
-  },
-})
-</script>
-```
-
-### Troubleshooting
-- **Raw text visible**: You're seeing the default renderer. Register a custom component via `setCustomComponents`.
-- **Attrs undefined**: This is normal when you didn't pass any args/JSON. Invalid/partial JSON falls back to `attrs.attrs` with the raw string.
-- **Component not receiving props**: Make sure your component accepts the `node` prop with the correct type.
-- **Streaming with incomplete attrs**: In streaming scenarios you may temporarily see `attrs.attrs` containing partial JSON like `{"incomplete` until the full syntax arrives. Check `node.loading` to detect this mid-state.
-
-## Utility helpers
-
-- `getMarkdown()` — configured `markdown-it-ts` instance with the parser plugins this package expects.
-- `parseMarkdownToStructure(content, md)` — convert Markdown strings into the AST consumed by `MarkdownRender`.
-- `setCustomComponents(id?, mapping)` — swap any node renderer for a specific `custom-id`.
+- Use [API Reference](/guide/api) for parser helpers, `setCustomComponents`, and AST hooks.
+- Use [Props & Options](/guide/props) for full renderer prop behavior.
+- Use [Troubleshooting](/guide/troubleshooting) if the right component is already chosen but CSS, peers, or SSR still misbehave.

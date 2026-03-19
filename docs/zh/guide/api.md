@@ -1,6 +1,12 @@
-# API 指南
+---
+description: 查阅 markstream-vue 的底层 API，包括解析器工具、渲染流程选择、作用域覆盖与 AST 级接入能力。
+---
 
-本页串联解析器工具、渲染器 props 与自定义钩子，帮助你快速定位入口。搭配 [使用示例](/zh/guide/usage) 与 [props](/zh/guide/props) 页面一起阅读效果更佳。
+# API 参考
+
+本页聚焦 `markstream-vue` 的底层入口：解析器工具、渲染流程选择，以及作用域覆盖相关钩子。
+
+如果你是想查 `MarkdownRender`、`CodeBlockNode`、`ImageNode` 这类导出的 Vue 组件，请优先看 [渲染器与节点组件](/zh/guide/components)。搭配 [使用示例](/zh/guide/usage) 与 [props](/zh/guide/props) 页面一起阅读效果更佳。
 
 ## 渲染流程速览
 

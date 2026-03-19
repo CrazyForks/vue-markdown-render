@@ -1,3 +1,18 @@
+---
+description: 快速查阅 MarkdownRender、CodeBlockNode、MermaidBlockNode、ImageNode、LinkNode 等 markstream-vue 导出组件。
+---
+
+# 渲染器与节点组件
+
+当你已经明确知道自己要找的是某个导出的组件，并且想快速确认它的 props、事件、CSS 要求，以及该去哪个页面继续往下看时，就从这页开始。
+
+如果你还在判断应该改解析流程、作用域覆盖，还是组件替换，建议先看：
+
+- 想查解析器工具、AST hooks 或 `setCustomComponents()` 的接入方式： [API 参考](/zh/guide/api)
+- 想有作用域地替换内置渲染器： [覆盖内置组件](/zh/guide/component-overrides)
+- 想支持 `thinking` 这类可信标签： [自定义标签与高级组件](/zh/guide/custom-components)
+- 想调配置、性能或工具栏： [Props 与选项](/zh/guide/props)
+
 ## 快速参考
 
 | 组件 | 推荐场景 | 关键 props / 事件 | 额外 CSS / 同伴依赖 | 排障提示 |
@@ -5,7 +20,7 @@
 | `MarkdownRender` | 渲染完整 AST（默认导出） | Props：`content` / `nodes`、`custom-id`、`final`、`parse-options`、`custom-html-tags`、`is-dark`、`code-block-props`、`mermaid-props`、`d2-props`、`infographic-props`；事件：`copy`、`handleArtifactClick`、`click`、`mouseover`、`mouseout` | 在 reset 之后引入 `markstream-vue/index.css`（CSS 已被限定在内部 `.markstream-vue` 容器中），并放入受控 layer | 用 `setCustomComponents(customId, mapping)` + `custom-id` 限定覆盖范围；配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
 | `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`stream`、`loading`；事件：`copy`、`previewCode`；插槽 `header-left` / `header-right`；diff 悬浮操作配置放在 `monacoOptions`（`diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction`） | 安装 `stream-monaco`（peer）并打包 Monaco workers | 空白编辑器 → 优先检查 worker 打包与 SSR |
 | `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`stream`、`loading`；插槽 `header-left` / `header-right` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
-| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` ≥ 11；无需额外 CSS | 详见 `/zh/guide/mermaid` |
+| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` >= 11；无需额外 CSS | 详见 `/zh/guide/mermaid` |
 | `D2BlockNode` | 渐进式 D2 图 | `node`、`isDark`、`maxHeight`、`progressiveRender`、`progressiveIntervalMs`；工具栏开关 | `@terrastruct/d2`；无需额外 CSS | 缺少依赖会回退到源码；详见 `/zh/guide/d2` |
 | `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
 | `ImageNode` | 自定义图片预览 / 懒加载 | Props：`fallback-src`、`show-caption`、`lazy`、`svg-min-height`、`use-placeholder`；事件：`click` / `load` / `error` | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
@@ -29,17 +44,26 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 ```
 
 说明：
+
 - `NodeRendererProps` 对应 `<MarkdownRender>` props。
 - `CodeBlockNodeProps` / `MermaidBlockNodeProps` / `D2BlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps` 的 `node` 统一为 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'd2'` / `language: 'd2lang'` / `language: 'infographic'` 区分渲染器）。
+
+## 先快速判断该用哪个组件
+
+- 大多数业务接入都应该先用 `MarkdownRender`。
+- 如果你要自己拼接底层节点渲染器，再考虑 `CodeBlockNode`、`MermaidBlockNode`、`D2BlockNode`、`MathBlockNode`。
+- 如果你只是想替换单个内置节点，通常看 `ImageNode`、`LinkNode`、`VmrContainerNode` 这一层就够了。
+- 如果你脱离 `MarkdownRender` 单独渲染节点组件，请记得包一层 `<div class="markstream-vue">...</div>`，否则库内变量和样式不会完整生效。
 
 ## MarkdownRender
 
 > 主入口：接受 Markdown 字符串或解析后的 AST，然后使用内置节点渲染器输出。
 
 ### 快速要点
+
 - **适用**：Vite/Nuxt/VitePress 中渲染整篇 Markdown。
-- **关键 props**：`content` / `nodes`、`custom-id`、`final`、`parse-options`、`custom-html-tags` |
-- **CSS 顺序**：先引入 reset（`modern-css-reset`、`@unocss/reset`、`@tailwind base`），再在 `@layer components` 中导入 `markstream-vue/index.css`。
+- **关键 props**：`content` / `nodes`、`custom-id`、`final`、`parse-options`、`custom-html-tags`
+- **CSS 顺序**：先引入 reset，再在 `@layer components` 中导入 `markstream-vue/index.css`。
 
 ### CSS 作用域
 
@@ -88,534 +112,129 @@ setCustomComponents('docs', {
 
 ### 性能相关 props
 
-- **批量渲染** —— `batchRendering`、`initialRenderBatchSize`、`renderBatchSize`、`renderBatchDelay`、`renderBatchBudgetMs` 控制每一帧有多少节点从占位骨架切换为真实组件。仅在关闭虚拟化（`:max-live-nodes="0"`）时会启用增量骨架模式；默认启用虚拟化时会直接渲染当前窗口的节点。
-- **延迟可见节点** —— `deferNodesUntilVisible` 与 `viewportPriority` 默认开启，让 Mermaid、D2、Monaco、KaTeX 等重型节点只有在接近视口时才加载。除非明确需要一次性渲染所有节点，否则不建议关闭。
-- **虚拟化窗口** —— `maxLiveNodes` 限制 DOM 中最多保留多少个已渲染节点，`liveNodeBuffer` 控制超前/超后范围。合理设置可在保持可滚动回溯的同时，避免大文档拖慢页面。详见 [性能指南](/zh/guide/performance)。
-- **代码块降级** —— 通过 `renderCodeBlocksAsPre` 与 `codeBlockStream` 可将非 Mermaid/Infographic/D2 代码块切换为 `<pre><code>` 简化渲染，或在高负载时临时关闭 Monaco 流式更新。
-
-结合这些 props，再配合 `custom-id` 作用域样式与全局解析设置（`setDefaultMathOptions`、自定义 MarkdownIt 插件），即可针对不同项目调出最适合的性能与体验平衡。
+- **批量渲染** —— `batchRendering`、`initialRenderBatchSize`、`renderBatchSize`、`renderBatchDelay`、`renderBatchBudgetMs` 控制每一帧有多少节点从占位骨架切换为真实组件。仅在关闭虚拟化（`:max-live-nodes="0"`）时会启用增量骨架模式。
+- **延迟可见节点** —— `deferNodesUntilVisible` 与 `viewportPriority` 默认开启，让 Mermaid、D2、Monaco、KaTeX 等重型节点只有在接近视口时才加载。
+- **虚拟化窗口** —— `maxLiveNodes` 限制 DOM 中最多保留多少个已渲染节点，`liveNodeBuffer` 控制超前/超后范围。详见 [性能指南](/zh/guide/performance)。
+- **代码块降级** —— 通过 `renderCodeBlocksAsPre` 与 `codeBlockStream` 可将普通代码块切换为 `<pre><code>` 或关闭流式更新。
 
 ### 常见问题
-- **样式错乱**：先检查 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here)（reset、layer 顺序、同伴 CSS）。
+
+- **样式错乱**：先检查 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here)。
 - **工具类覆盖**：传入 `custom-id` 并使用 `[data-custom-id="docs"]` 限定样式。
 - **SSR 报错**：对只在浏览器可用的同伴依赖（Mermaid、D2、Monaco）使用 `<ClientOnly>` 或 `onMounted`。
 
+### 什么时候优先用它
+
+- 你想走“默认解析器 + 默认渲染器”的最短接入路径。
+- 你希望把流式渲染、虚拟化、批量渲染、自定义标签、作用域覆盖都集中在一个入口处理。
+- 你还不想自己拼装各个节点渲染器，只是要在 `content` 与 `nodes` 之间做选择。
+
+### 最常见的组合方式
+
+- `content` + `custom-id`：静态页面或轻量定制页面。
+- `nodes` + `final`：流式输出、服务端预解析、增量渲染。
+- `custom-html-tags` + `setCustomComponents(customId, mapping)`：像 `thinking` 这样的可信标签。
+- `renderCodeBlocksAsPre`：SSR 或受限环境里，把重型代码块降级成普通 `<pre><code>`。
+
 ## CodeBlockNode
 
-> 支持 Monaco 渲染、流式 diff，以及头部插槽（`header-left`、`header-right`）的代码块组件。
+> 基于 Monaco 的代码块渲染器，支持流式 diff 和交互式工具栏。
 
-### 快速要点
-- **适用**：需要交互、滚动同步或流式输出的代码片段。
-- **依赖**：`stream-monaco`（peer）。生产构建需配置 Monaco worker 打包（Vite 推荐 `vite-plugin-monaco-editor-esm`）。
-- **CSS**：无需额外导入。
+- **适合**：代码审阅、diff 检查、补丁预览、悬浮操作
+- **关键 props**：`node`、`monacoOptions`、`stream`、`loading`
+- **事件**：`copy`、`previewCode`
+- **插槽**：`header-left`、`header-right`
+- **同伴依赖**：`stream-monaco`，以及 bundler 里的 Monaco worker 配置
+- **常见问题**：编辑器空白时，优先检查 worker 打包和 SSR 边界
 
-### 示例
+如果代码块本身就是产品体验的一部分，用它最合适；如果你只是想高亮代码，不需要 Monaco 的编辑能力，优先看 `MarkdownCodeBlockNode`。
 
-```vue
-<script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
-
-const node = {
-  type: 'code_block',
-  language: 'ts',
-  code: 'const a = 1',
-  raw: 'const a = 1',
-}
-</script>
-
-<template>
-  <div class="markstream-vue">
-    <CodeBlockNode :node="node" :monaco-options="{ fontSize: 14 }" />
-  </div>
-</template>
-```
-
-```vue
-<!-- 进阶：自定义头部控制 -->
-<template>
-  <CodeBlockNode
-    custom-id="docs"
-    :node="node"
-    :show-copy-button="false"
-  >
-    <template #header-right>
-      <span class="tag">
-        Custom
-      </span>
-    </template>
-  </CodeBlockNode>
-</template>
-```
-
-### HTML/SVG 预览对话框
-- 当 `node.language` 为 `html` 或 `svg`（且 `isShowPreview` 保持 `true`）时，工具栏会显示 Preview 按钮。
-- 不监听 `@preview-code` 的情况下，内置预览弹窗仅支持 **HTML**。
-- 监听 `@preview-code` 可自行处理 **HTML 与 SVG**。事件会携带 `{ node, artifactType, artifactTitle, id }`；一旦存在监听器，默认 HTML 预览弹窗会被自动禁用。
-
-```vue
-<script setup lang="ts">
-import { ref } from 'vue'
-
-const preview = ref(null)
-
-function handlePreview(artifact) {
-  preview.value = artifact
-}
-
-function closePreview() {
-  preview.value = null
-}
-</script>
-
-<template>
-  <CodeBlockNode
-    :node="node"
-    show-preview-button
-    @preview-code="handlePreview"
-  />
-
-  <dialog v-if="preview" class="my-preview" open>
-    <header>
-      <strong>{{ preview.artifactTitle }}</strong>
-      <button type="button" @click="closePreview">
-        关闭
-      </button>
-    </header>
-    <iframe
-      v-if="preview.artifactType === 'text/html'"
-      :srcdoc="preview.node.code"
-      sandbox="allow-scripts allow-same-origin"
-    />
-    <div v-else v-html="preview.node.code" />
-  </dialog>
-</template>
-```
-
-> 小贴士：可以通过 `:show-preview-button="false"` 隐藏按钮；若要全局禁用预览，可在 `MarkdownRender` 上传入 `:code-block-props="{ isShowPreview: false }"`。
-
-### 常见问题
-- **编辑器空白**：worker 未注册或 SSR 环境下提前执行。
-- **Tailwind 覆盖字体/背景**：复查 reset/layer 顺序，并避免全局样式覆盖编辑器容器。
-- **SSR**：Monaco 依赖浏览器 API，Nuxt 需 `<ClientOnly>`，Vite SSR 需 `onMounted` 才渲染节点。
+深入页面： [CodeBlockNode](/zh/guide/code-block-node)、[Monaco](/zh/guide/monaco)
 
 ## MarkdownCodeBlockNode
 
-> 基于 Shiki 的轻量代码块，专为 SSR/静态站点或对包体积敏感的场景设计。
+> 基于 `shiki` 和 `stream-markdown` 的轻量代码块渲染器。
 
-### 快速要点
-- **依赖**：`shiki` + `stream-markdown`。
-- **Props**：与 `CodeBlockNode` 类似（streaming + 头部控制）；内部会懒加载 `stream-markdown` 来做 Shiki 渲染。
-- **Tooltip 控制**：`showTooltips` 默认 `true`；设为 `false` 可关闭头部按钮 tooltip。
-- **事件**：`copy`（负载：复制的文本）、`previewCode`（负载：`{ type, content, title }`）。
-- **适用场景**：VitePress、内容站点或无需 Monaco 的应用。
+- **适合**：SSR 友好的文档站、博客页、更小的打包体积
+- **关键 props**：`node`、`stream`、`loading`
+- **插槽**：`header-left`、`header-right`
+- **同伴依赖**：`shiki`、`stream-markdown`
+- **常见问题**：一直没有高亮时，先确认两个 peers 都已安装，并在实际渲染环境里可用
 
-### 示例
-
-```vue
-<script setup lang="ts">
-import { MarkdownCodeBlockNode } from 'markstream-vue'
-
-const node = {
-  type: 'code_block',
-  language: 'vue',
-  code: '<template><p>Hello</p></template>',
-  raw: '<template><p>Hello</p></template>',
-}
-</script>
-
-<template>
-  <MarkdownCodeBlockNode :node="node" />
-</template>
-```
-
-排障：
-- 未安装 `shiki` 时会退回 `<pre><code>`，请确认依赖与 bundler 配置。
-- 同样需要在 `@layer components` 中引入相关 CSS，避免被 Tailwind/Uno 覆盖。
+如果你不需要 Monaco 的编辑面板和 diff 交互，这个通常是更轻的选择。
 
 ## MermaidBlockNode
 
-> 渐进式渲染 Mermaid 图，随着 `mermaid` 解析完成即时更新。
+> 渐进式 Mermaid 渲染器，带复制、导出、弹窗等交互能力。
 
-### 快速要点
-- **依赖**：`mermaid` ≥ 11（推荐 ESM 构建）。
-- **Props**：`node`、`isDark`、`isStrict`、`maxHeight`、超时参数、Header/按钮开关、`enableWheelZoom` 等。
-- **Tooltip 控制**：`showTooltips` 默认 `true`；设为 `false` 可关闭头部按钮 tooltip。
-- **事件**：`copy`、`export`、`openModal`、`toggleMode`（可通过 `ev.preventDefault()` 阻止默认行为）。
+- **适合**：大图、AI 生成图表、用户主动导出
+- **关键 props**：`node`、`isDark`、`isStrict`、`maxHeight`
+- **事件**：`copy`、`export`、`openModal`、`toggleMode`
+- **同伴依赖**：`mermaid` >= 11
+- **常见问题**：SSR 场景要把 Mermaid 初始化放到客户端边界之后
 
-### 示例
-
-```vue
-<script setup lang="ts">
-function onExport(ev: any) {
-  // 点击导出按钮时可拿到 `ev.svgString`
-  console.log(ev.svgString)
-}
-</script>
-
-<MermaidBlockNode
-  :node="node"
-  :is-strict="true"
-  @export="onExport"
-/>
-```
-
-排障：
-- 若出现空白，请查看控制台日志（多数为 CSS 漏引或语法不兼容）。
-- 渲染不可信来源（用户/LLM 等）的 Mermaid 时，建议开启 `isStrict`，组件会对 SVG 进行清理并禁用 HTML labels，避免 `javascript:` 链接或内联事件混入渲染结果。
-- SSR/Nuxt 环境需要 `onMounted` 或 `<ClientOnly>` 避免在服务端执行 mermaid。
+深入页面： [Mermaid](/zh/guide/mermaid)、[MermaidBlockNode](/zh/guide/mermaid-block-node)
 
 ## D2BlockNode
 
-> 渐进式 D2 渲染，失败时保留上一次成功的预览并回退到源码。
+> 渐进式 D2 图表渲染器，适合结构化架构图和说明图。
 
-### 快速要点
-- **依赖**：`@terrastruct/d2`。
-- **CSS**：无需额外 CSS；保持 `markstream-vue/index.css` 在 reset 之后。
-- **Props**：`node`、`isDark`、`maxHeight`、`progressiveRender`、`progressiveIntervalMs`、`themeId`、`darkThemeId`、Header/按钮开关等。
+- **适合**：D2 文档、自动生成的架构视图、渐进式渲染
+- **关键 props**：`node`、`isDark`、`maxHeight`、`progressiveRender`、`progressiveIntervalMs`
+- **同伴依赖**：`@terrastruct/d2`
+- **常见问题**：缺少 peer 时会回退显示源码，而不是渲染好的图表
 
-### 示例
-
-```vue
-<script setup lang="ts">
-import { D2BlockNode } from 'markstream-vue'
-
-const node = {
-  type: 'code_block',
-  language: 'd2',
-  code: 'direction: right\\nClient -> API: request\\nAPI -> DB: query',
-  raw: 'direction: right\\nClient -> API: request\\nAPI -> DB: query',
-}
-</script>
-
-<template>
-  <D2BlockNode :node="node" :progressive-interval-ms="600" />
-</template>
-```
-
-排障：
-- 未安装 `@terrastruct/d2` 时会回退成源码展示，安装后自动切换预览。
-- 使用 `:is-dark=\"true\"` 或外层 `.dark` 控制深色主题。
-- SSR 场景需要 `onMounted` / `<ClientOnly>` 保护。
+深入页面： [D2 图表](/zh/guide/d2)
 
 ## MathBlockNode / MathInlineNode
 
-> 使用 KaTeX 渲染块级与行内公式。
+> 基于 KaTeX 的块级 / 行内公式渲染器。
 
-### 快速要点
-- **依赖**：`katex`
-- **CSS**：`import 'katex/dist/katex.min.css'`
-- **Props**：`node`
+- **适合**：技术文档、公式说明、AI 数学输出
+- **关键 prop**：`node`
+- **同伴依赖**：`katex`
+- **必需 CSS**：`katex/dist/katex.min.css`
+- **常见问题**：公式空白通常是 KaTeX CSS 缺失，而不是解析失败
 
-### 示例
+## ImageNode
 
-```ts
-import 'katex/dist/katex.min.css'
-```
+> 内置图片渲染器，提供 caption、fallback、lazy 等常用能力。
 
-```vue
-<MathBlockNode :node="node" />
+- **适合**：自定义预览、埋点、lightbox 集成
+- **关键 props**：`fallback-src`、`show-caption`、`lazy`、`svg-min-height`、`use-placeholder`
+- **事件**：`click`、`load`、`error`
+- **常见接法**：先包一层自定义组件，再通过 `setCustomComponents(customId, { image: CustomImageNode })` 注册
 
-<MathInlineNode :node="inlineNode" />
-```
+深入页面： [ImageNode](/zh/guide/image-node)
 
-排障：
-- 缺少 CSS 会导致公式不可见。
-- Nuxt SSR 需要 `<ClientOnly>` 或 `client:only`，因为公式渲染只在客户端进行。
-- 如需自定义样式，请配合 `[data-custom-id]` 定位，勿直接修改 KaTeX 全局样式。
+## LinkNode
 
-## ImageNode — 自定义预览
+> 带下划线动画和 tooltip 选项的链接渲染器。
 
-`ImageNode` 会触发 `click`、`load`、`error`，常见做法是用自定义组件拦截 `click` 并打开 lightbox。
+- **适合**：文档站、聊天界面、需要和设计系统统一交互样式的链接
+- **关键 props**：`color`、`underlineHeight`、`showTooltip`
+- **常见问题**：浏览器默认样式或 reset 顺序不对时，看起来会像“组件失效”，先检查 CSS 顺序
 
-```vue
-<template>
-  <ImageNode :node="node" @click="([_ev, src]) => open(src)" />
-</template>
-```
+## VmrContainerNode
 
-```ts
-import { setCustomComponents } from 'markstream-vue'
-import ImagePreview from './ImagePreview.vue'
+> 用来渲染 `:::` 容器以及解析器归一化后的结构化块。
 
-setCustomComponents('docs', { image: ImagePreview })
-```
+- **适合**：提示框、Notice、AI 特殊块、容器型自定义组件
+- **关键 prop**：`node`，其中包含 `name`、`attrs`、`loading`、`children`
+- **归一化细节**：JSON attrs 会整理到 `node.attrs`；无效或不完整 JSON 会保留在 `attrs.attrs`；容器名后面的参数会落到 `attrs.args`
+- **常见接法**：和 `custom-html-tags` 或 parser hooks 配合，处理可信的结构化块
 
-样式提示：
-- 浏览器默认 `img` 边框、间距不同，记得引入 reset。
-- Tailwind/UnoCSS 的 `img` 工具类可能覆盖宽高，使用 `[data-custom-id]` 限定范围。
+## 单独渲染节点组件时的检查清单
 
-## LinkNode — 下划线与提示
+如果你绕过 `MarkdownRender`，直接挂载节点组件：
 
-`LinkNode` 暴露 `color`、`underlineHeight`、`underlineBottom`、`animationDuration`、`showTooltip` 等 props，便于无需 CSS 覆盖即可调整动画。
+- 外层包上 `.markstream-vue` 容器。
+- 引入和完整渲染器一致的 CSS。
+- 只安装并初始化当前节点真正需要的 peers。
+- 所有替换样式都用父级选择器或 `data-custom-id` 一类的方式做局部作用域。
 
-```vue
-<LinkNode
-  :node="node"
-  color="#e11d48"
-  :underline-height="3"
-  underline-bottom="-4px"
-  :animation-duration="1.2"
-  :show-tooltip="false"
-/>
-```
+## 如果你现在找的是别的层级
 
-提示：
-- 下划线颜色跟随 `currentColor`，如需独立颜色请添加局部 CSS。
-- `showTooltip=false` 时会退回浏览器原生 `title`。
-- 如果 anchor 样式被浏览器默认值影响，请结合 reset/`@layer` 方案。
-
-## HtmlInlineNode — 流式内联 HTML
-
-`HtmlInlineNode` 用于渲染解析器产出的 `html_inline` 节点（如 `<span>...</span>` 这类内联 HTML）。
-
-流式行为：
-- 当节点处于**真实中间态**（`loading===true` 且 `autoClosed!==true`）时，为避免不完整标签闪烁，组件会直接显示原始文本。
-- 当节点处于**自动补闭合中间态**（`autoClosed===true`）时，解析器已为稳定渲染自动补上 `</tag>`，组件会按 HTML 渲染（`innerHTML`），但仍保留 `loading=true` 供业务判断"还没真正闭合"。
-- 当真实闭合标签到达后，解析器会清除 `loading/autoClosed`，节点表现为普通内联 HTML。
-
-## VmrContainerNode — 自定义 ::: 容器
-
-`VmrContainerNode` 渲染自定义 `:::` 容器，支持嵌套的 markdown 内容。
-
-### 快速参考
-- **适用场景**：自定义容器块，如 `::: viewcode:topo-test-001 {"devId":"..."}`。
-- **渲染方式**：递归渲染子节点（段落、列表、代码块等）。
-- **CSS**：极简基础样式；通过 `setCustomComponents` 覆盖。
-
-### 支持的子节点
-
-组件支持以下块级节点：
-- **内联节点**（段落内）：text、strong、emphasis、link、image、inline_code 等
-- **块级节点**：paragraph、heading、list、blockquote、code_block、math_block、table
-
-未知节点类型会回退到 `FallbackComponent`，显示节点类型和原始内容用于调试。
-
-### 语法
-
-```markdown
-::: container-name {"key":"value"}
-内容...
-:::
-```
-
-解析器会提取：
-- `name` — 容器名称（例如 `viewcode:topo-test-001`）
-- `attrs` — 解析后的属性（`data-*` 前缀会被规范成普通 key）
-- `children` — 子节点（解析后的 markdown 内容）
-- `raw` — 原始 markdown 源文本
-
-### 节点类型定义
-
-```typescript
-interface VmrContainerNode {
-  type: 'vmr_container'
-  name: string // 来自 ::: name 的容器名称
-  attrs?: Record<string, unknown> // 解析后的属性（值可能是 string/number/boolean）
-  loading?: boolean // 流式中间态：容器未闭合时为 true
-  children: ParsedNode[] // 子节点
-  raw: string // 原始 markdown 源文本
-}
-```
-
-### 流式行为
-
-在流式场景（如 LLM 输出）中渲染容器时，解析器会优雅地处理 attrs：
-
-- **Loading 状态**：当 `:::` 容器已打开但尚未闭合时，`loading` 会被设置为 `true`。这允许你的组件在内容流式传输时显示中间状态（如骨架屏）。
-
-- **attrs 处理规则**：
-  - 容器名后面的 args 会存到 `attrs.args`（字符串）。
-  - JSON attrs 会规范到 `attrs`（去掉 `data-` 前缀），例如 `{"devId":"abc"}` → `attrs.devId = "abc"`。
-  - JSON 解析失败（无效或不完整）时，原始字符串会保存到 `attrs.attrs`。
-
-流式传输进度示例：
-```markdown
-# 初始状态（中间态）
-::: viewcode:stream {"incomplete
-# → attrs.attrs = '{"incomplete', loading = true
-
-# 更多内容到达后
-::: viewcode:stream {"devId":"abc"}
-# → attrs.devId = "abc", loading = false（如果存在闭合 :::）
-```
-
-### 默认渲染
-
-默认组件会递归渲染所有子节点：
-
-```vue
-<!-- 默认 VmrContainerNode 输出 -->
-<div class="vmr-container vmr-container-container-name" v-bind="node.attrs">
-  <!-- 子节点在这里渲染（段落、列表、代码块等） -->
-</div>
-```
-
-### 容器内内容示例
-
-```markdown
-::: info
-这是一个**粗体**段落，带有[链接](https://example.com)。
-
-## 容器内的标题
-
-- 列表项 1
-- 列表项 2
-
-```js
-console.log('代码块也可以工作')
-```
-:::
-```
-
-### 自定义覆盖
-
-使用 `setCustomComponents` 注册自定义组件：
-
-```vue
-<script setup lang="ts">
-import { setCustomComponents } from 'markstream-vue'
-import MyViewCode from './MyViewCode.vue'
-
-setCustomComponents('docs', {
-  vmr_container: MyViewCode,
-})
-</script>
-
-<template>
-  <MarkdownRender custom-id="docs" :content="markdown" />
-</template>
-```
-
-### 示例：ViewCode 组件
-
-以下是一个完整的示例，用于渲染自定义的 `viewcode:*` 容器：
-
-```vue
-<!-- components/ViewCodeContainer.vue -->
-<script setup lang="ts">
-import MarkdownRender from 'markstream-vue'
-import { computed } from 'vue'
-
-interface Props {
-  node: {
-    type: 'vmr_container'
-    name: string
-    attrs?: Record<string, unknown>
-    children: any[]
-    raw: string
-  }
-  indexKey?: number | string
-  customId?: string
-}
-
-const props = defineProps<Props>()
-
-// 从 attrs 提取 devId / args
-const devId = computed(() => String(props.node.attrs?.devId ?? ''))
-const args = computed(() => String(props.node.attrs?.args ?? ''))
-
-// 检查是否为 viewcode 容器
-const isViewCode = computed(() => props.node.name.startsWith('viewcode:'))
-</script>
-
-<template>
-  <!-- viewcode 容器的自定义渲染 -->
-  <div v-if="isViewCode" class="viewcode-wrapper">
-    <div class="viewcode-header">
-      <span class="viewcode-title">{{ node.name }}</span>
-      <span class="viewcode-dev-id">{{ devId || args }}</span>
-    </div>
-    <div class="viewcode-content">
-      <MarkdownRender
-        :nodes="node.children"
-        :custom-id="customId"
-        :index-key="`${indexKey}-viewcode`"
-      />
-    </div>
-  </div>
-
-  <!-- 其他容器的回退渲染 -->
-  <div v-else class="vmr-container" :class="`vmr-container-${node.name}`">
-    <MarkdownRender
-      :nodes="node.children"
-      :custom-id="customId"
-      :index-key="`${indexKey}-fallback`"
-    />
-  </div>
-</template>
-
-<style scoped>
-.viewcode-wrapper {
-  border: 1px solid #eaecef;
-  border-radius: 8px;
-  overflow: hidden;
-  margin: 1rem 0;
-}
-
-.viewcode-header {
-  background: #f8f8f8;
-  padding: 0.5rem 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #eaecef;
-}
-
-.viewcode-title {
-  font-weight: 600;
-  color: #333;
-}
-
-.viewcode-dev-id {
-  font-family: monospace;
-  font-size: 0.875rem;
-  color: #666;
-}
-
-.viewcode-content {
-  padding: 1rem;
-}
-</style>
-```
-
-### 示例：按名称条件渲染
-
-也可以根据容器名称渲染不同的组件：
-
-```vue
-<script setup lang="ts">
-import { setCustomComponents } from 'markstream-vue'
-import { h } from 'vue'
-import AlertContainer from './AlertContainer.vue'
-import ChartContainer from './ChartContainer.vue'
-import GenericContainer from './GenericContainer.vue'
-
-// 容器名称到组件的映射
-const containerMap = {
-  chart: ChartContainer,
-  alert: AlertContainer,
-}
-
-setCustomComponents('docs', {
-  vmr_container: (node) => {
-    // 根据容器名称选择组件
-    const Component = containerMap[node.name as keyof typeof containerMap]
-      || GenericContainer
-
-    return h(Component, { node })
-  },
-})
-</script>
-```
-
-### 排障
-- **看到原始文本**：说明你使用的是默认渲染器。请通过 `setCustomComponents` 注册自定义组件。
-- **Attrs 为 undefined**：如果你没传 args/JSON，这是正常的；无效/不完整 JSON 会回退到 `attrs.attrs`（原始字符串）。
-- **组件未收到 props**：请确保你的组件正确接受 `node` prop 且类型匹配。
-- **流式场景下 attrs 不完整**：在流式传输中你可能会暂时看到 `attrs.attrs` 包含部分 JSON（如 `{"incomplete`），直到完整语法到达。可通过 `node.loading` 判断中间态。
-
-## 工具函数
-
-- `getMarkdown()` — 返回预设好的 `markdown-it-ts` 实例。
-- `parseMarkdownToStructure(content, md)` — 将 Markdown 字符串解析成 AST，可直接传给 `MarkdownRender`。
-- `setCustomComponents(id?, mapping)` — 为指定 `custom-id` 替换任何节点渲染器。
+- 查解析器工具、`setCustomComponents`、AST hooks：看 [API 参考](/zh/guide/api)
+- 查完整渲染器配置：看 [Props 与选项](/zh/guide/props)
+- 组件选对了但样式 / peers / SSR 还是不对：看 [故障排除](/zh/guide/troubleshooting)

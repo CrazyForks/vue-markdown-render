@@ -1,3 +1,7 @@
+---
+description: Explore local and online markstream-vue playgrounds to reproduce rendering issues, compare frameworks, and verify fixes quickly.
+---
+
 # Playground
 
 This repository includes a playable demo under `/playground` that helps you test features locally and reproduce rendering issues.

@@ -1,8 +1,26 @@
+---
+description: 在 content 与 nodes 之间做出正确选择，并理解 markstream-vue 在 Vite、VitePress、Nuxt 与流式界面中的接入方式。
+---
+
 # 使用示例与 API
 
 本页聚焦三个问题：如何在 Vite/VitePress/Nuxt 中集成、解析器如何配合渲染器、样式出错时去哪查看 reset 与 Tailwind/UnoCSS 排障指南。
 
+## 先决定用 `content` 还是 `nodes`
+
+| 场景 | 推荐输入 |
+|------|---------|
+| 文档页、静态文章、低频更新 | `content` |
+| SSE、token 流式输出、AI Chat、高频增量更新 | `nodes` + `final` |
+| SSR 或 Worker 里预解析完成 | `nodes` |
+
+如果你只是在调现有能力，继续看本页和 [Props 与选项](/zh/guide/props) 就够了。只有在你要改变渲染行为时，再跳去看 [覆盖内置组件](/zh/guide/component-overrides)。
+
 如果需要在既有设计系统里覆盖样式，务必传入 `custom-id` 并阅读 [样式排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here)。
+
+如果你真正要做的是 AI Chat、逐 token 输出或 SSE 响应预览，建议直接走专门的 [AI 聊天与流式输出](/zh/guide/ai-chat-streaming) 路径，不用自己拼这些页面。
+
+如果你真正要做的是文档站或 VitePress 主题接入，建议改走 [文档站与 VitePress 集成](/zh/guide/vitepress-docs-integration)，那里会把 `content`、`enhanceApp` 和 CSS 顺序串成一条路径。
 
 ## 最小渲染示例
 
@@ -27,6 +45,8 @@ const doc = '# 使用示例\n\n支持 **streaming** 渲染。'
 ```
 
 ## VitePress + 自定义标签
+
+如果这不是一个零散示例，而是你的主要落地场景，看完这里后直接继续 [文档站与 VitePress 集成](/zh/guide/vitepress-docs-integration)。
 
 在 VitePress 中，你只需要在 `enhanceApp` 里注册一次自定义节点组件，然后在 `MarkdownRender` 上使用 `custom-html-tags`，解析器就会自动输出对应的自定义节点。
 
@@ -85,6 +105,8 @@ const nodes = parseMarkdownToStructure(streamedText, md, { final })
 ```vue
 <MarkdownRender :nodes="nodes" :final="final" />
 ```
+
+如果你想要一条从安装、接法、性能到排障都串好的完整路径，继续看 [AI 聊天与流式输出](/zh/guide/ai-chat-streaming)。
 
 ## 组件速览
 

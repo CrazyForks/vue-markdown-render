@@ -1,6 +1,24 @@
+---
+description: Choose between content and nodes, understand the render pipeline, and wire markstream-vue into Vite, VitePress, Nuxt, and streaming UIs.
+---
+
 # Usage & API
 
 This page shows how to wire `markstream-vue` into common stacks, how the parser fits into the renderer, and which docs to visit when something looks odd (reset order, Tailwind/UnoCSS layers, VitePress integration).
+
+## Choose `content` or `nodes` first
+
+| Situation | Recommended input |
+|-----------|-------------------|
+| Docs pages, static articles, low-frequency updates | `content` |
+| SSE, token streaming, AI chat, or frequent incremental updates | `nodes` + `final` |
+| SSR or worker-preparsed content | `nodes` |
+
+If you only need built-in configuration, stay in this page and [Props & Options](/guide/props). If you need to replace rendering behavior, jump to [Override Built-in Components](/guide/component-overrides).
+
+If your real goal is an AI chat surface, token stream, or SSE response viewer, use the dedicated [AI Chat & Streaming](/guide/ai-chat-streaming) path instead of piecing the docs together manually.
+
+If your real goal is a docs site or VitePress theme, use [Docs Site & VitePress](/guide/vitepress-docs-integration) for the end-to-end `content` + `enhanceApp` + CSS setup.
 
 ## Minimal render
 
@@ -25,6 +43,8 @@ const doc = '# Usage example\n\nSupports **streaming** nodes.'
 ```
 
 ## VitePress + custom tags
+
+If this is your main use case rather than a one-off example, continue with the dedicated [Docs Site & VitePress](/guide/vitepress-docs-integration) path after this section.
 
 In VitePress, register your custom node component once in `enhanceApp`, then use `custom-html-tags` on `MarkdownRender` to let the parser emit custom nodes automatically.
 
@@ -85,6 +105,8 @@ const nodes = parseMarkdownToStructure(source, md, { final: isFinalChunk })
 ```
 
 That avoids reparsing the full Markdown string inside `MarkdownRender` on every tiny content update, which is usually the biggest win for SSE / AI output.
+
+For a full end-to-end rollout order, peer selection, and chat-specific tuning, continue with [AI Chat & Streaming](/guide/ai-chat-streaming).
 
 ## Component matrix
 

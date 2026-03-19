@@ -25,6 +25,7 @@ Looking for other frameworks?
 ## Contents
 
 - [TL;DR Highlights](#tldr-highlights)
+- [Choose Your Path](#choose-your-path)
 - [Try It Now](#-try-it-now)
 - [Community & support](#-community--support)
 - [Quick Start](#-quick-start)
@@ -56,6 +57,17 @@ Looking for other frameworks?
 - Works with **raw Markdown strings or pre-parsed nodes**, supports **custom Vue components** inline.
 - TypeScript-first, ship-ready defaults — import CSS and render.
 
+## Choose Your Path
+
+| If you want to... | Start here | Then go to |
+| --- | --- | --- |
+| get the first render on screen | [Quick Start](#-quick-start) | [Installation guide](https://markstream-vue-docs.simonhe.me/guide/installation) |
+| integrate it into a docs site or VitePress theme | [Docs Site & VitePress](https://markstream-vue-docs.simonhe.me/guide/vitepress-docs-integration) | [Custom Tags & Advanced Components](https://markstream-vue-docs.simonhe.me/guide/custom-components) |
+| build an AI chat UI or SSE stream | [AI Chat & Streaming](https://markstream-vue-docs.simonhe.me/guide/ai-chat-streaming) | [Performance](https://markstream-vue-docs.simonhe.me/guide/performance) |
+| replace one built-in renderer | [Override Built-in Components](https://markstream-vue-docs.simonhe.me/guide/component-overrides) | [Renderer & Node Components](https://markstream-vue-docs.simonhe.me/guide/components) |
+| add trusted tags such as `thinking` | [Custom Tags & Advanced Components](https://markstream-vue-docs.simonhe.me/guide/custom-components) | [API Reference](https://markstream-vue-docs.simonhe.me/guide/api) |
+| debug a broken integration but do not know why yet | [Troubleshooting by Symptom](https://markstream-vue-docs.simonhe.me/guide/troubleshooting-path) | [Troubleshooting](https://markstream-vue-docs.simonhe.me/guide/troubleshooting) |
+
 ## 🚀 Try It Now
 
 - Playground (interactive demo): https://markstream-vue.simonhe.me/
@@ -67,6 +79,22 @@ Looking for other frameworks?
 - Changelog: [CHANGELOG.md](./CHANGELOG.md)
 - Nuxt playground: `pnpm play:nuxt`
 - Discord: https://discord.gg/vkzdkjeRCW
+
+## CLI helpers for skills and prompts
+
+If you want the packaged AI assets without cloning the repo:
+
+```bash
+npx markstream-vue skills list
+npx markstream-vue skills install
+npx markstream-vue prompts list
+npx markstream-vue prompts show install-markstream
+```
+
+Recommended usage:
+
+- `skills install` installs the bundled skills into your agent skill directory (default: `~/.agents/skills`)
+- `prompts list` and `prompts show` to discover and copy maintained prompt templates
 
 ## 💬 Community & support
 

@@ -1,24 +1,52 @@
+---
+description: Task-first guide for choosing the right markstream-vue path across installation, streaming usage, VitePress docs sites, component overrides, and migration.
+---
+
 # Guide
 
-## Choose Your Framework
+This guide is organized by task first, framework second. Start with the shortest path that matches what you are trying to do today.
 
-This documentation covers multiple framework versions. Select your preferred framework:
+## I Want To Get Something Working Quickly
+
+- [Install by scenario](/guide/installation) for peer-dependency decisions and CSS order.
+- [Quick Start](/guide/quick-start) for the smallest Vue 3 example.
+- [Usage & Streaming](/guide/usage) if you need to choose between `content` and `nodes`.
+- [Docs Site & VitePress](/guide/vitepress-docs-integration) if you are wiring stable Markdown pages, theme CSS, and custom tags inside a docs site.
+- [AI Chat & Streaming](/guide/ai-chat-streaming) if the UI updates continuously and you need one guided path for peers, parsing, performance, and troubleshooting.
+- [Troubleshooting by Symptom](/guide/troubleshooting-path) if you do not yet know whether the issue is CSS, peers, SSR, or custom-tag wiring.
+- [Props & Options](/guide/props) if the renderer already works and you only need configuration.
+
+## I Want To Customize Rendering
+
+- [API Reference](/guide/api) for parser helpers, scoping, and render-pipeline entry points.
+- [Renderer & Node Components](/guide/components) for exported renderer and node component reference.
+- [Override Built-in Components](/guide/component-overrides) to replace `image`, `code_block`, `mermaid`, `link`, or other built-ins.
+- [Custom Tags & Advanced Components](/guide/custom-components) to support trusted tags such as `thinking`.
+- [Advanced Parser Hooks](/guide/advanced) and [Parser API](/guide/parser-api) for token or AST-level customization.
+
+## I Want To Adopt It In An Existing App
+
+- [Nuxt SSR](/nuxt-ssr) for browser-only peers and client-only guards.
+- [AI / Skills workflows](/guide/ai-workflows) for copyable prompts, reusable checklists, and migration tasks.
+- [Migrate from react-markdown](/guide/react-markdown-migration) and the [Migration Cookbook](/guide/react-markdown-migration-cookbook) for React teams.
+- [Troubleshooting](/guide/troubleshooting) when the install works but styles, peers, or SSR do not.
+
+## Framework Entry Points
 
 ### Vue 3 (markstream-vue) ⭐ Recommended
 
-The latest and most feature-rich version.
-
 | Page | Description |
 |------|-------------|
-| [Installation](/guide/installation) | Setup and peer dependencies |
-| [Quick Start](/guide/quick-start) | Get started in minutes |
-| [Features](/guide/features) | Streaming, Mermaid, Monaco, and more |
-| [Components API](/guide/components) | Full component reference |
-| [Usage & API](/guide/usage) | Advanced usage patterns |
+| [Installation](/guide/installation) | Install the package and only the peers you actually need |
+| [Quick Start](/guide/quick-start) | Render your first Markdown document |
+| [Usage & Streaming](/guide/usage) | Decide between `content` and `nodes` |
+| [Docs Site & VitePress](/guide/vitepress-docs-integration) | Guided path for docs pages, `enhanceApp`, trusted tags, and CSS order |
+| [AI Chat & Streaming](/guide/ai-chat-streaming) | Guided path for chat UIs, SSE, and token-by-token output |
+| [API Reference](/guide/api) | Parser helpers, scoping, and render-pipeline entry points |
+| [Renderer & Node Components](/guide/components) | Renderer and node component reference |
+| [Customization](/guide/component-overrides) | Override built-ins and add custom tags |
 
 ### Vue 2 (markstream-vue2)
-
-For Vue 2.6+ (with Composition API) and Vue 2.7+ projects.
 
 | Page | Description |
 |------|-------------|
@@ -28,20 +56,15 @@ For Vue 2.6+ (with Composition API) and Vue 2.7+ projects.
 
 ### React (markstream-react)
 
-For React 18+ projects with hooks and TypeScript.
-
 | Page | Description |
 |------|-------------|
 | [Installation](/guide/react-installation) | React specific setup |
 | [Quick Start](/guide/react-quick-start) | React examples |
+| [React Components](/guide/react-components) | React renderer and node components |
 | [Migrate from react-markdown](/guide/react-markdown-migration) | Migration path for existing React Markdown apps |
 | [Migration Cookbook](/guide/react-markdown-migration-cookbook) | Before/after recipes for common migration scenarios |
-| [Migration Demo](https://markstream-react.pages.dev/migration-demo) | Hosted interactive before/after demo |
-| [Components & API](/guide/react-components) | React component reference |
 
 ### Angular (markstream-angular)
-
-For Angular 20+ projects with standalone components and the shared Markstream `/test` lab.
 
 | Page | Description |
 |------|-------------|
@@ -50,26 +73,4 @@ For Angular 20+ projects with standalone components and the shared Markstream `/
 
 ### Nuxt
 
-For Nuxt 3 SSR applications.
-
-- [Nuxt SSR Guide](/nuxt-ssr) - Server-side rendering configuration
-
----
-
-## Quick Try
-
-Render a short guide page directly in your app:
-
-```vue
-<script setup>
-import MarkdownRender from 'markstream-vue'
-
-const md = '# Welcome to the guide\n\nThis is a short demo.'
-</script>
-
-<template>
-  <MarkdownRender :content="md" />
-</template>
-```
-
-Use the left sidebar navigation to explore all topics in detail.
+- [Nuxt SSR Guide](/nuxt-ssr) for client-only boundaries, workers, and browser-only peers.

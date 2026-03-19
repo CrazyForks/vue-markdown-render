@@ -1,3 +1,7 @@
+---
+description: Fix Tailwind, shadcn, and CSS ordering issues when importing markstream-vue styles into a controlled layer.
+---
+
 # Tailwind Integration & Style Ordering
 
 If your project uses a Tailwind component library like `shadcn`, you may run into style ordering or overriding issues when including `markstream-vue` CSS. The recommended approach is to import the library CSS inside a controlled Tailwind layer.

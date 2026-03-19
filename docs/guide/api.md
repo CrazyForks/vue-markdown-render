@@ -1,6 +1,12 @@
-# API guide
+---
+description: Reference the low-level markstream-vue API for parser helpers, render-pipeline decisions, scoped overrides, and AST-aware integration points.
+---
 
-This page connects the parser helpers, renderer props, and customization hooks exposed by `markstream-vue`. Pair it with the [Usage](/guide/usage) and [Props](/guide/props) pages when wiring everything together.
+# API Reference
+
+This page covers the low-level entry points behind `markstream-vue`: parser helpers, render-pipeline decisions, and scoping hooks.
+
+If you are trying to look up exported Vue components such as `MarkdownRender`, `CodeBlockNode`, or `ImageNode`, use [Renderer & Node Components](/guide/components) instead. Pair this page with [Usage](/guide/usage) and [Props](/guide/props) when wiring everything together.
 
 ## Render pipeline at a glance
 

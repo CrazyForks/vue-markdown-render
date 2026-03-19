@@ -1,3 +1,7 @@
+---
+description: Integrate markstream-vue safely into Nuxt 3 SSR with client-only peers, browser guards, and worker-aware setup.
+---
+
 # Nuxt 3 SSR usage (example)
 
 > 中文版请查看 [Nuxt 3 SSR（中文）](/zh/nuxt-ssr)。

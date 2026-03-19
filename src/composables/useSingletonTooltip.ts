@@ -1,4 +1,5 @@
 import { createApp, h, ref } from 'vue'
+import Tooltip from '../components/Tooltip/Tooltip.vue'
 
 const visible = ref(false)
 const content = ref('')
@@ -25,44 +26,39 @@ function clearTimers() {
 
 // Mount singleton Tooltip once
 let mounted = false
-let mountPromise: Promise<void> | null = null
 function ensureMounted() {
   if (mounted)
     return
   if (typeof document === 'undefined')
     return
-  if (mountPromise)
-    return
 
-  mountPromise = import('../components/Tooltip/Tooltip.vue')
-    .then(({ default: Tooltip }) => {
-      mounted = true
-      const container = document.createElement('div')
-      container.setAttribute('data-singleton-tooltip', '1')
-      document.body.appendChild(container)
+  try {
+    mounted = true
+    const container = document.createElement('div')
+    container.setAttribute('data-singleton-tooltip', '1')
+    document.body.appendChild(container)
 
-      const App = {
-        setup() {
-          return () => h(Tooltip as any, {
-            'visible': visible.value,
-            'anchor-el': anchorEl.value,
-            'content': content.value,
-            'placement': placement.value,
-            'id': tooltipId.value,
-            'originX': originX.value,
-            'originY': originY.value,
-            'isDark': tooltipIsDark.value ?? undefined,
-          })
-        },
-      }
+    const App = {
+      setup() {
+        return () => h(Tooltip as any, {
+          'visible': visible.value,
+          'anchor-el': anchorEl.value,
+          'content': content.value,
+          'placement': placement.value,
+          'id': tooltipId.value,
+          'originX': originX.value,
+          'originY': originY.value,
+          'isDark': tooltipIsDark.value ?? undefined,
+        })
+      },
+    }
 
-      createApp(App).mount(container)
-    })
-    .catch((err) => {
-      mountPromise = null
-      mounted = false
-      console.warn('[markstream-vue] Failed to load Tooltip component. Tooltips will be disabled.', err)
-    })
+    createApp(App).mount(container)
+  }
+  catch (err) {
+    mounted = false
+    console.warn('[markstream-vue] Failed to mount Tooltip component. Tooltips will be disabled.', err)
+  }
 }
 
 export function showTooltipForAnchor(
