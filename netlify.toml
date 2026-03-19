@@ -12,11 +12,3 @@ VITEPRESS_BASE = "/"
 [context.deploy-preview]
 command = "pnpm run play:build"
 publish = "playground/dist"
-
-# If you want to host the docs at the root of the domain but keep the user guide
-# as the primary entry point, add a rewrite to /guide/.
-[[redirects]]
-from = "/"
-to = "/guide/"
-status = 200
-force = true
