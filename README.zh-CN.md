@@ -86,6 +86,7 @@
 如果你想直接拿到打包后的 AI 资产，而不是先克隆仓库：
 
 ```bash
+npx skills add Simon-He95/markstream-vue
 npx markstream-vue skills list
 npx markstream-vue skills install
 npx markstream-vue prompts list
@@ -94,8 +95,22 @@ npx markstream-vue prompts show install-markstream
 
 推荐这样理解：
 
+- `npx skills add Simon-He95/markstream-vue` 是最推荐的安装方式，因为它会直接读取 GitHub 仓库里的 `.agents/skills`
 - `skills install` 会把打包好的 skills 安装到你的 agent skills 目录，默认是 `~/.agents/skills`
 - `prompts list` / `prompts show` 用来发现并直接复制官方维护的 prompt 模板
+
+`npx skills add` 也支持这些来源：
+
+```bash
+# 完整 GitHub URL
+npx skills add https://github.com/Simon-He95/markstream-vue
+
+# 仓库里的单个 skill 直链
+npx skills add https://github.com/Simon-He95/markstream-vue/tree/main/.agents/skills/markstream-install
+
+# 任意 git URL
+npx skills add git@github.com:Simon-He95/markstream-vue.git
+```
 
 ## 💬 社区与支持
 
@@ -104,6 +119,14 @@ npx markstream-vue prompts show install-markstream
 - Issues：请使用模板并附上复现链接（https://markstream-vue.simonhe.me/test）
 
 测试页内置编辑器 + 实时预览，并提供“生成分享链接”功能（过长内容会回退为直接打开或预填 GitHub Issue）。
+
+## 支持项目
+
+如果 markstream-vue 对你的工作有帮助，欢迎通过下面的收款码支持项目的持续维护。
+
+| 支付宝 | 微信收款 |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/zhifubao.jpg" alt="支付宝收款码" width="240" /> | <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/weixin.jpg" alt="微信收款码" width="240" /> |
 
 ## ⚡ 快速上手
 

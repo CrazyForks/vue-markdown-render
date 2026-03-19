@@ -41,11 +41,13 @@ features:
 
 A streaming-friendly Markdown renderer with progressive Mermaid support, streaming diff code blocks, and high-performance handling of large documents.
 
-<div class="star-reminder-inline">
-
-If you find markstream-vue helpful, please consider <a href="https://github.com/Simon-He95/markstream-vue" target="_blank" rel="noopener noreferrer">giving us a star ⭐</a> on GitHub!
-
-</div>
+<SupportQRCodes
+  title="Support markstream-vue"
+  description="If markstream-vue helps your work, you can support ongoing maintenance with Alipay or WeChat Pay."
+  note="Thank you for helping keep the docs, demos, and package maintenance moving."
+  alipay-label="Alipay"
+  wechat-label="WeChat Pay"
+/>
 
 ## Pick The Shortest Path
 

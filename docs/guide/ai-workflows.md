@@ -13,7 +13,31 @@ This page is intentionally practical: copyable prompts, rollout checklists, and 
 
 ## Install the packaged skills
 
-For end users, the recommended command is the package CLI:
+For end users, the recommended command is the shared `skills` installer:
+
+```bash
+npx skills add Simon-He95/markstream-vue
+```
+
+That path works because the repository now publishes reusable skills under `.agents/skills`, which `npx skills` can discover directly from GitHub.
+
+The Vercel `skills` installer also supports multiple source formats:
+
+```bash
+# GitHub shorthand (owner/repo)
+npx skills add Simon-He95/markstream-vue
+
+# Full GitHub URL
+npx skills add https://github.com/Simon-He95/markstream-vue
+
+# Direct path to one skill in this repo
+npx skills add https://github.com/Simon-He95/markstream-vue/tree/main/.agents/skills/markstream-install
+
+# Any git URL
+npx skills add git@github.com:Simon-He95/markstream-vue.git
+```
+
+If you specifically want the package CLI, you can still use:
 
 ```bash
 npx markstream-vue skills install
@@ -29,13 +53,14 @@ npx markstream-vue skills install --target codex
 npx markstream-vue skills install --target ./tmp/skills-test --mode copy --force
 ```
 
+- `npx skills add Simon-He95/markstream-vue` is the primary recommendation for Codex-compatible skill installation
 - `skills install` defaults to `copy`, which is safer for `npx` and `dlx` usage
 - the default target is `~/.agents/skills`
 - `--target codex` targets `${CODEX_HOME:-~/.codex}/skills`
 - `--target` accepts either `agents`, `codex`, or any custom path
 - `--force` replaces existing installs at the target path
 
-The prompts stay in the repository under `prompts/`; only the skill folders are installed.
+The prompts stay in the repository under `prompts/`; the packaged installer only handles the skill folders.
 
 The same CLI can also expose bundled prompt templates:
 
@@ -50,16 +75,16 @@ That is usually the easiest way for npm users to discover the maintained prompt 
 
 This repository now includes reusable assets you can version with the codebase:
 
-- `skills/markstream-install/`
-- `skills/markstream-custom-components/`
-- `skills/markstream-migration/`
+- `.agents/skills/markstream-install/`
+- `.agents/skills/markstream-custom-components/`
+- `.agents/skills/markstream-migration/`
 - `prompts/install-markstream.md`
 - `prompts/override-built-in-components.md`
 - `prompts/add-custom-tag-thinking.md`
 - `prompts/migrate-react-markdown.md`
 - `prompts/audit-markstream-integration.md`
 
-Use the `skills/` folders when you want reusable Codex workflow assets. Use the `prompts/` files when you want copyable starting prompts for humans or other assistants.
+Use `.agents/skills/` when you want reusable Codex workflow assets that GitHub-based installers can discover automatically. Use `prompts/` when you want copyable starting prompts for humans or other assistants.
 
 ## 1. Give the AI these five facts first
 

@@ -13,7 +13,31 @@
 
 ## 安装打包后的 skills
 
-对最终用户来说，推荐直接使用包级 CLI：
+对最终用户来说，最推荐的是直接使用通用的 `skills` 安装器：
+
+```bash
+npx skills add Simon-He95/markstream-vue
+```
+
+这条路径之所以可用，是因为仓库里的可复用 skills 现在已经放在 `.agents/skills` 下，`npx skills` 可以直接从 GitHub 仓库识别并安装。
+
+Vercel 的 `skills` 安装器也支持多种来源格式：
+
+```bash
+# GitHub shorthand（owner/repo）
+npx skills add Simon-He95/markstream-vue
+
+# 完整 GitHub URL
+npx skills add https://github.com/Simon-He95/markstream-vue
+
+# 仓库里的单个 skill 直链
+npx skills add https://github.com/Simon-He95/markstream-vue/tree/main/.agents/skills/markstream-install
+
+# 任意 git URL
+npx skills add git@github.com:Simon-He95/markstream-vue.git
+```
+
+如果你更希望走包级 CLI，也仍然可以使用：
 
 ```bash
 npx markstream-vue skills install
@@ -29,13 +53,14 @@ npx markstream-vue skills install --target codex
 npx markstream-vue skills install --target ./tmp/skills-test --mode copy --force
 ```
 
+- `npx skills add Simon-He95/markstream-vue` 是当前最推荐的 Codex-compatible 安装方式
 - `skills install` 默认使用 `copy`，更适合 `npx` / `dlx` 场景
 - 默认目标目录是 `~/.agents/skills`
 - `--target codex` 会安装到 `${CODEX_HOME:-~/.codex}/skills`
 - `--target` 可以传 `agents`、`codex`，也可以传任意自定义路径
 - `--force` 用来替换目标目录里已有的安装
 
-`prompts/` 仍然保留在仓库里；安装命令只处理 `skills/`。
+`prompts/` 仍然保留在仓库里；包级安装命令只处理 skills 目录。
 
 同一个 CLI 也可以直接暴露 prompts：
 
@@ -50,16 +75,16 @@ npx markstream-vue prompts show install-markstream
 
 这个仓库现在已经有可版本化、可复用的资产：
 
-- `skills/markstream-install/`
-- `skills/markstream-custom-components/`
-- `skills/markstream-migration/`
+- `.agents/skills/markstream-install/`
+- `.agents/skills/markstream-custom-components/`
+- `.agents/skills/markstream-migration/`
 - `prompts/install-markstream.md`
 - `prompts/override-built-in-components.md`
 - `prompts/add-custom-tag-thinking.md`
 - `prompts/migrate-react-markdown.md`
 - `prompts/audit-markstream-integration.md`
 
-`skills/` 适合放可复用的 Codex 工作流资产；`prompts/` 适合放给人类或其他助手直接复制使用的提示词模板。
+`.agents/skills/` 适合放可复用、并且能被 GitHub 安装器自动发现的 Codex 工作流资产；`prompts/` 适合放给人类或其他助手直接复制使用的提示词模板。
 
 ## 1. 先把这五类信息告诉 AI
 

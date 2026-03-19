@@ -6,12 +6,12 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export const packageRoot = path.resolve(__dirname, '..')
-export const defaultSourceRoot = path.join(packageRoot, 'skills')
+export const defaultSourceRoot = path.join(packageRoot, '.agents', 'skills')
 
 export function printInstallHelp(command = 'markstream-vue skills install', defaultMode = 'copy') {
   console.log(`Usage: ${command} [options]
 
-Install bundled Markstream skills into a local agent skill directory.
+Install bundled Markstream skills from .agents/skills into a local agent skill directory.
 
 Options:
   --target <agents|codex|path>  Target directory preset or custom path.

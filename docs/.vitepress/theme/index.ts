@@ -3,6 +3,7 @@ import MarkdownRender from 'markstream-vue'
 import Theme from 'vitepress/theme'
 import GitHubStarBadge from './GitHubStarBadge.vue'
 import Layout from './Layout.vue'
+import SupportQRCodes from './SupportQRCodes.vue'
 import 'markstream-vue/index.css'
 import './style.css'
 
@@ -12,6 +13,7 @@ export default {
   enhanceApp({ app }: EnhanceAppContext) {
     app.component('GitHubStarBadge', GitHubStarBadge)
     app.component('MarkdownRender', MarkdownRender)
+    app.component('SupportQRCodes', SupportQRCodes)
   },
 }
 

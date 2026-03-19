@@ -85,6 +85,7 @@ Looking for other frameworks?
 If you want the packaged AI assets without cloning the repo:
 
 ```bash
+npx skills add Simon-He95/markstream-vue
 npx markstream-vue skills list
 npx markstream-vue skills install
 npx markstream-vue prompts list
@@ -93,8 +94,22 @@ npx markstream-vue prompts show install-markstream
 
 Recommended usage:
 
+- `npx skills add Simon-He95/markstream-vue` is the primary path for Codex-compatible skill discovery because it reads `.agents/skills` directly from the GitHub repository
 - `skills install` installs the bundled skills into your agent skill directory (default: `~/.agents/skills`)
 - `prompts list` and `prompts show` to discover and copy maintained prompt templates
+
+Other `npx skills add` forms also work:
+
+```bash
+# Full GitHub URL
+npx skills add https://github.com/Simon-He95/markstream-vue
+
+# Direct path to one skill in this repo
+npx skills add https://github.com/Simon-He95/markstream-vue/tree/main/.agents/skills/markstream-install
+
+# Any git URL
+npx skills add git@github.com:Simon-He95/markstream-vue.git
+```
 
 ## 💬 Community & support
 
@@ -103,6 +118,14 @@ Recommended usage:
 - Issues: please use templates and attach a repro link (https://markstream-vue.simonhe.me/test)
 
 The test page gives you an editor + live preview plus “generate share link” that encodes the input in the URL (with a fallback to open directly or pre-fill a GitHub Issue for long payloads).
+
+## Support the project
+
+If markstream-vue helps your work, you can support ongoing maintenance with one of these QR codes.
+
+| Alipay | WeChat Pay |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/zhifubao.jpg" alt="Alipay QR code" width="240" /> | <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/weixin.jpg" alt="WeChat Pay QR code" width="240" /> |
 
 ## ⚡ Quick Start
 
