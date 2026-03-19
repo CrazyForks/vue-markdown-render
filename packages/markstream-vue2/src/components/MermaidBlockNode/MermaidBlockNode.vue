@@ -35,6 +35,10 @@ interface MermaidBlockNodeProps {
   showZoomControls?: boolean
   enableWheelZoom?: boolean
   isStrict?: boolean
+  // Custom error handler called when mermaid rendering fails.
+  // Receives the error, the raw mermaid code, and the container element.
+  // Return true to prevent the default error display.
+  onRenderError?: (error: unknown, code: string, container: HTMLElement) => boolean | void
 }
 
 const props = withDefaults(
@@ -490,6 +494,15 @@ function renderErrorToContainer(error: unknown) {
     return
   if (!mermaidContent.value)
     return
+  // Allow consumer to handle the error via onRenderError callback
+  if (typeof props.onRenderError === 'function') {
+    const handled = props.onRenderError(error, baseFixedCode.value, mermaidContent.value)
+    if (handled === true) {
+      hasRenderError.value = true
+      stopPreviewPolling()
+      return
+    }
+  }
   const errorDiv = document.createElement('div')
   errorDiv.className = 'text-red-500 p-4'
   errorDiv.textContent = 'Failed to render diagram: '

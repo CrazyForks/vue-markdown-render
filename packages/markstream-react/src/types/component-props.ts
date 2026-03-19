@@ -90,6 +90,10 @@ export interface MermaidBlockNodeProps {
   enableWheelZoom?: boolean
   // When false, relax all sanitization/security (not recommended)
   isStrict?: boolean
+  // Custom error handler called when mermaid rendering fails.
+  // Receives the error, the raw mermaid code, and the container element.
+  // Return true to prevent the default error display.
+  onRenderError?: (error: unknown, code: string, container: HTMLElement) => boolean | void
 }
 
 export interface MermaidBlockEvent<TPayload = any> {

@@ -481,6 +481,15 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
     catch (error) {
       if (this.destroyed || token !== this.renderToken)
         return
+      // Allow consumer to handle the error via onRenderError callback
+      const onRenderError = this.mergedProps.onRenderError
+      if (typeof onRenderError === 'function' && this.previewHost?.nativeElement) {
+        const handled = onRenderError(error, this.code, this.previewHost.nativeElement)
+        if (handled === true) {
+          this.svgMarkup = ''
+          return
+        }
+      }
       this.svgMarkup = ''
       this.showSource = true
       this.error = error instanceof Error ? error.message : 'Failed to render Mermaid diagram.'
