@@ -77,7 +77,7 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 <script setup lang="ts">
 import { MermaidBlockNode } from 'markstream-vue'
 
-function handleMermaidError(error: unknown, code: string, container: HTMLElement) {
+function handleMermaidError(_err: unknown, code: string, container: HTMLElement) {
   // Show the raw mermaid text as a code block instead of an error message
   const pre = document.createElement('pre')
   pre.className = 'text-sm font-mono whitespace-pre-wrap p-4'

@@ -486,7 +486,7 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
       if (typeof onRenderError === 'function' && this.previewHost?.nativeElement) {
         const handled = onRenderError(error, this.code, this.previewHost.nativeElement)
         if (handled === true) {
-          this.syncSvgHosts()
+          this.svgMarkup = ''
           return
         }
       }
