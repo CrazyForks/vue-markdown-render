@@ -465,6 +465,15 @@ function renderErrorToContainer(error: unknown) {
     return
   if (!mermaidContent.value)
     return
+  // Allow consumer to handle the error via onRenderError callback
+  if (typeof props.onRenderError === 'function') {
+    const handled = props.onRenderError(error, baseFixedCode.value, mermaidContent.value)
+    if (handled === true) {
+      hasRenderError.value = true
+      stopPreviewPolling()
+      return
+    }
+  }
   const errorDiv = document.createElement('div')
   errorDiv.className = 'text-red-500 p-4'
   errorDiv.textContent = 'Failed to render diagram: '

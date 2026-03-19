@@ -396,6 +396,13 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     }
     catch (err) {
       if (!streaming) {
+        // Allow consumer to handle the error via onRenderError callback
+        if (typeof props.onRenderError === 'function' && contentRef.current) {
+          const handled = props.onRenderError(err, baseFixedCode, contentRef.current)
+          if (handled === true) {
+            return false
+          }
+        }
         setError(err instanceof Error ? err.message : String(err))
       }
       return false
