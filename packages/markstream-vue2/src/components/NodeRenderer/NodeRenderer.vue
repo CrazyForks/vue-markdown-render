@@ -1728,6 +1728,11 @@ function getRenderKey(node: ParsedNode, index: number) {
     return base
 
   const type = String((node as any).type || 'unknown')
+  // Keep streaming code blocks on a stable key so Monaco-backed components
+  // receive prop updates instead of being torn down and recreated per chunk.
+  if (type === 'code_block')
+    return base
+
   const loading = (node as any).loading === true
   const raw = typeof (node as any).raw === 'string' ? (node as any).raw.length : 0
   const content = typeof (node as any).content === 'string' ? (node as any).content.length : 0

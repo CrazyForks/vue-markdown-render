@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { enhanceRenderedHtml } from '../packages/markstream-angular/src/enhanceRenderedHtml'
 
-const monacoCleanup = vi.fn()
+const {
+  monacoCleanup,
+  canParseOffthread,
+  findPrefixOffthread,
+  mermaidState,
+} = vi.hoisted(() => ({
+  monacoCleanup: vi.fn(),
+  canParseOffthread: vi.fn(async () => true),
+  findPrefixOffthread: vi.fn(async () => null),
+  mermaidState: { failOnBToC: false },
+}))
 
 vi.mock('../packages/markstream-angular/src/optional/katex', () => ({
   isKatexEnabled: vi.fn(() => true),
@@ -17,10 +27,19 @@ vi.mock('../packages/markstream-angular/src/optional/katex', () => ({
 vi.mock('../packages/markstream-angular/src/optional/mermaid', () => ({
   isMermaidEnabled: vi.fn(() => true),
   getMermaid: vi.fn(async () => ({
-    render: vi.fn(async (_id: string, source: string) => ({
-      svg: `<svg data-mermaid="1">${source}</svg>`,
-    })),
+    render: vi.fn(async (_id: string, source: string) => {
+      if (mermaidState.failOnBToC && source.includes('B-->C'))
+        throw new Error('Incomplete mermaid graph')
+      return {
+        svg: `<svg data-mermaid="1">${source}</svg>`,
+      }
+    }),
   })),
+}))
+
+vi.mock('../packages/markstream-angular/src/workers/mermaidWorkerClient', () => ({
+  canParseOffthread,
+  findPrefixOffthread,
 }))
 
 vi.mock('../packages/markstream-angular/src/optional/d2', () => ({
@@ -70,6 +89,11 @@ vi.mock('../packages/markstream-angular/src/optional/monaco', () => ({
 describe('markstream-angular enhanceRenderedHtml', () => {
   it('hydrates math, mermaid, monaco, infographic, and d2 blocks in place', async () => {
     monacoCleanup.mockReset()
+    canParseOffthread.mockReset()
+    findPrefixOffthread.mockReset()
+    canParseOffthread.mockImplementation(async () => true)
+    findPrefixOffthread.mockImplementation(async () => null)
+    mermaidState.failOnBToC = false
     const onCopy = vi.fn()
     const root = document.createElement('div')
     root.innerHTML = `
@@ -108,6 +132,11 @@ describe('markstream-angular enhanceRenderedHtml', () => {
 
   it('skips heavy code/diagram upgrades while content is still streaming', async () => {
     monacoCleanup.mockReset()
+    canParseOffthread.mockReset()
+    findPrefixOffthread.mockReset()
+    canParseOffthread.mockImplementation(async () => true)
+    findPrefixOffthread.mockImplementation(async () => null)
+    mermaidState.failOnBToC = false
     const root = document.createElement('div')
     root.innerHTML = `
       <div class="markstream-angular markdown-renderer">
@@ -128,6 +157,11 @@ describe('markstream-angular enhanceRenderedHtml', () => {
   })
 
   it('does not re-render KaTeX from already-rendered output', async () => {
+    canParseOffthread.mockReset()
+    findPrefixOffthread.mockReset()
+    canParseOffthread.mockImplementation(async () => true)
+    findPrefixOffthread.mockImplementation(async () => null)
+    mermaidState.failOnBToC = false
     const root = document.createElement('div')
     root.innerHTML = `
       <div class="markstream-angular markdown-renderer">
@@ -148,6 +182,11 @@ describe('markstream-angular enhanceRenderedHtml', () => {
   })
 
   it('re-renders KaTeX when the source text changes during streaming', async () => {
+    canParseOffthread.mockReset()
+    findPrefixOffthread.mockReset()
+    canParseOffthread.mockImplementation(async () => true)
+    findPrefixOffthread.mockImplementation(async () => null)
+    mermaidState.failOnBToC = false
     const root = document.createElement('div')
     root.innerHTML = `
       <div class="markstream-angular markdown-renderer">
@@ -173,5 +212,36 @@ describe('markstream-angular enhanceRenderedHtml', () => {
     expect(shell.innerHTML).toContain('f(x) = x^3')
     expect(shell.querySelector('.markstream-nested-math')?.getAttribute('data-markstream-katex-source')).toBe('x = a + b')
     expect(shell.querySelector('.markstream-nested-math-block')?.getAttribute('data-markstream-katex-source')).toBe('f(x) = x^3')
+  })
+
+  it('renders a mermaid prefix preview while streaming when the full diagram is not yet valid', async () => {
+    canParseOffthread.mockReset()
+    findPrefixOffthread.mockReset()
+    canParseOffthread.mockImplementation(async (source: string) => !source.includes('B-->C'))
+    findPrefixOffthread.mockImplementation(async () => 'graph LR\nA-->B\n')
+    mermaidState.failOnBToC = true
+
+    const root = document.createElement('div')
+    root.innerHTML = `
+      <div class="markstream-angular markdown-renderer">
+        <pre data-markstream-code-block="1" data-markstream-language="mermaid"><code class="language-mermaid">graph LR
+A-->B
+B-->C
+</code></pre>
+      </div>
+    `
+
+    const shell = root.querySelector('.markstream-angular') as HTMLElement
+    await enhanceRenderedHtml(shell, { final: false })
+
+    expect(canParseOffthread).toHaveBeenCalled()
+    expect(findPrefixOffthread).toHaveBeenCalled()
+    expect(shell.innerHTML).toContain('data-mermaid="1"')
+    expect(shell.innerHTML).toContain('markstream-angular-mermaid')
+    const previewHost = shell.querySelector('.markstream-angular-mermaid')
+    expect(previewHost?.innerHTML).toContain('A--&gt;B')
+    expect(previewHost?.innerHTML).not.toContain('B--&gt;C')
+
+    mermaidState.failOnBToC = false
   })
 })

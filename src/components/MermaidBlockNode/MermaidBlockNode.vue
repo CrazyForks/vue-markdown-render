@@ -1519,10 +1519,10 @@ watch(
       // If mermaid is not available, do not attempt progressive render or start polling
       if (!mermaidAvailable.value || !canScheduleViewportWork())
         return
+      // Arm partial-preview eligibility before the immediate preview render runs.
+      startPreviewPolling()
       // Use progressive path to avoid throwing on incomplete code
       await progressiveRender()
-      // Start background polling to auto-upgrade to full render when ready
-      startPreviewPolling()
     }
     else {
       stopPreviewPolling()
