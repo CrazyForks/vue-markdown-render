@@ -1,4 +1,4 @@
-## [0.0.10-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.10-beta.0) (2026-03-19)
+## [0.0.10-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.10-beta.1) (2026-03-20)
 
 
 ### Bug Fixes
@@ -62,6 +62,7 @@
 * **parser:** keep backticked dollars/code literal and skip placeholder $...$ math ([747610c](https://github.com/Simon-He95/markstream-vue/commit/747610c2ba31d853172f80dc870f52cc97647114)), closes [#306](https://github.com/Simon-He95/markstream-vue/issues/306)
 * **parser:** keep complete html document as single html_block ([b376742](https://github.com/Simon-He95/markstream-vue/commit/b37674220c5ef2b1d1f8052a7b9508dadd986b6c))
 * **parser:** preserve inline formatting around math ([183a8ec](https://github.com/Simon-He95/markstream-vue/commit/183a8ec193bf7b7455f040b6cd0e9f447d073d42)), closes [#334](https://github.com/Simon-He95/markstream-vue/issues/334)
+* **parser:** preserve trailing content after strong links ([7ae8056](https://github.com/Simon-He95/markstream-vue/commit/7ae8056698f029c8a2aaf6c1bcab939049cd97ba)), closes [#336](https://github.com/Simon-He95/markstream-vue/issues/336)
 * **parser:** prevent list bleed after adjacent html blocks ([b922bc8](https://github.com/Simon-He95/markstream-vue/commit/b922bc82359f6ba41f415341a33239ce4f423fe0)), closes [#318](https://github.com/Simon-He95/markstream-vue/issues/318)
 * preserve escaped punctuation literals ([0328451](https://github.com/Simon-He95/markstream-vue/commit/032845108c735c55a98ff9ce72da43a27a045a7c)), closes [#322](https://github.com/Simon-He95/markstream-vue/issues/322)
 * prevent dropping numeric-only documents in parseMarkdownToStructure ([bba733c](https://github.com/Simon-He95/markstream-vue/commit/bba733c9a8d4b77f0fbd0560d695a611e0822eef)), closes [#278](https://github.com/Simon-He95/markstream-vue/issues/278)
@@ -77,6 +78,7 @@
 * stabilize deferred rendering and inline code styles ([e798ef5](https://github.com/Simon-He95/markstream-vue/commit/e798ef53b6d494c2d9a7c8b2d78bf7c9f18f6293))
 * stabilize reference parsing and contrast ([357629a](https://github.com/Simon-He95/markstream-vue/commit/357629ad31fc304c2ce9f879bf3a3ddd19997e83)), closes [#327](https://github.com/Simon-He95/markstream-vue/issues/327)
 * stabilize streaming custom thinking parsing ([1019ea4](https://github.com/Simon-He95/markstream-vue/commit/1019ea4b3505c36e7df1483034d819b557061af4))
+* stabilize streaming mermaid previews ([88f20fb](https://github.com/Simon-He95/markstream-vue/commit/88f20fb217677d1dfe80c34d8b6faab6614bf6ff)), closes [#337](https://github.com/Simon-He95/markstream-vue/issues/337)
 * standardize class attribute syntax in list item components and tests ([71af12b](https://github.com/Simon-He95/markstream-vue/commit/71af12b1638456fdbaf809849f3f230ea9505de0))
 * streamline class binding for streamed delta in InlineCodeNode and TextNode components ([bd7aa44](https://github.com/Simon-He95/markstream-vue/commit/bd7aa446c9d8fd3c03e6058e6587139d02c4791a))
 * sync link loading hint across frameworks ([e0cfba9](https://github.com/Simon-He95/markstream-vue/commit/e0cfba984d22ae7ac8551566fda08bbae5a9c690))
@@ -113,6 +115,7 @@
 * add diff editor inline fold proxy and hunk hover actions ([8529b1c](https://github.com/Simon-He95/markstream-vue/commit/8529b1ce07c2e417971dd7d76b6de85cf1d298a0))
 * add ECharts integration documentation in English and Chinese ([b39a993](https://github.com/Simon-He95/markstream-vue/commit/b39a99399f74244e2acada3e3a96fee9ce5a52c0))
 * add escapeHtmlTags option to render specific HTML-like tags as literal text ([74f2798](https://github.com/Simon-He95/markstream-vue/commit/74f2798f19e27926933eab30c36fd44bb71141eb)), closes [#261](https://github.com/Simon-He95/markstream-vue/issues/261)
+* add framework-specific markstream skills ([598deb6](https://github.com/Simon-He95/markstream-vue/commit/598deb64a34b75639bb87cdd567e1bd815bca6c1))
 * add GitHub star badge component and update documentation to encourage starring the project ([63d5e9a](https://github.com/Simon-He95/markstream-vue/commit/63d5e9a7185c79b5bbade651ef5b9c3e29c40712))
 * Add InfographicBlockNode component and integrate  rendering for code blocks. ([1c0e74d](https://github.com/Simon-He95/markstream-vue/commit/1c0e74d21ad9f6940699358d3e3d1db41b4009de))
 * add normalization for custom HTML opening tags at line start ([aafd530](https://github.com/Simon-He95/markstream-vue/commit/aafd530d372b15888e72a960a5cff7d6c8e27f37))
