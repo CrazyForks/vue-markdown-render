@@ -387,7 +387,13 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         }
       }
     }
-    if (curToken.type === 'link_close' && curToken.nesting === -1 && tokens[i + 1]?.type === 'text' && tokens[i - 1]?.type === 'text') {
+    if (
+      curToken.type === 'link_close'
+      && curToken.nesting === -1
+      && tokens[i - 2]?.type === 'link_open'
+      && tokens[i + 1]?.type === 'text'
+      && tokens[i - 1]?.type === 'text'
+    ) {
       // 修复链接后多余文本被包含在链接内的问题
       const text = tokens[i - 1].content || ''
       const attrs = tokens[i - 2].attrs || []
