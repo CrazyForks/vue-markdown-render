@@ -75,16 +75,15 @@ That is usually the easiest way for npm users to discover the maintained prompt 
 
 This repository now includes reusable assets you can version with the codebase:
 
-- `.agents/skills/markstream-install/`
-- `.agents/skills/markstream-custom-components/`
-- `.agents/skills/markstream-migration/`
+- Task skills: `markstream-install`, `markstream-custom-components`, `markstream-migration`
+- Framework entry skills: `markstream-vue`, `markstream-nuxt`, `markstream-vue2`, `markstream-vue2-cli`, `markstream-vue2-vite`, `markstream-react`, `markstream-angular`
 - `prompts/install-markstream.md`
 - `prompts/override-built-in-components.md`
 - `prompts/add-custom-tag-thinking.md`
 - `prompts/migrate-react-markdown.md`
 - `prompts/audit-markstream-integration.md`
 
-Use `.agents/skills/` when you want reusable Codex workflow assets that GitHub-based installers can discover automatically. Use `prompts/` when you want copyable starting prompts for humans or other assistants.
+Use `.agents/skills/` when you want reusable Codex workflow assets that GitHub-based installers can discover automatically. The task skills cover cross-framework work; the framework entry skills make Vue 3, Nuxt, Vue 2, Vue 2 CLI, Vue 2 Vite, React, and Angular scenarios directly discoverable. Use `prompts/` when you want copyable starting prompts for humans or other assistants.
 
 ## 1. Give the AI these five facts first
 
