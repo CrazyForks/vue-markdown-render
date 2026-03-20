@@ -25,8 +25,8 @@ description: 用 nodes 加 final 模式构建 AI 聊天与流式 Markdown 界面
 
 ```vue
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+import { computed, ref } from 'vue'
 
 const streamedText = ref('')
 const final = ref(false)

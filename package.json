@@ -117,10 +117,10 @@
     "markstream-vue": "./bin/markstream-vue.mjs"
   },
   "files": [
+    ".agents",
+    "bin",
     "dist",
     "dist/workers",
-    "bin",
-    ".agents",
     "prompts"
   ],
   "scripts": {

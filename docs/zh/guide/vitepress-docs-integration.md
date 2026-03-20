@@ -43,9 +43,9 @@ pnpm add markstream-vue shiki stream-markdown
 对 VitePress 来说，最稳妥的全局接入位置通常是 `docs/.vitepress/theme/index.ts`。
 
 ```ts
+import MarkdownRender, { setCustomComponents } from 'markstream-vue'
 // docs/.vitepress/theme/index.ts
 import DefaultTheme from 'vitepress/theme'
-import MarkdownRender, { setCustomComponents } from 'markstream-vue'
 import ThinkingNode from './components/ThinkingNode.vue'
 import './style.css'
 

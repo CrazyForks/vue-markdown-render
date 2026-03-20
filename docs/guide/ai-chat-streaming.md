@@ -25,8 +25,8 @@ For frequent updates, keep parsing outside `MarkdownRender` and pass `nodes` + `
 
 ```vue
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+import { computed, ref } from 'vue'
 
 const streamedText = ref('')
 const final = ref(false)

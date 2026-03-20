@@ -7,7 +7,7 @@ const DEFAULT_TITLE = 'markstream-vue Playground | Streaming Markdown, Mermaid, 
 const DEFAULT_DESCRIPTION = 'Explore markstream-vue with live playground demos for streaming Markdown, Mermaid, KaTeX, CDN peers, and large-document rendering.'
 const DEFAULT_ROBOTS = 'noindex,nofollow'
 
-type RouteSeoConfig = {
+interface RouteSeoConfig {
   title: string
   description: string
   robots?: string
@@ -119,53 +119,53 @@ function createStructuredData(path: string, canonicalUrl: string, seo: RouteSeoC
     {
       '@type': 'WebSite',
       '@id': `${PLAYGROUND_SITE_URL}/#website`,
-      name: 'markstream-vue Playground',
-      url: `${PLAYGROUND_SITE_URL}/`,
-      description: DEFAULT_DESCRIPTION,
-      publisher: {
+      'name': 'markstream-vue Playground',
+      'url': `${PLAYGROUND_SITE_URL}/`,
+      'description': DEFAULT_DESCRIPTION,
+      'publisher': {
         '@type': 'Organization',
-        name: 'markstream-vue',
-        url: GITHUB_REPO_URL,
+        'name': 'markstream-vue',
+        'url': GITHUB_REPO_URL,
       },
     },
     {
       '@type': 'BreadcrumbList',
-      itemListElement: [
+      'itemListElement': [
         {
           '@type': 'ListItem',
-          position: 1,
-          name: 'Playground',
-          item: `${PLAYGROUND_SITE_URL}/`,
+          'position': 1,
+          'name': 'Playground',
+          'item': `${PLAYGROUND_SITE_URL}/`,
         },
         ...(path === '/'
           ? []
           : [{
               '@type': 'ListItem',
-              position: 2,
-              name: pageName,
-              item: canonicalUrl,
+              'position': 2,
+              'name': pageName,
+              'item': canonicalUrl,
             }]),
       ],
     },
     {
       '@type': 'SoftwareApplication',
-      name: pageName,
-      applicationCategory: 'DeveloperApplication',
-      operatingSystem: 'Web',
-      url: canonicalUrl,
-      description: seo.description,
-      image: PLAYGROUND_OG_IMAGE_URL,
-      isAccessibleForFree: true,
-      offers: {
+      'name': pageName,
+      'applicationCategory': 'DeveloperApplication',
+      'operatingSystem': 'Web',
+      'url': canonicalUrl,
+      'description': seo.description,
+      'image': PLAYGROUND_OG_IMAGE_URL,
+      'isAccessibleForFree': true,
+      'offers': {
         '@type': 'Offer',
-        price: '0',
-        priceCurrency: 'USD',
+        'price': '0',
+        'priceCurrency': 'USD',
       },
-      sameAs: [
+      'sameAs': [
         GITHUB_REPO_URL,
         `${PLAYGROUND_SITE_URL}/`,
       ],
-      isPartOf: {
+      'isPartOf': {
         '@id': `${PLAYGROUND_SITE_URL}/#website`,
       },
     },

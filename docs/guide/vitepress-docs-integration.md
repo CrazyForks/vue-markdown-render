@@ -43,9 +43,9 @@ Add more peers only if your docs actually need them:
 For VitePress, the safest place to wire global docs-only behavior is `docs/.vitepress/theme/index.ts`.
 
 ```ts
+import MarkdownRender, { setCustomComponents } from 'markstream-vue'
 // docs/.vitepress/theme/index.ts
 import DefaultTheme from 'vitepress/theme'
-import MarkdownRender, { setCustomComponents } from 'markstream-vue'
 import ThinkingNode from './components/ThinkingNode.vue'
 import './style.css'
 

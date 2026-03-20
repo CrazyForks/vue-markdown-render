@@ -6,10 +6,10 @@ import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 // import { VueRendererMarkdown } from '../../src/exports'
 import App from './App.vue'
+import { installPlaygroundSeo } from './seo'
 // import JsLocalIcon from './assets/javascript.svg?raw'
 import 'monaco-editor/min/vs/editor/editor.main.css'
 import '@unocss/reset/tailwind.css'
-import { installPlaygroundSeo } from './seo'
 import './styles/main.css'
 
 const app = createApp(App)

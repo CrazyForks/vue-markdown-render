@@ -1,6 +1,6 @@
+import { readdirSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
-import { readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitepress'
 
@@ -390,9 +390,9 @@ function createDocsBreadcrumbItems(path: string, title: string, isChinese: boole
 
   items.push({
     '@type': 'ListItem',
-    position: 1,
-    name: homeName,
-    item: `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
+    'position': 1,
+    'name': homeName,
+    'item': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
   })
 
   if (path === homePath || (isChinese && path === '/zh') || (!isChinese && path === '/'))
@@ -402,17 +402,17 @@ function createDocsBreadcrumbItems(path: string, title: string, isChinese: boole
   if (path === guideRoot || path.startsWith(`${guideRoot}/`)) {
     items.push({
       '@type': 'ListItem',
-      position: 2,
-      name: guideName,
-      item: `${docsSiteUrl}${guideRoot}`,
+      'position': 2,
+      'name': guideName,
+      'item': `${docsSiteUrl}${guideRoot}`,
     })
 
     if (path !== guideRoot) {
       items.push({
         '@type': 'ListItem',
-        position: 3,
-        name: title,
-        item: `${docsSiteUrl}${path}`,
+        'position': 3,
+        'name': title,
+        'item': `${docsSiteUrl}${path}`,
       })
     }
 
@@ -421,9 +421,9 @@ function createDocsBreadcrumbItems(path: string, title: string, isChinese: boole
 
   items.push({
     '@type': 'ListItem',
-    position: 2,
-    name: title,
-    item: `${docsSiteUrl}${path}`,
+    'position': 2,
+    'name': title,
+    'item': `${docsSiteUrl}${path}`,
   })
 
   return items
@@ -437,30 +437,30 @@ function createDocsStructuredData(path: string, title: string, description: stri
     graph.push({
       '@type': 'WebSite',
       '@id': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}#website`,
-      name: 'markstream-vue Docs',
-      url: `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
-      inLanguage: isChinese ? 'zh-CN' : 'en-US',
+      'name': 'markstream-vue Docs',
+      'url': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
+      'inLanguage': isChinese ? 'zh-CN' : 'en-US',
       description,
-      publisher: {
+      'publisher': {
         '@type': 'Organization',
-        name: 'markstream-vue',
-        url: githubRepoUrl,
+        'name': 'markstream-vue',
+        'url': githubRepoUrl,
       },
     })
 
     graph.push({
       '@type': 'SoftwareApplication',
-      name: 'markstream-vue',
-      applicationCategory: 'DeveloperApplication',
-      operatingSystem: 'Web',
-      url: `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
+      'name': 'markstream-vue',
+      'applicationCategory': 'DeveloperApplication',
+      'operatingSystem': 'Web',
+      'url': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
       description,
-      offers: {
+      'offers': {
         '@type': 'Offer',
-        price: '0',
-        priceCurrency: 'USD',
+        'price': '0',
+        'priceCurrency': 'USD',
       },
-      sameAs: [
+      'sameAs': [
         githubRepoUrl,
         docsSiteUrl,
         'https://markstream-vue.simonhe.me/',
@@ -472,7 +472,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
   if (breadcrumbItems.length > 0) {
     graph.push({
       '@type': 'BreadcrumbList',
-      itemListElement: breadcrumbItems,
+      'itemListElement': breadcrumbItems,
     })
   }
 
