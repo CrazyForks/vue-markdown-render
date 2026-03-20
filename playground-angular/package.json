@@ -14,7 +14,7 @@
     "@angular/platform-browser": "^20.3.18",
     "@antv/infographic": "^0.2.16",
     "@terrastruct/d2": "^0.1.33",
-    "katex": "^0.16.38",
+    "katex": "^0.16.39",
     "markstream-angular": "workspace:*",
     "mermaid": "^11.13.0",
     "monaco-editor": "^0.52.2",
