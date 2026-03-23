@@ -51,4 +51,14 @@ describe('html_block parser', () => {
     expect(b?.loading).toBe(false)
     expect(c?.loading).toBe(false)
   })
+
+  it('keeps outer same-tag html blocks loading until the matching outer close arrives', () => {
+    const md = getMarkdown()
+    const nodes = parseMarkdownToStructure('<div>outer<div>inner</div>rest', md, { final: false })
+    const html = firstHtml(nodes) as any
+    expect(html).toBeDefined()
+    expect(html.type).toBe('html_block')
+    expect(html.tag).toBe('div')
+    expect(html.loading).toBe(true)
+  })
 })

@@ -680,6 +680,29 @@ function normalizeCustomHtmlOpeningTagSameLine(markdown: string, tags: string[])
     return s.slice(i)
   }
 
+  const findTagCloseIndexOutsideQuotes = (input: string) => {
+    let inSingle = false
+    let inDouble = false
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i]
+      if (ch === '\\') {
+        i++
+        continue
+      }
+      if (!inDouble && ch === '\'') {
+        inSingle = !inSingle
+        continue
+      }
+      if (!inSingle && ch === '"') {
+        inDouble = !inDouble
+        continue
+      }
+      if (!inSingle && !inDouble && ch === '>')
+        return i
+    }
+    return -1
+  }
+
   const hasClosingTagOnLine = (line: string, from: number, tag: string) => {
     const lowerTag = tag.toLowerCase()
     let pos = line.indexOf('<', from)
@@ -747,9 +770,10 @@ function normalizeCustomHtmlOpeningTagSameLine(markdown: string, tags: string[])
     if (!tagSet.has(tagName))
       return line
 
-    const gt = line.indexOf('>', i)
-    if (gt === -1)
+    const gtRel = findTagCloseIndexOutsideQuotes(line.slice(i))
+    if (gtRel === -1)
       return line
+    const gt = i + gtRel
 
     if (hasClosingTagOnLine(line, gt + 1, tagName))
       return line
@@ -1502,6 +1526,32 @@ export function parseMarkdownToStructure(
         result = postResult as unknown as ParsedNode[]
       }
     }
+  }
+
+  if (isFinal) {
+    const seen = new WeakSet<object>()
+    const finalizeHtmlBlockLoading = (value: unknown) => {
+      if (!value || typeof value !== 'object')
+        return
+      if (seen.has(value as object))
+        return
+      seen.add(value as object)
+
+      if (Array.isArray(value)) {
+        for (const item of value)
+          finalizeHtmlBlockLoading(item)
+        return
+      }
+
+      const node = value as Record<string, unknown>
+      if (node.type === 'html_block' && node.loading === true)
+        node.loading = false
+
+      for (const child of Object.values(node))
+        finalizeHtmlBlockLoading(child)
+    }
+
+    finalizeHtmlBlockLoading(result)
   }
 
   if (options.debug) {
