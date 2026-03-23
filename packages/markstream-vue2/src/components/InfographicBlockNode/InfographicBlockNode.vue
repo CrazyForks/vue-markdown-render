@@ -49,6 +49,26 @@ const isModalOpen = ref(false)
 const modalContent = ref<HTMLElement>()
 const modalCloneWrapper = ref<HTMLElement | null>(null)
 
+function resolveContainerHeight(actualHeight: number) {
+  if (!props.maxHeight || props.maxHeight === 'none')
+    return `${actualHeight}px`
+
+  const maxHeight = Number.parseFloat(String(props.maxHeight))
+  if (!Number.isFinite(maxHeight))
+    return `${actualHeight}px`
+
+  return `${Math.min(actualHeight, maxHeight)}px`
+}
+
+function updateContainerHeight() {
+  if (!infographicContainer.value)
+    return
+
+  const actualHeight = infographicContainer.value.scrollHeight
+  if (actualHeight > 0)
+    containerHeight.value = resolveContainerHeight(actualHeight)
+}
+
 // Zoom state
 const zoom = ref(1)
 const translateX = ref(0)
@@ -312,12 +332,7 @@ async function renderInfographic() {
 
     // Update container height after render
     nextTick(() => {
-      if (infographicContainer.value) {
-        const actualHeight = infographicContainer.value.scrollHeight
-        if (actualHeight > 0) {
-          containerHeight.value = `${Math.min(actualHeight, 800)}px`
-        }
-      }
+      updateContainerHeight()
     })
   }
   catch (error) {
@@ -357,6 +372,17 @@ watch(
   () => isCollapsed.value,
   (collapsed) => {
     if (!collapsed && !showSource.value) {
+      nextTick(() => {
+        renderInfographic()
+      })
+    }
+  },
+)
+
+watch(
+  () => props.maxHeight,
+  () => {
+    if (!showSource.value && !isCollapsed.value) {
       nextTick(() => {
         renderInfographic()
       })

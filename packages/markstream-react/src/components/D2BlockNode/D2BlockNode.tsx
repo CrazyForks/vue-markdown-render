@@ -106,6 +106,7 @@ function toSafeSvgMarkup(svg: string | null | undefined) {
     return ''
   const svgElement = svgEl as unknown as SVGElement
   scrubSvgElement(svgElement)
+  svgElement.classList.add('markstream-d2-root-svg')
   return svgElement.outerHTML
 }
 
@@ -162,10 +163,10 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
   }, [props.maxHeight])
 
   const bodyStyle = useMemo(() => {
-    if (!bodyMinHeight)
+    if (!showSourceFallback || !bodyMinHeight)
       return undefined
     return { minHeight: `${bodyMinHeight}px` }
-  }, [bodyMinHeight])
+  }, [bodyMinHeight, showSourceFallback])
 
   useEffect(() => {
     isRenderingRef.current = isRendering

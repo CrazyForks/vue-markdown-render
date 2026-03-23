@@ -234,6 +234,19 @@ export class InfographicBlockNodeComponent implements AfterViewInit, OnChanges, 
     return resolveCssSize(this.mergedProps.maxHeight, '500px')
   }
 
+  private resolveContainerMinHeight(actualHeight: number) {
+    const boundedHeight = Math.max(actualHeight, 280)
+    const raw = this.mergedProps.maxHeight
+    if (raw == null || raw === 'none')
+      return `${boundedHeight}px`
+
+    const maxHeight = Number.parseFloat(String(raw))
+    if (!Number.isFinite(maxHeight))
+      return `${boundedHeight}px`
+
+    return `${Math.min(boundedHeight, maxHeight)}px`
+  }
+
   get resolvedLoading() {
     if (typeof this.mergedProps.loading === 'boolean')
       return this.mergedProps.loading
@@ -397,7 +410,7 @@ export class InfographicBlockNodeComponent implements AfterViewInit, OnChanges, 
       this.svgMarkup = svg ? svg.outerHTML : ''
       const measuredHeight = host.scrollHeight
       if (measuredHeight > 0)
-        this.containerMinHeight = `${Math.min(Math.max(measuredHeight, 280), 800)}px`
+        this.containerMinHeight = this.resolveContainerMinHeight(measuredHeight)
       this.syncModalPreview()
     }
     catch (error) {

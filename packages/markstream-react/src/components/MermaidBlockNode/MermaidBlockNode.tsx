@@ -203,11 +203,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   const [hasRenderedOnce, setHasRenderedOnce] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [containerHeight, setContainerHeight] = useState<string>(() => {
-    if (props.maxHeight == null)
-      return '360px'
-    return props.maxHeight
-  })
+  const [containerHeight, setContainerHeight] = useState('360px')
   const [viewportReady, setViewportReady] = useState(typeof window === 'undefined')
 
   const mermaidRef = useRef<any>(null)
@@ -303,6 +299,13 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     }
   }, [modalOpen])
 
+  const resolveMaxContainerHeight = useCallback(() => {
+    if (!props.maxHeight || props.maxHeight === 'none')
+      return null
+    const maxHeight = Number.parseFloat(String(props.maxHeight))
+    return Number.isFinite(maxHeight) ? maxHeight : null
+  }, [props.maxHeight])
+
   const updateContainerHeight = useCallback((newWidth?: number) => {
     const container = containerRef.current
     const content = contentRef.current
@@ -341,8 +344,10 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     const aspect = intrinsicHeight / intrinsicWidth
     const target = containerWidth * aspect
     const resolved = Number.isFinite(target) && target > 0 ? target : intrinsicHeight
-    setContainerHeight(`${Math.min(resolved, intrinsicHeight)}px`)
-  }, [])
+    const maxHeight = resolveMaxContainerHeight()
+    const nextHeight = maxHeight == null ? resolved : Math.min(resolved, maxHeight)
+    setContainerHeight(`${nextHeight}px`)
+  }, [resolveMaxContainerHeight])
 
   useEffect(() => {
     if (!containerRef.current || typeof ResizeObserver === 'undefined')
@@ -358,6 +363,12 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     observer.observe(containerRef.current)
     return () => observer.disconnect()
   }, [isCollapsed, showSource, updateContainerHeight])
+
+  useEffect(() => {
+    if (showSource || isCollapsed)
+      return
+    updateContainerHeight()
+  }, [isCollapsed, props.maxHeight, showSource, updateContainerHeight])
 
   useEffect(() => {
     return () => {
@@ -592,6 +603,8 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     const transform = `translate(${translate.x}px, ${translate.y}px) scale(${zoom})`
     const clone = original.cloneNode(true) as HTMLElement
     clone.classList.add('fullscreen')
+    clone.style.height = '100%'
+    clone.style.maxHeight = '100%'
     const wrapper = clone.querySelector('[data-mermaid-wrapper]') as HTMLElement | null
     if (wrapper) {
       modalCloneWrapperRef.current = wrapper

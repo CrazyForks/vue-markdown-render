@@ -1604,7 +1604,8 @@ li .paragraph-node {
   overflow: auto;
 }
 
-.d2-svg svg {
+.d2-svg svg.markstream-d2-root-svg {
+  width: 100%;
   max-width: 100%;
   height: auto;
   display: block;

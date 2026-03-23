@@ -63,6 +63,27 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
 
   const baseCode = props.node.code
 
+  const resolveContainerHeight = useCallback((actualHeight: number) => {
+    if (!props.maxHeight || props.maxHeight === 'none')
+      return `${actualHeight}px`
+
+    const maxHeight = Number.parseFloat(String(props.maxHeight))
+    if (!Number.isFinite(maxHeight))
+      return `${actualHeight}px`
+
+    return `${Math.min(actualHeight, maxHeight)}px`
+  }, [props.maxHeight])
+
+  const updateContainerHeight = useCallback(() => {
+    const el = containerRef.current
+    if (!el)
+      return
+
+    const actualHeight = el.scrollHeight
+    if (actualHeight > 0)
+      setContainerHeight(resolveContainerHeight(actualHeight))
+  }, [resolveContainerHeight])
+
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard?.writeText(baseCode)
@@ -102,19 +123,14 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
 
       // Update height
       setTimeout(() => {
-        if (el) {
-          const actualHeight = el.scrollHeight
-          if (actualHeight > 0) {
-            setContainerHeight(`${Math.min(actualHeight, 800)}px`)
-          }
-        }
+        updateContainerHeight()
       }, 0)
     }
     catch (error) {
       console.error('Failed to render infographic:', error)
       el.innerHTML = `<div class="text-red-500 p-4">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
     }
-  }, [baseCode])
+  }, [baseCode, updateContainerHeight])
 
   // Effects
   useEffect(() => {
