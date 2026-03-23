@@ -170,8 +170,9 @@ function getTrailingOpenDepth(
   return depth
 }
 
-function findMatchingCloseRangeInHtml(content: string, tag: string) {
+function findMatchingCloseRangeInHtml(content: string, tag: string, startIndex = 0) {
   const tokenRe = new RegExp(String.raw`<\s*(\/?)\s*${escapeRegex(tag)}(?=[\s>/])[^>]*>`, 'gi')
+  tokenRe.lastIndex = Math.max(0, startIndex)
   let depth = 0
   let match: RegExpExecArray | null
 
@@ -198,8 +199,8 @@ function findMatchingCloseRangeInHtml(content: string, tag: string) {
   return null
 }
 
-function findMatchingCloseOffsetInHtml(content: string, tag: string) {
-  const range = findMatchingCloseRangeInHtml(content, tag)
+function findMatchingCloseOffsetInHtml(content: string, tag: string, startIndex = 0) {
+  const range = findMatchingCloseRangeInHtml(content, tag, startIndex)
   if (!range)
     return -1
   return range.end
@@ -873,7 +874,10 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
         // These are handled specially to support streaming and structured nodes
         if (customTagSet.has(tag)) {
           const raw = String(t.content ?? '')
-          const closeRange = findMatchingCloseRangeInHtml(raw, tag)
+          const openEnd = findTagCloseIndexOutsideQuotes(raw)
+          const closeRange = openEnd === -1
+            ? null
+            : findMatchingCloseRangeInHtml(raw, tag, openEnd + 1)
           const hasClose = !!closeRange
           t.loading = hasClose ? false : t.loading !== undefined ? t.loading : true
 
@@ -884,7 +888,6 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
             // Found a closing tag - extract inner content and trim
             const rawForNode = raw.slice(0, endTagIndex + closeLen)
             let inner = ''
-            const openEnd = findTagCloseIndexOutsideQuotes(raw)
             if (openEnd !== -1 && openEnd < endTagIndex) {
               inner = raw.slice(openEnd + 1, endTagIndex)
             }
