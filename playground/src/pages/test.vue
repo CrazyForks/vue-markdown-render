@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
 import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
 import type { SandboxFrameworkId, SandboxRenderSource } from '../../../playground-shared/versionSandbox'
 import type { StreamSliceMode } from '../composables/createLocalTextStream'
 import type { StreamPresetId } from '../composables/streamPresets'
 import type { StreamTransportMode } from '../composables/useStreamSimulator'
+import { Icon } from '@iconify/vue'
 import { useDebounceFn, useLocalStorage } from '@vueuse/core'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
@@ -23,11 +23,11 @@ import { disableMermaid, enableMermaid, isMermaidEnabled } from '../../../src/co
 import MarkdownRender from '../../../src/components/NodeRenderer'
 import PreCodeNode from '../../../src/components/PreCodeNode'
 import { setCustomComponents } from '../../../src/utils/nodeComponents'
-import ThinkingNode from '../components/ThinkingNode.vue'
 import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline'
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
 import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
 import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
+import ThinkingNode from '../components/ThinkingNode.vue'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from '../composables/streamPresets'
 import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from '../composables/useStreamSimulator'
 import { testSandboxFrameworks } from '../testSandboxConfig'
@@ -176,6 +176,8 @@ const renderModeLabel = computed(() => {
     return 'PreCodeNode'
   return 'Monaco'
 })
+const previewDiagramMaxHeight = computed(() => isPreviewFullscreen.value ? 'none' : '500px')
+const previewD2MaxHeight = computed(() => 'none')
 const charCount = computed(() => input.value.length)
 const lineCount = computed(() => (input.value ? input.value.split('\n').length : 0))
 
@@ -519,7 +521,7 @@ watch(mermaidEnabled, (enabled) => {
 </script>
 
 <template>
-  <div class="test-lab" :class="{ 'test-lab--dark': isDark, dark: isDark }">
+  <div class="test-lab" :class="{ 'test-lab--dark': isDark, 'dark': isDark }">
     <div class="test-lab__glow test-lab__glow--cyan" />
     <div class="test-lab__glow test-lab__glow--amber" />
 
@@ -968,6 +970,9 @@ watch(mermaidEnabled, (enabled) => {
                 :content="previewContent"
                 :custom-html-tags="testPageCustomHtmlTags"
                 :is-dark="isDark"
+                :mermaid-props="{ maxHeight: previewDiagramMaxHeight }"
+                :d2-props="{ maxHeight: previewD2MaxHeight }"
+                :infographic-props="{ maxHeight: previewDiagramMaxHeight }"
                 :viewport-priority="viewportPriority"
                 :batch-rendering="batchRendering"
                 :typewriter="typewriter"
@@ -1735,7 +1740,7 @@ watch(mermaidEnabled, (enabled) => {
   min-height: 100vh;
   border-radius: 0;
   box-shadow: none;
-  overflow: hidden;
+  overflow: auto;
   background: #fff;
 }
 
@@ -1750,8 +1755,10 @@ watch(mermaidEnabled, (enabled) => {
 
 .workspace-card--preview:fullscreen .preview-surface {
   min-height: 100vh;
-  height: 100vh;
+  height: auto;
   padding: 40px min(6vw, 72px);
+  overflow: visible;
+  box-sizing: border-box;
   background: #fff;
 }
 

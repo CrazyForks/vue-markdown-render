@@ -666,6 +666,14 @@ async function canParseOrPrefix(
 
 const isFullscreenDisabled = computed(() => showSource.value || isRendering.value || isCollapsed.value)
 
+function resolveMaxContainerHeight() {
+  if (!props.maxHeight || props.maxHeight === 'none')
+    return null
+
+  const maxHeight = Number.parseFloat(String(props.maxHeight))
+  return Number.isFinite(maxHeight) ? maxHeight : null
+}
+
 /**
  * 健壮地计算并更新容器高度，优先使用viewBox，并提供getBBox作为后备
  * @param newContainerWidth - 可选的容器宽度，由ResizeObserver提供以确保精确
@@ -732,10 +740,10 @@ function updateContainerHeight(newContainerWidth?: number) {
     // 如果外部传入了宽度，则使用它，否则自己获取
     const containerWidth
       = newContainerWidth ?? mermaidContainer.value.clientWidth
-    let newHeight = containerWidth * aspectRatio
-    if (newHeight > intrinsicHeight)
-      newHeight = intrinsicHeight // 高保真，不超过内容的固有高度
-    containerHeight.value = `${newHeight}px`
+    const maxHeight = resolveMaxContainerHeight()
+    const newHeight = containerWidth * aspectRatio
+    const resolvedHeight = maxHeight == null ? newHeight : Math.min(newHeight, maxHeight)
+    containerHeight.value = `${resolvedHeight}px`
   }
 }
 
@@ -772,6 +780,8 @@ function openModal() {
       // clone the container for modal and add fullscreen to the clone (not original)
       const clone = mermaidContainer.value.cloneNode(true) as HTMLElement
       clone.classList.add('fullscreen')
+      clone.style.height = '100%'
+      clone.style.maxHeight = '100%'
 
       // find the wrapper inside the clone using the data attribute and keep a ref
       const wrapper = clone.querySelector(
@@ -1623,6 +1633,15 @@ watch(
     if (userToggledShowSource.value)
       return
     showSource.value = !available
+  },
+)
+
+watch(
+  () => props.maxHeight,
+  () => {
+    nextTick(() => {
+      updateContainerHeight()
+    })
   },
 )
 

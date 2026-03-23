@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { MarkdownRender } from 'markstream-vue'
 
-defineProps<{ node: {
-  type: 'thinking'
-  content: string
-  children: any[]
-  loading?: boolean
-}
+defineProps<{
+  node: {
+    type: 'thinking'
+    content: string
+    children: any[]
+    loading?: boolean
+  }
   isDark?: boolean
 }>()
 </script>

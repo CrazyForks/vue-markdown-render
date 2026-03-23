@@ -25,6 +25,18 @@ vi.mock('../src/components/NodeRenderer', () => ({
         type: String,
         default: '',
       },
+      mermaidProps: {
+        type: Object,
+        default: () => ({}),
+      },
+      d2Props: {
+        type: Object,
+        default: () => ({}),
+      },
+      infographicProps: {
+        type: Object,
+        default: () => ({}),
+      },
     },
     template: '<div data-testid="preview">{{ content }}</div>',
   },
@@ -197,8 +209,9 @@ describe('playground /test smoke', () => {
 
   it('toggles preview fullscreen mode from the preview card', async () => {
     let fullscreenElement: Element | null = null
-    const requestFullscreen = vi.fn(async function (this: HTMLElement) {
-      fullscreenElement = this
+    let previewCardElement: Element | null = null
+    const requestFullscreen = vi.fn(async () => {
+      fullscreenElement = previewCardElement
       document.dispatchEvent(new Event('fullscreenchange'))
     })
     const exitFullscreen = vi.fn(async () => {
@@ -220,6 +233,7 @@ describe('playground /test smoke', () => {
     })
 
     const wrapper = await mountTestPage()
+    previewCardElement = wrapper.get('.workspace-card--preview').element
     const button = wrapper.get('[data-testid="preview-fullscreen-button"]')
 
     expect(button.text()).toContain('全屏预览')
@@ -235,6 +249,47 @@ describe('playground /test smoke', () => {
 
     expect(exitFullscreen).toHaveBeenCalledTimes(1)
     expect(button.text()).toContain('全屏预览')
+
+    wrapper.unmount()
+  })
+
+  it('removes infographic height caps in preview fullscreen mode', async () => {
+    let fullscreenElement: Element | null = null
+    let previewCardElement: Element | null = null
+    const requestFullscreen = vi.fn(async () => {
+      fullscreenElement = previewCardElement
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    })
+
+    const wrapper = await mountTestPage()
+    previewCardElement = wrapper.get('.workspace-card--preview').element
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    const button = wrapper.get('[data-testid="preview-fullscreen-button"]')
+
+    expect(preview.props('infographicProps')).toEqual({ maxHeight: '500px' })
+
+    await button.trigger('click')
+    await nextTick()
+
+    expect(preview.props('infographicProps')).toEqual({ maxHeight: 'none' })
+
+    wrapper.unmount()
+  })
+
+  it('keeps d2 preview unconstrained so the outer preview pane owns scrolling', async () => {
+    const wrapper = await mountTestPage()
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+
+    expect(preview.props('d2Props')).toEqual({ maxHeight: 'none' })
 
     wrapper.unmount()
   })
