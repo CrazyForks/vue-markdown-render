@@ -25,8 +25,8 @@ const routeSeoMap: Record<string, RouteSeoConfig> = {
     robots: 'index,follow',
   },
   '/test': {
-    title: 'Integration Test Lab | markstream-vue Playground',
-    description: 'Compare rendering modes, simulate stream behavior, and validate Monaco, Mermaid, KaTeX, and custom component wiring in one place.',
+    title: 'Markdown Preview & Test Lab | markstream-vue Playground',
+    description: 'Paste markdown for live preview, then compare framework and version behavior with streaming, Monaco, Mermaid, and KaTeX in one place.',
     robots: 'index,follow',
   },
   '/cdn-peers': {

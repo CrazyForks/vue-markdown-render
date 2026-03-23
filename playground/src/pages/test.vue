@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
 import type { SandboxFrameworkId, SandboxRenderSource } from '../../../playground-shared/versionSandbox'
 import type { StreamSliceMode } from '../composables/createLocalTextStream'
 import type { StreamPresetId } from '../composables/streamPresets'
 import type { StreamTransportMode } from '../composables/useStreamSimulator'
 import { useDebounceFn, useLocalStorage } from '@vueuse/core'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
 import { decodeMarkdownHash, encodeMarkdownPayload, resolveFrameworkTestHref, withMarkdownHash } from '../../../playground-shared/testPageState'
 import {
@@ -22,6 +23,7 @@ import { disableMermaid, enableMermaid, isMermaidEnabled } from '../../../src/co
 import MarkdownRender from '../../../src/components/NodeRenderer'
 import PreCodeNode from '../../../src/components/PreCodeNode'
 import { setCustomComponents } from '../../../src/utils/nodeComponents'
+import ThinkingNode from '../components/ThinkingNode.vue'
 import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline'
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
 import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
@@ -68,6 +70,7 @@ const streamTransportMode = useLocalStorage<StreamTransportMode>('vmr-test-strea
 const streamSliceMode = useLocalStorage<StreamSliceMode>('vmr-test-stream-slice-mode', 'pure-random')
 const streamDebug = useLocalStorage<boolean>('vmr-test-stream-debug', false)
 const showStreamSettings = useLocalStorage<boolean>('vmr-test-show-settings', true)
+const isDark = useLocalStorage<boolean>('vmr-test-dark', false)
 
 const renderMode = useLocalStorage<'monaco' | 'pre' | 'markdown'>('vmr-test-render-mode', 'monaco')
 const codeBlockStream = useLocalStorage<boolean>('vmr-test-code-stream', true)
@@ -77,6 +80,7 @@ const typewriter = useLocalStorage<boolean>('vmr-test-typewriter', true)
 const debugParse = useLocalStorage<boolean>('vmr-test-debug-parse', false)
 const mathEnabled = useLocalStorage<boolean>('vmr-test-math-enabled', isKatexEnabled())
 const mermaidEnabled = useLocalStorage<boolean>('vmr-test-mermaid-enabled', isMermaidEnabled())
+const testPageCustomHtmlTags = ['think', 'thinking'] as const
 
 getUseMonaco()
 setKaTeXWorker(new KatexWorker())
@@ -89,6 +93,8 @@ const noticeType = ref<'success' | 'error' | 'info'>('success')
 const isWorking = ref(false)
 const isCopied = ref(false)
 const issueUrl = ref<string>('')
+const previewCardRef = ref<HTMLElement | null>(null)
+const isPreviewFullscreen = ref(false)
 const MAX_URL_LEN = 2000
 
 const activeSample = computed(() => sampleCards.find(sample => sample.id === selectedSampleId.value) ?? sampleCards[0])
@@ -334,6 +340,29 @@ function openIssueInNewTab() {
   }
 }
 
+function syncPreviewFullscreenState() {
+  isPreviewFullscreen.value = document.fullscreenElement === previewCardRef.value
+}
+
+async function togglePreviewFullscreen() {
+  const previewCard = previewCardRef.value
+  if (!previewCard)
+    return
+
+  if (document.fullscreenElement === previewCard) {
+    if (!document.exitFullscreen)
+      return
+
+    await document.exitFullscreen()
+    return
+  }
+
+  if (!previewCard.requestFullscreen)
+    return
+
+  await previewCard.requestFullscreen()
+}
+
 function restoreFromUrl() {
   const decoded = decodeMarkdownHash(window.location.hash || '')
   if (!decoded)
@@ -377,6 +406,10 @@ function clearEditor() {
   input.value = ''
 }
 
+function toggleAppearance() {
+  isDark.value = !isDark.value
+}
+
 function frameworkHref(id: FrameworkId) {
   const framework = frameworkCards.find(item => item.id === id)
   if (!framework)
@@ -399,6 +432,12 @@ onMounted(() => {
   }
   shareUrl.value = basePageUrl()
   sandboxSnapshot.value = input.value
+  syncPreviewFullscreenState()
+  document.addEventListener('fullscreenchange', syncPreviewFullscreenState)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', syncPreviewFullscreenState)
 })
 
 watch(normalizedChunkSizeRange, (range) => {
@@ -457,11 +496,11 @@ watch(() => sandboxVersion.value, () => {
 
 watch(() => renderMode.value, (mode) => {
   if (mode === 'pre')
-    setCustomComponents({ code_block: PreCodeNode })
+    setCustomComponents({ code_block: PreCodeNode, think: ThinkingNode, thinking: ThinkingNode })
   else if (mode === 'markdown')
-    setCustomComponents({ code_block: MarkdownCodeBlockNode })
+    setCustomComponents({ code_block: MarkdownCodeBlockNode, think: ThinkingNode, thinking: ThinkingNode })
   else
-    setCustomComponents({ code_block: CodeBlockNode })
+    setCustomComponents({ code_block: CodeBlockNode, think: ThinkingNode, thinking: ThinkingNode })
 }, { immediate: true })
 
 watch(mathEnabled, (enabled) => {
@@ -480,7 +519,7 @@ watch(mermaidEnabled, (enabled) => {
 </script>
 
 <template>
-  <div class="test-lab">
+  <div class="test-lab" :class="{ 'test-lab--dark': isDark, dark: isDark }">
     <div class="test-lab__glow test-lab__glow--cyan" />
     <div class="test-lab__glow test-lab__glow--amber" />
 
@@ -490,8 +529,8 @@ watch(mermaidEnabled, (enabled) => {
           <span class="eyebrow">Cross-framework regression lab</span>
           <h1>Markstream Test Page</h1>
           <p>
-            用同一份 markdown，快速对照 Vue 3、Vue 2、React 和 Angular 的渲染行为。
-            这个页面更像一个调试驾驶舱，而不是单纯的 demo。
+            直接粘贴 markdown，即时预览渲染结果；需要排障时，再用同一份输入快速对照
+            Vue 3、Vue 2、React 和 Angular 的渲染行为。
           </p>
         </div>
 
@@ -869,7 +908,7 @@ watch(mermaidEnabled, (enabled) => {
             <header class="workspace-card__head">
               <div>
                 <h2>Markdown 输入</h2>
-                <p>左侧编辑，右侧马上验证渲染结果。</p>
+                <p>把 markdown 粘进来，右侧立即看到真实渲染结果。</p>
               </div>
               <span class="mini-pill">Live editor</span>
             </header>
@@ -887,24 +926,54 @@ watch(mermaidEnabled, (enabled) => {
             </footer>
           </article>
 
-          <article class="workspace-card">
+          <article ref="previewCardRef" class="workspace-card workspace-card--preview">
             <header class="workspace-card__head">
               <div>
                 <h2>实时预览</h2>
-                <p>当前模式：{{ renderModeLabel }}</p>
+                <p>
+                  当前模式：{{ renderModeLabel }}{{ isPreviewFullscreen ? ' · 按 Esc 退出全屏' : '' }}
+                </p>
               </div>
-              <span class="mini-pill" :class="{ 'mini-pill--active': isStreaming }">
-                {{ isStreaming ? 'Streaming' : 'Ready' }}
-              </span>
+              <div class="workspace-card__head-actions">
+                <button
+                  type="button"
+                  class="ghost-button icon-button"
+                  data-testid="theme-toggle-button"
+                  :aria-label="isDark ? '切换到浅色模式' : '切换到暗色模式'"
+                  :title="isDark ? '切换到浅色模式' : '切换到暗色模式'"
+                  @click="toggleAppearance"
+                >
+                  <Icon
+                    :icon="isDark ? 'carbon:moon' : 'carbon:sun'"
+                    class="icon-button__icon"
+                  />
+                </button>
+                <button
+                  type="button"
+                  class="ghost-button"
+                  data-testid="preview-fullscreen-button"
+                  :aria-pressed="isPreviewFullscreen"
+                  @click="togglePreviewFullscreen"
+                >
+                  {{ isPreviewFullscreen ? '退出全屏' : '全屏预览' }}
+                </button>
+                <span class="mini-pill" :class="{ 'mini-pill--active': isStreaming }">
+                  {{ isStreaming ? 'Streaming' : 'Ready' }}
+                </span>
+              </div>
             </header>
 
             <div class="preview-surface">
               <MarkdownRender
                 :content="previewContent"
+                :custom-html-tags="testPageCustomHtmlTags"
+                :is-dark="isDark"
                 :viewport-priority="viewportPriority"
                 :batch-rendering="batchRendering"
                 :typewriter="typewriter"
                 :code-block-stream="codeBlockStream"
+                code-block-dark-theme="vitesse-dark"
+                code-block-light-theme="vitesse-light"
                 :code-block-monaco-options="testPageMonacoOptions"
                 :parse-options="{ debug: debugParse }"
               />
@@ -988,6 +1057,23 @@ watch(mermaidEnabled, (enabled) => {
   overflow: hidden;
 }
 
+.test-lab--dark {
+  --lab-bg: #08111f;
+  --lab-surface: rgba(9, 18, 32, 0.82);
+  --lab-surface-strong: rgba(15, 23, 42, 0.94);
+  --lab-border: rgba(148, 163, 184, 0.14);
+  --lab-shadow: 0 28px 80px rgba(2, 6, 23, 0.45);
+  --lab-text: #e2e8f0;
+  --lab-muted: #94a3b8;
+  --lab-accent: #60a5fa;
+  --lab-accent-soft: rgba(96, 165, 250, 0.16);
+  color-scheme: dark;
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.16), transparent 30%),
+    radial-gradient(circle at 85% 12%, rgba(245, 158, 11, 0.12), transparent 28%),
+    linear-gradient(180deg, #0b1220 0%, var(--lab-bg) 100%);
+}
+
 .test-lab__shell {
   position: relative;
   z-index: 1;
@@ -1063,6 +1149,12 @@ watch(mermaidEnabled, (enabled) => {
   text-transform: uppercase;
 }
 
+.test-lab--dark .eyebrow {
+  background: rgba(15, 23, 42, 0.84);
+  border-color: rgba(96, 165, 250, 0.22);
+  color: #93c5fd;
+}
+
 .hero-panel h1 {
   margin: 12px 0 10px;
   font-size: clamp(2.1rem, 4vw, 3.4rem);
@@ -1134,6 +1226,28 @@ watch(mermaidEnabled, (enabled) => {
   background: linear-gradient(135deg, rgba(29, 78, 216, 0.12), rgba(34, 197, 94, 0.08));
 }
 
+.test-lab--dark .metric-card,
+.test-lab--dark .framework-chip,
+.test-lab--dark .sample-card,
+.test-lab--dark .range-control,
+.test-lab--dark .select-control,
+.test-lab--dark .toggle-item,
+.test-lab--dark .text-control,
+.test-lab--dark .segmented-control__button,
+.test-lab--dark .preset-chip {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+.test-lab--dark .framework-chip--current,
+.test-lab--dark .sample-card--active,
+.test-lab--dark .segmented-control__button--active,
+.test-lab--dark .preset-chip--active {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(15, 23, 42, 0.92));
+  border-color: rgba(96, 165, 250, 0.3);
+  color: #bfdbfe;
+}
+
 .framework-chip__label {
   font-weight: 700;
   font-size: 1rem;
@@ -1170,6 +1284,10 @@ watch(mermaidEnabled, (enabled) => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.workspace-card__head {
+  flex-wrap: wrap;
 }
 
 .panel-card__head h2,
@@ -1298,6 +1416,12 @@ watch(mermaidEnabled, (enabled) => {
   color: var(--lab-muted);
 }
 
+.test-lab--dark .action-button:not(.action-button--primary),
+.test-lab--dark .ghost-button {
+  background: rgba(30, 41, 59, 0.84);
+  color: #cbd5e1;
+}
+
 .progress-block {
   margin-top: 16px;
 }
@@ -1308,6 +1432,10 @@ watch(mermaidEnabled, (enabled) => {
   overflow: hidden;
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.08);
+}
+
+.test-lab--dark .progress-track {
+  background: rgba(51, 65, 85, 0.7);
 }
 
 .progress-fill {
@@ -1388,6 +1516,12 @@ watch(mermaidEnabled, (enabled) => {
 
 .text-control input:focus {
   outline: none;
+}
+
+.test-lab--dark .select-control select,
+.test-lab--dark .text-control input {
+  background: rgba(30, 41, 59, 0.9);
+  color: #e2e8f0;
 }
 
 .segmented-control {
@@ -1488,6 +1622,38 @@ watch(mermaidEnabled, (enabled) => {
   color: #b45309;
 }
 
+.test-lab--dark .mini-pill {
+  background: rgba(30, 41, 59, 0.9);
+  color: #cbd5e1;
+}
+
+.test-lab--dark .mini-pill--active {
+  background: rgba(37, 99, 235, 0.2);
+  color: #bfdbfe;
+}
+
+.workspace-card__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.icon-button__icon {
+  width: 18px;
+  height: 18px;
+}
+
 .workspace-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1539,10 +1705,58 @@ watch(mermaidEnabled, (enabled) => {
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.92));
 }
 
+.test-lab--dark .editor-textarea {
+  background: linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(15, 23, 42, 0.94));
+  color: #e2e8f0;
+}
+
+.test-lab--dark .preview-surface {
+  background: linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.96));
+}
+
+.workspace-card--preview:fullscreen {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  min-height: 100vh;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+  background: #fff;
+}
+
+.workspace-card--preview:fullscreen::backdrop {
+  background: rgba(15, 23, 42, 0.78);
+}
+
+.workspace-card--preview:fullscreen .workspace-card__head,
+.workspace-card--preview:fullscreen .workspace-card__foot {
+  display: none;
+}
+
+.workspace-card--preview:fullscreen .preview-surface {
+  min-height: 100vh;
+  height: 100vh;
+  padding: 40px min(6vw, 72px);
+  background: #fff;
+}
+
+.test-lab--dark .workspace-card--preview:fullscreen {
+  background: #020617;
+}
+
+.test-lab--dark .workspace-card--preview:fullscreen .preview-surface {
+  background: #020617;
+}
+
 .sandbox-frame-shell {
   min-height: 620px;
   background:
     linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(239, 246, 255, 0.9));
+}
+
+.test-lab--dark .sandbox-frame-shell {
+  background: linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(15, 23, 42, 0.92));
 }
 
 .sandbox-frame {
@@ -1601,6 +1815,11 @@ watch(mermaidEnabled, (enabled) => {
   .editor-textarea,
   .preview-surface {
     min-height: 420px;
+  }
+
+  .workspace-card__head-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .meta-list__row {

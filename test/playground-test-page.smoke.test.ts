@@ -4,6 +4,19 @@ import { nextTick } from 'vue'
 import { decodeMarkdownHash } from '../playground-shared/testPageState'
 import TestPage from '../playground/src/pages/test.vue'
 
+vi.mock('@iconify/vue', () => ({
+  Icon: {
+    name: 'IconStub',
+    props: {
+      icon: {
+        type: String,
+        default: '',
+      },
+    },
+    template: '<span data-testid="icon">{{ icon }}</span>',
+  },
+}))
+
 vi.mock('../src/components/NodeRenderer', () => ({
   default: {
     name: 'MarkdownRenderStub',
@@ -75,6 +88,10 @@ vi.mock('../src/workers/mermaidParser.worker?worker&inline', () => ({
   default: class FakeMermaidWorker {},
 }))
 
+const originalFullscreenElement = Object.getOwnPropertyDescriptor(document, 'fullscreenElement')
+const originalExitFullscreen = Object.getOwnPropertyDescriptor(document, 'exitFullscreen')
+const originalRequestFullscreen = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'requestFullscreen')
+
 async function mountTestPage() {
   const wrapper = mount(TestPage)
   await nextTick()
@@ -85,11 +102,28 @@ describe('playground /test smoke', () => {
   beforeEach(() => {
     katexEnabled = true
     mermaidEnabled = true
+    window.localStorage.removeItem('vmr-test-dark')
     window.history.replaceState({}, '', '/test')
   })
 
   afterEach(() => {
     vi.useRealTimers()
+    window.localStorage.removeItem('vmr-test-dark')
+
+    if (originalFullscreenElement)
+      Object.defineProperty(document, 'fullscreenElement', originalFullscreenElement)
+    else
+      Reflect.deleteProperty(document, 'fullscreenElement')
+
+    if (originalExitFullscreen)
+      Object.defineProperty(document, 'exitFullscreen', originalExitFullscreen)
+    else
+      Reflect.deleteProperty(document, 'exitFullscreen')
+
+    if (originalRequestFullscreen)
+      Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', originalRequestFullscreen)
+    else
+      Reflect.deleteProperty(HTMLElement.prototype, 'requestFullscreen')
   })
 
   it('opens the /test route and renders the lab shell', async () => {
@@ -157,6 +191,72 @@ describe('playground /test smoke', () => {
 
     expect(preview.text().length).toBeGreaterThan(initialLength)
     expect(preview.text().length).toBeLessThan(fullContent.length)
+
+    wrapper.unmount()
+  })
+
+  it('toggles preview fullscreen mode from the preview card', async () => {
+    let fullscreenElement: Element | null = null
+    const requestFullscreen = vi.fn(async function (this: HTMLElement) {
+      fullscreenElement = this
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+    const exitFullscreen = vi.fn(async () => {
+      fullscreenElement = null
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenElement,
+    })
+    Object.defineProperty(document, 'exitFullscreen', {
+      configurable: true,
+      value: exitFullscreen,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    })
+
+    const wrapper = await mountTestPage()
+    const button = wrapper.get('[data-testid="preview-fullscreen-button"]')
+
+    expect(button.text()).toContain('全屏预览')
+
+    await button.trigger('click')
+    await nextTick()
+
+    expect(requestFullscreen).toHaveBeenCalledTimes(1)
+    expect(button.text()).toContain('退出全屏')
+
+    await button.trigger('click')
+    await nextTick()
+
+    expect(exitFullscreen).toHaveBeenCalledTimes(1)
+    expect(button.text()).toContain('全屏预览')
+
+    wrapper.unmount()
+  })
+
+  it('toggles dark and light appearance from the icon button', async () => {
+    const wrapper = await mountTestPage()
+    const page = wrapper.get('.test-lab')
+    const button = wrapper.get('[data-testid="theme-toggle-button"]')
+
+    expect(page.classes()).not.toContain('test-lab--dark')
+    expect(button.attributes('aria-label')).toBe('切换到暗色模式')
+
+    await button.trigger('click')
+    await nextTick()
+
+    expect(page.classes()).toContain('test-lab--dark')
+    expect(button.attributes('aria-label')).toBe('切换到浅色模式')
+
+    await button.trigger('click')
+    await nextTick()
+
+    expect(page.classes()).not.toContain('test-lab--dark')
 
     wrapper.unmount()
   })

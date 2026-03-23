@@ -398,8 +398,8 @@ importers:
         specifier: ^0.16.39
         version: 0.16.39
       markstream-vue:
-        specifier: latest
-        version: 0.0.9-beta.3(@antv/infographic@0.2.16)(@terrastruct/d2@0.1.33)(katex@0.16.39)(mermaid@11.13.0)(shiki@3.23.0)(stream-markdown@0.0.14(shiki@3.23.0))(stream-monaco@0.0.20(monaco-editor@0.52.2))(vue-i18n@11.3.0(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3))
+        specifier: workspace:*
+        version: link:..
       stream-markdown:
         specifier: latest
         version: 0.0.14(shiki@3.23.0)
@@ -8637,10 +8637,6 @@ packages:
   markdown-it-task-checkbox@1.0.6:
     resolution: {integrity: sha512-7pxkHuvqTOu3iwVGmDPeYjQg+AIS9VQxzyLP9JCg9lBjgPAJXGEkChK6A2iFuj3tS0GV3HG2u5AMNhcQqwxpJw==}
 
-  markdown-it-ts@0.0.5:
-    resolution: {integrity: sha512-co2cRRjr6GkxKL04oEF/1ABWogdF2daTpNvFAOqXjsdtoAOnrEMDwlAgh05s4I0HLHPuwEiYl/5AsOmgnOEpKg==}
-    engines: {node: '>=18'}
-
   markdown-it-ts@0.0.9:
     resolution: {integrity: sha512-krzuXIaUUiXI8SLlyssp1q4FzDlnfP3wrJwb7ulzwa1DLTYnYDtVe9R5NLTi2FZTo59APCD6to5JnFFj5bs0nA==}
     engines: {node: '>=18'}
@@ -8652,36 +8648,6 @@ packages:
     resolution: {integrity: sha512-TI3V8YYWvkVf3KJe1dRkpnjs68JUPyEa5vjKrp1XEEJUAOaQc+Qj+L1qWbPd0SJuAdQkFU0h73sXXqwDYxsiDA==}
     engines: {node: '>= 20'}
     hasBin: true
-
-  markstream-vue@0.0.9-beta.3:
-    resolution: {integrity: sha512-D2E4ZP43mVHgqG2ou2CgUr7ssFBUvIUcQlC30iNsCdqUWTGLDWd2fvi/ZOK9u/EyLd38aHRIfXW8OeagB5pmWA==}
-    peerDependencies:
-      '@antv/infographic': ^0.2.3
-      '@terrastruct/d2': '>=0.1.33'
-      katex: '>=0.16.22'
-      mermaid: '>=11'
-      shiki: ^3.13.0
-      stream-markdown: '>=0.0.14'
-      stream-monaco: '>=0.0.20'
-      vue: 3.5.25
-      vue-i18n: '>=9'
-    peerDependenciesMeta:
-      '@antv/infographic':
-        optional: true
-      '@terrastruct/d2':
-        optional: true
-      katex:
-        optional: true
-      mermaid:
-        optional: true
-      shiki:
-        optional: true
-      stream-markdown:
-        optional: true
-      stream-monaco:
-        optional: true
-      vue-i18n:
-        optional: true
 
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
@@ -10947,9 +10913,6 @@ packages:
 
   stream-http@2.8.3:
     resolution: {integrity: sha512-+TSkfINHDo4J+ZobQLWiMouQYB+UVYFttRA94FpEzzJ7ZdqcL4uUUQ7WkdkI4DSozGmgBUE/a47L+38PenXhUw==}
-
-  stream-markdown-parser@0.0.70:
-    resolution: {integrity: sha512-sNFngKH5+DR6NbHE0KFKUzlMaBpQNkHX27aVD6Dd6tgg61yvQoVMI712s5n9ec1k0qiMHPZzAZaujhmHkOmREQ==}
 
   stream-markdown@0.0.14:
     resolution: {integrity: sha512-W9P+TU1/zvQFtogwVjI+hju5LwUdbMwjtKM/SxxRbUoMh7yHKO2JwCaZf9yslrP5IKKR1psxJW+N5O4XB3YOEw==}
@@ -21727,14 +21690,6 @@ snapshots:
 
   markdown-it-task-checkbox@1.0.6: {}
 
-  markdown-it-ts@0.0.5:
-    dependencies:
-      entities: 4.5.0
-      linkify-it: 5.0.0
-      mdurl: 2.0.0
-      punycode.js: 2.3.1
-      uc.micro: 2.1.0
-
   markdown-it-ts@0.0.9:
     dependencies:
       entities: 4.5.0
@@ -21746,21 +21701,6 @@ snapshots:
   markdown-table@3.0.4: {}
 
   marked@16.4.2: {}
-
-  markstream-vue@0.0.9-beta.3(@antv/infographic@0.2.16)(@terrastruct/d2@0.1.33)(katex@0.16.39)(mermaid@11.13.0)(shiki@3.23.0)(stream-markdown@0.0.14(shiki@3.23.0))(stream-monaco@0.0.20(monaco-editor@0.52.2))(vue-i18n@11.3.0(vue@3.5.25(typescript@5.9.3)))(vue@3.5.25(typescript@5.9.3)):
-    dependencies:
-      '@floating-ui/dom': 1.7.6
-      stream-markdown-parser: 0.0.70
-      vue: 3.5.25(typescript@5.9.3)
-    optionalDependencies:
-      '@antv/infographic': 0.2.16
-      '@terrastruct/d2': 0.1.33
-      katex: 0.16.39
-      mermaid: 11.13.0
-      shiki: 3.23.0
-      stream-markdown: 0.0.14(shiki@3.23.0)
-      stream-monaco: 0.0.20(monaco-editor@0.52.2)
-      vue-i18n: 11.3.0(vue@3.5.25(typescript@5.9.3))
 
   math-intrinsics@1.1.0: {}
 
@@ -24801,17 +24741,6 @@ snapshots:
       readable-stream: 2.3.8
       to-arraybuffer: 1.0.1
       xtend: 4.0.2
-
-  stream-markdown-parser@0.0.70:
-    dependencies:
-      markdown-it-container: 4.0.0
-      markdown-it-footnote: 4.0.0
-      markdown-it-ins: 4.0.0
-      markdown-it-mark: 4.0.0
-      markdown-it-sub: 2.0.0
-      markdown-it-sup: 2.0.0
-      markdown-it-task-checkbox: 1.0.6
-      markdown-it-ts: 0.0.5
 
   stream-markdown@0.0.14(shiki@3.19.0):
     dependencies:
