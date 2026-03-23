@@ -1,4 +1,4 @@
-## [0.0.10-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.10-beta.1) (2026-03-20)
+## [0.0.10-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.10-beta.2) (2026-03-23)
 
 
 ### Bug Fixes
@@ -33,8 +33,10 @@
 * **dependencies:** update stream-monaco version to 0.0.13 across all packages ([1e9dadd](https://github.com/Simon-He95/markstream-vue/commit/1e9dadd4685a4cb60689deac72c4e9cb7945588f))
 * enhance HTML inline parsing to handle malformed custom tags and maintain valid attributes ([fadb904](https://github.com/Simon-He95/markstream-vue/commit/fadb904f3b312291ce3457acdf6a6e0dfca84112)), closes [#305](https://github.com/Simon-He95/markstream-vue/issues/305)
 * enhance strong token parsing to correctly handle escaped asterisks ([97abc4a](https://github.com/Simon-He95/markstream-vue/commit/97abc4abd92aa1e8d16f72e635ee6d0396b9e6e1)), closes [#255](https://github.com/Simon-He95/markstream-vue/issues/255)
+* handle nested think html blocks ([693e20e](https://github.com/Simon-He95/markstream-vue/commit/693e20e323f18b9a0aa7336b0cbcae770d9f386a)), closes [#339](https://github.com/Simon-He95/markstream-vue/issues/339)
 * **image:** inline with math parse wrong ([6a1c0fa](https://github.com/Simon-He95/markstream-vue/commit/6a1c0fa732da53b0d586d5d054aa9101730ac186))
 * **image:** inline with math parse wrong ([edc7a44](https://github.com/Simon-He95/markstream-vue/commit/edc7a44d36598bb2ee2c0d3061a62c1201293646)), closes [#246](https://github.com/Simon-He95/markstream-vue/issues/246)
+* improve fullscreen diagram previews ([160622e](https://github.com/Simon-He95/markstream-vue/commit/160622efd6477befd798ebba3a870e0cd10ef2bb))
 * improve HTML tag matching to support uppercase tag names in inline parsing ([7a3342d](https://github.com/Simon-He95/markstream-vue/commit/7a3342dda33f71c3e9b41e1ceb8e23c6e3b12304))
 * improve reference detection in markdown parser and add related tests ([31e5b6e](https://github.com/Simon-He95/markstream-vue/commit/31e5b6eee57b85a838b0bdb2f71c29453c8d8902)), closes [#231](https://github.com/Simon-He95/markstream-vue/issues/231)
 * improve vue2 compatibility ([6e58454](https://github.com/Simon-He95/markstream-vue/commit/6e58454bf178f33c2b1e5dff468dba97c0cd0cfc))
@@ -65,6 +67,7 @@
 * **parser:** preserve trailing content after strong links ([7ae8056](https://github.com/Simon-He95/markstream-vue/commit/7ae8056698f029c8a2aaf6c1bcab939049cd97ba)), closes [#336](https://github.com/Simon-He95/markstream-vue/issues/336)
 * **parser:** prevent list bleed after adjacent html blocks ([b922bc8](https://github.com/Simon-He95/markstream-vue/commit/b922bc82359f6ba41f415341a33239ce4f423fe0)), closes [#318](https://github.com/Simon-He95/markstream-vue/issues/318)
 * preserve escaped punctuation literals ([0328451](https://github.com/Simon-He95/markstream-vue/commit/032845108c735c55a98ff9ce72da43a27a045a7c)), closes [#322](https://github.com/Simon-He95/markstream-vue/issues/322)
+* preserve trailing text after custom html close ([7207288](https://github.com/Simon-He95/markstream-vue/commit/72072882576b93771417d17d118d96471c9aff47))
 * prevent dropping numeric-only documents in parseMarkdownToStructure ([bba733c](https://github.com/Simon-He95/markstream-vue/commit/bba733c9a8d4b77f0fbd0560d695a611e0822eef)), closes [#278](https://github.com/Simon-He95/markstream-vue/issues/278)
 * prevent false positives for JSON in math parsing and add tests ([0fb4e82](https://github.com/Simon-He95/markstream-vue/commit/0fb4e8291c092288e563f1289dbff4e94f90a7f1)), closes [#264](https://github.com/Simon-He95/markstream-vue/issues/264)
 * prevent mermaid temp render nodes from causing scrollbar flash and layout shift ([8c69b4d](https://github.com/Simon-He95/markstream-vue/commit/8c69b4d67f181fdf70ec360524be10f44ab92fcc)), closes [#268](https://github.com/Simon-He95/markstream-vue/issues/268)
@@ -79,8 +82,10 @@
 * stabilize reference parsing and contrast ([357629a](https://github.com/Simon-He95/markstream-vue/commit/357629ad31fc304c2ce9f879bf3a3ddd19997e83)), closes [#327](https://github.com/Simon-He95/markstream-vue/issues/327)
 * stabilize streaming custom thinking parsing ([1019ea4](https://github.com/Simon-He95/markstream-vue/commit/1019ea4b3505c36e7df1483034d819b557061af4))
 * stabilize streaming mermaid previews ([88f20fb](https://github.com/Simon-He95/markstream-vue/commit/88f20fb217677d1dfe80c34d8b6faab6614bf6ff)), closes [#337](https://github.com/Simon-He95/markstream-vue/issues/337)
+* stabilize test panes and code block header actions ([cf7786d](https://github.com/Simon-He95/markstream-vue/commit/cf7786dd3b6d3be6f185302c265263dee43df965))
 * standardize class attribute syntax in list item components and tests ([71af12b](https://github.com/Simon-He95/markstream-vue/commit/71af12b1638456fdbaf809849f3f230ea9505de0))
 * streamline class binding for streamed delta in InlineCodeNode and TextNode components ([bd7aa44](https://github.com/Simon-He95/markstream-vue/commit/bd7aa446c9d8fd3c03e6058e6587139d02c4791a))
+* sync diagram preview behavior across packages ([df2e513](https://github.com/Simon-He95/markstream-vue/commit/df2e513a27b675fd74b3e0374a9184fe43eb0ec0))
 * sync link loading hint across frameworks ([e0cfba9](https://github.com/Simon-He95/markstream-vue/commit/e0cfba984d22ae7ac8551566fda08bbae5a9c690))
 * sync tooltip propagation to vue2 and react packages ([62f5171](https://github.com/Simon-He95/markstream-vue/commit/62f51711401e8f55b548f6df4fb426f25a32a913)), closes [#310](https://github.com/Simon-He95/markstream-vue/issues/310)
 * **theme:** toggle fail ([39cd71a](https://github.com/Simon-He95/markstream-vue/commit/39cd71af0c499c95d9c50b9770972540ac83c3ef)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
@@ -155,6 +160,7 @@
 * enhance README with framework options and additional sections for community support ([bc1f872](https://github.com/Simon-He95/markstream-vue/commit/bc1f872e7da55e35bebb9e34e00ea7543b59aa20))
 * enhance release process with tagging scripts and update .gitignore ([37add6a](https://github.com/Simon-He95/markstream-vue/commit/37add6a316072380d45c837d94fe00d1709c58f5))
 * enhance settings panel responsiveness and visibility logic ([61fb4d5](https://github.com/Simon-He95/markstream-vue/commit/61fb4d5b7f556b517a25656508f83b665c0c5fb4))
+* implement dark mode toggle and fullscreen preview functionality in test page ([e233553](https://github.com/Simon-He95/markstream-vue/commit/e2335530bc29a4f566d8c5ba4c7cdd3845e80df6))
 * Implement HTML Renderer with comprehensive tests ([c96433e](https://github.com/Simon-He95/markstream-vue/commit/c96433ecb4519f9957499f155e3485976aeb3eb1)), closes [#221](https://github.com/Simon-He95/markstream-vue/issues/221)
 * implement nightly and stable release workflows with tagging support ([7de79bf](https://github.com/Simon-He95/markstream-vue/commit/7de79bf589eff64b3f5c41563181b491bc3bd7cc))
 * improve cross-framework test playgrounds ([0df7d81](https://github.com/Simon-He95/markstream-vue/commit/0df7d81cd210273ef3ade19ea940b3103e6acf9d))
