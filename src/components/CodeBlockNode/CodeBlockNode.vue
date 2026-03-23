@@ -1782,7 +1782,7 @@ onUnmounted(() => {
 
       <!-- right slot / fallback action buttons -->
       <slot name="header-right">
-        <div class="flex items-center gap-x-2">
+        <div class="code-header-actions">
           <div
             v-if="isDiff"
             class="code-diff-stats"
@@ -2089,6 +2089,14 @@ onUnmounted(() => {
   gap: 2px;
 }
 
+.code-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .code-header-title {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2294,6 +2302,15 @@ onUnmounted(() => {
 }
 
 .code-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  line-height: 1;
+  flex-shrink: 0;
   font-family: inherit;
 }
 

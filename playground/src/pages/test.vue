@@ -904,7 +904,7 @@ watch(mermaidEnabled, (enabled) => {
         </aside>
 
         <section class="workspace-grid">
-          <article class="workspace-card">
+          <article class="workspace-card workspace-card--pane">
             <header class="workspace-card__head">
               <div>
                 <h2>Markdown 输入</h2>
@@ -926,7 +926,7 @@ watch(mermaidEnabled, (enabled) => {
             </footer>
           </article>
 
-          <article ref="previewCardRef" class="workspace-card workspace-card--preview">
+          <article ref="previewCardRef" class="workspace-card workspace-card--pane workspace-card--preview">
             <header class="workspace-card__head">
               <div>
                 <h2>实时预览</h2>
@@ -1046,6 +1046,7 @@ watch(mermaidEnabled, (enabled) => {
   --lab-muted: #59708f;
   --lab-accent: #1d4ed8;
   --lab-accent-soft: rgba(29, 78, 216, 0.12);
+  --workspace-pane-height: clamp(540px, 72vh, 880px);
   position: relative;
   min-height: 100vh;
   padding: 28px 18px 42px;
@@ -1669,6 +1670,13 @@ watch(mermaidEnabled, (enabled) => {
   min-height: 720px;
 }
 
+.workspace-card--pane {
+  height: var(--workspace-pane-height);
+  min-height: var(--workspace-pane-height);
+  max-height: var(--workspace-pane-height);
+  overflow: hidden;
+}
+
 .workspace-card__head,
 .workspace-card__foot {
   padding: 18px 20px;
@@ -1703,6 +1711,12 @@ watch(mermaidEnabled, (enabled) => {
   overflow: auto;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.92));
+}
+
+.workspace-card--pane .editor-textarea,
+.workspace-card--pane .preview-surface {
+  min-height: 0;
+  height: 100%;
 }
 
 .test-lab--dark .editor-textarea {
@@ -1783,6 +1797,7 @@ watch(mermaidEnabled, (enabled) => {
 
 @media (max-width: 820px) {
   .test-lab {
+    --workspace-pane-height: clamp(420px, 68vh, 680px);
     padding: 18px 12px 28px;
   }
 
