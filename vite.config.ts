@@ -148,6 +148,7 @@ export default defineConfig(({ mode }) => {
     '@': '/src',
   }
   if (mode !== 'npm') {
+    alias['markstream-vue'] = '/src/exports.ts'
     alias['stream-markdown-parser'] = '/packages/markdown-parser/src/index.ts'
     alias['stream-markdown-parser/*'] = '/packages/markdown-parser/src/*'
   }
