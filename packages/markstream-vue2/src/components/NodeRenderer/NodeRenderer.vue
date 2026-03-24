@@ -289,6 +289,14 @@ const mergedParseOptions = computed(() => {
   } as ParseOptions
 })
 
+// Set of effective custom HTML tags (normalised to lowercase).
+// Used in `renderedItems` to coerce pre-parsed html_block/html_inline nodes
+// whose tag matches a registered custom component.
+const effectiveCustomHtmlTagsSet = computed<Set<string>>(() => {
+  const arr: string[] = (mergedParseOptions.value as any).customHtmlTags ?? []
+  return new Set(arr.map(t => String(t).trim().toLowerCase()).filter(Boolean))
+})
+
 const parsedNodes = computed<ParsedNode[]>(() => {
   if (isLegacyVue26Vm(instance?.proxy as any) && !props.content && Array.isArray(props.nodes))
     return EMPTY_PARSED_NODES
@@ -1650,14 +1658,40 @@ const listBindings = computed(() => ({
 const legacyRenderedItems = computed(() => {
   return legacyNodeItems.value.map((node, index) => {
     const language = getCodeBlockLanguage(node)
+    let resolvedNode = node
+    let component = getNodeComponent(node, language)
+
+    // Coerce html_block/html_inline nodes whose tag matches a registered
+    // custom component listed in customHtmlTags.
+    if (
+      (node.type === 'html_block' || node.type === 'html_inline')
+      && component === (nodeComponents as any)[node.type]
+    ) {
+      const tag = String((node as any).tag ?? '').trim().toLowerCase()
+        || getHtmlTagFromContent((node as any).content)
+      if (tag && effectiveCustomHtmlTagsSet.value.has(tag)) {
+        const customComponents = customComponentsMap.value
+        const customForTag = (customComponents as any)[tag]
+        if (customForTag) {
+          component = customForTag
+          resolvedNode = {
+            ...(node as any),
+            type: tag,
+            tag,
+            content: stripCustomHtmlWrapper((node as any).content, tag),
+          } as ParsedNode
+        }
+      }
+    }
+
     return {
-      node,
-      component: getNodeComponent(node, language),
-      bindings: getBindingsFor(node, language),
-      isCodeBlock: node.type === 'code_block',
+      node: resolvedNode,
+      component,
+      bindings: getBindingsFor(resolvedNode, language),
+      isCodeBlock: resolvedNode.type === 'code_block',
       index,
       indexKey: `${indexPrefix.value}-${index}`,
-      renderKey: getRenderKey(node, index),
+      renderKey: getRenderKey(resolvedNode, index),
     }
   })
 })
@@ -1668,12 +1702,37 @@ const legacyStructuredContentMode = computed(() => {
 })
 const renderedItems = computed(() => {
   return visibleNodes.value.map((item) => {
-    const node = getCodeBlockRenderNode(item.node)
+    let node = getCodeBlockRenderNode(item.node)
     const language = getCodeBlockLanguage(node)
+    let component = getNodeComponent(node, language)
+
+    // Coerce html_block/html_inline nodes whose tag matches a registered
+    // custom component listed in customHtmlTags.
+    if (
+      (node.type === 'html_block' || node.type === 'html_inline')
+      && component === (nodeComponents as any)[node.type]
+    ) {
+      const tag = String((node as any).tag ?? '').trim().toLowerCase()
+        || getHtmlTagFromContent((node as any).content)
+      if (tag && effectiveCustomHtmlTagsSet.value.has(tag)) {
+        const customComponents = customComponentsMap.value
+        const customForTag = (customComponents as any)[tag]
+        if (customForTag) {
+          component = customForTag
+          node = {
+            ...(node as any),
+            type: tag,
+            tag,
+            content: stripCustomHtmlWrapper((node as any).content, tag),
+          } as ParsedNode
+        }
+      }
+    }
+
     return {
       ...item,
       node,
-      component: getNodeComponent(node, language),
+      component,
       bindings: getBindingsFor(node, language),
       isCodeBlock: node.type === 'code_block',
       indexKey: `${indexPrefix.value}-${item.index}`,
@@ -1704,6 +1763,23 @@ function getCodeBlockRenderNode(node: ParsedNode) {
   const cloned = { ...codeBlockNode } as ParsedNode
   codeBlockRenderCache.set(codeBlockNode, { signature, node: cloned })
   return cloned
+}
+
+function getHtmlTagFromContent(html: unknown) {
+  const raw = String(html ?? '')
+  const match = raw.match(/^\s*<\s*([A-Za-z][\w:-]*)/i)
+  return match ? match[1].toLowerCase() : ''
+}
+
+function stripCustomHtmlWrapper(html: unknown, tag: string) {
+  const raw = String(html ?? '')
+  if (!tag)
+    return raw
+  // Escape special regex characters to prevent unexpected behavior.
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const openRe = new RegExp(String.raw`^\s*<\s*${escaped}(?:\s[^>]*)?>\s*`, 'i')
+  const closeRe = new RegExp(String.raw`\s*<\s*\/\s*${escaped}\s*>\s*$`, 'i')
+  return raw.replace(openRe, '').replace(closeRe, '')
 }
 
 function getCodeBlockLanguage(node: ParsedNode) {
@@ -1915,6 +1991,7 @@ function handleContainerMouseout(event: MouseEvent) {
       :code-block-props="props.codeBlockProps"
       :themes="props.themes"
       :is-dark="props.isDark"
+      :custom-html-tags="props.customHtmlTags"
       @copy="emit('copy', $event)"
       @handle-artifact-click="emit('handleArtifactClick', $event)"
     />

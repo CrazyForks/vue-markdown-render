@@ -286,6 +286,14 @@ const mergedParseOptions = computed(() => {
   } as ParseOptions
 })
 
+// Set of effective custom HTML tags (normalised to lowercase).
+// Used in `renderedItems` to coerce pre-parsed html_block/html_inline nodes
+// whose tag matches a registered custom component.
+const effectiveCustomHtmlTagsSet = computed<Set<string>>(() => {
+  const arr: string[] = (mergedParseOptions.value as any).customHtmlTags ?? []
+  return new Set(arr.map(t => String(t).trim().toLowerCase()).filter(Boolean))
+})
+
 const parsedNodes = computed<ParsedNode[]>(() => {
   // 解析 content 字符串为节点数组
   // If the consumer passed an explicit `nodes` array, return a shallow
@@ -1638,18 +1646,64 @@ const renderedItems = computed(() => {
   return visibleNodes.value.map((item) => {
     // Reuse the previous shallow clone for code blocks unless the visible
     // payload changed, so parent recomputations do not churn Monaco props.
-    const node = getCodeBlockRenderNode(item.node)
+    let node = getCodeBlockRenderNode(item.node)
     const language = getCodeBlockLanguage(node)
+    let component = getNodeComponent(node, language)
+
+    // When an html_block or html_inline node resolved to its default
+    // component, check whether the node's tag matches a registered custom
+    // component AND is listed in customHtmlTags.  This handles pre-parsed
+    // nodes (via the `nodes` prop) that were not parsed with
+    // `customHtmlTags`, so their type is still `html_block`/`html_inline`
+    // but the tag references a known custom component.
+    if (
+      (node.type === 'html_block' || node.type === 'html_inline')
+      && component === (nodeComponents as any)[node.type]
+    ) {
+      const tag = String((node as any).tag ?? '').trim().toLowerCase()
+        || getHtmlTagFromContent((node as any).content)
+      if (tag && effectiveCustomHtmlTagsSet.value.has(tag)) {
+        const customComponents = customComponentsMap.value
+        const customForTag = (customComponents as any)[tag]
+        if (customForTag) {
+          component = customForTag
+          node = {
+            ...(node as any),
+            type: tag,
+            tag,
+            content: stripCustomHtmlWrapper((node as any).content, tag),
+          } as ParsedNode
+        }
+      }
+    }
+
     return {
       ...item,
       node,
-      component: getNodeComponent(node, language),
+      component,
       bindings: getBindingsFor(node, language),
       isCodeBlock: node.type === 'code_block',
       indexKey: `${indexPrefix.value}-${item.index}`,
     }
   })
 })
+
+function getHtmlTagFromContent(html: unknown) {
+  const raw = String(html ?? '')
+  const match = raw.match(/^\s*<\s*([A-Za-z][\w:-]*)/i)
+  return match ? match[1].toLowerCase() : ''
+}
+
+function stripCustomHtmlWrapper(html: unknown, tag: string) {
+  const raw = String(html ?? '')
+  if (!tag)
+    return raw
+  // Escape special regex characters to prevent unexpected behavior.
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const openRe = new RegExp(String.raw`^\s*<\s*${escaped}(?:\s[^>]*)?>\s*`, 'i')
+  const closeRe = new RegExp(String.raw`\s*<\s*\/\s*${escaped}\s*>\s*$`, 'i')
+  return raw.replace(openRe, '').replace(closeRe, '')
+}
 
 function getCodeBlockLanguage(node: ParsedNode) {
   return node?.type === 'code_block'

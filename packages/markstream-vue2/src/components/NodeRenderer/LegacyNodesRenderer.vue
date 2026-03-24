@@ -52,6 +52,7 @@ const props = withDefaults(defineProps<{
   renderCodeBlocksAsPre?: boolean
   themes?: string[]
   isDark?: boolean
+  customHtmlTags?: readonly string[]
 }>(), {
   codeBlockStream: true,
   showTooltips: true,
@@ -121,12 +122,45 @@ const listBindings = computed(() => ({
   ...nonCodeBindings.value,
   ...(typeof props.showTooltips === 'boolean' ? { showTooltips: props.showTooltips } : {}),
 }))
+// Set of effective custom HTML tags (normalised to lowercase).
+const effectiveCustomHtmlTagsSet = computed<Set<string>>(() => {
+  const tags = props.customHtmlTags ?? []
+  return new Set(
+    (tags as string[]).map(t => String(t).trim().toLowerCase()).filter(Boolean),
+  )
+})
+
 const renderedItems = computed(() => {
   const nodes = Array.isArray(props.nodes) ? props.nodes : []
   return nodes.map((rawNode, index) => {
-    const node = rawNode as ParsedNode
+    let node = rawNode as ParsedNode
     const language = getCodeBlockLanguage(node)
     const type = String((node as any)?.type || 'unknown')
+    let component = getNodeComponent(node, language)
+
+    // Coerce html_block/html_inline nodes whose tag matches a registered
+    // custom component listed in customHtmlTags.
+    if (
+      (node.type === 'html_block' || node.type === 'html_inline')
+      && component === (nodeComponents as any)[node.type]
+    ) {
+      const tag = String((node as any).tag ?? '').trim().toLowerCase()
+        || getHtmlTagFromContent((node as any).content)
+      if (tag && effectiveCustomHtmlTagsSet.value.has(tag)) {
+        const customComponents = customComponentsMap.value
+        const customForTag = (customComponents as any)[tag]
+        if (customForTag) {
+          component = customForTag
+          node = {
+            ...(node as any),
+            type: tag,
+            tag,
+            content: stripCustomHtmlWrapper((node as any).content, tag),
+          } as ParsedNode
+        }
+      }
+    }
+
     return {
       index,
       indexKey: `${indexPrefix.value}-${index}`,
@@ -134,14 +168,30 @@ const renderedItems = computed(() => {
       // preserve their last successful DOM instead of flashing back to <pre>.
       renderKey: type === 'code_block'
         ? `${indexPrefix.value}-${index}-${type}`
-        : `${indexPrefix.value}-${index}-${type}-${String((node as any)?.raw || '').length}`,
+        : `${indexPrefix.value}-${index}-${type}-${String((rawNode as any)?.raw || '').length}`,
       node,
       isCodeBlock: node?.type === 'code_block',
-      component: getNodeComponent(node, language),
+      component,
       bindings: getBindingsFor(node, language),
     }
   })
 })
+
+function getHtmlTagFromContent(html: unknown) {
+  const raw = String(html ?? '')
+  const match = raw.match(/^\s*<\s*([A-Za-z][\w:-]*)/i)
+  return match ? match[1].toLowerCase() : ''
+}
+
+function stripCustomHtmlWrapper(html: unknown, tag: string) {
+  const raw = String(html ?? '')
+  if (!tag)
+    return raw
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const openRe = new RegExp(String.raw`^\s*<\s*${escaped}(?:\s[^>]*)?>\s*`, 'i')
+  const closeRe = new RegExp(String.raw`\s*<\s*\/\s*${escaped}\s*>\s*$`, 'i')
+  return raw.replace(openRe, '').replace(closeRe, '')
+}
 
 function getCodeBlockLanguage(node: ParsedNode) {
   return node?.type === 'code_block'

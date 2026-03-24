@@ -725,4 +725,63 @@ Another paragraph.
       removeCustomComponents(scopeId)
     }
   })
+
+  it('passes node props to custom components when using nodes prop with customHtmlTags', async () => {
+    const scopeId = 'custom-nodes-prop-thinking'
+    const ThinkingNode = defineComponent({
+      name: 'ThinkingNode',
+      props: {
+        node: { type: Object, default: () => ({ loading: false, content: '' }) },
+      },
+      setup(props) {
+        return () => h('div', { class: 'thinking-node' }, props.node.content)
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      thinking: (props: any) => h(ThinkingNode, props),
+    })
+
+    try {
+      // Pre-parsed nodes as if parsed without customHtmlTags – the thinking
+      // tag is still an html_block with tag:"thinking".
+      const nodes = [
+        {
+          type: 'html_block',
+          tag: 'thinking',
+          content: '<thinking>I am thinking</thinking>',
+          raw: '<thinking>I am thinking</thinking>',
+          loading: false,
+        },
+        {
+          type: 'paragraph',
+          children: [{ type: 'text', content: 'Hello', raw: 'Hello' }],
+        },
+      ]
+
+      const wrapper = mount(MarkdownRender, {
+        props: {
+          nodes,
+          final: true,
+          customId: scopeId,
+          customHtmlTags: ['thinking'],
+        },
+      })
+      await flushAll()
+
+      try {
+        const text = normalizeText(wrapper.text())
+        expect(text).toContain('I am thinking')
+        expect(text).toContain('Hello')
+        // The custom component should be rendered (not the default HtmlBlockNode)
+        expect(wrapper.find('.thinking-node').exists()).toBe(true)
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
 })
