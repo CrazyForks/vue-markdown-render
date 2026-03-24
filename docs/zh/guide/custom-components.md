@@ -18,16 +18,24 @@ description: 为 thinking 等可信标签接入自定义组件，在不改解析
 
 ## 1. 最简单的自定义标签接法
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
-import ThinkingNode from './ThinkingNode.vue'
+
+declare const ThinkingNode: Component
 
 setCustomComponents('chat', {
   thinking: ThinkingNode,
 })
 ```
 
-```vue
+```vue twoslash
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const markdown = '<thinking>Step by step</thinking>'
+</script>
+
 <template>
   <MarkdownRender
     custom-id="chat"
@@ -43,7 +51,7 @@ setCustomComponents('chat', {
 
 自定义标签内部往往还会包含 Markdown。最稳妥的办法，就是在你的自定义组件里再嵌一层 `MarkdownRender` 来渲染内部内容。
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
@@ -126,8 +134,11 @@ const props = defineProps<{
 
 即使是自定义标签，也建议默认使用 scoped mapping：
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { removeCustomComponents, setCustomComponents } from 'markstream-vue'
+
+declare const ThinkingNode: Component
 
 setCustomComponents('chat', { thinking: ThinkingNode })
 

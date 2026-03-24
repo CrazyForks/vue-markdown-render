@@ -6,17 +6,27 @@ description: 用最小 Vue 示例快速跑起 markstream-vue，并理解默认 C
 
 示例：
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
-const md = `# Hello World\n\n这是 **加粗** 的文本。`
+type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
+
+const md: MarkdownRenderProps['content'] = `# Hello World\n\n这是 **加粗** 的文本。`
+const customId: MarkdownRenderProps['customId'] = 'quick-start'
+const isDark: MarkdownRenderProps['isDark'] = false
 </script>
 
 <template>
-  <MarkdownRender :content="md" />
+  <MarkdownRender
+    :content="md"
+    :custom-id="customId"
+    :is-dark="isDark"
+  />
 </template>
 ```
+
+如果你是为了看 props hover，优先 hover `MarkdownRenderProps['content']`、`MarkdownRenderProps['customId']`、`MarkdownRenderProps['isDark']`，或者上面模板里的对应 attribute。直接 hover 组件名在 Vue 片段里通常信息会更少。
 
 说明：本包的 CSS 会限定在内部 `.markstream-vue` 容器下，以尽量减少对宿主应用全局样式的影响；主入口已经默认引入样式，正常使用 `MarkdownRender` 无需再额外 `import 'markstream-vue/index.css'`。只有当你需要精确控制 CSS 顺序时，才建议手动单独引入。
 
@@ -28,11 +38,13 @@ const md = `# Hello World\n\n这是 **加粗** 的文本。`
 
 快速试一下：
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
-const md = `# Hello world
+type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
+
+const md: MarkdownRenderProps['content'] = `# Hello world
 
 试试 Mermaid：
 

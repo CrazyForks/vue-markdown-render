@@ -18,16 +18,24 @@ If you want trusted custom tags such as `thinking`, go to [Custom Tags & Advance
 
 Use `custom-id` on the renderer and register overrides under the same id:
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
-import DocImage from './DocImage.vue'
+
+declare const DocImage: Component
 
 setCustomComponents('docs', {
   image: DocImage,
 })
 ```
 
-```vue
+```vue twoslash
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const markdown = '![demo](https://example.com/demo.png)'
+</script>
+
 <template>
   <MarkdownRender custom-id="docs" :content="markdown" />
 </template>
@@ -62,7 +70,7 @@ Leaf-like nodes are the easiest place to begin because they do not require you t
 
 ### Example: replace `image`
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import type { ImageNodeProps } from 'markstream-vue'
 
@@ -79,9 +87,11 @@ const props = defineProps<ImageNodeProps>()
 </template>
 ```
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
-import DocImage from './DocImage.vue'
+
+declare const DocImage: Component
 
 setCustomComponents('docs', {
   image: DocImage,
@@ -90,7 +100,7 @@ setCustomComponents('docs', {
 
 ### Example: switch regular code blocks to `MarkdownCodeBlockNode`
 
-```ts
+```ts twoslash
 import { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue'
 
 setCustomComponents('docs', {
@@ -102,9 +112,11 @@ This only changes regular fenced code blocks. Mermaid, D2, and infographic block
 
 ### Example: override Mermaid only
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
-import CustomMermaidBlock from './CustomMermaidBlock.vue'
+
+declare const CustomMermaidBlock: Component
 
 setCustomComponents('docs', {
   mermaid: CustomMermaidBlock,
@@ -145,7 +157,7 @@ Practical advice:
 
 If the override only lives for a temporary view, remove it when that scope is no longer needed:
 
-```ts
+```ts twoslash
 import { removeCustomComponents } from 'markstream-vue'
 
 removeCustomComponents('docs')

@@ -2,9 +2,12 @@
 
 本库以 TypeScript 为首选语言，导出公共 API 类型。使用 `import type` 来获取节点定义以用于高级用法。
 
-```ts
+```ts twoslash
 import type { BaseNode } from 'markstream-vue'
 import { getMarkdown } from 'markstream-vue'
+
+const md = getMarkdown()
+const nodes: BaseNode[] = []
 ```
 
 ## 强类型自定义组件
@@ -27,8 +30,11 @@ const props = defineProps<{ node: CodeBlockNode }>()
 
 然后注册该组件：
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
+
+declare const CustomCodeBlock: Component
 
 setCustomComponents('docs', {
   code_block: CustomCodeBlock,
@@ -36,3 +42,9 @@ setCustomComponents('docs', {
 ```
 
 此种方式支持类型检查与智能提示。
+
+```ts twoslash
+import type { CodeBlockNodeProps } from 'markstream-vue'
+
+const node: CodeBlockNodeProps['node'] = { type: 'code_block', language: 'ts', code: 'console.log(1)', raw: 'console.log(1)' }
+```

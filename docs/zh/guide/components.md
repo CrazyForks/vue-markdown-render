@@ -31,22 +31,37 @@ description: 快速查阅 MarkdownRender、CodeBlockNode、MermaidBlockNode、Im
 
 `markstream-vue` 同步导出渲染器与组件 props 类型：
 
-```ts
-import type {
-  CodeBlockNodeProps,
-  D2BlockNodeProps,
-  InfographicBlockNodeProps,
-  MermaidBlockNodeProps,
-  NodeRendererProps,
-  PreCodeNodeProps,
-} from 'markstream-vue'
-import type { CodeBlockNode } from 'stream-markdown-parser'
+```ts twoslash
+import MarkdownRender, { type CodeBlockNodeProps } from 'markstream-vue'
+
+type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
+
+declare const markdownRenderProps: MarkdownRenderProps
+declare const codeBlockProps: CodeBlockNodeProps
+
+// 更推荐 hover 每一行点号后面的字段名。
+markdownRenderProps.content
+markdownRenderProps.customId
+markdownRenderProps.isDark
+markdownRenderProps.codeBlockMonacoOptions
+markdownRenderProps.codeBlockMonacoOptions?.theme
+markdownRenderProps.codeBlockMonacoOptions?.languages
+markdownRenderProps.codeBlockMonacoOptions?.diffHunkActionsOnHover
+markdownRenderProps.themes
+
+codeBlockProps.monacoOptions
+codeBlockProps.monacoOptions?.MAX_HEIGHT
+codeBlockProps.darkTheme
+codeBlockProps.lightTheme
 ```
 
 说明：
 
-- `NodeRendererProps` 对应 `<MarkdownRender>` props。
-- `CodeBlockNodeProps` / `MermaidBlockNodeProps` / `D2BlockNodeProps` / `InfographicBlockNodeProps` / `PreCodeNodeProps` 的 `node` 统一为 `CodeBlockNode`（用 `language: 'mermaid'` / `language: 'd2'` / `language: 'd2lang'` / `language: 'infographic'` 区分渲染器）。
+- `InstanceType<typeof MarkdownRender>['$props']` 是最直接的组件 props 查看入口。
+- `NodeRendererProps` 是同一套公开 props 结构的命名类型导出。
+- 更推荐 hover 上面每一行点号后面的字段名，而不是只 hover 导入的类型名。
+- 如果你主要想看组件 props 的 hover，优先看下面这段 `MarkdownRender` 示例。
+- 只有写成 `ts twoslash` / `vue twoslash` 的代码块才会在这个文档站里显示 hover 类型信息。
 
 ## 先快速判断该用哪个组件
 
@@ -72,17 +87,59 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 - 使用 `MarkdownRender` 时一般无需处理：它默认渲染在容器内部。
 - 如果你独立使用节点组件（例如 `CodeBlockNode`、`MathBlockNode`），请外层包一层 `<div class="markstream-vue">...</div>`，这样库内样式与变量才会生效。
 
-### 使用阶梯
+### 最适合先 hover 的目标
 
-```vue
+如果你只是想先看组件 props，先 hover 下面这段里的 `:content`、`custom-id`、`:is-dark`、`:code-block-monaco-options`：
+
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
-const md = '# 你好\n\n使用 custom-id 控制样式。'
+type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
+
+const content: MarkdownRenderProps['content'] = '# Hello'
+const customId: MarkdownRenderProps['customId'] = 'docs'
+const isDark: MarkdownRenderProps['isDark'] = true
+const monacoOptions: MarkdownRenderProps['codeBlockMonacoOptions'] = {
+  theme: 'vitesse-dark',
+  languages: ['typescript', 'vue'],
+  MAX_HEIGHT: 520,
+}
 </script>
 
 <template>
-  <MarkdownRender custom-id="docs" :content="md" />
+  <MarkdownRender
+    :content="content"
+    :custom-id="customId"
+    :is-dark="isDark"
+    :code-block-monaco-options="monacoOptions"
+  />
+</template>
+```
+
+### 使用阶梯
+
+```vue twoslash
+<script setup lang="ts">
+import type { CodeBlockMonacoOptions } from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
+
+const md = '# 你好\n\n使用 custom-id 控制样式。'
+const monacoOptions = {
+  theme: 'vitesse-dark',
+  themes: ['vitesse-dark', 'vitesse-light'],
+  languages: ['typescript', 'vue'],
+  MAX_HEIGHT: 520,
+  diffHunkActionsOnHover: true,
+} satisfies CodeBlockMonacoOptions
+</script>
+
+<template>
+  <MarkdownRender
+    custom-id="docs"
+    :content="md"
+    :code-block-monaco-options="monacoOptions"
+  />
 </template>
 ```
 

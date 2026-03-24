@@ -24,7 +24,7 @@ description: 在 content 与 nodes 之间做出正确选择，并理解 markstre
 
 ## 最小渲染示例
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
@@ -50,12 +50,14 @@ const doc = '# 使用示例\n\n支持 **streaming** 渲染。'
 
 在 VitePress 中，你只需要在 `enhanceApp` 里注册一次自定义节点组件，然后在 `MarkdownRender` 上使用 `custom-html-tags`，解析器就会自动输出对应的自定义节点。
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import MarkdownRender, { setCustomComponents } from 'markstream-vue'
 // docs/.vitepress/theme/index.ts
 import DefaultTheme from 'vitepress/theme'
-import ThinkingNode from './components/ThinkingNode.vue'
 import 'markstream-vue/index.css'
+
+declare const ThinkingNode: Component
 
 export default {
   extends: DefaultTheme,
@@ -78,7 +80,7 @@ export default {
 
 ## 解析流程
 
-```ts
+```ts twoslash
 import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
 const md = getMarkdown()
@@ -95,15 +97,27 @@ const nodes = parseMarkdownToStructure('# 标题', md)
 
 `content` 模式适合低频更新或一次性渲染；如果你在做 AI Chat、SSE、逐 token 输出，推荐把解析放到外部，然后用 `:nodes` + `:final` 驱动渲染器。这样可以减少整篇重解析、降低重绘次数，也更容易把解析工作放到 Worker 或独立状态层。
 
-```ts
-import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+```ts twoslash
+import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
 const md = getMarkdown('chat-message')
+declare const streamedText: string
+declare const final: boolean
 const nodes = parseMarkdownToStructure(streamedText, md, { final })
 ```
 
-```vue
-<MarkdownRender :nodes="nodes" :final="final" />
+```vue twoslash
+<script setup lang="ts">
+import type { BaseNode } from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
+
+const nodes: BaseNode[] = []
+const final = false
+</script>
+
+<template>
+  <MarkdownRender :nodes="nodes" :final="final" />
+</template>
 ```
 
 如果你想要一条从安装、接法、性能到排障都串好的完整路径，继续看 [AI 聊天与流式输出](/zh/guide/ai-chat-streaming)。
@@ -132,7 +146,19 @@ const nodes = parseMarkdownToStructure(streamedText, md, { final })
 - 使用 `MarkdownRender` 时会自动包含该容器，无需额外处理。
 - 如果你单独使用导出的节点组件（例如 `PreCodeNode`、`FootnoteNode`），请在外层包一层容器：
 
-```vue
+```vue twoslash
+<script setup lang="ts">
+import { PreCodeNode } from 'markstream-vue'
+import type { PreCodeNodeProps } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'ts',
+  code: 'console.log(1)',
+  raw: 'console.log(1)',
+} satisfies PreCodeNodeProps['node']
+</script>
+
 <template>
   <div class="markstream-vue">
     <PreCodeNode :node="node" />

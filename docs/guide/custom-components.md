@@ -18,16 +18,24 @@ If these tags live inside a docs site or VitePress theme, pair this page with [D
 
 ## 1. The simplest custom-tag setup
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
-import ThinkingNode from './ThinkingNode.vue'
+
+declare const ThinkingNode: Component
 
 setCustomComponents('chat', {
   thinking: ThinkingNode,
 })
 ```
 
-```vue
+```vue twoslash
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const markdown = '<thinking>Step by step</thinking>'
+</script>
+
 <template>
   <MarkdownRender
     custom-id="chat"
@@ -43,7 +51,7 @@ Once the tag is allowlisted, the parser emits a custom node whose `type` is the 
 
 Custom tags usually contain Markdown inside them. The easiest way to preserve that nested Markdown is to render the tag body with another `MarkdownRender`.
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
@@ -126,8 +134,11 @@ Move to [Advanced Parser Hooks](/guide/advanced) when:
 
 Even for custom tags, prefer scoped mappings:
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { removeCustomComponents, setCustomComponents } from 'markstream-vue'
+
+declare const ThinkingNode: Component
 
 setCustomComponents('chat', { thinking: ThinkingNode })
 

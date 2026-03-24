@@ -31,22 +31,37 @@ If you are still deciding where to customize the pipeline, start with:
 
 `markstream-vue` exports renderer and component prop interfaces:
 
-```ts
-import type {
-  CodeBlockNodeProps,
-  D2BlockNodeProps,
-  InfographicBlockNodeProps,
-  MermaidBlockNodeProps,
-  NodeRendererProps,
-  PreCodeNodeProps,
-} from 'markstream-vue'
-import type { CodeBlockNode } from 'stream-markdown-parser'
+```ts twoslash
+import MarkdownRender, { type CodeBlockNodeProps } from 'markstream-vue'
+
+type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
+
+declare const markdownRenderProps: MarkdownRenderProps
+declare const codeBlockProps: CodeBlockNodeProps
+
+// Hover the property names after each dot.
+markdownRenderProps.content
+markdownRenderProps.customId
+markdownRenderProps.isDark
+markdownRenderProps.codeBlockMonacoOptions
+markdownRenderProps.codeBlockMonacoOptions?.theme
+markdownRenderProps.codeBlockMonacoOptions?.languages
+markdownRenderProps.codeBlockMonacoOptions?.diffHunkActionsOnHover
+markdownRenderProps.themes
+
+codeBlockProps.monacoOptions
+codeBlockProps.monacoOptions?.MAX_HEIGHT
+codeBlockProps.darkTheme
+codeBlockProps.lightTheme
 ```
 
 Notes:
 
-- `NodeRendererProps` matches `<MarkdownRender>` props.
-- `CodeBlockNodeProps`, `MermaidBlockNodeProps`, `D2BlockNodeProps`, `InfographicBlockNodeProps`, and `PreCodeNodeProps` all use `CodeBlockNode` for `node` (use `language: 'mermaid'` / `language: 'd2'` / `language: 'd2lang'` / `language: 'infographic'` to route specialized renderers).
+- `InstanceType<typeof MarkdownRender>['$props']` is the most direct way to inspect the exported component props.
+- `NodeRendererProps` is the named export for the same public prop surface.
+- Hover the property names after each dot in the snippet above, not the imported type names.
+- If you specifically want the best component-prop hover targets, use the `MarkdownRender` snippet below first.
+- Only `ts twoslash` and `vue twoslash` fences in this docs site enable hoverable type details.
 
 ## Pick the right component quickly
 
@@ -72,17 +87,59 @@ Notes:
 - When you use `MarkdownRender`, this container is already present.
 - When you render node components directly, wrap them with `<div class="markstream-vue">...</div>` so theme variables and component styles apply.
 
-### Usage ladder
+### Best hover targets
 
-```vue
+Start by hovering `:content`, `custom-id`, `:is-dark`, and `:code-block-monaco-options` in this example:
+
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
-const md = '# Hello\n\nUse custom-id to scope styles.'
+type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
+
+const content: MarkdownRenderProps['content'] = '# Hello'
+const customId: MarkdownRenderProps['customId'] = 'docs'
+const isDark: MarkdownRenderProps['isDark'] = true
+const monacoOptions: MarkdownRenderProps['codeBlockMonacoOptions'] = {
+  theme: 'vitesse-dark',
+  languages: ['typescript', 'vue'],
+  MAX_HEIGHT: 520,
+}
 </script>
 
 <template>
-  <MarkdownRender custom-id="docs" :content="md" />
+  <MarkdownRender
+    :content="content"
+    :custom-id="customId"
+    :is-dark="isDark"
+    :code-block-monaco-options="monacoOptions"
+  />
+</template>
+```
+
+### Usage ladder
+
+```vue twoslash
+<script setup lang="ts">
+import type { CodeBlockMonacoOptions } from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
+
+const md = '# Hello\n\nUse custom-id to scope styles.'
+const monacoOptions = {
+  theme: 'vitesse-dark',
+  themes: ['vitesse-dark', 'vitesse-light'],
+  languages: ['typescript', 'vue'],
+  MAX_HEIGHT: 520,
+  diffHunkActionsOnHover: true,
+} satisfies CodeBlockMonacoOptions
+</script>
+
+<template>
+  <MarkdownRender
+    custom-id="docs"
+    :content="md"
+    :code-block-monaco-options="monacoOptions"
+  />
 </template>
 ```
 

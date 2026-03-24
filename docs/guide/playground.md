@@ -42,8 +42,8 @@ If you want to add examples to the playground for documentation pages, keep them
 
 Quick try — add a simple playground page by creating `playground/src/pages/quick-test.vue` and pasting a small test like:
 
-```vue
-<script setup>
+```vue twoslash
+<script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
 const md = '# Quick playground test\n\nThis is a demo.'

@@ -22,7 +22,7 @@ No extra Mermaid CSS import is required. Keep `markstream-vue/index.css` after y
 
 Mermaid renders as soon as the snippet is syntactically valid. The snippet below shows a gradual update (ideal for AI responses or long-running tasks):
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
@@ -82,7 +82,7 @@ Still stuck? Reproduce the issue in the playground (`pnpm play`) with a minimal 
 
 If you load Mermaid via CDN and want progressive off-main-thread parsing, inject a CDN-backed worker:
 
-```ts
+```ts twoslash
 import { createMermaidWorkerFromCDN, enableMermaid, setMermaidLoader, setMermaidWorker } from 'markstream-vue'
 
 // use the CDN global (UMD) on the main thread

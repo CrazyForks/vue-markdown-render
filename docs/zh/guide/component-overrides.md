@@ -18,16 +18,24 @@ description: 用带作用域的方式覆盖 markstream-vue 的 image、code_bloc
 
 在渲染器上加 `custom-id`，再用相同的 id 注册覆盖：
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
-import DocImage from './DocImage.vue'
+
+declare const DocImage: Component
 
 setCustomComponents('docs', {
   image: DocImage,
 })
 ```
 
-```vue
+```vue twoslash
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const markdown = '![demo](https://example.com/demo.png)'
+</script>
+
 <template>
   <MarkdownRender custom-id="docs" :content="markdown" />
 </template>
@@ -62,7 +70,7 @@ setCustomComponents('docs', {
 
 ### 示例：替换 `image`
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import type { ImageNodeProps } from 'markstream-vue'
 
@@ -79,9 +87,11 @@ const props = defineProps<ImageNodeProps>()
 </template>
 ```
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
-import DocImage from './DocImage.vue'
+
+declare const DocImage: Component
 
 setCustomComponents('docs', {
   image: DocImage,
@@ -90,7 +100,7 @@ setCustomComponents('docs', {
 
 ### 示例：把普通代码块切到 `MarkdownCodeBlockNode`
 
-```ts
+```ts twoslash
 import { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue'
 
 setCustomComponents('docs', {
@@ -102,9 +112,11 @@ setCustomComponents('docs', {
 
 ### 示例：只覆盖 Mermaid
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
-import CustomMermaidBlock from './CustomMermaidBlock.vue'
+
+declare const CustomMermaidBlock: Component
 
 setCustomComponents('docs', {
   mermaid: CustomMermaidBlock,
@@ -145,7 +157,7 @@ setCustomComponents('docs', {
 
 如果某个 override 只在临时页面里使用，离开页面后可以主动移除：
 
-```ts
+```ts twoslash
 import { removeCustomComponents } from 'markstream-vue'
 
 removeCustomComponents('docs')

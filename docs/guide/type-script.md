@@ -2,9 +2,12 @@
 
 This library is TypeScript-first and exports types for the public API. Use `import type` to get node definitions in your code for advanced manipulations.
 
-```ts
+```ts twoslash
 import type { BaseNode } from 'markstream-vue'
 import { getMarkdown } from 'markstream-vue'
+
+const md = getMarkdown()
+const nodes: BaseNode[] = []
 ```
 
 See `packages/markdown-parser/src` for type definitions used by the parser.
@@ -14,7 +17,6 @@ See `packages/markdown-parser/src` for type definitions used by the parser.
 You can strongly type your custom components to accept node-specific props. Example:
 
 ```vue
-<!-- components/CustomCodeBlock.vue -->
 <script setup lang="ts">
 import type { CodeBlockNode } from 'markstream-vue'
 
@@ -30,8 +32,11 @@ const props = defineProps<{ node: CodeBlockNode }>()
 
 Then register the component for a specific custom id or globally:
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
+
+declare const CustomCodeBlock: Component
 
 setCustomComponents('docs', {
   code_block: CustomCodeBlock,
@@ -42,8 +47,8 @@ This approach provides full TypeScript checking and code completion for node pro
 
 Try this — typed node value example you can use in your code:
 
-```ts
-import type { CodeBlockNode } from 'markstream-vue'
+```ts twoslash
+import type { CodeBlockNodeProps } from 'markstream-vue'
 
-const node: CodeBlockNode = { type: 'code_block', language: 'ts', code: 'console.log(1)', raw: 'console.log(1)' }
+const node: CodeBlockNodeProps['node'] = { type: 'code_block', language: 'ts', code: 'console.log(1)', raw: 'console.log(1)' }
 ```

@@ -22,7 +22,7 @@ If your real goal is a docs site or VitePress theme, use [Docs Site & VitePress]
 
 ## Minimal render
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
@@ -48,12 +48,14 @@ If this is your main use case rather than a one-off example, continue with the d
 
 In VitePress, register your custom node component once in `enhanceApp`, then use `custom-html-tags` on `MarkdownRender` to let the parser emit custom nodes automatically.
 
-```ts
+```ts twoslash
+import type { Component } from 'vue'
 import MarkdownRender, { setCustomComponents } from 'markstream-vue'
 // docs/.vitepress/theme/index.ts
 import DefaultTheme from 'vitepress/theme'
-import ThinkingNode from './components/ThinkingNode.vue'
 import 'markstream-vue/index.css'
+
+declare const ThinkingNode: Component
 
 export default {
   extends: DefaultTheme,
@@ -76,7 +78,7 @@ Tip: unknown HTML-like tags (such as `<question>`) render as raw HTML elements o
 
 ## Parser pipeline
 
-```ts
+```ts twoslash
 import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
 const md = getMarkdown()
@@ -93,15 +95,27 @@ const nodes = parseMarkdownToStructure('# Title', md)
 
 For low-frequency updates, passing `content` directly is convenient. For chat-style token streams or long documents, prefer parsing outside the component and passing `nodes` so Vue only reconciles the AST you hand it:
 
-```ts
+```ts twoslash
 import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
 const md = getMarkdown('chat')
+declare const source: string
+declare const isFinalChunk: boolean
 const nodes = parseMarkdownToStructure(source, md, { final: isFinalChunk })
 ```
 
-```vue
-<MarkdownRender :nodes="nodes" :final="isFinalChunk" />
+```vue twoslash
+<script setup lang="ts">
+import type { BaseNode } from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
+
+const nodes: BaseNode[] = []
+const isFinalChunk = false
+</script>
+
+<template>
+  <MarkdownRender :nodes="nodes" :final="isFinalChunk" />
+</template>
 ```
 
 That avoids reparsing the full Markdown string inside `MarkdownRender` on every tiny content update, which is usually the biggest win for SSE / AI output.
@@ -132,7 +146,19 @@ The package CSS is scoped under an internal `.markstream-vue` container to minim
 - When you use `MarkdownRender`, you get this container automatically.
 - If you render exported node components on their own (e.g. `PreCodeNode`, `FootnoteNode`), wrap them with a container element:
 
-```vue
+```vue twoslash
+<script setup lang="ts">
+import { PreCodeNode } from 'markstream-vue'
+import type { PreCodeNodeProps } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'ts',
+  code: 'console.log(1)',
+  raw: 'console.log(1)',
+} satisfies PreCodeNodeProps['node']
+</script>
+
 <template>
   <div class="markstream-vue">
     <PreCodeNode :node="node" />

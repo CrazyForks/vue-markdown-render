@@ -83,7 +83,7 @@ import 'katex/dist/katex.min.css'
 
 After installing peers, default loaders are already enabled. Only call loader helpers if you previously disabled them or want a custom loader, for example with CDN assets:
 
-```ts
+```ts twoslash
 import { enableD2, enableKatex, enableMermaid } from 'markstream-vue'
 
 enableMermaid()
@@ -100,15 +100,21 @@ enableD2()
 
 ## 7. Quick test
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
-const md = '# Hello from markstream-vue!'
+type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
+
+const md: MarkdownRenderProps['content'] = '# Hello from markstream-vue!'
+const customId: MarkdownRenderProps['customId'] = 'install-check'
 </script>
 
 <template>
-  <MarkdownRender :content="md" />
+  <MarkdownRender
+    :content="md"
+    :custom-id="customId"
+  />
 </template>
 ```
 

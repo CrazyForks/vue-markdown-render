@@ -59,13 +59,20 @@ export type { D2Loader } from './components/D2BlockNode/d2'
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
-export type { NodeRendererProps } from './components/NodeRenderer/NodeRenderer.vue'
+export type { NodeRendererProps } from './types/node-renderer-props'
 export type {
   CodeBlockDiffAppearance,
   CodeBlockDiffHideUnchangedRegions,
+  CodeBlockDiffHideUnchangedRegionsOptions,
+  CodeBlockDiffHunkActionContext,
+  CodeBlockDiffHunkActionKind,
+  CodeBlockDiffHunkSide,
   CodeBlockDiffLineStyle,
   CodeBlockDiffUnchangedRegionStyle,
+  CodeBlockMonacoLanguage,
   CodeBlockMonacoOptions,
+  CodeBlockMonacoTheme,
+  CodeBlockMonacoThemeObject,
   CodeBlockNodeProps,
   D2BlockNodeProps,
   ImageNodeProps,

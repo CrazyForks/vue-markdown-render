@@ -40,8 +40,16 @@ These knobs keep DOM work under a predictable budget, so users perceive a calm, 
 
 Try this — tune rendering performance by enabling `viewportPriority`:
 
-```vue
-<MarkdownRender :content="md" :viewport-priority="true" />
+```vue twoslash
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const md = '# Perf test'
+</script>
+
+<template>
+  <MarkdownRender :content="md" :viewport-priority="true" />
+</template>
 ```
 
 ## Virtualization & DOM windows
@@ -55,19 +63,27 @@ Try this — tune rendering performance by enabling `viewportPriority`:
 
 Example: Give the user a lighter DOM footprint while keeping scrollback smooth.
 
-```vue
-<MarkdownRender
-  :content="md"
-  :max-live-nodes="220"
-  :live-node-buffer="40"
-  :batch-rendering="true"
-  :initial-render-batch-size="24"
-  :render-batch-size="48"
-  :render-batch-delay="24"
-  :render-batch-budget-ms="8"
-  :defer-nodes-until-visible="true"
-  :viewport-priority="true"
-/>
+```vue twoslash
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const md = '# Virtualized transcript'
+</script>
+
+<template>
+  <MarkdownRender
+    :content="md"
+    :max-live-nodes="220"
+    :live-node-buffer="40"
+    :batch-rendering="true"
+    :initial-render-batch-size="24"
+    :render-batch-size="48"
+    :render-batch-delay="24"
+    :render-batch-budget-ms="8"
+    :defer-nodes-until-visible="true"
+    :viewport-priority="true"
+  />
+</template>
 ```
 
 With these knobs you can keep large AI transcripts or docs under a predictable CPU budget while still presenting consistent scroll behaviour.

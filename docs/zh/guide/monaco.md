@@ -47,12 +47,14 @@ module.exports = {
 
 > 注意：设置 `languages` 会覆盖 `stream-monaco` 内置的 `defaultLanguages`，而不是在其基础上追加。请在数组中显式列出你需要的所有语言（包括默认语言），以免缺少语法高亮。
 
-```vue
+只有 `ts twoslash` / `vue twoslash` 代码块才会在这个文档站里显示 hover 类型信息。更推荐 hover `languages`、`themes`、`theme`、`MAX_HEIGHT`、`onDiffHunkAction` 这些具体字段。
+
+```vue twoslash
 <script setup lang="ts">
-import type { MonacoTheme } from 'stream-monaco'
+import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme } from 'markstream-vue'
 import MarkdownRender from 'markstream-vue'
 
-const docsDark: MonacoTheme = {
+const docsDark: CodeBlockMonacoTheme = {
   name: 'docs-dark',
   base: 'vs-dark',
   inherit: true,
@@ -62,7 +64,7 @@ const docsDark: MonacoTheme = {
   rules: [],
 }
 
-const docsLight: MonacoTheme = {
+const docsLight: CodeBlockMonacoTheme = {
   name: 'docs-light',
   base: 'vs',
   inherit: true,
@@ -77,7 +79,7 @@ const monacoOptions = {
   themes: [docsDark, docsLight],
   theme: 'docs-dark',
   MAX_HEIGHT: 640,
-}
+} satisfies CodeBlockMonacoOptions
 
 const markdown = `
 \`\`\`python
@@ -105,16 +107,18 @@ fn main() {}
 
 对于 diff 代码块，可以在每个 hunk 的上下分段上显示悬浮操作按钮（`Revert` / `Stage`）。这些配置同样通过 `monacoOptions` / `codeBlockMonacoOptions` 透传：
 
-```ts
+```ts twoslash
+import type { CodeBlockDiffHunkActionContext, CodeBlockMonacoOptions } from 'markstream-vue'
+
 const monacoOptions = {
   diffHunkActionsOnHover: true,
   diffHunkHoverHideDelayMs: 240,
-  onDiffHunkAction(context) {
+  onDiffHunkAction(context: CodeBlockDiffHunkActionContext) {
     console.log(context.action, context.side, context.lineChange)
     // 返回 false 可以阻止 stream-monaco 的内置编辑行为。
     return false
   },
-}
+} satisfies CodeBlockMonacoOptions
 ```
 
 - `diffHunkActionsOnHover`：开启 hunk 悬浮按钮

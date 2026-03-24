@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { transformerTwoslash } from '@shikijs/vitepress-twoslash'
 import { defineConfig } from 'vitepress'
 
 const docsSiteUrl = 'https://markstream-vue-docs.simonhe.me'
@@ -9,6 +10,7 @@ const docsOgImageUrl = `${docsSiteUrl}/og-image.svg`
 const docsDefaultDescription = 'Streaming-friendly Markdown renderer for Vue 3, Vue 2, React, and Angular'
 const githubRepoUrl = 'https://github.com/Simon-He95/markstream-vue'
 const docsRootDir = fileURLToPath(new URL('..', import.meta.url))
+const workspaceRootDir = fileURLToPath(new URL('../..', import.meta.url))
 
 // TypeScript sometimes rejects VitePress site locales on the `Config` type.
 // Cast to `any` to avoid strict type errors in the docs config while keeping intellisense.
@@ -494,6 +496,23 @@ export default defineConfig({
   description: docsDefaultDescription,
   base: process.env.VITEPRESS_BASE || '/',
   head: siteHead,
+  markdown: {
+    languages: ['ts', 'tsx', 'js', 'jsx', 'vue'],
+    codeTransformers: [
+      transformerTwoslash({
+        explicitTrigger: true,
+        twoslashOptions: {
+          compilerOptions: {
+            baseUrl: workspaceRootDir,
+            paths: {
+              'markstream-vue': ['docs/.vitepress/twoslash/markstream-vue.d.ts'],
+              'stream-markdown-parser': ['packages/markdown-parser/src/index.ts'],
+            },
+          },
+        },
+      }),
+    ],
+  },
   sitemap: {
     hostname: docsSiteUrl,
     transformItems(items) {

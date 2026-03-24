@@ -47,31 +47,75 @@ pnpm add stream-monaco
 
 ### Basic example
 
-```vue
-<CodeBlockNode :node="{ type: 'code_block', language: 'js', code: 'console.log(1)', raw: 'console.log(1)' }" />
+```vue twoslash
+<script setup lang="ts">
+import { CodeBlockNode } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'js',
+  code: 'console.log(1)',
+  raw: 'console.log(1)',
+} satisfies CodeBlockNodeProps['node']
+</script>
+
+<template>
+  <CodeBlockNode :node="node" />
+</template>
 ```
 
 ### Replace header and hide copy button
 
-```vue
-<CodeBlockNode :node="node" :showCopyButton="false">
-  <template #header-left>
-    <div class="flex items-center">Custom left</div>
-  </template>
-  <template #header-right>
-    <button @click="runSnippet">Run</button>
-  </template>
-</CodeBlockNode>
+```vue twoslash
+<script setup lang="ts">
+import { CodeBlockNode } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'js',
+  code: 'console.log(1)',
+  raw: 'console.log(1)',
+} satisfies CodeBlockNodeProps['node']
+
+function runSnippet() {}
+</script>
+
+<template>
+  <CodeBlockNode :node="node" :show-copy-button="false">
+    <template #header-left>
+      <div class="flex items-center">Custom left</div>
+    </template>
+    <template #header-right>
+      <button @click="runSnippet">Run</button>
+    </template>
+  </CodeBlockNode>
+</template>
 ```
 
 ### Custom loading placeholder
 
-```vue
-<CodeBlockNode :node="node" :stream="false" :loading="true">
-  <template #loading="{ loading, stream }">
-    <div v-if="loading && !stream">Loading editor assets…</div>
-  </template>
-</CodeBlockNode>
+```vue twoslash
+<script setup lang="ts">
+import { CodeBlockNode } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'ts',
+  code: 'console.log("loading")',
+  raw: 'console.log("loading")',
+} satisfies CodeBlockNodeProps['node']
+</script>
+
+<template>
+  <CodeBlockNode :node="node" :stream="false" :loading="true">
+    <template #loading="{ loading, stream }">
+      <div v-if="loading && !stream">Loading editor assets…</div>
+    </template>
+  </CodeBlockNode>
+</template>
 ```
 
 ## Theme Switching
@@ -81,7 +125,7 @@ pnpm add stream-monaco
 ### Using @vueuse/core in standalone Vue apps
 
 ```vue
-<script setup>
+<script setup lang="ts">
 import { useDark, useToggle } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 
@@ -135,7 +179,7 @@ export function useDark() {
 
 ```vue
 <!-- In any .md file or component -->
-<script setup>
+<script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 import { useDark } from '../../.vitepress/theme'
 
@@ -186,7 +230,10 @@ Try this — simple snapshot example (inline usage):
 
 ```vue
 <script setup lang="ts">
-const node = { type: 'code_block', language: 'js', code: 'console.log("hello")', raw: 'console.log("hello")' }
+import { CodeBlockNode } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
+
+const node = { type: 'code_block', language: 'js', code: 'console.log("hello")', raw: 'console.log("hello")' } satisfies CodeBlockNodeProps['node']
 </script>
 
 <template>

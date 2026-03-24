@@ -9,7 +9,7 @@
 
 1) `CustomImageNode.vue`（包装原始 `ImageNode`，拦截点击并在新标签打开图片作为简易预览）：
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import { ImageNode } from 'markstream-vue'
 
@@ -32,12 +32,13 @@ function onImageClick(payload: [Event, string]) {
 
 2) 在 VitePress 主题增强（`docs/.vitepress/theme/index.ts` 的 `enhanceApp`）中注册自定义组件：
 
-```ts
+```ts twoslash
+import type { App, Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
 // docs/.vitepress/theme/index.ts
-import CustomImageNode from './components/CustomImageNode.vue'
+declare const CustomImageNode: Component
 
-export default ({ app }) => {
+export default ({ app }: { app: App }) => {
   // setCustomComponents 接受一个 id（任意字符串，用于区分不同注册）和组件映射
   // 通过这种方式，库在渲染 ImageNode 时会使用你提供的组件
   setCustomComponents('vitepress-image-preview', { image: CustomImageNode })

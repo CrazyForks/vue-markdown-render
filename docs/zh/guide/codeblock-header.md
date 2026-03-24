@@ -20,53 +20,96 @@
 
 隐藏头部（简单用法）
 
-```vue
-<CodeBlockNode
-  :node="{ type: 'code_block', language: 'javascript', code: 'console.log(1)', raw: 'console.log(1)' }"
-  :showHeader="false"
-  :loading="false"
-/>
+```vue twoslash
+<script setup lang="ts">
+import { CodeBlockNode } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'javascript',
+  code: 'console.log(1)',
+  raw: 'console.log(1)',
+} satisfies CodeBlockNodeProps['node']
+</script>
+
+<template>
+  <CodeBlockNode
+    :node="node"
+    :show-header="false"
+    :loading="false"
+  />
+</template>
 ```
 
 使用 `#header-left` / `#header-right` 插槽替换默认头部
 
-```vue
-<CodeBlockNode
-  :node="{ type: 'code_block', language: 'html', code: '<div>Hello</div>', raw: '<div>Hello</div>' }"
-  :loading="false"
-  :showCopyButton="false"
->
-  <template #header-left>
-    <div class="flex items-center space-x-2">
-      <!-- 自定义图标或标签 -->
-      <span class="text-sm font-medium">My HTML</span>
-    </div>
-  </template>
+```vue twoslash
+<script setup lang="ts">
+import { CodeBlockNode } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
 
-  <template #header-right>
-    <div class="flex items-center space-x-2">
-      <button class="px-2 py-1 bg-blue-600 text-white rounded">Run</button>
-      <button class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Inspect</button>
-    </div>
-  </template>
-</CodeBlockNode>
+const node = {
+  type: 'code_block',
+  language: 'html',
+  code: '<div>Hello</div>',
+  raw: '<div>Hello</div>',
+} satisfies CodeBlockNodeProps['node']
+</script>
+
+<template>
+  <CodeBlockNode
+    :node="node"
+    :loading="false"
+    :show-copy-button="false"
+  >
+    <template #header-left>
+      <div class="flex items-center space-x-2">
+        <span class="text-sm font-medium">My HTML</span>
+      </div>
+    </template>
+
+    <template #header-right>
+      <div class="flex items-center space-x-2">
+        <button class="px-2 py-1 bg-blue-600 text-white rounded">Run</button>
+        <button class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Inspect</button>
+      </div>
+    </template>
+  </CodeBlockNode>
+</template>
 ```
 
 自定义加载占位符（当 `stream=false` 且 `loading=true` 时显示）
 
-```vue
-<CodeBlockNode
-  :node="{ type: 'code_block', language: 'python', code: code, raw: code }"
-  :stream="false"
-  :loading="isLoading"
->
-<template #loading="{ loading, stream }">
-    <div v-if="loading && !stream" class="p-4 text-center">
-      <div class="animate-spin inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full" />
-      <p class="mt-2 text-sm text-gray-500">Initializing editor...</p>
-    </div>
-  </template>
-</CodeBlockNode>
+```vue twoslash
+<script setup lang="ts">
+import { CodeBlockNode } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
+
+const code = 'print("hello")'
+const isLoading = true
+const node = {
+  type: 'code_block',
+  language: 'python',
+  code,
+  raw: code,
+} satisfies CodeBlockNodeProps['node']
+</script>
+
+<template>
+  <CodeBlockNode
+    :node="node"
+    :stream="false"
+    :loading="isLoading"
+  >
+    <template #loading="{ loading, stream }">
+      <div v-if="loading && !stream" class="p-4 text-center">
+        <div class="animate-spin inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full" />
+        <p class="mt-2 text-sm text-gray-500">Initializing editor...</p>
+      </div>
+    </template>
+  </CodeBlockNode>
+</template>
 ```
 
 事件与注意事项

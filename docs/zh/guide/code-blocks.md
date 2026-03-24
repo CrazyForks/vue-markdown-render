@@ -35,7 +35,7 @@ npm i shiki stream-markdown
 
 - 通过 `setCustomComponents` 覆盖 `code_block` 节点以注册 Shiki 版渲染器。示例：
 
-```ts
+```ts twoslash
 import { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue'
 
 setCustomComponents({ code_block: MarkdownCodeBlockNode })
@@ -51,11 +51,31 @@ setCustomComponents({ code_block: MarkdownCodeBlockNode })
 - 低频语言图标按需加载，异步 chunk 返回后会自动刷新图标显示。
 - 如果你希望避免首次命中时的回退图标，可在应用空闲阶段预热一次：
 
-```ts
+```ts twoslash
 import { preloadExtendedLanguageIcons } from 'markstream-vue'
 
 if (typeof window !== 'undefined')
   void preloadExtendedLanguageIcons()
+```
+
+快速试一下：
+
+```vue twoslash
+<script setup lang="ts">
+import { CodeBlockNode } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'js',
+  code: 'console.log(42)',
+  raw: 'console.log(42)',
+} satisfies CodeBlockNodeProps['node']
+</script>
+
+<template>
+  <CodeBlockNode :node="node" />
+</template>
 ```
 
 ### Vue CLI 4（Webpack 4）注意事项

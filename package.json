@@ -250,6 +250,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^5.4.1",
+    "@shikijs/vitepress-twoslash": "^4.0.2",
     "@types/markdown-it-emoji": "^3.0.1",
     "@types/node": "^18.19.130",
     "@vitejs/plugin-vue": "^5.2.4",

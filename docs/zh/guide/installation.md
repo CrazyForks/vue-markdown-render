@@ -83,7 +83,7 @@ import 'katex/dist/katex.min.css'
 
 装好 peers 以后，默认 loader 已经启用。只有当你手动关闭过，或者想切到 CDN / 自定义 loader 时，才需要显式调用：
 
-```ts
+```ts twoslash
 import { enableD2, enableKatex, enableMermaid } from 'markstream-vue'
 
 enableMermaid()
@@ -100,15 +100,21 @@ enableD2()
 
 ## 7. 快速测试
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
-const md = '# 你好，markstream-vue！'
+type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
+
+const md: MarkdownRenderProps['content'] = '# 你好，markstream-vue！'
+const customId: MarkdownRenderProps['customId'] = 'install-check'
 </script>
 
 <template>
-  <MarkdownRender :content="md" />
+  <MarkdownRender
+    :content="md"
+    :custom-id="customId"
+  />
 </template>
 ```
 

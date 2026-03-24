@@ -101,12 +101,14 @@ Only a minimal set of Monaco languages ships with the default integration to kee
 
 > `languages` is **not** appended to the built-in defaults from `stream-monaco`; providing this array replaces the internal `defaultLanguages`. Include every language you need (even the original ones) whenever you override it.
 
-```vue
+Only `ts twoslash` and `vue twoslash` fences in this docs site enable hoverable type details. Hover `languages`, `themes`, `theme`, `MAX_HEIGHT`, or `onDiffHunkAction` below for the useful payloads.
+
+```vue twoslash
 <script setup lang="ts">
-import type { MonacoTheme } from 'stream-monaco'
+import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme } from 'markstream-vue'
 import MarkdownRender from 'markstream-vue'
 
-const docsDark: MonacoTheme = {
+const docsDark: CodeBlockMonacoTheme = {
   name: 'docs-dark',
   base: 'vs-dark',
   inherit: true,
@@ -116,7 +118,7 @@ const docsDark: MonacoTheme = {
   rules: [],
 }
 
-const docsLight: MonacoTheme = {
+const docsLight: CodeBlockMonacoTheme = {
   name: 'docs-light',
   base: 'vs',
   inherit: true,
@@ -131,7 +133,7 @@ const monacoOptions = {
   themes: [docsDark, docsLight],
   theme: 'docs-dark',
   MAX_HEIGHT: 640,
-}
+} satisfies CodeBlockMonacoOptions
 
 const markdown = `
 \`\`\`python
@@ -159,16 +161,18 @@ fn main() {}
 
 Diff code blocks can show hover action buttons for each hunk split (`Revert` / `Stage`). These options are also passed through `monacoOptions` / `codeBlockMonacoOptions`:
 
-```ts
+```ts twoslash
+import type { CodeBlockDiffHunkActionContext, CodeBlockMonacoOptions } from 'markstream-vue'
+
 const monacoOptions = {
   diffHunkActionsOnHover: true,
   diffHunkHoverHideDelayMs: 240,
-  onDiffHunkAction(context) {
+  onDiffHunkAction(context: CodeBlockDiffHunkActionContext) {
     console.log(context.action, context.side, context.lineChange)
     // Return false to prevent stream-monaco's built-in model edits.
     return false
   },
-}
+} satisfies CodeBlockMonacoOptions
 ```
 
 - `diffHunkActionsOnHover`: enable the hover buttons

@@ -20,7 +20,7 @@ Mermaid 不需要额外的 CSS 文件。使用 Tailwind/UnoCSS 时，请在 rese
 
 ## 2. 流式示例
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
@@ -80,7 +80,7 @@ B-->C[End]
 
 如果你通过 CDN 引入 Mermaid，并希望流式场景下的解析（语法检查/前缀查找）在 worker 中进行，可以注入一个“CDN 加载 Mermaid”的 worker：
 
-```ts
+```ts twoslash
 import { createMermaidWorkerFromCDN, enableMermaid, setMermaidLoader, setMermaidWorker } from 'markstream-vue'
 
 // 主线程使用 CDN 全局（UMD）

@@ -4,15 +4,18 @@
 
 示例：
 
-```ts
+```ts twoslash
+import type { MermaidBlockEvent } from 'markstream-vue'
 import { MermaidBlockNode, setCustomComponents } from 'markstream-vue'
 import { h } from 'vue'
+
+declare function uploadSvgToServer(svg: string): void
 
 setCustomComponents('playground-demo', {
   mermaid: (props: any) => h(MermaidBlockNode, {
     ...props,
     // 使用 `h()` 时，通过驼峰的 on<EventName> 传入事件监听器
-    onExport: (ev: any) => {
+    onExport: (ev: MermaidBlockEvent) => {
       // 组件在事件中同时暴露 `svgElement` 和 `svgString`，直接优先使用 ev.svgString
       const svgEl = ev.svgElement as SVGElement | null
       const svgStringFromEv = ev.svgString as string | null
@@ -24,7 +27,7 @@ setCustomComponents('playground-demo', {
       // 阻止组件默认的导出行为
       ev.preventDefault()
     },
-    onCopy: (ev: any) => {
+    onCopy: (ev: MermaidBlockEvent<{ type: 'copy', text: string }>) => {
       ev.preventDefault()
       // 复制文本在 ev.payload.text 中（你也可以在这里做埋点/自定义 toast）
       const text = ev.payload?.text ?? ''

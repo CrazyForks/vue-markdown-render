@@ -4,21 +4,24 @@ If you want to completely replace the `mermaid` renderer used by `MarkdownRender
 
 Example:
 
-```ts
+```ts twoslash
+import type { MermaidBlockEvent } from 'markstream-vue'
 import { MermaidBlockNode, setCustomComponents } from 'markstream-vue'
 import { h } from 'vue'
+
+declare function uploadSvgToServer(svg: string): void
 
 setCustomComponents('playground-demo', {
   mermaid: (props: any) => h(MermaidBlockNode, {
     ...props,
-    onCopy: async (ev: any) => {
+    onCopy: async (ev: MermaidBlockEvent<{ type: 'copy', text: string }>) => {
       // Optional: take over the copy behavior (clipboard + toast/analytics)
       ev.preventDefault()
       const text = ev.payload?.text ?? ''
       if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function')
         await navigator.clipboard.writeText(text)
     },
-    onExport: (ev: any) => {
+    onExport: (ev: MermaidBlockEvent) => {
       // read the rendered svg from ev.svgElement and upload or save
       const svgEl = ev.svgElement as SVGElement | null
       if (svgEl) {
@@ -39,13 +42,14 @@ Key points:
 
 Quick try — test the override by mounting the custom renderer inside your app's client entry and interacting with onExport in the playground.
 
-```ts
+```ts twoslash
 // .vitepress/clientAppEnhance.ts or playground client entry
+import type { MermaidBlockEvent } from 'markstream-vue'
 import { MermaidBlockNode, setCustomComponents } from 'markstream-vue'
 import { h } from 'vue'
 
 setCustomComponents('playground-demo', {
-  mermaid: (props: any) => h(MermaidBlockNode, { ...props, onExport: (ev) => {
+  mermaid: (props: any) => h(MermaidBlockNode, { ...props, onExport: (ev: MermaidBlockEvent) => {
     ev.preventDefault()
     console.log('exported', ev.svgElement)
   } })

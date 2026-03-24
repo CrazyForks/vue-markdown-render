@@ -11,7 +11,7 @@ Create a small wrapper component that intercepts `click` and use `setCustomCompo
 
 ### 1) `CustomImageNode.vue` (simple wrapper)
 
-```vue
+```vue twoslash
 <script setup lang="ts">
 import { ImageNode } from 'markstream-vue'
 
@@ -34,12 +34,13 @@ function onImageClick(payload: [Event, string]) {
 
 ### 2) Register in VitePress theme enhance
 
-```ts
+```ts twoslash
+import type { App, Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
 // docs/.vitepress/theme/index.ts
-import CustomImageNode from './components/CustomImageNode.vue'
+declare const CustomImageNode: Component
 
-export default ({ app }) => {
+export default ({ app }: { app: App }) => {
   setCustomComponents('vitepress-image-preview', { image: CustomImageNode })
 }
 ```
@@ -54,10 +55,11 @@ The `click` event from `ImageNode` is the primary hook for implementing custom p
 
 Quick try — register `CustomImageNode` in a VitePress client enhance and test clicking images in the `playground`:
 
-```ts
+```ts twoslash
 // docs/.vitepress/theme/index.ts
+import type { App, Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
-import CustomImageNode from './components/CustomImageNode.vue'
+declare const CustomImageNode: Component
 
-export default ({ app }) => setCustomComponents('vitepress-image-preview', { image: CustomImageNode })
+export default ({ app }: { app: App }) => setCustomComponents('vitepress-image-preview', { image: CustomImageNode })
 ```

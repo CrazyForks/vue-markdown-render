@@ -35,7 +35,7 @@ npm i shiki stream-markdown
 
 - Override the `code_block` node via `setCustomComponents` to register the Shiki-based renderer:
 
-```ts
+```ts twoslash
 import { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue'
 
 setCustomComponents({ code_block: MarkdownCodeBlockNode })
@@ -51,7 +51,7 @@ To keep the main bundle smaller, infrequent language icons are split into an asy
 - Rare languages load on demand and will update icon output automatically after the async chunk resolves.
 - If you prefer to avoid first-hit fallback icons, preload once during app idle:
 
-```ts
+```ts twoslash
 import { preloadExtendedLanguageIcons } from 'markstream-vue'
 
 if (typeof window !== 'undefined')
@@ -79,6 +79,20 @@ If you don't install either optional package the renderer falls back to a simple
 
 Try this — simple CodeBlock render:
 
-```vue
-<CodeBlockNode :node="{ type: 'code_block', language: 'js', code: 'console.log(42)', raw: 'console.log(42)' }" />
+```vue twoslash
+<script setup lang="ts">
+import { CodeBlockNode } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'js',
+  code: 'console.log(42)',
+  raw: 'console.log(42)',
+} satisfies CodeBlockNodeProps['node']
+</script>
+
+<template>
+  <CodeBlockNode :node="node" />
+</template>
 ```

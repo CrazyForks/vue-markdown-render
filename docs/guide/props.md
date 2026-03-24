@@ -56,6 +56,37 @@ These props are forwarded to `CodeBlockNode` / `MarkdownCodeBlockNode` (but **no
 
 Note: `code-block-monaco-options` is only used by the Monaco-backed `CodeBlockNode`. If you override `code_block` with `MarkdownCodeBlockNode`, treat `code-block-dark-theme` / `code-block-light-theme` as Shiki theme names, and `themes` as the Shiki theme list to preload.
 
+Only `ts twoslash` and `vue twoslash` fences in this docs site enable hoverable type details. Hover the object keys below, or `:code-block-monaco-options` in the template, instead of the imported type name.
+
+```vue twoslash
+<script setup lang="ts">
+import type { CodeBlockMonacoOptions } from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
+
+const md = '```ts\nconsole.log("hover monaco options")\n```'
+const monacoOptions = {
+  themes: ['vitesse-dark', 'vitesse-light'],
+  languages: ['typescript', 'vue', 'json'],
+  theme: 'vitesse-dark',
+  MAX_HEIGHT: 640,
+  diffHideUnchangedRegions: {
+    enabled: true,
+    contextLineCount: 2,
+  },
+  diffHunkActionsOnHover: true,
+  diffHunkHoverHideDelayMs: 240,
+} satisfies CodeBlockMonacoOptions
+</script>
+
+<template>
+  <MarkdownRender
+    custom-id="docs"
+    :content="md"
+    :code-block-monaco-options="monacoOptions"
+  />
+</template>
+```
+
 ## Diagram node props forwarded from `MarkdownRender`
 
 Use these to control specialized block renderers without overriding components manually:
