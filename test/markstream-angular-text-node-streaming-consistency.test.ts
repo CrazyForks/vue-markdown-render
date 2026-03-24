@@ -1,6 +1,13 @@
+import { createRequire } from 'node:module'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { TextNodeComponent } from '../packages/markstream-angular/src/components/TextNode/TextNode.component'
-import '../node_modules/.pnpm/node_modules/@angular/compiler'
+
+const require = createRequire(import.meta.url)
+const angularCompilerEntry = require.resolve('@angular/compiler', {
+  paths: [resolve(process.cwd(), 'node_modules/.pnpm/node_modules')],
+})
+await import(angularCompilerEntry)
+const { TextNodeComponent } = await import('../packages/markstream-angular/src/components/TextNode/TextNode.component')
 
 describe('markstream-angular text node streaming consistency', () => {
   it('settles a finished text delta when a later stream tick keeps the same text', () => {
