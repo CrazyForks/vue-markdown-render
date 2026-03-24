@@ -1,5 +1,5 @@
-import TwoslashFloatingVue from '@shikijs/vitepress-twoslash/client'
 import type { EnhanceAppContext } from 'vitepress'
+import TwoslashFloatingVue from '@shikijs/vitepress-twoslash/client'
 import MarkdownRender from 'markstream-vue'
 import Theme from 'vitepress/theme'
 import GitHubStarBadge from './GitHubStarBadge.vue'

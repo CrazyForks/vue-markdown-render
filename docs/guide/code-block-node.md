@@ -49,8 +49,8 @@ pnpm add stream-monaco
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',
@@ -69,8 +69,8 @@ const node = {
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',
@@ -85,10 +85,14 @@ function runSnippet() {}
 <template>
   <CodeBlockNode :node="node" :show-copy-button="false">
     <template #header-left>
-      <div class="flex items-center">Custom left</div>
+      <div class="flex items-center">
+        Custom left
+      </div>
     </template>
     <template #header-right>
-      <button @click="runSnippet">Run</button>
+      <button @click="runSnippet">
+        Run
+      </button>
     </template>
   </CodeBlockNode>
 </template>
@@ -98,8 +102,8 @@ function runSnippet() {}
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',
@@ -112,7 +116,9 @@ const node = {
 <template>
   <CodeBlockNode :node="node" :stream="false" :loading="true">
     <template #loading="{ loading, stream }">
-      <div v-if="loading && !stream">Loading editor assets…</div>
+      <div v-if="loading && !stream">
+        Loading editor assets…
+      </div>
     </template>
   </CodeBlockNode>
 </template>
@@ -230,8 +236,8 @@ Try this — simple snapshot example (inline usage):
 
 ```vue
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = { type: 'code_block', language: 'js', code: 'console.log("hello")', raw: 'console.log("hello")' } satisfies CodeBlockNodeProps['node']
 </script>

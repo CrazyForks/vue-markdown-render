@@ -59,7 +59,6 @@ export type { D2Loader } from './components/D2BlockNode/d2'
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
-export type { NodeRendererProps } from './types/node-renderer-props'
 export type {
   CodeBlockDiffAppearance,
   CodeBlockDiffHideUnchangedRegions,
@@ -84,6 +83,7 @@ export type {
   MermaidBlockNodeProps,
   PreCodeNodeProps,
 } from './types/component-props'
+export type { NodeRendererProps } from './types/node-renderer-props'
 // Export centralized props interfaces so they appear in package d.ts
 export * from './utils'
 export * from './workers/katexCdnWorker'

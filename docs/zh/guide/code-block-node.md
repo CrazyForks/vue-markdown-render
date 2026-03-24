@@ -55,8 +55,8 @@ pnpm add stream-monaco
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',
@@ -75,8 +75,8 @@ const node = {
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',
@@ -91,10 +91,14 @@ function runSnippet() {}
 <template>
   <CodeBlockNode :node="node" :show-copy-button="false">
     <template #header-left>
-      <div class="flex items-center">自定义左侧</div>
+      <div class="flex items-center">
+        自定义左侧
+      </div>
     </template>
     <template #header-right>
-      <button @click="runSnippet">运行</button>
+      <button @click="runSnippet">
+        运行
+      </button>
     </template>
   </CodeBlockNode>
 </template>
@@ -104,8 +108,8 @@ function runSnippet() {}
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',
@@ -118,7 +122,9 @@ const node = {
 <template>
   <CodeBlockNode :node="node" :stream="false" :loading="true">
     <template #loading="{ loading, stream }">
-      <div v-if="loading && !stream">正在加载编辑器资源…</div>
+      <div v-if="loading && !stream">
+        正在加载编辑器资源…
+      </div>
     </template>
   </CodeBlockNode>
 </template>
@@ -237,8 +243,8 @@ const themes = [
 
 ```vue
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = { type: 'code_block', language: 'js', code: 'console.log("hello")', raw: 'console.log("hello")' } satisfies CodeBlockNodeProps['node']
 </script>

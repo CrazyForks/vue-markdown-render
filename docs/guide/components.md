@@ -32,7 +32,8 @@ If you are still deciding where to customize the pipeline, start with:
 `markstream-vue` exports renderer and component prop interfaces:
 
 ```ts twoslash
-import MarkdownRender, { type CodeBlockNodeProps } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
 
 type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
 

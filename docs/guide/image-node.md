@@ -59,6 +59,7 @@ Quick try — register `CustomImageNode` in a VitePress client enhance and test 
 // docs/.vitepress/theme/index.ts
 import type { App, Component } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
+
 declare const CustomImageNode: Component
 
 export default ({ app }: { app: App }) => setCustomComponents('vitepress-image-preview', { image: CustomImageNode })

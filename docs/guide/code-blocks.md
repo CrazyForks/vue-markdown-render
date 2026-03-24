@@ -81,8 +81,8 @@ Try this — simple CodeBlock render:
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',

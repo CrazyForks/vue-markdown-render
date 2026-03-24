@@ -32,7 +32,8 @@ description: 快速查阅 MarkdownRender、CodeBlockNode、MermaidBlockNode、Im
 `markstream-vue` 同步导出渲染器与组件 props 类型：
 
 ```ts twoslash
-import MarkdownRender, { type CodeBlockNodeProps } from 'markstream-vue'
+import type { CodeBlockNodeProps } from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
 
 type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
 

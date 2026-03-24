@@ -1611,7 +1611,7 @@ const renderedItems = computed(() => {
 
 function getHtmlTagFromContent(html: unknown) {
   const raw = String(html ?? '')
-  const match = raw.match(/^\s*<\s*([A-Za-z][\w:-]*)/i)
+  const match = raw.match(/^\s*<\s*([A-Z][\w:-]*)/i)
   return match ? match[1].toLowerCase() : ''
 }
 

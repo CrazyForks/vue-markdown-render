@@ -148,8 +148,8 @@ The package CSS is scoped under an internal `.markstream-vue` container to minim
 
 ```vue twoslash
 <script setup lang="ts">
-import { PreCodeNode } from 'markstream-vue'
 import type { PreCodeNodeProps } from 'markstream-vue'
+import { PreCodeNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',

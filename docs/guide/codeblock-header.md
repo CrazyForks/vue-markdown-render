@@ -20,8 +20,8 @@ Hide the header (simple)
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',
@@ -44,8 +44,8 @@ Replace the default header using the `#header-left` and `#header-right` named sl
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = {
   type: 'code_block',
@@ -69,8 +69,12 @@ const node = {
 
     <template #header-right>
       <div class="flex items-center space-x-2">
-        <button class="px-2 py-1 bg-blue-600 text-white rounded">Run</button>
-        <button class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Inspect</button>
+        <button class="px-2 py-1 bg-blue-600 text-white rounded">
+          Run
+        </button>
+        <button class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">
+          Inspect
+        </button>
       </div>
     </template>
   </CodeBlockNode>
@@ -81,8 +85,8 @@ Custom loading placeholder (shown when `stream` is false and `loading` is true)
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const code = 'print("hello")'
 const isLoading = true
@@ -103,7 +107,9 @@ const node = {
     <template #loading="{ loading, stream }">
       <div v-if="loading && !stream" class="p-4 text-center">
         <div class="animate-spin inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full" />
-        <p class="mt-2 text-sm text-gray-500">Initializing editor...</p>
+        <p class="mt-2 text-sm text-gray-500">
+          Initializing editor...
+        </p>
       </div>
     </template>
   </CodeBlockNode>
@@ -122,8 +128,8 @@ Try this — replace the header in a small example:
 
 ```vue twoslash
 <script setup lang="ts">
-import { CodeBlockNode } from 'markstream-vue'
 import type { CodeBlockNodeProps } from 'markstream-vue'
+import { CodeBlockNode } from 'markstream-vue'
 
 const node = { type: 'code_block', language: 'js', code: 'console.log("run")', raw: 'console.log("run")' } satisfies CodeBlockNodeProps['node']
 </script>
