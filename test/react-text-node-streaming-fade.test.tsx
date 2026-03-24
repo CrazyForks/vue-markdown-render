@@ -136,6 +136,56 @@ describe('markstream-react text streaming fade', () => {
     })
   })
 
+  it('settles a finished strong-node delta when following sibling text keeps streaming', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const renderMarkdown = (content: string) =>
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+        viewportPriority: false,
+        maxLiveNodes: 0,
+      }))
+
+    await act(async () => {
+      root.render(renderMarkdown('1. **记忆化递归（动态规划'))
+    })
+    await flushReact()
+
+    await act(async () => {
+      root.render(renderMarkdown('1. **记忆化递归（动态规划）*'))
+    })
+    await flushReact()
+
+    let strongDelta = host.querySelector('.strong-node .text-node-stream-delta')
+    expect(strongDelta?.textContent).toBe('）')
+
+    await act(async () => {
+      root.render(renderMarkdown('1. **记忆化递归（动态规划）**：'))
+    })
+    await flushReact()
+
+    strongDelta = host.querySelector('.strong-node .text-node-stream-delta')
+    expect(strongDelta).toBeNull()
+    expect(host.querySelector('.strong-node')?.textContent).toBe('记忆化递归（动态规划）')
+
+    await act(async () => {
+      root.render(renderMarkdown('1. **记忆化递归（动态规划）**：使'))
+    })
+    await flushReact()
+
+    expect(host.querySelector('.strong-node .text-node-stream-delta')).toBeNull()
+    expect(host.textContent).toContain('记忆化递归（动态规划）：使')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
   it('replays appended-text fade inside heading nodes without fading the whole heading', async () => {
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 

@@ -20,6 +20,7 @@ export interface ResolveStreamingTextUpdateOptions {
   persistedContent?: string
   currentState: StreamingRenderState
   typewriterEnabled: boolean
+  streamRenderVersionChanged?: boolean
 }
 
 export function resolveStreamingTextState({
@@ -63,6 +64,7 @@ export function resolveStreamingTextUpdate({
   persistedContent,
   currentState,
   typewriterEnabled,
+  streamRenderVersionChanged = false,
 }: ResolveStreamingTextUpdateOptions): StreamingTextStateResult {
   const renderedContent = `${currentState.settledContent}${currentState.streamedDelta}`
 
@@ -78,6 +80,13 @@ export function resolveStreamingTextUpdate({
   // animation is still active. Preserve the current delta instead of settling
   // it immediately so the fade remains visible in dev and playgrounds.
   if (currentState.streamedDelta && renderedContent === nextContent) {
+    if (streamRenderVersionChanged) {
+      return {
+        settledContent: renderedContent,
+        streamedDelta: '',
+        appended: false,
+      }
+    }
     return {
       settledContent: currentState.settledContent,
       streamedDelta: currentState.streamedDelta,

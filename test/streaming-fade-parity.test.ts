@@ -96,6 +96,21 @@ describe('streaming fade parity', () => {
     })
 
     expect(resolveStreamingTextUpdate({
+      nextContent: 'HelloWorld',
+      persistedContent: 'HelloWorld',
+      currentState: {
+        settledContent: 'Hello',
+        streamedDelta: 'World',
+      },
+      typewriterEnabled: true,
+      streamRenderVersionChanged: true,
+    })).toEqual({
+      settledContent: 'HelloWorld',
+      streamedDelta: '',
+      appended: false,
+    })
+
+    expect(resolveStreamingTextUpdate({
       nextContent: 'HelloWorldAgain',
       persistedContent: 'HelloWorld',
       currentState: {

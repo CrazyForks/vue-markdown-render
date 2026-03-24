@@ -56,6 +56,7 @@ export interface AngularRenderContext {
   final?: boolean
   typewriter?: boolean
   textStreamState?: Map<string, string>
+  streamRenderVersion?: number
   showTooltips?: boolean
   codeBlockStream?: boolean
   renderCodeBlocksAsPre?: boolean
@@ -105,6 +106,7 @@ export function buildRenderContext(
   props: NodeRendererProps,
   events: NodeRendererEvents = {},
   textStreamState?: Map<string, string>,
+  streamRenderVersion?: number,
 ): AngularRenderContext {
   const customHtmlTags = normalizeCustomHtmlTags([
     ...(props.customHtmlTags || []),
@@ -118,6 +120,7 @@ export function buildRenderContext(
     final: props.final,
     typewriter: props.typewriter,
     textStreamState,
+    streamRenderVersion,
     showTooltips: props.showTooltips,
     codeBlockStream: props.codeBlockStream,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,

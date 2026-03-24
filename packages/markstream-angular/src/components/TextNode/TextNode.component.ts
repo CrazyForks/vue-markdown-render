@@ -40,16 +40,42 @@ export class TextNodeComponent implements OnChanges {
   settledText = ''
   streamedDelta = ''
   private streamFadeVersion = 0
+  private lastStreamRenderVersion?: number
 
   ngOnChanges() {
     const nextText = getString((this.node as any)?.content)
     const streamStateKey = getString(this.indexKey).trim()
     const textStreamState = this.context?.textStreamState
+    const streamRenderVersion = this.context?.streamRenderVersion
+    const streamRenderVersionChanged = streamRenderVersion !== this.lastStreamRenderVersion
     const rendered = `${this.settledText}${this.streamedDelta}`
     const previousPersisted = streamStateKey
       ? textStreamState?.get(streamStateKey)
       : undefined
     const previousText = previousPersisted ?? rendered
+
+    if (!this.typewriterEnabled) {
+      this.settledText = nextText
+      this.streamedDelta = ''
+      if (streamStateKey)
+        textStreamState?.set(streamStateKey, nextText)
+      this.lastStreamRenderVersion = streamRenderVersion
+      return
+    }
+
+    if (nextText === previousText) {
+      if (this.streamedDelta && streamRenderVersionChanged) {
+        this.settleStreamedDelta()
+      }
+      else if (rendered !== nextText) {
+        this.settledText = nextText
+        this.streamedDelta = ''
+      }
+      if (streamStateKey)
+        textStreamState?.set(streamStateKey, nextText)
+      this.lastStreamRenderVersion = streamRenderVersion
+      return
+    }
 
     const nextState = resolveStreamingTextState({
       nextContent: nextText,
@@ -63,6 +89,7 @@ export class TextNodeComponent implements OnChanges {
       this.streamFadeVersion += 1
     if (streamStateKey)
       textStreamState?.set(streamStateKey, nextText)
+    this.lastStreamRenderVersion = streamRenderVersion
   }
 
   get centered() {

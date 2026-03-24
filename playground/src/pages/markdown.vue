@@ -71,8 +71,11 @@ const streamChunkRangeLabel = computed(() => `${normalizedChunkSizeRange.value.m
 const streamDelayRangeLabel = computed(() => `${normalizedChunkDelayRange.value.min}-${normalizedChunkDelayRange.value.max}ms`)
 const {
   content,
+  isPaused,
+  isStreaming,
   start: startStreamSimulation,
   stop: stopStreamSimulation,
+  togglePause: toggleStreamPause,
 } = useStreamSimulator({
   source: streamContent,
   chunkSizeMin: computed(() => normalizedChunkSizeRange.value.min),
@@ -723,6 +726,16 @@ onBeforeUnmount(() => {
             </a>
 
             <!-- Test Page Button -->
+            <button
+              class="ml-2 flex items-center gap-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:bg-gray-200 dark:disabled:bg-gray-700 text-white disabled:text-gray-500 dark:disabled:text-gray-400 text-sm font-medium rounded-lg transition-all duration-200 shadow-md disabled:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:cursor-not-allowed"
+              :disabled="!isStreaming"
+              :title="isPaused ? 'Resume streaming' : 'Pause streaming'"
+              @click="toggleStreamPause"
+            >
+              <Icon :icon="isPaused ? 'carbon:play-filled-alt' : 'carbon:pause-filled'" class="w-4 h-4" />
+              <span>{{ isPaused ? 'Resume' : 'Pause' }}</span>
+            </button>
+
             <button
               class="ml-2 test-page-btn flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               title="Go to Test page"

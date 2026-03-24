@@ -680,6 +680,22 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const desiredThemeKeyRef = useRef<string | null>(null)
   const textStreamStateRef = useRef(new Map<string, string>())
+  const previousStreamInputsRef = useRef<{
+    content?: NodeRendererProps['content']
+    nodes?: NodeRendererProps['nodes']
+  } | null>(null)
+  const streamRenderVersionRef = useRef(0)
+
+  if (
+    previousStreamInputsRef.current?.content !== props.content
+    || previousStreamInputsRef.current?.nodes !== props.nodes
+  ) {
+    streamRenderVersionRef.current += 1
+    previousStreamInputsRef.current = {
+      content: props.content,
+      nodes: props.nodes,
+    }
+  }
 
   const customComponentsRevision = useSyncExternalStore(
     subscribeCustomComponents,
@@ -864,6 +880,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     indexKey: indexPrefix,
     typewriter: props.typewriter,
     textStreamState: textStreamStateRef.current,
+    streamRenderVersion: streamRenderVersionRef.current,
     customComponents,
     showTooltips: props.showTooltips,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
@@ -898,6 +915,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.codeBlockMonacoOptions,
     props.codeBlockMinWidth,
     props.codeBlockMaxWidth,
+    streamRenderVersionRef.current,
     props.onCopy,
     props.onHandleArtifactClick,
     customComponents,

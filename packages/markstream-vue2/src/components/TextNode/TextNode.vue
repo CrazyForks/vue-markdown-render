@@ -17,6 +17,7 @@ const instance = getCurrentInstance()
 const attrs = computed<Record<string, unknown>>(() => ((instance?.proxy as any)?.$attrs ?? {}) as Record<string, unknown>)
 const inheritedTypewriter = inject<{ value?: boolean } | undefined>('markstreamTypewriter', undefined)
 const inheritedTextStreamState = inject<Map<string, string> | undefined>('markstreamTextStreamState', undefined)
+const inheritedStreamVersion = inject<{ value?: number } | undefined>('markstreamStreamVersion', undefined)
 const explicitTypewriter = computed<boolean | undefined>(() => {
   const raw = attrs.value.typewriter
   if (raw === '' || raw === true || raw === 'true')
@@ -59,7 +60,7 @@ function settleStreamedDelta() {
 }
 
 watch(
-  [() => props.node.content, streamStateKey, typewriterEnabled],
+  [() => props.node.content, streamStateKey, typewriterEnabled, () => inheritedStreamVersion?.value],
   ([next]) => {
     const normalized = String(next ?? '')
     const rendered = getRenderedContent()
@@ -68,6 +69,23 @@ watch(
       ? inheritedTextStreamState?.get(key)
       : undefined
     const previousContent = previousPersisted ?? rendered
+
+    if (!typewriterEnabled.value) {
+      setFullContent(normalized)
+      if (key)
+        inheritedTextStreamState?.set(key, normalized)
+      return
+    }
+
+    if (normalized === previousContent) {
+      if (streamedDelta.value)
+        settleStreamedDelta()
+      else if (rendered !== normalized)
+        setFullContent(normalized)
+      if (key)
+        inheritedTextStreamState?.set(key, normalized)
+      return
+    }
 
     const nextState = resolveStreamingTextState({
       nextContent: normalized,

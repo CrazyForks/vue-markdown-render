@@ -15,6 +15,7 @@ const katexReady = useKatexReady()
 const attrs = useAttrs()
 const inheritedTypewriter = inject<{ value?: boolean } | undefined>('markstreamTypewriter', undefined)
 const inheritedTextStreamState = inject<Map<string, string> | undefined>('markstreamTextStreamState', undefined)
+const inheritedStreamVersion = inject<{ value?: number } | undefined>('markstreamStreamVersion', undefined)
 const explicitTypewriter = computed<boolean | undefined>(() => {
   const raw = attrs.typewriter
   if (raw === '' || raw === true || raw === 'true')
@@ -57,7 +58,7 @@ function settleStreamedDelta() {
 }
 
 watch(
-  [() => props.node.content, streamStateKey, typewriterEnabled],
+  [() => props.node.content, streamStateKey, typewriterEnabled, () => inheritedStreamVersion?.value],
   ([next]) => {
     const normalized = String(next ?? '')
     const rendered = getRenderedContent()
@@ -75,7 +76,10 @@ watch(
     }
 
     if (normalized === previousContent) {
-      setFullContent(normalized)
+      if (streamedDelta.value)
+        settleStreamedDelta()
+      else if (rendered !== normalized)
+        setFullContent(normalized)
       if (key)
         inheritedTextStreamState?.set(key, normalized)
       return

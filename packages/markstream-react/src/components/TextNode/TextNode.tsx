@@ -13,6 +13,7 @@ export function TextNode(props: NodeComponentProps<{ type: 'text', content: stri
   const [settledContent, setSettledContent] = useState(content)
   const [streamedDelta, setStreamedDelta] = useState('')
   const [streamFadeVersion, setStreamFadeVersion] = useState(0)
+  const lastStreamRenderVersionRef = useRef(ctx?.streamRenderVersion)
   const renderedContentRef = useRef({
     settledContent: content,
     streamedDelta: '',
@@ -33,8 +34,12 @@ export function TextNode(props: NodeComponentProps<{ type: 'text', content: stri
   }
 
   useEffect(() => {
+    const streamRenderVersion = ctx?.streamRenderVersion
+    const streamRenderVersionChanged = streamRenderVersion !== lastStreamRenderVersionRef.current
+
     if (children != null) {
       setRenderedContent('', '')
+      lastStreamRenderVersionRef.current = streamRenderVersion
       return
     }
 
@@ -48,6 +53,7 @@ export function TextNode(props: NodeComponentProps<{ type: 'text', content: stri
       persistedContent,
       currentState,
       typewriterEnabled,
+      streamRenderVersionChanged,
     })
 
     setRenderedContent(nextState.settledContent, nextState.streamedDelta)
@@ -55,7 +61,8 @@ export function TextNode(props: NodeComponentProps<{ type: 'text', content: stri
       setStreamFadeVersion(version => version + 1)
     if (streamStateKey)
       textStreamState?.set(streamStateKey, content)
-  }, [children, content, ctx?.textStreamState, streamStateKey, typewriterEnabled])
+    lastStreamRenderVersionRef.current = streamRenderVersion
+  }, [children, content, ctx?.textStreamState, ctx?.streamRenderVersion, streamStateKey, typewriterEnabled])
 
   const handleStreamedDeltaAnimationEnd = () => {
     if (!renderedContentRef.current.streamedDelta)

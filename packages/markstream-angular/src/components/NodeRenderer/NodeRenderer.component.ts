@@ -1,4 +1,4 @@
-import type { AfterViewInit, OnChanges, OnDestroy, OnInit } from '@angular/core'
+import type { AfterViewInit, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core'
 import type { RenderedHtmlEnhancementHandle } from '../../enhanceRenderedHtml'
 import type {
   AngularRenderableNode,
@@ -170,6 +170,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   private readonly nodeVisibility = new Set<number>()
   private readonly nodeSeen = new Set<number>()
   private readonly textStreamState = new Map<string, string>()
+  private streamRenderVersion = 0
   private readonly slotElements = new Map<number, HTMLElement>()
   private readonly observedElements = new Map<number, HTMLElement>()
   private observer: IntersectionObserver | null = null
@@ -241,7 +242,9 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     return this.deferNodesActive || this.virtualizationEnabled
   }
 
-  ngOnChanges() {
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes.content || changes.nodes)
+      this.streamRenderVersion += 1
     this.rebuild()
   }
 
@@ -314,6 +317,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
       },
       events,
       this.textStreamState,
+      this.streamRenderVersion,
     )
     this.parsedNodes = resolveParsedNodes(this)
     this.trimMeasuredState()

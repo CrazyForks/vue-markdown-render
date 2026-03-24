@@ -152,6 +152,7 @@ const instance = getCurrentInstance()
 const debugPerformanceEnabled = computed(() => props.debugPerformance && isClient && typeof console !== 'undefined')
 const attrs = computed<Record<string, unknown>>(() => ((instance?.proxy as any)?.$attrs ?? {}) as Record<string, unknown>)
 const textStreamState = new Map<string, string>()
+const streamRenderVersion = ref(0)
 const resolvedShowTooltips = computed<boolean | undefined>(() => {
   if (typeof props.showTooltips === 'boolean')
     return props.showTooltips
@@ -166,6 +167,15 @@ const resolvedShowTooltips = computed<boolean | undefined>(() => {
 provide('markstreamShowTooltips', resolvedShowTooltips)
 provide('markstreamTypewriter', computed(() => props.typewriter !== false))
 provide('markstreamTextStreamState', textStreamState)
+provide('markstreamStreamVersion', streamRenderVersion)
+
+watch(
+  [() => props.content, () => props.nodes],
+  () => {
+    streamRenderVersion.value += 1
+  },
+  { immediate: true },
+)
 
 function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)
