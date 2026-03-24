@@ -1698,8 +1698,10 @@ function stripCustomHtmlWrapper(html: unknown, tag: string) {
   const raw = String(html ?? '')
   if (!tag)
     return raw
-  const openRe = new RegExp(String.raw`^\s*<\s*${tag}(?:\s[^>]*)?>\s*`, 'i')
-  const closeRe = new RegExp(String.raw`\s*<\s*\/\s*${tag}\s*>\s*$`, 'i')
+  // Escape special regex characters to prevent unexpected behavior.
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const openRe = new RegExp(String.raw`^\s*<\s*${escaped}(?:\s[^>]*)?>\s*`, 'i')
+  const closeRe = new RegExp(String.raw`\s*<\s*\/\s*${escaped}\s*>\s*$`, 'i')
   return raw.replace(openRe, '').replace(closeRe, '')
 }
 
