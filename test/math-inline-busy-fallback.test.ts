@@ -5,6 +5,7 @@ import MathInlineNode from '../src/components/MathInlineNode/MathInlineNode.vue'
 import { flushAll } from './setup/flush-all'
 
 vi.mock('../src/components/MathInlineNode/katex', () => ({
+  getKatexSync: () => null,
   getKatex: async () => ({
     renderToString: (content: string) => `<span class="katex inline">${content}</span>`,
   }),

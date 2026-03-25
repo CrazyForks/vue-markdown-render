@@ -18,6 +18,10 @@ async function renderWithMaxHeight(maxHeight: string) {
     attachTo: document.body,
   })
 
+  ;(wrapper.vm as any).mermaidAvailable = true
+  ;(wrapper.vm as any).showSource = false
+  await nextTick()
+
   const content = wrapper.get('div._mermaid').element as HTMLElement
   content.innerHTML = '<svg viewBox="0 0 100 200"></svg>'
 

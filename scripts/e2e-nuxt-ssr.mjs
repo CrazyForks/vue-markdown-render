@@ -213,7 +213,7 @@ function collectUnexpectedIssues(entries) {
   })
 }
 
-async function waitForEnhancedWidgets(page, mode) {
+async function waitForEnhancedWidgets(page) {
   await page.locator('[data-ssr-case="enhanced"]').scrollIntoViewIfNeeded()
   await page.waitForSelector('[data-ssr-case="hydration"][data-ssr-hydrated="true"]', { timeout: 90000 })
   await page.waitForSelector('[data-ssr-case="enhanced"] [data-markstream-code-block="1"][data-markstream-enhanced="true"]', { timeout: 90000 })

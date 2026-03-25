@@ -19,6 +19,8 @@ describe('playground mermaid-export demo', () => {
 
     // Ensure the export button will be shown by setting mermaidAvailable
     ;(m.vm as any).mermaidAvailable = true
+    ;(m.vm as any).showSource = false
+    await nextTick()
 
     // Inject a fake SVG into the mermaid content area so export handler has something
     const content = m.find('div._mermaid')

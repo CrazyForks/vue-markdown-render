@@ -7,6 +7,7 @@ import { flushAll } from './setup/flush-all'
 
 // Mock getKatex to return a lightweight renderer
 vi.mock('../src/components/MathInlineNode/katex', () => ({
+  getKatexSync: () => null,
   getKatex: async () => ({
     renderToString: (content: string, opts: any) => `<span class="katex ${opts?.displayMode ? 'block' : 'inline'}">${content}</span>`,
   }),
