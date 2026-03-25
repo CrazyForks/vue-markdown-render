@@ -84,6 +84,67 @@ export function NextCustomRenderer({ customId, nodes }: { customId: string, node
   )
 }
 
+function TooltipExportDemo() {
+  const [visible, setVisible] = useState(false)
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        className="rounded-full border border-stone-300 bg-white px-4 py-2 text-xs font-semibold tracking-[0.04em] text-stone-900 shadow-sm transition hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-stone-300"
+        onBlur={() => setVisible(false)}
+        onFocus={(event) => {
+          setAnchorEl(event.currentTarget)
+          setVisible(true)
+        }}
+        onMouseEnter={(event) => {
+          setAnchorEl(event.currentTarget)
+          setVisible(true)
+        }}
+        onMouseLeave={() => setVisible(false)}
+      >
+        Hover for tooltip
+      </button>
+      <span className="text-xs font-medium text-stone-500">
+        hover / focus overlay export
+      </span>
+      <nextEntry.Tooltip
+        visible={visible}
+        anchorEl={anchorEl}
+        content="Tooltip body"
+      />
+    </div>
+  )
+}
+
+function HtmlPreviewFrameExportDemo() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        className="rounded-full border border-stone-300 bg-white px-4 py-2 text-xs font-semibold tracking-[0.04em] text-stone-900 shadow-sm transition hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-stone-300"
+        onClick={() => setOpen(true)}
+      >
+        Open preview
+      </button>
+      <span className="text-xs font-medium text-stone-500">
+        interactive modal export
+      </span>
+      {open
+        ? (
+            <nextEntry.HtmlPreviewFrame
+              code="<p>Preview</p>"
+              onClose={() => setOpen(false)}
+            />
+          )
+        : null}
+    </div>
+  )
+}
+
 export function NextExportMatrix() {
   const items = createMatrixCases(nextEntry, nextEntry)
 
@@ -94,7 +155,13 @@ export function NextExportMatrix() {
         {items.map(item => (
           <section key={item.name} data-ssr-export={item.name} className="ssr-card">
             <h3>{item.name}</h3>
-            {item.element}
+            <div className="markstream-react ssr-matrix-renderer">
+              {item.name === 'Tooltip'
+                ? <TooltipExportDemo />
+                : item.name === 'HtmlPreviewFrame'
+                  ? <HtmlPreviewFrameExportDemo />
+                  : item.element}
+            </div>
           </section>
         ))}
       </div>

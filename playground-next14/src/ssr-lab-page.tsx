@@ -104,7 +104,7 @@ function MatrixSection({ caseName, entryName, items }: { caseName: string, entry
         {items.map(item => (
           <section key={item.name} data-ssr-export={item.name} className="ssr-card">
             <h3>{item.name}</h3>
-            {item.element}
+            <div className="markstream-react ssr-matrix-renderer">{item.element}</div>
           </section>
         ))}
       </div>
@@ -145,7 +145,7 @@ export function SsrLabPage({
   const serverMatrix = createMatrixCases(serverEntry, serverEntry)
 
   return (
-    <main data-ssr-version={version} data-ssr-router={router} className="ssr-lab-shell">
+    <main data-ssr-version={version} data-ssr-router={router} className="ssr-lab-shell markstream-react">
       <header className="ssr-hero">
         <p className="ssr-eyebrow">
           {version}

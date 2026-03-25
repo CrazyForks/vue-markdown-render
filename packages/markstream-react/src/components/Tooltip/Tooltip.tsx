@@ -82,7 +82,7 @@ export function Tooltip(props: TooltipProps) {
       cancelled = true
       cleanup?.()
     }
-  }, [props.anchorEl, props.offset, props.placement, props.visible])
+  }, [props.anchorEl, props.offset, props.placement, props.visible, ready])
 
   if (typeof document === 'undefined')
     return null

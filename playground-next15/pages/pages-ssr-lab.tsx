@@ -115,7 +115,7 @@ function renderServerMatrixHtml() {
       {items.map(item => (
         <section key={item.name} data-ssr-export={item.name} className="ssr-card">
           <h3>{item.name}</h3>
-          {item.element}
+          <div className="markstream-react ssr-matrix-renderer">{item.element}</div>
         </section>
       ))}
     </div>

@@ -1,4 +1,9 @@
+@import 'katex/dist/katex.min.css';
 @import 'markstream-react/index.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 html {
   background: #f4f1e8;
@@ -65,6 +70,10 @@ a {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
+}
+
+.ssr-matrix-renderer {
+  position: relative;
 }
 
 .ssr-divider {
