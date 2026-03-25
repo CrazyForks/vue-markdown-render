@@ -2,7 +2,7 @@
 
 markstream-react 提供与 markstream-vue 相同强大的组件，但专为 React 构建。所有组件都支持 React 18+ 并包含完整的 TypeScript 支持。
 
-根入口 `markstream-react` 现在会产出完整的共享声明文件。像 `NodeRendererProps`、`NodeComponentProps`、`RenderContext`、`RenderNodeFn`、`CustomComponentMap`、`CodeBlockMonacoOptions` 这类公共类型，都可以直接从包根入口导入。
+根入口、`markstream-react/next`、`markstream-react/server` 现在都会产出独立声明文件。像 `NodeRendererProps`、`NodeComponentProps`、`RenderContext`、`RenderNodeFn`、`CustomComponentMap`、`CodeBlockMonacoOptions`、`MarkdownCodeBlockNodeProps`、`ListItemNodeProps`、`HtmlPreviewFrameProps`、`TooltipProps`、`TooltipPlacement`、`LinkNodeStyleProps` 这类共享渲染器与组件类型，都可以直接从你实际使用的入口导入。
 ## 主组件：MarkdownRender
 
 在 React 中渲染 markdown 内容的主要组件。
@@ -649,46 +649,27 @@ function App() {
 
 ## Next.js 最佳实践
 
-### 仅客户端渲染
+优先使用专门的 Next SSR 双入口，而不是 `mounted` guard 或 `ssr: false`。
 
 ```tsx
-'use client'
-
-import MarkdownRender from 'markstream-react'
-import { useEffect, useState } from 'react'
+import MarkdownRender from 'markstream-react/next'
 
 export default function MarkdownPage() {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div>加载中...</div>
-  }
-
-  return <MarkdownRender content="# Hello Next.js!" />
+  return <MarkdownRender content="# Hello Next.js!" final />
 }
 ```
 
-### 动态导入模式
+如果你需要纯服务端渲染路径：
 
 ```tsx
-import dynamic from 'next/dynamic'
-
-const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
-  {
-    ssr: false,
-    loading: () => <div>加载 markdown 中...</div>
-  }
-)
+import MarkdownRender from 'markstream-react/server'
 
 export default function MarkdownPage() {
-  return <MarkdownRender content="# Hello!" />
+  return <MarkdownRender content="# Hello!" final />
 }
 ```
+
+完整入口模型见 [React Next SSR](/zh/guide/react-next-ssr)。
 
 ## Hooks 集成
 

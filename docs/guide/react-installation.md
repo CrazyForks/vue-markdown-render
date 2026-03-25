@@ -190,44 +190,28 @@ function App() {
 
 ## Next.js Integration
 
-For Next.js projects, you need to ensure components only render on the client side when using browser-only features:
+For Next.js, prefer the dedicated SSR entrypoints:
 
 ```tsx
-'use client'
-
-import MarkdownRender from 'markstream-react'
-import { useEffect, useState } from 'react'
+import MarkdownRender from 'markstream-react/next'
 import 'markstream-react/index.css'
 
 export default function MarkdownPage() {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div>Loading...</div>
-  }
-
-  return <MarkdownRender content="# Hello Next.js!" />
+  return <MarkdownRender content="# Hello Next.js!" final />
 }
 ```
 
-Or use the `'use client'` directive with dynamic imports:
+If you need a pure server render path with stable fallbacks and no client component boundary:
 
 ```tsx
-import dynamic from 'next/dynamic'
-
-const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
-  { ssr: false }
-)
+import MarkdownRender from 'markstream-react/server'
 
 export default function MarkdownPage() {
-  return <MarkdownRender content="# Hello Next.js!" />
+  return <MarkdownRender content="# Hello Next.js!" final />
 }
 ```
+
+See [React Next SSR](/guide/react-next-ssr) for App Router, Pages Router, custom component, and verification details.
 
 ## Vite Integration
 

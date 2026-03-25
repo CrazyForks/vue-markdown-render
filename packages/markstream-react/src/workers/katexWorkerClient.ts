@@ -1,7 +1,7 @@
 interface Pending {
   resolve: (val: string) => void
   reject: (err: any) => void
-  timeoutId: number
+  timeoutId: ReturnType<typeof setTimeout>
 }
 
 let worker: Worker | null = null

@@ -77,6 +77,7 @@ export function HtmlPreviewFrame(props: HtmlPreviewFrameProps) {
         <iframe
           className="html-preview-frame__iframe"
           sandbox="allow-scripts allow-same-origin"
+          src="about:blank"
           srcDoc={srcdoc}
           title={props.title || 'Preview'}
         />
