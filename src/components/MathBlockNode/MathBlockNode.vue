@@ -19,9 +19,9 @@ function resolveInitialState() {
     }
   }
 
-  // On the client, always start from the raw fallback and enhance after mount to
-  // avoid hydration mismatches when the server rendered a different initial state
-  // (e.g. when a sync loader is only registered in a client-only plugin / CDN setup).
+  // Only perform a sync render during SSR so the server and client initial
+  // markup always match.  On the client the post-mount renderMath() call will
+  // enhance the component, avoiding SSR/client hydration divergence.
   if (!isServer) {
     return {
       html: '',
