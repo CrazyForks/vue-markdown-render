@@ -21,6 +21,17 @@ function resolveInitialState() {
     }
   }
 
+  // On the client, always start from the raw fallback and enhance after mount to
+  // avoid hydration mismatches when the server rendered a different initial state
+  // (e.g. when a sync loader is only registered in a client-only plugin / CDN setup).
+  if (!isServer) {
+    return {
+      html: '',
+      text: props.node.raw,
+      loading: false,
+    }
+  }
+
   const katex = getKatexSync()
   if (!katex) {
     return {
