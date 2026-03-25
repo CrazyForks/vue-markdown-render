@@ -178,6 +178,30 @@ function themeLooksDark(theme: any, fallback: boolean) {
     && !lightTokens.some(token => normalized.includes(token))
 }
 
+function getColorLuminance(color: string) {
+  const channels = String(color ?? '').match(/\d+(?:\.\d+)?/g)
+  if (!channels || channels.length < 3)
+    return null
+  const [r, g, b] = channels.slice(0, 3).map(Number)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+function shouldPreferPlainTextFallbackSurface(bg: string, fg: string, isPlainTextLanguage: boolean, expectDark: boolean) {
+  if (!isPlainTextLanguage)
+    return false
+
+  const bgLuminance = getColorLuminance(bg)
+  const fgLuminance = getColorLuminance(fg)
+
+  if (expectDark) {
+    return (bgLuminance != null && bgLuminance > 170)
+      || (fgLuminance != null && fgLuminance < 110)
+  }
+
+  return (bgLuminance != null && bgLuminance < 85)
+    || (fgLuminance != null && fgLuminance > 190)
+}
+
 export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactEvents) {
   const props = { ...DEFAULTS, ...rawProps } as ResolvedProps & CodeBlockNodeReactEvents
   const {
@@ -349,6 +373,13 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       const bg = String(styles?.getPropertyValue('--vscode-editor-background') ?? '').trim()
         || String((styles as any)?.backgroundColor ?? '').trim()
       const sel = String(styles?.getPropertyValue('--vscode-editor-selectionBackground') ?? '').trim()
+      const isPlainTextLanguage = resolveMonacoLanguageId(String(node.language || codeLanguage || detectedLanguage || 'plaintext')) === 'plaintext'
+      if (shouldPreferPlainTextFallbackSurface(bg, fg, isPlainTextLanguage, rootEl.classList.contains('is-dark'))) {
+        rootEl.style.removeProperty('--vscode-editor-foreground')
+        rootEl.style.removeProperty('--vscode-editor-background')
+        rootEl.style.removeProperty('--vscode-editor-selectionBackground')
+        return
+      }
       if (fg)
         rootEl.style.setProperty('--vscode-editor-foreground', fg)
       if (bg)
@@ -357,7 +388,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
         rootEl.style.setProperty('--vscode-editor-selectionBackground', sel)
     }
     catch {}
-  }, [node.diff])
+  }, [codeLanguage, detectedLanguage, node.diff, node.language])
 
   const preferredTheme = useMemo(() => (isDark ? darkTheme : lightTheme), [darkTheme, isDark, lightTheme])
 
@@ -555,6 +586,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
   }, [codeLanguage, detectedLanguage, node.language])
   const canonicalLanguage = useMemo(() => normalizeLanguageIdentifier(rawLanguage), [rawLanguage])
   const monacoLanguage = useMemo(() => resolveMonacoLanguageId(canonicalLanguage), [canonicalLanguage])
+  const isPlainTextLanguage = useMemo(() => monacoLanguage === 'plaintext', [monacoLanguage])
   const languageIcon = useMemo(
     () => getLanguageIcon(canonicalLanguage),
     [canonicalLanguage, languageIconsRevision],
@@ -1003,6 +1035,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
         loading ? 'is-rendering' : '',
         resolvedSurfaceIsDark ? 'is-dark' : '',
         node.diff ? 'is-diff' : '',
+        isPlainTextLanguage ? 'is-plain-text' : '',
       ].join(' ')}
       style={containerStyle}
     >

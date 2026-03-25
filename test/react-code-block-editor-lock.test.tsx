@@ -220,3 +220,62 @@ describe('markstream-react codeBlockNode theme updates', () => {
     })
   })
 })
+
+describe('markstream-react codeBlockNode plain text theme fallback', () => {
+  beforeEach(() => {
+    resetStreamMonacoHelpers()
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+  })
+
+  it('keeps dark plain text blocks on the fallback dark surface when Monaco reports light colors', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    helpers.createEditor.mockImplementation(async (el: HTMLElement) => {
+      const editor = document.createElement('div')
+      editor.className = 'monaco-editor'
+      editor.style.backgroundColor = 'rgb(255, 255, 255)'
+      editor.style.color = 'rgb(17, 24, 39)'
+
+      const background = document.createElement('div')
+      background.className = 'monaco-editor-background'
+      background.style.backgroundColor = 'rgb(255, 255, 255)'
+
+      const lines = document.createElement('div')
+      lines.className = 'view-lines'
+      lines.style.color = 'rgb(17, 24, 39)'
+
+      editor.append(background, lines)
+      el.appendChild(editor)
+    })
+
+    await act(async () => {
+      root.render(React.createElement(CodeBlockNode as any, {
+        node: {
+          type: 'code_block',
+          language: 'plaintext',
+          code: 'packages/',
+          raw: '```text\npackages/\n```',
+        },
+        loading: false,
+        isDark: true,
+        darkTheme: 'vitesse-dark',
+        lightTheme: 'vitesse-light',
+      }))
+    })
+    await waitForCallCount(helpers.createEditor, 1)
+    await flushReact()
+
+    const container = host.querySelector('.code-block-container') as HTMLElement | null
+    expect(container?.classList.contains('is-dark')).toBe(true)
+    expect(container?.classList.contains('is-plain-text')).toBe(true)
+    expect(container?.style.getPropertyValue('--vscode-editor-background')).toBe('')
+    expect(container?.style.getPropertyValue('--vscode-editor-foreground')).toBe('')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+})

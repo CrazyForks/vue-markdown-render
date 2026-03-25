@@ -117,6 +117,7 @@ const copyText = ref(false)
 
 const codeLanguage = ref(normalizeLanguageIdentifier(props.node.language))
 const monacoLanguage = computed(() => resolveMonacoLanguageId(codeLanguage.value))
+const isPlainTextLanguage = computed(() => monacoLanguage.value === 'plaintext')
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
 const editorCreated = ref(false)
@@ -477,6 +478,30 @@ function computeContentHeight(): number | null {
   }
 }
 
+function getColorLuminance(color: string) {
+  const channels = String(color ?? '').match(/\d+(?:\.\d+)?/g)
+  if (!channels || channels.length < 3)
+    return null
+  const [r, g, b] = channels.slice(0, 3).map(Number)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+function shouldPreferPlainTextFallbackSurface(bg: string, fg: string, expectDark: boolean) {
+  if (!isPlainTextLanguage.value)
+    return false
+
+  const bgLuminance = getColorLuminance(bg)
+  const fgLuminance = getColorLuminance(fg)
+
+  if (expectDark) {
+    return (bgLuminance != null && bgLuminance > 170)
+      || (fgLuminance != null && fgLuminance < 110)
+  }
+
+  return (bgLuminance != null && bgLuminance < 85)
+    || (fgLuminance != null && fgLuminance > 190)
+}
+
 // Copy computed CSS variables from the editor DOM up to the component root so
 // the header (which lives alongside the editor but outside its inner DOM)
 // can use variables like --vscode-editor-foreground / --vscode-editor-background.
@@ -522,6 +547,13 @@ function syncEditorCssVars() {
 
   const fg = fgVar || String(fgStyles?.color ?? rootStyles?.color ?? '').trim()
   const bg = bgVar || String(bgStyles?.backgroundColor ?? rootStyles?.backgroundColor ?? '').trim()
+
+  if (shouldPreferPlainTextFallbackSurface(bg, fg, rootEl.classList.contains('is-dark'))) {
+    rootEl.style.removeProperty('--vscode-editor-foreground')
+    rootEl.style.removeProperty('--vscode-editor-background')
+    rootEl.style.removeProperty('--vscode-editor-selectionBackground')
+    return
+  }
 
   if (fg)
     rootEl.style.setProperty('--vscode-editor-foreground', fg)
@@ -1484,7 +1516,7 @@ onUnmounted(() => {
     class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     :class="[
       resolvedSurfaceIsDark ? 'border-gray-700/30 bg-gray-900' : 'border-gray-200 bg-white',
-      { 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff },
+      { 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
     ]"
   >
     <!-- Configurable header area: consumers may override via named slots -->
@@ -1783,6 +1815,22 @@ onUnmounted(() => {
 
 .code-editor-layer > .code-editor-container {
   grid-area: 1 / 1;
+}
+
+.code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor),
+.code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor .monaco-editor-background),
+.code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor .margin),
+.code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor .lines-content) {
+  background: var(--vscode-editor-background, var(--markstream-code-fallback-bg)) !important;
+}
+
+.code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor),
+.code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor .margin),
+.code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor .view-lines),
+.code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor .view-line),
+.code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor .view-line span),
+.code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor .line-numbers) {
+  color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg)) !important;
 }
 
 .code-block-container.is-diff .code-block-header {

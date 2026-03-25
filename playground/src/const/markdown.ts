@@ -177,6 +177,11 @@ e^x = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots + \frac{x^n}{n!} + \cdots
 :::
 
 مرحبا بكم في عالم اللغة العربية!
+
+\`\`\`plaintext
+packages/
+\`\`\`
+
 1. First, let's set up the project:
 
 \`\`\`shellscript

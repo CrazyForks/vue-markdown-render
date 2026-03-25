@@ -927,6 +927,8 @@ body > div[id^="dmermaid-"] {
 }
 
 .markstream-angular .code-block-container {
+  --markstream-code-fallback-bg: #ffffff;
+  --markstream-code-fallback-fg: #111827;
   margin: 1rem 0;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.24);
@@ -937,9 +939,27 @@ body > div[id^="dmermaid-"] {
 
 .markstream-angular .code-block-container.is-dark,
 .dark .markstream-angular .code-block-container {
+  --markstream-code-fallback-bg: #111827;
+  --markstream-code-fallback-fg: #e5e7eb;
   border-color: rgba(71, 85, 105, 0.55);
   background: #0f172a;
   box-shadow: 0 22px 44px -30px rgba(2, 6, 23, 0.95);
+}
+
+.markstream-angular .code-block-container.is-plain-text .monaco-editor,
+.markstream-angular .code-block-container.is-plain-text .monaco-editor .monaco-editor-background,
+.markstream-angular .code-block-container.is-plain-text .monaco-editor .margin,
+.markstream-angular .code-block-container.is-plain-text .monaco-editor .lines-content {
+  background: var(--vscode-editor-background, var(--markstream-code-fallback-bg)) !important;
+}
+
+.markstream-angular .code-block-container.is-plain-text .monaco-editor,
+.markstream-angular .code-block-container.is-plain-text .monaco-editor .margin,
+.markstream-angular .code-block-container.is-plain-text .monaco-editor .view-lines,
+.markstream-angular .code-block-container.is-plain-text .monaco-editor .view-line,
+.markstream-angular .code-block-container.is-plain-text .monaco-editor .view-line span,
+.markstream-angular .code-block-container.is-plain-text .monaco-editor .line-numbers {
+  color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg)) !important;
 }
 
 .markstream-angular .code-block-header {

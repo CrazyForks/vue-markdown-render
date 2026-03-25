@@ -450,3 +450,57 @@ describe('codeBlockNode theme updates', () => {
     wrapper.unmount()
   })
 })
+
+describe('codeBlockNode plain text theme fallback', () => {
+  beforeEach(() => {
+    resetStreamMonacoHelpers()
+  })
+
+  it('keeps dark plain text blocks on the fallback dark surface when Monaco reports light colors', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    helpers.createEditor.mockImplementation(async (el: HTMLElement) => {
+      const editor = document.createElement('div')
+      editor.className = 'monaco-editor'
+      editor.style.backgroundColor = 'rgb(255, 255, 255)'
+      editor.style.color = 'rgb(17, 24, 39)'
+
+      const background = document.createElement('div')
+      background.className = 'monaco-editor-background'
+      background.style.backgroundColor = 'rgb(255, 255, 255)'
+
+      const lines = document.createElement('div')
+      lines.className = 'view-lines'
+      lines.style.color = 'rgb(17, 24, 39)'
+
+      editor.append(background, lines)
+      el.appendChild(editor)
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'plaintext',
+          code: 'packages/',
+          raw: '```text\npackages/\n```',
+        },
+        loading: false,
+        isDark: true,
+        darkTheme: 'vitesse-dark',
+        lightTheme: 'vitesse-light',
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+
+    const container = wrapper.get('.code-block-container').element as HTMLElement
+    expect(container.classList.contains('is-dark')).toBe(true)
+    expect(container.classList.contains('is-plain-text')).toBe(true)
+    expect(container.style.getPropertyValue('--vscode-editor-background')).toBe('')
+    expect(container.style.getPropertyValue('--vscode-editor-foreground')).toBe('')
+
+    wrapper.unmount()
+  })
+})

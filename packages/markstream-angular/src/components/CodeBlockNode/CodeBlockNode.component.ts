@@ -36,6 +36,7 @@ interface MonacoHelpers {
     <div
       class="code-block-container"
       [class.is-dark]="resolvedIsDark"
+      [class.is-plain-text]="isPlainTextLanguage"
       [class.is-rendering]="resolvedLoading"
       [attr.data-markstream-monaco]="editorReady && !useFallback ? '1' : null"
       [attr.data-markstream-monaco-diff]="editorReady && isDiff && !useFallback ? '1' : null"
@@ -339,6 +340,10 @@ export class CodeBlockNodeComponent implements AfterViewInit, OnChanges, OnDestr
 
   get monacoLanguage() {
     return resolveMonacoLanguageId(this.rawLanguage)
+  }
+
+  get isPlainTextLanguage() {
+    return this.monacoLanguage === 'plaintext'
   }
 
   get displayLanguage() {

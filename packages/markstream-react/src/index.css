@@ -1141,6 +1141,22 @@ li .paragraph-node {
   min-height: 120px;
 }
 
+.code-block-container.is-plain-text:not(.is-diff) .monaco-editor,
+.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .monaco-editor-background,
+.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .margin,
+.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .lines-content {
+  background: var(--vscode-editor-background, var(--markstream-code-fallback-bg)) !important;
+}
+
+.code-block-container.is-plain-text:not(.is-diff) .monaco-editor,
+.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .margin,
+.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .view-lines,
+.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .view-line,
+.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .view-line span,
+.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .line-numbers {
+  color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg)) !important;
+}
+
 .code-action-btn {
   cursor: pointer;
   opacity: 0.7;
