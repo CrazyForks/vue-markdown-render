@@ -10,6 +10,17 @@ const md = getMarkdown()
 const nodes: BaseNode[] = []
 ```
 
+自定义组件映射类型也已经对外导出：
+
+```ts twoslash
+import type { CustomComponents } from 'markstream-vue'
+
+const components: CustomComponents = {
+  thinking: {} as any,
+  code_block: {} as any,
+}
+```
+
 ## 强类型自定义组件
 
 你可以强类型化自定义组件以接收节点特定 props，例如：

@@ -2,6 +2,7 @@
 
 markstream-react provides the same powerful components as markstream-vue, but built for React. All components support React 18+ with full TypeScript support.
 
+The root `markstream-react` entrypoint ships declaration files for the shared renderer surface. Public prop types such as `NodeRendererProps`, `NodeComponentProps`, `RenderContext`, `RenderNodeFn`, `CustomComponentMap`, and `CodeBlockMonacoOptions` can be imported directly from the package.
 ## Main Component: MarkdownRender
 
 The primary component for rendering markdown content in React.
@@ -53,16 +54,16 @@ The primary component for rendering markdown content in React.
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `codeBlockDarkTheme` | `any` | Monaco dark theme object forwarded to every `CodeBlockNode` |
-| `codeBlockLightTheme` | `any` | Monaco light theme object forwarded to every `CodeBlockNode` |
-| `codeBlockMonacoOptions` | `Record<string, any>` | Options forwarded to `stream-monaco`, including diff hover-action settings like `diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, and `onDiffHunkAction` |
+| `codeBlockDarkTheme` | `CodeBlockMonacoTheme` | Monaco dark theme object forwarded to every `CodeBlockNode` |
+| `codeBlockLightTheme` | `CodeBlockMonacoTheme` | Monaco light theme object forwarded to every `CodeBlockNode` |
+| `codeBlockMonacoOptions` | `CodeBlockMonacoOptions` | Options forwarded to `stream-monaco`, including diff hover-action settings like `diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, and `onDiffHunkAction` |
 | `codeBlockMinWidth` | `string \| number` | Min width forwarded to `CodeBlockNode` |
 | `codeBlockMaxWidth` | `string \| number` | Max width forwarded to `CodeBlockNode` |
 | `codeBlockProps` | `Record<string, any>` | Extra props forwarded to every code-block renderer (`CodeBlockNode` / `MarkdownCodeBlockNode`) |
 | `mermaidProps` | `Partial<Omit<MermaidBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | Extra props forwarded to Mermaid fences and custom `mermaid` renderers |
 | `d2Props` | `Partial<Omit<D2BlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | Extra props forwarded to D2 fences and custom `d2` renderers |
 | `infographicProps` | `Partial<Omit<InfographicBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | Extra props forwarded to infographic fences and custom `infographic` renderers |
-| `themes` | `string[]` | Theme list forwarded to `stream-monaco` |
+| `themes` | `CodeBlockMonacoTheme[]` | Theme list forwarded to `stream-monaco` |
 
 #### Heavy renderer prop forwarding
 
@@ -492,6 +493,8 @@ setKaTeXWorker(new KatexWorker())
 All custom node components receive these props:
 
 ```tsx
+import type { CustomComponentMap, NodeComponentProps, RenderContext, RenderNodeFn } from 'markstream-react'
+
 interface NodeComponentProps<TNode = unknown> {
   node: TNode // The parsed node data
   ctx?: RenderContext // Renderer context (themes, events, flags)
@@ -503,6 +506,8 @@ interface NodeComponentProps<TNode = unknown> {
   children?: React.ReactNode
 }
 ```
+
+`CustomComponentMap` is the typed mapping shape accepted by `setCustomComponents(...)`.
 
 ### Example Custom Component
 

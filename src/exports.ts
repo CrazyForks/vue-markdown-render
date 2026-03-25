@@ -1,4 +1,5 @@
 import type { App, Component, Plugin } from 'vue'
+import type { CustomComponents as MarkstreamCustomComponents } from './types'
 import type { LanguageIconResolver } from './utils/languageIcon'
 import { setDefaultMathOptions } from 'stream-markdown-parser'
 import { defineAsyncComponent } from 'vue'
@@ -92,6 +93,8 @@ export * from './workers/mermaidCdnWorker'
 export * from './workers/mermaidWorkerClient'
 export { KATEX_COMMANDS, normalizeStandaloneBackslashT, setDefaultMathOptions } from 'stream-markdown-parser'
 export type { MathOptions } from 'stream-markdown-parser'
+
+export interface CustomComponents extends MarkstreamCustomComponents {}
 
 export {
   AdmonitionNode,

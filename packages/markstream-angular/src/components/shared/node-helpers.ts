@@ -1,5 +1,6 @@
 import type { Type } from '@angular/core'
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme } from '../../types/monaco'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { hydrateCustomTagContent } from '../../hydrateCustomTagContent'
 
@@ -20,9 +21,9 @@ export interface NodeRendererProps {
   customHtmlTags?: readonly string[]
   viewportPriority?: boolean
   codeBlockStream?: boolean
-  codeBlockDarkTheme?: any
-  codeBlockLightTheme?: any
-  codeBlockMonacoOptions?: Record<string, any>
+  codeBlockDarkTheme?: CodeBlockMonacoTheme
+  codeBlockLightTheme?: CodeBlockMonacoTheme
+  codeBlockMonacoOptions?: CodeBlockMonacoOptions
   renderCodeBlocksAsPre?: boolean
   codeBlockMinWidth?: string | number
   codeBlockMaxWidth?: string | number
@@ -32,7 +33,7 @@ export interface NodeRendererProps {
   infographicProps?: Record<string, any>
   customComponents?: Record<string, Type<any>>
   showTooltips?: boolean
-  themes?: string[]
+  themes?: CodeBlockMonacoTheme[]
   isDark?: boolean
   customId?: string
   indexKey?: number | string
@@ -70,10 +71,10 @@ export interface AngularRenderContext {
   infographicProps?: Record<string, any>
   customComponents?: Record<string, Type<any>>
   codeBlockThemes?: {
-    themes?: string[]
-    darkTheme?: any
-    lightTheme?: any
-    monacoOptions?: Record<string, any>
+    themes?: CodeBlockMonacoTheme[]
+    darkTheme?: CodeBlockMonacoTheme
+    lightTheme?: CodeBlockMonacoTheme
+    monacoOptions?: CodeBlockMonacoOptions
     minWidth?: string | number
     maxWidth?: string | number
   }

@@ -74,6 +74,7 @@ export { setDefaultI18nMap, useSafeI18n } from './i18n/useSafeI18n'
 export { MarkstreamAngularComponent } from './markstream-angular.component'
 export { MarkstreamAngularComponent as MarkdownRenderComponent } from './markstream-angular.component'
 export { MarkstreamAngularComponent as default } from './markstream-angular.component'
+export type { MarkstreamAngularComponentProps } from './markstream-angular.component'
 export type { D2Loader } from './optional/d2'
 export {
   disableD2,
@@ -117,6 +118,20 @@ export type {
   RenderableMarkdownNode,
 } from './renderMarkdownHtml'
 export { sanitizeHtmlContent } from './sanitizeHtmlContent'
+export type {
+  CodeBlockDiffAppearance,
+  CodeBlockDiffHideUnchangedRegions,
+  CodeBlockDiffHideUnchangedRegionsOptions,
+  CodeBlockDiffHunkActionContext,
+  CodeBlockDiffHunkActionKind,
+  CodeBlockDiffHunkSide,
+  CodeBlockDiffLineStyle,
+  CodeBlockDiffUnchangedRegionStyle,
+  CodeBlockMonacoLanguage,
+  CodeBlockMonacoOptions,
+  CodeBlockMonacoTheme,
+  CodeBlockMonacoThemeObject,
+} from './types/monaco'
 export {
   getLanguageIcon,
   languageMap,

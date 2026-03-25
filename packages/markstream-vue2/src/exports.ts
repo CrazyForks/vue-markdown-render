@@ -1,3 +1,4 @@
+import type { CustomComponents as MarkstreamCustomComponents } from './types'
 import type { LanguageIconResolver } from './utils/languageIcon'
 import { setDefaultMathOptions } from 'stream-markdown-parser'
 import AdmonitionNode from './components/AdmonitionNode'
@@ -56,6 +57,18 @@ export type { KatexLoader } from './components/MathInlineNode/katex'
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
 export type { NodeRendererProps } from './components/NodeRenderer/NodeRenderer.vue'
 export type {
+  CodeBlockDiffAppearance,
+  CodeBlockDiffHideUnchangedRegions,
+  CodeBlockDiffHideUnchangedRegionsOptions,
+  CodeBlockDiffHunkActionContext,
+  CodeBlockDiffHunkActionKind,
+  CodeBlockDiffHunkSide,
+  CodeBlockDiffLineStyle,
+  CodeBlockDiffUnchangedRegionStyle,
+  CodeBlockMonacoLanguage,
+  CodeBlockMonacoOptions,
+  CodeBlockMonacoTheme,
+  CodeBlockMonacoThemeObject,
   CodeBlockNodeProps,
   D2BlockNodeProps,
   ImageNodeProps,
@@ -74,6 +87,8 @@ export * from './workers/mermaidCdnWorker'
 export * from './workers/mermaidWorkerClient'
 export { KATEX_COMMANDS, normalizeStandaloneBackslashT, setDefaultMathOptions } from 'stream-markdown-parser'
 export type { MathOptions } from 'stream-markdown-parser'
+
+export interface CustomComponents extends MarkstreamCustomComponents {}
 
 export {
   AdmonitionNode,

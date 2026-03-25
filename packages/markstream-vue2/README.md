@@ -305,3 +305,11 @@ module.exports = {
 - The Vue 2 package mirrors the Vue 3 renderer feature set where possible (virtualization, streaming code blocks, Monaco, Mermaid, KaTeX, tooltip singleton).
 - Optional peers are still required for those features (`stream-monaco`, `stream-markdown`, `mermaid`, `katex`, etc.).
 - Custom node components are supported via `setCustomComponents` from `markstream-vue2`.
+
+## TypeScript
+
+Parser node types are re-exported from `stream-markdown-parser`, and Vue 2 specific mapping / Monaco types are available from `markstream-vue2` itself:
+
+```ts
+import type { CodeBlockMonacoOptions, CustomComponents, ParsedNode } from 'markstream-vue2'
+```

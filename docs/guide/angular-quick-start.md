@@ -72,6 +72,23 @@ export class StreamingDemoComponent {
 }
 ```
 
+## TypeScript Props
+
+```ts
+import type { CodeBlockMonacoOptions, NodeRendererProps } from 'markstream-angular'
+
+const monacoOptions: CodeBlockMonacoOptions = {
+  fontSize: 13,
+  wordWrap: 'on',
+}
+
+const props: NodeRendererProps = {
+  content: '# Angular',
+  codeBlockMonacoOptions: monacoOptions,
+  final: true,
+}
+```
+
 ## Custom Tags
 
 The Angular package supports the same custom HTML tag flow used in the playground `thinking` demos:
