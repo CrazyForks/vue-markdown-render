@@ -914,7 +914,6 @@ export function parseInlineTokens(
 
   function handleTextToken(token: MarkdownToken) {
     // 合并连续的 text 节点
-    let index = result.length - 1
     const rawContent = String(token.content ?? '')
     const rawSource = tokens.length === 1 && rawContent.includes('\\') && typeof raw === 'string'
       ? String(raw)
@@ -938,23 +937,29 @@ export function parseInlineTokens(
     if (content.endsWith('undefined') && !raw?.endsWith('undefined')) {
       content = content.slice(0, -9)
     }
-    for (index; index >= 0; index--) {
+    let trailingTextStart = result.length
+    let trailingTextContent = ''
+    for (let index = result.length - 1; index >= 0; index--) {
       const item = result[index]
-      if (item.type === 'text') {
-        currentTextNode = null
-        // Avoid duplicating text when the incoming token content already
-        // includes the previous text node (can happen with certain mid-state
-        // token streams).
-        const itemContent = String((item as any).content ?? '')
-        if (!content.startsWith(itemContent))
-          content = itemContent + content
-        continue
-      }
-      break
+      if (item.type !== 'text')
+        break
+      trailingTextStart = index
+      trailingTextContent = String((item as any).content ?? '') + trailingTextContent
     }
-
-    if (index < result.length - 1)
-      result.length = index + 1
+    if (trailingTextStart < result.length) {
+      // Some mid-state token streams resend the full trailing text chunk. Only
+      // replace the existing text tail when the incoming token clearly starts
+      // with that exact tail; otherwise keep the previous text nodes so later
+      // inline parsing (for example an opening backtick) cannot accidentally
+      // drop the already-rendered sibling text.
+      if (content.startsWith(trailingTextContent)) {
+        currentTextNode = null
+        result.length = trailingTextStart
+      }
+      else {
+        currentTextNode = result[result.length - 1] as TextNode
+      }
+    }
 
     const nextToken = tokens[i + 1]
     if (pPreToken?.type === 'list_item_open' && /^\d$/.test(content)) {

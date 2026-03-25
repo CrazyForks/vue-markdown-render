@@ -50,4 +50,50 @@ describe('text node streaming consistency', () => {
       wrapper.unmount()
     }
   })
+
+  it('keeps explanatory list text visible while an inline code span is still streaming', async () => {
+    const initial = `- **计算工具验证**
+   通过数学计算工具确认结果：`
+    const mid = `${initial}
+   \`363 ÷ 15,135 × 100 = 2.39841427...`
+    const final = `${mid}\``
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: initial,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+        viewportPriority: false,
+        maxLiveNodes: 0,
+      },
+    })
+
+    try {
+      await flushAll()
+
+      await wrapper.setProps({
+        content: mid,
+      })
+      await flushAll()
+
+      const listItem = wrapper.get('.list-item')
+      const midText = listItem.text().replace(/\s*\n\s*/g, '')
+      expect(midText).toContain('计算工具验证通过数学计算工具确认结果：363 ÷ 15,135 × 100 = 2.39841427')
+      expect(wrapper.get('.strong-node').text()).toBe('计算工具验证')
+      expect(wrapper.get('code').text()).toContain('363 ÷ 15,135 × 100 = 2.39841427')
+
+      await wrapper.setProps({
+        content: final,
+      })
+      await flushAll()
+
+      const finalText = wrapper.get('.list-item').text().replace(/\s*\n\s*/g, '')
+      expect(finalText).toContain('计算工具验证通过数学计算工具确认结果：363 ÷ 15,135 × 100 = 2.39841427...')
+      expect(wrapper.get('.strong-node').text()).toBe('计算工具验证')
+      expect(wrapper.get('code').text()).toBe('363 ÷ 15,135 × 100 = 2.39841427...')
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
 })

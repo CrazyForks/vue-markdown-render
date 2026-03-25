@@ -339,4 +339,54 @@ describe('markstream-react text streaming fade', () => {
       root.unmount()
     })
   })
+
+  it('keeps explanatory list text visible while an inline code span is still streaming', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const initial = `- **计算工具验证**
+   通过数学计算工具确认结果：`
+    const mid = `${initial}
+   \`363 ÷ 15,135 × 100 = 2.39841427...`
+    const final = `${mid}\``
+    const renderMarkdown = (content: string) =>
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+        viewportPriority: false,
+        maxLiveNodes: 0,
+      }))
+
+    await act(async () => {
+      root.render(renderMarkdown(initial))
+    })
+    await flushReact()
+
+    await act(async () => {
+      root.render(renderMarkdown(mid))
+    })
+    await flushReact()
+
+    const midText = String(host.textContent ?? '').replace(/\s*\n\s*/g, '')
+    expect(midText).toContain('计算工具验证通过数学计算工具确认结果：363 ÷ 15,135 × 100 = 2.39841427')
+    expect(host.querySelector('.strong-node')?.textContent).toBe('计算工具验证')
+    expect(host.querySelector('code.inline-code')?.textContent).toContain('363 ÷ 15,135 × 100 = 2.39841427')
+
+    await act(async () => {
+      root.render(renderMarkdown(final))
+    })
+    await flushReact()
+
+    const finalText = String(host.textContent ?? '').replace(/\s*\n\s*/g, '')
+    expect(finalText).toContain('计算工具验证通过数学计算工具确认结果：363 ÷ 15,135 × 100 = 2.39841427...')
+    expect(host.querySelector('.strong-node')?.textContent).toBe('计算工具验证')
+    expect(host.querySelector('code.inline-code')?.textContent).toBe('363 ÷ 15,135 × 100 = 2.39841427...')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
 })
