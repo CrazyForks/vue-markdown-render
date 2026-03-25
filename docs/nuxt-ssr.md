@@ -51,8 +51,8 @@ This gives you server HTML immediately. Heavy nodes still upgrade after hydratio
 SSR also works when you render from `nodes` instead of `content`, or when you register scoped custom components.
 
 ```ts
-import { defineComponent, h } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
+import { defineComponent, h } from 'vue'
 
 setCustomComponents('docs-ssr', {
   thinking: defineComponent({
@@ -70,7 +70,7 @@ setCustomComponents('docs-ssr', {
 <template>
   <MarkdownRender
     custom-id="docs-ssr"
-    :content="'<thinking>Server custom tag</thinking>'"
+    content="<thinking>Server custom tag</thinking>"
     :custom-html-tags="['thinking']"
     :final="true"
   />

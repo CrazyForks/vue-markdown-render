@@ -1,14 +1,15 @@
 <script setup lang="ts">
+/* eslint-disable vue/one-component-per-file */
 import type { PropType } from 'vue'
 import katex from 'katex'
 import MarkdownRender, { enableKatex, getUseMonaco, setCustomComponents, setKaTeXWorker, setMermaidWorker } from 'markstream-vue'
 import KatexWorker from 'markstream-vue/workers/katexRenderer.worker?worker&inline'
 import MermaidWorker from 'markstream-vue/workers/mermaidParser.worker?worker&inline'
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker&inline'
 import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker&inline'
 import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker&inline'
 import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker&inline'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker&inline'
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker&inline'
 import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue'
 
 interface NodeLike {

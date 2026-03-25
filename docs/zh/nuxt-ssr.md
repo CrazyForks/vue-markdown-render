@@ -63,8 +63,8 @@ enableKatex(() => katex)
 除了直接传 `content`，你也可以在 SSR 中传 `nodes`，或者配合 scoped custom components / trusted custom tags 一起使用。
 
 ```ts
-import { defineComponent, h } from 'vue'
 import { setCustomComponents } from 'markstream-vue'
+import { defineComponent, h } from 'vue'
 
 setCustomComponents('docs-ssr', {
   thinking: defineComponent({
@@ -82,7 +82,7 @@ setCustomComponents('docs-ssr', {
 <template>
   <MarkdownRender
     custom-id="docs-ssr"
-    :content="'<thinking>服务端自定义标签</thinking>'"
+    content="<thinking>服务端自定义标签</thinking>"
     :custom-html-tags="['thinking']"
     :final="true"
   />
