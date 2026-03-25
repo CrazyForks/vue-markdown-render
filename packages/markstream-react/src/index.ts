@@ -1,3 +1,5 @@
+import type { CustomComponentMap as MarkstreamCustomComponentMap } from './customComponents'
+import type { RenderContext as MarkstreamRenderContext, RenderNodeFn as MarkstreamRenderNodeFn } from './types'
 import './index.css'
 import './workers/katexRenderer.worker?worker'
 import './workers/mermaidParser.worker?worker'
@@ -62,8 +64,35 @@ export {
 export * from './i18n/useSafeI18n'
 export * from './renderers/renderNode'
 export type { NodeRendererProps } from './types'
-export * from './types/component-props'
+export type {
+  CodeBlockDiffAppearance,
+  CodeBlockDiffHideUnchangedRegions,
+  CodeBlockDiffHideUnchangedRegionsOptions,
+  CodeBlockDiffHunkActionContext,
+  CodeBlockDiffHunkActionKind,
+  CodeBlockDiffHunkSide,
+  CodeBlockDiffLineStyle,
+  CodeBlockDiffUnchangedRegionStyle,
+  CodeBlockMonacoLanguage,
+  CodeBlockMonacoOptions,
+  CodeBlockMonacoTheme,
+  CodeBlockMonacoThemeObject,
+  CodeBlockNodeProps,
+  D2BlockNodeProps,
+  ImageNodeProps,
+  InfographicBlockNodeProps,
+  LinkNodeProps,
+  MathBlockNodeProps,
+  MathInlineNodeProps,
+  MermaidBlockEvent,
+  MermaidBlockNodeProps,
+  PreCodeNodeProps,
+} from './types/component-props'
 export type { NodeComponentProps } from './types/node-component'
 export * from './utils/languageIcon'
 export * from './workers/katexWorkerClient'
 export * from './workers/mermaidWorkerClient'
+
+export type CustomComponentMap = MarkstreamCustomComponentMap
+export type RenderContext = MarkstreamRenderContext
+export type RenderNodeFn = MarkstreamRenderNodeFn

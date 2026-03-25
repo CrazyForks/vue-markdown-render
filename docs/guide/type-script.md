@@ -12,6 +12,17 @@ const nodes: BaseNode[] = []
 
 See `packages/markdown-parser/src` for type definitions used by the parser.
 
+Types for custom component registration are exported too:
+
+```ts twoslash
+import type { CustomComponents } from 'markstream-vue'
+
+const components: CustomComponents = {
+  thinking: {} as any,
+  code_block: {} as any,
+}
+```
+
 ## Strongly typed custom components
 
 You can strongly type your custom components to accept node-specific props. Example:

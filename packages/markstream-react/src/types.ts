@@ -1,10 +1,16 @@
 import type React from 'react'
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
-import type { D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from './types/component-props'
+import type {
+  CodeBlockMonacoOptions,
+  CodeBlockMonacoTheme,
+  D2BlockNodeProps,
+  InfographicBlockNodeProps,
+  MermaidBlockNodeProps,
+} from './types/component-props'
 
 export interface NodeRendererProps {
   content?: string
-  nodes?: BaseNode[]
+  nodes?: readonly BaseNode[] | null
   /**
    * Whether the input stream is complete (end-of-stream). When true, the parser
    * can stop emitting streaming "loading" nodes for unfinished constructs.
@@ -21,9 +27,9 @@ export interface NodeRendererProps {
   customHtmlTags?: readonly string[]
   viewportPriority?: boolean
   codeBlockStream?: boolean
-  codeBlockDarkTheme?: any
-  codeBlockLightTheme?: any
-  codeBlockMonacoOptions?: Record<string, any>
+  codeBlockDarkTheme?: CodeBlockMonacoTheme
+  codeBlockLightTheme?: CodeBlockMonacoTheme
+  codeBlockMonacoOptions?: CodeBlockMonacoOptions
   renderCodeBlocksAsPre?: boolean
   codeBlockMinWidth?: string | number
   codeBlockMaxWidth?: string | number
@@ -32,7 +38,7 @@ export interface NodeRendererProps {
   d2Props?: Partial<Omit<D2BlockNodeProps, 'node' | 'loading' | 'isDark'>>
   infographicProps?: Partial<Omit<InfographicBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   showTooltips?: boolean
-  themes?: string[]
+  themes?: CodeBlockMonacoTheme[]
   isDark?: boolean
   customId?: string
   indexKey?: number | string
@@ -69,10 +75,10 @@ export interface RenderContext {
   codeBlockStream?: boolean
   renderCodeBlocksAsPre?: boolean
   codeBlockThemes?: {
-    themes?: string[]
-    darkTheme?: any
-    lightTheme?: any
-    monacoOptions?: Record<string, any>
+    themes?: CodeBlockMonacoTheme[]
+    darkTheme?: CodeBlockMonacoTheme
+    lightTheme?: CodeBlockMonacoTheme
+    monacoOptions?: CodeBlockMonacoOptions
     minWidth?: string | number
     maxWidth?: string | number
   }

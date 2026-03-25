@@ -72,6 +72,23 @@ export class StreamingDemoComponent {
 }
 ```
 
+## TypeScript Props
+
+```ts
+import type { CodeBlockMonacoOptions, NodeRendererProps } from 'markstream-angular'
+
+const monacoOptions: CodeBlockMonacoOptions = {
+  fontSize: 13,
+  wordWrap: 'on',
+}
+
+const props: NodeRendererProps = {
+  content: '# Angular',
+  codeBlockMonacoOptions: monacoOptions,
+  final: true,
+}
+```
+
 ## 自定义标签
 
 Angular 版也支持 playground 里 `thinking` 这类 custom HTML tag 流程：

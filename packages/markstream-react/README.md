@@ -131,3 +131,14 @@ function ThinkingNode(props: NodeComponentProps<{ type: 'thinking', content: str
 
 setCustomComponents('chat', { thinking: ThinkingNode })
 ```
+
+## Type exports
+
+`markstream-react` now exposes the core public types directly from the package root, including:
+
+- `NodeRendererProps`
+- `NodeComponentProps`
+- `RenderContext`
+- `RenderNodeFn`
+- `CustomComponentMap`
+- `CodeBlockMonacoOptions`

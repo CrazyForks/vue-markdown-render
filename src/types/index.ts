@@ -1,3 +1,5 @@
+import type { Component } from 'vue'
+
 export interface BaseNode {
   type: string
   raw: string
@@ -305,40 +307,43 @@ export type ParsedNode
     | ReferenceNode
     | UnknownNode
 export interface CustomComponents {
-  text: any
-  paragraph: any
-  heading: any
-  code_block: any
-  list: any
-  list_item: any
-  blockquote: any
-  table: any
-  definition_list: any
-  footnote: any
-  footnote_reference: any
-  admonition: any
-  hardbreak: any
-  link: any
-  image: any
-  thematic_break: any
-  math_inline: any
-  math_block: any
-  strong: any
-  emphasis: any
-  strikethrough: any
-  highlight: any
-  insert: any
-  subscript: any
-  superscript: any
-  emoji: any
-  checkbox: any
-  inline_code: any
-  html_inline: any
-  reference: any
-  mermaid: any
-  infographic: any
-  d2: any
-  [key: string]: any
+  text?: Component
+  paragraph?: Component
+  heading?: Component
+  code_block?: Component
+  list?: Component
+  list_item?: Component
+  blockquote?: Component
+  table?: Component
+  definition_list?: Component
+  footnote?: Component
+  footnote_reference?: Component
+  footnote_anchor?: Component
+  admonition?: Component
+  hardbreak?: Component
+  link?: Component
+  image?: Component
+  thematic_break?: Component
+  math_inline?: Component
+  math_block?: Component
+  strong?: Component
+  emphasis?: Component
+  strikethrough?: Component
+  highlight?: Component
+  insert?: Component
+  subscript?: Component
+  superscript?: Component
+  emoji?: Component
+  checkbox?: Component
+  inline_code?: Component
+  html_inline?: Component
+  html_block?: Component
+  reference?: Component
+  mermaid?: Component
+  infographic?: Component
+  d2?: Component
+  vmr_container?: Component
+  [key: string]: Component | undefined
 }
 
 // Function to parse markdown into a structured representation

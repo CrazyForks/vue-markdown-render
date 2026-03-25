@@ -1,18 +1,96 @@
 import type { CodeBlockNode } from 'stream-markdown-parser'
 
+export interface CodeBlockMonacoThemeObject {
+  name: string
+  base?: string
+  inherit?: boolean
+  colors?: Record<string, string>
+  rules?: Array<Record<string, unknown>>
+  [key: string]: unknown
+}
+
+export type CodeBlockMonacoTheme = string | CodeBlockMonacoThemeObject
+
+export type CodeBlockMonacoLanguage = string | ((...args: any[]) => unknown)
+
+export interface CodeBlockDiffHideUnchangedRegionsOptions {
+  enabled?: boolean
+  contextLineCount?: number
+  minimumLineCount?: number
+  revealLineCount?: number
+}
+
+export type CodeBlockDiffHideUnchangedRegions
+  = | boolean
+    | CodeBlockDiffHideUnchangedRegionsOptions
+
+export type CodeBlockDiffLineStyle = 'background' | 'bar'
+
+export type CodeBlockDiffAppearance = 'auto' | 'light' | 'dark'
+
+export type CodeBlockDiffUnchangedRegionStyle = 'line-info' | 'line-info-basic' | 'metadata' | 'simple'
+
+export type CodeBlockDiffHunkActionKind = 'revert' | 'stage'
+
+export type CodeBlockDiffHunkSide = 'upper' | 'lower'
+
+export interface CodeBlockDiffHunkActionContext {
+  action: CodeBlockDiffHunkActionKind
+  side: CodeBlockDiffHunkSide
+  lineChange: unknown
+  originalModel: unknown
+  modifiedModel: unknown
+}
+
+export interface CodeBlockMonacoOptions {
+  MAX_HEIGHT?: number | string
+  fontSize?: number
+  lineHeight?: number
+  fontFamily?: string
+  tabSize?: number
+  readOnly?: boolean
+  wordWrap?: 'off' | 'on' | 'wordWrapColumn' | 'bounded' | string
+  wrappingIndent?: 'none' | 'same' | 'indent' | 'deepIndent' | string
+  theme?: string
+  themes?: CodeBlockMonacoTheme[]
+  languages?: CodeBlockMonacoLanguage[]
+  renderSideBySide?: boolean
+  enableSplitViewResizing?: boolean
+  ignoreTrimWhitespace?: boolean
+  maxComputationTime?: number
+  diffAlgorithm?: string
+  renderIndicators?: boolean
+  originalEditable?: boolean
+  revealDebounceMs?: number
+  revealStrategy?: 'bottom' | 'centerIfOutside' | 'center'
+  revealBatchOnIdleMs?: number
+  updateThrottleMs?: number
+  diffUpdateThrottleMs?: number
+  diffAutoScroll?: boolean
+  diffHideUnchangedRegions?: CodeBlockDiffHideUnchangedRegions
+  diffLineStyle?: CodeBlockDiffLineStyle
+  diffAppearance?: CodeBlockDiffAppearance
+  diffUnchangedRegionStyle?: CodeBlockDiffUnchangedRegionStyle
+  diffHunkActionsOnHover?: boolean
+  diffHunkHoverHideDelayMs?: number
+  onDiffHunkAction?: (context: CodeBlockDiffHunkActionContext) => void | boolean | Promise<void | boolean>
+  scrollbar?: Record<string, any>
+  [key: string]: any
+}
+
 export interface CodeBlockNodeProps {
   node: CodeBlockNode
   isDark?: boolean
   loading?: boolean
   stream?: boolean
-  darkTheme?: any
-  lightTheme?: any
+  darkTheme?: CodeBlockMonacoTheme
+  lightTheme?: CodeBlockMonacoTheme
   isShowPreview?: boolean
-  monacoOptions?: { [k: string]: any }
+  monacoOptions?: CodeBlockMonacoOptions
   enableFontSizeControl?: boolean
   minWidth?: string | number
   maxWidth?: string | number
-  themes?: any[]
+  themes?: CodeBlockMonacoTheme[]
   showHeader?: boolean
   showCopyButton?: boolean
   showExpandButton?: boolean
@@ -45,6 +123,7 @@ export interface LinkNodeProps {
     href: string
     title: string | null
     text: string
+    attrs?: [string, string][]
     children: { type: string, raw: string }[]
     raw: string
     loading?: boolean
@@ -79,7 +158,6 @@ export interface MermaidBlockNodeProps {
   previewPollDelayMs?: number
   previewPollMaxDelayMs?: number
   previewPollMaxAttempts?: number
-  // header customization
   showHeader?: boolean
   showModeToggle?: boolean
   showCopyButton?: boolean
@@ -88,11 +166,8 @@ export interface MermaidBlockNodeProps {
   showCollapseButton?: boolean
   showZoomControls?: boolean
   enableWheelZoom?: boolean
-  // When false, relax all sanitization/security (not recommended)
   isStrict?: boolean
-  // Custom error handler called when mermaid rendering fails.
-  // Receives the error, the raw mermaid code, and the container element.
-  // Return true to prevent the default error display.
+  showTooltips?: boolean
   onRenderError?: (error: unknown, code: string, container: HTMLElement) => boolean | void
 }
 
@@ -147,8 +222,8 @@ export interface InfographicBlockNodeProps {
   showHeader?: boolean
   showModeToggle?: boolean
   showCopyButton?: boolean
+  showCollapseButton?: boolean
   showExportButton?: boolean
   showFullscreenButton?: boolean
-  showCollapseButton?: boolean
   showZoomControls?: boolean
 }

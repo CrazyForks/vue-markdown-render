@@ -61,6 +61,20 @@ class AppComponent {
 bootstrapApplication(AppComponent)
 ```
 
+## TypeScript
+
+`markstream-angular` exports the same public props/context helpers you use at runtime:
+
+```ts
+import type {
+  AngularRenderContext,
+  CodeBlockMonacoOptions,
+  CustomComponentMap,
+  MarkstreamAngularComponentProps,
+  NodeRendererProps,
+} from 'markstream-angular'
+```
+
 ## Workers
 
 KaTeX and Mermaid can use the same off-thread worker path as the React/Vue packages:

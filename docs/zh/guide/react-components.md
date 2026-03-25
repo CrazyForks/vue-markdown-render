@@ -2,8 +2,7 @@
 
 markstream-react 提供与 markstream-vue 相同强大的组件，但专为 React 构建。所有组件都支持 React 18+ 并包含完整的 TypeScript 支持。
 
-根入口、`markstream-react/next`、`markstream-react/server` 现在都会产出独立声明文件。像 `NodeRendererProps`、`MarkdownCodeBlockNodeProps`、`ListItemNodeProps`、`HtmlPreviewFrameProps`、`TooltipProps`、`TooltipPlacement`、`LinkNodeStyleProps` 这类公共 props 类型，都可以直接从你实际使用的入口导入。
-
+根入口、`markstream-react/next`、`markstream-react/server` 现在都会产出独立声明文件。像 `NodeRendererProps`、`NodeComponentProps`、`RenderContext`、`RenderNodeFn`、`CustomComponentMap`、`CodeBlockMonacoOptions`、`MarkdownCodeBlockNodeProps`、`ListItemNodeProps`、`HtmlPreviewFrameProps`、`TooltipProps`、`TooltipPlacement`、`LinkNodeStyleProps` 这类共享渲染器与组件类型，都可以直接从你实际使用的入口导入。
 ## 主组件：MarkdownRender
 
 在 React 中渲染 markdown 内容的主要组件。
@@ -55,16 +54,16 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 
 | 属性 | 类型 | 描述 |
 |------|------|-------------|
-| `codeBlockDarkTheme` | `any` | 转发到每个 `CodeBlockNode` 的 Monaco 深色主题 |
-| `codeBlockLightTheme` | `any` | 转发到每个 `CodeBlockNode` 的 Monaco 浅色主题 |
-| `codeBlockMonacoOptions` | `Record<string, any>` | 转发到 `stream-monaco` 的选项，包括 `diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction` 这类 diff 悬浮操作配置 |
+| `codeBlockDarkTheme` | `CodeBlockMonacoTheme` | 转发到每个 `CodeBlockNode` 的 Monaco 深色主题 |
+| `codeBlockLightTheme` | `CodeBlockMonacoTheme` | 转发到每个 `CodeBlockNode` 的 Monaco 浅色主题 |
+| `codeBlockMonacoOptions` | `CodeBlockMonacoOptions` | 转发到 `stream-monaco` 的选项，包括 `diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction` 这类 diff 悬浮操作配置 |
 | `codeBlockMinWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最小宽度 |
 | `codeBlockMaxWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最大宽度 |
 | `codeBlockProps` | `Record<string, any>` | 额外转发到每个代码块渲染器（`CodeBlockNode` / `MarkdownCodeBlockNode`）的 props |
 | `mermaidProps` | `Partial<Omit<MermaidBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 Mermaid 围栏和自定义 `mermaid` 渲染器的 props |
 | `d2Props` | `Partial<Omit<D2BlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 D2 围栏和自定义 `d2` 渲染器的 props |
 | `infographicProps` | `Partial<Omit<InfographicBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 infographic 围栏和自定义 `infographic` 渲染器的 props |
-| `themes` | `string[]` | 转发到 `stream-monaco` 的主题列表 |
+| `themes` | `CodeBlockMonacoTheme[]` | 转发到 `stream-monaco` 的主题列表 |
 
 #### 重型渲染器 props 透传
 
@@ -494,6 +493,8 @@ setKaTeXWorker(new KatexWorker())
 所有自定义节点组件都接收这些 props：
 
 ```tsx
+import type { CustomComponentMap, NodeComponentProps, RenderContext, RenderNodeFn } from 'markstream-react'
+
 interface NodeComponentProps<TNode = unknown> {
   node: TNode // 解析后的节点数据
   ctx?: RenderContext // 渲染上下文（主题、事件、开关）
@@ -505,6 +506,8 @@ interface NodeComponentProps<TNode = unknown> {
   children?: React.ReactNode
 }
 ```
+
+`CustomComponentMap` 就是 `setCustomComponents(...)` 接收的映射类型。
 
 ### 示例自定义组件
 

@@ -2,6 +2,20 @@ import { defineNuxtConfig } from 'nuxt/config'
 
 export default defineNuxtConfig({
   devtools: { enabled: true },
+  app: {
+    head: {
+      title: 'markstream-nuxt Playground | Nuxt demo',
+      meta: [
+        {
+          name: 'description',
+          content: 'markstream-nuxt playground for streaming Markdown, Mermaid, KaTeX, and docs-site integration demos.',
+        },
+      ],
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      ],
+    },
+  },
   modules: [
     '@nuxtjs/tailwindcss',
   ],
