@@ -2,23 +2,27 @@ import fs from 'node:fs'
 import path from 'node:path'
 import dts from 'rollup-plugin-dts'
 
-const fallbackInput = './dist/index.d.ts'
-const preferredInputs = [
-  './dist/types/index.d.ts',
-  './dist/types/exports.d.ts',
-]
+const entryNames = ['index', 'next', 'server']
 
-const inputPath = preferredInputs.find(p => fs.existsSync(path.resolve(p)))
-  ?? (fs.existsSync(path.resolve(fallbackInput)) ? fallbackInput : null)
+function resolveInputPath(entryName) {
+  const preferred = [
+    `./dist/types/${entryName}.d.ts`,
+    entryName === 'index' ? './dist/types/exports.d.ts' : null,
+    `./dist/${entryName}.d.ts`,
+  ].filter(Boolean)
 
-if (!inputPath) {
-  throw new Error(
-    'No declaration entry found. Run `pnpm run build` (which emits declarations) before running `build:dts`.',
-  )
+  return preferred.find(p => fs.existsSync(path.resolve(p))) ?? null
 }
 
-export default [
-  {
+const configs = entryNames.map((entryName) => {
+  const inputPath = resolveInputPath(entryName)
+  if (!inputPath) {
+    throw new Error(
+      `No declaration entry found for "${entryName}". Run \`pnpm run build\` before running \`build:dts\`.`,
+    )
+  }
+
+  return {
     input: inputPath,
     plugins: [
       dts({
@@ -26,6 +30,7 @@ export default [
       }),
     ],
     external: [
+      /^node:.*$/,
       /^react(?:\/.*)?$/,
       /^react-dom(?:\/.*)?$/,
       /^(?:katex|mermaid|stream-monaco|stream-markdown)(?:\/.*)?$/,
@@ -35,9 +40,11 @@ export default [
     ],
     output: [
       {
-        file: 'dist/index.d.ts',
+        file: `dist/${entryName}.d.ts`,
         format: 'es',
       },
     ],
-  },
-]
+  }
+})
+
+export default configs

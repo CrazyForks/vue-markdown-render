@@ -84,71 +84,47 @@ function App() {
 
 ## Using with Next.js
 
-### App Router (Next.js 13+)
+Use the dedicated SSR entrypoints instead of `mounted` guards or `ssr: false`.
+
+See [React Next SSR](/guide/react-next-ssr) for the full contract and examples.
+
+### App Router (Next.js 14 / 15)
 
 ```tsx
-'use client'
-
-import MarkdownRender from 'markstream-react'
-import { useEffect, useState } from 'react'
+import MarkdownRender from 'markstream-react/next'
 
 export default function MarkdownPage() {
-  const [mounted, setMounted] = useState(false)
   const markdown = `# Hello Next.js!
 
-This works with Next.js App Router.
+This route ships real SSR HTML first.
 `
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div>Loading...</div>
-  }
-
-  return <MarkdownRender content={markdown} />
+  return <MarkdownRender content={markdown} final />
 }
 ```
 
 ### Pages Router
 
 ```tsx
-import MarkdownRender from 'markstream-react'
-import { useEffect, useState } from 'react'
+import MarkdownRender from 'markstream-react/next'
 import 'markstream-react/index.css'
 
 export default function MarkdownPage() {
-  const [mounted, setMounted] = useState(false)
   const markdown = `# Hello Next.js Pages Router!`
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div>Loading...</div>
-  }
-
-  return <MarkdownRender content={markdown} />
+  return <MarkdownRender content={markdown} final />
 }
 ```
 
-### Using Dynamic Imports (Recommended)
+### Pure Server Rendering
 
 ```tsx
-import dynamic from 'next/dynamic'
-import 'markstream-react/index.css'
-
-const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
-  { ssr: false }
-)
+import MarkdownRender from 'markstream-react/server'
 
 export default function MarkdownPage() {
-  const markdown = `# Hello Next.js!`
+  const markdown = `# Pure server entry`
 
-  return <MarkdownRender content={markdown} />
+  return <MarkdownRender content={markdown} final />
 }
 ```
 

@@ -2,6 +2,8 @@
 
 markstream-react provides the same powerful components as markstream-vue, but built for React. All components support React 18+ with full TypeScript support.
 
+The root, `markstream-react/next`, and `markstream-react/server` entrypoints all ship declaration files. Shared prop types such as `NodeRendererProps`, `MarkdownCodeBlockNodeProps`, `ListItemNodeProps`, `HtmlPreviewFrameProps`, `TooltipProps`, `TooltipPlacement`, and `LinkNodeStyleProps` can be imported directly from whichever entrypoint you use.
+
 ## Main Component: MarkdownRender
 
 The primary component for rendering markdown content in React.
@@ -644,46 +646,27 @@ Code block prop interfaces (`CodeBlockNodeProps`, `MermaidBlockNodeProps`, `D2Bl
 
 ## Next.js Best Practices
 
-### Client-Side Only Rendering
+Use the dedicated Next SSR entrypoints instead of `mounted` guards or `ssr: false`.
 
 ```tsx
-'use client'
-
-import MarkdownRender from 'markstream-react'
-import { useEffect, useState } from 'react'
+import MarkdownRender from 'markstream-react/next'
 
 export default function MarkdownPage() {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div>Loading...</div>
-  }
-
-  return <MarkdownRender content="# Hello Next.js!" />
+  return <MarkdownRender content="# Hello Next.js!" final />
 }
 ```
 
-### Dynamic Import Pattern
+For a pure server render path:
 
 ```tsx
-import dynamic from 'next/dynamic'
-
-const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
-  {
-    ssr: false,
-    loading: () => <div>Loading markdown...</div>
-  }
-)
+import MarkdownRender from 'markstream-react/server'
 
 export default function MarkdownPage() {
-  return <MarkdownRender content="# Hello!" />
+  return <MarkdownRender content="# Hello!" final />
 }
 ```
+
+See [React Next SSR](/guide/react-next-ssr) for the full entrypoint model.
 
 ## Hooks Integration
 
