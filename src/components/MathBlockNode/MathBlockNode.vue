@@ -19,6 +19,17 @@ function resolveInitialState() {
     }
   }
 
+  // Only perform a sync render during SSR so the server and client initial
+  // markup always match.  On the client the post-mount renderMath() call will
+  // enhance the component, avoiding SSR/client hydration divergence.
+  if (!isServer) {
+    return {
+      html: '',
+      text: props.node.raw,
+      loading: false,
+    }
+  }
+
   const katex = getKatexSync()
   if (!katex) {
     return {
