@@ -7,6 +7,8 @@ const toDir = path.resolve('dist')
 
 const fromCss = path.join(fromDir, 'index.tailwind.css')
 const toCss = path.join(toDir, 'index.tailwind.css')
+const primaryCss = path.join(toDir, 'index.css')
+const fallbackPrimaryCss = path.join(toDir, 'markstream-react.css')
 
 function stripTailwindDirectives(css) {
   return css
@@ -18,6 +20,20 @@ function stripTailwindDirectives(css) {
 
 async function main() {
   await fs.mkdir(toDir, { recursive: true })
+
+  try {
+    await fs.access(primaryCss)
+  }
+  catch {
+    try {
+      const css = await fs.readFile(fallbackPrimaryCss, 'utf8')
+      await fs.writeFile(primaryCss, css)
+    }
+    catch (err) {
+      const e = err
+      throw new Error(`[copy-tailwind-css] Missing ${primaryCss} and ${fallbackPrimaryCss}. Did the main npm build run? (${e?.message || e})`)
+    }
+  }
 
   try {
     const css = await fs.readFile(fromCss, 'utf8')

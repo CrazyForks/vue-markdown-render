@@ -150,6 +150,8 @@
     "play:react": "pnpm run -C playground-react18 dev",
     "play:react18": "pnpm run -C playground-react18 dev",
     "play:react19": "pnpm run -C playground-react19 dev",
+    "play:next14": "pnpm run build:parser && pnpm --filter markstream-react build && pnpm run -C playground-next14 dev",
+    "play:next15": "pnpm run build:parser && pnpm --filter markstream-react build && pnpm run -C playground-next15 dev",
     "play:angular:build": "pnpm run -C playground-angular build",
     "play:react:build": "pnpm run -C playground-react18 build",
     "play:react18:build": "pnpm run -C playground-react18 build",
@@ -205,7 +207,10 @@
     "check:peer-deps": "node ./scripts/check-peer-deps.cjs",
     "test:e2e:link-tooltip-streaming": "node scripts/e2e-link-tooltip-streaming.mjs",
     "test:e2e:vue2-cli-smoke": "node scripts/e2e-vue2-cli-smoke.mjs",
-    "test:e2e:math-streaming-stability": "node scripts/e2e-math-streaming-stability.mjs"
+    "test:e2e:math-streaming-stability": "node scripts/e2e-math-streaming-stability.mjs",
+    "test:e2e:next14-ssr": "node scripts/e2e-next-ssr.mjs --playground playground-next14 --version next14",
+    "test:e2e:next15-ssr": "node scripts/e2e-next-ssr.mjs --playground playground-next15 --version next15",
+    "test:e2e:next-ssr": "pnpm run test:e2e:next14-ssr && pnpm run test:e2e:next15-ssr"
   },
   "peerDependencies": {
     "@antv/infographic": "^0.2.3",

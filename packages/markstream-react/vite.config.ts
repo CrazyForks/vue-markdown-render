@@ -78,13 +78,18 @@ export default defineConfig(({ mode }) => {
         },
       },
       lib: {
-        entry: resolve(__dirname, 'src/index.ts'),
+        entry: {
+          index: resolve(__dirname, 'src/index.ts'),
+          next: resolve(__dirname, 'src/next.ts'),
+          server: resolve(__dirname, 'src/server.ts'),
+        },
         name,
-        fileName: 'index',
+        fileName: (_, entryName) => `${entryName}.js`,
         formats: ['es'],
       },
       rollupOptions: {
         external: [
+          'node:module',
           'react',
           'react-dom',
           'react/jsx-runtime',
@@ -99,6 +104,13 @@ export default defineConfig(({ mode }) => {
           '@terrastruct/d2',
           '@floating-ui/dom',
         ],
+        output: {
+          banner(chunk) {
+            return chunk.isEntry && chunk.name === 'next'
+              ? '\'use client\';'
+              : ''
+          },
+        },
       },
     },
   }

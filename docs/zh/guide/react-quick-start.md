@@ -84,71 +84,47 @@ function App() {
 
 ## 使用 Next.js
 
-### App Router（Next.js 13+）
+不要再把 `mounted` guard 或 `ssr: false` 当成主接法，Next 现在有专门的 SSR 双入口。
+
+完整说明见 [React Next SSR](/zh/guide/react-next-ssr)。
+
+### App Router（Next.js 14 / 15）
 
 ```tsx
-'use client'
-
-import MarkdownRender from 'markstream-react'
-import { useEffect, useState } from 'react'
+import MarkdownRender from 'markstream-react/next'
 
 export default function MarkdownPage() {
-  const [mounted, setMounted] = useState(false)
   const markdown = `# Hello Next.js!
 
-这适用于 Next.js App Router。
+这个路由会先返回真实 SSR HTML。
 `
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div>加载中...</div>
-  }
-
-  return <MarkdownRender content={markdown} />
+  return <MarkdownRender content={markdown} final />
 }
 ```
 
 ### Pages Router
 
 ```tsx
-import MarkdownRender from 'markstream-react'
-import { useEffect, useState } from 'react'
+import MarkdownRender from 'markstream-react/next'
 import 'markstream-react/index.css'
 
 export default function MarkdownPage() {
-  const [mounted, setMounted] = useState(false)
   const markdown = `# Hello Next.js Pages Router!`
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <div>加载中...</div>
-  }
-
-  return <MarkdownRender content={markdown} />
+  return <MarkdownRender content={markdown} final />
 }
 ```
 
-### 使用动态导入（推荐）
+### 纯服务端渲染
 
 ```tsx
-import dynamic from 'next/dynamic'
-import 'markstream-react/index.css'
-
-const MarkdownRender = dynamic(
-  () => import('markstream-react').then(mod => mod.default),
-  { ssr: false }
-)
+import MarkdownRender from 'markstream-react/server'
 
 export default function MarkdownPage() {
-  const markdown = `# Hello Next.js!`
+  const markdown = `# 纯 server 入口`
 
-  return <MarkdownRender content={markdown} />
+  return <MarkdownRender content={markdown} final />
 }
 ```
 
