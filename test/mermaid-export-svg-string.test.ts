@@ -16,12 +16,15 @@ describe('mermaid block export event', () => {
       props: {
         node,
         loading: false,
+        onExport: (ev: any) => ev.preventDefault(),
       },
       attachTo: document.body,
     })
 
     // Make the component think mermaid is available so the export button renders
     ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).showSource = false
+    await nextTick()
 
     // Populate the mermaid content area with an SVG so the export handler can find it
     const content = wrapper.find('div._mermaid')

@@ -50,7 +50,6 @@ const listItemComponent = computed(() => {
       :is="listItemComponent"
       v-for="(item, index) in node.items"
       :key="`${indexKey || 'list'}-${index}`"
-      v-memo="[item]"
       v-bind="{ showTooltips }"
       :node="item"
       :custom-id="customId"

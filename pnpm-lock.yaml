@@ -192,7 +192,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.15)(@vitest/ui@4.1.0(vitest@4.1.0))(jiti@2.6.1)(jsdom@24.1.3)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2)
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.15)(@vitest/ui@4.1.0)(jiti@2.6.1)(jsdom@24.1.3)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/markstream-angular:
     dependencies:
@@ -26420,7 +26420,7 @@ snapshots:
       - typescript
       - universal-cookie
 
-  vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.15)(@vitest/ui@4.1.0(vitest@4.1.0))(jiti@2.6.1)(jsdom@24.1.3)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2):
+  vitest@3.2.4(@types/debug@4.1.12)(@types/node@22.19.15)(@vitest/ui@4.1.0)(jiti@2.6.1)(jsdom@24.1.3)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/expect': 3.2.4

@@ -18,11 +18,11 @@ description: 快速查阅 MarkdownRender、CodeBlockNode、MermaidBlockNode、Im
 | 组件 | 推荐场景 | 关键 props / 事件 | 额外 CSS / 同伴依赖 | 排障提示 |
 | ---- | -------- | ---------------- | ------------------- | -------- |
 | `MarkdownRender` | 渲染完整 AST（默认导出） | Props：`content` / `nodes`、`custom-id`、`final`、`parse-options`、`custom-html-tags`、`is-dark`、`code-block-props`、`mermaid-props`、`d2-props`、`infographic-props`；事件：`copy`、`handleArtifactClick`、`click`、`mouseover`、`mouseout` | 在 reset 之后引入 `markstream-vue/index.css`（CSS 已被限定在内部 `.markstream-vue` 容器中），并放入受控 layer | 用 `setCustomComponents(customId, mapping)` + `custom-id` 限定覆盖范围；配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
-| `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`stream`、`loading`；事件：`copy`、`previewCode`；插槽 `header-left` / `header-right`；diff 悬浮操作配置放在 `monacoOptions`（`diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction`） | 安装 `stream-monaco`（peer）并打包 Monaco workers | 空白编辑器 → 优先检查 worker 打包与 SSR |
+| `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`stream`、`loading`；事件：`copy`、`previewCode`；插槽 `header-left` / `header-right`；diff 悬浮操作配置放在 `monacoOptions`（`diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction`） | 安装 `stream-monaco`（peer）并打包 Monaco workers | SSR 首包会先给 `<pre><code>` fallback；编辑器空白时优先检查 worker 打包和客户端增强链路 |
 | `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`stream`、`loading`；插槽 `header-left` / `header-right` | 同伴依赖 `shiki` + `stream-markdown` | SSR/低体积场景优先使用 |
-| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` >= 11；无需额外 CSS | 详见 `/zh/guide/mermaid` |
-| `D2BlockNode` | 渐进式 D2 图 | `node`、`isDark`、`maxHeight`、`progressiveRender`、`progressiveIntervalMs`；工具栏开关 | `@terrastruct/d2`；无需额外 CSS | 缺少依赖会回退到源码；详见 `/zh/guide/d2` |
-| `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | Nuxt SSR 中需 `<ClientOnly>` |
+| `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` >= 11；无需额外 CSS | SSR 首包先给可读 fallback；异步渲染问题详见 `/zh/guide/mermaid` |
+| `D2BlockNode` | 渐进式 D2 图 | `node`、`isDark`、`maxHeight`、`progressiveRender`、`progressiveIntervalMs`；工具栏开关 | `@terrastruct/d2`；无需额外 CSS | SSR 首包先给 fallback / 源码；缺少依赖时保持 fallback；详见 `/zh/guide/d2` |
+| `MathBlockNode` / `MathInlineNode` | KaTeX 公式 | `node` | 安装 `katex` 并引入 `katex/dist/katex.min.css` | 注册同步 KaTeX loader 后可直接 SSR 出 HTML；否则稳定回退为原文 |
 | `ImageNode` | 自定义图片预览 / 懒加载 | Props：`fallback-src`、`show-caption`、`lazy`、`svg-min-height`、`use-placeholder`；事件：`click` / `load` / `error` | 无额外 CSS | 通过 `setCustomComponents` 包装，实现 lightbox |
 | `LinkNode` | 下划线动画、颜色自定义 | `color`、`underlineHeight`、`showTooltip` | 无 | 浏览器默认 `a` 样式可通过 reset 解决 |
 | `VmrContainerNode` | 自定义 `:::` 容器 | `node`（`name`、`attrs`、`loading`、`children`） | 极简基础 CSS；通过 `setCustomComponents` 覆盖 | JSON attrs 会规范到 `node.attrs`（去掉 `data-` 前缀）；无效/不完整 JSON 存到 `attrs.attrs`；name 后面的 args 存到 `attrs.args` |
@@ -179,7 +179,7 @@ setCustomComponents('docs', {
 
 - **样式错乱**：先检查 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here)。
 - **工具类覆盖**：传入 `custom-id` 并使用 `[data-custom-id="docs"]` 限定样式。
-- **SSR 报错**：对只在浏览器可用的同伴依赖（Mermaid、D2、Monaco）使用 `<ClientOnly>` 或 `onMounted`。
+- **SSR 报错**：渲染器本身已经 SSR-safe；只把你自己的浏览器专属页面逻辑，或手动初始化的 peer，放到 `<ClientOnly>` / `onMounted` 后面。
 
 ### 什么时候优先用它
 
@@ -229,7 +229,7 @@ setCustomComponents('docs', {
 - **关键 props**：`node`、`isDark`、`isStrict`、`maxHeight`
 - **事件**：`copy`、`export`、`openModal`、`toggleMode`
 - **同伴依赖**：`mermaid` >= 11
-- **常见问题**：SSR 场景要把 Mermaid 初始化放到客户端边界之后
+- **常见问题**：把 Mermaid 当成客户端增强能力看待；SSR 首包已经有 fallback，真正的 preview 仍然在客户端初始化
 
 深入页面： [Mermaid](/zh/guide/mermaid)、[MermaidBlockNode](/zh/guide/mermaid-block-node)
 

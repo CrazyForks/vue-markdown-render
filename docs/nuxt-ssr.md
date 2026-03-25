@@ -1,71 +1,151 @@
 ---
-description: Integrate markstream-vue safely into Nuxt 3 SSR with client-only peers, browser guards, and worker-aware setup.
+description: Use markstream-vue in Nuxt SSR with server-rendered HTML, stable fallbacks, and client enhancement for rich nodes.
 ---
 
 # Nuxt 3 SSR usage (example)
 
 > 中文版请查看 [Nuxt 3 SSR（中文）](/zh/nuxt-ssr)。
 
-This short recipe shows a minimal, safe way to use `markstream-vue` in Nuxt 3 so that client-only features (Monaco, Mermaid, Web Workers) are only initialized in the browser.
+`markstream-vue` can now render directly during Nuxt SSR. You do not need to wrap `<MarkdownRender>` in `<client-only>` just to stay safe.
 
-## Install peers (client-side)
+The SSR model is:
 
-Install the peers you need in your Nuxt app. For example, to enable Mermaid and Monaco editor previews (optional):
+- Standard markdown, HTML, links, tables, footnotes, and images render on the server.
+- Code blocks render a stable server `<pre><code>` fallback first, then enhance to Monaco on the client.
+- Math can render real KaTeX HTML on the server when you provide a synchronous KaTeX loader.
+- Mermaid, D2, and Infographic render readable SSR fallbacks first, then enhance on the client.
+- Scoped custom component overrides, custom node types, and trusted `customHtmlTags` also render on the server.
 
-```bash
-# pnpm (recommended)
-pnpm add mermaid stream-monaco
-
-# npm
-npm install mermaid stream-monaco
-```
-
-Do NOT import these peers from server-only code paths during SSR.
-
-## Example page (client-only wrapper)
-
-Create a page or component that defers mounting the renderer to the client. Nuxt provides a `<client-only>` built-in wrapper which is perfect:
+## Minimal SSR page
 
 ```vue
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
 
-const markdown = ref(`# Hello from Nuxt 3\n\nThis content is rendered only on the client.`)
+const markdown = ref(`
+# Hello from Nuxt SSR
+
+Inline math: $E = mc^2$
+
+\`\`\`ts
+export const greet = (name: string) => \`hello \${name}\`
+\`\`\`
+
+\`\`\`mermaid
+graph TD
+  SSR --> Hydration
+\`\`\`
+`.trim())
 </script>
 
 <template>
-  <client-only>
-    <MarkdownRender :content="markdown" />
-  </client-only>
+  <MarkdownRender :content="markdown" :final="true" />
 </template>
 ```
 
-This ensures the `MarkdownRender` component (and any optional peers it lazy-loads) are only imported/initialized in the browser.
+This gives you server HTML immediately. Heavy nodes still upgrade after hydration, but the first response is not an empty shell.
 
-## Server-rendered diagrams or math
+## Pre-parsed nodes and custom components
 
-If you need server-rendered HTML for diagrams or math (so crawlers or first paint include them), pre-render those outputs during your build step or via a small server-side task. Example approaches:
+SSR also works when you render from `nodes` instead of `content`, or when you register scoped custom components.
 
-- Use a build script that runs `mermaid-cli` / `katex` to convert certain diagrams/formulas to HTML/SVG during content generation and embed the resulting HTML into the page.
-- Use a server endpoint that returns pre-rendered diagram SVG/HTML and fetch it on the client as needed.
+```ts
+import { setCustomComponents } from 'markstream-vue'
+import { defineComponent, h } from 'vue'
 
-Then pass pre-rendered fragments into the renderer as trusted HTML or a server-side AST so the client avoids heavy initialization for those artifacts.
+setCustomComponents('docs-ssr', {
+  thinking: defineComponent({
+    props: {
+      node: { type: Object, required: true },
+    },
+    setup(props) {
+      return () => h('aside', { 'data-ssr-thinking': '1' }, String((props.node as any).content ?? ''))
+    },
+  }),
+})
+```
 
-## Notes
+```vue
+<template>
+  <MarkdownRender
+    custom-id="docs-ssr"
+    content="<thinking>Server custom tag</thinking>"
+    :custom-html-tags="['thinking']"
+    :final="true"
+  />
+</template>
+```
 
-- Prefer `client-only` when using Monaco Editor, Web Workers, or progressive Mermaid.
-- The library is designed to be import-safe during SSR: heavy peers are lazy-loaded in the browser and many DOM/Worker usages are guarded. If you see an import-time ReferenceError, please provide the stack trace.
+Use `nodes + final` when you already have pre-parsed AST content on the server and want deterministic SSR without re-parsing in the browser.
 
----
+## Server-rendered math with KaTeX
+
+If you want KaTeX HTML in the SSR response, register a sync loader in your Nuxt app:
+
+```ts
+import katex from 'katex'
+import { enableKatex } from 'markstream-vue'
+
+enableKatex(() => katex)
+```
+
+Without that loader, math still stays SSR-safe and falls back to readable raw text.
+
+## When to still use `<client-only>`
+
+You usually do not need it anymore for the renderer itself.
+
+Use `<client-only>` only when your own page logic is browser-only, or when you intentionally want to skip SSR for a whole region.
 
 ## Nuxt playground
 
-This repository now ships with a Nuxt playground that mirrors the streaming demo from the Vite playground. It lives in `playground-nuxt/` at the repo root.
+This repository ships with a Nuxt playground in `playground-nuxt/`.
 
 ```bash
 pnpm install
 pnpm play:nuxt
 ```
 
-The command boots Nuxt 4 (dev server at `http://localhost:3000`) and renders the same Markdown stream as the main playground, so you can verify SSR, workers, and Tailwind interactions in an actual Nuxt environment. Feel free to copy pieces from that folder when wiring up your own project.
+The dedicated SSR verification route is:
+
+- `/ssr-lab`
+
+It contains a fixed matrix for:
+
+- basic markdown + HTML SSR
+- rich-node SSR fallback
+- hydration-time enhancement
+- disabled-enhancement fallback
+- custom-tag and scoped override validation
+
+## SSR regression command
+
+Run the dedicated Nuxt SSR regression suite with:
+
+```bash
+pnpm test:e2e:nuxt-ssr
+```
+
+That command verifies both:
+
+- `nuxt dev`
+- `nuxt build && nuxt preview`
+
+Each mode checks the raw HTTP HTML for `/ssr-lab`, then opens the page in a browser to verify hydration and enhancement stability.
+
+## Library-level SSR regression coverage
+
+The repository also keeps a direct `renderToString` regression suite for the renderer itself:
+
+```bash
+pnpm test --run test/ssr-render-to-string.test.ts test/ssr-import.test.ts
+```
+
+That suite explicitly covers:
+
+- a built-in node matrix for lighter SSR nodes such as headings, paragraphs, inline formatting, links, lists, tables, footnotes, admonitions, and `vmr_container`
+- the standalone `MarkdownCodeBlockNode` shell during SSR
+- scoped built-in overrides via `setCustomComponents`
+- direct custom node types rendered through `nodes`
+- trusted custom tags wired through `customHtmlTags`

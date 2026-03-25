@@ -62,6 +62,32 @@ export function isKatexEnabled() {
   return typeof katexLoader === 'function'
 }
 
+export function getKatexSync() {
+  const globalKatex = getGlobalKatex()
+  if (globalKatex) {
+    katex = globalKatex
+    return katex
+  }
+
+  if (katex)
+    return katex
+
+  const loader = katexLoader
+  if (!loader || loader === defaultKatexLoader)
+    return null
+
+  try {
+    const result = loader()
+    if (!result || typeof (result as PromiseLike<any>)?.then === 'function')
+      return null
+    katex = normalizeKatexModule(result) ?? result
+    return katex
+  }
+  catch {
+    return null
+  }
+}
+
 export async function getKatex() {
   const globalKatex = getGlobalKatex()
   if (globalKatex) {

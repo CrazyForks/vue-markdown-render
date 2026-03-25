@@ -457,6 +457,8 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="d2-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    data-markstream-d2="1"
+    :data-markstream-mode="showSourceFallback ? 'fallback' : 'preview'"
     :class="props.isDark ? 'border-gray-700/30 bg-gray-900 text-gray-100' : 'border-gray-200 bg-white text-gray-900'"
   >
     <div

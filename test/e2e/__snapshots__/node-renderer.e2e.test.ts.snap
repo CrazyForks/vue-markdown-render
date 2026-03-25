@@ -122,7 +122,7 @@ exports[`markdownRender node e2e coverage > renders code block node 1`] = `
   <!--v-if-->
   <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="code_block">
     <div data-v-8dfe8a80="" class="node-content">
-      <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals --><pre data-v-8dfe8a80="" class="language-ts" aria-busy="false" aria-label="Code block: ts" data-language="ts" tabindex="0" loading="false" index-key="markdown-renderer-0" stream="true" showtooltips="true" is-dark="false"><code translate="no">export const sum = (a: number, b: number) =&gt; a + b
+      <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals --><pre data-v-8dfe8a80="" class="language-ts" aria-busy="false" aria-label="Code block: ts" data-language="ts" data-markstream-pre="1" tabindex="0" loading="false" index-key="markdown-renderer-0" stream="true" showtooltips="true" is-dark="false"><code translate="no">export const sum = (a: number, b: number) =&gt; a + b
 </code></pre>
     </div>
   </div>
@@ -367,15 +367,15 @@ exports[`markdownRender node e2e coverage > renders image node 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-        <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false">
-        <figure data-v-4ff2ac62="" data-v-93ee5c2d="" class="text-center my-8" index-key="markdown-renderer-0-0">
-          <div data-v-4ff2ac62="" class="relative inline-block">
-            <!-- 包裹条件渲染元素，启用 out-in 模式以在替换时做平滑过渡 -->
-            <transition-stub data-v-4ff2ac62="" name="img-switch" mode="out-in" appear="false" persisted="false" css="true"><img data-v-4ff2ac62="" src="https://example.com/vue.png" alt="Vue Logo" title="Vue Logo" class="max-w-96 h-auto rounded-lg transition-opacity duration-200 ease-in-out opacity-0" loading="lazy" decoding="async" tabindex="-1" aria-label="Vue Logo"></transition-stub>
-          </div>
-          <!--v-if-->
-        </figure>
-        </p>
+        <div data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false">
+          <figure data-v-4ff2ac62="" data-v-93ee5c2d="" class="text-center my-8" index-key="markdown-renderer-0-0">
+            <div data-v-4ff2ac62="" class="relative inline-block">
+              <!-- 包裹条件渲染元素，启用 out-in 模式以在替换时做平滑过渡 -->
+              <transition-stub data-v-4ff2ac62="" name="img-switch" mode="out-in" appear="false" persisted="false" css="true"><img data-v-4ff2ac62="" src="https://example.com/vue.png" alt="Vue Logo" title="Vue Logo" class="max-w-96 h-auto rounded-lg transition-opacity duration-200 ease-in-out opacity-0" loading="lazy" decoding="async" tabindex="-1" aria-label="Vue Logo"></transition-stub>
+            </div>
+            <!--v-if-->
+          </figure>
+        </div>
       </transition-stub>
     </div>
   </div>

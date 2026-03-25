@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmojiNode from '../EmojiNode'
@@ -38,6 +39,20 @@ const props = defineProps<{
   indexKey?: number | string
 }>()
 const overrides = getCustomNodeComponents(props.customId)
+const paragraphTag = computed(() => {
+  if (props.node.children.length === 0)
+    return 'p'
+
+  const isMediaOnlyParagraph = props.node.children.every((child) => {
+    if (child.type === 'image')
+      return true
+    if (child.type !== 'text')
+      return false
+    return String((child as any).content ?? '').trim() === ''
+  })
+
+  return isMediaOnlyParagraph ? 'div' : 'p'
+})
 
 const nodeComponents = {
   inline_code: InlineCodeNode,
@@ -66,7 +81,7 @@ const nodeComponents = {
 </script>
 
 <template>
-  <p dir="auto" class="paragraph-node">
+  <component :is="paragraphTag" dir="auto" class="paragraph-node">
     <component
       :is="nodeComponents[child.type]"
       v-for="(child, index) in node.children"
@@ -75,7 +90,7 @@ const nodeComponents = {
       :index-key="`${indexKey}-${index}`"
       :custom-id="props.customId"
     />
-  </p>
+  </component>
 </template>
 
 <style scoped>

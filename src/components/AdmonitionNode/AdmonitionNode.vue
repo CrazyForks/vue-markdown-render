@@ -81,7 +81,6 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
       :aria-labelledby="headerId"
     >
       <NodeRenderer
-        v-memo="[props.node.children]"
         :index-key="`admonition-${indexKey}`"
         :nodes="props.node.children"
         :custom-id="props.customId"

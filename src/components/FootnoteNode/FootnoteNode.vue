@@ -29,7 +29,6 @@ defineEmits(['copy'])
     <!-- <span class="font-semibold mr-2 text-[#0366d6]">[{{ node.id }}]</span> -->
     <div class="flex-1">
       <NodeRenderer
-        v-memo="[props.node.children]"
         :index-key="`footnote-${props.indexKey}`"
         :nodes="props.node.children"
         :custom-id="props.customId"

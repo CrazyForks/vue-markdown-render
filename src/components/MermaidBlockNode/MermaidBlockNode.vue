@@ -252,7 +252,7 @@ const translateX = ref(0)
 const translateY = ref(0)
 const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
-const showSource = ref(false)
+const showSource = ref(true)
 const userToggledShowSource = ref(false)
 const isRendering = ref(false)
 const renderQueue = ref<Promise<void> | null>(null)
@@ -1710,6 +1710,8 @@ const computedButtonStyle = computed(() => {
 <template>
   <div
     class="my-4 rounded-lg border overflow-hidden shadow-sm"
+    data-markstream-mermaid="1"
+    :data-markstream-mode="showSource ? 'fallback' : hasRenderedOnce ? 'preview' : 'pending'"
     :class="[
       props.isDark ? 'border-gray-700/30' : 'border-gray-200',
       { 'is-rendering': props.loading },
