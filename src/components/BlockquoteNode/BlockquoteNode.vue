@@ -32,7 +32,6 @@ defineEmits<{
 <template>
   <blockquote class="blockquote" dir="auto" :cite="node.cite">
     <NodeRenderer
-      v-memo="[props.node.children]"
       :index-key="`blockquote-${props.indexKey}`"
       :nodes="props.node.children || []"
       :custom-id="props.customId"

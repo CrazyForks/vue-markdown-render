@@ -19,6 +19,16 @@ export default defineNuxtConfig({
   },
   vite: {
     optimizeDeps: {
+      include: [
+        '@antv/infographic',
+        '@floating-ui/dom',
+        '@terrastruct/d2',
+        'katex',
+        'katex/dist/contrib/mhchem',
+        'mermaid',
+        'stream-markdown',
+        'vue-i18n',
+      ],
       exclude: ['monaco-editor', 'stream-monaco', 'markstream-vue'],
     },
     worker: {

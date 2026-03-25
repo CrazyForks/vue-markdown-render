@@ -10,7 +10,7 @@ export const MathInlineNodeAsync = defineAsyncComponent(async () => {
     && typeof (globalThis as any).process !== 'undefined'
     // eslint-disable-next-line node/prefer-global/process
     && (globalThis as any).process?.env?.NODE_ENV === 'test'
-  if (isTestEnv) {
+  if (isTestEnv && typeof window !== 'undefined') {
     return (props) => {
       // test fallback should be deterministic and minimal
       return h(TextNode, {

@@ -1,29 +1,75 @@
 <script setup lang="ts">
 import type { MathInlineNodeProps } from '../../types/component-props'
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 
-import { getKatex } from './katex'
+import { getKatex, getKatexSync } from './katex'
 
 const props = defineProps<MathInlineNodeProps>()
 
 const containerEl = ref<HTMLElement | null>(null)
-const mathElement = ref<HTMLElement | null>(null)
+const isServer = typeof window === 'undefined'
+const displayMode = computed(() => props.node.markup === '$$')
+
+function resolveInitialState() {
+  if (!props.node.content) {
+    return {
+      html: '',
+      text: props.node.raw,
+      loading: false,
+    }
+  }
+
+  const katex = getKatexSync()
+  if (!katex) {
+    return {
+      html: '',
+      text: props.node.raw,
+      loading: false,
+    }
+  }
+
+  try {
+    return {
+      html: katex.renderToString(props.node.content, {
+        throwOnError: props.node.loading,
+        displayMode: displayMode.value,
+      }),
+      text: '',
+      loading: false,
+    }
+  }
+  catch {
+    return {
+      html: '',
+      text: props.node.raw,
+      loading: false,
+    }
+  }
+}
+
+const initialState = resolveInitialState()
+const renderedHtml = ref(initialState.html)
+const renderedText = ref(initialState.text)
 let hasRenderedOnce = false
 let currentRenderId = 0
 let isUnmounted = false
 let currentAbortController: AbortController | null = null
-const renderingLoading = ref(true)
+const renderingLoading = ref(initialState.loading)
 const registerVisibility = useViewportPriority()
 let visibilityHandle: ReturnType<typeof registerVisibility> | null = null
 
+if (initialState.html || initialState.text)
+  hasRenderedOnce = true
+
 async function renderMath() {
-  if (!mathElement.value || isUnmounted)
+  if (isUnmounted)
     return
   if (!props.node.content) {
     renderingLoading.value = false
-    mathElement.value.textContent = props.node.raw
+    renderedHtml.value = ''
+    renderedText.value = props.node.raw
     hasRenderedOnce = true
     return
   }
@@ -49,8 +95,7 @@ async function renderMath() {
     catch {}
   }
 
-  const displayMode = props.node.markup === '$$'
-  renderKaTeXWithBackpressure(props.node.content, displayMode, {
+  renderKaTeXWithBackpressure(props.node.content, displayMode.value, {
     // Inline math should not wait on worker slots; fallback to sync render immediately
     timeout: 1500,
     waitTimeout: 0,
@@ -60,16 +105,13 @@ async function renderMath() {
     .then((html) => {
       if (isUnmounted || renderId !== currentRenderId)
         return
-      if (!mathElement.value)
-        return
-      mathElement.value.innerHTML = html
+      renderedHtml.value = html
+      renderedText.value = ''
       renderingLoading.value = false
       hasRenderedOnce = true
     })
     .catch(async (err: any) => {
       if (isUnmounted || renderId !== currentRenderId)
-        return
-      if (!mathElement.value)
         return
       // Fallback cases:
       // 1) Worker failed to initialize -> try sync render
@@ -84,13 +126,16 @@ async function renderMath() {
         const katex = await getKatex()
         if (katex) {
           try {
-            const displayMode = props.node.markup === '$$'
-            const html = katex.renderToString(props.node.content, { throwOnError: props.node.loading, displayMode })
+            const html = katex.renderToString(props.node.content, {
+              throwOnError: props.node.loading,
+              displayMode: displayMode.value,
+            })
+            renderedHtml.value = html
+            renderedText.value = ''
             renderingLoading.value = false
-            mathElement.value.innerHTML = html
             hasRenderedOnce = true
             // populate worker client cache for inline as well
-            setKaTeXCache(props.node.content, displayMode, html)
+            setKaTeXCache(props.node.content, displayMode.value, html)
           }
           catch {
           }
@@ -100,7 +145,8 @@ async function renderMath() {
       }
       if (isDisabled) {
         renderingLoading.value = false
-        mathElement.value.textContent = props.node.raw
+        renderedHtml.value = ''
+        renderedText.value = props.node.raw
         return
       }
       // If we reach here, the worker render failed and sync fallback was not possible.
@@ -111,10 +157,12 @@ async function renderMath() {
       }
       if (!props.node.loading) {
         renderingLoading.value = false
-        mathElement.value.textContent = props.node.raw
+        renderedHtml.value = ''
+        renderedText.value = props.node.raw
       }
       else if (isDisabled) {
-        mathElement.value.textContent = props.node.raw
+        renderedHtml.value = ''
+        renderedText.value = props.node.raw
       }
     })
 }
@@ -127,6 +175,8 @@ watch(
 )
 
 onMounted(() => {
+  if (isServer || renderedHtml.value)
+    return
   renderMath()
 })
 
@@ -142,9 +192,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <span ref="containerEl" class="math-inline-wrapper">
-    <span v-show="!renderingLoading" ref="mathElement" class="math-inline" />
-    <transition v-if="renderingLoading" name="table-node-fade">
+  <span
+    ref="containerEl"
+    class="math-inline-wrapper"
+    data-markstream-math="inline"
+    :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
+  >
+    <span v-if="renderedHtml" class="math-inline" v-html="renderedHtml" />
+    <span v-else-if="renderedText" class="math-inline math-inline--fallback">{{ renderedText }}</span>
+    <transition v-else-if="renderingLoading" name="table-node-fade">
       <span
         class="math-inline__loading"
         role="status"
@@ -168,6 +224,10 @@ onBeforeUnmount(() => {
 .math-inline {
   display: inline-block;
   vertical-align: middle;
+}
+
+.math-inline--fallback {
+  white-space: pre-wrap;
 }
 
 .math-inline__loading {

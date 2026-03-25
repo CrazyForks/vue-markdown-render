@@ -26,6 +26,7 @@ const figureRef = ref<HTMLElement | null>(null)
 const registerVisibility = useViewportPriority()
 const visibilityHandle = ref<ReturnType<typeof registerVisibility> | null>(null)
 const isVisible = ref(typeof window === 'undefined')
+const visibilityReady = ref(typeof window === 'undefined')
 
 if (typeof window !== 'undefined') {
   watch(
@@ -35,11 +36,13 @@ if (typeof window !== 'undefined') {
       visibilityHandle.value = null
       if (!el) {
         isVisible.value = false
+        visibilityReady.value = false
         return
       }
       const handle = registerVisibility(el, { rootMargin: '400px' })
       visibilityHandle.value = handle
       isVisible.value = handle.isVisible.value
+      visibilityReady.value = true
       handle.whenVisible.then(() => {
         isVisible.value = true
       })
@@ -55,7 +58,7 @@ onBeforeUnmount(() => {
 
 // 计算当前用于渲染的 src（当有 error 且提供 fallback 时使用 fallback）
 const displaySrc = computed(() => hasError.value && props.fallbackSrc ? props.fallbackSrc : props.node.src)
-const canRenderImage = computed(() => !props.lazy || isVisible.value)
+const canRenderImage = computed(() => !props.lazy || isVisible.value || !visibilityReady.value)
 
 // 是否为 svg 文件（可能没有内置尺寸）
 const isSvg = computed(() => /\.svg(?:\?|$)/i.test(displaySrc.value))

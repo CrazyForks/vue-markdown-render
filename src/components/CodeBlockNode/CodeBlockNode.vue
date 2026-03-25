@@ -254,9 +254,6 @@ const preFallbackWrap = computed(() => {
   return String(wordWrap) !== 'off'
 })
 const showPreWhileMonacoLoads = computed(() => {
-  // Avoid SSR hydration mismatches by only enabling this placeholder on client.
-  if (typeof window === 'undefined')
-    return false
   // If Monaco isn't available at all, the component renders a standalone PreCodeNode.
   if (usePreCodeRender.value)
     return false
@@ -1796,6 +1793,8 @@ onUnmounted(() => {
     ref="container"
     :style="containerStyle"
     class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    data-markstream-code-block="1"
+    :data-markstream-enhanced="editorMounted && !usePreCodeRender ? 'true' : 'false'"
     :class="[
       { 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
     ]"

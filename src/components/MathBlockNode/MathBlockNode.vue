@@ -4,26 +4,71 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 
-import { getKatex } from '../MathInlineNode/katex'
+import { getKatex, getKatexSync } from '../MathInlineNode/katex'
 
 const props = defineProps<MathBlockNodeProps>()
 const containerEl = ref<HTMLElement | null>(null)
-const mathBlockElement = ref<HTMLElement | null>(null)
+const isServer = typeof window === 'undefined'
+
+function resolveInitialState() {
+  if (!props.node.content) {
+    return {
+      html: '',
+      text: props.node.raw,
+      loading: false,
+    }
+  }
+
+  const katex = getKatexSync()
+  if (!katex) {
+    return {
+      html: '',
+      text: props.node.raw,
+      loading: false,
+    }
+  }
+
+  try {
+    return {
+      html: katex.renderToString(props.node.content, {
+        throwOnError: props.node.loading,
+        displayMode: true,
+      }),
+      text: '',
+      loading: false,
+    }
+  }
+  catch {
+    return {
+      html: '',
+      text: props.node.raw,
+      loading: false,
+    }
+  }
+}
+
+const initialState = resolveInitialState()
+const renderedHtml = ref(initialState.html)
+const renderedText = ref(initialState.text)
 let hasRenderedOnce = false
 let currentRenderId = 0
 let isUnmounted = false
 let currentAbortController: AbortController | null = null
 const registerVisibility = useViewportPriority()
 let visibilityHandle: ReturnType<typeof registerVisibility> | null = null
-const renderingLoading = ref(true)
+const renderingLoading = ref(initialState.loading)
+
+if (initialState.html || initialState.text)
+  hasRenderedOnce = true
 
 // Function to render math using KaTeX
 async function renderMath() {
-  if (!mathBlockElement.value || isUnmounted)
+  if (isUnmounted)
     return
   if (!props.node.content) {
     renderingLoading.value = false
-    mathBlockElement.value.textContent = props.node.raw
+    renderedHtml.value = ''
+    renderedText.value = props.node.raw
     hasRenderedOnce = true
     return
   }
@@ -62,17 +107,14 @@ async function renderMath() {
       // ignore if a newer render was requested or component unmounted
       if (isUnmounted || renderId !== currentRenderId)
         return
-      if (!mathBlockElement.value)
-        return
-      mathBlockElement.value.innerHTML = html
+      renderedHtml.value = html
+      renderedText.value = ''
       hasRenderedOnce = true
       renderingLoading.value = false
     })
     .catch(async (err: any) => {
       // ignore if a newer render was requested or component unmounted
       if (isUnmounted || renderId !== currentRenderId)
-        return
-      if (!mathBlockElement.value)
         return
 
       // If the worker failed to initialize (e.g. bad new Worker path), the
@@ -96,7 +138,8 @@ async function renderMath() {
               throwOnError: props.node.loading,
               displayMode: true,
             })
-            mathBlockElement.value.innerHTML = html
+            renderedHtml.value = html
+            renderedText.value = ''
             hasRenderedOnce = true
             renderingLoading.value = false
             // populate worker client cache so future calls hit cache
@@ -112,7 +155,8 @@ async function renderMath() {
 
       if (isDisabled) {
         renderingLoading.value = false
-        mathBlockElement.value.textContent = props.node.raw
+        renderedHtml.value = ''
+        renderedText.value = props.node.raw
         return
       }
 
@@ -121,7 +165,8 @@ async function renderMath() {
       }
       if (!props.node.loading) {
         renderingLoading.value = false
-        mathBlockElement.value.textContent = props.node.raw
+        renderedHtml.value = ''
+        renderedText.value = props.node.raw
       }
     })
 }
@@ -133,6 +178,8 @@ watch(
   },
 )
 onMounted(() => {
+  if (isServer || renderedHtml.value)
+    return
   renderMath()
 })
 
@@ -149,13 +196,25 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="containerEl" class="math-block text-center overflow-x-auto relative min-h-[40px]">
+  <div
+    ref="containerEl"
+    class="math-block text-center overflow-x-auto relative min-h-[40px]"
+    data-markstream-math="block"
+    :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
+  >
     <Transition name="math-fade">
-      <div v-if="renderingLoading" class="math-loading-overlay">
+      <div v-if="renderingLoading && !renderedHtml && !renderedText" class="math-loading-overlay">
         <div class="math-loading-spinner" />
       </div>
     </Transition>
-    <div ref="mathBlockElement" :class="{ 'math-rendering': renderingLoading }" />
+    <div
+      v-if="renderedHtml"
+      class="math-block__content"
+      :class="{ 'math-rendering': renderingLoading }"
+      v-html="renderedHtml"
+    />
+    <pre v-else-if="renderedText" class="math-block__fallback text-left">{{ renderedText }}</pre>
+    <div v-else class="math-block__content" :class="{ 'math-rendering': renderingLoading }" />
   </div>
 </template>
 
@@ -191,6 +250,12 @@ onBeforeUnmount(() => {
 .math-rendering {
   opacity: 0.3;
   transition: opacity 0.2s ease;
+}
+
+.math-block__fallback {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
 }
 
 .math-fade-enter-active,

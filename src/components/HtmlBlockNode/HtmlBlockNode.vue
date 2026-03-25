@@ -148,7 +148,7 @@ onBeforeUnmount(() => {
       <DynamicRenderer v-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />
       <pre v-else-if="renderMode.mode === 'text'" class="html-block-node__raw">{{ renderMode.content }}</pre>
       <!-- Fallback to v-html for standard HTML -->
-      <div v-else v-memo="[renderContent]" v-html="renderContent" />
+      <div v-else v-html="renderContent" />
     </template>
     <div v-else class="html-block-node__placeholder">
       <slot name="placeholder" :node="node">

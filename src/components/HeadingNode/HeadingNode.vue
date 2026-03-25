@@ -66,7 +66,6 @@ const nodeComponents = {
 <template>
   <component
     :is="`h${node.level}`"
-    v-memo="[node.level, node.children, node.attrs]"
     class="heading-node"
     :class="[`heading-${node.level}`]"
     dir="auto"
@@ -76,7 +75,6 @@ const nodeComponents = {
       :is="nodeComponents[child.type]"
       v-for="(child, index) in node.children"
       :key="`${indexKey || 'heading'}-${index}`"
-      v-memo="[child]"
       :custom-id="props.customId"
       :node="child"
       :index-key="`${indexKey || 'heading'}-${index}`"

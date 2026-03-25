@@ -27,6 +27,7 @@ const ariaLabel = computed(() => {
     :aria-busy="node.loading === true"
     :aria-label="ariaLabel"
     :data-language="normalizedLanguage"
+    data-markstream-pre="1"
     tabindex="0"
   ><code translate="no" v-text="node.code" /></pre>
 </template>

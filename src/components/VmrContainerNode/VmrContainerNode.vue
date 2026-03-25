@@ -73,7 +73,6 @@ function getNodeComponent(type: string) {
       :is="getNodeComponent(child.type)"
       v-for="(child, index) in node.children"
       :key="`${indexKey || 'vmr-container'}-${index}`"
-      v-memo="[child]"
       :custom-id="props.customId"
       :node="child"
       :index-key="`${indexKey || 'vmr-container'}-${index}`"
