@@ -97,15 +97,7 @@ function createTh(text: string) {
   }, {
     type: 'inline',
     tag: '',
-    children: [
-      {
-        tag: '',
-        type: 'text',
-        block: false,
-        content: text,
-        children: null,
-      },
-    ],
+    children: null,
     content: text,
     level: 4,
     attrs: null,
@@ -127,11 +119,11 @@ export function fixTableTokens(tokens: MarkdownToken[]): MarkdownToken[] {
   const token = tokens[i]
   if (token.type === 'inline') {
     const tcontent = String(token.content ?? '')
-    const childContent = String(token.children?.[0]?.content ?? '')
+    const headerContent = tcontent.split('\n')[0] ?? ''
 
     if (!tcontent.includes('\n') && /^\|(?:[^|\n]+\|?)+/.test(tcontent)) {
       // 解析 table
-      const body = childContent.slice(1).split('|').map(i => i.trim()).filter(Boolean).flatMap(i => createTh(i))
+      const body = headerContent.slice(1).split('|').map(i => i.trim()).filter(Boolean).flatMap(i => createTh(i))
       const insert = ([
         ...createStart(),
         ...body,
@@ -139,9 +131,9 @@ export function fixTableTokens(tokens: MarkdownToken[]): MarkdownToken[] {
       ] as unknown) as MarkdownToken[]
       fixedTokens.splice(i - 1, 3, ...insert)
     }
-    else if (/^\|(?:[^|\n]+\|)+\n\|:?-/.test(tcontent)) {
+    else if (/^\|(?:[^|\n]+\|)+\n\|(?:\s*:?-+:?\s*\|?)+$/.test(tcontent)) {
       // 解析 table
-      const body = childContent.slice(1, -1).split('|').map(i => i.trim()).flatMap(i => createTh(i))
+      const body = headerContent.slice(1, -1).split('|').map(i => i.trim()).flatMap(i => createTh(i))
       const insert = ([
         ...createStart(),
         ...body,
