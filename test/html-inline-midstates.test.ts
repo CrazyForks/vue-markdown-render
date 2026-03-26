@@ -441,7 +441,7 @@ $$
     expect(hasNode(inner as any, 'math_block')).toBe(true)
   })
 
-  it('streaming: unclosed <thinking> preserves partial table text (no top-level table leak)', () => {
+  it('streaming: unclosed <thinking> keeps partial table parsing scoped to inner content', () => {
     const part1 = `<thinking>
 | a | b |
 | - |`
@@ -453,8 +453,10 @@ $$
     expect(hasNode(n1 as any, 'table')).toBe(false)
 
     const inner = parseMarkdownToStructure(String((n1[0] as any).content ?? ''), md)
-    // Incomplete table should remain as text, not disappear.
-    expect(textIncludes(inner as any, '| a | b |')).toBe(true)
+    expect(hasNode(inner as any, 'table')).toBe(true)
+    expect((inner[0] as any).loading).toBe(true)
+    expect(textIncludes(inner as any, 'a')).toBe(true)
+    expect(textIncludes(inner as any, 'b')).toBe(true)
   })
 
   it('streaming: unclosed <thinking> preserves partial blockquote text (no top-level blockquote leak)', () => {
