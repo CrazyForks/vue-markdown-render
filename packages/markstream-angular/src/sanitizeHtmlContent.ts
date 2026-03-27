@@ -1,3 +1,10 @@
+import {
+  BLOCKED_HTML_TAGS as BLOCKED_TAGS,
+  DANGEROUS_HTML_ATTRS as DANGEROUS_ATTRS,
+  isUnsafeHtmlUrl as isUnsafeUrl,
+  URL_HTML_ATTRS as URL_ATTRS,
+  VOID_HTML_TAGS as VOID_ELEMENTS,
+} from 'stream-markdown-parser'
 import { escapeAttr, escapeHtml, isSafeAttrName } from './components/shared/node-helpers'
 
 interface HtmlToken {
@@ -5,94 +12,6 @@ interface HtmlToken {
   tagName?: string
   attrs?: Record<string, string>
   content?: string
-}
-
-const DANGEROUS_ATTRS = new Set([
-  'onclick',
-  'onerror',
-  'onload',
-  'onmouseover',
-  'onmouseout',
-  'onmousedown',
-  'onmouseup',
-  'onkeydown',
-  'onkeyup',
-  'onfocus',
-  'onblur',
-  'onsubmit',
-  'onreset',
-  'onchange',
-  'onselect',
-  'ondblclick',
-  'ontouchstart',
-  'ontouchend',
-  'ontouchmove',
-  'ontouchcancel',
-  'onwheel',
-  'onscroll',
-  'oncopy',
-  'oncut',
-  'onpaste',
-  'oninput',
-  'oninvalid',
-  'onsearch',
-])
-
-const BLOCKED_TAGS = new Set(['script'])
-
-const URL_ATTRS = new Set([
-  'href',
-  'src',
-  'srcset',
-  'xlink:href',
-  'formaction',
-])
-
-const VOID_ELEMENTS = new Set([
-  'area',
-  'base',
-  'br',
-  'col',
-  'embed',
-  'hr',
-  'img',
-  'input',
-  'link',
-  'meta',
-  'param',
-  'source',
-  'track',
-  'wbr',
-])
-
-function stripControlAndWhitespace(value: string): string {
-  let out = ''
-  for (const ch of value) {
-    const code = ch.charCodeAt(0)
-    if (code <= 0x1F || code === 0x7F)
-      continue
-    if (/\s/u.test(ch))
-      continue
-    out += ch
-  }
-  return out
-}
-
-function isUnsafeUrl(value: string): boolean {
-  const normalized = stripControlAndWhitespace(value).toLowerCase()
-
-  if (normalized.startsWith('javascript:') || normalized.startsWith('vbscript:'))
-    return true
-
-  if (normalized.startsWith('data:')) {
-    return !(
-      normalized.startsWith('data:image/')
-      || normalized.startsWith('data:video/')
-      || normalized.startsWith('data:audio/')
-    )
-  }
-
-  return false
 }
 
 function sanitizeAttrs(attrs: Record<string, string>): Record<string, string> {

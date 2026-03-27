@@ -22,22 +22,18 @@ export const ESCAPED_TEX_BRACE_COMMANDS = TEX_BRACE_COMMANDS.map(c => c.replace(
 
 const TEX_CMD_RE = /\\[a-z]+/i
 const PREFIX_CLASS = '(?:\\\\|\\u0008)'
-const TEX_CMD_WITH_BRACES_RE = new RegExp(`${PREFIX_CLASS}(?:${ESCAPED_TEX_BRACE_COMMANDS})\\s*\\{[^}]+\\}`, 'i')
+const TEX_CMD_WITH_BRACES_RE = new RegExp(String.raw`${PREFIX_CLASS}(?:${ESCAPED_TEX_BRACE_COMMANDS})\s*\{[^}]+\}`, 'i')
 // Detect brace-taking TeX commands even when the leading backslash or the
 // closing brace/content is missing (e.g. "operatorname{" or "operatorname{span").
 // This helps the heuristic treat incomplete but clearly TeX-like fragments
 // as math-like instead of plain text.
-const TEX_BRACE_CMD_START_RE = new RegExp(`(?:${PREFIX_CLASS})?(?:${ESCAPED_TEX_BRACE_COMMANDS})\s*\{`, 'i')
+const TEX_BRACE_CMD_START_RE = new RegExp(String.raw`(?:${PREFIX_CLASS})?(?:${ESCAPED_TEX_BRACE_COMMANDS})\s*\{`, 'i')
 const TEX_SPECIFIC_RE = /\\(?:text|frac|left|right|times)/
 // Match common math operator symbols or named commands.
 // Avoid treating the C/C++ increment operator ("++") as a math operator by
 // ensuring a lone '+' isn't matched when it's part of a '++' sequence.
-// Use a RegExp constructed from a string to avoid issues escaping '/' in a
-// regex literal on some platforms/linters.
-
 // Avoid lookbehind for older iOS: use a non-capturing prefix instead
-// eslint-disable-next-line prefer-regex-literals
-const OPS_RE = new RegExp('(?:^|[^+])\\+(?!\\+)|[=\\-*/^<>]|\\\\times|\\\\pm|\\\\cdot|\\\\le|\\\\ge|\\\\neq')
+const OPS_RE = /(?:^|[^+])\+(?!\+)|[=\-*/^<>]|\\times|\\pm|\\cdot|\\le|\\ge|\\neq/
 // Hyphenated multi-word (like "Quasi-Streaming") should not be treated
 // as a math operator. But single-letter-variable hyphens (e.g. "x-y") are
 // still math; so only ignore hyphens between multi-letter words.
@@ -47,6 +43,19 @@ const WORDS_RE = /\b(?:sin|cos|tan|log|ln|exp|sqrt|frac|sum|lim|int|prod)\b/
 // Heuristic to detect common date/time patterns like 2025/9/30 21:37:24 and
 // avoid classifying them as math merely because they contain '/' or ':'
 const DATE_TIME_RE = /\b\d{4}\/\d{1,2}\/\d{1,2}(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?\b/
+const CONTROL_TEX_REPLACEMENTS: Record<string, string> = {
+  [String.fromCharCode(8)]: '\\b',
+  [String.fromCharCode(11)]: '\\v',
+  [String.fromCharCode(12)]: '\\f',
+}
+
+function normalizeMathControlChars(value: string) {
+  let result = ''
+  for (const ch of value)
+    result += CONTROL_TEX_REPLACEMENTS[ch] ?? ch
+  return result
+}
+
 export function isMathLike(s: string) {
   if (!s)
     return false
@@ -57,19 +66,7 @@ export function isMathLike(s: string) {
   // Convert the handful of control characters that collide with common TeX
   // commands (\b, \f, \v) back into their two-character escaped forms so our
   // regexes can match the intent reliably without flagging real newlines/tabs.
-  // eslint-disable-next-line no-control-regex
-  const norm = s.replace(/[\u0008\v\f]/g, (ch) => {
-    switch (ch) {
-      case '\u0008':
-        return '\\b'
-      case '\u000B':
-        return '\\v'
-      case '\u000C':
-        return '\\f'
-      default:
-        return ch
-    }
-  })
+  const norm = normalizeMathControlChars(s)
   const stripped = norm.trim()
 
   // quick bailouts

@@ -4,6 +4,29 @@ import { parseBasicBlockToken } from './block-token-parser'
 import { parseBlockquote } from './blockquote-parser'
 import { parseList } from './list-parser'
 
+const CONTAINER_KINDS = new Set(['warning', 'info', 'note', 'tip', 'danger', 'caution'])
+
+function parseContainerInfo(info: string) {
+  let markerEnd = 0
+  while (markerEnd < info.length && markerEnd < 3 && info[markerEnd] === ':')
+    markerEnd++
+
+  if (markerEnd === 0 || info[markerEnd] === ':')
+    return null
+
+  const rest = info.slice(markerEnd).trimStart()
+  if (!rest)
+    return null
+
+  const firstWhitespace = rest.search(/\s/)
+  const rawKind = (firstWhitespace === -1 ? rest : rest.slice(0, firstWhitespace)).toLowerCase()
+  if (!CONTAINER_KINDS.has(rawKind))
+    return null
+
+  const title = firstWhitespace === -1 ? '' : rest.slice(firstWhitespace).trim()
+  return { kind: rawKind, title }
+}
+
 export function parseContainer(
   tokens: MarkdownToken[],
   index: number,
@@ -22,21 +45,21 @@ export function parseContainer(
     const info = String(openToken.info ?? '').trim()
     if (info && !info.startsWith(':::')) {
       // if info looks like 'warning title', drop leading kind token
-      const maybe = info.replace(new RegExp(`^${kind}`), '').trim()
-      if (maybe)
-        title = maybe
+      const lowerInfo = info.toLowerCase()
+      if (lowerInfo.startsWith(kind)) {
+        const maybe = info.slice(kind.length).trim()
+        if (maybe)
+          title = maybe
+      }
     }
   }
   else {
     // container_open: info usually contains the marker like ' warning Title'
     const info = String(openToken.info ?? '').trim()
-
-    const match
-      // eslint-disable-next-line regexp/no-super-linear-backtracking
-      = /^:{1,3}\s*(warning|info|note|tip|danger|caution)\s*(.*)$/i.exec(info)
-    if (match) {
-      kind = match[1]
-      title = String(match[2] ?? '')
+    const parsedInfo = parseContainerInfo(info)
+    if (parsedInfo) {
+      kind = parsedInfo.kind
+      title = parsedInfo.title
     }
   }
 

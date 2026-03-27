@@ -1,22 +1,5 @@
 import type { HtmlBlockNode, MarkdownToken } from '../../types'
-
-// Common void tags that don't require a closing tag
-const VOID_TAGS = new Set([
-  'area',
-  'base',
-  'br',
-  'col',
-  'embed',
-  'hr',
-  'img',
-  'input',
-  'link',
-  'meta',
-  'param',
-  'source',
-  'track',
-  'wbr',
-])
+import { VOID_HTML_TAGS } from '../../htmlTags'
 
 function findTagCloseIndexOutsideQuotes(input: string) {
   let inSingle = false
@@ -85,6 +68,22 @@ function findMatchingCloseTagEnd(rawHtml: string, tag: string, startIndex: numbe
   return -1
 }
 
+export function parseTagAttrs(openTag: string): [string, string][] {
+  const attrs: [string, string][] = []
+  const attrRegex = /\s([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
+  let match
+
+  while ((match = attrRegex.exec(openTag)) !== null) {
+    const attrName = match[1]
+    if (!attrName)
+      continue
+    const attrValue = match[2] || match[3] || match[4] || ''
+    attrs.push([attrName, attrValue])
+  }
+
+  return attrs
+}
+
 export function parseHtmlBlock(token: MarkdownToken): HtmlBlockNode {
   const raw = String(token.content ?? '')
 
@@ -118,7 +117,8 @@ export function parseHtmlBlock(token: MarkdownToken): HtmlBlockNode {
   const openTag = openEnd === -1 ? raw : raw.slice(0, openEnd + 1)
   // Self-closing first tag like <img ... />
   const selfClosing = openEnd !== -1 && /\/\s*>$/.test(openTag)
-  const isVoid = VOID_TAGS.has(tag)
+  const isVoid = VOID_HTML_TAGS.has(tag)
+  const attrs = parseTagAttrs(openTag)
 
   const closeEnd = openEnd === -1 ? -1 : findMatchingCloseTagEnd(raw, tag, openEnd + 1)
   const hasClosing = closeEnd !== -1
@@ -134,6 +134,7 @@ export function parseHtmlBlock(token: MarkdownToken): HtmlBlockNode {
     content,
     raw,
     tag,
+    attrs: attrs.length ? attrs : undefined,
     loading,
   }
 }

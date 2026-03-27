@@ -76,6 +76,7 @@ export interface HtmlBlockNode extends BaseNode {
   attrs?: [string, string][] | null
   tag: string
   content: string
+  children?: ParsedNode[]
 }
 
 export interface HtmlInlineNode extends BaseNode {
@@ -407,7 +408,7 @@ export interface ParseOptions {
    * Used by inline parsing; pair with `getMarkdown({ customHtmlTags })`
    * to enable mid-state suppression for the same tags during streaming.
    */
-  customHtmlTags?: string[]
+  customHtmlTags?: readonly string[]
   /**
    * If provided, link nodes are only emitted when this returns true for the href.
    * When it returns false, the link is rendered as plain text (the link text only).

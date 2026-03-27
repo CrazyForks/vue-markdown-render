@@ -1,4 +1,12 @@
 import type { Component } from 'vue'
+import {
+  BLOCKED_HTML_TAGS as BLOCKED_TAGS,
+  DANGEROUS_HTML_ATTRS as DANGEROUS_ATTRS,
+  isUnsafeHtmlUrl as isUnsafeUrl,
+  EXTENDED_STANDARD_HTML_TAGS as STANDARD_HTML_TAGS,
+  URL_HTML_ATTRS as URL_ATTRS,
+  VOID_HTML_TAGS as VOID_ELEMENTS,
+} from 'stream-markdown-parser'
 import { h } from 'vue'
 
 // HTML Parser Token type
@@ -9,184 +17,7 @@ export interface HtmlToken {
   content?: string
 }
 
-// Dangerous attributes that should be filtered out for XSS protection
-const DANGEROUS_ATTRS = new Set([
-  'onclick',
-  'onerror',
-  'onload',
-  'onmouseover',
-  'onmouseout',
-  'onmousedown',
-  'onmouseup',
-  'onkeydown',
-  'onkeyup',
-  'onfocus',
-  'onblur',
-  'onsubmit',
-  'onreset',
-  'onchange',
-  'onselect',
-  'ondblclick',
-  'ontouchstart',
-  'ontouchend',
-  'ontouchmove',
-  'ontouchcancel',
-  'onwheel',
-  'onscroll',
-  'oncopy',
-  'oncut',
-  'onpaste',
-  'oninput',
-  'oninvalid',
-  'onreset',
-  'onsearch',
-  'onsubmit',
-])
-
-// Standard HTML void elements (self-closing)
-const VOID_ELEMENTS = new Set([
-  'area',
-  'base',
-  'br',
-  'col',
-  'embed',
-  'hr',
-  'img',
-  'input',
-  'link',
-  'meta',
-  'param',
-  'source',
-  'track',
-  'wbr',
-])
-
-// Standard HTML tags that should NOT be treated as custom components
-const STANDARD_HTML_TAGS = new Set([
-  'a',
-  'abbr',
-  'address',
-  'area',
-  'article',
-  'aside',
-  'audio',
-  'b',
-  'base',
-  'bdi',
-  'bdo',
-  'blockquote',
-  'body',
-  'br',
-  'button',
-  'canvas',
-  'caption',
-  'cite',
-  'code',
-  'col',
-  'colgroup',
-  'data',
-  'datalist',
-  'dd',
-  'del',
-  'details',
-  'dfn',
-  'dialog',
-  'div',
-  'dl',
-  'dt',
-  'em',
-  'embed',
-  'fieldset',
-  'figcaption',
-  'figure',
-  'footer',
-  'form',
-  'h1',
-  'h2',
-  'h3',
-  'h4',
-  'h5',
-  'h6',
-  'head',
-  'header',
-  'hgroup',
-  'hr',
-  'html',
-  'i',
-  'iframe',
-  'img',
-  'input',
-  'ins',
-  'kbd',
-  'label',
-  'legend',
-  'li',
-  'link',
-  'main',
-  'map',
-  'mark',
-  'menu',
-  'meta',
-  'meter',
-  'nav',
-  'noscript',
-  'object',
-  'ol',
-  'optgroup',
-  'option',
-  'output',
-  'p',
-  'param',
-  'picture',
-  'pre',
-  'progress',
-  'q',
-  'rp',
-  'rt',
-  'ruby',
-  's',
-  'samp',
-  'script',
-  'section',
-  'select',
-  'small',
-  'source',
-  'span',
-  'strong',
-  'style',
-  'sub',
-  'summary',
-  'sup',
-  'table',
-  'tbody',
-  'td',
-  'template',
-  'textarea',
-  'tfoot',
-  'th',
-  'thead',
-  'time',
-  'title',
-  'tr',
-  'track',
-  'u',
-  'ul',
-  'var',
-  'video',
-  'wbr',
-])
-
 const CUSTOM_TAG_REGEX = /<([a-z][a-z0-9-]*)\b[^>]*>/gi
-
-const BLOCKED_TAGS = new Set(['script'])
-
-const URL_ATTRS = new Set([
-  'href',
-  'src',
-  'srcset',
-  'xlink:href',
-  'formaction',
-])
 
 const SHOULD_LOG = (() => {
   try {
@@ -204,37 +35,6 @@ function warn(message: string) {
 function logError(message: string, err: unknown) {
   if (SHOULD_LOG)
     console.error(message, err)
-}
-
-function stripControlAndWhitespace(value: string): string {
-  let out = ''
-  for (const ch of value) {
-    const code = ch.charCodeAt(0)
-    if (code <= 0x1F || code === 0x7F)
-      continue
-    if (/\s/u.test(ch))
-      continue
-    out += ch
-  }
-  return out
-}
-
-function isUnsafeUrl(value: string): boolean {
-  const normalized = stripControlAndWhitespace(value).toLowerCase()
-
-  if (normalized.startsWith('javascript:') || normalized.startsWith('vbscript:'))
-    return true
-
-  // Allow data: for media only; block HTML/script-able payloads by default.
-  if (normalized.startsWith('data:')) {
-    return !(
-      normalized.startsWith('data:image/')
-      || normalized.startsWith('data:video/')
-      || normalized.startsWith('data:audio/')
-    )
-  }
-
-  return false
 }
 
 function hasOwn(obj: Record<string, unknown>, key: string): boolean {
