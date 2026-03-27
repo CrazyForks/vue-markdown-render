@@ -6,23 +6,14 @@ import { getString } from '../shared/node-helpers'
   selector: 'markstream-angular-image-node',
   standalone: true,
   template: `
-    <figure class="image-node">
-      <div class="image-node__inner">
-        <img
-          class="image-node__img"
-          [class.image-node__img--svg]="isSvg"
-          [attr.src]="src"
-          [attr.alt]="alt"
-          [attr.title]="title || null"
-          [attr.loading]="'lazy'"
-          decoding="async"
-          [style.minHeight]="isSvg ? '12rem' : null"
-          [style.width]="isSvg ? '100%' : null"
-          [style.height]="isSvg ? 'auto' : null"
-          [style.objectFit]="isSvg ? 'contain' : null"
-        >
-      </div>
-    </figure>
+    <img
+      class="image-node__img"
+      [attr.src]="src"
+      [attr.alt]="alt"
+      [attr.title]="title || null"
+      [attr.loading]="'lazy'"
+      decoding="async"
+    >
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -39,9 +30,5 @@ export class ImageNodeComponent {
 
   get title() {
     return getString((this.node as any)?.title)
-  }
-
-  get isSvg() {
-    return /\.svg(?:\?|$)/i.test(this.src)
   }
 }

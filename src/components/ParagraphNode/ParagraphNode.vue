@@ -39,20 +39,68 @@ const props = defineProps<{
   indexKey?: number | string
 }>()
 const overrides = getCustomNodeComponents(props.customId)
-const paragraphTag = computed(() => {
-  if (props.node.children.length === 0)
-    return 'p'
 
-  const isMediaOnlyParagraph = props.node.children.every((child) => {
-    if (child.type === 'image')
-      return true
-    if (child.type !== 'text')
-      return false
-    return String((child as any).content ?? '').trim() === ''
-  })
+function isWhitespaceText(child: NodeChild) {
+  return child.type === 'text' && String((child as any).content ?? '').trim() === ''
+}
 
-  return isMediaOnlyParagraph ? 'div' : 'p'
+function getTextContent(child: NodeChild) {
+  return String((child as any).content ?? '')
+}
+
+function getMeaningfulLinkChildren(child: NodeChild) {
+  if (child.type !== 'link' || !Array.isArray((child as any).children))
+    return []
+
+  return (child as any).children.filter((linkChild: NodeChild) => !isWhitespaceText(linkChild))
+}
+
+function isImageOnlyLink(child: NodeChild) {
+  const linkChildren = getMeaningfulLinkChildren(child)
+  return linkChildren.length === 1 && linkChildren[0]?.type === 'image'
+}
+
+const meaningfulChildren = computed(() => props.node.children.filter(child => !isWhitespaceText(child)))
+
+const isMediaOnlyParagraph = computed(() => (
+  meaningfulChildren.value.length > 0
+  && meaningfulChildren.value.every(child => child.type === 'image' || isImageOnlyLink(child))
+))
+
+const renderedChildren = computed(() => {
+  if (!isMediaOnlyParagraph.value || meaningfulChildren.value.length <= 1)
+    return props.node.children
+
+  const children: NodeChild[] = []
+  for (let i = 0; i < props.node.children.length; i++) {
+    const child = props.node.children[i]
+    if (!isWhitespaceText(child)) {
+      children.push(child)
+      continue
+    }
+
+    const hasPrevious = children.length > 0
+    const hasNext = props.node.children.slice(i + 1).some(nextChild => !isWhitespaceText(nextChild))
+    if (!hasPrevious || !hasNext)
+      continue
+
+    children.push({
+      ...child,
+      content: ' ',
+      raw: ' ',
+    } as NodeChild)
+  }
+
+  return children
 })
+
+function getChildProps(child: NodeChild, index: number) {
+  return {
+    node: child,
+    'index-key': `${props.indexKey}-${index}`,
+    'custom-id': props.customId,
+  }
+}
 
 const nodeComponents = {
   inline_code: InlineCodeNode,
@@ -81,16 +129,19 @@ const nodeComponents = {
 </script>
 
 <template>
-  <component :is="paragraphTag" dir="auto" class="paragraph-node">
-    <component
-      :is="nodeComponents[child.type]"
-      v-for="(child, index) in node.children"
+  <p dir="auto" class="paragraph-node">
+    <template
+      v-for="(child, index) in renderedChildren"
       :key="`${indexKey || 'paragraph'}-${index}`"
-      :node="child"
-      :index-key="`${indexKey}-${index}`"
-      :custom-id="props.customId"
-    />
-  </component>
+    >
+      <template v-if="isMediaOnlyParagraph && isWhitespaceText(child)">{{ getTextContent(child) }}</template>
+      <component
+        v-else
+        :is="nodeComponents[child.type]"
+        v-bind="getChildProps(child, index)"
+      />
+    </template>
+  </p>
 </template>
 
 <style scoped>

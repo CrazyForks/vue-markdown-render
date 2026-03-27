@@ -360,23 +360,26 @@ exports[`markdownRender node e2e coverage > renders highlight node 1`] = `
 </div>"
 `;
 
+exports[`markdownRender node e2e coverage > renders image links with relative target stay inline 1`] = `
+"<div data-v-8dfe8a80="" class="markstream-vue markdown-renderer">
+  <!--v-if-->
+  <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
+    <div data-v-8dfe8a80="" class="node-content">
+      <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
+      <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node typewriter-enter-from typewriter-enter-active" typewriter="true" is-dark="false"><a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="https://www.npmjs.com/package/markstream-vue" title="" aria-label="Link: https://www.npmjs.com/package/markstream-vue" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--link-color: #0366d6; --underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.35; --underline-rest-opacity: 0.175; --underline-duration: 1.6s; --underline-timing: ease-in-out; --underline-iteration: infinite;"><img data-v-4ff2ac62="" data-v-994bfd08="" src="https://img.shields.io/npm/v/markstream-vue?color=a1b858&amp;label=" alt="NPM version" title="NPM version" class="image-node__img h-auto rounded-lg transition-opacity duration-200 ease-in-out image-node__img--inline opacity-0" loading="lazy" decoding="async" tabindex="-1" aria-label="NPM version" index-key="markdown-renderer-0-0-0"></a> <a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="README.zh-CN.md" title="" aria-label="Link: README.zh-CN.md" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--link-color: #0366d6; --underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.35; --underline-rest-opacity: 0.175; --underline-duration: 1.6s; --underline-timing: ease-in-out; --underline-iteration: infinite;"><img data-v-4ff2ac62="" data-v-994bfd08="" src="https://img.shields.io/badge/docs-%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3-blue" alt="中文版" title="中文版" class="image-node__img h-auto rounded-lg transition-opacity duration-200 ease-in-out image-node__img--inline opacity-0" loading="lazy" decoding="async" tabindex="-1" aria-label="中文版" index-key="markdown-renderer-0-2-0"></a></p>
+    </div>
+  </div>
+  <!--v-if-->
+</div>"
+`;
+
 exports[`markdownRender node e2e coverage > renders image node 1`] = `
 "<div data-v-8dfe8a80="" class="markstream-vue markdown-renderer">
   <!--v-if-->
   <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-      <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-        <div data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false">
-          <figure data-v-4ff2ac62="" data-v-93ee5c2d="" class="text-center my-8" index-key="markdown-renderer-0-0">
-            <div data-v-4ff2ac62="" class="relative inline-block">
-              <!-- 包裹条件渲染元素，启用 out-in 模式以在替换时做平滑过渡 -->
-              <transition-stub data-v-4ff2ac62="" name="img-switch" mode="out-in" appear="false" persisted="false" css="true"><img data-v-4ff2ac62="" src="https://example.com/vue.png" alt="Vue Logo" title="Vue Logo" class="max-w-96 h-auto rounded-lg transition-opacity duration-200 ease-in-out opacity-0" loading="lazy" decoding="async" tabindex="-1" aria-label="Vue Logo"></transition-stub>
-            </div>
-            <!--v-if-->
-          </figure>
-        </div>
-      </transition-stub>
+      <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node typewriter-enter-from typewriter-enter-active" typewriter="true" is-dark="false"><img data-v-4ff2ac62="" data-v-93ee5c2d="" src="https://example.com/vue.png" alt="Vue Logo" title="Vue Logo" class="image-node__img h-auto rounded-lg transition-opacity duration-200 ease-in-out image-node__img--inline opacity-0" loading="lazy" decoding="async" tabindex="-1" aria-label="Vue Logo" index-key="markdown-renderer-0-0"></p>
     </div>
   </div>
   <!--v-if-->
@@ -537,6 +540,19 @@ exports[`markdownRender node e2e coverage > renders reference node 1`] = `
           <!--v-if--></span>
         </p>
       </transition-stub>
+    </div>
+  </div>
+  <!--v-if-->
+</div>"
+`;
+
+exports[`markdownRender node e2e coverage > renders single badge image with trailing newline stays inline 1`] = `
+"<div data-v-8dfe8a80="" class="markstream-vue markdown-renderer">
+  <!--v-if-->
+  <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
+    <div data-v-8dfe8a80="" class="node-content">
+      <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
+      <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node typewriter-enter-from typewriter-enter-active" typewriter="true" is-dark="false"><img data-v-4ff2ac62="" data-v-93ee5c2d="" src="https://img.shields.io/npm/l/markstream-vue" alt="License" title="License" class="image-node__img h-auto rounded-lg transition-opacity duration-200 ease-in-out image-node__img--inline opacity-0" loading="lazy" decoding="async" tabindex="-1" aria-label="License" index-key="markdown-renderer-0-0"></p>
     </div>
   </div>
   <!--v-if-->

@@ -64,14 +64,14 @@ markstream-angular {
 }
 
 .markstream-angular markstream-angular-blockquote-node,
-.markstream-angular markstream-angular-paragraph-node,
-.markstream-angular markstream-angular-image-node {
+.markstream-angular markstream-angular-paragraph-node {
   display: flow-root;
   width: 100%;
 }
 
 .markstream-angular markstream-angular-nested-renderer,
-.markstream-angular markstream-angular-node-outlet {
+.markstream-angular markstream-angular-node-outlet,
+.markstream-angular markstream-angular-image-node {
   display: contents;
 }
 
@@ -327,35 +327,20 @@ markstream-angular {
 }
 
 .markstream-angular img {
-  display: block;
+  display: inline-block;
   max-width: 100%;
   height: auto;
   border-radius: 0.9rem;
-}
-
-.markstream-angular .image-node {
-  margin: 2rem 0;
-  text-align: center;
-}
-
-.markstream-angular .image-node__inner {
-  position: relative;
-  display: inline-block;
-  width: min(100%, 24rem);
-  max-width: 24rem;
+  vertical-align: middle;
 }
 
 .markstream-angular .image-node__img {
   display: inline-block;
-  width: 100%;
-  max-width: 24rem;
+  width: auto;
+  max-width: 100%;
   height: auto;
   border-radius: 0.75rem;
-  box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08);
-}
-
-.markstream-angular .image-node__img--svg {
-  box-shadow: none;
+  vertical-align: middle;
 }
 
 .markstream-angular details {

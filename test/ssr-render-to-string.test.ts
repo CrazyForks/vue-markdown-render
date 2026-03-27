@@ -123,8 +123,7 @@ Footnotes are server-rendered.[^1]
     expect(html).toContain('<table')
     expect(html).toContain('href="https://vuejs.org"')
     expect(html).toContain('src="/vue-markdown-icon.svg"')
-    expect(html).toContain('<figure')
-    expect(html).not.toMatch(/<p[^>]*>\s*<figure/)
+    expect(html).not.toContain('<figure')
     expect(html).toContain('Footnote body')
   })
 

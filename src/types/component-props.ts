@@ -211,9 +211,7 @@ export interface ImageNodeProps {
     loading?: boolean
   }
   fallbackSrc?: string
-  showCaption?: boolean
   lazy?: boolean
-  svgMinHeight?: string
   usePlaceholder?: boolean
 }
 

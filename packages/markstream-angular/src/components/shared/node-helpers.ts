@@ -84,7 +84,6 @@ export interface AngularRenderContext {
 const markdownCache = new Map<string, MarkdownIt>()
 
 export const BLOCK_LEVEL_TYPES = new Set([
-  'image',
   'table',
   'code_block',
   'html_block',
@@ -188,6 +187,58 @@ export function getNodeList(value: unknown): AngularRenderableNode[] {
   return Array.isArray(value)
     ? value.filter((item): item is AngularRenderableNode => !!item && typeof item === 'object')
     : []
+}
+
+export function isWhitespaceTextNode(node: AngularRenderableNode | null | undefined) {
+  return getString((node as any)?.type) === 'text' && getString((node as any)?.content).trim() === ''
+}
+
+export function getMeaningfulLinkChildren(node: AngularRenderableNode | null | undefined) {
+  if (getString((node as any)?.type) !== 'link')
+    return []
+
+  return getNodeList((node as any)?.children).filter(child => !isWhitespaceTextNode(child))
+}
+
+export function isImageOnlyLinkNode(node: AngularRenderableNode | null | undefined) {
+  const linkChildren = getMeaningfulLinkChildren(node)
+  return linkChildren.length === 1 && getString((linkChildren[0] as any)?.type) === 'image'
+}
+
+export function isMediaOnlyParagraphNodes(children: readonly AngularRenderableNode[]) {
+  const meaningfulChildren = getNodeList(children).filter(child => !isWhitespaceTextNode(child))
+  return meaningfulChildren.length > 0
+    && meaningfulChildren.every(child => getString((child as any)?.type) === 'image' || isImageOnlyLinkNode(child))
+}
+
+export function normalizeMediaOnlyParagraphNodes(children: readonly AngularRenderableNode[]) {
+  const source = getNodeList(children)
+  const meaningfulChildren = source.filter(child => !isWhitespaceTextNode(child))
+
+  if (!isMediaOnlyParagraphNodes(source) || meaningfulChildren.length <= 1)
+    return source
+
+  const normalized: AngularRenderableNode[] = []
+  for (let index = 0; index < source.length; index += 1) {
+    const child = source[index]
+    if (!isWhitespaceTextNode(child)) {
+      normalized.push(child)
+      continue
+    }
+
+    const hasPrevious = normalized.length > 0
+    const hasNext = source.slice(index + 1).some(nextChild => !isWhitespaceTextNode(nextChild))
+    if (!hasPrevious || !hasNext)
+      continue
+
+    normalized.push({
+      ...(child as Record<string, unknown>),
+      content: ' ',
+      raw: ' ',
+    } as AngularRenderableNode)
+  }
+
+  return normalized
 }
 
 export function getString(value: unknown): string {
