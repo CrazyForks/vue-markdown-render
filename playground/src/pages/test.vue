@@ -71,7 +71,6 @@ const streamBurstiness = useLocalStorage<number>('vmr-test-stream-burstiness', 3
 const streamTransportMode = useLocalStorage<StreamTransportMode>('vmr-test-stream-transport-mode', 'readable-stream')
 const streamSliceMode = useLocalStorage<StreamSliceMode>('vmr-test-stream-slice-mode', 'pure-random')
 const streamDebug = useLocalStorage<boolean>('vmr-test-stream-debug', false)
-const showStreamSettings = useLocalStorage<boolean>('vmr-test-show-settings', true)
 const isDark = useLocalStorage<boolean>('vmr-test-dark', false)
 
 const renderMode = useLocalStorage<'monaco' | 'pre' | 'markdown'>('vmr-test-render-mode', 'monaco')
@@ -97,6 +96,7 @@ const copiedShareTarget = ref<TestPageViewMode | null>(null)
 const issueUrl = ref<string>('')
 const editorTextareaRef = ref<HTMLTextAreaElement | null>(null)
 const previewCardRef = ref<HTMLElement | null>(null)
+const streamSettingsDialogRef = ref<HTMLDialogElement | null>(null)
 const isPreviewFullscreen = ref(false)
 const testPageViewMode = ref<TestPageViewMode>('lab')
 const MAX_URL_LEN = 2000
@@ -170,6 +170,7 @@ const selectedStreamPresetId = computed<StreamPresetId>({
   },
 })
 const streamPresetDescription = computed(() => activeStreamPreset.value?.descriptionZh ?? '当前参数已偏离预设，属于自定义 min/max 流式画像。')
+const streamPresetLabel = computed(() => activeStreamPreset.value?.label ?? 'Custom')
 const streamChunkRangeLabel = computed(() => `${normalizedChunkSizeRange.value.min}-${normalizedChunkSizeRange.value.max} 字`)
 const streamDelayRangeLabel = computed(() => `${normalizedChunkDelayRange.value.min}-${normalizedChunkDelayRange.value.max}ms`)
 const streamModeLabel = computed(() => streamTransportMode.value === 'readable-stream' ? 'ReadableStream' : 'Scheduler')
@@ -477,6 +478,18 @@ function toggleAppearance() {
   isDark.value = !isDark.value
 }
 
+function openStreamSettingsDialog() {
+  if (!streamSettingsDialogRef.value || streamSettingsDialogRef.value.open)
+    return
+  streamSettingsDialogRef.value.showModal?.()
+}
+
+function closeStreamSettingsDialog() {
+  if (!streamSettingsDialogRef.value?.open)
+    return
+  streamSettingsDialogRef.value.close()
+}
+
 function frameworkHref(id: FrameworkId) {
   const framework = frameworkCards.find(item => item.id === id)
   if (!framework)
@@ -603,6 +616,34 @@ watch(mermaidEnabled, (enabled) => {
           </p>
         </div>
 
+        <div class="hero-panel__actions">
+          <div class="hero-panel__action-row">
+            <button type="button" class="action-button action-button--primary" :disabled="isWorking" @click="generateAndCopy">
+              {{ copiedShareTarget === 'lab' ? '已复制实验页链接' : (isWorking ? '生成中...' : '复制实验页链接') }}
+            </button>
+            <button type="button" class="action-button" @click="copyRawInput">
+              复制 Issue 链接
+            </button>
+            <button type="button" class="action-button" @click="openIssueInNewTab">
+              打开 Issue
+            </button>
+          </div>
+
+          <div class="hero-panel__status-row">
+            <span class="mini-pill">{{ renderModeLabel }}</span>
+            <span class="mini-pill" :class="{ 'mini-pill--active': isStreaming }">
+              {{ isStreaming ? 'Streaming' : 'Ready' }}
+            </span>
+          </div>
+
+          <div v-if="tooLong" class="info-banner info-banner--warning">
+            当前内容过长，建议使用 Issue 链接分享完整输入。
+          </div>
+          <div v-if="notice" class="info-banner" :class="`info-banner--${noticeType}`">
+            {{ notice }}
+          </div>
+        </div>
+
         <div class="hero-panel__metrics">
           <div class="metric-card">
             <span>当前框架</span>
@@ -638,7 +679,7 @@ watch(mermaidEnabled, (enabled) => {
 
       <div class="lab-layout" :class="{ 'lab-layout--share-preview': isSharePreviewMode }">
         <aside v-if="!isSharePreviewMode" class="lab-sidebar">
-          <section class="panel-card">
+          <section class="panel-card panel-card--samples">
             <div class="panel-card__head">
               <div>
                 <h2>样例</h2>
@@ -662,18 +703,41 @@ watch(mermaidEnabled, (enabled) => {
             </div>
           </section>
 
-          <section class="panel-card">
+          <section class="panel-card panel-card--stream">
             <div class="panel-card__head">
               <div>
                 <h2>流式控制</h2>
-                <p>模拟真实增量输出，把抖动、停顿和 burst 一起带进来。</p>
+                <p>先用这里的紧凑摘要和常用操作控制流式预览，细节参数放进更多设置里。</p>
               </div>
-              <button type="button" class="ghost-button" @click="showStreamSettings = !showStreamSettings">
-                {{ showStreamSettings ? '收起' : '展开' }}
+              <button type="button" class="ghost-button" @click="openStreamSettingsDialog">
+                更多设置
               </button>
             </div>
 
-            <div class="control-actions">
+            <div class="stream-summary">
+              <div class="stream-summary__row">
+                <span class="mini-pill mini-pill--active">{{ streamPresetLabel }}</span>
+                <span class="mini-pill">{{ streamModeLabel }}</span>
+                <span class="mini-pill">{{ streamSliceMode === 'boundary-aware' ? 'Boundary Aware' : 'Pure Random' }}</span>
+                <span class="mini-pill">{{ renderModeLabel }}</span>
+              </div>
+
+              <div class="stream-summary__row stream-summary__row--dense">
+                <span class="stream-summary__item">Chunk {{ streamChunkRangeLabel }}</span>
+                <span class="stream-summary__item">Delay {{ streamDelayRangeLabel }}</span>
+                <span class="stream-summary__item">Burst {{ streamBurstiness }}%</span>
+                <span class="stream-summary__item" :class="{ 'stream-summary__item--active': codeBlockStream }">代码块流式</span>
+                <span class="stream-summary__item" :class="{ 'stream-summary__item--active': viewportPriority }">viewportPriority</span>
+                <span class="stream-summary__item" :class="{ 'stream-summary__item--active': batchRendering }">batchRendering</span>
+                <span class="stream-summary__item" :class="{ 'stream-summary__item--active': typewriter }">typewriter</span>
+                <span class="stream-summary__item" :class="{ 'stream-summary__item--active': mathEnabled }">KaTeX</span>
+                <span class="stream-summary__item" :class="{ 'stream-summary__item--active': mermaidEnabled }">Mermaid</span>
+                <span v-if="debugParse" class="stream-summary__item stream-summary__item--active">解析树 debug</span>
+                <span v-if="streamDebug" class="stream-summary__item stream-summary__item--active">chunk debug</span>
+              </div>
+            </div>
+
+            <div class="control-actions control-actions--stream-bar">
               <button type="button" class="action-button action-button--primary" @click="startStreamRender">
                 {{ isStreaming ? '停止流式渲染' : '开始流式渲染' }}
               </button>
@@ -686,6 +750,9 @@ watch(mermaidEnabled, (enabled) => {
               <button type="button" class="action-button" @click="clearEditor">
                 清空输入
               </button>
+              <button type="button" class="action-button" @click="openStreamSettingsDialog">
+                调整参数
+              </button>
             </div>
 
             <div class="progress-block">
@@ -697,152 +764,24 @@ watch(mermaidEnabled, (enabled) => {
                 <span>{{ isStreaming ? `${streamModeLabel} · 最近一次 ${lastChunkSize} 字 / ${lastDelayMs}ms` : 'Static preview' }}</span>
               </div>
             </div>
-
-            <div v-if="showStreamSettings" class="control-stack">
-              <label class="select-control">
-                <span>Transport</span>
-                <select v-model="streamTransportMode">
-                  <option value="readable-stream">
-                    ReadableStream
-                  </option>
-                  <option value="scheduler">
-                    Scheduler
-                  </option>
-                </select>
-              </label>
-
-              <label class="select-control">
-                <span>Slice Mode</span>
-                <select v-model="streamSliceMode">
-                  <option value="pure-random">
-                    Pure Random
-                  </option>
-                  <option value="boundary-aware">
-                    Boundary Aware
-                  </option>
-                </select>
-              </label>
-
-              <label class="select-control">
-                <span>流式画像 preset</span>
-                <select v-model="selectedStreamPresetId">
-                  <option v-for="preset in STREAM_PRESETS" :key="preset.id" :value="preset.id">
-                    {{ preset.label }}
-                  </option>
-                  <option :value="CUSTOM_STREAM_PRESET_ID">
-                    Custom
-                  </option>
-                </select>
-              </label>
-
-              <p class="control-note">
-                {{ streamPresetDescription }}
-              </p>
-
-              <label class="range-control">
-                <span>chunkSizeMin</span>
-                <strong>{{ normalizedChunkSizeRange.min }}</strong>
-                <input v-model.number="streamChunkSizeMin" type="range" min="1" max="80" step="1">
-              </label>
-
-              <label class="range-control">
-                <span>chunkSizeMax</span>
-                <strong>{{ normalizedChunkSizeRange.max }}</strong>
-                <input v-model.number="streamChunkSizeMax" type="range" min="1" max="80" step="1">
-              </label>
-
-              <label class="range-control">
-                <span>chunkDelayMin</span>
-                <strong>{{ normalizedChunkDelayRange.min }}ms</strong>
-                <input v-model.number="streamChunkDelayMin" type="range" min="8" max="600" step="4">
-              </label>
-
-              <label class="range-control">
-                <span>chunkDelayMax</span>
-                <strong>{{ normalizedChunkDelayRange.max }}ms</strong>
-                <input v-model.number="streamChunkDelayMax" type="range" min="8" max="600" step="4">
-              </label>
-
-              <label class="range-control">
-                <span>突发/停顿强度</span>
-                <strong>{{ streamBurstiness }}%</strong>
-                <input v-model.number="streamBurstiness" type="range" min="0" max="100" step="1">
-              </label>
-
-              <p class="control-note">
-                当前窗口：{{ streamChunkRangeLabel }}，{{ streamDelayRangeLabel }}。当 min=max 时就是固定节奏。
-              </p>
-
-              <p class="control-note">
-                `Pure Random` 会直接按随机长度做原始 `slice`；`Boundary Aware` 会尽量贴近单词或标点边界。
-              </p>
-
-              <p class="control-note">
-                `ReadableStream` 更接近真实 reader 消费链路；`Scheduler` 保留我们本地定时调度模型。burstiness 只会影响非纯随机调度。
-              </p>
-
-              <div class="toggle-grid">
-                <label class="toggle-item">
-                  <span>代码块流式渲染</span>
-                  <input v-model="codeBlockStream" type="checkbox">
-                </label>
-                <label class="toggle-item">
-                  <span>viewportPriority</span>
-                  <input v-model="viewportPriority" type="checkbox">
-                </label>
-                <label class="toggle-item">
-                  <span>batchRendering</span>
-                  <input v-model="batchRendering" type="checkbox">
-                </label>
-                <label class="toggle-item">
-                  <span>typewriter</span>
-                  <input v-model="typewriter" type="checkbox">
-                </label>
-                <label class="toggle-item">
-                  <span>KaTeX</span>
-                  <input v-model="mathEnabled" type="checkbox">
-                </label>
-                <label class="toggle-item">
-                  <span>Mermaid</span>
-                  <input v-model="mermaidEnabled" type="checkbox">
-                </label>
-                <label class="toggle-item">
-                  <span>解析树 debug</span>
-                  <input v-model="debugParse" type="checkbox">
-                </label>
-                <label class="toggle-item">
-                  <span>chunk debug</span>
-                  <input v-model="streamDebug" type="checkbox">
-                </label>
-              </div>
-
-              <label class="select-control">
-                <span>代码块模式</span>
-                <select v-model="renderMode">
-                  <option value="monaco">
-                    Monaco
-                  </option>
-                  <option value="markdown">
-                    MarkdownCodeBlock
-                  </option>
-                  <option value="pre">
-                    PreCodeNode
-                  </option>
-                </select>
-              </label>
-            </div>
           </section>
 
-          <section class="panel-card">
+          <section class="panel-card panel-card--sandbox">
             <div class="panel-card__head">
               <div>
                 <h2>版本沙箱</h2>
-                <p>指定 framework、source 和包版本，在独立 iframe 里对照渲染。</p>
+                <p>左侧收紧成配置面板，右侧保留更大的 iframe 对照区域。</p>
               </div>
               <span class="mini-pill">{{ sandboxStatusLabel }}</span>
             </div>
 
-            <div class="control-stack">
+            <div class="sandbox-summary">
+              <span class="mini-pill mini-pill--active">{{ activeSandboxFramework.label }}</span>
+              <span class="mini-pill">{{ activeSandbox.source === 'workspace' ? 'workspace' : 'npm' }}</span>
+              <span class="mini-pill">{{ activeSandbox.source === 'workspace' ? 'local' : activeSandbox.version }}</span>
+            </div>
+
+            <div class="control-stack control-stack--sandbox">
               <label class="select-control">
                 <span>目标框架</span>
                 <select v-model="sandboxFrameworkId">
@@ -854,6 +793,14 @@ watch(mermaidEnabled, (enabled) => {
                     {{ framework.label }}
                   </option>
                 </select>
+              </label>
+                      <label class="text-control">
+                <span>包版本</span>
+                <input
+                  v-model="sandboxVersion"
+                  type="text"
+                  :placeholder="sandboxVersionPlaceholder"
+                >
               </label>
 
               <div class="segmented-control">
@@ -889,14 +836,6 @@ watch(mermaidEnabled, (enabled) => {
                 </button>
               </div>
 
-              <label class="text-control">
-                <span>包版本</span>
-                <input
-                  v-model="sandboxVersion"
-                  type="text"
-                  :placeholder="sandboxVersionPlaceholder"
-                >
-              </label>
 
               <label class="toggle-item">
                 <span>输入变化自动同步到 iframe</span>
@@ -932,48 +871,10 @@ watch(mermaidEnabled, (enabled) => {
             </div>
           </section>
 
-          <section class="panel-card">
-            <div class="panel-card__head">
-              <div>
-                <h2>分享与排障</h2>
-                <p>把当前输入直接带给别人复现。</p>
-              </div>
-            </div>
-
-            <div class="share-actions">
-              <button type="button" class="action-button action-button--primary" :disabled="isWorking" @click="generateAndCopy">
-                {{ copiedShareTarget === 'lab' ? '已复制实验页链接' : (isWorking ? '生成中...' : '复制实验页链接') }}
-              </button>
-              <button type="button" class="action-button" @click="copyRawInput">
-                复制 Issue 链接
-              </button>
-              <button type="button" class="action-button" @click="openIssueInNewTab">
-                打开 Issue
-              </button>
-            </div>
-
-            <div class="meta-list">
-              <div class="meta-list__row">
-                <span>当前视图</span>
-                <strong>{{ renderModeLabel }}</strong>
-              </div>
-              <div class="meta-list__row">
-                <span>分享地址</span>
-                <strong>{{ shareUrl || '尚未生成' }}</strong>
-              </div>
-            </div>
-
-            <div v-if="tooLong" class="info-banner info-banner--warning">
-              当前内容过长，建议使用 Issue 链接分享完整输入。
-            </div>
-            <div v-if="notice" class="info-banner" :class="`info-banner--${noticeType}`">
-              {{ notice }}
-            </div>
-          </section>
         </aside>
 
         <section class="workspace-grid" :class="{ 'workspace-grid--share-preview': isSharePreviewMode }">
-          <article v-if="!isSharePreviewMode" class="workspace-card workspace-card--pane">
+          <article v-if="!isSharePreviewMode" class="workspace-card workspace-card--pane workspace-card--editor">
             <header class="workspace-card__head">
               <div>
                 <h2>Markdown 输入</h2>
@@ -1112,7 +1013,7 @@ watch(mermaidEnabled, (enabled) => {
             </footer>
           </article>
 
-          <article v-if="!isSharePreviewMode && streamDebug && streamChunks.length" class="workspace-card workspace-card--full">
+          <article v-if="!isSharePreviewMode && streamDebug && streamChunks.length" class="workspace-card workspace-card--full workspace-card--debug">
             <header class="workspace-card__head">
               <div>
                 <h2>Chunk Debug</h2>
@@ -1130,7 +1031,7 @@ watch(mermaidEnabled, (enabled) => {
             </div>
           </article>
 
-          <article v-if="!isSharePreviewMode" class="workspace-card workspace-card--full">
+          <article v-if="!isSharePreviewMode" class="workspace-card workspace-card--full workspace-card--sandbox-preview">
             <header class="workspace-card__head">
               <div>
                 <h2>版本沙箱预览</h2>
@@ -1158,6 +1059,158 @@ watch(mermaidEnabled, (enabled) => {
           </article>
         </section>
       </div>
+
+      <dialog
+        v-if="!isSharePreviewMode"
+        ref="streamSettingsDialogRef"
+        class="settings-dialog"
+      >
+        <div class="settings-dialog__panel">
+          <header class="settings-dialog__head">
+            <div>
+              <h2>流式详细设置</h2>
+              <p>这里调整 transport、窗口、开关项和代码块渲染策略。</p>
+            </div>
+            <button type="button" class="ghost-button" @click="closeStreamSettingsDialog">
+              关闭
+            </button>
+          </header>
+
+          <div class="control-stack control-stack--stream">
+            <label class="select-control">
+              <span>Transport</span>
+              <select v-model="streamTransportMode">
+                <option value="readable-stream">
+                  ReadableStream
+                </option>
+                <option value="scheduler">
+                  Scheduler
+                </option>
+              </select>
+            </label>
+
+            <label class="select-control">
+              <span>Slice Mode</span>
+              <select v-model="streamSliceMode">
+                <option value="pure-random">
+                  Pure Random
+                </option>
+                <option value="boundary-aware">
+                  Boundary Aware
+                </option>
+              </select>
+            </label>
+
+            <label class="select-control">
+              <span>流式画像 preset</span>
+              <select v-model="selectedStreamPresetId">
+                <option v-for="preset in STREAM_PRESETS" :key="preset.id" :value="preset.id">
+                  {{ preset.label }}
+                </option>
+                <option :value="CUSTOM_STREAM_PRESET_ID">
+                  Custom
+                </option>
+              </select>
+            </label>
+
+            <p class="control-note">
+              {{ streamPresetDescription }}
+            </p>
+
+            <label class="range-control">
+              <span>chunkSizeMin</span>
+              <strong>{{ normalizedChunkSizeRange.min }}</strong>
+              <input v-model.number="streamChunkSizeMin" type="range" min="1" max="80" step="1">
+            </label>
+
+            <label class="range-control">
+              <span>chunkSizeMax</span>
+              <strong>{{ normalizedChunkSizeRange.max }}</strong>
+              <input v-model.number="streamChunkSizeMax" type="range" min="1" max="80" step="1">
+            </label>
+
+            <label class="range-control">
+              <span>chunkDelayMin</span>
+              <strong>{{ normalizedChunkDelayRange.min }}ms</strong>
+              <input v-model.number="streamChunkDelayMin" type="range" min="8" max="600" step="4">
+            </label>
+
+            <label class="range-control">
+              <span>chunkDelayMax</span>
+              <strong>{{ normalizedChunkDelayRange.max }}ms</strong>
+              <input v-model.number="streamChunkDelayMax" type="range" min="8" max="600" step="4">
+            </label>
+
+            <label class="range-control">
+              <span>突发/停顿强度</span>
+              <strong>{{ streamBurstiness }}%</strong>
+              <input v-model.number="streamBurstiness" type="range" min="0" max="100" step="1">
+            </label>
+
+            <p class="control-note">
+              当前窗口：{{ streamChunkRangeLabel }}，{{ streamDelayRangeLabel }}。当 min=max 时就是固定节奏。
+            </p>
+
+            <p class="control-note">
+              `Pure Random` 会直接按随机长度做原始 `slice`；`Boundary Aware` 会尽量贴近单词或标点边界。
+            </p>
+
+            <p class="control-note">
+              `ReadableStream` 更接近真实 reader 消费链路；`Scheduler` 保留我们本地定时调度模型。burstiness 只会影响非纯随机调度。
+            </p>
+
+            <div class="toggle-grid">
+              <label class="toggle-item">
+                <span>代码块流式渲染</span>
+                <input v-model="codeBlockStream" type="checkbox">
+              </label>
+              <label class="toggle-item">
+                <span>viewportPriority</span>
+                <input v-model="viewportPriority" type="checkbox">
+              </label>
+              <label class="toggle-item">
+                <span>batchRendering</span>
+                <input v-model="batchRendering" type="checkbox">
+              </label>
+              <label class="toggle-item">
+                <span>typewriter</span>
+                <input v-model="typewriter" type="checkbox">
+              </label>
+              <label class="toggle-item">
+                <span>KaTeX</span>
+                <input v-model="mathEnabled" type="checkbox">
+              </label>
+              <label class="toggle-item">
+                <span>Mermaid</span>
+                <input v-model="mermaidEnabled" type="checkbox">
+              </label>
+              <label class="toggle-item">
+                <span>解析树 debug</span>
+                <input v-model="debugParse" type="checkbox">
+              </label>
+              <label class="toggle-item">
+                <span>chunk debug</span>
+                <input v-model="streamDebug" type="checkbox">
+              </label>
+            </div>
+
+            <label class="select-control">
+              <span>代码块模式</span>
+              <select v-model="renderMode">
+                <option value="monaco">
+                  Monaco
+                </option>
+                <option value="markdown">
+                  MarkdownCodeBlock
+                </option>
+                <option value="pre">
+                  PreCodeNode
+                </option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </dialog>
     </div>
   </div>
 </template>
@@ -1258,9 +1311,9 @@ watch(mermaidEnabled, (enabled) => {
 .hero-panel {
   position: relative;
   overflow: hidden;
-  padding: 28px;
+  padding: 20px 22px;
   display: grid;
-  gap: 22px;
+  gap: 14px;
 }
 
 .hero-panel::after {
@@ -1273,10 +1326,38 @@ watch(mermaidEnabled, (enabled) => {
   pointer-events: none;
 }
 
+.hero-panel__copy,
+.hero-panel__actions {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.hero-panel__action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.hero-panel__action-row .action-button:first-child {
+  grid-column: 1 / -1;
+}
+
+.hero-panel__action-row .action-button,
+.hero-panel__actions .info-banner {
+  padding-block: 10px;
+}
+
+.hero-panel__status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .eyebrow {
   display: inline-flex;
   width: fit-content;
-  padding: 7px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(29, 78, 216, 0.14);
@@ -1294,17 +1375,17 @@ watch(mermaidEnabled, (enabled) => {
 }
 
 .hero-panel h1 {
-  margin: 12px 0 10px;
-  font-size: clamp(2.1rem, 4vw, 3.4rem);
-  line-height: 0.94;
+  margin: 0;
+  font-size: clamp(1.72rem, 2.9vw, 2.45rem);
+  line-height: 1;
 }
 
 .hero-panel p {
   margin: 0;
   max-width: 720px;
   color: var(--lab-muted);
-  font-size: 1rem;
-  line-height: 1.7;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .hero-panel__metrics {
@@ -1314,8 +1395,8 @@ watch(mermaidEnabled, (enabled) => {
 }
 
 .metric-card {
-  padding: 16px 18px;
-  border-radius: 22px;
+  padding: 11px 14px;
+  border-radius: 18px;
   background: var(--lab-surface-strong);
   border: 1px solid rgba(15, 23, 42, 0.06);
 }
@@ -1323,12 +1404,12 @@ watch(mermaidEnabled, (enabled) => {
 .metric-card span {
   display: block;
   color: var(--lab-muted);
-  font-size: 0.82rem;
-  margin-bottom: 8px;
+  font-size: 0.78rem;
+  margin-bottom: 4px;
 }
 
 .metric-card strong {
-  font-size: 1.4rem;
+  font-size: 1.05rem;
 }
 
 .framework-switcher {
@@ -1340,9 +1421,9 @@ watch(mermaidEnabled, (enabled) => {
 .framework-chip {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 15px 18px;
-  border-radius: 22px;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: rgba(255, 255, 255, 0.78);
   color: inherit;
@@ -1393,18 +1474,21 @@ watch(mermaidEnabled, (enabled) => {
 
 .framework-chip__note {
   color: var(--lab-muted);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
 }
 
 .lab-layout {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    'workspace'
+    'sidebar';
   gap: 20px;
   align-items: start;
 }
 
 .lab-layout--share-preview {
-  grid-template-columns: 1fr;
+  grid-template-areas: 'workspace';
   gap: 0;
 }
 
@@ -1412,6 +1496,14 @@ watch(mermaidEnabled, (enabled) => {
 .workspace-grid {
   display: grid;
   gap: 18px;
+}
+
+.lab-sidebar {
+  grid-area: sidebar;
+}
+
+.workspace-grid {
+  grid-area: workspace;
 }
 
 .panel-card {
@@ -1462,6 +1554,7 @@ watch(mermaidEnabled, (enabled) => {
   color: var(--lab-muted);
   font-size: 0.78rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .mini-pill--active {
@@ -1472,7 +1565,6 @@ watch(mermaidEnabled, (enabled) => {
 .sample-list,
 .control-stack,
 .toggle-grid,
-.share-actions,
 .meta-list {
   display: grid;
   gap: 12px;
@@ -1512,6 +1604,10 @@ watch(mermaidEnabled, (enabled) => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 16px;
+}
+
+.control-actions--stream-bar {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .control-actions--stacked {
@@ -1625,6 +1721,48 @@ watch(mermaidEnabled, (enabled) => {
   line-height: 1.6;
 }
 
+.stream-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.stream-summary__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.stream-summary__row--dense {
+  flex: 1 1 440px;
+}
+
+.stream-summary__item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  color: var(--lab-muted);
+  font-size: 0.79rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stream-summary__item--active {
+  background: rgba(29, 78, 216, 0.12);
+  border-color: rgba(29, 78, 216, 0.2);
+  color: var(--lab-accent);
+}
+
 .select-control select {
   border: 0;
   border-radius: 14px;
@@ -1695,6 +1833,58 @@ watch(mermaidEnabled, (enabled) => {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.sandbox-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.panel-card--sandbox {
+  display: grid;
+  gap: 14px;
+}
+
+.panel-card--sandbox .panel-card__head {
+  align-items: center;
+}
+
+.panel-card--sandbox .control-stack {
+  gap: 10px;
+}
+
+.panel-card--sandbox .select-control,
+.panel-card--sandbox .text-control,
+.panel-card--sandbox .toggle-item {
+  padding: 10px 12px;
+  border-radius: 16px;
+}
+
+.panel-card--sandbox .segmented-control__button,
+.panel-card--sandbox .preset-chip {
+  border-radius: 14px;
+}
+
+.panel-card--sandbox .control-actions {
+  margin-top: 0;
+}
+
+.panel-card--sandbox .meta-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel-card--sandbox .meta-list__row {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.panel-card--sandbox .info-banner {
+  padding: 10px 12px;
+  font-size: 0.86rem;
 }
 
 .preset-chip {
@@ -1828,6 +2018,15 @@ watch(mermaidEnabled, (enabled) => {
   position: relative;
 }
 
+.workspace-card--sandbox-preview {
+  min-height: 640px;
+}
+
+.workspace-card--sandbox-preview .workspace-card__head,
+.workspace-card--sandbox-preview .workspace-card__foot {
+  padding: 16px 18px;
+}
+
 .workspace-card--share-preview {
   grid-template-rows: minmax(0, 1fr);
   min-height: 100vh;
@@ -1943,6 +2142,52 @@ watch(mermaidEnabled, (enabled) => {
   overflow: auto;
 }
 
+.settings-dialog {
+  width: min(980px, calc(100vw - 32px));
+  max-width: 100%;
+  max-height: calc(100vh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.settings-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(6px);
+}
+
+.settings-dialog__panel {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 28px;
+  background: var(--lab-surface);
+  border: 1px solid var(--lab-border);
+  box-shadow: var(--lab-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.settings-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-dialog__head h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.settings-dialog__head p {
+  margin: 6px 0 0;
+  color: var(--lab-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
 .test-lab--dark .editor-textarea {
   background: linear-gradient(180deg, rgba(2, 6, 23, 0.96), rgba(15, 23, 42, 0.94));
   color: #e2e8f0;
@@ -1956,6 +2201,27 @@ watch(mermaidEnabled, (enabled) => {
 
 .test-lab--dark .preview-surface {
   background: linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.96));
+}
+
+.test-lab--dark .stream-summary {
+  background: rgba(15, 23, 42, 0.76);
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+.test-lab--dark .stream-summary__item {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+.test-lab--dark .stream-summary__item--active {
+  background: rgba(37, 99, 235, 0.2);
+  border-color: rgba(96, 165, 250, 0.24);
+  color: #bfdbfe;
+}
+
+.test-lab--dark .panel-card--sandbox .meta-list__row {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(148, 163, 184, 0.12);
 }
 
 .workspace-card--preview:fullscreen {
@@ -2017,12 +2283,142 @@ watch(mermaidEnabled, (enabled) => {
   min-height: 100%;
 }
 
-@media (max-width: 1180px) {
-  .lab-layout {
+@media (min-width: 1181px) {
+  .lab-layout:not(.lab-layout--share-preview) {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-areas: none;
+  }
+
+  .lab-layout:not(.lab-layout--share-preview) .lab-sidebar,
+  .lab-layout:not(.lab-layout--share-preview) .workspace-grid {
+    display: contents;
+  }
+
+  .panel-card--samples {
+    order: 1;
+    grid-column: 1 / -1;
+  }
+
+  .panel-card--stream {
+    order: 2;
+    grid-column: 1 / -1;
+  }
+
+  .workspace-card--editor {
+    order: 3;
+    grid-column: 1 / 7;
+  }
+
+  .workspace-card--preview {
+    order: 4;
+    grid-column: 7 / -1;
+  }
+
+  .panel-card--sandbox {
+    order: 5;
+    grid-column: 1 / 5;
+  }
+
+  .workspace-card--sandbox-preview {
+    order: 6;
+    grid-column: 5 / -1;
+  }
+
+  .workspace-card--debug {
+    order: 7;
+    grid-column: 1 / -1;
+  }
+
+  .hero-panel {
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
+    align-items: start;
+  }
+
+  .hero-panel__copy {
+    grid-column: 1;
+  }
+
+  .hero-panel__actions {
+    grid-column: 2;
+  }
+
+  .hero-panel__metrics,
+  .framework-switcher {
+    grid-column: 1 / -1;
+  }
+
+  .panel-card--samples .sample-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .stream-summary {
+    align-items: center;
+  }
+
+  .stream-summary__row--dense {
+    flex: 1 1 auto;
+  }
+
+  .control-actions--stream-bar {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .control-stack--stream {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .control-stack--stream .control-note,
+  .control-stack--stream .toggle-grid {
+    grid-column: 1 / -1;
+  }
+
+  .control-stack--stream .toggle-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .control-stack--sandbox {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .control-stack--sandbox .segmented-control,
+  .control-stack--sandbox .preset-list,
+  .control-stack--sandbox .toggle-item {
+    grid-column: 1 / -1;
+  }
+
+  .panel-card--sandbox .meta-list {
     grid-template-columns: 1fr;
   }
 
+}
+
+@media (max-width: 1180px) {
   .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-panel__action-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .control-actions--stream-bar,
+  .panel-card--samples .sample-list,
+  .control-stack--stream,
+  .control-stack--sandbox {
+    grid-template-columns: 1fr;
+  }
+
+  .stream-summary__row--dense {
+    flex-basis: 100%;
+  }
+
+  .control-stack--stream .toggle-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-card--sandbox .meta-list {
     grid-template-columns: 1fr;
   }
 }
@@ -2047,10 +2443,26 @@ watch(mermaidEnabled, (enabled) => {
     padding: 22px 18px;
   }
 
+  .settings-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .settings-dialog__panel {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
   .hero-panel__metrics,
   .framework-switcher,
-  .control-actions {
+  .control-actions,
+  .hero-panel__action-row {
     grid-template-columns: 1fr;
+  }
+
+  .settings-dialog__head {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .workspace-card {
