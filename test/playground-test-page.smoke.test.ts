@@ -277,8 +277,9 @@ describe('playground /test smoke', () => {
 
     expect(requestFullscreen).toHaveBeenCalledTimes(1)
     expect(button.text()).toContain('退出全屏')
+    expect(wrapper.get('[data-testid="immersive-preview-back-button"]').text()).toContain('返回编辑')
 
-    await button.trigger('click')
+    await wrapper.get('[data-testid="immersive-preview-back-button"]').trigger('click')
     await nextTick()
 
     expect(exitFullscreen).toHaveBeenCalledTimes(1)
@@ -294,10 +295,11 @@ describe('playground /test smoke', () => {
 
     expect(wrapper.find('textarea').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Cross-framework regression lab')
-    expect(wrapper.get('[data-testid="shared-preview-shell"]').text()).toContain('共享预览')
     expect(wrapper.get('[data-testid="preview"]').text()).toBe('## shared only')
+    expect(wrapper.get('[data-testid="immersive-preview-back-button"]').text()).toContain('Test Page')
+    expect(wrapper.get('[data-testid="immersive-preview-star-link"]').attributes('href')).toBe('https://github.com/Simon-He95/markstream-vue')
 
-    await wrapper.get('[data-testid="shared-preview-exit-button"]').trigger('click')
+    await wrapper.get('[data-testid="immersive-preview-back-button"]').trigger('click')
     await nextTick()
 
     expect(wrapper.find('textarea').exists()).toBe(true)
@@ -366,6 +368,25 @@ describe('playground /test smoke', () => {
     await nextTick()
 
     expect(page.classes()).not.toContain('test-lab--dark')
+
+    wrapper.unmount()
+  })
+
+  it('toggles dark and light appearance from the immersive preview toolbar', async () => {
+    window.history.replaceState({}, '', buildTestPageHref('/test', '## shared only', 'preview'))
+
+    const wrapper = await mountTestPage()
+    const page = wrapper.get('.test-lab')
+    const button = wrapper.get('[data-testid="immersive-preview-theme-button"]')
+
+    expect(page.classes()).not.toContain('test-lab--dark')
+    expect(button.attributes('aria-label')).toBe('切换到暗色模式')
+
+    await button.trigger('click')
+    await nextTick()
+
+    expect(page.classes()).toContain('test-lab--dark')
+    expect(button.attributes('aria-label')).toBe('切换到浅色模式')
 
     wrapper.unmount()
   })
