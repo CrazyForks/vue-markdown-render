@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
+import type { TestPageViewMode } from '../../../playground-shared/testPageState'
 import type { SandboxFrameworkId, SandboxRenderSource } from '../../../playground-shared/versionSandbox'
 import type { StreamSliceMode } from '../composables/createLocalTextStream'
 import type { StreamPresetId } from '../composables/streamPresets'
@@ -8,7 +9,7 @@ import { Icon } from '@iconify/vue'
 import { useDebounceFn, useLocalStorage } from '@vueuse/core'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
-import { decodeMarkdownHash, encodeMarkdownPayload, resolveFrameworkTestHref, withMarkdownHash } from '../../../playground-shared/testPageState'
+import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode, withTestPageViewMode } from '../../../playground-shared/testPageState'
 import {
   buildTestSandboxHref,
   normalizeSandboxSource,
@@ -91,10 +92,11 @@ const tooLong = ref(false)
 const notice = ref<string>('')
 const noticeType = ref<'success' | 'error' | 'info'>('success')
 const isWorking = ref(false)
-const isCopied = ref(false)
+const copiedShareTarget = ref<TestPageViewMode | null>(null)
 const issueUrl = ref<string>('')
 const previewCardRef = ref<HTMLElement | null>(null)
 const isPreviewFullscreen = ref(false)
+const testPageViewMode = ref<TestPageViewMode>('lab')
 const MAX_URL_LEN = 2000
 
 const activeSample = computed(() => sampleCards.find(sample => sample.id === selectedSampleId.value) ?? sampleCards[0])
@@ -180,6 +182,8 @@ const previewDiagramMaxHeight = computed(() => isPreviewFullscreen.value ? 'none
 const previewD2MaxHeight = computed(() => 'none')
 const charCount = computed(() => input.value.length)
 const lineCount = computed(() => (input.value ? input.value.split('\n').length : 0))
+const isSharePreviewMode = computed(() => testPageViewMode.value === 'preview')
+const previewShareButtonLabel = computed(() => isSharePreviewMode.value ? '复制当前分享链接' : '分享预览')
 
 const sandboxFrameworkId = useLocalStorage<SandboxFrameworkId>('vmr-test-sandbox-framework', 'vue3')
 const sandboxSource = useLocalStorage<SandboxRenderSource>('vmr-test-sandbox-source', 'workspace')
@@ -249,33 +253,32 @@ function basePageUrl() {
   return url.toString()
 }
 
+function currentBasePageUrl(viewMode = testPageViewMode.value) {
+  return withTestPageViewMode(basePageUrl(), viewMode)
+}
+
 function buildIssueUrl(text: string) {
   const base = 'https://github.com/Simon-He95/markstream-vue/issues/new?template=bug_report.yml'
   const body = `**Reproduction input**:\n\nPlease find the reproduction input below:\n\n\`\`\`markdown\n${text}\n\`\`\``
   return `${base}&body=${encodeURIComponent(body)}`
 }
 
-function generateShareLink() {
-  const payload = encodeMarkdownPayload(input.value)
-  if (!payload)
-    return
-  const full = withMarkdownHash(basePageUrl(), input.value)
-
+function generateShareLink(viewMode: TestPageViewMode = 'lab') {
+  const full = buildTestPageHref(basePageUrl(), input.value, viewMode)
   if (full.length > MAX_URL_LEN) {
     tooLong.value = true
     shareUrl.value = ''
     issueUrl.value = buildIssueUrl(input.value)
     showToast('内容太长，建议直接附到 GitHub Issue。', 'info', 4000)
-    return
+    return null
   }
 
   tooLong.value = false
   shareUrl.value = full
-  window.history.replaceState(undefined, '', full)
+  return full
 }
 
-async function copyShareLink() {
-  const target = shareUrl.value || basePageUrl()
+async function copyShareLink(target: string) {
   try {
     await navigator.clipboard.writeText(target)
     return true
@@ -295,24 +298,51 @@ function showToast(message: string, type: 'success' | 'error' | 'info' = 'succes
 
 async function generateAndCopy() {
   isWorking.value = true
-  isCopied.value = false
-  generateShareLink()
+  copiedShareTarget.value = null
+  const target = generateShareLink('lab')
 
-  if (tooLong.value) {
+  if (!target) {
     isWorking.value = false
     return
   }
 
-  const copied = await copyShareLink()
+  window.history.replaceState(undefined, '', target)
+  const copied = await copyShareLink(target)
   isWorking.value = false
 
   if (copied) {
-    isCopied.value = true
+    copiedShareTarget.value = 'lab'
     showToast('分享链接已复制。', 'success', 1800)
-    window.setTimeout(() => (isCopied.value = false), 1800)
+    window.setTimeout(() => (copiedShareTarget.value = null), 1800)
   }
   else {
     showToast('复制失败，请手动复制地址栏链接。', 'error', 3000)
+  }
+}
+
+async function generateAndCopyPreview() {
+  isWorking.value = true
+  copiedShareTarget.value = null
+  const target = generateShareLink('preview')
+
+  if (!target) {
+    isWorking.value = false
+    return
+  }
+
+  if (isSharePreviewMode.value)
+    window.history.replaceState(undefined, '', target)
+
+  const copied = await copyShareLink(target)
+  isWorking.value = false
+
+  if (copied) {
+    copiedShareTarget.value = 'preview'
+    showToast('预览分享链接已复制。', 'success', 1800)
+    window.setTimeout(() => (copiedShareTarget.value = null), 1800)
+  }
+  else {
+    showToast('复制失败，请手动复制分享链接。', 'error', 3000)
   }
 }
 
@@ -374,6 +404,17 @@ function restoreFromUrl() {
   return true
 }
 
+function restoreViewModeFromUrl() {
+  testPageViewMode.value = resolveTestPageViewMode(window.location.search)
+}
+
+function exitSharedPreview() {
+  testPageViewMode.value = 'lab'
+  const full = buildTestPageHref(basePageUrl(), input.value, 'lab')
+  shareUrl.value = full
+  window.history.replaceState(undefined, '', full)
+}
+
 function applySample(sampleId: SampleId) {
   const sample = sampleCards.find(item => item.id === sampleId)
   if (!sample)
@@ -423,16 +464,18 @@ function frameworkHref(id: FrameworkId) {
     typeof window !== 'undefined'
       ? { hostname: window.location.hostname, protocol: window.location.protocol }
       : undefined,
+    testPageViewMode.value,
   )
 }
 
 onMounted(() => {
+  restoreViewModeFromUrl()
   const restored = restoreFromUrl()
   if (!restored) {
     const sample = sampleCards.find(item => item.id === selectedSampleId.value) ?? sampleCards[0]
     input.value = sample.content
   }
-  shareUrl.value = basePageUrl()
+  shareUrl.value = currentBasePageUrl()
   sandboxSnapshot.value = input.value
   syncPreviewFullscreenState()
   document.addEventListener('fullscreenchange', syncPreviewFullscreenState)
@@ -464,9 +507,9 @@ watch(streamBurstiness, (value) => {
 
 watch(input, () => {
   tooLong.value = false
-  isCopied.value = false
+  copiedShareTarget.value = null
   if (!isStreaming.value && typeof window !== 'undefined')
-    shareUrl.value = basePageUrl()
+    shareUrl.value = currentBasePageUrl()
   if (sandboxAutoSync.value)
     syncSandboxDebounced()
 })
@@ -521,12 +564,12 @@ watch(mermaidEnabled, (enabled) => {
 </script>
 
 <template>
-  <div class="test-lab" :class="{ 'test-lab--dark': isDark, 'dark': isDark }">
-    <div class="test-lab__glow test-lab__glow--cyan" />
-    <div class="test-lab__glow test-lab__glow--amber" />
+  <div class="test-lab" :class="{ 'test-lab--dark': isDark, 'dark': isDark, 'test-lab--share-preview': isSharePreviewMode }">
+    <div v-if="!isSharePreviewMode" class="test-lab__glow test-lab__glow--cyan" />
+    <div v-if="!isSharePreviewMode" class="test-lab__glow test-lab__glow--amber" />
 
-    <div class="test-lab__shell">
-      <section class="hero-panel">
+    <div class="test-lab__shell" :class="{ 'test-lab__shell--share-preview': isSharePreviewMode }">
+      <section v-if="!isSharePreviewMode" class="hero-panel">
         <div class="hero-panel__copy">
           <span class="eyebrow">Cross-framework regression lab</span>
           <h1>Markstream Test Page</h1>
@@ -569,8 +612,8 @@ watch(mermaidEnabled, (enabled) => {
         </div>
       </section>
 
-      <div class="lab-layout">
-        <aside class="lab-sidebar">
+      <div class="lab-layout" :class="{ 'lab-layout--share-preview': isSharePreviewMode }">
+        <aside v-if="!isSharePreviewMode" class="lab-sidebar">
           <section class="panel-card">
             <div class="panel-card__head">
               <div>
@@ -875,7 +918,7 @@ watch(mermaidEnabled, (enabled) => {
 
             <div class="share-actions">
               <button type="button" class="action-button action-button--primary" :disabled="isWorking" @click="generateAndCopy">
-                {{ isCopied ? '已复制分享链接' : (isWorking ? '生成中...' : '复制分享链接') }}
+                {{ copiedShareTarget === 'lab' ? '已复制实验页链接' : (isWorking ? '生成中...' : '复制实验页链接') }}
               </button>
               <button type="button" class="action-button" @click="copyRawInput">
                 复制 Issue 链接
@@ -905,8 +948,8 @@ watch(mermaidEnabled, (enabled) => {
           </section>
         </aside>
 
-        <section class="workspace-grid">
-          <article class="workspace-card workspace-card--pane">
+        <section class="workspace-grid" :class="{ 'workspace-grid--share-preview': isSharePreviewMode }">
+          <article v-if="!isSharePreviewMode" class="workspace-card workspace-card--pane">
             <header class="workspace-card__head">
               <div>
                 <h2>Markdown 输入</h2>
@@ -928,12 +971,17 @@ watch(mermaidEnabled, (enabled) => {
             </footer>
           </article>
 
-          <article ref="previewCardRef" class="workspace-card workspace-card--pane workspace-card--preview">
+          <article
+            ref="previewCardRef"
+            class="workspace-card workspace-card--pane workspace-card--preview"
+            :class="{ 'workspace-card--share-preview': isSharePreviewMode }"
+            :data-testid="isSharePreviewMode ? 'shared-preview-shell' : undefined"
+          >
             <header class="workspace-card__head">
               <div>
-                <h2>实时预览</h2>
+                <h2>{{ isSharePreviewMode ? '共享预览' : '实时预览' }}</h2>
                 <p>
-                  当前模式：{{ renderModeLabel }}{{ isPreviewFullscreen ? ' · 按 Esc 退出全屏' : '' }}
+                  {{ isSharePreviewMode ? `直接打开即可看到 ${renderModeLabel} 渲染结果。` : `当前模式：${renderModeLabel}${isPreviewFullscreen ? ' · 按 Esc 退出全屏' : ''}` }}
                 </p>
               </div>
               <div class="workspace-card__head-actions">
@@ -951,6 +999,25 @@ watch(mermaidEnabled, (enabled) => {
                   />
                 </button>
                 <button
+                  type="button"
+                  class="ghost-button"
+                  data-testid="preview-share-button"
+                  :disabled="isWorking"
+                  @click="generateAndCopyPreview"
+                >
+                  {{ copiedShareTarget === 'preview' ? '已复制预览链接' : (isWorking ? '生成中...' : previewShareButtonLabel) }}
+                </button>
+                <button
+                  v-if="isSharePreviewMode"
+                  type="button"
+                  class="ghost-button"
+                  data-testid="shared-preview-exit-button"
+                  @click="exitSharedPreview"
+                >
+                  打开编辑器
+                </button>
+                <button
+                  v-else
                   type="button"
                   class="ghost-button"
                   data-testid="preview-fullscreen-button"
@@ -986,11 +1053,11 @@ watch(mermaidEnabled, (enabled) => {
 
             <footer class="workspace-card__foot">
               <span>{{ previewContent.length }} chars rendered</span>
-              <span>{{ isStreaming ? (isPaused ? '流式已暂停' : '正在逐步追加中') : '已显示完整输入' }}</span>
+              <span>{{ isSharePreviewMode ? '当前页面为只读共享预览' : (isStreaming ? (isPaused ? '流式已暂停' : '正在逐步追加中') : '已显示完整输入') }}</span>
             </footer>
           </article>
 
-          <article v-if="streamDebug && streamChunks.length" class="workspace-card workspace-card--full">
+          <article v-if="!isSharePreviewMode && streamDebug && streamChunks.length" class="workspace-card workspace-card--full">
             <header class="workspace-card__head">
               <div>
                 <h2>Chunk Debug</h2>
@@ -1008,7 +1075,7 @@ watch(mermaidEnabled, (enabled) => {
             </div>
           </article>
 
-          <article class="workspace-card workspace-card--full">
+          <article v-if="!isSharePreviewMode" class="workspace-card workspace-card--full">
             <header class="workspace-card__head">
               <div>
                 <h2>版本沙箱预览</h2>
@@ -1080,6 +1147,10 @@ watch(mermaidEnabled, (enabled) => {
     linear-gradient(180deg, #0b1220 0%, var(--lab-bg) 100%);
 }
 
+.test-lab--share-preview {
+  padding: 0;
+}
+
 .test-lab__shell {
   position: relative;
   z-index: 1;
@@ -1087,6 +1158,12 @@ watch(mermaidEnabled, (enabled) => {
   margin: 0 auto;
   display: grid;
   gap: 22px;
+}
+
+.test-lab__shell--share-preview {
+  max-width: none;
+  min-height: 100vh;
+  gap: 0;
 }
 
 .test-lab__glow {
@@ -1269,6 +1346,11 @@ watch(mermaidEnabled, (enabled) => {
   grid-template-columns: 340px minmax(0, 1fr);
   gap: 20px;
   align-items: start;
+}
+
+.lab-layout--share-preview {
+  grid-template-columns: 1fr;
+  gap: 0;
 }
 
 .lab-sidebar,
@@ -1664,6 +1746,11 @@ watch(mermaidEnabled, (enabled) => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.workspace-grid--share-preview {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
 .workspace-card {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -1680,6 +1767,15 @@ watch(mermaidEnabled, (enabled) => {
   min-height: var(--workspace-pane-height);
   max-height: var(--workspace-pane-height);
   overflow: hidden;
+}
+
+.workspace-card--share-preview {
+  min-height: 100vh;
+  height: 100vh;
+  max-height: none;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
 }
 
 .workspace-card__head,
@@ -1722,6 +1818,16 @@ watch(mermaidEnabled, (enabled) => {
 .workspace-card--pane .preview-surface {
   min-height: 0;
   height: 100%;
+}
+
+.workspace-card--share-preview .workspace-card__head,
+.workspace-card--share-preview .workspace-card__foot {
+  padding-left: min(4vw, 32px);
+  padding-right: min(4vw, 32px);
+}
+
+.workspace-card--share-preview .preview-surface {
+  padding: 32px min(5vw, 48px) 42px;
 }
 
 .test-lab--dark .editor-textarea {
@@ -1808,6 +1914,10 @@ watch(mermaidEnabled, (enabled) => {
     padding: 18px 12px 28px;
   }
 
+  .test-lab--share-preview {
+    padding: 0;
+  }
+
   .hero-panel,
   .panel-card,
   .workspace-card {
@@ -1837,6 +1947,15 @@ watch(mermaidEnabled, (enabled) => {
   .editor-textarea,
   .preview-surface {
     min-height: 420px;
+  }
+
+  .workspace-card--share-preview {
+    min-height: 100vh;
+    height: 100vh;
+  }
+
+  .workspace-card--share-preview .preview-surface {
+    padding: 20px 16px 28px;
   }
 
   .workspace-card__head-actions {

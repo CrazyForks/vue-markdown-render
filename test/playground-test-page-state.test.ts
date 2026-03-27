@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createMarkdownHash, decodeMarkdownHash, resolveFrameworkTestHref, withMarkdownHash } from '../playground-shared/testPageState'
+import { buildTestPageHref, createMarkdownHash, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode, withMarkdownHash, withTestPageViewMode } from '../playground-shared/testPageState'
 import { buildTestSandboxHref, resolveSandboxSelection } from '../playground-shared/versionSandbox'
 
 describe('playground test page state helpers', () => {
@@ -19,6 +19,14 @@ describe('playground test page state helpers', () => {
     expect(withMarkdownHash('https://markstream-react.pages.dev/test', markdown)).toContain('#data=')
   })
 
+  it('encodes preview-only mode in the shared test page url', () => {
+    const href = buildTestPageHref('/test', '# Shared preview', 'preview')
+
+    expect(href).toContain('/test?view=preview#data=')
+    expect(resolveTestPageViewMode('?view=preview')).toBe('preview')
+    expect(withTestPageViewMode('/test?view=preview', 'lab')).toBe('/test')
+  })
+
   it('prefers localhost target when matching playground ports are available', () => {
     const href = resolveFrameworkTestHref(
       {
@@ -29,9 +37,10 @@ describe('playground test page state helpers', () => {
       'vue3',
       'same input',
       { hostname: 'localhost', protocol: 'http:' },
+      'preview',
     )
 
-    expect(href).toMatch(/^http:\/\/localhost:4174\/test#data=/)
+    expect(href).toMatch(/^http:\/\/localhost:4174\/test\?view=preview#data=/)
   })
 
   it('normalizes unsupported workspace selections to npm for version sandboxes', () => {
