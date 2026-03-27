@@ -88,7 +88,6 @@ setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())
 
 const shareUrl = ref<string>('')
-const tooLong = ref(false)
 const notice = ref<string>('')
 const noticeType = ref<'success' | 'error' | 'info'>('success')
 const isWorking = ref(false)
@@ -100,6 +99,8 @@ const streamSettingsDialogRef = ref<HTMLDialogElement | null>(null)
 const isPreviewFullscreen = ref(false)
 const testPageViewMode = ref<TestPageViewMode>('lab')
 const MAX_URL_LEN = 2000
+const LOCAL_SHARE_QUERY_KEY = 'share'
+const LOCAL_SHARE_STORAGE_PREFIX = 'vmr-test-share:'
 
 const activeSample = computed(() => sampleCards.find(sample => sample.id === selectedSampleId.value) ?? sampleCards[0])
 const normalizedChunkSizeRange = computed(() => normalizeStreamRange(
@@ -186,7 +187,14 @@ const previewD2MaxHeight = computed(() => 'none')
 const charCount = computed(() => input.value.length)
 const lineCount = computed(() => (input.value ? input.value.split('\n').length : 0))
 const isSharePreviewMode = computed(() => testPageViewMode.value === 'preview')
-const previewShareButtonLabel = computed(() => isSharePreviewMode.value ? '复制当前分享链接' : '分享预览')
+const labShareUsesLocalStorage = computed(() => buildTestPageHref('/test', input.value, 'lab').length > MAX_URL_LEN)
+const previewShareUsesLocalStorage = computed(() => buildTestPageHref('/test', input.value, 'preview').length > MAX_URL_LEN)
+const previewShareButtonLabel = computed(() => {
+  if (isSharePreviewMode.value)
+    return '复制当前分享链接'
+  return previewShareUsesLocalStorage.value ? '复制本地预览链接' : '分享预览'
+})
+const labShareButtonLabel = computed(() => labShareUsesLocalStorage.value ? '复制本地实验页链接' : '复制实验页链接')
 const showImmersivePreviewControls = computed(() => isSharePreviewMode.value || isPreviewFullscreen.value)
 const immersiveBackLabel = computed(() => isSharePreviewMode.value ? '打开 Test Page' : '返回编辑')
 
@@ -255,11 +263,34 @@ function openSandboxInNewTab() {
 function basePageUrl() {
   const url = new URL(window.location.href)
   url.hash = ''
+  url.searchParams.delete(LOCAL_SHARE_QUERY_KEY)
   return url.toString()
 }
 
 function currentBasePageUrl(viewMode = testPageViewMode.value) {
   return withTestPageViewMode(basePageUrl(), viewMode)
+}
+
+function shareStorageKey(shareId: string) {
+  return `${LOCAL_SHARE_STORAGE_PREFIX}${shareId}`
+}
+
+function currentShareId() {
+  const url = new URL(window.location.href)
+  return url.searchParams.get(LOCAL_SHARE_QUERY_KEY)
+}
+
+function buildLocalShareHref(shareId: string, viewMode: TestPageViewMode = 'lab') {
+  const url = new URL(withTestPageViewMode(basePageUrl(), viewMode))
+  url.searchParams.set(LOCAL_SHARE_QUERY_KEY, shareId)
+  url.hash = ''
+  return url.toString()
+}
+
+function persistLocalShare(markdown: string) {
+  const shareId = currentShareId() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
+  window.localStorage.setItem(shareStorageKey(shareId), markdown)
+  return shareId
 }
 
 function buildIssueUrl(text: string) {
@@ -274,17 +305,17 @@ function focusEditorSoon() {
   })
 }
 
-function generateShareLink(viewMode: TestPageViewMode = 'lab') {
+function generateShareLink(viewMode: TestPageViewMode = 'lab', options: { silent?: boolean } = {}) {
   const full = buildTestPageHref(basePageUrl(), input.value, viewMode)
+  issueUrl.value = buildIssueUrl(input.value)
   if (full.length > MAX_URL_LEN) {
-    tooLong.value = true
-    shareUrl.value = ''
-    issueUrl.value = buildIssueUrl(input.value)
-    showToast('内容太长，建议直接附到 GitHub Issue。', 'info', 4000)
-    return null
+    const localHref = buildLocalShareHref(persistLocalShare(input.value), viewMode)
+    shareUrl.value = localHref
+    if (!options.silent)
+      showToast('当前内容太长，已切换为本地分享链接；只能在你当前浏览器打开，分享给别人不会生效。', 'info', 4200)
+    return localHref
   }
 
-  tooLong.value = false
   shareUrl.value = full
   return full
 }
@@ -323,7 +354,7 @@ async function generateAndCopy() {
 
   if (copied) {
     copiedShareTarget.value = 'lab'
-    showToast('分享链接已复制。', 'success', 1800)
+    showToast(labShareUsesLocalStorage.value ? '本地实验页链接已复制；仅当前浏览器可打开，分享给别人不会生效。' : '分享链接已复制。', labShareUsesLocalStorage.value ? 'info' : 'success', labShareUsesLocalStorage.value ? 3200 : 1800)
     window.setTimeout(() => (copiedShareTarget.value = null), 1800)
   }
   else {
@@ -349,7 +380,7 @@ async function generateAndCopyPreview() {
 
   if (copied) {
     copiedShareTarget.value = 'preview'
-    showToast('预览分享链接已复制。', 'success', 1800)
+    showToast(previewShareUsesLocalStorage.value ? '本地预览链接已复制；只能在你当前浏览器查看，分享给别人不会生效。' : '预览分享链接已复制。', previewShareUsesLocalStorage.value ? 'info' : 'success', previewShareUsesLocalStorage.value ? 3200 : 1800)
     window.setTimeout(() => (copiedShareTarget.value = null), 1800)
   }
   else {
@@ -415,13 +446,26 @@ function restoreFromUrl() {
   return true
 }
 
+function restoreFromLocalShare() {
+  const shareId = currentShareId()
+  if (!shareId)
+    return false
+
+  const shared = window.localStorage.getItem(shareStorageKey(shareId))
+  if (shared == null)
+    return false
+
+  input.value = shared
+  return true
+}
+
 function restoreViewModeFromUrl() {
   testPageViewMode.value = resolveTestPageViewMode(window.location.search)
 }
 
 function exitSharedPreview() {
   testPageViewMode.value = 'lab'
-  const full = buildTestPageHref(basePageUrl(), input.value, 'lab')
+  const full = generateShareLink('lab', { silent: true })
   shareUrl.value = full
   window.history.replaceState(undefined, '', full)
 }
@@ -448,7 +492,6 @@ function applySample(sampleId: SampleId) {
   stopStreamRender()
   selectedSampleId.value = sample.id
   input.value = sample.content
-  tooLong.value = false
   showToast(`已切换到“${sample.title}”样例。`, 'info', 1200)
 }
 
@@ -507,7 +550,7 @@ function frameworkHref(id: FrameworkId) {
 
 onMounted(() => {
   restoreViewModeFromUrl()
-  const restored = restoreFromUrl()
+  const restored = restoreFromLocalShare() || restoreFromUrl()
   if (!restored) {
     const sample = sampleCards.find(item => item.id === selectedSampleId.value) ?? sampleCards[0]
     input.value = sample.content
@@ -543,7 +586,6 @@ watch(streamBurstiness, (value) => {
 }, { immediate: true })
 
 watch(input, () => {
-  tooLong.value = false
   copiedShareTarget.value = null
   if (!isStreaming.value && typeof window !== 'undefined')
     shareUrl.value = currentBasePageUrl()
@@ -619,7 +661,7 @@ watch(mermaidEnabled, (enabled) => {
         <div class="hero-panel__actions">
           <div class="hero-panel__action-row">
             <button type="button" class="action-button action-button--primary" :disabled="isWorking" @click="generateAndCopy">
-              {{ copiedShareTarget === 'lab' ? '已复制实验页链接' : (isWorking ? '生成中...' : '复制实验页链接') }}
+              {{ copiedShareTarget === 'lab' ? (labShareUsesLocalStorage ? '已复制本地实验页链接' : '已复制实验页链接') : (isWorking ? '生成中...' : labShareButtonLabel) }}
             </button>
             <button type="button" class="action-button" @click="copyRawInput">
               复制 Issue 链接
@@ -636,8 +678,8 @@ watch(mermaidEnabled, (enabled) => {
             </span>
           </div>
 
-          <div v-if="tooLong" class="info-banner info-banner--warning">
-            当前内容过长，建议使用 Issue 链接分享完整输入。
+          <div v-if="labShareUsesLocalStorage || previewShareUsesLocalStorage" class="info-banner info-banner--warning">
+            当前内容太长，分享链接已切换为本地存储模式；只能在你当前浏览器自己打开，发给别人看不到，跨浏览器复现请使用 Issue 链接。
           </div>
           <div v-if="notice" class="info-banner" :class="`info-banner--${noticeType}`">
             {{ notice }}
@@ -794,7 +836,7 @@ watch(mermaidEnabled, (enabled) => {
                   </option>
                 </select>
               </label>
-                      <label class="text-control">
+              <label class="text-control">
                 <span>包版本</span>
                 <input
                   v-model="sandboxVersion"
@@ -836,7 +878,6 @@ watch(mermaidEnabled, (enabled) => {
                 </button>
               </div>
 
-
               <label class="toggle-item">
                 <span>输入变化自动同步到 iframe</span>
                 <input v-model="sandboxAutoSync" type="checkbox">
@@ -870,7 +911,6 @@ watch(mermaidEnabled, (enabled) => {
               右侧 iframe 还没同步最新输入，点“刷新沙箱”即可用当前 markdown 重载。
             </div>
           </section>
-
         </aside>
 
         <section class="workspace-grid" :class="{ 'workspace-grid--share-preview': isSharePreviewMode }">
@@ -971,7 +1011,7 @@ watch(mermaidEnabled, (enabled) => {
                   :disabled="isWorking"
                   @click="generateAndCopyPreview"
                 >
-                  {{ copiedShareTarget === 'preview' ? '已复制预览链接' : (isWorking ? '生成中...' : previewShareButtonLabel) }}
+                  {{ copiedShareTarget === 'preview' ? (previewShareUsesLocalStorage ? '已复制本地预览链接' : '已复制预览链接') : (isWorking ? '生成中...' : previewShareButtonLabel) }}
                 </button>
                 <button
                   type="button"
@@ -1685,6 +1725,8 @@ watch(mermaidEnabled, (enabled) => {
 
 .progress-meta {
   margin-top: 10px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
 }
 
 .range-control,
@@ -1755,6 +1797,8 @@ watch(mermaidEnabled, (enabled) => {
   font-size: 0.79rem;
   font-weight: 600;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
 }
 
 .stream-summary__item--active {

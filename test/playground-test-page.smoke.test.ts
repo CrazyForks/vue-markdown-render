@@ -111,11 +111,18 @@ async function mountTestPage() {
   return wrapper
 }
 
+function createLongMarkdown() {
+  return Array.from(
+    { length: 600 },
+    (_, index) => `- row ${index}: ${index.toString(36)}${(index * 13).toString(36)}${(index * 29).toString(36)}${(index * 47).toString(36)}`,
+  ).join('\n')
+}
+
 describe('playground /test smoke', () => {
   beforeEach(() => {
     katexEnabled = true
     mermaidEnabled = true
-    window.localStorage.removeItem('vmr-test-dark')
+    window.localStorage.clear()
     window.history.replaceState({}, '', '/test')
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -127,7 +134,7 @@ describe('playground /test smoke', () => {
 
   afterEach(() => {
     vi.useRealTimers()
-    window.localStorage.removeItem('vmr-test-dark')
+    window.localStorage.clear()
 
     if (originalFullscreenElement)
       Object.defineProperty(document, 'fullscreenElement', originalFullscreenElement)
@@ -206,6 +213,33 @@ describe('playground /test smoke', () => {
     expect(url.pathname).toBe('/test')
     expect(url.searchParams.get('view')).toBe('preview')
     expect(decodeMarkdownHash(url.hash)).toBe('## shared preview')
+
+    wrapper.unmount()
+  })
+
+  it('falls back to storage-backed preview share links for long markdown', async () => {
+    const wrapper = await mountTestPage()
+    const textarea = wrapper.get('textarea')
+    const longMarkdown = createLongMarkdown()
+
+    expect(buildTestPageHref('/test', longMarkdown, 'preview').length).toBeGreaterThan(2000)
+
+    await textarea.setValue(longMarkdown)
+    await nextTick()
+    await wrapper.get('[data-testid="preview-share-button"]').trigger('click')
+
+    const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>
+    expect(writeText).toHaveBeenCalledTimes(1)
+
+    const href = writeText.mock.calls[0][0]
+    const url = new URL(href)
+    const shareId = url.searchParams.get('share')
+
+    expect(url.pathname).toBe('/test')
+    expect(url.searchParams.get('view')).toBe('preview')
+    expect(url.hash).toBe('')
+    expect(shareId).toBeTruthy()
+    expect(window.localStorage.getItem(`vmr-test-share:${shareId}`)).toBe(longMarkdown)
 
     wrapper.unmount()
   })
@@ -305,6 +339,28 @@ describe('playground /test smoke', () => {
     expect(wrapper.find('textarea').exists()).toBe(true)
     expect(window.location.search).toBe('')
     expect(decodeMarkdownHash(window.location.hash)).toBe('## shared only')
+
+    wrapper.unmount()
+  })
+
+  it('opens storage-backed preview links directly in preview-only mode', async () => {
+    const longMarkdown = createLongMarkdown()
+    const shareId = 'stored-preview'
+
+    window.localStorage.setItem(`vmr-test-share:${shareId}`, longMarkdown)
+    window.history.replaceState({}, '', `/test?view=preview&share=${shareId}`)
+
+    const wrapper = await mountTestPage()
+
+    expect(wrapper.find('textarea').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="preview"]').text()).toBe(longMarkdown)
+
+    await wrapper.get('[data-testid="immersive-preview-back-button"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('textarea').exists()).toBe(true)
+    expect(window.location.search).toBe(`?share=${shareId}`)
+    expect(window.location.hash).toBe('')
 
     wrapper.unmount()
   })
