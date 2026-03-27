@@ -1,4 +1,5 @@
 import type { InlineCodeNode, MarkdownToken, ParsedNode } from '../../types'
+import { VOID_HTML_TAGS } from '../../htmlTags'
 import { buildAllowedHtmlTagSet } from '../index'
 
 type ParseInlineTokensFn = (
@@ -7,23 +8,6 @@ type ParseInlineTokensFn = (
   pPreToken?: MarkdownToken,
   options?: { requireClosingStrong?: boolean, customHtmlTags?: readonly string[] },
 ) => ParsedNode[]
-
-const VOID_TAGS = new Set([
-  'area',
-  'base',
-  'br',
-  'col',
-  'embed',
-  'hr',
-  'img',
-  'input',
-  'link',
-  'meta',
-  'param',
-  'source',
-  'track',
-  'wbr',
-])
 
 interface TagSetCacheEntry {
   customTagSet: Set<string> | null
@@ -53,7 +37,7 @@ function isClosingTag(html: string) {
 }
 
 function isSelfClosing(tag: string, html: string) {
-  return /\/\s*>\s*$/.test(html) || VOID_TAGS.has(tag)
+  return /\/\s*>\s*$/.test(html) || VOID_HTML_TAGS.has(tag)
 }
 
 function normalizeCustomTag(t: unknown) {

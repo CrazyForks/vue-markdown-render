@@ -111,6 +111,52 @@ function createTh(text: string) {
     children: null,
   }]
 }
+
+function getPipeRowCells(line: string, requireTrailingPipe: boolean) {
+  if (!line.startsWith('|') || line.includes('\n'))
+    return null
+  if (requireTrailingPipe && !line.endsWith('|'))
+    return null
+
+  const cells = line.slice(1).split('|')
+  if (cells.at(-1) === '')
+    cells.pop()
+
+  return cells.length > 0 && cells.every(cell => cell.length > 0) ? cells : null
+}
+
+function isSingleLineFallbackTable(line: string) {
+  return getPipeRowCells(line, false) !== null
+}
+
+function hasTrailingPipeHeaderRow(line: string) {
+  return getPipeRowCells(line, true) !== null
+}
+
+function isSeparatorCell(cell: string) {
+  return /^:?-+:?$/.test(cell.trim())
+}
+
+function isTableSeparatorRow(line: string) {
+  if (!line.startsWith('|'))
+    return false
+
+  const cells = line.slice(1).split('|')
+  if (cells.at(-1) === '')
+    cells.pop()
+
+  return cells.length > 0 && cells.every(isSeparatorCell)
+}
+
+function isTruncatedSeparatorRow(line: string) {
+  return line === '|' || line === '|:'
+}
+
+function hasTrailingPipeHeaderRowWithoutColon(line: string) {
+  const cells = getPipeRowCells(line, true)
+  return cells !== null && cells.every(cell => !cell.includes(':'))
+}
+
 export function fixTableTokens(tokens: MarkdownToken[]): MarkdownToken[] {
   const fixedTokens = [...tokens]
   if (tokens.length < 3)
@@ -120,8 +166,9 @@ export function fixTableTokens(tokens: MarkdownToken[]): MarkdownToken[] {
   if (token.type === 'inline') {
     const tcontent = String(token.content ?? '')
     const headerContent = tcontent.split('\n')[0] ?? ''
+    const [headerLine = '', separatorLine = '', ...rest] = tcontent.split('\n')
 
-    if (!tcontent.includes('\n') && /^\|(?:[^|\n]+\|?)+/.test(tcontent)) {
+    if (!tcontent.includes('\n') && isSingleLineFallbackTable(tcontent)) {
       // 解析 table
       const body = headerContent.slice(1).split('|').map(i => i.trim()).filter(Boolean).flatMap(i => createTh(i))
       const insert = ([
@@ -131,7 +178,12 @@ export function fixTableTokens(tokens: MarkdownToken[]): MarkdownToken[] {
       ] as unknown) as MarkdownToken[]
       fixedTokens.splice(i - 1, 3, ...insert)
     }
-    else if (/^\|(?:[^|\n]+\|)+\n\|(?:\s*:?-+:?\s*\|?)+$/.test(tcontent)) {
+    else if (
+      tcontent.includes('\n')
+      && rest.length === 0
+      && hasTrailingPipeHeaderRow(headerLine)
+      && isTableSeparatorRow(separatorLine)
+    ) {
       // 解析 table
       const body = headerContent.slice(1, -1).split('|').map(i => i.trim()).flatMap(i => createTh(i))
       const insert = ([
@@ -141,7 +193,12 @@ export function fixTableTokens(tokens: MarkdownToken[]): MarkdownToken[] {
       ] as unknown) as MarkdownToken[]
       fixedTokens.splice(i - 1, 3, ...insert)
     }
-    else if (/^\|(?:[^|\n:]+\|)+\n\|:?$/.test(tcontent)) {
+    else if (
+      tcontent.includes('\n')
+      && rest.length === 0
+      && hasTrailingPipeHeaderRowWithoutColon(headerLine)
+      && isTruncatedSeparatorRow(separatorLine)
+    ) {
       token.content = tcontent.slice(0, -2)
       token.children!.splice(2, 1)
     }

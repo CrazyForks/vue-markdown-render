@@ -388,7 +388,7 @@ function isLikelyPlaceholderDollar(content: string) {
 
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
   // Inline rule for `\\(...\\)` and `$$...$$` and `$...$`
-  const mathInline = (state: unknown, silent: boolean) => {
+  const mathInline = (state: unknown, silent?: boolean) => {
     const s = state as any
     const strict = !!mathOpts?.strictDelimiters
     const allowLoading = !s?.env?.__markstreamFinal

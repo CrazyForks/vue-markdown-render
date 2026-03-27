@@ -1,95 +1,14 @@
-import type { MarkdownIt } from 'markdown-it-ts'
+import type { MarkdownIt, Token } from 'markdown-it-ts'
 import type { MarkdownToken, ParsedNode, ParseOptions } from '../types'
+import { STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { parseInlineTokens } from './inline-parsers'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
 import { parseBlockquote } from './node-parsers/blockquote-parser'
 import { containerTokenHandlers } from './node-parsers/container-token-handlers'
 import { parseHardBreak } from './node-parsers/hardbreak-parser'
+import { parseHtmlBlock, parseTagAttrs } from './node-parsers/html-block-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
-
-const STANDARD_HTML_TAGS = new Set<string>([
-  // void
-  'area',
-  'base',
-  'br',
-  'col',
-  'embed',
-  'hr',
-  'img',
-  'input',
-  'link',
-  'meta',
-  'param',
-  'source',
-  'track',
-  'wbr',
-  // inline
-  'a',
-  'abbr',
-  'b',
-  'bdi',
-  'bdo',
-  'button',
-  'cite',
-  'code',
-  'data',
-  'del',
-  'dfn',
-  'em',
-  'font',
-  'i',
-  'ins',
-  'kbd',
-  'label',
-  'mark',
-  'q',
-  's',
-  'samp',
-  'small',
-  'span',
-  'strong',
-  'sub',
-  'sup',
-  'time',
-  'u',
-  'var',
-  // block
-  'article',
-  'aside',
-  'blockquote',
-  'div',
-  'details',
-  'figcaption',
-  'figure',
-  'footer',
-  'header',
-  'h1',
-  'h2',
-  'h3',
-  'h4',
-  'h5',
-  'h6',
-  'li',
-  'main',
-  'nav',
-  'ol',
-  'p',
-  'pre',
-  'section',
-  'summary',
-  'table',
-  'tbody',
-  'td',
-  'th',
-  'thead',
-  'tr',
-  'ul',
-  // svg-ish (commonly embedded)
-  'svg',
-  'g',
-  'path',
-])
 
 function normalizeTagName(t: unknown) {
   const raw = String(t ?? '').trim()
@@ -214,6 +133,483 @@ function parseStandaloneHtmlDocument(markdown: string): ParsedNode[] | null {
       loading: false,
     } as ParsedNode,
   ]
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function findTagCloseIndexOutsideQuotes(input: string) {
+  let inSingle = false
+  let inDouble = false
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i]
+    if (ch === '\\') {
+      i++
+      continue
+    }
+    if (!inDouble && ch === '\'') {
+      inSingle = !inSingle
+      continue
+    }
+    if (!inSingle && ch === '"') {
+      inDouble = !inDouble
+      continue
+    }
+    if (!inSingle && !inDouble && ch === '>')
+      return i
+  }
+
+  return -1
+}
+
+function getMergeableNodeRaw(node: ParsedNode) {
+  const raw = (node as any)?.raw
+  if (typeof raw === 'string')
+    return raw
+
+  const content = (node as any)?.content
+  if (typeof content === 'string')
+    return content
+
+  return ''
+}
+
+const SOURCE_EXACT_HTML_BLOCK_TAGS = new Set([
+  'article',
+  'aside',
+  'blockquote',
+  'div',
+  'figcaption',
+  'figure',
+  'footer',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'header',
+  'li',
+  'main',
+  'nav',
+  'ol',
+  'p',
+  'pre',
+  'section',
+  'summary',
+  'table',
+  'tbody',
+  'td',
+  'th',
+  'thead',
+  'tr',
+  'ul',
+])
+
+function findNextHtmlBlockFromSource(source: string, tag: string, startIndex: number) {
+  if (!source || !tag)
+    return null
+
+  const lowerTag = tag.toLowerCase()
+  const openRe = new RegExp(String.raw`<\s*${escapeRegex(lowerTag)}(?=\s|>|/)`, 'gi')
+  openRe.lastIndex = Math.max(0, startIndex)
+  const openMatch = openRe.exec(source)
+  if (!openMatch || openMatch.index == null)
+    return null
+
+  const start = openMatch.index
+  const openSlice = source.slice(start)
+  const openEndRel = findTagCloseIndexOutsideQuotes(openSlice)
+  if (openEndRel === -1)
+    return null
+
+  const openEnd = start + openEndRel
+  const openTag = source.slice(start, openEnd + 1)
+  if (VOID_HTML_TAGS.has(lowerTag) || /\/\s*>$/.test(openTag)) {
+    return {
+      raw: openTag,
+      start,
+      end: openEnd + 1,
+      closed: true,
+    }
+  }
+
+  let depth = 1
+  let index = openEnd + 1
+
+  const isOpenAt = (pos: number) => {
+    const slice = source.slice(pos)
+    return new RegExp(String.raw`^<\s*${escapeRegex(lowerTag)}(?=\s|>|/)`, 'i').test(slice)
+  }
+  const isCloseAt = (pos: number) => {
+    const slice = source.slice(pos)
+    return new RegExp(String.raw`^<\s*\/\s*${escapeRegex(lowerTag)}(?=\s|>)`, 'i').test(slice)
+  }
+
+  while (index < source.length) {
+    const lt = source.indexOf('<', index)
+    if (lt === -1) {
+      return {
+        raw: source.slice(start),
+        start,
+        end: source.length,
+        closed: false,
+      }
+    }
+
+    if (isCloseAt(lt)) {
+      const endRel = findTagCloseIndexOutsideQuotes(source.slice(lt))
+      if (endRel === -1)
+        return null
+      depth--
+      const end = lt + endRel + 1
+      if (depth === 0) {
+        return {
+          raw: source.slice(start, end),
+          start,
+          end,
+          closed: true,
+        }
+      }
+      index = end
+      continue
+    }
+
+    if (isOpenAt(lt)) {
+      const endRel = findTagCloseIndexOutsideQuotes(source.slice(lt))
+      if (endRel === -1)
+        return null
+      const raw = source.slice(lt, lt + endRel + 1)
+      if (!/\/\s*>$/.test(raw))
+        depth++
+      index = lt + endRel + 1
+      continue
+    }
+
+    index = lt + 1
+  }
+
+  return {
+    raw: source.slice(start),
+    start,
+    end: source.length,
+    closed: false,
+  }
+}
+
+function findApproximateConsumedPrefixEnd(exact: string, approximate: string) {
+  if (!approximate)
+    return 0
+
+  let i = 0
+  let j = 0
+  while (i < exact.length && j < approximate.length) {
+    if (exact[i] === approximate[j]) {
+      i++
+      j++
+      continue
+    }
+
+    if (exact[i] === '\r' || exact[i] === '\n') {
+      i++
+      continue
+    }
+
+    return -1
+  }
+
+  return j === approximate.length ? i : -1
+}
+
+function buildHtmlBlockContent(raw: string, tag: string, closed: boolean) {
+  if (closed)
+    return raw
+  return `${raw.replace(/<[^>]*$/, '')}\n</${tag}>`
+}
+
+function extendHtmlBlockCloseToLineEnding(source: string, startIndex: number) {
+  let end = Math.max(0, startIndex)
+
+  while (end < source.length && (source[end] === ' ' || source[end] === '\t'))
+    end++
+
+  if (source[end] === '\r') {
+    end++
+    if (source[end] === '\n')
+      end++
+    return end
+  }
+
+  if (source[end] === '\n')
+    return end + 1
+
+  return startIndex
+}
+
+function isDetailsOpenHtmlBlock(node: ParsedNode) {
+  if (node.type !== 'html_block')
+    return false
+  if (String((node as any).tag ?? '').toLowerCase() !== 'details')
+    return false
+  const raw = String((node as any).raw ?? (node as any).content ?? '')
+  return /^\s*<details\b/i.test(raw)
+}
+
+function isDetailsCloseHtmlBlock(node: ParsedNode) {
+  if (node.type !== 'html_block')
+    return false
+  const raw = String((node as any).raw ?? (node as any).content ?? '')
+  return /^\s*<\/details\b/i.test(raw)
+}
+
+function findLastClosingTagStart(raw: string, tag: string) {
+  const closeRe = new RegExp(String.raw`<\s*\/\s*${escapeRegex(tag)}(?=\s|>)`, 'gi')
+  let last = -1
+  let match: RegExpExecArray | null
+
+  while ((match = closeRe.exec(raw)) !== null)
+    last = match.index
+
+  return last
+}
+
+function buildDetailsChildParseOptions(options: ParseOptions, final: boolean): ParseOptions {
+  return {
+    final,
+    requireClosingStrong: options.requireClosingStrong,
+    customHtmlTags: options.customHtmlTags,
+    validateLink: options.validateLink,
+  }
+}
+
+function parseDetailsFragmentChildren(
+  fragment: string,
+  md: MarkdownIt,
+  options: ParseOptions,
+) {
+  if (!fragment.trim())
+    return []
+
+  return parseMarkdownToStructure(fragment, md, options)
+}
+
+function buildStructuredSummaryNode(
+  summaryRaw: string,
+  md: MarkdownIt,
+  options: ParseOptions,
+) {
+  const summaryNode = parseHtmlBlock({ content: summaryRaw } as MarkdownToken) as ParsedNode & Record<string, unknown>
+  const openEnd = findTagCloseIndexOutsideQuotes(summaryRaw)
+  const closeStart = findLastClosingTagStart(summaryRaw, 'summary')
+
+  if (openEnd !== -1 && closeStart !== -1 && closeStart >= openEnd + 1) {
+    const summaryInner = summaryRaw.slice(openEnd + 1, closeStart)
+    const children = parseDetailsFragmentChildren(summaryInner, md, options)
+    if (children.length > 0)
+      summaryNode.children = children
+  }
+
+  summaryNode.raw = summaryRaw
+  return summaryNode as ParsedNode
+}
+
+function buildDetailsPrefixChildren(
+  openRaw: string,
+  md: MarkdownIt,
+  options: ParseOptions,
+) {
+  const openEnd = findTagCloseIndexOutsideQuotes(openRaw)
+  if (openEnd === -1)
+    return []
+
+  const innerPrefix = openRaw.slice(openEnd + 1)
+  if (!innerPrefix.trim())
+    return []
+
+  const summaryBlock = findNextHtmlBlockFromSource(innerPrefix, 'summary', 0)
+  if (!summaryBlock)
+    return parseDetailsFragmentChildren(innerPrefix, md, options)
+
+  const beforeSummary = innerPrefix.slice(0, summaryBlock.start)
+  const afterSummary = innerPrefix.slice(summaryBlock.end)
+
+  return [
+    ...parseDetailsFragmentChildren(beforeSummary, md, options),
+    buildStructuredSummaryNode(summaryBlock.raw, md, options),
+    ...parseDetailsFragmentChildren(afterSummary, md, options),
+  ]
+}
+
+function combineStructuredDetailsHtmlBlocks(
+  nodes: ParsedNode[],
+  source: string,
+  md: MarkdownIt,
+  options: ParseOptions,
+  final: boolean,
+  sourceCursor = 0,
+): [ParsedNode[], number] {
+  const merged: ParsedNode[] = []
+  let cursor = sourceCursor
+
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i]
+    const nodeRaw = getMergeableNodeRaw(node)
+    let nodePos = -1
+    if (nodeRaw) {
+      nodePos = source.indexOf(nodeRaw, cursor)
+      if (nodePos !== -1)
+        cursor = nodePos + nodeRaw.length
+    }
+
+    if (!isDetailsOpenHtmlBlock(node)) {
+      merged.push(node)
+      continue
+    }
+
+    const openRaw = String((node as any).raw ?? getMergeableNodeRaw(node) ?? '')
+    const openStart = nodePos !== -1 ? nodePos : source.indexOf(openRaw, Math.max(0, cursor - openRaw.length))
+    if (openStart === -1) {
+      merged.push(node)
+      continue
+    }
+
+    let depth = 1
+    let closeIndex = -1
+    for (let j = i + 1; j < nodes.length; j++) {
+      const current = nodes[j]
+      if (isDetailsOpenHtmlBlock(current)) {
+        depth++
+        continue
+      }
+      if (!isDetailsCloseHtmlBlock(current))
+        continue
+      depth--
+      if (depth === 0) {
+        closeIndex = j
+        break
+      }
+    }
+
+    const middleNodes = closeIndex === -1 ? nodes.slice(i + 1) : nodes.slice(i + 1, closeIndex)
+    const [children] = combineStructuredDetailsHtmlBlocks(
+      middleNodes,
+      source,
+      md,
+      options,
+      final,
+      openStart + openRaw.length,
+    )
+    const prefixChildren = buildDetailsPrefixChildren(
+      openRaw,
+      md,
+      buildDetailsChildParseOptions(options, final),
+    )
+
+    const exact = findNextHtmlBlockFromSource(source, 'details', openStart)
+    const closeRaw = closeIndex === -1
+      ? '</details>'
+      : String((nodes[closeIndex] as any)?.raw ?? getMergeableNodeRaw(nodes[closeIndex]) ?? '</details>')
+    const explicitClose = closeIndex !== -1 && exact?.closed === true
+    const trimmedCloseRaw = closeRaw.replace(/[\t\r\n ]+$/, '')
+    const closeStart = explicitClose
+      ? (() => {
+          const closeOffset = exact.raw.lastIndexOf(trimmedCloseRaw)
+          return closeOffset === -1 ? source.length : openStart + closeOffset
+        })()
+      : source.length
+    const middleSource = source.slice(openStart + openRaw.length, closeStart === -1 ? source.length : closeStart)
+    const middleTokens = md.parse(middleSource, { __markstreamFinal: final }) as unknown as MarkdownToken[]
+    const renderedMiddle = md.renderer.render(
+      middleTokens as unknown as Token[],
+      (md as any).options,
+      { __markstreamFinal: final },
+    )
+    const closeMarkupEnd = closeStart + trimmedCloseRaw.length
+    const closeSliceEnd = explicitClose
+      ? Math.max(closeStart + closeRaw.length, extendHtmlBlockCloseToLineEnding(source, closeMarkupEnd))
+      : source.length
+    const renderedCloseRaw = explicitClose
+      ? source.slice(closeStart, closeSliceEnd)
+      : closeRaw
+    const mergedRaw = explicitClose
+      ? source.slice(openStart, closeSliceEnd)
+      : source.slice(openStart)
+
+    merged.push({
+      ...(node as any),
+      tag: 'details',
+      attrs: parseTagAttrs(openRaw.slice(0, findTagCloseIndexOutsideQuotes(openRaw) + 1)),
+      raw: mergedRaw,
+      content: `${openRaw}${renderedMiddle}${renderedCloseRaw}`,
+      children: [...prefixChildren, ...children],
+      loading: !final && !explicitClose,
+    } as ParsedNode)
+
+    cursor = explicitClose ? closeSliceEnd : source.length
+    if (closeIndex === -1)
+      break
+    i = closeIndex
+  }
+
+  return [merged, cursor]
+}
+
+function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, source: string) {
+  if (!source)
+    return nodes
+
+  const merged = nodes.slice()
+  let sourceHtmlCursor = 0
+
+  for (let i = 0; i < merged.length; i++) {
+    const node = merged[i] as any
+    if (node?.type !== 'html_block')
+      continue
+
+    const tag = String(node?.tag ?? '').toLowerCase()
+    if (!tag)
+      continue
+    if (!SOURCE_EXACT_HTML_BLOCK_TAGS.has(tag))
+      continue
+
+    const exact = findNextHtmlBlockFromSource(source, tag, sourceHtmlCursor)
+    if (!exact)
+      continue
+    sourceHtmlCursor = exact.end
+
+    const currentContent = String(node?.content ?? getMergeableNodeRaw(node))
+    const currentRaw = String(node?.raw ?? currentContent)
+    const nextContent = buildHtmlBlockContent(exact.raw, tag, exact.closed)
+    const desiredLoading = !final && !exact.closed
+    const needsExpansion = currentContent !== nextContent || currentRaw !== exact.raw || Boolean(node?.loading) !== desiredLoading
+
+    node.content = nextContent
+    node.raw = exact.raw
+    node.loading = desiredLoading
+
+    if (!needsExpansion)
+      continue
+
+    let tailCursor = findApproximateConsumedPrefixEnd(exact.raw, currentContent)
+    if (tailCursor === -1)
+      tailCursor = 0
+
+    const j = i + 1
+    while (j < merged.length) {
+      const nextRaw = getMergeableNodeRaw(merged[j])
+      if (!nextRaw)
+        break
+      const nextPos = exact.raw.indexOf(nextRaw, tailCursor)
+      if (nextPos === -1)
+        break
+      tailCursor = nextPos + nextRaw.length
+      merged.splice(j, 1)
+    }
+  }
+
+  return merged
 }
 
 function stripDanglingHtmlLikeTail(markdown: string) {
@@ -1527,6 +1923,9 @@ export function parseMarkdownToStructure(
       }
     }
   }
+
+  result = mergeSplitTopLevelHtmlBlocks(result, isFinal, safeMarkdown)
+  result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, options, isFinal)[0]
 
   if (isFinal) {
     const seen = new WeakSet<object>()

@@ -1,95 +1,15 @@
 import type { MarkdownIt, Token } from 'markdown-it-ts'
+import { STANDARD_BLOCK_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 
-const VOID_TAGS = new Set([
-  'area',
-  'base',
-  'br',
-  'col',
-  'embed',
-  'hr',
-  'img',
-  'input',
-  'link',
-  'meta',
-  'param',
-  'source',
-  'track',
-  'wbr',
-])
+const VOID_TAGS = VOID_HTML_TAGS
 
 // A conservative set of common HTML tags used to detect streaming mid-states.
 // We only suppress/merge partial tags for these names to avoid false positives
 // (e.g., autolinks like <http://...>).
-const BASE_COMMON_HTML_TAGS = new Set<string>([
-  ...Array.from(VOID_TAGS),
-  // inline/common
-  'a',
-  'abbr',
-  'b',
-  'bdi',
-  'bdo',
-  'button',
-  'cite',
-  'code',
-  'data',
-  'del',
-  'dfn',
-  'em',
-  'font',
-  'i',
-  'img',
-  'input',
-  'ins',
-  'kbd',
-  'label',
-  'mark',
-  'q',
-  's',
-  'samp',
-  'small',
-  'span',
-  'strong',
-  'sub',
-  'sup',
-  'time',
-  'u',
-  'var',
-  // block/common
-  'article',
-  'aside',
-  'blockquote',
-  'div',
-  'details',
-  'figcaption',
-  'figure',
-  'footer',
-  'header',
-  'h1',
-  'h2',
-  'h3',
-  'h4',
-  'h5',
-  'h6',
-  'li',
-  'main',
-  'nav',
-  'ol',
-  'p',
-  'pre',
-  'section',
-  'summary',
-  'table',
-  'tbody',
-  'td',
-  'th',
-  'thead',
-  'tr',
-  'ul',
-  // svg-ish (often embedded inline)
-  'svg',
-  'g',
-  'path',
-])
+const BASE_COMMON_HTML_TAGS = STANDARD_HTML_TAGS
+
+const BLOCK_LEVEL_HTML_TAGS = new Set<string>(STANDARD_BLOCK_HTML_TAGS)
+BLOCK_LEVEL_HTML_TAGS.delete('details')
 
 const OPEN_TAG_RE = /<([A-Z][\w-]*)(?=[\s/>]|$)/gi
 const CLOSE_TAG_RE = /<\/\s*([A-Z][\w-]*)(?=[\s/>]|$)/gi
@@ -197,13 +117,6 @@ function findMatchingCloseRangeInHtml(content: string, tag: string, startIndex =
   }
 
   return null
-}
-
-function findMatchingCloseOffsetInHtml(content: string, tag: string, startIndex = 0) {
-  const range = findMatchingCloseRangeInHtml(content, tag, startIndex)
-  if (!range)
-    return -1
-  return range.end
 }
 
 function getTrailingCustomTagDepthInHtml(content: string, tag: string) {
@@ -524,7 +437,26 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
       autoCloseInlineTagSet.add(name)
     }
   }
-  const shouldMergeHtmlBlockTag = (tag: string) => customTagSet.has(tag) || !commonHtmlTags.has(tag)
+  const shouldMergeHtmlBlockTag = (tag: string) => customTagSet.has(tag) || !commonHtmlTags.has(tag) || BLOCK_LEVEL_HTML_TAGS.has(tag)
+  const getHtmlBlockCarrierContent = (token: Token & { content?: string, children?: any[] }) => {
+    if (token.type === 'html_block')
+      return String(token.content ?? '')
+    if (token.type !== 'inline' || !Array.isArray(token.children) || token.children.length !== 1)
+      return ''
+    const onlyChild = token.children[0]
+    if (onlyChild?.type !== 'html_block')
+      return ''
+    return String(token.content ?? onlyChild.content ?? '')
+  }
+  const normalizeHtmlBlockCarrier = (
+    token: Token & { content?: string, children?: any[], raw?: string },
+    content: string,
+  ) => {
+    token.type = 'html_block'
+    token.content = content
+    token.raw = content
+    token.children = []
+  }
   // Streaming mid-state: suppress partial inline HTML in text tokens until the
   // tag is fully closed with `>`, then allow it to be tokenized as html_inline.
   md.core.ruler.after('inline', 'fix_html_inline_streaming', (state: unknown) => {
@@ -593,18 +525,19 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
           }
 
           const chunk = String((t as any).content ?? (t as any).raw ?? '')
-          const closeEnd = chunk
-            ? findMatchingCloseOffsetInHtml(chunk, openTag)
-            : -1
-          const isClosingTag = closeEnd !== -1
 
           if (chunk) {
             const openToken = toks[openIndex] as Token & { content?: string, loading?: boolean }
-            if (closeEnd !== -1) {
-              const before = chunk.slice(0, closeEnd)
-              const after = chunk.slice(closeEnd)
+            const mergedContent = `${String(openToken.content || '')}\n${chunk}`
+            const openEnd = findTagCloseIndexOutsideQuotes(mergedContent)
+            const closeRange = openEnd === -1
+              ? null
+              : findMatchingCloseRangeInHtml(mergedContent, openTag, openEnd + 1)
+            if (closeRange) {
+              const before = mergedContent.slice(0, closeRange.end)
+              const after = mergedContent.slice(closeRange.end)
 
-              openToken.content = `${String(openToken.content || '')}\n${before}`
+              openToken.content = before
               openToken.loading = false
 
               const afterTrimmed = after.replace(/^\s+/, '')
@@ -621,32 +554,31 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
               continue
             }
 
-            openToken.content = `${String(openToken.content || '')}\n${chunk}`
+            openToken.content = mergedContent
             if (openToken.loading !== false)
-              openToken.loading = !isClosingTag
+              openToken.loading = true
           }
 
           // Remove current token after merging.
           toks.splice(i, 1)
           i--
-
-          if (isClosingTag)
-            tagStack.pop()
           continue
         }
       }
 
-      if (t.type === 'html_block') {
-        const rawContent = String(t.content || '')
+      const rawContent = getHtmlBlockCarrierContent(t)
+      if (rawContent) {
         // Support both opening (<tag ...>) and closing (</tag>) blocks.
         const tag = (rawContent.match(/<\s*(?:\/\s*)?([^\s>/]+)/)?.[1] ?? '').toLowerCase()
         const isClosingTag = /^\s*<\s*\//.test(rawContent)
 
         // Merge configured custom tags and unknown HTML-like tags (e.g. <think>)
-        // until their matching closing tag arrives. Keep standard HTML tags like
-        // <div> and <br> on the markdown-it default path.
+        // until their matching closing tag arrives. Also merge standard block
+        // tags that markdown-it can split on blank lines, such as <details>.
         if (!tag || !shouldMergeHtmlBlockTag(tag))
           continue
+
+        normalizeHtmlBlockCarrier(t, rawContent)
 
         if (!isClosingTag) {
           // 开始标签，入栈

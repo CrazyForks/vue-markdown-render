@@ -2,7 +2,7 @@
   "name": "markstream-vue",
   "type": "module",
   "version": "0.0.10-beta.3",
-  "packageManager": "pnpm@10.32.1",
+  "packageManager": "pnpm@10.33.0",
   "description": "Streaming-friendly Vue 3 Markdown renderer for docs sites, AI chat UIs, and large documents.",
   "author": "Simon He",
   "license": "MIT",
@@ -260,7 +260,7 @@
     "@types/markdown-it-emoji": "^3.0.1",
     "@types/node": "^18.19.130",
     "@vitejs/plugin-vue": "^5.2.4",
-    "@vitest/ui": "^4.1.0",
+    "@vitest/ui": "^4.1.2",
     "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.27",
     "bumpp": "^8.2.1",
@@ -286,8 +286,8 @@
     "vite-plugin-pages": "^0.33.3",
     "vite-svg-loader": "^5.1.1",
     "vitepress": "^1.6.4",
-    "vitest": "^4.1.0",
-    "vue": "^3.5.30",
+    "vitest": "^4.1.2",
+    "vue": "^3.5.31",
     "vue-tsc": "^2.2.12"
   },
   "pnpm": {
