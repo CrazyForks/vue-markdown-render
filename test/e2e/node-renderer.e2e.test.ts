@@ -132,7 +132,7 @@ describe('markdownRender node e2e coverage', () => {
       mountOptions: {
         global: {
           stubs: {
-            transition: false,
+            'transition': false,
             'transition-group': false,
           },
         },
@@ -155,7 +155,7 @@ describe('markdownRender node e2e coverage', () => {
       mountOptions: {
         global: {
           stubs: {
-            transition: false,
+            'transition': false,
             'transition-group': false,
           },
         },
@@ -182,7 +182,7 @@ After`,
       mountOptions: {
         global: {
           stubs: {
-            transition: false,
+            'transition': false,
             'transition-group': false,
           },
         },
@@ -208,7 +208,7 @@ After`,
       mountOptions: {
         global: {
           stubs: {
-            transition: false,
+            'transition': false,
             'transition-group': false,
           },
         },
@@ -233,7 +233,7 @@ After`,
       mountOptions: {
         global: {
           stubs: {
-            transition: false,
+            'transition': false,
             'transition-group': false,
           },
         },
@@ -271,7 +271,7 @@ After`,
       mountOptions: {
         global: {
           stubs: {
-            transition: false,
+            'transition': false,
             'transition-group': false,
           },
         },

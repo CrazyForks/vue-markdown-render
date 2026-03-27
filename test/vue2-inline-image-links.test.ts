@@ -3,8 +3,10 @@
  */
 
 import { mount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
+
+import ParagraphNode from '../packages/markstream-vue2/src/components/ParagraphNode/ParagraphNode.vue'
 
 vi.mock('../packages/markstream-vue2/src/components/LinkNode', () => ({
   default: defineComponent({
@@ -54,8 +56,6 @@ vi.mock('../packages/markstream-vue2/src/components/TextNode', () => ({
     },
   }),
 }))
-
-import ParagraphNode from '../packages/markstream-vue2/src/components/ParagraphNode/ParagraphNode.vue'
 
 describe('markstream-vue2 paragraph media-only links', () => {
   it('keeps image links inline without inserting text spans between them', () => {
@@ -108,7 +108,7 @@ describe('markstream-vue2 paragraph media-only links', () => {
       },
       global: {
         stubs: {
-          transition: false,
+          'transition': false,
           'transition-group': false,
         },
       },

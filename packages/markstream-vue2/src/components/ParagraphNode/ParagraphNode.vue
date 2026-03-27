@@ -96,7 +96,7 @@ const renderedChildren = computed(() => {
 
 function getChildProps(child: NodeChild, index: number) {
   return {
-    node: child,
+    'node': child,
     'index-key': `${props.indexKey ?? 'paragraph'}-${index}`,
     'custom-id': props.customId,
   }
@@ -134,10 +134,12 @@ const nodeComponents = {
       v-for="(child, index) in renderedChildren"
       :key="`${indexKey || 'paragraph'}-${index}`"
     >
-      <template v-if="isMediaOnlyParagraph && isWhitespaceText(child)">{{ getTextContent(child) }}</template>
+      <template v-if="isMediaOnlyParagraph && isWhitespaceText(child)">
+        {{ getTextContent(child) }}
+      </template>
       <component
-        v-else
         :is="nodeComponents[child.type]"
+        v-else
         v-bind="getChildProps(child, index)"
       />
     </template>
