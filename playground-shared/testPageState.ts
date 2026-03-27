@@ -11,6 +11,8 @@ export interface LocationLike {
   protocol: string
 }
 
+export type TestPageViewMode = 'lab' | 'preview'
+
 const FALLBACK_ORIGIN = 'https://markstream.local'
 
 export function isLocalHost(hostname: string) {
@@ -70,11 +72,40 @@ export function withMarkdownHash(baseUrl: string, markdown: string) {
   return `${url.pathname}${url.search}${url.hash}`
 }
 
+export function resolveTestPageViewMode(search: string): TestPageViewMode {
+  const params = new URLSearchParams(search)
+  return params.get('view') === 'preview' ? 'preview' : 'lab'
+}
+
+export function withTestPageViewMode(baseUrl: string, viewMode: TestPageViewMode = 'lab') {
+  const isAbsolute = /^[a-z]+:\/\//i.test(baseUrl)
+  const url = new URL(baseUrl, FALLBACK_ORIGIN)
+
+  if (viewMode === 'preview')
+    url.searchParams.set('view', 'preview')
+  else
+    url.searchParams.delete('view')
+
+  if (isAbsolute)
+    return url.toString()
+
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
+export function buildTestPageHref(
+  baseUrl: string,
+  markdown: string,
+  viewMode: TestPageViewMode = 'lab',
+) {
+  return withMarkdownHash(withTestPageViewMode(baseUrl, viewMode), markdown)
+}
+
 export function resolveFrameworkTestHref(
   framework: FrameworkTarget,
   currentFrameworkId: string,
   markdown: string,
   locationLike?: LocationLike,
+  viewMode: TestPageViewMode = 'lab',
 ) {
   let baseUrl = framework.id === currentFrameworkId
     ? '/test'
@@ -89,5 +120,5 @@ export function resolveFrameworkTestHref(
     baseUrl = `${locationLike.protocol}//${locationLike.hostname}:${framework.localPort}/test`
   }
 
-  return withMarkdownHash(baseUrl, markdown)
+  return buildTestPageHref(baseUrl, markdown, viewMode)
 }

@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
-import { decodeMarkdownHash } from '../playground-shared/testPageState'
+import { buildTestPageHref, decodeMarkdownHash } from '../playground-shared/testPageState'
 import TestPage from '../playground/src/pages/test.vue'
 
 vi.mock('@iconify/vue', () => ({
@@ -103,6 +103,7 @@ vi.mock('../src/workers/mermaidParser.worker?worker&inline', () => ({
 const originalFullscreenElement = Object.getOwnPropertyDescriptor(document, 'fullscreenElement')
 const originalExitFullscreen = Object.getOwnPropertyDescriptor(document, 'exitFullscreen')
 const originalRequestFullscreen = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'requestFullscreen')
+const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
 
 async function mountTestPage() {
   const wrapper = mount(TestPage)
@@ -116,6 +117,12 @@ describe('playground /test smoke', () => {
     mermaidEnabled = true
     window.localStorage.removeItem('vmr-test-dark')
     window.history.replaceState({}, '', '/test')
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    })
   })
 
   afterEach(() => {
@@ -136,6 +143,11 @@ describe('playground /test smoke', () => {
       Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', originalRequestFullscreen)
     else
       Reflect.deleteProperty(HTMLElement.prototype, 'requestFullscreen')
+
+    if (originalClipboard)
+      Object.defineProperty(navigator, 'clipboard', originalClipboard)
+    else
+      Reflect.deleteProperty(navigator, 'clipboard')
   })
 
   it('opens the /test route and renders the lab shell', async () => {
@@ -172,6 +184,28 @@ describe('playground /test smoke', () => {
 
     expect(href).toContain('/test#data=')
     expect(decodeMarkdownHash(hash)).toBe('## carried across frameworks')
+
+    wrapper.unmount()
+  })
+
+  it('copies a preview-only share link from the preview toolbar', async () => {
+    const wrapper = await mountTestPage()
+    const textarea = wrapper.get('textarea')
+
+    await textarea.setValue('## shared preview')
+    await nextTick()
+
+    await wrapper.get('[data-testid="preview-share-button"]').trigger('click')
+
+    const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>
+    expect(writeText).toHaveBeenCalledTimes(1)
+
+    const href = writeText.mock.calls[0][0]
+    const url = new URL(href)
+
+    expect(url.pathname).toBe('/test')
+    expect(url.searchParams.get('view')).toBe('preview')
+    expect(decodeMarkdownHash(url.hash)).toBe('## shared preview')
 
     wrapper.unmount()
   })
@@ -243,12 +277,34 @@ describe('playground /test smoke', () => {
 
     expect(requestFullscreen).toHaveBeenCalledTimes(1)
     expect(button.text()).toContain('退出全屏')
+    expect(wrapper.get('[data-testid="immersive-preview-back-button"]').text()).toContain('返回编辑')
 
-    await button.trigger('click')
+    await wrapper.get('[data-testid="immersive-preview-back-button"]').trigger('click')
     await nextTick()
 
     expect(exitFullscreen).toHaveBeenCalledTimes(1)
     expect(button.text()).toContain('全屏预览')
+
+    wrapper.unmount()
+  })
+
+  it('opens preview share links directly in preview-only mode', async () => {
+    window.history.replaceState({}, '', buildTestPageHref('/test', '## shared only', 'preview'))
+
+    const wrapper = await mountTestPage()
+
+    expect(wrapper.find('textarea').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Cross-framework regression lab')
+    expect(wrapper.get('[data-testid="preview"]').text()).toBe('## shared only')
+    expect(wrapper.get('[data-testid="immersive-preview-back-button"]').text()).toContain('Test Page')
+    expect(wrapper.get('[data-testid="immersive-preview-star-link"]').attributes('href')).toBe('https://github.com/Simon-He95/markstream-vue')
+
+    await wrapper.get('[data-testid="immersive-preview-back-button"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('textarea').exists()).toBe(true)
+    expect(window.location.search).toBe('')
+    expect(decodeMarkdownHash(window.location.hash)).toBe('## shared only')
 
     wrapper.unmount()
   })
@@ -312,6 +368,25 @@ describe('playground /test smoke', () => {
     await nextTick()
 
     expect(page.classes()).not.toContain('test-lab--dark')
+
+    wrapper.unmount()
+  })
+
+  it('toggles dark and light appearance from the immersive preview toolbar', async () => {
+    window.history.replaceState({}, '', buildTestPageHref('/test', '## shared only', 'preview'))
+
+    const wrapper = await mountTestPage()
+    const page = wrapper.get('.test-lab')
+    const button = wrapper.get('[data-testid="immersive-preview-theme-button"]')
+
+    expect(page.classes()).not.toContain('test-lab--dark')
+    expect(button.attributes('aria-label')).toBe('切换到暗色模式')
+
+    await button.trigger('click')
+    await nextTick()
+
+    expect(page.classes()).toContain('test-lab--dark')
+    expect(button.attributes('aria-label')).toBe('切换到浅色模式')
 
     wrapper.unmount()
   })
