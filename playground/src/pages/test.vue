@@ -98,7 +98,7 @@ const previewCardRef = ref<HTMLElement | null>(null)
 const streamSettingsDialogRef = ref<HTMLDialogElement | null>(null)
 const isPreviewFullscreen = ref(false)
 const testPageViewMode = ref<TestPageViewMode>('lab')
-const MAX_URL_LEN = 2000
+const MAX_URL_LEN = 10000
 const LOCAL_SHARE_QUERY_KEY = 'share'
 const LOCAL_SHARE_STORAGE_PREFIX = 'vmr-test-share:'
 

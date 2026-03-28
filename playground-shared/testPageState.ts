@@ -1,3 +1,4 @@
+import { deflateSync, inflateSync } from 'fflate'
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
 
 export interface FrameworkTarget {
@@ -14,19 +15,63 @@ export interface LocationLike {
 export type TestPageViewMode = 'lab' | 'preview'
 
 const FALLBACK_ORIGIN = 'https://markstream.local'
+const RAW_PREFIX = 'raw:'
+const DEFLATE_PREFIX = 'z:'
+const BASE64_CHUNK_SIZE = 0x8000
+
+function encodeBase64Url(bytes: Uint8Array) {
+  let binary = ''
+  for (let index = 0; index < bytes.length; index += BASE64_CHUNK_SIZE)
+    binary += String.fromCharCode(...bytes.subarray(index, index + BASE64_CHUNK_SIZE))
+
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
+}
+
+function decodeBase64Url(payload: string) {
+  const normalized = payload
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(payload.length + ((4 - payload.length % 4) % 4), '=')
+
+  const binary = atob(normalized)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index++)
+    bytes[index] = binary.charCodeAt(index)
+
+  return bytes
+}
+
+function encodeDeflatedPayload(markdown: string) {
+  try {
+    const compressed = deflateSync(new TextEncoder().encode(markdown), { level: 9 })
+    return `${DEFLATE_PREFIX}${encodeBase64Url(compressed)}`
+  }
+  catch {
+    return ''
+  }
+}
 
 export function isLocalHost(hostname: string) {
   return hostname === 'localhost' || hostname === '127.0.0.1'
 }
 
 export function encodeMarkdownPayload(markdown: string) {
-  const encodedRaw = encodeURIComponent(markdown)
-  const compressed = compressToEncodedURIComponent(markdown)
-
-  if (!compressed && !encodedRaw)
+  if (!markdown)
     return ''
 
-  return (compressed && compressed.length < encodedRaw.length) ? compressed : `raw:${encodedRaw}`
+  const encodedRaw = encodeURIComponent(markdown)
+  const rawPayload = `${RAW_PREFIX}${encodedRaw}`
+  const legacyCompressed = compressToEncodedURIComponent(markdown)
+  const deflated = encodeDeflatedPayload(markdown)
+
+  const candidates = [rawPayload, legacyCompressed, deflated].filter(Boolean)
+  if (!candidates.length)
+    return ''
+
+  return candidates.reduce((shortest, candidate) => candidate.length < shortest.length ? candidate : shortest)
 }
 
 export function createMarkdownHash(markdown: string) {
@@ -40,9 +85,18 @@ export function decodeMarkdownHash(hash: string) {
     return null
 
   const payload = matched[1]
-  if (payload.startsWith('raw:')) {
+  if (payload.startsWith(RAW_PREFIX)) {
     try {
-      return decodeURIComponent(payload.slice(4))
+      return decodeURIComponent(payload.slice(RAW_PREFIX.length))
+    }
+    catch {
+      return null
+    }
+  }
+
+  if (payload.startsWith(DEFLATE_PREFIX)) {
+    try {
+      return new TextDecoder().decode(inflateSync(decodeBase64Url(payload.slice(DEFLATE_PREFIX.length))))
     }
     catch {
       return null

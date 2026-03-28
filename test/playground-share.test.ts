@@ -1,56 +1,32 @@
-import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
+import { compressToEncodedURIComponent } from 'lz-string'
 import { describe, expect, it } from 'vitest'
-
-function makeDataForUrl(input: string) {
-  const encodedRaw = encodeURIComponent(input)
-  let compressed = ''
-  try {
-    compressed = compressToEncodedURIComponent(input)
-  }
-  catch {
-    compressed = ''
-  }
-  const data = (compressed && compressed.length < encodedRaw.length) ? compressed : `raw:${encodedRaw}`
-  return data
-}
-
-function restoreFromData(payload: string) {
-  if (payload.startsWith('raw:')) {
-    try {
-      return decodeURIComponent(payload.slice(4))
-    }
-    catch {
-      return ''
-    }
-  }
-  try {
-    return decompressFromEncodedURIComponent(payload) || ''
-  }
-  catch {
-    return ''
-  }
-}
+import { createMarkdownHash, decodeMarkdownHash } from '../playground-shared/testPageState'
 
 describe('playground share payload', () => {
-  it('chooses the shorter representation and can restore it (distinct links)', () => {
-    const input = `<a href=" ">示例链接1</a >  \n<a href="https://www.google.com">Google</a >  \n<a href="https://github.com">GitHub</a >  \n<a href="https://stackoverflow.com">Stack Overflow</a >  \n<a href="https://www.wikipedia.org">维基百科</a >`
-    const data = makeDataForUrl(input)
-    // The implementation picks the shorter of compressed vs raw; ensure that holds
-    const rawLen = encodeURIComponent(input).length
-    expect(data.length).toBeLessThanOrEqual(rawLen)
-    const restored = restoreFromData(data)
-    expect(restored).toBe(input)
+  it('prefers the stronger deflate codec for large markdown payloads', () => {
+    const input = [
+      '# Shareable markdown',
+      '',
+      '```ts',
+      ...Array.from({ length: 400 }, (_, index) => `console.log('line-${index}', ${index ** 2})`),
+      '```',
+      '',
+      ...Array.from({ length: 400 }, (_, index) => `- 第 ${index + 1} 行：你好，世界 ${index.toString(36)}`),
+    ].join('\n')
+    const legacyHash = `data=${compressToEncodedURIComponent(input)}`
+    const hash = createMarkdownHash(input)
+
+    expect(hash.startsWith('data=z:')).toBe(true)
+    expect(hash.length).toBeLessThan(legacyHash.length)
+    expect(decodeMarkdownHash(hash)).toBe(input)
   })
 
-  it('prefers compressed when input is repetitive', () => {
-    const input = 'hello '.repeat(1000)
-    const data = makeDataForUrl(input)
-    // For repetitive input compressed should be shorter
-    expect(data.startsWith('raw:')).toBe(false)
-    const restored = restoreFromData(data)
-    expect(restored).toBe(input)
-    // sanity: compression should actually reduce length vs raw
-    const rawLen = encodeURIComponent(input).length
-    expect(data.length).toBeLessThan(rawLen)
+  it('continues to decode legacy raw and lz-string payloads', () => {
+    const input = `<a href=" ">示例链接1</a >\n<a href="https://github.com">GitHub</a >\n<a href="https://www.wikipedia.org">维基百科</a >`
+    const legacyRawHash = `data=raw:${encodeURIComponent(input)}`
+    const legacyLzHash = `data=${compressToEncodedURIComponent(input)}`
+
+    expect(decodeMarkdownHash(legacyRawHash)).toBe(input)
+    expect(decodeMarkdownHash(legacyLzHash)).toBe(input)
   })
 })

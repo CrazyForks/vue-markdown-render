@@ -118,6 +118,20 @@ function createLongMarkdown() {
   ).join('\n')
 }
 
+function createOversizedMarkdown() {
+  let seed = 0x12345678
+  const nextChunk = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0
+    return `${seed.toString(36).padStart(7, '0')}${((seed >>> 1) ^ 0x5A5A5A5A).toString(36).padStart(7, '0')}`
+  }
+
+  return [
+    '```text',
+    ...Array.from({ length: 2400 }, (_, index) => `${index.toString(36).padStart(4, '0')} ${nextChunk()}${nextChunk()}${nextChunk()}${nextChunk()}`),
+    '```',
+  ].join('\n')
+}
+
 describe('playground /test smoke', () => {
   beforeEach(() => {
     katexEnabled = true
@@ -217,14 +231,37 @@ describe('playground /test smoke', () => {
     wrapper.unmount()
   })
 
-  it('falls back to storage-backed preview share links for long markdown', async () => {
+  it('keeps preview share links in the url for larger markdown inputs', async () => {
     const wrapper = await mountTestPage()
     const textarea = wrapper.get('textarea')
     const longMarkdown = createLongMarkdown()
 
-    expect(buildTestPageHref('/test', longMarkdown, 'preview').length).toBeGreaterThan(2000)
-
     await textarea.setValue(longMarkdown)
+    await nextTick()
+    await wrapper.get('[data-testid="preview-share-button"]').trigger('click')
+
+    const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>
+    expect(writeText).toHaveBeenCalledTimes(1)
+
+    const href = writeText.mock.calls[0][0]
+    const url = new URL(href)
+
+    expect(url.pathname).toBe('/test')
+    expect(url.searchParams.get('view')).toBe('preview')
+    expect(url.searchParams.get('share')).toBeNull()
+    expect(decodeMarkdownHash(url.hash)).toBe(longMarkdown)
+
+    wrapper.unmount()
+  })
+
+  it('falls back to storage-backed preview share links for oversized markdown', async () => {
+    const wrapper = await mountTestPage()
+    const textarea = wrapper.get('textarea')
+    const oversizedMarkdown = createOversizedMarkdown()
+
+    expect(buildTestPageHref('/test', oversizedMarkdown, 'preview').length).toBeGreaterThan(10000)
+
+    await textarea.setValue(oversizedMarkdown)
     await nextTick()
     await wrapper.get('[data-testid="preview-share-button"]').trigger('click')
 
@@ -239,7 +276,7 @@ describe('playground /test smoke', () => {
     expect(url.searchParams.get('view')).toBe('preview')
     expect(url.hash).toBe('')
     expect(shareId).toBeTruthy()
-    expect(window.localStorage.getItem(`vmr-test-share:${shareId}`)).toBe(longMarkdown)
+    expect(window.localStorage.getItem(`vmr-test-share:${shareId}`)).toBe(oversizedMarkdown)
 
     wrapper.unmount()
   })
@@ -359,8 +396,8 @@ describe('playground /test smoke', () => {
     await nextTick()
 
     expect(wrapper.find('textarea').exists()).toBe(true)
-    expect(window.location.search).toBe(`?share=${shareId}`)
-    expect(window.location.hash).toBe('')
+    expect(window.location.search).toBe('')
+    expect(decodeMarkdownHash(window.location.hash)).toBe(longMarkdown)
 
     wrapper.unmount()
   })
