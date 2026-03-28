@@ -2079,6 +2079,7 @@ watch(mermaidEnabled, (enabled) => {
   border-radius: 0;
   border: 0;
   box-shadow: none;
+  overflow: hidden;
 }
 
 .preview-immersive-shell {
@@ -2097,7 +2098,10 @@ watch(mermaidEnabled, (enabled) => {
 .preview-immersive-toolbar {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
+  max-width: 100%;
   padding: 10px 12px;
   border-radius: 999px;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -2163,6 +2167,7 @@ watch(mermaidEnabled, (enabled) => {
   min-height: 560px;
   padding: 22px 20px;
   overflow: auto;
+  box-sizing: border-box;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.92));
 }
@@ -2183,7 +2188,10 @@ watch(mermaidEnabled, (enabled) => {
   min-height: 100vh;
   height: 100%;
   padding: 32px min(5vw, 48px) 42px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .settings-dialog {
@@ -2273,9 +2281,11 @@ watch(mermaidEnabled, (enabled) => {
   height: 100%;
   max-width: none;
   min-height: 100vh;
+  box-sizing: border-box;
   border-radius: 0;
+  border: 0;
   box-shadow: none;
-  overflow: auto;
+  overflow: hidden;
   background: #fff;
 }
 
@@ -2290,9 +2300,12 @@ watch(mermaidEnabled, (enabled) => {
 
 .workspace-card--preview:fullscreen .preview-surface {
   min-height: 100vh;
-  height: auto;
+  height: 100%;
   padding: 40px min(6vw, 72px);
-  overflow: visible;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
   background: #fff;
 }
@@ -2325,6 +2338,23 @@ watch(mermaidEnabled, (enabled) => {
 
 .preview-surface :deep(.markdown-renderer) {
   min-height: 100%;
+}
+
+.workspace-card--share-preview .preview-surface :deep(.markdown-renderer),
+.workspace-card--preview:fullscreen .preview-surface :deep(.markdown-renderer) {
+  width: min(100%, 820px);
+  margin: 0 auto;
+}
+
+.workspace-card--share-preview .preview-surface :deep(img),
+.workspace-card--share-preview .preview-surface :deep(svg),
+.workspace-card--share-preview .preview-surface :deep(canvas),
+.workspace-card--share-preview .preview-surface :deep(video),
+.workspace-card--preview:fullscreen .preview-surface :deep(img),
+.workspace-card--preview:fullscreen .preview-surface :deep(svg),
+.workspace-card--preview:fullscreen .preview-surface :deep(canvas),
+.workspace-card--preview:fullscreen .preview-surface :deep(video) {
+  max-width: 100%;
 }
 
 @media (min-width: 1181px) {
@@ -2540,6 +2570,10 @@ watch(mermaidEnabled, (enabled) => {
   }
 
   .workspace-card--share-preview .preview-surface {
+    padding: 20px 16px 28px;
+  }
+
+  .workspace-card--preview:fullscreen .preview-surface {
     padding: 20px 16px 28px;
   }
 
