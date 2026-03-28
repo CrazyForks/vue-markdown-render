@@ -1,10 +1,11 @@
 import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
+import type { TestPageViewMode } from '../../../playground-shared/testPageState'
 import type { StreamPresetId } from './streamPresets'
 import type { StreamSliceMode, StreamTransportMode } from './useStreamSimulator'
 import { NodeRenderer } from 'markstream-react'
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
-import { decodeMarkdownHash, resolveFrameworkTestHref } from '../../../playground-shared/testPageState'
+import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode } from '../../../playground-shared/testPageState'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from './streamPresets'
 import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from './useStreamSimulator'
 
@@ -12,6 +13,7 @@ type SampleId = TestLabSampleId
 type FrameworkId = TestLabFrameworkId
 
 const CURRENT_FRAMEWORK: FrameworkId = 'react'
+const DARK_MODE_KEY = 'vmr-test-dark'
 
 const frameworkCards = TEST_LAB_FRAMEWORKS
 const sampleCards = TEST_LAB_SAMPLES
@@ -22,8 +24,19 @@ interface TestLabProps {
 }
 
 export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
+  const streamSettingsDialogRef = useRef<HTMLDialogElement>(null)
+  const previewCardRef = useRef<HTMLElement>(null)
+  const previewShareTimerRef = useRef<number | null>(null)
   const [selectedSampleId, setSelectedSampleId] = useState<SampleId>('baseline')
   const [input, setInput] = useState(sampleCards[0].content)
+  const [viewMode, setViewMode] = useState<TestPageViewMode>(() => (
+    typeof window === 'undefined' ? 'lab' : resolveTestPageViewMode(window.location.search)
+  ))
+  const [isDark, setIsDark] = useState(() => (
+    typeof window !== 'undefined' && window.localStorage.getItem(DARK_MODE_KEY) === 'dark'
+  ))
+  const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false)
+  const [isPreviewShareCopied, setIsPreviewShareCopied] = useState(false)
   const [streamChunkSizeMin, setStreamChunkSizeMin] = useState(2)
   const [streamChunkSizeMax, setStreamChunkSizeMax] = useState(7)
   const [streamChunkDelayMin, setStreamChunkDelayMin] = useState(14)
@@ -89,6 +102,12 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
   const streamPresetDescription = activeStreamPreset?.description ?? 'Current values are outside the built-in presets.'
   const streamChunkRangeLabel = `${normalizedChunkSizeRange.min}-${normalizedChunkSizeRange.max} chars`
   const streamDelayRangeLabel = `${normalizedChunkDelayRange.min}-${normalizedChunkDelayRange.max}ms`
+  const streamStatusLabel = isStreaming ? (isPaused ? 'Paused' : 'Streaming') : 'Ready'
+  const activeStreamPresetLabel = activeStreamPreset?.label ?? 'Custom window'
+  const isSharePreviewMode = viewMode === 'preview'
+  const showImmersivePreviewControls = isSharePreviewMode || isPreviewFullscreen
+  const immersiveBackLabel = isSharePreviewMode ? '打开 Test Page' : '返回编辑'
+  const themeToggleLabel = isDark ? '切换浅色' : '切换暗色'
 
   useEffect(() => {
     if (typeof window === 'undefined')
@@ -96,6 +115,30 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
     const restored = decodeMarkdownHash(window.location.hash || '')
     if (restored)
       setInput(restored)
+    setViewMode(resolveTestPageViewMode(window.location.search))
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined')
+      return
+    window.localStorage.setItem(DARK_MODE_KEY, isDark ? 'dark' : 'light')
+  }, [isDark])
+
+  useEffect(() => {
+    if (typeof document === 'undefined')
+      return
+
+    function syncPreviewFullscreenState() {
+      setIsPreviewFullscreen(document.fullscreenElement === previewCardRef.current)
+    }
+
+    document.addEventListener('fullscreenchange', syncPreviewFullscreenState)
+    return () => document.removeEventListener('fullscreenchange', syncPreviewFullscreenState)
+  }, [])
+
+  useEffect(() => () => {
+    if (previewShareTimerRef.current != null && typeof window !== 'undefined')
+      window.clearTimeout(previewShareTimerRef.current)
   }, [])
 
   useEffect(() => {
@@ -141,6 +184,7 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
   function clearEditor() {
     resetStreamState()
     setInput('')
+    setIsPreviewShareCopied(false)
   }
 
   function handleStreamPresetChange(presetId: StreamPresetId) {
@@ -172,11 +216,82 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
     )
   }
 
+  function currentBasePageUrl() {
+    const url = new URL(window.location.href)
+    url.hash = ''
+    url.search = ''
+    return url.toString()
+  }
+
+  function toggleAppearance() {
+    setIsDark(previous => !previous)
+  }
+
+  async function copyPreviewShareLink() {
+    if (typeof window === 'undefined')
+      return
+
+    const target = buildTestPageHref(currentBasePageUrl(), input, 'preview')
+    await navigator.clipboard.writeText(target)
+    setIsPreviewShareCopied(true)
+
+    if (previewShareTimerRef.current != null)
+      window.clearTimeout(previewShareTimerRef.current)
+
+    previewShareTimerRef.current = window.setTimeout(() => {
+      setIsPreviewShareCopied(false)
+    }, 1800)
+  }
+
+  async function togglePreviewFullscreen() {
+    if (typeof document === 'undefined')
+      return
+
+    const previewCard = previewCardRef.current
+    if (!previewCard)
+      return
+
+    if (document.fullscreenElement === previewCard) {
+      if (document.exitFullscreen)
+        await document.exitFullscreen()
+      return
+    }
+
+    if (previewCard.requestFullscreen)
+      await previewCard.requestFullscreen()
+  }
+
+  function returnToEditableTestPage() {
+    if (isSharePreviewMode) {
+      window.location.href = buildTestPageHref(currentBasePageUrl(), input, 'lab')
+      return
+    }
+
+    if (typeof document !== 'undefined' && document.fullscreenElement === previewCardRef.current && document.exitFullscreen)
+      void document.exitFullscreen()
+  }
+
+  function openStreamSettingsDialog() {
+    if (!streamSettingsDialogRef.current)
+      return
+    if (!streamSettingsDialogRef.current.open)
+      streamSettingsDialogRef.current.showModal()
+  }
+
+  function closeStreamSettingsDialog() {
+    if (streamSettingsDialogRef.current?.open)
+      streamSettingsDialogRef.current.close()
+  }
+
   return (
-    <div className="test-lab">
-      <div className="test-lab__shell">
-        <section className="hero-panel">
-          <div className="hero-copy">
+    <div className={`test-lab ${isDark ? 'test-lab--dark dark' : ''} ${isSharePreviewMode ? 'test-lab--share-preview' : ''}`}>
+      {!isSharePreviewMode && <div className="test-lab__glow test-lab__glow--cyan" />}
+      {!isSharePreviewMode && <div className="test-lab__glow test-lab__glow--amber" />}
+
+      <div className={`test-lab__shell ${isSharePreviewMode ? 'test-lab__shell--share-preview' : ''}`}>
+        {!isSharePreviewMode && (
+          <section className="hero-panel">
+          <div className="hero-panel__copy">
             <span className="eyebrow">
               {frameworkLabel}
               {' '}
@@ -186,21 +301,33 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
             <p>专门用来和 Vue 3、Vue 2、Angular 的 test page 做对照，快速定位框架层差异。</p>
           </div>
 
-          <div className="hero-metrics">
-            <div className="metric-card">
-              <span>字符数</span>
-              <strong>{charCount}</strong>
+          <div className="hero-panel__actions">
+            <div className="hero-panel__status-row">
+              <span className="mini-pill">{frameworkLabel}</span>
+              <span className={`mini-pill ${isStreaming ? 'mini-pill--active' : ''}`}>{streamStatusLabel}</span>
+              <span className="mini-pill">{activeStreamPresetLabel}</span>
             </div>
-            <div className="metric-card">
-              <span>行数</span>
-              <strong>{lineCount}</strong>
-            </div>
-            <div className="metric-card">
-              <span>进度</span>
-              <strong>
-                {progress}
-                %
-              </strong>
+
+            <div className="hero-panel__metrics">
+              <div className="metric-card">
+                <span>当前框架</span>
+                <strong>{frameworkLabel}</strong>
+              </div>
+              <div className="metric-card">
+                <span>字符数</span>
+                <strong>{charCount}</strong>
+              </div>
+              <div className="metric-card">
+                <span>行数</span>
+                <strong>{lineCount}</strong>
+              </div>
+              <div className="metric-card">
+                <span>进度</span>
+                <strong>
+                  {progress}
+                  %
+                </strong>
+              </div>
             </div>
           </div>
 
@@ -216,13 +343,15 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
               </a>
             ))}
           </div>
-        </section>
+          </section>
+        )}
 
-        <div className="lab-layout">
-          <aside className="panel-card sidebar-card">
-            <div className="panel-head">
+        <div className={`lab-layout ${isSharePreviewMode ? 'lab-layout--share-preview' : ''}`}>
+          {!isSharePreviewMode && (
+            <section className="panel-card panel-card--samples">
+            <div className="panel-card__head">
               <div>
-                <h2>样例切换</h2>
+                <h2>样例</h2>
                 <p>同一段输入，切到别的框架继续比。</p>
               </div>
               <span className="mini-pill">{activeSample.title}</span>
@@ -241,15 +370,206 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
                 </button>
               ))}
             </div>
+            </section>
+          )}
 
-            <div className="panel-head panel-head--spaced">
+          {!isSharePreviewMode && (
+            <section className="panel-card panel-card--stream">
+            <div className="panel-card__head">
               <div>
                 <h2>流式控制</h2>
-                <p>检查 React 版本在纯随机 slice、停顿和 burst 下的稳定性。</p>
+                <p>主卡片只保留节奏摘要，详细参数放到更多设置里。</p>
+              </div>
+              <button type="button" className="ghost-button" onClick={openStreamSettingsDialog}>
+                更多设置
+              </button>
+            </div>
+
+            <div className="stream-summary">
+              <div className="stream-summary__row">
+                <span className="mini-pill mini-pill--active">{activeStreamPresetLabel}</span>
+                <span className="mini-pill">{streamTransportMode === 'readable-stream' ? 'ReadableStream' : 'Scheduler'}</span>
+                <span className="mini-pill">{streamSliceMode === 'boundary-aware' ? 'Boundary Aware' : 'Pure Random'}</span>
+                <span className={`mini-pill ${isStreaming ? 'mini-pill--active' : ''}`}>{streamStatusLabel}</span>
+              </div>
+
+              <div className="stream-summary__row stream-summary__row--dense">
+                <span className="stream-summary__item">
+                  Chunk
+                  {' '}
+                  {streamChunkRangeLabel}
+                </span>
+                <span className="stream-summary__item">
+                  Delay
+                  {' '}
+                  {streamDelayRangeLabel}
+                </span>
+                <span className="stream-summary__item">
+                  Burst
+                  {' '}
+                  {normalizedBurstiness}
+                  %
+                </span>
+                <span className={`stream-summary__item ${isPaused ? 'stream-summary__item--active' : ''}`}>
+                  {isPaused ? '已暂停' : '连续输出'}
+                </span>
               </div>
             </div>
 
-            <div className="control-grid">
+            <div className="button-grid">
+              <button type="button" className="testlab-btn testlab-btn--primary" onClick={toggleStream}>
+                {isStreaming ? '停止流式渲染' : '开始流式渲染'}
+              </button>
+              <button type="button" className="testlab-btn" disabled={!isStreaming} onClick={toggleStreamingPause}>
+                {isPaused ? '继续流式渲染' : '暂停流式渲染'}
+              </button>
+              <button type="button" className="testlab-btn" onClick={resetEditor}>
+                重置样例
+              </button>
+              <button type="button" className="testlab-btn" onClick={clearEditor}>
+                清空输入
+              </button>
+              <button type="button" className="testlab-btn" onClick={onGoHome}>
+                返回主 demo
+              </button>
+            </div>
+
+            <div className="progress-block">
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${progress}%` }} />
+              </div>
+              <div className="progress-meta">
+                <span>
+                  {previewContent.length}
+                  {' '}
+                  /
+                  {' '}
+                  {input.length || 0}
+                </span>
+                <span>
+                  {isStreaming ? `${lastChunkSize} chars / ${lastDelayMs}ms` : 'Static preview'}
+                </span>
+              </div>
+            </div>
+            </section>
+          )}
+
+          <section className={`workspace-grid ${isSharePreviewMode ? 'workspace-grid--share-preview' : ''}`}>
+            {!isSharePreviewMode && (
+              <article className="workspace-card workspace-card--pane workspace-card--editor">
+              <header className="workspace-card__head">
+                <div>
+                  <h2>Markdown 输入</h2>
+                  <p>把 markdown 粘进来，右侧立即对照 React 渲染结果。</p>
+                </div>
+                <span className="mini-pill">Live editor</span>
+              </header>
+
+              <textarea
+                value={input}
+                onChange={event => setInput(event.target.value)}
+                className="editor-textarea"
+                spellCheck={false}
+                placeholder="Paste markdown here..."
+              />
+
+              <footer className="workspace-card__foot">
+                <span>可直接粘贴 issue 复现内容</span>
+                <span>
+                  {charCount}
+                  {' '}
+                  chars
+                </span>
+              </footer>
+              </article>
+            )}
+
+            <article
+              ref={previewCardRef}
+              className={`workspace-card workspace-card--pane workspace-card--preview ${isSharePreviewMode ? 'workspace-card--share-preview' : ''}`}
+            >
+              {showImmersivePreviewControls && (
+                <div className="preview-immersive-shell">
+                  <div className="preview-immersive-toolbar">
+                    <button type="button" className="ghost-button preview-immersive-toolbar__button" onClick={returnToEditableTestPage}>
+                      {immersiveBackLabel}
+                    </button>
+                    <button type="button" className="ghost-button preview-immersive-toolbar__button" onClick={toggleAppearance}>
+                      {themeToggleLabel}
+                    </button>
+                    {!isSharePreviewMode && (
+                      <button type="button" className="ghost-button preview-immersive-toolbar__button" onClick={() => void togglePreviewFullscreen()}>
+                        {isPreviewFullscreen ? '退出全屏' : '全屏预览'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!isSharePreviewMode && (
+                <header className="workspace-card__head">
+                <div>
+                  <h2>实时预览</h2>
+                  <p>{`${isStreaming ? (isPaused ? '流式已暂停' : 'Streaming 中') : '已显示完整输入'}${isPreviewFullscreen ? ' · 按 Esc 退出全屏' : ''}`}</p>
+                </div>
+                <div className="workspace-card__head-actions">
+                  <button type="button" className="ghost-button" onClick={toggleAppearance}>
+                    {themeToggleLabel}
+                  </button>
+                  <button type="button" className="ghost-button" onClick={() => void copyPreviewShareLink()}>
+                    {isPreviewShareCopied ? '已复制预览链接' : '复制预览链接'}
+                  </button>
+                  <button type="button" className="ghost-button" onClick={() => void togglePreviewFullscreen()}>
+                    {isPreviewFullscreen ? '退出全屏' : '全屏预览'}
+                  </button>
+                  <span className={`mini-pill ${isStreaming ? 'mini-pill--active' : ''}`}>{streamStatusLabel}</span>
+                </div>
+                </header>
+              )}
+
+              <div className="preview-surface">
+                <NodeRenderer
+                  content={deferredPreview}
+                  typewriter={false}
+                  codeBlockStream
+                  isDark={isDark}
+                  codeBlockDarkTheme="vitesse-dark"
+                  codeBlockLightTheme="vitesse-light"
+                />
+              </div>
+
+              {!isSharePreviewMode && (
+                <footer className="workspace-card__foot">
+                <span>
+                  {deferredPreview.length}
+                  {' '}
+                  /
+                  {' '}
+                  {input.length || 0}
+                </span>
+                <span>
+                  {isStreaming ? `${streamTransportMode} · ${lastChunkSize} chars / ${lastDelayMs}ms` : 'React renderer'}
+                </span>
+                </footer>
+              )}
+            </article>
+          </section>
+        </div>
+
+        {!isSharePreviewMode && (
+          <dialog ref={streamSettingsDialogRef} className="settings-dialog">
+          <div className="settings-dialog__panel">
+            <header className="settings-dialog__head">
+              <div>
+                <h2>流式详细设置</h2>
+                <p>这里调整 transport、分片策略和 chunk 窗口。</p>
+              </div>
+              <button type="button" className="ghost-button" onClick={closeStreamSettingsDialog}>
+                关闭
+              </button>
+            </header>
+
+            <div className="control-grid control-grid--stream">
               <label className="input-card">
                 <span>Preset</span>
                 <select
@@ -356,88 +676,9 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
               {' '}
               snaps toward word and punctuation boundaries.
             </p>
-
-            <div className="button-grid">
-              <button type="button" className="testlab-btn testlab-btn--primary" onClick={toggleStream}>
-                {isStreaming ? '停止流式渲染' : '开始流式渲染'}
-              </button>
-              <button type="button" className="testlab-btn" disabled={!isStreaming} onClick={toggleStreamingPause}>
-                {isPaused ? '继续流式渲染' : '暂停流式渲染'}
-              </button>
-              <button type="button" className="testlab-btn" onClick={resetEditor}>
-                重置样例
-              </button>
-              <button type="button" className="testlab-btn" onClick={clearEditor}>
-                清空输入
-              </button>
-              <button type="button" className="testlab-btn" onClick={onGoHome}>
-                返回主 demo
-              </button>
-            </div>
-          </aside>
-
-          <section className="workspace-grid">
-            <article className="workspace-card">
-              <header className="workspace-card__head">
-                <div>
-                  <h2>Markdown 输入</h2>
-                  <p>把复现内容直接贴进来。</p>
-                </div>
-              </header>
-
-              <textarea
-                value={input}
-                onChange={event => setInput(event.target.value)}
-                className="editor-textarea"
-                spellCheck={false}
-                placeholder="Paste markdown here..."
-              />
-
-              <footer className="workspace-card__foot">
-                <span>
-                  {charCount}
-                  {' '}
-                  chars
-                </span>
-                <span>
-                  {lineCount}
-                  {' '}
-                  lines
-                </span>
-              </footer>
-            </article>
-
-            <article className="workspace-card">
-              <header className="workspace-card__head">
-                <div>
-                  <h2>实时预览</h2>
-                  <p>{isStreaming ? (isPaused ? '流式已暂停' : 'Streaming 中') : '已显示完整输入'}</p>
-                </div>
-                <span className="mini-pill">
-                  {progress}
-                  %
-                </span>
-              </header>
-
-              <div className="preview-surface">
-                <NodeRenderer content={deferredPreview} typewriter={false} codeBlockStream />
-              </div>
-
-              <footer className="workspace-card__foot">
-                <span>
-                  {deferredPreview.length}
-                  {' '}
-                  /
-                  {' '}
-                  {input.length || 0}
-                </span>
-                <span>
-                  {isStreaming ? `${streamTransportMode} · ${lastChunkSize} chars / ${lastDelayMs}ms` : 'React renderer'}
-                </span>
-              </footer>
-            </article>
-          </section>
-        </div>
+          </div>
+          </dialog>
+        )}
       </div>
     </div>
   )

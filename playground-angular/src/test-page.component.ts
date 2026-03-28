@@ -1,9 +1,10 @@
 import type { OnDestroy, OnInit, Type } from '@angular/core'
 import type { SafeResourceUrl } from '@angular/platform-browser'
 import type { TestLabFrameworkId, TestLabSampleId } from '../../playground-shared/testLabFixtures'
+import type { TestPageViewMode } from '../../playground-shared/testPageState'
 import type { SandboxFrameworkId, SandboxRenderSource } from '../../playground-shared/versionSandbox'
 import { CommonModule } from '@angular/common'
-import { ChangeDetectionStrategy, Component, computed, EventEmitter, inject, Output, signal } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, ElementRef, EventEmitter, inject, Output, signal, ViewChild } from '@angular/core'
 import { DomSanitizer } from '@angular/platform-browser'
 import {
   disableKatex,
@@ -17,7 +18,7 @@ import {
   PreCodeNode,
 } from 'markstream-angular'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../playground-shared/testLabFixtures'
-import { decodeMarkdownHash, resolveFrameworkTestHref, withMarkdownHash } from '../../playground-shared/testPageState'
+import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode, withMarkdownHash } from '../../playground-shared/testPageState'
 import {
   buildTestSandboxHref,
   normalizeSandboxSource,
@@ -33,6 +34,7 @@ type RenderMode = 'monaco' | 'pre' | 'markdown'
 type NoticeType = 'success' | 'error' | 'info'
 
 const CURRENT_FRAMEWORK: FrameworkId = 'angular'
+const DARK_MODE_KEY = 'vmr-test-dark'
 const MAX_URL_LEN = 2000
 const diffHideUnchangedRegions = {
   enabled: true,
@@ -114,6 +116,7 @@ function buildIssueUrl(text: string) {
 function basePageUrl() {
   const url = new URL(window.location.href)
   url.hash = ''
+  url.search = ''
   return url.toString()
 }
 
@@ -122,12 +125,17 @@ function basePageUrl() {
   standalone: true,
   imports: [CommonModule, MarkstreamAngularComponent],
   template: `
-    <div class="test-lab">
-      <div class="test-lab__glow test-lab__glow--cyan"></div>
-      <div class="test-lab__glow test-lab__glow--amber"></div>
+    <div
+      class="test-lab"
+      [class.test-lab--dark]="isDark()"
+      [class.dark]="isDark()"
+      [class.test-lab--share-preview]="isSharePreviewMode()"
+    >
+      <div *ngIf="!isSharePreviewMode()" class="test-lab__glow test-lab__glow--cyan"></div>
+      <div *ngIf="!isSharePreviewMode()" class="test-lab__glow test-lab__glow--amber"></div>
 
-      <div class="test-lab__shell">
-        <section class="hero-panel">
+      <div class="test-lab__shell" [class.test-lab__shell--share-preview]="isSharePreviewMode()">
+        <section *ngIf="!isSharePreviewMode()" class="hero-panel">
           <div class="hero-panel__copy">
             <span class="eyebrow">Cross-framework regression lab</span>
             <h1>markstream-angular /test</h1>
@@ -137,22 +145,35 @@ function basePageUrl() {
             </p>
           </div>
 
-          <div class="hero-panel__metrics">
-            <div class="metric-card">
-              <span>当前框架</span>
-              <strong>Angular</strong>
+          <div class="hero-panel__actions">
+            <div class="hero-panel__status-row">
+              <span class="mini-pill">Angular</span>
+              <span class="mini-pill" [class.mini-pill--active]="isStreaming()">
+                {{ streamStatusLabel() }}
+              </span>
+              <span class="mini-pill">{{ renderModeLabel() }}</span>
+              <span class="mini-pill" [class.mini-pill--active]="!sandboxDirty()">
+                沙箱{{ sandboxStatusLabel() }}
+              </span>
             </div>
-            <div class="metric-card">
-              <span>字符数</span>
-              <strong>{{ charCount() }}</strong>
-            </div>
-            <div class="metric-card">
-              <span>行数</span>
-              <strong>{{ lineCount() }}</strong>
-            </div>
-            <div class="metric-card">
-              <span>预览进度</span>
-              <strong>{{ progress() }}%</strong>
+
+            <div class="hero-panel__metrics">
+              <div class="metric-card">
+                <span>当前框架</span>
+                <strong>Angular</strong>
+              </div>
+              <div class="metric-card">
+                <span>字符数</span>
+                <strong>{{ charCount() }}</strong>
+              </div>
+              <div class="metric-card">
+                <span>行数</span>
+                <strong>{{ lineCount() }}</strong>
+              </div>
+              <div class="metric-card">
+                <span>预览进度</span>
+                <strong>{{ progress() }}%</strong>
+              </div>
             </div>
           </div>
 
@@ -169,9 +190,8 @@ function basePageUrl() {
           </div>
         </section>
 
-        <div class="lab-layout">
-          <aside class="lab-sidebar">
-            <section class="panel-card">
+        <div class="lab-layout" [class.lab-layout--share-preview]="isSharePreviewMode()">
+          <section *ngIf="!isSharePreviewMode()" class="panel-card panel-card--samples">
               <div class="panel-card__head">
                 <div>
                   <h2>样例</h2>
@@ -192,20 +212,41 @@ function basePageUrl() {
                   <span>{{ sample.summary }}</span>
                 </button>
               </div>
-            </section>
+          </section>
 
-            <section class="panel-card">
+          <section *ngIf="!isSharePreviewMode()" class="panel-card panel-card--stream">
               <div class="panel-card__head">
                 <div>
                   <h2>流式控制</h2>
-                  <p>模拟真实增量输出，检查闪烁和中间态。</p>
+                  <p>主卡片只保留流式摘要，详细参数放到更多设置里。</p>
                 </div>
-                <button type="button" class="ghost-button" (click)="toggleStreamSettings()">
-                  {{ showStreamSettings() ? '收起' : '展开' }}
+                <button type="button" class="ghost-button" (click)="openStreamSettingsDialog()">
+                  更多设置
                 </button>
               </div>
 
-              <div class="control-actions">
+              <div class="stream-summary">
+                <div class="stream-summary__row">
+                  <span class="mini-pill mini-pill--active">{{ renderModeLabel() }}</span>
+                  <span class="mini-pill" [class.mini-pill--active]="isStreaming()">
+                    {{ streamStatusLabel() }}
+                  </span>
+                  <span class="mini-pill mini-pill--active">{{ streamFeatureSummaryLabel() }}</span>
+                </div>
+
+                <div class="stream-summary__row stream-summary__row--dense">
+                  <span class="stream-summary__item">Chunk {{ streamSpeed() }} chars</span>
+                  <span class="stream-summary__item">Delay {{ streamInterval() }}ms</span>
+                  <span class="stream-summary__item" [class.stream-summary__item--active]="codeBlockStream()">
+                    代码块流式
+                  </span>
+                  <span class="stream-summary__item" [class.stream-summary__item--active]="debugParse()">
+                    {{ debugParse() ? '解析树 debug' : '正常解析' }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="control-actions control-actions--stream-bar">
                 <button type="button" class="action-button action-button--primary" (click)="toggleStreamRender()">
                   {{ isStreaming() ? '停止流式渲染' : '开始流式渲染' }}
                 </button>
@@ -229,76 +270,9 @@ function basePageUrl() {
                   <span>{{ isStreaming() ? 'Streaming' : 'Static preview' }}</span>
                 </div>
               </div>
+          </section>
 
-              <div *ngIf="showStreamSettings()" class="control-stack">
-                <label class="range-control">
-                  <span>每次追加字符数</span>
-                  <strong>{{ streamSpeed() }}</strong>
-                  <input
-                    type="range"
-                    min="1"
-                    max="80"
-                    [value]="streamSpeed()"
-                    (input)="updateStreamSpeed($event)"
-                  >
-                </label>
-
-                <label class="range-control">
-                  <span>更新时间间隔</span>
-                  <strong>{{ streamInterval() }}ms</strong>
-                  <input
-                    type="range"
-                    min="8"
-                    max="300"
-                    step="4"
-                    [value]="streamInterval()"
-                    (input)="updateStreamInterval($event)"
-                  >
-                </label>
-
-                <div class="toggle-grid">
-                  <label class="toggle-item">
-                    <span>代码块流式渲染</span>
-                    <input type="checkbox" [checked]="codeBlockStream()" (change)="updateCodeBlockStream($event)">
-                  </label>
-                  <label class="toggle-item">
-                    <span>viewportPriority</span>
-                    <input type="checkbox" [checked]="viewportPriority()" (change)="updateViewportPriority($event)">
-                  </label>
-                  <label class="toggle-item">
-                    <span>batchRendering</span>
-                    <input type="checkbox" [checked]="batchRendering()" (change)="updateBatchRendering($event)">
-                  </label>
-                  <label class="toggle-item">
-                    <span>typewriter</span>
-                    <input type="checkbox" [checked]="typewriter()" (change)="updateTypewriter($event)">
-                  </label>
-                  <label class="toggle-item">
-                    <span>KaTeX</span>
-                    <input type="checkbox" [checked]="mathEnabled()" (change)="updateMathEnabled($event)">
-                  </label>
-                  <label class="toggle-item">
-                    <span>Mermaid</span>
-                    <input type="checkbox" [checked]="mermaidEnabled()" (change)="updateMermaidEnabled($event)">
-                  </label>
-                  <label class="toggle-item">
-                    <span>解析树 debug</span>
-                    <input type="checkbox" [checked]="debugParse()" (change)="updateDebugParse($event)">
-                  </label>
-                </div>
-
-                <label class="select-control">
-                  <span>代码块模式</span>
-                  <select [value]="renderMode()" (change)="updateRenderMode($event)">
-                    <option value="monaco">Monaco</option>
-                    <option value="markdown">MarkdownCodeBlock</option>
-                    <option value="pre">PreCodeNode</option>
-                  </select>
-                </label>
-              </div>
-            </section>
-
-            <section class="panel-card">
+          <section *ngIf="!isSharePreviewMode()" class="panel-card panel-card--sandbox">
               <div class="panel-card__head">
                 <div>
                   <h2>版本沙箱</h2>
@@ -394,9 +368,9 @@ function basePageUrl() {
               <div *ngIf="sandboxDirty()" class="info-banner info-banner--warning">
                 右侧 iframe 还没同步最新输入，点“刷新沙箱”即可用当前 markdown 重载。
               </div>
-            </section>
+          </section>
 
-            <section class="panel-card">
+          <section *ngIf="!isSharePreviewMode()" class="panel-card panel-card--share">
               <div class="panel-card__head">
                 <div>
                   <h2>分享与排障</h2>
@@ -433,11 +407,10 @@ function basePageUrl() {
               <div *ngIf="notice()" class="info-banner" [class.info-banner--success]="noticeType() === 'success'" [class.info-banner--error]="noticeType() === 'error'" [class.info-banner--info]="noticeType() === 'info'">
                 {{ notice() }}
               </div>
-            </section>
-          </aside>
+          </section>
 
-          <section class="workspace-grid">
-            <article class="workspace-card">
+          <section class="workspace-grid" [class.workspace-grid--share-preview]="isSharePreviewMode()">
+            <article *ngIf="!isSharePreviewMode()" class="workspace-card workspace-card--pane workspace-card--editor">
               <header class="workspace-card__head">
                 <div>
                   <h2>Markdown 输入</h2>
@@ -460,21 +433,63 @@ function basePageUrl() {
               </footer>
             </article>
 
-            <article class="workspace-card">
-              <header class="workspace-card__head">
+            <article
+              #previewCardRef
+              class="workspace-card workspace-card--pane workspace-card--preview"
+              [class.workspace-card--share-preview]="isSharePreviewMode()"
+            >
+              <div *ngIf="showImmersivePreviewControls()" class="preview-immersive-shell">
+                <div class="preview-immersive-toolbar">
+                  <button type="button" class="ghost-button preview-immersive-toolbar__button" (click)="returnToEditableTestPage()">
+                    {{ immersiveBackLabel() }}
+                  </button>
+                  <button type="button" class="ghost-button preview-immersive-toolbar__button" (click)="toggleAppearance()">
+                    {{ previewThemeButtonLabel() }}
+                  </button>
+                  <button
+                    *ngIf="!isSharePreviewMode()"
+                    type="button"
+                    class="ghost-button preview-immersive-toolbar__button"
+                    (click)="togglePreviewFullscreen()"
+                  >
+                    {{ isPreviewFullscreen() ? '退出全屏' : '全屏预览' }}
+                  </button>
+                </div>
+              </div>
+
+              <header *ngIf="!isSharePreviewMode()" class="workspace-card__head">
                 <div>
                   <h2>实时预览</h2>
-                  <p>当前模式：{{ renderModeLabel() }}</p>
+                  <p>
+                    {{
+                      (isStreaming() ? 'Streaming 中' : '已显示完整输入')
+                      + (isPreviewFullscreen() ? ' · 按 Esc 退出全屏' : '')
+                    }}
+                  </p>
                 </div>
-                <span class="mini-pill" [class.mini-pill--active]="isStreaming()">
-                  {{ isStreaming() ? 'Streaming' : 'Ready' }}
-                </span>
+                <div class="workspace-card__head-actions">
+                  <button type="button" class="ghost-button" (click)="toggleAppearance()">
+                    {{ previewThemeButtonLabel() }}
+                  </button>
+                  <button type="button" class="ghost-button" (click)="generateAndCopyPreview()">
+                    {{ previewShareCopied() ? '已复制预览链接' : '复制预览链接' }}
+                  </button>
+                  <button type="button" class="ghost-button" (click)="togglePreviewFullscreen()">
+                    {{ isPreviewFullscreen() ? '退出全屏' : '全屏预览' }}
+                  </button>
+                  <span class="mini-pill" [class.mini-pill--active]="isStreaming()">
+                    {{ streamStatusLabel() }}
+                  </span>
+                </div>
               </header>
 
               <div class="preview-surface">
                 <markstream-angular
                   [content]="previewContent()"
                   [final]="!isStreaming()"
+                  [isDark]="isDark()"
+                  [codeBlockDarkTheme]="'vitesse-dark'"
+                  [codeBlockLightTheme]="'vitesse-light'"
                   [viewportPriority]="viewportPriority()"
                   [batchRendering]="batchRendering()"
                   [typewriter]="typewriter()"
@@ -487,13 +502,13 @@ function basePageUrl() {
                 />
               </div>
 
-              <footer class="workspace-card__foot">
-                <span>{{ previewContent().length }} chars rendered</span>
-                <span>{{ isStreaming() ? '正在逐步追加中' : '已显示完整输入' }}</span>
+              <footer *ngIf="!isSharePreviewMode()" class="workspace-card__foot">
+                <span>{{ previewContent().length }} / {{ input().length || 0 }}</span>
+                <span>{{ isStreaming() ? renderModeLabel() + ' · Streaming 中' : 'Angular renderer' }}</span>
               </footer>
             </article>
 
-            <article class="workspace-card workspace-card--full">
+            <article *ngIf="!isSharePreviewMode()" class="workspace-card workspace-card--full workspace-card--sandbox-preview">
               <header class="workspace-card__head">
                 <div>
                   <h2>版本沙箱预览</h2>
@@ -520,6 +535,87 @@ function basePageUrl() {
             </article>
           </section>
         </div>
+
+        <dialog *ngIf="!isSharePreviewMode()" #streamSettingsDialogRef class="settings-dialog">
+          <div class="settings-dialog__panel">
+            <header class="settings-dialog__head">
+              <div>
+                <h2>流式详细设置</h2>
+                <p>这里调整节奏、代码块模式和渲染增强开关。</p>
+              </div>
+              <button type="button" class="ghost-button" (click)="closeStreamSettingsDialog()">
+                关闭
+              </button>
+            </header>
+
+            <div class="control-stack control-stack--dialog">
+              <label class="range-control">
+                <span>每次追加字符数</span>
+                <strong>{{ streamSpeed() }}</strong>
+                <input
+                  type="range"
+                  min="1"
+                  max="80"
+                  [value]="streamSpeed()"
+                  (input)="updateStreamSpeed($event)"
+                >
+              </label>
+
+              <label class="range-control">
+                <span>更新时间间隔</span>
+                <strong>{{ streamInterval() }}ms</strong>
+                <input
+                  type="range"
+                  min="8"
+                  max="300"
+                  step="4"
+                  [value]="streamInterval()"
+                  (input)="updateStreamInterval($event)"
+                >
+              </label>
+
+              <label class="select-control">
+                <span>代码块模式</span>
+                <select [value]="renderMode()" (change)="updateRenderMode($event)">
+                  <option value="monaco">Monaco</option>
+                  <option value="markdown">MarkdownCodeBlock</option>
+                  <option value="pre">PreCodeNode</option>
+                </select>
+              </label>
+
+              <div class="toggle-grid">
+                <label class="toggle-item">
+                  <span>代码块流式渲染</span>
+                  <input type="checkbox" [checked]="codeBlockStream()" (change)="updateCodeBlockStream($event)">
+                </label>
+                <label class="toggle-item">
+                  <span>viewportPriority</span>
+                  <input type="checkbox" [checked]="viewportPriority()" (change)="updateViewportPriority($event)">
+                </label>
+                <label class="toggle-item">
+                  <span>batchRendering</span>
+                  <input type="checkbox" [checked]="batchRendering()" (change)="updateBatchRendering($event)">
+                </label>
+                <label class="toggle-item">
+                  <span>typewriter</span>
+                  <input type="checkbox" [checked]="typewriter()" (change)="updateTypewriter($event)">
+                </label>
+                <label class="toggle-item">
+                  <span>KaTeX</span>
+                  <input type="checkbox" [checked]="mathEnabled()" (change)="updateMathEnabled($event)">
+                </label>
+                <label class="toggle-item">
+                  <span>Mermaid</span>
+                  <input type="checkbox" [checked]="mermaidEnabled()" (change)="updateMermaidEnabled($event)">
+                </label>
+                <label class="toggle-item">
+                  <span>解析树 debug</span>
+                  <input type="checkbox" [checked]="debugParse()" (change)="updateDebugParse($event)">
+                </label>
+              </div>
+            </div>
+          </div>
+        </dialog>
       </div>
     </div>
   `,
@@ -527,6 +623,8 @@ function basePageUrl() {
 })
 export class TestPageComponent implements OnInit, OnDestroy {
   @Output() readonly navigateHome = new EventEmitter<void>()
+  @ViewChild('streamSettingsDialogRef') private streamSettingsDialogRef?: ElementRef<HTMLDialogElement>
+  @ViewChild('previewCardRef') private previewCardRef?: ElementRef<HTMLElement>
   private readonly domSanitizer = inject(DomSanitizer)
 
   readonly currentFramework: FrameworkId = CURRENT_FRAMEWORK
@@ -538,11 +636,14 @@ export class TestPageComponent implements OnInit, OnDestroy {
 
   readonly selectedSampleId = signal<SampleId>(normalizeSampleId(readStoredString('vmr-test-sample', 'baseline')))
   readonly input = signal(this.resolveInitialSample().content)
+  readonly viewMode = signal<TestPageViewMode>('lab')
+  readonly isDark = signal(readStoredString(DARK_MODE_KEY, 'light') === 'dark')
+  readonly isPreviewFullscreen = signal(false)
+  readonly previewShareCopied = signal(false)
   readonly streamContent = signal('')
   readonly isStreaming = signal(false)
   readonly streamSpeed = signal(clampInt(readStoredNumber('vmr-test-stream-speed', 4), 1, 80, 4))
   readonly streamInterval = signal(clampInt(readStoredNumber('vmr-test-stream-interval', 24), 8, 300, 24))
-  readonly showStreamSettings = signal(readStoredBoolean('vmr-test-show-settings', true))
   readonly renderMode = signal<RenderMode>(normalizeRenderMode(readStoredString('vmr-test-render-mode', 'monaco')))
   readonly codeBlockStream = signal(readStoredBoolean('vmr-test-code-stream', true))
   readonly viewportPriority = signal(readStoredBoolean('vmr-test-viewport-priority', true))
@@ -591,12 +692,30 @@ export class TestPageComponent implements OnInit, OnDestroy {
 
   readonly charCount = computed(() => this.input().length)
   readonly lineCount = computed(() => this.input() ? this.input().split('\n').length : 0)
+  readonly streamStatusLabel = computed(() => this.isStreaming() ? 'Streaming' : 'Ready')
+  readonly isSharePreviewMode = computed(() => this.viewMode() === 'preview')
+  readonly showImmersivePreviewControls = computed(() => this.isSharePreviewMode() || this.isPreviewFullscreen())
+  readonly immersiveBackLabel = computed(() => this.isSharePreviewMode() ? '打开 Test Page' : '返回编辑')
+  readonly previewThemeButtonLabel = computed(() => this.isDark() ? '切换浅色' : '切换暗色')
   readonly renderModeLabel = computed(() => {
     if (this.renderMode() === 'markdown')
       return 'MarkdownCodeBlock'
     if (this.renderMode() === 'pre')
       return 'PreCodeNode'
     return 'Monaco'
+  })
+  readonly streamFeatureSummaryLabel = computed(() => {
+    const enabledCount = [
+      this.codeBlockStream(),
+      this.viewportPriority(),
+      this.batchRendering(),
+      this.typewriter(),
+      this.mathEnabled(),
+      this.mermaidEnabled(),
+      this.debugParse(),
+    ].filter(Boolean).length
+
+    return enabledCount ? `已开 ${enabledCount} 项增强` : '基础模式'
   })
 
   readonly parseOptions = computed(() => this.debugParse() ? { debug: true } : undefined)
@@ -652,14 +771,22 @@ export class TestPageComponent implements OnInit, OnDestroy {
   private timer: number | null = null
   private noticeTimer: number | null = null
   private copiedTimer: number | null = null
+  private previewShareTimer: number | null = null
+  private fullscreenHandler: (() => void) | null = null
 
   ngOnInit() {
     this.applyFeatureToggles()
     const restored = decodeMarkdownHash(typeof window === 'undefined' ? '' : (window.location.hash || ''))
     if (restored)
       this.input.set(restored)
-    if (typeof window !== 'undefined')
+    if (typeof window !== 'undefined') {
+      this.viewMode.set(resolveTestPageViewMode(window.location.search))
       this.shareUrl.set(basePageUrl())
+      this.fullscreenHandler = () => {
+        this.isPreviewFullscreen.set(document.fullscreenElement === this.previewCardRef?.nativeElement)
+      }
+      document.addEventListener('fullscreenchange', this.fullscreenHandler)
+    }
     this.sandboxSnapshot.set(this.input())
   }
 
@@ -669,6 +796,10 @@ export class TestPageComponent implements OnInit, OnDestroy {
       window.clearTimeout(this.noticeTimer)
     if (this.copiedTimer != null && typeof window !== 'undefined')
       window.clearTimeout(this.copiedTimer)
+    if (this.previewShareTimer != null && typeof window !== 'undefined')
+      window.clearTimeout(this.previewShareTimer)
+    if (this.fullscreenHandler)
+      document.removeEventListener('fullscreenchange', this.fullscreenHandler)
   }
 
   applySample(sampleId: SampleId) {
@@ -691,10 +822,16 @@ export class TestPageComponent implements OnInit, OnDestroy {
     this.handleInputMutation()
   }
 
-  toggleStreamSettings() {
-    const next = !this.showStreamSettings()
-    this.showStreamSettings.set(next)
-    persistStoredValue('vmr-test-show-settings', next)
+  openStreamSettingsDialog() {
+    const dialog = this.streamSettingsDialogRef?.nativeElement
+    if (dialog && !dialog.open)
+      dialog.showModal()
+  }
+
+  closeStreamSettingsDialog() {
+    const dialog = this.streamSettingsDialogRef?.nativeElement
+    if (dialog?.open)
+      dialog.close()
   }
 
   updateStreamSpeed(event: Event) {
@@ -781,6 +918,55 @@ export class TestPageComponent implements OnInit, OnDestroy {
     this.stopStreamRender()
     this.input.set('')
     this.handleInputMutation()
+  }
+
+  toggleAppearance() {
+    const next = !this.isDark()
+    this.isDark.set(next)
+    persistStoredValue(DARK_MODE_KEY, next ? 'dark' : 'light')
+  }
+
+  async generateAndCopyPreview() {
+    const target = buildTestPageHref(basePageUrl(), this.input(), 'preview')
+
+    try {
+      await navigator.clipboard.writeText(target)
+      this.previewShareCopied.set(true)
+      if (this.previewShareTimer != null && typeof window !== 'undefined')
+        window.clearTimeout(this.previewShareTimer)
+      if (typeof window !== 'undefined') {
+        this.previewShareTimer = window.setTimeout(() => this.previewShareCopied.set(false), 1800)
+      }
+    }
+    catch (error) {
+      console.warn('copy failed', error)
+      this.showToast('复制失败，请手动复制地址栏链接。', 'error', 3000)
+    }
+  }
+
+  async togglePreviewFullscreen() {
+    const previewCard = this.previewCardRef?.nativeElement
+    if (!previewCard || typeof document === 'undefined')
+      return
+
+    if (document.fullscreenElement === previewCard) {
+      if (document.exitFullscreen)
+        await document.exitFullscreen()
+      return
+    }
+
+    if (previewCard.requestFullscreen)
+      await previewCard.requestFullscreen()
+  }
+
+  returnToEditableTestPage() {
+    if (this.isSharePreviewMode()) {
+      window.location.href = buildTestPageHref(basePageUrl(), this.input(), 'lab')
+      return
+    }
+
+    if (typeof document !== 'undefined' && document.fullscreenElement === this.previewCardRef?.nativeElement && document.exitFullscreen)
+      void document.exitFullscreen()
   }
 
   frameworkHref(id: FrameworkId) {
@@ -914,6 +1100,7 @@ export class TestPageComponent implements OnInit, OnDestroy {
   private handleInputMutation() {
     this.tooLong.set(false)
     this.isCopied.set(false)
+    this.previewShareCopied.set(false)
     if (!this.isStreaming() && typeof window !== 'undefined')
       this.shareUrl.set(basePageUrl())
     if (this.sandboxAutoSync())
