@@ -104,6 +104,9 @@ const originalFullscreenElement = Object.getOwnPropertyDescriptor(document, 'ful
 const originalExitFullscreen = Object.getOwnPropertyDescriptor(document, 'exitFullscreen')
 const originalRequestFullscreen = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'requestFullscreen')
 const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+const originalCreateSVGPoint = typeof SVGSVGElement === 'undefined'
+  ? undefined
+  : Object.getOwnPropertyDescriptor(SVGSVGElement.prototype, 'createSVGPoint')
 
 async function mountTestPage() {
   const wrapper = mount(TestPage)
@@ -144,6 +147,17 @@ describe('playground /test smoke', () => {
         writeText: vi.fn().mockResolvedValue(undefined),
       },
     })
+
+    if (typeof SVGSVGElement !== 'undefined' && !SVGSVGElement.prototype.createSVGPoint) {
+      Object.defineProperty(SVGSVGElement.prototype, 'createSVGPoint', {
+        configurable: true,
+        value: () => ({
+          x: 0,
+          y: 0,
+          matrixTransform: () => ({ x: 0, y: 0 }),
+        }),
+      })
+    }
   })
 
   afterEach(() => {
@@ -169,6 +183,13 @@ describe('playground /test smoke', () => {
       Object.defineProperty(navigator, 'clipboard', originalClipboard)
     else
       Reflect.deleteProperty(navigator, 'clipboard')
+
+    if (typeof SVGSVGElement !== 'undefined') {
+      if (originalCreateSVGPoint)
+        Object.defineProperty(SVGSVGElement.prototype, 'createSVGPoint', originalCreateSVGPoint)
+      else
+        Reflect.deleteProperty(SVGSVGElement.prototype, 'createSVGPoint')
+    }
   })
 
   it('opens the /test route and renders the lab shell', async () => {
@@ -276,7 +297,11 @@ describe('playground /test smoke', () => {
     expect(url.searchParams.get('view')).toBe('preview')
     expect(url.hash).toBe('')
     expect(shareId).toBeTruthy()
-    expect(window.localStorage.getItem(`vmr-test-share:${shareId}`)).toBe(oversizedMarkdown)
+    const storedShare = window.localStorage.getItem(`vmr-test-share:${shareId}`)
+    expect(storedShare).toBeTruthy()
+    expect(JSON.parse(storedShare!)).toMatchObject({
+      content: oversizedMarkdown,
+    })
 
     wrapper.unmount()
   })
