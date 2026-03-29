@@ -1,10 +1,10 @@
-import type { OnDestroy, OnInit, Type } from '@angular/core'
+import type { ElementRef, OnDestroy, OnInit, Type } from '@angular/core'
 import type { SafeResourceUrl } from '@angular/platform-browser'
 import type { TestLabFrameworkId, TestLabSampleId } from '../../playground-shared/testLabFixtures'
 import type { TestPageViewMode } from '../../playground-shared/testPageState'
 import type { SandboxFrameworkId, SandboxRenderSource } from '../../playground-shared/versionSandbox'
 import { CommonModule } from '@angular/common'
-import { ChangeDetectionStrategy, Component, computed, ElementRef, EventEmitter, inject, Output, signal, ViewChild } from '@angular/core'
+import { ChangeDetectionStrategy, Component, computed, EventEmitter, inject, Output, signal, ViewChild } from '@angular/core'
 import { DomSanitizer } from '@angular/platform-browser'
 import {
   disableKatex,
@@ -704,6 +704,7 @@ export class TestPageComponent implements OnInit, OnDestroy {
       return 'PreCodeNode'
     return 'Monaco'
   })
+
   readonly streamFeatureSummaryLabel = computed(() => {
     const enabledCount = [
       this.codeBlockStream(),

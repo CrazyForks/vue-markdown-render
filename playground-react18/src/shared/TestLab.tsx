@@ -291,196 +291,196 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
       <div className={`test-lab__shell ${isSharePreviewMode ? 'test-lab__shell--share-preview' : ''}`}>
         {!isSharePreviewMode && (
           <section className="hero-panel">
-          <div className="hero-panel__copy">
-            <span className="eyebrow">
-              {frameworkLabel}
-              {' '}
-              Regression Lab
-            </span>
-            <h1>markstream-react /test</h1>
-            <p>专门用来和 Vue 3、Vue 2、Angular 的 test page 做对照，快速定位框架层差异。</p>
-          </div>
-
-          <div className="hero-panel__actions">
-            <div className="hero-panel__status-row">
-              <span className="mini-pill">{frameworkLabel}</span>
-              <span className={`mini-pill ${isStreaming ? 'mini-pill--active' : ''}`}>{streamStatusLabel}</span>
-              <span className="mini-pill">{activeStreamPresetLabel}</span>
+            <div className="hero-panel__copy">
+              <span className="eyebrow">
+                {frameworkLabel}
+                {' '}
+                Regression Lab
+              </span>
+              <h1>markstream-react /test</h1>
+              <p>专门用来和 Vue 3、Vue 2、Angular 的 test page 做对照，快速定位框架层差异。</p>
             </div>
 
-            <div className="hero-panel__metrics">
-              <div className="metric-card">
-                <span>当前框架</span>
-                <strong>{frameworkLabel}</strong>
+            <div className="hero-panel__actions">
+              <div className="hero-panel__status-row">
+                <span className="mini-pill">{frameworkLabel}</span>
+                <span className={`mini-pill ${isStreaming ? 'mini-pill--active' : ''}`}>{streamStatusLabel}</span>
+                <span className="mini-pill">{activeStreamPresetLabel}</span>
               </div>
-              <div className="metric-card">
-                <span>字符数</span>
-                <strong>{charCount}</strong>
-              </div>
-              <div className="metric-card">
-                <span>行数</span>
-                <strong>{lineCount}</strong>
-              </div>
-              <div className="metric-card">
-                <span>进度</span>
-                <strong>
-                  {progress}
-                  %
-                </strong>
+
+              <div className="hero-panel__metrics">
+                <div className="metric-card">
+                  <span>当前框架</span>
+                  <strong>{frameworkLabel}</strong>
+                </div>
+                <div className="metric-card">
+                  <span>字符数</span>
+                  <strong>{charCount}</strong>
+                </div>
+                <div className="metric-card">
+                  <span>行数</span>
+                  <strong>{lineCount}</strong>
+                </div>
+                <div className="metric-card">
+                  <span>进度</span>
+                  <strong>
+                    {progress}
+                    %
+                  </strong>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="framework-switcher">
-            {frameworkCards.map(framework => (
-              <a
-                key={framework.id}
-                className={`framework-chip ${framework.id === CURRENT_FRAMEWORK ? 'framework-chip--current' : ''}`}
-                href={frameworkHref(framework.id)}
-              >
-                <span className="framework-chip__label">{framework.label}</span>
-                <span className="framework-chip__note">{framework.note}</span>
-              </a>
-            ))}
-          </div>
+            <div className="framework-switcher">
+              {frameworkCards.map(framework => (
+                <a
+                  key={framework.id}
+                  className={`framework-chip ${framework.id === CURRENT_FRAMEWORK ? 'framework-chip--current' : ''}`}
+                  href={frameworkHref(framework.id)}
+                >
+                  <span className="framework-chip__label">{framework.label}</span>
+                  <span className="framework-chip__note">{framework.note}</span>
+                </a>
+              ))}
+            </div>
           </section>
         )}
 
         <div className={`lab-layout ${isSharePreviewMode ? 'lab-layout--share-preview' : ''}`}>
           {!isSharePreviewMode && (
             <section className="panel-card panel-card--samples">
-            <div className="panel-card__head">
-              <div>
-                <h2>样例</h2>
-                <p>同一段输入，切到别的框架继续比。</p>
+              <div className="panel-card__head">
+                <div>
+                  <h2>样例</h2>
+                  <p>同一段输入，切到别的框架继续比。</p>
+                </div>
+                <span className="mini-pill">{activeSample.title}</span>
               </div>
-              <span className="mini-pill">{activeSample.title}</span>
-            </div>
 
-            <div className="sample-list">
-              {sampleCards.map(sample => (
-                <button
-                  key={sample.id}
-                  type="button"
-                  className={`sample-card ${sample.id === selectedSampleId ? 'sample-card--active' : ''}`}
-                  onClick={() => applySample(sample.id)}
-                >
-                  <strong>{sample.title}</strong>
-                  <span>{sample.summary}</span>
-                </button>
-              ))}
-            </div>
+              <div className="sample-list">
+                {sampleCards.map(sample => (
+                  <button
+                    key={sample.id}
+                    type="button"
+                    className={`sample-card ${sample.id === selectedSampleId ? 'sample-card--active' : ''}`}
+                    onClick={() => applySample(sample.id)}
+                  >
+                    <strong>{sample.title}</strong>
+                    <span>{sample.summary}</span>
+                  </button>
+                ))}
+              </div>
             </section>
           )}
 
           {!isSharePreviewMode && (
             <section className="panel-card panel-card--stream">
-            <div className="panel-card__head">
-              <div>
-                <h2>流式控制</h2>
-                <p>主卡片只保留节奏摘要，详细参数放到更多设置里。</p>
-              </div>
-              <button type="button" className="ghost-button" onClick={openStreamSettingsDialog}>
-                更多设置
-              </button>
-            </div>
-
-            <div className="stream-summary">
-              <div className="stream-summary__row">
-                <span className="mini-pill mini-pill--active">{activeStreamPresetLabel}</span>
-                <span className="mini-pill">{streamTransportMode === 'readable-stream' ? 'ReadableStream' : 'Scheduler'}</span>
-                <span className="mini-pill">{streamSliceMode === 'boundary-aware' ? 'Boundary Aware' : 'Pure Random'}</span>
-                <span className={`mini-pill ${isStreaming ? 'mini-pill--active' : ''}`}>{streamStatusLabel}</span>
+              <div className="panel-card__head">
+                <div>
+                  <h2>流式控制</h2>
+                  <p>主卡片只保留节奏摘要，详细参数放到更多设置里。</p>
+                </div>
+                <button type="button" className="ghost-button" onClick={openStreamSettingsDialog}>
+                  更多设置
+                </button>
               </div>
 
-              <div className="stream-summary__row stream-summary__row--dense">
-                <span className="stream-summary__item">
-                  Chunk
-                  {' '}
-                  {streamChunkRangeLabel}
-                </span>
-                <span className="stream-summary__item">
-                  Delay
-                  {' '}
-                  {streamDelayRangeLabel}
-                </span>
-                <span className="stream-summary__item">
-                  Burst
-                  {' '}
-                  {normalizedBurstiness}
-                  %
-                </span>
-                <span className={`stream-summary__item ${isPaused ? 'stream-summary__item--active' : ''}`}>
-                  {isPaused ? '已暂停' : '连续输出'}
-                </span>
-              </div>
-            </div>
+              <div className="stream-summary">
+                <div className="stream-summary__row">
+                  <span className="mini-pill mini-pill--active">{activeStreamPresetLabel}</span>
+                  <span className="mini-pill">{streamTransportMode === 'readable-stream' ? 'ReadableStream' : 'Scheduler'}</span>
+                  <span className="mini-pill">{streamSliceMode === 'boundary-aware' ? 'Boundary Aware' : 'Pure Random'}</span>
+                  <span className={`mini-pill ${isStreaming ? 'mini-pill--active' : ''}`}>{streamStatusLabel}</span>
+                </div>
 
-            <div className="button-grid">
-              <button type="button" className="testlab-btn testlab-btn--primary" onClick={toggleStream}>
-                {isStreaming ? '停止流式渲染' : '开始流式渲染'}
-              </button>
-              <button type="button" className="testlab-btn" disabled={!isStreaming} onClick={toggleStreamingPause}>
-                {isPaused ? '继续流式渲染' : '暂停流式渲染'}
-              </button>
-              <button type="button" className="testlab-btn" onClick={resetEditor}>
-                重置样例
-              </button>
-              <button type="button" className="testlab-btn" onClick={clearEditor}>
-                清空输入
-              </button>
-              <button type="button" className="testlab-btn" onClick={onGoHome}>
-                返回主 demo
-              </button>
-            </div>
+                <div className="stream-summary__row stream-summary__row--dense">
+                  <span className="stream-summary__item">
+                    Chunk
+                    {' '}
+                    {streamChunkRangeLabel}
+                  </span>
+                  <span className="stream-summary__item">
+                    Delay
+                    {' '}
+                    {streamDelayRangeLabel}
+                  </span>
+                  <span className="stream-summary__item">
+                    Burst
+                    {' '}
+                    {normalizedBurstiness}
+                    %
+                  </span>
+                  <span className={`stream-summary__item ${isPaused ? 'stream-summary__item--active' : ''}`}>
+                    {isPaused ? '已暂停' : '连续输出'}
+                  </span>
+                </div>
+              </div>
 
-            <div className="progress-block">
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: `${progress}%` }} />
+              <div className="button-grid">
+                <button type="button" className="testlab-btn testlab-btn--primary" onClick={toggleStream}>
+                  {isStreaming ? '停止流式渲染' : '开始流式渲染'}
+                </button>
+                <button type="button" className="testlab-btn" disabled={!isStreaming} onClick={toggleStreamingPause}>
+                  {isPaused ? '继续流式渲染' : '暂停流式渲染'}
+                </button>
+                <button type="button" className="testlab-btn" onClick={resetEditor}>
+                  重置样例
+                </button>
+                <button type="button" className="testlab-btn" onClick={clearEditor}>
+                  清空输入
+                </button>
+                <button type="button" className="testlab-btn" onClick={onGoHome}>
+                  返回主 demo
+                </button>
               </div>
-              <div className="progress-meta">
-                <span>
-                  {previewContent.length}
-                  {' '}
-                  /
-                  {' '}
-                  {input.length || 0}
-                </span>
-                <span>
-                  {isStreaming ? `${lastChunkSize} chars / ${lastDelayMs}ms` : 'Static preview'}
-                </span>
+
+              <div className="progress-block">
+                <div className="progress-track">
+                  <div className="progress-fill" style={{ width: `${progress}%` }} />
+                </div>
+                <div className="progress-meta">
+                  <span>
+                    {previewContent.length}
+                    {' '}
+                    /
+                    {' '}
+                    {input.length || 0}
+                  </span>
+                  <span>
+                    {isStreaming ? `${lastChunkSize} chars / ${lastDelayMs}ms` : 'Static preview'}
+                  </span>
+                </div>
               </div>
-            </div>
             </section>
           )}
 
           <section className={`workspace-grid ${isSharePreviewMode ? 'workspace-grid--share-preview' : ''}`}>
             {!isSharePreviewMode && (
               <article className="workspace-card workspace-card--pane workspace-card--editor">
-              <header className="workspace-card__head">
-                <div>
-                  <h2>Markdown 输入</h2>
-                  <p>把 markdown 粘进来，右侧立即对照 React 渲染结果。</p>
-                </div>
-                <span className="mini-pill">Live editor</span>
-              </header>
+                <header className="workspace-card__head">
+                  <div>
+                    <h2>Markdown 输入</h2>
+                    <p>把 markdown 粘进来，右侧立即对照 React 渲染结果。</p>
+                  </div>
+                  <span className="mini-pill">Live editor</span>
+                </header>
 
-              <textarea
-                value={input}
-                onChange={event => setInput(event.target.value)}
-                className="editor-textarea"
-                spellCheck={false}
-                placeholder="Paste markdown here..."
-              />
+                <textarea
+                  value={input}
+                  onChange={event => setInput(event.target.value)}
+                  className="editor-textarea"
+                  spellCheck={false}
+                  placeholder="Paste markdown here..."
+                />
 
-              <footer className="workspace-card__foot">
-                <span>可直接粘贴 issue 复现内容</span>
-                <span>
-                  {charCount}
-                  {' '}
-                  chars
-                </span>
-              </footer>
+                <footer className="workspace-card__foot">
+                  <span>可直接粘贴 issue 复现内容</span>
+                  <span>
+                    {charCount}
+                    {' '}
+                    chars
+                  </span>
+                </footer>
               </article>
             )}
 
@@ -508,22 +508,22 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
 
               {!isSharePreviewMode && (
                 <header className="workspace-card__head">
-                <div>
-                  <h2>实时预览</h2>
-                  <p>{`${isStreaming ? (isPaused ? '流式已暂停' : 'Streaming 中') : '已显示完整输入'}${isPreviewFullscreen ? ' · 按 Esc 退出全屏' : ''}`}</p>
-                </div>
-                <div className="workspace-card__head-actions">
-                  <button type="button" className="ghost-button" onClick={toggleAppearance}>
-                    {themeToggleLabel}
-                  </button>
-                  <button type="button" className="ghost-button" onClick={() => void copyPreviewShareLink()}>
-                    {isPreviewShareCopied ? '已复制预览链接' : '复制预览链接'}
-                  </button>
-                  <button type="button" className="ghost-button" onClick={() => void togglePreviewFullscreen()}>
-                    {isPreviewFullscreen ? '退出全屏' : '全屏预览'}
-                  </button>
-                  <span className={`mini-pill ${isStreaming ? 'mini-pill--active' : ''}`}>{streamStatusLabel}</span>
-                </div>
+                  <div>
+                    <h2>实时预览</h2>
+                    <p>{`${isStreaming ? (isPaused ? '流式已暂停' : 'Streaming 中') : '已显示完整输入'}${isPreviewFullscreen ? ' · 按 Esc 退出全屏' : ''}`}</p>
+                  </div>
+                  <div className="workspace-card__head-actions">
+                    <button type="button" className="ghost-button" onClick={toggleAppearance}>
+                      {themeToggleLabel}
+                    </button>
+                    <button type="button" className="ghost-button" onClick={() => void copyPreviewShareLink()}>
+                      {isPreviewShareCopied ? '已复制预览链接' : '复制预览链接'}
+                    </button>
+                    <button type="button" className="ghost-button" onClick={() => void togglePreviewFullscreen()}>
+                      {isPreviewFullscreen ? '退出全屏' : '全屏预览'}
+                    </button>
+                    <span className={`mini-pill ${isStreaming ? 'mini-pill--active' : ''}`}>{streamStatusLabel}</span>
+                  </div>
                 </header>
               )}
 
@@ -540,16 +540,16 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
 
               {!isSharePreviewMode && (
                 <footer className="workspace-card__foot">
-                <span>
-                  {deferredPreview.length}
-                  {' '}
-                  /
-                  {' '}
-                  {input.length || 0}
-                </span>
-                <span>
-                  {isStreaming ? `${streamTransportMode} · ${lastChunkSize} chars / ${lastDelayMs}ms` : 'React renderer'}
-                </span>
+                  <span>
+                    {deferredPreview.length}
+                    {' '}
+                    /
+                    {' '}
+                    {input.length || 0}
+                  </span>
+                  <span>
+                    {isStreaming ? `${streamTransportMode} · ${lastChunkSize} chars / ${lastDelayMs}ms` : 'React renderer'}
+                  </span>
                 </footer>
               )}
             </article>
@@ -558,125 +558,125 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
 
         {!isSharePreviewMode && (
           <dialog ref={streamSettingsDialogRef} className="settings-dialog">
-          <div className="settings-dialog__panel">
-            <header className="settings-dialog__head">
-              <div>
-                <h2>流式详细设置</h2>
-                <p>这里调整 transport、分片策略和 chunk 窗口。</p>
+            <div className="settings-dialog__panel">
+              <header className="settings-dialog__head">
+                <div>
+                  <h2>流式详细设置</h2>
+                  <p>这里调整 transport、分片策略和 chunk 窗口。</p>
+                </div>
+                <button type="button" className="ghost-button" onClick={closeStreamSettingsDialog}>
+                  关闭
+                </button>
+              </header>
+
+              <div className="control-grid control-grid--stream">
+                <label className="input-card">
+                  <span>Preset</span>
+                  <select
+                    value={selectedStreamPresetId}
+                    onChange={event => handleStreamPresetChange(event.target.value as StreamPresetId)}
+                  >
+                    {STREAM_PRESETS.map(preset => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.label}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_STREAM_PRESET_ID}>Custom</option>
+                  </select>
+                </label>
+                <label className="input-card">
+                  <span>Transport</span>
+                  <select
+                    value={streamTransportMode}
+                    onChange={event => setStreamTransportMode(event.target.value as StreamTransportMode)}
+                  >
+                    <option value="readable-stream">ReadableStream</option>
+                    <option value="scheduler">Scheduler</option>
+                  </select>
+                </label>
+                <label className="input-card">
+                  <span>Slice Mode</span>
+                  <select
+                    value={streamSliceMode}
+                    onChange={event => setStreamSliceMode(event.target.value as StreamSliceMode)}
+                  >
+                    <option value="pure-random">Pure Random</option>
+                    <option value="boundary-aware">Boundary Aware</option>
+                  </select>
+                </label>
+                <label className="input-card">
+                  <span>chunkSizeMin</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={80}
+                    value={streamChunkSizeMin}
+                    onChange={event => setStreamChunkSizeMin(Number(event.target.value))}
+                  />
+                </label>
+                <label className="input-card">
+                  <span>chunkSizeMax</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={80}
+                    value={streamChunkSizeMax}
+                    onChange={event => setStreamChunkSizeMax(Number(event.target.value))}
+                  />
+                </label>
+                <label className="input-card">
+                  <span>chunkDelayMin</span>
+                  <input
+                    type="number"
+                    min={8}
+                    max={600}
+                    value={streamChunkDelayMin}
+                    onChange={event => setStreamChunkDelayMin(Number(event.target.value))}
+                  />
+                </label>
+                <label className="input-card">
+                  <span>chunkDelayMax</span>
+                  <input
+                    type="number"
+                    min={8}
+                    max={600}
+                    value={streamChunkDelayMax}
+                    onChange={event => setStreamChunkDelayMax(Number(event.target.value))}
+                  />
+                </label>
+                <label className="input-card">
+                  <span>Burstiness (%)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={streamBurstiness}
+                    onChange={event => setStreamBurstiness(Number(event.target.value))}
+                  />
+                </label>
               </div>
-              <button type="button" className="ghost-button" onClick={closeStreamSettingsDialog}>
-                关闭
-              </button>
-            </header>
 
-            <div className="control-grid control-grid--stream">
-              <label className="input-card">
-                <span>Preset</span>
-                <select
-                  value={selectedStreamPresetId}
-                  onChange={event => handleStreamPresetChange(event.target.value as StreamPresetId)}
-                >
-                  {STREAM_PRESETS.map(preset => (
-                    <option key={preset.id} value={preset.id}>
-                      {preset.label}
-                    </option>
-                  ))}
-                  <option value={CUSTOM_STREAM_PRESET_ID}>Custom</option>
-                </select>
-              </label>
-              <label className="input-card">
-                <span>Transport</span>
-                <select
-                  value={streamTransportMode}
-                  onChange={event => setStreamTransportMode(event.target.value as StreamTransportMode)}
-                >
-                  <option value="readable-stream">ReadableStream</option>
-                  <option value="scheduler">Scheduler</option>
-                </select>
-              </label>
-              <label className="input-card">
-                <span>Slice Mode</span>
-                <select
-                  value={streamSliceMode}
-                  onChange={event => setStreamSliceMode(event.target.value as StreamSliceMode)}
-                >
-                  <option value="pure-random">Pure Random</option>
-                  <option value="boundary-aware">Boundary Aware</option>
-                </select>
-              </label>
-              <label className="input-card">
-                <span>chunkSizeMin</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={80}
-                  value={streamChunkSizeMin}
-                  onChange={event => setStreamChunkSizeMin(Number(event.target.value))}
-                />
-              </label>
-              <label className="input-card">
-                <span>chunkSizeMax</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={80}
-                  value={streamChunkSizeMax}
-                  onChange={event => setStreamChunkSizeMax(Number(event.target.value))}
-                />
-              </label>
-              <label className="input-card">
-                <span>chunkDelayMin</span>
-                <input
-                  type="number"
-                  min={8}
-                  max={600}
-                  value={streamChunkDelayMin}
-                  onChange={event => setStreamChunkDelayMin(Number(event.target.value))}
-                />
-              </label>
-              <label className="input-card">
-                <span>chunkDelayMax</span>
-                <input
-                  type="number"
-                  min={8}
-                  max={600}
-                  value={streamChunkDelayMax}
-                  onChange={event => setStreamChunkDelayMax(Number(event.target.value))}
-                />
-              </label>
-              <label className="input-card">
-                <span>Burstiness (%)</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={streamBurstiness}
-                  onChange={event => setStreamBurstiness(Number(event.target.value))}
-                />
-              </label>
+              <p className="control-note">{streamPresetDescription}</p>
+              <p className="control-note">
+                Active window:
+                {' '}
+                {streamChunkRangeLabel}
+                ,
+                {' '}
+                {streamDelayRangeLabel}
+                . When min=max, the cadence becomes fixed.
+              </p>
+              <p className="control-note">
+                <code>Pure Random</code>
+                {' '}
+                uses raw random
+                <code>slice</code>
+                ;
+                <code>Boundary Aware</code>
+                {' '}
+                snaps toward word and punctuation boundaries.
+              </p>
             </div>
-
-            <p className="control-note">{streamPresetDescription}</p>
-            <p className="control-note">
-              Active window:
-              {' '}
-              {streamChunkRangeLabel}
-              ,
-              {' '}
-              {streamDelayRangeLabel}
-              . When min=max, the cadence becomes fixed.
-            </p>
-            <p className="control-note">
-              <code>Pure Random</code>
-              {' '}
-              uses raw random
-              <code>slice</code>
-              ;
-              <code>Boundary Aware</code>
-              {' '}
-              snaps toward word and punctuation boundaries.
-            </p>
-          </div>
           </dialog>
         )}
       </div>
