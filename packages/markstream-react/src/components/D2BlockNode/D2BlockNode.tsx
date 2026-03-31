@@ -1,6 +1,8 @@
+import type { VisibilityHandle } from '../../context/viewportPriority'
 import type { D2BlockNodeProps } from '../../types/component-props'
 import clsx from 'clsx'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
 import { getD2 } from './d2'
@@ -138,6 +140,7 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
   const [svgMarkup, setSvgMarkup] = useState('')
   const [bodyMinHeight, setBodyMinHeight] = useState<number | null>(null)
   const [isRendering, setIsRendering] = useState(false)
+  const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
 
   const renderTokenRef = useRef(0)
   const d2InstanceRef = useRef<any | null>(null)
@@ -146,10 +149,13 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
   const lastRenderAtRef = useRef(0)
   const throttleTimerRef = useRef<number | null>(null)
   const pendingRenderRef = useRef(false)
+  const viewportTargetRef = useRef<HTMLDivElement | null>(null)
+  const viewportHandleRef = useRef<VisibilityHandle | null>(null)
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const bodyObserverRef = useRef<ResizeObserver | null>(null)
   const isRenderingRef = useRef(false)
   const renderDiagramRef = useRef<() => void>(() => {})
+  const registerViewport = useViewportPriority()
 
   const baseCode = props.node?.code ?? ''
   const showSourceFallback = showSource || !d2Available || !svgMarkup
@@ -172,6 +178,21 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
     isRenderingRef.current = isRendering
   }, [isRendering])
 
+  useEffect(() => {
+    const el = viewportTargetRef.current
+    if (!el)
+      return
+    const handle = registerViewport(el, { rootMargin: '160px' })
+    viewportHandleRef.current = handle
+    if (handle.isVisible())
+      setViewportReady(true)
+    handle.whenVisible.then(() => setViewportReady(true))
+    return () => {
+      handle.destroy()
+      viewportHandleRef.current = null
+    }
+  }, [registerViewport])
+
   const updateBodyMinHeight = useCallback(() => {
     const el = bodyRef.current
     if (!el)
@@ -186,6 +207,8 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
     if (scheduledRef.current || typeof window === 'undefined')
       return
     if (unmountedRef.current)
+      return
+    if (!viewportReady)
       return
     if (isRenderingRef.current) {
       pendingRenderRef.current = true
@@ -217,7 +240,7 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
       window.requestAnimationFrame(runner)
     else
       setTimeout(runner, 0)
-  }, [props.progressiveIntervalMs])
+  }, [props.progressiveIntervalMs, viewportReady])
 
   const ensureD2Instance = useCallback(async () => {
     if (d2InstanceRef.current)
@@ -244,6 +267,8 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
 
   const renderDiagram = useCallback(async () => {
     if (typeof window === 'undefined' || unmountedRef.current)
+      return
+    if (!viewportReady)
       return
     if (props.loading && !props.progressiveRender)
       return
@@ -328,7 +353,7 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
         }
       }
     }
-  }, [baseCode, ensureD2Instance, props.darkThemeId, props.isDark, props.loading, props.progressiveRender, props.themeId, scheduleRender])
+  }, [baseCode, ensureD2Instance, props.darkThemeId, props.isDark, props.loading, props.progressiveRender, props.themeId, scheduleRender, viewportReady])
 
   useEffect(() => {
     renderDiagramRef.current = renderDiagram
@@ -389,6 +414,7 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
   }, [showSourceFallback, svgMarkup, baseCode, updateBodyMinHeight])
 
   useEffect(() => {
+    unmountedRef.current = false
     scheduleRender()
     const raf = requestAnimationFrame(() => updateBodyMinHeight())
     if (typeof ResizeObserver !== 'undefined') {
@@ -413,6 +439,7 @@ export function D2BlockNode(rawProps: D2BlockNodeProps) {
 
   return (
     <div
+      ref={viewportTargetRef}
       className={clsx(
         'd2-block my-4 rounded-lg border overflow-hidden shadow-sm',
         props.isDark ? 'border-gray-700/30 bg-gray-900 text-gray-100' : 'border-gray-200 bg-white text-gray-900',

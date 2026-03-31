@@ -1,7 +1,9 @@
+import type { VisibilityHandle } from '../../context/viewportPriority'
 import type { InfographicBlockNodeProps, MermaidBlockEvent } from '../../types/component-props'
 import clsx from 'clsx'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
 import { getInfographic } from './infographic'
@@ -49,6 +51,7 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   const [showSource, setShowSource] = useState(false)
   const [containerHeight, setContainerHeight] = useState('360px')
   const [modalOpen, setModalOpen] = useState(false)
+  const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
 
   // Zoom
   const [zoom, setZoom] = useState(1)
@@ -56,10 +59,13 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   const [isDragging, setIsDragging] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const viewportTargetRef = useRef<HTMLDivElement>(null)
+  const viewportHandleRef = useRef<VisibilityHandle | null>(null)
   const modalContentRef = useRef<HTMLDivElement>(null)
   const modalCloneWrapperRef = useRef<HTMLElement | null>(null)
   const dragStartRef = useRef({ x: 0, y: 0 })
   const instanceRef = useRef<any>(null)
+  const registerViewport = useViewportPriority()
 
   const baseCode = props.node.code
 
@@ -95,6 +101,8 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   }, [baseCode, props])
 
   const renderInfographic = useCallback(async () => {
+    if (!viewportReady)
+      return
     if (!containerRef.current)
       return
     const el = containerRef.current
@@ -130,14 +138,29 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
       console.error('Failed to render infographic:', error)
       el.innerHTML = `<div class="text-red-500 p-4">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
     }
-  }, [baseCode, updateContainerHeight])
+  }, [baseCode, updateContainerHeight, viewportReady])
+
+  useEffect(() => {
+    const el = viewportTargetRef.current
+    if (!el)
+      return
+    const handle = registerViewport(el, { rootMargin: '160px' })
+    viewportHandleRef.current = handle
+    if (handle.isVisible())
+      setViewportReady(true)
+    handle.whenVisible.then(() => setViewportReady(true))
+    return () => {
+      handle.destroy()
+      viewportHandleRef.current = null
+    }
+  }, [registerViewport])
 
   // Effects
   useEffect(() => {
-    if (!showSource && !isCollapsed) {
+    if (viewportReady && !showSource && !isCollapsed) {
       renderInfographic()
     }
-  }, [baseCode, showSource, isCollapsed, renderInfographic])
+  }, [baseCode, isCollapsed, renderInfographic, showSource, viewportReady])
 
   useEffect(() => {
     return () => {
@@ -259,7 +282,7 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   // JSX Structure mirroring Vue template
   return (
     <>
-      <div className={clsx('my-4 rounded-lg border overflow-hidden shadow-sm', props.isDark ? 'border-gray-700/30' : 'border-gray-200', { 'is-rendering': props.loading })}>
+      <div ref={viewportTargetRef} className={clsx('my-4 rounded-lg border overflow-hidden shadow-sm', props.isDark ? 'border-gray-700/30' : 'border-gray-200', { 'is-rendering': props.loading })}>
         {props.showHeader && (
           <div className={clsx('flex justify-between items-center px-4 py-2.5 border-b', props.isDark ? 'bg-gray-800 border-gray-700/30' : 'bg-gray-50 border-gray-200')}>
             <div className="flex items-center gap-x-2 overflow-hidden">

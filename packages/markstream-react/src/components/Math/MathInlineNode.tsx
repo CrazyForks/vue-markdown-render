@@ -1,24 +1,50 @@
+import type { VisibilityHandle } from '../../context/viewportPriority'
 import type { MathInlineNodeProps } from '../../types/component-props'
 import { useEffect, useRef, useState } from 'react'
+import { useViewportPriority } from '../../context/viewportPriority'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 import { getKatex } from './katex'
 
 export function MathInlineNode({ node }: MathInlineNodeProps) {
   const containerRef = useRef<HTMLSpanElement | null>(null)
   const mathRef = useRef<HTMLSpanElement | null>(null)
+  const viewportHandleRef = useRef<VisibilityHandle | null>(null)
+  const registerViewport = useViewportPriority()
   const [loading, setLoading] = useState(true)
+  const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
   const renderIdRef = useRef(0)
 
   useEffect(() => {
+    const el = containerRef.current
+    if (!el)
+      return
+    const handle = registerViewport(el, { rootMargin: '400px' })
+    viewportHandleRef.current = handle
+    if (handle.isVisible())
+      setViewportReady(true)
+    handle.whenVisible.then(() => setViewportReady(true))
+    return () => {
+      handle.destroy()
+      viewportHandleRef.current = null
+    }
+  }, [registerViewport])
+
+  useEffect(() => {
+    const content = node.content ?? ''
+    if (!content) {
+      if (mathRef.current)
+        mathRef.current.innerHTML = ''
+      setLoading(false)
+      return
+    }
+    if (!viewportReady) {
+      setLoading(true)
+      return
+    }
+
     let aborted = false
     const controller = new AbortController()
     const renderId = ++renderIdRef.current
-    const content = node.content ?? ''
-    if (!content) {
-      setLoading(false)
-      return () => controller.abort()
-    }
-
     const displayMode = node.markup === '$$'
     renderKaTeXWithBackpressure(content, displayMode, {
       timeout: 1500,
@@ -70,7 +96,7 @@ export function MathInlineNode({ node }: MathInlineNodeProps) {
       aborted = true
       controller.abort()
     }
-  }, [node.content, node.loading, node.raw, node.markup])
+  }, [node.content, node.loading, node.raw, node.markup, viewportReady])
 
   return (
     <span ref={containerRef} className="math-inline-wrapper">

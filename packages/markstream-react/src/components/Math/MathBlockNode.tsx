@@ -1,22 +1,50 @@
+import type { VisibilityHandle } from '../../context/viewportPriority'
 import type { MathBlockNodeProps } from '../../types/component-props'
 import { useEffect, useRef, useState } from 'react'
+import { useViewportPriority } from '../../context/viewportPriority'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 import { getKatex } from './katex'
 
 export function MathBlockNode({ node }: MathBlockNodeProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const mathRef = useRef<HTMLDivElement | null>(null)
+  const viewportHandleRef = useRef<VisibilityHandle | null>(null)
+  const registerViewport = useViewportPriority()
   const [rendering, setRendering] = useState(true)
+  const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
   const renderIdRef = useRef(0)
 
   useEffect(() => {
+    const el = containerRef.current
+    if (!el)
+      return
+    const handle = registerViewport(el, { rootMargin: '400px' })
+    viewportHandleRef.current = handle
+    if (handle.isVisible())
+      setViewportReady(true)
+    handle.whenVisible.then(() => setViewportReady(true))
+    return () => {
+      handle.destroy()
+      viewportHandleRef.current = null
+    }
+  }, [registerViewport])
+
+  useEffect(() => {
+    const content = node.content ?? ''
+    if (!content) {
+      if (mathRef.current)
+        mathRef.current.innerHTML = ''
+      setRendering(false)
+      return
+    }
+    if (!viewportReady) {
+      setRendering(true)
+      return
+    }
+
     let aborted = false
     const controller = new AbortController()
     const renderId = ++renderIdRef.current
-    const content = node.content ?? ''
-    if (!content) {
-      setRendering(false)
-      return () => controller.abort()
-    }
 
     renderKaTeXWithBackpressure(content, true, {
       timeout: 3000,
@@ -67,10 +95,10 @@ export function MathBlockNode({ node }: MathBlockNodeProps) {
       aborted = true
       controller.abort()
     }
-  }, [node.content, node.loading, node.raw])
+  }, [node.content, node.loading, node.raw, viewportReady])
 
   return (
-    <div className="math-block text-center overflow-x-auto relative min-h-[40px]">
+    <div ref={containerRef} className="math-block text-center overflow-x-auto relative min-h-[40px]">
       <div ref={mathRef} className={rendering ? 'math-rendering' : undefined} />
     </div>
   )

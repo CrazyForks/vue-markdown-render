@@ -1,4 +1,6 @@
+import type { VisibilityHandle } from '../../context/viewportPriority'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
 import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
@@ -144,11 +146,15 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const [fontSize, setFontSize] = useState<number>(defaultFontSize)
   const tooltipsEnabled = useMemo(() => props.showTooltips !== false, [props.showTooltips])
 
+  const viewportTargetRef = useRef<HTMLDivElement | null>(null)
   const codeBlockContentRef = useRef<HTMLDivElement | null>(null)
   const rendererTargetRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<ShikiRenderer | null>(null)
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: { theme?: string | undefined, themes?: string[] | undefined }) => ShikiRenderer)>(null)
   const importAttemptedRef = useRef(false)
+  const viewportHandleRef = useRef<VisibilityHandle | null>(null)
+  const registerViewport = useViewportPriority()
+  const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
 
   const getPreferredColorScheme = useCallback(() => {
     return props.isDark ? props.darkTheme : props.lightTheme
@@ -183,6 +189,11 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [])
 
   const initRenderer = useCallback(async () => {
+    if (!viewportReady) {
+      renderFallback(props.node.code)
+      return
+    }
+
     await ensureStreamMarkdownLoaded()
 
     if (!codeBlockContentRef.current || !rendererTargetRef.current) {
@@ -216,7 +227,22 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     catch {
       // keep fallback
     }
-  }, [clearFallback, ensureStreamMarkdownLoaded, getPreferredColorScheme, normalizedLanguage, props.loading, props.node.code, props.stream, props.themes, renderFallback])
+  }, [clearFallback, ensureStreamMarkdownLoaded, getPreferredColorScheme, normalizedLanguage, props.loading, props.node.code, props.stream, props.themes, renderFallback, viewportReady])
+
+  useEffect(() => {
+    const el = viewportTargetRef.current
+    if (!el)
+      return
+    const handle = registerViewport(el, { rootMargin: '400px' })
+    viewportHandleRef.current = handle
+    if (handle.isVisible())
+      setViewportReady(true)
+    handle.whenVisible.then(() => setViewportReady(true))
+    return () => {
+      handle.destroy()
+      viewportHandleRef.current = null
+    }
+  }, [registerViewport])
 
   useEffect(() => {
     void initRenderer()
@@ -229,10 +255,16 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   useEffect(() => {
     if (!rendererRef.current)
       return
+    if (!viewportReady)
+      return
     void rendererRef.current.setTheme(getPreferredColorScheme())
-  }, [getPreferredColorScheme])
+  }, [getPreferredColorScheme, viewportReady])
 
   useEffect(() => {
+    if (!viewportReady) {
+      renderFallback(props.node.code)
+      return
+    }
     if (!rendererRef.current)
       return
     if (props.stream === false && props.loading)
@@ -241,7 +273,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     Promise.resolve(rendererRef.current.updateCode(props.node.code, normalizedLanguage))
       .then(() => clearFallback())
       .catch(() => {})
-  }, [clearFallback, normalizedLanguage, props.loading, props.node.code, props.stream, renderFallback])
+  }, [clearFallback, normalizedLanguage, props.loading, props.node.code, props.stream, renderFallback, viewportReady])
 
   useEffect(() => {
     if (!tooltipsEnabled)
@@ -304,6 +336,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
 
   return (
     <div
+      ref={viewportTargetRef}
       className={[
         'code-block-container my-4 rounded-lg border overflow-hidden shadow-sm',
         props.isDark ? 'border-gray-700/30 bg-gray-900 is-dark' : 'border-gray-200 bg-white',
