@@ -210,4 +210,125 @@ para
     expect(nodes[0]?.tag).toBe('details')
     expect(nodes[1]?.type).toBe('paragraph')
   })
+
+  it('self-contained details with no trailing content produces a single node', () => {
+    const markdown = `<details open> <summary>S</summary> body \n</details>\n`
+
+    const md = getMarkdown('html-block-self-contained-no-trailing')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.tag).toBe('details')
+    expect((nodes[0] as any)?.loading).toBe(false)
+  })
+
+  it('self-contained details followed by a heading keeps them separate', () => {
+    const markdown = `<details open> <summary>S</summary> body \n</details>\n\n# Heading\n`
+
+    const md = getMarkdown('html-block-self-contained-heading')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes).toHaveLength(2)
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.tag).toBe('details')
+    expect(nodes[1]?.type).toBe('heading')
+  })
+
+  it('two consecutive self-contained details blocks stay separate', () => {
+    const markdown = `<details open> <summary>A</summary> aaa \n</details>\n\n<details> <summary>B</summary> bbb \n</details>\n`
+
+    const md = getMarkdown('html-block-self-contained-consecutive')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes).toHaveLength(2)
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.tag).toBe('details')
+    expect(nodes[1]?.type).toBe('html_block')
+    expect(nodes[1]?.tag).toBe('details')
+  })
+
+  it('self-contained details followed by a multi-line details block stay separate', () => {
+    const markdown = `<details open> <summary>A</summary> aaa \n</details>\n\n<details>\n<summary>B</summary>\n\nbbb\n</details>\n`
+
+    const md = getMarkdown('html-block-self-contained-then-multiline')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes).toHaveLength(2)
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.tag).toBe('details')
+    expect(nodes[1]?.type).toBe('html_block')
+    expect(nodes[1]?.tag).toBe('details')
+    expect(String(nodes[1]?.content ?? '')).toContain('<p>bbb</p>')
+  })
+
+  it('self-contained details followed by a code block stay separate', () => {
+    const markdown = '<details open> <summary>S</summary> body \n</details>\n\n```js\nconsole.log(1)\n```\n'
+
+    const md = getMarkdown('html-block-self-contained-code')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes).toHaveLength(2)
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.tag).toBe('details')
+    expect(nodes[1]?.type).toBe('code_block')
+  })
+
+  it('self-contained details in streaming mode does not absorb following content', () => {
+    const markdown = `<details open> <summary>S</summary> body \n</details> \n\n我是通义千问\n`
+
+    for (const final of [false, true]) {
+      const md = getMarkdown(`html-block-self-contained-stream-${final}`)
+      const nodes = parseMarkdownToStructure(markdown, md, { final }) as any[]
+
+      expect(nodes).toHaveLength(2)
+      expect(nodes[0]?.type).toBe('html_block')
+      expect(nodes[0]?.tag).toBe('details')
+      expect((nodes[0] as any)?.loading).toBe(false)
+      expect(nodes[1]?.type).toBe('paragraph')
+    }
+  })
+
+  it('self-contained details preserves attributes correctly', () => {
+    const markdown = `<details style="background:#f8f8f8" open> <summary>S</summary> body \n</details>\n\npara\n`
+
+    const md = getMarkdown('html-block-self-contained-attrs')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes).toHaveLength(2)
+    const details = nodes[0] as any
+    expect(details?.tag).toBe('details')
+    expect(details?.attrs).toEqual([['style', 'background:#f8f8f8'], ['open', '']])
+    expect(details?.children?.find((c: any) => c?.tag === 'summary')).toBeDefined()
+    expect(nodes[1]?.type).toBe('paragraph')
+  })
+
+  it('self-contained details preserves summary children and body text', () => {
+    const markdown = `<details open> <summary> Thinking... </summary> 好的 \n</details> \n\n我是通义千问\n`
+
+    const md = getMarkdown('html-block-self-contained-children')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes).toHaveLength(2)
+    const details = nodes[0] as any
+    expect(details?.tag).toBe('details')
+    expect(details?.loading).toBe(false)
+    const summary = details?.children?.find((c: any) => c?.tag === 'summary')
+    expect(summary).toBeDefined()
+    expect(nodes[1]?.type).toBe('paragraph')
+  })
+
+  it('self-contained details followed by multiple paragraphs stays separate from all', () => {
+    const markdown = `<details open> <summary>S</summary> body \n</details> \n\npara1\n\npara2\n`
+
+    const md = getMarkdown('html-block-self-contained-multi-para')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes.length).toBeGreaterThanOrEqual(2)
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.tag).toBe('details')
+    for (let k = 1; k < nodes.length; k++) {
+      expect(nodes[k]?.type).not.toBe('html_block')
+    }
+  })
 })
