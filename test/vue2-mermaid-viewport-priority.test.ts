@@ -51,8 +51,10 @@ afterEach(() => {
 })
 
 describe('markstream-vue2 mermaid viewport priority', () => {
-  it('keeps worker parsing idle until the block becomes visible', async () => {
+  it('prerenders during idle before the block becomes visible', async () => {
     vi.useFakeTimers()
+    vi.stubGlobal('requestIdleCallback', ((cb: any) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 }), 1)) as any)
+    vi.stubGlobal('cancelIdleCallback', ((id: number) => clearTimeout(id)) as any)
 
     const canParseOffthread = vi.fn(async () => true)
     const findPrefixOffthread = vi.fn(async () => null)
@@ -92,7 +94,7 @@ describe('markstream-vue2 mermaid viewport priority', () => {
       },
     })
     await flushVueUpdates()
-    await vi.advanceTimersByTimeAsync(400)
+    await vi.advanceTimersByTimeAsync(250)
     await flushVueUpdates()
 
     expect(canParseOffthread).not.toHaveBeenCalled()
@@ -100,11 +102,7 @@ describe('markstream-vue2 mermaid viewport priority', () => {
 
     const observer = FakeIntersectionObserver.instances.at(-1)
     expect(observer).toBeTruthy()
-    const observedEl = observer ? Array.from(observer.elements)[0] : null
-    expect(observedEl).toBeTruthy()
 
-    observer?.trigger(observedEl!, true)
-    await flushVueUpdates()
     await vi.advanceTimersByTimeAsync(1200)
     await flushVueUpdates()
 

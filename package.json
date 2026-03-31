@@ -126,8 +126,12 @@
   "scripts": {
     "dev": "pnpm run -C playground dev",
     "test": "vitest",
+    "test:perf:height-estimation-experiment": "node scripts/benchmark-height-estimation-experiment.mjs",
     "test:e2e:diff-folding": "node scripts/e2e-diff-folding.mjs",
     "test:e2e:codeblock-highlight-stability": "node scripts/e2e-codeblock-highlight-stability.mjs",
+    "test:e2e:height-estimation-experiment": "node scripts/e2e-height-estimation-experiment.mjs",
+    "test:e2e:main-playground-performance": "node scripts/e2e-main-playground-performance.mjs",
+    "test:e2e:playground-performance": "node scripts/e2e-playground-performance.mjs",
     "test:e2e:angular-playground": "node scripts/e2e-angular-playground.mjs",
     "test:e2e:diff-theme-switch": "node scripts/e2e-diff-theme-switch.mjs",
     "test:e2e:nuxt-ssr": "node scripts/e2e-nuxt-ssr.mjs",
@@ -251,6 +255,7 @@
     }
   },
   "dependencies": {
+    "@chenglou/pretext": "^0.0.3",
     "@floating-ui/dom": "^1.7.6",
     "stream-markdown-parser": "workspace:*"
   },

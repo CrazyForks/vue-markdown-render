@@ -15,7 +15,10 @@ import { getUseMonaco } from './monaco'
 import { scheduleGlobalMonacoTheme } from './monacoThemeScheduler'
 
 const props = withDefaults(
-  defineProps<CodeBlockNodeProps>(),
+  defineProps<CodeBlockNodeProps & {
+    estimatedHeightPx?: number
+    estimatedContentHeightPx?: number
+  }>(),
   {
     isShowPreview: true,
     darkTheme: 'vitesse-dark',
@@ -349,16 +352,42 @@ const preFallbackTabSize = computed(() => {
   // Monaco default is 4.
   return 4
 })
+const estimatedVisibleContentHeight = computed(() => {
+  const value = props.estimatedContentHeightPx
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : null
+})
 const preFallbackStyle = computed(() => {
   const fontFamily = (props.monacoOptions as any)?.fontFamily
   return {
     fontSize: `${preFallbackFontSize.value}px`,
     lineHeight: `${preFallbackLineHeight.value}px`,
     tabSize: preFallbackTabSize.value,
+    ...(estimatedVisibleContentHeight.value != null
+      ? { minHeight: `${estimatedVisibleContentHeight.value}px` }
+      : {}),
     ...(typeof fontFamily === 'string' && fontFamily.trim()
       ? { '--markstream-code-font-family': fontFamily.trim() }
       : {}),
   } as Record<string, string | number>
+})
+const shouldReserveEstimatedEditorHeight = computed(() => {
+  return estimatedVisibleContentHeight.value != null && !editorMounted.value
+})
+const codeEditorContainerStyle = computed(() => {
+  if (!shouldReserveEstimatedEditorHeight.value)
+    return undefined
+  return {
+    minHeight: `${estimatedVisibleContentHeight.value}px`,
+  }
+})
+const loadingPlaceholderStyle = computed(() => {
+  if (estimatedVisibleContentHeight.value == null)
+    return undefined
+  return {
+    minHeight: `${estimatedVisibleContentHeight.value}px`,
+  }
 })
 // Keep computed height tight to content. Extra padding caused visible bottom gap.
 const CONTENT_PADDING = 0
@@ -1934,6 +1963,7 @@ onUnmounted(() => {
         ref="codeEditor"
         class="code-editor-container"
         :class="[stream ? '' : 'code-height-placeholder', { 'is-hidden': showPreWhileMonacoLoads }]"
+        :style="codeEditorContainerStyle"
       />
       <PreCodeNode
         v-if="showPreWhileMonacoLoads"
@@ -1950,7 +1980,7 @@ onUnmounted(() => {
       :on-close="() => (showInlinePreview = false)"
     />
     <!-- Loading placeholder (non-streaming mode) can be overridden via slot -->
-    <div v-show="!stream && loading" class="code-loading-placeholder">
+    <div v-show="!stream && loading" class="code-loading-placeholder" :style="loadingPlaceholderStyle">
       <slot name="loading" :loading="loading" :stream="stream">
         <div class="loading-skeleton">
           <div class="skeleton-line" />

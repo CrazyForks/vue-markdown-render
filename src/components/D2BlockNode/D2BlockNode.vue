@@ -3,6 +3,7 @@ import type { D2BlockNodeProps } from '../../types/component-props'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
+import { useViewportPriority } from '../../composables/viewportPriority'
 import { getD2 } from './d2'
 
 const props = withDefaults(
@@ -31,8 +32,13 @@ const svgMarkup = ref('')
 const renderToken = ref(0)
 const bodyRef = ref<HTMLElement | null>(null)
 const bodyMinHeight = ref<number | null>(null)
+const viewportTarget = ref<HTMLElement | null>(null)
+const registerViewport = useViewportPriority()
+const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
+const viewportReady = ref(typeof window === 'undefined')
 
 const baseCode = computed(() => props.node.code ?? '')
+const renderSignature = computed(() => `${props.isDark ? 'dark' : 'light'}:${baseCode.value}`)
 const showSourceFallback = computed(() => {
   return showSource.value || !d2Available.value || !svgMarkup.value
 })
@@ -57,6 +63,28 @@ let lastRenderAt = 0
 let throttleTimer: number | null = null
 let pendingRender = false
 let bodyObserver: ResizeObserver | null = null
+let lastCompletedRenderSignature = ''
+
+if (typeof window !== 'undefined') {
+  watch(
+    () => viewportTarget.value,
+    (el) => {
+      viewportHandle.value?.destroy()
+      viewportHandle.value = null
+      if (!el) {
+        viewportReady.value = false
+        return
+      }
+      const handle = registerViewport(el, { rootMargin: '160px' })
+      viewportHandle.value = handle
+      viewportReady.value = handle.isVisible.value
+      handle.whenVisible.then(() => {
+        viewportReady.value = true
+      })
+    },
+    { immediate: true },
+  )
+}
 
 const DARK_THEME_OVERRIDES: Record<string, string> = {
   N1: '#E5E7EB',
@@ -250,12 +278,22 @@ async function ensureD2Instance() {
 async function renderDiagram() {
   if (!isClient || unmounted)
     return
+  if (!viewportReady.value)
+    return
   if (props.loading && !props.progressiveRender)
     return
+  const signature = renderSignature.value
+  if (signature === lastCompletedRenderSignature && !renderError.value && svgMarkup.value) {
+    d2Available.value = true
+    if (props.loading)
+      showSource.value = false
+    return
+  }
   const code = baseCode.value
   if (!code) {
     clearSvg()
     renderError.value = null
+    lastCompletedRenderSignature = ''
     return
   }
 
@@ -309,6 +347,7 @@ async function renderDiagram() {
     if (!svg)
       throw new Error('D2 render returned empty output.')
     setSvg(svg)
+    lastCompletedRenderSignature = signature
     if (props.loading)
       showSource.value = false
     renderError.value = null
@@ -319,6 +358,7 @@ async function renderDiagram() {
     const message = err?.message ? String(err.message) : 'D2 render failed.'
     if (!props.loading)
       renderError.value = message
+    lastCompletedRenderSignature = ''
     if (message.includes('@terrastruct/d2')) {
       d2Available.value = false
       showSource.value = true
@@ -421,6 +461,14 @@ watch(
 )
 
 watch(
+  () => viewportReady.value,
+  (ready) => {
+    if (ready)
+      scheduleRender(true)
+  },
+)
+
+watch(
   () => [showSourceFallback.value, svgMarkup.value, baseCode.value],
   () => {
     nextTick(() => {
@@ -430,7 +478,6 @@ watch(
 )
 
 onMounted(() => {
-  scheduleRender()
   nextTick(() => {
     updateBodyMinHeight()
   })
@@ -445,6 +492,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unmounted = true
+  lastCompletedRenderSignature = ''
+  viewportHandle.value?.destroy()
+  viewportHandle.value = null
   if (throttleTimer != null) {
     clearTimeout(throttleTimer)
     throttleTimer = null
@@ -456,6 +506,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div
+    ref="viewportTarget"
     class="d2-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     data-markstream-d2="1"
     :data-markstream-mode="showSourceFallback ? 'fallback' : 'preview'"

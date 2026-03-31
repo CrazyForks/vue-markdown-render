@@ -3,6 +3,7 @@ import type { InfographicBlockNodeProps } from '../../types/component-props'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
+import { useViewportPriority } from '../../composables/viewportPriority'
 import infographicIconUrl from '../../icon/infographic.svg?url'
 import { getInfographic } from './infographic'
 
@@ -24,9 +25,11 @@ const props = withDefaults(
 const _emits = defineEmits(['copy', 'export', 'openModal'])
 
 const { t } = useSafeI18n()
+const registerViewport = useViewportPriority()
 
 const copyText = ref(false)
 const isCollapsed = ref(false)
+const viewportTarget = ref<HTMLElement>()
 const infographicContainer = ref<HTMLElement>()
 const showSource = ref(true)
 const userToggledShowSource = ref(false)
@@ -35,6 +38,29 @@ const isModalOpen = ref(false)
 const modalContent = ref<HTMLElement>()
 const modalCloneWrapper = ref<HTMLElement | null>(null)
 const hasPreview = ref(false)
+const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
+const viewportReady = ref(typeof window === 'undefined')
+
+if (typeof window !== 'undefined') {
+  watch(
+    () => viewportTarget.value,
+    (el) => {
+      viewportHandle.value?.destroy()
+      viewportHandle.value = null
+      if (!el) {
+        viewportReady.value = false
+        return
+      }
+      const handle = registerViewport(el, { rootMargin: '160px' })
+      viewportHandle.value = handle
+      viewportReady.value = handle.isVisible.value
+      handle.whenVisible.then(() => {
+        viewportReady.value = true
+      })
+    },
+    { immediate: true },
+  )
+}
 
 function resolveContainerHeight(actualHeight: number) {
   if (!props.maxHeight || props.maxHeight === 'none')
@@ -64,6 +90,7 @@ const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
 
 const baseCode = computed(() => props.node.code)
+const renderSignature = computed(() => baseCode.value)
 
 // Tooltip helpers
 type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right'
@@ -287,10 +314,26 @@ function stopDrag() {
 }
 
 let infographicInstance: any | null = null
+let renderInFlight = false
+let rerenderQueued = false
+let rerenderForce = false
+let lastCompletedRenderSignature = ''
 
-async function renderInfographic() {
+async function renderInfographic(force = false) {
+  if (!viewportReady.value)
+    return
   if (!infographicContainer.value)
     return
+  if (renderInFlight) {
+    rerenderQueued = true
+    rerenderForce = rerenderForce || force
+    return
+  }
+  const signature = renderSignature.value
+  if (!force && signature === lastCompletedRenderSignature && hasPreview.value)
+    return
+
+  renderInFlight = true
 
   try {
     const InfographicClass = await getInfographic()
@@ -318,6 +361,7 @@ async function renderInfographic() {
     // Render the syntax
     infographicInstance.render(baseCode.value)
     hasPreview.value = true
+    lastCompletedRenderSignature = signature
 
     // Update container height after render
     nextTick(() => {
@@ -327,21 +371,37 @@ async function renderInfographic() {
   catch (error) {
     console.error('Failed to render infographic:', error)
     hasPreview.value = false
+    lastCompletedRenderSignature = ''
     if (infographicContainer.value) {
       infographicContainer.value.innerHTML = `<div class="text-red-500 p-4">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
     }
   }
+  finally {
+    renderInFlight = false
+    if (rerenderQueued) {
+      const forceNext = rerenderForce
+      rerenderQueued = false
+      rerenderForce = false
+      nextTick(() => {
+        void renderInfographic(forceNext)
+      })
+    }
+  }
+}
+
+function queueInfographicRender(force = false) {
+  if (!viewportReady.value || showSource.value || isCollapsed.value)
+    return
+  nextTick(() => {
+    void renderInfographic(force)
+  })
 }
 
 // Watch for code changes
 watch(
   () => baseCode.value,
   () => {
-    if (!showSource.value && !isCollapsed.value) {
-      nextTick(() => {
-        renderInfographic()
-      })
-    }
+    queueInfographicRender(true)
   },
 )
 
@@ -349,11 +409,8 @@ watch(
 watch(
   () => showSource.value,
   (isSource) => {
-    if (!isSource && !isCollapsed.value) {
-      nextTick(() => {
-        renderInfographic()
-      })
-    }
+    if (!isSource)
+      queueInfographicRender()
   },
 )
 
@@ -361,40 +418,43 @@ watch(
 watch(
   () => isCollapsed.value,
   (collapsed) => {
-    if (!collapsed && !showSource.value) {
-      nextTick(() => {
-        renderInfographic()
-      })
-    }
+    if (!collapsed)
+      queueInfographicRender()
   },
 )
 
 watch(
   () => props.maxHeight,
   () => {
-    if (!showSource.value && !isCollapsed.value) {
-      nextTick(() => {
-        renderInfographic()
-      })
-    }
+    nextTick(() => {
+      updateContainerHeight()
+    })
+  },
+)
+
+watch(
+  () => viewportReady.value,
+  (ready) => {
+    if (!ready || showSource.value || isCollapsed.value)
+      return
+    queueInfographicRender()
   },
 )
 
 onMounted(() => {
   if (!userToggledShowSource.value)
     showSource.value = false
-  if (!showSource.value && !isCollapsed.value) {
-    nextTick(() => {
-      renderInfographic()
-    })
-  }
+  queueInfographicRender()
 })
 
 onBeforeUnmount(() => {
+  viewportHandle.value?.destroy()
+  viewportHandle.value = null
   if (infographicInstance) {
     infographicInstance.destroy?.()
     infographicInstance = null
   }
+  lastCompletedRenderSignature = ''
   if (typeof window !== 'undefined') {
     try {
       window.removeEventListener('keydown', handleKeydown)
@@ -433,6 +493,7 @@ watch(
 
 <template>
   <div
+    ref="viewportTarget"
     class="my-4 rounded-lg border overflow-hidden shadow-sm"
     data-markstream-infographic="1"
     :data-markstream-mode="renderMode"

@@ -121,7 +121,6 @@ watch(displaySrc, () => {
 }
 
 .image-node__img--inline {
-  max-width: none;
   min-height: 0 !important;
   width: auto !important;
   height: auto !important;

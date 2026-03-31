@@ -39,7 +39,7 @@ const diffHideUnchangedRegions = {
   revealLineCount: 5,
 } as const
 const playgroundMonacoOptions = {
-  renderSideBySide: true,
+  renderSideBySide: false,
   useInlineViewWhenSpaceIsLimited: true,
   maxComputationTime: 0,
   ignoreTrimWhitespace: false,

@@ -199,25 +199,6 @@ async function resolveMermaidInstance() {
   }
 }
 
-// Only initialize mermaid on the client to avoid SSR errors
-if (typeof window !== 'undefined') {
-  ;(async () => {
-    try {
-      const instance = await resolveMermaidInstance()
-      if (!instance)
-        return
-      instance?.initialize?.({
-        ...mermaidInitConfig.value,
-        // dompurifyConfig: { ...DOMPURIFY_CONFIG },
-      })
-    }
-    catch (err) {
-      mermaidAvailable.value = false
-      console.warn('[markstream-vue] Failed to initialize mermaid renderer. Call enableMermaid() to configure a loader.', err)
-    }
-  })()
-}
-
 const copyText = ref(false)
 const isCollapsed = ref(false)
 const mermaidContainer = ref<HTMLElement>()
@@ -263,6 +244,7 @@ const contentStableDelay = computed(() => Math.max(0, props.contentStableDelayMs
 const previewPollInitialDelay = computed(() => Math.max(120, props.previewPollDelayMs ?? 800))
 const previewPollMaxDelay = computed(() => Math.max(previewPollInitialDelay.value, props.previewPollMaxDelayMs ?? 4000))
 const previewPollMaxAttempts = computed(() => Math.max(1, Math.trunc(props.previewPollMaxAttempts ?? 12)))
+const usesProgressivePreview = computed(() => props.loading !== false)
 let contentStableTimer: number | null = null
 let renderRetryTimer: ReturnType<typeof setTimeout> | null = null
 let progressiveRenderDebounceTimer: number | null = null
@@ -822,6 +804,8 @@ function closeModal() {
 }
 
 function checkContentStability() {
+  if (!usesProgressivePreview.value)
+    return
   if (!showSource.value) {
     return
   }
@@ -1204,6 +1188,38 @@ async function initMermaid() {
   return renderQueue.value
 }
 
+function normalizeMermaidSource(code: string) {
+  return code.replace(/\s+/g, '')
+}
+
+async function renderStaticDiagram() {
+  const base = baseFixedCode.value
+  if (!base.trim()) {
+    if (mermaidContent.value)
+      clearElement(mermaidContent.value)
+    lastSvgSnapshot.value = null
+    lastRenderedCode.value = ''
+    hasRenderError.value = false
+    return
+  }
+  if (!mermaidAvailable.value || !canScheduleViewportWork())
+    return
+
+  const normalizedBase = normalizeMermaidSource(base)
+  if (
+    hasRenderedOnce.value
+    && normalizedBase === lastRenderedCode.value
+    && mermaidContent.value?.querySelector('svg')
+  ) {
+    return
+  }
+
+  await initMermaid()
+  lastRenderedCode.value = normalizedBase
+  lastSvgSnapshot.value = mermaidContent.value?.innerHTML ?? null
+  hasRenderError.value = false
+}
+
 // Note: debouncedInitMermaid is no longer needed; progressive path handles debouncing
 
 // Lightweight partial render that does NOT flip hasRenderedOnce or cache
@@ -1428,6 +1444,8 @@ function scheduleNextPreviewPoll(delay = previewPollInitialDelay.value) {
 function startPreviewPolling() {
   if (isPreviewPolling)
     return
+  if (!usesProgressivePreview.value)
+    return
   if (!mermaidAvailable.value)
     return
   if (!canScheduleViewportWork())
@@ -1448,6 +1466,12 @@ watch(
   () => {
     hasRenderedOnce.value = false
     svgCache.value = {}
+    if (!usesProgressivePreview.value) {
+      stopPreviewPolling()
+      if (canScheduleViewportWork() && !showSource.value)
+        void renderStaticDiagram()
+      return
+    }
     // Use idle progressive path; will call initMermaid when full code becomes valid
     if (canScheduleViewportWork())
       debouncedProgressiveRender()
@@ -1529,6 +1553,11 @@ watch(
       // If mermaid is not available, do not attempt progressive render or start polling
       if (!mermaidAvailable.value || !canScheduleViewportWork())
         return
+      if (!usesProgressivePreview.value) {
+        stopPreviewPolling()
+        await renderStaticDiagram()
+        return
+      }
       // Arm partial-preview eligibility before the immediate preview render runs.
       startPreviewPolling()
       // Use progressive path to avoid throwing on incomplete code
@@ -1615,14 +1644,23 @@ watch(
 )
 
 onMounted(async () => {
+  void resolveMermaidInstance().catch((err) => {
+    mermaidAvailable.value = false
+    console.warn('[markstream-vue] Failed to initialize mermaid renderer. Call enableMermaid() to configure a loader.', err)
+  })
   await nextTick()
   // Set initial default tab based on mermaid availability (unless user already toggled)
   if (!userToggledShowSource.value) {
     showSource.value = !mermaidAvailable.value
   }
   if (canScheduleViewportWork()) {
-    debouncedProgressiveRender()
-    lastContentLength.value = baseFixedCode.value.length
+    if (usesProgressivePreview.value) {
+      debouncedProgressiveRender()
+      lastContentLength.value = baseFixedCode.value.length
+    }
+    else if (!showSource.value) {
+      void renderStaticDiagram()
+    }
   }
 })
 
@@ -1651,12 +1689,17 @@ watch(
     if (!visible)
       return
     if (!hasRenderedOnce.value) {
-      debouncedProgressiveRender()
-      lastContentLength.value = baseFixedCode.value.length
+      if (usesProgressivePreview.value) {
+        debouncedProgressiveRender()
+        lastContentLength.value = baseFixedCode.value.length
+      }
+      else {
+        void renderStaticDiagram()
+      }
     }
     if (!props.loading && !hasRenderedOnce.value)
-      debouncedProgressiveRender()
-    if (!showSource.value && mermaidAvailable.value)
+      void renderStaticDiagram()
+    if (!showSource.value && mermaidAvailable.value && usesProgressivePreview.value)
       startPreviewPolling()
   },
   { immediate: false },
@@ -1691,9 +1734,13 @@ watch(
     else {
       if (canScheduleViewportWork() && !hasRenderedOnce.value) {
         await nextTick()
-        debouncedProgressiveRender()
-        if (!showSource.value)
+        if (usesProgressivePreview.value) {
+          debouncedProgressiveRender()
           startPreviewPolling()
+        }
+        else if (!showSource.value) {
+          void renderStaticDiagram()
+        }
       }
     }
   },
@@ -1807,6 +1854,7 @@ const computedButtonStyle = computed(() => {
         <button
           v-if="props.showExportButton && mermaidAvailable"
           :class="`${computedButtonStyle} ${isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : ''}`"
+          :aria-label="t('common.export') || 'Export'"
           :disabled="isFullscreenDisabled"
           @click="handleExportClick"
           @mouseenter="onBtnHover($event, t('common.export') || 'Export')"
@@ -1819,6 +1867,7 @@ const computedButtonStyle = computed(() => {
         <button
           v-if="props.showFullscreenButton && mermaidAvailable"
           :class="`${computedButtonStyle} ${isFullscreenDisabled ? 'opacity-50 cursor-not-allowed' : ''}`"
+          :aria-label="isModalOpen ? (t('common.minimize') || 'Minimize') : (t('common.open') || 'Open')"
           :disabled="isFullscreenDisabled"
           @click="handleOpenModalClick"
           @mouseenter="onBtnHover($event, isModalOpen ? (t('common.minimize') || 'Minimize') : (t('common.open') || 'Open'))"

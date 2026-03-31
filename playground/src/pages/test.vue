@@ -155,7 +155,7 @@ const diffHideUnchangedRegions = {
 } as const
 
 const testPageMonacoOptions = {
-  renderSideBySide: true,
+  renderSideBySide: false,
   useInlineViewWhenSpaceIsLimited: true,
   maxComputationTime: 0,
   ignoreTrimWhitespace: false,

@@ -7,7 +7,7 @@ import { useSafeI18n } from '../../composables/useSafeI18n'
 // 接收 props：node 是必须，其他为可选配置（fallback、是否启用 lazy）
 const props = withDefaults(defineProps<ImageNodeProps>(), {
   fallbackSrc: '',
-  lazy: true,
+  lazy: false,
   usePlaceholder: true,
 })
 
@@ -21,6 +21,7 @@ const fallbackTried = ref(false)
 
 // 计算当前用于渲染的 src（当有 error 且提供 fallback 时使用 fallback）
 const displaySrc = computed(() => hasError.value && props.fallbackSrc ? props.fallbackSrc : props.node.src)
+const useEagerImagePath = computed(() => !props.lazy)
 
 // 处理图片加载错误：尝试一次 fallback，否则保留错误状态
 function handleImageError() {
@@ -69,14 +70,16 @@ watch(displaySrc, () => {
       :src="displaySrc"
       :alt="String(props.node.alt ?? props.node.title ?? '')"
       :title="String(props.node.title ?? props.node.alt ?? '')"
-      class="image-node__img h-auto rounded-lg transition-opacity duration-200 ease-in-out image-node__img--inline"
+      class="image-node__img h-auto rounded-lg image-node__img--inline"
       :class="{
-        'opacity-0': !imageLoaded,
-        'opacity-100': imageLoaded,
+        'transition-opacity duration-200 ease-in-out': !useEagerImagePath,
+        'opacity-0': !useEagerImagePath && !imageLoaded,
+        'opacity-100': useEagerImagePath || imageLoaded,
         'cursor-pointer': imageLoaded,
       }"
-      :loading="props.lazy ? 'lazy' : 'eager'"
-      decoding="async"
+      :loading="props.lazy ? 'lazy' : undefined"
+      :fetchpriority="useEagerImagePath ? 'high' : undefined"
+      :decoding="useEagerImagePath ? 'sync' : 'async'"
       :tabindex="imageLoaded ? 0 : -1"
       :aria-label="props.node.alt ?? t('image.preview')"
       @error="handleImageError"
@@ -119,7 +122,6 @@ watch(displaySrc, () => {
 }
 
 .image-node__img--inline {
-  max-width: none;
   min-height: 0 !important;
   width: auto !important;
   height: auto !important;

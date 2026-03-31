@@ -55,9 +55,11 @@ afterEach(() => {
 })
 
 describe('markstream-react mermaid viewport priority', () => {
-  it('keeps worker parsing idle until the block becomes visible', async () => {
+  it('prerenders during idle before the block becomes visible', async () => {
     vi.useFakeTimers()
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    vi.stubGlobal('requestIdleCallback', ((cb: any) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 }), 1)) as any)
+    vi.stubGlobal('cancelIdleCallback', ((id: number) => clearTimeout(id)) as any)
 
     const canParseOffthread = vi.fn(async () => true)
     const findPrefixOffthread = vi.fn(async () => null)
@@ -98,7 +100,7 @@ describe('markstream-react mermaid viewport priority', () => {
     })
     await flushReact()
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(400)
+      await vi.advanceTimersByTimeAsync(250)
     })
     await flushReact()
 
@@ -107,13 +109,7 @@ describe('markstream-react mermaid viewport priority', () => {
 
     const observer = FakeIntersectionObserver.instances.at(-1)
     expect(observer).toBeTruthy()
-    const observedEl = observer ? Array.from(observer.elements)[0] : null
-    expect(observedEl).toBeTruthy()
 
-    await act(async () => {
-      observer?.trigger(observedEl!, true)
-    })
-    await flushReact()
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1200)
     })

@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
+import { useViewportPriority } from '../../composables/viewportPriority'
 import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier } from '../../utils'
 
 const props = withDefaults(
@@ -40,6 +41,8 @@ const props = withDefaults(
     showFontSizeButtons?: boolean
     /** Toggle singleton tooltips for header action buttons */
     showTooltips?: boolean
+    estimatedHeightPx?: number
+    estimatedContentHeightPx?: number
   }>(),
   {
     isShowPreview: true,
@@ -69,11 +72,36 @@ const codeLanguage = ref<string>(normalizeLanguageIdentifier(props.node.language
 const copyText = ref(false)
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
+const container = ref<HTMLElement | null>(null)
 const codeBlockContent = ref<HTMLElement | null>(null)
 const rendererTarget = ref<HTMLElement | null>(null)
 const fallbackHtml = ref('')
 const rendererReady = ref(false)
 let renderObserver: MutationObserver | undefined
+const registerVisibility = useViewportPriority()
+const viewportHandle = ref<ReturnType<typeof registerVisibility> | null>(null)
+const viewportReady = ref(typeof window === 'undefined')
+
+if (typeof window !== 'undefined') {
+  watch(
+    () => container.value,
+    (el) => {
+      viewportHandle.value?.destroy()
+      viewportHandle.value = null
+      if (!el) {
+        viewportReady.value = false
+        return
+      }
+      const handle = registerVisibility(el, { rootMargin: '400px' })
+      viewportHandle.value = handle
+      viewportReady.value = handle.isVisible.value
+      handle.whenVisible.then(() => {
+        viewportReady.value = true
+      })
+    },
+    { immediate: true },
+  )
+}
 
 // Auto-scroll state management
 const autoScrollEnabled = ref(true) // Start with auto-scroll enabled
@@ -127,11 +155,31 @@ const containerStyle = computed(() => {
     s.maxWidth = max
   return s
 })
+const estimatedVisibleContentHeight = computed(() => {
+  const value = props.estimatedContentHeightPx
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : null
+})
+
+const shouldReserveEstimatedContentHeight = computed(() => {
+  return estimatedVisibleContentHeight.value != null && !rendererReady.value
+})
 
 // Computed style for code block content with font size
 const contentStyle = computed(() => {
   return {
     fontSize: `${codeFontSize.value}px`,
+    ...(shouldReserveEstimatedContentHeight.value
+      ? { minHeight: `${estimatedVisibleContentHeight.value}px` }
+      : {}),
+  }
+})
+const loadingPlaceholderStyle = computed(() => {
+  if (estimatedVisibleContentHeight.value == null)
+    return undefined
+  return {
+    minHeight: `${estimatedVisibleContentHeight.value}px`,
   }
 })
 const tooltipsEnabled = computed(() => props.showTooltips !== false)
@@ -194,7 +242,6 @@ async function clearFallbackWhenRendererReady() {
   })
   renderObserver.observe(target, { childList: true, subtree: true })
 }
-// Lazy-load stream-markdown (and thus shiki) only when needed
 interface ShikiRenderer {
   updateCode: (code: string, lang?: string) => void | Promise<void>
   setTheme: (theme?: string) => void | Promise<void>
@@ -204,12 +251,13 @@ let renderer: ShikiRenderer | undefined
 let createShikiRenderer:
   | ((el: HTMLElement, opts: { theme?: string | undefined, themes?: string[] | undefined }) => ShikiRenderer)
   | undefined
-
 let registerHighlight
 let registeredHighlightLanguages: Set<string> | undefined
+let registeredHighlightThemesKey: string | null = null
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV)
+let streamMarkdownLoadPromise: Promise<void> | null = null
 
 function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) {
   const [baseToken] = String(rawLang ?? '').split(':')
@@ -245,24 +293,49 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null)
     }
   }
 }
+
 async function ensureStreamMarkdownLoaded() {
   if (createShikiRenderer)
     return
-  try {
-    const mod = await import('stream-markdown')
-    createShikiRenderer = mod.createShikiStreamRenderer
-    registerHighlight = mod.registerHighlight
-    const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
-    registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
-    registerHighlight?.({ themes: props.themes })
-  }
-  catch (e) {
-    // stream-markdown is an optional peer; if missing, silently skip highlighting
-    console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
-  }
+  if (streamMarkdownLoadPromise)
+    return streamMarkdownLoadPromise
+
+  streamMarkdownLoadPromise = (async () => {
+    try {
+      const mod = await import('stream-markdown')
+      createShikiRenderer = mod.createShikiStreamRenderer
+      registerHighlight = mod.registerHighlight
+      const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
+      registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
+      ensureHighlightThemesRegistered(props.themes)
+    }
+    catch (e) {
+      console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
+    }
+    finally {
+      streamMarkdownLoadPromise = null
+    }
+  })()
+
+  return streamMarkdownLoadPromise
+}
+
+function ensureHighlightThemesRegistered(themes?: string[]) {
+  if (!registerHighlight)
+    return
+  const nextKey = Array.isArray(themes) ? themes.join('\u0000') : ''
+  if (registeredHighlightThemesKey === nextKey)
+    return
+  registerHighlight({ themes })
+  registeredHighlightThemesKey = nextKey
 }
 
 async function initRenderer() {
+  if (!viewportReady.value) {
+    renderFallback(props.node.code)
+    return
+  }
+
   await ensureStreamMarkdownLoaded()
 
   if (!codeBlockContent.value || !rendererTarget.value) {
@@ -270,7 +343,7 @@ async function initRenderer() {
     return
   }
 
-  registerHighlight?.({ themes: props.themes })
+  ensureHighlightThemesRegistered(props.themes)
 
   if (!renderer && createShikiRenderer) {
     renderer = createShikiRenderer(rendererTarget.value, {
@@ -293,22 +366,36 @@ async function initRenderer() {
   await updateRendererWithFallback(props.node.code, codeLanguage.value)
   await clearFallbackWhenRendererReady()
 }
-initRenderer()
 onMounted(() => {
+  if (!viewportReady.value) {
+    renderFallback(props.node.code)
+    return
+  }
   initRenderer()
 })
 onBeforeUnmount(() => {
+  viewportHandle.value?.destroy()
+  viewportHandle.value = null
   renderObserver?.disconnect()
   renderObserver = undefined
 })
 
 watch(() => props.themes, async () => {
-  if (registerHighlight)
-    registerHighlight({ themes: props.themes })
+  ensureHighlightThemesRegistered(props.themes)
 })
 
 watch(() => props.loading, (loading) => {
   if (loading)
+    return
+  if (!viewportReady.value) {
+    renderFallback(props.node.code)
+    return
+  }
+  initRenderer()
+})
+
+watch(() => viewportReady.value, (ready) => {
+  if (!ready)
     return
   initRenderer()
 })
@@ -322,6 +409,10 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   const normalizedLang = normalizeLanguageIdentifier(lang)
   if (normalizedLang !== codeLanguage.value)
     codeLanguage.value = normalizedLang
+  if (!viewportReady.value) {
+    renderFallback(code)
+    return
+  }
   if (!codeBlockContent.value || !rendererTarget.value) {
     renderFallback(code)
     return
@@ -345,6 +436,8 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
 watch(
   () => [props.darkTheme, props.lightTheme],
   async () => {
+    if (!viewportReady.value)
+      return
     if (!codeBlockContent.value || !rendererTarget.value)
       return
     if (!renderer)
@@ -529,6 +622,7 @@ function previewCode() {
 
 <template>
   <div
+    ref="container"
     :style="containerStyle"
     class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     :class="[props.isDark ? 'border-gray-700/30 bg-gray-900' : 'border-gray-200 bg-white', props.isDark ? 'is-dark' : '']"
@@ -658,7 +752,7 @@ function previewCode() {
       <div v-if="!rendererReady" class="code-fallback-plain" v-html="fallbackHtml" />
     </div>
     <!-- Loading placeholder can be overridden via slot -->
-    <div v-show="!stream && loading" class="code-loading-placeholder">
+    <div v-show="!stream && loading" class="code-loading-placeholder" :style="loadingPlaceholderStyle">
       <slot name="loading" :loading="loading" :stream="stream">
         <div class="loading-skeleton">
           <div class="skeleton-line" />
@@ -673,9 +767,6 @@ function previewCode() {
 <style scoped>
 .code-block-container {
   contain: content;
-  /* 新增：显著减少离屏 codeblock 的布局/绘制与样式计算 */
-  content-visibility: auto;
-  contain-intrinsic-size: 320px 180px;
 }
 
 .code-block-content {

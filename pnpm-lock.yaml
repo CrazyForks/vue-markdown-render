@@ -23,6 +23,9 @@ importers:
       '@antv/infographic':
         specifier: ^0.2.3
         version: 0.2.3
+      '@chenglou/pretext':
+        specifier: ^0.0.3
+        version: 0.0.3
       '@floating-ui/dom':
         specifier: ^1.7.6
         version: 1.7.6
@@ -1687,6 +1690,9 @@ packages:
 
   '@braintree/sanitize-url@7.1.1':
     resolution: {integrity: sha512-i1L7noDNxtFyL5DmZafWy1wRVhGehQmzZaz1HiN5e7iylJMSZR7ekOV7NsIqa5qBldlLrsKv4HbgFUVlQrz8Mw==}
+
+  '@chenglou/pretext@0.0.3':
+    resolution: {integrity: sha512-RQmqMqUAPRCyv4R3LlRi/ao6KbNWYclqLA+V1HS7sWgyUUbjn3JmmlfXZSY/BjM4rbmIaMSyIVisYocYGYftiQ==}
 
   '@chevrotain/cst-dts-gen@11.0.3':
     resolution: {integrity: sha512-BvIKpRLeS/8UbfxXxgC33xOumsacaeCKAjAeLyOn7Pcp95HiRbrpl14S+9vaZLolnbssPIUuiUd8IvgkRyt6NQ==}
@@ -14382,6 +14388,8 @@ snapshots:
       citty: 0.2.1
 
   '@braintree/sanitize-url@7.1.1': {}
+
+  '@chenglou/pretext@0.0.3': {}
 
   '@chevrotain/cst-dts-gen@11.0.3':
     dependencies:

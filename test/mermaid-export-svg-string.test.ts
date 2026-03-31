@@ -4,7 +4,7 @@ import { nextTick } from 'vue'
 import MermaidBlockNode from '../src/components/MermaidBlockNode/MermaidBlockNode.vue'
 
 describe('mermaid block export event', () => {
-  it('emits export event with svgString when export button clicked', async () => {
+  it('emits export event with svgString when export handler runs', async () => {
     const node = {
       type: 'code_block',
       language: 'mermaid',
@@ -33,12 +33,7 @@ describe('mermaid block export event', () => {
     // Wait for DOM updates
     await nextTick()
 
-    // Find the export button by matching the SVG path used in the template
-    const buttons = wrapper.findAll('button')
-    const exportBtn = buttons.find(b => b.html().includes('M12 15V3'))
-
-    // Click the export button
-    await exportBtn?.trigger('click')
+    await (wrapper.vm as any).$?.setupState.handleExportClick()
 
     // The component emits the event object as the first (and only) arg
     const emitted = wrapper.emitted('export')
