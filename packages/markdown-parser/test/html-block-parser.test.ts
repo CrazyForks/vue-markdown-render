@@ -198,4 +198,16 @@ para
     expect(html?.children?.[3]?.tag).toBe('div')
     expect(html?.children?.[4]?.children?.[0]?.content).toBe('para')
   })
+
+  it('does not absorb content after a self-contained details block', () => {
+    const markdown = `<details style="color:gray;background-color: #f8f8f8;padding: 8px;border-radius: 4px;" open> <summary> Thinking... </summary> 好的，我现在需要处理用户的问题："你是谁"。首先，我要按照用户设定的规则来回答。用户要求先检查提供的上下文（context）中的信息，如果在里面找不到答案，再用 \n</details> \n\n我是通义千问，阿里巴巴集团旗下的超大规模语言模型。我能够帮助你回答问题、创作文字（如写故事、写公文、写邮件、写剧本等）、进行逻辑推理、编程等任务，并支持多语言交流。\n`
+
+    const md = getMarkdown('html-block-details-self-contained')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes).toHaveLength(2)
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.tag).toBe('details')
+    expect(nodes[1]?.type).toBe('paragraph')
+  })
 })

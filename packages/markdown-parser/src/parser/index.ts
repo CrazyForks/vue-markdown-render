@@ -492,7 +492,19 @@ function combineStructuredDetailsHtmlBlocks(
       }
     }
 
-    const middleNodes = closeIndex === -1 ? nodes.slice(i + 1) : nodes.slice(i + 1, closeIndex)
+    const exact = findNextHtmlBlockFromSource(source, 'details', openStart)
+    const selfContained = closeIndex === -1 && exact?.closed === true
+
+    const effectiveOpenRaw = selfContained
+      ? (() => {
+          const ct = findLastClosingTagStart(openRaw, 'details')
+          return ct !== -1 ? openRaw.slice(0, ct) : openRaw
+        })()
+      : openRaw
+
+    const middleNodes = selfContained
+      ? []
+      : closeIndex === -1 ? nodes.slice(i + 1) : nodes.slice(i + 1, closeIndex)
     const [children] = combineStructuredDetailsHtmlBlocks(
       middleNodes,
       source,
@@ -502,24 +514,27 @@ function combineStructuredDetailsHtmlBlocks(
       openStart + openRaw.length,
     )
     const prefixChildren = buildDetailsPrefixChildren(
-      openRaw,
+      effectiveOpenRaw,
       md,
       buildDetailsChildParseOptions(options, final),
     )
 
-    const exact = findNextHtmlBlockFromSource(source, 'details', openStart)
     const closeRaw = closeIndex === -1
       ? '</details>'
       : String((nodes[closeIndex] as any)?.raw ?? getMergeableNodeRaw(nodes[closeIndex]) ?? '</details>')
-    const explicitClose = closeIndex !== -1 && exact?.closed === true
+    const explicitClose = selfContained || (closeIndex !== -1 && exact?.closed === true)
     const trimmedCloseRaw = closeRaw.replace(/[\t\r\n ]+$/, '')
     const closeStart = explicitClose
       ? (() => {
-          const closeOffset = exact.raw.lastIndexOf(trimmedCloseRaw)
+          const closeOffset = (exact?.raw ?? '').lastIndexOf(trimmedCloseRaw)
           return closeOffset === -1 ? source.length : openStart + closeOffset
         })()
       : source.length
-    const middleSource = source.slice(openStart + openRaw.length, closeStart === -1 ? source.length : closeStart)
+    const openTagEndIndex = findTagCloseIndexOutsideQuotes(openRaw)
+    const middleSourceStart = selfContained && openTagEndIndex !== -1
+      ? openStart + openTagEndIndex + 1
+      : openStart + openRaw.length
+    const middleSource = source.slice(middleSourceStart, closeStart === -1 ? source.length : closeStart)
     const middleTokens = md.parse(middleSource, { __markstreamFinal: final }) as unknown as MarkdownToken[]
     const renderedMiddle = md.renderer.render(
       middleTokens as unknown as Token[],
@@ -537,20 +552,25 @@ function combineStructuredDetailsHtmlBlocks(
       ? source.slice(openStart, closeSliceEnd)
       : source.slice(openStart)
 
+    const contentPrefix = selfContained && openTagEndIndex !== -1
+      ? openRaw.slice(0, openTagEndIndex + 1)
+      : openRaw
+
     merged.push({
       ...(node as any),
       tag: 'details',
-      attrs: parseTagAttrs(openRaw.slice(0, findTagCloseIndexOutsideQuotes(openRaw) + 1)),
+      attrs: parseTagAttrs(openRaw.slice(0, openTagEndIndex + 1)),
       raw: mergedRaw,
-      content: `${openRaw}${renderedMiddle}${renderedCloseRaw}`,
+      content: `${contentPrefix}${renderedMiddle}${renderedCloseRaw}`,
       children: [...prefixChildren, ...children],
       loading: !final && !explicitClose,
     } as ParsedNode)
 
     cursor = explicitClose ? closeSliceEnd : source.length
-    if (closeIndex === -1)
+    if (closeIndex === -1 && !selfContained)
       break
-    i = closeIndex
+    if (closeIndex !== -1)
+      i = closeIndex
   }
 
   return [merged, cursor]
