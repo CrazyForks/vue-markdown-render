@@ -31,7 +31,7 @@ function normalizeText(input: string) {
   return input.replace(/\s+/g, ' ').trim()
 }
 
-describe('Vue2: non-whitelisted custom HTML tags', () => {
+describe('vue2: non-whitelisted custom HTML tags', () => {
   it('renders whitelisted tag as custom component', async () => {
     const scopeId = 'vue2-whitelisted-tag'
     const CustomTag = {

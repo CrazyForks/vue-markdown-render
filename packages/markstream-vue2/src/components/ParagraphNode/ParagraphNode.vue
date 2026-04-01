@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { ParsedNode } from 'stream-markdown-parser'
 import { STANDARD_HTML_TAGS } from 'stream-markdown-parser'
 import { computed } from 'vue-demi'
 import { getHtmlTagFromContent } from '../../utils/htmlRenderer'
@@ -138,7 +137,7 @@ const nodeComponents = {
 }
 
 // Process children to handle non-whitelisted custom HTML tags
-function processChild(child: NodeChild, index: number): { child: NodeChild, component: any } {
+function processChild(child: NodeChild): { child: NodeChild, component: any } {
   // Handle html_block and html_inline nodes with non-whitelisted custom tags
   if (child.type === 'html_block' || child.type === 'html_inline') {
     const tag = String((child as any).tag ?? '').trim().toLowerCase()

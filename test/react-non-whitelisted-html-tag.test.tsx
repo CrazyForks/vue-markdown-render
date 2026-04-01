@@ -1,3 +1,4 @@
+/* eslint-disable antfu/no-import-node-modules-by-path */
 /**
  * @vitest-environment jsdom
  *
@@ -24,7 +25,7 @@ async function flushReact() {
   })
 }
 
-describe('React: non-whitelisted custom HTML tags', () => {
+describe('react: non-whitelisted custom HTML tags', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', class {
       observe() {}
