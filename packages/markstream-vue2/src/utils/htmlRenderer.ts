@@ -162,6 +162,15 @@ export function convertAttrsToProps(attrs: Record<string, string>): Record<strin
 }
 
 /**
+ * Extract HTML tag name from content string
+ */
+export function getHtmlTagFromContent(html: unknown): string {
+  const raw = String(html ?? '')
+  const match = raw.match(/^\s*<\s*([A-Z][\w:-]*)/i)
+  return match ? match[1].toLowerCase() : ''
+}
+
+/**
  * Check if text content is meaningful (not just whitespace)
  */
 function isMeaningfulText(text: string): boolean {

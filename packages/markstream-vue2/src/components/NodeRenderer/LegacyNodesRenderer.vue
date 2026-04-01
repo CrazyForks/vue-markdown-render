@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BaseNode, ParsedNode } from 'stream-markdown-parser'
+import { STANDARD_HTML_TAGS } from 'stream-markdown-parser'
 import { computed } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -30,6 +31,7 @@ import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
+import { getHtmlTagFromContent } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
@@ -146,17 +148,45 @@ const renderedItems = computed(() => {
     ) {
       const tag = String((node as any).tag ?? '').trim().toLowerCase()
         || getHtmlTagFromContent((node as any).content)
-      if (tag && effectiveCustomHtmlTagsSet.value.has(tag)) {
-        const customComponents = customComponentsMap.value
-        const customForTag = (customComponents as any)[tag]
-        if (customForTag) {
-          component = customForTag
-          node = {
-            ...(node as any),
-            type: tag,
-            tag,
-            content: stripCustomHtmlWrapper((node as any).content, tag),
-          } as ParsedNode
+      if (tag) {
+        // Check if tag is whitelisted in customHtmlTags
+        if (effectiveCustomHtmlTagsSet.value.has(tag)) {
+          const customComponents = customComponentsMap.value
+          const customForTag = (customComponents as any)[tag]
+          if (customForTag) {
+            component = customForTag
+            node = {
+              ...(node as any),
+              type: tag,
+              tag,
+              content: stripCustomHtmlWrapper((node as any).content, tag),
+            } as ParsedNode
+          }
+        }
+        else if (!STANDARD_HTML_TAGS.has(tag)) {
+          // Non-whitelisted, non-standard HTML tag: render as plain text
+          // Escape HTML entities so the tag itself is displayed literally
+          const rawContent = String((node as any).content ?? (node as any).raw ?? '')
+          const escapedContent = rawContent
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+          if (node.type === 'html_inline') {
+            component = TextNode
+            node = {
+              type: 'text',
+              content: escapedContent,
+              raw: escapedContent,
+            } as ParsedNode
+          }
+          else {
+            component = ParagraphNode
+            node = {
+              type: 'paragraph',
+              children: [{ type: 'text', content: escapedContent, raw: escapedContent }],
+              raw: escapedContent,
+            } as ParsedNode
+          }
         }
       }
     }
@@ -176,12 +206,6 @@ const renderedItems = computed(() => {
     }
   })
 })
-
-function getHtmlTagFromContent(html: unknown) {
-  const raw = String(html ?? '')
-  const match = raw.match(/^\s*<\s*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
-}
 
 function stripCustomHtmlWrapper(html: unknown, tag: string) {
   const raw = String(html ?? '')

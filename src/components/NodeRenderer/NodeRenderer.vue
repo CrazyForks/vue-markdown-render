@@ -3,7 +3,7 @@ import type { MarkdownIt, ParsedNode } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { CustomComponents } from '../../types'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import { getMarkdown, parseMarkdownToStructure, STANDARD_HTML_TAGS } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -2070,6 +2070,8 @@ const nonCodeBindings = computed(() => ({
   // Forward `typewriter` flag to non-code node components so they can
   // opt in/out of enter transitions or other typewriter-like behaviour.
   typewriter: props.typewriter,
+  // Forward customHtmlTags for non-whitelisted tag detection in child components
+  customHtmlTags: props.customHtmlTags,
 }))
 const linkBindings = computed(() => ({
   ...nonCodeBindings.value,
@@ -2125,10 +2127,12 @@ const renderedItems = computed(() => {
       const htmlNode = node as RuntimeHtmlNode
       const tag = String(htmlNode.tag ?? '').trim().toLowerCase()
         || getHtmlTagFromContent(htmlNode.content)
-      if (tag && effectiveCustomHtmlTagsSet.value.has(tag)) {
+      if (tag) {
         const customComponents = customComponentsMap.value
         const customForTag = customComponents[tag]
-        if (customForTag) {
+
+        // Check if tag is whitelisted in customHtmlTags
+        if (effectiveCustomHtmlTagsSet.value.has(tag) && customForTag) {
           component = customForTag
           node = {
             ...htmlNode,
@@ -2136,6 +2140,33 @@ const renderedItems = computed(() => {
             tag,
             content: stripCustomHtmlWrapper(htmlNode.content, tag),
           } as ParsedNode
+        }
+        else if (!STANDARD_HTML_TAGS.has(tag) && !customForTag) {
+          // Non-whitelisted, non-standard HTML tag with no custom component:
+          // render as plain text. Escape HTML entities so the tag itself is
+          // displayed literally.
+          const rawContent = String(htmlNode.content ?? htmlNode.raw ?? '')
+          const escapedContent = rawContent
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+
+          if (node.type === 'html_inline') {
+            component = TextNode
+            node = {
+              type: 'text',
+              content: escapedContent,
+              raw: escapedContent,
+            } as ParsedNode
+          }
+          else {
+            component = ParagraphNode
+            node = {
+              type: 'paragraph',
+              children: [{ type: 'text', content: escapedContent, raw: escapedContent }],
+              raw: escapedContent,
+            } as ParsedNode
+          }
         }
       }
     }

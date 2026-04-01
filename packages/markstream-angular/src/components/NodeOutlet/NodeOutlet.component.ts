@@ -1,6 +1,7 @@
 import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, forwardRef, Input } from '@angular/core'
+import { STANDARD_HTML_TAGS } from 'stream-markdown-parser'
 import { getCustomNodeComponents } from '../../customComponents'
 import { AdmonitionNodeComponent } from '../AdmonitionNode/AdmonitionNode.component'
 import { BlockquoteNodeComponent } from '../BlockquoteNode/BlockquoteNode.component'
@@ -135,8 +136,18 @@ import { VmrContainerNodeComponent } from '../VmrContainerNode/VmrContainerNode.
         <markstream-angular-checkbox-node *ngSwitchCase="'checkbox_input'" [node]="node" />
         <markstream-angular-emoji-node *ngSwitchCase="'emoji'" [node]="node" />
         <markstream-angular-reference-node *ngSwitchCase="'reference'" [node]="node" />
-        <markstream-angular-html-block-node *ngSwitchCase="'html_block'" [node]="htmlRenderNode" [context]="context" />
-        <markstream-angular-html-inline-node *ngSwitchCase="'html_inline'" [node]="htmlRenderNode" [context]="context" />
+        <ng-container *ngSwitchCase="'html_block'">
+          <markstream-angular-text-node *ngIf="shouldEscapeHtmlTag; else htmlBlockNode" [node]="escapedTextNode" [context]="context" [indexKey]="indexKey" />
+          <ng-template #htmlBlockNode>
+            <markstream-angular-html-block-node [node]="htmlRenderNode" [context]="context" />
+          </ng-template>
+        </ng-container>
+        <ng-container *ngSwitchCase="'html_inline'">
+          <markstream-angular-text-node *ngIf="shouldEscapeHtmlTag; else htmlInlineNode" [node]="escapedTextNode" [context]="context" [indexKey]="indexKey" />
+          <ng-template #htmlInlineNode>
+            <markstream-angular-html-inline-node [node]="htmlRenderNode" [context]="context" />
+          </ng-template>
+        </ng-container>
         <markstream-angular-vmr-container-node *ngSwitchCase="'vmr_container'" [node]="node" [context]="context" [indexKey]="indexKey" />
         <markstream-angular-thematic-break-node *ngSwitchCase="'thematic_break'" />
         <markstream-angular-math-inline-node *ngSwitchCase="'math_inline'" [node]="node" />
@@ -208,7 +219,11 @@ export class NodeOutletComponent {
     }
 
     const tag = this.htmlTag
-    return tag ? customComponents?.[tag] ?? null : null
+    // Check if there's a custom component for this tag before deciding to escape
+    if (tag && customComponents?.[tag])
+      return customComponents[tag]
+
+    return null
   }
 
   get customNode() {
@@ -221,6 +236,58 @@ export class NodeOutletComponent {
 
   get htmlTag() {
     return resolveHtmlTag(this.node)
+  }
+
+  /**
+   * Check if this HTML tag should be escaped (rendered as text) instead of being parsed as HTML.
+   * This happens when:
+   * 1. The node is html_block or html_inline
+   * 2. The tag is NOT in the customHtmlTags whitelist
+   * 3. The tag is NOT a standard HTML tag
+   * 4. There is NO registered custom component for this tag
+   */
+  get shouldEscapeHtmlTag() {
+    const type = this.resolvedType
+    if (type !== 'html_block' && type !== 'html_inline')
+      return false
+
+    const tag = this.htmlTag
+    if (!tag)
+      return false
+
+    // Check if tag is in whitelist
+    const customHtmlTags = this.context?.customHtmlTags ?? []
+    const isWhitelisted = customHtmlTags.some(t => String(t).toLowerCase() === tag)
+    if (isWhitelisted)
+      return false
+
+    // Check if tag is a standard HTML tag
+    if (STANDARD_HTML_TAGS.has(tag))
+      return false
+
+    // Check if there's a custom component registered for this tag
+    const customComponents = this.customComponentMap
+    if (customComponents?.[tag])
+      return false
+
+    return true
+  }
+
+  /**
+   * Returns an escaped text node for non-whitelisted, non-standard HTML tags.
+   */
+  get escapedTextNode(): AngularRenderableNode {
+    const rawContent = String((this.node as any)?.content ?? (this.node as any)?.raw ?? '')
+    const escapedContent = rawContent
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+
+    return {
+      type: 'text',
+      content: escapedContent,
+      raw: escapedContent,
+    } as AngularRenderableNode
   }
 
   get htmlRenderNode() {

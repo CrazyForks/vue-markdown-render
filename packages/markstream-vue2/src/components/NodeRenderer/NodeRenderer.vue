@@ -2,7 +2,7 @@
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from '../../types/component-props'
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import { getMarkdown, parseMarkdownToStructure, STANDARD_HTML_TAGS } from 'stream-markdown-parser'
 import { computed, getCurrentInstance, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -34,6 +34,7 @@ import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
 import { provideViewportPriority } from '../../composables/viewportPriority'
+import { getHtmlTagFromContent } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import { isLegacyVue26Vm } from '../../utils/vue26'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
@@ -1646,6 +1647,8 @@ const nonCodeBindings = computed(() => ({
   // Forward `typewriter` flag to non-code node components so they can
   // opt in/out of enter transitions or other typewriter-like behaviour.
   typewriter: props.typewriter,
+  // Forward customHtmlTags for non-whitelisted tag detection in child components
+  customHtmlTags: props.customHtmlTags,
 }))
 const linkBindings = computed(() => ({
   ...nonCodeBindings.value,
@@ -1669,17 +1672,45 @@ const legacyRenderedItems = computed(() => {
     ) {
       const tag = String((node as any).tag ?? '').trim().toLowerCase()
         || getHtmlTagFromContent((node as any).content)
-      if (tag && effectiveCustomHtmlTagsSet.value.has(tag)) {
-        const customComponents = customComponentsMap.value
-        const customForTag = (customComponents as any)[tag]
-        if (customForTag) {
-          component = customForTag
-          resolvedNode = {
-            ...(node as any),
-            type: tag,
-            tag,
-            content: stripCustomHtmlWrapper((node as any).content, tag),
-          } as ParsedNode
+      if (tag) {
+        // Check if tag is whitelisted in customHtmlTags
+        if (effectiveCustomHtmlTagsSet.value.has(tag)) {
+          const customComponents = customComponentsMap.value
+          const customForTag = (customComponents as any)[tag]
+          if (customForTag) {
+            component = customForTag
+            resolvedNode = {
+              ...(node as any),
+              type: tag,
+              tag,
+              content: stripCustomHtmlWrapper((node as any).content, tag),
+            } as ParsedNode
+          }
+        }
+        else if (!STANDARD_HTML_TAGS.has(tag)) {
+          // Non-whitelisted, non-standard HTML tag: render as plain text
+          // Escape HTML entities so the tag itself is displayed literally
+          const rawContent = String((node as any).content ?? (node as any).raw ?? '')
+          const escapedContent = rawContent
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+          if (node.type === 'html_inline') {
+            component = TextNode
+            resolvedNode = {
+              type: 'text',
+              content: escapedContent,
+              raw: escapedContent,
+            } as ParsedNode
+          }
+          else {
+            component = ParagraphNode
+            resolvedNode = {
+              type: 'paragraph',
+              children: [{ type: 'text', content: escapedContent, raw: escapedContent }],
+              raw: escapedContent,
+            } as ParsedNode
+          }
         }
       }
     }
@@ -1714,17 +1745,45 @@ const renderedItems = computed(() => {
     ) {
       const tag = String((node as any).tag ?? '').trim().toLowerCase()
         || getHtmlTagFromContent((node as any).content)
-      if (tag && effectiveCustomHtmlTagsSet.value.has(tag)) {
-        const customComponents = customComponentsMap.value
-        const customForTag = (customComponents as any)[tag]
-        if (customForTag) {
-          component = customForTag
-          node = {
-            ...(node as any),
-            type: tag,
-            tag,
-            content: stripCustomHtmlWrapper((node as any).content, tag),
-          } as ParsedNode
+      if (tag) {
+        // Check if tag is whitelisted in customHtmlTags
+        if (effectiveCustomHtmlTagsSet.value.has(tag)) {
+          const customComponents = customComponentsMap.value
+          const customForTag = (customComponents as any)[tag]
+          if (customForTag) {
+            component = customForTag
+            node = {
+              ...(node as any),
+              type: tag,
+              tag,
+              content: stripCustomHtmlWrapper((node as any).content, tag),
+            } as ParsedNode
+          }
+        }
+        else if (!STANDARD_HTML_TAGS.has(tag)) {
+          // Non-whitelisted, non-standard HTML tag: render as plain text
+          // Escape HTML entities so the tag itself is displayed literally
+          const rawContent = String((node as any).content ?? (node as any).raw ?? '')
+          const escapedContent = rawContent
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+          if (node.type === 'html_inline') {
+            component = TextNode
+            node = {
+              type: 'text',
+              content: escapedContent,
+              raw: escapedContent,
+            } as ParsedNode
+          }
+          else {
+            component = ParagraphNode
+            node = {
+              type: 'paragraph',
+              children: [{ type: 'text', content: escapedContent, raw: escapedContent }],
+              raw: escapedContent,
+            } as ParsedNode
+          }
         }
       }
     }
@@ -1763,12 +1822,6 @@ function getCodeBlockRenderNode(node: ParsedNode) {
   const cloned = { ...codeBlockNode } as ParsedNode
   codeBlockRenderCache.set(codeBlockNode, { signature, node: cloned })
   return cloned
-}
-
-function getHtmlTagFromContent(html: unknown) {
-  const raw = String(html ?? '')
-  const match = raw.match(/^\s*<\s*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
 }
 
 function stripCustomHtmlWrapper(html: unknown, tag: string) {
