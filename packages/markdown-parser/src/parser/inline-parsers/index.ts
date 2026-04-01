@@ -113,6 +113,44 @@ function decodeVisibleTextFromRaw(rawText: string) {
   return output
 }
 
+function getRawIndexForVisibleIndex(rawText: string, visibleIndex: number) {
+  let outputIndex = 0
+
+  for (let rawIndex = 0; rawIndex < rawText.length; rawIndex++) {
+    const char = rawText[rawIndex]
+    const nextChar = rawText[rawIndex + 1]
+
+    if (char === '\\' && nextChar && ESCAPABLE_PUNCTUATION.has(nextChar)) {
+      if (outputIndex === visibleIndex)
+        return rawIndex + 1
+      outputIndex++
+      rawIndex++
+      continue
+    }
+
+    if (outputIndex === visibleIndex)
+      return rawIndex
+
+    outputIndex++
+  }
+
+  return -1
+}
+
+function isEscapedVisibleChar(rawText: string, visibleIndex: number, expectedChar?: string) {
+  const rawIndex = getRawIndexForVisibleIndex(rawText, visibleIndex)
+  if (rawIndex === -1)
+    return false
+  if (expectedChar && rawText[rawIndex] !== expectedChar)
+    return false
+
+  let slashCount = 0
+  for (let i = rawIndex - 1; i >= 0 && rawText[i] === '\\'; i--)
+    slashCount++
+
+  return slashCount % 2 === 1
+}
+
 const WORD_CHAR_RE = /[\p{L}\p{N}]/u
 const WORD_ONLY_RE = /^[\p{L}\p{N}]+$/u
 
@@ -691,9 +729,11 @@ export function parseInlineTokens(
       }
 
       case 'image':
-        resetCurrentTextNode()
-        pushNode(parseImageToken(token))
-        i++
+        if (!recoverOuterImageLinkStartFromImageToken(token)) {
+          resetCurrentTextNode()
+          pushNode(parseImageToken(token))
+          i++
+        }
         break
 
       case 'strong_open': {
@@ -882,6 +922,12 @@ export function parseInlineTokens(
           pushText(displayText, displayText)
           i++
         }
+        else if (recoverOuterImageLinkFromSyntheticLinkToken(token)) {
+          i++
+        }
+        else if (recoverMarkdownImageFromTrailingBang(token)) {
+          i++
+        }
         else if (recoverMarkdownLinkFromTrailingText(token)) {
           i++
         }
@@ -981,6 +1027,12 @@ export function parseInlineTokens(
       return
     }
 
+    if (recoverOuterImageLinkFromRawText(content))
+      return
+
+    if (recoverOuterImageLinkMidStateFromText(content))
+      return
+
     const hasInlineCandidates = (
       content.includes('*')
       || content.includes('_')
@@ -1001,7 +1053,10 @@ export function parseInlineTokens(
     if (handleCheckboxLike(content))
       return
     const preToken = tokens[i - 1]
-    if ((content === '[' && !nextToken?.markup?.includes('*')) || (content === ']' && !preToken?.markup?.includes('*'))) {
+    if (
+      (content === '[' && !nextToken?.markup?.includes('*') && !hasEscapedMarkup(token, '\\['))
+      || (content === ']' && !preToken?.markup?.includes('*') && !hasEscapedMarkup(token, '\\]'))
+    ) {
       i++
       return
     }
@@ -1037,6 +1092,14 @@ export function parseInlineTokens(
   }
 
   function handleLinkOpen(token: MarkdownToken) {
+    if (shouldTreatLinkOpenAsTextInEscapedOuterImageTail()) {
+      const { node, nextIndex } = parseLinkToken(tokens, i, options as any)
+      const text = String(node.text || node.href || '')
+      pushText(text, text)
+      i = nextIndex
+      return
+    }
+
     // mirror logic previously in the switch-case for 'link_open'
     resetCurrentTextNode()
 
@@ -1143,6 +1206,244 @@ export function parseInlineTokens(
       raw: String(`[${label}](${href}${linkToken.title ? ` "${linkToken.title}"` : ''})`),
     } as ParsedNode)
     return true
+  }
+
+  function recoverMarkdownImageFromTrailingBang(token: MarkdownToken): boolean {
+    if (token.type !== 'link')
+      return false
+
+    const previous = result[result.length - 1] as TextNode | undefined
+    const previousToken = tokens[i - 1]
+    if (!previous || previous.type !== 'text' || previousToken?.type !== 'text')
+      return false
+
+    const previousContent = String(previous.content ?? '')
+    const previousTokenContent = String(previousToken.content ?? '')
+    if (!previousContent.endsWith('!') || !previousTokenContent.endsWith('!'))
+      return false
+    if (hasEscapedMarkup(previousToken, '\\!'))
+      return false
+
+    const before = previousContent.slice(0, -1)
+    if (before) {
+      previous.content = before
+      previous.raw = before
+      currentTextNode = previous
+    }
+    else {
+      result.pop()
+      currentTextNode = null
+    }
+
+    const linkToken = token as MarkdownToken & {
+      href?: string
+      loading?: boolean
+      text?: string
+      title?: string | null
+      children?: Array<{ type?: string, content?: string, raw?: string }>
+    }
+    const alt = String(
+      linkToken.text
+      ?? linkToken.children?.map(child => String(child?.content ?? child?.raw ?? '')).join('')
+      ?? '',
+    )
+    const href = String(linkToken.href ?? '')
+    const title = linkToken.title == null || linkToken.title === '' ? null : String(linkToken.title)
+
+    pushParsed({
+      type: 'image',
+      src: href,
+      alt,
+      title,
+      raw: String(`![${alt}](${href}${title ? ` "${title}"` : ''})`),
+      loading: Boolean(linkToken.loading),
+    } as ParsedNode)
+    return true
+  }
+
+  function buildLoadingOuterImageLinkNode(
+    imageNode: ParsedNode & { alt?: string, raw?: string },
+    href = '',
+    title: string | null = null,
+  ): ParsedNode {
+    const text = String(imageNode.alt ?? imageNode.raw ?? '')
+
+    return {
+      type: 'link',
+      href,
+      title,
+      text,
+      children: [imageNode as ParsedNode],
+      raw: String(`[${text}](${href}${title ? ` "${title}"` : ''})`),
+      loading: true,
+    } as ParsedNode
+  }
+
+  function buildLoadingImageNodeFromRaw(raw: string): ParsedNode {
+    const normalizedRaw = raw.startsWith('![') ? raw : `![${raw}`
+    const innerRaw = normalizedRaw.slice(2)
+    const closeIdx = innerRaw.indexOf('](')
+    const alt = closeIdx === -1 ? innerRaw.replace(/\]$/, '') : innerRaw.slice(0, closeIdx)
+
+    return {
+      type: 'image',
+      src: '',
+      alt,
+      title: null,
+      raw: normalizedRaw,
+      loading: true,
+    } as ParsedNode
+  }
+
+  function recoverOuterImageLinkFromRawText(content: string): boolean {
+    const outerStart = content.indexOf('[![')
+    if (outerStart === -1)
+      return false
+    if (typeof raw === 'string' && tokens.length === 1 && isEscapedVisibleChar(raw, outerStart, '['))
+      return false
+
+    const before = content.slice(0, outerStart)
+    if (before)
+      pushText(before, before)
+
+    const imageNode = buildLoadingImageNodeFromRaw(content.slice(outerStart + 1))
+    pushParsed(buildLoadingOuterImageLinkNode(imageNode))
+    i++
+    return true
+  }
+
+  function recoverOuterImageLinkStartFromImageToken(token: MarkdownToken): boolean {
+    if (options?.final)
+      return false
+
+    const previousToken = tokens[i - 1]
+    if (previousToken?.type !== 'text')
+      return false
+
+    const previousTokenContent = String(previousToken.content ?? '')
+    if (!previousTokenContent.endsWith('['))
+      return false
+    if (hasEscapedMarkup(previousToken, '\\['))
+      return false
+
+    const previous = result[result.length - 1] as TextNode | undefined
+    if (previous?.type === 'text' && previous.content.endsWith('[')) {
+      const before = previous.content.slice(0, -1)
+      if (before) {
+        previous.content = before
+        previous.raw = before
+        currentTextNode = previous
+      }
+      else {
+        result.pop()
+        currentTextNode = null
+      }
+    }
+
+    const imageNode = parseImageToken(token)
+    pushParsed(buildLoadingOuterImageLinkNode(imageNode))
+    i++
+    return true
+  }
+
+  function recoverOuterImageLinkFromSyntheticLinkToken(token: MarkdownToken): boolean {
+    if (token.type !== 'link')
+      return false
+
+    const linkToken = token as MarkdownToken & {
+      href?: string
+      text?: string
+      title?: string | null
+      raw?: string
+    }
+    const raw = String(linkToken.raw ?? '')
+    const text = String(linkToken.text ?? '')
+    if (!raw.startsWith('[![') && !text.startsWith('!['))
+      return false
+
+    const imageTitle = linkToken.title == null || linkToken.title === '' ? null : String(linkToken.title)
+    const imageNode = {
+      type: 'image',
+      src: String(linkToken.href ?? ''),
+      alt: text.replace(/^!\[/, '').replace(/\]$/, ''),
+      title: imageTitle,
+      raw: raw.startsWith('[![') ? raw.slice(1) : raw,
+      loading: true,
+    } as ParsedNode & { alt?: string, raw?: string }
+
+    pushParsed(buildLoadingOuterImageLinkNode(imageNode))
+    return true
+  }
+
+  function recoverOuterImageLinkMidStateFromText(content: string): boolean {
+    if (!content.startsWith(']('))
+      return false
+    const outerOpenToken = tokens[i - 2]
+    if (outerOpenToken?.type === 'text' && String(outerOpenToken.content ?? '').endsWith('[') && hasEscapedMarkup(outerOpenToken, '\\['))
+      return false
+
+    const previous = result[result.length - 1] as ParsedNode | undefined
+    if (previous?.type !== 'image' && previous?.type !== 'link')
+      return false
+
+    const previousLink = previous?.type === 'link'
+      && Array.isArray((previous as any).children)
+      && (previous as any).children.length === 1
+      && (previous as any).children[0]?.type === 'image'
+      ? result.pop() as ParsedNode & {
+          href?: string
+          title?: string | null
+          text?: string
+          children: ParsedNode[]
+          loading?: boolean
+        }
+      : null
+
+    const imageNode = previousLink
+      ? previousLink.children[0] as ParsedNode & { alt?: string, raw?: string }
+      : result.pop() as ParsedNode & { alt?: string, raw?: string }
+
+    if (!imageNode || imageNode.type !== 'image')
+      return false
+
+    const nextToken = tokens[i + 1]
+    let href = String(previousLink?.href ?? '')
+    let title: string | null = previousLink?.title == null ? null : String(previousLink.title)
+    let loading = true
+
+    if (nextToken?.type === 'link_open') {
+      const { node, nextIndex } = parseLinkToken(tokens, i + 1, options as any)
+      href = node.href
+      title = node.title
+      loading = true
+      i = nextIndex
+    }
+    else {
+      href = content.slice(2)
+      if (href.includes('"')) {
+        const parts = href.split('"')
+        href = String(parts[0] ?? '').trim()
+        title = parts[1] == null ? null : String(parts[1]).trim()
+      }
+      i++
+    }
+
+    const linkNode = buildLoadingOuterImageLinkNode(imageNode as ParsedNode & { alt?: string, raw?: string }, href, title) as ParsedNode & { loading?: boolean }
+    linkNode.loading = loading
+    pushParsed(linkNode)
+    return true
+  }
+
+  function shouldTreatLinkOpenAsTextInEscapedOuterImageTail() {
+    const outerOpenToken = tokens[i - 3]
+    return (
+      tokens[i - 2]?.type === 'image'
+      && tokens[i - 1]?.type === 'text'
+      && String(tokens[i - 1].content ?? '') === ']('
+      && outerOpenToken?.type === 'text'
+      && String(outerOpenToken.content ?? '').endsWith('[')
+      && hasEscapedMarkup(outerOpenToken, '\\[')
+    )
   }
 
   function handleInlineLinkContent(content: string, _token: MarkdownToken): boolean {
@@ -1285,19 +1586,21 @@ export function parseInlineTokens(
       return false
 
     const textNodeContent = content.slice(0, imageStart)
-    if (!currentTextNode) {
+    if (textNodeContent && !currentTextNode) {
       currentTextNode = {
         type: 'text',
         content: textNodeContent,
         raw: textNodeContent,
       }
     }
-    else {
+    else if (textNodeContent && currentTextNode) {
       currentTextNode.content += textNodeContent
     }
-    result.push(currentTextNode)
-    currentTextNode = null // Reset current text node
-    pushParsed(parseImageToken(token, true) as ParsedNode)
+    if (currentTextNode) {
+      result.push(currentTextNode)
+      currentTextNode = null
+    }
+    pushParsed(buildLoadingImageNodeFromRaw(content.slice(imageStart)))
     i++
     return true
   }

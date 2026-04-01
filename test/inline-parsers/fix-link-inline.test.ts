@@ -572,4 +572,190 @@ describe('inline parser fixes (link mid-states)', () => {
       expect(texts, `prefix(${i}): ${chunk}`).not.toContain('(http')
     }
   })
+
+  it('keeps streaming markdown images as image loading nodes instead of flipping to links', () => {
+    const full = '![Picture](https://imzbf.github.io/md-editor-rt/imgs/mark_emoji.gif)'
+
+    const earlyNodes = parseMarkdownToStructure(full.slice(0, 2), md, { final: false })
+    expect(collectTarget(earlyNodes as any[], 'image')).toHaveLength(1)
+    expect(collectLinks(earlyNodes as any[])).toHaveLength(0)
+
+    for (const chunk of [full.slice(0, 20), full.slice(0, 60)]) {
+      const nodes = parseMarkdownToStructure(chunk, md, { final: false })
+      const images = collectTarget(nodes as any[], 'image')
+      const links = collectLinks(nodes as any[])
+
+      expect(images.length, chunk).toBe(1)
+      expect(images[0].loading, chunk).toBe(true)
+      expect(images[0].alt, chunk).toBe('Picture')
+      expect(links, chunk).toHaveLength(0)
+    }
+
+    const finalNodes = parseMarkdownToStructure(full, md, { final: true })
+    const finalImages = collectTarget(finalNodes as any[], 'image')
+    const finalLinks = collectLinks(finalNodes as any[])
+
+    expect(finalImages).toHaveLength(1)
+    expect(finalImages[0].loading).toBe(false)
+    expect(finalImages[0].src).toBe('https://imzbf.github.io/md-editor-rt/imgs/mark_emoji.gif')
+    expect(finalImages[0].alt).toBe('Picture')
+    expect(finalLinks).toHaveLength(0)
+  })
+
+  it('does not turn escaped exclamation plus link into an image mid-state', () => {
+    const nodes = parseMarkdownToStructure('\\![Picture](https://imzbf.github.io/md-editor-rt/imgs/mark_emoji.gif', md, { final: false })
+    const images = collectTarget(nodes as any[], 'image')
+    const links = collectLinks(nodes as any[])
+    const texts = collectTarget(nodes as any[], 'text').map((t: any) => String(t.content ?? '')).join('')
+
+    expect(images).toHaveLength(0)
+    expect(links).toHaveLength(1)
+    expect(texts).toContain('!')
+  })
+
+  it('keeps nested image links as loading links when the outer link has just started', () => {
+    const veryEarlyMarkdown = '[![P'
+    const veryEarlyNodes = parseMarkdownToStructure(veryEarlyMarkdown, md, { final: false })
+    const veryEarlyImages = collectTarget(veryEarlyNodes as any[], 'image')
+    const veryEarlyLinks = collectLinks(veryEarlyNodes as any[])
+    const veryEarlyTexts = collectTarget(veryEarlyNodes as any[], 'text')
+
+    expect(veryEarlyImages).toHaveLength(1)
+    expect(veryEarlyLinks).toHaveLength(1)
+    expect(veryEarlyLinks[0].loading).toBe(true)
+    expect(veryEarlyLinks[0].href).toBe('')
+    expect(veryEarlyLinks[0].children[0].type).toBe('image')
+    expect(veryEarlyTexts).toHaveLength(0)
+
+    const hrefEarlyMarkdown = '[![Picture](https://img'
+    const hrefEarlyNodes = parseMarkdownToStructure(hrefEarlyMarkdown, md, { final: false })
+    const hrefEarlyImages = collectTarget(hrefEarlyNodes as any[], 'image')
+    const hrefEarlyLinks = collectLinks(hrefEarlyNodes as any[])
+    const hrefEarlyTexts = collectTarget(hrefEarlyNodes as any[], 'text')
+
+    expect(hrefEarlyImages).toHaveLength(1)
+    expect(hrefEarlyLinks).toHaveLength(1)
+    expect(hrefEarlyLinks[0].loading).toBe(true)
+    expect(hrefEarlyLinks[0].href).toBe('')
+    expect(hrefEarlyLinks[0].children[0].type).toBe('image')
+    expect(hrefEarlyTexts).toHaveLength(0)
+
+    const earlyMarkdown = '[![Picture](https://img)'
+    const earlyNodes = parseMarkdownToStructure(earlyMarkdown, md, { final: false })
+    const earlyImages = collectTarget(earlyNodes as any[], 'image')
+    const earlyLinks = collectLinks(earlyNodes as any[])
+    const earlyTexts = collectTarget(earlyNodes as any[], 'text')
+
+    expect(earlyImages).toHaveLength(1)
+    expect(earlyLinks).toHaveLength(1)
+    expect(earlyLinks[0].loading).toBe(true)
+    expect(earlyLinks[0].href).toBe('')
+    expect(earlyLinks[0].children).toHaveLength(1)
+    expect(earlyLinks[0].children[0].type).toBe('image')
+    expect(earlyTexts).toHaveLength(0)
+
+    const markdown = '[![Picture](https://img)]('
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+    const images = collectTarget(nodes as any[], 'image')
+    const links = collectLinks(nodes as any[])
+    const texts = collectTarget(nodes as any[], 'text')
+
+    expect(images).toHaveLength(1)
+    expect(links).toHaveLength(1)
+    expect(links[0].loading).toBe(true)
+    expect(links[0].href).toBe('')
+    expect(links[0].children).toHaveLength(1)
+    expect(links[0].children[0].type).toBe('image')
+    expect(texts).toHaveLength(0)
+  })
+
+  it('preserves text before a nested image link while the outer link is incomplete', () => {
+    const markdown = 'prefix [![Picture](https://img)'
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+    const images = collectTarget(nodes as any[], 'image')
+    const links = collectLinks(nodes as any[])
+    const texts = collectTarget(nodes as any[], 'text').map((t: any) => String(t.content ?? ''))
+
+    expect(images).toHaveLength(1)
+    expect(links).toHaveLength(1)
+    expect(links[0].loading).toBe(true)
+    expect(links[0].children).toHaveLength(1)
+    expect(links[0].children[0].type).toBe('image')
+    expect(texts.join('')).toBe('prefix ')
+  })
+
+  it('preserves text before very early nested image links', () => {
+    const markdown = 'prefix [![P'
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+    const images = collectTarget(nodes as any[], 'image')
+    const links = collectLinks(nodes as any[])
+    const texts = collectTarget(nodes as any[], 'text').map((t: any) => String(t.content ?? ''))
+
+    expect(images).toHaveLength(1)
+    expect(links).toHaveLength(1)
+    expect(links[0].loading).toBe(true)
+    expect(links[0].children[0].type).toBe('image')
+    expect(texts.join('')).toBe('prefix ')
+  })
+
+  it('does not turn escaped outer brackets before images into nested image links', () => {
+    for (const markdown of [
+      '\\[![P',
+      '\\[![Picture](https://img',
+      '\\[![Picture](https://img)',
+      '\\[![Picture](https://img)](',
+      '\\[![Picture](https://img)](https://outer',
+    ]) {
+      const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+      const images = collectTarget(nodes as any[], 'image')
+      const links = collectLinks(nodes as any[])
+      const texts = collectTarget(nodes as any[], 'text').map((t: any) => String(t.content ?? '')).join('')
+
+      expect(images.length, markdown).toBe(1)
+      expect(links.length, markdown).toBe(0)
+      expect(texts, markdown).toContain('[')
+    }
+  })
+
+  it('preserves prefix text for escaped outer brackets before images', () => {
+    const markdown = 'prefix \\[![Picture](https://img'
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+    const images = collectTarget(nodes as any[], 'image')
+    const links = collectLinks(nodes as any[])
+    const texts = collectTarget(nodes as any[], 'text').map((t: any) => String(t.content ?? '')).join('')
+
+    expect(images).toHaveLength(1)
+    expect(links).toHaveLength(0)
+    expect(texts).toBe('prefix [')
+  })
+
+  it('still allows double escaped outer bracket sequences to form real nested image links', () => {
+    const markdown = '\\\\[![Picture](https://img'
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+    const images = collectTarget(nodes as any[], 'image')
+    const links = collectLinks(nodes as any[])
+    const texts = collectTarget(nodes as any[], 'text').map((t: any) => String(t.content ?? '')).join('')
+
+    expect(images).toHaveLength(1)
+    expect(links).toHaveLength(1)
+    expect(links[0].loading).toBe(true)
+    expect(links[0].children[0].type).toBe('image')
+    expect(texts).toBe('\\')
+  })
+
+  it('keeps nested image links as loading links while the outer href streams', () => {
+    const markdown = '[![Picture](https://img)](https://outer'
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false })
+    const images = collectTarget(nodes as any[], 'image')
+    const links = collectLinks(nodes as any[])
+    const texts = collectTarget(nodes as any[], 'text')
+
+    expect(images).toHaveLength(1)
+    expect(links).toHaveLength(1)
+    expect(links[0].loading).toBe(true)
+    expect(links[0].href).toBe('https://outer')
+    expect(links[0].children).toHaveLength(1)
+    expect(links[0].children[0].type).toBe('image')
+    expect(texts).toHaveLength(0)
+  })
 })
