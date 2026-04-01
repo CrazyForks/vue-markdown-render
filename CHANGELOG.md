@@ -1,4 +1,4 @@
-## [0.0.10-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.10-beta.5) (2026-03-31)
+## [0.0.10-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.10-beta.6) (2026-04-01)
 
 
 ### Bug Fixes
