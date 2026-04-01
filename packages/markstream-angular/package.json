@@ -1,7 +1,7 @@
 {
   "name": "markstream-angular",
   "type": "module",
-  "version": "0.0.1-alpha.10",
+  "version": "0.0.1",
   "description": "Experimental Angular Markdown renderer for Markstream, built on stream-markdown AST and a stable HTML baseline renderer.",
   "author": "Simon He",
   "license": "MIT",
