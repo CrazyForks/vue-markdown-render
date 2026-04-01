@@ -1,6 +1,7 @@
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { RenderContext } from '../types'
 import React from 'react'
+import { STANDARD_HTML_TAGS } from 'stream-markdown-parser'
 import { AdmonitionNode } from '../components/AdmonitionNode/AdmonitionNode'
 import { BlockquoteNode } from '../components/BlockquoteNode/BlockquoteNode'
 import { CheckboxNode } from '../components/CheckboxNode/CheckboxNode'
@@ -153,24 +154,44 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
 
   if (node.type === 'html_block' || node.type === 'html_inline') {
     const tag = String((node as any).tag ?? '').trim().toLowerCase() || getHtmlTagFromContent((node as any).content)
-    const customForTag = tag ? (customComponents as Record<string, any>)[tag] : null
-    if (customForTag) {
-      const coerced = {
-        ...(node as any),
-        type: tag,
-        tag,
-        content: stripCustomHtmlWrapper((node as any).content, tag),
+    if (tag) {
+      const customForTag = (customComponents as Record<string, any>)[tag]
+      // Check if tag is whitelisted in customHtmlTags
+      const customHtmlTags = ctx.customHtmlTags ?? []
+      const isWhitelisted = customHtmlTags.some((t: string) => t.toLowerCase() === tag)
+      if (isWhitelisted && customForTag) {
+        const coerced = {
+          ...(node as any),
+          type: tag,
+          tag,
+          content: stripCustomHtmlWrapper((node as any).content, tag),
+        }
+        return React.createElement(customForTag as any, {
+          key,
+          node: coerced,
+          customId: ctx.customId,
+          isDark: ctx.isDark,
+          ctx,
+          renderNode,
+          indexKey: key,
+          typewriter: ctx.typewriter,
+        })
       }
-      return React.createElement(customForTag as any, {
-        key,
-        node: coerced,
-        customId: ctx.customId,
-        isDark: ctx.isDark,
-        ctx,
-        renderNode,
-        indexKey: key,
-        typewriter: ctx.typewriter,
-      })
+      // Non-whitelisted, non-standard HTML tag: render as plain text
+      // Only escape if: not in whitelist, not standard HTML, AND no custom component registered
+      if (!isWhitelisted && !STANDARD_HTML_TAGS.has(tag) && !customForTag) {
+        const rawContent = String((node as any).content ?? (node as any).raw ?? '')
+        const escapedContent = rawContent
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+        if (node.type === 'html_inline') {
+          return <TextNode key={key} node={{ type: 'text', content: escapedContent, raw: escapedContent } as any} ctx={ctx} indexKey={key} typewriter={ctx.typewriter} />
+        }
+        else {
+          return <ParagraphNode key={key} node={{ type: 'paragraph', children: [{ type: 'text', content: escapedContent, raw: escapedContent }], raw: escapedContent } as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} />
+        }
+      }
     }
   }
 

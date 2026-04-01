@@ -70,6 +70,7 @@ export interface RenderContext {
   textStreamState?: Map<string, string>
   streamRenderVersion?: number
   customComponents?: Record<string, React.ComponentType<any>>
+  customHtmlTags?: readonly string[]
   codeBlockProps?: NodeRendererCodeBlockProps
   mermaidProps?: Partial<Omit<MermaidBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   d2Props?: Partial<Omit<D2BlockNodeProps, 'node' | 'loading' | 'isDark'>>

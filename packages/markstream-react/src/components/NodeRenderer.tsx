@@ -882,6 +882,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     textStreamState: textStreamStateRef.current,
     streamRenderVersion: streamRenderVersionRef.current,
     customComponents,
+    customHtmlTags: props.customHtmlTags,
     showTooltips: props.showTooltips,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
     codeBlockStream: props.codeBlockStream,
