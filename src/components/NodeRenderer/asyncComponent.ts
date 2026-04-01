@@ -13,15 +13,14 @@ type MathInlineFallbackProps = MathInlineNodeProps & Record<string, unknown>
 type MathBlockFallbackProps = MathBlockNodeProps & Record<string, unknown>
 
 function getProcessEnv() {
-  if (typeof globalThis === 'undefined' || !('process' in globalThis))
-    return undefined
-  return (globalThis as { process?: ProcessLike }).process
+  const processValue = Reflect.get(globalThis, 'process') as ProcessLike | undefined
+  return processValue?.env
 }
 
 export const MathInlineNodeAsync = defineAsyncComponent(async () => {
   // In test environment prefer the simple text fallback to avoid
   // race conditions with workers/KaTeX rendering.
-  const isTestEnv = getProcessEnv()?.env?.NODE_ENV === 'test'
+  const isTestEnv = getProcessEnv()?.NODE_ENV === 'test'
   if (isTestEnv && typeof window !== 'undefined') {
     return (props: MathInlineFallbackProps) => {
       // test fallback should be deterministic and minimal

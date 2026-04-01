@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { MarkdownIt, ParsedNode } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { CustomComponents } from '../../types'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
@@ -58,12 +58,11 @@ interface IdleDeadlineLike {
 }
 
 type RendererAttrs = Record<string, unknown> & {
-  showTooltips?: unknown
+  'showTooltips'?: unknown
   'show-tooltips'?: unknown
 }
 
 type RendererParseOptions = NonNullable<NodeRendererProps['parseOptions']>
-type RendererCodeBlockProps = NonNullable<NodeRendererProps['codeBlockProps']>
 type RuntimeCodeBlockNode = ParsedNode & {
   type: 'code_block'
   language?: string
@@ -2119,7 +2118,7 @@ const renderedItems = computed(() => {
     // nodes (via the `nodes` prop) that were not parsed with
     // `customHtmlTags`, so their type is still `html_block`/`html_inline`
     // but the tag references a known custom component.
-  if (
+    if (
       (node.type === 'html_block' || node.type === 'html_inline')
       && component === nodeComponents[node.type]
     ) {

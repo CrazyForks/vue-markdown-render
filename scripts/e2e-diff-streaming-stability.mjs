@@ -216,7 +216,8 @@ async function main() {
             if (b.visibleHeight !== a.visibleHeight)
               return b.visibleHeight - a.visibleHeight
             return a.distance - b.distance
-          })[0]?.root ?? null
+          })[0]
+          ?.root ?? null
         const block = diffRoot?.closest('.code-block-container') ?? null
         const diffRootDataset = diffRoot
           ? {
@@ -449,7 +450,7 @@ async function main() {
           .map((element) => {
             const style = getComputedStyle(element)
             const visibleLines = Array.from(
-              element.querySelectorAll<HTMLElement>('.view-line'),
+              element.querySelectorAll < HTMLElement > ('.view-line'),
             ).filter((line) => {
               const lineRect = line.getBoundingClientRect()
               const lineStyle = getComputedStyle(line)
@@ -460,7 +461,7 @@ async function main() {
                 && Number.parseFloat(lineStyle.opacity || '1') > 0.01
             }).length
             const tops = Array.from(
-              element.querySelectorAll<HTMLElement>('.view-line'),
+              element.querySelectorAll < HTMLElement > ('.view-line'),
             )
               .map((line) => {
                 const lineRect = line.getBoundingClientRect()

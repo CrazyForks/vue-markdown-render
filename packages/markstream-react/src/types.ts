@@ -1,9 +1,9 @@
 import type React from 'react'
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type {
-  CodeBlockNodeProps,
   CodeBlockMonacoOptions,
   CodeBlockMonacoTheme,
+  CodeBlockNodeProps,
   D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,

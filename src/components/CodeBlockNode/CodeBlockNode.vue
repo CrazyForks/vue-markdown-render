@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CodeBlockMonacoTheme, CodeBlockNodeProps } from '../../types/component-props'
+import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLike, MonacoNamespaceLike, MonacoRuntimeOptions } from './monaco'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onUnmounted, ref, watch } from 'vue'
@@ -13,11 +14,7 @@ import PreCodeNode from '../PreCodeNode'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
 import {
   getUseMonaco,
-  type MonacoDiffEditorViewLike,
-  type MonacoDisposableLike,
-  type MonacoEditorViewLike,
-  type MonacoNamespaceLike,
-  type MonacoRuntimeOptions,
+
 } from './monaco'
 import { scheduleGlobalMonacoTheme } from './monacoThemeScheduler'
 
