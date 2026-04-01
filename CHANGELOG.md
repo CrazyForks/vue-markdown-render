@@ -1,4 +1,4 @@
-## [0.0.10-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.10-beta.6) (2026-04-01)
+## [0.0.10](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.10) (2026-04-01)
 
 
 ### Bug Fixes
@@ -14,6 +14,7 @@
 * add type declarations for markdown-it plugins ([ec1517c](https://github.com/Simon-He95/markstream-vue/commit/ec1517c852d74df04c5632b42cebe89607027060))
 * address code review feedback - Angular error state and lint fix ([074e8c4](https://github.com/Simon-He95/markstream-vue/commit/074e8c46595a594ab4a1f87c04e31cc9e963df26))
 * align angular thinking fade with vue ([eefe7bf](https://github.com/Simon-He95/markstream-vue/commit/eefe7bf552aa0b3f93c57e0b16fdedf6731f6590))
+* align custom html tag handling across renderers ([9293a03](https://github.com/Simon-He95/markstream-vue/commit/9293a038d88055b9a1261b1345d0014e77bbaf4c))
 * align plaintext monaco dark fallback ([37d6b5f](https://github.com/Simon-He95/markstream-vue/commit/37d6b5fbed02a3d39c9ff5c60edb8fe22fc283d4))
 * align react playground chat layout with vue ([ee8af05](https://github.com/Simon-He95/markstream-vue/commit/ee8af054a6ae6006243bae6ff2ff2e6148ac5ea3))
 * align streaming fade across packages and playgrounds ([6ef4a22](https://github.com/Simon-He95/markstream-vue/commit/6ef4a22aba4c196250fa5da85b429adc31da3c33))
@@ -66,6 +67,7 @@
 * **netlify.toml:** remove playground-nuxt from build command ([28e22ea](https://github.com/Simon-He95/markstream-vue/commit/28e22eac3832f269acf7387f090fea62bfce82b1))
 * **netlify.toml:** update build command to include markstream-vue ([91ecf00](https://github.com/Simon-He95/markstream-vue/commit/91ecf00642e350b0b7a8074aa71aae902ba8837d))
 * **netlify.toml:** update publish path to correct directory ([6bf3710](https://github.com/Simon-He95/markstream-vue/commit/6bf371089e06bf740ec64e71839999c76c7b3ce6))
+* non-whitelisted HTML tags cause content truncation ([4257b71](https://github.com/Simon-He95/markstream-vue/commit/4257b71e3a621de6e98d3fa74c382e89a56445ab))
 * normalize markdown code block language labels ([9fcb93c](https://github.com/Simon-He95/markstream-vue/commit/9fcb93cfdcbf5013c390723f267aeb5271c68360))
 * **nuxt.config.ts:** set nitro preset to static ([580e83e](https://github.com/Simon-He95/markstream-vue/commit/580e83e34487446d423e11b403c8f270240f70ac))
 * **parser:** avoid duplicated hardbreak prefix before math ([aa3e434](https://github.com/Simon-He95/markstream-vue/commit/aa3e4344373793f3b0616b570a2e56e61aab08af)), closes [#324](https://github.com/Simon-He95/markstream-vue/issues/324)
@@ -102,6 +104,7 @@
 * stabilize reference parsing and contrast ([357629a](https://github.com/Simon-He95/markstream-vue/commit/357629ad31fc304c2ce9f879bf3a3ddd19997e83)), closes [#327](https://github.com/Simon-He95/markstream-vue/issues/327)
 * stabilize streamed text updates across renderers ([3187fa3](https://github.com/Simon-He95/markstream-vue/commit/3187fa31aa39f5e50d64d96a946a157922f7c4ae))
 * stabilize streaming custom thinking parsing ([1019ea4](https://github.com/Simon-He95/markstream-vue/commit/1019ea4b3505c36e7df1483034d819b557061af4))
+* stabilize streaming image link parsing ([a4c60b7](https://github.com/Simon-He95/markstream-vue/commit/a4c60b778fc332cba0e793d3a101e885bfada1e4)), closes [#363](https://github.com/Simon-He95/markstream-vue/issues/363)
 * stabilize streaming mermaid previews ([88f20fb](https://github.com/Simon-He95/markstream-vue/commit/88f20fb217677d1dfe80c34d8b6faab6614bf6ff)), closes [#337](https://github.com/Simon-He95/markstream-vue/issues/337)
 * stabilize test panes and code block header actions ([cf7786d](https://github.com/Simon-He95/markstream-vue/commit/cf7786dd3b6d3be6f185302c265263dee43df965))
 * standardize class attribute syntax in list item components and tests ([71af12b](https://github.com/Simon-He95/markstream-vue/commit/71af12b1638456fdbaf809849f3f230ea9505de0))
