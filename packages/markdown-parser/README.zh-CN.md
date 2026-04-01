@@ -253,6 +253,7 @@ interface ParseOptions {
   preTransformTokens?: (tokens: Token[]) => Token[]
   postTransformTokens?: (tokens: Token[]) => Token[]
   // 自定义 HTML 类标签，作为自定义节点输出（如 ['thinking']）
+  // 请传标签式名字，比如 'thinking'、'answer-box'、'my_component'
   customHtmlTags?: string[]
   // 输出 link 节点前校验 href；返回 false 时降级为纯文本
   validateLink?: (url: string) => boolean
@@ -298,7 +299,7 @@ const nodes = parseMarkdownToStructure(
 
 ### 未知 HTML 类标签
 
-默认情况下，非标准的 HTML 类标签（例如 `<question>`）在完整闭合时会按原生 HTML 渲染（作为自定义元素输出）；流式场景下未闭合的片段会先按**纯文本**处理以避免闪烁。若希望它们作为自定义节点输出（`type: 'question'`，携带 attrs/content），需要在 `customHtmlTags` 中显式声明。
+默认情况下，非标准的 HTML 类标签（例如 `<question>`）在完整闭合时会按原生 HTML 渲染（作为自定义元素输出）。未闭合或格式不完整的片段会保持为**纯文本**，避免在流式或最终渲染时吞掉周围内容。若希望它们作为自定义节点输出（`type: 'question'`，携带 attrs/content），需要在 `customHtmlTags` 中显式声明。
 
 ### 工具函数
 

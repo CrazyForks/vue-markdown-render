@@ -79,7 +79,7 @@ setDefaultMathOptions({
 
 ### 未知 HTML 类标签（默认行为）
 
-默认情况下，非标准的 HTML 类标签（例如 `<question>`）在完整闭合后会按原生 HTML 渲染；流式场景下未闭合片段会先按**纯文本**处理以避免闪烁。
+默认情况下，非标准的 HTML 类标签（例如 `<question>`）在完整闭合后会按原生 HTML 渲染；未闭合或格式不完整的片段会保持为**纯文本**，避免吞掉周围内容。
 
 如果你希望某个自定义标签参与解析并产出自定义节点（以便 `setCustomComponents` 映射，并携带 attrs/content），请将其加入 `customHtmlTags`。
 

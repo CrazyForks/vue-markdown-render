@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { STANDARD_HTML_TAGS } from 'stream-markdown-parser'
+import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
 import { computed } from 'vue'
+import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText } from '../../utils/htmlRenderer'
 import { getCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmojiNode from '../EmojiNode'
@@ -63,12 +64,6 @@ function isImageOnlyLink(child: NodeChild) {
   return linkChildren.length === 1 && linkChildren[0]?.type === 'image'
 }
 
-function getHtmlTagFromContent(html: unknown) {
-  const raw = String(html ?? '')
-  const match = raw.match(/^\s*<\s*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
-}
-
 const meaningfulChildren = computed(() => props.node.children.filter(child => !isWhitespaceText(child)))
 
 const isMediaOnlyParagraph = computed(() => (
@@ -77,8 +72,7 @@ const isMediaOnlyParagraph = computed(() => (
 ))
 
 const customHtmlTagsSet = computed<Set<string>>(() => {
-  const tags = props.customHtmlTags ?? []
-  return new Set((tags as string[]).map(t => String(t).trim().toLowerCase()).filter(Boolean))
+  return new Set(normalizeCustomHtmlTags(props.customHtmlTags))
 })
 
 const renderedChildren = computed(() => {
@@ -144,28 +138,18 @@ const nodeComponents = {
 
 // Process children to handle non-whitelisted custom HTML tags
 function processChild(child: NodeChild): { child: NodeChild, component: any } {
-  // Handle html_block and html_inline nodes with non-whitelisted custom tags
   if (child.type === 'html_block' || child.type === 'html_inline') {
     const tag = String((child as any).tag ?? '').trim().toLowerCase()
       || getHtmlTagFromContent((child as any).content)
 
-    // Check if there's a registered custom component for this tag
-    const hasCustomComponent = (overrides as any)[tag]
-
-    // Only escape if: tag exists, not in whitelist, not standard HTML, AND no custom component registered
-    if (tag && !customHtmlTagsSet.value.has(tag) && !STANDARD_HTML_TAGS.has(tag) && !hasCustomComponent) {
-      // Non-whitelisted, non-standard HTML tag: render as plain text
+    if (tag && !customHtmlTagsSet.value.has(tag) && shouldRenderUnknownHtmlTagAsText((child as any).content ?? (child as any).raw, tag)) {
       const rawContent = String((child as any).content ?? (child as any).raw ?? '')
-      const escapedContent = rawContent
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
 
       return {
         child: {
           type: 'text',
-          content: escapedContent,
-          raw: escapedContent,
+          content: rawContent,
+          raw: rawContent,
         } as NodeChild,
         component: TextNode,
       }
@@ -186,9 +170,9 @@ function processChild(child: NodeChild): { child: NodeChild, component: any } {
         {{ getTextContent(child) }}
       </template>
       <component
-        :is="processChild(child, index).component"
+        :is="processChild(child).component"
         v-else
-        v-bind="getChildProps(processChild(child, index).child, index)"
+        v-bind="getChildProps(processChild(child).child, index)"
       />
     </template>
   </p>

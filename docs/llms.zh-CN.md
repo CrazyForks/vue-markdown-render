@@ -184,7 +184,7 @@
 
 - 表述： “自定义 tag”, “嵌组件”
 - 步骤：
-  - 通过 `customHtmlTags` / `custom-html-tags` 声明自定义标签（未知标签闭合后按原生 HTML 渲染；流式未闭合片段按纯文本）
+  - 通过 `customHtmlTags` / `custom-html-tags` 声明自定义标签（未知标签闭合后按原生 HTML 渲染；未闭合或格式不完整的片段按纯文本）
   - 用 `setCustomComponents(customId, mapping)` 映射渲染
 - 最小追问： “tag 名称有哪些？希望按 HTML 透传还是自定义 node type？”
 - 文档：`docs/guide/advanced.md`, `docs/guide/parser-api.md`

@@ -1,5 +1,7 @@
 import type { InlineCodeNode, MarkdownToken, ParsedNode } from '../../types'
 import { VOID_HTML_TAGS } from '../../htmlTags'
+import { parseTagAttrs } from '../../htmlTagUtils'
+import { normalizeCustomTag } from '../customHtmlTags'
 import { buildAllowedHtmlTagSet } from '../index'
 
 type ParseInlineTokensFn = (
@@ -40,14 +42,6 @@ function isSelfClosing(tag: string, html: string) {
   return /\/\s*>\s*$/.test(html) || VOID_HTML_TAGS.has(tag)
 }
 
-function normalizeCustomTag(t: unknown) {
-  const raw = String(t ?? '').trim()
-  if (!raw)
-    return ''
-  const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
-  return m ? m[1].toLowerCase() : ''
-}
-
 function getTagSets(customTags?: readonly string[]) {
   if (!customTags || customTags.length === 0)
     return getEmptyTagSets()
@@ -75,20 +69,6 @@ function tokenToRaw(token: MarkdownToken) {
 }
 
 type AttrTuple = [string, string]
-
-function parseTagAttrs(openTag: string): AttrTuple[] {
-  const attrs: AttrTuple[] = []
-  const attrRegex = /\s([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
-  let match
-  while ((match = attrRegex.exec(openTag)) !== null) {
-    const attrName = match[1]
-    if (!attrName)
-      continue
-    const attrValue = match[2] || match[3] || match[4] || ''
-    attrs.push([attrName, attrValue])
-  }
-  return attrs
-}
 
 function getAttrValue(attrs: AttrTuple[], name: string): string | undefined {
   const lowerName = name.toLowerCase()

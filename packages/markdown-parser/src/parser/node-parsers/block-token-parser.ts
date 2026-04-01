@@ -1,4 +1,6 @@
 import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions, VmrContainerNode } from '../../types'
+import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes } from '../../htmlTagUtils'
+import { normalizeCustomTag } from '../customHtmlTags'
 import { buildAllowedHtmlTagSet } from '../index'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseFenceToken } from '../inline-parsers/fence-parser'
@@ -29,14 +31,6 @@ function getEmptyHtmlTagSets() {
     }
   }
   return emptyHtmlTagSets
-}
-
-function normalizeCustomTag(t: unknown) {
-  const raw = String(t ?? '').trim()
-  if (!raw)
-    return ''
-  const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
-  return m ? m[1].toLowerCase() : ''
 }
 
 function getHtmlTagSets(customTags?: readonly string[]) {
@@ -170,29 +164,6 @@ function parseVmrContainer(
   return [containerNode, hasCloseToken ? (j + 1) : j]
 }
 
-function findTagCloseIndexOutsideQuotes(input: string) {
-  let inSingle = false
-  let inDouble = false
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i]
-    if (ch === '\\') {
-      i++
-      continue
-    }
-    if (!inDouble && ch === '\'') {
-      inSingle = !inSingle
-      continue
-    }
-    if (!inSingle && ch === '"') {
-      inDouble = !inDouble
-      continue
-    }
-    if (!inSingle && !inDouble && ch === '>')
-      return i
-  }
-  return -1
-}
-
 function stripWrapperNewlines(s: string) {
   // Preserve inner whitespace/indentation, but drop a single leading/trailing newline
   // introduced by the common pattern: <tag>\n...\n</tag>
@@ -206,10 +177,6 @@ function stripTrailingPartialClosingTag(inner: string, tag: string) {
   return inner.replace(re, '')
 }
 
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
 function findMatchingCloseTagRange(
   rawHtml: string,
   tag: string,
@@ -219,8 +186,8 @@ function findMatchingCloseTagRange(
     return null
 
   const lowerTag = tag.toLowerCase()
-  const openTagRe = new RegExp(String.raw`^<\s*${escapeRegex(lowerTag)}(?=\s|>|/)`, 'i')
-  const closeTagRe = new RegExp(String.raw`^<\s*\/\s*${escapeRegex(lowerTag)}(?=\s|>)`, 'i')
+  const openTagRe = new RegExp(String.raw`^<\s*${escapeTagForRegExp(lowerTag)}(?=\s|>|/)`, 'i')
+  const closeTagRe = new RegExp(String.raw`^<\s*\/\s*${escapeTagForRegExp(lowerTag)}(?=\s|>)`, 'i')
 
   let depth = 0
   let index = Math.max(0, startIndex)

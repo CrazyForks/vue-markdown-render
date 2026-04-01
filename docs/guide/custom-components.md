@@ -12,6 +12,9 @@ The recommended path is:
 2. map the resulting node type with `setCustomComponents`
 3. keep the mapping scoped with `custom-id`
 
+Use tag-like names in `custom-html-tags`, for example `thinking`, `answer-box`, or `my_component`.
+Namespaced forms like `foo:bar` are ignored. Built-in override keys such as `code_block` stay reserved for node renderer overrides, so trusted custom tags should still be declared explicitly via `custom-html-tags`.
+
 Reach for parser hooks only after this flow stops being enough.
 
 If these tags live inside a docs site or VitePress theme, pair this page with [Docs Site & VitePress](/guide/vitepress-docs-integration) so the theme-level registration and CSS order stay in one place.

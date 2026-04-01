@@ -36,8 +36,9 @@ export type { MathOptions } from './config'
 export type { MarkdownIt }
 
 // Re-export utilities
+export * from './customHtmlTags'
 export { findMatchingClose } from './findMatchingClose'
-
+export * from './htmlRenderUtils'
 export * from './htmlTags'
 export { parseFenceToken } from './parser/inline-parsers/fence-parser'
 

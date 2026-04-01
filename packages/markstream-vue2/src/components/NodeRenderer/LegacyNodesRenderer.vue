@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BaseNode, ParsedNode } from 'stream-markdown-parser'
-import { STANDARD_HTML_TAGS } from 'stream-markdown-parser'
+import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
 import { computed } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -31,7 +31,7 @@ import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
-import { getHtmlTagFromContent } from '../../utils/htmlRenderer'
+import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
@@ -126,10 +126,7 @@ const listBindings = computed(() => ({
 }))
 // Set of effective custom HTML tags (normalised to lowercase).
 const effectiveCustomHtmlTagsSet = computed<Set<string>>(() => {
-  const tags = props.customHtmlTags ?? []
-  return new Set(
-    (tags as string[]).map(t => String(t).trim().toLowerCase()).filter(Boolean),
-  )
+  return new Set(normalizeCustomHtmlTags(props.customHtmlTags))
 })
 
 const renderedItems = computed(() => {
@@ -163,28 +160,22 @@ const renderedItems = computed(() => {
             } as ParsedNode
           }
         }
-        else if (!STANDARD_HTML_TAGS.has(tag)) {
-          // Non-whitelisted, non-standard HTML tag: render as plain text
-          // Escape HTML entities so the tag itself is displayed literally
+        else if (shouldRenderUnknownHtmlTagAsText((node as any).content ?? (node as any).raw, tag)) {
           const rawContent = String((node as any).content ?? (node as any).raw ?? '')
-          const escapedContent = rawContent
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
           if (node.type === 'html_inline') {
             component = TextNode
             node = {
               type: 'text',
-              content: escapedContent,
-              raw: escapedContent,
+              content: rawContent,
+              raw: rawContent,
             } as ParsedNode
           }
           else {
             component = ParagraphNode
             node = {
               type: 'paragraph',
-              children: [{ type: 'text', content: escapedContent, raw: escapedContent }],
-              raw: escapedContent,
+              children: [{ type: 'text', content: rawContent, raw: rawContent }],
+              raw: rawContent,
             } as ParsedNode
           }
         }
@@ -206,16 +197,6 @@ const renderedItems = computed(() => {
     }
   })
 })
-
-function stripCustomHtmlWrapper(html: unknown, tag: string) {
-  const raw = String(html ?? '')
-  if (!tag)
-    return raw
-  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const openRe = new RegExp(String.raw`^\s*<\s*${escaped}(?:\s[^>]*)?>\s*`, 'i')
-  const closeRe = new RegExp(String.raw`\s*<\s*\/\s*${escaped}\s*>\s*$`, 'i')
-  return raw.replace(openRe, '').replace(closeRe, '')
-}
 
 function getCodeBlockLanguage(node: ParsedNode) {
   return node?.type === 'code_block'

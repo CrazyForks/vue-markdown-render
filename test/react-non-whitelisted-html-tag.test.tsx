@@ -105,6 +105,29 @@ describe('react: non-whitelisted custom HTML tags', () => {
     root.unmount()
   })
 
+  it('renders closed non-whitelisted custom tag as raw HTML', async () => {
+    const scopeId = 'react-closed-unknown-tag'
+    const markdown = `<echat-url>content</echat-url>`
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          content: markdown,
+          customId: scopeId,
+          final: true,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.innerHTML).toMatch(/<echat-url[^>]*>content<\/echat-url>/i)
+
+    root.unmount()
+  })
+
   it('renders non-whitelisted custom tag content correctly', async () => {
     const scopeId = 'react-non-whitelisted-content'
     // Non-whitelisted tags should still show their content
@@ -166,10 +189,9 @@ describe('react: non-whitelisted custom HTML tags', () => {
     root.unmount()
   })
 
-  it('renders non-whitelisted tag literally with HTML entities', async () => {
-    // Non-whitelisted tags should display as literal text, not empty nodes
+  it('renders incomplete non-whitelisted tag literally as text', async () => {
     const scopeId = 'react-literal-tag-display'
-    const markdown = `<echat-url>content</echat-url>`
+    const markdown = `<echat-url>content`
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
@@ -187,14 +209,9 @@ describe('react: non-whitelisted custom HTML tags', () => {
     await flushReact()
 
     const html = host.innerHTML
-    // The content is double-escaped:
-    // 1. renderNode escapes: <echat-url> → &lt;echat-url&gt;
-    // 2. HTML display escapes: &lt; → &amp;lt;
-    // So we check for the double-escaped form
-    expect(html).toContain('&amp;lt;echat-url')
-    expect(html).toContain('&amp;lt;/echat-url')
+    expect(html).toContain('&lt;echat-url&gt;content')
+    expect(html).not.toContain('&amp;lt;')
     expect(html).toContain('content')
-    // Should NOT render as actual HTML element
     expect(html).not.toMatch(/<echat-url[^>]*>/i)
 
     root.unmount()

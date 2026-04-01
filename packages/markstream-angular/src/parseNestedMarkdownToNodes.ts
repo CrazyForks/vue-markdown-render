@@ -1,5 +1,5 @@
 import type { BaseNode, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { hydrateCustomTagContent } from './hydrateCustomTagContent'
 
 export interface NestedMarkdownNodesInput {
@@ -81,7 +81,7 @@ function resolveFinalFromNode(node?: (BaseNode & Record<string, any>) | null) {
 }
 
 function resolveMarkdownInstance(options: NestedMarkdownNodesOptions) {
-  const normalizedTags = mergeCustomHtmlTags(options.customHtmlTags)
+  const normalizedTags = mergeCustomHtmlTags(options.customHtmlTags, (options.parseOptions as any)?.customHtmlTags)
   const cacheKey = `${options.cacheKey || DEFAULT_CACHE_KEY}::${normalizedTags.join(',')}`
   let markdown = markdownCache.get(cacheKey)
 
@@ -95,31 +95,6 @@ function resolveMarkdownInstance(options: NestedMarkdownNodesOptions) {
   return options.customMarkdownIt
     ? options.customMarkdownIt(markdown)
     : markdown
-}
-
-function mergeCustomHtmlTags(...lists: Array<readonly string[] | undefined>) {
-  const seen = new Set<string>()
-  const normalized: string[] = []
-
-  for (const list of lists) {
-    for (const tag of list || []) {
-      const value = normalizeCustomTag(tag)
-      if (!value || seen.has(value))
-        continue
-      seen.add(value)
-      normalized.push(value)
-    }
-  }
-
-  return normalized
-}
-
-function normalizeCustomTag(value: unknown) {
-  const raw = String(value ?? '').trim()
-  if (!raw)
-    return ''
-  const match = raw.match(/^[<\s/]*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
 }
 
 function getNodeList(value: unknown) {

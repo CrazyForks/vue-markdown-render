@@ -87,7 +87,7 @@ These hooks are also available via `parseOptions` prop on the `MarkdownRender` c
 
 ### Unknown HTML-like tags (default behavior)
 
-Non-standard HTML-like tags (for example `<question>`) render as raw HTML elements once complete; during streaming, partial tags are kept as **literal text** to avoid flicker.
+Non-standard HTML-like tags (for example `<question>`) render as raw HTML elements once complete. Incomplete or malformed fragments are kept as **literal text** so they do not swallow surrounding content.
 
 If you want a custom tag to be emitted as a custom node (so it can be mapped via `setCustomComponents` with parsed attrs/content), add it to `customHtmlTags`.
 

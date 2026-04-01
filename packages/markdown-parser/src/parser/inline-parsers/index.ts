@@ -1065,7 +1065,7 @@ export function parseInlineTokens(
     if (handleInlineCodeContent(rawContent, token))
       return
 
-    if (handleInlineImageContent(content, token))
+    if (handleInlineImageContent(content))
       return
 
     // Avoid synthesizing links from raw text only when the next token is
@@ -1391,12 +1391,12 @@ export function parseInlineTokens(
       && (previous as any).children.length === 1
       && (previous as any).children[0]?.type === 'image'
       ? result.pop() as ParsedNode & {
-          href?: string
-          title?: string | null
-          text?: string
-          children: ParsedNode[]
-          loading?: boolean
-        }
+        href?: string
+        title?: string | null
+        text?: string
+        children: ParsedNode[]
+        loading?: boolean
+      }
       : null
 
     const imageNode = previousLink
@@ -1580,7 +1580,7 @@ export function parseInlineTokens(
     return false
   }
 
-  function handleInlineImageContent(content: string, token: MarkdownToken): boolean {
+  function handleInlineImageContent(content: string): boolean {
     const imageStart = content.indexOf('![')
     if (imageStart === -1)
       return false

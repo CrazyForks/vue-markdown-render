@@ -1,37 +1,11 @@
 <script lang="ts">
 import type { BaseNode, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
 import type { NodeRendererProps } from './NodeRenderer/NodeRenderer.vue'
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
 import { defineComponent } from 'vue-demi'
 import { isLegacyVue26Vm, resolveVueListeners } from '../utils/vue26'
 import NodeRenderer from './NodeRenderer'
 import LegacyNodesRenderer from './NodeRenderer/LegacyNodesRenderer.vue'
-
-function normalizeCustomTag(value: unknown) {
-  const raw = String(value ?? '').trim()
-  if (!raw)
-    return ''
-  const match = raw.match(/^[<\s/]*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
-}
-
-function resolveCustomHtmlTags(tags?: readonly string[]) {
-  if (!tags || tags.length === 0)
-    return { key: '', tags: [] as string[] }
-  const seen = new Set<string>()
-  const normalized: string[] = []
-  for (const tag of tags) {
-    const value = normalizeCustomTag(tag)
-    if (!value || seen.has(value))
-      continue
-    seen.add(value)
-    normalized.push(value)
-  }
-  return {
-    key: normalized.join(','),
-    tags: normalized,
-  }
-}
 
 export default defineComponent({
   name: 'MarkdownRender',
@@ -89,11 +63,7 @@ export default defineComponent({
     mergedParseOptions(): ParseOptions | undefined {
       const base = this.parseOptions ?? {}
       const resolvedFinal = this.final ?? (base as any).final
-      const propTags = this.customHtmlTags ?? []
-      const optionTags = (base as any).customHtmlTags ?? []
-      const merged = [...propTags, ...optionTags]
-        .map(normalizeCustomTag)
-        .filter(Boolean)
+      const merged = mergeCustomHtmlTags(this.customHtmlTags, (base as any).customHtmlTags)
       const hasFinal = resolvedFinal != null
       const hasCustom = merged.length > 0
       if (!hasFinal && !hasCustom)
@@ -101,7 +71,7 @@ export default defineComponent({
       return {
         ...(base as any),
         ...(hasFinal ? { final: resolvedFinal } : {}),
-        ...(hasCustom ? { customHtmlTags: Array.from(new Set(merged)) } : {}),
+        ...(hasCustom ? { customHtmlTags: merged } : {}),
       } as ParseOptions
     },
     parsedLegacyNodes(): BaseNode[] {
@@ -109,7 +79,7 @@ export default defineComponent({
         return this.nodes
       if (!this.content)
         return []
-      const { key, tags } = resolveCustomHtmlTags(this.customHtmlTags)
+      const { key, tags } = resolveCustomHtmlTags((this.mergedParseOptions as any)?.customHtmlTags)
       const markdown = getMarkdown(key ? `${this.instanceMsgId}:${key}` : this.instanceMsgId, {
         customHtmlTags: tags,
       })

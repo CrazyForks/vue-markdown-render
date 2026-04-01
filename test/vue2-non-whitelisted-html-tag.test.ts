@@ -92,9 +92,28 @@ describe('vue2: non-whitelisted custom HTML tags', () => {
     }
   })
 
+  it('renders closed non-whitelisted custom tag as raw HTML', async () => {
+    const scopeId = 'vue2-closed-unknown-tag'
+    const markdown = `<echat-url>content</echat-url>`
+    const wrapper = await mount(MarkdownRender, {
+      props: {
+        content: markdown,
+        customId: scopeId,
+        final: true,
+      },
+    })
+    await flushAll()
+    try {
+      const html = wrapper.html()
+      expect(html).toMatch(/<echat-url[^>]*>content<\/echat-url>/i)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
   it('renders non-whitelisted custom tag content correctly', async () => {
     const scopeId = 'vue2-non-whitelisted-content'
-    // Non-whitelisted tags should still show their content
     const markdown = `Hello <unknown-tag>world</unknown-tag>!`
     const wrapper = await mount(MarkdownRender, {
       props: {
@@ -106,11 +125,10 @@ describe('vue2: non-whitelisted custom HTML tags', () => {
     })
     await flushAll()
     try {
-      const text = normalizeText(wrapper.text())
-      // Content should be preserved
-      expect(text).toContain('Hello')
-      expect(text).toContain('world')
-      expect(text).toContain('!')
+      const html = wrapper.html()
+      expect(html).toContain('Hello')
+      expect(html).toMatch(/<unknown-tag[^>]*>world<\/unknown-tag>/i)
+      expect(html).toContain('!')
     }
     finally {
       wrapper.unmount()
@@ -145,10 +163,9 @@ describe('vue2: non-whitelisted custom HTML tags', () => {
     }
   })
 
-  it('renders non-whitelisted tag literally with HTML entities', async () => {
-    // Non-whitelisted tags should display as literal text, not empty nodes
+  it('renders incomplete non-whitelisted tag literally as text', async () => {
     const scopeId = 'vue2-literal-tag-display'
-    const markdown = `<echat-url>content</echat-url>`
+    const markdown = `<echat-url>content`
 
     const wrapper = await mount(MarkdownRender, {
       props: {
@@ -162,14 +179,9 @@ describe('vue2: non-whitelisted custom HTML tags', () => {
 
     try {
       const html = wrapper.html()
-      // The content is double-escaped:
-      // 1. processChild escapes: <echat-url> → &lt;echat-url&gt;
-      // 2. HTML display escapes: &lt; → &amp;lt;
-      // So we check for the double-escaped form
-      expect(html).toContain('&amp;lt;echat-url')
-      expect(html).toContain('&amp;lt;/echat-url')
+      expect(html).toContain('&lt;echat-url&gt;content')
+      expect(html).not.toContain('&amp;lt;')
       expect(html).toContain('content')
-      // Should NOT render as actual HTML element
       expect(html).not.toMatch(/<echat-url[^>]*>/i)
     }
     finally {
@@ -196,15 +208,13 @@ After list.`
     })
     await flushAll()
     try {
-      const text = normalizeText(wrapper.text())
-      // Before/after content should be preserved
-      expect(text).toContain('Before list')
-      expect(text).toContain('After list')
-      // List items should be complete
-      expect(text).toContain('Item with')
-      expect(text).toContain('inline content')
-      expect(text).toContain('and more text')
-      expect(text).toContain('Another item')
+      const html = wrapper.html()
+      expect(html).toContain('Before list')
+      expect(html).toContain('After list')
+      expect(html).toContain('Item with')
+      expect(html).toMatch(/<custom-tag[^>]*>inline content<\/custom-tag>/i)
+      expect(html).toContain('and more text')
+      expect(html).toContain('Another item')
     }
     finally {
       wrapper.unmount()

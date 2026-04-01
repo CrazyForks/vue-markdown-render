@@ -3,6 +3,7 @@ import type { MarkdownIt, ParseOptions } from 'stream-markdown-parser'
 import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, forwardRef, Input } from '@angular/core'
+import { mergeCustomHtmlTags } from 'stream-markdown-parser'
 import { parseNestedMarkdownToNodes } from '../../parseNestedMarkdownToNodes'
 import { NodeOutletComponent } from '../NodeOutlet/NodeOutlet.component'
 import { normalizeTokenAttrs } from '../shared/node-helpers'
@@ -135,14 +136,6 @@ export class NestedRendererComponent implements OnChanges {
   }
 
   private resolveCustomHtmlTags() {
-    const merged = new Set<string>()
-    for (const list of [this.context?.customHtmlTags, this.customHtmlTags]) {
-      for (const tag of list || []) {
-        const normalized = String(tag || '').trim()
-        if (normalized)
-          merged.add(normalized)
-      }
-    }
-    return Array.from(merged)
+    return mergeCustomHtmlTags(this.context?.customHtmlTags, this.customHtmlTags)
   }
 }

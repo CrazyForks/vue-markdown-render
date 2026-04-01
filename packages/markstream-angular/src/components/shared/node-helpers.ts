@@ -1,8 +1,24 @@
 import type { Type } from '@angular/core'
 import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme } from '../../types/monaco'
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import {
+  getHtmlTagFromContent,
+  getMarkdown,
+  hasCompleteHtmlTagContent,
+  normalizeCustomHtmlTags,
+  normalizeCustomHtmlTagName as normalizeTagName,
+  parseMarkdownToStructure,
+  stripCustomHtmlWrapper,
+} from 'stream-markdown-parser'
 import { hydrateCustomTagContent } from '../../hydrateCustomTagContent'
+
+export {
+  getHtmlTagFromContent,
+  hasCompleteHtmlTagContent,
+  normalizeCustomHtmlTags,
+  normalizeTagName,
+  stripCustomHtmlWrapper,
+}
 
 export type AngularRenderableNode = (ParsedNode | BaseNode) & Record<string, unknown>
 
@@ -249,29 +265,6 @@ export function getString(value: unknown): string {
       : String(value)
 }
 
-export function normalizeCustomHtmlTags(tags?: readonly string[]): string[] {
-  if (!tags || tags.length === 0)
-    return []
-  const seen = new Set<string>()
-  const normalized: string[] = []
-  for (const tag of tags) {
-    const value = normalizeTagName(tag)
-    if (!value || seen.has(value))
-      continue
-    seen.add(value)
-    normalized.push(value)
-  }
-  return normalized
-}
-
-export function normalizeTagName(value: unknown): string {
-  const raw = getString(value).trim()
-  if (!raw)
-    return ''
-  const match = raw.match(/^[<\s/]*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
-}
-
 export function isSafeAttrName(value: string): boolean {
   return /^[^\s"'<>`=]+$/.test(value) && !/^on/i.test(value)
 }
@@ -300,21 +293,6 @@ export function clampHeadingLevel(value: unknown): number {
 
 export function capitalize(value: string): string {
   return value ? `${value[0].toUpperCase()}${value.slice(1)}` : ''
-}
-
-export function getHtmlTagFromContent(html: unknown) {
-  const raw = String(html ?? '')
-  const match = raw.match(/^\s*<\s*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
-}
-
-export function stripCustomHtmlWrapper(html: unknown, tag: string) {
-  const raw = String(html ?? '')
-  if (!tag)
-    return raw
-  const openRe = new RegExp(String.raw`^\s*<\s*${tag}(?:\s[^>]*)?>\s*`, 'i')
-  const closeRe = new RegExp(String.raw`\s*<\s*\/\s*${tag}\s*>\s*$`, 'i')
-  return raw.replace(openRe, '').replace(closeRe, '')
 }
 
 export function normalizeCodeLanguage(raw: unknown) {

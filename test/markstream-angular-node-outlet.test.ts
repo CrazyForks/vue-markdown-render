@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { hasCompleteHtmlTagContent } from '../packages/markstream-angular/src/components/shared/node-helpers'
 import {
   coerceBuiltinHtmlNode,
   coerceCustomHtmlNode,
@@ -31,6 +32,11 @@ describe('markstream-angular NodeOutlet', () => {
     } as any
 
     expect((coerceBuiltinHtmlNode(node, 'html_block') as any).content).toBe('<details><summary>More</summary><p>Body</p></details>')
+  })
+
+  it('only escapes malformed unknown html tags', () => {
+    expect(hasCompleteHtmlTagContent('<question>ok</question>', 'question')).toBe(true)
+    expect(hasCompleteHtmlTagContent('<question>ok', 'question')).toBe(false)
   })
 
   it('routes heavy node props by code block mode', () => {

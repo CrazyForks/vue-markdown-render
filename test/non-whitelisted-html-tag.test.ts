@@ -92,6 +92,26 @@ describe('non-whitelisted custom HTML tags', () => {
     }
   })
 
+  it('renders closed non-whitelisted custom tag as raw HTML', async () => {
+    const scopeId = 'closed-unknown-tag'
+    const markdown = `<echat-url>content</echat-url>`
+    const wrapper = await mount(MarkdownRender, {
+      props: {
+        content: markdown,
+        customId: scopeId,
+        final: true,
+      },
+    })
+    await flushAll()
+    try {
+      const html = wrapper.html()
+      expect(html).toMatch(/<echat-url[^>]*>content<\/echat-url>/i)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
   it('renders non-whitelisted custom tag content correctly', async () => {
     const scopeId = 'non-whitelisted-content'
     // Non-whitelisted tags should still show their content
@@ -145,31 +165,24 @@ describe('non-whitelisted custom HTML tags', () => {
     }
   })
 
-  it('renders non-whitelisted tag literally with HTML entities', async () => {
-    // Non-whitelisted tags should display as literal text, not empty nodes
+  it('renders incomplete non-whitelisted tag literally as text', async () => {
     const scopeId = 'literal-tag-display'
-    const markdown = `<echat-url>content</echat-url>`
+    const markdown = `<echat-url>content`
 
     const wrapper = await mount(MarkdownRender, {
       props: {
         content: markdown,
         customId: scopeId,
         final: true,
-        // NOT adding 'echat-url' to customHtmlTags
       },
     })
     await flushAll()
 
     try {
       const html = wrapper.html()
-      // The content is double-escaped:
-      // 1. processChild escapes: <echat-url> → &lt;echat-url&gt;
-      // 2. HTML display escapes: &lt; → &amp;lt;
-      // So we check for the double-escaped form
-      expect(html).toContain('&amp;lt;echat-url')
-      expect(html).toContain('&amp;lt;/echat-url')
+      expect(html).toContain('&lt;echat-url&gt;content')
+      expect(html).not.toContain('&amp;lt;')
       expect(html).toContain('content')
-      // Should NOT render as actual HTML element
       expect(html).not.toMatch(/<echat-url[^>]*>/i)
     }
     finally {

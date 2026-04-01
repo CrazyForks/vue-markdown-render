@@ -549,6 +549,27 @@ describe('markstream-react next/server SSR', () => {
     }
   })
 
+  it('keeps closed unknown tags as raw HTML and escapes malformed ones in the server entry', async () => {
+    const serverEntry = await import('../packages/markstream-react/src/server')
+
+    const closedHtml = renderToStaticMarkup(
+      React.createElement(serverEntry.NodeRenderer, {
+        content: '<question>ok</question>',
+        final: true,
+      }),
+    )
+    expect(closedHtml).toContain('<question>ok</question>')
+
+    const malformedHtml = renderToStaticMarkup(
+      React.createElement(serverEntry.NodeRenderer, {
+        content: '<question>ok',
+        final: true,
+      }),
+    )
+    expect(malformedHtml).toContain('&lt;question&gt;ok')
+    expect(malformedHtml).not.toContain('&amp;lt;')
+  })
+
   it('renders custom overrides, custom tags, and heavy-node fallbacks through next and server entries', async () => {
     const nextEntry = await import('../packages/markstream-react/src/next')
     const serverEntry = await import('../packages/markstream-react/src/server')

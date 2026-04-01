@@ -16,7 +16,14 @@ import type {
 } from '../types/component-props'
 import type { NodeComponentProps } from '../types/node-component'
 import React from 'react'
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import {
+  getHtmlTagFromContent,
+  getMarkdown,
+  mergeCustomHtmlTags,
+  parseMarkdownToStructure,
+  shouldRenderUnknownHtmlTagAsText,
+  stripCustomHtmlWrapper,
+} from 'stream-markdown-parser'
 import { getCustomNodeComponents } from '../customComponents'
 import { BLOCK_LEVEL_TYPES, renderInline, renderNodeChildren, tokenAttrsToProps } from '../renderers/renderChildren'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
@@ -24,33 +31,6 @@ import { parseHtmlToReactNodes } from './html'
 import { renderKatexToHtml } from './katex'
 
 const fallbackMarkdown = getMarkdown()
-
-function normalizeCustomTag(value: unknown) {
-  const raw = String(value ?? '').trim()
-  if (!raw)
-    return ''
-  const match = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
-  return match ? match[1].toLowerCase() : ''
-}
-
-function isHtmlLikeTagName(tag: string) {
-  return /^[a-z][a-z0-9-]*$/.test(tag)
-}
-
-function getHtmlTagFromContent(html: unknown) {
-  const raw = String(html ?? '')
-  const match = raw.match(/^\s*<\s*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
-}
-
-function stripCustomHtmlWrapper(html: unknown, tag: string) {
-  const raw = String(html ?? '')
-  if (!tag)
-    return raw
-  const openRe = new RegExp(String.raw`^\s*<\s*${tag}(?:\s[^>]*)?>\s*`, 'i')
-  const closeRe = new RegExp(String.raw`\s*<\s*\/\s*${tag}\s*>\s*$`, 'i')
-  return raw.replace(openRe, '').replace(closeRe, '')
-}
 
 function formatLanguageLabel(language: unknown) {
   const normalized = normalizeLanguageIdentifier(String(language ?? ''))
@@ -108,10 +88,12 @@ function createRenderContext(
   props: NodeRendererProps,
   customComponents: Record<string, React.ComponentType<any>>,
   indexPrefix: string,
+  customHtmlTags: readonly string[],
 ): RenderContext {
   return {
     customId: props.customId,
     customComponents,
+    customHtmlTags,
     isDark: props.isDark,
     indexKey: indexPrefix,
     typewriter: props.typewriter,
@@ -953,8 +935,9 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
 
   if (node.type === 'html_block' || node.type === 'html_inline') {
     const tag = String((node as any).tag ?? '').trim().toLowerCase() || getHtmlTagFromContent((node as any).content)
+    const isWhitelisted = (ctx.customHtmlTags ?? []).some((t: string) => t.toLowerCase() === tag)
     const customForTag = tag ? (customComponents as Record<string, any>)[tag] : null
-    if (customForTag) {
+    if (isWhitelisted && customForTag) {
       const coerced = {
         ...(node as any),
         type: tag,
@@ -971,6 +954,13 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
         indexKey: key,
         typewriter: ctx.typewriter,
       })
+    }
+    const rawContent = String((node as any).content ?? (node as any).raw ?? '')
+    if (!isWhitelisted && shouldRenderUnknownHtmlTagAsText(rawContent, tag)) {
+      if (node.type === 'html_inline') {
+        return <TextNode key={key} node={{ type: 'text', content: rawContent, raw: rawContent } as any} ctx={ctx} indexKey={key} typewriter={ctx.typewriter} />
+      }
+      return <ParagraphNode key={key} node={{ type: 'paragraph', children: [{ type: 'text', content: rawContent, raw: rawContent }], raw: rawContent } as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} />
     }
   }
 
@@ -1093,20 +1083,13 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
 
 export function NodeRenderer(props: NodeRendererProps) {
   const customComponents = getCustomNodeComponents(props.customId)
-  const inferredCustomHtmlTags = Object.keys(customComponents)
-    .map(String)
-    .map(s => s.trim().toLowerCase())
-    .filter(isHtmlLikeTagName)
 
   const baseParseOptions = props.parseOptions ?? {}
   const optionTags = (baseParseOptions as any).customHtmlTags ?? []
-  const effectiveCustomHtmlTags = Array.from(new Set([
-    ...(props.customHtmlTags ?? []),
-    ...(Array.isArray(optionTags) ? optionTags : []),
-    ...inferredCustomHtmlTags,
-  ]
-    .map(normalizeCustomTag)
-    .filter(Boolean)))
+  const effectiveCustomHtmlTags = mergeCustomHtmlTags(
+    props.customHtmlTags,
+    Array.isArray(optionTags) ? optionTags : [],
+  )
 
   const instanceMsgId = props.customId
     ? `server-renderer-${props.customId}`
@@ -1132,7 +1115,7 @@ export function NodeRenderer(props: NodeRendererProps) {
       : []
 
   const indexPrefix = props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'
-  const renderCtx = createRenderContext(props, customComponents, indexPrefix)
+  const renderCtx = createRenderContext(props, customComponents, indexPrefix, effectiveCustomHtmlTags)
 
   return (
     <div

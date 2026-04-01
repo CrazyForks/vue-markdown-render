@@ -76,7 +76,7 @@ export default {
 />
 ```
 
-提示：像 `<question>` 这类未知的 HTML 类标签在完整闭合后会按原生 HTML 渲染；流式场景下未闭合片段会先作为纯文本输出以避免闪烁。只有当你希望它参与解析并产出自定义节点（type + attrs/content）时，才需要加入 `custom-html-tags`。
+提示：像 `<question>` 这类未知的 HTML 类标签在完整闭合后会按原生 HTML 渲染。未闭合或格式不完整的片段会保持为纯文本，避免吞掉附近的 Markdown。只有当你希望它参与解析并产出自定义节点（type + attrs/content）时，才需要加入 `custom-html-tags`。
 
 ## 解析流程
 

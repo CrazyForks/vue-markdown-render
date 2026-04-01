@@ -1,30 +1,6 @@
 import type { HtmlBlockNode, MarkdownToken } from '../../types'
 import { VOID_HTML_TAGS } from '../../htmlTags'
-
-function findTagCloseIndexOutsideQuotes(input: string) {
-  let inSingle = false
-  let inDouble = false
-
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i]
-    if (ch === '\\') {
-      i++
-      continue
-    }
-    if (!inDouble && ch === '\'') {
-      inSingle = !inSingle
-      continue
-    }
-    if (!inSingle && ch === '"') {
-      inDouble = !inDouble
-      continue
-    }
-    if (!inSingle && !inDouble && ch === '>')
-      return i
-  }
-
-  return -1
-}
+import { findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../../htmlTagUtils'
 
 function findMatchingCloseTagEnd(rawHtml: string, tag: string, startIndex: number) {
   const lowerTag = tag.toLowerCase()
@@ -66,22 +42,6 @@ function findMatchingCloseTagEnd(rawHtml: string, tag: string, startIndex: numbe
   }
 
   return -1
-}
-
-export function parseTagAttrs(openTag: string): [string, string][] {
-  const attrs: [string, string][] = []
-  const attrRegex = /\s([\w:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
-  let match
-
-  while ((match = attrRegex.exec(openTag)) !== null) {
-    const attrName = match[1]
-    if (!attrName)
-      continue
-    const attrValue = match[2] || match[3] || match[4] || ''
-    attrs.push([attrName, attrValue])
-  }
-
-  return attrs
 }
 
 export function parseHtmlBlock(token: MarkdownToken): HtmlBlockNode {

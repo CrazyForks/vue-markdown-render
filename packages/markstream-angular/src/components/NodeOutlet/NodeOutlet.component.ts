@@ -34,6 +34,7 @@ import { MermaidBlockNodeComponent } from '../MermaidBlockNode/MermaidBlockNode.
 import { ParagraphNodeComponent } from '../ParagraphNode/ParagraphNode.component'
 import { PreCodeNodeComponent } from '../PreCodeNode/PreCodeNode.component'
 import { ReferenceNodeComponent } from '../ReferenceNode/ReferenceNode.component'
+import { hasCompleteHtmlTagContent } from '../shared/node-helpers'
 import {
   coerceBuiltinHtmlNode,
   coerceCustomHtmlNode,
@@ -244,7 +245,8 @@ export class NodeOutletComponent {
    * 1. The node is html_block or html_inline
    * 2. The tag is NOT in the customHtmlTags whitelist
    * 3. The tag is NOT a standard HTML tag
-   * 4. There is NO registered custom component for this tag
+   * 4. The tag is incomplete/malformed, so rendering it as HTML would swallow
+   *    surrounding content.
    */
   get shouldEscapeHtmlTag() {
     const type = this.resolvedType
@@ -265,28 +267,22 @@ export class NodeOutletComponent {
     if (STANDARD_HTML_TAGS.has(tag))
       return false
 
-    // Check if there's a custom component registered for this tag
-    const customComponents = this.customComponentMap
-    if (customComponents?.[tag])
+    if (hasCompleteHtmlTagContent((this.node as any)?.content ?? (this.node as any)?.raw, tag))
       return false
 
     return true
   }
 
   /**
-   * Returns an escaped text node for non-whitelisted, non-standard HTML tags.
+   * Returns a text node for incomplete non-whitelisted, non-standard HTML tags.
    */
   get escapedTextNode(): AngularRenderableNode {
     const rawContent = String((this.node as any)?.content ?? (this.node as any)?.raw ?? '')
-    const escapedContent = rawContent
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
 
     return {
       type: 'text',
-      content: escapedContent,
-      raw: escapedContent,
+      content: rawContent,
+      raw: rawContent,
     } as AngularRenderableNode
   }
 

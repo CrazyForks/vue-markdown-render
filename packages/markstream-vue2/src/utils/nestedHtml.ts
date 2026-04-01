@@ -1,5 +1,5 @@
 import type { BaseNode, CustomComponentAttrs, ParsedNode } from 'stream-markdown-parser'
-import { getMarkdown } from 'stream-markdown-parser'
+import { getMarkdown, normalizeCustomHtmlTagName, normalizeCustomHtmlTags } from 'stream-markdown-parser'
 
 export type NestedRenderableNode = (ParsedNode | BaseNode) & Record<string, unknown>
 
@@ -105,7 +105,7 @@ function createRenderContext(options: NestedMarkdownHtmlOptions): RenderContext 
     markdown,
     options: {
       allowHtml: options.allowHtml !== false,
-      customNodeTag: normalizeTagName(options.customNodeTag) || DEFAULT_CUSTOM_NODE_TAG,
+      customNodeTag: normalizeCustomHtmlTagName(options.customNodeTag) || DEFAULT_CUSTOM_NODE_TAG,
       customNodeClass: options.customNodeClass,
     },
   }
@@ -412,29 +412,6 @@ function getString(value: unknown): string {
     : value == null
       ? ''
       : String(value)
-}
-
-function normalizeCustomHtmlTags(tags?: readonly string[]): string[] {
-  if (!tags || tags.length === 0)
-    return []
-  const seen = new Set<string>()
-  const normalized: string[] = []
-  for (const tag of tags) {
-    const value = normalizeTagName(tag)
-    if (!value || seen.has(value))
-      continue
-    seen.add(value)
-    normalized.push(value)
-  }
-  return normalized
-}
-
-function normalizeTagName(value: unknown): string {
-  const raw = getString(value).trim()
-  if (!raw)
-    return ''
-  const match = raw.match(/^[<\s/]*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
 }
 
 function isSafeAttrName(value: string): boolean {

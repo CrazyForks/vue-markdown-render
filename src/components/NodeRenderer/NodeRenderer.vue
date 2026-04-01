@@ -3,7 +3,7 @@ import type { MarkdownIt, ParsedNode } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { CustomComponents } from '../../types'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
-import { getMarkdown, parseMarkdownToStructure, STANDARD_HTML_TAGS } from 'stream-markdown-parser'
+import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -44,6 +44,7 @@ import {
   heightEstimationExperimentRevision,
   registerHeightEstimationRendererController,
 } from '../../internal/heightEstimationExperiment'
+import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
@@ -189,8 +190,13 @@ const instanceMsgId = props.customId
   : `renderer-${Date.now()}-${Math.random().toString(36).slice(2)}`
 const defaultMd = getMarkdown(instanceMsgId)
 const customTagCache = new Map<string, MarkdownIt>()
+const customComponentsMap = computed<Partial<CustomComponents>>(() => {
+  void customComponentsRevision.value
+  return getCustomNodeComponents(props.customId)
+})
+const effectiveCustomHtmlTags = computed(() => mergeCustomHtmlTags(props.customHtmlTags, props.parseOptions?.customHtmlTags))
 const mdBase = computed(() => {
-  const { key, tags } = resolveCustomHtmlTags(props.customHtmlTags)
+  const { key, tags } = resolveCustomHtmlTags(effectiveCustomHtmlTags.value)
   if (!key)
     return defaultMd
   const cached = customTagCache.get(key)
@@ -207,39 +213,10 @@ const mdInstance = computed(() => {
     : base
 })
 
-function normalizeCustomTag(t: unknown) {
-  const raw = String(t ?? '').trim()
-  if (!raw)
-    return ''
-  const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
-  return m ? m[1].toLowerCase() : ''
-}
-
-function resolveCustomHtmlTags(tags?: readonly string[]) {
-  if (!tags || tags.length === 0)
-    return { key: '', tags: [] as string[] }
-  const seen = new Set<string>()
-  const normalized: string[] = []
-  for (const tag of tags) {
-    const value = normalizeCustomTag(tag)
-    if (!value || seen.has(value))
-      continue
-    seen.add(value)
-    normalized.push(value)
-  }
-  if (normalized.length === 0)
-    return { key: '', tags: [] as string[] }
-  return { key: normalized.join(','), tags: normalized }
-}
-
 const mergedParseOptions = computed(() => {
   const base = (props.parseOptions ?? {}) as RendererParseOptions
   const resolvedFinal = props.final ?? base.final
-  const propTags = props.customHtmlTags ?? []
-  const optionTags = base.customHtmlTags ?? []
-  const merged = [...propTags, ...optionTags]
-    .map(normalizeCustomTag)
-    .filter(Boolean)
+  const merged = effectiveCustomHtmlTags.value
   const hasFinal = resolvedFinal != null
   const hasCustom = merged.length > 0
 
@@ -249,7 +226,7 @@ const mergedParseOptions = computed(() => {
   return {
     ...base,
     ...(hasFinal ? { final: resolvedFinal } : {}),
-    ...(hasCustom ? { customHtmlTags: Array.from(new Set(merged)) } : {}),
+    ...(hasCustom ? { customHtmlTags: merged } : {}),
   } as RendererParseOptions
 })
 
@@ -2040,10 +2017,6 @@ const nodeComponents: Partial<CustomComponents> = {
   // 可以添加更多节点类型
   // 例如:custom_node: CustomNode,
 }
-const customComponentsMap = computed<Partial<CustomComponents>>(() => {
-  void customComponentsRevision.value
-  return getCustomNodeComponents(props.customId)
-})
 const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'))
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode
@@ -2071,7 +2044,7 @@ const nonCodeBindings = computed(() => ({
   // opt in/out of enter transitions or other typewriter-like behaviour.
   typewriter: props.typewriter,
   // Forward customHtmlTags for non-whitelisted tag detection in child components
-  customHtmlTags: props.customHtmlTags,
+  customHtmlTags: mergedParseOptions.value.customHtmlTags,
 }))
 const linkBindings = computed(() => ({
   ...nonCodeBindings.value,
@@ -2141,30 +2114,23 @@ const renderedItems = computed(() => {
             content: stripCustomHtmlWrapper(htmlNode.content, tag),
           } as ParsedNode
         }
-        else if (!STANDARD_HTML_TAGS.has(tag) && !customForTag) {
-          // Non-whitelisted, non-standard HTML tag with no custom component:
-          // render as plain text. Escape HTML entities so the tag itself is
-          // displayed literally.
+        else if (shouldRenderUnknownHtmlTagAsText(htmlNode.content ?? htmlNode.raw, tag)) {
           const rawContent = String(htmlNode.content ?? htmlNode.raw ?? '')
-          const escapedContent = rawContent
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
 
           if (node.type === 'html_inline') {
             component = TextNode
             node = {
               type: 'text',
-              content: escapedContent,
-              raw: escapedContent,
+              content: rawContent,
+              raw: rawContent,
             } as ParsedNode
           }
           else {
             component = ParagraphNode
             node = {
               type: 'paragraph',
-              children: [{ type: 'text', content: escapedContent, raw: escapedContent }],
-              raw: escapedContent,
+              children: [{ type: 'text', content: rawContent, raw: rawContent }],
+              raw: rawContent,
             } as ParsedNode
           }
         }
@@ -2191,23 +2157,6 @@ const renderedItems = computed(() => {
     }
   })
 })
-
-function getHtmlTagFromContent(html: unknown) {
-  const raw = String(html ?? '')
-  const match = raw.match(/^\s*<\s*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
-}
-
-function stripCustomHtmlWrapper(html: unknown, tag: string) {
-  const raw = String(html ?? '')
-  if (!tag)
-    return raw
-  // Escape special regex characters to prevent unexpected behavior.
-  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const openRe = new RegExp(String.raw`^\s*<\s*${escaped}(?:\s[^>]*)?>\s*`, 'i')
-  const closeRe = new RegExp(String.raw`\s*<\s*\/\s*${escaped}\s*>\s*$`, 'i')
-  return raw.replace(openRe, '').replace(closeRe, '')
-}
 
 function getCodeBlockLanguage(node: ParsedNode) {
   return node?.type === 'code_block'

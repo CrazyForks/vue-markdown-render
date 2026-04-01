@@ -1,29 +1,23 @@
 import type { MarkdownIt, Token } from 'markdown-it-ts'
 import type { MarkdownToken, ParsedNode, ParseOptions } from '../types'
+import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
+import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
 import { parseInlineTokens } from './inline-parsers'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
 import { parseBlockquote } from './node-parsers/blockquote-parser'
 import { containerTokenHandlers } from './node-parsers/container-token-handlers'
 import { parseHardBreak } from './node-parsers/hardbreak-parser'
-import { parseHtmlBlock, parseTagAttrs } from './node-parsers/html-block-parser'
+import { parseHtmlBlock } from './node-parsers/html-block-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
-
-function normalizeTagName(t: unknown) {
-  const raw = String(t ?? '').trim()
-  if (!raw)
-    return ''
-  const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
-  return m ? m[1].toLowerCase() : ''
-}
 
 function getCustomHtmlTagSet(options?: ParseOptions) {
   const custom = options?.customHtmlTags
   if (!Array.isArray(custom) || custom.length === 0)
     return null
 
-  const normalized = custom.map(normalizeTagName).filter(Boolean)
+  const normalized = normalizeCustomHtmlTags(custom)
   return normalized.length ? new Set(normalized) : null
 }
 
@@ -32,8 +26,7 @@ export function buildAllowedHtmlTagSet(options?: ParseOptions) {
   if (!Array.isArray(custom) || custom.length === 0)
     return STANDARD_HTML_TAGS
   const set = new Set<string>(STANDARD_HTML_TAGS)
-  for (const t of custom) {
-    const name = normalizeTagName(t)
+  for (const name of normalizeCustomHtmlTags(custom)) {
     if (name)
       set.add(name)
   }
@@ -135,35 +128,6 @@ function parseStandaloneHtmlDocument(markdown: string): ParsedNode[] | null {
   ]
 }
 
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function findTagCloseIndexOutsideQuotes(input: string) {
-  let inSingle = false
-  let inDouble = false
-
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i]
-    if (ch === '\\') {
-      i++
-      continue
-    }
-    if (!inDouble && ch === '\'') {
-      inSingle = !inSingle
-      continue
-    }
-    if (!inSingle && ch === '"') {
-      inDouble = !inDouble
-      continue
-    }
-    if (!inSingle && !inDouble && ch === '>')
-      return i
-  }
-
-  return -1
-}
-
 function getMergeableNodeRaw(node: ParsedNode) {
   const raw = (node as any)?.raw
   if (typeof raw === 'string')
@@ -176,44 +140,20 @@ function getMergeableNodeRaw(node: ParsedNode) {
   return ''
 }
 
-const SOURCE_EXACT_HTML_BLOCK_TAGS = new Set([
-  'article',
-  'aside',
-  'blockquote',
-  'div',
-  'figcaption',
-  'figure',
-  'footer',
-  'h1',
-  'h2',
-  'h3',
-  'h4',
-  'h5',
-  'h6',
-  'header',
-  'li',
-  'main',
-  'nav',
-  'ol',
-  'p',
-  'pre',
-  'section',
-  'summary',
-  'table',
-  'tbody',
-  'td',
-  'th',
-  'thead',
-  'tr',
-  'ul',
-])
+function isCloseOnlyHtmlBlockForTag(node: ParsedNode, tag: string) {
+  if (node.type !== 'html_block' || !tag)
+    return false
+
+  const raw = String((node as any)?.raw ?? (node as any)?.content ?? '')
+  return new RegExp(String.raw`^\s*<\s*\/\s*${escapeTagForRegExp(tag)}\s*>\s*$`, 'i').test(raw)
+}
 
 function findNextHtmlBlockFromSource(source: string, tag: string, startIndex: number) {
   if (!source || !tag)
     return null
 
   const lowerTag = tag.toLowerCase()
-  const openRe = new RegExp(String.raw`<\s*${escapeRegex(lowerTag)}(?=\s|>|/)`, 'gi')
+  const openRe = new RegExp(String.raw`<\s*${escapeTagForRegExp(lowerTag)}(?=\s|>|/)`, 'gi')
   openRe.lastIndex = Math.max(0, startIndex)
   const openMatch = openRe.exec(source)
   if (!openMatch || openMatch.index == null)
@@ -241,11 +181,11 @@ function findNextHtmlBlockFromSource(source: string, tag: string, startIndex: nu
 
   const isOpenAt = (pos: number) => {
     const slice = source.slice(pos)
-    return new RegExp(String.raw`^<\s*${escapeRegex(lowerTag)}(?=\s|>|/)`, 'i').test(slice)
+    return new RegExp(String.raw`^<\s*${escapeTagForRegExp(lowerTag)}(?=\s|>|/)`, 'i').test(slice)
   }
   const isCloseAt = (pos: number) => {
     const slice = source.slice(pos)
-    return new RegExp(String.raw`^<\s*\/\s*${escapeRegex(lowerTag)}(?=\s|>)`, 'i').test(slice)
+    return new RegExp(String.raw`^<\s*\/\s*${escapeTagForRegExp(lowerTag)}(?=\s|>)`, 'i').test(slice)
   }
 
   while (index < source.length) {
@@ -365,7 +305,7 @@ function isDetailsCloseHtmlBlock(node: ParsedNode) {
 }
 
 function findLastClosingTagStart(raw: string, tag: string) {
-  const closeRe = new RegExp(String.raw`<\s*\/\s*${escapeRegex(tag)}(?=\s|>)`, 'gi')
+  const closeRe = new RegExp(String.raw`<\s*\/\s*${escapeTagForRegExp(tag)}(?=\s|>)`, 'gi')
   let last = -1
   let match: RegExpExecArray | null
 
@@ -585,21 +525,33 @@ function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, sourc
 
   for (let i = 0; i < merged.length; i++) {
     const node = merged[i] as any
-    if (node?.type !== 'html_block')
+    const nodeRaw = getMergeableNodeRaw(node)
+    const nodePos = nodeRaw ? source.indexOf(nodeRaw, sourceHtmlCursor) : -1
+    if (node?.type !== 'html_block') {
+      if (nodePos !== -1)
+        sourceHtmlCursor = nodePos + nodeRaw.length
       continue
+    }
 
     const tag = String(node?.tag ?? '').toLowerCase()
     if (!tag)
       continue
-    if (!SOURCE_EXACT_HTML_BLOCK_TAGS.has(tag))
+    if (tag === 'details') {
+      if (nodePos !== -1)
+        sourceHtmlCursor = nodePos + nodeRaw.length
       continue
+    }
 
-    const exact = findNextHtmlBlockFromSource(source, tag, sourceHtmlCursor)
+    const exact = findNextHtmlBlockFromSource(
+      source,
+      tag,
+      nodePos !== -1 ? nodePos : sourceHtmlCursor,
+    )
     if (!exact)
       continue
     sourceHtmlCursor = exact.end
 
-    const currentContent = String(node?.content ?? getMergeableNodeRaw(node))
+    const currentContent = String(node?.content ?? nodeRaw)
     const currentRaw = String(node?.raw ?? currentContent)
     const nextContent = buildHtmlBlockContent(exact.raw, tag, exact.closed)
     const desiredLoading = !final && !exact.closed
@@ -612,12 +564,16 @@ function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, sourc
     if (!needsExpansion)
       continue
 
-    let tailCursor = findApproximateConsumedPrefixEnd(exact.raw, currentContent)
+    let tailCursor = findApproximateConsumedPrefixEnd(exact.raw, currentRaw)
     if (tailCursor === -1)
       tailCursor = 0
 
     const j = i + 1
     while (j < merged.length) {
+      if (exact.closed && isCloseOnlyHtmlBlockForTag(merged[j], tag)) {
+        merged.splice(j, 1)
+        continue
+      }
       const nextRaw = getMergeableNodeRaw(merged[j])
       if (!nextRaw)
         break
@@ -1826,14 +1782,7 @@ export function parseMarkdownToStructure(
   // a single empty line after the closing tag when the next line begins with a
   // block-level marker.
   if (options.customHtmlTags?.length && safeMarkdown.includes('<')) {
-    const tags = options.customHtmlTags
-      .map(t => String(t ?? '').trim())
-      .filter(Boolean)
-      .map((t) => {
-        const m = t.match(/^[<\s/]*([A-Z][\w-]*)/i)
-        return (m?.[1] ?? '').toLowerCase()
-      })
-      .filter(Boolean)
+    const tags = normalizeCustomHtmlTags(options.customHtmlTags)
 
     if (tags.length) {
       safeMarkdown = ensureBlankLineBeforeInlineMultilineCustomHtmlBlocks(safeMarkdown, tags)

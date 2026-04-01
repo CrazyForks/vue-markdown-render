@@ -1,4 +1,5 @@
 import type { BaseNode } from 'stream-markdown-parser'
+import { normalizeCustomHtmlTags, normalizeCustomHtmlTagName as normalizeTagName } from 'stream-markdown-parser'
 
 interface CustomTagSegment {
   tag: string
@@ -156,29 +157,6 @@ function resolveCustomTagName(node: Record<string, any>, tagSet: Set<string>) {
 
   const byType = normalizeTagName(node.type)
   return byType && tagSet.has(byType) ? byType : ''
-}
-
-function normalizeCustomHtmlTags(tags?: readonly string[]) {
-  const seen = new Set<string>()
-  const normalized: string[] = []
-
-  for (const tag of tags || []) {
-    const value = normalizeTagName(tag)
-    if (!value || seen.has(value))
-      continue
-    seen.add(value)
-    normalized.push(value)
-  }
-
-  return normalized
-}
-
-function normalizeTagName(value: unknown) {
-  const raw = String(value ?? '').trim()
-  if (!raw)
-    return ''
-  const match = raw.match(/^[<\s/]*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
 }
 
 function cloneNodeTree<T extends BaseNode>(node: T): T {

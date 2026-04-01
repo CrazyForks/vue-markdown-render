@@ -2,7 +2,11 @@ import type { ParsedNode } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../context/viewportPriority'
 import type { NodeRendererProps, RenderContext } from '../types'
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import {
+  getMarkdown,
+  mergeCustomHtmlTags,
+  parseMarkdownToStructure,
+} from 'stream-markdown-parser'
 import { useViewportPriority, ViewportPriorityProvider } from '../context/viewportPriority'
 import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../customComponents'
 import { renderNode } from '../renderers/renderNode'
@@ -35,18 +39,6 @@ const DEFAULT_PROPS: Required<Pick<NodeRendererProps, 'codeBlockStream'
 }
 
 const fallbackMarkdown = getMarkdown()
-
-function normalizeCustomTag(value: unknown) {
-  const raw = String(value ?? '').trim()
-  if (!raw)
-    return ''
-  const match = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
-  return match ? match[1].toLowerCase() : ''
-}
-
-function isHtmlLikeTagName(tag: string) {
-  return /^[a-z][a-z0-9-]*$/.test(tag)
-}
 
 type ResolvedProps = NodeRendererProps & typeof DEFAULT_PROPS
 
@@ -712,29 +704,17 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
       : `renderer-${Date.now()}-${Math.random().toString(36).slice(2)}`
   }, [props.customId])
 
-  const inferredCustomHtmlTags = useMemo(() => {
-    return Object.keys(customComponents)
-      .map(String)
-      .map(s => s.trim().toLowerCase())
-      .filter(isHtmlLikeTagName)
-  }, [customComponents])
-
   const effectiveCustomHtmlTags = useMemo(() => {
     const base = props.parseOptions ?? {}
     const optionTags = (base as any).customHtmlTags ?? []
-    const merged = [
-      ...(props.customHtmlTags ?? []),
-      ...(Array.isArray(optionTags) ? optionTags : []),
-      ...inferredCustomHtmlTags,
-    ]
-      .map(normalizeCustomTag)
-      .filter(Boolean)
-    return Array.from(new Set(merged))
+    return mergeCustomHtmlTags(
+      props.customHtmlTags,
+      Array.isArray(optionTags) ? optionTags : [],
+    )
   }, [
     props.customId,
     props.customHtmlTags,
     props.parseOptions,
-    inferredCustomHtmlTags,
     customComponentsRevision,
   ])
 
@@ -882,7 +862,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     textStreamState: textStreamStateRef.current,
     streamRenderVersion: streamRenderVersionRef.current,
     customComponents,
-    customHtmlTags: props.customHtmlTags,
+    customHtmlTags: effectiveCustomHtmlTags,
     showTooltips: props.showTooltips,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
     codeBlockStream: props.codeBlockStream,
@@ -908,6 +888,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.showTooltips,
     props.renderCodeBlocksAsPre,
     props.codeBlockStream,
+    effectiveCustomHtmlTags,
     mergedCodeBlockProps,
     mergedMermaidProps,
     mergedD2Props,

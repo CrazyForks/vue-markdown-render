@@ -1,5 +1,7 @@
 import type { MarkdownIt, Token } from 'markdown-it-ts'
+import { normalizeCustomHtmlTagName } from '../customHtmlTags'
 import { STANDARD_BLOCK_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
+import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes } from '../htmlTagUtils'
 
 const VOID_TAGS = VOID_HTML_TAGS
 
@@ -26,10 +28,6 @@ function isHtmlInlineClosingTag(content: string) {
 
 function isSelfClosingHtmlInline(content: string, tag: string) {
   return VOID_TAGS.has(tag) || /\/\s*>\s*$/.test(content)
-}
-
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function findMatchingCloseChildIndex(
@@ -91,7 +89,7 @@ function getTrailingOpenDepth(
 }
 
 function findMatchingCloseRangeInHtml(content: string, tag: string, startIndex = 0) {
-  const tokenRe = new RegExp(String.raw`<\s*(\/?)\s*${escapeRegex(tag)}(?=[\s>/])[^>]*>`, 'gi')
+  const tokenRe = new RegExp(String.raw`<\s*(\/?)\s*${escapeTagForRegExp(tag)}(?=[\s>/])[^>]*>`, 'gi')
   tokenRe.lastIndex = Math.max(0, startIndex)
   let depth = 0
   let match: RegExpExecArray | null
@@ -120,7 +118,7 @@ function findMatchingCloseRangeInHtml(content: string, tag: string, startIndex =
 }
 
 function getTrailingCustomTagDepthInHtml(content: string, tag: string) {
-  const tokenRe = new RegExp(String.raw`<\s*(\/?)\s*${escapeRegex(tag)}(?=[\s>/])[^>]*>`, 'gi')
+  const tokenRe = new RegExp(String.raw`<\s*(\/?)\s*${escapeTagForRegExp(tag)}(?=[\s>/])[^>]*>`, 'gi')
   let depth = 0
   let match: RegExpExecArray | null
 
@@ -140,27 +138,6 @@ function getTrailingCustomTagDepthInHtml(content: string, tag: string) {
   }
 
   return depth
-}
-
-function findTagCloseIndexOutsideQuotes(html: string) {
-  let inSingle = false
-  let inDouble = false
-
-  for (let i = 0; i < html.length; i++) {
-    const ch = html[i]
-    if (ch === '"' && !inSingle) {
-      inDouble = !inDouble
-      continue
-    }
-    if (ch === '\'' && !inDouble) {
-      inSingle = !inSingle
-      continue
-    }
-    if (ch === '>' && !inSingle && !inDouble)
-      return i
-  }
-
-  return -1
 }
 
 function tokenToRaw(token: Token) {
@@ -426,13 +403,9 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
   const customTagSet = new Set<string>()
   if (options.customHtmlTags?.length) {
     for (const t of options.customHtmlTags) {
-      const raw = String(t ?? '').trim()
-      if (!raw)
+      const name = normalizeCustomHtmlTagName(t)
+      if (!name)
         continue
-      const m = raw.match(/^[<\s/]*([A-Z][\w-]*)/i)
-      if (!m)
-        continue
-      const name = m[1].toLowerCase()
       customTagSet.add(name)
       autoCloseInlineTagSet.add(name)
     }

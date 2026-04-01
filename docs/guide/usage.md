@@ -74,7 +74,7 @@ export default {
 />
 ```
 
-Tip: unknown HTML-like tags (such as `<question>`) render as raw HTML elements once closed; during streaming, partial tags stay as plain text to avoid flicker. Add the tag name to `custom-html-tags` when you want custom node output (type + attrs/content).
+Tip: unknown HTML-like tags (such as `<question>`) render as raw HTML elements once closed. Incomplete or malformed fragments stay as plain text so they do not swallow nearby Markdown. Add the tag name to `custom-html-tags` when you want custom node output (type + attrs/content).
 
 ## Parser pipeline
 

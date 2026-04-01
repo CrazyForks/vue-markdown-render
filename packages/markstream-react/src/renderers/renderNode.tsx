@@ -1,7 +1,7 @@
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { RenderContext } from '../types'
 import React from 'react'
-import { STANDARD_HTML_TAGS } from 'stream-markdown-parser'
+import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from 'stream-markdown-parser'
 import { AdmonitionNode } from '../components/AdmonitionNode/AdmonitionNode'
 import { BlockquoteNode } from '../components/BlockquoteNode/BlockquoteNode'
 import { CheckboxNode } from '../components/CheckboxNode/CheckboxNode'
@@ -43,21 +43,6 @@ import { VmrContainerNode } from '../components/VmrContainerNode/VmrContainerNod
 import { getCustomNodeComponents } from '../customComponents'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { renderNodeChildren } from './renderChildren'
-
-function getHtmlTagFromContent(html: unknown) {
-  const raw = String(html ?? '')
-  const match = raw.match(/^\s*<\s*([A-Z][\w:-]*)/i)
-  return match ? match[1].toLowerCase() : ''
-}
-
-function stripCustomHtmlWrapper(html: unknown, tag: string) {
-  const raw = String(html ?? '')
-  if (!tag)
-    return raw
-  const openRe = new RegExp(String.raw`^\s*<\s*${tag}(?:\s[^>]*)?>\s*`, 'i')
-  const closeRe = new RegExp(String.raw`\s*<\s*\/\s*${tag}\s*>\s*$`, 'i')
-  return raw.replace(openRe, '').replace(closeRe, '')
-}
 
 function renderCodeBlock(
   node: any,
@@ -177,19 +162,13 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
           typewriter: ctx.typewriter,
         })
       }
-      // Non-whitelisted, non-standard HTML tag: render as plain text
-      // Only escape if: not in whitelist, not standard HTML, AND no custom component registered
-      if (!isWhitelisted && !STANDARD_HTML_TAGS.has(tag) && !customForTag) {
-        const rawContent = String((node as any).content ?? (node as any).raw ?? '')
-        const escapedContent = rawContent
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
+      const rawContent = String((node as any).content ?? (node as any).raw ?? '')
+      if (!isWhitelisted && shouldRenderUnknownHtmlTagAsText(rawContent, tag)) {
         if (node.type === 'html_inline') {
-          return <TextNode key={key} node={{ type: 'text', content: escapedContent, raw: escapedContent } as any} ctx={ctx} indexKey={key} typewriter={ctx.typewriter} />
+          return <TextNode key={key} node={{ type: 'text', content: rawContent, raw: rawContent } as any} ctx={ctx} indexKey={key} typewriter={ctx.typewriter} />
         }
         else {
-          return <ParagraphNode key={key} node={{ type: 'paragraph', children: [{ type: 'text', content: escapedContent, raw: escapedContent }], raw: escapedContent } as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} />
+          return <ParagraphNode key={key} node={{ type: 'paragraph', children: [{ type: 'text', content: rawContent, raw: rawContent }], raw: rawContent } as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} />
         }
       }
     }

@@ -12,6 +12,9 @@ description: 为 thinking 等可信标签接入自定义组件，在不改解析
 2. 用 `setCustomComponents` 把它映射到自定义组件
 3. 用 `custom-id` 把覆盖范围限制在当前业务区域
 
+`custom-html-tags` 里请传标签式名字，比如 `thinking`、`answer-box`、`my_component`。
+像 `foo:bar` 这种 namespaced 形式会被忽略；`code_block` 这类内置 override key 会继续保留给节点渲染器覆盖，所以可信自定义标签仍然需要显式写进 `custom-html-tags`。
+
 只有当这条路径不够用时，再去碰解析器钩子。
 
 如果这些标签最终是用在文档站或 VitePress 主题里，建议再配合 [文档站与 VitePress 集成](/zh/guide/vitepress-docs-integration) 一起看，把主题层注册和 CSS 顺序一次理顺。

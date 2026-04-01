@@ -254,6 +254,7 @@ interface ParseOptions {
   preTransformTokens?: (tokens: Token[]) => Token[]
   postTransformTokens?: (tokens: Token[]) => Token[]
   // Custom HTML-like tags to emit as custom nodes (e.g. ['thinking'])
+  // Use tag-like names such as 'thinking', 'answer-box', or 'my_component'.
   customHtmlTags?: string[]
   // Validate link href before emitting a `link` node; false -> plain text
   validateLink?: (url: string) => boolean
@@ -299,7 +300,7 @@ const nodes = parseMarkdownToStructure(
 
 ### Unknown HTML-like tags
 
-By default, non-standard HTML-like tags (for example `<question>`) are rendered as raw HTML elements once they are complete; during streaming, partial tags are kept as **literal text** to avoid flicker. If you want them emitted as custom nodes (`type: 'question'` with parsed attrs/content), opt in via `customHtmlTags`.
+By default, non-standard HTML-like tags (for example `<question>`) are rendered as raw HTML elements once they are complete. Incomplete or malformed fragments stay as **literal text** so they do not swallow surrounding content during streaming or final renders. If you want them emitted as custom nodes (`type: 'question'` with parsed attrs/content), opt in via `customHtmlTags`.
 
 ### Utility Functions
 
