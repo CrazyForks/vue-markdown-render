@@ -24,8 +24,8 @@ function resolveInitialState() {
   if (!katex) {
     return {
       html: '',
-      text: props.node.raw,
-      loading: false,
+      text: props.node.loading ? '' : props.node.raw,
+      loading: props.node.loading,
     }
   }
 
@@ -42,8 +42,8 @@ function resolveInitialState() {
   catch {
     return {
       html: '',
-      text: props.node.raw,
-      loading: false,
+      text: props.node.loading ? '' : props.node.raw,
+      loading: props.node.loading,
     }
   }
 }
