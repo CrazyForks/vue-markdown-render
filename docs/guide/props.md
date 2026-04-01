@@ -51,7 +51,7 @@ These props are forwarded to `CodeBlockNode` / `MarkdownCodeBlockNode` (but **no
 - `code-block-dark-theme`, `code-block-light-theme`
 - `code-block-monaco-options`
 - `code-block-min-width`, `code-block-max-width`
-- `code-block-props` (escape hatch to forward any extra CodeBlock props)
+- `code-block-props` (extra code-block props such as `showHeader`, `showFontSizeButtons`, and `showTooltips`, plus any custom forwarded keys)
 - `themes` (theme list forwarded to `stream-monaco` when present)
 
 Note: `code-block-monaco-options` is only used by the Monaco-backed `CodeBlockNode`. If you override `code_block` with `MarkdownCodeBlockNode`, treat `code-block-dark-theme` / `code-block-light-theme` as Shiki theme names, and `themes` as the Shiki theme list to preload.
@@ -85,6 +85,18 @@ const monacoOptions = {
     :code-block-monaco-options="monacoOptions"
   />
 </template>
+```
+
+`code-block-props` is also strongly typed through the renderer props surface, so you can reuse it without falling back to `any`:
+
+```ts twoslash
+import type { NodeRendererProps } from 'markstream-vue'
+
+const codeBlockProps: NonNullable<NodeRendererProps['codeBlockProps']> = {
+  showHeader: false,
+  showFontSizeButtons: false,
+  showTooltips: false,
+}
 ```
 
 ## Diagram node props forwarded from `MarkdownRender`
@@ -134,7 +146,7 @@ Example (global defaults):
 <template>
   <MarkdownRender
     :content="md"
-    :code-block-props="{ showHeader: false, showFontSizeButtons: false }"
+    :code-block-props="{ showHeader: false, showFontSizeButtons: false, showTooltips: false }"
   />
 </template>
 ```

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
+import type { CustomComponents } from '../../types'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
@@ -56,6 +57,29 @@ interface IdleDeadlineLike {
   timeRemaining?: () => number
 }
 
+type RendererAttrs = Record<string, unknown> & {
+  showTooltips?: unknown
+  'show-tooltips'?: unknown
+}
+
+type RendererParseOptions = NonNullable<NodeRendererProps['parseOptions']>
+type RendererCodeBlockProps = NonNullable<NodeRendererProps['codeBlockProps']>
+type RuntimeCodeBlockNode = ParsedNode & {
+  type: 'code_block'
+  language?: string
+  loading?: boolean
+  diff?: boolean
+  code?: string
+  originalCode?: string
+  updatedCode?: string
+  raw?: string
+}
+type RuntimeHtmlNode = ParsedNode & {
+  type: 'html_block' | 'html_inline'
+  tag?: string
+  content?: string
+}
+
 const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
   showTooltips: true,
@@ -94,7 +118,7 @@ const viewportPriorityAutoDisabled = ref(false)
 const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 const isClient = typeof window !== 'undefined'
 const debugPerformanceEnabled = computed(() => props.debugPerformance && isClient && typeof console !== 'undefined')
-const attrs = useAttrs()
+const attrs = useAttrs() as RendererAttrs
 const textStreamState = new Map<string, string>()
 const streamRenderVersion = ref(0)
 const experimentContainerWidth = ref(0)
@@ -102,7 +126,7 @@ const simpleTextProbeProfile = ref(createEmptySimpleTextProbeProfile())
 const resolvedShowTooltips = computed<boolean | undefined>(() => {
   if (typeof props.showTooltips === 'boolean')
     return props.showTooltips
-  const raw = (attrs as any).showTooltips ?? (attrs as any)['show-tooltips']
+  const raw = attrs.showTooltips ?? attrs['show-tooltips']
   if (raw === '' || raw === true || raw === 'true')
     return true
   if (raw === false || raw === 'false')
@@ -210,10 +234,10 @@ function resolveCustomHtmlTags(tags?: readonly string[]) {
 }
 
 const mergedParseOptions = computed(() => {
-  const base = props.parseOptions ?? {}
-  const resolvedFinal = props.final ?? (base as any).final
+  const base = (props.parseOptions ?? {}) as RendererParseOptions
+  const resolvedFinal = props.final ?? base.final
   const propTags = props.customHtmlTags ?? []
-  const optionTags = (base as any).customHtmlTags ?? []
+  const optionTags = base.customHtmlTags ?? []
   const merged = [...propTags, ...optionTags]
     .map(normalizeCustomTag)
     .filter(Boolean)
@@ -224,17 +248,17 @@ const mergedParseOptions = computed(() => {
     return base
 
   return {
-    ...(base as any),
+    ...base,
     ...(hasFinal ? { final: resolvedFinal } : {}),
     ...(hasCustom ? { customHtmlTags: Array.from(new Set(merged)) } : {}),
-  } as ParseOptions
+  } as RendererParseOptions
 })
 
 // Set of effective custom HTML tags (normalised to lowercase).
 // Used in `renderedItems` to coerce pre-parsed html_block/html_inline nodes
 // whose tag matches a registered custom component.
 const effectiveCustomHtmlTagsSet = computed<Set<string>>(() => {
-  const arr: string[] = (mergedParseOptions.value as any).customHtmlTags ?? []
+  const arr = mergedParseOptions.value.customHtmlTags ?? []
   return new Set(arr.map(t => String(t).trim().toLowerCase()).filter(Boolean))
 })
 
@@ -315,9 +339,10 @@ const requestFrame = isClient && typeof window.requestAnimationFrame === 'functi
 const cancelFrame = isClient && typeof window.cancelAnimationFrame === 'function'
   ? window.cancelAnimationFrame.bind(window)
   : null
-const isTestEnv = typeof globalThis !== 'undefined'
-  && typeof (globalThis as any).process !== 'undefined'
-  && (globalThis as any).process?.env?.NODE_ENV === 'test'
+const processEnv = typeof globalThis !== 'undefined' && 'process' in globalThis
+  ? (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env
+  : undefined
+const isTestEnv = processEnv?.NODE_ENV === 'test'
 const hasIdleCallback = isClient && typeof window.requestIdleCallback === 'function'
 const resolvedBatchSize = computed(() => {
   const size = Math.trunc(props.renderBatchSize ?? 80)
@@ -862,7 +887,7 @@ function resolveCodeBlockRendererKind(node: ParsedNode) {
 }
 
 function resolveCodeBlockShowHeader() {
-  const showHeader = (props.codeBlockProps as any)?.showHeader
+  const showHeader = props.codeBlockProps?.showHeader
   return showHeader !== false
 }
 
@@ -890,7 +915,7 @@ const estimatedNodeHeights = computed(() => {
       if (rendererKind === 'monaco' || rendererKind === 'markdown') {
         return estimateCodeBlockHeight(node, {
           rendererKind,
-          monacoOptions: props.codeBlockMonacoOptions as Record<string, any> | undefined,
+          monacoOptions: props.codeBlockMonacoOptions,
           showHeader: resolveCodeBlockShowHeader(),
         })
       }
@@ -1978,7 +2003,7 @@ const D2BlockNodeAsync = defineAsyncComponent(async () => {
 })
 
 // 组件映射表
-const nodeComponents = {
+const nodeComponents: Partial<CustomComponents> = {
   text: TextNode,
   paragraph: ParagraphNode,
   heading: HeadingNode,
@@ -2016,7 +2041,7 @@ const nodeComponents = {
   // 可以添加更多节点类型
   // 例如:custom_node: CustomNode,
 }
-const customComponentsMap = computed(() => {
+const customComponentsMap = computed<Partial<CustomComponents>>(() => {
   void customComponentsRevision.value
   return getCustomNodeComponents(props.customId)
 })
@@ -2060,7 +2085,7 @@ function getCodeBlockRenderNode(node: ParsedNode) {
   if (node.type !== 'code_block')
     return node
 
-  const codeBlockNode = node as any
+  const codeBlockNode = node as RuntimeCodeBlockNode
   const signature = [
     String(codeBlockNode.language ?? ''),
     String(codeBlockNode.loading ?? ''),
@@ -2094,28 +2119,29 @@ const renderedItems = computed(() => {
     // nodes (via the `nodes` prop) that were not parsed with
     // `customHtmlTags`, so their type is still `html_block`/`html_inline`
     // but the tag references a known custom component.
-    if (
+  if (
       (node.type === 'html_block' || node.type === 'html_inline')
-      && component === (nodeComponents as any)[node.type]
+      && component === nodeComponents[node.type]
     ) {
-      const tag = String((node as any).tag ?? '').trim().toLowerCase()
-        || getHtmlTagFromContent((node as any).content)
+      const htmlNode = node as RuntimeHtmlNode
+      const tag = String(htmlNode.tag ?? '').trim().toLowerCase()
+        || getHtmlTagFromContent(htmlNode.content)
       if (tag && effectiveCustomHtmlTagsSet.value.has(tag)) {
         const customComponents = customComponentsMap.value
-        const customForTag = (customComponents as any)[tag]
+        const customForTag = customComponents[tag]
         if (customForTag) {
           component = customForTag
           node = {
-            ...(node as any),
+            ...htmlNode,
             type: tag,
             tag,
-            content: stripCustomHtmlWrapper((node as any).content, tag),
+            content: stripCustomHtmlWrapper(htmlNode.content, tag),
           } as ParsedNode
         }
       }
     }
 
-    let bindings = { ...getBindingsFor(node, language) } as Record<string, any>
+    let bindings = { ...getBindingsFor(node, language) } as Record<string, unknown>
     const estimatedHeight = estimatedNodeHeights.value[item.index]
     if (node.type === 'code_block' && estimatedHeight?.kind === 'code-block') {
       bindings = {
@@ -2155,7 +2181,7 @@ function stripCustomHtmlWrapper(html: unknown, tag: string) {
 
 function getCodeBlockLanguage(node: ParsedNode) {
   return node?.type === 'code_block'
-    ? String((node as any).language ?? '').trim().toLowerCase()
+    ? String((node as RuntimeCodeBlockNode).language ?? '').trim().toLowerCase()
     : ''
 }
 
@@ -2166,25 +2192,25 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   if (!node)
     return FallbackComponent
   const customComponents = customComponentsMap.value
-  const customForType = (customComponents as any)[String((node as any).type)]
+  const customForType = customComponents[String(node.type)]
   if (node.type === 'code_block') {
     const lang = language ?? getCodeBlockLanguage(node)
     // Keep Mermaid blocks routed to MermaidBlockNode unless a specific
     // `mermaid` override is provided.
     if (lang === 'mermaid') {
-      const customMermaid = (customComponents as any).mermaid
+      const customMermaid = customComponents.mermaid
       return customMermaid || MermaidBlockNodeAsync
     }
 
     // Keep Infographic blocks routed to InfographicBlockNode unless a specific
     // `infographic` override is provided.
     if (lang === 'infographic') {
-      const customInfographic = (customComponents as any).infographic
+      const customInfographic = customComponents.infographic
       return customInfographic || InfographicBlockNodeAsync
     }
 
     if (lang === 'd2' || lang === 'd2lang') {
-      const customD2 = (customComponents as any).d2
+      const customD2 = customComponents.d2
       return customD2 || D2BlockNodeAsync
     }
 
@@ -2193,7 +2219,7 @@ function getNodeComponent(node: ParsedNode, language?: string) {
 
     // Honor a custom `code_block` component if the consumer registered one
     // via `setCustomComponents(customId, { code_block: MyComponent })`.
-    const customCodeBlock = (customComponents as any).code_block
+    const customCodeBlock = customComponents.code_block
     if (customCodeBlock)
       return customCodeBlock
 
@@ -2203,7 +2229,7 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   if (customForType)
     return customForType
 
-  return (nodeComponents as any)[String((node as any).type)] || FallbackComponent
+  return nodeComponents[String(node.type)] || FallbackComponent
 }
 
 function getBindingsFor(node: ParsedNode, language?: string) {

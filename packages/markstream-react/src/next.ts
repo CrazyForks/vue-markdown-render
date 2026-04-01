@@ -153,7 +153,7 @@ export type { MarkdownCodeBlockNodeProps } from './components/MarkdownCodeBlockN
 export type { TooltipPlacement, TooltipProps } from './components/Tooltip/Tooltip'
 export * from './i18n/useSafeI18n'
 export * from './renderers/renderNode'
-export type { NodeRendererProps } from './types'
+export type { NodeRendererCodeBlockProps, NodeRendererProps } from './types'
 export * from './types/component-props'
 export type { NodeComponentProps } from './types/node-component'
 export * from './utils/languageIcon'

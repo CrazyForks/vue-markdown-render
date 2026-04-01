@@ -2,7 +2,7 @@
 
 markstream-react 提供与 markstream-vue 相同强大的组件，但专为 React 构建。所有组件都支持 React 18+ 并包含完整的 TypeScript 支持。
 
-根入口、`markstream-react/next`、`markstream-react/server` 现在都会产出独立声明文件。像 `NodeRendererProps`、`NodeComponentProps`、`RenderContext`、`RenderNodeFn`、`CustomComponentMap`、`CodeBlockMonacoOptions`、`MarkdownCodeBlockNodeProps`、`ListItemNodeProps`、`HtmlPreviewFrameProps`、`TooltipProps`、`TooltipPlacement`、`LinkNodeStyleProps` 这类共享渲染器与组件类型，都可以直接从你实际使用的入口导入。
+根入口、`markstream-react/next`、`markstream-react/server` 现在都会产出独立声明文件。像 `NodeRendererProps`、`NodeRendererCodeBlockProps`、`NodeComponentProps`、`RenderContext`、`RenderNodeFn`、`CustomComponentMap`、`CodeBlockMonacoOptions`、`MarkdownCodeBlockNodeProps`、`ListItemNodeProps`、`HtmlPreviewFrameProps`、`TooltipProps`、`TooltipPlacement`、`LinkNodeStyleProps` 这类共享渲染器与组件类型，都可以直接从你实际使用的入口导入。
 ## 主组件：MarkdownRender
 
 在 React 中渲染 markdown 内容的主要组件。
@@ -59,7 +59,7 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 | `codeBlockMonacoOptions` | `CodeBlockMonacoOptions` | 转发到 `stream-monaco` 的选项，包括 `diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction` 这类 diff 悬浮操作配置 |
 | `codeBlockMinWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最小宽度 |
 | `codeBlockMaxWidth` | `string \| number` | 转发到 `CodeBlockNode` 的最大宽度 |
-| `codeBlockProps` | `Record<string, any>` | 额外转发到每个代码块渲染器（`CodeBlockNode` / `MarkdownCodeBlockNode`）的 props |
+| `codeBlockProps` | `NodeRendererCodeBlockProps` | 额外转发到每个代码块渲染器（`CodeBlockNode` / `MarkdownCodeBlockNode`）的 props |
 | `mermaidProps` | `Partial<Omit<MermaidBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 Mermaid 围栏和自定义 `mermaid` 渲染器的 props |
 | `d2Props` | `Partial<Omit<D2BlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 D2 围栏和自定义 `d2` 渲染器的 props |
 | `infographicProps` | `Partial<Omit<InfographicBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | 额外转发到 infographic 围栏和自定义 `infographic` 渲染器的 props |
@@ -87,6 +87,18 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 - 保持 `viewportPriority` 开启，避免离屏 Mermaid / Monaco / D2 在文字仍在流式更新时继续做后台工作。
 - 高频 SSE 更推荐直接传 `nodes`，而不是每个 chunk 都重跑整篇 `content` 解析。
 - Mermaid 常用调优项包括：`renderDebounceMs`、`contentStableDelayMs`、`previewPollDelayMs`、`previewPollMaxDelayMs`、`previewPollMaxAttempts`。
+
+`NodeRendererCodeBlockProps` 会跟随公开的 `CodeBlockNode` props 结构（去掉 `node`），所以像 `showHeader`、`showFontSizeButtons`、`showTooltips` 这类字段都能直接获得补全，而不需要退回 `any`。
+
+```tsx
+import type { NodeRendererCodeBlockProps } from 'markstream-react'
+
+const codeBlockProps: NodeRendererCodeBlockProps = {
+  showHeader: false,
+  showFontSizeButtons: false,
+  showTooltips: false,
+}
+```
 
 #### 事件
 

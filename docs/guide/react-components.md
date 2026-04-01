@@ -2,7 +2,7 @@
 
 markstream-react provides the same powerful components as markstream-vue, but built for React. All components support React 18+ with full TypeScript support.
 
-The root `markstream-react`, `markstream-react/next`, and `markstream-react/server` entrypoints all ship declaration files. Shared renderer and component types such as `NodeRendererProps`, `NodeComponentProps`, `RenderContext`, `RenderNodeFn`, `CustomComponentMap`, `CodeBlockMonacoOptions`, `MarkdownCodeBlockNodeProps`, `ListItemNodeProps`, `HtmlPreviewFrameProps`, `TooltipProps`, `TooltipPlacement`, and `LinkNodeStyleProps` can be imported directly from the entrypoint you use.
+The root `markstream-react`, `markstream-react/next`, and `markstream-react/server` entrypoints all ship declaration files. Shared renderer and component types such as `NodeRendererProps`, `NodeRendererCodeBlockProps`, `NodeComponentProps`, `RenderContext`, `RenderNodeFn`, `CustomComponentMap`, `CodeBlockMonacoOptions`, `MarkdownCodeBlockNodeProps`, `ListItemNodeProps`, `HtmlPreviewFrameProps`, `TooltipProps`, `TooltipPlacement`, and `LinkNodeStyleProps` can be imported directly from the entrypoint you use.
 ## Main Component: MarkdownRender
 
 The primary component for rendering markdown content in React.
@@ -59,7 +59,7 @@ The primary component for rendering markdown content in React.
 | `codeBlockMonacoOptions` | `CodeBlockMonacoOptions` | Options forwarded to `stream-monaco`, including diff hover-action settings like `diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, and `onDiffHunkAction` |
 | `codeBlockMinWidth` | `string \| number` | Min width forwarded to `CodeBlockNode` |
 | `codeBlockMaxWidth` | `string \| number` | Max width forwarded to `CodeBlockNode` |
-| `codeBlockProps` | `Record<string, any>` | Extra props forwarded to every code-block renderer (`CodeBlockNode` / `MarkdownCodeBlockNode`) |
+| `codeBlockProps` | `NodeRendererCodeBlockProps` | Extra props forwarded to every code-block renderer (`CodeBlockNode` / `MarkdownCodeBlockNode`) |
 | `mermaidProps` | `Partial<Omit<MermaidBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | Extra props forwarded to Mermaid fences and custom `mermaid` renderers |
 | `d2Props` | `Partial<Omit<D2BlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | Extra props forwarded to D2 fences and custom `d2` renderers |
 | `infographicProps` | `Partial<Omit<InfographicBlockNodeProps, 'node' \| 'loading' \| 'isDark'>>` | Extra props forwarded to infographic fences and custom `infographic` renderers |
@@ -87,6 +87,18 @@ Streaming notes:
 - Keep `viewportPriority` enabled to prevent offscreen Mermaid / Monaco / D2 work from running while text is still streaming.
 - For high-frequency SSE, prefer passing `nodes` instead of reparsing the full `content` string every chunk.
 - Common Mermaid tuning keys: `renderDebounceMs`, `contentStableDelayMs`, `previewPollDelayMs`, `previewPollMaxDelayMs`, `previewPollMaxAttempts`.
+
+`NodeRendererCodeBlockProps` follows the public `CodeBlockNode` prop surface except for `node`, so you get completion for flags like `showHeader`, `showFontSizeButtons`, and `showTooltips` without dropping to `any`.
+
+```tsx
+import type { NodeRendererCodeBlockProps } from 'markstream-react'
+
+const codeBlockProps: NodeRendererCodeBlockProps = {
+  showHeader: false,
+  showFontSizeButtons: false,
+  showTooltips: false,
+}
+```
 
 #### Events
 

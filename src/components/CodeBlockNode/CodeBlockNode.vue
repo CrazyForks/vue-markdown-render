@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CodeBlockNodeProps } from '../../types/component-props'
+import type { CodeBlockMonacoTheme, CodeBlockNodeProps } from '../../types/component-props'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onUnmounted, ref, watch } from 'vue'
@@ -11,7 +11,14 @@ import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageI
 import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
-import { getUseMonaco } from './monaco'
+import {
+  getUseMonaco,
+  type MonacoDiffEditorViewLike,
+  type MonacoDisposableLike,
+  type MonacoEditorViewLike,
+  type MonacoNamespaceLike,
+  type MonacoRuntimeOptions,
+} from './monaco'
 import { scheduleGlobalMonacoTheme } from './monacoThemeScheduler'
 
 const props = withDefaults(
@@ -45,13 +52,11 @@ const emits = defineEmits(['previewCode', 'copy'])
 // Patch the editor host so touch handlers default to passive for Monaco roots.
 const MONACO_TOUCH_PATCH_FLAG = '__markstreamMonacoPassiveTouch__'
 
-if (typeof window !== 'undefined')
-  ensureMonacoPassiveTouchListeners()
-
 function ensureMonacoPassiveTouchListeners() {
   try {
-    const globalObj = window as any
-    if (globalObj[MONACO_TOUCH_PATCH_FLAG])
+    const globalObj = window as Window
+    const flagStore = globalObj as unknown as Record<string, unknown>
+    if (flagStore[MONACO_TOUCH_PATCH_FLAG])
       return
     const proto = window.Element?.prototype
     const nativeAdd = proto?.addEventListener
@@ -67,7 +72,7 @@ function ensureMonacoPassiveTouchListeners() {
         return nativeAdd.call(this, type, listener, withPassiveOptions(options))
       return nativeAdd.call(this, type, listener, options)
     }
-    globalObj[MONACO_TOUCH_PATCH_FLAG] = true
+    flagStore[MONACO_TOUCH_PATCH_FLAG] = true
   }
   catch {}
 }
@@ -98,6 +103,11 @@ function withPassiveOptions(options?: boolean | AddEventListenerOptions): AddEve
   return { passive: true }
 }
 
+function warnCodeBlockDev(context: string, error: unknown) {
+  if (import.meta.env?.DEV)
+    console.warn(`[markstream-vue] ${context}:`, error)
+}
+
 const instance = getCurrentInstance()
 const hasPreviewListener = computed(() => {
   const props = instance?.vnode.props as Record<string, unknown> | null | undefined
@@ -118,6 +128,7 @@ const isCollapsed = ref(false)
 const editorCreated = ref(false)
 const editorMounted = ref(false)
 const monacoReady = ref(false)
+let isUnmounted = false
 let expandRafId: number | null = null
 let deferredHeightSyncRafId: number | null = null
 const heightBeforeCollapse = ref<number | null>(null)
@@ -146,6 +157,7 @@ if (typeof window !== 'undefined') {
   )
 }
 onBeforeUnmount(() => {
+  isUnmounted = true
   viewportHandle.value?.destroy()
   viewportHandle.value = null
 })
@@ -153,22 +165,22 @@ onBeforeUnmount(() => {
 // Lazy-load `stream-monaco` helpers at runtime so consumers who don't install
 // `stream-monaco` won't have the editor code bundled. We provide safe no-op
 // fallbacks for the minimal API we use.
-let createEditor: ((el: HTMLElement, code: string, lang: string) => void) | null = null
-let createDiffEditor: ((el: HTMLElement, original: string, modified: string, lang: string) => void) | null = null
-let updateCode: (code: string, lang: string) => void = () => {}
-let updateDiffCode: (original: string, modified: string, lang: string) => void = () => {}
-let getEditor: () => any = () => null
-let getEditorView: () => any = () => ({ getModel: () => ({ getLineCount: () => 1 }), getOption: () => 14, updateOptions: () => {} })
-let getDiffEditorView: () => any = () => ({ getModel: () => ({ getLineCount: () => 1 }), getOption: () => 14, updateOptions: () => {} })
+let createEditor: ((el: HTMLElement, code: string, lang: string) => Promise<unknown> | unknown) | null = null
+let createDiffEditor: ((el: HTMLElement, original: string, modified: string, lang: string) => Promise<unknown> | unknown) | null = null
+let updateCode: (code: string, lang: string) => Promise<unknown> | unknown = () => {}
+let updateDiffCode: (original: string, modified: string, lang: string) => Promise<unknown> | unknown = () => {}
+let getEditor: () => MonacoNamespaceLike | null = () => null
+let getEditorView: () => MonacoEditorViewLike | null = () => ({ getModel: () => ({ getLineCount: () => 1 }), getOption: () => 14, updateOptions: () => {} })
+let getDiffEditorView: () => MonacoDiffEditorViewLike | null = () => ({ getModel: () => ({ getLineCount: () => 1 }), getOption: () => 14, updateOptions: () => {} })
 let cleanupEditor: () => void = () => {}
 let safeClean = () => {}
 let refreshDiffPresentation: () => void = () => {}
 let createEditorPromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
-let setTheme: (theme: any) => Promise<void> = async () => {}
-const editorHeightSyncDisposables: Array<{ dispose?: () => void }> = []
+let setTheme: (theme: CodeBlockMonacoTheme | undefined) => Promise<void> | void = async () => {}
+const editorHeightSyncDisposables: MonacoDisposableLike[] = []
 const inlineFoldProxyCleanups: Array<() => void> = []
-let runtimeMonacoOptions: Record<string, any> | null = null
+let runtimeMonacoOptions: MonacoRuntimeOptions | null = null
 const isDiff = computed(() => props.node.diff)
 const diffStats = ref({ removed: 0, added: 0 })
 const diffStatsAriaLabel = computed(() => `-${diffStats.value.removed} +${diffStats.value.added}`)
@@ -250,7 +262,7 @@ const desiredEditorKind = computed<'diff' | 'single'>(() => (isDiff.value ? 'dif
 const currentEditorKind = ref<'diff' | 'single'>(desiredEditorKind.value)
 const usePreCodeRender = ref(false)
 const preFallbackWrap = computed(() => {
-  const wordWrap = (props.monacoOptions as any)?.wordWrap
+  const wordWrap = props.monacoOptions?.wordWrap
   // Keep consistent with CodeBlockNode's default `wordWrap: 'on'`.
   if (wordWrap == null)
     return true
@@ -269,6 +281,8 @@ if (typeof window !== 'undefined') {
   ;(async () => {
     try {
       const mod = await getUseMonaco()
+      if (isUnmounted)
+        return
       // If mod is null, stream-monaco is not available
       if (!mod) {
         // Only log warning in development mode
@@ -279,8 +293,8 @@ if (typeof window !== 'undefined') {
         return
       }
       // `useMonaco` and `detectLanguage` should be available
-      const useMonaco = (mod as any).useMonaco
-      const det = (mod as any).detectLanguage
+      const useMonaco = mod.useMonaco
+      const det = mod.detectLanguage
       if (typeof det === 'function')
         detectLanguage = det
       if (typeof useMonaco === 'function') {
@@ -303,11 +317,13 @@ if (typeof window !== 'undefined') {
         setTheme = helpers.setTheme || setTheme
         monacoReady.value = true
 
-        if (codeEditor.value)
+        if (!isUnmounted && codeEditor.value)
           await ensureEditorCreation(codeEditor.value as HTMLElement)
       }
     }
     catch (err) {
+      if (isUnmounted)
+        return
       // Only log warning in development mode
       if (import.meta.env?.DEV) {
         console.warn('[markstream-vue] Failed to initialize Monaco editor:', err)
@@ -331,7 +347,7 @@ const fontBaselineReady = computed(() => {
   return typeof a === 'number' && Number.isFinite(a) && a > 0 && typeof b === 'number' && Number.isFinite(b) && b > 0
 })
 const preFallbackFontSize = computed(() => {
-  const fromOptions = (props.monacoOptions as any)?.fontSize
+  const fromOptions = props.monacoOptions?.fontSize
   if (typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0)
     return fromOptions
   const fromState = codeFontSize.value
@@ -340,13 +356,13 @@ const preFallbackFontSize = computed(() => {
   return 12
 })
 const preFallbackLineHeight = computed(() => {
-  const fromOptions = (props.monacoOptions as any)?.lineHeight
+  const fromOptions = props.monacoOptions?.lineHeight
   if (typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0)
     return fromOptions
   return Math.round(preFallbackFontSize.value * 1.5)
 })
 const preFallbackTabSize = computed(() => {
-  const fromOptions = (props.monacoOptions as any)?.tabSize
+  const fromOptions = props.monacoOptions?.tabSize
   if (typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0)
     return fromOptions
   // Monaco default is 4.
@@ -359,7 +375,7 @@ const estimatedVisibleContentHeight = computed(() => {
     : null
 })
 const preFallbackStyle = computed(() => {
-  const fontFamily = (props.monacoOptions as any)?.fontFamily
+  const fontFamily = props.monacoOptions?.fontFamily
   return {
     fontSize: `${preFallbackFontSize.value}px`,
     lineHeight: `${preFallbackLineHeight.value}px`,
@@ -419,7 +435,7 @@ function readActualFontSizeFromEditor(): number | null {
     const mon = getEditor()
     const key = mon?.EditorOption?.fontInfo
     if (ed && key != null) {
-      const info = ed.getOption?.(key)
+      const info = ed.getOption?.(key) as { fontSize?: unknown } | undefined
       const size = info?.fontSize
       if (typeof size === 'number' && Number.isFinite(size) && size > 0)
         return size
@@ -447,7 +463,7 @@ function readActualFontSizeFromEditor(): number | null {
   return null
 }
 
-function getLineHeightSafe(editor: any): number {
+function getLineHeightSafe(editor: MonacoEditorViewLike | null | undefined): number {
   try {
     const monacoEditor = getEditor()
     const key = monacoEditor?.EditorOption?.lineHeight
@@ -597,12 +613,13 @@ function resetCodeFont() {
 function computeContentHeight(): number | null {
   // Prefer Monaco's contentHeight when available; fallback to lineCount * lineHeight
   try {
-    const ed = isDiff.value ? getDiffEditorView() : getEditorView()
-    if (!ed)
+    const diffEditor = isDiff.value ? getDiffEditorView() : null
+    const editor = isDiff.value ? diffEditor : getEditorView()
+    if (!editor)
       return null
-    if (isDiff.value && ed?.getOriginalEditor && ed?.getModifiedEditor) {
-      const o = ed.getOriginalEditor?.()
-      const m = ed.getModifiedEditor?.()
+    if (diffEditor?.getOriginalEditor && diffEditor?.getModifiedEditor) {
+      const o = diffEditor.getOriginalEditor?.()
+      const m = diffEditor.getModifiedEditor?.()
       o?.layout?.()
       m?.layout?.()
       const oh = (o?.getContentHeight?.() as number) || 0
@@ -617,19 +634,19 @@ function computeContentHeight(): number | null {
       const lh = Math.max(getLineHeightSafe(o), getLineHeightSafe(m))
       return Math.ceil(lc * (lh + LINE_EXTRA_PER_LINE) + CONTENT_PADDING + PIXEL_EPSILON)
     }
-    else if (ed?.getContentHeight) {
-      ed?.layout?.()
-      const h = ed.getContentHeight()
+    else if (editor?.getContentHeight) {
+      editor?.layout?.()
+      const h = editor.getContentHeight()
       if (h > 0)
         return Math.ceil(h + PIXEL_EPSILON)
     }
     // generic fallback
-    const model = ed?.getModel?.()
+    const model = editor?.getModel?.()
     let lineCount = 1
     if (model && typeof model.getLineCount === 'function') {
       lineCount = model.getLineCount()
     }
-    const lh = getLineHeightSafe(ed)
+    const lh = getLineHeightSafe(editor)
     return Math.ceil(lineCount * (lh + LINE_EXTRA_PER_LINE) + CONTENT_PADDING + PIXEL_EPSILON)
   }
   catch {
@@ -920,7 +937,10 @@ function bindEditorHeightSync() {
     const originalEditor = diff?.getOriginalEditor?.()
     const modifiedEditor = diff?.getModifiedEditor?.()
 
-    const bind = (source: any, eventName: string) => {
+    const bind = (
+      source: MonacoEditorViewLike | null | undefined,
+      eventName: 'onDidContentSizeChange' | 'onDidLayoutChange',
+    ) => {
       try {
         const subscribe = source?.[eventName]
         if (typeof subscribe !== 'function')
@@ -1381,12 +1401,14 @@ function resetEditorHost(el: HTMLElement) {
 }
 
 async function runEditorCreation(el: HTMLElement) {
-  if (!createEditor)
+  if (!createEditor || isUnmounted)
     return
 
   clearEditorHeightSyncBindings()
   clearInlineFoldProxies()
   resetEditorHost(el)
+  if (isUnmounted)
+    return
 
   if (isDiff.value) {
     safeClean()
@@ -1400,6 +1422,8 @@ async function runEditorCreation(el: HTMLElement) {
   else {
     await createEditor(el as HTMLElement, props.node.code, monacoLanguage.value)
   }
+  if (isUnmounted)
+    return
 
   const editor = isDiff.value ? getDiffEditorView() : getEditorView()
   if (typeof props.monacoOptions?.fontSize === 'number') {
@@ -1424,7 +1448,11 @@ async function runEditorCreation(el: HTMLElement) {
 
   if (props.loading === false) {
     await nextTick()
+    if (isUnmounted)
+      return
     safeRaf(() => {
+      if (isUnmounted)
+        return
       if (isExpanded.value && !isCollapsed.value)
         updateExpandedHeight()
       else if (!isCollapsed.value)
@@ -1433,6 +1461,8 @@ async function runEditorCreation(el: HTMLElement) {
   }
 
   await nextTick()
+  if (isUnmounted)
+    return
   editorMounted.value = true
   bindEditorHeightSync()
   syncEditorCssVars()
@@ -1442,8 +1472,9 @@ async function runEditorCreation(el: HTMLElement) {
 }
 
 function ensureEditorCreation(el: HTMLElement) {
-  if (!createEditor)
+  if (!createEditor || isUnmounted)
     return null
+  ensureMonacoPassiveTouchListeners()
   if (createEditorPromise)
     return createEditorPromise
   if (editorCreated.value && editorMounted.value)
@@ -1454,10 +1485,12 @@ function ensureEditorCreation(el: HTMLElement) {
     await runEditorCreation(el)
   })()
 
-  createEditorPromise = pending.finally(() => {
-    createEditorPromise = null
+  const currentPromise = pending.finally(() => {
+    if (createEditorPromise === currentPromise)
+      createEditorPromise = null
   })
-  return createEditorPromise
+  createEditorPromise = currentPromise
+  return currentPromise
 }
 
 // 延迟创建编辑器：仅在可见且准备就绪时创建，避免无意义的初始化
@@ -1480,8 +1513,9 @@ const stopCreateEditorWatch = watch(
     try {
       await creation
     }
-    catch {
+    catch (error) {
       // Keep the `<pre>` fallback if Monaco fails to mount for this block.
+      warnCodeBlockDev('Failed to mount Monaco editor', error)
       editorMounted.value = false
     }
 
@@ -1508,18 +1542,27 @@ watch(
       return
     if (!viewportReady.value)
       return
+    const pendingCreation = createEditorPromise
+    if (pendingCreation) {
+      try {
+        await pendingCreation
+      }
+      catch {}
+      if (isUnmounted || !codeEditor.value)
+        return
+    }
 
     try {
       editorMounted.value = false
       editorCreated.value = false
-      createEditorPromise = null
       clearEditorHeightSyncBindings()
       clearInlineFoldProxies()
       safeClean()
       await nextTick()
       await ensureEditorCreation(codeEditor.value as HTMLElement)
     }
-    catch {
+    catch (error) {
+      warnCodeBlockDev('Failed to recreate Monaco editor after code block kind changed', error)
       // Keep fallback rendering if recreation fails.
       editorMounted.value = false
     }
@@ -1530,11 +1573,11 @@ function getPreferredColorScheme() {
   return props.isDark ? props.darkTheme : props.lightTheme
 }
 
-function getThemeName(theme: any) {
+function getThemeName(theme: CodeBlockMonacoTheme | null | undefined) {
   if (typeof theme === 'string')
     return theme
   if (theme && typeof theme === 'object' && 'name' in theme)
-    return String((theme as any).name)
+    return String(theme.name)
   return null
 }
 
@@ -1580,10 +1623,12 @@ function themeUpdate() {
 
   void scheduleGlobalMonacoTheme(setTheme, themeToSet)
     .then(syncPresentation)
-    .catch(() => {})
+    .catch((error) => {
+      warnCodeBlockDev('Failed to apply Monaco theme', error)
+    })
 }
 
-function themeLooksDark(theme: any) {
+function themeLooksDark(theme: CodeBlockMonacoTheme | null | undefined) {
   const themeName = getThemeName(theme) ?? ''
   const normalized = themeName.toLowerCase()
   if (!normalized)
@@ -1645,7 +1690,7 @@ function buildRuntimeMonacoOptions() {
     onThemeChange() {
       syncEditorCssVars()
     },
-  } as Record<string, any>
+  } as MonacoRuntimeOptions
 }
 
 function syncRuntimeMonacoOptions() {
@@ -1721,18 +1766,27 @@ watch(
       return
     if (props.stream === false && props.loading !== false)
       return
+    const pendingCreation = createEditorPromise
+    if (pendingCreation) {
+      try {
+        await pendingCreation
+      }
+      catch {}
+      if (isUnmounted || !codeEditor.value)
+        return
+    }
 
     try {
       editorMounted.value = false
       editorCreated.value = false
-      createEditorPromise = null
       clearEditorHeightSyncBindings()
       clearInlineFoldProxies()
       safeClean()
       await nextTick()
       await ensureEditorCreation(codeEditor.value as HTMLElement)
     }
-    catch {
+    catch (error) {
+      warnCodeBlockDev('Failed to recreate Monaco editor after Monaco options changed', error)
       editorMounted.value = false
     }
   },
@@ -1753,36 +1807,40 @@ const stopLoadingWatch = watch(
     await nextTick()
     safeRaf(() => {
       void (async () => {
-        if (loadingJustFinished && editorCreated.value) {
-          if (isDiff.value && codeEditor.value) {
-            const pendingCreation = createEditorPromise
-            if (pendingCreation) {
-              try {
-                await pendingCreation
+        try {
+          if (loadingJustFinished && editorCreated.value) {
+            if (isDiff.value && codeEditor.value) {
+              const pendingCreation = createEditorPromise
+              if (pendingCreation) {
+                try {
+                  await pendingCreation
+                }
+                catch {}
               }
-              catch {}
+              editorMounted.value = false
+              editorCreated.value = false
+              clearEditorHeightSyncBindings()
+              clearInlineFoldProxies()
+              safeClean()
+              codeEditor.value.replaceChildren()
+              await nextTick()
+              await ensureEditorCreation(codeEditor.value as HTMLElement)
             }
-            editorMounted.value = false
-            editorCreated.value = false
-            createEditorPromise = null
-            clearEditorHeightSyncBindings()
-            clearInlineFoldProxies()
-            safeClean()
-            codeEditor.value.replaceChildren()
-            await nextTick()
-            await ensureEditorCreation(codeEditor.value as HTMLElement)
+            else {
+              updateCode(String(props.node.code ?? ''), monacoLanguage.value)
+            }
           }
-          else {
-            updateCode(String(props.node.code ?? ''), monacoLanguage.value)
+          if (!isCollapsed.value) {
+            if (isExpanded.value)
+              updateExpandedHeight()
+            else
+              updateCollapsedHeight()
           }
+          stopLoadingWatch()
         }
-        if (!isCollapsed.value) {
-          if (isExpanded.value)
-            updateExpandedHeight()
-          else
-            updateCollapsedHeight()
+        catch (error) {
+          warnCodeBlockDev('Failed to refresh Monaco editor after streaming settled', error)
         }
-        stopLoadingWatch()
       })()
     })
     stopExpandAutoResize()
@@ -1816,7 +1874,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <PreCodeNode v-if="usePreCodeRender" :node="(node as any)" :loading="props.loading" />
+  <PreCodeNode v-if="usePreCodeRender" :node="props.node" :loading="props.loading" />
   <div
     v-else
     ref="container"
@@ -1970,12 +2028,12 @@ onUnmounted(() => {
         class="code-pre-fallback"
         :class="{ 'is-wrap': preFallbackWrap }"
         :style="preFallbackStyle"
-        :node="(node as any)"
+        :node="props.node"
       />
     </div>
     <HtmlPreviewFrame
       v-if="showInlinePreview && !hasPreviewListener && isPreviewable && codeLanguage === 'html'"
-      :code="node.code"
+      :code="props.node.code"
       :is-dark="props.isDark"
       :on-close="() => (showInlinePreview = false)"
     />

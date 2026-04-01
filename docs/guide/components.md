@@ -36,19 +36,26 @@ import type { CodeBlockNodeProps } from 'markstream-vue'
 import MarkdownRender from 'markstream-vue'
 
 type MarkdownRenderProps = InstanceType<typeof MarkdownRender>['$props']
+type MarkdownRenderCodeBlockProps = NonNullable<MarkdownRenderProps['codeBlockProps']>
 
 declare const markdownRenderProps: MarkdownRenderProps
+declare const markdownRenderCodeBlockProps: MarkdownRenderCodeBlockProps
 declare const codeBlockProps: CodeBlockNodeProps
 
 // Hover the property names after each dot.
 markdownRenderProps.content
 markdownRenderProps.customId
 markdownRenderProps.isDark
+markdownRenderProps.codeBlockProps?.showHeader
+markdownRenderProps.codeBlockProps?.showTooltips
 markdownRenderProps.codeBlockMonacoOptions
 markdownRenderProps.codeBlockMonacoOptions?.theme
 markdownRenderProps.codeBlockMonacoOptions?.languages
 markdownRenderProps.codeBlockMonacoOptions?.diffHunkActionsOnHover
 markdownRenderProps.themes
+
+markdownRenderCodeBlockProps.showFontSizeButtons
+markdownRenderCodeBlockProps.showCollapseButton
 
 codeBlockProps.monacoOptions
 codeBlockProps.monacoOptions?.MAX_HEIGHT
@@ -60,6 +67,7 @@ Notes:
 
 - `InstanceType<typeof MarkdownRender>['$props']` is the most direct way to inspect the exported component props.
 - `NodeRendererProps` is the named export for the same public prop surface.
+- `codeBlockProps` now follows the public `CodeBlockNode` prop surface except for `node`, so hover/completion works for flags like `showHeader`, `showFontSizeButtons`, and `showTooltips`.
 - Hover the property names after each dot in the snippet above, not the imported type names.
 - If you specifically want the best component-prop hover targets, use the `MarkdownRender` snippet below first.
 - Only `ts twoslash` and `vue twoslash` fences in this docs site enable hoverable type details.

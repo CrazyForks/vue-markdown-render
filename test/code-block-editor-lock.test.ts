@@ -155,6 +155,59 @@ describe('codeBlockNode editor creation locking', () => {
     await flushPendingMicrotasks()
     wrapper.unmount()
   })
+
+  it('waits for the in-flight single editor creation before recreating as diff', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          code: 'const value = 1',
+          raw: '```ts\nconst value = 1\n```',
+        },
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'diff',
+        code: '@@ -1 +1 @@',
+        diff: true,
+        originalCode: 'const value = 1\n',
+        updatedCode: 'const value = 2\n',
+        raw: '```diff\n-const value = 1\n+const value = 2\n```',
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.createDiffEditor).not.toHaveBeenCalled()
+
+    const finish = resolveCreate
+    if (finish)
+      finish()
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    expect(helpers.createEditor).toHaveBeenCalledTimes(1)
+    expect(helpers.createDiffEditor).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
 })
 
 describe('codeBlockNode language normalization', () => {

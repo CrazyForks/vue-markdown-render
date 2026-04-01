@@ -63,7 +63,7 @@ export {
 } from './customComponents'
 export * from './i18n/useSafeI18n'
 export * from './renderers/renderNode'
-export type { NodeRendererProps } from './types'
+export type { NodeRendererCodeBlockProps, NodeRendererProps } from './types'
 export type {
   CodeBlockDiffAppearance,
   CodeBlockDiffHideUnchangedRegions,

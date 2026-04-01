@@ -2,10 +2,13 @@ import type { BaseNode, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
 import type {
   CodeBlockMonacoOptions,
   CodeBlockMonacoTheme,
+  CodeBlockNodeProps,
   D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,
 } from './component-props'
+
+export type NodeRendererCodeBlockProps = Partial<Omit<CodeBlockNodeProps, 'node'>> & Record<string, unknown>
 
 export interface NodeRendererProps {
   /** Raw Markdown input. Omit this when you pass pre-parsed nodes instead. */
@@ -48,7 +51,7 @@ export interface NodeRendererProps {
   /** Maximum width forwarded to CodeBlockNode (px or CSS unit) */
   codeBlockMaxWidth?: string | number
   /** Arbitrary props to forward to every CodeBlockNode */
-  codeBlockProps?: Record<string, any>
+  codeBlockProps?: NodeRendererCodeBlockProps
   /** Props forwarded to MermaidBlockNode for mermaid fences */
   mermaidProps?: Partial<Omit<MermaidBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   /** Props forwarded to D2BlockNode for d2/d2lang fences */

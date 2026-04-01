@@ -8,7 +8,6 @@ import { getKatex, getKatexSync } from '../MathInlineNode/katex'
 
 const props = defineProps<MathBlockNodeProps>()
 const containerEl = ref<HTMLElement | null>(null)
-const isServer = typeof window === 'undefined'
 
 function resolveInitialState() {
   if (!props.node.content) {
@@ -19,17 +18,8 @@ function resolveInitialState() {
     }
   }
 
-  // Only perform a sync render during SSR so the server and client initial
-  // markup always match.  On the client the post-mount renderMath() call will
-  // enhance the component, avoiding SSR/client hydration divergence.
-  if (!isServer) {
-    return {
-      html: '',
-      text: props.node.raw,
-      loading: false,
-    }
-  }
-
+  // Prefer a synchronous KaTeX render whenever the loader can provide one so
+  // SSR and client hydration start from the same markup.
   const katex = getKatexSync()
   if (!katex) {
     return {
@@ -189,7 +179,7 @@ watch(
   },
 )
 onMounted(() => {
-  if (isServer || renderedHtml.value)
+  if (renderedHtml.value)
     return
   renderMath()
 })

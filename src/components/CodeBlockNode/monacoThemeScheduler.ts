@@ -1,8 +1,10 @@
-type SetTheme = (theme: any) => Promise<void>
+import type { CodeBlockMonacoTheme } from '../../types/component-props'
+
+type SetTheme = (theme: CodeBlockMonacoTheme | undefined) => Promise<void> | void
 
 let applyPromise: Promise<void> | null = null
 let inFlightKey: string | null = null
-let pendingTheme: any = null
+let pendingTheme: CodeBlockMonacoTheme | null = null
 let pendingKey: string | null = null
 let lastAppliedKey: string | null = null
 let currentSetTheme: SetTheme | null = null
@@ -10,13 +12,18 @@ let currentSetTheme: SetTheme | null = null
 const themeKeyCache = new WeakMap<object, string>()
 let themeKeySeq = 0
 
-function getThemeKey(theme: any): string | null {
+function warnThemeSchedulerDev(error: unknown) {
+  if (import.meta.env?.DEV)
+    console.warn('[markstream-vue] Failed to apply Monaco theme:', error)
+}
+
+function getThemeKey(theme: CodeBlockMonacoTheme | null | undefined): string | null {
   if (theme == null)
     return null
   if (typeof theme === 'string')
     return theme
-  if (typeof theme === 'object' && theme && 'name' in theme)
-    return String((theme as any).name)
+  if (typeof theme === 'object' && 'name' in theme)
+    return String(theme.name)
   if (typeof theme === 'object') {
     const cached = themeKeyCache.get(theme)
     if (cached)
@@ -36,7 +43,7 @@ function getThemeKey(theme: any): string | null {
   return String(theme)
 }
 
-export function scheduleGlobalMonacoTheme(setTheme: SetTheme, theme: any): Promise<void> {
+export function scheduleGlobalMonacoTheme(setTheme: SetTheme, theme: CodeBlockMonacoTheme | null | undefined): Promise<void> {
   const key = getThemeKey(theme)
   if (!key)
     return Promise.resolve()
@@ -72,7 +79,9 @@ export function scheduleGlobalMonacoTheme(setTheme: SetTheme, theme: any): Promi
         await (currentSetTheme ?? setTheme)(nextTheme)
         lastAppliedKey = nextKey
       }
-      catch {}
+      catch (error) {
+        warnThemeSchedulerDev(error)
+      }
     }
   })().finally(() => {
     applyPromise = null
