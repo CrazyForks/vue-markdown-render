@@ -38,10 +38,9 @@
 /* Prevent mermaid temporary render containers from causing layout shift */
 body > div[id^="dmermaid-"] {
   position: fixed;
-  top: 0;
+  top: -10000px;
   left: 0;
-  width: 0;
-  height: 0;
-  overflow: hidden;
+  width: 100%;
+  visibility: hidden;
   pointer-events: none;
 }

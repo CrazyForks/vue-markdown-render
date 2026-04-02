@@ -142,6 +142,39 @@ function renderSvgToTarget(target: HTMLElement | null | undefined, svg: string |
   return target.innerHTML
 }
 
+function isBrokenMermaidSvg(svg: string | null | undefined) {
+  if (!svg || typeof DOMParser === 'undefined')
+    return !svg
+
+  const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
+  const svgEl = parsed.documentElement
+  if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
+    return true
+
+  const viewBox = svgEl.getAttribute('viewBox')
+  if (viewBox) {
+    const parts = viewBox.trim().split(/[\s,]+/)
+    if (parts.length === 4) {
+      const width = Number.parseFloat(parts[2] || '')
+      const height = Number.parseFloat(parts[3] || '')
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
+        return true
+    }
+  }
+
+  const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll('*'))]
+  for (const node of nodes) {
+    for (const attr of Array.from(node.attributes)) {
+      if (/\bNaN\b/i.test(attr.value))
+        return true
+      if (attr.name === 'style' && /max-width:\s*0(?:px)?/i.test(attr.value))
+        return true
+    }
+  }
+
+  return false
+}
+
 const DEFAULTS = {
   maxHeight: '500px',
   loading: true,
@@ -395,7 +428,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
         () => (mermaidRef.current as any).render(id, themed),
         { timeoutMs: fullRenderTimeout, signal },
       ) as any
-      if (!result?.svg)
+      if (!result?.svg || isBrokenMermaidSvg(result.svg))
         return false
       const rendered = renderSvgToTarget(contentRef.current, result.svg, strictMode)
       result.bindFunctions?.(contentRef.current)
@@ -435,7 +468,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
         () => (mermaidRef.current as any).render(id, themed),
         { timeoutMs: renderTimeout, signal },
       ) as any
-      if (res?.svg) {
+      if (res?.svg && !isBrokenMermaidSvg(res.svg)) {
         renderSvgToTarget(contentRef.current, res.svg, strictMode)
         res.bindFunctions?.(contentRef.current)
         updateContainerHeight()
@@ -460,6 +493,35 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     if (normalized === lastRenderedCodeRef.current && hasRenderedOnceRef.current)
       return
     const token = ++renderTokenRef.current
+    const diagramKind = getMermaidDiagramKind(code)
+    if (diagramKind === 'gantt') {
+      const prefix = getSafePrefixCandidate(code)
+      if (!prefix.trim())
+        return
+      try {
+        await canParseWithFallback(prefix, theme, {
+          workerTimeout,
+          parseTimeout,
+          mermaid: mermaidRef.current,
+          signal,
+        })
+        if (signal?.aborted || renderTokenRef.current !== token)
+          return
+        if (prefix === code) {
+          const ok = await renderFull(code, theme, signal)
+          if (ok)
+            lastRenderedCodeRef.current = normalized
+        }
+        else {
+          await renderPartial(prefix, theme, signal)
+        }
+      }
+      catch (err) {
+        if ((err as any)?.name === 'AbortError')
+          return
+      }
+      return
+    }
     try {
       await canParseWithFallback(code, theme, {
         workerTimeout,
@@ -1097,7 +1159,46 @@ function applyThemeTo(code: string, theme: Theme) {
   return `%%{init: {"theme": "${themeValue}"}}%%\n${code}`
 }
 
+function getMermaidDiagramKind(code: string) {
+  for (const rawLine of code.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('%%'))
+      continue
+    const match = line.match(/^([A-Z][\w-]*)\b/i)
+    return match?.[1]?.toLowerCase() || ''
+  }
+  return ''
+}
+
+function isGanttTaskLine(rawLine: string) {
+  const line = rawLine.trim()
+  if (!line || line.startsWith('%%'))
+    return false
+  if (/^(?:gantt|title|dateformat|axisformat|tickinterval|excludes|section|todaymarker|topaxis|weekday|weekend|acctitle|accdescr|accdescrmultiline)\b/i.test(line))
+    return false
+  return line.includes(':')
+}
+
+function getSafeGanttPreviewCandidate(code: string) {
+  const lines = code.split(/\r?\n/)
+  if (!/\r?\n$/.test(code) && lines.length > 0)
+    lines.pop()
+  while (lines.length > 0) {
+    const last = lines[lines.length - 1]?.trim()
+    if (!last || last.startsWith('%%')) {
+      lines.pop()
+      continue
+    }
+    if (isGanttTaskLine(last))
+      break
+    lines.pop()
+  }
+  return lines.some(isGanttTaskLine) ? lines.join('\n') : ''
+}
+
 function getSafePrefixCandidate(code: string) {
+  if (getMermaidDiagramKind(code) === 'gantt')
+    return getSafeGanttPreviewCandidate(code)
   const lines = code.split('\n')
   while (lines.length > 0) {
     const lastRaw = lines[lines.length - 1]

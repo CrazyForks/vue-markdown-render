@@ -440,20 +440,23 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
       let renderSource = source
       if (this.resolvedLoading && this.resolvedProgressiveRender) {
         try {
-          await this.canParseWithFallback(source, theme, mermaid, token)
-        }
-        catch (error: any) {
-          if (error?.name === 'AbortError')
-            return
-          const prefix = await this.findPrefixCandidate(source, theme, token)
+          const res = await this.canParseOrPrefix(source, theme, mermaid, token)
           if (this.destroyed || token !== this.renderToken)
             return
-          if (!prefix) {
+          if (!res.fullOk && !res.prefix) {
             this.rendering = false
             this.cdr.markForCheck()
             return
           }
-          renderSource = prefix
+          if (res.prefix)
+            renderSource = res.prefix
+        }
+        catch (error: any) {
+          if (error?.name === 'AbortError')
+            return
+          this.rendering = false
+          this.cdr.markForCheck()
+          return
         }
       }
 
@@ -469,6 +472,8 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
         return
 
       const svg = typeof rendered === 'string' ? rendered : rendered?.svg
+      if (this.isBrokenMermaidSvg(svg))
+        throw new Error('Mermaid produced invalid SVG during preview')
       const safeSvg = toSafeSvgMarkup(svg)
       if (!safeSvg)
         throw new Error('Mermaid returned empty output.')
@@ -481,6 +486,11 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
     catch (error) {
       if (this.destroyed || token !== this.renderToken)
         return
+      if (this.resolvedLoading && this.resolvedProgressiveRender) {
+        this.svgMarkup = ''
+        this.syncSvgHosts()
+        return
+      }
       // Allow consumer to handle the error via onRenderError callback
       const onRenderError = this.mergedProps.onRenderError
       if (typeof onRenderError === 'function' && this.previewHost?.nativeElement) {
@@ -553,6 +563,35 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
     return true
   }
 
+  private async canParseOrPrefix(source: string, theme: MermaidTheme, mermaid: any, token: number) {
+    if (this.getMermaidDiagramKind(source) === 'gantt') {
+      const prefix = this.getSafePrefixCandidate(source)
+      if (!prefix.trim())
+        return { fullOk: false, prefix: '' }
+      await this.canParseWithFallback(prefix, theme, mermaid, token)
+      if (this.destroyed || token !== this.renderToken)
+        throw new DOMException('Aborted', 'AbortError')
+      return prefix === source ? { fullOk: true, prefix: '' } : { fullOk: false, prefix }
+    }
+
+    try {
+      await this.canParseWithFallback(source, theme, mermaid, token)
+      return { fullOk: true, prefix: '' }
+    }
+    catch (error: any) {
+      if (error?.name === 'AbortError')
+        throw error
+    }
+
+    const prefix = await this.findPrefixCandidate(source, theme, token)
+    if (!prefix)
+      return { fullOk: false, prefix: '' }
+    await this.canParseWithFallback(prefix, theme, mermaid, token)
+    if (this.destroyed || token !== this.renderToken)
+      throw new DOMException('Aborted', 'AbortError')
+    return { fullOk: false, prefix }
+  }
+
   private async findPrefixCandidate(source: string, theme: MermaidTheme, token: number) {
     try {
       const prefix = await findPrefixOffthread(source, theme, this.resolvedWorkerTimeout)
@@ -577,7 +616,46 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
     return `%%{init: {"theme": "${themeValue}"}}%%\n${source}`
   }
 
+  private getMermaidDiagramKind(source: string) {
+    for (const rawLine of source.split(/\r?\n/)) {
+      const line = rawLine.trim()
+      if (!line || line.startsWith('%%'))
+        continue
+      const match = line.match(/^([A-Z][\w-]*)\b/i)
+      return match?.[1]?.toLowerCase() || ''
+    }
+    return ''
+  }
+
+  private isGanttTaskLine(rawLine: string) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('%%'))
+      return false
+    if (/^(?:gantt|title|dateformat|axisformat|tickinterval|excludes|section|todaymarker|topaxis|weekday|weekend|acctitle|accdescr|accdescrmultiline)\b/i.test(line))
+      return false
+    return line.includes(':')
+  }
+
+  private getSafeGanttPreviewCandidate(source: string) {
+    const lines = source.split(/\r?\n/)
+    if (!/\r?\n$/.test(source) && lines.length > 0)
+      lines.pop()
+    while (lines.length > 0) {
+      const last = lines[lines.length - 1]?.trim()
+      if (!last || last.startsWith('%%')) {
+        lines.pop()
+        continue
+      }
+      if (this.isGanttTaskLine(last))
+        break
+      lines.pop()
+    }
+    return lines.some(line => this.isGanttTaskLine(line)) ? lines.join('\n') : ''
+  }
+
   private getSafePrefixCandidate(source: string) {
+    if (this.getMermaidDiagramKind(source) === 'gantt')
+      return this.getSafeGanttPreviewCandidate(source)
     const lines = source.split('\n')
     while (lines.length > 0) {
       const lastRaw = lines[lines.length - 1]
@@ -597,6 +675,39 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
       lines.pop()
     }
     return lines.join('\n')
+  }
+
+  private isBrokenMermaidSvg(svg: string | null | undefined) {
+    if (!svg || typeof DOMParser === 'undefined')
+      return !svg
+
+    const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
+    const svgEl = parsed.documentElement
+    if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
+      return true
+
+    const viewBox = svgEl.getAttribute('viewBox')
+    if (viewBox) {
+      const parts = viewBox.trim().split(/[\s,]+/)
+      if (parts.length === 4) {
+        const width = Number.parseFloat(parts[2] || '')
+        const height = Number.parseFloat(parts[3] || '')
+        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
+          return true
+      }
+    }
+
+    const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll('*'))]
+    for (const node of nodes) {
+      for (const attr of Array.from(node.attributes)) {
+        if (/\bNaN\b/i.test(attr.value))
+          return true
+        if (attr.name === 'style' && /max-width:\s*0(?:px)?/i.test(attr.value))
+          return true
+      }
+    }
+
+    return false
   }
 
   private withTimeout<T>(run: () => Promise<T>, timeoutMs: number) {

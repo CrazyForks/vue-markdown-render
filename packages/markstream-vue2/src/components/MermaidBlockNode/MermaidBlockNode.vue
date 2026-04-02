@@ -214,6 +214,39 @@ function renderSvgToTarget(target: HTMLElement | null | undefined, svg: string |
   return target.innerHTML
 }
 
+function isBrokenMermaidSvg(svg: string | null | undefined) {
+  if (!svg || typeof DOMParser === 'undefined')
+    return !svg
+
+  const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
+  const svgEl = parsed.documentElement
+  if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
+    return true
+
+  const viewBox = svgEl.getAttribute('viewBox')
+  if (viewBox) {
+    const parts = viewBox.trim().split(/[\s,]+/)
+    if (parts.length === 4) {
+      const width = Number.parseFloat(parts[2] || '')
+      const height = Number.parseFloat(parts[3] || '')
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
+        return true
+    }
+  }
+
+  const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll('*'))]
+  for (const node of nodes) {
+    for (const attr of Array.from(node.attributes)) {
+      if (/\bNaN\b/i.test(attr.value))
+        return true
+      if (attr.name === 'style' && /max-width:\s*0(?:px)?/i.test(attr.value))
+        return true
+    }
+  }
+
+  return false
+}
+
 const { t } = useSafeI18n()
 
 async function resolveMermaidInstance() {
@@ -275,6 +308,17 @@ function getCodeWithTheme(theme: 'light' | 'dark', code = baseFixedCode.value) {
   return themeConfig + baseCode
 }
 
+function getMermaidDiagramKind(code: string) {
+  for (const rawLine of code.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('%%'))
+      continue
+    const match = line.match(/^([A-Z][\w-]*)\b/i)
+    return match?.[1]?.toLowerCase() || ''
+  }
+  return ''
+}
+
 // Zoom state
 const zoom = ref(1)
 const translateX = ref(0)
@@ -284,7 +328,7 @@ const dragStart = ref({ x: 0, y: 0 })
 const showSource = ref(false)
 const userToggledShowSource = ref(false)
 const isRendering = ref(false)
-const renderQueue = ref<Promise<void> | null>(null)
+const renderQueue = ref<Promise<boolean> | null>(null)
 const lastContentLength = ref(0)
 const isContentGenerating = ref(false)
 const renderDebounceDelay = computed(() => Math.max(0, props.renderDebounceMs ?? 300))
@@ -573,8 +617,36 @@ function canApplyPartialPreview() {
   return allowPartialPreview && !showSource.value && !hasRenderedOnce.value && !hasRenderError.value
 }
 
+function isGanttTaskLine(rawLine: string) {
+  const line = rawLine.trim()
+  if (!line || line.startsWith('%%'))
+    return false
+  if (/^(?:gantt|title|dateformat|axisformat|tickinterval|excludes|section|todaymarker|topaxis|weekday|weekend|acctitle|accdescr|accdescrmultiline)\b/i.test(line))
+    return false
+  return line.includes(':')
+}
+
+function getSafeGanttPreviewCandidate(code: string) {
+  const lines = code.split(/\r?\n/)
+  if (!/\r?\n$/.test(code) && lines.length > 0)
+    lines.pop()
+  while (lines.length > 0) {
+    const last = lines[lines.length - 1]?.trim()
+    if (!last || last.startsWith('%%')) {
+      lines.pop()
+      continue
+    }
+    if (isGanttTaskLine(last))
+      break
+    lines.pop()
+  }
+  return lines.some(isGanttTaskLine) ? lines.join('\n') : ''
+}
+
 // NEW: heuristically trim trailing incomplete lines for worker/preview usage
 function getSafePrefixCandidate(code: string): string {
+  if (getMermaidDiagramKind(code) === 'gantt')
+    return getSafeGanttPreviewCandidate(code)
   const lines = code.split(/\r?\n/)
   // drop trailing empty or dangling edge lines
   while (lines.length > 0) {
@@ -649,6 +721,26 @@ async function canParseOrPrefix(
   theme: 'light' | 'dark',
   opts?: { signal?: AbortSignal, timeoutMs?: number },
 ): Promise<{ fullOk: boolean, prefixOk: boolean, prefix?: string }> {
+  const diagramKind = getMermaidDiagramKind(code)
+  if (diagramKind === 'gantt') {
+    const prefix = getSafePrefixCandidate(code)
+    if (!prefix.trim())
+      return { fullOk: false, prefixOk: false }
+    try {
+      const ok = await canParseOffthread(prefix, theme, opts)
+      if (ok) {
+        if (prefix === code)
+          return { fullOk: true, prefixOk: false }
+        return { fullOk: false, prefixOk: true, prefix }
+      }
+    }
+    catch (e) {
+      if ((e as any)?.name === 'AbortError')
+        throw e
+    }
+    return { fullOk: false, prefixOk: false }
+  }
+
   try {
     const fullOk = await canParseOffthread(code, theme, opts)
     if (fullOk)
@@ -1155,6 +1247,8 @@ async function initMermaid() {
         { timeoutMs: timeouts.value.fullRender },
       )
       const svg = res?.svg
+      if (isBrokenMermaidSvg(svg))
+        throw new Error('Mermaid produced invalid SVG during preview')
 
       if (mermaidContent.value) {
         const rendered = renderSvgToTarget(mermaidContent.value, svg)
@@ -1180,6 +1274,7 @@ async function initMermaid() {
         consecutiveRenderTimeouts = 0
         clearRenderRetryTimer()
       }
+      return true
     }
     catch (error) {
       const timedOut = isTimeoutError(error)
@@ -1194,10 +1289,12 @@ async function initMermaid() {
       else {
         consecutiveRenderTimeouts = 0
         clearRenderRetryTimer()
-        console.error('Failed to render mermaid diagram:', error)
+        if (props.loading === false)
+          console.error('Failed to render mermaid diagram:', error)
         if (props.loading === false)
           renderErrorToContainer(error)
       }
+      return false
     }
     finally {
       isRendering.value = false
@@ -1240,7 +1337,7 @@ async function renderPartial(code: string) {
       { timeoutMs: timeouts.value.render },
     )
     const svg = res?.svg
-    if (mermaidContent.value && svg) {
+    if (mermaidContent.value && svg && !isBrokenMermaidSvg(svg)) {
       renderSvgToTarget(mermaidContent.value, svg)
       updateContainerHeight()
     }
@@ -1283,7 +1380,9 @@ async function progressiveRender() {
   try {
     const res = await canParseOrPrefix(base, theme, { signal, timeoutMs: timeouts.value.worker })
     if (res.fullOk) {
-      await initMermaid()
+      const rendered = await initMermaid()
+      if (!rendered)
+        return
       // Guard against race: if a newer render started, skip flag changes
       if (renderToken.value === token) {
         lastSvgSnapshot.value = mermaidContent.value?.innerHTML ?? null
@@ -1412,13 +1511,19 @@ function scheduleNextPreviewPoll(delay = previewPollInitialDelay.value) {
         previewPollController.abort()
       previewPollController = new AbortController()
       try {
-        const ok = await canParseOffthread(base, theme, { signal: previewPollController.signal, timeoutMs: timeouts.value.worker })
-        if (ok) {
-          await initMermaid()
-          if (hasRenderedOnce.value) {
+        const res = await canParseOrPrefix(base, theme, {
+          signal: previewPollController.signal,
+          timeoutMs: timeouts.value.worker,
+        })
+        if (res.fullOk) {
+          const rendered = await initMermaid()
+          if (rendered && hasRenderedOnce.value) {
             stopPreviewPolling()
             return
           }
+        }
+        else if (res.prefixOk && res.prefix && canApplyPartialPreview()) {
+          await renderPartial(res.prefix)
         }
       }
       catch {
@@ -1497,7 +1602,9 @@ watch(() => props.isDark, async () => {
     translateY.value = 0
     await nextTick()
   }
-  await initMermaid()
+  const rendered = await initMermaid()
+  if (!rendered)
+    return
   if (hasUserTransform) {
     await nextTick()
     zoom.value = currentTransformState.zoom
@@ -1579,7 +1686,9 @@ watch(
       // 否则：进行一次最终完整解析，成功则完整渲染；失败才展示错误
       try {
         await canParseOffthread(base, theme, { timeoutMs: timeouts.value.worker })
-        await initMermaid()
+        const rendered = await initMermaid()
+        if (!rendered)
+          return
         // 记录本次渲染的 code（去除空白）
         lastRenderedCode.value = normalizedBase
         hasRenderError.value = false
