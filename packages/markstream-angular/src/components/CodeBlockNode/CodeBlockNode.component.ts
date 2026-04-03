@@ -234,6 +234,7 @@ export class CodeBlockNodeComponent implements AfterViewInit, OnChanges, OnDestr
   private viewReady = false
   private destroyed = false
   private copyTimer: number | null = null
+  private deferredHeightSyncRaf: number | null = null
 
   get t() {
     return this.i18n.t
@@ -438,6 +439,7 @@ export class CodeBlockNodeComponent implements AfterViewInit, OnChanges, OnDestr
     this.destroyed = true
     if (this.copyTimer != null && typeof window !== 'undefined')
       window.clearTimeout(this.copyTimer)
+    this.cancelDeferredHeightSync()
     this.cleanupEditor()
   }
 
@@ -563,6 +565,7 @@ export class CodeBlockNodeComponent implements AfterViewInit, OnChanges, OnDestr
         if (this.expanded || !this.resolvedLoading || !this.editorReady)
           this.applyEditorHeight()
         this.editorReady = true
+        this.scheduleDeferredHeightSync()
       }
       catch {
         this.useFallback = true
@@ -672,6 +675,7 @@ export class CodeBlockNodeComponent implements AfterViewInit, OnChanges, OnDestr
       return
 
     const maxHeight = this.resolveMaxHeight()
+    host.style.minHeight = '0px'
     host.style.maxHeight = this.expanded ? 'none' : `${maxHeight}px`
     host.style.overflow = this.expanded ? 'visible' : 'auto'
 
@@ -695,7 +699,6 @@ export class CodeBlockNodeComponent implements AfterViewInit, OnChanges, OnDestr
   }
 
   private resolveEditorHeight(view: any, maxHeight: number) {
-    const fallbackBase = this.isDiff ? 180 : 120
     let contentHeight = Number.NaN
     try {
       if (typeof view.getContentHeight === 'function')
@@ -706,21 +709,79 @@ export class CodeBlockNodeComponent implements AfterViewInit, OnChanges, OnDestr
     catch {}
 
     if (!Number.isFinite(contentHeight) || contentHeight <= 0) {
-      const lines = Math.max(1, this.resolvedCode.split('\n').length)
-      const estimate = fallbackBase + lines * (this.isDiff ? 20 : 18)
-      return Math.ceil(Math.max(120, this.expanded ? estimate : Math.min(estimate, maxHeight)))
+      const lines = this.resolveEditorLineCount(view)
+      const lineHeight = this.resolveEditorLineHeight()
+      const estimate = lines * (lineHeight + 1.5) + 1
+      return Math.ceil(Math.max(1, this.expanded ? estimate : Math.min(estimate, maxHeight)))
     }
 
-    return Math.ceil(Math.max(120, this.expanded ? contentHeight : Math.min(contentHeight, maxHeight)))
+    return Math.ceil(Math.max(1, this.expanded ? contentHeight : Math.min(contentHeight, maxHeight)))
+  }
+
+  private resolveEditorLineCount(view: any) {
+    try {
+      if (
+        this.editorKind === 'diff'
+        && typeof view?.getOriginalEditor === 'function'
+        && typeof view?.getModifiedEditor === 'function'
+      ) {
+        const originalLines = Number(view.getOriginalEditor?.()?.getModel?.()?.getLineCount?.() ?? 1)
+        const modifiedLines = Number(view.getModifiedEditor?.()?.getModel?.()?.getLineCount?.() ?? 1)
+        return Math.max(1, originalLines, modifiedLines)
+      }
+
+      const lines = Number(view?.getModel?.()?.getLineCount?.() ?? 1)
+      if (Number.isFinite(lines) && lines > 0)
+        return lines
+    }
+    catch {}
+
+    return Math.max(1, String(this.resolvedCode || '').split('\n').length)
+  }
+
+  private resolveEditorLineHeight() {
+    const fromOptions = Number(this.resolvedMonacoOptions.lineHeight)
+    if (Number.isFinite(fromOptions) && fromOptions > 0)
+      return fromOptions
+
+    const fromFontOption = Number(this.resolvedMonacoOptions.fontSize)
+    if (Number.isFinite(fromFontOption) && fromFontOption > 0)
+      return Math.max(12, Math.round(fromFontOption * 1.35))
+
+    const fromState = Number(this.fontSize)
+    if (Number.isFinite(fromState) && fromState > 0)
+      return Math.max(12, Math.round(fromState * 1.35))
+
+    return 18
   }
 
   private resolveMaxHeight() {
     const raw = this.resolvedMonacoOptions.MAX_HEIGHT ?? 500
     if (typeof raw === 'number' && Number.isFinite(raw))
-      return Math.max(120, raw)
+      return raw > 0 ? raw : 500
     const matched = String(raw).match(/^(\d+(?:\.\d+)?)/)
     const parsed = matched ? Number.parseFloat(matched[1]) : 500
-    return Number.isFinite(parsed) ? Math.max(120, parsed) : 500
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 500
+  }
+
+  private cancelDeferredHeightSync() {
+    if (this.deferredHeightSyncRaf == null || typeof window === 'undefined')
+      return
+    window.cancelAnimationFrame(this.deferredHeightSyncRaf)
+    this.deferredHeightSyncRaf = null
+  }
+
+  private scheduleDeferredHeightSync() {
+    if (typeof window === 'undefined' || this.destroyed)
+      return
+
+    this.cancelDeferredHeightSync()
+    this.deferredHeightSyncRaf = window.requestAnimationFrame(() => {
+      this.deferredHeightSyncRaf = window.requestAnimationFrame(() => {
+        this.deferredHeightSyncRaf = null
+        this.applyEditorHeight()
+      })
+    })
   }
 
   private cleanupEditor() {

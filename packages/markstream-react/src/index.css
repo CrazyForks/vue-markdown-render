@@ -524,7 +524,6 @@ li .paragraph-node {
 
 .code-block-body {
   position: relative;
-  min-height: 120px;
 }
 
 .code-block-body--expanded {
@@ -535,10 +534,6 @@ li .paragraph-node {
   min-height: 0;
   height: 0;
   overflow: hidden;
-}
-
-.code-block-monaco {
-  min-height: 120px;
 }
 
 .code-block-overlay {
@@ -1118,11 +1113,6 @@ li .paragraph-node {
 
 .code-editor-container {
   transition: height 180ms ease, max-height 180ms ease;
-  min-height: 120px;
-}
-
-.code-height-placeholder {
-  min-height: 120px;
 }
 
 .code-block-container.is-plain-text:not(.is-diff) .monaco-editor,

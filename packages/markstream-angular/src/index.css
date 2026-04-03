@@ -1007,7 +1007,6 @@ body > div[id^="dmermaid-"] {
 
 .markstream-angular .code-block-body {
   position: relative;
-  min-height: 120px;
 }
 
 .code-block-body--expanded {
