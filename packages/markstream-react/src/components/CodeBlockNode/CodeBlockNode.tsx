@@ -297,10 +297,12 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     catch {}
 
     if (nextExpanded) {
+      host.style.minHeight = '0px'
       host.style.maxHeight = 'none'
       host.style.overflow = 'visible'
     }
     else {
+      host.style.minHeight = '0px'
       host.style.maxHeight = `${Math.ceil(maxHeight)}px`
       host.style.overflow = 'auto'
     }
@@ -319,7 +321,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       const contentHeight = Number(maybeGetContentHeight())
       if (Number.isFinite(contentHeight) && contentHeight > 0) {
         const height = nextExpanded ? contentHeight : Math.min(contentHeight, maxHeight)
-        host.style.height = `${Math.ceil(Math.max(120, height))}px`
+        host.style.height = `${Math.ceil(Math.max(1, height))}px`
       }
       view.layout?.()
     }
