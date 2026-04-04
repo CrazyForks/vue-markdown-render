@@ -68,7 +68,8 @@ const nodeComponents = {
 
 <style scoped>
 .highlight-node {
-  background-color: #ffff00;
+  background-color: var(--highlight-bg);
+  color: var(--highlight-fg);
   padding: 0 0.2rem;
 }
 </style>
