@@ -283,7 +283,11 @@ Term 2
    COMPACT — AI chat / dashboard / sidebar
    Only override tokens. ~60% of default spacing.
    ================================================================ */
-.markstream-vue.compact {
+/* Target both the root .markstream-vue.compact AND any nested
+   .markstream-vue inside it (NodeRenderer creates its own scope
+   which re-declares default token values). */
+.markstream-vue.compact,
+.compact .markstream-vue {
   /* Typography — smaller */
   --ms-text-body: 0.875rem;
   --ms-leading-body: 1.5;
