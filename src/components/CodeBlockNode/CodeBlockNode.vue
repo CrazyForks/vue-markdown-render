@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CodeBlockMonacoTheme, CodeBlockNodeProps } from '../../types/component-props'
+import CodeBlockShell from './CodeBlockShell.vue'
 import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLike, MonacoNamespaceLike, MonacoRuntimeOptions } from './monaco'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
@@ -1915,137 +1916,55 @@ onUnmounted(() => {
       { dark: props.isDark, 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
     ]"
   >
-    <!-- Configurable header area: consumers may override via named slots -->
-    <div
-      v-if="props.showHeader"
-      class="code-block-header flex justify-between items-center px-4 py-2.5 border-b"
-      :style="headerStyle"
+    <CodeBlockShell
+      :show-header="props.showHeader"
+      :show-collapse-button="props.showCollapseButton"
+      :show-font-size-buttons="props.showFontSizeButtons"
+      :enable-font-size-control="props.enableFontSizeControl"
+      :show-copy-button="props.showCopyButton"
+      :show-expand-button="props.showExpandButton"
+      :show-preview-button="props.showPreviewButton"
+      :show-tooltips="props.showTooltips"
+      :is-dark="props.isDark"
+      :loading="props.loading"
+      :stream="stream"
+      :is-collapsed="isCollapsed"
+      :is-expanded="isExpanded"
+      :copy-text="copyText"
+      :is-previewable="isPreviewable"
+      :code-font-size="codeFontSize"
+      :code-font-min="codeFontMin"
+      :code-font-max="codeFontMax"
+      :default-code-font-size="defaultCodeFontSize"
+      :font-baseline-ready="fontBaselineReady"
+      :diff-stats="isDiff ? diffStats : null"
+      :diff-stats-aria-label="diffStatsAriaLabel"
+      @toggle-collapse="toggleHeaderCollapse"
+      @decrease-font="decreaseCodeFont"
+      @reset-font="resetCodeFont"
+      @increase-font="increaseCodeFont"
+      @copy="copy"
+      @toggle-expand="toggleExpand"
+      @preview="previewCode"
     >
-      <!-- left slot / fallback language label -->
-      <slot name="header-left">
-        <div class="code-header-main">
-          <span class="icon-slot h-4 w-4 flex-shrink-0" v-html="languageIcon" />
-          <div class="code-header-copy">
-            <div class="code-header-title">
-              {{ headerTitle }}
-            </div>
-            <div v-if="headerCaption" class="code-header-caption">
-              {{ headerCaption }}
+      <template #header-left>
+        <slot name="header-left">
+          <div class="code-header-main">
+            <span class="icon-slot h-4 w-4 flex-shrink-0" v-html="languageIcon" />
+            <div class="code-header-copy">
+              <div class="code-header-title">
+                {{ headerTitle }}
+              </div>
+              <div v-if="headerCaption" class="code-header-caption">
+                {{ headerCaption }}
+              </div>
             </div>
           </div>
-        </div>
-      </slot>
+        </slot>
+      </template>
 
-      <!-- right slot / fallback action buttons -->
-      <slot name="header-right">
-        <div class="code-header-actions">
-          <div
-            v-if="isDiff"
-            class="code-diff-stats"
-            :aria-label="diffStatsAriaLabel"
-          >
-            <span class="code-diff-stat removed">-{{ diffStats.removed }}</span>
-            <span class="code-diff-stat added">+{{ diffStats.added }}</span>
-          </div>
-          <button
-            v-if="props.showCollapseButton"
-            type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors"
-            :aria-pressed="isCollapsed"
-            @click="toggleHeaderCollapse"
-            @mouseenter="onBtnHover($event, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))"
-            @focus="onBtnHover($event, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))"
-            @mouseleave="onBtnLeave"
-            @blur="onBtnLeave"
-          >
-            <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
-          </button>
-          <template v-if="props.showFontSizeButtons && props.enableFontSizeControl">
-            <button
-              type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors"
-              :disabled="Number.isFinite(codeFontSize) ? codeFontSize <= codeFontMin : false"
-              @click="decreaseCodeFont()"
-              @mouseenter="onBtnHover($event, t('common.decrease') || 'Decrease')"
-              @focus="onBtnHover($event, t('common.decrease') || 'Decrease')"
-              @mouseleave="onBtnLeave"
-              @blur="onBtnLeave"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14" /></svg>
-            </button>
-            <button
-              type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors"
-              :disabled="!fontBaselineReady || codeFontSize === defaultCodeFontSize"
-              @click="resetCodeFont()"
-              @mouseenter="onBtnHover($event, t('common.reset') || 'Reset')"
-              @focus="onBtnHover($event, t('common.reset') || 'Reset')"
-              @mouseleave="onBtnLeave"
-              @blur="onBtnLeave"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></g></svg>
-            </button>
-            <button
-              type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors"
-              :disabled="Number.isFinite(codeFontSize) ? codeFontSize >= codeFontMax : false"
-              @click="increaseCodeFont()"
-              @mouseenter="onBtnHover($event, t('common.increase') || 'Increase')"
-              @focus="onBtnHover($event, t('common.increase') || 'Increase')"
-              @mouseleave="onBtnLeave"
-              @blur="onBtnLeave"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7v14" /></svg>
-            </button>
-          </template>
-
-          <button
-            v-if="props.showCopyButton"
-            type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors"
-            :aria-label="copyText ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')"
-            @click="copy"
-            @mouseenter="onCopyHover($event)"
-            @focus="onCopyHover($event)"
-            @mouseleave="onBtnLeave"
-            @blur="onBtnLeave"
-          >
-            <svg v-if="!copyText" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
-          </button>
-
-          <button
-            v-if="props.showExpandButton"
-            type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors"
-            :aria-pressed="isExpanded"
-            @click="toggleExpand($event)"
-            @mouseenter="onBtnHover($event, isExpanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))"
-            @focus="onBtnHover($event, isExpanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))"
-            @mouseleave="onBtnLeave"
-            @blur="onBtnLeave"
-          >
-            <svg v-if="isExpanded" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" /></svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" /></svg>
-          </button>
-
-          <button
-            v-if="isPreviewable && props.showPreviewButton"
-            type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors"
-            :aria-label="t('common.preview') || 'Preview'"
-            @click="previewCode"
-            @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
-            @focus="onBtnHover($event, t('common.preview') || 'Preview')"
-            @mouseleave="onBtnLeave"
-            @blur="onBtnLeave"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"><!-- Icon from Freehand free icons by Streamline - https://creativecommons.org/licenses/by/4.0/ --><g fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"><path d="M23.628 7.41c-.12-1.172-.08-3.583-.9-4.233c-1.921-1.51-6.143-1.11-8.815-1.19c-3.481-.15-7.193.14-10.625.24a.34.34 0 0 0 0 .67c3.472-.05 7.074-.29 10.575-.09c2.471.15 6.653-.14 8.254 1.16c.4.33.41 2.732.49 3.582a42 42 0 0 1 .08 9.005a13.8 13.8 0 0 1-.45 3.001c-2.42 1.4-19.69 2.381-20.72.55a21 21 0 0 1-.65-4.632a41.5 41.5 0 0 1 .12-7.964c.08 0 7.334.33 12.586.24c2.331 0 4.682-.13 6.764-.21a.33.33 0 0 0 0-.66c-7.714-.16-12.897-.43-19.31.05c.11-1.38.48-3.922.38-4.002a.3.3 0 0 0-.42 0c-.37.41-.29 1.77-.36 2.251s-.14 1.07-.2 1.6a45 45 0 0 0-.36 8.645a21.8 21.8 0 0 0 .66 5.002c1.46 2.702 17.248 1.461 20.95.43c1.45-.4 1.69-.8 1.871-1.95c.575-3.809.602-7.68.08-11.496" /><path d="M4.528 5.237a.84.84 0 0 0-.21-1c-.77-.41-1.71.39-1 1.1a.83.83 0 0 0 1.21-.1m2.632-.25c.14-.14.19-.84-.2-1c-.77-.41-1.71.39-1 1.09a.82.82 0 0 0 1.2-.09m2.88 0a.83.83 0 0 0-.21-1c-.77-.41-1.71.39-1 1.09a.82.82 0 0 0 1.21-.09m-4.29 8.735c0 .08.23 2.471.31 2.561a.371.371 0 0 0 .63-.14c0-.09 0 0 .15-1.72a10 10 0 0 0-.11-2.232a5.3 5.3 0 0 1-.26-1.37a.3.3 0 0 0-.54-.24a6.8 6.8 0 0 0-.2 2.33c-1.281-.38-1.121.13-1.131-.42a15 15 0 0 0-.19-1.93c-.16-.17-.36-.17-.51.14a20 20 0 0 0-.43 3.471c.04.773.18 1.536.42 2.272c.26.4.7.22.7-.1c0-.09-.16-.09 0-1.862c.06-1.18-.23-.3 1.16-.76m5.033-2.552c.32-.07.41-.28.39-.37c0-.55-3.322-.34-3.462-.24s-.2.18-.18.28s0 .11 0 .16a3.8 3.8 0 0 0 1.591.361v.82a15 15 0 0 0-.13 3.132c0 .2-.09.94.17 1.16a.34.34 0 0 0 .48 0c.125-.35.196-.718.21-1.09a8 8 0 0 0 .14-3.232c0-.13.05-.7-.1-.89a8 8 0 0 0 .89-.09m5.544-.181a.69.69 0 0 0-.89-.44a2.8 2.8 0 0 0-1.252 1.001a2.3 2.3 0 0 0-.41-.83a1 1 0 0 0-1.6.27a7 7 0 0 0-.35 2.07c0 .571 0 2.642.06 2.762c.14 1.09 1 .51.63.13a17.6 17.6 0 0 1 .38-3.962c.32-1.18.32.2.39.51s.11 1.081.73 1.081s.48-.93 1.401-1.78q.075 1.345 0 2.69a15 15 0 0 0 0 1.811a.34.34 0 0 0 .68 0q.112-.861.11-1.73a16.7 16.7 0 0 0 .12-3.582m1.441-.201c-.05.16-.3 3.002-.31 3.202a6.3 6.3 0 0 0 .21 1.741c.33 1 1.21 1.07 2.291.82a3.7 3.7 0 0 0 1.14-.23c.21-.22.10-.59-.41-.64q-.817.096-1.64.07c-.44-.07-.34 0-.67-4.442q.015-.185 0-.37a.316.316 0 0 0-.23-.38a.316.316 0 0 0-.38.23" /></g></svg>
-          </button>
-        </div>
-      </slot>
-    </div>
-    <div v-show="!isCollapsed && (stream ? true : !loading)" class="code-editor-layer">
+      <!-- Monaco editor layer -->
+      <div v-show="!isCollapsed && (stream ? true : !loading)" class="code-editor-layer">
       <div
         ref="codeEditor"
         class="code-editor-container"
@@ -2066,19 +1985,17 @@ onUnmounted(() => {
       :is-dark="props.isDark"
       :on-close="() => (showInlinePreview = false)"
     />
-    <!-- Loading placeholder (non-streaming mode) can be overridden via slot -->
-    <div v-show="!stream && loading" class="code-loading-placeholder" :style="loadingPlaceholderStyle">
-      <slot name="loading" :loading="loading" :stream="stream">
-        <div class="loading-skeleton">
-          <div class="skeleton-line" />
-          <div class="skeleton-line" />
-          <div class="skeleton-line short" />
-        </div>
-      </slot>
-    </div>
-    <!-- Teleported tooltip removed: using singleton composable instead -->
-    <!-- Copy status for screen readers -->
-    <span class="sr-only" aria-live="polite" role="status">{{ copyText ? t('common.copied') || 'Copied' : '' }}</span>
+
+      <template #loading>
+        <slot name="loading" :loading="loading" :stream="stream">
+          <div class="loading-skeleton">
+            <div class="skeleton-line" />
+            <div class="skeleton-line" />
+            <div class="skeleton-line short" />
+          </div>
+        </slot>
+      </template>
+    </CodeBlockShell>
   </div>
 </template>
 
