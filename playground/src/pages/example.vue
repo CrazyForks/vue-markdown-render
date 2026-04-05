@@ -250,17 +250,20 @@ This text contains <mark>inline HTML mark</mark> and <abbr title="HyperText Mark
 </script>
 
 <template>
-  <div class="markstream-vue example-page" :class="{ dark: isDark }">
-    <header class="example-header">
-      <h1>Static Component Example</h1>
-      <p>For design review &mdash; all components rendered at once, no streaming.</p>
-      <button class="toggle-btn" @click="toggleDark">
+  <div class="markstream-vue min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors" :class="{ dark: isDark }">
+    <header class="sticky top-0 z-50 flex items-center gap-4 px-8 py-3 border-b border-gray-200 dark:border-gray-800 bg-inherit backdrop-blur-sm">
+      <h1 class="text-base font-semibold m-0">Static Component Example</h1>
+      <p class="text-xs text-gray-500 dark:text-gray-400 m-0">For design review &mdash; all components rendered at once, no streaming.</p>
+      <button
+        class="ml-auto px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-transparent text-inherit cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        @click="toggleDark"
+      >
         {{ isDark ? 'Light Mode' : 'Dark Mode' }}
       </button>
-      <router-link to="/" class="back-link">&larr; Back to Playground</router-link>
+      <router-link to="/" class="text-xs text-blue-600 dark:text-blue-400 no-underline hover:underline">&larr; Back to Playground</router-link>
     </header>
 
-    <main class="example-content">
+    <main class="max-w-3xl mx-auto px-8 py-8">
       <MarkdownRender
         :content="content"
         :is-dark="isDark"
@@ -276,68 +279,3 @@ This text contains <mark>inline HTML mark</mark> and <abbr title="HyperText Mark
     </main>
   </div>
 </template>
-
-<style scoped>
-.example-page {
-  min-height: 100vh;
-  background: hsl(var(--ms-background));
-  color: hsl(var(--ms-foreground));
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-.example-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 2rem;
-  border-bottom: 1px solid hsl(var(--ms-border));
-  background: inherit;
-  backdrop-filter: blur(8px);
-}
-
-.example-header h1 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.example-header p {
-  font-size: 0.8rem;
-  color: hsl(var(--ms-muted-foreground));
-  margin: 0;
-}
-
-.toggle-btn {
-  margin-left: auto;
-  padding: 0.375rem 0.75rem;
-  border: 1px solid hsl(var(--ms-border));
-  border-radius: var(--ms-radius);
-  background: transparent;
-  color: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-.toggle-btn:hover {
-  background: hsl(var(--ms-accent));
-}
-
-.back-link {
-  font-size: 0.8rem;
-  color: var(--link-color);
-  text-decoration: none;
-}
-
-.back-link:hover {
-  text-decoration: underline;
-}
-
-.example-content {
-  max-width: 48rem;
-  margin: 0 auto;
-  padding: 2rem;
-}
-</style>
