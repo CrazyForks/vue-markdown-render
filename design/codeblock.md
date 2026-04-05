@@ -241,18 +241,33 @@ Diff 基色仍引用全局 token：`--ms-diff-added` / `--ms-diff-removed`。
 - Shell 部分（header、操作按钮、骨架屏）与 CodeBlockNode **大量重复**
 - 已作为公开 API 导出
 
-### 决策：废弃，引用场景切换到 CodeBlockNode
+### 决策：保留，抽取共享 Shell
 
-原因：
-1. CodeBlockNode 已有 fallback 渲染（Monaco 未加载时用 `<pre>`）
-2. Shell 部分重复维护成本高，token 迁移要做两遍
-3. 语法高亮质量 Monaco ≥ Shiki，无独特优势
-4. 用户需要轻量渲染时，可用 `renderCodeBlocksAsPre` 选项
+Shiki 版本服务于**大量只读代码展示**场景（如文档站、博客、教程），
+这类场景下加载 Monaco 编辑器不合理（包体积大、初始化慢、无需编辑功能）。
+
+**重构方向**：抽取共享 Shell，消除重复
+
+```
+CodeBlockShell（共享）
+├─ header（标题、语言图标、操作按钮）
+├─ 边框 / 圆角 / 阴影
+├─ 骨架屏
+├─ 折叠/展开
+└─ token 体系接入
+
+CodeBlockNode（Monaco 版）
+└─ 编辑器区域：Monaco + diff + .is-dark
+
+MarkdownCodeBlockNode（Shiki 版）
+└─ 渲染区域：Shiki 高亮 + 静态输出
+```
 
 步骤：
-1. 标记 `MarkdownCodeBlockNode` 为 `@deprecated`
-2. 下个主版本移除
-3. 文档中引导用户迁移到 CodeBlockNode 或 `renderCodeBlocksAsPre`
+1. 抽取 Shell 为共享 composable 或子组件（header、按钮、骨架屏、折叠逻辑）
+2. CodeBlockNode 和 MarkdownCodeBlockNode 各自引用共享 Shell
+3. 两者的 `theme` prop 设计保持一致（字符串 = 固定，`{ light, dark }` = 配对）
+4. MarkdownCodeBlockNode 的 Shiki 主题切换逻辑与 CodeBlockNode 的 Monaco 主题切换对齐
 
 ---
 
@@ -283,4 +298,5 @@ Diff 基色仍引用全局 token：`--ms-diff-added` / `--ms-diff-removed`。
 | 6 | **限制 `syncEditorCssVars`**：不再将 `--vscode-*` 同步到根容器 |
 | 7 | **实现 `theme` prop**：统一 API，向后兼容 `darkTheme`/`lightTheme` |
 | 8 | **重命名 `.is-dark` 推导**：`resolvedChromeIsDark` → `editorSurfaceIsDark`，增加对象主题检测 |
-| 9 | **废弃 MarkdownCodeBlockNode**：标记 deprecated，下主版本移除 |
+| 9 | **抽取共享 Shell**：header / 按钮 / 骨架屏 / 折叠逻辑抽为共享子组件或 composable |
+| 10 | **MarkdownCodeBlockNode 接入共享 Shell**：复用 Shell，保留 Shiki 渲染区域 |
