@@ -490,7 +490,7 @@ watch(
 <template>
   <div
     ref="viewportTarget"
-    class="markstream-vue infographic-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    class="markstream-vue infographic-block-container my-4 rounded-lg border overflow-hidden"
     data-markstream-infographic="1"
     :data-markstream-mode="renderMode"
     :class="[
@@ -645,7 +645,7 @@ watch(
           </div>
         </div>
         <div
-          class="infographic-preview min-h-[360px] relative transition-all duration-100 overflow-hidden block"
+          class="infographic-preview relative transition-all duration-100 overflow-hidden block"
           :style="{ height: containerHeight }"
           @mousedown="startDrag"
           @mousemove="onDrag"
@@ -679,7 +679,7 @@ watch(
             @click.self="closeModal"
           >
             <div
-              class="dialog-panel infographic-modal-panel relative w-full h-full max-w-full max-h-full rounded shadow-lg overflow-hidden"
+              class="dialog-panel infographic-modal-panel relative w-full h-full max-w-full max-h-full rounded overflow-hidden"
             >
               <div class="absolute top-6 right-6 z-50 flex items-center gap-2">
                 <button
@@ -733,6 +733,7 @@ watch(
   background: var(--diagram-bg);
   border-color: var(--diagram-border);
   color: hsl(var(--ms-foreground));
+  box-shadow: var(--ms-shadow-subtle);
 }
 
 /* ── Header ── */
@@ -759,7 +760,7 @@ watch(
 .infographic-mode-btn.is-active {
   background: var(--code-action-active-bg);
   color: var(--code-action-active-fg);
-  box-shadow: 0 1px 2px 0 hsl(var(--ms-foreground) / 0.05);
+  box-shadow: var(--ms-shadow-subtle);
 }
 
 /* ── Action buttons ── */
@@ -790,6 +791,7 @@ watch(
 /* ── Preview area ── */
 .infographic-preview {
   background: var(--diagram-bg);
+  min-height: var(--ms-size-diagram-min-height);
 }
 
 /* ── Modal ── */
@@ -800,6 +802,7 @@ watch(
 .infographic-modal-panel {
   background: var(--modal-bg);
   color: var(--modal-fg);
+  box-shadow: var(--ms-shadow-modal);
 }
 
 .fullscreen {
@@ -815,7 +818,7 @@ watch(
 }
 .infographic-dialog-enter-active,
 .infographic-dialog-leave-active {
-  transition: opacity 200ms ease;
+  transition: opacity var(--ms-duration-overlay) var(--ms-ease-standard);
 }
 .infographic-dialog-enter-from .dialog-panel,
 .infographic-dialog-leave-to .dialog-panel {
@@ -829,6 +832,6 @@ watch(
 }
 .infographic-dialog-enter-active .dialog-panel,
 .infographic-dialog-leave-active .dialog-panel {
-  transition: transform 200ms ease, opacity 200ms ease;
+  transition: transform var(--ms-duration-overlay) var(--ms-ease-standard), opacity var(--ms-duration-overlay) var(--ms-ease-standard);
 }
 </style>

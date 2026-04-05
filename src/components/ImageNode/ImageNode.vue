@@ -114,11 +114,11 @@ watch(displaySrc, () => {
 
 <style scoped>
 .image-node__img {
-  max-width: 24rem;
+  max-width: var(--ms-size-image-max-width);
 }
 
 .placeholder-layer {
-  max-width: 24rem;
+  max-width: var(--ms-size-image-max-width);
   will-change: transform, opacity;
 }
 
@@ -142,7 +142,7 @@ watch(displaySrc, () => {
 
 /* Transition between placeholder and image: fade + slight upward motion */
 .img-switch-enter-active, .img-switch-leave-active {
-  transition: opacity 220ms ease, transform 220ms ease;
+  transition: opacity var(--ms-duration-emphasis) var(--ms-ease-standard), transform var(--ms-duration-emphasis) var(--ms-ease-standard);
 }
 .img-switch-enter-from, .img-switch-leave-to {
   opacity: 0;

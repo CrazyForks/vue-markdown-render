@@ -124,7 +124,7 @@ onBeforeUnmount(() => {
           :id="props.id"
           ref="tooltip"
           :style="{ position: 'fixed', left: style.left, top: style.top, transform: style.transform }"
-          class="z-[9999] inline-block text-base py-2 px-3 rounded-md shadow-md whitespace-nowrap pointer-events-none tooltip-element border"
+          class="z-[9999] inline-block text-base py-2 px-3 rounded-md whitespace-nowrap pointer-events-none tooltip-element border"
           role="tooltip"
         >
           {{ content }}
@@ -140,11 +140,12 @@ onBeforeUnmount(() => {
 .tooltip-enter-to { opacity: 1; transform: translateY(0) scale(1); }
 .tooltip-leave-from { opacity: 1; transform: translateY(0) scale(1); }
 .tooltip-leave-to { opacity: 0; transform: translateY(-6px) scale(0.98); }
-.tooltip-enter-active, .tooltip-leave-active { transition: opacity 120ms linear; }
+.tooltip-enter-active, .tooltip-leave-active { transition: opacity var(--ms-duration-fast) var(--ms-ease-linear); }
 
 /* Move transition: always active on the element so updates to transform animate smoothly */
 .tooltip-element {
-  transition: transform 220ms cubic-bezier(.16,1,.3,1), box-shadow 220ms cubic-bezier(.16,1,.3,1);
+  box-shadow: var(--ms-shadow-popover);
+  transition: transform var(--ms-duration-emphasis) var(--ms-ease-spring), box-shadow var(--ms-duration-emphasis) var(--ms-ease-spring);
   background-color: var(--tooltip-bg);
   color: var(--tooltip-fg);
   border-color: var(--tooltip-border);

@@ -45,11 +45,11 @@ defineEmits<{
 .blockquote {
   font-weight: 500;
   font-style: italic;
-  border-left: 0.25rem solid var(--blockquote-border);
+  border-left: var(--ms-border-width-strong) solid var(--blockquote-border);
   quotes: "\201C" "\201D" "\2018" "\2019";
-  margin-top: 1.6em;
-  margin-bottom: 1.6em;
-  padding-left: 1em;
+  margin-top: var(--ms-flow-blockquote-y);
+  margin-bottom: var(--ms-flow-blockquote-y);
+  padding-left: var(--ms-flow-blockquote-indent);
 }
 
 /* 防止内部 NodeRenderer 使用 content-visibility: auto 时在大文档滚动中出现“高但空白”的占位 */

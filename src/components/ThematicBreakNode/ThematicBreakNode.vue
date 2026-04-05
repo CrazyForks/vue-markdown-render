@@ -6,6 +6,7 @@
 
 <style scoped>
 .hr-node {
-  @apply border-t border-[var(--hr-border)] my-12;
+  @apply border-t border-[var(--hr-border)];
+  margin: var(--ms-flow-hr-y) 0;
 }
 </style>

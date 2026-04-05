@@ -109,7 +109,7 @@ onUnmounted(() => {
   color: var(--modal-fg);
   border-radius: calc(var(--ms-radius) * 2);
   overflow: hidden;
-  box-shadow: 0 10px 40px hsl(var(--ms-foreground) / 0.25);
+  box-shadow: var(--ms-shadow-preview);
   display: flex;
   flex-direction: column;
 }

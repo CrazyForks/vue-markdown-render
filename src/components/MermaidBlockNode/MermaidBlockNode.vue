@@ -1169,7 +1169,7 @@ async function switchMode(target: 'source' | 'preview') {
   // Measure target content natural height
   const to = el.scrollHeight
   // Animate
-  el.style.transition = 'height 180ms ease'
+  el.style.transition = 'height var(--ms-duration-standard) var(--ms-ease-standard)'
   // Force reflow
   void el.offsetHeight
   el.style.height = `${to}px`
@@ -2021,7 +2021,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
         </div>
         <div
           ref="mermaidContainer"
-          class="mermaid-preview-area min-h-[360px] relative overflow-hidden block transition-[height] duration-150 ease-out"
+          class="mermaid-preview-area relative overflow-hidden block transition-[height] duration-150 ease-out"
           :style="{ height: containerHeight }"
           v-on="wheelListeners"
           @mousedown="startDrag"
@@ -2054,7 +2054,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
                 @click.self="closeModal"
               >
                 <div
-                  class="dialog-panel mermaid-modal-panel relative w-full h-full max-w-full max-h-full rounded shadow-lg overflow-hidden"
+                  class="dialog-panel mermaid-modal-panel relative w-full h-full max-w-full max-h-full rounded overflow-hidden"
                 >
                   <div class="absolute top-6 right-6 z-50 flex items-center gap-2">
                     <button
@@ -2138,7 +2138,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 .mermaid-mode-btn.is-active {
   background: var(--code-action-active-bg);
   color: var(--code-action-active-fg);
-  box-shadow: 0 1px 2px 0 hsl(var(--ms-foreground) / 0.05);
+  box-shadow: var(--ms-shadow-subtle);
 }
 
 /* ── Action buttons (copy, export, fullscreen, zoom, collapse, modal close) ── */
@@ -2168,6 +2168,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 /* ── Preview area ── */
 .mermaid-preview-area {
   background: var(--diagram-bg);
+  min-height: var(--ms-size-diagram-min-height);
 }
 
 /* ── Modal overlay ── */
@@ -2179,6 +2180,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 .mermaid-modal-panel {
   background: var(--modal-bg);
   color: var(--modal-fg);
+  box-shadow: var(--ms-shadow-modal);
 }
 
 /* ── Mermaid SVG content ── */
@@ -2208,7 +2210,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 }
 .mermaid-dialog-enter-active,
 .mermaid-dialog-leave-active {
-  transition: opacity 200ms ease;
+  transition: opacity var(--ms-duration-overlay) var(--ms-ease-standard);
 }
 .mermaid-dialog-enter-from .dialog-panel,
 .mermaid-dialog-leave-to .dialog-panel {
@@ -2222,6 +2224,6 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 }
 .mermaid-dialog-enter-active .dialog-panel,
 .mermaid-dialog-leave-active .dialog-panel {
-  transition: transform 200ms ease, opacity 200ms ease;
+  transition: transform var(--ms-duration-overlay) var(--ms-ease-standard), opacity var(--ms-duration-overlay) var(--ms-ease-standard);
 }
 </style>

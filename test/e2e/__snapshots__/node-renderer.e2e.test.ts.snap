@@ -73,7 +73,7 @@ exports[`markdownRender node e2e coverage > renders checkbox nodes 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <ul data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-disc" is-dark="false">
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
@@ -91,7 +91,7 @@ exports[`markdownRender node e2e coverage > renders checkbox nodes 1`] = `
               <!--v-if-->
             </div>
           </li>
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
@@ -138,7 +138,7 @@ exports[`markdownRender node e2e coverage > renders complex inline code with emp
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <ol data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-decimal" is-dark="false">
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto" value="1">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="1">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
@@ -266,7 +266,7 @@ exports[`markdownRender node e2e coverage > renders footnote nodes 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-        <div data-v-8dfe8a80="" id="fnref--1" class="flex mt-2 mb-2 text-sm leading-relaxed border-t border-[var(--footnote-border)] pt-2" is-dark="false">
+        <div data-v-8dfe8a80="" id="fnref--1" class="footnote-node flex text-sm leading-relaxed border-t border-[var(--footnote-border)] pt-2" is-dark="false">
           <!-- <span class="font-semibold mr-2 text-[#0366d6]">[{{ node.id }}]</span> -->
           <div class="flex-1">
             <div data-v-8dfe8a80="" class="markstream-vue markdown-renderer">
@@ -471,7 +471,7 @@ exports[`markdownRender node e2e coverage > renders ordered list node 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <ol data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-decimal" is-dark="false">
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto" value="1">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="1">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
@@ -487,7 +487,7 @@ exports[`markdownRender node e2e coverage > renders ordered list node 1`] = `
               <!--v-if-->
             </div>
           </li>
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto" value="2">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="2">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
@@ -645,10 +645,10 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <div data-v-8fb37ab3="" data-v-8dfe8a80="" class="table-node-wrapper" loading="false">
-          <table data-v-8fb37ab3="" class="my-8 text-sm table-node" aria-busy="false">
+          <table data-v-8fb37ab3="" class="text-sm table-node" aria-busy="false">
             <thead data-v-8fb37ab3="" class="border-[var(--table-border)]">
               <tr data-v-8fb37ab3="" class="border-b">
-                <th data-v-8fb37ab3="" dir="auto" class="font-semibold p-[calc(4/7*1em)] text-left">
+                <th data-v-8fb37ab3="" dir="auto" class="font-semibold table-node-cell text-left">
                   <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markstream-vue markdown-renderer">
                     <!--v-if-->
                     <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
@@ -662,7 +662,7 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
                     <!--v-if-->
                   </div>
                 </th>
-                <th data-v-8fb37ab3="" dir="auto" class="font-semibold p-[calc(4/7*1em)] text-left">
+                <th data-v-8fb37ab3="" dir="auto" class="font-semibold table-node-cell text-left">
                   <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markstream-vue markdown-renderer">
                     <!--v-if-->
                     <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
@@ -680,7 +680,7 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
             </thead>
             <tbody data-v-8fb37ab3="">
               <tr data-v-8fb37ab3="" class="border-[var(--table-border)]">
-                <td data-v-8fb37ab3="" class="p-[calc(4/7*1em)] text-left" dir="auto">
+                <td data-v-8fb37ab3="" class="table-node-cell text-left" dir="auto">
                   <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markstream-vue markdown-renderer">
                     <!--v-if-->
                     <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
@@ -694,7 +694,7 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
                     <!--v-if-->
                   </div>
                 </td>
-                <td data-v-8fb37ab3="" class="p-[calc(4/7*1em)] text-left" dir="auto">
+                <td data-v-8fb37ab3="" class="table-node-cell text-left" dir="auto">
                   <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markstream-vue markdown-renderer">
                     <!--v-if-->
                     <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
@@ -765,7 +765,7 @@ exports[`markdownRender node e2e coverage > renders unordered list node 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <ul data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-disc" is-dark="false">
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
@@ -781,7 +781,7 @@ exports[`markdownRender node e2e coverage > renders unordered list node 1`] = `
               <!--v-if-->
             </div>
           </li>
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">

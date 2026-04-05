@@ -63,13 +63,21 @@ const listItemComponent = computed(() => {
 
 <style scoped>
 .list-node {
-  @apply my-5 pl-[calc(13/8*1em)];
+  margin-top: var(--ms-flow-list-y);
+  margin-bottom: var(--ms-flow-list-y);
+  padding-left: var(--ms-flow-list-indent);
 }
 .list-decimal {
   list-style-type: decimal;
 }
 .list-disc {
   list-style-type: disc;
-  @apply max-lg:my-[calc(4/3*1em)] max-lg:pl-[calc(14/9*1em)];
+}
+@media (max-width: 1023px) {
+  .list-disc {
+    margin-top: calc(4/3*1em);
+    margin-bottom: calc(4/3*1em);
+    padding-left: var(--ms-flow-list-indent-mobile);
+  }
 }
 </style>

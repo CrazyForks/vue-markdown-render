@@ -507,7 +507,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="viewportTarget"
-    class="markstream-vue d2-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    class="markstream-vue d2-block-container my-4 rounded-lg border overflow-hidden"
     data-markstream-d2="1"
     :data-markstream-mode="showSourceFallback ? 'fallback' : 'preview'"
     :class="{ dark: props.isDark }"
@@ -626,6 +626,7 @@ onBeforeUnmount(() => {
   background: var(--diagram-bg);
   border-color: var(--diagram-border);
   color: hsl(var(--ms-foreground));
+  box-shadow: var(--ms-shadow-subtle);
 }
 
 /* ── Header ── */

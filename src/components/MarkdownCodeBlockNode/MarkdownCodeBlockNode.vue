@@ -569,7 +569,7 @@ function toggleExpand(e?: Event) {
     content.style['overflow-x'] = 'auto'
   }
   else {
-    content.style.maxHeight = '500px'
+    content.style.maxHeight = ''
     content.style.overflow = 'auto'
     // When collapsing, re-enable auto-scroll and scroll to bottom
     autoScrollEnabled.value = true
@@ -625,7 +625,7 @@ function previewCode() {
   <div
     ref="container"
     :style="containerStyle"
-    class="markstream-vue code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    class="markstream-vue code-block-container my-4 rounded-lg border overflow-hidden"
     :class="{ dark: props.isDark }"
   >
     <CodeBlockShell
@@ -700,6 +700,7 @@ function previewCode() {
   background: var(--code-bg);
   border-color: var(--code-border);
   color: var(--code-fg);
+  box-shadow: var(--ms-shadow-subtle);
 }
 
 /* ── Header ── */
@@ -730,7 +731,7 @@ function previewCode() {
 
 /* ── Code content ── */
 .code-block-content {
-  max-height: min(70vh, 500px);
+  max-height: min(70vh, var(--ms-size-code-max-height));
   overflow: auto;
   transition: max-height 0.3s ease;
   font-family: var(--vscode-editor-font-family, 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
@@ -776,7 +777,7 @@ function previewCode() {
 /* ── Loading placeholder ── */
 .code-loading-placeholder {
   padding: 1rem;
-  min-height: 120px;
+  min-height: var(--ms-size-skeleton-min-height);
 }
 
 .loading-skeleton {

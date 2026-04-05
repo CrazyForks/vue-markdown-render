@@ -94,17 +94,17 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
 <style scoped>
 /* Base admonition — consumes semantic tokens from .markstream-vue */
 .admonition {
-  margin: 1rem 0;
+  margin: var(--ms-flow-admonition-y) 0;
   padding: 0;
   border-radius: var(--ms-radius);
-  border-left: 4px solid var(--admonition-border);
+  border-left: var(--ms-border-width-strong) solid var(--admonition-border);
   background-color: var(--admonition-bg);
   color: var(--admonition-fg);
   overflow: hidden;
 }
 
 .admonition-header {
-  padding: 0.5rem 1rem;
+  padding: var(--ms-inset-panel-body-sm) var(--ms-inset-panel-body);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -113,7 +113,7 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
 }
 
 .admonition-content {
-  padding: 0.5rem 1rem 1rem;
+  padding: var(--ms-inset-admonition-body-top) var(--ms-inset-panel-body) var(--ms-inset-admonition-body-bottom);
   color: var(--admonition-fg);
 }
 
@@ -183,8 +183,8 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
   font-size: 0.9rem;
 }
 .admonition-toggle:focus {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline: var(--ms-focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--ms-focus-ring-offset);
 }
 
 </style>

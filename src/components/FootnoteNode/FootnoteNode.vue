@@ -24,7 +24,7 @@ defineEmits(['copy'])
 <template>
   <div
     :id="`fnref--${node.id}`"
-    class="flex mt-2 mb-2 text-sm leading-relaxed border-t border-[var(--footnote-border)] pt-2"
+    class="footnote-node flex text-sm leading-relaxed border-t border-[var(--footnote-border)] pt-2"
   >
     <!-- <span class="font-semibold mr-2 text-[#0366d6]">[{{ node.id }}]</span> -->
     <div class="flex-1">
@@ -40,6 +40,11 @@ defineEmits(['copy'])
 </template>
 
 <style>
+.footnote-node {
+  margin-top: var(--ms-flow-footnote-y);
+  margin-bottom: var(--ms-flow-footnote-y);
+}
+
 /* 脚注中嵌套 NodeRenderer 关闭 content-visibility 占位，防止空白内容 */
 .markstream-vue [class*="footnote-"] .markdown-renderer,
 .markstream-vue .flex-1 .markdown-renderer {

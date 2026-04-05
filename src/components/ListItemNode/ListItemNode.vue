@@ -43,7 +43,7 @@ const liValueAttr = computed(() =>
 </script>
 
 <template>
-  <li class="list-item pl-1.5 my-2" dir="auto" v-bind="liValueAttr">
+  <li class="list-item" dir="auto" v-bind="liValueAttr">
     <NodeRenderer
       v-bind="{ showTooltips: props.showTooltips }"
       :index-key="`list-item-${props.indexKey}`"
@@ -57,6 +57,11 @@ const liValueAttr = computed(() =>
 </template>
 
 <style scoped>
+.list-item {
+  margin: var(--ms-flow-list-item-y) 0;
+  padding-left: var(--ms-space-1_5);
+}
+
 ol > .list-item::marker{
   color: var(--list-counter-marker);
   line-height: 1.6;

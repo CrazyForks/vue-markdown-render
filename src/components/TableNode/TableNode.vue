@@ -49,7 +49,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
 <template>
   <div class="table-node-wrapper">
     <table
-      class="my-8 text-sm table-node"
+      class="text-sm table-node"
       :class="{ 'table-node--loading': isLoading }"
       :aria-busy="isLoading"
     >
@@ -59,7 +59,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
             v-for="(cell, index) in node.header.cells"
             :key="`header-${index}`"
             dir="auto"
-            class="font-semibold p-[calc(4/7*1em)]"
+            class="font-semibold table-node-cell"
             :class="[
               cell.align === 'right'
                 ? 'text-right'
@@ -88,7 +88,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
           <td
             v-for="(cell, cellIndex) in row.cells"
             :key="`cell-${rowIndex}-${cellIndex}`"
-            class="p-[calc(4/7*1em)]"
+            class="table-node-cell"
             :class="[
               cell.align === 'right'
                 ? 'text-right'
@@ -136,6 +136,11 @@ const bodyRows = computed(() => props.node.rows ?? [])
   table-layout: fixed;
   width: 100%;
   border-collapse: collapse;
+  margin: var(--ms-flow-table-y) 0;
+}
+
+.table-node-cell {
+  padding: var(--ms-flow-table-cell);
 }
 
 .table-node :deep(th),

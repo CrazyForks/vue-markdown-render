@@ -199,7 +199,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="containerEl"
-    class="math-block text-center overflow-x-auto relative min-h-[40px]"
+    class="math-block text-center overflow-x-auto relative"
     data-markstream-math="block"
     :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
   >
@@ -220,6 +220,10 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.math-block {
+  min-height: var(--ms-size-math-min-height);
+}
+
 .math-loading-overlay {
   position: absolute;
   top: 0;
@@ -230,7 +234,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(2px);
-  min-height: 40px;
+  min-height: var(--ms-size-math-min-height);
 }
 
 .math-loading-spinner {
@@ -250,7 +254,7 @@ onBeforeUnmount(() => {
 
 .math-rendering {
   opacity: 0.3;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--ms-duration-overlay) var(--ms-ease-standard);
 }
 
 .math-block__fallback {
@@ -261,7 +265,7 @@ onBeforeUnmount(() => {
 
 .math-fade-enter-active,
 .math-fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity var(--ms-duration-slow) var(--ms-ease-standard);
 }
 
 .math-fade-enter-from,

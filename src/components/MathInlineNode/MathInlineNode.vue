@@ -259,7 +259,7 @@ onBeforeUnmount(() => {
 
 .table-node-fade-enter-active,
 .table-node-fade-leave-active {
-  transition: opacity 0.18s ease;
+  transition: opacity var(--ms-duration-standard) var(--ms-ease-standard);
 }
 
 .table-node-fade-enter-from,

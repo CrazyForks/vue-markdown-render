@@ -1914,7 +1914,7 @@ onUnmounted(() => {
     v-else
     ref="container"
     :style="containerStyle"
-    class="markstream-vue code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    class="markstream-vue code-block-container my-4 rounded-lg border overflow-hidden"
     data-markstream-code-block="1"
     :data-markstream-enhanced="editorMounted && !usePreCodeRender ? 'true' : 'false'"
     :class="[
@@ -2014,6 +2014,7 @@ onUnmounted(() => {
   content-visibility: auto;
   contain-intrinsic-size: 320px 180px;
   container-type: inline-size;
+  box-shadow: var(--ms-shadow-subtle);
   --markstream-code-fallback-bg: var(--code-bg);
   --markstream-code-fallback-fg: var(--code-fg);
   --markstream-code-border-color: var(--code-border);
@@ -2134,11 +2135,11 @@ onUnmounted(() => {
 }
 
 .code-editor-container {
-  transition: height 180ms ease, max-height 180ms ease;
+  transition: height var(--ms-duration-standard) var(--ms-ease-standard), max-height var(--ms-duration-standard) var(--ms-ease-standard);
 }
 
 .code-block-header {
-  gap: 16px;
+  gap: var(--ms-gap-header);
   border-color: var(--code-border);
   color: var(--code-fg);
   background-color: var(--code-header-bg);
@@ -2149,7 +2150,7 @@ onUnmounted(() => {
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--ms-gap-header-main);
   overflow: hidden;
 }
 
@@ -2163,7 +2164,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--ms-gap-header-actions);
   flex-wrap: wrap;
 }
 
@@ -2347,14 +2348,14 @@ onUnmounted(() => {
 .code-block-container.is-rendering .code-height-placeholder{
   background-size: 400% 100%;
   animation: code-skeleton-shimmer 1.2s ease-in-out infinite;
-  min-height: 120px;
+  min-height: var(--ms-size-skeleton-min-height);
   background: linear-gradient(90deg, var(--loading-shimmer) 25%, hsl(var(--ms-muted) / 0.7) 37%, var(--loading-shimmer) 63%);
 }
 
 /* Loading placeholder styles */
 .code-loading-placeholder {
   padding: 1rem;
-  min-height: 120px;
+  min-height: var(--ms-size-skeleton-min-height);
 }
 
 .loading-skeleton {
