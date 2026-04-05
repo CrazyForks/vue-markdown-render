@@ -1863,11 +1863,11 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 
 <template>
   <div
-    class="mermaid-block-container my-4 rounded-lg border overflow-hidden"
+    class="markstream-vue mermaid-block-container my-4 rounded-lg border overflow-hidden"
     data-markstream-mermaid="1"
     :data-markstream-mode="showSource ? 'fallback' : hasRenderedOnce ? 'preview' : 'pending'"
     :class="[
-      { 'is-rendering': props.loading },
+      { 'is-rendering': props.loading, dark: props.isDark },
     ]"
   >
     <!-- 重新设计的头部区域 -->
@@ -2046,7 +2046,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
         </div>
         <!-- Modal pseudo-fullscreen overlay (teleported to body) -->
         <teleport to="body">
-          <div class="markstream-vue">
+          <div class="markstream-vue" :class="{ dark: props.isDark }">
             <transition name="mermaid-dialog" appear>
               <div
                 v-if="isModalOpen"

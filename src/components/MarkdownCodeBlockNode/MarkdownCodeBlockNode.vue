@@ -624,7 +624,8 @@ function previewCode() {
   <div
     ref="container"
     :style="containerStyle"
-    class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    class="markstream-vue code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    :class="{ dark: props.isDark }"
   >
     <div
       v-if="props.showHeader"

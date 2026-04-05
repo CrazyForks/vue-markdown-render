@@ -63,7 +63,7 @@ onUnmounted(() => {
 
 <template>
   <teleport to="body">
-    <div class="markstream-vue">
+    <div class="markstream-vue" :class="{ dark: props.isDark }">
       <div class="html-preview-frame__backdrop" @click="props.onClose?.()">
         <div class="html-preview-frame" @click.stop>
           <div class="html-preview-frame__header">

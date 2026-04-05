@@ -490,11 +490,11 @@ watch(
 <template>
   <div
     ref="viewportTarget"
-    class="infographic-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    class="markstream-vue infographic-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     data-markstream-infographic="1"
     :data-markstream-mode="renderMode"
     :class="[
-      { 'is-rendering': props.loading },
+      { 'is-rendering': props.loading, dark: props.isDark },
     ]"
   >
     <!-- Header -->
@@ -671,7 +671,7 @@ watch(
 
     <!-- Modal fullscreen overlay (teleported to body) -->
     <teleport to="body">
-      <div class="markstream-vue">
+      <div class="markstream-vue" :class="{ dark: props.isDark }">
         <transition name="infographic-dialog" appear>
           <div
             v-if="isModalOpen"

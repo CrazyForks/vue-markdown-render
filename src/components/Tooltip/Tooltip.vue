@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
 
 <template>
   <teleport to="body">
-    <div class="markstream-vue">
+    <div class="markstream-vue" :class="{ dark: isDark }">
       <transition name="tooltip" appear>
         <div
           v-show="visible && ready"

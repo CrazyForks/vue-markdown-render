@@ -1876,11 +1876,11 @@ onUnmounted(() => {
     v-else
     ref="container"
     :style="containerStyle"
-    class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    class="markstream-vue code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     data-markstream-code-block="1"
     :data-markstream-enhanced="editorMounted && !usePreCodeRender ? 'true' : 'false'"
     :class="[
-      { 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
+      { dark: props.isDark, 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
     ]"
   >
     <!-- Configurable header area: consumers may override via named slots -->
