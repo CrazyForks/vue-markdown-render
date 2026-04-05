@@ -1565,8 +1565,25 @@ watch(
   },
 )
 
-function getPreferredColorScheme() {
+function isPairedTheme(t: unknown): t is { light: CodeBlockMonacoTheme, dark: CodeBlockMonacoTheme } {
+  return !!t && typeof t === 'object' && 'light' in t && 'dark' in t
+}
+
+function getPreferredColorScheme(): CodeBlockMonacoTheme | undefined {
+  // Unified theme prop takes precedence
+  if (props.theme !== undefined) {
+    const t = props.theme
+    if (isPairedTheme(t))
+      return props.isDark ? t.dark : t.light
+    // Fixed theme — always this theme regardless of isDark
+    return t as CodeBlockMonacoTheme
+  }
+  // Backward compat: darkTheme / lightTheme
   return props.isDark ? props.darkTheme : props.lightTheme
+}
+
+function isFixedTheme(): boolean {
+  return props.theme !== undefined && !isPairedTheme(props.theme)
 }
 
 function getThemeName(theme: CodeBlockMonacoTheme | null | undefined) {
@@ -1625,6 +1642,12 @@ function themeUpdate() {
 }
 
 function themeLooksDark(theme: CodeBlockMonacoTheme | null | undefined) {
+  // For object themes, try to detect from editor.background luminance
+  if (theme && typeof theme === 'object' && theme.colors?.['editor.background']) {
+    const lum = getColorLuminance(theme.colors['editor.background'])
+    if (lum != null)
+      return lum < 128
+  }
   const themeName = getThemeName(theme) ?? ''
   const normalized = themeName.toLowerCase()
   if (!normalized)
@@ -1658,21 +1681,31 @@ function themeLooksDark(theme: CodeBlockMonacoTheme | null | undefined) {
     && !lightTokens.some(token => normalized.includes(token))
 }
 
-const resolvedChromeIsDark = computed(() => themeLooksDark(resolveRequestedTheme()))
+/**
+ * Whether the editor surface (Monaco area) is dark.
+ * For fixed themes: detected from theme name or object luminance.
+ * For paired themes: follows page isDark.
+ */
+const editorSurfaceIsDark = computed(() => {
+  if (isFixedTheme())
+    return themeLooksDark(resolveRequestedTheme())
+  // Paired or default: follow page theme
+  return !!props.isDark
+})
 
 const effectiveDiffAppearance = computed<'light' | 'dark'>(() => {
   if (!isDiff.value)
-    return resolvedChromeIsDark.value ? 'dark' : 'light'
+    return editorSurfaceIsDark.value ? 'dark' : 'light'
 
   const explicit = resolvedMonacoOptions.value?.diffAppearance
   if (explicit === 'light' || explicit === 'dark')
     return explicit
 
-  return props.isDark ? 'dark' : 'light'
+  return editorSurfaceIsDark.value ? 'dark' : 'light'
 })
 
 const resolvedSurfaceIsDark = computed(() =>
-  isDiff.value ? effectiveDiffAppearance.value === 'dark' : resolvedChromeIsDark.value,
+  isDiff.value ? effectiveDiffAppearance.value === 'dark' : editorSurfaceIsDark.value,
 )
 
 function buildRuntimeMonacoOptions() {

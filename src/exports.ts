@@ -74,6 +74,7 @@ export type {
   CodeBlockMonacoTheme,
   CodeBlockMonacoThemeObject,
   CodeBlockNodeProps,
+  CodeBlockThemeProp,
   D2BlockNodeProps,
   ImageNodeProps,
   InfographicBlockNodeProps,
