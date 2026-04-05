@@ -1,6 +1,6 @@
 # CodeBlock 主题架构
 
-> 核心决策：Monaco 区域与外壳区域分离。Monaco 自治，外壳走 token。
+> 核心决策：Monaco 区域与外壳区域**严格分离**。Shell 走 token，Monaco 自治。
 
 ---
 
@@ -8,14 +8,15 @@
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Shell（外壳）                               │  ← token 体系驱动
+│  Shell（外壳）— 页面主题 token 驱动          │
 │  ┌─ header: 标题、语言标签、操作按钮         │
 │  ├─ border / shadow / 圆角                   │
 │  ├─ 折叠/展开 chrome                         │
+│  ├─ 骨架屏（loading skeleton）               │
 │  └─ diff 框架: 外边框、标题栏、文件名        │
 │                                               │
 │  ┌───────────────────────────────────────┐   │
-│  │  Monaco（编辑器区域）                  │   │  ← Monaco 主题自治
+│  │  Monaco（编辑器区域）— Monaco 主题自治 │   │
 │  │  ┌─ 背景、前景                        │   │
 │  │  ├─ 语法高亮色（keyword, string...）   │   │
 │  │  ├─ 行号                              │   │
@@ -27,20 +28,28 @@
 └─────────────────────────────────────────────┘
 ```
 
-### Shell 区域
+---
 
-| 元素 | 取值来源 | 当前 token |
+## 边界规则（每个元素只归一个区域）
+
+### Shell 区域 — 页面主题 token
+
+| 元素 | token | 说明 |
 |---|---|---|
-| 容器边框 | 页面主题 token | `var(--code-border)` |
-| Header 背景 | 页面主题 token | `var(--code-header-bg)` |
-| 操作按钮 | 页面主题 token | `var(--code-action-*)` |
-| 折叠/展开 | 页面主题 token | `var(--code-action-*)` |
-| Diff 外框/阴影 | 页面主题 token | `var(--code-border)` 等 |
-| Diff 标题栏/文件名 | 页面主题 token | `var(--code-header-bg)` 等 |
+| 容器边框 | `var(--code-border)` | |
+| **Header 背景** | `var(--code-header-bg)` | **改动：不再使用 `--vscode-editor-background`** |
+| **Header 文字** | `var(--code-fg)` | **改动：不再使用 `--vscode-editor-foreground`** |
+| 操作按钮默认色 | `var(--code-action-fg)` | |
+| 操作按钮 hover | `var(--code-action-hover-bg/fg)` | **改动：不再使用 `--vscode-editor-selectionBackground`** |
+| 操作按钮 active | `var(--code-action-active-bg/fg)` | 模式切换活跃态 |
+| 骨架屏 | `var(--loading-shimmer)` | **改动：不再受 `.is-dark` 影响** |
+| Diff 外框/阴影 | `var(--code-border)` 等 | |
+| Diff 标题栏 | `var(--code-header-bg)` | |
 
-Shell 区域跟随页面 `.dark` 自动切换，无需 `.is-dark`。
+**规则**：Shell 元素只用 `var(--code-*)` 和 `var(--ms-*)` token。不引用任何 `--vscode-*` 变量。
+跟随页面 `.dark` 自动切换，无需 `.is-dark`。
 
-### Monaco 区域
+### Monaco 区域 — Monaco 主题自治
 
 | 元素 | 取值来源 | 说明 |
 |---|---|---|
@@ -48,41 +57,39 @@ Shell 区域跟随页面 `.dark` 自动切换，无需 `.is-dark`。
 | 语法高亮色 | Monaco theme | 完全由 Monaco token colors 决定 |
 | 行号色 | Monaco theme | `--vscode-editorLineNumber-foreground` |
 | 选区背景 | Monaco theme | `--vscode-editor-selectionBackground` |
-| Diff 行背景 | 基于 Monaco 明暗 | 需要感知 Monaco 表面亮度 |
-| Diff 内联高亮 | 基于 Monaco 明暗 | 需要感知 Monaco 表面亮度 |
-| Gutter 标记 | 基于 Monaco 明暗 | 需要感知 Monaco 表面亮度 |
+| Diff 行背景 | 基于 Monaco 明暗 | `.is-dark` 切换 opacity |
+| Diff 内联高亮 | 基于 Monaco 明暗 | `.is-dark` 切换 opacity |
+| Gutter 标记 | 基于 Monaco 明暗 | `.is-dark` 切换 opacity |
 
-Monaco 区域完全由 Monaco 主题决定，不受页面 `.dark` 直接影响。
+**规则**：Monaco 区域由 Monaco 主题 + `.is-dark` class 驱动。diff 基色（色相）仍来自全局
+`--ms-diff-added` / `--ms-diff-removed`，但 opacity 和阴影深度由 `.is-dark` 控制。
 
 ---
 
-## Monaco 主题切换规则
+## Monaco 主题 Props 设计
 
-### 优先级
+### 统一为单个 `theme` prop
 
-```
-用户强制指定 > 页面明暗自动切换
-```
-
-### 行为矩阵
-
-| 用户配置 | 页面 Light | 页面 Dark |
-|---|---|---|
-| 未指定（默认） | 使用 `lightTheme` | 使用 `darkTheme` |
-| 仅指定 `lightTheme` | 使用指定值 | 使用 `darkTheme`（默认） |
-| 仅指定 `darkTheme` | 使用 `lightTheme`（默认） | 使用指定值 |
-| 指定 `forceTheme` | **始终使用 `forceTheme`** | **始终使用 `forceTheme`** |
-
-### Props 设计
+取代现有的 `darkTheme` + `lightTheme` + 新增的 `forceTheme` 三 prop 设计，
+合并为一个灵活的 `theme` prop：
 
 ```ts
-interface CodeBlockProps {
-  // 自动切换（现有行为，保留）
-  lightTheme?: string | MonacoThemeObject   // 亮色页面时使用
-  darkTheme?: string | MonacoThemeObject    // 暗色页面时使用
+type CodeBlockTheme = string | MonacoThemeObject
 
-  // 强制指定（新增）
-  forceTheme?: string | MonacoThemeObject   // 设置后忽略明暗切换，始终使用此主题
+interface CodeBlockProps {
+  /**
+   * Monaco 主题配置。
+   *
+   * - 字符串 / 对象：固定主题，不随页面明暗切换
+   *   theme="monokai"
+   *   theme={...customThemeObject}
+   *
+   * - { light, dark } 配对：随页面明暗自动切换
+   *   theme={{ light: 'github-light', dark: 'one-dark-pro' }}
+   *
+   * - 未指定：使用内置默认 light/dark 主题
+   */
+  theme?: CodeBlockTheme | { light: CodeBlockTheme; dark: CodeBlockTheme }
 }
 ```
 
@@ -90,99 +97,177 @@ interface CodeBlockProps {
 
 ```ts
 const activeTheme = computed(() => {
-  if (props.forceTheme) return props.forceTheme
-  return isDark.value ? props.darkTheme : props.lightTheme
+  const t = props.theme
+  if (!t) {
+    // 未指定：内置默认
+    return isDark.value ? DEFAULT_DARK_THEME : DEFAULT_LIGHT_THEME
+  }
+  if (typeof t === 'string' || isThemeObject(t)) {
+    // 单主题：固定使用，不切换
+    return t
+  }
+  // 配对：按页面明暗切换
+  return isDark.value ? t.dark : t.light
 })
 ```
 
-其中 `isDark` 来自页面级 `.dark` 状态（不再反向检测 Monaco 表面亮度）。
+### 用法示例
+
+```html
+<!-- 自动切换（大多数场景） -->
+<CodeBlock :theme="{ light: 'github-light', dark: 'one-dark-pro' }" />
+
+<!-- 固定主题（不随页面切换） -->
+<CodeBlock theme="monokai" />
+
+<!-- 默认（内置 light/dark） -->
+<CodeBlock />
+```
+
+### 向后兼容
+
+保留 `darkTheme` / `lightTheme` prop 作为 deprecated alias：
+
+```ts
+const resolvedThemeProp = computed(() => {
+  if (props.theme) return props.theme
+  // 向后兼容
+  if (props.darkTheme || props.lightTheme) {
+    return { light: props.lightTheme ?? DEFAULT_LIGHT, dark: props.darkTheme ?? DEFAULT_DARK }
+  }
+  return undefined
+})
+```
 
 ---
 
-## `.is-dark` 的角色变化
+## `.is-dark` 的角色
 
-### 之前
+### 触发规则
 
-```
-Monaco 主题加载 → 检测 editor background 亮度 → resolvedSurfaceIsDark
-  → .is-dark class → 驱动 diff/gutter/skeleton 颜色
-```
-
-问题：反向检测，增加复杂度且有延迟。
-
-### 之后
-
-```
-页面 isDark → 选择 darkTheme/lightTheme → Monaco 加载
-  → .is-dark class 仍需保留，但来源更清晰：
-
-  if (forceTheme) → 检测 forceTheme 的 bg 亮度决定 .is-dark
-  else            → 直接等于页面 isDark
+```ts
+const editorSurfaceIsDark = computed(() => {
+  const t = activeTheme.value
+  // 配对模式：跟随页面
+  if (!props.theme || isPairedTheme(props.theme)) return isDark.value
+  // 单主题模式：检测主题名/亮度
+  return detectThemeDarkness(t)
+})
 ```
 
-`.is-dark` 在 Monaco 区域附近仍有必要——因为 diff 行背景、gutter 标记等需要匹配
-Monaco 的表面亮度（不是页面亮度）。但触发逻辑从"反向检测"变为"正向推导"。
+### 检测主题明暗
 
-### `forceTheme` 的特殊情况
+```ts
+function detectThemeDarkness(theme: CodeBlockTheme): boolean {
+  if (typeof theme === 'string') return themeLooksDark(theme)
+  // 主题对象：检测 background 色的亮度
+  if (theme.colors?.['editor.background']) {
+    return getLuminance(theme.colors['editor.background']) < 128
+  }
+  // 兜底
+  return isDark.value
+}
+```
 
-用户在亮色页面上强制使用暗色代码主题（如 Monokai）：
-- Shell 外壳：亮色（跟随页面 token）
-- Monaco 编辑器：暗色（forceTheme）
-- `.is-dark`：true（因为编辑器表面是暗的）
-- Diff 行高亮：暗色风格（匹配编辑器表面）
+### `.is-dark` 只作用于 Monaco 区域
 
-这正是分离的价值——两个区域可以有不同的明暗状态。
+`.is-dark` class **只影响**编辑器内部和 diff 行/gutter 的 opacity 系数。
+Shell 元素（header、按钮、边框、骨架屏）**完全不受** `.is-dark` 影响。
+
+---
+
+## Diff stage 背景层
+
+**决策：移除 `--markstream-diff-stage-bg` 渐变，直接使用编辑器背景。**
+
+```css
+/* 之前 */
+.code-block-container.is-diff .code-editor-layer {
+  background: var(--markstream-diff-stage-bg); /* 复杂渐变 */
+}
+
+/* 之后 */
+.code-block-container.is-diff .code-editor-layer {
+  background: transparent; /* Monaco 自己控制背景 */
+}
+```
+
+简化层级，避免 Shell token 渐变和 Monaco 背景色叠加不协调。
 
 ---
 
 ## `--markstream-diff-*` 变量归属
 
-按归属区域重新分类：
+### 归 Shell（迁移到 token / 删除）
 
-### 归 Shell（走 token 体系）
+| 变量 | 处理 |
+|---|---|
+| `--markstream-diff-frame-border` | → `var(--code-border)` |
+| `--markstream-diff-frame-shadow` | → 基于 `hsl(var(--ms-foreground) / ...)` |
+| `--markstream-diff-shell-*` | → token 化 |
+| `--markstream-diff-header-border` | → `var(--code-border)` |
+| `--markstream-diff-stage-bg` | → **删除**（stage 背景移除） |
+| `--markstream-diff-focus` | → `var(--focus-ring)` |
+| `--markstream-diff-action-hover` | → `var(--code-action-hover-bg)` |
+| `--markstream-diff-panel-bg*` | → token 化 |
+| `--markstream-diff-panel-border` | → token 化 |
+| `--markstream-diff-pane-divider` | → token 化 |
+| `--markstream-diff-widget-shadow` | → 基于 `hsl(var(--ms-foreground) / ...)` |
 
-| 变量 | 说明 | 迁移到 |
-|---|---|---|
-| `--markstream-diff-frame-border` | diff 外框边框 | `var(--code-border)` |
-| `--markstream-diff-frame-shadow` | diff 外框阴影 | 新 token 或内联 |
-| `--markstream-diff-shell-*` | diff 壳体样式 | token 化 |
-| `--markstream-diff-header-border` | diff 标题分隔线 | `var(--code-border)` |
-| `--markstream-diff-stage-bg` | diff 舞台区域背景 | token 化 |
-| `--markstream-diff-focus` | focus 环 | `var(--focus-ring)` |
-| `--markstream-diff-action-hover` | 操作按钮 hover | `var(--code-action-hover-bg)` |
-| `--markstream-diff-panel-bg*` | 面板背景 | token 化 |
-| `--markstream-diff-panel-border` | 面板边框 | token 化 |
-| `--markstream-diff-pane-divider` | 面板分隔线 | token 化 |
-| `--markstream-diff-widget-shadow` | 小部件阴影 | token 化 |
+### 归 Monaco（保留组件内，跟随 `.is-dark`）
 
-### 归 Monaco 区域（保留组件内，跟随 `.is-dark`）
+| 变量 | 原因 |
+|---|---|
+| `--markstream-diff-editor-bg/fg` | 匹配 Monaco 表面 |
+| `--markstream-diff-added-fg/bg` | 匹配编辑器表面亮度 |
+| `--markstream-diff-removed-fg/bg` | 匹配编辑器表面亮度 |
+| `--markstream-diff-added/removed-inline` | 匹配编辑器表面亮度 |
+| `--markstream-diff-added/removed-gutter` | 匹配编辑器表面亮度 |
+| `--markstream-diff-line-number*` | 匹配 Monaco 行号色 |
+| `--markstream-diff-unchanged-*` | 匹配编辑器表面 |
+| `--markstream-diff-gutter-*` | 匹配编辑器表面 |
+| `--markstream-diff-added/removed-line-fill` | 匹配编辑器表面亮度 |
 
-| 变量 | 说明 | 原因 |
-|---|---|---|
-| `--markstream-diff-editor-bg/fg` | 编辑器区域背景/前景 | 匹配 Monaco 表面 |
-| `--markstream-diff-added-fg/bg` | diff 新增行 | 需匹配编辑器表面亮度 |
-| `--markstream-diff-removed-fg/bg` | diff 删除行 | 需匹配编辑器表面亮度 |
-| `--markstream-diff-added/removed-inline` | diff 内联高亮 | 需匹配编辑器表面亮度 |
-| `--markstream-diff-added/removed-gutter` | gutter 标记 | 需匹配编辑器表面亮度 |
-| `--markstream-diff-line-number*` | 行号 | 匹配 Monaco 行号色 |
-| `--markstream-diff-unchanged-*` | 未变更区域 | 匹配编辑器表面 |
-| `--markstream-diff-gutter-*` | gutter 区域 | 匹配编辑器表面 |
-| `--markstream-diff-added/removed-line-fill` | 行填充 | 匹配编辑器表面亮度 |
+Diff 基色仍引用全局 token：`--ms-diff-added` / `--ms-diff-removed`。
 
-### Diff 色彩仍使用全局 token
+---
 
-diff 的基色（added/removed 的色相和饱和度）仍来自全局 token：
+## MarkdownCodeBlockNode 处理
 
-```
-全局 token                    Monaco 区域使用
-──────────                    ──────────────
---ms-diff-added              → --markstream-diff-added-fg (直引)
---ms-diff-removed            → --markstream-diff-removed-fg (直引)
---diff-added-bg (0.1 opacity) → --markstream-diff-added-line (直引)
---diff-removed-bg            → --markstream-diff-removed-line (直引)
-```
+### 现状
 
-用户改全局 `--ms-diff-added` → diff 编辑器区域颜色也会变。
+- 默认不使用，仅在用户通过 `setCustomComponents` 注册时生效
+- 用 Shiki 渲染语法高亮（比 Monaco 轻量），不加载编辑器
+- Shell 部分（header、操作按钮、骨架屏）与 CodeBlockNode **大量重复**
+- 已作为公开 API 导出
+
+### 决策：废弃，引用场景切换到 CodeBlockNode
+
+原因：
+1. CodeBlockNode 已有 fallback 渲染（Monaco 未加载时用 `<pre>`）
+2. Shell 部分重复维护成本高，token 迁移要做两遍
+3. 语法高亮质量 Monaco ≥ Shiki，无独特优势
+4. 用户需要轻量渲染时，可用 `renderCodeBlocksAsPre` 选项
+
+步骤：
+1. 标记 `MarkdownCodeBlockNode` 为 `@deprecated`
+2. 下个主版本移除
+3. 文档中引导用户迁移到 CodeBlockNode 或 `renderCodeBlocksAsPre`
+
+---
+
+## 已识别的边界问题及处理
+
+| 问题 | 决策 |
+|---|---|
+| Header 当前用 `--vscode-*` 颜色 | **改为 token**。Header 归 Shell，用 `--code-header-bg/fg` |
+| 操作按钮 hover 用 `--vscode-editor-selectionBackground` | **改为 token**。用 `--code-action-hover-bg` |
+| 骨架屏受 `.is-dark` 影响 | **改为纯 token**。骨架屏归 Shell，不看 `.is-dark` |
+| 折叠时 CSS 变量仍活跃 | **可接受**。`v-show` 隐藏但变量不影响其他元素 |
+| `resolvedChromeIsDark` 命名 | **重命名为 `editorSurfaceIsDark`** |
+| 主题名字符串检测不精确 | **增加对象主题亮度检测**（读取 `editor.background`） |
+| `syncEditorCssVars` 跨边界同步 | **限制范围**。仅同步到 Monaco 容器内，不上浮到根元素 |
+| Diff stage 渐变背景 | **删除**。让 Monaco 自己控制背景 |
 
 ---
 
@@ -190,8 +275,12 @@ diff 的基色（added/removed 的色相和饱和度）仍来自全局 token：
 
 | 阶段 | 内容 |
 |---|---|
-| 1 | 将 Shell 归属的 `--markstream-diff-*` 变量替换为 token 引用，移出 `.is-dark` 块 |
-| 2 | Monaco 归属的变量保留在 `.is-dark` 块，但确认都引用 `--ms-*` 语义令牌 |
-| 3 | 简化 `.is-dark` 触发逻辑：非 forceTheme 时直接等于 `isDark`，forceTheme 时检测主题亮度 |
-| 4 | 实现 `forceTheme` prop |
-| 5 | 清理冗余的 `--markstream-*` 变量（shell 部分已被 token 替代的可删除） |
+| 1 | **Header 归 Shell**：移除 `headerStyle` 中的 `--vscode-*` 引用，改用 token |
+| 2 | **按钮归 Shell**：hover 改用 `--code-action-hover-bg`，移除 `--vscode-*` |
+| 3 | **骨架屏归 Shell**：移除 `.is-dark .skeleton-line` 规则 |
+| 4 | **Diff stage 简化**：移除 `--markstream-diff-stage-bg` 渐变 |
+| 5 | **Shell diff 变量 token 化**：将 Shell 归属变量替换为 token 引用 |
+| 6 | **限制 `syncEditorCssVars`**：不再将 `--vscode-*` 同步到根容器 |
+| 7 | **实现 `theme` prop**：统一 API，向后兼容 `darkTheme`/`lightTheme` |
+| 8 | **重命名 `.is-dark` 推导**：`resolvedChromeIsDark` → `editorSurfaceIsDark`，增加对象主题检测 |
+| 9 | **废弃 MarkdownCodeBlockNode**：标记 deprecated，下主版本移除 |
