@@ -272,159 +272,73 @@ Term 2
 
 <style>
 /*
- * Two typography presets: Default + Compact.
- * "default" = the new designed baseline (Technical Clean + breathing room).
- * "compact" = high-density for AI chat / dashboards.
+ * Two presets, pure token overrides.
+ * No component selectors — just change token values and everything follows.
  *
- * Selectors use .markstream-vue.{preset} for specificity
- * to override library scoped styles.
+ * "default" uses the library's built-in token defaults (no overrides needed).
+ * "compact" overrides spacing/size tokens for high density.
  */
-
-
-/* ================================================================
-   DEFAULT — Technical Clean + Notion breathing room
-   Positioning: AI 对话 + 开发文档 + 内容渲染的交叉场景。
-   专业但不冷淡，代码和散文都舒适。
-
-   Design intent:
-   - 65ch content width (research-backed optimal line length)
-   - 16px body, 1.6 line-height (accessibility + comfort sweet spot)
-   - Major Third (1.25) heading scale
-   - Weight > size for hierarchy (Apple/Linear approach)
-   - Heading top margin > bottom margin (proximity principle)
-   - Table has header bg + zebra + hover
-   - Blockquote has subtle bg fill, not just a bare left border
-   - HR as fading gradient, not a hard line
-   - h5/h6 use muted color instead of size reduction
-   ================================================================ */
-
-.markstream-vue.default .example-content { max-width: 65ch; }
-
-/* Headings: Major Third (1.25) scale from 16px base → 20 → 25 → 31.25 */
-.markstream-vue.default .heading-node { letter-spacing: -0.015em; }
-.markstream-vue.default .heading-1 { font-size: 2rem; font-weight: 700; margin-top: 0; margin-bottom: 0.75em; line-height: 1.2; }
-.markstream-vue.default .heading-2 { font-size: 1.5rem; font-weight: 600; margin-top: 2.25em; margin-bottom: 0.6em; line-height: 1.25; }
-.markstream-vue.default .heading-3 { font-size: 1.25rem; font-weight: 600; margin-top: 1.8em; margin-bottom: 0.5em; line-height: 1.3; }
-.markstream-vue.default .heading-4 { font-size: 1rem; font-weight: 600; margin-top: 1.5em; margin-bottom: 0.4em; line-height: 1.4; }
-.markstream-vue.default .heading-5 { font-size: 0.875rem; font-weight: 600; margin-top: 1.25em; margin-bottom: 0.3em; color: hsl(var(--ms-muted-foreground)); }
-.markstream-vue.default .heading-6 { font-size: 0.875rem; font-weight: 500; margin-top: 1em; margin-bottom: 0.25em; color: hsl(var(--ms-muted-foreground)); font-style: italic; }
-
-/* Body text */
-.markstream-vue.default .paragraph-node { font-size: 1rem; line-height: 1.6; margin: 1.25em 0; }
-
-/* Blockquote: subtle bg + left accent, not bare border */
-.markstream-vue.default .blockquote {
-  border-left-width: 3px;
-  border-left-color: hsl(var(--ms-muted-foreground) / 0.25);
-  padding: 0.5em 1em;
-  margin: 1.5em 0;
-  background: hsl(var(--ms-muted) / 0.35);
-  border-radius: 0 calc(var(--ms-radius) - 2px) calc(var(--ms-radius) - 2px) 0;
-  font-style: normal;
-}
-
-/* Lists */
-.markstream-vue.default .list-node { line-height: 1.6; margin: 1em 0; }
-.markstream-vue.default .list-item { margin: 0.25em 0; }
-
-/* Code blocks: slight elevation to separate from page */
-.markstream-vue.default .code-block-container {
-  margin: 1.5em 0;
-  border-radius: calc(var(--ms-radius) + 2px);
-  box-shadow: 0 1px 3px hsl(var(--ms-foreground) / 0.06);
-}
-
-/* Tables: header bg + zebra stripes + hover */
-.markstream-vue.default .table-node { font-size: 0.9375rem; margin: 1.75em 0; }
-.markstream-vue.default .table-node th {
-  background: hsl(var(--ms-muted) / 0.6);
-  font-weight: 600;
-  font-size: 0.8125rem;
-  letter-spacing: 0.02em;
-}
-.markstream-vue.default .table-node tr:nth-child(even) td { background: hsl(var(--ms-muted) / 0.2); }
-.markstream-vue.default .table-node tr:hover td { background: hsl(var(--ms-accent) / 0.4); }
-
-/* Admonition */
-.markstream-vue.default .admonition { border-radius: calc(var(--ms-radius)); margin: 1.5em 0; }
-
-/* HR: gradient fade instead of hard line */
-.markstream-vue.default .hr-node {
-  border: none;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, hsl(var(--ms-border)), transparent);
-  margin: 2.5em 0;
-}
-
-/* Definition list */
-.markstream-vue.default .definition-term { font-weight: 600; color: hsl(var(--ms-foreground)); }
-.markstream-vue.default .definition-desc {
-  margin-left: 1em;
-  padding-left: 0.75em;
-  border-left: 2px solid hsl(var(--ms-border) / 0.5);
-}
-
-/* Math */
-.markstream-vue.default .math-block { margin: 1.5em 0; }
 
 /* ================================================================
    COMPACT — AI chat / dashboard / sidebar
-   Positioning: 空间敏感场景。信息密度优先，但不牺牲可读性。
-
-   Design intent:
-   - Full width (host controls container)
-   - 14px body, 1.5 line-height
-   - ~60% of default spacing
-   - Smaller headings, tighter margins
-   - Tables and code blocks take minimum vertical space
-   - Admonitions shrink padding
+   Only override tokens. ~60% of default spacing.
    ================================================================ */
+.markstream-vue.compact {
+  /* Heading rhythm — compressed */
+  --ms-flow-heading-1-mt: 0;
+  --ms-flow-heading-1-mb: 0.3em;
+  --ms-flow-heading-2-mt: 1.25em;
+  --ms-flow-heading-2-mb: 0.25em;
+  --ms-flow-heading-3-mt: 1em;
+  --ms-flow-heading-3-mb: 0.2em;
+  --ms-flow-heading-4-mt: 0.8em;
+  --ms-flow-heading-4-mb: 0.15em;
+  --ms-flow-heading-5-mt: 0.6em;
+  --ms-flow-heading-5-mb: 0.1em;
+  --ms-flow-heading-6-mt: 0.5em;
+  --ms-flow-heading-6-mb: 0.1em;
 
-.markstream-vue.compact .example-content { max-width: 100%; padding: 1rem; }
+  /* Flow spacing — tighter */
+  --ms-flow-paragraph-y: 0.625em;
+  --ms-flow-list-y: 0.5em;
+  --ms-flow-list-item-y: 0.125em;
+  --ms-flow-list-indent: 1.25em;
+  --ms-flow-table-y: 0.625em;
+  --ms-flow-table-cell: 0.2em 0.4em;
+  --ms-flow-blockquote-y: 0.625em;
+  --ms-flow-blockquote-indent: 0.75em;
+  --ms-flow-admonition-y: 0.5em;
+  --ms-flow-footnote-y: 0.25em;
+  --ms-flow-hr-y: 1.25em;
+  --ms-flow-diagram-y: 0.625em;
+  --ms-flow-codeblock-y: 0.625em;
+  --ms-flow-definition-term-mt: 0.25em;
+  --ms-flow-definition-desc-ml: 0.75em;
+  --ms-flow-definition-desc-mb: 0.25em;
 
-/* Headings: compressed scale */
-.markstream-vue.compact .heading-1 { font-size: 1.375rem; font-weight: 700; margin-top: 0; margin-bottom: 0.3em; line-height: 1.2; }
-.markstream-vue.compact .heading-2 { font-size: 1.125rem; font-weight: 600; margin-top: 1.25em; margin-bottom: 0.25em; line-height: 1.25; }
-.markstream-vue.compact .heading-3 { font-size: 1rem; font-weight: 600; margin-top: 1em; margin-bottom: 0.2em; line-height: 1.3; }
-.markstream-vue.compact .heading-4 { font-size: 0.875rem; font-weight: 600; margin-top: 0.8em; margin-bottom: 0.15em; }
-.markstream-vue.compact .heading-5 { font-size: 0.8125rem; font-weight: 600; margin-top: 0.6em; margin-bottom: 0.1em; color: hsl(var(--ms-muted-foreground)); }
-.markstream-vue.compact .heading-6 { font-size: 0.8125rem; font-weight: 500; margin-top: 0.5em; margin-bottom: 0.1em; color: hsl(var(--ms-muted-foreground)); }
+  /* Panel insets — smaller */
+  --ms-inset-panel-x: 0.75rem;
+  --ms-inset-panel-y: 0.375rem;
+  --ms-inset-panel-body-sm: 0.25rem;
+  --ms-inset-panel-body: 0.625rem;
+  --ms-inset-admonition-body-top: 0.25rem;
+  --ms-inset-admonition-body-bottom: 0.375rem;
 
-/* Body text */
-.markstream-vue.compact .paragraph-node { font-size: 0.875rem; line-height: 1.5; margin: 0.625em 0; }
+  /* Gaps — tighter */
+  --ms-gap-header: 0.5rem;
+  --ms-gap-header-main: 0.375rem;
+  --ms-gap-header-actions: 0.25rem;
 
-/* Blockquote */
-.markstream-vue.compact .blockquote {
-  padding-left: 0.75em;
-  margin: 0.625em 0;
-  font-size: 0.875rem;
+  /* Sizes — smaller */
+  --ms-size-diagram-min-height: 280px;
+  --ms-size-code-max-height: 420px;
+  --ms-size-skeleton-min-height: 80px;
+
+  /* Animation — faster */
+  --ms-duration-standard: 140ms;
+  --ms-duration-overlay: 160ms;
 }
 
-/* Lists */
-.markstream-vue.compact .list-node { margin: 0.5em 0; font-size: 0.875rem; padding-left: 1.25em; }
-.markstream-vue.compact .list-item { margin: 0.125em 0; }
-
-/* Code blocks */
-.markstream-vue.compact .code-block-container { margin: 0.625em 0; border-radius: calc(var(--ms-radius) - 2px); }
-
-/* Tables */
-.markstream-vue.compact .table-node { font-size: 0.8125rem; margin: 0.625em 0; }
-.markstream-vue.compact .table-node th { font-weight: 600; font-size: 0.75rem; }
-.markstream-vue.compact .table-node th,
-.markstream-vue.compact .table-node td { padding: 0.2em 0.4em; }
-
-/* Admonitions */
-.markstream-vue.compact .admonition { margin: 0.5em 0; font-size: 0.875rem; }
-.markstream-vue.compact .admonition-header { padding: 0.25rem 0.625rem; font-size: 0.8125rem; }
-.markstream-vue.compact .admonition-content { padding: 0.25rem 0.625rem 0.375rem; }
-
-/* HR */
-.markstream-vue.compact .hr-node { margin: 1.25em 0; }
-
-/* Math */
-.markstream-vue.compact .math-block { margin: 0.625em 0; }
-
-/* Definition list */
-.markstream-vue.compact .definition-term { font-size: 0.875rem; }
-.markstream-vue.compact .definition-desc { font-size: 0.875rem; margin-left: 0.75em; margin-bottom: 0.25em; }
+/* Compact content width controlled by host (full width here for demo) */
+.compact .example-content { max-width: 100%; padding: 1rem; }
 </style>
