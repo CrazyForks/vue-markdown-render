@@ -280,9 +280,14 @@ This text contains <mark>inline HTML mark</mark> and <abbr title="HyperText Mark
 <style scoped>
 .example-page {
   min-height: 100vh;
-  background: hsl(var(--ms-background, 0 0% 100%));
-  color: hsl(var(--ms-foreground, 222.2 84% 4.9%));
+  background: #ffffff;
+  color: #1a1a2e;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.example-page.dark {
+  background: #0a0a1a;
+  color: #e8e8f0;
 }
 
 .example-header {
@@ -293,9 +298,13 @@ This text contains <mark>inline HTML mark</mark> and <abbr title="HyperText Mark
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 2rem;
-  border-bottom: 1px solid hsl(var(--ms-border, 214.3 31.8% 91.4%));
+  border-bottom: 1px solid #e2e8f0;
   background: inherit;
   backdrop-filter: blur(8px);
+}
+
+.example-page.dark .example-header {
+  border-bottom-color: #2d2d3f;
 }
 
 .example-header h1 {
@@ -313,7 +322,7 @@ This text contains <mark>inline HTML mark</mark> and <abbr title="HyperText Mark
 .toggle-btn {
   margin-left: auto;
   padding: 0.375rem 0.75rem;
-  border: 1px solid hsl(var(--ms-border, 214.3 31.8% 91.4%));
+  border: 1px solid #e2e8f0;
   border-radius: 0.375rem;
   background: transparent;
   color: inherit;
@@ -321,14 +330,26 @@ This text contains <mark>inline HTML mark</mark> and <abbr title="HyperText Mark
   cursor: pointer;
 }
 
+.example-page.dark .toggle-btn {
+  border-color: #2d2d3f;
+}
+
 .toggle-btn:hover {
-  background: hsl(var(--ms-accent, 210 40% 96.1%));
+  background: #f1f5f9;
+}
+
+.example-page.dark .toggle-btn:hover {
+  background: #1e1e2e;
 }
 
 .back-link {
   font-size: 0.8rem;
-  color: hsl(var(--ms-link, 212 100% 42%));
+  color: #0366d6;
   text-decoration: none;
+}
+
+.example-page.dark .back-link {
+  color: #58a6ff;
 }
 
 .back-link:hover {
