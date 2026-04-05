@@ -214,18 +214,31 @@ const themes = [
 
 **How it works:**
 
-When `isDark` changes, `CodeBlockNode` automatically switches to the corresponding theme:
-- When `isDark` is `true` → uses `codeBlockDarkTheme` (e.g., `'vitesse-dark'`)
-- When `isDark` is `false` → uses `codeBlockLightTheme` (e.g., `'vitesse-light'`)
+The `theme` prop accepts either a fixed theme or a light/dark pair:
+
+```vue
+<!-- Auto-switch between light and dark (recommended) -->
+<CodeBlockNode :theme="{ light: 'vitesse-light', dark: 'vitesse-dark' }" />
+
+<!-- Fixed theme (ignores isDark) -->
+<CodeBlockNode theme="monokai" />
+
+<!-- Theme object (fixed, ignores isDark) -->
+<CodeBlockNode :theme="{ name: 'my-theme', colors: { ... } }" />
+```
+
+When using a `{ light, dark }` pair, the component automatically switches based on the `isDark` prop.
 
 The `themes` prop registers the available themes so Monaco can lazy-load them on demand.
+
+> **Backward compatibility:** `darkTheme` / `lightTheme` props still work but are deprecated. Prefer the unified `theme` prop.
 
 **Key differences for CodeBlockNode:**
 
 | Prop | Direct CodeBlockNode | Via MarkdownRender |
 |------|---------------------|-------------------|
 | `isDark` | Passed directly to `<CodeBlockNode :is-dark="isDark" />` | Passed via `<MarkdownRender :is-dark="isDark" />` and automatically forwarded |
-| Theme props | `:dark-theme="'vitesse-dark'"` `:light-theme="'vitesse-light'"` | `:code-block-dark-theme="'vitesse-dark'"` `:code-block-light-theme="'vitesse-light'"` |
+| Theme | `:theme="{ light: 'vitesse-light', dark: 'vitesse-dark' }"` | `:code-block-dark-theme="'vitesse-dark'"` `:code-block-light-theme="'vitesse-light'"` (legacy) |
 | Themes list | `:themes="['vitesse-dark', 'vitesse-light', ...]"` | `:themes="['vitesse-dark', 'vitesse-light', ...]"` |
 
 ## Notes

@@ -31,13 +31,14 @@
 
 ### 三档内置渲染器
 
-| 模式 | 渲染器 | 特点 | 选择方式 |
-|---|---|---|---|
-| Monaco | CodeBlockNode | 完整编辑器，语法高亮，diff | 默认 |
-| Shiki | MarkdownCodeBlockNode | 轻量高亮，无编辑器，适合大量只读展示 | `setCustomComponents` 注册 |
-| Pre | PreCodeNode | 纯 `<pre><code>`，无高亮 | `renderCodeBlocksAsPre: true` |
+| 模式 | 渲染器 | Shell | 特点 | 选择方式 |
+|---|---|---|---|---|
+| Monaco | CodeBlockNode | **有** | 完整编辑器，语法高亮，diff | 默认 |
+| Shiki | MarkdownCodeBlockNode | **有** | 轻量高亮，无编辑器，适合大量只读展示 | `setCustomComponents` 注册 |
+| Pre | PreCodeNode | **无** | 纯 `<pre><code>`，无高亮，超轻量 | `renderCodeBlocksAsPre: true` |
 
-三档**都套同一个 Shell**，体验一致（header、复制按钮、折叠、语言标签、token 主题）。
+CodeBlockNode 和 MarkdownCodeBlockNode 共享 `CodeBlockShell`（header、操作按钮、骨架屏、折叠）。
+PreCodeNode 有意不套 Shell — 它是超轻量选项，不需要 header/按钮。需要这些功能应使用 Shiki 或 Monaco 模式。
 
 ### 自定义组件
 
@@ -338,6 +339,6 @@ CodeBlockShell（共享）
 | 6 | **限制 `syncEditorCssVars`**：不再将 `--vscode-*` 同步到根容器 |
 | 7 | **实现 `theme` prop**：统一 API，向后兼容 `darkTheme`/`lightTheme` |
 | 8 | **重命名 `.is-dark` 推导**：`resolvedChromeIsDark` → `editorSurfaceIsDark`，增加对象主题检测 |
-| 9 | **抽取共享 Shell**：header / 按钮 / 骨架屏 / 折叠逻辑抽为共享子组件，内容区域用 slot |
-| 10 | **三档内置渲染器接入 Shell**：CodeBlockNode(Monaco)、MarkdownCodeBlockNode(Shiki)、PreCodeNode(pre) 各自作为 Shell slot 内容 |
-| 11 | **NodeRenderer 路由调整**：内置组件走 Shell 包裹，`setCustomComponents` 自定义组件直接渲染（不套 Shell） |
+| 9 | **抽取共享 Shell**：CodeBlockShell.vue — header / 按钮 / 骨架屏 / 折叠，内容区域用 slot |
+| 10 | **CodeBlockNode + MarkdownCodeBlockNode 接入 Shell**：PreCodeNode 不套 Shell（超轻量设计意图） |
+| 11 | NodeRenderer 路由不变 — Shell 内嵌在各组件中，自定义组件直接渲染 |
