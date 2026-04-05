@@ -665,6 +665,9 @@ function previewCode() {
           </div>
         </slot>
       </template>
+      <template v-if="$slots['header-right']" #header-right>
+        <slot name="header-right" />
+      </template>
 
       <!-- Content area -->
       <div

@@ -1599,6 +1599,11 @@ function resolveRequestedTheme() {
   const preferred = getPreferredColorScheme()
   const explicit = resolvedMonacoOptions.value?.theme
   const requested = preferred ?? explicit
+
+  // Object themes are self-contained — trust them directly, skip availability check
+  if (requested != null && typeof requested === 'object')
+    return requested
+
   const availableThemes = Array.isArray(props.themes) ? props.themes : []
   if (!availableThemes.length || requested == null)
     return requested
@@ -1961,6 +1966,9 @@ onUnmounted(() => {
             </div>
           </div>
         </slot>
+      </template>
+      <template v-if="$slots['header-right']" #header-right>
+        <slot name="header-right" />
       </template>
 
       <!-- Monaco editor layer -->
