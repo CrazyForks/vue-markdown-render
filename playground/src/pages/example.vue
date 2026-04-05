@@ -250,17 +250,20 @@ This text contains <mark>inline HTML mark</mark> and <abbr title="HyperText Mark
 </script>
 
 <template>
-  <div class="markstream-vue min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors" :class="{ dark: isDark }">
-    <header class="sticky top-0 z-50 flex items-center gap-4 px-8 py-3 border-b border-gray-200 dark:border-gray-800 bg-inherit backdrop-blur-sm">
+  <div
+    class="markstream-vue min-h-screen bg-[hsl(var(--ms-background))] text-[hsl(var(--ms-foreground))] transition-colors"
+    :class="{ dark: isDark }"
+  >
+    <header class="sticky top-0 z-50 flex items-center gap-4 px-8 py-3 border-b border-[hsl(var(--ms-border))] bg-[hsl(var(--ms-background))] backdrop-blur-sm">
       <h1 class="text-base font-semibold m-0">Static Component Example</h1>
-      <p class="text-xs text-gray-500 dark:text-gray-400 m-0">For design review &mdash; all components rendered at once, no streaming.</p>
+      <p class="text-xs text-[hsl(var(--ms-muted-foreground))] m-0">For design review &mdash; all components rendered at once, no streaming.</p>
       <button
-        class="ml-auto px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-transparent text-inherit cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        class="ml-auto px-3 py-1.5 text-xs border border-[hsl(var(--ms-border))] rounded-md bg-transparent text-inherit cursor-pointer hover:bg-[hsl(var(--ms-accent))] transition-colors"
         @click="toggleDark"
       >
         {{ isDark ? 'Light Mode' : 'Dark Mode' }}
       </button>
-      <router-link to="/" class="text-xs text-blue-600 dark:text-blue-400 no-underline hover:underline">&larr; Back to Playground</router-link>
+      <router-link to="/" class="text-xs text-[var(--link-color)] no-underline hover:underline">&larr; Back to Playground</router-link>
     </header>
 
     <main class="max-w-3xl mx-auto px-8 py-8">
