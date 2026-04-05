@@ -349,7 +349,7 @@ full = 9999px
 /* ✅ 之后 */
 .blockquote { border-left: 0.25rem solid var(--blockquote-border); }
 .admonition-note { border-left-color: var(--admonition-note); }
-.highlight-node { background: var(--highlight-bg); color: var(--highlight-fg); }
+.highlight-node { background: var(--highlight-bg); }
 ```
 
 ---
@@ -367,6 +367,21 @@ full = 9999px
 - Monaco Editor 主题名切换
 - Mermaid 主题名切换
 - `prefers-color-scheme` 检测兜底
+
+### CodeBlockNode `.is-dark` 例外
+
+CodeBlockNode 保留 `.is-dark` CSS 块。此处 `.is-dark` 的语义是**"编辑器表面为暗色"**
+（由 Monaco 主题检测 `resolvedSurfaceIsDark` 决定），与页面级 `.dark` 无关。
+
+- 一个亮色页面上可以出现暗色主题的代码块
+- `.is-dark` 块包含 ~15 个 diff 视图的阴影/透明度/渐变差异值
+- 这些值已全部引用 `--ms-*` 语义令牌，只是 opacity 系数不同
+
+### Admonition header-bg 例外
+
+提示框标题背景需要在 dark 下使用更高透明度（6% → 12%），因此
+`--admonition-*-header-bg` 在 `.dark` 区块中重新定义。这是 Layer 2 中
+唯一需要 dark 覆盖的语义令牌。
 
 ---
 

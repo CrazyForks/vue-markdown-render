@@ -37,13 +37,13 @@
   --ms-background:              var(--background,             0 0% 100%);
   --ms-foreground:              var(--foreground,             222.2 84% 4.9%);
 
-  --ms-muted:                   var(--muted,                  210 40% 96.1%);
+  --ms-muted:                   var(--muted,                  210 40% 96%);
   --ms-muted-foreground:        var(--muted-foreground,       215.4 16.3% 46.9%);
 
-  --ms-secondary:               var(--secondary,              210 40% 96.1%);
+  --ms-secondary:               var(--secondary,              210 40% 96%);
   --ms-secondary-foreground:    var(--secondary-foreground,   222.2 47.4% 11.2%);
 
-  --ms-accent:                  var(--accent,                 210 40% 96.1%);
+  --ms-accent:                  var(--accent,                 210 40% 96%);
   --ms-accent-foreground:       var(--accent-foreground,      222.2 47.4% 11.2%);
 
   --ms-primary:                 var(--primary,                222.2 47.4% 11.2%);
@@ -166,7 +166,6 @@
 
   /* ── Blockquote ── */
   --blockquote-border:          hsl(var(--ms-border));
-  --blockquote-fg:              hsl(var(--ms-foreground));
 
   /* ── Admonition ── */
   --admonition-bg:              hsl(var(--ms-muted));
@@ -185,9 +184,6 @@
 
   /* ── Table ── */
   --table-border:               hsl(var(--ms-border));
-  --table-header-bg:            hsl(var(--ms-muted));
-  --table-header-fg:            hsl(var(--ms-foreground));
-  --table-row-hover-bg:         hsl(var(--ms-accent) / 0.5);
 
   /* ── Link ── */
   --link-color:                 hsl(var(--ms-link));
@@ -201,7 +197,6 @@
 
   /* ── Highlight ── */
   --highlight-bg:               hsl(var(--ms-highlight));
-  --highlight-fg:               hsl(var(--ms-highlight-foreground));
 
   /* ── Footnote ── */
   --footnote-border:            hsl(var(--ms-border));
@@ -220,9 +215,6 @@
   --diagram-bg:                 hsl(var(--ms-muted));
   --diagram-border:             hsl(var(--ms-border));
   --diagram-header-bg:          hsl(var(--ms-muted));
-
-  /* ── Math ── */
-  --math-fg:                    hsl(var(--ms-foreground));
 
   /* ── Loading states ── */
   --loading-spinner:            hsl(var(--ms-muted-foreground));

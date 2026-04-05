@@ -119,7 +119,6 @@ watch(displaySrc, () => {
 
 .placeholder-layer {
   max-width: 24rem;
-  background-color: var(--image-placeholder-bg);
   will-change: transform, opacity;
 }
 
