@@ -303,7 +303,7 @@ Term 2
 /* Headings: Major Third (1.25) scale from 16px base → 20 → 25 → 31.25 */
 .markstream-vue.default .heading-node { letter-spacing: -0.015em; }
 .markstream-vue.default .heading-1 { font-size: 2rem; font-weight: 700; margin-top: 0; margin-bottom: 0.75em; line-height: 1.2; }
-.markstream-vue.default .heading-2 { font-size: 1.5rem; font-weight: 600; margin-top: 2.25em; margin-bottom: 0.6em; line-height: 1.25; padding-bottom: 0.3em; border-bottom: 1px solid hsl(var(--ms-border)); }
+.markstream-vue.default .heading-2 { font-size: 1.5rem; font-weight: 600; margin-top: 2.25em; margin-bottom: 0.6em; line-height: 1.25; }
 .markstream-vue.default .heading-3 { font-size: 1.25rem; font-weight: 600; margin-top: 1.8em; margin-bottom: 0.5em; line-height: 1.3; }
 .markstream-vue.default .heading-4 { font-size: 1rem; font-weight: 600; margin-top: 1.5em; margin-bottom: 0.4em; line-height: 1.4; }
 .markstream-vue.default .heading-5 { font-size: 0.875rem; font-weight: 600; margin-top: 1.25em; margin-bottom: 0.3em; color: hsl(var(--ms-muted-foreground)); }
