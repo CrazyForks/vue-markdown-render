@@ -120,6 +120,12 @@
   --ms-highlight-foreground:    0 0% 100%;
 
   --ms-link:                    213 94% 68%;
+
+  /* Admonition: stronger tint on dark backgrounds */
+  --admonition-note-header-bg:  color-mix(in srgb, hsl(var(--ms-info)) 12%, transparent);
+  --admonition-tip-header-bg:   color-mix(in srgb, hsl(var(--ms-success)) 12%, transparent);
+  --admonition-warn-header-bg:  color-mix(in srgb, hsl(var(--ms-warning)) 12%, transparent);
+  --admonition-danger-header-bg: color-mix(in srgb, hsl(var(--ms-destructive)) 12%, transparent);
 }
 
 /* ==========================================================================
@@ -172,6 +178,10 @@
   --admonition-tip:             hsl(var(--ms-success));
   --admonition-warning:         hsl(var(--ms-warning));
   --admonition-danger:          hsl(var(--ms-destructive));
+  --admonition-note-header-bg:  color-mix(in srgb, hsl(var(--ms-info)) 6%, transparent);
+  --admonition-tip-header-bg:   color-mix(in srgb, hsl(var(--ms-success)) 6%, transparent);
+  --admonition-warn-header-bg:  color-mix(in srgb, hsl(var(--ms-warning)) 6%, transparent);
+  --admonition-danger-header-bg: color-mix(in srgb, hsl(var(--ms-destructive)) 6%, transparent);
 
   /* ── Table ── */
   --table-border:               hsl(var(--ms-border));

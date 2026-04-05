@@ -55,7 +55,7 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
 </script>
 
 <template>
-  <div class="admonition" :class="[`admonition-${props.node.kind}`, props.isDark ? 'is-dark' : '']">
+  <div class="admonition" :class="[`admonition-${props.node.kind}`]">
     <div :id="headerId" class="admonition-header">
       <span v-if="iconMap[props.node.kind]" class="admonition-icon">{{ iconMap[props.node.kind] }}</span>
       <span class="admonition-title">{{ displayTitle }}</span>
@@ -129,7 +129,7 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
 }
 .admonition-note .admonition-header,
 .admonition-info .admonition-header {
-  background-color: color-mix(in srgb, var(--admonition-note) 6%, transparent);
+  background-color: var(--admonition-note-header-bg);
   color: var(--admonition-note);
 }
 
@@ -137,7 +137,7 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
   border-left-color: var(--admonition-tip);
 }
 .admonition-tip .admonition-header {
-  background-color: color-mix(in srgb, var(--admonition-tip) 6%, transparent);
+  background-color: var(--admonition-tip-header-bg);
   color: var(--admonition-tip);
 }
 
@@ -147,7 +147,7 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
 }
 .admonition-warning .admonition-header,
 .admonition-caution .admonition-header {
-  background-color: color-mix(in srgb, var(--admonition-warning) 6%, transparent);
+  background-color: var(--admonition-warn-header-bg);
   color: var(--admonition-warning);
 }
 
@@ -157,7 +157,7 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
 }
 .admonition-danger .admonition-header,
 .admonition-error .admonition-header {
-  background-color: color-mix(in srgb, var(--admonition-danger) 6%, transparent);
+  background-color: var(--admonition-danger-header-bg);
   color: var(--admonition-danger);
 }
 
@@ -187,61 +187,4 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
   outline-offset: 2px;
 }
 
-/* Dark mode — bridge tokens in index.css handle the actual values;
-   these blocks just re-reference the same semantic tokens so the
-   component stays consistent. Will be removed in a later pass. */
-.admonition.is-dark {
-  background-color: var(--admonition-bg);
-  border-left-color: var(--admonition-border);
-  color: var(--admonition-fg);
-}
-.admonition.is-dark .admonition-header {
-  background-color: var(--admonition-header-bg);
-  color: var(--admonition-muted);
-}
-.admonition.is-dark .admonition-content {
-  color: var(--admonition-fg);
-}
-
-.admonition.is-dark .admonition-note .admonition-header,
-.admonition.is-dark .admonition-info .admonition-header {
-  background-color: color-mix(in srgb, var(--admonition-note) 12%, transparent);
-  color: var(--admonition-note);
-}
-.admonition.is-dark .admonition-tip .admonition-header {
-  background-color: color-mix(in srgb, var(--admonition-tip) 12%, transparent);
-  color: var(--admonition-tip);
-}
-.admonition.is-dark .admonition-warning .admonition-header,
-.admonition.is-dark .admonition-caution .admonition-header {
-  background-color: color-mix(in srgb, var(--admonition-warning) 12%, transparent);
-  color: var(--admonition-warning);
-}
-.admonition.is-dark .admonition-danger .admonition-header,
-.admonition.is-dark .admonition-error .admonition-header {
-  background-color: color-mix(in srgb, var(--admonition-danger) 12%, transparent);
-  color: var(--admonition-danger);
-}
-
-@media (prefers-color-scheme: dark) {
-  .admonition-note .admonition-header,
-  .admonition-info .admonition-header {
-    background-color: color-mix(in srgb, var(--admonition-note) 12%, transparent);
-    color: var(--admonition-note);
-  }
-  .admonition-tip .admonition-header {
-    background-color: color-mix(in srgb, var(--admonition-tip) 12%, transparent);
-    color: var(--admonition-tip);
-  }
-  .admonition-warning .admonition-header,
-  .admonition-caution .admonition-header {
-    background-color: color-mix(in srgb, var(--admonition-warning) 12%, transparent);
-    color: var(--admonition-warning);
-  }
-  .admonition-danger .admonition-header,
-  .admonition-error .admonition-header {
-    background-color: color-mix(in srgb, var(--admonition-danger) 12%, transparent);
-    color: var(--admonition-danger);
-  }
-}
 </style>
