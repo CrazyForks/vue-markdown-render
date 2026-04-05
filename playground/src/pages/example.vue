@@ -171,17 +171,29 @@ pnpm dev
 
 ## Admonitions
 
-> [!NOTE]
-> This is a note admonition. Useful for additional information.
+::: note
+This is a note admonition. Useful for additional information.
+:::
 
-> [!TIP]
-> This is a tip. Helpful advice for the reader.
+::: tip
+This is a tip. Helpful advice for the reader.
+:::
 
-> [!WARNING]
-> This is a warning. Pay attention to this.
+::: warning
+This is a warning. Pay attention to this.
+:::
 
-> [!CAUTION]
-> This is a caution/danger notice. Something could go wrong.
+::: danger
+This is a danger notice. Something could go wrong.
+:::
+
+::: info
+This is an info box with a **bold** word and \`inline code\`.
+:::
+
+::: caution Custom Title
+This caution has a custom title instead of the default.
+:::
 
 ---
 
@@ -205,7 +217,7 @@ $$
 
 ## Images
 
-![Placeholder Image](https://via.placeholder.com/400x200/e2e8f0/64748b?text=Image+Placeholder)
+![Vue Logo](https://vuejs.org/images/logo.png)
 
 ---
 
