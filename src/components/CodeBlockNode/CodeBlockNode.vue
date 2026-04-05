@@ -683,10 +683,13 @@ function syncEditorCssVars() {
   const rootEl = container.value as HTMLElement | null
   if (!editorEl || !rootEl)
     return
+  // Target: write --vscode-* vars to the editor container (Monaco zone),
+  // NOT to rootEl (Shell zone). Shell no longer reads these variables.
+  const targetEl = editorEl
   if (isDiff.value) {
-    rootEl.style.removeProperty('--vscode-editor-foreground')
-    rootEl.style.removeProperty('--vscode-editor-background')
-    rootEl.style.removeProperty('--vscode-editor-selectionBackground')
+    targetEl.style.removeProperty('--vscode-editor-foreground')
+    targetEl.style.removeProperty('--vscode-editor-background')
+    targetEl.style.removeProperty('--vscode-editor-selectionBackground')
     return
   }
   // Monaco usually applies theme variables on an element with class
@@ -722,18 +725,18 @@ function syncEditorCssVars() {
   const bg = bgVar || String(bgStyles?.backgroundColor ?? rootStyles?.backgroundColor ?? '').trim()
 
   if (shouldPreferPlainTextFallbackSurface(bg, fg, rootEl.classList.contains('is-dark'))) {
-    rootEl.style.removeProperty('--vscode-editor-foreground')
-    rootEl.style.removeProperty('--vscode-editor-background')
-    rootEl.style.removeProperty('--vscode-editor-selectionBackground')
+    targetEl.style.removeProperty('--vscode-editor-foreground')
+    targetEl.style.removeProperty('--vscode-editor-background')
+    targetEl.style.removeProperty('--vscode-editor-selectionBackground')
     return
   }
 
   if (fg)
-    rootEl.style.setProperty('--vscode-editor-foreground', fg)
+    targetEl.style.setProperty('--vscode-editor-foreground', fg)
   if (bg)
-    rootEl.style.setProperty('--vscode-editor-background', bg)
+    targetEl.style.setProperty('--vscode-editor-background', bg)
   if (selVar)
-    rootEl.style.setProperty('--vscode-editor-selectionBackground', selVar)
+    targetEl.style.setProperty('--vscode-editor-selectionBackground', selVar)
 }
 
 let resizeSyncHandler: (() => void) | null = null
@@ -1201,12 +1204,8 @@ const containerStyle = computed(() => {
   return s
 })
 const headerStyle = computed<Record<string, string> | undefined>(() => {
-  if (isDiff.value)
-    return undefined
-  return {
-    color: 'var(--vscode-editor-foreground, var(--markstream-code-fallback-fg))',
-    backgroundColor: 'var(--vscode-editor-background, var(--markstream-code-fallback-bg))',
-  }
+  // Shell zone: header always uses page-level tokens, not Monaco colors
+  return undefined
 })
 const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
@@ -1918,7 +1917,7 @@ onUnmounted(() => {
           <button
             v-if="props.showCollapseButton"
             type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+            class="code-action-btn p-2 text-xs rounded-md transition-colors"
             :aria-pressed="isCollapsed"
             @click="toggleHeaderCollapse"
             @mouseenter="onBtnHover($event, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))"
@@ -1931,7 +1930,7 @@ onUnmounted(() => {
           <template v-if="props.showFontSizeButtons && props.enableFontSizeControl">
             <button
               type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+              class="code-action-btn p-2 text-xs rounded-md transition-colors"
               :disabled="Number.isFinite(codeFontSize) ? codeFontSize <= codeFontMin : false"
               @click="decreaseCodeFont()"
               @mouseenter="onBtnHover($event, t('common.decrease') || 'Decrease')"
@@ -1943,7 +1942,7 @@ onUnmounted(() => {
             </button>
             <button
               type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+              class="code-action-btn p-2 text-xs rounded-md transition-colors"
               :disabled="!fontBaselineReady || codeFontSize === defaultCodeFontSize"
               @click="resetCodeFont()"
               @mouseenter="onBtnHover($event, t('common.reset') || 'Reset')"
@@ -1955,7 +1954,7 @@ onUnmounted(() => {
             </button>
             <button
               type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+              class="code-action-btn p-2 text-xs rounded-md transition-colors"
               :disabled="Number.isFinite(codeFontSize) ? codeFontSize >= codeFontMax : false"
               @click="increaseCodeFont()"
               @mouseenter="onBtnHover($event, t('common.increase') || 'Increase')"
@@ -1970,7 +1969,7 @@ onUnmounted(() => {
           <button
             v-if="props.showCopyButton"
             type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+            class="code-action-btn p-2 text-xs rounded-md transition-colors"
             :aria-label="copyText ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')"
             @click="copy"
             @mouseenter="onCopyHover($event)"
@@ -1985,7 +1984,7 @@ onUnmounted(() => {
           <button
             v-if="props.showExpandButton"
             type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+            class="code-action-btn p-2 text-xs rounded-md transition-colors"
             :aria-pressed="isExpanded"
             @click="toggleExpand($event)"
             @mouseenter="onBtnHover($event, isExpanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))"
@@ -2000,7 +1999,7 @@ onUnmounted(() => {
           <button
             v-if="isPreviewable && props.showPreviewButton"
             type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+            class="code-action-btn p-2 text-xs rounded-md transition-colors"
             :aria-label="t('common.preview') || 'Preview'"
             @click="previewCode"
             @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
@@ -2075,12 +2074,6 @@ onUnmounted(() => {
     ),
     linear-gradient(180deg, var(--code-bg) 0%, hsl(var(--ms-muted)) 100%);
   --markstream-diff-header-border: hsl(var(--ms-border) / 0.92);
-  --markstream-diff-stage-bg: radial-gradient(
-      circle at top center,
-      hsl(var(--ms-background) / 0.95),
-      transparent 60%
-    ),
-    linear-gradient(180deg, var(--code-bg) 0%, hsl(var(--ms-muted)) 100%);
   --markstream-diff-editor-bg: var(--code-bg);
   --markstream-diff-editor-fg: hsl(var(--ms-foreground));
   --markstream-diff-unchanged-fg: hsl(var(--ms-foreground));
@@ -2136,7 +2129,6 @@ onUnmounted(() => {
   --markstream-diff-shell-shadow: 0 34px 80px -52px hsl(var(--ms-foreground) / 0.72);
   --markstream-diff-shell-bg: hsl(var(--ms-background) / 0.99);
   --markstream-diff-header-border: hsl(var(--ms-border) / 0.82);
-  --markstream-diff-stage-bg: hsl(var(--ms-background) / 0.99);
   --markstream-diff-editor-bg: var(--code-bg);
   --markstream-diff-editor-fg: hsl(var(--ms-foreground));
   --markstream-diff-unchanged-fg: hsl(var(--ms-foreground));
@@ -2190,6 +2182,8 @@ onUnmounted(() => {
 .code-block-header {
   gap: 16px;
   border-color: var(--code-border);
+  color: var(--code-fg);
+  background-color: var(--code-header-bg);
 }
 
 .code-header-main {
@@ -2279,7 +2273,7 @@ onUnmounted(() => {
 
 .code-block-container.is-diff .code-editor-layer {
   padding: 4px 4px 8px;
-  background: var(--markstream-diff-stage-bg);
+  background: transparent;
   --vscode-editor-background: var(--markstream-diff-editor-bg);
   --vscode-editor-foreground: var(--markstream-diff-editor-fg);
   --vscode-diffEditor-unchangedRegionForeground: var(--markstream-diff-unchanged-fg);
@@ -2351,9 +2345,7 @@ onUnmounted(() => {
   --stream-monaco-removed-line-fill: var(--markstream-diff-removed-line-fill);
 }
 
-.code-block-container.is-diff.is-dark .code-editor-layer {
-  background: var(--markstream-diff-stage-bg);
-}
+
 
 .code-editor-container.is-hidden {
   opacity: 0;
@@ -2421,11 +2413,6 @@ onUnmounted(() => {
   border-radius: 0.25rem;
 }
 
-.code-block-container.is-dark .skeleton-line {
-  background: linear-gradient(90deg, var(--loading-shimmer) 25%, hsl(var(--ms-muted) / 0.7) 37%, var(--loading-shimmer) 63%);
-  background-size: 400% 100%;
-}
-
 .skeleton-line.short {
   width: 60%;
 }
@@ -2446,6 +2433,12 @@ onUnmounted(() => {
   line-height: 1;
   flex-shrink: 0;
   font-family: inherit;
+  color: var(--code-action-fg);
+}
+
+.code-action-btn:hover {
+  background-color: var(--code-action-hover-bg);
+  color: var(--code-action-hover-fg);
 }
 
 .code-block-container.is-diff .icon-slot {
