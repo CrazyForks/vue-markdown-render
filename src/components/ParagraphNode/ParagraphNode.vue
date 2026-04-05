@@ -180,6 +180,8 @@ function processChild(child: NodeChild): { child: NodeChild, component: any } {
 
 <style scoped>
 .paragraph-node{
+  font-size: var(--ms-text-body);
+  line-height: var(--ms-leading-body);
   margin: var(--ms-flow-paragraph-y) 0;
 }
 li .paragraph-node{

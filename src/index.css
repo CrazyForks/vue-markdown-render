@@ -276,6 +276,23 @@
   --ms-flow-heading-6-mt: 0;
   --ms-flow-heading-6-mb: 0;
 
+  /* ── Typography ── */
+  --ms-text-body: 1rem;
+  --ms-leading-body: 1.6;
+  --ms-text-h1: 2.25rem;
+  --ms-text-h2: 1.5rem;
+  --ms-text-h3: 1.25rem;
+  --ms-text-h4: 1rem;
+  --ms-text-h5: 1rem;
+  --ms-text-h6: 1rem;
+  --ms-leading-h1: calc(10 / 9);
+  --ms-leading-h2: calc(4 / 3);
+  --ms-leading-h3: calc(5 / 3);
+  --ms-weight-h1: 800;
+  --ms-weight-h2: 700;
+  --ms-weight-h3: 600;
+  --ms-weight-h4: 600;
+
   /* ── Panel insets & layout gaps ── */
   --ms-inset-panel-x: var(--ms-space-4);
   --ms-inset-panel-y: var(--ms-space-2_5);

@@ -284,6 +284,18 @@ Term 2
    Only override tokens. ~60% of default spacing.
    ================================================================ */
 .markstream-vue.compact {
+  /* Typography — smaller */
+  --ms-text-body: 0.875rem;
+  --ms-leading-body: 1.5;
+  --ms-text-h1: 1.375rem;
+  --ms-text-h2: 1.125rem;
+  --ms-text-h3: 1rem;
+  --ms-text-h4: 0.875rem;
+  --ms-text-h5: 0.8125rem;
+  --ms-text-h6: 0.8125rem;
+  --ms-weight-h1: 700;
+  --ms-weight-h2: 600;
+
   /* Heading rhythm — compressed */
   --ms-flow-heading-1-mt: 0;
   --ms-flow-heading-1-mb: 0.3em;
