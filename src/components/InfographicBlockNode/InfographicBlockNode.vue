@@ -4,13 +4,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
-import infographicIconUrl from '../../icon/infographic.svg?url'
+import infographicIcon from '../../icon/infographic.svg?raw'
 import { getInfographic } from './infographic'
 
 const props = withDefaults(
   defineProps<InfographicBlockNodeProps>(),
   {
-    maxHeight: '500px',
+    maxHeight: undefined,
     loading: true,
     showHeader: true,
     showCopyButton: true,
@@ -63,14 +63,25 @@ if (typeof window !== 'undefined') {
 }
 
 function resolveContainerHeight(actualHeight: number) {
-  if (!props.maxHeight || props.maxHeight === 'none')
+  if (props.maxHeight === 'none')
     return `${actualHeight}px`
 
-  const maxHeight = Number.parseFloat(String(props.maxHeight))
-  if (!Number.isFinite(maxHeight))
-    return `${actualHeight}px`
+  // Explicit prop value takes priority
+  if (props.maxHeight != null) {
+    const maxHeight = Number.parseFloat(String(props.maxHeight))
+    if (Number.isFinite(maxHeight))
+      return `${Math.min(actualHeight, maxHeight)}px`
+  }
 
-  return `${Math.min(actualHeight, maxHeight)}px`
+  // Fall back to CSS token (respects density theming)
+  const el = infographicContainer.value
+  if (el) {
+    const raw = getComputedStyle(el).getPropertyValue('--ms-size-code-max-height').trim()
+    const num = Number.parseFloat(raw)
+    if (Number.isFinite(num))
+      return `${Math.min(actualHeight, num)}px`
+  }
+  return `${Math.min(actualHeight, 500)}px` // ultimate fallback
 }
 
 function updateContainerHeight() {
@@ -373,7 +384,7 @@ async function renderInfographic(force = false) {
     hasPreview.value = false
     lastCompletedRenderSignature = ''
     if (infographicContainer.value) {
-      infographicContainer.value.innerHTML = `<div class="text-red-500 p-4">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
+      infographicContainer.value.innerHTML = `<div style="padding: var(--ms-inset-panel-body); color: hsl(var(--ms-destructive))">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
     }
   }
   finally {
@@ -463,11 +474,7 @@ onBeforeUnmount(() => {
   }
 })
 
-const computedButtonStyle = computed(() => {
-  return props.isDark
-    ? 'infographic-action-btn p-2 text-xs rounded text-gray-400 hover:bg-gray-700 hover:text-gray-200'
-    : 'infographic-action-btn p-2 text-xs rounded text-gray-600 hover:bg-gray-200 hover:text-gray-700'
-})
+const computedButtonStyle = 'infographic-action-btn p-[var(--ms-action-btn-padding)] rounded'
 
 const isFullscreenDisabled = computed(() => showSource.value || isCollapsed.value)
 const renderMode = computed(() => {
@@ -494,41 +501,35 @@ watch(
 <template>
   <div
     ref="viewportTarget"
-    class="my-4 rounded-lg border overflow-hidden shadow-sm"
+    class="infographic-block-container rounded-lg border overflow-hidden"
     data-markstream-infographic="1"
     :data-markstream-mode="renderMode"
     :class="[
-      props.isDark ? 'border-gray-700/30' : 'border-gray-200',
-      { 'is-rendering': props.loading },
+      { 'is-rendering': props.loading, dark: props.isDark },
     ]"
   >
     <!-- Header -->
     <div
       v-if="props.showHeader"
-      class="infographic-block-header flex justify-between items-center px-4 py-2.5 border-b"
-      :class="props.isDark ? 'bg-gray-800 border-gray-700/30' : 'bg-gray-50 border-gray-200'"
+      class="infographic-block-header flex justify-between items-center border-b"
     >
       <!-- Left side -->
       <div v-if="$slots['header-left']">
         <slot name="header-left" />
       </div>
       <div v-else class="flex items-center gap-x-2 overflow-hidden">
-        <img :src="infographicIconUrl" class="w-4 h-4 my-0" alt="Infographic">
-        <span class="text-sm font-medium font-mono truncate" :class="props.isDark ? 'text-gray-400' : 'text-gray-600'">Infographic</span>
+        <span class="icon-slot action-icon shrink-0" v-html="infographicIcon" />
+        <span class="infographic-label font-medium font-mono truncate">Infographic</span>
       </div>
 
       <!-- Center - Mode toggle -->
       <div v-if="$slots['header-center']">
         <slot name="header-center" />
       </div>
-      <div v-else-if="props.showModeToggle" class="flex items-center gap-x-1 rounded-md p-0.5" :class="props.isDark ? 'bg-gray-700' : 'bg-gray-100'">
+      <div v-else-if="props.showModeToggle" class="infographic-mode-toggle flex items-center gap-0.5">
         <button
-          class="px-2.5 py-1 text-xs rounded transition-colors"
-          :class="[
-            !showSource
-              ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm')
-              : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'),
-          ]"
+          class="infographic-mode-btn px-2 py-0.5 rounded transition-colors"
+          :class="[!showSource ? 'is-active' : '']"
           @click="() => handleSwitchMode('preview')"
           @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
           @focus="onBtnHover($event, t('common.preview') || 'Preview')"
@@ -536,17 +537,13 @@ watch(
           @blur="onBtnLeave"
         >
           <div class="flex items-center gap-x-1">
-            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></g></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></g></svg>
             <span>{{ t('common.preview') || 'Preview' }}</span>
           </div>
         </button>
         <button
-          class="px-2.5 py-1 text-xs rounded transition-colors"
-          :class="[
-            showSource
-              ? (props.isDark ? 'bg-gray-600 text-gray-200 shadow-sm' : 'bg-white text-gray-700 shadow-sm')
-              : (props.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'),
-          ]"
+          class="infographic-mode-btn px-2 py-0.5 rounded transition-colors"
+          :class="[showSource ? 'is-active' : '']"
           @click="() => handleSwitchMode('source')"
           @mouseenter="onBtnHover($event, t('common.source') || 'Source')"
           @focus="onBtnHover($event, t('common.source') || 'Source')"
@@ -554,7 +551,7 @@ watch(
           @blur="onBtnLeave"
         >
           <div class="flex items-center gap-x-1">
-            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16 18l6-6l-6-6M8 6l-6 6l6 6" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16 18l6-6l-6-6M8 6l-6 6l6 6" /></svg>
             <span>{{ t('common.source') || 'Source' }}</span>
           </div>
         </button>
@@ -564,7 +561,7 @@ watch(
       <div v-if="$slots['header-right']">
         <slot name="header-right" />
       </div>
-      <div v-else class="flex items-center gap-x-1">
+      <div v-else class="infographic-header-actions flex items-center">
         <button
           v-if="props.showCollapseButton"
           :class="computedButtonStyle"
@@ -575,7 +572,7 @@ watch(
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
+          <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
         </button>
         <button
           v-if="props.showCopyButton"
@@ -586,8 +583,8 @@ watch(
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg v-if="!copyText" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
+          <svg v-if="!copyText" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
         </button>
         <button
           v-if="props.showExportButton"
@@ -599,7 +596,7 @@ watch(
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 15V3m9 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10l5 5l5-5" /></g></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 15V3m9 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10l5 5l5-5" /></g></svg>
         </button>
         <button
           v-if="props.showFullscreenButton"
@@ -611,43 +608,43 @@ watch(
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg v-if="!isModalOpen" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" /></svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" /></svg>
+          <svg v-if="!isModalOpen" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" /></svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" /></svg>
         </button>
       </div>
     </div>
 
     <!-- Content area -->
     <div v-show="!isCollapsed">
-      <div v-if="showSource" class="p-4" :class="props.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-        <pre class="text-sm font-mono whitespace-pre-wrap" :class="props.isDark ? 'text-gray-300' : 'text-gray-700'">{{ baseCode }}</pre>
+      <div v-if="showSource" class="infographic-source">
+        <pre class="infographic-source-code text-sm font-mono whitespace-pre-wrap">{{ baseCode }}</pre>
       </div>
       <div v-else class="relative">
         <!-- Zoom controls -->
         <div v-if="props.showZoomControls" class="absolute top-2 right-2 z-10 rounded-lg">
           <div class="flex items-center gap-2 backdrop-blur rounded-lg">
             <button
-              class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+              class="infographic-action-btn p-[var(--ms-action-btn-padding)] rounded"
               @click="zoomIn"
               @mouseenter="onBtnHover($event, t('common.zoomIn') || 'Zoom in')"
               @focus="onBtnHover($event, t('common.zoomIn') || 'Zoom in')"
               @mouseleave="onBtnLeave"
               @blur="onBtnLeave"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
             </button>
             <button
-              class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+              class="infographic-action-btn p-[var(--ms-action-btn-padding)] rounded"
               @click="zoomOut"
               @mouseenter="onBtnHover($event, t('common.zoomOut') || 'Zoom out')"
               @focus="onBtnHover($event, t('common.zoomOut') || 'Zoom out')"
               @mouseleave="onBtnLeave"
               @blur="onBtnLeave"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
             </button>
             <button
-              class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+              class="infographic-action-btn p-[var(--ms-action-btn-padding)] rounded"
               @click="resetZoom"
               @mouseenter="onBtnHover($event, t('common.resetZoom') || 'Reset zoom')"
               @focus="onBtnHover($event, t('common.resetZoom') || 'Reset zoom')"
@@ -659,8 +656,7 @@ watch(
           </div>
         </div>
         <div
-          class="min-h-[360px] relative transition-all duration-100 overflow-hidden block"
-          :class="props.isDark ? 'bg-gray-900' : 'bg-gray-50'"
+          class="infographic-preview relative transition-all overflow-hidden block"
           :style="{ height: containerHeight }"
           @mousedown="startDrag"
           @mousemove="onDrag"
@@ -686,41 +682,40 @@ watch(
 
     <!-- Modal fullscreen overlay (teleported to body) -->
     <teleport to="body">
-      <div class="markstream-vue">
+      <div class="markstream-vue" :class="{ dark: props.isDark }">
         <transition name="infographic-dialog" appear>
           <div
             v-if="isModalOpen"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            class="infographic-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
             @click.self="closeModal"
           >
             <div
-              class="dialog-panel relative w-full h-full max-w-full max-h-full rounded shadow-lg overflow-hidden"
-              :class="props.isDark ? 'bg-gray-900' : 'bg-white'"
+              class="dialog-panel infographic-modal-panel relative w-full h-full max-w-full max-h-full rounded overflow-hidden"
             >
               <div class="absolute top-6 right-6 z-50 flex items-center gap-2">
                 <button
-                  class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+                  class="infographic-action-btn p-[var(--ms-action-btn-padding)] rounded"
                   @click="zoomIn"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
                 </button>
                 <button
-                  class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+                  class="infographic-action-btn p-[var(--ms-action-btn-padding)] rounded"
                   @click="zoomOut"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
                 </button>
                 <button
-                  class="p-2 text-xs rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+                  class="infographic-action-btn p-[var(--ms-action-btn-padding)] rounded"
                   @click="resetZoom"
                 >
                   {{ Math.round(zoom * 100) }}%
                 </button>
                 <button
-                  class="inline-flex items-center justify-center p-2 rounded transition-colors" :class="[props.isDark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200']"
+                  class="infographic-action-btn inline-flex items-center justify-center p-[var(--ms-action-btn-padding)] rounded"
                   @click="closeModal"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12" /></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12" /></svg>
                 </button>
               </div>
               <div
@@ -744,12 +739,111 @@ watch(
 </template>
 
 <style scoped>
+/* ── Container ── */
+.infographic-block-container {
+  margin: var(--ms-flow-diagram-y) 0;
+  background: var(--diagram-bg);
+  border-color: var(--diagram-border);
+  color: hsl(var(--ms-foreground));
+  box-shadow: var(--ms-shadow-subtle);
+}
+
+/* ── Header ── */
+.infographic-block-header {
+  padding: var(--ms-inset-panel-y) var(--ms-inset-panel-x);
+  background: var(--diagram-header-bg);
+  border-color: var(--diagram-border);
+  color: hsl(var(--ms-foreground));
+}
+
+.infographic-label {
+  font-size: var(--ms-text-label);
+  color: hsl(var(--ms-muted-foreground));
+}
+
+.action-icon {
+  width: var(--ms-action-btn-icon);
+  height: var(--ms-action-btn-icon);
+}
+.icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-slot :deep(svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Mode toggle ── */
+.infographic-mode-toggle {
+  background: transparent;
+}
+
+.infographic-mode-btn {
+  font-size: var(--ms-text-label);
+  color: var(--code-action-fg);
+  opacity: 0.6;
+  transition: color 0.15s, background-color 0.15s, opacity 0.15s;
+}
+
+.infographic-mode-btn:hover {
+  opacity: 0.9;
+}
+
+.infographic-mode-btn.is-active {
+  background: hsl(var(--ms-foreground) / 0.08);
+  color: var(--code-fg);
+  opacity: 1;
+}
+
+.infographic-header-actions {
+  gap: var(--ms-gap-header-actions);
+}
+
+/* ── Action buttons ── */
 .infographic-action-btn {
   font-family: inherit;
+  color: var(--code-action-fg);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.infographic-action-btn:hover {
+  background: var(--code-action-hover-bg);
+  color: var(--code-action-hover-fg);
 }
 
 .infographic-action-btn:active {
   transform: scale(0.98);
+}
+
+/* ── Source view ── */
+.infographic-source {
+  padding: var(--ms-inset-panel-body);
+  background: var(--diagram-bg);
+}
+
+.infographic-source-code {
+  color: hsl(var(--ms-foreground));
+}
+
+/* ── Preview area ── */
+.infographic-preview {
+  background: var(--diagram-bg);
+  min-height: var(--ms-size-diagram-min-height);
+  transition-duration: var(--ms-duration-fast);
+}
+
+/* ── Modal ── */
+.infographic-modal-overlay {
+  background: var(--modal-overlay);
+}
+
+.infographic-modal-panel {
+  background: var(--modal-bg);
+  color: var(--modal-fg);
+  box-shadow: var(--ms-shadow-modal);
 }
 
 .fullscreen {
@@ -765,7 +859,7 @@ watch(
 }
 .infographic-dialog-enter-active,
 .infographic-dialog-leave-active {
-  transition: opacity 200ms ease;
+  transition: opacity var(--ms-duration-overlay) var(--ms-ease-standard);
 }
 .infographic-dialog-enter-from .dialog-panel,
 .infographic-dialog-leave-to .dialog-panel {
@@ -779,6 +873,6 @@ watch(
 }
 .infographic-dialog-enter-active .dialog-panel,
 .infographic-dialog-leave-active .dialog-panel {
-  transition: transform 200ms ease, opacity 200ms ease;
+  transition: transform var(--ms-duration-overlay) var(--ms-ease-standard), opacity var(--ms-duration-overlay) var(--ms-ease-standard);
 }
 </style>

@@ -9,7 +9,7 @@ import { getD2 } from './d2'
 const props = withDefaults(
   defineProps<D2BlockNodeProps>(),
   {
-    maxHeight: '500px',
+    maxHeight: undefined,
     loading: true,
     progressiveRender: true,
     progressiveIntervalMs: 700,
@@ -49,10 +49,14 @@ const bodyStyle = computed(() => {
   return { minHeight: `${bodyMinHeight.value}px` }
 })
 const renderStyle = computed(() => {
-  if (!props.maxHeight)
-    return undefined
-  const max = typeof props.maxHeight === 'number' ? `${props.maxHeight}px` : String(props.maxHeight)
-  return { maxHeight: max }
+  if (props.maxHeight === 'none')
+    return { maxHeight: 'none' }
+  if (props.maxHeight != null) {
+    const max = typeof props.maxHeight === 'number' ? `${props.maxHeight}px` : String(props.maxHeight)
+    return { maxHeight: max }
+  }
+  // No explicit prop — CSS token handles it via scoped style
+  return undefined
 })
 
 const isClient = typeof window !== 'undefined'
@@ -507,28 +511,26 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="viewportTarget"
-    class="d2-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
+    class="d2-block-container rounded-lg border overflow-hidden"
     data-markstream-d2="1"
     :data-markstream-mode="showSourceFallback ? 'fallback' : 'preview'"
-    :class="props.isDark ? 'border-gray-700/30 bg-gray-900 text-gray-100' : 'border-gray-200 bg-white text-gray-900'"
+    :class="{ dark: props.isDark }"
   >
     <div
       v-if="props.showHeader"
-      class="d2-block-header flex justify-between items-center px-4 py-2.5 border-b border-gray-400/5"
-      style="color: var(--vscode-editor-foreground);background-color: var(--vscode-editor-background);"
+      class="d2-block-header flex justify-between items-center border-b"
     >
       <div class="flex items-center gap-x-2">
-        <span class="text-sm font-medium font-mono">D2</span>
+        <span class="d2-label font-medium font-mono">D2</span>
       </div>
-      <div class="flex items-center gap-x-2">
+      <div class="d2-header-actions flex items-center">
         <div
           v-if="props.showModeToggle"
-          class="flex items-center gap-x-1 rounded-md p-0.5"
-          :class="props.isDark ? 'bg-gray-700' : 'bg-gray-100'"
+          class="d2-mode-toggle flex items-center gap-0.5"
         >
           <button
             type="button"
-            class="mode-btn px-2 py-1 text-xs rounded"
+            class="mode-btn px-2 py-0.5 rounded"
             :class="!showSource ? 'is-active' : ''"
             @click="handleSwitchMode('preview')"
             @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
@@ -540,7 +542,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="mode-btn px-2 py-1 text-xs rounded"
+            class="mode-btn px-2 py-0.5 rounded"
             :class="showSource ? 'is-active' : ''"
             @click="handleSwitchMode('source')"
             @mouseenter="onBtnHover($event, t('common.source') || 'Source')"
@@ -555,7 +557,7 @@ onBeforeUnmount(() => {
         <button
           v-if="props.showCopyButton"
           type="button"
-          class="d2-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+          class="d2-action-btn p-[var(--ms-action-btn-padding)] rounded-md"
           :aria-label="copyText ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')"
           @click="copy"
           @mouseenter="onCopyHover($event)"
@@ -563,14 +565,14 @@ onBeforeUnmount(() => {
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg v-if="!copyText" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
+          <svg v-if="!copyText" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
         </button>
 
         <button
           v-if="props.showExportButton && svgMarkup"
           type="button"
-          class="d2-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+          class="d2-action-btn p-[var(--ms-action-btn-padding)] rounded-md"
           :aria-label="t('common.export') || 'Export'"
           @click="exportSvg"
           @mouseenter="onBtnHover($event, t('common.export') || 'Export')"
@@ -578,13 +580,13 @@ onBeforeUnmount(() => {
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0-12l-4 4m4-4l4 4M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0-12l-4 4m4-4l4 4M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></svg>
         </button>
 
         <button
           v-if="props.showCollapseButton"
           type="button"
-          class="d2-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
+          class="d2-action-btn p-[var(--ms-action-btn-padding)] rounded-md"
           :aria-pressed="isCollapsed"
           @click="toggleCollapse"
           @mouseenter="onBtnHover($event, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))"
@@ -592,20 +594,20 @@ onBeforeUnmount(() => {
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
+          <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
         </button>
       </div>
     </div>
 
     <div v-show="!isCollapsed" ref="bodyRef" class="d2-block-body" :style="bodyStyle">
-      <div v-if="props.loading && !hasPreview" class="d2-source px-4 py-4">
+      <div v-if="props.loading && !hasPreview" class="d2-source">
         <pre class="d2-code"><code>{{ baseCode }}</code></pre>
         <p v-if="renderError" class="d2-error mt-2 text-xs">
           {{ renderError }}
         </p>
       </div>
       <div v-else>
-        <div v-if="showSourceFallback" class="d2-source px-4 py-4">
+        <div v-if="showSourceFallback" class="d2-source">
           <pre class="d2-code"><code>{{ baseCode }}</code></pre>
           <p v-if="renderError" class="d2-error mt-2 text-xs">
             {{ renderError }}
@@ -623,11 +625,74 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* ── Container ── */
+.d2-block-container {
+  margin: var(--ms-flow-diagram-y) 0;
+  background: var(--diagram-bg);
+  border-color: var(--diagram-border);
+  color: hsl(var(--ms-foreground));
+  box-shadow: var(--ms-shadow-subtle);
+}
+
+/* ── Header ── */
+.d2-block-header {
+  padding: var(--ms-inset-panel-y) var(--ms-inset-panel-x);
+  background: var(--diagram-header-bg);
+  border-color: var(--diagram-border);
+  color: hsl(var(--ms-foreground));
+}
+
+/* ── Mode toggle ── */
+.d2-mode-toggle {
+  background: transparent;
+}
+
+.mode-btn {
+  font-size: var(--ms-text-label);
+  color: var(--code-action-fg);
+  opacity: 0.6;
+  transition: opacity 0.2s, color 0.2s, background-color 0.2s;
+}
+
+.mode-btn:hover {
+  opacity: 0.9;
+}
+
+.mode-btn.is-active {
+  background: hsl(var(--ms-foreground) / 0.08);
+  color: var(--code-fg);
+  opacity: 1;
+}
+
+.d2-header-actions {
+  gap: var(--ms-gap-header-actions);
+}
+
+/* ── Action buttons ── */
+.d2-action-btn {
+  color: var(--code-action-fg);
+  opacity: 0.7;
+  transition: opacity 0.2s, background-color 0.15s, color 0.15s;
+}
+
+.d2-action-btn:hover {
+  opacity: 1;
+  background: var(--code-action-hover-bg);
+  color: var(--code-action-hover-fg);
+}
+
+.d2-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Body ── */
 .d2-block-body {
   position: relative;
 }
 
 .d2-source {
+  padding: var(--ms-inset-panel-body) var(--ms-inset-panel-x);
   font-family: var(--vscode-editor-font-family, 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
 }
 
@@ -638,6 +703,7 @@ onBeforeUnmount(() => {
 }
 
 .d2-render {
+  max-height: var(--ms-size-code-max-height);
   overflow: auto;
 }
 
@@ -648,31 +714,16 @@ onBeforeUnmount(() => {
   display: block;
 }
 
-.mode-btn {
-  opacity: 0.7;
-  transition: opacity 0.2s;
+.d2-label {
+  font-size: var(--ms-text-label);
 }
 
-.mode-btn.is-active {
-  opacity: 1;
-  font-weight: 600;
-}
-
-.d2-action-btn {
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.d2-action-btn:hover {
-  opacity: 1;
-}
-
-.d2-action-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
+.action-icon {
+  width: var(--ms-action-btn-icon);
+  height: var(--ms-action-btn-icon);
 }
 
 .d2-error {
-  color: #dc2626;
+  color: hsl(var(--ms-destructive));
 }
 </style>

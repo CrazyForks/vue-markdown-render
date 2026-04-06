@@ -83,6 +83,6 @@ function getNodeComponent(type: string) {
 <style scoped>
 .vmr-container {
   @apply rounded-lg border p-4 my-4;
-  border-left-width: 4px;
+  border-left-width: var(--ms-border-width-strong);
 }
 </style>

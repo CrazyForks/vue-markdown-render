@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom'
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { arrow as arrowMiddleware, autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps<{
   visible: boolean
@@ -11,28 +11,15 @@ const props = defineProps<{
   originX?: number | null
   originY?: number | null
   id?: string | null
+  /** @deprecated Dark mode is now handled via semantic CSS tokens. */
   isDark?: boolean | null
 }>()
 
-// Determine effective dark mode: prefer explicit prop, otherwise detect global/document preference
-const isDarkEffective = computed(() => {
-  if (props.isDark !== undefined && props.isDark !== null)
-    return Boolean(props.isDark)
-  if (typeof document !== 'undefined') {
-    try {
-      if (document.documentElement.classList.contains('dark'))
-        return true
-      if ((window as any)?.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
-        return true
-    }
-    catch {}
-  }
-  return false
-})
-
 const tooltip = ref<HTMLElement | null>(null)
-// Position via transform to allow smooth transitions
+const arrowEl = ref<HTMLElement | null>(null)
 const style = ref<Record<string, string>>({ transform: 'translate3d(0px, 0px, 0px)', left: '0px', top: '0px' })
+const arrowStyle = ref<Record<string, string>>({})
+const actualPlacement = ref<string>(props.placement ?? 'top')
 const ready = ref(false)
 
 let cleanupAutoUpdate: (() => void) | null = null
@@ -40,16 +27,33 @@ let cleanupAutoUpdate: (() => void) | null = null
 async function updatePosition() {
   if (!props.anchorEl || !tooltip.value)
     return
-  const middleware = [offset(props.offset ?? 8), flip(), shift({ padding: 8 })]
-  const { x, y } = await computePosition(props.anchorEl, tooltip.value, {
+  const middleware = [
+    offset(props.offset ?? 6),
+    flip(),
+    shift({ padding: 6 }),
+    ...(arrowEl.value ? [arrowMiddleware({ element: arrowEl.value, padding: 4 })] : []),
+  ]
+  const { x, y, placement, middlewareData } = await computePosition(props.anchorEl, tooltip.value, {
     placement: props.placement ?? 'top',
     middleware,
     strategy: 'fixed',
   })
-  // Use transform so changes animate smoothly
   style.value.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`
   style.value.left = '0px'
   style.value.top = '0px'
+  actualPlacement.value = placement
+
+  // Arrow positioning
+  if (middlewareData.arrow && arrowEl.value) {
+    const { x: ax, y: ay } = middlewareData.arrow
+    const side = placement.split('-')[0] as 'top' | 'bottom' | 'left' | 'right'
+    const staticSide = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' }[side]
+    arrowStyle.value = {
+      left: ax != null ? `${ax}px` : '',
+      top: ay != null ? `${ay}px` : '',
+      [staticSide]: '-3px',
+    }
+  }
 }
 
 watch(
@@ -61,34 +65,26 @@ watch(
       if (props.anchorEl && tooltip.value) {
         try {
           const rect = props.anchorEl.getBoundingClientRect()
-          // compute target position first
           await updatePosition()
           const targetTransform = style.value.transform
           if (props.originX != null && props.originY != null) {
             const dx = Math.abs(Number(props.originX) - rect.left)
             const dy = Math.abs(Number(props.originY) - rect.top)
             const dist = Math.hypot(dx, dy)
-            const THRESH = 120
-            if (dist > THRESH) {
-              // place tooltip visually at origin first (while hidden), then show and animate to target
+            if (dist > 120) {
               style.value.transform = `translate3d(${Math.round(props.originX)}px, ${Math.round(props.originY)}px, 0)`
-              // make element visible at origin
               await nextTick()
               ready.value = true
-              // next tick set to target so CSS transform animates
               await nextTick()
               style.value.transform = targetTransform
             }
             else {
-              // show directly at target
               ready.value = true
             }
           }
           else {
-            // no origin: show directly at target
             ready.value = true
           }
-          // setup autoUpdate to reposition on scroll/resize/mutation; returns cleanup
           cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, updatePosition)
         }
         catch {
@@ -98,7 +94,6 @@ watch(
         }
       }
       else {
-        // nothing to position; still mark ready so v-show can render if visible
         ready.value = true
       }
     }
@@ -112,7 +107,6 @@ watch(
   },
 )
 
-// Recompute when anchor/placement/content changes to animate between anchors
 watch([
   () => props.anchorEl,
   () => props.placement,
@@ -132,17 +126,18 @@ onBeforeUnmount(() => {
 
 <template>
   <teleport to="body">
-    <div class="markstream-vue">
+    <div class="markstream-vue" :class="{ dark: isDark }">
       <transition name="tooltip" appear>
         <div
           v-show="visible && ready"
           :id="props.id"
           ref="tooltip"
           :style="{ position: 'fixed', left: style.left, top: style.top, transform: style.transform }"
-          class="z-[9999] inline-block text-base py-2 px-3 rounded-md shadow-md whitespace-nowrap pointer-events-none tooltip-element border" :class="[isDarkEffective ? 'bg-gray-900 text-white border-gray-700 border is-dark' : 'bg-white text-gray-900 border-gray-200 border']"
+          class="tooltip-element"
           role="tooltip"
         >
           {{ content }}
+          <div ref="arrowEl" class="tooltip-arrow" :data-placement="actualPlacement" :style="arrowStyle" />
         </div>
       </transition>
     </div>
@@ -150,13 +145,65 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* Fade + slide (translate) for smooth transitions */
-.tooltip-enter-from { opacity: 0; transform: translateY(-6px) scale(0.98); }
-.tooltip-enter-to { opacity: 1; transform: translateY(0) scale(1); }
-.tooltip-leave-from { opacity: 1; transform: translateY(0) scale(1); }
-.tooltip-leave-to { opacity: 0; transform: translateY(-6px) scale(0.98); }
-.tooltip-enter-active, .tooltip-leave-active { transition: opacity 120ms linear; }
+.tooltip-element {
+  z-index: 9999;
+  display: inline-block;
+  max-width: 20rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+  pointer-events: none;
+  background-color: var(--tooltip-bg);
+  color: var(--tooltip-fg);
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.15), 0 0 0 1px hsl(0 0% 0% / 0.12), var(--ms-shadow-popover);
+  transition: transform var(--ms-duration-emphasis) var(--ms-ease-spring),
+              box-shadow var(--ms-duration-emphasis) var(--ms-ease-spring);
+}
 
-/* Move transition: always active on the element so updates to transform animate smoothly */
-.tooltip-element { transition: transform 220ms cubic-bezier(.16,1,.3,1), box-shadow 220ms cubic-bezier(.16,1,.3,1); }
+/* Arrow */
+.tooltip-arrow {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: inherit;
+  transform: rotate(45deg);
+}
+.tooltip-arrow[data-placement^="top"] {
+  bottom: -3px;
+}
+.tooltip-arrow[data-placement^="bottom"] {
+  top: -3px;
+}
+.tooltip-arrow[data-placement^="left"] {
+  right: -3px;
+}
+.tooltip-arrow[data-placement^="right"] {
+  left: -3px;
+}
+
+/* Transitions */
+.tooltip-enter-active {
+  transition: opacity 180ms cubic-bezier(.16, 1, .3, 1),
+              transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+.tooltip-leave-active {
+  transition: opacity 120ms ease-in,
+              transform 120ms ease-in;
+}
+.tooltip-enter-from {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.tooltip-enter-to,
+.tooltip-leave-from {
+  opacity: 1;
+  transform: scale(1);
+}
+.tooltip-leave-to {
+  opacity: 0;
+  transform: scale(0.97);
+}
 </style>

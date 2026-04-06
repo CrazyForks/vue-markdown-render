@@ -470,5 +470,52 @@ data
    - 在这种情况下，\\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 可以看作 \\(\boldsymbol{\beta}\\) 与 \\(W\\) 正交的一个特例（当 \\(W\\) 只由 \\(\boldsymbol{\alpha}\\) 张成时）。
 总之，\\(\boldsymbol{\alpha}^T \boldsymbol{\beta} = 0\\) 直接体现了正交补空间的关系：它表明一个向量属于另一个向量张成子空间的正交补空间。如果你有更多向量或子空间，这种联系可以进一步深化。
 
-**示例：** emm\`1-(5)\`、\`3-(3)\`、\`3-(4)\` complex test \`1-(4)\`“heiheihei”中，hello world。
+**示例：** emm\`1-(5)\`、\`3-(3)\`、\`3-(4)\` complex test \`1-(4)\`”heiheihei”中，hello world。
+
+---
+
+## Blockquote
+
+> This is a blockquote with **bold**, *italic*, and \`inline code\`.
+>
+> > Nested blockquotes work too.
+
+## Heading Levels
+
+### Heading 3
+#### Heading 4
+##### Heading 5
+###### Heading 6
+
+## Inline Elements
+
+Text with ==highlighted text==, <sub>subscript</sub> and <sup>superscript</sup>, and <ins>inserted text</ins>.
+
+Use \`npm install\` to install dependencies. The \`--save-dev\` flag marks it as a dev dependency.
+
+## Definition List
+
+Token System
+: A set of CSS custom properties that define colors, spacing, typography, and other visual attributes.
+
+Design Token
+: An individual variable (e.g., \`--ms-foreground\`) that can be overridden to customize the theme.
+
+## Footnotes
+
+The design token system[^1] enables full theme customization.
+
+[^1]: See \`design/architecture.md\` for the complete token specification.
+
+::: note
+This is a note admonition for additional context.
+:::
+
+::: danger
+This is a danger admonition for critical warnings.
+:::
+
+## Image
+
+![Vue Logo](https://vuejs.org/images/logo.png)
 `

@@ -8,7 +8,13 @@ exports[`markdownRender node e2e coverage > renders admonition node 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <div data-v-c8910e11="" data-v-8dfe8a80="" class="admonition admonition-stable">
-          <div data-v-c8910e11="" id="admonition-stable" class="admonition-stable"><span data-v-c8910e11="" class="admonition-stable">⚠️</span><span data-v-c8910e11="" class="admonition-stable">Warning</span><!-- 可选的折叠控制（放在 header 末端） -->
+          <!-- Legend-style title that sits on the border -->
+          <div data-v-c8910e11="" id="admonition-stable" class="admonition-stable">
+            <!-- SVG icons per type --><svg data-v-c8910e11="" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="admonition-stable">
+              <path data-v-c8910e11="" d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path>
+              <path data-v-c8910e11="" d="M12 9v4"></path>
+              <path data-v-c8910e11="" d="M12 17h.01"></path>
+            </svg><span data-v-c8910e11="" class="admonition-stable">Warning</span>
             <!--v-if-->
           </div>
           <div data-v-c8910e11="" id="admonition-stable-content" class="admonition-stable" aria-labelledby="admonition-stable">
@@ -73,14 +79,14 @@ exports[`markdownRender node e2e coverage > renders checkbox nodes 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <ul data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-disc" is-dark="false">
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
                 <div data-v-8dfe8a80="" class="node-content">
                   <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
                   <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-                    <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-31e4c290="" data-v-93ee5c2d="" class="checkbox-node" index-key="list-item-markdown-renderer-0-0-0-0"><input data-v-31e4c290="" type="checkbox" checked="" disabled="" class="checkbox-input"></span>
+                    <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-31e4c290="" data-v-93ee5c2d="" class="checkbox-node" role="img" aria-label="checked" index-key="list-item-markdown-renderer-0-0-0-0"><!-- Unchecked --><!-- Checked --><svg data-v-31e4c290="" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="checkbox-icon checkbox-checked"><rect data-v-31e4c290="" x="3" y="3" width="18" height="18" rx="4" fill="currentColor"></rect><path data-v-31e4c290="" d="M9 12l2 2 4-4" stroke="hsl(var(--ms-background))" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
                       <!----><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-2"><span data-v-a84b8095=""> Completed task</span>
                       <!--v-if--></span>
                       <!---->
@@ -91,14 +97,14 @@ exports[`markdownRender node e2e coverage > renders checkbox nodes 1`] = `
               <!--v-if-->
             </div>
           </li>
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
                 <div data-v-8dfe8a80="" class="node-content">
                   <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
                   <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-                    <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-31e4c290="" data-v-93ee5c2d="" class="checkbox-node" index-key="list-item-markdown-renderer-0-1-0-0"><input data-v-31e4c290="" type="checkbox" disabled="" class="checkbox-input"></span>
+                    <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-31e4c290="" data-v-93ee5c2d="" class="checkbox-node" role="img" aria-label="unchecked" index-key="list-item-markdown-renderer-0-1-0-0"><!-- Unchecked --><svg data-v-31e4c290="" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" class="checkbox-icon checkbox-unchecked"><rect data-v-31e4c290="" x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" stroke-width="2"></rect></svg></span>
                       <!----><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-1-0-2"><span data-v-a84b8095=""> Pending task</span>
                       <!--v-if--></span>
                       <!---->
@@ -138,7 +144,7 @@ exports[`markdownRender node e2e coverage > renders complex inline code with emp
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <ol data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-decimal" is-dark="false">
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto" value="1">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="1">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
@@ -146,10 +152,10 @@ exports[`markdownRender node e2e coverage > renders complex inline code with emp
                   <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
                   <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
                     <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><strong data-v-b1e65240="" data-v-93ee5c2d="" class="strong-node"><span data-v-a84b8095="" data-v-b1e65240="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-0-0"><span data-v-a84b8095="">整合冗余条款：</span><!--v-if--></span></strong><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-1"><span data-v-a84b8095=""> 将原</span>
-                      <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline text-[85%] px-1 py-0.5 rounded font-mono bg-[hsl(var(--secondary))] whitespace-normal break-words max-w-full before:content-[''] after:content-['']" index-key="list-item-markdown-renderer-0-0-0-2"><span data-v-36040df8="">1-(5)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-3"><span data-v-a84b8095="">、</span>
-                      <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline text-[85%] px-1 py-0.5 rounded font-mono bg-[hsl(var(--secondary))] whitespace-normal break-words max-w-full before:content-[''] after:content-['']" index-key="list-item-markdown-renderer-0-0-0-4"><span data-v-36040df8="">3-(3)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-5"><span data-v-a84b8095="">、</span>
-                      <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline text-[85%] px-1 py-0.5 rounded font-mono bg-[hsl(var(--secondary))] whitespace-normal break-words max-w-full before:content-[''] after:content-['']" index-key="list-item-markdown-renderer-0-0-0-6"><span data-v-36040df8="">3-(4)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-7"><span data-v-a84b8095="">中关于“缴纳费用”和“告知法律状态变化”的核心义务合并，统一放入</span>
-                      <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline text-[85%] px-1 py-0.5 rounded font-mono bg-[hsl(var(--secondary))] whitespace-normal break-words max-w-full before:content-[''] after:content-['']" index-key="list-item-markdown-renderer-0-0-0-8"><span data-v-36040df8="">1-(4)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-9"><span data-v-a84b8095="">“法律状态维护与通知义务”中，使其逻辑更集中，避免了在不同部分重复提及相似义务。</span>
+                      <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline-code" index-key="list-item-markdown-renderer-0-0-0-2"><span data-v-36040df8="">1-(5)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-3"><span data-v-a84b8095="">、</span>
+                      <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline-code" index-key="list-item-markdown-renderer-0-0-0-4"><span data-v-36040df8="">3-(3)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-5"><span data-v-a84b8095="">、</span>
+                      <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline-code" index-key="list-item-markdown-renderer-0-0-0-6"><span data-v-36040df8="">3-(4)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-7"><span data-v-a84b8095="">中关于“缴纳费用”和“告知法律状态变化”的核心义务合并，统一放入</span>
+                      <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline-code" index-key="list-item-markdown-renderer-0-0-0-8"><span data-v-36040df8="">1-(4)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-0-9"><span data-v-a84b8095="">“法律状态维护与通知义务”中，使其逻辑更集中，避免了在不同部分重复提及相似义务。</span>
                       <!--v-if--></span>
                     </p>
                   </transition-stub>
@@ -266,7 +272,7 @@ exports[`markdownRender node e2e coverage > renders footnote nodes 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
-        <div data-v-8dfe8a80="" id="fnref--1" class="flex mt-2 mb-2 text-sm leading-relaxed border-t border-[#eaecef] pt-2" is-dark="false">
+        <div data-v-8dfe8a80="" id="fnref--1" class="footnote-node flex text-sm leading-relaxed border-t border-[var(--footnote-border)] pt-2" is-dark="false">
           <!-- <span class="font-semibold mr-2 text-[#0366d6]">[{{ node.id }}]</span> -->
           <div class="flex-1">
             <div data-v-8dfe8a80="" class="markstream-vue markdown-renderer">
@@ -276,7 +282,7 @@ exports[`markdownRender node e2e coverage > renders footnote nodes 1`] = `
                   <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
                   <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
                     <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="footnote-markdown-renderer-1-0-0"><span data-v-a84b8095="">Footnote explanation</span>
-                      <!--v-if--></span><a data-v-31914872="" data-v-93ee5c2d="" class="footnote-anchor text-sm text-[#0366d6] hover:underline cursor-pointer" href="#fnref-1" title="返回引用 1" index-key="footnote-markdown-renderer-1-0-1"> ↩︎ </a>
+                      <!--v-if--></span><a data-v-31914872="" data-v-93ee5c2d="" class="footnote-anchor text-sm hover:underline cursor-pointer" href="#fnref-1" title="返回引用 1" index-key="footnote-markdown-renderer-1-0-1"> ↩︎ </a>
                     </p>
                   </transition-stub>
                 </div>
@@ -366,7 +372,7 @@ exports[`markdownRender node e2e coverage > renders image links with relative ta
   <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-      <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node typewriter-enter-from typewriter-enter-active" typewriter="true" is-dark="false"><a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="https://www.npmjs.com/package/markstream-vue" title="" aria-label="Link: https://www.npmjs.com/package/markstream-vue" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--link-color: #0366d6; --underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.35; --underline-rest-opacity: 0.175; --underline-duration: 1.6s; --underline-timing: ease-in-out; --underline-iteration: infinite;"><img data-v-4ff2ac62="" data-v-994bfd08="" src="https://img.shields.io/npm/v/markstream-vue?color=a1b858&amp;label=" alt="NPM version" title="NPM version" class="image-node__img h-auto rounded-lg image-node__img--inline opacity-100" fetchpriority="high" decoding="sync" tabindex="-1" aria-label="NPM version" index-key="markdown-renderer-0-0-0"></a> <a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="README.zh-CN.md" title="" aria-label="Link: README.zh-CN.md" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--link-color: #0366d6; --underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.35; --underline-rest-opacity: 0.175; --underline-duration: 1.6s; --underline-timing: ease-in-out; --underline-iteration: infinite;"><img data-v-4ff2ac62="" data-v-994bfd08="" src="https://img.shields.io/badge/docs-%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3-blue" alt="中文版" title="中文版" class="image-node__img h-auto rounded-lg image-node__img--inline opacity-100" fetchpriority="high" decoding="sync" tabindex="-1" aria-label="中文版" index-key="markdown-renderer-0-2-0"></a></p>
+      <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node typewriter-enter-from typewriter-enter-active" typewriter="true" is-dark="false"><a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="https://www.npmjs.com/package/markstream-vue" title="" aria-label="Link: https://www.npmjs.com/package/markstream-vue" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.35; --underline-rest-opacity: 0.175; --underline-duration: 1.6s; --underline-timing: ease-in-out; --underline-iteration: infinite;"><span data-v-4ff2ac62="" data-v-994bfd08="" class="image-node-container" index-key="markdown-renderer-0-0-0"><img data-v-4ff2ac62="" src="https://img.shields.io/npm/v/markstream-vue?color=a1b858&amp;label=" alt="NPM version" title="NPM version" class="image-node__img is-loaded" fetchpriority="high" decoding="sync" tabindex="-1" aria-label="NPM version"></span></a> <a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="README.zh-CN.md" title="" aria-label="Link: README.zh-CN.md" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.35; --underline-rest-opacity: 0.175; --underline-duration: 1.6s; --underline-timing: ease-in-out; --underline-iteration: infinite;"><span data-v-4ff2ac62="" data-v-994bfd08="" class="image-node-container" index-key="markdown-renderer-0-2-0"><img data-v-4ff2ac62="" src="https://img.shields.io/badge/docs-%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3-blue" alt="中文版" title="中文版" class="image-node__img is-loaded" fetchpriority="high" decoding="sync" tabindex="-1" aria-label="中文版"></span></a></p>
     </div>
   </div>
   <!--v-if-->
@@ -379,7 +385,7 @@ exports[`markdownRender node e2e coverage > renders image node 1`] = `
   <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-      <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node typewriter-enter-from typewriter-enter-active" typewriter="true" is-dark="false"><img data-v-4ff2ac62="" data-v-93ee5c2d="" src="https://example.com/vue.png" alt="Vue Logo" title="Vue Logo" class="image-node__img h-auto rounded-lg image-node__img--inline opacity-100" fetchpriority="high" decoding="sync" tabindex="-1" aria-label="Vue Logo" index-key="markdown-renderer-0-0"></p>
+      <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node typewriter-enter-from typewriter-enter-active" typewriter="true" is-dark="false"><span data-v-4ff2ac62="" data-v-93ee5c2d="" class="image-node-container" index-key="markdown-renderer-0-0"><img data-v-4ff2ac62="" src="https://example.com/vue.png" alt="Vue Logo" title="Vue Logo" class="image-node__img is-loaded" fetchpriority="high" decoding="sync" tabindex="-1" aria-label="Vue Logo"></span></p>
     </div>
   </div>
   <!--v-if-->
@@ -394,7 +400,7 @@ exports[`markdownRender node e2e coverage > renders inline code node 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-0"><span data-v-a84b8095="">Here is </span>
-          <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline text-[85%] px-1 py-0.5 rounded font-mono bg-[hsl(var(--secondary))] whitespace-normal break-words max-w-full before:content-[''] after:content-['']" index-key="markdown-renderer-0-1"><span data-v-36040df8="">const answer = 42</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-2"><span data-v-a84b8095=""> inline.</span>
+          <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline-code" index-key="markdown-renderer-0-1"><span data-v-36040df8="">const answer = 42</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-2"><span data-v-a84b8095=""> inline.</span>
           <!--v-if--></span>
         </p>
       </transition-stub>
@@ -432,7 +438,7 @@ exports[`markdownRender node e2e coverage > renders link node 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-0"><span data-v-a84b8095="">Visit </span>
-          <!--v-if--></span><a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="https://vuejs.org" title="" aria-label="Link: https://vuejs.org" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--link-color: #0366d6; --underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.35; --underline-rest-opacity: 0.175; --underline-duration: 1.6s; --underline-timing: ease-in-out; --underline-iteration: infinite;"><span data-v-a84b8095="" data-v-994bfd08="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-1-0"><span data-v-a84b8095="">Vue</span>
+          <!--v-if--></span><a data-v-994bfd08="" data-v-93ee5c2d="" class="link-node" href="https://vuejs.org" title="" aria-label="Link: https://vuejs.org" aria-hidden="false" target="_blank" rel="noopener noreferrer" style="--underline-height: 2px; --underline-bottom: -3px; --underline-opacity: 0.35; --underline-rest-opacity: 0.175; --underline-duration: 1.6s; --underline-timing: ease-in-out; --underline-iteration: infinite;"><span data-v-a84b8095="" data-v-994bfd08="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-1-0"><span data-v-a84b8095="">Vue</span>
             <!--v-if--></span>
           </a><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-2"><span data-v-a84b8095=""> now.</span>
           <!--v-if--></span>
@@ -471,7 +477,7 @@ exports[`markdownRender node e2e coverage > renders ordered list node 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <ol data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-decimal" is-dark="false">
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto" value="1">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="1">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
@@ -487,7 +493,7 @@ exports[`markdownRender node e2e coverage > renders ordered list node 1`] = `
               <!--v-if-->
             </div>
           </li>
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto" value="2">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="2">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
@@ -536,7 +542,7 @@ exports[`markdownRender node e2e coverage > renders reference node 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="true" is-dark="false"><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-0"><span data-v-a84b8095="">Cite research </span>
-          <!--v-if--></span><span data-v-93ee5c2d="" class="reference-node cursor-pointer bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs rounded-md px-1.5 mx-0.5 hover:bg-[hsl(var(--secondary))]" role="button" tabindex="0" index-key="markdown-renderer-0-1">1</span><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-2"><span data-v-a84b8095=""> for details.</span>
+          <!--v-if--></span><span data-v-7c86ecd2="" data-v-93ee5c2d="" class="reference-node cursor-pointer text-xs rounded-md px-1.5 mx-0.5" role="button" tabindex="0" index-key="markdown-renderer-0-1">1</span><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="markdown-renderer-0-2"><span data-v-a84b8095=""> for details.</span>
           <!--v-if--></span>
         </p>
       </transition-stub>
@@ -552,7 +558,7 @@ exports[`markdownRender node e2e coverage > renders single badge image with trai
   <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-      <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node typewriter-enter-from typewriter-enter-active" typewriter="true" is-dark="false"><img data-v-4ff2ac62="" data-v-93ee5c2d="" src="https://img.shields.io/npm/l/markstream-vue" alt="License" title="License" class="image-node__img h-auto rounded-lg image-node__img--inline opacity-100" fetchpriority="high" decoding="sync" tabindex="-1" aria-label="License" index-key="markdown-renderer-0-0"></p>
+      <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node typewriter-enter-from typewriter-enter-active" typewriter="true" is-dark="false"><span data-v-4ff2ac62="" data-v-93ee5c2d="" class="image-node-container" index-key="markdown-renderer-0-0"><img data-v-4ff2ac62="" src="https://img.shields.io/npm/l/markstream-vue" alt="License" title="License" class="image-node__img is-loaded" fetchpriority="high" decoding="sync" tabindex="-1" aria-label="License"></span></p>
     </div>
   </div>
   <!--v-if-->
@@ -645,10 +651,10 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <div data-v-8fb37ab3="" data-v-8dfe8a80="" class="table-node-wrapper" loading="false">
-          <table data-v-8fb37ab3="" class="my-8 text-sm table-node" aria-busy="false">
-            <thead data-v-8fb37ab3="" class="border-[var(--table-border,#cbd5e1)]">
-              <tr data-v-8fb37ab3="" class="border-b">
-                <th data-v-8fb37ab3="" dir="auto" class="font-semibold p-[calc(4/7*1em)] text-left">
+          <table data-v-8fb37ab3="" class="table-node" aria-busy="false">
+            <thead data-v-8fb37ab3="">
+              <tr data-v-8fb37ab3="">
+                <th data-v-8fb37ab3="" dir="auto" class="text-left">
                   <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markstream-vue markdown-renderer">
                     <!--v-if-->
                     <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
@@ -662,7 +668,7 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
                     <!--v-if-->
                   </div>
                 </th>
-                <th data-v-8fb37ab3="" dir="auto" class="font-semibold p-[calc(4/7*1em)] text-left">
+                <th data-v-8fb37ab3="" dir="auto" class="text-left">
                   <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markstream-vue markdown-renderer">
                     <!--v-if-->
                     <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
@@ -679,8 +685,8 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
               </tr>
             </thead>
             <tbody data-v-8fb37ab3="">
-              <tr data-v-8fb37ab3="" class="border-[var(--table-border,#cbd5e1)]">
-                <td data-v-8fb37ab3="" class="p-[calc(4/7*1em)] text-left" dir="auto">
+              <tr data-v-8fb37ab3="">
+                <td data-v-8fb37ab3="" class="text-left" dir="auto">
                   <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markstream-vue markdown-renderer">
                     <!--v-if-->
                     <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
@@ -694,7 +700,7 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
                     <!--v-if-->
                   </div>
                 </td>
-                <td data-v-8fb37ab3="" class="p-[calc(4/7*1em)] text-left" dir="auto">
+                <td data-v-8fb37ab3="" class="text-left" dir="auto">
                   <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markstream-vue markdown-renderer">
                     <!--v-if-->
                     <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="text">
@@ -765,7 +771,7 @@ exports[`markdownRender node e2e coverage > renders unordered list node 1`] = `
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <ul data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-disc" is-dark="false">
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
@@ -781,7 +787,7 @@ exports[`markdownRender node e2e coverage > renders unordered list node 1`] = `
               <!--v-if-->
             </div>
           </li>
-          <li data-v-d94d2511="" data-v-b195669a="" class="list-item pl-1.5 my-2" dir="auto">
+          <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
               <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">

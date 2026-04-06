@@ -110,10 +110,10 @@ describe('markdownRender node e2e coverage', () => {
       markdown: '- [x] Completed task\n- [ ] Pending task',
       expectedText: ['Completed task', 'Pending task'],
       assert: (wrapper) => {
-        const inputs = wrapper.findAll('input[type="checkbox"]')
-        expect(inputs).toHaveLength(2)
-        expect((inputs[0].element as HTMLInputElement).checked).toBe(true)
-        expect((inputs[1].element as HTMLInputElement).checked).toBe(false)
+        const checkboxes = wrapper.findAll('.checkbox-node')
+        expect(checkboxes).toHaveLength(2)
+        expect(checkboxes[0].find('.checkbox-checked').exists()).toBe(true)
+        expect(checkboxes[1].find('.checkbox-unchecked').exists()).toBe(true)
       },
     },
     {
@@ -141,8 +141,7 @@ describe('markdownRender node e2e coverage', () => {
         const paragraph = wrapper.find('p.paragraph-node')
         expect(paragraph.exists()).toBe(true)
         expect(paragraph.find('figure').exists()).toBe(false)
-        const directImages = Array.from(paragraph.element.children).filter(child => child.tagName === 'IMG')
-        expect(directImages).toHaveLength(1)
+        expect(paragraph.findAll('img')).toHaveLength(1)
         const img = paragraph.find('img')
         expect(img.exists()).toBe(true)
         expect(img.attributes('src')).toBe('https://example.com/vue.png')
@@ -164,8 +163,7 @@ describe('markdownRender node e2e coverage', () => {
         const paragraph = wrapper.find('p.paragraph-node')
         expect(paragraph.exists()).toBe(true)
         expect(paragraph.find('figure').exists()).toBe(false)
-        const directImages = Array.from(paragraph.element.children).filter(child => child.tagName === 'IMG')
-        expect(directImages).toHaveLength(1)
+        expect(paragraph.findAll('img')).toHaveLength(1)
         const img = paragraph.find('img')
         expect(img.exists()).toBe(true)
         expect(img.attributes('src')).toBe('https://img.shields.io/npm/l/markstream-vue')
@@ -193,8 +191,7 @@ After`,
         expect(paragraphs).toHaveLength(3)
         const imageParagraph = paragraphs[1]
         expect(imageParagraph.find('figure').exists()).toBe(false)
-        const directImages = Array.from(imageParagraph.element.children).filter(child => child.tagName === 'IMG')
-        expect(directImages).toHaveLength(1)
+        expect(imageParagraph.findAll('img')).toHaveLength(1)
         const img = imageParagraph.find('img')
         expect(img.exists()).toBe(true)
         expect(img.attributes('src')).toBe('https://example.com/vue.png')
@@ -218,8 +215,7 @@ After`,
         const paragraph = wrapper.find('p.paragraph-node')
         expect(paragraph.exists()).toBe(true)
         expect(paragraph.find('figure').exists()).toBe(false)
-        const directImages = Array.from(paragraph.element.children).filter(child => child.tagName === 'IMG')
-        expect(directImages).toHaveLength(1)
+        expect(paragraph.findAll('img')).toHaveLength(1)
         const img = paragraph.find('img')
         expect(img.exists()).toBe(true)
         expect(img.attributes('src')).toBe('https://example.com/vue.png')
@@ -253,12 +249,9 @@ After`,
         const images = paragraph.findAll('img')
         expect(images).toHaveLength(3)
         expect(paragraph.findAll('figure')).toHaveLength(0)
-        const directLinkImages = Array.from(paragraph.element.children).filter((child) => {
-          if (child.tagName !== 'A')
-            return false
-          return child.children.length === 1 && child.firstElementChild?.tagName === 'IMG'
-        })
-        expect(directLinkImages).toHaveLength(3)
+        // Each link should contain an img (possibly wrapped in a container span)
+        const linksWithImages = links.filter(link => link.find('img').exists())
+        expect(linksWithImages).toHaveLength(3)
         expect(images[0].attributes('src')).toContain('img.shields.io/npm/v/markstream-vue')
         expect(images[1].attributes('src')).toContain('img.shields.io/badge/playground-live-34c759')
         expect(images[2].attributes('src')).toContain('/badge.svg')
@@ -569,7 +562,7 @@ After`,
         const reference = wrapper.find('span.reference-node')
         expect(reference.exists()).toBe(true)
         expect(reference.text()).toBe('1')
-        expect(reference.classes()).toContain('text-[hsl(var(--muted-foreground))]')
+        expect(reference.classes()).toContain('reference-node')
       },
     },
     {

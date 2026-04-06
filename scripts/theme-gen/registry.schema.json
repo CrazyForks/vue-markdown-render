@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Theme Registry",
+  "description": "Curated design tokens extracted from DESIGN.md files for markstream-vue theme generation.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "name", "source", "colors"],
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Kebab-case identifier, used as CSS data-theme value and filename",
+        "pattern": "^[a-z0-9-]+$"
+      },
+      "name": {
+        "type": "string",
+        "description": "Display name (e.g. 'Claude', 'Linear')"
+      },
+      "source": {
+        "type": "string",
+        "description": "Origin DESIGN.md directory name in awesome-design-md"
+      },
+      "category": {
+        "type": "string",
+        "enum": ["ai", "devtool", "infra", "design", "fintech", "enterprise"],
+        "description": "Classification for documentation"
+      },
+      "native": {
+        "type": "string",
+        "enum": ["light", "dark"],
+        "description": "The scheme the source design is built around. The opposite scheme will be auto-generated."
+      },
+      "colors": {
+        "type": "object",
+        "required": ["background", "foreground", "brand"],
+        "properties": {
+          "background":    { "type": "string", "description": "Page background" },
+          "foreground":    { "type": "string", "description": "Primary text color" },
+          "brand":         { "type": "string", "description": "Primary brand / accent / CTA color" },
+          "surface":       { "type": "string", "description": "Card / elevated surface background" },
+          "secondaryText": { "type": "string", "description": "Secondary / muted text color" },
+          "border":        { "type": "string", "description": "Default border color" },
+          "error":         { "type": "string", "description": "Error / destructive color" },
+          "link":          { "type": "string", "description": "Link text color" }
+        },
+        "additionalProperties": false
+      },
+      "fonts": {
+        "type": "object",
+        "properties": {
+          "sans":  { "type": "string", "description": "Sans-serif font stack (CSS font-family value)" },
+          "mono":  { "type": "string", "description": "Monospace font stack" },
+          "serif": { "type": "string", "description": "Serif font stack (for heading variants)" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  }
+}

@@ -37,13 +37,14 @@ defineEmits<{
 
 const itemNode = computed(() => props.node ?? props.item)
 
+
 const liValueAttr = computed(() =>
   props.value == null ? {} : { value: props.value },
 )
 </script>
 
 <template>
-  <li class="list-item pl-1.5 my-2" dir="auto" v-bind="liValueAttr">
+  <li class="list-item" dir="auto" v-bind="liValueAttr">
     <NodeRenderer
       v-bind="{ showTooltips: props.showTooltips }"
       :index-key="`list-item-${props.indexKey}`"
@@ -57,13 +58,19 @@ const liValueAttr = computed(() =>
 </template>
 
 <style scoped>
+.list-item {
+  margin: var(--ms-flow-list-item-y) 0;
+  padding-left: var(--ms-space-1_5);
+}
+
 ol > .list-item::marker{
-  color: var(--list-item-counter-marker,#64748b);
+  color: var(--list-counter-marker);
   line-height: 1.6;
 }
 ul > .list-item::marker{
-  color: var(--list-item-marker,#cbd5e1)
+  color: var(--list-marker)
 }
+
 
 /* 大列表滚动到视口时，嵌套 NodeRenderer 需要立即绘制内容，避免空白 */
 .list-item :deep(.markdown-renderer) {

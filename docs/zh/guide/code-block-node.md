@@ -220,18 +220,31 @@ const themes = [
 
 **工作原理：**
 
-当 `isDark` 变化时，`CodeBlockNode` 会自动切换到对应的主题：
-- 当 `isDark` 为 `true` → 使用 `codeBlockDarkTheme`（如 `'vitesse-dark'`）
-- 当 `isDark` 为 `false` → 使用 `codeBlockLightTheme`（如 `'vitesse-light'`）
+`theme` prop 支持固定主题或明暗配对：
+
+```vue
+<!-- 自动切换明暗（推荐） -->
+<CodeBlockNode :theme="{ light: 'vitesse-light', dark: 'vitesse-dark' }" />
+
+<!-- 固定主题（忽略 isDark） -->
+<CodeBlockNode theme="monokai" />
+
+<!-- 主题对象（固定，忽略 isDark） -->
+<CodeBlockNode :theme="{ name: 'my-theme', colors: { ... } }" />
+```
+
+使用 `{ light, dark }` 配对时，组件根据 `isDark` prop 自动切换。
 
 `themes` prop 用于注册可用主题，以便 Monaco 可以按需懒加载它们。
+
+> **向后兼容：** `darkTheme` / `lightTheme` props 仍然可用但已废弃。推荐使用统一的 `theme` prop。
 
 **CodeBlockNode 的关键差异：**
 
 | Prop | 直接使用 CodeBlockNode | 通过 MarkdownRender |
 |------|---------------------|-------------------|
 | `isDark` | 直接传给 `<CodeBlockNode :is-dark="isDark" />` | 通过 `<MarkdownRender :is-dark="isDark" />` 传入并自动转发 |
-| 主题 props | `:dark-theme="'vitesse-dark'"` `:light-theme="'vitesse-light'"` | `:code-block-dark-theme="'vitesse-dark'"` `:code-block-light-theme="'vitesse-light'"` |
+| 主题 | `:theme="{ light: 'vitesse-light', dark: 'vitesse-dark' }"` | `:code-block-dark-theme="'vitesse-dark'"` `:code-block-light-theme="'vitesse-light'"` (兼容) |
 | 主题列表 | `:themes="['vitesse-dark', 'vitesse-light', ...]"` | `:themes="['vitesse-dark', 'vitesse-light', ...]"` |
 
 ## 注意事项

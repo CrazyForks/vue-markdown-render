@@ -199,7 +199,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="containerEl"
-    class="math-block text-center overflow-x-auto relative min-h-[40px]"
+    class="math-block text-center overflow-x-auto relative"
     data-markstream-math="block"
     :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
   >
@@ -220,6 +220,10 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.math-block {
+  min-height: var(--ms-size-math-min-height);
+}
+
 .math-loading-overlay {
   position: absolute;
   top: 0;
@@ -230,14 +234,14 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(2px);
-  min-height: 40px;
+  min-height: var(--ms-size-math-min-height);
 }
 
 .math-loading-spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid rgba(0, 0, 0, 0.1);
-  border-top-color: rgba(0, 0, 0, 0.6);
+  border: 2px solid color-mix(in srgb, var(--loading-spinner) 15%, transparent);
+  border-top-color: color-mix(in srgb, var(--loading-spinner) 80%, transparent);
   border-radius: 50%;
   animation: math-spin 0.8s linear infinite;
 }
@@ -250,7 +254,7 @@ onBeforeUnmount(() => {
 
 .math-rendering {
   opacity: 0.3;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--ms-duration-overlay) var(--ms-ease-standard);
 }
 
 .math-block__fallback {
@@ -261,7 +265,7 @@ onBeforeUnmount(() => {
 
 .math-fade-enter-active,
 .math-fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity var(--ms-duration-slow) var(--ms-ease-standard);
 }
 
 .math-fade-enter-from,
@@ -269,14 +273,5 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  .math-loading-overlay {
-    background-color: rgba(0, 0, 0, 0.6);
-  }
-
-  .math-loading-spinner {
-    border-color: rgba(255, 255, 255, 0.2);
-    border-top-color: rgba(255, 255, 255, 0.8);
-  }
-}
+/* Dark mode spinner now handled by --loading-spinner token; no override needed */
 </style>

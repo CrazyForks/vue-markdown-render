@@ -4,6 +4,7 @@ import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier } from '../../utils'
+import CodeBlockShell from '../CodeBlockNode/CodeBlockShell.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -568,7 +569,7 @@ function toggleExpand(e?: Event) {
     content.style['overflow-x'] = 'auto'
   }
   else {
-    content.style.maxHeight = '500px'
+    content.style.maxHeight = ''
     content.style.overflow = 'auto'
     // When collapsing, re-enable auto-scroll and scroll to bottom
     autoScrollEnabled.value = true
@@ -624,153 +625,100 @@ function previewCode() {
   <div
     ref="container"
     :style="containerStyle"
-    class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
-    :class="[props.isDark ? 'border-gray-700/30 bg-gray-900' : 'border-gray-200 bg-white', props.isDark ? 'is-dark' : '']"
+    class="code-block-container rounded-lg border overflow-hidden"
+    :class="{ dark: props.isDark }"
   >
-    <div
-      v-if="props.showHeader"
-      class="code-block-header flex justify-between items-center px-4 py-2.5 border-b border-gray-400/5"
-      style="color: var(--vscode-editor-foreground);background-color: var(--vscode-editor-background);"
+    <CodeBlockShell
+      :show-header="props.showHeader"
+      :show-collapse-button="props.showCollapseButton"
+      :show-font-size-buttons="props.showFontSizeButtons"
+      :enable-font-size-control="props.enableFontSizeControl"
+      :show-copy-button="props.showCopyButton"
+      :show-expand-button="props.showExpandButton"
+      :show-preview-button="props.showPreviewButton"
+      :show-tooltips="props.showTooltips"
+      :is-dark="props.isDark"
+      :loading="props.loading"
+      :stream="props.stream"
+      :is-collapsed="isCollapsed"
+      :is-expanded="isExpanded"
+      :copy-text="copyText"
+      :is-previewable="isPreviewable"
+      :code-font-size="codeFontSize"
+      :code-font-min="codeFontMin"
+      :code-font-max="codeFontMax"
+      :default-code-font-size="defaultCodeFontSize"
+      :font-baseline-ready="fontBaselineReady"
+      @toggle-collapse="toggleHeaderCollapse"
+      @decrease-font="decreaseCodeFont"
+      @reset-font="resetCodeFont"
+      @increase-font="increaseCodeFont"
+      @copy="copy"
+      @toggle-expand="toggleExpand"
+      @preview="previewCode"
     >
-      <!-- left slot / fallback language label -->
-      <slot name="header-left">
-        <div class="flex items-center gap-x-2">
-          <span class="icon-slot h-4 w-4 flex-shrink-0" v-html="languageIcon" />
-          <span class="text-sm font-medium font-mono">{{ displayLanguage }}</span>
-        </div>
-      </slot>
+      <template #header-left>
+        <slot name="header-left">
+          <div class="flex items-center gap-x-2">
+            <span class="icon-slot h-4 w-4 flex-shrink-0" v-html="languageIcon" />
+            <span class="code-header-title">{{ displayLanguage }}</span>
+          </div>
+        </slot>
+      </template>
+      <template v-if="$slots['header-right']" #header-right>
+        <slot name="header-right" />
+      </template>
 
-      <!-- right slot / fallback action buttons -->
-      <slot name="header-right">
-        <div class="flex items-center gap-x-2">
-          <button
-            v-if="props.showCollapseButton"
-            type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-            :aria-pressed="isCollapsed"
-            @click="toggleHeaderCollapse"
-            @mouseenter="onBtnHover($event, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))"
-            @focus="onBtnHover($event, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))"
-            @mouseleave="onBtnLeave"
-            @blur="onBtnLeave"
-          >
-            <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
-          </button>
-          <template v-if="props.showFontSizeButtons && props.enableFontSizeControl">
-            <button
-              type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-              :disabled="Number.isFinite(codeFontSize) ? codeFontSize <= codeFontMin : false"
-              @click="decreaseCodeFont()"
-              @mouseenter="onBtnHover($event, t('common.decrease') || 'Decrease')"
-              @focus="onBtnHover($event, t('common.decrease') || 'Decrease')"
-              @mouseleave="onBtnLeave"
-              @blur="onBtnLeave"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14" /></svg>
-            </button>
-            <button
-              type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-              :disabled="!fontBaselineReady || codeFontSize === defaultCodeFontSize"
-              @click="resetCodeFont()"
-              @mouseenter="onBtnHover($event, t('common.reset') || 'Reset')"
-              @focus="onBtnHover($event, t('common.reset') || 'Reset')"
-              @mouseleave="onBtnLeave"
-              @blur="onBtnLeave"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></g></svg>
-            </button>
-            <button
-              type="button"
-              class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-              :disabled="Number.isFinite(codeFontSize) ? codeFontSize >= codeFontMax : false"
-              @click="increaseCodeFont()"
-              @mouseenter="onBtnHover($event, t('common.increase') || 'Increase')"
-              @focus="onBtnHover($event, t('common.increase') || 'Increase')"
-              @mouseleave="onBtnLeave"
-              @blur="onBtnLeave"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7v14" /></svg>
-            </button>
-          </template>
+      <!-- Content area -->
+      <div
+        ref="codeBlockContent"
+        class="code-block-content"
+        :style="contentStyle"
+        @scroll="handleScroll"
+      >
+        <div ref="rendererTarget" class="code-block-render" />
+        <div v-if="!rendererReady" class="code-fallback-plain" v-html="fallbackHtml" />
+      </div>
 
-          <button
-            v-if="props.showCopyButton"
-            type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-            :aria-label="copyText ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')"
-            @click="copy"
-            @mouseenter="onCopyHover($event)"
-            @focus="onCopyHover($event)"
-            @mouseleave="onBtnLeave"
-            @blur="onBtnLeave"
-          >
-            <svg v-if="!copyText" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
-          </button>
-
-          <button
-            v-if="props.showExpandButton"
-            type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-            :aria-pressed="isExpanded"
-            @click="toggleExpand($event)"
-            @mouseenter="onBtnHover($event, isExpanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))"
-            @focus="onBtnHover($event, isExpanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand'))"
-            @mouseleave="onBtnLeave"
-            @blur="onBtnLeave"
-          >
-            <svg v-if="isExpanded" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" /></svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" /></svg>
-          </button>
-
-          <button
-            v-if="isPreviewable && props.showPreviewButton"
-            type="button"
-            class="code-action-btn p-2 text-xs rounded-md transition-colors hover:bg-[var(--vscode-editor-selectionBackground)]"
-            :aria-label="t('common.preview') || 'Preview'"
-            @click="previewCode"
-            @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
-            @focus="onBtnHover($event, t('common.preview') || 'Preview')"
-            @mouseleave="onBtnLeave"
-            @blur="onBtnLeave"
-          >
-            <svg data-v-3d59cc65="" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></g></svg>
-          </button>
-        </div>
-      </slot>
-    </div>
-    <div
-      v-show="!isCollapsed && (stream ? true : !loading)"
-      ref="codeBlockContent"
-      class="code-block-content"
-      :style="contentStyle"
-      @scroll="handleScroll"
-    >
-      <div ref="rendererTarget" class="code-block-render" />
-      <div v-if="!rendererReady" class="code-fallback-plain" v-html="fallbackHtml" />
-    </div>
-    <!-- Loading placeholder can be overridden via slot -->
-    <div v-show="!stream && loading" class="code-loading-placeholder" :style="loadingPlaceholderStyle">
-      <slot name="loading" :loading="loading" :stream="stream">
-        <div class="loading-skeleton">
-          <div class="skeleton-line" />
-          <div class="skeleton-line" />
-          <div class="skeleton-line short" />
-        </div>
-      </slot>
-    </div>
+      <template #loading>
+        <slot name="loading" :loading="loading" :stream="stream">
+          <div class="loading-skeleton">
+            <div class="skeleton-line" />
+            <div class="skeleton-line" />
+            <div class="skeleton-line short" />
+          </div>
+        </slot>
+      </template>
+    </CodeBlockShell>
   </div>
 </template>
 
 <style scoped>
+/* ── Container ── */
 .code-block-container {
+  margin: var(--ms-flow-codeblock-y) 0;
   contain: content;
+  background: var(--code-bg);
+  border-color: var(--code-border);
+  color: var(--code-fg);
+  box-shadow: var(--ms-shadow-subtle);
 }
 
+/* ── Header ── */
+.code-block-header {
+  background: var(--code-header-bg);
+  border-color: var(--code-border);
+  color: var(--code-fg);
+}
+.code-header-title {
+  font-size: var(--ms-text-label);
+  font-weight: 500;
+  color: var(--code-action-fg);
+}
+
+/* ── Code content ── */
 .code-block-content {
-  max-height: min(70vh, 500px);
+  max-height: min(70vh, var(--ms-size-code-max-height));
   overflow: auto;
   transition: max-height 0.3s ease;
   font-family: var(--vscode-editor-font-family, 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
@@ -813,25 +761,10 @@ function previewCode() {
   padding: 1rem;
 }
 
-.code-action-btn {
-  cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.code-action-btn:hover {
-  opacity: 1;
-}
-
-.code-action-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-/* Loading placeholder styles */
+/* ── Loading placeholder ── */
 .code-loading-placeholder {
   padding: 1rem;
-  min-height: 120px;
+  min-height: var(--ms-size-skeleton-min-height);
 }
 
 .loading-skeleton {
@@ -842,15 +775,10 @@ function previewCode() {
 
 .skeleton-line {
   height: 1rem;
-  background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 37%, rgba(0,0,0,0.06) 63%);
+  background: linear-gradient(90deg, var(--loading-shimmer) 25%, hsl(var(--ms-muted-foreground) / 0.12) 37%, var(--loading-shimmer) 63%);
   background-size: 400% 100%;
   animation: code-skeleton-shimmer 1.2s ease-in-out infinite;
   border-radius: 0.25rem;
-}
-
-.code-block-container.is-dark .skeleton-line {
-  background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.06) 63%);
-  background-size: 400% 100%;
 }
 
 .skeleton-line.short {

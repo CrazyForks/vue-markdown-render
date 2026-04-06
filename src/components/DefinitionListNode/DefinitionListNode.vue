@@ -60,12 +60,12 @@ defineEmits(['copy'])
 
 .definition-term {
   font-weight: 600;
-  margin-top: 0.5rem;
+  margin-top: var(--ms-flow-definition-term-mt);
 }
 
 .definition-desc {
-  margin-left: 1rem;
-  margin-bottom: 0.5rem;
+  margin-left: var(--ms-flow-definition-desc-ml);
+  margin-bottom: var(--ms-flow-definition-desc-mb);
 }
 
 /* 避免列表中嵌套 NodeRenderer 的 content-visibility 导致空白占位 */

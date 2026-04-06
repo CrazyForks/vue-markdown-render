@@ -283,7 +283,7 @@ describe('codeBlockNode diff defaults', () => {
     expect(monacoOptions.lineDecorationsWidth).toBe(12)
     expect(monacoOptions.lineNumbersMinChars).toBe(2)
     expect(monacoOptions.glyphMargin).toBe(false)
-    expect(monacoOptions.fontSize).toBe(13)
+    expect(monacoOptions.fontSize).toBe(14)
     expect(monacoOptions.lineHeight).toBe(30)
     expect(monacoOptions.renderOverviewRuler).toBe(false)
     expect(monacoOptions.overviewRulerBorder).toBe(false)

@@ -22,6 +22,14 @@ export interface CodeBlockMonacoThemeObject {
 export type CodeBlockMonacoTheme = string | CodeBlockMonacoThemeObject
 
 /**
+ * Unified theme prop for code blocks.
+ *
+ * - `string` or `CodeBlockMonacoThemeObject`: fixed theme, ignores page dark/light
+ * - `{ light, dark }`: auto-switches based on page isDark
+ */
+export type CodeBlockThemeProp = CodeBlockMonacoTheme | { light: CodeBlockMonacoTheme, dark: CodeBlockMonacoTheme }
+
+/**
  * Common language entry accepted by `stream-monaco`.
  *
  * The runtime also supports advanced lazy-loader signatures; keep the union
@@ -178,9 +186,16 @@ export interface CodeBlockNodeProps {
   isDark?: boolean
   loading?: boolean
   stream?: boolean
-  /** Preferred dark Monaco theme for this code block instance. */
+  /**
+   * Unified theme configuration.
+   * - `string` or theme object: fixed theme, ignores page dark/light switch
+   * - `{ light, dark }`: auto-switches based on `isDark`
+   * - When omitted, falls back to `darkTheme`/`lightTheme` props
+   */
+  theme?: CodeBlockThemeProp
+  /** @deprecated Use `theme` prop instead. Kept for backward compatibility. */
   darkTheme?: CodeBlockMonacoTheme
-  /** Preferred light Monaco theme for this code block instance. */
+  /** @deprecated Use `theme` prop instead. Kept for backward compatibility. */
   lightTheme?: CodeBlockMonacoTheme
   isShowPreview?: boolean
   /** Monaco editor and diff behavior forwarded to `stream-monaco`. */

@@ -84,33 +84,53 @@ const nodeComponents = {
 
 <style scoped>
 .heading-node {
-  @apply font-medium leading-tight;
+  font-weight: 500;
+  line-height: 1.25;
 }
 hr + .heading-node {
-  @apply mt-0;
+  margin-top: 0;
 }
 
 .heading-1 {
-  @apply mt-0 mb-[calc(8/9*1em)] text-4xl leading-[calc(10/9*1)] font-extrabold;
+  font-size: var(--ms-text-h1);
+  line-height: var(--ms-leading-h1);
+  font-weight: var(--ms-weight-h1);
+  margin-top: var(--ms-flow-heading-1-mt);
+  margin-bottom: var(--ms-flow-heading-1-mb);
 }
 
 .heading-2 {
-  @apply mt-8 mb-4 text-2xl leading-[calc(4/3*1)] font-bold;
+  font-size: var(--ms-text-h2);
+  line-height: var(--ms-leading-h2);
+  font-weight: var(--ms-weight-h2);
+  margin-top: var(--ms-flow-heading-2-mt);
+  margin-bottom: var(--ms-flow-heading-2-mb);
 }
 
 .heading-3 {
-  @apply mt-[calc(8/5*1em)] mb-[calc(3/5*1em)] text-xl font-semibold leading-[calc(5/3*1)];
+  font-size: var(--ms-text-h3);
+  line-height: var(--ms-leading-h3);
+  font-weight: var(--ms-weight-h3);
+  margin-top: var(--ms-flow-heading-3-mt);
+  margin-bottom: var(--ms-flow-heading-3-mb);
 }
 
 .heading-4 {
-  @apply mt-6 mb-2 text-base font-semibold;
+  font-size: var(--ms-text-h4);
+  font-weight: var(--ms-weight-h4);
+  margin-top: var(--ms-flow-heading-4-mt);
+  margin-bottom: var(--ms-flow-heading-4-mb);
 }
 
 .heading-5 {
-  @apply m-0 text-base;
+  font-size: var(--ms-text-h5);
+  margin-top: var(--ms-flow-heading-5-mt);
+  margin-bottom: var(--ms-flow-heading-5-mb);
 }
 
 .heading-6 {
-  @apply m-0 text-base;
+  font-size: var(--ms-text-h6);
+  margin-top: var(--ms-flow-heading-6-mt);
+  margin-bottom: var(--ms-flow-heading-6-mb);
 }
 </style>
