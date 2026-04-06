@@ -4,7 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
-import infographicIconUrl from '../../icon/infographic.svg?url'
+import infographicIcon from '../../icon/infographic.svg?raw'
 import { getInfographic } from './infographic'
 
 const props = withDefaults(
@@ -518,7 +518,7 @@ watch(
         <slot name="header-left" />
       </div>
       <div v-else class="flex items-center gap-x-2 overflow-hidden">
-        <img :src="infographicIconUrl" class="w-4 h-4 my-0" alt="Infographic">
+        <span class="icon-slot action-icon shrink-0" v-html="infographicIcon" />
         <span class="infographic-label font-medium font-mono truncate">Infographic</span>
       </div>
 
@@ -764,6 +764,16 @@ watch(
 .action-icon {
   width: var(--ms-action-btn-icon);
   height: var(--ms-action-btn-icon);
+}
+.icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-slot :deep(svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* ── Mode toggle pill ── */

@@ -5,7 +5,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
-import mermaidIconUrl from '../../icon/mermaid.svg?url'
+import mermaidIcon from '../../icon/mermaid.svg?raw'
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
 
@@ -1896,7 +1896,7 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
         <slot name="header-left" />
       </div>
       <div v-else class="flex items-center gap-x-2 overflow-hidden">
-        <img :src="mermaidIconUrl" class="w-4 h-4 my-0" alt="Mermaid">
+        <span class="icon-slot action-icon shrink-0" v-html="mermaidIcon" />
         <span class="mermaid-label-text text-[length:var(--ms-text-label)] font-medium font-mono truncate">Mermaid</span>
       </div>
 
@@ -2124,6 +2124,16 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
 .action-icon {
   width: var(--ms-action-btn-icon);
   height: var(--ms-action-btn-icon);
+}
+.icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-slot :deep(svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 </style>
 

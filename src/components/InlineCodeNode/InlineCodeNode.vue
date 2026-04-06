@@ -112,7 +112,7 @@ const streamedDeltaClass = computed(() => (
 
 <template>
   <code
-    class="inline text-[85%] px-1 py-0.5 rounded font-mono whitespace-normal break-words max-w-full before:content-[''] after:content-['']"
+    class="inline-code"
   >
     <span v-if="settledCode">{{ settledCode }}</span>
     <span
@@ -126,10 +126,20 @@ const streamedDeltaClass = computed(() => (
 </template>
 
 <style scoped>
-code {
+.inline-code {
+  display: inline;
+  font-family: var(--ms-font-mono);
+  font-size: 0.8125em;
+  line-height: inherit;
   color: var(--inline-code-fg);
   background-color: var(--inline-code-bg);
-  border: var(--ms-border-width) solid var(--inline-code-border);
+  padding: 0.15em 0.35em;
+  border-radius: 0.25em;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 100%;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .inline-code-stream-delta {
