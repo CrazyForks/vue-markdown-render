@@ -12,6 +12,12 @@
   color: inherit;
 }
 
+/* Task list: hide bullet and remove indent when item contains a checkbox */
+.markstream-vue li:has(.checkbox-node) {
+  list-style-type: none;
+  margin-left: calc(-1 * var(--ms-flow-list-indent));
+}
+
 @tailwind components;
 @tailwind utilities;
 
