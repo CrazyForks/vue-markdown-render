@@ -507,19 +507,19 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="viewportTarget"
-    class="markstream-vue d2-block-container my-4 rounded-lg border overflow-hidden"
+    class="markstream-vue d2-block-container rounded-lg border overflow-hidden"
     data-markstream-d2="1"
     :data-markstream-mode="showSourceFallback ? 'fallback' : 'preview'"
     :class="{ dark: props.isDark }"
   >
     <div
       v-if="props.showHeader"
-      class="d2-block-header flex justify-between items-center px-4 py-2.5 border-b"
+      class="d2-block-header flex justify-between items-center border-b"
     >
       <div class="flex items-center gap-x-2">
         <span class="text-sm font-medium font-mono">D2</span>
       </div>
-      <div class="flex items-center gap-x-2">
+      <div class="d2-header-actions flex items-center">
         <div
           v-if="props.showModeToggle"
           class="d2-mode-toggle flex items-center gap-x-1 rounded-md p-0.5"
@@ -596,14 +596,14 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-show="!isCollapsed" ref="bodyRef" class="d2-block-body" :style="bodyStyle">
-      <div v-if="props.loading && !hasPreview" class="d2-source px-4 py-4">
+      <div v-if="props.loading && !hasPreview" class="d2-source">
         <pre class="d2-code"><code>{{ baseCode }}</code></pre>
         <p v-if="renderError" class="d2-error mt-2 text-xs">
           {{ renderError }}
         </p>
       </div>
       <div v-else>
-        <div v-if="showSourceFallback" class="d2-source px-4 py-4">
+        <div v-if="showSourceFallback" class="d2-source">
           <pre class="d2-code"><code>{{ baseCode }}</code></pre>
           <p v-if="renderError" class="d2-error mt-2 text-xs">
             {{ renderError }}
@@ -623,6 +623,7 @@ onBeforeUnmount(() => {
 <style scoped>
 /* ── Container ── */
 .d2-block-container {
+  margin: var(--ms-flow-diagram-y) 0;
   background: var(--diagram-bg);
   border-color: var(--diagram-border);
   color: hsl(var(--ms-foreground));
@@ -631,6 +632,7 @@ onBeforeUnmount(() => {
 
 /* ── Header ── */
 .d2-block-header {
+  padding: var(--ms-inset-panel-y) var(--ms-inset-panel-x);
   background: var(--diagram-header-bg);
   border-color: var(--diagram-border);
   color: hsl(var(--ms-foreground));
@@ -651,6 +653,10 @@ onBeforeUnmount(() => {
   opacity: 1;
   font-weight: 600;
   color: hsl(var(--ms-foreground));
+}
+
+.d2-header-actions {
+  gap: var(--ms-gap-header-actions);
 }
 
 /* ── Action buttons ── */
@@ -677,6 +683,7 @@ onBeforeUnmount(() => {
 }
 
 .d2-source {
+  padding: var(--ms-inset-panel-body) var(--ms-inset-panel-x);
   font-family: var(--vscode-editor-font-family, 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
 }
 

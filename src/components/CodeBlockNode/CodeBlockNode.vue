@@ -1914,7 +1914,7 @@ onUnmounted(() => {
     v-else
     ref="container"
     :style="containerStyle"
-    class="markstream-vue code-block-container my-4 rounded-lg border overflow-hidden"
+    class="markstream-vue code-block-container rounded-lg border overflow-hidden"
     data-markstream-code-block="1"
     :data-markstream-enhanced="editorMounted && !usePreCodeRender ? 'true' : 'false'"
     :class="[
@@ -2009,10 +2009,11 @@ onUnmounted(() => {
 
 <style scoped>
 .code-block-container {
+  margin: var(--ms-flow-codeblock-y) 0;
   contain: content;
     /* 新增：显著减少离屏 codeblock 的布局/绘制与样式计算 */
   content-visibility: auto;
-  contain-intrinsic-size: 320px 180px;
+  contain-intrinsic-size: 320px var(--ms-size-skeleton-min-height);
   container-type: inline-size;
   box-shadow: var(--ms-shadow-subtle);
   --markstream-code-fallback-bg: var(--code-bg);

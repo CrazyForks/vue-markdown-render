@@ -1863,7 +1863,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 
 <template>
   <div
-    class="markstream-vue mermaid-block-container my-4 rounded-lg border overflow-hidden"
+    class="markstream-vue mermaid-block-container rounded-lg border overflow-hidden"
     data-markstream-mermaid="1"
     :data-markstream-mode="showSource ? 'fallback' : hasRenderedOnce ? 'preview' : 'pending'"
     :class="[
@@ -1873,7 +1873,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
     <!-- 重新设计的头部区域 -->
     <div
       v-if="props.showHeader"
-      class="mermaid-block-header flex justify-between items-center px-4 py-2.5 border-b"
+      class="mermaid-block-header flex justify-between items-center border-b"
     >
       <!-- 左侧插槽（允许完全接管左侧显示） -->
       <div v-if="$slots['header-left']">
@@ -1923,7 +1923,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
       <div v-if="$slots['header-right']">
         <slot name="header-right" />
       </div>
-      <div v-else class="flex items-center gap-x-1">
+      <div v-else class="mermaid-header-actions flex items-center">
         <button
           v-if="props.showCollapseButton"
           :class="computedButtonStyle"
@@ -1980,7 +1980,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 
     <!-- 内容区域（带高度过渡的容器） -->
     <div v-show="!isCollapsed" ref="modeContainerRef">
-      <div v-if="showSource" class="mermaid-source-panel p-4">
+      <div v-if="showSource" class="mermaid-source-panel">
         <pre class="mermaid-source-code text-sm font-mono whitespace-pre-wrap">{{ baseFixedCode }}</pre>
       </div>
       <div v-else class="relative">
@@ -2107,11 +2107,13 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 <style scoped>
 /* ── Outer container ── */
 .mermaid-block-container {
+  margin: var(--ms-flow-diagram-y) 0;
   border-color: var(--diagram-border);
 }
 
 /* ── Header ── */
 .mermaid-block-header {
+  padding: var(--ms-inset-panel-y) var(--ms-inset-panel-x);
   background: var(--diagram-header-bg);
   border-color: var(--diagram-border);
 }
@@ -2142,6 +2144,10 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 }
 
 /* ── Action buttons (copy, export, fullscreen, zoom, collapse, modal close) ── */
+.mermaid-header-actions {
+  gap: var(--ms-gap-header-actions);
+}
+
 .mermaid-action-btn {
   font-family: inherit;
   color: var(--code-action-fg);
@@ -2158,6 +2164,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 
 /* ── Source panel ── */
 .mermaid-source-panel {
+  padding: var(--ms-inset-panel-body);
   background: var(--diagram-bg);
 }
 
@@ -2188,7 +2195,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
   font-family: inherit;
   content-visibility: auto;
   contain: content;
-  contain-intrinsic-size: 360px 240px;
+  contain-intrinsic-size: var(--ms-size-diagram-min-height) 240px;
 }
 
 ._mermaid :deep(svg) {

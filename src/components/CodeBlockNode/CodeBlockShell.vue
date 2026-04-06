@@ -98,7 +98,7 @@ const fontIncreaseDisabled = computed(() =>
   <!-- Header -->
   <div
     v-if="props.showHeader"
-    class="code-block-header flex justify-between items-center px-4 py-2.5 border-b"
+    class="code-block-header flex justify-between items-center border-b"
   >
     <!-- left: language icon + title (provided by parent via slot) -->
     <slot name="header-left" />
@@ -238,3 +238,14 @@ const fontIncreaseDisabled = computed(() =>
   <!-- Screen reader copy status -->
   <span class="sr-only" aria-live="polite" role="status">{{ copyText ? t('common.copied') || 'Copied' : '' }}</span>
 </template>
+
+<style scoped>
+.code-block-header {
+  padding: var(--ms-inset-panel-y) var(--ms-inset-panel-x);
+}
+.code-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ms-gap-header-actions);
+}
+</style>

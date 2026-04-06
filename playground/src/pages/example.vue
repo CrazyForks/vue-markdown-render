@@ -140,7 +140,7 @@ pnpm dev
 |---------|--------|-------|
 | Color tokens | Done | 25 components migrated |
 | Dark mode | Done | Bridge tokens + .dark class |
-| Spacing tokens | Planned | See token-expansion-draft |
+| Spacing tokens | Done | Flow, inset, gap, size tokens |
 | Shell extraction | Done | CodeBlockShell.vue |
 | Visual redesign | Not started | Core #343 deliverable |
 

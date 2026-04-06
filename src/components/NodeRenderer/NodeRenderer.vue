@@ -2436,7 +2436,7 @@ function handleContainerMouseout(event: MouseEvent) {
 .unknown-node {
   color: hsl(var(--ms-muted-foreground));
   font-style: italic;
-  margin: 1rem 0;
+  margin: var(--ms-flow-paragraph-y) 0;
 }
 </style>
 

@@ -490,7 +490,7 @@ watch(
 <template>
   <div
     ref="viewportTarget"
-    class="markstream-vue infographic-block-container my-4 rounded-lg border overflow-hidden"
+    class="markstream-vue infographic-block-container rounded-lg border overflow-hidden"
     data-markstream-infographic="1"
     :data-markstream-mode="renderMode"
     :class="[
@@ -500,7 +500,7 @@ watch(
     <!-- Header -->
     <div
       v-if="props.showHeader"
-      class="infographic-block-header flex justify-between items-center px-4 py-2.5 border-b"
+      class="infographic-block-header flex justify-between items-center border-b"
     >
       <!-- Left side -->
       <div v-if="$slots['header-left']">
@@ -550,7 +550,7 @@ watch(
       <div v-if="$slots['header-right']">
         <slot name="header-right" />
       </div>
-      <div v-else class="flex items-center gap-x-1">
+      <div v-else class="infographic-header-actions flex items-center">
         <button
           v-if="props.showCollapseButton"
           :class="computedButtonStyle"
@@ -605,7 +605,7 @@ watch(
 
     <!-- Content area -->
     <div v-show="!isCollapsed">
-      <div v-if="showSource" class="infographic-source p-4">
+      <div v-if="showSource" class="infographic-source">
         <pre class="infographic-source-code text-sm font-mono whitespace-pre-wrap">{{ baseCode }}</pre>
       </div>
       <div v-else class="relative">
@@ -730,6 +730,7 @@ watch(
 <style scoped>
 /* ── Container ── */
 .infographic-block-container {
+  margin: var(--ms-flow-diagram-y) 0;
   background: var(--diagram-bg);
   border-color: var(--diagram-border);
   color: hsl(var(--ms-foreground));
@@ -738,6 +739,7 @@ watch(
 
 /* ── Header ── */
 .infographic-block-header {
+  padding: var(--ms-inset-panel-y) var(--ms-inset-panel-x);
   background: var(--diagram-header-bg);
   border-color: var(--diagram-border);
   color: hsl(var(--ms-foreground));
@@ -763,6 +765,10 @@ watch(
   box-shadow: var(--ms-shadow-subtle);
 }
 
+.infographic-header-actions {
+  gap: var(--ms-gap-header-actions);
+}
+
 /* ── Action buttons ── */
 .infographic-action-btn {
   font-family: inherit;
@@ -781,6 +787,7 @@ watch(
 
 /* ── Source view ── */
 .infographic-source {
+  padding: var(--ms-inset-panel-body);
   background: var(--diagram-bg);
 }
 

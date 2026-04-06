@@ -129,7 +129,7 @@ const streamedDeltaClass = computed(() => (
 code {
   color: var(--inline-code-fg);
   background-color: var(--inline-code-bg);
-  border: 1px solid var(--inline-code-border);
+  border: var(--ms-border-width) solid var(--inline-code-border);
 }
 
 .inline-code-stream-delta {
