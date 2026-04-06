@@ -892,12 +892,20 @@ onBeforeUnmount(() => {
 }
 
 .chatbot-messages::-webkit-scrollbar-thumb {
-  background: hsl(var(--ms-border, 214.3 31.8% 91.4%));
+  background: #cbd5e1;
   border-radius: 4px;
 }
 
+.dark .chatbot-messages::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
 .chatbot-messages::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--ms-muted-foreground, 215.4 16.3% 46.9%));
+  background: #94a3b8;
+}
+
+.dark .chatbot-messages::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
 
 .settings-toggle {
