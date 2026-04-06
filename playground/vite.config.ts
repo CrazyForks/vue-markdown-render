@@ -56,6 +56,7 @@ export default defineConfig(({ command }) => {
     resolve: {
       alias: {
         '~/': `${path.resolve(__dirname, 'src')}/`,
+        'markstream-vue/index.css': path.resolve(__dirname, '../src/index.css'),
         'markstream-vue': path.resolve(__dirname, '../src/exports.ts'),
         'markstream-angular': path.resolve(__dirname, '../packages/markstream-angular/src/index.ts'),
         'stream-markdown-parser': path.resolve(__dirname, '../packages/markdown-parser/src/index.ts'),

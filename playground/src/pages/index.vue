@@ -16,6 +16,7 @@ import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STR
 import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from '../composables/useStreamSimulator'
 import { streamContent } from '../const/markdown'
 import 'katex/dist/katex.min.css'
+import '../../../src/index.css'
 // import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
 
 const _d2Demo = `
