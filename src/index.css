@@ -35,48 +35,51 @@
 
   /* Bridge: inherit shadcn compat variables */
   --ms-background:              var(--background,             0 0% 100%);
-  --ms-foreground:              var(--foreground,             222.2 84% 4.9%);
+  --ms-foreground:              var(--foreground,             0 0% 10%);
 
-  --ms-muted:                   var(--muted,                  210 40% 96%);
-  --ms-muted-foreground:        var(--muted-foreground,       215.4 16.3% 46.9%);
+  --ms-muted:                   var(--muted,                  0 0% 96.5%);
+  --ms-muted-foreground:        var(--muted-foreground,       0 0% 43%);
 
-  --ms-secondary:               var(--secondary,              210 40% 96%);
-  --ms-secondary-foreground:    var(--secondary-foreground,   222.2 47.4% 11.2%);
+  --ms-secondary:               var(--secondary,              0 0% 93.5%);
+  --ms-secondary-foreground:    var(--secondary-foreground,   0 0% 10%);
 
-  --ms-accent:                  var(--accent,                 210 40% 96%);
-  --ms-accent-foreground:       var(--accent-foreground,      222.2 47.4% 11.2%);
+  --ms-accent:                  var(--accent,                 0 0% 91%);
+  --ms-accent-foreground:       var(--accent-foreground,      0 0% 10%);
 
-  --ms-primary:                 var(--primary,                222.2 47.4% 11.2%);
-  --ms-primary-foreground:      var(--primary-foreground,     210 40% 98%);
+  --ms-primary:                 var(--primary,                0 0% 10%);
+  --ms-primary-foreground:      var(--primary-foreground,     0 0% 100%);
 
-  --ms-destructive:             var(--destructive,            0 84.2% 60.2%);
-  --ms-destructive-foreground:  var(--destructive-foreground, 210 40% 98%);
+  --ms-destructive:             var(--destructive,            0 62% 52%);
+  --ms-destructive-foreground:  var(--destructive-foreground, 0 0% 100%);
 
-  --ms-border:                  var(--border,                 214.3 31.8% 91.4%);
-  --ms-ring:                    var(--ring,                   222.2 84% 4.9%);
+  --ms-border:                  var(--border,                 0 0% 87%);
+  --ms-ring:                    var(--ring,                   0 0% 10%);
 
   --ms-popover:                 var(--popover,                0 0% 100%);
-  --ms-popover-foreground:      var(--popover-foreground,     222.2 84% 4.9%);
+  --ms-popover-foreground:      var(--popover-foreground,     0 0% 10%);
 
   --ms-radius:                  var(--radius,                 0.5rem);
 
-  /* Extension: markdown-specific, no shadcn collision */
-  --ms-info:                    217 91% 60%;
-  --ms-info-foreground:         210 40% 98%;
+  /* Extension: markdown-specific, no shadcn collision
+   * Functional colors: unified sat ~58-64%, lightness tuned for
+   * equal visual weight on neutral canvas.
+   * Highlight & warning use dark foreground (light bg). */
+  --ms-info:                    215 60% 50%;
+  --ms-info-foreground:         0 0% 100%;
 
-  --ms-success:                 168 100% 37.5%;
-  --ms-success-foreground:      210 40% 98%;
+  --ms-success:                 152 56% 39%;
+  --ms-success-foreground:      0 0% 100%;
 
-  --ms-warning:                 34 100% 50%;
-  --ms-warning-foreground:      0 0% 100%;
+  --ms-warning:                 38 64% 46%;
+  --ms-warning-foreground:      0 0% 9%;
 
-  --ms-diff-added:              174 60% 51%;
-  --ms-diff-removed:            350 100% 60%;
+  --ms-diff-added:              152 50% 36%;
+  --ms-diff-removed:            0 58% 48%;
 
-  --ms-highlight:               54 100% 62%;
+  --ms-highlight:               50 60% 72%;
   --ms-highlight-foreground:    0 0% 0%;
 
-  --ms-link:                    212 100% 42%;
+  --ms-link:                    215 58% 42%;
 
   --ms-font-sans:               ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --ms-font-mono:               ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -87,39 +90,50 @@
 .dark .markstream-vue,
 .markstream-vue.dark {
 
-  /* Bridge: dark fallbacks (used when host has no dark tokens) */
-  --ms-background:              var(--background,             222.2 84% 4.9%);
-  --ms-foreground:              var(--foreground,             210 40% 98%);
+  /* Bridge: dark fallbacks (used when host has no dark tokens)
+   * Neutral steps: bg 7 → muted 12 → secondary 16 → border 20 → accent 24
+   * Ensures each surface level is visually distinguishable. */
+  --ms-background:              var(--background,             0 0% 7%);
+  --ms-foreground:              var(--foreground,             0 0% 93%);
 
-  --ms-muted:                   var(--muted,                  217.2 32.6% 17.5%);
-  --ms-muted-foreground:        var(--muted-foreground,       215 20.2% 65.1%);
+  --ms-muted:                   var(--muted,                  0 0% 12%);
+  --ms-muted-foreground:        var(--muted-foreground,       0 0% 60%);
 
-  --ms-secondary:               var(--secondary,              217.2 32.6% 17.5%);
-  --ms-secondary-foreground:    var(--secondary-foreground,   210 40% 98%);
+  --ms-secondary:               var(--secondary,              0 0% 16%);
+  --ms-secondary-foreground:    var(--secondary-foreground,   0 0% 93%);
 
-  --ms-accent:                  var(--accent,                 217.2 32.6% 17.5%);
-  --ms-accent-foreground:       var(--accent-foreground,      210 40% 98%);
+  --ms-accent:                  var(--accent,                 0 0% 24%);
+  --ms-accent-foreground:       var(--accent-foreground,      0 0% 93%);
 
-  --ms-primary:                 var(--primary,                210 40% 98%);
-  --ms-primary-foreground:      var(--primary-foreground,     222.2 47.4% 11.2%);
+  --ms-primary:                 var(--primary,                0 0% 93%);
+  --ms-primary-foreground:      var(--primary-foreground,     0 0% 10%);
 
-  --ms-destructive:             var(--destructive,            0 62.8% 30.6%);
-  --ms-destructive-foreground:  var(--destructive-foreground, 210 40% 98%);
+  --ms-destructive:             var(--destructive,            0 60% 50%);
+  --ms-destructive-foreground:  var(--destructive-foreground, 0 0% 93%);
 
-  --ms-border:                  var(--border,                 217.2 32.6% 17.5%);
-  --ms-ring:                    var(--ring,                   212.7 26.8% 83.9%);
+  --ms-border:                  var(--border,                 0 0% 20%);
+  --ms-ring:                    var(--ring,                   0 0% 80%);
 
-  --ms-popover:                 var(--popover,                222.2 84% 4.9%);
-  --ms-popover-foreground:      var(--popover-foreground,     210 40% 98%);
+  --ms-popover:                 var(--popover,                0 0% 9%);
+  --ms-popover-foreground:      var(--popover-foreground,     0 0% 93%);
 
-  /* Extension: dark overrides */
-  --ms-diff-added:              174 72% 70%;
-  --ms-diff-removed:            0 92% 82%;
+  /* Extension: dark overrides — lightness lifted for readability */
+  --ms-info:                    215 55% 62%;
+  --ms-info-foreground:         0 0% 100%;
 
-  --ms-highlight:               54 80% 42%;
-  --ms-highlight-foreground:    0 0% 100%;
+  --ms-success:                 152 48% 55%;
+  --ms-success-foreground:      0 0% 100%;
 
-  --ms-link:                    213 94% 68%;
+  --ms-warning:                 32 65% 58%;
+  --ms-warning-foreground:      0 0% 9%;
+
+  --ms-diff-added:              152 42% 60%;
+  --ms-diff-removed:            0 58% 58%;
+
+  --ms-highlight:               48 65% 50%;
+  --ms-highlight-foreground:    0 0% 0%;
+
+  --ms-link:                    215 50% 65%;
 
   /* Admonition: stronger tint on dark backgrounds */
   --admonition-note-header-bg:  color-mix(in srgb, hsl(var(--ms-info)) 12%, transparent);

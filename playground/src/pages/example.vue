@@ -20,6 +20,40 @@ function toggleDark() {
   document.documentElement.classList.toggle('dark', isDark.value)
 }
 
+// ── Color palette data ──
+const palette = [
+  {
+    title: 'Neutral',
+    tokens: [
+      { name: 'background', bg: '--ms-background', fg: '--ms-foreground' },
+      { name: 'muted', bg: '--ms-muted', fg: '--ms-muted-foreground' },
+      { name: 'secondary', bg: '--ms-secondary', fg: '--ms-secondary-foreground' },
+      { name: 'accent', bg: '--ms-accent', fg: '--ms-accent-foreground' },
+      { name: 'border', bg: '--ms-border', fg: '--ms-foreground' },
+      { name: 'muted-fg', bg: '--ms-muted-foreground', fg: '--ms-background' },
+      { name: 'foreground', bg: '--ms-foreground', fg: '--ms-background' },
+    ],
+  },
+  {
+    title: 'Signal',
+    tokens: [
+      { name: 'info', bg: '--ms-info', fg: '--ms-info-foreground' },
+      { name: 'success', bg: '--ms-success', fg: '--ms-success-foreground' },
+      { name: 'warning', bg: '--ms-warning', fg: '--ms-warning-foreground' },
+      { name: 'destructive', bg: '--ms-destructive', fg: '--ms-destructive-foreground' },
+    ],
+  },
+  {
+    title: 'Content',
+    tokens: [
+      { name: 'link', bg: '--ms-link', fg: '--ms-background' },
+      { name: 'highlight', bg: '--ms-highlight', fg: '--ms-highlight-foreground' },
+      { name: 'diff-added', bg: '--ms-diff-added', fg: '--ms-background' },
+      { name: 'diff-removed', bg: '--ms-diff-removed', fg: '--ms-background' },
+    ],
+  },
+]
+
 const presets = [
   { id: 'default', label: 'Default', desc: 'Polished Editorial — 16px, 1.75 line-height, warm reading rhythm' },
   { id: 'compact', label: 'Compact', desc: 'AI chat / dashboard — 14px, 1.5 line-height, tight spacing' },
@@ -254,6 +288,30 @@ Term 2
       <div class="mb-4 text-xs text-[hsl(var(--ms-muted-foreground))]">
         <strong>{{ presets.find(p => p.id === activePreset)?.label }}</strong> — {{ presets.find(p => p.id === activePreset)?.desc }}
       </div>
+
+      <!-- Color Palette -->
+      <section class="palette-section">
+        <h2 class="palette-title">Color Palette</h2>
+        <div v-for="group in palette" :key="group.title" class="palette-group">
+          <h3 class="palette-group-title">{{ group.title }}</h3>
+          <div class="palette-row">
+            <div v-for="token in group.tokens" :key="token.name" class="palette-item">
+              <div
+                class="palette-swatch"
+                :style="{
+                  backgroundColor: `hsl(var(${token.bg}))`,
+                  color: `hsl(var(${token.fg}))`,
+                }"
+              >Aa</div>
+              <span class="palette-label">{{ token.name }}</span>
+              <span class="palette-var">{{ token.bg.replace('--ms-', '') }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="palette-divider">
+
       <MarkdownRender
         :content="content"
         :is-dark="isDark"
@@ -349,4 +407,69 @@ Term 2
 
 /* Compact content width: full width for demo */
 .compact .example-content { max-width: 100%; padding: 1rem; }
+
+/* ── Color Palette ── */
+.palette-section {
+  margin-bottom: 2rem;
+}
+.palette-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  color: hsl(var(--ms-foreground));
+}
+.palette-group {
+  margin-bottom: 1.25rem;
+}
+.palette-group-title {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(var(--ms-muted-foreground));
+  margin-bottom: 0.5rem;
+}
+.palette-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.palette-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 4.5rem;
+}
+.palette-swatch {
+  width: 4.5rem;
+  height: 3.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--ms-border));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: var(--ms-font-sans);
+  transition: transform 0.15s ease;
+}
+.palette-swatch:hover {
+  transform: scale(1.08);
+}
+.palette-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  margin-top: 0.375rem;
+  color: hsl(var(--ms-foreground));
+}
+.palette-var {
+  font-size: 0.5625rem;
+  color: hsl(var(--ms-muted-foreground));
+  font-family: var(--ms-font-mono);
+}
+.palette-divider {
+  border: none;
+  border-top: 1px solid hsl(var(--ms-border));
+  margin: 2rem 0;
+}
 </style>
