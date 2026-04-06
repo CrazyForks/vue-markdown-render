@@ -6,6 +6,9 @@
   @import 'markstream-vue/index.css';
 }
 
+/* Brand themes — each scoped via [data-theme="name"] */
+@import '../../themes/index.css';
+
 html,
 body,
 #app {

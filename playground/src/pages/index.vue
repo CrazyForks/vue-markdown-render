@@ -166,6 +166,21 @@ setCustomComponents('playground-demo', { thinking: ThinkingNode })
 // 主题切换
 const isDark = useDark()
 const toggleTheme = useToggle(isDark)
+
+// Brand theme selector
+const activeBrandTheme = ref('')
+const brandThemes = [
+  '', 'airbnb', 'airtable', 'apple', 'bmw', 'cal', 'claude', 'clay',
+  'clickhouse', 'cohere', 'coinbase', 'composio', 'cursor', 'elevenlabs',
+  'expo', 'figma', 'framer', 'hashicorp', 'ibm', 'intercom', 'kraken',
+  'linear', 'lovable', 'minimax', 'mintlify', 'miro', 'mistral', 'mongodb',
+  'notion', 'nvidia', 'ollama', 'opencode-ai', 'pinterest', 'posthog',
+  'raycast', 'replicate', 'resend', 'revolut', 'runwayml', 'sanity',
+  'sentry', 'spacex', 'spotify', 'stripe', 'supabase', 'superhuman',
+  'together-ai', 'uber', 'vercel', 'voltagent', 'warp', 'webflow',
+  'wise', 'x-ai', 'zapier',
+]
+
 // Code block theme selector (single dropdown)
 const themes = [
   'andromeeda',
@@ -389,7 +404,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="markstream-vue flex items-center justify-center p-4 lg:pr-[304px] app-container h-full bg-[hsl(var(--ms-background))]" :class="{ dark: isDark }">
+  <div class="markstream-vue flex items-center justify-center p-4 lg:pr-[304px] app-container h-full bg-[hsl(var(--ms-background))]" :class="{ dark: isDark }" :data-theme="activeBrandTheme || undefined">
     <!-- 设置按钮和面板 -->
     <div class="fixed top-4 right-4 z-10">
       <button
@@ -443,7 +458,40 @@ onBeforeUnmount(() => {
             <span class="text-xs font-semibold uppercase tracking-[0.24em] text-[hsl(var(--ms-muted-foreground))]">Settings</span>
           </div>
 
-          <!-- 主题选择器 -->
+          <!-- 品牌主题选择器 -->
+          <div class="space-y-2">
+            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
+              Brand Theme
+            </label>
+            <div class="relative">
+              <select
+                v-model="activeBrandTheme"
+                class="
+                  w-full appearance-none px-3 py-2 pr-8
+                  bg-[hsl(var(--ms-muted))]
+                  border border-[hsl(var(--ms-border))]
+                  rounded-lg text-sm font-medium
+                  text-[hsl(var(--ms-foreground))]
+                  hover:bg-[hsl(var(--ms-accent))]
+                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
+                  transition-all duration-200 cursor-pointer
+                "
+              >
+                <option value="">Default</option>
+                <option v-for="t in brandThemes.filter(Boolean)" :key="t" :value="t">
+                  {{ t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, ' ') }}
+                </option>
+              </select>
+              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                <Icon
+                  icon="carbon:chevron-down"
+                  class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Code block 主题选择器 -->
           <div class="space-y-2">
             <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               Code Theme

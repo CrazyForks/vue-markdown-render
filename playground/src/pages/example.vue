@@ -25,6 +25,19 @@ function toggleDark() {
   document.documentElement.classList.toggle('dark', isDark.value)
 }
 
+const activeTheme = ref('')
+const themeList = [
+  '', 'airbnb', 'airtable', 'apple', 'bmw', 'cal', 'claude', 'clay',
+  'clickhouse', 'cohere', 'coinbase', 'composio', 'cursor', 'elevenlabs',
+  'expo', 'figma', 'framer', 'hashicorp', 'ibm', 'intercom', 'kraken',
+  'linear', 'lovable', 'minimax', 'mintlify', 'miro', 'mistral', 'mongodb',
+  'notion', 'nvidia', 'ollama', 'opencode-ai', 'pinterest', 'posthog',
+  'raycast', 'replicate', 'resend', 'revolut', 'runwayml', 'sanity',
+  'sentry', 'spacex', 'spotify', 'stripe', 'supabase', 'superhuman',
+  'together-ai', 'uber', 'vercel', 'voltagent', 'warp', 'webflow',
+  'wise', 'x-ai', 'zapier',
+]
+
 // ── Color palette data ──
 const palette = [
   {
@@ -326,6 +339,7 @@ Term 2
   <div
     class="markstream-vue min-h-screen bg-[hsl(var(--ms-background))] text-[hsl(var(--ms-foreground))] transition-colors"
     :class="[activePreset, { dark: isDark }]"
+    :data-theme="activeTheme || undefined"
   >
     <header class="sticky top-0 z-50 flex flex-wrap items-center gap-3 px-6 py-2.5 border-b border-[hsl(var(--ms-border))] bg-[hsl(var(--ms-background))] backdrop-blur-sm">
       <span class="text-sm font-semibold mr-2">Typography</span>
@@ -342,6 +356,15 @@ Term 2
         {{ preset.label }}
       </button>
       <div class="ml-auto flex items-center gap-3">
+        <select
+          v-model="activeTheme"
+          class="px-2 py-1 text-xs border border-[hsl(var(--ms-border))] rounded-md bg-[hsl(var(--ms-background))] text-inherit cursor-pointer"
+        >
+          <option value="">Default</option>
+          <option v-for="t in themeList.filter(Boolean)" :key="t" :value="t">
+            {{ t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, ' ') }}
+          </option>
+        </select>
         <button
           class="px-2.5 py-1 text-xs border border-[hsl(var(--ms-border))] rounded-md bg-transparent text-inherit cursor-pointer hover:bg-[hsl(var(--ms-accent))] transition-colors"
           @click="toggleDark"
