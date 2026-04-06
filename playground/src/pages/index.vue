@@ -835,7 +835,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Messages area with scroll (use column-reverse on the scroll container) -->
-      <main ref="messagesContainer" class="markstream-vue mb-4 mr-[1px] flex flex-1 flex-col-reverse overflow-y-auto chatbot-messages" :class="{ dark: isDark }">
+      <main ref="messagesContainer" class="mb-4 mr-[1px] flex flex-1 flex-col-reverse overflow-y-auto chatbot-messages">
         <MarkdownRender
           :content="content"
           :code-block-dark-theme="selectedTheme || undefined"
