@@ -888,7 +888,7 @@ onBeforeUnmount(() => {
 }
 
 .chatbot-messages::-webkit-scrollbar-track {
-  background: transparent;
+  background: hsl(var(--ms-muted) / 0.3);
 }
 
 .chatbot-messages::-webkit-scrollbar-thumb {
