@@ -79,8 +79,6 @@
   --ms-highlight:               50 60% 72%;
   --ms-highlight-foreground:    0 0% 0%;
 
-  --ms-link:                    215 58% 42%;
-
   --ms-font-sans:               ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --ms-font-mono:               ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
@@ -132,8 +130,6 @@
 
   --ms-highlight:               48 65% 50%;
   --ms-highlight-foreground:    0 0% 0%;
-
-  --ms-link:                    215 50% 65%;
 
   /* Shadows: use black in dark mode (foreground is bright, would glow) */
   --ms-shadow-subtle: 0 1px 3px 0 hsl(0 0% 0% / 0.25);
@@ -220,7 +216,7 @@
   --table-header-bg:            hsl(var(--ms-muted));
 
   /* ── Link ── */
-  --link-color:                 hsl(var(--ms-link));
+  --link-color:                 hsl(var(--ms-info));
 
   /* ── List ── */
   --list-marker:                hsl(var(--ms-muted-foreground) / 0.5);

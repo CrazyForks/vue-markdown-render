@@ -50,7 +50,6 @@ const palette = [
   {
     title: 'Content',
     tokens: [
-      { name: 'link', bg: '--ms-link', fg: '--ms-background' },
       { name: 'highlight', bg: '--ms-highlight', fg: '--ms-highlight-foreground' },
       { name: 'diff-added', bg: '--ms-diff-added', fg: '--ms-background' },
       { name: 'diff-removed', bg: '--ms-diff-removed', fg: '--ms-background' },

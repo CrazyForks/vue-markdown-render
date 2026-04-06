@@ -230,7 +230,7 @@ const resolvedMonacoOptions = computed(() => {
     lineDecorationsWidth: 12,
     lineNumbersMinChars: 2,
     glyphMargin: false,
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 30,
     renderOverviewRuler: false,
     overviewRulerBorder: false,
@@ -476,7 +476,7 @@ function getLineHeightSafe(editor: MonacoEditorViewLike | null | undefined): num
   const domH = measureLineHeightFromDom()
   if (domH && domH > 0)
     return domH
-  const fs = Number.isFinite(codeFontSize.value) && codeFontSize.value! > 0 ? (codeFontSize.value as number) : 12
+  const fs = Number.isFinite(codeFontSize.value) && codeFontSize.value! > 0 ? (codeFontSize.value as number) : 14
   // Conservative fallback close to Monaco's default ratio
   return Math.max(12, Math.round(fs * 1.35))
 }
@@ -2319,7 +2319,7 @@ onUnmounted(() => {
   background: transparent;
   color: var(--vscode-editor-foreground, inherit);
   /* Match Monaco defaults to avoid a jarring swap while it loads */
-  font-size: var(--vscode-editor-font-size, 12px);
+  font-size: var(--vscode-editor-font-size, 14px);
   font-weight: 400;
   font-family: var(
     --markstream-code-font-family,
