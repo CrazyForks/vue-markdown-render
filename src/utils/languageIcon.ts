@@ -1,77 +1,28 @@
 import { shallowRef } from 'vue'
-import CIcon from '../icon/c.svg?raw'
-import CppIcon from '../icon/cpp.svg?raw'
-import CsharpIcon from '../icon/csharp.svg?raw'
-import CssIcon from '../icon/css.svg?raw'
-import GoIcon from '../icon/go.svg?raw'
-import HtmlIcon from '../icon/html.svg?raw'
-import JavaIcon from '../icon/java.svg?raw'
-import JsxReactIcon from '../icon/javascript-react.svg?raw'
-import JsIcon from '../icon/javascript.svg?raw'
-import JsonIcon from '../icon/json.svg?raw'
-import KotlinIcon from '../icon/kotlin.svg?raw'
-import MarkdownIcon from '../icon/markdown.svg?raw'
-import MermaidIcon from '../icon/mermaid.svg?raw'
-import PhpIcon from '../icon/php.svg?raw'
-import PythonIcon from '../icon/python.svg?raw'
-import RubyIcon from '../icon/ruby.svg?raw'
-import RustIcon from '../icon/rust.svg?raw'
-import SassIcon from '../icon/sass.svg?raw'
-import ShellIcon from '../icon/shell.svg?raw'
-import SqlIcon from '../icon/sql.svg?raw'
-import SquareCodeIcon from '../icon/square-code.svg?raw'
-import TextIcon from '../icon/text.svg?raw'
-import TsReactIcon from '../icon/typescript-react.svg?raw'
-import TsIcon from '../icon/typescript.svg?raw'
-import VueIcon from '../icon/vue.svg?raw'
-import XmlIcon from '../icon/xml.svg?raw'
-import YamlIcon from '../icon/yaml.svg?raw'
+import { materialIconTheme } from '../icon-themes/material'
+import {
+  _setRevisionBumper,
+  getThemeFallback,
+  preloadActiveThemeExtended,
+  registerIconTheme,
+  resolveFromTheme,
+} from '../icon-themes/registry'
 
 export type LanguageIconResolver = (lang: string) => string | undefined | null
 
-type LanguageIconMap = Record<string, string>
-
 let userLanguageIconResolver: LanguageIconResolver | null = null
-let extendedLanguageIconMap: LanguageIconMap | null = null
-let extendedLanguageIconPromise: Promise<LanguageIconMap | null> | null = null
 
 // Bump this ref when the async icon table is loaded so computed icon bindings can refresh.
 export const languageIconsRevision = shallowRef(0)
 
-const DEFAULT_LANGUAGE_ICON = SquareCodeIcon
+// Wire the registry to bump our revision ref
+_setRevisionBumper(() => { languageIconsRevision.value++ })
 
-const CORE_LANGUAGE_ICON_MAP: LanguageIconMap = {
-  '': TextIcon,
-  'plain': TextIcon,
-  'text': TextIcon,
-  'javascript': JsIcon,
-  'typescript': TsIcon,
-  'jsx': JsxReactIcon,
-  'tsx': TsReactIcon,
-  'html': HtmlIcon,
-  'css': CssIcon,
-  'scss': SassIcon,
-  'json': JsonIcon,
-  'python': PythonIcon,
-  'ruby': RubyIcon,
-  'go': GoIcon,
-  'java': JavaIcon,
-  'kotlin': KotlinIcon,
-  'c': CIcon,
-  'cpp': CppIcon,
-  'cs': CsharpIcon,
-  'csharp': CsharpIcon,
-  'php': PhpIcon,
-  'shell': ShellIcon,
-  'powershell': ShellIcon,
-  'sql': SqlIcon,
-  'yaml': YamlIcon,
-  'markdown': MarkdownIcon,
-  'xml': XmlIcon,
-  'rust': RustIcon,
-  'vue': VueIcon,
-  'mermaid': MermaidIcon,
-}
+// ── Default theme: Material Icon Theme ─────────────────────────────────
+
+registerIconTheme(materialIconTheme)
+
+// ── Language alias normalization ────────────────────────────────────────
 
 const LANGUAGE_ALIAS_MAP: Record<string, string> = {
   '': '',
@@ -116,22 +67,7 @@ function extractLanguageToken(lang?: string | null): string {
   return base.toLowerCase()
 }
 
-async function loadExtendedLanguageIconMap(): Promise<LanguageIconMap | null> {
-  if (extendedLanguageIconMap)
-    return extendedLanguageIconMap
-
-  if (!extendedLanguageIconPromise) {
-    extendedLanguageIconPromise = import('./languageIconExtended')
-      .then((mod) => {
-        extendedLanguageIconMap = mod.EXTENDED_LANGUAGE_ICON_MAP
-        languageIconsRevision.value++
-        return extendedLanguageIconMap
-      })
-      .catch(() => null)
-  }
-
-  return extendedLanguageIconPromise
-}
+// ── Public API ──────────────────────────────────────────────────────────
 
 export function setLanguageIconResolver(resolver?: LanguageIconResolver | null) {
   userLanguageIconResolver = resolver ?? null
@@ -159,28 +95,25 @@ export function resolveMonacoLanguageId(lang?: string | null): string {
 }
 
 export async function preloadExtendedLanguageIcons() {
-  await loadExtendedLanguageIconMap()
+  await preloadActiveThemeExtended()
 }
 
 export function getLanguageIcon(lang: string): string {
+  // 1. User custom resolver always wins (backward compat)
   if (userLanguageIconResolver) {
     const hit = userLanguageIconResolver(lang)
     if (hit != null && hit !== '')
       return hit
   }
 
+  // 2. Active theme resolution
   const normalized = normalizeLanguageIdentifier(lang)
-  const coreIcon = CORE_LANGUAGE_ICON_MAP[normalized]
-  if (coreIcon)
-    return coreIcon
+  const themeHit = resolveFromTheme(normalized)
+  if (themeHit)
+    return themeHit
 
-  const extendedIcon = extendedLanguageIconMap?.[normalized]
-  if (extendedIcon)
-    return extendedIcon
-
-  // Load the infrequent language icon set only when needed.
-  void loadExtendedLanguageIconMap()
-  return DEFAULT_LANGUAGE_ICON
+  // 3. Fallback from active theme
+  return getThemeFallback()
 }
 
 export const languageMap: Record<string, string> = {

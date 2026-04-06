@@ -1,6 +1,8 @@
 export * from '../components/CodeBlockNode/monaco'
 export * from './katex-threshold'
 export * from './languageIcon'
+export { registerIconTheme, setIconTheme, getRegisteredThemes } from '../icon-themes'
+export type { IconTheme } from '../icon-themes'
 export * from './performance-monitor'
 export * from './safeRaf'
 export * from 'stream-markdown-parser'

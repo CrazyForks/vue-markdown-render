@@ -42,6 +42,7 @@ import ThematicBreakNode from './components/ThematicBreakNode'
 import Tooltip from './components/Tooltip'
 import VmrContainerNode from './components/VmrContainerNode'
 import { setDefaultI18nMap } from './composables/useSafeI18n'
+import { setIconTheme } from './icon-themes'
 import { setLanguageIconResolver } from './utils/languageIcon'
 import { clearGlobalCustomComponents, getCustomNodeComponents, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
 import './index.css'
@@ -201,10 +202,13 @@ const componentMap: Record<string, Component> = {
 }
 
 export const VueRendererMarkdown: Plugin = {
-  install(app: App, options?: { getLanguageIcon?: LanguageIconResolver, mathOptions?: any }) {
+  install(app: App, options?: { getLanguageIcon?: LanguageIconResolver, iconTheme?: string, mathOptions?: any }) {
     Object.entries(componentMap).forEach(([name, component]) => {
       app.component(name, component)
     })
+    // Theme is set first, then user resolver is applied on top (resolver takes priority)
+    if (options?.iconTheme)
+      setIconTheme(options.iconTheme)
     if (options?.getLanguageIcon)
       setLanguageIconResolver(options.getLanguageIcon)
     // optional global math options
