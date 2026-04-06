@@ -883,22 +883,7 @@ onBeforeUnmount(() => {
   min-height: unset !important;
 }
 
-.chatbot-messages::-webkit-scrollbar {
-  width: 8px;
-}
-
-.chatbot-messages::-webkit-scrollbar-track {
-  background: hsl(var(--ms-muted) / 0.3);
-}
-
-.chatbot-messages::-webkit-scrollbar-thumb {
-  background: hsl(var(--ms-border));
-  border-radius: 4px;
-}
-
-.chatbot-messages::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--ms-muted-foreground));
-}
+/* Scrollbar: use native OS behavior (macOS overlay scrollbars) */
 
 .settings-toggle {
   backdrop-filter: blur(8px);
