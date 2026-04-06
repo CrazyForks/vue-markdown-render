@@ -137,11 +137,15 @@
 
   /* Shadows: use black in dark mode (foreground is bright, would glow) */
   --ms-shadow-subtle: 0 1px 3px 0 hsl(0 0% 0% / 0.25);
-  --ms-shadow-popover: 0 4px 6px -1px hsl(0 0% 0% / 0.4),
-                       0 2px 4px -2px hsl(0 0% 0% / 0.3);
+  --ms-shadow-popover: 0 4px 6px -1px hsl(0 0% 0% / 0.2),
+                       0 2px 4px -2px hsl(0 0% 0% / 0.15);
   --ms-shadow-modal: 0 10px 15px -3px hsl(0 0% 0% / 0.5),
                      0 4px 6px -4px hsl(0 0% 0% / 0.4);
   --ms-shadow-preview: 0 10px 40px hsl(0 0% 0% / 0.6);
+
+  /* Tooltip: subtle lift from black, muted text */
+  --tooltip-bg:                 hsl(0 0% 12%);
+  --tooltip-fg:                 hsl(0 0% 72%);
 
   /* Code block: header slightly darker than body in dark mode */
   --code-header-bg:             hsl(var(--ms-muted));
@@ -228,8 +232,8 @@
   --footnote-border:            hsl(var(--ms-border));
 
   /* ── Tooltip ── */
-  --tooltip-bg:                 hsl(var(--ms-popover));
-  --tooltip-fg:                 hsl(var(--ms-popover-foreground));
+  --tooltip-bg:                 hsl(0 0% 18%);
+  --tooltip-fg:                 hsl(0 0% 88%);
   --tooltip-border:             hsl(var(--ms-border));
 
   /* ── Modal ── */
