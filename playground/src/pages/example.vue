@@ -13,7 +13,11 @@ setKaTeXWorker(() => new KatexWorker())
 setMermaidWorker(() => new MermaidWorker())
 getUseMonaco()
 
-const isDark = ref(false)
+const isDark = ref(
+  typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
+)
+// Sync initial state to DOM
+if (isDark.value) document.documentElement.classList.add('dark')
 
 function toggleDark() {
   isDark.value = !isDark.value

@@ -625,7 +625,7 @@ function previewCode() {
   <div
     ref="container"
     :style="containerStyle"
-    class="markstream-vue code-block-container my-4 rounded-lg border overflow-hidden"
+    class="code-block-container rounded-lg border overflow-hidden"
     :class="{ dark: props.isDark }"
   >
     <CodeBlockShell
@@ -661,7 +661,7 @@ function previewCode() {
         <slot name="header-left">
           <div class="flex items-center gap-x-2">
             <span class="icon-slot h-4 w-4 flex-shrink-0" v-html="languageIcon" />
-            <span class="text-sm font-medium font-mono">{{ displayLanguage }}</span>
+            <span class="code-header-title">{{ displayLanguage }}</span>
           </div>
         </slot>
       </template>
@@ -696,6 +696,7 @@ function previewCode() {
 <style scoped>
 /* ── Container ── */
 .code-block-container {
+  margin: var(--ms-flow-codeblock-y) 0;
   contain: content;
   background: var(--code-bg);
   border-color: var(--code-border);
@@ -709,24 +710,10 @@ function previewCode() {
   border-color: var(--code-border);
   color: var(--code-fg);
 }
-
-/* ── Action buttons ── */
-.code-action-btn {
-  cursor: pointer;
+.code-header-title {
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--code-action-fg);
-  opacity: 0.7;
-  transition: opacity 0.2s, background-color 0.15s, color 0.15s;
-}
-
-.code-action-btn:hover {
-  opacity: 1;
-  background: var(--code-action-hover-bg);
-  color: var(--code-action-hover-fg);
-}
-
-.code-action-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
 }
 
 /* ── Code content ── */

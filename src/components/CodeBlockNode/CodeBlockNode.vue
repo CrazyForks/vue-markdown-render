@@ -1914,7 +1914,7 @@ onUnmounted(() => {
     v-else
     ref="container"
     :style="containerStyle"
-    class="markstream-vue code-block-container rounded-lg border overflow-hidden"
+    class="code-block-container rounded-lg border overflow-hidden"
     data-markstream-code-block="1"
     :data-markstream-enhanced="editorMounted && !usePreCodeRender ? 'true' : 'false'"
     :class="[
@@ -2173,9 +2173,9 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--code-action-fg);
 }
 
 .code-header-caption {
@@ -2382,25 +2382,6 @@ onUnmounted(() => {
   100% { background-position: 0 0; }
 }
 
-.code-action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2rem;
-  min-height: 2rem;
-  padding: 0.5rem;
-  border-radius: 0.375rem;
-  line-height: 1;
-  flex-shrink: 0;
-  font-family: inherit;
-  color: var(--code-action-fg);
-}
-
-.code-action-btn:hover {
-  background-color: var(--code-action-hover-bg);
-  color: var(--code-action-hover-fg);
-}
-
 .code-block-container.is-diff .icon-slot {
   width: 28px;
   height: 28px;
@@ -2458,19 +2439,6 @@ onUnmounted(() => {
   color: var(--diff-added-fg);
   background: hsl(var(--ms-diff-added) / 0.16);
   border-color: hsl(var(--ms-diff-added) / 0.22);
-}
-
-.code-action-btn:active {
-  transform: scale(0.98);
-}
-
-.code-action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.code-action-btn:disabled:hover {
-  background-color: transparent;
 }
 
 /* Ensure injected icons align consistently whether img or inline svg */

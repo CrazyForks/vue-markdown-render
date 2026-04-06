@@ -135,6 +135,14 @@
 
   --ms-link:                    215 50% 65%;
 
+  /* Shadows: use black in dark mode (foreground is bright, would glow) */
+  --ms-shadow-subtle: 0 1px 3px 0 hsl(0 0% 0% / 0.25);
+  --ms-shadow-popover: 0 4px 6px -1px hsl(0 0% 0% / 0.4),
+                       0 2px 4px -2px hsl(0 0% 0% / 0.3);
+  --ms-shadow-modal: 0 10px 15px -3px hsl(0 0% 0% / 0.5),
+                     0 4px 6px -4px hsl(0 0% 0% / 0.4);
+  --ms-shadow-preview: 0 10px 40px hsl(0 0% 0% / 0.6);
+
   /* Admonition: stronger tint on dark backgrounds */
   --admonition-note-header-bg:  color-mix(in srgb, hsl(var(--ms-info)) 12%, transparent);
   --admonition-tip-header-bg:   color-mix(in srgb, hsl(var(--ms-success)) 12%, transparent);
@@ -309,8 +317,8 @@
   --ms-weight-h4: 600;
 
   /* ── Panel insets & layout gaps ── */
-  --ms-inset-panel-x: 1rem;
-  --ms-inset-panel-y: 0.75rem;
+  --ms-inset-panel-x: 0.625rem;
+  --ms-inset-panel-y: 0.375rem;
   --ms-inset-panel-body-sm: 0.5rem;
   --ms-inset-panel-body: 1rem;
   --ms-inset-admonition-body-top: 0.5rem;
