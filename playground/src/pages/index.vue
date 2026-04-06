@@ -388,26 +388,26 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex items-center justify-center p-4 lg:pr-[304px] app-container h-full bg-gray-50 dark:bg-gray-900">
+  <div class="markstream-vue flex items-center justify-center p-4 lg:pr-[304px] app-container h-full bg-[hsl(var(--ms-background))]" :class="{ dark: isDark }">
     <!-- 设置按钮和面板 -->
     <div class="fixed top-4 right-4 z-10">
       <button
         v-if="isCompactSettings"
         class="
           settings-toggle w-10 h-10 rounded-full
-          bg-white/95 dark:bg-gray-800/95
-          backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50
-          hover:bg-gray-50 dark:hover:bg-gray-700/50
-          shadow-lg dark:shadow-gray-900/20
+          bg-[hsl(var(--ms-background)/0.95)]
+          backdrop-blur-md border border-[hsl(var(--ms-border)/0.5)]
+          hover:bg-[hsl(var(--ms-accent))]
+          shadow-lg
           transition-all duration-200 flex items-center justify-center
-          focus:outline-none focus:ring-2 focus:ring-blue-500/50
+          focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
         "
-        :class="{ 'ring-2 ring-blue-500/50': showSettings }"
+        :class="{ 'ring-2 ring-[hsl(var(--ms-ring)/0.5)]': showSettings }"
         @click="showSettings = !showSettings"
       >
         <Icon
           icon="carbon:settings"
-          class="w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform duration-200"
+          class="w-5 h-5 text-[hsl(var(--ms-muted-foreground))] transition-transform duration-200"
           :class="{ 'rotate-90': showSettings }"
         />
       </button>
@@ -424,9 +424,9 @@ onBeforeUnmount(() => {
           v-if="shouldShowSettingsPanel"
           class="
             settings-panel
-            bg-white/95 dark:bg-gray-800/95
-            backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50
-            rounded-xl shadow-xl dark:shadow-gray-900/30
+            bg-[hsl(var(--ms-background)/0.95)]
+            backdrop-blur-md border border-[hsl(var(--ms-border)/0.5)]
+            rounded-xl shadow-xl
             p-4 space-y-4 min-w-[220px] w-[280px]
             overflow-y-auto
             origin-top-right
@@ -434,17 +434,17 @@ onBeforeUnmount(() => {
           :class="isCompactSettings ? 'absolute top-12 right-0 mt-2 max-h-[calc(100vh-5rem)]' : 'max-h-[calc(100vh-2rem)]'"
           @click.stop
         >
-          <div v-if="!isCompactSettings" class="flex items-center gap-2 border-b border-gray-200/70 pb-2 dark:border-gray-700/70">
+          <div v-if="!isCompactSettings" class="flex items-center gap-2 border-b border-[hsl(var(--ms-border))] pb-2">
             <Icon
               icon="carbon:settings"
-              class="w-4 h-4 text-gray-500 dark:text-gray-400"
+              class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
             />
-            <span class="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Settings</span>
+            <span class="text-xs font-semibold uppercase tracking-[0.24em] text-[hsl(var(--ms-muted-foreground))]">Settings</span>
           </div>
 
           <!-- 主题选择器 -->
           <div class="space-y-2">
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               Code Theme
             </label>
             <div class="relative">
@@ -452,12 +452,12 @@ onBeforeUnmount(() => {
                 v-model="selectedTheme"
                 class="
                   w-full appearance-none px-3 py-2 pr-8
-                  bg-gray-50 dark:bg-gray-700/50
-                  border border-gray-200 dark:border-gray-600
+                  bg-[hsl(var(--ms-muted))]
+                  border border-[hsl(var(--ms-border))]
                   rounded-lg text-sm font-medium
-                  text-gray-900 dark:text-gray-100
-                  hover:bg-gray-100 dark:hover:bg-gray-700
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                  text-[hsl(var(--ms-foreground))]
+                  hover:bg-[hsl(var(--ms-accent))]
+                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
                   transition-all duration-200 cursor-pointer
                 "
                 aria-label="Code block theme"
@@ -471,7 +471,7 @@ onBeforeUnmount(() => {
               <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                 <Icon
                   icon="carbon:chevron-down"
-                  class="w-4 h-4 text-gray-400 dark:text-gray-500"
+                  class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
                 />
               </div>
             </div>
@@ -479,7 +479,7 @@ onBeforeUnmount(() => {
 
           <!-- 流式速度控制 -->
           <div class="space-y-2">
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               Stream Profile
             </label>
             <div class="relative">
@@ -487,12 +487,12 @@ onBeforeUnmount(() => {
                 v-model="selectedStreamPresetId"
                 class="
                   w-full appearance-none px-3 py-2 pr-8
-                  bg-gray-50 dark:bg-gray-700/50
-                  border border-gray-200 dark:border-gray-600
+                  bg-[hsl(var(--ms-muted))]
+                  border border-[hsl(var(--ms-border))]
                   rounded-lg text-sm font-medium
-                  text-gray-900 dark:text-gray-100
-                  hover:bg-gray-100 dark:hover:bg-gray-700
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                  text-[hsl(var(--ms-foreground))]
+                  hover:bg-[hsl(var(--ms-accent))]
+                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
                   transition-all duration-200 cursor-pointer
                 "
               >
@@ -506,17 +506,17 @@ onBeforeUnmount(() => {
               <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                 <Icon
                   icon="carbon:chevron-down"
-                  class="w-4 h-4 text-gray-400 dark:text-gray-500"
+                  class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
                 />
               </div>
             </div>
-            <p class="text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+            <p class="text-[11px] leading-5 text-[hsl(var(--ms-muted-foreground))]">
               {{ streamPresetDescription }}
             </p>
           </div>
 
           <div class="space-y-2">
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               Transport
             </label>
             <div class="relative">
@@ -524,12 +524,12 @@ onBeforeUnmount(() => {
                 v-model="streamTransportMode"
                 class="
                   w-full appearance-none px-3 py-2 pr-8
-                  bg-gray-50 dark:bg-gray-700/50
-                  border border-gray-200 dark:border-gray-600
+                  bg-[hsl(var(--ms-muted))]
+                  border border-[hsl(var(--ms-border))]
                   rounded-lg text-sm font-medium
-                  text-gray-900 dark:text-gray-100
-                  hover:bg-gray-100 dark:hover:bg-gray-700
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                  text-[hsl(var(--ms-foreground))]
+                  hover:bg-[hsl(var(--ms-accent))]
+                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
                   transition-all duration-200 cursor-pointer
                 "
               >
@@ -543,14 +543,14 @@ onBeforeUnmount(() => {
               <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                 <Icon
                   icon="carbon:chevron-down"
-                  class="w-4 h-4 text-gray-400 dark:text-gray-500"
+                  class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
                 />
               </div>
             </div>
           </div>
 
           <div class="space-y-2">
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               Slice Mode
             </label>
             <div class="relative">
@@ -558,12 +558,12 @@ onBeforeUnmount(() => {
                 v-model="streamSliceMode"
                 class="
                   w-full appearance-none px-3 py-2 pr-8
-                  bg-gray-50 dark:bg-gray-700/50
-                  border border-gray-200 dark:border-gray-600
+                  bg-[hsl(var(--ms-muted))]
+                  border border-[hsl(var(--ms-border))]
                   rounded-lg text-sm font-medium
-                  text-gray-900 dark:text-gray-100
-                  hover:bg-gray-100 dark:hover:bg-gray-700
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500
+                  text-[hsl(var(--ms-foreground))]
+                  hover:bg-[hsl(var(--ms-accent))]
+                  focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ms-ring)/0.5)]
                   transition-all duration-200 cursor-pointer
                 "
               >
@@ -577,14 +577,14 @@ onBeforeUnmount(() => {
               <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                 <Icon
                   icon="carbon:chevron-down"
-                  class="w-4 h-4 text-gray-400 dark:text-gray-500"
+                  class="w-4 h-4 text-[hsl(var(--ms-muted-foreground))]"
                 />
               </div>
             </div>
           </div>
 
           <div class="space-y-2">
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               chunkDelayMin
             </label>
             <div class="flex items-center gap-3">
@@ -596,14 +596,14 @@ onBeforeUnmount(() => {
                 step="4"
                 class="flex-1 cursor-pointer"
               >
-              <span class="text-xs font-medium text-gray-600 dark:text-gray-400 w-14 text-right">
+              <span class="text-xs font-medium text-[hsl(var(--ms-muted-foreground))] w-14 text-right">
                 {{ normalizedChunkDelayRange.min }}ms
               </span>
             </div>
           </div>
 
           <div class="space-y-2">
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               chunkDelayMax
             </label>
             <div class="flex items-center gap-3">
@@ -615,14 +615,14 @@ onBeforeUnmount(() => {
                 step="4"
                 class="flex-1 cursor-pointer"
               >
-              <span class="text-xs font-medium text-gray-600 dark:text-gray-400 w-14 text-right">
+              <span class="text-xs font-medium text-[hsl(var(--ms-muted-foreground))] w-14 text-right">
                 {{ normalizedChunkDelayRange.max }}ms
               </span>
             </div>
           </div>
 
           <div class="space-y-2">
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               chunkSizeMin
             </label>
             <div class="flex items-center gap-3">
@@ -634,14 +634,14 @@ onBeforeUnmount(() => {
                 step="1"
                 class="flex-1 cursor-pointer"
               >
-              <span class="text-xs font-medium text-gray-600 dark:text-gray-400 w-14 text-right">
+              <span class="text-xs font-medium text-[hsl(var(--ms-muted-foreground))] w-14 text-right">
                 {{ normalizedChunkSizeRange.min }}
               </span>
             </div>
           </div>
 
           <div class="space-y-2">
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               chunkSizeMax
             </label>
             <div class="flex items-center gap-3">
@@ -653,14 +653,14 @@ onBeforeUnmount(() => {
                 step="1"
                 class="flex-1 cursor-pointer"
               >
-              <span class="text-xs font-medium text-gray-600 dark:text-gray-400 w-14 text-right">
+              <span class="text-xs font-medium text-[hsl(var(--ms-muted-foreground))] w-14 text-right">
                 {{ normalizedChunkSizeRange.max }}
               </span>
             </div>
           </div>
 
           <div class="space-y-2">
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <label class="block text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               Burstiness
             </label>
             <div class="flex items-center gap-3">
@@ -672,26 +672,26 @@ onBeforeUnmount(() => {
                 step="1"
                 class="flex-1 cursor-pointer"
               >
-              <span class="text-xs font-medium text-gray-600 dark:text-gray-400 w-12 text-right">
+              <span class="text-xs font-medium text-[hsl(var(--ms-muted-foreground))] w-12 text-right">
                 {{ normalizedBurstiness }}%
               </span>
             </div>
           </div>
 
-          <p class="text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+          <p class="text-[11px] leading-5 text-[hsl(var(--ms-muted-foreground))]">
             Active window: {{ streamChunkRangeLabel }} chars and {{ streamDelayRangeLabel }}. When min=max, the cadence becomes fixed.
           </p>
 
-          <p class="text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+          <p class="text-[11px] leading-5 text-[hsl(var(--ms-muted-foreground))]">
             `Pure Random` uses raw random `slice`; `Boundary Aware` snaps toward word and punctuation boundaries. `ReadableStream` is closest to the real reader path.
           </p>
 
           <!-- 分割线 -->
-          <div class="border-t border-gray-200 dark:border-gray-700" />
+          <div class="border-t border-[hsl(var(--ms-border))]" />
 
           <!-- 主题切换 -->
           <div class="flex items-center justify-between">
-            <label class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+            <label class="text-xs font-semibold text-[hsl(var(--ms-muted-foreground))] uppercase tracking-wide">
               Dark Mode
             </label>
             <button
@@ -751,19 +751,19 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Chatbot-style container -->
-    <div class="chatbot-container max-w-5xl w-full bg-white dark:bg-gray-800 rounded-2xl shadow-2xl dark:shadow-gray-900/50 flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700">
+    <div class="chatbot-container max-w-5xl w-full bg-[hsl(var(--ms-background))] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-[hsl(var(--ms-border))]">
       <!-- Header -->
-      <div class="chatbot-header px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-800">
+      <div class="chatbot-header px-6 py-4 border-b border-[hsl(var(--ms-border))] bg-[hsl(var(--ms-muted))]">
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
               <Icon icon="carbon:chat" class="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 class="text-lg font-semibold text-gray-800 dark:text-gray-100">
+              <h1 class="text-lg font-semibold text-[hsl(var(--ms-foreground))]">
                 markstream-vue
               </h1>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-xs text-[hsl(var(--ms-muted-foreground))]">
                 Streaming markdown demo
               </p>
             </div>
@@ -900,13 +900,8 @@ onBeforeUnmount(() => {
 
 .theme-selector select option {
   padding: 8px 12px;
-  background-color: white;
-  color: #374151;
-}
-
-.dark .theme-selector select option {
-  background-color: #1f2937;
-  color: #f3f4f6;
+  background-color: hsl(var(--ms-background));
+  color: hsl(var(--ms-foreground));
 }
 
 /* 设置面板动画 */
