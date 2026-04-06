@@ -23,16 +23,31 @@ function toggleMoreMenu() {
   }
 }
 
+// CSS variables to forward from source context to teleported menu
+const MENU_CSS_VARS = [
+  '--ms-popover', '--ms-popover-foreground',
+  '--code-border', '--code-action-fg',
+  '--code-action-hover-bg', '--code-action-hover-fg',
+  '--ms-shadow-popover', '--ms-duration-fast', '--ms-ease-standard',
+]
+
 function updateMenuPosition() {
   const btn = moreBtnRef.value
   if (!btn) return
   const rect = btn.getBoundingClientRect()
-  menuStyle.value = {
+  // Read computed CSS vars from source context and forward to teleported menu
+  const computed = getComputedStyle(btn)
+  const vars: Record<string, string> = {
     position: 'absolute',
     top: `${rect.bottom + window.scrollY + 4}px`,
     right: `${document.body.scrollWidth - rect.right - window.scrollX}px`,
     zIndex: '9999',
   }
+  for (const v of MENU_CSS_VARS) {
+    const val = computed.getPropertyValue(v).trim()
+    if (val) vars[v] = val
+  }
+  menuStyle.value = vars
 }
 
 function closeMoreMenuOutside(e: Event) {
@@ -208,7 +223,7 @@ const fontIncreaseDisabled = computed(() =>
 
           <Teleport to="body">
             <Transition name="code-menu">
-              <div v-if="moreMenuOpen" ref="moreMenuRef" :style="menuStyle" class="markstream-vue min-w-[10rem] p-1 bg-[var(--tooltip-bg)] border border-[var(--code-border)] rounded-md shadow-[var(--ms-shadow-popover)]" role="menu">
+              <div v-if="moreMenuOpen" ref="moreMenuRef" :style="menuStyle" class="min-w-[10rem] p-1 bg-[hsl(var(--ms-popover))] text-[hsl(var(--ms-popover-foreground))] border border-[var(--code-border)] rounded-md shadow-[var(--ms-shadow-popover)]" role="menu">
               <!-- Font size controls -->
               <template v-if="props.showFontSizeButtons && props.enableFontSizeControl">
                 <button type="button" role="menuitem" class="flex items-center gap-2 w-full py-1.5 px-2 rounded text-xs text-[var(--code-action-fg)] cursor-pointer whitespace-nowrap hover:bg-[var(--code-action-hover-bg)] hover:text-[var(--code-action-hover-fg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors" :disabled="fontDecreaseDisabled" @click="emit('decreaseFont')">

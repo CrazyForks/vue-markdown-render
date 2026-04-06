@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
+import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
 import MarkdownRender from '../../../src/components/NodeRenderer'
 import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline'
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
@@ -56,6 +57,21 @@ const palette = [
     ],
   },
 ]
+
+// Shiki code block node (lightweight, no Monaco)
+const shikiNode = {
+  type: 'code_block' as const,
+  language: 'typescript',
+  code: `import { createApp } from 'vue'
+import { VueRendererMarkdown } from 'markstream-vue'
+
+const app = createApp(App)
+app.use(VueRendererMarkdown, {
+  iconTheme: 'material',
+})
+app.mount('#app')`,
+  raw: '',
+}
 
 const presets = [
   { id: 'default', label: 'Default', desc: 'Polished Editorial — 16px, 1.75 line-height, warm reading rhythm' },
@@ -376,6 +392,21 @@ Term 2
           showExpandButton: true,
         }"
       />
+
+      <!-- Shiki-rendered code block (lightweight, no Monaco) -->
+      <h2 class="text-xl font-semibold mt-8 mb-4">Shiki Code Block</h2>
+      <div class="markstream-vue" :class="{ dark: isDark }">
+        <MarkdownCodeBlockNode
+          :node="shikiNode"
+          :is-dark="isDark"
+          :loading="false"
+          :stream="false"
+          index-key="shiki-demo"
+          :show-header="true"
+          :show-copy-button="true"
+          :show-collapse-button="true"
+        />
+      </div>
     </main>
   </div>
 </template>
