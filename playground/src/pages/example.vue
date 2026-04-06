@@ -21,8 +21,8 @@ function toggleDark() {
 }
 
 const presets = [
-  { id: 'default', label: 'Default', desc: 'Technical Clean + breathing room — 65ch, 16px, 1.6 line-height' },
-  { id: 'compact', label: 'Compact', desc: 'AI chat / dashboard — full width, 14px, tight spacing' },
+  { id: 'default', label: 'Default', desc: 'Polished Editorial — 16px, 1.75 line-height, warm reading rhythm' },
+  { id: 'compact', label: 'Compact', desc: 'AI chat / dashboard — 14px, 1.5 line-height, tight spacing' },
 ] as const
 
 const activePreset = ref<string>('default')
@@ -272,23 +272,17 @@ Term 2
 
 <style>
 /*
- * Two presets, pure token overrides.
- * No component selectors — just change token values and everything follows.
- *
- * "default" uses the library's built-in token defaults (no overrides needed).
- * "compact" overrides spacing/size tokens for high density.
+ * "default" uses the library's built-in token defaults (Polished Editorial).
+ * "compact" overrides tokens for high-density AI chat / dashboard use.
  */
 
 /* ================================================================
    COMPACT — AI chat / dashboard / sidebar
-   Only override tokens. ~60% of default spacing.
+   ~60% of default spacing. Tighter typography and rhythm.
    ================================================================ */
-/* Target both the root .markstream-vue.compact AND any nested
-   .markstream-vue inside it (NodeRenderer creates its own scope
-   which re-declares default token values). */
 .markstream-vue.compact,
 .compact .markstream-vue {
-  /* Typography — smaller */
+  /* Typography — smaller, tighter */
   --ms-text-body: 0.875rem;
   --ms-leading-body: 1.5;
   --ms-text-h1: 1.375rem;
@@ -297,8 +291,6 @@ Term 2
   --ms-text-h4: 0.875rem;
   --ms-text-h5: 0.8125rem;
   --ms-text-h6: 0.8125rem;
-  --ms-weight-h1: 700;
-  --ms-weight-h2: 600;
 
   /* Heading rhythm — compressed */
   --ms-flow-heading-1-mt: 0;
@@ -355,6 +347,6 @@ Term 2
   --ms-duration-overlay: 160ms;
 }
 
-/* Compact content width controlled by host (full width here for demo) */
+/* Compact content width: full width for demo */
 .compact .example-content { max-width: 100%; padding: 1rem; }
 </style>

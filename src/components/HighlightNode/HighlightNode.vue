@@ -70,5 +70,6 @@ const nodeComponents = {
 .highlight-node {
   background-color: var(--highlight-bg);
   padding: 0 0.2rem;
+  border-radius: 0.2em;
 }
 </style>

@@ -244,68 +244,68 @@
   --ms-space-12: 3rem;
 
   /* ── Document flow spacing ── */
-  --ms-flow-paragraph-y: 1.25em;
-  --ms-flow-list-y: var(--ms-space-5);
-  --ms-flow-list-item-y: var(--ms-space-2);
+  --ms-flow-paragraph-y: 1.5em;
+  --ms-flow-list-y: 1em;
+  --ms-flow-list-item-y: 0.25em;
   --ms-flow-list-indent: calc(13 / 8 * 1em);
   --ms-flow-list-indent-mobile: calc(14 / 9 * 1em);
-  --ms-flow-table-y: var(--ms-space-8);
+  --ms-flow-table-y: 2em;
   --ms-flow-table-cell: calc(4 / 7 * 1em);
-  --ms-flow-blockquote-y: 1.6em;
-  --ms-flow-blockquote-indent: 1em;
-  --ms-flow-admonition-y: var(--ms-space-4);
-  --ms-flow-footnote-y: var(--ms-space-2);
-  --ms-flow-hr-y: var(--ms-space-12);
-  --ms-flow-diagram-y: var(--ms-space-4);
-  --ms-flow-codeblock-y: var(--ms-space-4);
-  --ms-flow-definition-term-mt: var(--ms-space-2);
-  --ms-flow-definition-desc-ml: var(--ms-space-4);
-  --ms-flow-definition-desc-mb: var(--ms-space-2);
+  --ms-flow-blockquote-y: 1.25em;
+  --ms-flow-blockquote-indent: 1.25em;
+  --ms-flow-admonition-y: 1.25em;
+  --ms-flow-footnote-y: 0.5em;
+  --ms-flow-hr-y: 2.5em;
+  --ms-flow-diagram-y: 1.5em;
+  --ms-flow-codeblock-y: 1.5em;
+  --ms-flow-definition-term-mt: 0.75em;
+  --ms-flow-definition-desc-ml: 1.25em;
+  --ms-flow-definition-desc-mb: 0.5em;
 
   /* ── Heading rhythm ── */
   --ms-flow-heading-1-mt: 0;
-  --ms-flow-heading-1-mb: calc(8 / 9 * 1em);
-  --ms-flow-heading-2-mt: var(--ms-space-8);
-  --ms-flow-heading-2-mb: var(--ms-space-4);
-  --ms-flow-heading-3-mt: calc(8 / 5 * 1em);
-  --ms-flow-heading-3-mb: calc(3 / 5 * 1em);
-  --ms-flow-heading-4-mt: var(--ms-space-6);
-  --ms-flow-heading-4-mb: var(--ms-space-2);
-  --ms-flow-heading-5-mt: 0;
-  --ms-flow-heading-5-mb: 0;
-  --ms-flow-heading-6-mt: 0;
-  --ms-flow-heading-6-mb: 0;
+  --ms-flow-heading-1-mb: 1em;
+  --ms-flow-heading-2-mt: 2em;
+  --ms-flow-heading-2-mb: 0.75em;
+  --ms-flow-heading-3-mt: 1.5em;
+  --ms-flow-heading-3-mb: 0.6em;
+  --ms-flow-heading-4-mt: 1.25em;
+  --ms-flow-heading-4-mb: 0.4em;
+  --ms-flow-heading-5-mt: 1em;
+  --ms-flow-heading-5-mb: 0.25em;
+  --ms-flow-heading-6-mt: 1em;
+  --ms-flow-heading-6-mb: 0.25em;
 
   /* ── Typography ── */
   --ms-text-body: 1rem;
-  --ms-leading-body: 1.6;
+  --ms-leading-body: 1.75;
   --ms-text-h1: 2.25rem;
   --ms-text-h2: 1.5rem;
   --ms-text-h3: 1.25rem;
   --ms-text-h4: 1rem;
   --ms-text-h5: 1rem;
   --ms-text-h6: 1rem;
-  --ms-leading-h1: calc(10 / 9);
-  --ms-leading-h2: calc(4 / 3);
-  --ms-leading-h3: calc(5 / 3);
-  --ms-weight-h1: 800;
-  --ms-weight-h2: 700;
+  --ms-leading-h1: 1.2;
+  --ms-leading-h2: 1.35;
+  --ms-leading-h3: 1.5;
+  --ms-weight-h1: 700;
+  --ms-weight-h2: 600;
   --ms-weight-h3: 600;
   --ms-weight-h4: 600;
 
   /* ── Panel insets & layout gaps ── */
-  --ms-inset-panel-x: var(--ms-space-4);
-  --ms-inset-panel-y: var(--ms-space-2_5);
-  --ms-inset-panel-body-sm: var(--ms-space-2);
-  --ms-inset-panel-body: var(--ms-space-4);
-  --ms-inset-admonition-body-top: var(--ms-space-2);
-  --ms-inset-admonition-body-bottom: var(--ms-space-4);
+  --ms-inset-panel-x: 1rem;
+  --ms-inset-panel-y: 0.75rem;
+  --ms-inset-panel-body-sm: 0.5rem;
+  --ms-inset-panel-body: 1rem;
+  --ms-inset-admonition-body-top: 0.5rem;
+  --ms-inset-admonition-body-bottom: 0.75rem;
   --ms-gap-header: var(--ms-space-4);
   --ms-gap-header-main: var(--ms-space-2_5);
   --ms-gap-header-actions: var(--ms-space-2);
 
   /* ── Shadows ── */
-  --ms-shadow-subtle: 0 1px 2px 0 hsl(var(--ms-foreground) / 0.05);
+  --ms-shadow-subtle: 0 1px 3px 0 hsl(var(--ms-foreground) / 0.06);
   --ms-shadow-popover: 0 4px 6px -1px hsl(var(--ms-foreground) / 0.1),
                        0 2px 4px -2px hsl(var(--ms-foreground) / 0.1);
   --ms-shadow-modal: 0 10px 15px -3px hsl(var(--ms-foreground) / 0.1),
