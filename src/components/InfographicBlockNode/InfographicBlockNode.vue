@@ -526,9 +526,9 @@ watch(
       <div v-if="$slots['header-center']">
         <slot name="header-center" />
       </div>
-      <div v-else-if="props.showModeToggle" class="infographic-mode-toggle flex items-center gap-x-1 rounded-md p-0.5">
+      <div v-else-if="props.showModeToggle" class="infographic-mode-toggle flex items-center gap-0.5">
         <button
-          class="infographic-mode-btn px-2.5 py-1 rounded transition-colors"
+          class="infographic-mode-btn px-2 py-0.5 rounded transition-colors"
           :class="[!showSource ? 'is-active' : '']"
           @click="() => handleSwitchMode('preview')"
           @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
@@ -542,7 +542,7 @@ watch(
           </div>
         </button>
         <button
-          class="infographic-mode-btn px-2.5 py-1 rounded transition-colors"
+          class="infographic-mode-btn px-2 py-0.5 rounded transition-colors"
           :class="[showSource ? 'is-active' : '']"
           @click="() => handleSwitchMode('source')"
           @mouseenter="onBtnHover($event, t('common.source') || 'Source')"
@@ -776,21 +776,26 @@ watch(
   height: 100%;
 }
 
-/* ── Mode toggle pill ── */
+/* ── Mode toggle ── */
 .infographic-mode-toggle {
-  background: hsl(var(--ms-secondary));
+  background: transparent;
 }
 
 .infographic-mode-btn {
   font-size: var(--ms-text-label);
   color: var(--code-action-fg);
-  transition: color 0.15s, background-color 0.15s;
+  opacity: 0.6;
+  transition: color 0.15s, background-color 0.15s, opacity 0.15s;
+}
+
+.infographic-mode-btn:hover {
+  opacity: 0.9;
 }
 
 .infographic-mode-btn.is-active {
-  background: var(--code-action-active-bg);
-  color: var(--code-action-active-fg);
-  box-shadow: var(--ms-shadow-subtle);
+  background: hsl(var(--ms-foreground) / 0.08);
+  color: var(--code-fg);
+  opacity: 1;
 }
 
 .infographic-header-actions {

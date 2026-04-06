@@ -526,11 +526,11 @@ onBeforeUnmount(() => {
       <div class="d2-header-actions flex items-center">
         <div
           v-if="props.showModeToggle"
-          class="d2-mode-toggle flex items-center gap-x-1 rounded-md p-0.5"
+          class="d2-mode-toggle flex items-center gap-0.5"
         >
           <button
             type="button"
-            class="mode-btn px-2 py-1 rounded"
+            class="mode-btn px-2 py-0.5 rounded"
             :class="!showSource ? 'is-active' : ''"
             @click="handleSwitchMode('preview')"
             @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
@@ -542,7 +542,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="mode-btn px-2 py-1 rounded"
+            class="mode-btn px-2 py-0.5 rounded"
             :class="showSource ? 'is-active' : ''"
             @click="handleSwitchMode('source')"
             @mouseenter="onBtnHover($event, t('common.source') || 'Source')"
@@ -642,22 +642,26 @@ onBeforeUnmount(() => {
   color: hsl(var(--ms-foreground));
 }
 
-/* ── Mode toggle pill ── */
+/* ── Mode toggle ── */
 .d2-mode-toggle {
-  background: hsl(var(--ms-secondary));
+  background: transparent;
 }
 
 .mode-btn {
   font-size: var(--ms-text-label);
   color: var(--code-action-fg);
-  opacity: 0.7;
-  transition: opacity 0.2s, color 0.2s;
+  opacity: 0.6;
+  transition: opacity 0.2s, color 0.2s, background-color 0.2s;
+}
+
+.mode-btn:hover {
+  opacity: 0.9;
 }
 
 .mode-btn.is-active {
+  background: hsl(var(--ms-foreground) / 0.08);
+  color: var(--code-fg);
   opacity: 1;
-  font-weight: 600;
-  color: hsl(var(--ms-foreground));
 }
 
 .d2-header-actions {

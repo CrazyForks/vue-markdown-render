@@ -1904,9 +1904,9 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
       <div v-if="$slots['header-center']">
         <slot name="header-center" />
       </div>
-      <div v-else-if="props.showModeToggle && mermaidAvailable" class="mermaid-mode-toggle-group flex items-center gap-x-1 rounded-md p-0.5">
+      <div v-else-if="props.showModeToggle && mermaidAvailable" class="mermaid-mode-toggle-group flex items-center gap-0.5">
         <button
-          class="mermaid-mode-btn px-2.5 py-1 rounded transition-colors"
+          class="mermaid-mode-btn px-2 py-0.5 rounded transition-colors"
           :class="[!showSource ? 'is-active' : '']"
           @click="() => handleSwitchMode('preview')"
           @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
@@ -1920,7 +1920,7 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
           </div>
         </button>
         <button
-          class="mermaid-mode-btn px-2.5 py-1 rounded transition-colors"
+          class="mermaid-mode-btn px-2 py-0.5 rounded transition-colors"
           :class="[showSource ? 'is-active' : '']"
           @click="() => handleSwitchMode('source')"
           @mouseenter="onBtnHover($event, t('common.source') || 'Source')"
@@ -2156,25 +2156,25 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
   color: var(--code-action-fg);
 }
 
-/* ── Mode toggle pill group ── */
+/* ── Mode toggle ── */
 .mermaid-mode-toggle-group {
-  background: var(--code-action-hover-bg);
+  background: transparent;
 }
 
-/* ── Mode toggle buttons ── */
 .mermaid-mode-btn {
   font-size: var(--ms-text-label);
   color: var(--code-action-fg);
+  opacity: 0.6;
 }
 
 .mermaid-mode-btn:hover {
-  color: var(--code-action-hover-fg);
+  opacity: 0.9;
 }
 
 .mermaid-mode-btn.is-active {
-  background: var(--code-action-active-bg);
-  color: var(--code-action-active-fg);
-  box-shadow: var(--ms-shadow-subtle);
+  background: hsl(var(--ms-foreground) / 0.08);
+  color: var(--code-fg);
+  opacity: 1;
 }
 
 /* ── Action buttons (copy, export, fullscreen, zoom, collapse, modal close) ── */
