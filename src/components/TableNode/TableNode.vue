@@ -53,7 +53,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
       :class="{ 'table-node--loading': isLoading }"
       :aria-busy="isLoading"
     >
-      <thead class="border-[var(--table-border)]">
+      <thead class="border-[var(--table-border)] bg-[var(--table-header-bg)]">
         <tr class="border-b">
           <th
             v-for="(cell, index) in node.header.cells"

@@ -646,7 +646,7 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
       <transition-stub data-v-8dfe8a80="" name="typewriter" appear="true" persisted="false" css="true">
         <div data-v-8fb37ab3="" data-v-8dfe8a80="" class="table-node-wrapper" loading="false">
           <table data-v-8fb37ab3="" class="text-sm table-node" aria-busy="false">
-            <thead data-v-8fb37ab3="" class="border-[var(--table-border)]">
+            <thead data-v-8fb37ab3="" class="border-[var(--table-border)] bg-[var(--table-header-bg)]">
               <tr data-v-8fb37ab3="" class="border-b">
                 <th data-v-8fb37ab3="" dir="auto" class="font-semibold table-node-cell text-left">
                   <div data-v-8dfe8a80="" data-v-8fb37ab3="" class="markstream-vue markdown-renderer">

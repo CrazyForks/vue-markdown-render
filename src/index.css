@@ -156,10 +156,10 @@
   --inline-code-border:         hsl(var(--ms-border) / 0.9);
 
   /* ── Code block ── */
-  --code-bg:                    hsl(var(--ms-background));
+  --code-bg:                    hsl(var(--ms-muted));
   --code-fg:                    hsl(var(--ms-foreground));
   --code-border:                hsl(var(--ms-border));
-  --code-header-bg:             hsl(var(--ms-muted));
+  --code-header-bg:             hsl(var(--ms-secondary));
   --code-selection-bg:          hsl(var(--ms-accent) / 0.3);
   --code-line-number:           hsl(var(--ms-muted-foreground));
 
@@ -179,7 +179,7 @@
   --diff-removed-inline-bg:     hsl(var(--ms-diff-removed) / 0.2);
 
   /* ── Blockquote ── */
-  --blockquote-border:          hsl(var(--ms-border));
+  --blockquote-border:          hsl(var(--ms-muted-foreground) / 0.35);
 
   /* ── Admonition ── */
   --admonition-bg:              hsl(var(--ms-muted));
@@ -198,12 +198,13 @@
 
   /* ── Table ── */
   --table-border:               hsl(var(--ms-border));
+  --table-header-bg:            hsl(var(--ms-muted) / 0.5);
 
   /* ── Link ── */
   --link-color:                 hsl(var(--ms-link));
 
   /* ── List ── */
-  --list-marker:                hsl(var(--ms-border));
+  --list-marker:                hsl(var(--ms-muted-foreground) / 0.5);
   --list-counter-marker:        hsl(var(--ms-muted-foreground));
 
   /* ── Thematic break (HR) ── */
