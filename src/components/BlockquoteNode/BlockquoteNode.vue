@@ -43,10 +43,10 @@ defineEmits<{
 
 <style scoped>
 .blockquote {
-  font-weight: 500;
-  font-style: italic;
-  border-left: var(--ms-border-width-strong) solid var(--blockquote-border);
-  quotes: "\201C" "\201D" "\2018" "\2019";
+  font-weight: 400;
+  font-style: normal;
+  color: var(--blockquote-fg, hsl(var(--ms-muted-foreground)));
+  border-left: 3px solid var(--blockquote-border);
   margin-top: var(--ms-flow-blockquote-y);
   margin-bottom: var(--ms-flow-blockquote-y);
   padding-left: var(--ms-flow-blockquote-indent);

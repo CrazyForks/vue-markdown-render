@@ -375,6 +375,9 @@ Term 2
   --ms-text-h4: 0.875rem;
   --ms-text-h5: 0.8125rem;
   --ms-text-h6: 0.8125rem;
+  --ms-text-label: 0.6875rem;
+  --ms-action-btn-padding: 0.25rem;
+  --ms-action-btn-icon: 0.75rem;
 
   /* Heading rhythm — compressed */
   --ms-flow-heading-1-mt: 0;
@@ -409,10 +412,10 @@ Term 2
   --ms-flow-definition-desc-mb: 0.25em;
 
   /* Panel insets — smaller */
-  --ms-inset-panel-x: 0.75rem;
-  --ms-inset-panel-y: 0.375rem;
-  --ms-inset-panel-body-sm: 0.25rem;
-  --ms-inset-panel-body: 0.625rem;
+  --ms-inset-panel-x: 0.5rem;
+  --ms-inset-panel-y: 0.25rem;
+  --ms-inset-panel-body-sm: 0.125rem;
+  --ms-inset-panel-body: 0.5rem;
   --ms-inset-admonition-body-top: 0.25rem;
   --ms-inset-admonition-body-bottom: 0.375rem;
 

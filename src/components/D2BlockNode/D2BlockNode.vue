@@ -521,7 +521,7 @@ onBeforeUnmount(() => {
       class="d2-block-header flex justify-between items-center border-b"
     >
       <div class="flex items-center gap-x-2">
-        <span class="text-sm font-medium font-mono">D2</span>
+        <span class="d2-label font-medium font-mono">D2</span>
       </div>
       <div class="d2-header-actions flex items-center">
         <div
@@ -530,7 +530,7 @@ onBeforeUnmount(() => {
         >
           <button
             type="button"
-            class="mode-btn px-2 py-1 text-xs rounded"
+            class="mode-btn px-2 py-1 rounded"
             :class="!showSource ? 'is-active' : ''"
             @click="handleSwitchMode('preview')"
             @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
@@ -542,7 +542,7 @@ onBeforeUnmount(() => {
           </button>
           <button
             type="button"
-            class="mode-btn px-2 py-1 text-xs rounded"
+            class="mode-btn px-2 py-1 rounded"
             :class="showSource ? 'is-active' : ''"
             @click="handleSwitchMode('source')"
             @mouseenter="onBtnHover($event, t('common.source') || 'Source')"
@@ -557,7 +557,7 @@ onBeforeUnmount(() => {
         <button
           v-if="props.showCopyButton"
           type="button"
-          class="d2-action-btn p-2 text-xs rounded-md"
+          class="d2-action-btn p-[var(--ms-action-btn-padding)] rounded-md"
           :aria-label="copyText ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')"
           @click="copy"
           @mouseenter="onCopyHover($event)"
@@ -565,14 +565,14 @@ onBeforeUnmount(() => {
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg v-if="!copyText" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
+          <svg v-if="!copyText" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
         </button>
 
         <button
           v-if="props.showExportButton && svgMarkup"
           type="button"
-          class="d2-action-btn p-2 text-xs rounded-md"
+          class="d2-action-btn p-[var(--ms-action-btn-padding)] rounded-md"
           :aria-label="t('common.export') || 'Export'"
           @click="exportSvg"
           @mouseenter="onBtnHover($event, t('common.export') || 'Export')"
@@ -580,13 +580,13 @@ onBeforeUnmount(() => {
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0-12l-4 4m4-4l4 4M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0-12l-4 4m4-4l4 4M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></svg>
         </button>
 
         <button
           v-if="props.showCollapseButton"
           type="button"
-          class="d2-action-btn p-2 text-xs rounded-md"
+          class="d2-action-btn p-[var(--ms-action-btn-padding)] rounded-md"
           :aria-pressed="isCollapsed"
           @click="toggleCollapse"
           @mouseenter="onBtnHover($event, isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse'))"
@@ -594,7 +594,7 @@ onBeforeUnmount(() => {
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
+          <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
         </button>
       </div>
     </div>
@@ -648,6 +648,7 @@ onBeforeUnmount(() => {
 }
 
 .mode-btn {
+  font-size: var(--ms-text-label);
   color: var(--code-action-fg);
   opacity: 0.7;
   transition: opacity 0.2s, color 0.2s;
@@ -707,6 +708,15 @@ onBeforeUnmount(() => {
   max-width: 100%;
   height: auto;
   display: block;
+}
+
+.d2-label {
+  font-size: var(--ms-text-label);
+}
+
+.action-icon {
+  width: var(--ms-action-btn-icon);
+  height: var(--ms-action-btn-icon);
 }
 
 .d2-error {

@@ -1874,7 +1874,7 @@ watch(
   { immediate: false },
 )
 
-const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
+const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)] rounded'
 </script>
 
 <template>
@@ -1897,7 +1897,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
       </div>
       <div v-else class="flex items-center gap-x-2 overflow-hidden">
         <img :src="mermaidIconUrl" class="w-4 h-4 my-0" alt="Mermaid">
-        <span class="mermaid-label-text text-sm font-medium font-mono truncate">Mermaid</span>
+        <span class="mermaid-label-text text-[length:var(--ms-text-label)] font-medium font-mono truncate">Mermaid</span>
       </div>
 
       <!-- 中间插槽或默认切换按钮 -->
@@ -1906,7 +1906,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
       </div>
       <div v-else-if="props.showModeToggle && mermaidAvailable" class="mermaid-mode-toggle-group flex items-center gap-x-1 rounded-md p-0.5">
         <button
-          class="mermaid-mode-btn px-2.5 py-1 text-xs rounded transition-colors"
+          class="mermaid-mode-btn px-2.5 py-1 rounded transition-colors"
           :class="[!showSource ? 'is-active' : '']"
           @click="() => handleSwitchMode('preview')"
           @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
@@ -1915,12 +1915,12 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
           @blur="onBtnLeave"
         >
           <div class="flex items-center gap-x-1">
-            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></g></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></g></svg>
             <span>{{ t('common.preview') || 'Preview' }}</span>
           </div>
         </button>
         <button
-          class="mermaid-mode-btn px-2.5 py-1 text-xs rounded transition-colors"
+          class="mermaid-mode-btn px-2.5 py-1 rounded transition-colors"
           :class="[showSource ? 'is-active' : '']"
           @click="() => handleSwitchMode('source')"
           @mouseenter="onBtnHover($event, t('common.source') || 'Source')"
@@ -1929,7 +1929,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
           @blur="onBtnLeave"
         >
           <div class="flex items-center gap-x-1">
-            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16 18l6-6l-6-6M8 6l-6 6l6 6" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m16 18l6-6l-6-6M8 6l-6 6l6 6" /></svg>
             <span>{{ t('common.source') || 'Source' }}</span>
           </div>
         </button>
@@ -1950,7 +1950,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
+          <svg :style="{ rotate: isCollapsed ? '0deg' : '90deg' }" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6" /></svg>
         </button>
         <button
           v-if="props.showCopyButton"
@@ -1961,8 +1961,8 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg v-if="!copyText" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
+          <svg v-if="!copyText" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></g></svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5" /></svg>
         </button>
         <button
           v-if="props.showExportButton && mermaidAvailable"
@@ -1975,7 +1975,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 15V3m9 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10l5 5l5-5" /></g></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 15V3m9 12v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10l5 5l5-5" /></g></svg>
         </button>
         <button
           v-if="props.showFullscreenButton && mermaidAvailable"
@@ -1988,8 +1988,8 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
           @mouseleave="onBtnLeave"
           @blur="onBtnLeave"
         >
-          <svg v-if="!isModalOpen" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" /></svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="0.75rem" height="0.75rem" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" /></svg>
+          <svg v-if="!isModalOpen" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" /></svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" /></svg>
         </button>
       </div>
     </div>
@@ -2004,27 +2004,27 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
         <div v-if="props.showZoomControls" class="absolute top-2 right-2 z-10 rounded-lg">
           <div class="flex items-center gap-2 backdrop-blur rounded-lg">
             <button
-              class="mermaid-action-btn p-2 text-xs rounded transition-colors"
+              class="mermaid-action-btn p-[var(--ms-action-btn-padding)] rounded transition-colors"
               @click="zoomIn"
               @mouseenter="onBtnHover($event, t('common.zoomIn') || 'Zoom in')"
               @focus="onBtnHover($event, t('common.zoomIn') || 'Zoom in')"
               @mouseleave="onBtnLeave"
               @blur="onBtnLeave"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
             </button>
             <button
-              class="mermaid-action-btn p-2 text-xs rounded transition-colors"
+              class="mermaid-action-btn p-[var(--ms-action-btn-padding)] rounded transition-colors"
               @click="zoomOut"
               @mouseenter="onBtnHover($event, t('common.zoomOut') || 'Zoom out')"
               @focus="onBtnHover($event, t('common.zoomOut') || 'Zoom out')"
               @mouseleave="onBtnLeave"
               @blur="onBtnLeave"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
             </button>
             <button
-              class="mermaid-action-btn p-2 text-xs rounded transition-colors"
+              class="mermaid-action-btn p-[var(--ms-action-btn-padding)] text-[length:var(--ms-text-label)] rounded transition-colors"
               @click="resetZoom"
               @mouseenter="onBtnHover($event, t('common.resetZoom') || 'Reset zoom')"
               @focus="onBtnHover($event, t('common.resetZoom') || 'Reset zoom')"
@@ -2074,28 +2074,28 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
                 >
                   <div class="absolute top-6 right-6 z-50 flex items-center gap-2">
                     <button
-                      class="mermaid-action-btn p-2 text-xs rounded transition-colors"
+                      class="mermaid-action-btn p-[var(--ms-action-btn-padding)] rounded transition-colors"
                       @click="zoomIn"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M11 8v6m-3-3h6" /></g></svg>
                     </button>
                     <button
-                      class="mermaid-action-btn p-2 text-xs rounded transition-colors"
+                      class="mermaid-action-btn p-[var(--ms-action-btn-padding)] rounded transition-colors"
                       @click="zoomOut"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="m21 21l-4.35-4.35M8 11h6" /></g></svg>
                     </button>
                     <button
-                      class="mermaid-action-btn p-2 text-xs rounded transition-colors"
+                      class="mermaid-action-btn p-[var(--ms-action-btn-padding)] text-[length:var(--ms-text-label)] rounded transition-colors"
                       @click="resetZoom"
                     >
                       {{ Math.round(zoom * 100) }}%
                     </button>
                     <button
-                      class="mermaid-action-btn inline-flex items-center justify-center p-2 rounded transition-colors"
+                      class="mermaid-action-btn inline-flex items-center justify-center p-[var(--ms-action-btn-padding)] rounded transition-colors"
                       @click="closeModal"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="w-3 h-3"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12" /></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12" /></svg>
                     </button>
                   </div>
                   <div
@@ -2119,6 +2119,13 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
     </div>
   </div>
 </template>
+
+<style>
+.action-icon {
+  width: var(--ms-action-btn-icon);
+  height: var(--ms-action-btn-icon);
+}
+</style>
 
 <style scoped>
 /* ── Outer container ── */
@@ -2146,6 +2153,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 
 /* ── Mode toggle buttons ── */
 .mermaid-mode-btn {
+  font-size: var(--ms-text-label);
   color: var(--code-action-fg);
 }
 
@@ -2166,6 +2174,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 
 .mermaid-action-btn {
   font-family: inherit;
+  font-size: var(--ms-text-label);
   color: var(--code-action-fg);
 }
 

@@ -139,7 +139,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
 .table-node :deep(td) {
   border-bottom: 1px solid var(--table-border);
   border-right: 1px solid var(--table-border);
-  padding: 0.5em 0.75em;
+  padding: var(--ms-flow-table-cell);
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;

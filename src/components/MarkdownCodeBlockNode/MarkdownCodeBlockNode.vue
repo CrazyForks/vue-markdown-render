@@ -711,7 +711,7 @@ function previewCode() {
   color: var(--code-fg);
 }
 .code-header-title {
-  font-size: 0.75rem;
+  font-size: var(--ms-text-label);
   font-weight: 500;
   color: var(--code-action-fg);
 }

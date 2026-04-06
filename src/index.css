@@ -165,6 +165,10 @@
 
 .markstream-vue {
 
+  /* ── Base typography (inherited by all children) ── */
+  font-size: var(--ms-text-body);
+  line-height: var(--ms-leading-body);
+
   /* ── Inline code ── */
   --inline-code-bg:             hsl(var(--ms-secondary));
   --inline-code-fg:             hsl(var(--ms-foreground));
@@ -194,7 +198,7 @@
   --diff-removed-inline-bg:     hsl(var(--ms-diff-removed) / 0.2);
 
   /* ── Blockquote ── */
-  --blockquote-border:          hsl(var(--ms-muted-foreground) / 0.35);
+  --blockquote-border:          hsl(var(--ms-muted-foreground) / 0.2);
 
   /* ── Admonition ── */
   --admonition-bg:              hsl(var(--ms-muted));
@@ -280,7 +284,7 @@
   --ms-flow-list-indent: calc(13 / 8 * 1em);
   --ms-flow-list-indent-mobile: calc(14 / 9 * 1em);
   --ms-flow-table-y: 2em;
-  --ms-flow-table-cell: calc(4 / 7 * 1em);
+  --ms-flow-table-cell: 0.5em 0.75em;
   --ms-flow-blockquote-y: 1.25em;
   --ms-flow-blockquote-indent: 1.25em;
   --ms-flow-admonition-y: 1.25em;
@@ -322,6 +326,9 @@
   --ms-weight-h2: 600;
   --ms-weight-h3: 600;
   --ms-weight-h4: 600;
+  --ms-text-label: 0.75rem;
+  --ms-action-btn-padding: 0.375rem;
+  --ms-action-btn-icon: 0.875rem;
 
   /* ── Panel insets & layout gaps ── */
   --ms-inset-panel-x: 0.625rem;
