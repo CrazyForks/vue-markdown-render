@@ -1879,7 +1879,7 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
 
 <template>
   <div
-    class="markstream-vue mermaid-block-container rounded-lg border overflow-hidden"
+    class="mermaid-block-container rounded-lg border overflow-hidden"
     data-markstream-mermaid="1"
     :data-markstream-mode="showSource ? 'fallback' : hasRenderedOnce ? 'preview' : 'pending'"
     :class="[

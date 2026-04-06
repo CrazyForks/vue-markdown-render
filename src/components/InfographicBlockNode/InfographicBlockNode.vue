@@ -501,7 +501,7 @@ watch(
 <template>
   <div
     ref="viewportTarget"
-    class="markstream-vue infographic-block-container rounded-lg border overflow-hidden"
+    class="infographic-block-container rounded-lg border overflow-hidden"
     data-markstream-infographic="1"
     :data-markstream-mode="renderMode"
     :class="[

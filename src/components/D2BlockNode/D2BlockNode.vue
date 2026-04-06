@@ -511,7 +511,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="viewportTarget"
-    class="markstream-vue d2-block-container rounded-lg border overflow-hidden"
+    class="d2-block-container rounded-lg border overflow-hidden"
     data-markstream-d2="1"
     :data-markstream-mode="showSourceFallback ? 'fallback' : 'preview'"
     :class="{ dark: props.isDark }"
