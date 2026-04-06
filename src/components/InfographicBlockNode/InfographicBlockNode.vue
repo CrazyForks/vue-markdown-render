@@ -10,7 +10,7 @@ import { getInfographic } from './infographic'
 const props = withDefaults(
   defineProps<InfographicBlockNodeProps>(),
   {
-    maxHeight: '500px',
+    maxHeight: undefined,
     loading: true,
     showHeader: true,
     showCopyButton: true,
@@ -63,14 +63,25 @@ if (typeof window !== 'undefined') {
 }
 
 function resolveContainerHeight(actualHeight: number) {
-  if (!props.maxHeight || props.maxHeight === 'none')
+  if (props.maxHeight === 'none')
     return `${actualHeight}px`
 
-  const maxHeight = Number.parseFloat(String(props.maxHeight))
-  if (!Number.isFinite(maxHeight))
-    return `${actualHeight}px`
+  // Explicit prop value takes priority
+  if (props.maxHeight != null) {
+    const maxHeight = Number.parseFloat(String(props.maxHeight))
+    if (Number.isFinite(maxHeight))
+      return `${Math.min(actualHeight, maxHeight)}px`
+  }
 
-  return `${Math.min(actualHeight, maxHeight)}px`
+  // Fall back to CSS token (respects density theming)
+  const el = infographicContainer.value
+  if (el) {
+    const raw = getComputedStyle(el).getPropertyValue('--ms-size-code-max-height').trim()
+    const num = Number.parseFloat(raw)
+    if (Number.isFinite(num))
+      return `${Math.min(actualHeight, num)}px`
+  }
+  return `${Math.min(actualHeight, 500)}px` // ultimate fallback
 }
 
 function updateContainerHeight() {
@@ -373,7 +384,7 @@ async function renderInfographic(force = false) {
     hasPreview.value = false
     lastCompletedRenderSignature = ''
     if (infographicContainer.value) {
-      infographicContainer.value.innerHTML = `<div class="p-4" style="color: hsl(var(--ms-destructive))">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
+      infographicContainer.value.innerHTML = `<div style="padding: var(--ms-inset-panel-body); color: hsl(var(--ms-destructive))">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
     }
   }
   finally {
@@ -645,7 +656,7 @@ watch(
           </div>
         </div>
         <div
-          class="infographic-preview relative transition-all duration-100 overflow-hidden block"
+          class="infographic-preview relative transition-all overflow-hidden block"
           :style="{ height: containerHeight }"
           @mousedown="startDrag"
           @mousemove="onDrag"
@@ -799,6 +810,7 @@ watch(
 .infographic-preview {
   background: var(--diagram-bg);
   min-height: var(--ms-size-diagram-min-height);
+  transition-duration: var(--ms-duration-fast);
 }
 
 /* ── Modal ── */

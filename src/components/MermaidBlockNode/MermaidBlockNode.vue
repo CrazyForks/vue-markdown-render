@@ -15,7 +15,7 @@ const props = withDefaults(
   // 全屏按钮禁用状态
   defineProps<MermaidBlockNodeProps>(),
   {
-    maxHeight: '500px',
+    maxHeight: undefined,
     loading: true,
     workerTimeoutMs: 1400,
     parseTimeoutMs: 1800,
@@ -501,7 +501,7 @@ function renderErrorToContainer(error: unknown) {
     }
   }
   const errorDiv = document.createElement('div')
-  errorDiv.className = 'p-4'
+  errorDiv.style.padding = 'var(--ms-inset-panel-body)'
   errorDiv.style.color = 'hsl(var(--ms-destructive))'
   errorDiv.textContent = 'Failed to render diagram: '
   const errorSpan = document.createElement('span')
@@ -509,7 +509,11 @@ function renderErrorToContainer(error: unknown) {
   errorDiv.appendChild(errorSpan)
   clearElement(mermaidContent.value)
   mermaidContent.value.appendChild(errorDiv)
-  containerHeight.value = '360px'
+  // Reset height from CSS token (respects density theming)
+  const tokenH = mermaidContent.value
+    ? getComputedStyle(mermaidContent.value).getPropertyValue('--ms-size-diagram-min-height').trim()
+    : ''
+  containerHeight.value = tokenH || '360px'
   hasRenderError.value = true
   // 在错误显示时，停止任何预览轮询，避免错误被覆盖
   stopPreviewPolling()
@@ -742,11 +746,23 @@ async function canParseOrPrefix(
 const isFullscreenDisabled = computed(() => showSource.value || isRendering.value || isCollapsed.value)
 
 function resolveMaxContainerHeight() {
-  if (!props.maxHeight || props.maxHeight === 'none')
+  if (props.maxHeight === 'none')
     return null
 
-  const maxHeight = Number.parseFloat(String(props.maxHeight))
-  return Number.isFinite(maxHeight) ? maxHeight : null
+  // Explicit prop value takes priority
+  if (props.maxHeight != null) {
+    const maxHeight = Number.parseFloat(String(props.maxHeight))
+    if (Number.isFinite(maxHeight)) return maxHeight
+  }
+
+  // Fall back to CSS token (respects density theming)
+  const el = mermaidContainer.value
+  if (el) {
+    const raw = getComputedStyle(el).getPropertyValue('--ms-size-code-max-height').trim()
+    const num = Number.parseFloat(raw)
+    if (Number.isFinite(num)) return num
+  }
+  return 500 // ultimate fallback
 }
 
 /**
@@ -2021,7 +2037,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
         </div>
         <div
           ref="mermaidContainer"
-          class="mermaid-preview-area relative overflow-hidden block transition-[height] duration-150 ease-out"
+          class="mermaid-preview-area relative overflow-hidden block transition-[height] ease-out"
           :style="{ height: containerHeight }"
           v-on="wheelListeners"
           @mousedown="startDrag"
@@ -2176,6 +2192,7 @@ const computedButtonStyle = 'mermaid-action-btn p-2 text-xs rounded'
 .mermaid-preview-area {
   background: var(--diagram-bg);
   min-height: var(--ms-size-diagram-min-height);
+  transition-duration: var(--ms-duration-standard);
 }
 
 /* ── Modal overlay ── */

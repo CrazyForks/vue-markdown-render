@@ -9,7 +9,7 @@ import { getD2 } from './d2'
 const props = withDefaults(
   defineProps<D2BlockNodeProps>(),
   {
-    maxHeight: '500px',
+    maxHeight: undefined,
     loading: true,
     progressiveRender: true,
     progressiveIntervalMs: 700,
@@ -49,10 +49,14 @@ const bodyStyle = computed(() => {
   return { minHeight: `${bodyMinHeight.value}px` }
 })
 const renderStyle = computed(() => {
-  if (!props.maxHeight)
-    return undefined
-  const max = typeof props.maxHeight === 'number' ? `${props.maxHeight}px` : String(props.maxHeight)
-  return { maxHeight: max }
+  if (props.maxHeight === 'none')
+    return { maxHeight: 'none' }
+  if (props.maxHeight != null) {
+    const max = typeof props.maxHeight === 'number' ? `${props.maxHeight}px` : String(props.maxHeight)
+    return { maxHeight: max }
+  }
+  // No explicit prop — CSS token handles it via scoped style
+  return undefined
 })
 
 const isClient = typeof window !== 'undefined'
@@ -694,6 +698,7 @@ onBeforeUnmount(() => {
 }
 
 .d2-render {
+  max-height: var(--ms-size-code-max-height);
   overflow: auto;
 }
 
