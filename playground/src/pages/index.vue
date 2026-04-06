@@ -893,6 +893,7 @@ onBeforeUnmount(() => {
           :custom-html-tags="['thinking']"
           :escape-html-tags="['question', 'answer']"
           :is-dark="isDark"
+          :data-theme="activeBrandTheme || undefined"
           custom-id="playground-demo"
           class="p-6"
         />

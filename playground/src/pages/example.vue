@@ -408,6 +408,7 @@ Term 2
         :is-dark="isDark"
         :loading="false"
         :stream="false"
+        :data-theme="activeTheme || undefined"
         :code-block-props="{
           showHeader: true,
           showCopyButton: true,
