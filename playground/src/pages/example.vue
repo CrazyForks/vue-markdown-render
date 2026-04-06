@@ -90,6 +90,16 @@ Another paragraph to show the vertical rhythm between blocks. Good typography cr
 
 ---
 
+## Inline Code
+
+Use \`npm install\` to install dependencies. The \`--save-dev\` flag marks it as a dev dependency.
+
+In TypeScript, use \`Record<string, unknown>\` for generic object types. The \`Partial<T>\` utility makes all properties optional. You can combine them: \`Partial<Record<string, unknown>>\`.
+
+The config file exports a \`defineConfig()\` function. Set \`mode: 'production'\` for optimized builds. Environment variables are accessed via \`import.meta.env.VITE_API_URL\`.
+
+---
+
 ## Blockquote
 
 > This is a blockquote. It can contain **bold**, *italic*, and \`code\`.
@@ -256,6 +266,23 @@ graph LR
   B --> E[Fallback defaults]
   C --> F[Component styles]
   F --> G[Light/Dark auto]
+\`\`\`
+
+---
+
+## Infographic
+
+\`\`\`infographic
+{
+  "title": "Design Token System",
+  "type": "stats",
+  "items": [
+    { "label": "Components", "value": "25", "description": "Migrated to tokens" },
+    { "label": "CSS Tokens", "value": "82", "description": "Color + spacing + animation" },
+    { "label": "Icon Themes", "value": "1", "description": "Material Icon Theme default" },
+    { "label": "Test Pass", "value": "100%", "description": "1029 tests passing" }
+  ]
+}
 \`\`\`
 
 ---
