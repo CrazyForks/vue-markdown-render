@@ -834,7 +834,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Messages area with scroll (use column-reverse on the scroll container) -->
-      <main ref="messagesContainer" class="mb-4 mr-[1px] flex flex-1 flex-col-reverse overflow-y-auto chatbot-messages">
+      <main ref="messagesContainer" class="markstream-vue mb-4 mr-[1px] flex flex-1 flex-col-reverse overflow-y-auto chatbot-messages" :class="{ dark: isDark }">
         <MarkdownRender
           :content="content"
           :code-block-dark-theme="selectedTheme || undefined"
@@ -892,20 +892,12 @@ onBeforeUnmount(() => {
 }
 
 .chatbot-messages::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: hsl(var(--ms-border));
   border-radius: 4px;
 }
 
-.dark .chatbot-messages::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-
 .chatbot-messages::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-.dark .chatbot-messages::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: hsl(var(--ms-muted-foreground));
 }
 
 .settings-toggle {
