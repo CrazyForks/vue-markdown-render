@@ -12,21 +12,36 @@ import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingleto
 
 const moreMenuOpen = ref(false)
 const moreMenuRef = ref<HTMLElement | null>(null)
+const moreBtnRef = ref<HTMLElement | null>(null)
+const menuStyle = ref<Record<string, string>>({})
 
 function toggleMoreMenu() {
   moreMenuOpen.value = !moreMenuOpen.value
   if (moreMenuOpen.value) {
+    updateMenuPosition()
     document.addEventListener('click', closeMoreMenuOutside, { once: true, capture: true })
   }
 }
 
-function closeMoreMenuOutside(e: Event) {
-  if (moreMenuRef.value && !moreMenuRef.value.contains(e.target as Node)) {
-    moreMenuOpen.value = false
+function updateMenuPosition() {
+  const btn = moreBtnRef.value
+  if (!btn) return
+  const rect = btn.getBoundingClientRect()
+  menuStyle.value = {
+    position: 'absolute',
+    top: `${rect.bottom + window.scrollY + 4}px`,
+    right: `${document.body.scrollWidth - rect.right - window.scrollX}px`,
+    zIndex: '9999',
   }
-  else if (moreMenuOpen.value) {
-    // Re-register if click was inside
+}
+
+function closeMoreMenuOutside(e: Event) {
+  const target = e.target as Node
+  if (moreMenuRef.value?.contains(target) || moreBtnRef.value?.contains(target)) {
     document.addEventListener('click', closeMoreMenuOutside, { once: true, capture: true })
+  }
+  else {
+    moreMenuOpen.value = false
   }
 }
 
@@ -175,8 +190,9 @@ const fontIncreaseDisabled = computed(() =>
         </button>
 
         <!-- More menu (overflow for secondary actions) -->
-        <div v-if="hasOverflowItems" ref="moreMenuRef" class="relative">
+        <div v-if="hasOverflowItems" class="relative">
           <button
+            ref="moreBtnRef"
             type="button"
             class="code-action-btn inline-flex items-center justify-center p-1.5 rounded leading-none shrink-0 cursor-pointer text-[var(--code-action-fg)] hover:bg-[var(--code-action-hover-bg)] hover:text-[var(--code-action-hover-fg)] active:scale-[0.96] transition-colors"
             :aria-expanded="moreMenuOpen"
@@ -190,21 +206,22 @@ const fontIncreaseDisabled = computed(() =>
             <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3.5 h-3.5"><g fill="currentColor"><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></g></svg>
           </button>
 
-          <Transition name="code-menu">
-            <div v-if="moreMenuOpen" class="absolute top-[calc(100%+0.25rem)] right-0 z-10 min-w-[10rem] p-1 bg-[var(--tooltip-bg)] border border-[var(--code-border)] rounded-md shadow-[var(--ms-shadow-popover)]" role="menu">
+          <Teleport to="body">
+            <Transition name="code-menu">
+              <div v-if="moreMenuOpen" ref="moreMenuRef" :style="menuStyle" class="markstream-vue min-w-[10rem] p-1 bg-[var(--tooltip-bg)] border border-[var(--code-border)] rounded-md shadow-[var(--ms-shadow-popover)]" role="menu">
               <!-- Font size controls -->
               <template v-if="props.showFontSizeButtons && props.enableFontSizeControl">
                 <button type="button" role="menuitem" class="flex items-center gap-2 w-full py-1.5 px-2 rounded text-xs text-[var(--code-action-fg)] cursor-pointer whitespace-nowrap hover:bg-[var(--code-action-hover-bg)] hover:text-[var(--code-action-hover-fg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors" :disabled="fontDecreaseDisabled" @click="emit('decreaseFont')">
                   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3.5 h-3.5"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14" /></svg>
-                  <span>{{ t('common.decrease') || 'Decrease font' }}</span>
+                  <span>{{ t('common.fontSmaller') || 'Font size −' }}</span>
                 </button>
                 <button type="button" role="menuitem" class="flex items-center gap-2 w-full py-1.5 px-2 rounded text-xs text-[var(--code-action-fg)] cursor-pointer whitespace-nowrap hover:bg-[var(--code-action-hover-bg)] hover:text-[var(--code-action-hover-fg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors" :disabled="fontResetDisabled" @click="emit('resetFont')">
                   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3.5 h-3.5"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9a9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></g></svg>
-                  <span>{{ t('common.reset') || 'Reset font' }}</span>
+                  <span>{{ t('common.fontReset') || 'Font size reset' }}</span>
                 </button>
                 <button type="button" role="menuitem" class="flex items-center gap-2 w-full py-1.5 px-2 rounded text-xs text-[var(--code-action-fg)] cursor-pointer whitespace-nowrap hover:bg-[var(--code-action-hover-bg)] hover:text-[var(--code-action-hover-fg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors" :disabled="fontIncreaseDisabled" @click="emit('increaseFont')">
                   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3.5 h-3.5"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7v14" /></svg>
-                  <span>{{ t('common.increase') || 'Increase font' }}</span>
+                  <span>{{ t('common.fontLarger') || 'Font size +' }}</span>
                 </button>
               </template>
 
@@ -220,8 +237,9 @@ const fontIncreaseDisabled = computed(() =>
                 <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="w-3.5 h-3.5"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M2.062 12.348a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 19.876 0a1 1 0 0 1 0 .696a10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></g></svg>
                 <span>{{ t('common.preview') || 'Preview' }}</span>
               </button>
-            </div>
-          </Transition>
+              </div>
+            </Transition>
+          </Teleport>
         </div>
       </div>
     </slot>
@@ -247,17 +265,24 @@ const fontIncreaseDisabled = computed(() =>
 
 <!-- Only transition animations remain — Vue needs named classes for <Transition> -->
 <style>
+.code-menu-enter-active,
+.code-menu-leave-active {
+  transform-origin: top right;
+}
 .code-menu-enter-active {
-  transition: opacity 120ms ease, transform 120ms ease;
+  transition: opacity 220ms cubic-bezier(.16, 1, .3, 1),
+              transform 220ms cubic-bezier(.16, 1, .3, 1);
 }
 .code-menu-leave-active {
-  transition: opacity 120ms ease;
+  transition: opacity 140ms ease-in,
+              transform 140ms ease-in;
 }
 .code-menu-enter-from {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: scale(0.9) translateY(-4px);
 }
 .code-menu-leave-to {
   opacity: 0;
+  transform: scale(0.95) translateY(-2px);
 }
 </style>

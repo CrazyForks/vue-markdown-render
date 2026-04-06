@@ -143,6 +143,9 @@
                      0 4px 6px -4px hsl(0 0% 0% / 0.4);
   --ms-shadow-preview: 0 10px 40px hsl(0 0% 0% / 0.6);
 
+  /* Code block: header slightly darker than body in dark mode */
+  --code-header-bg:             hsl(var(--ms-muted));
+
   /* Admonition: stronger tint on dark backgrounds */
   --admonition-note-header-bg:  color-mix(in srgb, hsl(var(--ms-info)) 12%, transparent);
   --admonition-tip-header-bg:   color-mix(in srgb, hsl(var(--ms-success)) 12%, transparent);
