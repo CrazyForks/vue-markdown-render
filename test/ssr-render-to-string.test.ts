@@ -297,7 +297,7 @@ Footnotes are server-rendered.[^1]
     expect(html).toContain('class="footnote-reference"')
     expect(html).toContain('class="hard-break"')
     expect(html).toContain('<blockquote')
-    expect(html).toContain('type="checkbox"')
+    expect(html).toContain('class="checkbox-node"')
     expect(html).toContain('<ol')
     expect(html).toContain('<dl')
     expect(html).toContain('<table')

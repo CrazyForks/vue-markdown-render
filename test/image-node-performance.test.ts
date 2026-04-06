@@ -40,7 +40,6 @@ describe('image node performance defaults', () => {
     expect(wrapper.get('img').attributes('loading')).toBe('lazy')
     expect(wrapper.get('img').attributes('fetchpriority')).toBeUndefined()
     expect(wrapper.get('img').attributes('decoding')).toBe('async')
-    expect(wrapper.get('img').classes()).toContain('opacity-0')
-    expect(wrapper.get('img').classes()).toContain('transition-opacity')
+    expect(wrapper.get('img').classes()).toContain('is-loading')
   })
 })
