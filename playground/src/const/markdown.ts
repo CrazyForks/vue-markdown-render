@@ -514,4 +514,8 @@ This is a note admonition for additional context.
 ::: danger
 This is a danger admonition for critical warnings.
 :::
+
+## Image
+
+![Vue Logo](https://vuejs.org/images/logo.png)
 `
