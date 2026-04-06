@@ -159,6 +159,27 @@ createApp({
 
 暗色变量可以通过给祖先节点加 `.dark`，或直接给 `MarkdownRender` 传入 `:is-dark="true"`（仅对渲染器生效）。
 
+新的接入建议优先使用统一代码块 `theme` prop。如果你是通过 `MarkdownRender` 统一下发，可以放到 `code-block-props`：
+
+```vue
+<MarkdownRender
+  :is-dark="isDark"
+  :code-block-props="{ theme: { light: 'vitesse-light', dark: 'vitesse-dark' } }"
+  :content="doc"
+/>
+```
+
+语言图标默认使用内置的 `material` theme。进阶接入可以用导出的 helper 查看或切换 icon theme，也可以在 `app.use(VueRendererMarkdown, { iconTheme })` 时指定初始主题：
+
+```ts
+import { getRegisteredThemes, setIconTheme } from 'markstream-vue'
+
+console.log(getRegisteredThemes()) // ['material']
+setIconTheme('material')
+```
+
+如果你需要接自己的图标包，可以继续使用 `registerIconTheme()` 注册。
+
 按需启用重型依赖：
 
 ```ts

@@ -137,7 +137,7 @@ setCustomComponents('docs', {
 
 另外，渲染器还会按节点类型继续透传一些能力相关 props：
 
-- 普通代码块会拿到 `stream`、`darkTheme`、`lightTheme`、`monacoOptions`、`themes`、`minWidth`、`maxWidth`，以及你传给 `codeBlockProps` 的内容
+- 普通代码块会拿到 `stream`、`theme`、`darkTheme`、`lightTheme`、`monacoOptions`、`themes`、`minWidth`、`maxWidth`，以及你传给 `codeBlockProps` 的内容（新的推荐字段是 `theme`；`darkTheme` / `lightTheme` 继续保留作兼容）
 - Mermaid、D2、Infographic 会分别拿到对应的 `mermaidProps`、`d2Props`、`infographicProps`
 - link 和 list 会继承 tooltip / typewriter 相关的上层配置
 

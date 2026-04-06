@@ -59,8 +59,7 @@ markdownRenderCodeBlockProps.showCollapseButton
 
 codeBlockProps.monacoOptions
 codeBlockProps.monacoOptions?.MAX_HEIGHT
-codeBlockProps.darkTheme
-codeBlockProps.lightTheme
+codeBlockProps.theme
 ```
 
 Notes:
@@ -68,9 +67,21 @@ Notes:
 - `InstanceType<typeof MarkdownRender>['$props']` is the most direct way to inspect the exported component props.
 - `NodeRendererProps` is the named export for the same public prop surface.
 - `codeBlockProps` now follows the public `CodeBlockNode` prop surface except for `node`, so hover/completion works for flags like `showHeader`, `showFontSizeButtons`, and `showTooltips`.
+- Prefer `codeBlockProps.theme` for new code. `darkTheme` / `lightTheme` still exist for backward compatibility.
 - Hover the property names after each dot in the snippet above, not the imported type names.
 - If you specifically want the best component-prop hover targets, use the `MarkdownRender` snippet below first.
 - Only `ts twoslash` and `vue twoslash` fences in this docs site enable hoverable type details.
+
+Language icons default to the built-in `material` theme. Advanced integrations can inspect or switch icon themes with the exported helpers:
+
+```ts
+import { getRegisteredThemes, registerIconTheme, setIconTheme } from 'markstream-vue'
+
+console.log(getRegisteredThemes()) // ['material']
+setIconTheme('material')
+
+// registerIconTheme(...) lets you add your own icon pack before switching.
+```
 
 ## Pick the right component quickly
 

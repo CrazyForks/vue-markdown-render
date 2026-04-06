@@ -59,8 +59,7 @@ markdownRenderCodeBlockProps.showCollapseButton
 
 codeBlockProps.monacoOptions
 codeBlockProps.monacoOptions?.MAX_HEIGHT
-codeBlockProps.darkTheme
-codeBlockProps.lightTheme
+codeBlockProps.theme
 ```
 
 说明：
@@ -68,9 +67,21 @@ codeBlockProps.lightTheme
 - `InstanceType<typeof MarkdownRender>['$props']` 是最直接的组件 props 查看入口。
 - `NodeRendererProps` 是同一套公开 props 结构的命名类型导出。
 - `codeBlockProps` 现在会跟随公开的 `CodeBlockNode` props 结构（去掉 `node`），因此像 `showHeader`、`showFontSizeButtons`、`showTooltips` 这类字段也能直接获得 hover 与补全。
+- 新接入更推荐使用 `codeBlockProps.theme`；`darkTheme` / `lightTheme` 仍保留作兼容字段。
 - 更推荐 hover 上面每一行点号后面的字段名，而不是只 hover 导入的类型名。
 - 如果你主要想看组件 props 的 hover，优先看下面这段 `MarkdownRender` 示例。
 - 只有写成 `ts twoslash` / `vue twoslash` 的代码块才会在这个文档站里显示 hover 类型信息。
+
+语言图标默认使用内置 `material` theme。进阶接入可以通过导出的 helper 查看或切换 icon theme：
+
+```ts
+import { getRegisteredThemes, registerIconTheme, setIconTheme } from 'markstream-vue'
+
+console.log(getRegisteredThemes()) // ['material']
+setIconTheme('material')
+
+// registerIconTheme(...) 可用于先注册你自己的图标包，再切换过去。
+```
 
 ## 先快速判断该用哪个组件
 

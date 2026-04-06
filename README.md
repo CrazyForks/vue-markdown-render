@@ -158,6 +158,27 @@ Renderer CSS is scoped under an internal `.markstream-vue` container to minimize
 
 For dark theme variables, either add a `.dark` class on an ancestor, or pass `:is-dark="true"` to `MarkdownRender` to scope dark mode to the renderer.
 
+Prefer the unified code-block `theme` prop for new integrations. When you render through `MarkdownRender`, pass it via `code-block-props`:
+
+```vue
+<MarkdownRender
+  :is-dark="isDark"
+  :code-block-props="{ theme: { light: 'vitesse-light', dark: 'vitesse-dark' } }"
+  :content="doc"
+/>
+```
+
+Language icons use the built-in `material` theme by default. Advanced integrations can inspect or switch icon themes with the exported helpers, or set an initial theme with `app.use(VueRendererMarkdown, { iconTheme })`:
+
+```ts
+import { getRegisteredThemes, setIconTheme } from 'markstream-vue'
+
+console.log(getRegisteredThemes()) // ['material']
+setIconTheme('material')
+```
+
+Use `registerIconTheme()` if you want to add your own icon pack.
+
 Enable heavy peers only when needed:
 
 ```ts
