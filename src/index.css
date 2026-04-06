@@ -171,7 +171,7 @@
 
   /* ── Inline code ── */
   --inline-code-bg:             hsl(var(--ms-secondary));
-  --inline-code-fg:             hsl(var(--ms-foreground));
+  --inline-code-fg:             hsl(var(--ms-foreground) / 0.75);
   --inline-code-border:         hsl(var(--ms-border) / 0.9);
 
   /* ── Code block ── */
