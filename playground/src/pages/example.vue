@@ -174,13 +174,35 @@ pnpm dev
 
 ## Table
 
+### Feature Status
+
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Color tokens | Done | 25 components migrated |
-| Dark mode | Done | Bridge tokens + .dark class |
+| Dark mode | Done | Bridge tokens + \`.dark\` class |
 | Spacing tokens | Done | Flow, inset, gap, size tokens |
-| Shell extraction | Done | CodeBlockShell.vue |
-| Visual redesign | Not started | Core #343 deliverable |
+| Shell extraction | Done | \`CodeBlockShell.vue\` |
+| Visual redesign | Not started | Core **#343** deliverable |
+
+### Performance Benchmarks
+
+| Metric | v1.0 | v2.0 | Change |
+|--------|-----:|-----:|-------:|
+| Bundle size (gzip) | 48.2 KB | 32.7 KB | −32% |
+| First render | 120 ms | 45 ms | −62% |
+| Re-render | 18 ms | 6 ms | −67% |
+| Memory usage | 12.4 MB | 8.1 MB | −35% |
+| Lighthouse score | 72 | 94 | +31% |
+| Test coverage | 68% | 91% | +34% |
+| Components | 18 | 25 | +39% |
+| CSS tokens | 0 | 82 | — |
+
+### Compact Table
+
+| Key | Value |
+|-----|-------|
+| License | MIT |
+| Runtime | Vue 3 |
 
 ---
 

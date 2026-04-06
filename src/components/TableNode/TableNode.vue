@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import NodeRenderer from '../NodeRenderer'
 
-// 定义单元格节点
 interface TableCellNode {
   type: 'table_cell'
   header: boolean
@@ -14,14 +13,12 @@ interface TableCellNode {
   align?: 'left' | 'right' | 'center'
 }
 
-// 定义行节点
 interface TableRowNode {
   type: 'table_row'
   cells: TableCellNode[]
   raw: string
 }
 
-// 定义表格节点
 interface TableNode {
   type: 'table'
   header: TableRowNode
@@ -30,7 +27,6 @@ interface TableNode {
   loading: boolean
 }
 
-// 接收props
 const props = defineProps<{
   node: TableNode
   indexKey: string | number
@@ -39,7 +35,6 @@ const props = defineProps<{
   customId?: string
 }>()
 
-// 定义事件
 defineEmits(['copy'])
 
 const isLoading = computed(() => props.node.loading ?? false)
@@ -49,17 +44,16 @@ const bodyRows = computed(() => props.node.rows ?? [])
 <template>
   <div class="table-node-wrapper">
     <table
-      class="text-sm table-node"
+      class="table-node"
       :class="{ 'table-node--loading': isLoading }"
       :aria-busy="isLoading"
     >
-      <thead class="border-[var(--table-border)] bg-[var(--table-header-bg)]">
-        <tr class="border-b">
+      <thead>
+        <tr>
           <th
             v-for="(cell, index) in node.header.cells"
             :key="`header-${index}`"
             dir="auto"
-            class="font-semibold table-node-cell"
             :class="[
               cell.align === 'right'
                 ? 'text-right'
@@ -82,13 +76,10 @@ const bodyRows = computed(() => props.node.rows ?? [])
         <tr
           v-for="(row, rowIndex) in bodyRows"
           :key="`row-${rowIndex}`"
-          class="border-[var(--table-border)]"
-          :class="[rowIndex < bodyRows.length - 1 ? 'border-b' : '']"
         >
           <td
             v-for="(cell, cellIndex) in row.cells"
             :key="`cell-${rowIndex}-${cellIndex}`"
-            class="table-node-cell"
             :class="[
               cell.align === 'right'
                 ? 'text-right'
@@ -132,28 +123,57 @@ const bodyRows = computed(() => props.node.rows ?? [])
 }
 
 .table-node {
-  /* Use a stable layout to prevent column reflow jitter during streaming/typewriter updates. */
-  table-layout: fixed;
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   margin: var(--ms-flow-table-y) 0;
+  font-size: inherit;
+  border: 1px solid var(--table-border);
+  border-radius: var(--ms-radius);
+  overflow: hidden;
+  box-shadow: var(--ms-shadow-subtle);
 }
 
-.table-node-cell {
-  padding: var(--ms-flow-table-cell);
-}
-
+/* ── Full grid borders (inner only, outer handled by table border) ── */
 .table-node :deep(th),
 .table-node :deep(td) {
+  border-bottom: 1px solid var(--table-border);
+  border-right: 1px solid var(--table-border);
+  padding: 0.5em 0.75em;
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
 }
 
-.table-node--loading {
-  /* Loading state keeps the skeleton shimmer; layout is already fixed above. */
+/* Remove right border on last cell */
+.table-node :deep(th:last-child),
+.table-node :deep(td:last-child) {
+  border-right: none;
 }
 
+/* Remove bottom border on last row */
+.table-node :deep(tbody tr:last-child td) {
+  border-bottom: none;
+}
+
+/* ── Header ── */
+.table-node :deep(thead th) {
+  font-weight: 600;
+  background-color: var(--table-header-bg);
+  border-bottom-width: 2px;
+}
+
+/* ── Zebra striping (very subtle) ── */
+.table-node :deep(tbody tr:nth-child(even)) {
+  background-color: hsl(var(--ms-muted) / 0.35);
+}
+
+/* ── Row hover ── */
+.table-node :deep(tbody tr):hover {
+  background-color: var(--code-action-hover-bg);
+}
+
+/* ── Loading ── */
 .table-node--loading tbody td {
   position: relative;
   overflow: hidden;
@@ -199,7 +219,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
 
 .table-node-fade-enter-active,
 .table-node-fade-leave-active {
-  transition: opacity 0.18s ease;
+  transition: opacity var(--ms-duration-standard) var(--ms-ease-standard);
 }
 
 .table-node-fade-enter-from,
@@ -207,27 +227,20 @@ const bodyRows = computed(() => props.node.rows ?? [])
   opacity: 0;
 }
 
-/* 表格单元格内的 NodeRenderer 禁用 content-visibility 的占位行为，避免“高但空”的问题 */
+/* ── Table inside NodeRenderer ── */
 :deep(.table-node .markdown-renderer) {
-  /* Make the NodeRenderer wrapper behave as if it's not there so
-     table cells keep their expected inline/flow layout. */
   display: contents;
   content-visibility: visible;
   contain: content;
   contain-intrinsic-size: 0px 0px;
 }
 
-/* Also make internal NodeRenderer wrapper elements layout-transparent
-   so they don't introduce block-level boxes inside table cells. */
 :deep(.table-node .markdown-renderer .node-slot),
 :deep(.table-node .markdown-renderer .node-content),
-:deep(.table-node .markdown-renderer .node-space)
-{
+:deep(.table-node .markdown-renderer .node-space) {
   display: contents;
 }
 
-/* Override the default `break-words` / pre-wrap text styles inside tables so
-   dense tables don't turn into vertical glyph stacks. */
 :deep(.table-node .text-node),
 :deep(.table-node code) {
   white-space: inherit;
@@ -237,15 +250,9 @@ const bodyRows = computed(() => props.node.rows ?? [])
 }
 
 @keyframes table-node-shimmer {
-  0% {
-    background-position: 0% 0%;
-  }
-  50% {
-    background-position: 100% 0%;
-  }
-  100% {
-    background-position: 200% 0%;
-  }
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 0%; }
+  100% { background-position: 200% 0%; }
 }
 
 .hr + .table-node-wrapper {

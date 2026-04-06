@@ -213,7 +213,7 @@
 
   /* ── Table ── */
   --table-border:               hsl(var(--ms-border));
-  --table-header-bg:            hsl(var(--ms-muted) / 0.5);
+  --table-header-bg:            hsl(var(--ms-muted));
 
   /* ── Link ── */
   --link-color:                 hsl(var(--ms-link));
