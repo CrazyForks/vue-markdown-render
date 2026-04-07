@@ -725,43 +725,34 @@ function previewCode() {
 
 :deep(.code-block-render pre),
 :deep(.code-block-content .shiki) {
-  /* Override Shiki's inline background-color so container --code-bg shows through */
-  background: transparent !important;
-  margin: 0;
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
 }
 
 :deep(.code-block-content .shiki-fallback) {
-  padding: var(--markstream-code-padding-y, 8px) var(--markstream-code-padding-x, 12px);
-  padding-left: var(--markstream-code-padding-left, 12px);
+  padding: 1rem;
   margin: 0;
   background: transparent;
-  color: var(--vscode-editor-foreground, inherit);
+  color: inherit;
   white-space: pre;
   font-family: inherit;
   font-size: inherit;
-  font-weight: 400;
   line-height: inherit;
 }
 
 .code-fallback-plain {
-  padding: var(--markstream-code-padding-y, 8px) var(--markstream-code-padding-x, 12px);
-  padding-left: var(--markstream-code-padding-left, 12px);
   white-space: pre;
   overflow: auto;
   background: transparent;
-  color: var(--vscode-editor-foreground, inherit);
+  color: inherit;
   font-size: inherit;
-  font-weight: 400;
   line-height: inherit;
   font-family: inherit;
 }
 
 :deep(.code-block-content pre) {
-  padding: var(--markstream-code-padding-y, 8px) var(--markstream-code-padding-x, 12px);
-  padding-left: var(--markstream-code-padding-left, 12px);
+  padding: 1rem;
 }
 
 /* ── Loading placeholder ── */
