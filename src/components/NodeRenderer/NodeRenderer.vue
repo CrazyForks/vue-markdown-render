@@ -2410,7 +2410,7 @@ function handleContainerMouseout(event: MouseEvent) {
   width: 100%;
   min-height: 1rem;
   margin: 0.25rem 0;
-  border-radius: 0.5rem;
+  border-radius: var(--ms-radius);
   background-image: linear-gradient(90deg, var(--loading-shimmer), transparent, var(--loading-shimmer));
   background-size: 200% 100%;
   animation: node-placeholder-shimmer 1.1s ease-in-out infinite;

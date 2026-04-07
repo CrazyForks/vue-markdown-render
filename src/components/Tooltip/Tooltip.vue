@@ -150,7 +150,7 @@ onBeforeUnmount(() => {
   display: inline-block;
   max-width: 20rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
+  border-radius: calc(var(--ms-radius) * 0.75);
   font-size: 0.75rem;
   line-height: 1.4;
   white-space: normal;

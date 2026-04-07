@@ -187,7 +187,7 @@ const bodyRows = computed(() => props.node.rows ?? [])
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 0.25rem;
+  border-radius: calc(var(--ms-radius) * 0.5);
   background: linear-gradient(
     90deg,
     var(--loading-shimmer) 25%,

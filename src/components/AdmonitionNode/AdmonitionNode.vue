@@ -162,7 +162,7 @@ const headerId = `admonition-${Math.random().toString(36).slice(2, 9)}`
   color: inherit;
   cursor: pointer;
   padding: 0.125rem;
-  border-radius: 0.25rem;
+  border-radius: calc(var(--ms-radius) * 0.5);
   display: inline-flex;
   align-items: center;
   transition: background-color var(--ms-duration-fast) var(--ms-ease-standard);
