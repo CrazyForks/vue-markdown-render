@@ -138,6 +138,12 @@ function goToCdnPeers() {
   })
 }
 
+function goToThemeGallery() {
+  router.push('/example').catch(() => {
+    window.location.href = '/example'
+  })
+}
+
 // Keep persisted values within reasonable bounds on hydration.
 watchEffect(() => {
   if (streamChunkDelayMin.value !== normalizedChunkDelayRange.value.min)
@@ -848,6 +854,15 @@ onBeforeUnmount(() => {
               <Icon icon="carbon:book" class="w-4 h-4" />
               <span>Docs</span>
             </a>
+
+            <button
+              class="ml-2 flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              title="Open theme gallery"
+              @click="goToThemeGallery"
+            >
+              <Icon icon="carbon:color-palette" class="w-4 h-4" />
+              <span>Themes</span>
+            </button>
 
             <!-- Test Page Button -->
             <button
