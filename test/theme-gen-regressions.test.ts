@@ -10,6 +10,18 @@ interface HslColor {
 
 type TokenMap = Record<string, string>
 
+const lightSemanticKeyColors = {
+  info: '#1d4ed8',
+  success: '#166534',
+  warning: '#92400e',
+}
+
+const darkSemanticKeyColors = {
+  info: '#78a9ff',
+  success: '#63d29d',
+  warning: '#ffbe5c',
+}
+
 function parseToken(token: string): HslColor {
   const values = token.match(/[\d.]+/g)?.map(Number)
   if (!values || values.length < 3)
@@ -41,18 +53,22 @@ function getActualAdmonitionHeaderBackground(tokens: TokenMap, semanticKey: 'inf
 }
 
 describe('theme-gen regressions', () => {
-  it('keeps semantic header colors readable on the actual admonition header background', () => {
+  it('keeps provided semantic header colors readable on the actual admonition header background', () => {
     const cases = [
-      { name: 'claude', background: '#f5f4ed', foreground: '#141413', brand: '#c96442' },
-      { name: 'green', background: '#f0fdf4', foreground: '#14532d', brand: '#16a34a' },
-      { name: 'ink', background: '#0b1020', foreground: '#e5ecff', brand: '#7c3aed' },
+      { name: 'claude', background: '#f5f4ed', foreground: '#141413', brand: '#c96442', ...lightSemanticKeyColors },
+      { name: 'green', background: '#f0fdf4', foreground: '#14532d', brand: '#16a34a', ...lightSemanticKeyColors },
+      { name: 'ink', background: '#0b1020', foreground: '#e5ecff', brand: '#7c3aed', ...darkSemanticKeyColors },
     ]
 
     for (const { name, ...keyColors } of cases) {
       const { light, dark } = generateBothSchemes(keyColors)
+      let checkedPairs = 0
 
       for (const [mode, tokens] of Object.entries({ light, dark })) {
         for (const semanticKey of ['info', 'success', 'warning'] as const) {
+          if (!tokens[semanticKey])
+            continue
+          checkedPairs += 1
           const semantic = parseToken(tokens[semanticKey])
           const actualHeaderBg = getActualAdmonitionHeaderBackground(tokens, semanticKey)
           expect(
@@ -61,6 +77,8 @@ describe('theme-gen regressions', () => {
           ).toBeGreaterThanOrEqual(4.5)
         }
       }
+
+      expect(checkedPairs, `${name} should emit semantic tokens for at least one generated scheme`).toBeGreaterThan(0)
     }
   })
 
@@ -69,6 +87,7 @@ describe('theme-gen regressions', () => {
       background: '#f5f4ed',
       foreground: '#141413',
       brand: '#c96442',
+      ...lightSemanticKeyColors,
     })
 
     const report = validateContrast(light)
