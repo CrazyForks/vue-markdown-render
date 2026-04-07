@@ -43,31 +43,14 @@ export function generateOppositeScheme(tokens, sourceMode) {
   const newFg = flipForForeground(fg, targetIsLight, newBg)
   const newBrand = adjustBrandForScheme(brand, targetIsLight, newBg)
 
-  // Generate full palette from derived key colors
-  const derived = generatePalette({
+  // Generate full palette from derived key colors.
+  // Signal & content tokens are not passed — the opposite scheme
+  // only emits them if the source registry provided them.
+  return generatePalette({
     background: hslToHex(newBg),
     foreground: hslToHex(newFg),
     brand: hslToHex(newBrand),
   })
-
-  // Override semantic colors that need special dark/light handling.
-  // Link is NOT overridden — generatePalette's deriveLink sweep handles both schemes.
-  const result = { ...derived }
-
-  if (targetIsLight) {
-    result['diff-added'] = '174 60% 51%'
-    result['diff-removed'] = '350 100% 60%'
-    result['highlight'] = '54 100% 62%'
-    result['highlight-foreground'] = '0 0% 0%'
-  }
-  else {
-    result['diff-added'] = '174 72% 70%'
-    result['diff-removed'] = '0 92% 82%'
-    result['highlight'] = '54 80% 42%'
-    result['highlight-foreground'] = '0 0% 100%'
-  }
-
-  return result
 }
 
 /**
@@ -105,6 +88,24 @@ export function generateBothSchemes(keyColors) {
         brandForeground: keyColors.dark.brandForeground || keyColors.brandForeground,
       }),
       ...((keyColors.dark.ring) && { ring: keyColors.dark.ring }),
+      ...((keyColors.dark.info || keyColors.info) && {
+        info: keyColors.dark.info || keyColors.info,
+      }),
+      ...((keyColors.dark.success || keyColors.success) && {
+        success: keyColors.dark.success || keyColors.success,
+      }),
+      ...((keyColors.dark.warning || keyColors.warning) && {
+        warning: keyColors.dark.warning || keyColors.warning,
+      }),
+      ...((keyColors.dark.highlight || keyColors.highlight) && {
+        highlight: keyColors.dark.highlight || keyColors.highlight,
+      }),
+      ...((keyColors.dark.diffAdded || keyColors.diffAdded) && {
+        diffAdded: keyColors.dark.diffAdded || keyColors.diffAdded,
+      }),
+      ...((keyColors.dark.diffRemoved || keyColors.diffRemoved) && {
+        diffRemoved: keyColors.dark.diffRemoved || keyColors.diffRemoved,
+      }),
       ...(keyColors.fonts && { fonts: keyColors.fonts }),
     })
   }
