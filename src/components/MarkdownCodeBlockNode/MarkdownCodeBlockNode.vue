@@ -659,9 +659,13 @@ function previewCode() {
     >
       <template #header-left>
         <slot name="header-left">
-          <div class="flex items-center gap-x-2">
+          <div class="code-header-main">
             <span class="icon-slot h-4 w-4 flex-shrink-0" v-html="languageIcon" />
-            <span class="code-header-title">{{ displayLanguage }}</span>
+            <div class="code-header-copy">
+              <div class="code-header-title">
+                {{ displayLanguage }}
+              </div>
+            </div>
           </div>
         </slot>
       </template>
@@ -694,34 +698,24 @@ function previewCode() {
 </template>
 
 <style scoped>
-/* ── Container ── */
-.code-block-container {
-  margin: var(--ms-flow-codeblock-y) 0;
-  contain: content;
-  background: var(--code-bg);
-  border-color: var(--code-border);
-  color: var(--code-fg);
-  box-shadow: var(--ms-shadow-subtle);
-}
-
-/* ── Header ── */
-.code-block-header {
-  background: var(--code-header-bg);
-  border-color: var(--code-border);
-  color: var(--code-fg);
-}
-.code-header-title {
-  font-size: var(--ms-text-label);
-  font-weight: 500;
-  color: var(--code-action-fg);
-}
-
 /* ── Code content ── */
 .code-block-content {
   max-height: min(70vh, var(--ms-size-code-max-height));
   overflow: auto;
-  transition: max-height 0.3s ease;
-  font-family: var(--vscode-editor-font-family, 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
+  transition: max-height var(--ms-duration-slow) var(--ms-ease-standard);
+  font-family: var(
+    --markstream-code-font-family,
+    ui-monospace,
+    SFMono-Regular,
+    SF Mono,
+    Menlo,
+    Monaco,
+    Consolas,
+    Liberation Mono,
+    Courier New,
+    monospace
+  );
+  font-size: var(--vscode-editor-font-size, 14px);
   line-height: var(--vscode-editor-line-height, 1.5);
 }
 
@@ -757,7 +751,7 @@ function previewCode() {
   font-family: inherit;
 }
 
-:deep(.code-block-content pre){
+:deep(.code-block-content pre) {
   padding: 1rem;
 }
 
@@ -778,7 +772,7 @@ function previewCode() {
   background: linear-gradient(90deg, var(--loading-shimmer) 25%, hsl(var(--ms-muted-foreground) / 0.12) 37%, var(--loading-shimmer) 63%);
   background-size: 400% 100%;
   animation: code-skeleton-shimmer 1.2s ease-in-out infinite;
-  border-radius: 0.25rem;
+  border-radius: calc(var(--ms-radius) * 0.5);
 }
 
 .skeleton-line.short {

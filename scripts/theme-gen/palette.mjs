@@ -13,12 +13,9 @@
 
 import {
   adjustLightness,
-  adjustSaturation,
   contrastRatio,
-  hslToRgb,
   hslToShadcn,
   mixHsl,
-  rgbToHsl,
   toHsl,
 } from './color.mjs'
 
@@ -36,6 +33,15 @@ import {
  * @param {string} [input.border]    - Border color
  * @param {string} [input.error]     - Error / destructive color
  * @param {string} [input.link]      - Link color
+ * @param {string} [input.brandForeground] - Text on brand buttons (overrides auto)
+ * @param {string} [input.ring]      - Focus ring color
+ * @param {string} [input.info]      - Info / note semantic color
+ * @param {string} [input.success]   - Success / tip semantic color
+ * @param {string} [input.warning]   - Warning semantic color
+ * @param {string} [input.highlight] - Highlight / mark color
+ * @param {string} [input.diffAdded] - Diff added color
+ * @param {string} [input.diffRemoved] - Diff removed color
+ * @param {string} [input.radius]    - Default component border-radius
  * @param {object} [input.fonts]     - Typography overrides
  * @param {string} [input.fonts.sans]  - Sans-serif font stack
  * @param {string} [input.fonts.mono]  - Monospace font stack
@@ -49,15 +55,14 @@ export function generatePalette(input) {
 
   const isLight = bg.l > 50
   const surface = input.surface ? toHsl(input.surface) : deriveSurface(bg, isLight)
-  // Even user-provided values get contrast-corrected against background
-  const secondaryTextRaw = input.secondaryText ? toHsl(input.secondaryText) : deriveSecondaryText(fg, bg, isLight)
-  const secondaryText = contrastRatio(secondaryTextRaw, bg) >= 4.5
-    ? secondaryTextRaw
-    : ensureContrast(secondaryTextRaw, bg, 4.5, isLight)
-  const borderRaw = input.border ? toHsl(input.border) : deriveBorder(bg, fg, isLight)
-  const border = contrastRatio(borderRaw, bg) >= 3
-    ? borderRaw
-    : ensureContrast(borderRaw, bg, 3, isLight)
+  // User-provided values pass through unchanged (trust the designer).
+  // Only derived values get contrast-corrected.
+  const secondaryText = input.secondaryText
+    ? toHsl(input.secondaryText)
+    : deriveSecondaryText(fg, bg, isLight)
+  const border = input.border
+    ? toHsl(input.border)
+    : deriveBorder(bg, fg, isLight)
   const error = input.error ? toHsl(input.error) : deriveError(isLight)
   const link = input.link ? toHsl(input.link) : deriveLink(brand, bg, fg, isLight)
 
@@ -74,33 +79,44 @@ export function generatePalette(input) {
     ? adjustLightness(fg, 5)
     : adjustLightness(fg, -5)
   const primary = brand
-  const primaryFg = derivePrimaryForeground(brand)
+  const primaryFg = input.brandForeground
+    ? toHsl(input.brandForeground)
+    : derivePrimaryForeground(brand)
   const destructive = error
   const destructiveFg = derivePrimaryForeground(error)
-  const ring = isLight
-    ? adjustLightness(fg, 0)
-    : adjustLightness(fg, 0)
+  const ring = input.ring
+    ? toHsl(input.ring)
+    : fg
   const popover = bg
   const popoverFg = fg
 
   // ── Extension tokens (markstream-specific) ──
-  // Semantic colors are derived against the REAL admonition header bg:
-  // alphaBlend(semanticColor, muted, alpha) where alpha = 0.06 (light) / 0.12 (dark)
-  const info = deriveSemanticColor(217, 91, 60, isLight, muted)
-  const success = deriveSemanticColor(168, 100, 37.5, isLight, muted)
-  const warning = deriveSemanticColor(34, 100, 50, isLight, muted)
-  const diffAdded = isLight
-    ? { h: 174, s: 60, l: 51 }
-    : { h: 174, s: 72, l: 70 }
-  const diffRemoved = isLight
-    ? { h: 350, s: 100, l: 60 }
-    : { h: 0, s: 92, l: 82 }
-  const highlight = isLight
-    ? { h: 54, s: 100, l: 62 }
-    : { h: 54, s: 80, l: 42 }
-  const highlightFg = isLight
-    ? { h: 0, s: 0, l: 0 }
-    : { h: 0, s: 0, l: 100 }
+  // Signal & content colors are only emitted when explicitly provided.
+  // When absent, the library defaults in index.css apply.
+  const extensionTokens = {}
+
+  if (input.info) {
+    const c = toHsl(input.info)
+    extensionTokens['info'] = c
+    extensionTokens['info-foreground'] = derivePrimaryForeground(c)
+  }
+  if (input.success) {
+    const c = toHsl(input.success)
+    extensionTokens['success'] = c
+    extensionTokens['success-foreground'] = derivePrimaryForeground(c)
+  }
+  if (input.warning) {
+    const c = toHsl(input.warning)
+    extensionTokens['warning'] = c
+    extensionTokens['warning-foreground'] = derivePrimaryForeground(c)
+  }
+  if (input.diffAdded) extensionTokens['diff-added'] = toHsl(input.diffAdded)
+  if (input.diffRemoved) extensionTokens['diff-removed'] = toHsl(input.diffRemoved)
+  if (input.highlight) {
+    const c = toHsl(input.highlight)
+    extensionTokens['highlight'] = c
+    extensionTokens['highlight-foreground'] = derivePrimaryForeground(c)
+  }
 
   const colorTokens = toTokenMap({
     // Bridge
@@ -122,17 +138,8 @@ export function generatePalette(input) {
     'popover-foreground': popoverFg,
     'radius': null, // not a color — handled separately
 
-    // Extension
-    'info': info,
-    'info-foreground': { h: 210, s: 40, l: 98 },
-    'success': success,
-    'success-foreground': { h: 210, s: 40, l: 98 },
-    'warning': warning,
-    'warning-foreground': { h: 0, s: 0, l: 100 },
-    'diff-added': diffAdded,
-    'diff-removed': diffRemoved,
-    'highlight': highlight,
-    'highlight-foreground': highlightFg,
+    // Extension (pass-through only)
+    ...extensionTokens,
     'link': link,
   })
 
@@ -144,6 +151,10 @@ export function generatePalette(input) {
     colorTokens['font-mono'] = fonts.mono
   if (fonts.serif)
     colorTokens['font-serif'] = fonts.serif
+
+  // Radius token
+  if (input.radius)
+    colorTokens['radius'] = input.radius
 
   return colorTokens
 }
@@ -314,47 +325,6 @@ function derivePrimaryForeground(brand) {
   return best
 }
 
-/**
- * Alpha-blend fg over bg in RGB space (same model as CSS alpha compositing).
- */
-function alphaBlendHsl(fg, bg, alpha) {
-  const f = hslToRgb(fg.h, fg.s, fg.l)
-  const b = hslToRgb(bg.h, bg.s, bg.l)
-  return rgbToHsl(
-    Math.round(f.r * alpha + b.r * (1 - alpha)),
-    Math.round(f.g * alpha + b.g * (1 - alpha)),
-    Math.round(f.b * alpha + b.b * (1 - alpha)),
-  )
-}
-
-/**
- * Derive semantic color that must be readable as text on the REAL admonition
- * header background: alphaBlend(semanticColor, muted, alpha).
- *
- * The admonition header background is the semantic color blended at low opacity
- * over the muted surface. We iteratively darken (light mode) or lighten (dark mode)
- * until the color reads at ≥ 4.5:1 against this composited background.
- *
- * @param {number} h - Base hue
- * @param {number} s - Base saturation
- * @param {number} l - Base lightness
- * @param {boolean} isLight - Current scheme mode
- * @param {object} muted - The muted background token { h, s, l }
- */
-function deriveSemanticColor(h, s, l, isLight, muted) {
-  const alpha = isLight ? 0.06 : 0.12
-  let color = isLight ? { h, s, l } : { h, s: s * 0.85, l: Math.min(l + 15, 80) }
-
-  for (let i = 0; i < 100; i++) {
-    const headerBg = alphaBlendHsl(color, muted, alpha)
-    if (contrastRatio(color, headerBg) >= 4.5) return color
-    color = isLight
-      ? adjustLightness(color, -1)
-      : adjustLightness(color, 1)
-    if (color.l <= 0 || color.l >= 100) return color
-  }
-  return color
-}
 
 // ─── Output formatting ──────────────────────────────────────────────
 
@@ -389,6 +359,8 @@ export const BRIDGE_TOKENS = [
 
 /**
  * All extension token names specific to markstream-vue.
+ * Signal & content tokens are optional — only emitted when the registry provides them.
+ * When absent, the library defaults in src/index.css apply.
  */
 export const EXTENSION_TOKENS = [
   'info', 'info-foreground',

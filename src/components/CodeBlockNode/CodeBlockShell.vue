@@ -29,6 +29,7 @@ const MENU_CSS_VARS = [
   '--code-border', '--code-action-fg',
   '--code-action-hover-bg', '--code-action-hover-fg',
   '--ms-shadow-popover', '--ms-duration-fast', '--ms-ease-standard',
+  '--ms-radius',
 ]
 
 function updateMenuPosition() {
@@ -223,7 +224,7 @@ const fontIncreaseDisabled = computed(() =>
 
           <Teleport to="body">
             <Transition name="code-menu">
-              <div v-if="moreMenuOpen" ref="moreMenuRef" :style="menuStyle" class="min-w-[10rem] p-1 bg-[hsl(var(--ms-popover))] text-[hsl(var(--ms-popover-foreground))] border border-[var(--code-border)] rounded-md shadow-[var(--ms-shadow-popover)]" role="menu">
+              <div v-if="moreMenuOpen" ref="moreMenuRef" :style="menuStyle" class="min-w-[10rem] p-1 bg-[hsl(var(--ms-popover))] text-[hsl(var(--ms-popover-foreground))] border border-[var(--code-border)] shadow-[var(--ms-shadow-popover)]" style="border-radius: var(--ms-radius)" role="menu">
               <!-- Font size controls -->
               <template v-if="props.showFontSizeButtons && props.enableFontSizeControl">
                 <button type="button" role="menuitem" class="flex items-center gap-2 w-full py-1.5 px-2 rounded text-xs text-[var(--code-action-fg)] cursor-pointer whitespace-nowrap hover:bg-[var(--code-action-hover-bg)] hover:text-[var(--code-action-hover-fg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors" :disabled="fontDecreaseDisabled" @click="emit('decreaseFont')">
@@ -278,12 +279,119 @@ const fontIncreaseDisabled = computed(() =>
   <span class="sr-only" aria-live="polite" role="status">{{ copyText ? t('common.copied') || 'Copied' : '' }}</span>
 </template>
 
-<!-- Only transition animations remain — Vue needs named classes for <Transition> -->
+<!--
+  Shared styles for CodeBlockShell and its slot content.
+  Non-scoped so they apply to parent-compiled slot content.
+  All selectors rooted under .code-block-header to avoid global leaks.
+-->
 <style>
 .action-icon {
   width: var(--ms-action-btn-icon);
   height: var(--ms-action-btn-icon);
 }
+
+/* ── Container base (shared by all code block variants) ── */
+.code-block-container {
+  margin: var(--ms-flow-codeblock-y) 0;
+  contain: content;
+  content-visibility: auto;
+  contain-intrinsic-size: 320px var(--ms-size-skeleton-min-height);
+  container-type: inline-size;
+  background: var(--code-bg);
+  border-color: var(--code-border);
+  color: var(--code-fg);
+  box-shadow: var(--ms-shadow-subtle);
+}
+
+/* ── Header layout ── */
+.code-block-header {
+  gap: var(--ms-gap-header);
+}
+
+.code-block-header .code-header-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--ms-gap-header-main);
+  overflow: hidden;
+}
+
+.code-block-header .code-header-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.code-block-header .code-header-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ms-text-label);
+  font-weight: 500;
+  color: var(--code-action-fg);
+}
+
+.code-block-header .code-header-caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--code-line-number);
+}
+
+.code-block-header .code-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ms-gap-header-actions);
+  flex-wrap: wrap;
+}
+
+/* ── Icon slot (shared by all code block variants) ── */
+.code-block-header .icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.code-block-header .icon-slot svg,
+.code-block-header .icon-slot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Diff stats ── */
+.code-diff-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ms-space-1_5);
+  margin-right: var(--ms-space-1);
+  font-size: var(--ms-text-label);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.code-diff-stat {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: var(--ms-radius);
+  line-height: 1;
+}
+
+.code-diff-stat.removed {
+  color: var(--diff-removed-fg);
+  background: hsl(var(--ms-diff-removed) / 0.1);
+}
+
+.code-diff-stat.added {
+  color: var(--diff-added-fg);
+  background: hsl(var(--ms-diff-added) / 0.1);
+}
+
+/* ── Menu transition ── */
 .code-menu-enter-active,
 .code-menu-leave-active {
   transform-origin: top right;

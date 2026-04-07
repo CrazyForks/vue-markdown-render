@@ -168,6 +168,7 @@
 .markstream-vue {
 
   /* ── Base typography (inherited by all children) ── */
+  font-family: var(--ms-font-sans);
   font-size: var(--ms-text-body);
   line-height: var(--ms-leading-body);
 

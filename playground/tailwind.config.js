@@ -1,7 +1,9 @@
 import typography from '@tailwindcss/typography'
+import markstreamPreset from '../tailwind.preset.js'
 
 /** @type {import('tailwindcss').Config} */
 export default {
+  presets: [markstreamPreset],
   darkMode: ['selector'],
   safelist: [
     'border-gray-400/5',

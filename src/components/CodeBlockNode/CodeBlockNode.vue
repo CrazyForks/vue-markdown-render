@@ -2001,13 +2001,6 @@ onUnmounted(() => {
 
 <style scoped>
 .code-block-container {
-  margin: var(--ms-flow-codeblock-y) 0;
-  contain: content;
-    /* 新增：显著减少离屏 codeblock 的布局/绘制与样式计算 */
-  content-visibility: auto;
-  contain-intrinsic-size: 320px var(--ms-size-skeleton-min-height);
-  container-type: inline-size;
-  box-shadow: var(--ms-shadow-subtle);
   --markstream-code-fallback-bg: var(--code-bg);
   --markstream-code-fallback-fg: var(--code-fg);
   --markstream-code-border-color: var(--code-border);
@@ -2126,52 +2119,6 @@ onUnmounted(() => {
   transition: height var(--ms-duration-standard) var(--ms-ease-standard), max-height var(--ms-duration-standard) var(--ms-ease-standard);
 }
 
-.code-block-header {
-  gap: var(--ms-gap-header);
-  border-color: var(--code-border);
-  color: var(--code-fg);
-  background-color: var(--code-header-bg);
-}
-
-.code-header-main {
-  min-width: 0;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--ms-gap-header-main);
-  overflow: hidden;
-}
-
-.code-header-copy {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.code-header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--ms-gap-header-actions);
-  flex-wrap: wrap;
-}
-
-.code-header-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--ms-text-label);
-  font-weight: 500;
-  color: var(--code-action-fg);
-}
-
-.code-header-caption {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--code-line-number);
-}
 
 .code-editor-layer {
   display: grid;
@@ -2200,22 +2147,18 @@ onUnmounted(() => {
   color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg)) !important;
 }
 
-.code-block-container.is-diff .code-block-header {
-  color: var(--markstream-diff-shell-fg);
-  background: transparent;
-  border-bottom-color: var(--markstream-diff-header-border);
-}
-
 .code-block-container.is-diff {
   color: var(--markstream-diff-shell-fg);
   border-color: var(--markstream-diff-shell-border);
   background: var(--markstream-diff-shell-bg);
   box-shadow: var(--markstream-diff-shell-shadow);
   --vscode-editor-selectionBackground: var(--markstream-diff-action-hover);
-}
-
-.code-block-container.is-diff .code-header-caption {
-  color: var(--markstream-diff-shell-muted);
+  /* Override shared tokens so CodeBlockShell header inherits diff styling */
+  --code-fg: var(--markstream-diff-shell-fg);
+  --code-header-bg: transparent;
+  --code-border: var(--markstream-diff-header-border);
+  --code-line-number: var(--markstream-diff-shell-muted);
+  --code-action-fg: var(--markstream-diff-shell-muted);
 }
 
 .code-block-container.is-diff .code-editor-layer {
@@ -2359,7 +2302,7 @@ onUnmounted(() => {
   background: linear-gradient(90deg, var(--loading-shimmer) 25%, hsl(var(--ms-muted) / 0.7) 37%, var(--loading-shimmer) 63%);
   background-size: 400% 100%;
   animation: code-skeleton-shimmer 1.2s ease-in-out infinite;
-  border-radius: 0.25rem;
+  border-radius: calc(var(--ms-radius) * 0.5);
 }
 
 .skeleton-line.short {
@@ -2371,47 +2314,7 @@ onUnmounted(() => {
   100% { background-position: 0 0; }
 }
 
-:deep(.code-diff-stats) {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ms-space-1_5);
-  margin-right: var(--ms-space-1);
-  font-size: var(--ms-text-label);
-  font-weight: 600;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
 
-:deep(.code-diff-stat) {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: var(--ms-radius);
-  line-height: 1;
-}
-
-:deep(.code-diff-stat.removed) {
-  color: var(--diff-removed-fg);
-  background: hsl(var(--ms-diff-removed) / 0.1);
-}
-
-:deep(.code-diff-stat.added) {
-  color: var(--diff-added-fg);
-  background: hsl(var(--ms-diff-added) / 0.1);
-}
-
-/* Ensure injected icons align consistently whether img or inline svg */
-.icon-slot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.icon-slot :deep(svg),
-.icon-slot :deep(img) {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
 
 
 /* ── Unchanged lines widget (ghost style) ── */
@@ -2601,7 +2504,7 @@ onUnmounted(() => {
   appearance: none;
   background: transparent;
   border: 0;
-  border-radius: 4px;
+  border-radius: calc(var(--ms-radius) * 0.5);
   box-shadow: none;
   color: var(--vscode-diffEditor-unchangedRegionForeground, currentColor);
   cursor: pointer;
