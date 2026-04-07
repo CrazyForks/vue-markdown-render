@@ -36,6 +36,8 @@ import {
  * @param {string} [input.border]    - Border color
  * @param {string} [input.error]     - Error / destructive color
  * @param {string} [input.link]      - Link color
+ * @param {string} [input.brandForeground] - Text on brand buttons (overrides auto)
+ * @param {string} [input.ring]      - Focus ring color
  * @param {object} [input.fonts]     - Typography overrides
  * @param {string} [input.fonts.sans]  - Sans-serif font stack
  * @param {string} [input.fonts.mono]  - Monospace font stack
@@ -49,15 +51,14 @@ export function generatePalette(input) {
 
   const isLight = bg.l > 50
   const surface = input.surface ? toHsl(input.surface) : deriveSurface(bg, isLight)
-  // Even user-provided values get contrast-corrected against background
-  const secondaryTextRaw = input.secondaryText ? toHsl(input.secondaryText) : deriveSecondaryText(fg, bg, isLight)
-  const secondaryText = contrastRatio(secondaryTextRaw, bg) >= 4.5
-    ? secondaryTextRaw
-    : ensureContrast(secondaryTextRaw, bg, 4.5, isLight)
-  const borderRaw = input.border ? toHsl(input.border) : deriveBorder(bg, fg, isLight)
-  const border = contrastRatio(borderRaw, bg) >= 3
-    ? borderRaw
-    : ensureContrast(borderRaw, bg, 3, isLight)
+  // User-provided values pass through unchanged (trust the designer).
+  // Only derived values get contrast-corrected.
+  const secondaryText = input.secondaryText
+    ? toHsl(input.secondaryText)
+    : deriveSecondaryText(fg, bg, isLight)
+  const border = input.border
+    ? toHsl(input.border)
+    : deriveBorder(bg, fg, isLight)
   const error = input.error ? toHsl(input.error) : deriveError(isLight)
   const link = input.link ? toHsl(input.link) : deriveLink(brand, bg, fg, isLight)
 
@@ -74,12 +75,14 @@ export function generatePalette(input) {
     ? adjustLightness(fg, 5)
     : adjustLightness(fg, -5)
   const primary = brand
-  const primaryFg = derivePrimaryForeground(brand)
+  const primaryFg = input.brandForeground
+    ? toHsl(input.brandForeground)
+    : derivePrimaryForeground(brand)
   const destructive = error
   const destructiveFg = derivePrimaryForeground(error)
-  const ring = isLight
-    ? adjustLightness(fg, 0)
-    : adjustLightness(fg, 0)
+  const ring = input.ring
+    ? toHsl(input.ring)
+    : fg
   const popover = bg
   const popoverFg = fg
 

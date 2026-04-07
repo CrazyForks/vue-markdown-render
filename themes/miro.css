@@ -19,11 +19,11 @@
   --ms-accent: 352.2 5.9% 98.1%;
   --ms-accent-foreground: 240 3.4% 16.4%;
   --ms-primary: 230.1 98.8% 67.6%;
-  --ms-primary-foreground: 0 0% 0%;
+  --ms-primary-foreground: 0 0% 100%;
   --ms-destructive: 0 84.2% 60.2%;
   --ms-destructive-foreground: 0 0% 0%;
-  --ms-border: 227.1 14.3% 60.8%;
-  --ms-ring: 240 3.4% 11.4%;
+  --ms-border: 227.1 14.3% 80.8%;
+  --ms-ring: 225 14.8% 89.4%;
   --ms-popover: 0 0% 100%;
   --ms-popover-foreground: 240 3.4% 11.4%;
   --ms-info: 217 91% 48%;

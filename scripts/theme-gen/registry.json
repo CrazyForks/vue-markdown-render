@@ -11,7 +11,9 @@
       "brand": "#ff385c",
       "surface": "#f2f2f2",
       "secondaryText": "#6a6a6a",
-      "border": "#c1c1c1"
+      "border": "#c1c1c1",
+      "error": "#c13515",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"Airbnb Cereal VF\", Circular, -apple-system, system-ui, Roboto, \"Helvetica Neue\", sans-serif"
@@ -29,7 +31,8 @@
       "brand": "#1b61c9",
       "surface": "#f8fafc",
       "secondaryText": "#333333",
-      "border": "#e0e2e6"
+      "border": "#e0e2e6",
+      "brandForeground": "#fff"
     },
     "fonts": {
       "sans": "Haas, -apple-system, system-ui, \"Segoe UI\", Roboto, sans-serif"
@@ -44,7 +47,8 @@
     "colors": {
       "background": "#f5f5f7",
       "foreground": "#1d1d1f",
-      "brand": "#0071e3"
+      "brand": "#0071e3",
+      "brandForeground": "#fff"
     },
     "fonts": {
       "sans": "\"SF Pro Display\", \"SF Pro Icons\", \"Helvetica Neue\", Helvetica, Arial, sans-serif"
@@ -60,7 +64,8 @@
       "background": "#ffffff",
       "foreground": "#262626",
       "brand": "#1c69d4",
-      "secondaryText": "#757575"
+      "secondaryText": "#757575",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"BMWTypeNextLatin\", Helvetica, Arial, sans-serif"
@@ -76,7 +81,8 @@
       "background": "#ffffff",
       "foreground": "#242424",
       "brand": "#242424",
-      "secondaryText": "#898989"
+      "secondaryText": "#898989",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"Cal Sans\", system-ui, sans-serif",
@@ -93,9 +99,23 @@
       "background": "#f5f4ed",
       "foreground": "#141413",
       "brand": "#c96442",
+      "brandForeground": "#faf9f5",
       "surface": "#faf9f5",
       "secondaryText": "#5e5d59",
-      "border": "#f0eee6"
+      "border": "#e8e6dc",
+      "error": "#b53333",
+      "ring": "#d1cfc5"
+    },
+    "dark": {
+      "background": "#141413",
+      "foreground": "#faf9f5",
+      "brand": "#c96442",
+      "brandForeground": "#faf9f5",
+      "surface": "#30302e",
+      "secondaryText": "#87867f",
+      "border": "#30302e",
+      "error": "#b53333",
+      "ring": "#4d4c48"
     },
     "fonts": {
       "sans": "\"Anthropic Sans\", Arial, sans-serif",
@@ -114,7 +134,8 @@
       "foreground": "#000000",
       "brand": "#078a52",
       "secondaryText": "#9f9b93",
-      "border": "#dad4c8"
+      "border": "#dad4c8",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "Roobert, Arial, sans-serif",
@@ -136,6 +157,11 @@
     "fonts": {
       "sans": "Inter, Arial, Helvetica, sans-serif",
       "mono": "Inconsolata, ui-monospace, monospace"
+    },
+    "dark": {
+      "background": "#000000",
+      "foreground": "#ffffff",
+      "secondaryText": "#a0a0a0"
     }
   },
   {
@@ -150,12 +176,20 @@
       "brand": "#1863dc",
       "surface": "#fafafa",
       "secondaryText": "#93939f",
-      "border": "#d9d9dd"
+      "border": "#d9d9dd",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"Unica77 Cohere Web\", Inter, Arial, system-ui, sans-serif",
       "mono": "CohereMono, ui-monospace, SFMono-Regular, monospace",
       "serif": "CohereText, \"Space Grotesk\", Inter, sans-serif"
+    },
+    "dark": {
+      "background": "#17171c",
+      "foreground": "#fafafa",
+      "surface": "#212121",
+      "secondaryText": "#d9d9dd",
+      "border": "#333333"
     }
   },
   {
@@ -168,7 +202,8 @@
       "background": "#ffffff",
       "foreground": "#0a0b0d",
       "brand": "#0052ff",
-      "surface": "#eef0f3"
+      "surface": "#eef0f3",
+      "brandForeground": "#fff"
     },
     "fonts": {
       "sans": "CoinbaseSans, -apple-system, system-ui, sans-serif"
@@ -200,7 +235,9 @@
       "background": "#f2f1ed",
       "foreground": "#26251e",
       "brand": "#f54e00",
-      "surface": "#e6e5e0"
+      "surface": "#e6e5e0",
+      "error": "#cf2d56",
+      "brandForeground": "#26251e"
     },
     "fonts": {
       "sans": "CursorGothic, system-ui, \"Helvetica Neue\", Helvetica, Arial, sans-serif",
@@ -220,7 +257,8 @@
       "brand": "#000000",
       "surface": "#f5f5f5",
       "secondaryText": "#4e4e4e",
-      "border": "#e5e5e5"
+      "border": "#e5e5e5",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "Waldenburg, system-ui, sans-serif",
@@ -239,7 +277,9 @@
       "brand": "#000000",
       "surface": "#ffffff",
       "secondaryText": "#60646c",
-      "border": "#e0e1e6"
+      "border": "#e0e1e6",
+      "error": "#eb8e90",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "Inter, system-ui, -apple-system, sans-serif",
@@ -255,11 +295,18 @@
     "colors": {
       "background": "#ffffff",
       "foreground": "#000000",
-      "brand": "#000000"
+      "brand": "#000000",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "figmaSans, system-ui, sans-serif",
       "mono": "figmaMono, ui-monospace, monospace"
+    },
+    "dark": {
+      "background": "#000000",
+      "foreground": "#ffffff",
+      "surface": "#000000",
+      "secondaryText": "#ffffff"
     }
   },
   {
@@ -272,7 +319,8 @@
       "background": "#000000",
       "foreground": "#ffffff",
       "brand": "#0099ff",
-      "secondaryText": "#a6a6a6"
+      "secondaryText": "#a6a6a6",
+      "brandForeground": "#000000"
     },
     "fonts": {
       "sans": "\"GT Walsheim Framer Medium\", system-ui, sans-serif",
@@ -291,10 +339,18 @@
       "brand": "#000000",
       "surface": "#f1f2f3",
       "secondaryText": "#656a76",
-      "border": "#d5d7db"
+      "border": "#d5d7db",
+      "error": "#731e25",
+      "brandForeground": "#d5d7db"
     },
     "fonts": {
       "sans": "\"HashiCorp Sans\", system-ui, sans-serif"
+    },
+    "dark": {
+      "background": "#0d0e12",
+      "foreground": "#efeff1",
+      "surface": "#15181e",
+      "secondaryText": "#d5d7db"
     }
   },
   {
@@ -309,7 +365,8 @@
       "brand": "#0f62fe",
       "surface": "#f4f4f4",
       "secondaryText": "#525252",
-      "border": "#c6c6c6"
+      "border": "#c6c6c6",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"IBM Plex Sans\", system-ui, sans-serif",
@@ -329,7 +386,8 @@
       "brand": "#ff5600",
       "surface": "#ffffff",
       "secondaryText": "#7b7b78",
-      "border": "#dedbd6"
+      "border": "#dedbd6",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "Saans, system-ui, sans-serif",
@@ -348,7 +406,8 @@
       "foreground": "#101114",
       "brand": "#7132f5",
       "secondaryText": "#9497a9",
-      "border": "#dedee5"
+      "border": "#dedee5",
+      "brandForeground": "#fff"
     },
     "fonts": {
       "sans": "\"Kraken-Product\", system-ui, sans-serif"
@@ -366,11 +425,18 @@
       "brand": "#5e6ad2",
       "surface": "#191a1b",
       "secondaryText": "#8a8f98",
-      "border": "#23252a"
+      "border": "#23252a",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"Inter Variable\", Inter, \"SF Pro Display\", system-ui, sans-serif",
       "mono": "\"Berkeley Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+    },
+    "dark": {
+      "background": "#08090a",
+      "foreground": "#f7f8f8",
+      "surface": "#0f1011",
+      "secondaryText": "#d0d6e0"
     }
   },
   {
@@ -384,7 +450,8 @@
       "foreground": "#1c1c1c",
       "brand": "#1c1c1c",
       "secondaryText": "#5f5f5d",
-      "border": "#eceae4"
+      "border": "#eceae4",
+      "brandForeground": "#fcfbf8"
     },
     "fonts": {
       "sans": "\"Camera Plain Variable\", system-ui, sans-serif"
@@ -401,10 +468,17 @@
       "foreground": "#222222",
       "brand": "#1456f0",
       "secondaryText": "#45515e",
-      "border": "#e5e7eb"
+      "border": "#e5e7eb",
+      "brandForeground": "#fff"
     },
     "fonts": {
       "sans": "\"DM Sans\", system-ui, sans-serif"
+    },
+    "dark": {
+      "background": "#181e25",
+      "foreground": "#f0f2f5",
+      "surface": "#1f2731",
+      "secondaryText": "#a0a8b4"
     }
   },
   {
@@ -419,7 +493,8 @@
       "brand": "#18e299",
       "surface": "#fafafa",
       "secondaryText": "#666666",
-      "border": "#e5e5e5"
+      "border": "#e5e5e5",
+      "error": "#d45656"
     },
     "fonts": {
       "sans": "Inter, system-ui, sans-serif",
@@ -437,7 +512,9 @@
       "foreground": "#1c1c1e",
       "brand": "#5b76fe",
       "secondaryText": "#555a6a",
-      "border": "#c7cad5"
+      "border": "#c7cad5",
+      "brandForeground": "#fff",
+      "ring": "rgb(224,226,232)"
     },
     "fonts": {
       "sans": "\"Roobert PRO Medium\", system-ui, sans-serif"
@@ -453,10 +530,16 @@
       "background": "#fffaeb",
       "foreground": "#1f1f1f",
       "brand": "#fa520f",
-      "surface": "#fff0c2"
+      "surface": "#fff0c2",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "Arial, Helvetica, sans-serif"
+    },
+    "dark": {
+      "background": "#1f1f1f",
+      "foreground": "#ffffff",
+      "surface": "#2a2a2a"
     }
   },
   {
@@ -490,7 +573,8 @@
       "foreground": "#191919",
       "brand": "#0075de",
       "surface": "#f6f5f4",
-      "secondaryText": "#615d59"
+      "secondaryText": "#615d59",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"NotionInter\", Inter, -apple-system, system-ui, sans-serif",
@@ -509,7 +593,8 @@
       "brand": "#76b900",
       "surface": "#1a1a1a",
       "secondaryText": "#a7a7a7",
-      "border": "#5e5e5e"
+      "border": "#5e5e5e",
+      "brandForeground": "#fff"
     },
     "fonts": {
       "sans": "\"NVIDIA-EMEA\", Arial, Helvetica, sans-serif"
@@ -527,11 +612,19 @@
       "brand": "#000000",
       "surface": "#fafafa",
       "secondaryText": "#737373",
-      "border": "#e5e5e5"
+      "border": "#e5e5e5",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"SF Pro Rounded\", system-ui, -apple-system, sans-serif",
       "mono": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+    },
+    "dark": {
+      "background": "#090909",
+      "foreground": "#ffffff",
+      "surface": "#262626",
+      "secondaryText": "#a3a3a3",
+      "border": "#525252"
     }
   },
   {
@@ -545,7 +638,9 @@
       "foreground": "#fdfcfc",
       "brand": "#007aff",
       "surface": "#302c2c",
-      "secondaryText": "#9a9898"
+      "secondaryText": "#9a9898",
+      "error": "#ff3b30",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "mono": "\"Berkeley Mono\", \"IBM Plex Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
@@ -563,7 +658,9 @@
       "brand": "#e60023",
       "surface": "#e5e5e0",
       "secondaryText": "#62625b",
-      "border": "#91918c"
+      "border": "#91918c",
+      "error": "#e60023",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"Pin Sans\", -apple-system, system-ui, \"Segoe UI\", Roboto, sans-serif"
@@ -581,7 +678,8 @@
       "brand": "#f54e00",
       "surface": "#eeefe9",
       "secondaryText": "#65675e",
-      "border": "#bfc1b7"
+      "border": "#bfc1b7",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"IBM Plex Sans Variable\", -apple-system, system-ui, sans-serif",
@@ -600,11 +698,21 @@
       "brand": "#ff6363",
       "surface": "#101111",
       "secondaryText": "#9c9c9d",
-      "border": "#252829"
+      "border": "#252829",
+      "error": "#ff6363",
+      "brandForeground": "#18191a",
+      "ring": "rgb(27, 28, 30)"
     },
     "fonts": {
       "sans": "Inter, system-ui, sans-serif",
       "mono": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+    },
+    "dark": {
+      "background": "#040506",
+      "foreground": "#f4f4f6",
+      "surface": "#151617",
+      "border": "#1e1f21",
+      "ring": "rgb(22, 23, 25)"
     }
   },
   {
@@ -617,11 +725,19 @@
       "background": "#ffffff",
       "foreground": "#202020",
       "brand": "#ea2804",
-      "secondaryText": "#646464"
+      "secondaryText": "#646464",
+      "brandForeground": "#fcfcfc"
     },
     "fonts": {
       "sans": "\"basier-square\", system-ui, sans-serif",
       "mono": "\"jetbrains-mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+    },
+    "dark": {
+      "background": "#202020",
+      "foreground": "#fcfcfc",
+      "surface": "#2a2a2a",
+      "secondaryText": "#bbbbbb",
+      "border": "#4e4e4e"
     }
   },
   {
@@ -634,7 +750,8 @@
       "background": "#000000",
       "foreground": "#f0f0f0",
       "brand": "#ff801f",
-      "secondaryText": "#a1a4a5"
+      "secondaryText": "#a1a4a5",
+      "brandForeground": "#000000"
     },
     "fonts": {
       "sans": "Inter, system-ui, sans-serif",
@@ -654,7 +771,9 @@
       "brand": "#494fdf",
       "surface": "#f4f4f4",
       "secondaryText": "#505a63",
-      "border": "#c9c9cd"
+      "border": "#c9c9cd",
+      "error": "#e23b4a",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"Aeonik Pro\", Inter, Arial, sans-serif"
@@ -676,6 +795,13 @@
     },
     "fonts": {
       "sans": "abcNormal, system-ui, sans-serif"
+    },
+    "dark": {
+      "background": "#000000",
+      "foreground": "#ffffff",
+      "surface": "#1a1a1a",
+      "secondaryText": "#a7a7a7",
+      "border": "#27272a"
     }
   },
   {
@@ -690,7 +816,8 @@
       "brand": "#f36458",
       "surface": "#212121",
       "secondaryText": "#b9b9b9",
-      "border": "#353535"
+      "border": "#353535",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "waldenburgNormal, system-ui, sans-serif",
@@ -708,7 +835,8 @@
       "foreground": "#ffffff",
       "brand": "#6a5fc1",
       "surface": "#362d59",
-      "border": "#362d59"
+      "border": "#362d59",
+      "brandForeground": "#fff"
     },
     "fonts": {
       "sans": "Rubik, -apple-system, system-ui, \"Segoe UI\", Helvetica, Arial, sans-serif",
@@ -742,10 +870,18 @@
       "brand": "#1ed760",
       "surface": "#181818",
       "secondaryText": "#b3b3b3",
-      "border": "#4d4d4d"
+      "border": "#4d4d4d",
+      "error": "#f3727f",
+      "brandForeground": "#000"
     },
     "fonts": {
       "sans": "SpotifyMixUI, \"Circular\", \"Helvetica Neue\", helvetica, arial, sans-serif"
+    },
+    "dark": {
+      "background": "#0a0a0a",
+      "foreground": "#ffffff",
+      "surface": "#111111",
+      "border": "#4d4d4d"
     }
   },
   {
@@ -759,7 +895,8 @@
       "foreground": "#061b31",
       "brand": "#533afd",
       "secondaryText": "#64748d",
-      "border": "#e5edf5"
+      "border": "#e5edf5",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"sohne-var\", \"SF Pro Display\", system-ui, sans-serif",
@@ -783,6 +920,13 @@
     "fonts": {
       "sans": "Circular, \"Helvetica Neue\", Helvetica, Arial, sans-serif",
       "mono": "\"Source Code Pro\", \"Office Code Pro\", Menlo, monospace"
+    },
+    "dark": {
+      "background": "#0f0f0f",
+      "foreground": "#fafafa",
+      "surface": "#141414",
+      "secondaryText": "#b4b4b4",
+      "border": "#2e2e2e"
     }
   },
   {
@@ -796,7 +940,8 @@
       "foreground": "#292827",
       "brand": "#cbb7fb",
       "surface": "#e9e5dd",
-      "border": "#dcd7d3"
+      "border": "#dcd7d3",
+      "brandForeground": "#292827"
     },
     "fonts": {
       "sans": "\"Super Sans VF\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif"
@@ -811,11 +956,17 @@
     "colors": {
       "background": "#ffffff",
       "foreground": "#000000",
-      "brand": "#ef2cc1"
+      "brand": "#ef2cc1",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "\"The Future\", Arial, sans-serif",
       "mono": "\"PP Neue Montreal Mono\", ui-monospace, monospace"
+    },
+    "dark": {
+      "background": "#010120",
+      "foreground": "#ffffff",
+      "surface": "#010120"
     }
   },
   {
@@ -829,10 +980,18 @@
       "foreground": "#000000",
       "brand": "#000000",
       "surface": "#efefef",
-      "secondaryText": "#4b4b4b"
+      "secondaryText": "#4b4b4b",
+      "brandForeground": "#ffffff"
     },
     "fonts": {
       "sans": "UberMove, UberMoveText, system-ui, \"Helvetica Neue\", Helvetica, Arial, sans-serif"
+    },
+    "dark": {
+      "background": "#000000",
+      "foreground": "#ffffff",
+      "surface": "#111111",
+      "secondaryText": "#afafaf",
+      "border": "#2a2a2a"
     }
   },
   {
@@ -847,7 +1006,9 @@
       "brand": "#171717",
       "surface": "#fafafa",
       "secondaryText": "#4d4d4d",
-      "border": "#ebebeb"
+      "border": "#ebebeb",
+      "brandForeground": "#fff",
+      "ring": "rgb(235,235,235)"
     },
     "fonts": {
       "sans": "Geist, Arial, sans-serif",
@@ -866,7 +1027,8 @@
       "brand": "#00d992",
       "surface": "#101010",
       "secondaryText": "#b8b3b0",
-      "border": "#3d3a39"
+      "border": "#3d3a39",
+      "error": "#fb565b"
     },
     "fonts": {
       "sans": "system-ui, -apple-system, \"Segoe UI\", Roboto, Inter, sans-serif",
@@ -883,11 +1045,16 @@
       "background": "#353534",
       "foreground": "#faf9f6",
       "brand": "#faf9f6",
-      "secondaryText": "#868584"
+      "secondaryText": "#868584",
+      "brandForeground": "#afaeac"
     },
     "fonts": {
       "sans": "\"Matter Regular\", Inter, system-ui, sans-serif",
       "mono": "\"Geist Mono\", \"Matter Mono Regular\", ui-monospace, monospace"
+    },
+    "dark": {
+      "background": "#080807",
+      "surface": "#111110"
     }
   },
   {
@@ -901,7 +1068,9 @@
       "foreground": "#080808",
       "brand": "#146ef5",
       "secondaryText": "#5a5a5a",
-      "border": "#d8d8d8"
+      "border": "#d8d8d8",
+      "error": "#ee1d36",
+      "brandForeground": "#fff"
     },
     "fonts": {
       "sans": "\"WF Visual Sans Variable\", Arial, sans-serif"
@@ -918,7 +1087,9 @@
       "foreground": "#0e0f0c",
       "brand": "#9fe870",
       "surface": "#e8ebe6",
-      "secondaryText": "#868685"
+      "secondaryText": "#868685",
+      "error": "#d03238",
+      "brandForeground": "#163300"
     },
     "fonts": {
       "sans": "\"Wise Sans\", Inter, Helvetica, Arial, sans-serif"
@@ -938,6 +1109,10 @@
     "fonts": {
       "sans": "universalSans, system-ui, sans-serif",
       "mono": "\"Geist Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+    },
+    "dark": {
+      "background": "#1f2228",
+      "foreground": "#ffffff"
     }
   },
   {
@@ -952,7 +1127,8 @@
       "brand": "#ff4f00",
       "surface": "#eceae3",
       "secondaryText": "#939084",
-      "border": "#c5c0b1"
+      "border": "#c5c0b1",
+      "brandForeground": "#fffefb"
     },
     "fonts": {
       "sans": "Inter, Helvetica, Arial, sans-serif",

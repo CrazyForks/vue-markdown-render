@@ -46,13 +46,13 @@
   --ms-background: 60 1% 20.6%;
   --ms-foreground: 45 28.6% 97.3%;
   --ms-muted: 60 1% 28.6%;
-  --ms-muted-foreground: 30 0.8% 62.2%;
+  --ms-muted-foreground: 30 0.8% 52.2%;
   --ms-secondary: 60 1% 25.6%;
   --ms-secondary-foreground: 45 28.6% 87.3%;
   --ms-accent: 58.5 3.8% 28.3%;
   --ms-accent-foreground: 45 28.6% 92.3%;
   --ms-primary: 45 28.6% 97.3%;
-  --ms-primary-foreground: 0 0% 0%;
+  --ms-primary-foreground: 40 1.8% 68%;
   --ms-destructive: 0 62.8% 30.6%;
   --ms-destructive-foreground: 0 0% 100%;
   --ms-border: 58.2 4.3% 47.8%;

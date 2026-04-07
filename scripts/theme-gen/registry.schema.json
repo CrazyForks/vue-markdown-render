@@ -41,7 +41,26 @@
           "secondaryText": { "type": "string", "description": "Secondary / muted text color" },
           "border":        { "type": "string", "description": "Default border color" },
           "error":         { "type": "string", "description": "Error / destructive color" },
-          "link":          { "type": "string", "description": "Link text color" }
+          "link":          { "type": "string", "description": "Link text color" },
+          "brandForeground": { "type": "string", "description": "Text on brand/CTA buttons (overrides auto contrast pick)" },
+          "ring":          { "type": "string", "description": "Focus ring color" }
+        },
+        "additionalProperties": false
+      },
+      "dark": {
+        "type": "object",
+        "description": "Explicit dark-scheme colors. When dark.background is present, used instead of auto-generating opposite scheme.",
+        "properties": {
+          "background":      { "type": "string" },
+          "foreground":      { "type": "string" },
+          "brand":           { "type": "string" },
+          "surface":         { "type": "string" },
+          "secondaryText":   { "type": "string" },
+          "border":          { "type": "string" },
+          "error":           { "type": "string" },
+          "link":            { "type": "string" },
+          "brandForeground": { "type": "string" },
+          "ring":            { "type": "string" }
         },
         "additionalProperties": false
       },

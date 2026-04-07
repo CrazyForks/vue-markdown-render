@@ -87,6 +87,7 @@ function generate(args) {
 Usage: generate --name <name> --bg <hex> --fg <hex> --brand <hex>
                 [--surface <hex>] [--border <hex>] [--link <hex>]
                 [--error <hex>] [--secondary-text <hex>]
+                [--brand-fg <hex>] [--ring <hex>]
                 [--font-sans <stack>] [--font-mono <stack>] [--font-serif <stack>]
                 [--out <dir>] [--format css|json]
 `)
@@ -117,6 +118,8 @@ Usage: generate --name <name> --bg <hex> --fg <hex> --brand <hex>
     ...(opts.link && { link: opts.link }),
     ...(opts.error && { error: opts.error }),
     ...(opts['secondary-text'] && { secondaryText: opts['secondary-text'] }),
+    ...(opts['brand-fg'] && { brandForeground: opts['brand-fg'] }),
+    ...(opts.ring && { ring: opts.ring }),
     ...(Object.keys(fonts).length > 0 && { fonts }),
   }
 
@@ -195,7 +198,10 @@ function build(args) {
       ...(entry.colors.border && { border: entry.colors.border }),
       ...(entry.colors.error && { error: entry.colors.error }),
       ...(entry.colors.link && { link: entry.colors.link }),
+      ...(entry.colors.brandForeground && { brandForeground: entry.colors.brandForeground }),
+      ...(entry.colors.ring && { ring: entry.colors.ring }),
       ...(entry.fonts && { fonts: entry.fonts }),
+      ...(entry.dark && { dark: entry.dark }),
     }
 
     const { light, dark } = generateBothSchemes(keyColors)

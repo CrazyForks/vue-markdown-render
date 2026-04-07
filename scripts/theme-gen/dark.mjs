@@ -81,7 +81,36 @@ export function generateBothSchemes(keyColors) {
   const sourceIsLight = bg.l > 50
 
   const primary = generatePalette(keyColors)
-  const opposite = generateOppositeScheme(primary, sourceIsLight ? 'light' : 'dark')
+
+  let opposite
+  if (keyColors.dark && keyColors.dark.background && sourceIsLight) {
+    // Explicit dark palette provided — use directly instead of algorithmic flip.
+    // Missing fields fall back to light-side values.
+    opposite = generatePalette({
+      background: keyColors.dark.background,
+      foreground: keyColors.dark.foreground || keyColors.foreground,
+      brand: keyColors.dark.brand || keyColors.brand,
+      ...(keyColors.dark.surface && { surface: keyColors.dark.surface }),
+      ...((keyColors.dark.secondaryText || keyColors.secondaryText) && {
+        secondaryText: keyColors.dark.secondaryText || keyColors.secondaryText,
+      }),
+      ...((keyColors.dark.border) && { border: keyColors.dark.border }),
+      ...((keyColors.dark.error || keyColors.error) && {
+        error: keyColors.dark.error || keyColors.error,
+      }),
+      ...((keyColors.dark.link || keyColors.link) && {
+        link: keyColors.dark.link || keyColors.link,
+      }),
+      ...((keyColors.dark.brandForeground || keyColors.brandForeground) && {
+        brandForeground: keyColors.dark.brandForeground || keyColors.brandForeground,
+      }),
+      ...((keyColors.dark.ring) && { ring: keyColors.dark.ring }),
+      ...(keyColors.fonts && { fonts: keyColors.fonts }),
+    })
+  }
+  else {
+    opposite = generateOppositeScheme(primary, sourceIsLight ? 'light' : 'dark')
+  }
 
   // Font tokens are mode-independent — copy from primary to opposite
   for (const key of ['font-sans', 'font-mono', 'font-serif']) {
