@@ -33,7 +33,8 @@
       "surface": "#f8fafc",
       "secondaryText": "#333333",
       "border": "#e0e2e6",
-      "brandForeground": "#fff"
+      "brandForeground": "#fff",
+      "success": "#006400"
     },
     "fonts": {
       "sans": "Haas, -apple-system, system-ui, \"Segoe UI\", Roboto, sans-serif"
@@ -50,7 +51,8 @@
       "background": "#f5f5f7",
       "foreground": "#1d1d1f",
       "brand": "#0071e3",
-      "brandForeground": "#fff"
+      "brandForeground": "#fff",
+      "info": "#0071e3"
     },
     "fonts": {
       "sans": "\"SF Pro Display\", \"SF Pro Icons\", \"Helvetica Neue\", Helvetica, Arial, sans-serif"
@@ -68,7 +70,8 @@
       "foreground": "#262626",
       "brand": "#1c69d4",
       "secondaryText": "#757575",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "info": "#1c69d4"
     },
     "fonts": {
       "sans": "\"BMWTypeNextLatin\", Helvetica, Arial, sans-serif"
@@ -140,7 +143,10 @@
       "brand": "#078a52",
       "secondaryText": "#9f9b93",
       "border": "#dad4c8",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "success": "#078a52",
+      "warning": "#fbbd41",
+      "info": "#3bd3fd"
     },
     "fonts": {
       "sans": "Roobert, Arial, sans-serif",
@@ -157,7 +163,8 @@
       "background": "#000000",
       "foreground": "#ffffff",
       "brand": "#faff69",
-      "secondaryText": "#a0a0a0"
+      "secondaryText": "#a0a0a0",
+      "success": "#27a644"
     },
     "fonts": {
       "sans": "Inter, Arial, Helvetica, sans-serif",
@@ -183,7 +190,8 @@
       "surface": "#fafafa",
       "secondaryText": "#93939f",
       "border": "#d9d9dd",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "info": "#1863dc"
     },
     "fonts": {
       "sans": "\"Unica77 Cohere Web\", Inter, Arial, system-ui, sans-serif",
@@ -209,7 +217,8 @@
       "foreground": "#0a0b0d",
       "brand": "#0052ff",
       "surface": "#eef0f3",
-      "brandForeground": "#fff"
+      "brandForeground": "#fff",
+      "info": "#0052ff"
     },
     "fonts": {
       "sans": "CoinbaseSans, -apple-system, system-ui, sans-serif"
@@ -225,7 +234,8 @@
     "colors": {
       "background": "#0f0f0f",
       "foreground": "#ffffff",
-      "brand": "#0007cd"
+      "brand": "#0007cd",
+      "info": "#0089ff"
     },
     "fonts": {
       "sans": "abcDiatype, system-ui, sans-serif",
@@ -245,7 +255,8 @@
       "brand": "#f54e00",
       "surface": "#e6e5e0",
       "error": "#cf2d56",
-      "brandForeground": "#26251e"
+      "brandForeground": "#26251e",
+      "success": "#1f8a65"
     },
     "fonts": {
       "sans": "CursorGothic, system-ui, \"Helvetica Neue\", Helvetica, Arial, sans-serif",
@@ -289,7 +300,8 @@
       "secondaryText": "#60646c",
       "border": "#e0e1e6",
       "error": "#eb8e90",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "warning": "#ab6400"
     },
     "fonts": {
       "sans": "Inter, system-ui, -apple-system, sans-serif",
@@ -332,7 +344,8 @@
       "foreground": "#ffffff",
       "brand": "#0099ff",
       "secondaryText": "#a6a6a6",
-      "brandForeground": "#000000"
+      "brandForeground": "#000000",
+      "info": "#0099ff"
     },
     "fonts": {
       "sans": "\"GT Walsheim Framer Medium\", system-ui, sans-serif",
@@ -353,7 +366,9 @@
       "secondaryText": "#656a76",
       "border": "#d5d7db",
       "error": "#731e25",
-      "brandForeground": "#d5d7db"
+      "brandForeground": "#d5d7db",
+      "info": "#1060ff",
+      "warning": "#bb5a00"
     },
     "fonts": {
       "sans": "\"HashiCorp Sans\", system-ui, sans-serif"
@@ -379,7 +394,10 @@
       "surface": "#f4f4f4",
       "secondaryText": "#525252",
       "border": "#c6c6c6",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "info": "#0f62fe",
+      "success": "#24a148",
+      "warning": "#f1c21b"
     },
     "fonts": {
       "sans": "\"IBM Plex Sans\", system-ui, sans-serif",
@@ -421,7 +439,8 @@
       "brand": "#7132f5",
       "secondaryText": "#9497a9",
       "border": "#dedee5",
-      "brandForeground": "#fff"
+      "brandForeground": "#fff",
+      "success": "#149e61"
     },
     "fonts": {
       "sans": "\"Kraken-Product\", system-ui, sans-serif"
@@ -441,7 +460,8 @@
       "surface": "#191a1b",
       "secondaryText": "#8a8f98",
       "border": "#23252a",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "success": "#27a644"
     },
     "fonts": {
       "sans": "\"Inter Variable\", Inter, \"SF Pro Display\", system-ui, sans-serif",
@@ -512,7 +532,9 @@
       "surface": "#fafafa",
       "secondaryText": "#666666",
       "border": "#e5e5e5",
-      "error": "#d45656"
+      "error": "#d45656",
+      "info": "#3772cf",
+      "warning": "#c37d0d"
     },
     "fonts": {
       "sans": "Inter, system-ui, sans-serif",
@@ -533,7 +555,8 @@
       "secondaryText": "#555a6a",
       "border": "#c7cad5",
       "brandForeground": "#fff",
-      "ring": "rgb(224,226,232)"
+      "ring": "rgb(224,226,232)",
+      "success": "#00b473"
     },
     "fonts": {
       "sans": "\"Roobert PRO Medium\", system-ui, sans-serif"
@@ -574,7 +597,8 @@
       "brand": "#00ed64",
       "surface": "#1c2d38",
       "secondaryText": "#5c6c75",
-      "border": "#3d4f58"
+      "border": "#3d4f58",
+      "info": "#006cfa"
     },
     "fonts": {
       "sans": "\"Euclid Circular A\", system-ui, sans-serif",
@@ -595,7 +619,10 @@
       "brand": "#0075de",
       "surface": "#f6f5f4",
       "secondaryText": "#615d59",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "info": "#0075de",
+      "success": "#2a9d99",
+      "warning": "#dd5b00"
     },
     "fonts": {
       "sans": "\"NotionInter\", Inter, -apple-system, system-ui, sans-serif",
@@ -616,7 +643,11 @@
       "surface": "#1a1a1a",
       "secondaryText": "#a7a7a7",
       "border": "#5e5e5e",
-      "brandForeground": "#fff"
+      "brandForeground": "#fff",
+      "error": "#e52020",
+      "info": "#0046a4",
+      "success": "#3f8500",
+      "warning": "#ef9100"
     },
     "fonts": {
       "sans": "\"NVIDIA-EMEA\", Arial, Helvetica, sans-serif"
@@ -663,7 +694,10 @@
       "surface": "#302c2c",
       "secondaryText": "#9a9898",
       "error": "#ff3b30",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "info": "#007aff",
+      "success": "#30d158",
+      "warning": "#ff9f0a"
     },
     "fonts": {
       "mono": "\"Berkeley Mono\", \"IBM Plex Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
@@ -684,7 +718,8 @@
       "secondaryText": "#62625b",
       "border": "#91918c",
       "error": "#e60023",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "success": "#428619"
     },
     "fonts": {
       "sans": "\"Pin Sans\", -apple-system, system-ui, \"Segoe UI\", Roboto, sans-serif"
@@ -727,7 +762,10 @@
       "border": "#252829",
       "error": "#ff6363",
       "brandForeground": "#18191a",
-      "ring": "rgb(27, 28, 30)"
+      "ring": "rgb(27, 28, 30)",
+      "info": "#55b3ff",
+      "success": "#5fc992",
+      "warning": "#ffbc33"
     },
     "fonts": {
       "sans": "Inter, system-ui, sans-serif",
@@ -753,7 +791,8 @@
       "foreground": "#202020",
       "brand": "#ea2804",
       "secondaryText": "#646464",
-      "brandForeground": "#fcfcfc"
+      "brandForeground": "#fcfcfc",
+      "success": "#2b9a66"
     },
     "fonts": {
       "sans": "\"basier-square\", system-ui, sans-serif",
@@ -778,7 +817,10 @@
       "foreground": "#f0f0f0",
       "brand": "#ff801f",
       "secondaryText": "#a1a4a5",
-      "brandForeground": "#000000"
+      "brandForeground": "#000000",
+      "info": "#0075ff",
+      "success": "#19d600",
+      "warning": "#ffc53d"
     },
     "fonts": {
       "sans": "Inter, system-ui, sans-serif",
@@ -801,7 +843,10 @@
       "secondaryText": "#505a63",
       "border": "#c9c9cd",
       "error": "#e23b4a",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "info": "#007bc2",
+      "success": "#00a87e",
+      "warning": "#ec7e00"
     },
     "fonts": {
       "sans": "\"Aeonik Pro\", Inter, Arial, sans-serif"
@@ -847,7 +892,9 @@
       "surface": "#212121",
       "secondaryText": "#b9b9b9",
       "border": "#353535",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "info": "#0052ef",
+      "success": "#37cd84"
     },
     "fonts": {
       "sans": "waldenburgNormal, system-ui, sans-serif",
@@ -904,7 +951,9 @@
       "secondaryText": "#b3b3b3",
       "border": "#4d4d4d",
       "error": "#f3727f",
-      "brandForeground": "#000"
+      "brandForeground": "#000",
+      "info": "#539df5",
+      "warning": "#ffa42b"
     },
     "fonts": {
       "sans": "SpotifyMixUI, \"Circular\", \"Helvetica Neue\", helvetica, arial, sans-serif"
@@ -929,7 +978,9 @@
       "brand": "#533afd",
       "secondaryText": "#64748d",
       "border": "#e5edf5",
-      "brandForeground": "#ffffff"
+      "brandForeground": "#ffffff",
+      "success": "#15be53",
+      "warning": "#9b6829"
     },
     "fonts": {
       "sans": "\"sohne-var\", \"SF Pro Display\", system-ui, sans-serif",
@@ -1067,7 +1118,10 @@
       "surface": "#101010",
       "secondaryText": "#b8b3b0",
       "border": "#3d3a39",
-      "error": "#fb565b"
+      "error": "#fb565b",
+      "info": "#4cb3d4",
+      "success": "#008b00",
+      "warning": "#ffba00"
     },
     "fonts": {
       "sans": "system-ui, -apple-system, \"Segoe UI\", Roboto, Inter, sans-serif",
@@ -1111,7 +1165,9 @@
       "secondaryText": "#5a5a5a",
       "border": "#d8d8d8",
       "error": "#ee1d36",
-      "brandForeground": "#fff"
+      "brandForeground": "#fff",
+      "success": "#00d722",
+      "warning": "#ffae13"
     },
     "fonts": {
       "sans": "\"WF Visual Sans Variable\", Arial, sans-serif"
@@ -1131,7 +1187,9 @@
       "surface": "#e8ebe6",
       "secondaryText": "#868685",
       "error": "#d03238",
-      "brandForeground": "#163300"
+      "brandForeground": "#163300",
+      "success": "#054d28",
+      "warning": "#ffd11a"
     },
     "fonts": {
       "sans": "\"Wise Sans\", Inter, Helvetica, Arial, sans-serif"

@@ -28,16 +28,8 @@
   --ms-ring: 210 12.5% 12.5%;
   --ms-popover: 240 11.1% 94.7%;
   --ms-popover-foreground: 210 12.5% 12.5%;
-  --ms-info: 217 91% 44%;
-  --ms-info-foreground: 210 40% 98%;
-  --ms-success: 168 100% 21.5%;
-  --ms-success-foreground: 210 40% 98%;
-  --ms-warning: 34 100% 28%;
+  --ms-warning: 35.1 100% 33.5%;
   --ms-warning-foreground: 0 0% 100%;
-  --ms-diff-added: 174 60% 51%;
-  --ms-diff-removed: 350 100% 60%;
-  --ms-highlight: 54 100% 62%;
-  --ms-highlight-foreground: 0 0% 0%;
   --ms-link: 207 100% 38%;
 }
 
@@ -60,15 +52,5 @@
   --ms-ring: 240 6.7% 97.1%;
   --ms-popover: 240 8.6% 6.9%;
   --ms-popover-foreground: 240 6.7% 97.1%;
-  --ms-info: 217 77.4% 75%;
-  --ms-info-foreground: 210 40% 98%;
-  --ms-success: 168 85% 52.5%;
-  --ms-success-foreground: 210 40% 98%;
-  --ms-warning: 34 85% 65%;
-  --ms-warning-foreground: 0 0% 100%;
-  --ms-diff-added: 174 72% 70%;
-  --ms-diff-removed: 0 92% 82%;
-  --ms-highlight: 54 80% 42%;
-  --ms-highlight-foreground: 0 0% 100%;
   --ms-link: 222 100% 67%;
 }
