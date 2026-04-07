@@ -227,22 +227,18 @@ const resolvedMonacoOptions = computed(() => {
     selectionHighlight: false,
     occurrencesHighlight: 'off',
     matchBrackets: 'never',
-    lineDecorationsWidth: 12,
+    lineDecorationsWidth: 4,
     lineNumbersMinChars: 2,
     glyphMargin: false,
-    fontSize: 14,
-    lineHeight: 30,
     renderOverviewRuler: false,
     overviewRulerBorder: false,
     hideCursorInOverviewRuler: true,
     scrollBeyondLastLine: false,
-    padding: { top: 10, bottom: needsExtraBottomSpace ? 22 : 14 },
     diffHideUnchangedRegions,
     diffLineStyle: 'background',
     diffAppearance: 'auto',
     diffUnchangedRegionStyle,
-    diffHunkActionsOnHover: true,
-    diffHunkHoverHideDelayMs: 160,
+    diffHunkActionsOnHover: false,
   }
   return {
     ...diffDefaults,
@@ -1193,11 +1189,7 @@ const containerStyle = computed(() => {
     s.minWidth = min
   if (max)
     s.maxWidth = max
-  if (isDiff.value) {
-    s.color = 'var(--markstream-diff-shell-fg)'
-    s.borderColor = 'var(--markstream-diff-shell-border)'
-  }
-  else {
+  if (!isDiff.value) {
     s.color = 'var(--vscode-editor-foreground, var(--markstream-code-fallback-fg))'
     s.backgroundColor = 'var(--vscode-editor-background, var(--markstream-code-fallback-bg))'
     s.borderColor = 'var(--markstream-code-border-color)'
@@ -2025,14 +2017,9 @@ onUnmounted(() => {
   --markstream-diff-frame-shadow: 0 16px 40px -32px hsl(var(--ms-foreground) / 0.18);
   --markstream-diff-shell-fg: hsl(var(--ms-foreground));
   --markstream-diff-shell-muted: hsl(var(--ms-muted-foreground));
-  --markstream-diff-shell-border: hsl(var(--ms-border) / 0.18);
-  --markstream-diff-shell-shadow: 0 30px 70px -48px hsl(var(--ms-foreground) / 0.42);
-  --markstream-diff-shell-bg: radial-gradient(
-      circle at top center,
-      hsl(var(--ms-background) / 0.9),
-      transparent 55%
-    ),
-    linear-gradient(180deg, var(--code-bg) 0%, hsl(var(--ms-muted)) 100%);
+  --markstream-diff-shell-border: var(--code-border);
+  --markstream-diff-shell-shadow: var(--ms-shadow-subtle);
+  --markstream-diff-shell-bg: var(--code-bg);
   --markstream-diff-header-border: hsl(var(--ms-border) / 0.92);
   --markstream-diff-editor-bg: var(--code-bg);
   --markstream-diff-editor-fg: hsl(var(--ms-foreground));
@@ -2049,7 +2036,7 @@ onUnmounted(() => {
   --markstream-diff-pane-divider: hsl(var(--ms-border) / 0.42);
   --markstream-diff-gutter-bg: transparent;
   --markstream-diff-gutter-guide: transparent;
-  --markstream-diff-gutter-gap: 16px;
+  --markstream-diff-gutter-gap: 8px;
   --markstream-diff-line-number: var(--code-line-number);
   --markstream-diff-line-number-active: var(--code-line-number);
   --markstream-diff-added-fg: var(--diff-added-fg);
@@ -2085,9 +2072,9 @@ onUnmounted(() => {
   --markstream-diff-frame-shadow: 0 18px 40px -30px hsl(var(--ms-foreground) / 0.84);
   --markstream-diff-shell-fg: hsl(var(--ms-foreground));
   --markstream-diff-shell-muted: hsl(var(--ms-muted-foreground));
-  --markstream-diff-shell-border: hsl(var(--ms-border) / 0.56);
-  --markstream-diff-shell-shadow: 0 34px 80px -52px hsl(var(--ms-foreground) / 0.72);
-  --markstream-diff-shell-bg: hsl(var(--ms-background) / 0.99);
+  --markstream-diff-shell-border: var(--code-border);
+  --markstream-diff-shell-shadow: var(--ms-shadow-subtle);
+  --markstream-diff-shell-bg: var(--code-bg);
   --markstream-diff-header-border: hsl(var(--ms-border) / 0.82);
   --markstream-diff-editor-bg: var(--code-bg);
   --markstream-diff-editor-fg: hsl(var(--ms-foreground));
@@ -2108,7 +2095,7 @@ onUnmounted(() => {
     hsl(var(--ms-background) / 0.98) 100%
   );
   --markstream-diff-gutter-guide: hsl(var(--ms-muted-foreground) / 0.08);
-  --markstream-diff-gutter-gap: 16px;
+  --markstream-diff-gutter-gap: 8px;
   --markstream-diff-line-number: var(--code-line-number);
   --markstream-diff-line-number-active: var(--code-line-number);
   --markstream-diff-added-fg: var(--diff-added-fg);
@@ -2214,16 +2201,16 @@ onUnmounted(() => {
 }
 
 .code-block-container.is-diff .code-block-header {
-  padding: 18px 20px 14px;
   color: var(--markstream-diff-shell-fg);
   background: transparent;
   border-bottom-color: var(--markstream-diff-header-border);
 }
 
 .code-block-container.is-diff {
+  color: var(--markstream-diff-shell-fg);
+  border-color: var(--markstream-diff-shell-border);
   background: var(--markstream-diff-shell-bg);
   box-shadow: var(--markstream-diff-shell-shadow);
-  border-color: var(--markstream-diff-shell-border);
   --vscode-editor-selectionBackground: var(--markstream-diff-action-hover);
 }
 
@@ -2232,7 +2219,6 @@ onUnmounted(() => {
 }
 
 .code-block-container.is-diff .code-editor-layer {
-  padding: 4px 4px 8px;
   background: transparent;
   --vscode-editor-background: var(--markstream-diff-editor-bg);
   --vscode-editor-foreground: var(--markstream-diff-editor-fg);
@@ -2249,26 +2235,26 @@ onUnmounted(() => {
   --stream-monaco-editor-fg: var(--markstream-diff-editor-fg);
   --stream-monaco-unchanged-fg: var(--markstream-diff-unchanged-fg);
   --stream-monaco-unchanged-bg: var(--markstream-diff-unchanged-bg);
-  --stream-monaco-frame-radius: 18px;
-  --stream-monaco-fixed-editor-bg: var(--markstream-diff-panel-bg-strong);
-  --stream-monaco-frame-border: var(--markstream-diff-frame-border);
-  --stream-monaco-frame-shadow: var(--markstream-diff-frame-shadow);
-  --stream-monaco-panel-bg: var(--markstream-diff-panel-bg);
-  --stream-monaco-panel-bg-soft: var(--markstream-diff-panel-bg-soft);
-  --stream-monaco-panel-bg-strong: var(--markstream-diff-panel-bg-strong);
-  --stream-monaco-panel-border: var(--markstream-diff-panel-border);
+  --stream-monaco-frame-radius: 0;
+  --stream-monaco-fixed-editor-bg: var(--markstream-diff-editor-bg);
+  --stream-monaco-frame-border: transparent;
+  --stream-monaco-frame-shadow: none;
+  --stream-monaco-panel-bg: var(--markstream-diff-editor-bg);
+  --stream-monaco-panel-bg-soft: var(--markstream-diff-editor-bg);
+  --stream-monaco-panel-bg-strong: var(--markstream-diff-editor-bg);
+  --stream-monaco-panel-border: transparent;
   --stream-monaco-pane-divider: var(--markstream-diff-pane-divider);
   --stream-monaco-gutter-bg: var(--markstream-diff-gutter-bg);
   --stream-monaco-gutter-guide: var(--markstream-diff-gutter-guide);
-  --stream-monaco-gutter-marker-width: 4px;
-  --stream-monaco-gutter-gap: var(--markstream-diff-gutter-gap);
+  --stream-monaco-gutter-marker-width: 3px;
+  --stream-monaco-gutter-gap: 8px;
   --stream-monaco-line-number: var(--markstream-diff-line-number);
   --stream-monaco-line-number-active: var(--markstream-diff-line-number-active);
   --stream-monaco-line-number-left: calc(
     var(--stream-monaco-gutter-marker-width) + var(--stream-monaco-gutter-gap)
   );
-  --stream-monaco-line-number-width: 36px;
-  --stream-monaco-line-number-align: center;
+  --stream-monaco-line-number-width: 28px;
+  --stream-monaco-line-number-align: right;
   --stream-monaco-original-margin-width: calc(
     var(--stream-monaco-gutter-marker-width) +
       (var(--stream-monaco-gutter-gap) * 2) +
@@ -2303,6 +2289,9 @@ onUnmounted(() => {
   --stream-monaco-removed-gutter: var(--markstream-diff-removed-gutter);
   --stream-monaco-added-line-fill: var(--markstream-diff-added-line-fill);
   --stream-monaco-removed-line-fill: var(--markstream-diff-removed-line-fill);
+  --stream-monaco-added-border: hsl(var(--ms-diff-added) / 0.25);
+  --stream-monaco-removed-border: hsl(var(--ms-diff-removed) / 0.25);
+  --stream-monaco-widget-shadow: var(--markstream-diff-widget-shadow);
 }
 
 
@@ -2382,63 +2371,33 @@ onUnmounted(() => {
   100% { background-position: 0 0; }
 }
 
-.code-block-container.is-diff .icon-slot {
-  width: 28px;
-  height: 28px;
-  box-shadow: inset 0 1px 0 hsl(var(--ms-background) / 0.7);
-  padding: 5px;
-  color: var(--markstream-diff-added-fg);
-}
-
-.code-block-container.is-diff.is-dark .icon-slot {
-  box-shadow:
-    inset 0 1px 0 hsl(var(--ms-background) / 0.08),
-    0 12px 28px -20px hsl(var(--ms-ring) / 0.45);
-}
-
-.code-diff-stats {
+:deep(.code-diff-stats) {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-right: 4px;
-  font-size: 13px;
-  font-weight: 700;
+  gap: var(--ms-space-1_5);
+  margin-right: var(--ms-space-1);
+  font-size: var(--ms-text-label);
+  font-weight: 600;
   line-height: 1;
-  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
 }
 
-.code-diff-stat {
+:deep(.code-diff-stat) {
   display: inline-flex;
   align-items: center;
-}
-
-.code-diff-stat.removed {
-  color: var(--vscode-diffEditor-removedTextForeground, var(--markstream-diff-removed-fg));
-}
-
-.code-diff-stat.added {
-  color: var(--vscode-diffEditor-insertedTextForeground, var(--markstream-diff-added-fg));
-}
-
-.code-block-container.is-dark .code-diff-stat {
-  padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid transparent;
+  padding: 2px 6px;
+  border-radius: var(--ms-radius);
   line-height: 1;
-  box-shadow: inset 0 1px 0 hsl(var(--ms-background) / 0.05);
 }
 
-.code-block-container.is-dark .code-diff-stat.removed {
+:deep(.code-diff-stat.removed) {
   color: var(--diff-removed-fg);
-  background: hsl(var(--ms-diff-removed) / 0.16);
-  border-color: hsl(var(--ms-diff-removed) / 0.2);
+  background: hsl(var(--ms-diff-removed) / 0.1);
 }
 
-.code-block-container.is-dark .code-diff-stat.added {
+:deep(.code-diff-stat.added) {
   color: var(--diff-added-fg);
-  background: hsl(var(--ms-diff-added) / 0.16);
-  border-color: hsl(var(--ms-diff-added) / 0.22);
+  background: hsl(var(--ms-diff-added) / 0.1);
 }
 
 /* Ensure injected icons align consistently whether img or inline svg */
@@ -2454,19 +2413,52 @@ onUnmounted(() => {
   height: 100%;
 }
 
-@container (max-width: 640px) {
-  .code-block-container.is-diff .code-block-header {
-    padding: 16px 16px 12px;
-  }
 
-  .code-block-container.is-diff .code-editor-layer {
-    padding: 4px 4px 8px;
-  }
+/* ── Unchanged lines widget (ghost style) ── */
+:deep(.stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center) {
+  border-radius: var(--ms-radius) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+  min-height: 28px !important;
+  transition: background-color 0.14s ease, border-color 0.14s ease !important;
+}
 
-  .code-diff-stats {
-    gap: 6px;
-    font-size: 12px;
-  }
+:deep(.stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center:hover),
+:deep(.stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center.stream-monaco-focus-within) {
+  background: color-mix(in srgb, var(--stream-monaco-editor-fg) 4%, transparent) !important;
+  border-color: color-mix(in srgb, var(--stream-monaco-editor-fg) 10%, transparent) !important;
+  box-shadow: none !important;
+}
+
+:deep(.stream-monaco-diff-root.stream-monaco-diff-appearance-dark .monaco-editor .diff-hidden-lines .center) {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+:deep(.stream-monaco-diff-root.stream-monaco-diff-appearance-dark .monaco-editor .diff-hidden-lines .center:hover),
+:deep(.stream-monaco-diff-root.stream-monaco-diff-appearance-dark .monaco-editor .diff-hidden-lines .center.stream-monaco-focus-within) {
+  background: color-mix(in srgb, var(--stream-monaco-editor-fg) 6%, transparent) !important;
+  border-color: color-mix(in srgb, var(--stream-monaco-editor-fg) 12%, transparent) !important;
+  box-shadow: none !important;
+}
+
+/* Expand icon before the count label */
+:deep(.stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center .stream-monaco-unchanged-count)::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  flex-shrink: 0;
+  background: currentColor;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
 }
 
 :deep(.monaco-diff-editor .diffOverview){
