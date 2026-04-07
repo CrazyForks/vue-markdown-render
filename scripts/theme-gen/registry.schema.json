@@ -43,7 +43,13 @@
           "error":         { "type": "string", "description": "Error / destructive color" },
           "link":          { "type": "string", "description": "Link text color" },
           "brandForeground": { "type": "string", "description": "Text on brand/CTA buttons (overrides auto contrast pick)" },
-          "ring":          { "type": "string", "description": "Focus ring color" }
+          "ring":          { "type": "string", "description": "Focus ring color" },
+          "info":          { "type": "string", "description": "Info / note semantic color" },
+          "success":       { "type": "string", "description": "Success / tip semantic color" },
+          "warning":       { "type": "string", "description": "Warning semantic color" },
+          "highlight":     { "type": "string", "description": "Highlight / mark color" },
+          "diffAdded":     { "type": "string", "description": "Diff added indicator color" },
+          "diffRemoved":   { "type": "string", "description": "Diff removed indicator color" }
         },
         "additionalProperties": false
       },
@@ -64,7 +70,13 @@
           "error":           { "type": "string" },
           "link":            { "type": "string" },
           "brandForeground": { "type": "string" },
-          "ring":            { "type": "string" }
+          "ring":            { "type": "string" },
+          "info":            { "type": "string" },
+          "success":         { "type": "string" },
+          "warning":         { "type": "string" },
+          "highlight":       { "type": "string" },
+          "diffAdded":       { "type": "string" },
+          "diffRemoved":     { "type": "string" }
         },
         "additionalProperties": false
       },
