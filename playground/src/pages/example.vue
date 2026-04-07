@@ -301,16 +301,17 @@ graph LR
 ## Infographic
 
 \`\`\`infographic
-{
-  "title": "Design Token System",
-  "type": "stats",
-  "items": [
-    { "label": "Components", "value": "25", "description": "Migrated to tokens" },
-    { "label": "CSS Tokens", "value": "82", "description": "Color + spacing + animation" },
-    { "label": "Icon Themes", "value": "1", "description": "Material Icon Theme default" },
-    { "label": "Test Pass", "value": "100%", "description": "1029 tests passing" }
-  ]
-}
+infographic list-row-simple-horizontal-arrow
+data
+  items:
+    - label: Components
+      desc: 25 migrated to tokens
+    - label: CSS Tokens
+      desc: 82 semantic variables
+    - label: Icon Theme
+      desc: Material Icon Theme default
+    - label: Test Pass
+      desc: 1029 tests passing
 \`\`\`
 
 ---

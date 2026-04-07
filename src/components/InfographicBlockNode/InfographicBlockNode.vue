@@ -369,8 +369,29 @@ async function renderInfographic(force = false) {
       height: '100%',
     })
 
+    let renderErrorMessage = ''
+    infographicInstance.on?.('error', (error: unknown) => {
+      const errors = Array.isArray(error) ? error : [error]
+      renderErrorMessage = errors
+        .map((item) => {
+          if (item instanceof Error)
+            return item.message
+          if (typeof item === 'string')
+            return item
+          if (item && typeof item === 'object' && 'message' in item)
+            return String((item as { message?: unknown }).message ?? '')
+          return String(item ?? '')
+        })
+        .filter(Boolean)
+        .join('; ')
+    })
+
     // Render the syntax
     infographicInstance.render(baseCode.value)
+    if (renderErrorMessage)
+      throw new Error(renderErrorMessage)
+    if (!infographicContainer.value.childNodes.length)
+      throw new Error('Infographic render returned empty output.')
     hasPreview.value = true
     lastCompletedRenderSignature = signature
 
