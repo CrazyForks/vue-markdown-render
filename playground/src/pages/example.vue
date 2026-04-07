@@ -303,15 +303,15 @@ graph LR
 \`\`\`infographic
 infographic list-row-simple-horizontal-arrow
 data
-  items:
-    - label: Components
-      desc: 25 migrated to tokens
-    - label: CSS Tokens
-      desc: 82 semantic variables
-    - label: Icon Theme
-      desc: Material Icon Theme default
-    - label: Test Pass
-      desc: 1029 tests passing
+  items
+    - label Components
+      desc 25 migrated to tokens
+    - label Tokens
+      desc 82 semantic variables
+    - label Icon Theme
+      desc Material default
+    - label Test Pass
+      desc 1029 passing
 \`\`\`
 
 ---
