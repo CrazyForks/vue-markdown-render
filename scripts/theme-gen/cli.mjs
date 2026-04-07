@@ -30,7 +30,7 @@ import { generateBothSchemes, validateContrast } from './dark.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-/** Token keys that are not color values (font stacks, radius, etc.) */
+/** Token keys that are not color values (font stacks, radius, etc.) — rendered in the shared block */
 const NON_COLOR_TOKENS = new Set(['font-sans', 'font-mono', 'font-serif', 'radius'])
 
 // ─── CLI dispatch ───────────────────────────────────────────────────
@@ -201,6 +201,7 @@ function build(args) {
       ...(entry.colors.brandForeground && { brandForeground: entry.colors.brandForeground }),
       ...(entry.colors.ring && { ring: entry.colors.ring }),
       ...(entry.fonts && { fonts: entry.fonts }),
+      ...(entry.radius && { radius: entry.radius }),
       ...(entry.dark && { dark: entry.dark }),
     }
 
@@ -260,7 +261,7 @@ function renderThemeCss(name, light, dark) {
 
   // Shared tokens (fonts, radius — mode-independent)
   if (Object.keys(shared).length > 0) {
-    lines.push(`/* ── Typography ── */`)
+    lines.push(`/* ── Shared ── */`)
     lines.push(`.markstream-vue[data-theme="${name}"] {`)
     for (const [key, val] of Object.entries(shared)) {
       lines.push(`  --ms-${key}: ${val};`)

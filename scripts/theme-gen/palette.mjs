@@ -38,6 +38,7 @@ import {
  * @param {string} [input.link]      - Link color
  * @param {string} [input.brandForeground] - Text on brand buttons (overrides auto)
  * @param {string} [input.ring]      - Focus ring color
+ * @param {string} [input.radius]    - Default component border-radius
  * @param {object} [input.fonts]     - Typography overrides
  * @param {string} [input.fonts.sans]  - Sans-serif font stack
  * @param {string} [input.fonts.mono]  - Monospace font stack
@@ -147,6 +148,10 @@ export function generatePalette(input) {
     colorTokens['font-mono'] = fonts.mono
   if (fonts.serif)
     colorTokens['font-serif'] = fonts.serif
+
+  // Radius token
+  if (input.radius)
+    colorTokens['radius'] = input.radius
 
   return colorTokens
 }

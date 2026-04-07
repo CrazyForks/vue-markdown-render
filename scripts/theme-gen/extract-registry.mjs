@@ -178,6 +178,22 @@ for (const entry of registry) {
 
   const changes = []
 
+  // ── radius ──
+  if (!entry.radius) {
+    // Extract from card class border-radius (best proxy for container panels)
+    const cardRadiusMatch = lightHtml.match(/\.card\s*\{[^}]*border-radius:\s*([\d.]+)px/i)
+      || lightHtml.match(/\.card[^{]*\{[^}]*border-radius:\s*([\d.]+)px/i)
+    if (cardRadiusMatch) {
+      const px = parseFloat(cardRadiusMatch[1])
+      // Only accept reasonable container radii (4-20px)
+      if (px >= 4 && px <= 20) {
+        const rem = Math.round(px / 16 * 1000) / 1000
+        entry.radius = `${rem}rem`
+        changes.push(`radius=${px}px`)
+      }
+    }
+  }
+
   // ── error ──
   if (!entry.colors.error) {
     const error = findColor(lightVars,

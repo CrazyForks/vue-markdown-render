@@ -112,8 +112,8 @@ export function generateBothSchemes(keyColors) {
     opposite = generateOppositeScheme(primary, sourceIsLight ? 'light' : 'dark')
   }
 
-  // Font tokens are mode-independent — copy from primary to opposite
-  for (const key of ['font-sans', 'font-mono', 'font-serif']) {
+  // Shared tokens are mode-independent — copy from primary to opposite
+  for (const key of ['font-sans', 'font-mono', 'font-serif', 'radius']) {
     if (primary[key] && !opposite[key])
       opposite[key] = primary[key]
   }

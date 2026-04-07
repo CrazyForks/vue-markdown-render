@@ -47,6 +47,10 @@
         },
         "additionalProperties": false
       },
+      "radius": {
+        "type": "string",
+        "description": "Default component border-radius (CSS value, e.g. '0.5rem', '6px')"
+      },
       "dark": {
         "type": "object",
         "description": "Explicit dark-scheme colors. When dark.background is present, used instead of auto-generating opposite scheme.",

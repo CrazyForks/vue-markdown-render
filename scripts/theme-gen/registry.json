@@ -17,7 +17,8 @@
     },
     "fonts": {
       "sans": "\"Airbnb Cereal VF\", Circular, -apple-system, system-ui, Roboto, \"Helvetica Neue\", sans-serif"
-    }
+    },
+    "radius": "1.25rem"
   },
   {
     "id": "airtable",
@@ -36,7 +37,8 @@
     },
     "fonts": {
       "sans": "Haas, -apple-system, system-ui, \"Segoe UI\", Roboto, sans-serif"
-    }
+    },
+    "radius": "1rem"
   },
   {
     "id": "apple",
@@ -52,7 +54,8 @@
     },
     "fonts": {
       "sans": "\"SF Pro Display\", \"SF Pro Icons\", \"Helvetica Neue\", Helvetica, Arial, sans-serif"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "bmw",
@@ -87,7 +90,8 @@
     "fonts": {
       "sans": "\"Cal Sans\", system-ui, sans-serif",
       "mono": "\"Roboto Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
-    }
+    },
+    "radius": "0.75rem"
   },
   {
     "id": "claude",
@@ -117,6 +121,7 @@
       "error": "#b53333",
       "ring": "#4d4c48"
     },
+    "radius": "0.75rem",
     "fonts": {
       "sans": "\"Anthropic Sans\", Arial, sans-serif",
       "mono": "\"Anthropic Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -162,7 +167,8 @@
       "background": "#000000",
       "foreground": "#ffffff",
       "secondaryText": "#a0a0a0"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "cohere",
@@ -207,7 +213,8 @@
     },
     "fonts": {
       "sans": "CoinbaseSans, -apple-system, system-ui, sans-serif"
-    }
+    },
+    "radius": "1rem"
   },
   {
     "id": "composio",
@@ -223,7 +230,8 @@
     "fonts": {
       "sans": "abcDiatype, system-ui, sans-serif",
       "mono": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
-    }
+    },
+    "radius": "0.25rem"
   },
   {
     "id": "cursor",
@@ -243,7 +251,8 @@
       "sans": "CursorGothic, system-ui, \"Helvetica Neue\", Helvetica, Arial, sans-serif",
       "mono": "berkeleyMono, ui-monospace, SFMono-Regular, Menlo, monospace",
       "serif": "jjannon, \"Iowan Old Style\", \"Palatino Linotype\", Georgia, serif"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "elevenlabs",
@@ -263,7 +272,8 @@
     "fonts": {
       "sans": "Waldenburg, system-ui, sans-serif",
       "mono": "\"Geist Mono\", ui-monospace, SFMono-Regular, monospace"
-    }
+    },
+    "radius": "1.25rem"
   },
   {
     "id": "expo",
@@ -284,7 +294,8 @@
     "fonts": {
       "sans": "Inter, system-ui, -apple-system, sans-serif",
       "mono": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "figma",
@@ -307,7 +318,8 @@
       "foreground": "#ffffff",
       "surface": "#000000",
       "secondaryText": "#ffffff"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "framer",
@@ -351,7 +363,8 @@
       "foreground": "#efeff1",
       "surface": "#15181e",
       "secondaryText": "#d5d7db"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "ibm",
@@ -393,7 +406,8 @@
       "sans": "Saans, system-ui, sans-serif",
       "mono": "SaansMono, ui-monospace, monospace",
       "serif": "Serrif, Georgia, serif"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "kraken",
@@ -411,7 +425,8 @@
     },
     "fonts": {
       "sans": "\"Kraken-Product\", system-ui, sans-serif"
-    }
+    },
+    "radius": "0.75rem"
   },
   {
     "id": "linear",
@@ -437,7 +452,8 @@
       "foreground": "#f7f8f8",
       "surface": "#0f1011",
       "secondaryText": "#d0d6e0"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "lovable",
@@ -455,7 +471,8 @@
     },
     "fonts": {
       "sans": "\"Camera Plain Variable\", system-ui, sans-serif"
-    }
+    },
+    "radius": "0.75rem"
   },
   {
     "id": "minimax",
@@ -479,7 +496,8 @@
       "foreground": "#f0f2f5",
       "surface": "#1f2731",
       "secondaryText": "#a0a8b4"
-    }
+    },
+    "radius": "1.25rem"
   },
   {
     "id": "mintlify",
@@ -499,7 +517,8 @@
     "fonts": {
       "sans": "Inter, system-ui, sans-serif",
       "mono": "\"Geist Mono\", ui-monospace, SFMono-Regular, monospace"
-    }
+    },
+    "radius": "1rem"
   },
   {
     "id": "miro",
@@ -518,7 +537,8 @@
     },
     "fonts": {
       "sans": "\"Roobert PRO Medium\", system-ui, sans-serif"
-    }
+    },
+    "radius": "0.75rem"
   },
   {
     "id": "mistral",
@@ -560,7 +580,8 @@
       "sans": "\"Euclid Circular A\", system-ui, sans-serif",
       "mono": "\"Source Code Pro\", ui-monospace, SFMono-Regular, monospace",
       "serif": "\"MongoDB Value Serif\", Georgia, serif"
-    }
+    },
+    "radius": "1rem"
   },
   {
     "id": "notion",
@@ -579,7 +600,8 @@
     "fonts": {
       "sans": "\"NotionInter\", Inter, -apple-system, system-ui, sans-serif",
       "serif": "\"Lyon-Text\", Georgia, \"Noto Serif\", serif"
-    }
+    },
+    "radius": "0.75rem"
   },
   {
     "id": "nvidia",
@@ -625,7 +647,8 @@
       "surface": "#262626",
       "secondaryText": "#a3a3a3",
       "border": "#525252"
-    }
+    },
+    "radius": "0.75rem"
   },
   {
     "id": "opencode-ai",
@@ -644,7 +667,8 @@
     },
     "fonts": {
       "mono": "\"Berkeley Mono\", \"IBM Plex Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
-    }
+    },
+    "radius": "0.25rem"
   },
   {
     "id": "pinterest",
@@ -664,7 +688,8 @@
     },
     "fonts": {
       "sans": "\"Pin Sans\", -apple-system, system-ui, \"Segoe UI\", Roboto, sans-serif"
-    }
+    },
+    "radius": "1.25rem"
   },
   {
     "id": "posthog",
@@ -684,7 +709,8 @@
     "fonts": {
       "sans": "\"IBM Plex Sans Variable\", -apple-system, system-ui, sans-serif",
       "mono": "\"Source Code Pro\", Menlo, Consolas, Monaco, monospace"
-    }
+    },
+    "radius": "0.375rem"
   },
   {
     "id": "raycast",
@@ -713,7 +739,8 @@
       "surface": "#151617",
       "border": "#1e1f21",
       "ring": "rgb(22, 23, 25)"
-    }
+    },
+    "radius": "1rem"
   },
   {
     "id": "replicate",
@@ -757,7 +784,8 @@
       "sans": "Inter, system-ui, sans-serif",
       "mono": "\"Commit Mono\", ui-monospace, SFMono-Regular, Menlo, monospace",
       "serif": "Domaine, Georgia, serif"
-    }
+    },
+    "radius": "1rem"
   },
   {
     "id": "revolut",
@@ -777,7 +805,8 @@
     },
     "fonts": {
       "sans": "\"Aeonik Pro\", Inter, Arial, sans-serif"
-    }
+    },
+    "radius": "1.25rem"
   },
   {
     "id": "runwayml",
@@ -802,7 +831,8 @@
       "surface": "#1a1a1a",
       "secondaryText": "#a7a7a7",
       "border": "#27272a"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "sanity",
@@ -841,7 +871,8 @@
     "fonts": {
       "sans": "Rubik, -apple-system, system-ui, \"Segoe UI\", Helvetica, Arial, sans-serif",
       "mono": "Monaco, Menlo, \"Ubuntu Mono\", monospace"
-    }
+    },
+    "radius": "0.75rem"
   },
   {
     "id": "spacex",
@@ -856,7 +887,8 @@
     },
     "fonts": {
       "sans": "\"D-DIN\", Arial, Verdana, sans-serif"
-    }
+    },
+    "radius": "0.25rem"
   },
   {
     "id": "spotify",
@@ -882,7 +914,8 @@
       "foreground": "#ffffff",
       "surface": "#111111",
       "border": "#4d4d4d"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "stripe",
@@ -901,7 +934,8 @@
     "fonts": {
       "sans": "\"sohne-var\", \"SF Pro Display\", system-ui, sans-serif",
       "mono": "\"Source Code Pro\", SFMono-Regular, Menlo, monospace"
-    }
+    },
+    "radius": "0.375rem"
   },
   {
     "id": "supabase",
@@ -927,7 +961,8 @@
       "surface": "#141414",
       "secondaryText": "#b4b4b4",
       "border": "#2e2e2e"
-    }
+    },
+    "radius": "1rem"
   },
   {
     "id": "superhuman",
@@ -945,7 +980,8 @@
     },
     "fonts": {
       "sans": "\"Super Sans VF\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif"
-    }
+    },
+    "radius": "1rem"
   },
   {
     "id": "together-ai",
@@ -967,7 +1003,8 @@
       "background": "#010120",
       "foreground": "#ffffff",
       "surface": "#010120"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "uber",
@@ -992,7 +1029,8 @@
       "surface": "#111111",
       "secondaryText": "#afafaf",
       "border": "#2a2a2a"
-    }
+    },
+    "radius": "0.75rem"
   },
   {
     "id": "vercel",
@@ -1013,7 +1051,8 @@
     "fonts": {
       "sans": "Geist, Arial, sans-serif",
       "mono": "\"Geist Mono\", ui-monospace, SFMono-Regular, \"Roboto Mono\", Menlo, monospace"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "voltagent",
@@ -1033,7 +1072,8 @@
     "fonts": {
       "sans": "system-ui, -apple-system, \"Segoe UI\", Roboto, Inter, sans-serif",
       "mono": "SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "warp",
@@ -1055,7 +1095,8 @@
     "dark": {
       "background": "#080807",
       "surface": "#111110"
-    }
+    },
+    "radius": "0.875rem"
   },
   {
     "id": "webflow",
@@ -1074,7 +1115,8 @@
     },
     "fonts": {
       "sans": "\"WF Visual Sans Variable\", Arial, sans-serif"
-    }
+    },
+    "radius": "0.5rem"
   },
   {
     "id": "wise",
@@ -1133,6 +1175,7 @@
     "fonts": {
       "sans": "Inter, Helvetica, Arial, sans-serif",
       "serif": "\"GT Alpina\", Georgia, serif"
-    }
+    },
+    "radius": "0.313rem"
   }
 ]
