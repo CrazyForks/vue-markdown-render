@@ -223,7 +223,7 @@ const fontIncreaseDisabled = computed(() =>
 
           <Teleport to="body">
             <Transition name="code-menu">
-              <div v-if="moreMenuOpen" ref="moreMenuRef" :style="menuStyle" class="min-w-[10rem] p-1 bg-[hsl(var(--ms-popover))] text-[hsl(var(--ms-popover-foreground))] border border-[var(--code-border)] rounded-md shadow-[var(--ms-shadow-popover)]" role="menu">
+              <div v-if="moreMenuOpen" ref="moreMenuRef" :style="menuStyle" class="min-w-[10rem] p-1 bg-[hsl(var(--ms-popover))] text-[hsl(var(--ms-popover-foreground))] border border-[var(--code-border)] rounded-lg shadow-[var(--ms-shadow-popover)]" role="menu">
               <!-- Font size controls -->
               <template v-if="props.showFontSizeButtons && props.enableFontSizeControl">
                 <button type="button" role="menuitem" class="flex items-center gap-2 w-full py-1.5 px-2 rounded text-xs text-[var(--code-action-fg)] cursor-pointer whitespace-nowrap hover:bg-[var(--code-action-hover-bg)] hover:text-[var(--code-action-hover-fg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors" :disabled="fontDecreaseDisabled" @click="emit('decreaseFont')">
