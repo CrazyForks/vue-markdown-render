@@ -421,7 +421,7 @@ watch(
   () => showSource.value,
   (isSource) => {
     if (!isSource)
-      queueInfographicRender()
+      queueInfographicRender(true)
   },
 )
 
