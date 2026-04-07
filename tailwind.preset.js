@@ -32,10 +32,10 @@ export default {
         'popover-foreground': 'hsl(var(--ms-popover-foreground))',
       },
       borderRadius: {
-        lg: 'calc(var(--ms-radius) + 4px)',
-        md: 'calc(var(--ms-radius) + 2px)',
-        DEFAULT: 'var(--ms-radius)',
-        sm: 'calc(var(--ms-radius) - 2px)',
+        lg: 'var(--ms-radius)',
+        md: 'calc(var(--ms-radius) * 0.75)',
+        DEFAULT: 'calc(var(--ms-radius) * 0.5)',
+        sm: 'calc(var(--ms-radius) * 0.33)',
       },
       fontFamily: {
         sans: ['var(--ms-font-sans)'],

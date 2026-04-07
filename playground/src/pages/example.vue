@@ -419,18 +419,16 @@ Term 2
 
       <!-- Shiki-rendered code block (lightweight, no Monaco) -->
       <h2 class="text-xl font-semibold mt-8 mb-4">Shiki Code Block</h2>
-      <div class="markstream-vue" :class="{ dark: isDark }">
-        <MarkdownCodeBlockNode
-          :node="shikiNode"
-          :is-dark="isDark"
-          :loading="false"
-          :stream="false"
-          index-key="shiki-demo"
-          :show-header="true"
-          :show-copy-button="true"
-          :show-collapse-button="true"
-        />
-      </div>
+      <MarkdownCodeBlockNode
+        :node="shikiNode"
+        :is-dark="isDark"
+        :loading="false"
+        :stream="false"
+        index-key="shiki-demo"
+        :show-header="true"
+        :show-copy-button="true"
+        :show-collapse-button="true"
+      />
     </main>
   </div>
 </template>
