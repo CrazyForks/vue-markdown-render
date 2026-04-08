@@ -136,6 +136,8 @@ export interface CodeBlockMonacoOptions {
   languages?: CodeBlockMonacoLanguage[]
   /** Render diff editors side-by-side instead of inline. */
   renderSideBySide?: boolean
+  /** Allow Monaco to fall back to inline diff mode when the editor is narrow. */
+  useInlineViewWhenSpaceIsLimited?: boolean
   /** Allow resizing the split handle in side-by-side diff mode. */
   enableSplitViewResizing?: boolean
   /** Keep whitespace-only changes visible in Monaco diff editors. */

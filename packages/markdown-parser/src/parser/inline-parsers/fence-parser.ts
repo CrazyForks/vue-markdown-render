@@ -7,27 +7,57 @@ const DIFF_HEADER_PREFIXES = ['diff ', 'index ', '--- ', '+++ ', '@@ ']
 // Newline splitter reused in this module
 const NEWLINE_RE = /\r?\n/
 
-function splitUnifiedDiff(content: string) {
+function flushPendingDiffHunk(
+  orig: string[],
+  updated: string[],
+  pendingOrig: string[],
+  pendingUpdated: string[],
+) {
+  if (pendingOrig.length > 0)
+    orig.push(...pendingOrig)
+  if (pendingUpdated.length > 0)
+    updated.push(...pendingUpdated)
+  pendingOrig.length = 0
+  pendingUpdated.length = 0
+}
+
+function splitUnifiedDiff(content: string, closed: boolean) {
   const orig: string[] = []
   const updated: string[] = []
-  for (const rawLine of content.split(NEWLINE_RE)) {
+  const pendingOrig: string[] = []
+  const pendingUpdated: string[] = []
+  const lines = content.split(NEWLINE_RE)
+  const stableLineCount = Math.max(0, lines.length - 1)
+
+  const processLine = (rawLine: string) => {
     const line = rawLine
     // skip diff metadata lines
     if (DIFF_HEADER_PREFIXES.some(p => line.startsWith(p)))
-      continue
+      return
 
     if (line.length >= 2 && line[0] === '-' && line[1] === ' ') {
-      orig.push(` ${line.slice(1)}`)
+      pendingOrig.push(` ${line.slice(1)}`)
     }
     else if (line.length >= 2 && line[0] === '+' && line[1] === ' ') {
-      updated.push(` ${line.slice(1)}`)
+      pendingUpdated.push(` ${line.slice(1)}`)
     }
     else {
+      flushPendingDiffHunk(orig, updated, pendingOrig, pendingUpdated)
       // fallback: treat as context (no prefix)
       orig.push(line)
       updated.push(line)
     }
   }
+
+  for (let index = 0; index < stableLineCount; index++)
+    processLine(lines[index] ?? '')
+
+  if (closed && stableLineCount < lines.length)
+    processLine(lines[lines.length - 1] ?? '')
+
+  if (closed || (pendingOrig.length > 0 && pendingUpdated.length > 0))
+    flushPendingDiffHunk(orig, updated, pendingOrig, pendingUpdated)
+
   return {
     original: orig.join('\n'),
     updated: updated.join('\n'),
@@ -63,7 +93,7 @@ export function parseFenceToken(token: MarkdownToken): CodeBlockNode {
     content = content.replace(TRAILING_FENCE_LINE_RE, '')
 
   if (diff) {
-    const { original, updated } = splitUnifiedDiff(content)
+    const { original, updated } = splitUnifiedDiff(content, closed === true)
     // 返回时保留原来的 code 字段为 updated（编辑后代码），并额外附加原始与更新的文本
     return {
       type: 'code_block',

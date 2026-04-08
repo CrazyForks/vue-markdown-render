@@ -9,7 +9,7 @@ const isDark = ref(true)
 const themes = ['vitesse-dark', 'vitesse-light']
 const codeBlockMonacoOptions = computed(() => ({
   renderSideBySide: true,
-  useInlineViewWhenSpaceIsLimited: true,
+  useInlineViewWhenSpaceIsLimited: false,
   maxComputationTime: 0,
   ignoreTrimWhitespace: false,
   renderIndicators: true,

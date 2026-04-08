@@ -62,7 +62,7 @@ const codeBlockMonacoOptions = {
   fontSize: 13,
   lineHeight: 30,
   renderSideBySide: true,
-  useInlineViewWhenSpaceIsLimited: true,
+  useInlineViewWhenSpaceIsLimited: false,
   maxComputationTime: 0,
   ignoreTrimWhitespace: false,
   renderIndicators: true,

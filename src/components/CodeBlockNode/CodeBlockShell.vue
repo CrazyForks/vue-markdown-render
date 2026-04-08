@@ -261,8 +261,10 @@ const fontIncreaseDisabled = computed(() =>
     </slot>
   </div>
 
-  <!-- Content: visible when not collapsed and (streaming OR not loading) -->
-  <slot v-if="!isCollapsed && (stream ? true : !loading)" />
+  <!-- Content: keep slot subtree mounted so Monaco/renderer state survives collapse. -->
+  <div v-show="!isCollapsed && (stream ? true : !loading)" class="code-block-shell-content">
+    <slot />
+  </div>
 
   <!-- Loading skeleton -->
   <div v-show="!stream && loading" class="code-loading-placeholder">

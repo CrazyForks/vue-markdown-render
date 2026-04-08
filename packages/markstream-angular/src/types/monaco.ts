@@ -53,6 +53,7 @@ export interface CodeBlockMonacoOptions {
   themes?: CodeBlockMonacoTheme[]
   languages?: CodeBlockMonacoLanguage[]
   renderSideBySide?: boolean
+  useInlineViewWhenSpaceIsLimited?: boolean
   enableSplitViewResizing?: boolean
   ignoreTrimWhitespace?: boolean
   maxComputationTime?: number

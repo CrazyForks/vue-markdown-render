@@ -195,12 +195,25 @@ async function waitForHiddenRegions(page, timeout = 20000) {
     const hiddenTexts = Array.from(document.querySelectorAll('.diff-hidden-lines'))
       .map(el => (el.textContent ?? '').trim())
       .filter(Boolean)
-    return hiddenTexts.some(text => /hidden lines|unchanged/i.test(text))
+    return hiddenTexts.some(text => /hidden lines|unchanged|unmodified/i.test(text))
   }, { timeout })
 }
 
 async function collectResult(page, name, extra = {}) {
   return page.evaluate(({ name, extra }) => {
+    const isVisibleButton = (element) => {
+      if (!(element instanceof HTMLElement))
+        return false
+      const rect = element.getBoundingClientRect()
+      const style = window.getComputedStyle(element)
+      return (
+        rect.width >= 16
+        && rect.height >= 16
+        && style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && Number.parseFloat(style.opacity || '1') > 0.01
+      )
+    }
     const roundPx = (value) => {
       return Math.round(value * 100) / 100
     }
@@ -223,7 +236,13 @@ async function collectResult(page, name, extra = {}) {
       const editorHiddenTexts = Array.from(editorEl.querySelectorAll('.diff-hidden-lines'))
         .map(el => (el.textContent ?? '').trim())
         .filter(Boolean)
-      const foldButton = editorEl.querySelector('.markstream-inline-fold-proxy, .diff-hidden-lines a')
+      const foldButtonCandidates = Array.from(
+        editorEl.querySelectorAll('.markstream-inline-fold-proxy, .diff-hidden-lines a'),
+      )
+      const foldButton
+        = foldButtonCandidates.find(candidate => isVisibleButton(candidate))
+          ?? foldButtonCandidates[0]
+          ?? null
       const foldButtonRect = foldButton?.getBoundingClientRect?.() ?? null
       const hostHeightPx = host instanceof HTMLElement ? roundPx(host.getBoundingClientRect().height) : null
       const hostMaxHeightPx = parsePx(hostStyle?.maxHeight)
@@ -272,8 +291,8 @@ async function collectResult(page, name, extra = {}) {
       diffEditors: diffEditors.length,
       hiddenRegionCount: hiddenTexts.length,
       hiddenRegionTexts: hiddenTexts,
-      hasHiddenRegionText: hiddenTexts.some(text => /hidden lines|unchanged/i.test(text)),
-      bodyContainsHiddenLinesText: /hidden lines|unchanged/i.test(bodyText),
+      hasHiddenRegionText: hiddenTexts.some(text => /hidden lines|unchanged|unmodified/i.test(text)),
+      bodyContainsHiddenLinesText: /hidden lines|unchanged|unmodified/i.test(bodyText),
       originalVisibleLines,
       modifiedVisibleLines,
       foldedHostShrinks,
@@ -335,7 +354,7 @@ async function runHomeInlineScenario(context, baseUrl) {
   await page.waitForTimeout(800)
 
   const initial = await collectResult(page, 'index-route-inline', { url })
-  const foldButton = page.locator('.markstream-inline-fold-proxy, .diff-hidden-lines a').first()
+  const foldButton = page.locator('.markstream-inline-fold-proxy:visible, .diff-hidden-lines a:visible').first()
   await foldButton.click()
   await page.waitForFunction(() => document.querySelectorAll('.diff-hidden-lines').length === 0, { timeout: 10000 })
   const afterExpandHiddenRegionCount = await page.locator('.diff-hidden-lines').count()
