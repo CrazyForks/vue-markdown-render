@@ -1,4 +1,4 @@
-## [0.0.12-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.12-beta.0) (2026-04-07)
+## [0.0.12-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.12-beta.1) (2026-04-08)
 
 
 ### Bug Fixes
@@ -134,6 +134,7 @@
 * stabilize reference parsing and contrast ([357629a](https://github.com/Simon-He95/markstream-vue/commit/357629ad31fc304c2ce9f879bf3a3ddd19997e83)), closes [#327](https://github.com/Simon-He95/markstream-vue/issues/327)
 * stabilize streamed text updates across renderers ([3187fa3](https://github.com/Simon-He95/markstream-vue/commit/3187fa31aa39f5e50d64d96a946a157922f7c4ae))
 * stabilize streaming custom thinking parsing ([1019ea4](https://github.com/Simon-He95/markstream-vue/commit/1019ea4b3505c36e7df1483034d819b557061af4))
+* stabilize streaming diff code blocks ([e38ca8d](https://github.com/Simon-He95/markstream-vue/commit/e38ca8d64ea1a60b3e889eb632b9438aa17a9be2))
 * stabilize streaming image link parsing ([a4c60b7](https://github.com/Simon-He95/markstream-vue/commit/a4c60b778fc332cba0e793d3a101e885bfada1e4)), closes [#363](https://github.com/Simon-He95/markstream-vue/issues/363)
 * stabilize streaming mermaid previews ([88f20fb](https://github.com/Simon-He95/markstream-vue/commit/88f20fb217677d1dfe80c34d8b6faab6614bf6ff)), closes [#337](https://github.com/Simon-He95/markstream-vue/issues/337)
 * stabilize test panes and code block header actions ([cf7786d](https://github.com/Simon-He95/markstream-vue/commit/cf7786dd3b6d3be6f185302c265263dee43df965))
