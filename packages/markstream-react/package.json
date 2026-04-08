@@ -101,7 +101,7 @@
     "react": ">=18",
     "react-dom": ">=18",
     "stream-markdown": ">=0.0.15",
-    "stream-monaco": ">=0.0.21"
+    "stream-monaco": ">=0.0.22"
   },
   "peerDependenciesMeta": {
     "@antv/infographic": {
