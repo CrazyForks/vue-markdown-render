@@ -322,6 +322,48 @@ function findCodeSpanRangeAt(ranges: Array<[number, number]>, index: number): [n
   return null
 }
 
+function buildImageRanges(src: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = []
+  let i = 0
+  while (i < src.length - 1) {
+    if (src[i] === '!' && src[i + 1] === '[') {
+      const start = i
+      let j = i + 2
+      while (j < src.length) {
+        if (src[j] === '\\' && j + 1 < src.length) {
+          j += 2
+          continue
+        }
+        if (src[j] === ']')
+          break
+        j++
+      }
+      if (j < src.length && src[j] === ']' && j + 1 < src.length && src[j + 1] === '(') {
+        let k = j + 2
+        let depth = 1
+        while (k < src.length && depth > 0) {
+          if (src[k] === '\\' && k + 1 < src.length) {
+            k += 2
+            continue
+          }
+          if (src[k] === '(')
+            depth++
+          else if (src[k] === ')')
+            depth--
+          k++
+        }
+        if (depth === 0) {
+          ranges.push([start, k])
+          i = k
+          continue
+        }
+      }
+    }
+    i++
+  }
+  return ranges
+}
+
 function isEscapedAt(src: string, index: number) {
   let cursor = index - 1
   let backslashes = 0
@@ -422,6 +464,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       // We'll scan the entire inline source and tokenize all occurrences
       const src = s.src
       const codeSpanRanges = buildCodeSpanRanges(src)
+      const imageRanges = buildImageRanges(src)
       let foundAny = false
       // Reset searchPos for $$ to allow it to scan the full content
       // even after $ rule has processed some text
@@ -607,6 +650,12 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const codeSpanAtIndex = findCodeSpanRangeAt(codeSpanRanges, index)
         if (codeSpanAtIndex) {
           searchPos = codeSpanAtIndex[1]
+          continue
+        }
+
+        const imageRangeAtIndex = findCodeSpanRangeAt(imageRanges, index)
+        if (imageRangeAtIndex) {
+          searchPos = imageRangeAtIndex[1]
           continue
         }
 

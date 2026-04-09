@@ -214,4 +214,29 @@ describe('math followed by image bug', () => {
     expect((imageNode as { alt: string }).alt).toBe('img')
     expect((imageNode as { title: string | null }).title).toBe('title')
   })
+
+  it('should parse image whose alt text contains inline math formulas', () => {
+    const md = getMarkdown()
+    const content = '![图6：Brain-Score大脑对齐性能（RSA）。我们测试了TopoLM和非拓扑控制在Brain-Score语言上的表现，使用表示相似性分析（RSA）来估计对齐。TopoLM在Pereira2018上优于控制，但在Blank2014和Fedorenko2016上表现较差（对每个基准分别进行的\\(t\\)-检验：\\(p<0.05\\)）。对于每个基准，我们从10个交叉验证循环中抽样，以计算自助法95%置信区间（黑条）。当结果在3个基准上取平均时（最后一面板"Brain-Score"），我们发现TopoLM与其控制之间存在显著差异（\\(t\\)-检验：\\(p>0.05\\)）。然而，这一结果需要谨慎解读，因为它主要受Fedorenko2016的结果影响，该结果仅显示非常大的绝对值，因为用于归一化的基础数据非常嘈杂，即噪声上限非常低。](https://www.baidu.com/img/PCfb_5bf082d29588c07f842ccde3f97243ea.png)'
+    const result = parseMarkdownToStructure(content, md)
+
+    // Should have 1 paragraph node
+    expect(result.length).toBe(1)
+    expect(result[0].type).toBe('paragraph')
+
+    const children = (result[0] as ParsedNode & { children?: ParsedNode[] }).children || []
+
+    // Should contain a single image node (not broken into multiple tokens)
+    const imageNodes = children.filter((n: ParsedNode) => n.type === 'image')
+    expect(imageNodes.length).toBe(1)
+    expect((imageNodes[0] as { src: string }).src).toBe('https://www.baidu.com/img/PCfb_5bf082d29588c07f842ccde3f97243ea.png')
+
+    // Should NOT have math_inline nodes (math is inside the image alt text, not standalone)
+    const mathNodes = children.filter((n: ParsedNode) => n.type === 'math_inline')
+    expect(mathNodes.length).toBe(0)
+
+    // Should NOT have link nodes
+    const linkNodes = children.filter((n: ParsedNode) => n.type === 'link')
+    expect(linkNodes.length).toBe(0)
+  })
 })
