@@ -314,7 +314,7 @@ function buildCodeSpanRanges(src: string): Array<[number, number]> {
   return ranges
 }
 
-function findCodeSpanRangeAt(ranges: Array<[number, number]>, index: number): [number, number] | null {
+function findRangeAt(ranges: Array<[number, number]>, index: number): [number, number] | null {
   for (const range of ranges) {
     if (index >= range[0] && index < range[1])
       return range
@@ -647,13 +647,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           continue
         }
 
-        const codeSpanAtIndex = findCodeSpanRangeAt(codeSpanRanges, index)
+        const codeSpanAtIndex = findRangeAt(codeSpanRanges, index)
         if (codeSpanAtIndex) {
           searchPos = codeSpanAtIndex[1]
           continue
         }
 
-        const imageRangeAtIndex = findCodeSpanRangeAt(imageRanges, index)
+        const imageRangeAtIndex = findRangeAt(imageRanges, index)
         if (imageRangeAtIndex) {
           searchPos = imageRangeAtIndex[1]
           continue
