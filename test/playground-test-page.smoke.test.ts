@@ -195,8 +195,8 @@ describe('playground /test smoke', () => {
   it('opens the /test route and renders the lab shell', async () => {
     const wrapper = await mountTestPage()
 
-    expect(wrapper.text()).toContain('Markstream Test Page')
-    expect(wrapper.text()).toContain('Cross-framework regression lab')
+    expect(wrapper.text()).toContain('Markstream Diagnostic Studio')
+    expect(wrapper.text()).toContain('Cross-framework Rendering Studio')
     expect(wrapper.text()).toContain('版本沙箱')
     expect(wrapper.text()).toContain('Angular')
     expect(wrapper.get('iframe').attributes('src')).toContain('/test-sandbox?framework=vue3')
