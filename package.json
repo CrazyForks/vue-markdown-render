@@ -255,7 +255,7 @@
     }
   },
   "dependencies": {
-    "@chenglou/pretext": "^0.0.3",
+    "@chenglou/pretext": "^0.0.5",
     "@floating-ui/dom": "^1.7.6",
     "stream-markdown-parser": "workspace:*"
   },
