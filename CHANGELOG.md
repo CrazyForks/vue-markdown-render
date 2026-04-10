@@ -1,4 +1,4 @@
-## [0.0.12-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.12-beta.1) (2026-04-08)
+## [0.0.12](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.12) (2026-04-10)
 
 
 ### Bug Fixes
@@ -126,6 +126,7 @@
 * restore original styles changed during token migration ([784f7e9](https://github.com/Simon-He95/markstream-vue/commit/784f7e9bfaa27fa685788c355ce0e441edbc9881))
 * restore test and lint green ([3aee857](https://github.com/Simon-He95/markstream-vue/commit/3aee8579a6a0d5bdd70ad213ad48852caa650710))
 * serve docs landing page at root ([2f77476](https://github.com/Simon-He95/markstream-vue/commit/2f774763eae44d3c10a7316138d4be8c0393d749))
+* skip math delimiters inside image alt text ranges ([b0bf2d8](https://github.com/Simon-He95/markstream-vue/commit/b0bf2d8fe1201572b055314b8e3d5a9454634dfa)), closes [#related-issue](https://github.com/Simon-He95/markstream-vue/issues/related-issue)
 * soften inline code text color to 75% foreground opacity ([886bb35](https://github.com/Simon-He95/markstream-vue/commit/886bb354b6e0f520b4fa60801c3948ad396a5015))
 * soften link loading hint ([36512da](https://github.com/Simon-He95/markstream-vue/commit/36512da12c8a698305104ea2ddd9baa310e70434))
 * stabilize angular playground preview rendering ([1c61a62](https://github.com/Simon-He95/markstream-vue/commit/1c61a620a8b9c11cab773abc32b6c8a617f59170))
