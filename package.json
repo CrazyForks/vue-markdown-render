@@ -135,6 +135,7 @@
     "test:e2e:angular-playground": "node scripts/e2e-angular-playground.mjs",
     "test:e2e:diff-theme-switch": "node scripts/e2e-diff-theme-switch.mjs",
     "test:e2e:nuxt-ssr": "node scripts/e2e-nuxt-ssr.mjs",
+    "test:e2e:katex-unicode-unit": "node scripts/e2e-katex-unicode-unit-regression.mjs",
     "lint": "eslint . --cache",
     "lint:fix": "pnpm run lint --fix",
     "test:ui": "vitest --ui",
