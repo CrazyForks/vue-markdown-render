@@ -2096,7 +2096,7 @@ onUnmounted(() => {
     v-else
     ref="container"
     :style="containerStyle"
-    class="code-block-container rounded-lg border overflow-hidden"
+    class="code-block-container rounded-lg border"
     data-markstream-code-block="1"
     :data-markstream-enhanced="editorMounted && !usePreCodeRender ? 'true' : 'false'"
     :class="[
