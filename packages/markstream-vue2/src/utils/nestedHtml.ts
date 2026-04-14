@@ -1,5 +1,13 @@
 import type { BaseNode, CustomComponentAttrs, ParsedNode } from 'stream-markdown-parser'
-import { BLOCKED_HTML_TAGS, getMarkdown, normalizeCustomHtmlTagName, normalizeCustomHtmlTags } from 'stream-markdown-parser'
+import {
+  BLOCKED_HTML_TAGS,
+  DANGEROUS_HTML_ATTRS,
+  getMarkdown,
+  isUnsafeHtmlUrl,
+  normalizeCustomHtmlTagName,
+  normalizeCustomHtmlTags,
+  URL_HTML_ATTRS,
+} from 'stream-markdown-parser'
 
 export type NestedRenderableNode = (ParsedNode | BaseNode) & Record<string, unknown>
 
@@ -371,16 +379,22 @@ function serializeAttrs(attrs?: CustomComponentAttrs | null, extraClass = ''): s
   const mergedClasses = [extraClass]
 
   for (const [name, value] of pairs) {
-    if (!isSafeAttrName(name))
+    const safeName = String(name).trim()
+    const lowerName = safeName.toLowerCase()
+    if (!safeName || !isSafeAttrName(safeName))
       continue
-    if (name === 'class') {
+    if (DANGEROUS_HTML_ATTRS.has(lowerName))
+      continue
+    if (value !== true && URL_HTML_ATTRS.has(lowerName) && value && isUnsafeHtmlUrl(String(value)))
+      continue
+    if (lowerName === 'class') {
       mergedClasses.push(String(value))
       continue
     }
     if (value === true)
-      rendered.push(` ${name}`)
+      rendered.push(` ${safeName}`)
     else
-      rendered.push(` ${name}="${escapeAttr(String(value))}"`)
+      rendered.push(` ${safeName}="${escapeAttr(String(value))}"`)
   }
 
   const className = mergedClasses.map(value => value.trim()).filter(Boolean).join(' ')

@@ -238,6 +238,40 @@ describe('vue 2 - HtmlBlockNode Custom Components Integration', () => {
     expect((wrapper.text().match(/alpha/g) || []).length).toBe(1)
     expect((wrapper.text().match(/beta/g) || []).length).toBe(1)
   })
+
+  it('should sanitize dangerous attrs on structured wrapper roots', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          tag: 'a',
+          content: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+          attrs: [
+            ['href', 'javascript:alert(1)'],
+            ['onclick', 'alert(1)'],
+            ['data-safe', 'ok'],
+          ],
+          children: [
+            {
+              type: 'paragraph',
+              raw: '',
+              children: [{ type: 'text', raw: '', content: 'safe child' }],
+            },
+          ],
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await flushAll()
+
+    const root = wrapper.find('.html-block-node')
+    expect(root.element.tagName).toBe('A')
+    expect(root.attributes('data-safe')).toBe('ok')
+    expect(root.attributes('href')).toBeUndefined()
+    expect(root.attributes('onclick')).toBeUndefined()
+    expect(wrapper.text()).toContain('safe child')
+  })
 })
 
 describe('vue 2 - HtmlInlineNode Custom Components Integration', () => {

@@ -1,5 +1,5 @@
 import type { NodeComponentProps } from '../../types/node-component'
-import { BLOCKED_HTML_TAGS } from 'stream-markdown-parser'
+import { BLOCKED_HTML_TAGS, sanitizeHtmlTokenAttrs } from 'stream-markdown-parser'
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../../customComponents'
@@ -82,7 +82,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   }, [isDeferred, node.content, shouldRender])
 
   const boundAttrs = useMemo(() => {
-    const rawAttrs = tokenAttrsToProps(node.attrs ?? undefined)
+    const rawAttrs = tokenAttrsToProps(sanitizeHtmlTokenAttrs(node.attrs ?? undefined))
     return rawAttrs ? normalizeDomAttrs(rawAttrs as Record<string, string>) : undefined
   }, [node.attrs])
   const structuredTag = useMemo(() => String(node.tag ?? '').trim(), [node.tag])

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BLOCKED_HTML_TAGS } from 'stream-markdown-parser'
+import { BLOCKED_HTML_TAGS, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
@@ -22,25 +22,12 @@ const StructuredNodeRenderer = defineAsyncComponent({
   suspensible: false,
 })
 
-// The parser produces attrs as an array of [key, value] tuples.
-// Vue's `v-bind` expects an object (or array of objects). Convert safely.
 const boundAttrs = computed(() => {
-  const a = props.node.attrs
-  if (!a)
+  const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs)
+  if (!sanitizedAttrs)
     return undefined
-  if (Array.isArray(a)) {
-    // Convert tuple array to object; guard against malformed entries.
-    const obj: Record<string, string> = {}
-    for (const tuple of a) {
-      if (!tuple || tuple.length < 2)
-        continue
-      const [k, v] = tuple
-      if (k != null)
-        obj[String(k)] = v == null ? '' : String(v)
-    }
-    return obj
-  }
-  return a
+  const record = tokenAttrsToRecord(sanitizedAttrs)
+  return Object.keys(record).length > 0 ? record : undefined
 })
 
 // Get custom components from global registry

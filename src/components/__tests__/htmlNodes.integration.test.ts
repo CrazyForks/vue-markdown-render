@@ -404,6 +404,41 @@ describe('component Behavior', () => {
     expect(text.match(/去田里劳作，争取多收成些粮食卖钱/g)?.length ?? 0).toBe(1)
   })
 
+  it('sanitizes dangerous attrs on structured html wrapper roots', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          tag: 'a',
+          content: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+          attrs: [
+            ['href', 'javascript:alert(1)'],
+            ['onclick', 'alert(1)'],
+            ['data-safe', 'ok'],
+          ],
+          children: [
+            {
+              type: 'paragraph',
+              raw: 'safe child',
+              children: [{ type: 'text', raw: 'safe child', content: 'safe child' }],
+            },
+          ],
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const root = wrapper.find('.html-block-node')
+    expect(root.element.tagName).toBe('A')
+    expect(root.attributes('data-safe')).toBe('ok')
+    expect(root.attributes('href')).toBeUndefined()
+    expect(root.attributes('onclick')).toBeUndefined()
+    expect(wrapper.text()).toContain('safe child')
+  })
+
   it('does not treat blocked html tags as structured wrapper nodes', async () => {
     const wrapper = mount(HtmlBlockNode, {
       props: {

@@ -190,4 +190,32 @@ describe('vue2 nested html helper', () => {
     expect(blockedHtml).toBe('<script>\n\n- alpha\n\n</script>')
     expect(blockedHtml).not.toContain('<ul>')
   })
+
+  it('sanitizes dangerous attrs on structured html wrappers', () => {
+    const html = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'a',
+        raw: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+        content: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+        attrs: [
+          ['href', 'javascript:alert(1)'],
+          ['onclick', 'alert(1)'],
+          ['data-safe', 'ok'],
+        ],
+        children: [
+          {
+            type: 'paragraph',
+            raw: 'safe child',
+            children: [{ type: 'text', raw: 'safe child', content: 'safe child' }],
+          },
+        ],
+      } as any,
+    )
+
+    expect(html).toContain('<a data-safe="ok">')
+    expect(html).toContain('<p>safe child</p>')
+    expect(html).not.toContain('onclick=')
+    expect(html).not.toContain('javascript:')
+  })
 })

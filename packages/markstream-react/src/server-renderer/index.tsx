@@ -22,6 +22,7 @@ import {
   getMarkdown,
   mergeCustomHtmlTags,
   parseMarkdownToStructure,
+  sanitizeHtmlTokenAttrs,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
 } from 'stream-markdown-parser'
@@ -87,7 +88,7 @@ function renderStaticCodeShell(
 }
 
 function mergeHtmlBlockWrapperProps(attrs?: [string, string | null][] | null) {
-  const normalized = normalizeDomAttrs((tokenAttrsToProps(attrs ?? undefined) as Record<string, string> | undefined) || {})
+  const normalized = normalizeDomAttrs((tokenAttrsToProps(sanitizeHtmlTokenAttrs(attrs ?? undefined)) as Record<string, string> | undefined) || {})
   const next = { ...normalized }
   const existing = typeof next.className === 'string' ? next.className.trim() : ''
   next.className = existing ? `html-block-node ${existing}` : 'html-block-node'
