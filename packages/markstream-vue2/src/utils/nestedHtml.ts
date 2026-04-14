@@ -1,5 +1,5 @@
 import type { BaseNode, CustomComponentAttrs, ParsedNode } from 'stream-markdown-parser'
-import { getMarkdown, normalizeCustomHtmlTagName, normalizeCustomHtmlTags } from 'stream-markdown-parser'
+import { BLOCKED_HTML_TAGS, getMarkdown, normalizeCustomHtmlTagName, normalizeCustomHtmlTags } from 'stream-markdown-parser'
 
 export type NestedRenderableNode = (ParsedNode | BaseNode) & Record<string, unknown>
 
@@ -299,13 +299,18 @@ function renderAdmonitionNode(node: NestedRenderableNode, ctx: RenderContext): s
 
 function renderHtmlNode(node: NestedRenderableNode, ctx: RenderContext): string {
   const content = getString(node.content)
-  if (!content)
-    return ''
+  const rawContent = content || getString(node.raw)
+  const tag = getString(node.tag).trim().toLowerCase()
+  const children = getNodeList(node.children)
   if (!ctx.options.allowHtml)
-    return escapeHtml(content)
+    return escapeHtml(rawContent)
   if (node.loading && !node.autoClosed)
-    return escapeHtml(content)
-  return content
+    return escapeHtml(rawContent)
+  if (tag && children.length > 0 && !BLOCKED_HTML_TAGS.has(tag)) {
+    const attrs = serializeAttrs(node.attrs as CustomComponentAttrs | undefined)
+    return `<${tag}${attrs}>${renderNodesToHtml(children, ctx)}</${tag}>`
+  }
+  return rawContent
 }
 
 function renderCustomOrFallbackNode(node: NestedRenderableNode, ctx: RenderContext): string {

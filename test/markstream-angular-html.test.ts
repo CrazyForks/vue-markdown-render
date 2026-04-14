@@ -94,7 +94,8 @@ describe('markstream-angular html renderer', () => {
     })
 
     expect(html).toContain('<details>')
-    expect(html).toContain('<summary>More</summary>')
+    expect(html).toContain('<summary>')
+    expect(html).toContain('More')
     expect(html).toContain('<p>Body</p>')
     expect(html).toContain('</details>')
   })
@@ -133,5 +134,66 @@ describe('markstream-angular html renderer', () => {
     expect(html).not.toContain('javascript:')
     expect(html).not.toContain('<script')
     expect(html).not.toContain('alert(1)')
+  })
+
+  it('renders structured html wrappers while leaving blocked tags on the sanitized fallback path', () => {
+    const structuredHtml = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'span',
+        raw: '<span style="font-size: 12px;"></span>',
+        content: '<span style="font-size: 12px;"></span>',
+        attrs: [['style', 'font-size: 12px;']],
+        children: [
+          {
+            type: 'list',
+            raw: '',
+            ordered: false,
+            items: [
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'alpha' }],
+              },
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'beta' }],
+              },
+            ],
+          },
+        ],
+      } as any,
+    )
+
+    expect(structuredHtml).toContain('<span style="font-size: 12px;">')
+    expect(structuredHtml).toContain('<ul><li>alpha</li><li>beta</li></ul>')
+
+    const blockedHtml = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'script',
+        raw: '<script>\n\n- alpha\n\n</script>',
+        content: '<script>\n\n- alpha\n\n</script>',
+        children: [
+          {
+            type: 'list',
+            raw: '',
+            ordered: false,
+            items: [
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'alpha' }],
+              },
+            ],
+          },
+        ],
+      } as any,
+    )
+
+    expect(blockedHtml).not.toContain('<ul>')
+    expect(blockedHtml).not.toContain('<li>')
+    expect(blockedHtml).not.toContain('<script')
   })
 })

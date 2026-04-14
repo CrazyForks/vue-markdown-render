@@ -105,6 +105,66 @@ describe('react: non-whitelisted custom HTML tags', () => {
     root.unmount()
   })
 
+  it('renders markdown children inside standard html wrappers exactly once', async () => {
+    const scopeId = 'react-structured-html-wrapper'
+    const markdown = `<span style="font-size: 12px;">
+
+- alpha
+- beta
+
+</span>`
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          content: markdown,
+          customId: scopeId,
+          final: true,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.querySelectorAll('ul')).toHaveLength(1)
+    expect(host.querySelectorAll('li')).toHaveLength(2)
+    expect((host.textContent || '').match(/alpha/g)?.length ?? 0).toBe(1)
+    expect((host.textContent || '').match(/beta/g)?.length ?? 0).toBe(1)
+
+    root.unmount()
+  })
+
+  it('does not structure blocked html wrappers into live markdown children', async () => {
+    const scopeId = 'react-structured-blocked-tag'
+    const markdown = `<script>
+
+- alpha
+- beta
+
+</script>`
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          content: markdown,
+          customId: scopeId,
+          final: true,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.querySelectorAll('ul')).toHaveLength(0)
+    expect(host.querySelectorAll('li')).toHaveLength(0)
+
+    root.unmount()
+  })
+
   it('renders closed non-whitelisted custom tag as raw HTML', async () => {
     const scopeId = 'react-closed-unknown-tag'
     const markdown = `<echat-url>content</echat-url>`

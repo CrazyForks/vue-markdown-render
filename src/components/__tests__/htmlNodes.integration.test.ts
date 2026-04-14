@@ -7,7 +7,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { defineComponent, h, nextTick } from 'vue'
 import HtmlBlockNode from '../../components/HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../../components/HtmlInlineNode/HtmlInlineNode.vue'
+import MarkdownRender from '../../components/NodeRenderer'
 import { setCustomComponents } from '../../utils/nodeComponents'
+import { flushAll } from '../../../test/setup/flush-all'
 
 // Mock custom components
 const TestComponent = defineComponent({
@@ -365,5 +367,81 @@ describe('component Behavior', () => {
 
     // Whitespace-only content should still render container
     expect(wrapper.find('.html-block-node').exists()).toBe(true)
+  })
+
+  it('renders markdown children inside structured html blocks without duplicating leaked nodes', async () => {
+    const markdown = `<span style="font-size: 12px;">
+
+🗺️【环境状态】
+- 地点：石溪村，李东的茅屋
+- 时间：4/12 周四 上午07:00
+
+🎯【选项】
+1. 去田里劳作，争取多收成些粮食卖钱
+2. 上山检查之前设置的陷阱，看有没有捕到猎
+</span>`
+
+    const wrapper = mount(MarkdownRender, {
+      props: {
+        content: markdown,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const htmlBlock = wrapper.find('.html-block-node')
+    expect(htmlBlock.exists()).toBe(true)
+    expect(htmlBlock.element.tagName).toBe('SPAN')
+    expect(htmlBlock.attributes('style')).toContain('font-size: 12px;')
+    expect(wrapper.findAll('ul')).toHaveLength(1)
+    expect(wrapper.findAll('ol')).toHaveLength(1)
+
+    const text = wrapper.text()
+    expect(text.match(/地点：石溪村，李东的茅屋/g)?.length ?? 0).toBe(1)
+    expect(text.match(/去田里劳作，争取多收成些粮食卖钱/g)?.length ?? 0).toBe(1)
+  })
+
+  it('does not treat blocked html tags as structured wrapper nodes', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          tag: 'script',
+          content: `<script>
+
+- alpha
+
+</script>`,
+          children: [
+            {
+              type: 'list',
+              raw: '',
+              ordered: false,
+              items: [
+                {
+                  type: 'list_item',
+                  raw: '',
+                  children: [
+                    {
+                      type: 'paragraph',
+                      raw: '',
+                      children: [{ type: 'text', raw: '', content: 'alpha' }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await nextTick()
+    expect(wrapper.findAll('ul')).toHaveLength(0)
+    expect(wrapper.findAll('li')).toHaveLength(0)
   })
 })

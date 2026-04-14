@@ -1,5 +1,6 @@
 import type { BaseNode, CustomComponentAttrs, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import {
+  BLOCKED_HTML_TAGS,
   getMarkdown,
   normalizeCustomHtmlTagName,
   normalizeCustomHtmlTags,
@@ -375,13 +376,18 @@ function renderAdmonitionNode(node: RenderableMarkdownNode, ctx: RenderContext):
 
 function renderHtmlNode(node: RenderableMarkdownNode, ctx: RenderContext): string {
   const content = getString(node.content)
-  if (!content)
-    return ''
+  const rawContent = content || getString(node.raw)
+  const tag = getString(node.tag).trim().toLowerCase()
+  const children = getNodeList(node.children)
   if (!ctx.options.allowHtml)
-    return escapeHtml(content)
+    return escapeHtml(rawContent)
   if (node.loading && !node.autoClosed)
-    return escapeHtml(content)
-  return sanitizeHtmlContent(content)
+    return escapeHtml(rawContent)
+  if (tag && children.length > 0 && !BLOCKED_HTML_TAGS.has(tag)) {
+    const attrs = serializeAttrs(node.attrs as CustomComponentAttrs | undefined)
+    return `<${tag}${attrs}>${renderNodesToHtml(children, ctx)}</${tag}>`
+  }
+  return sanitizeHtmlContent(rawContent)
 }
 
 function renderCustomOrFallbackNode(node: RenderableMarkdownNode, ctx: RenderContext): string {

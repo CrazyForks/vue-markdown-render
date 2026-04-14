@@ -17,6 +17,7 @@ import type {
 import type { NodeComponentProps } from '../types/node-component'
 import React from 'react'
 import {
+  BLOCKED_HTML_TAGS,
   getHtmlTagFromContent,
   getMarkdown,
   mergeCustomHtmlTags,
@@ -27,6 +28,7 @@ import {
 import { getCustomNodeComponents } from '../customComponents'
 import { BLOCK_LEVEL_TYPES, renderInline, renderNodeChildren, tokenAttrsToProps } from '../renderers/renderChildren'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
+import { normalizeDomAttrs } from '../utils/htmlToReact'
 import { parseHtmlToReactNodes } from './html'
 import { renderKatexToHtml } from './katex'
 
@@ -82,6 +84,14 @@ function renderStaticCodeShell(
       </div>
     </div>
   )
+}
+
+function mergeHtmlBlockWrapperProps(attrs?: [string, string | null][] | null) {
+  const normalized = normalizeDomAttrs((tokenAttrsToProps(attrs ?? undefined) as Record<string, string> | undefined) || {})
+  const next = { ...normalized }
+  const existing = typeof next.className === 'string' ? next.className.trim() : ''
+  next.className = existing ? `html-block-node ${existing}` : 'html-block-node'
+  return next
 }
 
 function createRenderContext(
@@ -856,7 +866,36 @@ export function ReferenceNode(props: NodeComponentProps<{ type: 'reference', id:
   )
 }
 
-export function HtmlBlockNode(props: NodeComponentProps<{ type: 'html_block', content?: string }>) {
+export function HtmlBlockNode(props: NodeComponentProps<{
+  type: 'html_block'
+  content?: string
+  tag?: string
+  attrs?: [string, string | null][] | null
+  children?: ParsedNode[]
+}>) {
+  const structuredTag = String((props.node as any)?.tag ?? '').trim().toLowerCase()
+  const structuredChildren = Array.isArray((props.node as any)?.children)
+    ? ((props.node as any).children as ParsedNode[])
+    : []
+  if (
+    structuredChildren.length > 0
+    && structuredTag
+    && !BLOCKED_HTML_TAGS.has(structuredTag)
+    && props.ctx
+    && props.renderNode
+  ) {
+    return React.createElement(
+      structuredTag,
+      mergeHtmlBlockWrapperProps((props.node as any)?.attrs ?? null),
+      renderNodeChildren(
+        structuredChildren,
+        props.ctx,
+        `${String(props.indexKey ?? 'html-block')}-structured`,
+        props.renderNode,
+      ),
+    )
+  }
+
   const customComponents = getCustomNodeComponents(props.customId)
   const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents)
   if (nodes == null)
@@ -1068,7 +1107,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
     case 'reference':
       return <ReferenceNode key={key} node={node as any} ctx={ctx} typewriter={ctx.typewriter} />
     case 'html_block':
-      return <HtmlBlockNode key={key} node={node as any} typewriter={ctx.typewriter} customId={ctx.customId} />
+      return <HtmlBlockNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} customId={ctx.customId} />
     case 'html_inline':
       return <HtmlInlineNode key={key} node={node as any} typewriter={ctx.typewriter} customId={ctx.customId} />
     case 'vmr_container':

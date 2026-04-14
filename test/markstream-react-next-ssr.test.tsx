@@ -570,6 +570,58 @@ describe('markstream-react next/server SSR', () => {
     expect(malformedHtml).not.toContain('&amp;lt;')
   })
 
+  it('renders structured html wrappers on the server without structuring blocked tags', async () => {
+    const serverEntry = await import('../packages/markstream-react/src/server')
+
+    const structuredHtml = renderToStaticMarkup(
+      React.createElement(serverEntry.NodeRenderer, {
+        nodes: [
+          {
+            type: 'html_block',
+            tag: 'span',
+            attrs: [['style', 'font-size: 12px;']],
+            content: '<span style="font-size: 12px;"></span>',
+            children: [
+              {
+                type: 'list',
+                ordered: false,
+                items: [listItemNode('alpha'), listItemNode('beta')],
+              },
+            ],
+          } as any,
+        ],
+      }),
+    )
+
+    expect(structuredHtml).toContain('<span')
+    expect(structuredHtml).toContain('font-size:12px')
+    expect(structuredHtml).toContain('<ul')
+    expect(structuredHtml).toContain('alpha')
+    expect(structuredHtml).toContain('beta')
+
+    const blockedHtml = renderToStaticMarkup(
+      React.createElement(serverEntry.NodeRenderer, {
+        nodes: [
+          {
+            type: 'html_block',
+            tag: 'script',
+            content: '<script>\n\n- alpha\n\n</script>',
+            children: [
+              {
+                type: 'list',
+                ordered: false,
+                items: [listItemNode('alpha')],
+              },
+            ],
+          } as any,
+        ],
+      }),
+    )
+
+    expect(blockedHtml).not.toContain('<ul>')
+    expect(blockedHtml).not.toContain('<li>')
+  })
+
   it('renders custom overrides, custom tags, and heavy-node fallbacks through next and server entries', async () => {
     const nextEntry = await import('../packages/markstream-react/src/next')
     const serverEntry = await import('../packages/markstream-react/src/server')

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
+import { BLOCKED_HTML_TAGS } from 'stream-markdown-parser'
+import { computed, defineAsyncComponent, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
@@ -10,10 +11,16 @@ const props = defineProps<{
     raw?: string
     tag?: string
     attrs?: [string, string][] | null
+    children?: any[]
     loading?: boolean
   }
   customId?: string
 }>()
+
+const StructuredNodeRenderer = defineAsyncComponent({
+  loader: () => import('../NodeRenderer'),
+  suspensible: false,
+})
 
 // The parser produces attrs as an array of [key, value] tuples.
 // Vue's `v-bind` expects an object (or array of objects). Convert safely.
@@ -60,9 +67,16 @@ const DynamicRenderer = defineComponent({
 const htmlRef = ref<HTMLElement | null>(null)
 const shouldRender = ref(typeof window === 'undefined')
 const renderContent = ref(props.node.content)
+const structuredChildren = computed(() => Array.isArray(props.node.children) ? props.node.children : [])
+const structuredTag = computed(() => String(props.node.tag || 'div'))
+const isBlockedStructuredTag = computed(() => BLOCKED_HTML_TAGS.has(structuredTag.value.trim().toLowerCase()))
+const isStructured = computed(() => structuredChildren.value.length > 0 && !!props.node.tag && !isBlockedStructuredTag.value)
 
 // Computed property to determine render mode and content
 const renderMode = computed(() => {
+  if (isStructured.value)
+    return { mode: 'structured' as const }
+
   // Avoid parsing until the node is actually going to render (deferred rendering path).
   if (!shouldRender.value)
     return { mode: 'html', content: renderContent.value ?? '' }
@@ -142,13 +156,25 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="htmlRef" class="html-block-node" v-bind="boundAttrs">
+  <component
+    :is="isStructured ? structuredTag : 'div'"
+    ref="htmlRef"
+    class="html-block-node"
+    v-bind="isStructured ? boundAttrs : undefined"
+  >
     <template v-if="shouldRender">
+      <StructuredNodeRenderer
+        v-if="renderMode.mode === 'structured'"
+        :nodes="structuredChildren"
+        :custom-id="customId"
+        :batch-rendering="false"
+        :defer-nodes-until-visible="false"
+      />
       <!-- Use dynamic rendering for custom components -->
-      <DynamicRenderer v-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />
+      <DynamicRenderer v-else-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />
       <pre v-else-if="renderMode.mode === 'text'" class="html-block-node__raw">{{ renderMode.content }}</pre>
       <!-- Fallback to v-html for standard HTML -->
-      <div v-else v-html="renderContent" />
+      <div v-else v-bind="boundAttrs" v-html="renderContent" />
     </template>
     <div v-else class="html-block-node__placeholder">
       <slot name="placeholder" :node="node">
@@ -157,7 +183,7 @@ onBeforeUnmount(() => {
         <span class="html-block-node__placeholder-bar w-2/3" />
       </slot>
     </div>
-  </div>
+  </component>
 </template>
 
 <style scoped>
