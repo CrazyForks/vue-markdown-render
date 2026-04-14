@@ -187,6 +187,7 @@
     "skills:install:codex": "node ./bin/markstream-vue.mjs skills install --target codex --mode symlink",
     "prompts:list": "node ./bin/markstream-vue.mjs prompts list",
     "prompts:dir": "node ./bin/markstream-vue.mjs prompts dir",
+    "prebuild:dts": "node ./scripts/prepare-dts-entry.cjs",
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
     "build:demo": "vite build",
     "build:view": "vite preview",
