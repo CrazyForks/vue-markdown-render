@@ -142,6 +142,19 @@ Footnotes are server-rendered.[^1]
     expect(html.match(/beta/g)?.length ?? 0).toBe(1)
   })
 
+  it('renders nested structured html wrappers on the server', async () => {
+    const html = await renderMarkdown(`<div>
+<div>
+
+- alpha
+
+</div>
+</div>`)
+
+    expect(html.match(/<ul/g)?.length ?? 0).toBe(1)
+    expect(html.match(/alpha/g)?.length ?? 0).toBe(1)
+  })
+
   it('renders an explicit SSR matrix for the lighter built-in node components', async () => {
     const matrixNodes = [
       {

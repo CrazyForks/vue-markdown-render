@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BLOCKED_HTML_TAGS, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
+import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
@@ -56,7 +56,7 @@ const shouldRender = ref(typeof window === 'undefined')
 const renderContent = ref(props.node.content)
 const structuredChildren = computed(() => Array.isArray(props.node.children) ? props.node.children : [])
 const structuredTag = computed(() => String(props.node.tag || 'div'))
-const isBlockedStructuredTag = computed(() => BLOCKED_HTML_TAGS.has(structuredTag.value.trim().toLowerCase()))
+const isBlockedStructuredTag = computed(() => NON_STRUCTURING_HTML_TAGS.has(structuredTag.value.trim().toLowerCase()))
 const isStructured = computed(() => structuredChildren.value.length > 0 && !!props.node.tag && !isBlockedStructuredTag.value)
 
 // Computed property to determine render mode and content

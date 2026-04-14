@@ -103,6 +103,48 @@ describe('issue 380 html wrapper markdown regression', () => {
     expect(nodes[0]?.raw).toBe(markdown)
   })
 
+  it('keeps literal-content tags unstructured even when their inner content looks like markdown blocks', () => {
+    const samples = ['pre', 'style', 'textarea'] as const
+
+    for (const tag of samples) {
+      const markdown = `<${tag}>
+
+- a
+- b
+
+</${tag}>`
+      const md = getMarkdown(`issue-380-literal-${tag}`)
+      const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+      expect(nodes).toHaveLength(1)
+      expect(nodes[0]?.type).toBe('html_block')
+      expect(nodes[0]?.tag).toBe(tag)
+      expect(nodes[0]?.children).toBeUndefined()
+      expect(nodes[0]?.raw).toBe(markdown)
+    }
+  })
+
+  it('structures nested html wrappers when the inner wrapper already contains markdown blocks', () => {
+    const markdown = `<div>
+<div>
+
+- a
+
+</div>
+</div>`
+    const md = getMarkdown('issue-380-nested')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.tag).toBe('div')
+    expect(nodes[0]?.children?.map((child: any) => child?.type)).toEqual(['html_block'])
+    expect(nodes[0]?.children?.[0]?.tag).toBe('div')
+    expect(nodes[0]?.children?.[0]?.children?.map((child: any) => child?.type)).toEqual(['list'])
+    expect(nodes[0]?.children?.[0]?.children?.[0]?.items).toHaveLength(1)
+    expect(nodes[0]?.children?.[0]?.children?.[0]?.items?.[0]?.children?.[0]?.children?.[0]?.content).toBe('a')
+  })
+
   it('keeps streaming span wrappers stable before the closing tag arrives', () => {
     const markdown = `<span>
 

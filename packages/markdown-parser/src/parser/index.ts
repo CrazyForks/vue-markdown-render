@@ -1,7 +1,7 @@
 import type { MarkdownIt, Token } from 'markdown-it-ts'
 import type { MarkdownToken, ParsedNode, ParseOptions } from '../types'
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
-import { BLOCKED_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
+import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
 import { parseInlineTokens } from './inline-parsers'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -370,6 +370,13 @@ function shouldStructureGenericHtmlBlockChildren(
   if (children.some(child => STRUCTURED_HTML_WRAPPER_BLOCK_TYPES.has(String(child?.type ?? '').toLowerCase())))
     return true
 
+  if (children.some((child) => {
+    if (child?.type !== 'html_block')
+      return false
+    return Array.isArray((child as any)?.children) && (child as any).children.length > 0
+  }))
+    return true
+
   if (!hasStructuredHtmlWrapperMarkers(innerRaw))
     return false
 
@@ -391,7 +398,7 @@ function structureGenericHtmlBlockChildren(
       return node
 
     const tag = String((node as any)?.tag ?? '').toLowerCase()
-    if (!tag || tag === 'details' || BLOCKED_HTML_TAGS.has(tag) || Array.isArray((node as any)?.children))
+    if (!tag || tag === 'details' || NON_STRUCTURING_HTML_TAGS.has(tag) || Array.isArray((node as any)?.children))
       return node
 
     const raw = String((node as any)?.raw ?? (node as any)?.content ?? '')

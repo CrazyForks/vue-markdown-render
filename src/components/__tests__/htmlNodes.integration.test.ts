@@ -479,4 +479,47 @@ describe('component Behavior', () => {
     expect(wrapper.findAll('ul')).toHaveLength(0)
     expect(wrapper.findAll('li')).toHaveLength(0)
   })
+
+  it('does not treat literal-content html tags as structured wrapper nodes', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          tag: 'pre',
+          content: `<pre>
+
+- alpha
+
+</pre>`,
+          children: [
+            {
+              type: 'list',
+              raw: '',
+              ordered: false,
+              items: [
+                {
+                  type: 'list_item',
+                  raw: '',
+                  children: [
+                    {
+                      type: 'paragraph',
+                      raw: '',
+                      children: [{ type: 'text', raw: '', content: 'alpha' }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await nextTick()
+    expect(wrapper.findAll('ul')).toHaveLength(0)
+    expect(wrapper.findAll('li')).toHaveLength(0)
+    expect(wrapper.html()).toContain('<pre>')
+    expect(wrapper.text()).toContain('- alpha')
+  })
 })

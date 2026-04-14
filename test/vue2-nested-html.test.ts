@@ -189,6 +189,31 @@ describe('vue2 nested html helper', () => {
 
     expect(blockedHtml).toBe('<script>\n\n- alpha\n\n</script>')
     expect(blockedHtml).not.toContain('<ul>')
+
+    const literalHtml = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'pre',
+        raw: '<pre>\n\n- alpha\n\n</pre>',
+        content: '<pre>\n\n- alpha\n\n</pre>',
+        children: [
+          {
+            type: 'list',
+            raw: '',
+            ordered: false,
+            items: [
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'alpha' }],
+              },
+            ],
+          },
+        ],
+      } as any,
+    )
+
+    expect(literalHtml).toBe('<pre>\n\n- alpha\n\n</pre>')
   })
 
   it('sanitizes dangerous attrs on structured html wrappers', () => {

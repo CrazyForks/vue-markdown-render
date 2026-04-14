@@ -1,5 +1,5 @@
 import type { NodeComponentProps } from '../../types/node-component'
-import { BLOCKED_HTML_TAGS, sanitizeHtmlTokenAttrs } from 'stream-markdown-parser'
+import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlTokenAttrs } from 'stream-markdown-parser'
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../../customComponents'
@@ -89,7 +89,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   const structuredChildren = useMemo(() => Array.isArray(node.children) ? node.children : [], [node.children])
   const isStructured = structuredChildren.length > 0
     && !!structuredTag
-    && !BLOCKED_HTML_TAGS.has(structuredTag.toLowerCase())
+    && !NON_STRUCTURING_HTML_TAGS.has(structuredTag.toLowerCase())
     && !!props.ctx
     && !!props.renderNode
   const structuredWrapperProps = useMemo(

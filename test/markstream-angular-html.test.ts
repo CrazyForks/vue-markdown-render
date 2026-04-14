@@ -195,6 +195,33 @@ describe('markstream-angular html renderer', () => {
     expect(blockedHtml).not.toContain('<ul>')
     expect(blockedHtml).not.toContain('<li>')
     expect(blockedHtml).not.toContain('<script')
+
+    const literalHtml = renderMarkdownNodeToHtml(
+      {
+        type: 'html_block',
+        tag: 'pre',
+        raw: '<pre>\n\n- alpha\n\n</pre>',
+        content: '<pre>\n\n- alpha\n\n</pre>',
+        children: [
+          {
+            type: 'list',
+            raw: '',
+            ordered: false,
+            items: [
+              {
+                type: 'list_item',
+                raw: '',
+                children: [{ type: 'text', raw: '', content: 'alpha' }],
+              },
+            ],
+          },
+        ],
+      } as any,
+    )
+
+    expect(literalHtml).not.toContain('<ul>')
+    expect(literalHtml).not.toContain('<li>')
+    expect(literalHtml).toContain('<pre>')
   })
 
   it('sanitizes dangerous attrs on structured html wrappers', () => {

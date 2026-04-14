@@ -1,9 +1,9 @@
 import type { BaseNode, CustomComponentAttrs, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import {
-  BLOCKED_HTML_TAGS,
   DANGEROUS_HTML_ATTRS,
   getMarkdown,
   isUnsafeHtmlUrl,
+  NON_STRUCTURING_HTML_TAGS,
   normalizeCustomHtmlTagName,
   normalizeCustomHtmlTags,
   parseMarkdownToStructure,
@@ -386,7 +386,7 @@ function renderHtmlNode(node: RenderableMarkdownNode, ctx: RenderContext): strin
     return escapeHtml(rawContent)
   if (node.loading && !node.autoClosed)
     return escapeHtml(rawContent)
-  if (tag && children.length > 0 && !BLOCKED_HTML_TAGS.has(tag)) {
+  if (tag && children.length > 0 && !NON_STRUCTURING_HTML_TAGS.has(tag)) {
     const attrs = serializeAttrs(node.attrs as CustomComponentAttrs | undefined)
     return `<${tag}${attrs}>${renderNodesToHtml(children, ctx)}</${tag}>`
   }

@@ -118,4 +118,57 @@ describe('markstream-react heavy-node prop forwarding', () => {
     expect(html).not.toContain('javascript:')
     expect(html).toContain('safe child')
   })
+
+  it('keeps literal-content tags on the raw html path for both client and server renderers', () => {
+    const node = {
+      type: 'html_block',
+      tag: 'pre',
+      content: '<pre>\n\n- alpha\n\n</pre>',
+      children: [
+        {
+          type: 'list',
+          raw: '',
+          ordered: false,
+          items: [
+            {
+              type: 'list_item',
+              raw: '',
+              children: [
+                {
+                  type: 'paragraph',
+                  raw: '',
+                  children: [{ type: 'text', raw: '', content: 'alpha' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      loading: false,
+    }
+
+    const clientHtml = renderToStaticMarkup(
+      React.createElement(ReactHtmlBlockNode, {
+        node,
+        ctx: baseCtx,
+        renderNode: clientRenderNode,
+        indexKey: 'client-pre-raw',
+        customId: baseCtx.customId,
+      } as any),
+    )
+    const serverHtml = renderToStaticMarkup(
+      React.createElement(ReactServerHtmlBlockNode, {
+        node,
+        ctx: baseCtx,
+        renderNode: serverRenderNode,
+        indexKey: 'server-pre-raw',
+        customId: baseCtx.customId,
+      } as any),
+    )
+
+    expect(clientHtml).not.toContain('<ul>')
+    expect(clientHtml).toContain('<pre>')
+    expect(serverHtml).not.toContain('<ul>')
+    expect(serverHtml).toContain('<pre>')
+  })
 })

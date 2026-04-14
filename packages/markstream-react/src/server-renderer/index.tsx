@@ -17,10 +17,10 @@ import type {
 import type { NodeComponentProps } from '../types/node-component'
 import React from 'react'
 import {
-  BLOCKED_HTML_TAGS,
   getHtmlTagFromContent,
   getMarkdown,
   mergeCustomHtmlTags,
+  NON_STRUCTURING_HTML_TAGS,
   parseMarkdownToStructure,
   sanitizeHtmlTokenAttrs,
   shouldRenderUnknownHtmlTagAsText,
@@ -881,7 +881,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   if (
     structuredChildren.length > 0
     && structuredTag
-    && !BLOCKED_HTML_TAGS.has(structuredTag)
+    && !NON_STRUCTURING_HTML_TAGS.has(structuredTag)
     && props.ctx
     && props.renderNode
   ) {
