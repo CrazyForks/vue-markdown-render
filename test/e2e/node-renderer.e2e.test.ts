@@ -42,6 +42,16 @@ function normalizeText(input: string) {
 }
 
 function sanitizeSnapshotHtml(html: string, name: string) {
+  html = html.replace(/class="([^"]*)"/g, (_, classNames: string) => {
+    const normalized = classNames
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter(className => !/^typewriter-(?:enter|leave)(?:-(?:from|to|active))?$/.test(className))
+      .join(' ')
+
+    return normalized ? `class="${normalized}"` : ''
+  })
+
   if (name.includes('admonition'))
     return html.replace(/admonition-[a-z0-9]+/gi, 'admonition-stable')
   return html

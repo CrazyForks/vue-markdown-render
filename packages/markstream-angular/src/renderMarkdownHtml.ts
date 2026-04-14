@@ -1,9 +1,13 @@
 import type { BaseNode, CustomComponentAttrs, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import {
+  BLOCKED_HTML_TAGS,
+  DANGEROUS_HTML_ATTRS,
   getMarkdown,
+  isUnsafeHtmlUrl,
   normalizeCustomHtmlTagName,
   normalizeCustomHtmlTags,
   parseMarkdownToStructure,
+  URL_HTML_ATTRS,
 } from 'stream-markdown-parser'
 import { hydrateCustomTagContent } from './hydrateCustomTagContent'
 import { sanitizeHtmlContent } from './sanitizeHtmlContent'
@@ -375,13 +379,18 @@ function renderAdmonitionNode(node: RenderableMarkdownNode, ctx: RenderContext):
 
 function renderHtmlNode(node: RenderableMarkdownNode, ctx: RenderContext): string {
   const content = getString(node.content)
-  if (!content)
-    return ''
+  const rawContent = content || getString(node.raw)
+  const tag = getString(node.tag).trim().toLowerCase()
+  const children = getNodeList(node.children)
   if (!ctx.options.allowHtml)
-    return escapeHtml(content)
+    return escapeHtml(rawContent)
   if (node.loading && !node.autoClosed)
-    return escapeHtml(content)
-  return sanitizeHtmlContent(content)
+    return escapeHtml(rawContent)
+  if (tag && children.length > 0 && !BLOCKED_HTML_TAGS.has(tag)) {
+    const attrs = serializeAttrs(node.attrs as CustomComponentAttrs | undefined)
+    return `<${tag}${attrs}>${renderNodesToHtml(children, ctx)}</${tag}>`
+  }
+  return sanitizeHtmlContent(rawContent)
 }
 
 function renderCustomOrFallbackNode(node: RenderableMarkdownNode, ctx: RenderContext): string {
@@ -442,16 +451,22 @@ function serializeAttrs(attrs?: CustomComponentAttrs | null, extraClass = ''): s
   const mergedClasses = [extraClass]
 
   for (const [name, value] of pairs) {
-    if (!isSafeAttrName(name))
+    const safeName = String(name).trim()
+    const lowerName = safeName.toLowerCase()
+    if (!safeName || !isSafeAttrName(safeName))
       continue
-    if (name === 'class') {
+    if (DANGEROUS_HTML_ATTRS.has(lowerName))
+      continue
+    if (value !== true && URL_HTML_ATTRS.has(lowerName) && value && isUnsafeHtmlUrl(String(value)))
+      continue
+    if (lowerName === 'class') {
       mergedClasses.push(String(value))
       continue
     }
     if (value === true)
-      rendered.push(` ${name}`)
+      rendered.push(` ${safeName}`)
     else
-      rendered.push(` ${name}="${escapeAttr(String(value))}"`)
+      rendered.push(` ${safeName}="${escapeAttr(String(value))}"`)
   }
 
   const className = mergedClasses.map(value => value.trim()).filter(Boolean).join(' ')

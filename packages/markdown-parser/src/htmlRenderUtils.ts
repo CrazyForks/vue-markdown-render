@@ -42,6 +42,26 @@ export function sanitizeHtmlAttrs(attrs: Record<string, string>) {
   return clean
 }
 
+export function tokenAttrsToRecord(attrs?: Array<[string, string | null]> | null) {
+  const record: Record<string, string> = {}
+  if (!Array.isArray(attrs) || attrs.length === 0)
+    return record
+
+  for (const [key, value] of attrs) {
+    if (!key)
+      continue
+    record[String(key)] = value == null ? '' : String(value)
+  }
+
+  return record
+}
+
+export function sanitizeHtmlTokenAttrs(attrs?: Array<[string, string | null]> | null) {
+  const sanitized = sanitizeHtmlAttrs(tokenAttrsToRecord(attrs))
+  const pairs = Object.entries(sanitized).map(([key, value]) => [key, value] as [string, string])
+  return pairs.length > 0 ? pairs : undefined
+}
+
 export function convertHtmlPropValue(value: string, key: string): any {
   const lowerKey = key.toLowerCase()
 

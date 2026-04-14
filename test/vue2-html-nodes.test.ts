@@ -9,6 +9,7 @@ import { defineComponent, h } from 'vue'
 import HtmlBlockNode from '../packages/markstream-vue2/src/components/HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../packages/markstream-vue2/src/components/HtmlInlineNode/HtmlInlineNode.vue'
 import { setCustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
+import { flushAll } from './setup/flush-all'
 
 // Mock custom components
 const TestComponent = defineComponent({
@@ -181,6 +182,95 @@ describe('vue 2 - HtmlBlockNode Custom Components Integration', () => {
 
     // Should show placeholder initially
     expect(wrapper.find('.html-block-node__placeholder').exists()).toBe(true)
+  })
+
+  it('should render structured markdown children inside standard html wrappers once', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          tag: 'span',
+          content: '<span style="font-size: 12px;"></span>',
+          attrs: [['style', 'font-size: 12px;']],
+          children: [
+            {
+              type: 'list',
+              raw: '',
+              ordered: false,
+              items: [
+                {
+                  type: 'list_item',
+                  raw: '',
+                  children: [
+                    {
+                      type: 'paragraph',
+                      raw: '',
+                      children: [{ type: 'text', raw: '', content: 'alpha' }],
+                    },
+                  ],
+                },
+                {
+                  type: 'list_item',
+                  raw: '',
+                  children: [
+                    {
+                      type: 'paragraph',
+                      raw: '',
+                      children: [{ type: 'text', raw: '', content: 'beta' }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await flushAll()
+
+    const root = wrapper.find('.html-block-node')
+    expect(root.element.tagName).toBe('SPAN')
+    expect(root.attributes('style')).toContain('font-size: 12px;')
+    expect(wrapper.findAll('ul')).toHaveLength(1)
+    expect(wrapper.findAll('li')).toHaveLength(2)
+    expect((wrapper.text().match(/alpha/g) || []).length).toBe(1)
+    expect((wrapper.text().match(/beta/g) || []).length).toBe(1)
+  })
+
+  it('should sanitize dangerous attrs on structured wrapper roots', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          tag: 'a',
+          content: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+          attrs: [
+            ['href', 'javascript:alert(1)'],
+            ['onclick', 'alert(1)'],
+            ['data-safe', 'ok'],
+          ],
+          children: [
+            {
+              type: 'paragraph',
+              raw: '',
+              children: [{ type: 'text', raw: '', content: 'safe child' }],
+            },
+          ],
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await flushAll()
+
+    const root = wrapper.find('.html-block-node')
+    expect(root.element.tagName).toBe('A')
+    expect(root.attributes('data-safe')).toBe('ok')
+    expect(root.attributes('href')).toBeUndefined()
+    expect(root.attributes('onclick')).toBeUndefined()
+    expect(wrapper.text()).toContain('safe child')
   })
 })
 
