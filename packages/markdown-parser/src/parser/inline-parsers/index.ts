@@ -596,14 +596,14 @@ export function parseInlineTokens(
 
   function tryReparseCollapsedInlineText(rawContent: string): ParsedNode[] | null {
     const md = (options as any)?.__markdownIt as MarkdownIt | undefined
-    if (!md || !options?.final)
+    if (!md)
       return null
     if (tokens.length <= 1 || !tokens.some(token => token?.type === 'math_inline'))
       return null
     if (!INLINE_REPARSE_MARKER_RE.test(rawContent))
       return null
 
-    const reparsed = md.parseInline(rawContent, { __markstreamFinal: true }) as unknown as MarkdownToken[]
+    const reparsed = md.parseInline(rawContent, { __markstreamFinal: !!options?.final }) as unknown as MarkdownToken[]
     if (!Array.isArray(reparsed) || reparsed.length === 0)
       return null
 

@@ -1,9 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { getMarkdown, parseMarkdownToStructure } from '../src'
 
-function parse(markdown: string) {
+const REAL_WORLD_MULTILINE_INPUT = `$2.897771955 times 10^{-3}text{m·K}$^[1]^
+测试<sup>[3]</sup>。
+$x$^[1]^
+$x$ ^[1]^
+测试^[1]^
+$2.897771955 \\times 10^{-3}\\text{m·K}$^[1]^
+<sup>[1]</sup>
+测试<sup>[12]</sup>结束
+A<sup>[3]</sup>B
+$x$^[1]^
+测试^[1]^
+<sup>[3]</sup>
+测试<sup>[12]</sup>结束`
+
+function parse(markdown: string, final = true) {
   const md = getMarkdown('issue-386')
-  return parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+  return parseMarkdownToStructure(markdown, md, { final }) as any[]
 }
 
 function collectByType(value: any, targetType: string): any[] {
@@ -27,8 +41,8 @@ function collectByType(value: any, targetType: string): any[] {
 }
 
 describe('issue #386 inline math suffix regressions', () => {
-  it('keeps superscript syntax immediately after inline math', () => {
-    const nodes = parse('$2.897771955 times 10^{-3}text{m·K}$^[1]^')
+  it.each([true, false])('keeps superscript syntax immediately after inline math when final=%s', (final) => {
+    const nodes = parse('$2.897771955 times 10^{-3}text{m·K}$^[1]^', final)
     const paragraph = nodes[0] as any
 
     expect(paragraph?.type).toBe('paragraph')
@@ -42,8 +56,8 @@ describe('issue #386 inline math suffix regressions', () => {
     expect(textNodes.some((node: any) => node.content === '^[1]^')).toBe(false)
   })
 
-  it('keeps footnote references immediately after inline math', () => {
-    const nodes = parse('$x$[^1]\n\n[^1]: note')
+  it.each([true, false])('keeps footnote references immediately after inline math when final=%s', (final) => {
+    const nodes = parse('$x$[^1]\n\n[^1]: note', final)
     const paragraph = nodes[0] as any
 
     expect(paragraph?.type).toBe('paragraph')
@@ -59,25 +73,64 @@ describe('issue #386 inline math suffix regressions', () => {
     expect(collectByType(footnotes[0], 'text').some((node: any) => node.content === 'note')).toBe(true)
   })
 
-  it('preserves brackets inside sup html content', () => {
-    const nodes = parse('测试<sup>[3]</sup>。')
+  it.each([true, false])('preserves brackets inside sup html content when final=%s', (final) => {
+    const nodes = parse('测试<sup>[3]</sup>。', final)
     const paragraph = nodes[0] as any
     const htmlInline = collectByType(paragraph, 'html_inline')[0] as any
 
     expect(htmlInline).toBeDefined()
     expect(htmlInline.content).toBe('<sup>[3]</sup>')
-    expect(htmlInline.children?.[0]?.type).toBe('reference')
-    expect(htmlInline.children?.[0]?.raw).toBe('[3]')
+    expect(htmlInline.children).toEqual([
+      {
+        type: 'text',
+        content: '[3]',
+        raw: '[3]',
+      },
+    ])
   })
 
-  it('preserves brackets inside generic inline html content', () => {
-    const nodes = parse('<span>[3]</span>')
+  it.each([true, false])('preserves brackets inside generic inline html content when final=%s', (final) => {
+    const nodes = parse('<span>[3]</span>', final)
     const paragraph = nodes[0] as any
     const htmlInline = collectByType(paragraph, 'html_inline')[0] as any
 
     expect(htmlInline).toBeDefined()
     expect(htmlInline.content).toBe('<span>[3]</span>')
-    expect(htmlInline.children?.[0]?.type).toBe('reference')
-    expect(htmlInline.children?.[0]?.raw).toBe('[3]')
+    expect(htmlInline.children).toEqual([
+      {
+        type: 'text',
+        content: '[3]',
+        raw: '[3]',
+      },
+    ])
+  })
+
+  it.each([true, false])('parses the real multiline issue-386 input without leaking raw superscript syntax when final=%s', (final) => {
+    const nodes = parse(REAL_WORLD_MULTILINE_INPUT, final)
+    const paragraph = nodes[0] as any
+    const superscripts = collectByType(paragraph, 'superscript')
+    const htmlInlineNodes = collectByType(paragraph, 'html_inline')
+    const textNodes = collectByType(paragraph, 'text')
+
+    expect(paragraph?.type).toBe('paragraph')
+    expect(superscripts).toHaveLength(7)
+    expect(superscripts.map((node: any) => node.children?.map((child: any) => child.content).join(''))).toEqual([
+      '[1]',
+      '[1]',
+      '[1]',
+      '[1]',
+      '[1]',
+      '[1]',
+      '[1]',
+    ])
+    expect(textNodes.some((node: any) => String(node.content).includes('^[1]^'))).toBe(false)
+    expect(htmlInlineNodes.map((node: any) => node.children?.map((child: any) => child.content).join(''))).toEqual([
+      '[3]',
+      '[1]',
+      '[12]',
+      '[3]',
+      '[3]',
+      '[12]',
+    ])
   })
 })
