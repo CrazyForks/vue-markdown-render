@@ -47,31 +47,70 @@ const props = withDefaults(
 const emits = defineEmits(['previewCode', 'copy'])
 
 // Chrome warns when Monaco registers non-passive touchstart listeners.
-// Patch the editor host so touch handlers default to passive for Monaco roots.
-const MONACO_TOUCH_PATCH_FLAG = '__markstreamMonacoPassiveTouch__'
-function ensureMonacoPassiveTouchListeners() {
+// Scope the workaround to editor boot so the host page prototype is restored.
+const MONACO_TOUCH_PATCH_STATE_KEY = '__markstreamMonacoPassiveTouchState__'
+type AddEventListenerFn = Element['addEventListener']
+
+interface MonacoTouchPatchState {
+  depth: number
+  original: AddEventListenerFn | null
+}
+
+function getMonacoTouchPatchState() {
+  const globalObj = window as Window
+  const stateStore = globalObj as unknown as Record<string, unknown>
+  const existing = stateStore[MONACO_TOUCH_PATCH_STATE_KEY] as MonacoTouchPatchState | undefined
+  if (existing)
+    return existing
+  const next: MonacoTouchPatchState = {
+    depth: 0,
+    original: null,
+  }
+  stateStore[MONACO_TOUCH_PATCH_STATE_KEY] = next
+  return next
+}
+
+async function withMonacoPassiveTouchListeners<T>(task: () => Promise<T> | T) {
+  if (typeof window === 'undefined')
+    return await task()
+
   try {
-    const globalObj = window as Window
-    const flagStore = globalObj as unknown as Record<string, unknown>
-    if (flagStore[MONACO_TOUCH_PATCH_FLAG])
-      return
     const proto = window.Element?.prototype
     const nativeAdd = proto?.addEventListener
     if (!proto || !nativeAdd)
-      return
-    proto.addEventListener = function patchedMonacoTouchStart(
-      this: Element,
-      type: string,
-      listener: EventListenerOrEventListenerObject,
-      options?: boolean | AddEventListenerOptions,
-    ) {
-      if (type === 'touchstart' && shouldForcePassiveForMonaco(this, options))
-        return nativeAdd.call(this, type, listener, withPassiveOptions(options))
-      return nativeAdd.call(this, type, listener, options)
+      return await task()
+
+    const state = getMonacoTouchPatchState()
+    if (state.depth === 0) {
+      state.original = nativeAdd
+      proto.addEventListener = function patchedMonacoTouchStart(
+        this: Element,
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | AddEventListenerOptions,
+      ) {
+        const original = state.original ?? nativeAdd
+        if (type === 'touchstart' && shouldForcePassiveForMonaco(this, options))
+          return original.call(this, type, listener, withPassiveOptions(options))
+        return original.call(this, type, listener, options)
+      }
     }
-    flagStore[MONACO_TOUCH_PATCH_FLAG] = true
+
+    state.depth++
+    try {
+      return await task()
+    }
+    finally {
+      state.depth = Math.max(0, state.depth - 1)
+      if (state.depth === 0 && state.original && proto.addEventListener !== state.original) {
+        proto.addEventListener = state.original
+        state.original = null
+      }
+    }
   }
-  catch {}
+  catch {
+    return await task()
+  }
 }
 
 function shouldForcePassiveForMonaco(target: EventTarget | null, options?: boolean | AddEventListenerOptions) {
@@ -1664,7 +1703,6 @@ async function runEditorCreation(el: HTMLElement) {
 function ensureEditorCreation(el: HTMLElement) {
   if (!createEditor || isUnmounted)
     return null
-  ensureMonacoPassiveTouchListeners()
   if (createEditorPromise)
     return createEditorPromise
   if (editorCreated.value && editorMounted.value)
@@ -1672,7 +1710,7 @@ function ensureEditorCreation(el: HTMLElement) {
 
   editorCreated.value = true
   const pending = (async () => {
-    await runEditorCreation(el)
+    await withMonacoPassiveTouchListeners(() => runEditorCreation(el))
   })()
 
   const currentPromise = pending.finally(() => {

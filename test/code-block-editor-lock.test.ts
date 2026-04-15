@@ -1053,3 +1053,79 @@ describe('codeBlockNode plain text theme fallback', () => {
     wrapper.unmount()
   })
 })
+
+describe('codeBlockNode Monaco touch patch boundaries', () => {
+  beforeEach(() => {
+    resetStreamMonacoHelpers()
+  })
+
+  it('restores Element.prototype.addEventListener after editor creation succeeds', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const originalAddEventListener = Element.prototype.addEventListener
+    let resolveCreate: (() => void) | null = null
+
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = resolve
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: false,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    expect(Element.prototype.addEventListener).not.toBe(originalAddEventListener)
+
+    resolveCreate?.()
+    await flushPendingMicrotasks()
+
+    expect(Element.prototype.addEventListener).toBe(originalAddEventListener)
+    wrapper.unmount()
+  })
+
+  it('restores Element.prototype.addEventListener after editor creation fails', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const originalAddEventListener = Element.prototype.addEventListener
+    let rejectCreate: ((error?: unknown) => void) | null = null
+
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectCreate = reject
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: false,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    expect(Element.prototype.addEventListener).not.toBe(originalAddEventListener)
+
+    rejectCreate?.(new Error('boom'))
+    await flushPendingMicrotasks()
+
+    expect(Element.prototype.addEventListener).toBe(originalAddEventListener)
+    wrapper.unmount()
+  })
+})
