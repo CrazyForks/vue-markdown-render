@@ -435,6 +435,24 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     const strict = !!mathOpts?.strictDelimiters
     const allowLoading = !s?.env?.__markstreamFinal
 
+    const preserveSpacesBeforeLineBreak = (src: string, start: number) => {
+      let end = start
+      while (end < src.length && (src[end] === ' ' || src[end] === '\t'))
+        end++
+
+      if (end === start)
+        return start
+
+      const hitsLineBreak = src[end] === '\n' || (src[end] === '\r' && src[end + 1] === '\n')
+      if (!hitsLineBreak)
+        return start
+
+      const text = src.slice(start, end)
+      const token = s.push('text', '', 0)
+      token.content = text
+      return end
+    }
+
     if (/^\*[^*]+/.test(s.src)) {
       return false
     }
@@ -852,12 +870,15 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
             // Always advance cursor past the math span; otherwise when the math
             // is at end-of-line (raw === ''), we'd loop forever on the same opener.
             // 这里的 raw 可能还会有 math_inline, 应该交给后续的规则处理，直接 s.pos 到当前位置
-            s.pos = endIdx + close.length
+            s.pos = preserveSpacesBeforeLineBreak(src, endIdx + close.length)
             searchPos = s.pos
             preMathPos = searchPos
             if (!isBeforeClose)
               s.push('strong_close', '', 0)
-            continue
+            // Leave the remaining inline suffix to markdown-it so later rules
+            // (for example superscript, footnotes, or strong/emphasis) can
+            // tokenize it normally instead of being collapsed into plain text.
+            return true
           }
           else {
             const token = s.push('math_inline', 'math', 0)
@@ -868,9 +889,14 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           }
         }
 
-        searchPos = endIdx + close.length
+        searchPos = preserveSpacesBeforeLineBreak(src, endIdx + close.length)
         preMathPos = searchPos
         s.pos = searchPos
+        // Do not consume the trailing suffix here. Returning now lets the
+        // inline parser continue from the end of the math token so adjacent
+        // markdown like `^[1]^`, `[^1]`, or `**strong**` is still parsed by
+        // the normal rules.
+        return true
       }
 
       if (foundAny) {

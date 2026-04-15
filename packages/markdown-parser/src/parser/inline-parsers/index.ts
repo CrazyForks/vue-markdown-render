@@ -24,7 +24,7 @@ import { parseTextToken } from './text-parser'
 const STRONG_PAIR_RE = /\*\*([\s\S]*?)\*\*/
 const STRIKETHROUGH_RE = /[^~]*~{2,}[^~]+/
 const HAS_STRONG_RE = /\*\*/
-const INLINE_REPARSE_MARKER_RE = /\*\*\*|___|\*\*|__|\*|_|~~/
+const INLINE_REPARSE_MARKER_RE = /[[_*^~]/
 const ESCAPED_PUNCTUATION_RE = /\\([\\()[\]`$|*_\-!])/g
 const ESCAPABLE_PUNCTUATION = new Set(['\\', '(', ')', '[', ']', '`', '$', '|', '*', '_', '-', '!'])
 
