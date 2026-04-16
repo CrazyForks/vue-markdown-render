@@ -202,7 +202,7 @@ function renderNodeToHtml(node: RenderableMarkdownNode | null | undefined, ctx: 
 
   switch (node.type) {
     case 'text':
-      return escapeHtml(getString(node.content))
+      return renderTextNode(node)
     case 'paragraph':
       return `<p>${renderNodesToHtml(getNodeList(node.children), ctx)}</p>`
     case 'strong':
@@ -265,13 +265,26 @@ function renderNodeToHtml(node: RenderableMarkdownNode | null | undefined, ctx: 
     case 'math_block':
       return renderMathBlockNode(node)
     case 'reference':
-      return `<sup class="markstream-nested-reference">[${escapeHtml(getString(node.id))}]</sup>`
+      return `<span class="markstream-nested-reference">${escapeHtml(getString(node.id))}</span>`
     case 'html_inline':
     case 'html_block':
       return renderHtmlNode(node, ctx)
     default:
       return renderCustomOrFallbackNode(node, ctx)
   }
+}
+
+function renderTextNode(node: RenderableMarkdownNode): string {
+  const content = getString(node.content)
+  const escaped = escapeHtml(content)
+  const centered = !!node.center
+  if (!centered && !content.includes('\n'))
+    return escaped
+
+  const className = centered
+    ? 'markstream-angular-text-node markstream-angular-text--centered'
+    : 'markstream-angular-text-node'
+  return `<span class="${className}">${escaped}</span>`
 }
 
 function renderLinkNode(node: RenderableMarkdownNode, ctx: RenderContext): string {
