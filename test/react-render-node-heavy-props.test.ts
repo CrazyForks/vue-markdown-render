@@ -12,7 +12,6 @@ import {
   HtmlBlockNode as ReactServerHtmlBlockNode,
   renderNode as serverRenderNode,
 } from '../packages/markstream-react/src/server-renderer/index'
-import { renderNode } from '../packages/markstream-react/src/renderers/renderNode'
 
 describe('markstream-react heavy-node prop forwarding', () => {
   const baseCtx: RenderContext = {

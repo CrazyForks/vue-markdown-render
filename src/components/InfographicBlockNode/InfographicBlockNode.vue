@@ -526,7 +526,7 @@ watch(
     data-markstream-infographic="1"
     :data-markstream-mode="renderMode"
     :class="[
-      { 'is-rendering': props.loading, dark: props.isDark },
+      { 'is-rendering': props.loading, 'dark': props.isDark },
     ]"
   >
     <!-- Header -->

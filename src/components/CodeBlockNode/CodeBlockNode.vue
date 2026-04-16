@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { CodeBlockMonacoTheme, CodeBlockNodeProps } from '../../types/component-props'
-import CodeBlockShell from './CodeBlockShell.vue'
 import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLike, MonacoNamespaceLike, MonacoRuntimeOptions } from './monaco'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
@@ -12,6 +11,7 @@ import { useViewportPriority } from '../../composables/viewportPriority'
 import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils'
 import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
+import CodeBlockShell from './CodeBlockShell.vue'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
 import {
   getUseMonaco,
@@ -2138,7 +2138,7 @@ onUnmounted(() => {
     data-markstream-code-block="1"
     :data-markstream-enhanced="editorMounted && !usePreCodeRender ? 'true' : 'false'"
     :class="[
-      { dark: props.isDark, 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
+      { 'dark': props.isDark, 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
     ]"
   >
     <CodeBlockShell
@@ -2193,26 +2193,26 @@ onUnmounted(() => {
 
       <!-- Monaco editor layer -->
       <div v-show="!isCollapsed && (stream ? true : !loading)" class="code-editor-layer">
-      <div
-        ref="codeEditor"
-        class="code-editor-container"
-        :class="[stream ? '' : 'code-height-placeholder', { 'is-hidden': showPreWhileMonacoLoads }]"
-        :style="codeEditorContainerStyle"
+        <div
+          ref="codeEditor"
+          class="code-editor-container"
+          :class="[stream ? '' : 'code-height-placeholder', { 'is-hidden': showPreWhileMonacoLoads }]"
+          :style="codeEditorContainerStyle"
+        />
+        <PreCodeNode
+          v-if="showPreWhileMonacoLoads"
+          class="code-pre-fallback"
+          :class="{ 'is-wrap': preFallbackWrap }"
+          :style="preFallbackStyle"
+          :node="props.node"
+        />
+      </div>
+      <HtmlPreviewFrame
+        v-if="showInlinePreview && !hasPreviewListener && isPreviewable && codeLanguage === 'html'"
+        :code="props.node.code"
+        :is-dark="props.isDark"
+        :on-close="() => (showInlinePreview = false)"
       />
-      <PreCodeNode
-        v-if="showPreWhileMonacoLoads"
-        class="code-pre-fallback"
-        :class="{ 'is-wrap': preFallbackWrap }"
-        :style="preFallbackStyle"
-        :node="props.node"
-      />
-    </div>
-    <HtmlPreviewFrame
-      v-if="showInlinePreview && !hasPreviewListener && isPreviewable && codeLanguage === 'html'"
-      :code="props.node.code"
-      :is-dark="props.isDark"
-      :on-close="() => (showInlinePreview = false)"
-    />
 
       <template #loading>
         <slot name="loading" :loading="loading" :stream="stream">
@@ -2351,7 +2351,6 @@ onUnmounted(() => {
   transition: none;
 }
 
-
 .code-editor-layer {
   display: grid;
   min-width: 0;
@@ -2469,8 +2468,6 @@ onUnmounted(() => {
   --stream-monaco-widget-shadow: var(--markstream-diff-widget-shadow);
 }
 
-
-
 .code-editor-container.is-hidden {
   opacity: 0;
   pointer-events: none;
@@ -2545,9 +2542,6 @@ onUnmounted(() => {
   0% { background-position: 100% 0; }
   100% { background-position: 0 0; }
 }
-
-
-
 
 /* ── Unchanged lines widget (ghost style) ── */
 :deep(.stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center) {

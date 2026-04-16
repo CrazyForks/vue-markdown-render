@@ -176,15 +176,61 @@ const toggleTheme = useToggle(isDark)
 // Brand theme selector
 const activeBrandTheme = ref('')
 const brandThemes = [
-  '', 'airbnb', 'airtable', 'apple', 'bmw', 'cal', 'claude', 'clay',
-  'clickhouse', 'cohere', 'coinbase', 'composio', 'cursor', 'elevenlabs',
-  'expo', 'figma', 'framer', 'hashicorp', 'ibm', 'intercom', 'kraken',
-  'linear', 'lovable', 'minimax', 'mintlify', 'miro', 'mistral', 'mongodb',
-  'notion', 'nvidia', 'ollama', 'opencode-ai', 'pinterest', 'posthog',
-  'raycast', 'replicate', 'resend', 'revolut', 'runwayml', 'sanity',
-  'sentry', 'spacex', 'spotify', 'stripe', 'supabase', 'superhuman',
-  'together-ai', 'uber', 'vercel', 'voltagent', 'warp', 'webflow',
-  'wise', 'x-ai', 'zapier',
+  '',
+  'airbnb',
+  'airtable',
+  'apple',
+  'bmw',
+  'cal',
+  'claude',
+  'clay',
+  'clickhouse',
+  'cohere',
+  'coinbase',
+  'composio',
+  'cursor',
+  'elevenlabs',
+  'expo',
+  'figma',
+  'framer',
+  'hashicorp',
+  'ibm',
+  'intercom',
+  'kraken',
+  'linear',
+  'lovable',
+  'minimax',
+  'mintlify',
+  'miro',
+  'mistral',
+  'mongodb',
+  'notion',
+  'nvidia',
+  'ollama',
+  'opencode-ai',
+  'pinterest',
+  'posthog',
+  'raycast',
+  'replicate',
+  'resend',
+  'revolut',
+  'runwayml',
+  'sanity',
+  'sentry',
+  'spacex',
+  'spotify',
+  'stripe',
+  'supabase',
+  'superhuman',
+  'together-ai',
+  'uber',
+  'vercel',
+  'voltagent',
+  'warp',
+  'webflow',
+  'wise',
+  'x-ai',
+  'zapier',
 ]
 
 // Code block theme selector (single dropdown)
@@ -457,7 +503,9 @@ onBeforeUnmount(() => {
           <label class="setting-label">Brand Theme</label>
           <div class="setting-select-wrap">
             <select v-model="activeBrandTheme" class="setting-select">
-              <option value="">Default</option>
+              <option value="">
+                Default
+              </option>
               <option v-for="t in brandThemes.filter(Boolean)" :key="t" :value="t">
                 {{ t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, ' ') }}
               </option>
@@ -471,7 +519,9 @@ onBeforeUnmount(() => {
           <label class="setting-label">Code Theme</label>
           <div class="setting-select-wrap">
             <select v-model="selectedTheme" class="setting-select" aria-label="Code block theme" @click.stop @change.stop>
-              <option v-for="t in themes" :key="t" :value="t">{{ formatThemeName(t) }}</option>
+              <option v-for="t in themes" :key="t" :value="t">
+                {{ formatThemeName(t) }}
+              </option>
             </select>
             <Icon icon="carbon:chevron-down" class="setting-select-icon" />
           </div>
@@ -482,12 +532,18 @@ onBeforeUnmount(() => {
           <label class="setting-label">Stream Profile</label>
           <div class="setting-select-wrap">
             <select v-model="selectedStreamPresetId" class="setting-select">
-              <option v-for="preset in STREAM_PRESETS" :key="preset.id" :value="preset.id">{{ preset.label }}</option>
-              <option :value="CUSTOM_STREAM_PRESET_ID">Custom</option>
+              <option v-for="preset in STREAM_PRESETS" :key="preset.id" :value="preset.id">
+                {{ preset.label }}
+              </option>
+              <option :value="CUSTOM_STREAM_PRESET_ID">
+                Custom
+              </option>
             </select>
             <Icon icon="carbon:chevron-down" class="setting-select-icon" />
           </div>
-          <p class="setting-hint">{{ streamPresetDescription }}</p>
+          <p class="setting-hint">
+            {{ streamPresetDescription }}
+          </p>
         </div>
 
         <!-- Transport -->
@@ -495,8 +551,12 @@ onBeforeUnmount(() => {
           <label class="setting-label">Transport</label>
           <div class="setting-select-wrap">
             <select v-model="streamTransportMode" class="setting-select">
-              <option value="readable-stream">ReadableStream</option>
-              <option value="scheduler">Scheduler</option>
+              <option value="readable-stream">
+                ReadableStream
+              </option>
+              <option value="scheduler">
+                Scheduler
+              </option>
             </select>
             <Icon icon="carbon:chevron-down" class="setting-select-icon" />
           </div>
@@ -507,8 +567,12 @@ onBeforeUnmount(() => {
           <label class="setting-label">Slice Mode</label>
           <div class="setting-select-wrap">
             <select v-model="streamSliceMode" class="setting-select">
-              <option value="pure-random">Pure Random</option>
-              <option value="boundary-aware">Boundary Aware</option>
+              <option value="pure-random">
+                Pure Random
+              </option>
+              <option value="boundary-aware">
+                Boundary Aware
+              </option>
             </select>
             <Icon icon="carbon:chevron-down" class="setting-select-icon" />
           </div>
@@ -596,8 +660,12 @@ onBeforeUnmount(() => {
               <Icon icon="carbon:machine-learning-model" class="chat-header__logo-icon" />
             </div>
             <div class="chat-header__info">
-              <h1 class="chat-header__title">markstream-vue</h1>
-              <p class="chat-header__subtitle">Streaming Markdown Renderer</p>
+              <h1 class="chat-header__title">
+                markstream-vue
+              </h1>
+              <p class="chat-header__subtitle">
+                Streaming Markdown Renderer
+              </p>
               <div class="chat-header__meta">
                 <span class="chat-header__meta-pill" :class="{ 'chat-header__meta-pill--active': isStreaming }">
                   {{ isStreaming ? (isPaused ? 'Paused' : 'Streaming') : 'Ready' }}

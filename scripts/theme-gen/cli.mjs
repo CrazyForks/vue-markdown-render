@@ -20,12 +20,11 @@
  *   node scripts/theme-gen/cli.mjs demo
  */
 
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { hslToShadcn, toHsl, toShadcnHsl, contrastRatio, hslObjToHex, toOklch, toOklchCss } from './color.mjs'
-import { generatePalette, BRIDGE_TOKENS, EXTENSION_TOKENS } from './palette.mjs'
+import { hslObjToHex, toHsl, toOklch, toOklchCss, toShadcnHsl } from './color.mjs'
 import { generateBothSchemes, validateContrast } from './dark.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -105,9 +104,12 @@ Usage: generate --name <name> --bg <hex> --fg <hex> --brand <hex>
 
   // Build font overrides if any --font-* flags provided
   const fonts = {}
-  if (opts['font-sans']) fonts.sans = opts['font-sans']
-  if (opts['font-mono']) fonts.mono = opts['font-mono']
-  if (opts['font-serif']) fonts.serif = opts['font-serif']
+  if (opts['font-sans'])
+    fonts.sans = opts['font-sans']
+  if (opts['font-mono'])
+    fonts.mono = opts['font-mono']
+  if (opts['font-serif'])
+    fonts.serif = opts['font-serif']
 
   const keyColors = {
     background: opts.bg,
@@ -236,7 +238,7 @@ function build(args) {
 
   // Also generate an index CSS that imports all themes
   const indexLines = entries.map(e => `@import './${e.id}.css';`)
-  writeFileSync(resolve(outDir, 'index.css'), indexLines.join('\n') + '\n')
+  writeFileSync(resolve(outDir, 'index.css'), `${indexLines.join('\n')}\n`)
   console.log(`Index written → themes/index.css`)
 }
 

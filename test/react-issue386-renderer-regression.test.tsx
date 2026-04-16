@@ -253,9 +253,9 @@ describe('markstream-react issue #386 renderer regressions', () => {
 
   it('lets block-marked custom html tags break out of paragraph wrappers on the client', async () => {
     const scopeId = 'react-blockish-inline-tag-client'
-    const BlockRef = withMarkstreamComponentDisplay((({ node }: { node: { content?: string } }) => (
+    const BlockRef = withMarkstreamComponentDisplay(({ node }: { node: { content?: string } }) => (
       <div className="block-ref-node">{node.content || ''}</div>
-    )), 'block')
+    ), 'block')
 
     setCustomComponents(scopeId, { 'inline-ref': BlockRef })
 
@@ -281,9 +281,9 @@ describe('markstream-react issue #386 renderer regressions', () => {
 
   it('lets block-marked custom html tags break out of paragraph wrappers during SSR', () => {
     const scopeId = 'react-blockish-inline-tag-ssr'
-    const BlockRef = withMarkstreamComponentDisplay((({ node }: { node: { content?: string } }) => (
+    const BlockRef = withMarkstreamComponentDisplay(({ node }: { node: { content?: string } }) => (
       <div className="block-ref-node">{node.content || ''}</div>
-    )), 'block')
+    ), 'block')
 
     setCustomComponents(scopeId, { 'inline-ref': BlockRef })
 

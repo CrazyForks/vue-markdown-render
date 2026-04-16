@@ -279,7 +279,7 @@ function canFindNodeRawAfterSourceIndex(source: string, startIndex: number, node
   if (!nodeRaw)
     return false
 
-  if (source.indexOf(nodeRaw, startIndex) !== -1)
+  if (source.includes(nodeRaw, startIndex))
     return true
 
   const tail = source.slice(Math.max(0, startIndex))
@@ -354,7 +354,7 @@ const STRUCTURED_HTML_WRAPPER_BLOCK_TYPES = new Set([
   'thematic_break',
 ])
 
-const STRUCTURED_HTML_WRAPPER_MARKER_RE = /(?:^|\n)(?:\s{0,3}(?:#{1,6}\s+\S|[-+*]\s+\S|\d+[.)]\s+\S|>\s*\S|(?:`{3,}|~{3,})|(?:\*{3,}|-{3,}|_{3,})(?:\s|$)|\|.*\|))/m
+const STRUCTURED_HTML_WRAPPER_MARKER_RE = /(?:^|\n)\s{0,3}(?:#{1,6}\s+\S|[-+*]\s+\S|\d+[.)]\s+\S|>\s*\S|`{3,}|~{3,}|(?:\*{3,}|-{3,}|_{3,})(?:\s|$)|\|.*\|)/m
 
 function hasStructuredHtmlWrapperMarkers(fragment: string) {
   return /\n\s*\n/.test(fragment) || STRUCTURED_HTML_WRAPPER_MARKER_RE.test(fragment)
@@ -374,8 +374,9 @@ function shouldStructureGenericHtmlBlockChildren(
     if (child?.type !== 'html_block')
       return false
     return Array.isArray((child as any)?.children) && (child as any).children.length > 0
-  }))
+  })) {
     return true
+  }
 
   if (!hasStructuredHtmlWrapperMarkers(innerRaw))
     return false

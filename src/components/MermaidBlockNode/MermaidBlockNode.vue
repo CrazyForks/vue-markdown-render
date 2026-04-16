@@ -752,7 +752,8 @@ function resolveMaxContainerHeight() {
   // Explicit prop value takes priority
   if (props.maxHeight != null) {
     const maxHeight = Number.parseFloat(String(props.maxHeight))
-    if (Number.isFinite(maxHeight)) return maxHeight
+    if (Number.isFinite(maxHeight))
+      return maxHeight
   }
 
   // Fall back to CSS token (respects density theming)
@@ -760,7 +761,8 @@ function resolveMaxContainerHeight() {
   if (el) {
     const raw = getComputedStyle(el).getPropertyValue('--ms-size-code-max-height').trim()
     const num = Number.parseFloat(raw)
-    if (Number.isFinite(num)) return num
+    if (Number.isFinite(num))
+      return num
   }
   return 500 // ultimate fallback
 }
@@ -1883,7 +1885,7 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
     data-markstream-mermaid="1"
     :data-markstream-mode="showSource ? 'fallback' : hasRenderedOnce ? 'preview' : 'pending'"
     :class="[
-      { 'is-rendering': props.loading, dark: props.isDark },
+      { 'is-rendering': props.loading, 'dark': props.isDark },
     ]"
   >
     <!-- 重新设计的头部区域 -->

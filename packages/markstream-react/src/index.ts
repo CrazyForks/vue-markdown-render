@@ -63,6 +63,10 @@ export {
   setCustomComponents,
   withMarkstreamComponentDisplay,
 } from './customComponents'
+export type {
+  CustomComponentDisplayMode,
+  MarkstreamCustomComponent,
+} from './customComponents'
 export * from './i18n/useSafeI18n'
 export * from './renderers/renderNode'
 export type { NodeRendererCodeBlockProps, NodeRendererProps } from './types'
@@ -93,12 +97,8 @@ export type {
 export type { NodeComponentProps } from './types/node-component'
 export * from './utils/languageIcon'
 export * from './workers/katexWorkerClient'
-export * from './workers/mermaidWorkerClient'
 
-export type {
-  CustomComponentDisplayMode,
-  MarkstreamCustomComponent,
-} from './customComponents'
+export * from './workers/mermaidWorkerClient'
 
 export type CustomComponentMap = MarkstreamCustomComponentMap
 export type RenderContext = MarkstreamRenderContext

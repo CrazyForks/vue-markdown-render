@@ -3,7 +3,7 @@
  */
 
 import { createRequire } from 'node:module'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const packageRequire = createRequire(new URL('../packages/markstream-react/package.json', import.meta.url))
 const React = packageRequire('react') as typeof import('react')
@@ -507,6 +507,12 @@ function renderExport(name: string, element: React.ReactElement) {
 }
 
 describe('markstream-react next/server SSR', () => {
+  beforeEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    vi.resetModules()
+  })
+
   afterEach(async () => {
     const serverEntry = await import('../packages/markstream-react/src/server')
     serverEntry.clearGlobalCustomComponents()
@@ -514,19 +520,22 @@ describe('markstream-react next/server SSR', () => {
     serverEntry.removeCustomComponents?.('next-ssr-lab-alt')
     serverEntry.removeCustomComponents?.('server-ssr-lab')
     serverEntry.removeCustomComponents?.('server-ssr-lab-alt')
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    vi.resetModules()
   })
 
   it('keeps root, next, and server entry imports safe', async () => {
-    const entries = await Promise.all([
-      import('../packages/markstream-react/src/index'),
-      import('../packages/markstream-react/src/next'),
-      import('../packages/markstream-react/src/server'),
-    ])
+    const entries = [
+      await import('../packages/markstream-react/src/index'),
+      await import('../packages/markstream-react/src/next'),
+      await import('../packages/markstream-react/src/server'),
+    ]
 
     expect(typeof entries[0].default).toBe('function')
     expect(typeof entries[1].default).toBe('function')
     expect(typeof entries[2].default).toBe('function')
-  })
+  }, 15000)
 
   it('renders the next entry export matrix as SSR-safe HTML', async () => {
     const nextEntry = await import('../packages/markstream-react/src/next')

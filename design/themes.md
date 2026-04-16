@@ -119,8 +119,8 @@ NodeRenderer (isDark prop)
 
 ```ts
 interface Props {
-  darkTheme?: CodeBlockMonacoTheme   // 暗色编辑器主题
-  lightTheme?: CodeBlockMonacoTheme  // 亮色编辑器主题
+  darkTheme?: CodeBlockMonacoTheme // 暗色编辑器主题
+  lightTheme?: CodeBlockMonacoTheme // 亮色编辑器主题
 }
 
 // 运行时根据 isDark 切换

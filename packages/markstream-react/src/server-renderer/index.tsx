@@ -17,7 +17,6 @@ import type {
 import type { NodeComponentProps } from '../types/node-component'
 import React from 'react'
 import {
-  getHtmlTagFromContent,
   getMarkdown,
   mergeCustomHtmlTags,
   NON_STRUCTURING_HTML_TAGS,
@@ -29,8 +28,8 @@ import {
 import { getCustomNodeComponents } from '../customComponents'
 import { BLOCK_LEVEL_TYPES, renderInline, renderNodeChildren, tokenAttrsToProps } from '../renderers/renderChildren'
 import { isParagraphBreakingCustomHtmlNode, resolveCustomHtmlTag } from '../utils/customHtmlTag'
-import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { normalizeDomAttrs } from '../utils/htmlToReact'
+import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { parseHtmlToReactNodes } from './html'
 import { renderKatexToHtml } from './katex'
 

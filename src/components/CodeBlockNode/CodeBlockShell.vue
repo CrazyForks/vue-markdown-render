@@ -10,34 +10,6 @@ import { computed, ref } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 
-const moreMenuOpen = ref(false)
-const moreMenuRef = ref<HTMLElement | null>(null)
-const moreBtnRef = ref<HTMLElement | null>(null)
-
-function toggleMoreMenu() {
-  moreMenuOpen.value = !moreMenuOpen.value
-  if (moreMenuOpen.value) {
-    document.addEventListener('click', closeMoreMenuOutside, { once: true, capture: true })
-  }
-}
-
-function closeMoreMenuOutside(e: Event) {
-  const target = e.target as Node
-  if (moreMenuRef.value?.contains(target) || moreBtnRef.value?.contains(target)) {
-    document.addEventListener('click', closeMoreMenuOutside, { once: true, capture: true })
-  }
-  else {
-    moreMenuOpen.value = false
-  }
-}
-
-// Whether the overflow menu has any items to show
-const hasOverflowItems = computed(() =>
-  (props.showFontSizeButtons && props.enableFontSizeControl)
-  || props.showExpandButton
-  || (props.isPreviewable && props.showPreviewButton),
-)
-
 const props = withDefaults(defineProps<{
   // Header visibility
   showHeader?: boolean
@@ -83,7 +55,6 @@ const props = withDefaults(defineProps<{
   showFontSizeButtons: true,
   fontBaselineReady: false,
 })
-
 const emit = defineEmits<{
   (e: 'toggleCollapse'): void
   (e: 'decreaseFont'): void
@@ -93,17 +64,46 @@ const emit = defineEmits<{
   (e: 'toggleExpand', event: MouseEvent): void
   (e: 'preview'): void
 }>()
+const moreMenuOpen = ref(false)
+const moreMenuRef = ref<HTMLElement | null>(null)
+const moreBtnRef = ref<HTMLElement | null>(null)
+
+function toggleMoreMenu() {
+  moreMenuOpen.value = !moreMenuOpen.value
+  if (moreMenuOpen.value) {
+    document.addEventListener('click', closeMoreMenuOutside, { once: true, capture: true })
+  }
+}
+
+function closeMoreMenuOutside(e: Event) {
+  const target = e.target as Node
+  if (moreMenuRef.value?.contains(target) || moreBtnRef.value?.contains(target)) {
+    document.addEventListener('click', closeMoreMenuOutside, { once: true, capture: true })
+  }
+  else {
+    moreMenuOpen.value = false
+  }
+}
+
+// Whether the overflow menu has any items to show
+const hasOverflowItems = computed(() =>
+  (props.showFontSizeButtons && props.enableFontSizeControl)
+  || props.showExpandButton
+  || (props.isPreviewable && props.showPreviewButton),
+)
 
 const { t } = useSafeI18n()
 const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
 function onBtnHover(e: MouseEvent | FocusEvent, text: string) {
-  if (!tooltipsEnabled.value) return
+  if (!tooltipsEnabled.value)
+    return
   showTooltipForAnchor(e.currentTarget as HTMLElement, text, 'top', false, undefined, props.isDark)
 }
 
 function onBtnLeave() {
-  if (!tooltipsEnabled.value) return
+  if (!tooltipsEnabled.value)
+    return
   hideTooltip()
 }
 
