@@ -41,6 +41,7 @@ import { TextNode } from '../components/TextNode/TextNode'
 import { ThematicBreakNode } from '../components/ThematicBreakNode/ThematicBreakNode'
 import { VmrContainerNode } from '../components/VmrContainerNode/VmrContainerNode'
 import { getCustomNodeComponents } from '../customComponents'
+import { resolveCustomHtmlTag } from '../utils/customHtmlTag'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { renderNodeChildren } from './renderChildren'
 
@@ -138,12 +139,12 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
   }
 
   if (node.type === 'html_block' || node.type === 'html_inline') {
-    const tag = String((node as any).tag ?? '').trim().toLowerCase() || getHtmlTagFromContent((node as any).content)
+    const resolvedCustomTag = resolveCustomHtmlTag(node as any, customComponents as any, ctx.customHtmlTags)
+    const fallbackTag = String((node as any).tag ?? '').trim().toLowerCase() || getHtmlTagFromContent((node as any).content)
+    const tag = resolvedCustomTag?.tag ?? fallbackTag
     if (tag) {
-      const customForTag = (customComponents as Record<string, any>)[tag]
-      // Check if tag is whitelisted in customHtmlTags
-      const customHtmlTags = ctx.customHtmlTags ?? []
-      const isWhitelisted = customHtmlTags.some((t: string) => t.toLowerCase() === tag)
+      const customForTag = resolvedCustomTag?.component ?? (customComponents as Record<string, any>)[tag]
+      const isWhitelisted = resolvedCustomTag?.isWhitelisted ?? (ctx.customHtmlTags ?? []).some((t: string) => t.toLowerCase() === tag)
       if (isWhitelisted && customForTag) {
         const coerced = {
           ...(node as any),

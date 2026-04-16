@@ -6,6 +6,7 @@ import { NodeRenderer } from 'markstream-react'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
 import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode } from '../../../playground-shared/testPageState'
+import { PLAYGROUND_CUSTOM_HTML_TAGS, PLAYGROUND_CUSTOM_ID } from './markstreamPlayground'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from './streamPresets'
 import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from './useStreamSimulator'
 
@@ -533,6 +534,8 @@ export function TestLab({ frameworkLabel, onGoHome }: TestLabProps) {
                   typewriter={false}
                   codeBlockStream
                   isDark={isDark}
+                  customId={PLAYGROUND_CUSTOM_ID}
+                  customHtmlTags={PLAYGROUND_CUSTOM_HTML_TAGS}
                   codeBlockDarkTheme="vitesse-dark"
                   codeBlockLightTheme="vitesse-light"
                 />
