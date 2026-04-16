@@ -7,7 +7,9 @@ import katex from 'katex'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import React, { act } from '../packages/markstream-react/node_modules/react'
 import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
+import { renderToStaticMarkup } from '../packages/markstream-react/node_modules/react-dom/server'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
+import { NodeRenderer as ServerNodeRenderer } from '../packages/markstream-react/src/server'
 import { clearKaTeXCache, clearKaTeXWorker, setKaTeXWorker } from '../packages/markstream-react/src/workers/katexWorkerClient'
 
 const REAL_WORLD_MULTILINE_INPUT = `$2.897771955 times 10^{-3}text{m·K}$^[1]^
@@ -132,8 +134,35 @@ describe('markstream-react issue #386 renderer regressions', () => {
     const view = await renderMarkdown('测试<sup>[3]</sup>。')
 
     expect(view.host.querySelector('.html-inline-node sup')?.textContent).toBe('[3]')
+    expect(view.host.querySelectorAll('p.paragraph-node')).toHaveLength(1)
+    expect(view.host.querySelector('p.paragraph-node .html-inline-node sup')?.textContent).toBe('[3]')
+    expect(view.host.querySelector('p.paragraph-node')?.textContent).toBe('测试[3]。')
 
     await view.unmount()
+  })
+
+  it('keeps inline html embedded in the same paragraph on the client', async () => {
+    const view = await renderMarkdown('A<sup>[3]</sup>B')
+
+    expect(view.host.querySelectorAll('p.paragraph-node')).toHaveLength(1)
+    expect(view.host.querySelector('p.paragraph-node .html-inline-node sup')?.textContent).toBe('[3]')
+    expect(view.host.querySelector('p.paragraph-node')?.textContent).toBe('A[3]B')
+
+    await view.unmount()
+  })
+
+  it('keeps inline html embedded in the same paragraph during SSR', () => {
+    const html = renderToStaticMarkup(React.createElement(ServerNodeRenderer as any, {
+      content: 'A<sup>[3]</sup>B',
+      typewriter: false,
+    }))
+
+    expect(html).toContain('<p')
+    expect(html).toContain('A')
+    expect(html).toContain('<sup>[3]</sup>')
+    expect(html).toContain('B')
+    expect(html).not.toContain('</p><span class="html-inline-node"')
+    expect(html).not.toContain('</sup></div></div></div><div class="node-slot"')
   })
 
   it('renders the real multiline issue-386 input in streaming mode without leaking raw superscript syntax', async () => {
