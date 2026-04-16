@@ -11,6 +11,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import React, { act, StrictMode } from '../packages/markstream-react/node_modules/react'
 import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
+import { HtmlBlockNode } from '../packages/markstream-react/src/components/HtmlBlockNode/HtmlBlockNode'
+import { HtmlInlineNode } from '../packages/markstream-react/src/components/HtmlInlineNode/HtmlInlineNode'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
 import { removeCustomComponents, setCustomComponents } from '../packages/markstream-react/src/customComponents'
 
@@ -101,6 +103,51 @@ describe('react: non-whitelisted custom HTML tags', () => {
     expect(html).toContain('<div')
     expect(html).toContain('</div>')
     expect(html).toContain('Content')
+
+    root.unmount()
+  })
+
+  it('sanitizes raw html fallback content for client html nodes', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const blockNode = React.createElement(HtmlBlockNode as any, {
+      node: {
+        type: 'html_block',
+        content: '<div><img src="x" onerror="alert(1)"><a href="javascript:alert(1)" title="ok">Link</a><script>alert(1)</script></div>',
+        loading: false,
+      },
+      customId: 'react-safe-html-block',
+    })
+    const inlineNode = React.createElement(HtmlInlineNode as any, {
+      node: {
+        type: 'html_inline',
+        content: 'Before <img src="x" onerror="alert(1)"><a href="javascript:alert(1)" title="ok">Link</a> After',
+        loading: false,
+      },
+      customId: 'react-safe-html-inline',
+    })
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(React.Fragment, null, blockNode, inlineNode)),
+      )
+    })
+    await flushReact()
+
+    const imgs = Array.from(host.querySelectorAll('img'))
+    const links = Array.from(host.querySelectorAll('a'))
+
+    expect(imgs.length).toBeGreaterThan(0)
+    imgs.forEach(img => expect(img.getAttribute('onerror')).toBeNull())
+    expect(links.length).toBeGreaterThan(0)
+    links.forEach((link) => {
+      expect(link.getAttribute('href')).toBeNull()
+      expect(link.getAttribute('title')).toBe('ok')
+    })
+    expect(host.innerHTML).not.toContain('<script')
+    expect(host.innerHTML).not.toContain('javascript:')
+    expect(host.innerHTML).not.toContain('alert(1)')
 
     root.unmount()
   })

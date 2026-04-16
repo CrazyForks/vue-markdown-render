@@ -1,6 +1,6 @@
 import type { NodeComponentProps } from '../../types/node-component'
-import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlTokenAttrs } from 'stream-markdown-parser'
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs } from 'stream-markdown-parser'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../../customComponents'
 import { renderNodeChildren, tokenAttrsToProps } from '../../renderers/renderChildren'
@@ -107,6 +107,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
       return null
     return parseHtmlToReactNodes(node.content, effectiveCustomComponents)
   }, [effectiveCustomComponents, node.content, useDynamic])
+  const safeHtmlContent = useMemo(() => sanitizeHtmlContent(renderContent ?? ''), [renderContent])
   const structuredContent = useMemo(() => {
     if (!isStructured || !props.ctx || !props.renderNode)
       return null
@@ -150,7 +151,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
                   <>{reactNodes}</>
                 )
               : (
-                  <div dangerouslySetInnerHTML={{ __html: renderContent ?? '' }} />
+                  <div dangerouslySetInnerHTML={{ __html: safeHtmlContent }} />
                 )
           )
         : placeholderNode}

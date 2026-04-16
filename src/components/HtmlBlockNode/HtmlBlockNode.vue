@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
+import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
@@ -84,12 +84,12 @@ const renderMode = computed(() => {
 
   // Check if content contains custom components
   if (!hasCustomComponents(content, customComponents.value))
-    return { mode: 'html', content }
+    return { mode: 'html', content: sanitizeHtmlContent(content) }
 
   // Parse and build VNode tree
   const nodes = parseHtmlToVNodes(content, customComponents.value)
   if (nodes === null)
-    return { mode: 'html', content } // Fallback to v-html if parsing fails
+    return { mode: 'html', content: sanitizeHtmlContent(content) } // Fallback to sanitized HTML if parsing fails
 
   return { mode: 'dynamic', nodes }
 })
@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
       <DynamicRenderer v-else-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />
       <pre v-else-if="renderMode.mode === 'text'" class="html-block-node__raw">{{ renderMode.content }}</pre>
       <!-- Fallback to v-html for standard HTML -->
-      <div v-else v-bind="boundAttrs" v-html="renderContent" />
+      <div v-else v-bind="boundAttrs" v-html="renderMode.content" />
     </template>
     <div v-else class="html-block-node__placeholder">
       <slot name="placeholder" :node="node">
