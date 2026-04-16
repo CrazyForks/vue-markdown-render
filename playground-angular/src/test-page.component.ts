@@ -272,104 +272,6 @@ function basePageUrl() {
               </div>
           </section>
 
-          <section *ngIf="!isSharePreviewMode()" class="panel-card panel-card--sandbox">
-              <div class="panel-card__head">
-                <div>
-                  <h2>版本沙箱</h2>
-                  <p>指定 framework、source 和包版本，在独立 iframe 里对照渲染器。</p>
-                </div>
-                <span class="mini-pill">{{ sandboxStatusLabel() }}</span>
-              </div>
-
-              <div class="control-stack">
-                <label class="select-control">
-                  <span>目标框架</span>
-                  <select [value]="sandboxFrameworkId()" (change)="updateSandboxFramework($event)">
-                    <option
-                      *ngFor="let framework of sandboxFrameworks"
-                      [value]="framework.id"
-                    >
-                      {{ framework.label }}
-                    </option>
-                  </select>
-                </label>
-
-                <div class="segmented-control">
-                  <button
-                    type="button"
-                    class="segmented-control__button"
-                    [class.segmented-control__button--active]="activeSandbox().source === 'workspace'"
-                    [disabled]="!activeSandboxFramework().supportsWorkspace"
-                    (click)="chooseSandboxSource('workspace')"
-                  >
-                    workspace
-                  </button>
-                  <button
-                    type="button"
-                    class="segmented-control__button"
-                    [class.segmented-control__button--active]="activeSandbox().source === 'npm'"
-                    (click)="chooseSandboxSource('npm')"
-                  >
-                    npm
-                  </button>
-                </div>
-
-                <div class="preset-list">
-                  <button
-                    *ngFor="let version of sandboxQuickVersions()"
-                    type="button"
-                    class="preset-chip"
-                    [class.preset-chip--active]="sandboxVersion() === version"
-                    (click)="chooseSandboxVersion(version)"
-                  >
-                    {{ version }}
-                  </button>
-                </div>
-
-                <label class="text-control">
-                  <span>包版本</span>
-                  <input
-                    type="text"
-                    [value]="sandboxVersion()"
-                    [placeholder]="sandboxVersionPlaceholder()"
-                    (input)="updateSandboxVersion($event)"
-                  >
-                </label>
-
-                <label class="toggle-item">
-                  <span>输入变化自动同步到 iframe</span>
-                  <input type="checkbox" [checked]="sandboxAutoSync()" (change)="updateSandboxAutoSync($event)">
-                </label>
-              </div>
-
-              <div class="control-actions control-actions--stacked">
-                <button type="button" class="action-button action-button--primary" (click)="syncSandbox()">
-                  刷新沙箱
-                </button>
-                <button type="button" class="action-button" (click)="openSandboxInNewTab()">
-                  独立打开
-                </button>
-              </div>
-
-              <div class="meta-list">
-                <div class="meta-list__row">
-                  <span>渲染目标</span>
-                  <strong>{{ sandboxPackageLabel() }}</strong>
-                </div>
-                <div class="meta-list__row">
-                  <span>运行时</span>
-                  <strong>{{ sandboxRuntimeLabel() }}</strong>
-                </div>
-              </div>
-
-              <div *ngIf="!activeSandboxFramework().supportsWorkspace" class="info-banner info-banner--info">
-                {{ activeSandboxFramework().label }} 在这个沙箱里先走 npm 包模式；本地 workspace 对照仍可用上方 framework 切页。
-              </div>
-              <div *ngIf="sandboxDirty()" class="info-banner info-banner--warning">
-                右侧 iframe 还没同步最新输入，点“刷新沙箱”即可用当前 markdown 重载。
-              </div>
-          </section>
-
           <section *ngIf="!isSharePreviewMode()" class="panel-card panel-card--share">
               <div class="panel-card__head">
                 <div>
@@ -507,8 +409,108 @@ function basePageUrl() {
                 <span>{{ isStreaming() ? renderModeLabel() + ' · Streaming 中' : 'Angular renderer' }}</span>
               </footer>
             </article>
+          </section>
 
-            <article *ngIf="!isSharePreviewMode()" class="workspace-card workspace-card--full workspace-card--sandbox-preview">
+          <section *ngIf="!isSharePreviewMode()" class="sandbox-grid">
+            <section class="panel-card panel-card--sandbox">
+              <div class="panel-card__head">
+                <div>
+                  <h2>版本沙箱</h2>
+                  <p>指定 framework、source 和包版本，在独立 iframe 里对照渲染器。</p>
+                </div>
+                <span class="mini-pill">{{ sandboxStatusLabel() }}</span>
+              </div>
+
+              <div class="control-stack">
+                <label class="select-control">
+                  <span>目标框架</span>
+                  <select [value]="sandboxFrameworkId()" (change)="updateSandboxFramework($event)">
+                    <option
+                      *ngFor="let framework of sandboxFrameworks"
+                      [value]="framework.id"
+                    >
+                      {{ framework.label }}
+                    </option>
+                  </select>
+                </label>
+
+                <div class="segmented-control">
+                  <button
+                    type="button"
+                    class="segmented-control__button"
+                    [class.segmented-control__button--active]="activeSandbox().source === 'workspace'"
+                    [disabled]="!activeSandboxFramework().supportsWorkspace"
+                    (click)="chooseSandboxSource('workspace')"
+                  >
+                    workspace
+                  </button>
+                  <button
+                    type="button"
+                    class="segmented-control__button"
+                    [class.segmented-control__button--active]="activeSandbox().source === 'npm'"
+                    (click)="chooseSandboxSource('npm')"
+                  >
+                    npm
+                  </button>
+                </div>
+
+                <div class="preset-list">
+                  <button
+                    *ngFor="let version of sandboxQuickVersions()"
+                    type="button"
+                    class="preset-chip"
+                    [class.preset-chip--active]="sandboxVersion() === version"
+                    (click)="chooseSandboxVersion(version)"
+                  >
+                    {{ version }}
+                  </button>
+                </div>
+
+                <label class="text-control">
+                  <span>包版本</span>
+                  <input
+                    type="text"
+                    [value]="sandboxVersion()"
+                    [placeholder]="sandboxVersionPlaceholder()"
+                    (input)="updateSandboxVersion($event)"
+                  >
+                </label>
+
+                <label class="toggle-item">
+                  <span>输入变化自动同步到 iframe</span>
+                  <input type="checkbox" [checked]="sandboxAutoSync()" (change)="updateSandboxAutoSync($event)">
+                </label>
+              </div>
+
+              <div class="control-actions control-actions--stacked">
+                <button type="button" class="action-button action-button--primary" (click)="syncSandbox()">
+                  刷新沙箱
+                </button>
+                <button type="button" class="action-button" (click)="openSandboxInNewTab()">
+                  独立打开
+                </button>
+              </div>
+
+              <div class="meta-list">
+                <div class="meta-list__row">
+                  <span>渲染目标</span>
+                  <strong>{{ sandboxPackageLabel() }}</strong>
+                </div>
+                <div class="meta-list__row">
+                  <span>运行时</span>
+                  <strong>{{ sandboxRuntimeLabel() }}</strong>
+                </div>
+              </div>
+
+              <div *ngIf="!activeSandboxFramework().supportsWorkspace" class="info-banner info-banner--info">
+                {{ activeSandboxFramework().label }} 在这个沙箱里先走 npm 包模式；本地 workspace 对照仍可用上方 framework 切页。
+              </div>
+              <div *ngIf="sandboxDirty()" class="info-banner info-banner--warning">
+                右侧 iframe 还没同步最新输入，点“刷新沙箱”即可用当前 markdown 重载。
+              </div>
+            </section>
+
+            <article class="workspace-card workspace-card--full workspace-card--sandbox-preview">
               <header class="workspace-card__head">
                 <div>
                   <h2>版本沙箱预览</h2>
