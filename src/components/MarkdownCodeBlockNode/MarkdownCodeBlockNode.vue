@@ -176,13 +176,6 @@ const contentStyle = computed(() => {
       : {}),
   }
 })
-const loadingPlaceholderStyle = computed(() => {
-  if (estimatedVisibleContentHeight.value == null)
-    return undefined
-  return {
-    minHeight: `${estimatedVisibleContentHeight.value}px`,
-  }
-})
 const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
 function getPreferredColorScheme() {
@@ -515,36 +508,6 @@ function resolveTooltipTarget(e: Event) {
   if (!btn || btn.disabled)
     return null
   return btn
-}
-
-type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right'
-function onBtnHover(e: Event, text: string, place: TooltipPlacement = 'top') {
-  if (!tooltipsEnabled.value)
-    return
-  const target = resolveTooltipTarget(e)
-  if (!target)
-    return
-  const ev = e as MouseEvent
-  const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(target, text, place, false, origin, props.isDark)
-}
-
-function onBtnLeave() {
-  if (!tooltipsEnabled.value)
-    return
-  hideTooltip()
-}
-
-function onCopyHover(e: Event) {
-  if (!tooltipsEnabled.value)
-    return
-  const target = resolveTooltipTarget(e)
-  if (!target)
-    return
-  const txt = copyText.value ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')
-  const ev = e as MouseEvent
-  const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(target, txt, 'top', false, origin, props.isDark)
 }
 
 // Expand/collapse functionality

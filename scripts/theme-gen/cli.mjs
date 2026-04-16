@@ -22,6 +22,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 import { hslObjToHex, toHsl, toOklch, toOklchCss, toShadcnHsl } from './color.mjs'
@@ -221,9 +222,18 @@ function build(args) {
     const warns = [...lightReport, ...darkReport].filter(r => !r.passAA && r.severity === 'warn').length
 
     let status
-    if (errors > 0) { status = `✗ ${errors}`; failCount++ }
-    else if (warns > 0) { status = `~ ${warns}`; warnCount++ }
-    else { status = '✓'; passCount++ }
+    if (errors > 0) {
+      status = `✗ ${errors}`
+      failCount++
+    }
+    else if (warns > 0) {
+      status = `~ ${warns}`
+      warnCount++
+    }
+    else {
+      status = '✓'
+      passCount++
+    }
 
     const css = renderThemeCss(entry.id, light, dark)
     const path = resolve(outDir, `${entry.id}.css`)
@@ -341,10 +351,19 @@ function parseCssTokens(css) {
 
 function extractTokens(block) {
   const tokens = {}
-  const re = /--ms-([\w-]+)\s*:\s*([^;]+);/g
-  let m
-  while ((m = re.exec(block)) !== null) {
-    tokens[m[1]] = m[2].trim()
+  for (const line of block.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('--ms-'))
+      continue
+    const colonIndex = trimmed.indexOf(':')
+    const semicolonIndex = trimmed.lastIndexOf(';')
+    if (colonIndex === -1 || semicolonIndex === -1 || semicolonIndex <= colonIndex)
+      continue
+    const key = trimmed.slice('--ms-'.length, colonIndex).trim()
+    const value = trimmed.slice(colonIndex + 1, semicolonIndex).trim()
+    if (!key || !value)
+      continue
+    tokens[key] = value
   }
   return tokens
 }

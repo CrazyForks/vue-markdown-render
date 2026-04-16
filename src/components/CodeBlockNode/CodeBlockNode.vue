@@ -271,10 +271,6 @@ const resolvedMonacoOptions = computed(() => {
     ...((raw.experimental as Record<string, unknown> | undefined) ?? {}),
   }
   const diffUnchangedRegionStyle = raw.diffUnchangedRegionStyle ?? 'line-info'
-  const needsExtraBottomSpace
-    = diffUnchangedRegionStyle === 'line-info'
-      || diffUnchangedRegionStyle === 'line-info-basic'
-      || diffUnchangedRegionStyle === 'metadata'
   const diffDefaults = {
     maxComputationTime: 0,
     diffAlgorithm: 'legacy',
@@ -449,13 +445,6 @@ const shouldReserveEstimatedEditorHeight = computed(() => {
 })
 const codeEditorContainerStyle = computed(() => {
   if (!shouldReserveEstimatedEditorHeight.value)
-    return undefined
-  return {
-    minHeight: `${estimatedVisibleContentHeight.value}px`,
-  }
-})
-const loadingPlaceholderStyle = computed(() => {
-  if (estimatedVisibleContentHeight.value == null)
     return undefined
   return {
     minHeight: `${estimatedVisibleContentHeight.value}px`,
@@ -1012,7 +1001,7 @@ function clearInlineFoldProxies() {
   }
 }
 
-function syncEditorHostHeight(allowDuringStreamingDiff = false) {
+function syncEditorHostHeight(_allowDuringStreamingDiff = false) {
   if (isCollapsed.value)
     return
   if (isExpanded.value)
@@ -1439,10 +1428,6 @@ const containerStyle = computed(() => {
   }
   return s
 })
-const headerStyle = computed<Record<string, string> | undefined>(() => {
-  // Shell zone: header always uses page-level tokens, not Monaco colors
-  return undefined
-})
 const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
 // 复制代码
@@ -1473,36 +1458,6 @@ function resolveTooltipTarget(e: Event) {
   if (!btn || btn.disabled)
     return null
   return btn
-}
-
-type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right'
-function onBtnHover(e: Event, text: string, place: TooltipPlacement = 'top') {
-  if (!tooltipsEnabled.value)
-    return
-  const target = resolveTooltipTarget(e)
-  if (!target)
-    return
-  const ev = e as MouseEvent
-  const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(target, text, place, false, origin, props.isDark)
-}
-
-function onBtnLeave() {
-  if (!tooltipsEnabled.value)
-    return
-  hideTooltip()
-}
-
-function onCopyHover(e: Event) {
-  if (!tooltipsEnabled.value)
-    return
-  const target = resolveTooltipTarget(e)
-  if (!target)
-    return
-  const txt = copyText.value ? (t('common.copied') || 'Copied') : (t('common.copy') || 'Copy')
-  const ev = e as MouseEvent
-  const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  showTooltipForAnchor(target, txt, 'top', false, origin, props.isDark)
 }
 
 function toggleExpand(e?: Event) {

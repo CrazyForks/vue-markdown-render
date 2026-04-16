@@ -3,15 +3,18 @@
  */
 
 import type { RenderContext } from '../packages/markstream-react/src/types'
+import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
-import React from '../packages/markstream-react/node_modules/react'
-import { renderToStaticMarkup } from '../packages/markstream-react/node_modules/react-dom/server'
 import { HtmlBlockNode as ReactHtmlBlockNode } from '../packages/markstream-react/src/components/HtmlBlockNode/HtmlBlockNode'
 import { renderNode as clientRenderNode } from '../packages/markstream-react/src/renderers/renderNode'
 import {
   HtmlBlockNode as ReactServerHtmlBlockNode,
   renderNode as serverRenderNode,
 } from '../packages/markstream-react/src/server-renderer/index'
+
+const packageRequire = createRequire(new URL('../packages/markstream-react/package.json', import.meta.url))
+const React = packageRequire('react') as typeof import('react')
+const { renderToStaticMarkup } = packageRequire('react-dom/server') as typeof import('react-dom/server')
 
 describe('markstream-react heavy-node prop forwarding', () => {
   const baseCtx: RenderContext = {
@@ -40,7 +43,7 @@ describe('markstream-react heavy-node prop forwarding', () => {
       },
     }
 
-    const element = renderNode({
+    const element = clientRenderNode({
       type: 'code_block',
       language: 'mermaid',
       code: 'graph LR\nA-->B\n',

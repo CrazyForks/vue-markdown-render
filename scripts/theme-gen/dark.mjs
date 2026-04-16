@@ -251,7 +251,7 @@ export function validateContrast(tokens) {
     }
   }
 
-  return pairs.map(([fgKey, bgKey, label, threshold, severity, preRatio, preBg]) => {
+  return pairs.map(([fgKey, bgKey, label, threshold, severity, preRatio]) => {
     let ratio
     if (preRatio !== undefined) {
       ratio = preRatio

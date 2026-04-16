@@ -40,14 +40,14 @@ class FakeIntersectionObserver {
   }
 }
 
-afterEach(() => {
+beforeEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.resetModules()
   FakeIntersectionObserver.instances = []
 })
 
-beforeEach(() => {
+afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.resetModules()

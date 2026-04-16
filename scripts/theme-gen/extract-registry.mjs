@@ -17,6 +17,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { contrastRatio, toHsl } from './color.mjs'
 
@@ -33,7 +34,10 @@ for (let i = 0; i < args.length; i++) {
     if (!next || next.startsWith('--')) {
       opts[key] = true
     }
-    else { opts[key] = next; i++ }
+    else {
+      opts[key] = next
+      i++
+    }
   }
 }
 
@@ -46,12 +50,18 @@ const onlyId = opts.only || null
 
 function extractCssVars(html) {
   const vars = {}
-  // Match --name: value; patterns (handles multi-line and inline)
-  const re = /--([\w-]+)\s*:\s*([^;]+);/g
-  let m
-  while ((m = re.exec(html)) !== null) {
-    const key = m[1].trim()
-    const val = m[2].trim()
+  for (const declaration of html.split(';')) {
+    const tokenStart = declaration.lastIndexOf('--')
+    if (tokenStart === -1)
+      continue
+    const chunk = declaration.slice(tokenStart).trim()
+    const colonIndex = chunk.indexOf(':')
+    if (colonIndex === -1)
+      continue
+    const key = chunk.slice(2, colonIndex).trim()
+    const val = chunk.slice(colonIndex + 1).trim()
+    if (!key || !val)
+      continue
     vars[key] = val
   }
   return vars
@@ -69,13 +79,26 @@ function isOpaque(val) {
       return val[4].toLowerCase() === 'f'
     return true
   }
-  // rgba(r, g, b, a) or hsla(h, s, l, a) — check alpha
-  const alphaMatch = val.match(/[\s,/]\s*([\d.]+)\s*\)$/)
-  if (alphaMatch) {
-    const a = Number.parseFloat(alphaMatch[1])
+  const alphaValue = extractFunctionalAlpha(val)
+  if (alphaValue != null) {
+    const a = Number.parseFloat(alphaValue)
     return a >= 0.9
   }
   return true
+}
+
+function extractFunctionalAlpha(val) {
+  const openIndex = val.indexOf('(')
+  const closeIndex = val.lastIndexOf(')')
+  if (openIndex === -1 || closeIndex === -1 || closeIndex <= openIndex)
+    return null
+  const inner = val.slice(openIndex + 1, closeIndex).trim()
+  if (!inner)
+    return null
+  if (inner.includes('/'))
+    return inner.split('/').pop()?.trim() ?? null
+  const parts = inner.split(',').map(part => part.trim()).filter(Boolean)
+  return parts.length === 4 ? parts[3] : null
 }
 
 /**
@@ -104,20 +127,19 @@ function findBrandForeground(html, brandColor) {
 
   // Look for button/CTA styles with brand background
   // Pattern: background: <brand>; color: <fg>;
-  const btnRe = /style="[^"]*background:\s*(?:var\([^)]*\)|#[\da-f]{3})[^"]*color:\s*(#[\da-f]{3,8}|var\([^)]+\))/gi
   const brandBgRe = new RegExp(
     `style="[^"]*background:\\s*(?:var\\(--[^)]*\\)|${brandHex.replace('#', '#?')})[^"]*color:\\s*(#[\\da-f]{3,8})`,
     'gi',
   )
 
-  let m
   // Try matching brand background specifically
-  while ((m = brandBgRe.exec(html)) !== null) {
-    return m[1]
-  }
+  const brandBgMatch = brandBgRe.exec(html)
+  if (brandBgMatch)
+    return brandBgMatch[1]
 
   // Fallback: look for nav-cta or btn-brand class button colors
   const ctaRe = /\.(?:nav-cta|btn-brand|btn-primary)\s*\{[^}]*color:\s*(?:var\(--([\w-]+)\)|(#[\da-f]{3,8}))/gi
+  let m
   while ((m = ctaRe.exec(html)) !== null) {
     if (m[2])
       return m[2]
@@ -170,7 +192,10 @@ for (const entry of registry) {
     continue
 
   // Skip Claude — already manually updated
-  if (entry.id === 'claude') { skipped++; continue }
+  if (entry.id === 'claude') {
+    skipped++
+    continue
+  }
 
   const themeDir = resolve(sourceDir, entry.source)
   let lightHtml, darkHtml

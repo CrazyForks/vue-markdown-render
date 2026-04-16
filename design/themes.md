@@ -62,7 +62,9 @@ border: 1px solid hsl(var(--border) / 0.9);
 Tailwind 配置中也引用这些变量（带回退值）：
 
 ```js
-'foreground': 'hsl(var(--foreground), 217.2 22.08% 19.5%)'
+const fallback = {
+  foreground: 'hsl(var(--foreground), 217.2 22.08% 19.5%)',
+}
 ```
 
 ---

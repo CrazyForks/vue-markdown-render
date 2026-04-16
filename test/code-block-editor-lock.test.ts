@@ -855,11 +855,10 @@ describe('codeBlockNode diff defaults', () => {
 
   it('estimates diff host height from the current streamed line count instead of pinning to max height', async () => {
     const helpers = getStreamMonacoHelpers()
-    let originalContentSizeListener: (() => void) | null = null
     const diffEditor = {
       getOriginalEditor: vi.fn(() => ({
         onDidContentSizeChange: vi.fn((listener: () => void) => {
-          originalContentSizeListener = listener
+          void listener
           return { dispose: vi.fn() }
         }),
         onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),

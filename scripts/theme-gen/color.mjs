@@ -21,21 +21,31 @@ export function parseColor(str) {
     return parseHex(str)
 
   // rgb / rgba
-  const rgbMatch = str.match(/^rgba?\(\s*([^)]+)\)$/i)
-  if (rgbMatch)
-    return parseRgbArgs(rgbMatch[1])
+  const rgbArgs = extractFunctionArgs(str, ['rgb', 'rgba'])
+  if (rgbArgs)
+    return parseRgbArgs(rgbArgs)
 
   // hsl / hsla  →  convert to rgb internally
-  const hslMatch = str.match(/^hsla?\(\s*([^)]+)\)$/i)
-  if (hslMatch)
-    return parseHslArgs(hslMatch[1])
+  const hslArgs = extractFunctionArgs(str, ['hsl', 'hsla'])
+  if (hslArgs)
+    return parseHslArgs(hslArgs)
 
   // oklch  →  convert to rgb via OKLab → linear RGB → sRGB
-  const oklchMatch = str.match(/^oklch\(\s*([^)]+)\)$/i)
-  if (oklchMatch)
-    return parseOklchArgs(oklchMatch[1])
+  const oklchArgs = extractFunctionArgs(str, ['oklch'])
+  if (oklchArgs)
+    return parseOklchArgs(oklchArgs)
 
   throw new Error(`Unsupported color format: "${str}"`)
+}
+
+function extractFunctionArgs(str, names) {
+  const lower = str.toLowerCase()
+  for (const name of names) {
+    const prefix = `${name}(`
+    if (lower.startsWith(prefix) && str.endsWith(')'))
+      return str.slice(prefix.length, -1).trim()
+  }
+  return null
 }
 
 function parseHex(hex) {
@@ -222,8 +232,7 @@ function gammaEncodeRgb({ lr, lg, lb }) {
  * OKLab → sRGB { r, g, b } (0-255). Direct conversion with gamma encode + clamp.
  * Used internally for achromatic fast path.
  */
-function oklabToLinearSrgb_gammaEncode(L, a, b) {
-  const channels = oklchToLinearSrgbChannels(L, 0, 0)
+function oklabToLinearSrgb_gammaEncode(L) {
   // For achromatic, a=0 b=0 so we just need L → LMS → linear RGB
   const l_ = L
   const m_ = L
