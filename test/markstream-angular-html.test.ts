@@ -124,6 +124,18 @@ describe('markstream-angular html renderer', () => {
     expect(html).toContain('markstream-nested-math-block__render')
   })
 
+  it('keeps softbreak text visible and renders references like the runtime renderer', () => {
+    const html = renderMarkdownToHtml({
+      content: '第一行\n第二行[3]',
+      final: true,
+    })
+
+    expect(html).toContain('class="markstream-angular-text-node"')
+    expect(html).toContain('第一行\n第二行')
+    expect(html).toContain('<span class="markstream-nested-reference">3</span>')
+    expect(html).not.toContain('<sup class="markstream-nested-reference">')
+  })
+
   it('sanitizes dangerous html while preserving safe attributes', () => {
     const html = sanitizeHtmlFragment('<details open onclick="evil()"><summary>Safe</summary><a href="javascript:alert(1)" title="ok">Link</a><script>alert(1)</script></details>')
 
