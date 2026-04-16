@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
+import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue-demi'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
@@ -70,7 +70,7 @@ const renderMode = computed(() => {
 
   // Check if content contains custom components
   if (!hasCustomComponents(content, customComponents.value))
-    return { mode: 'html', content }
+    return { mode: 'html', content: sanitizeHtmlContent(content) }
 
   return { mode: 'dynamic', content }
 })
@@ -127,17 +127,19 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <!-- eslint-disable vue/no-v-text-v-html-on-component -->
   <component
-    v-if="renderMode.mode === 'structured' && shouldRender"
     :is="structuredTag"
+    v-if="renderMode.mode === 'structured' && shouldRender"
     ref="htmlRef"
     class="html-block-node"
     v-bind="boundAttrs"
     v-html="structuredHtml"
   />
+  <!-- eslint-enable vue/no-v-text-v-html-on-component -->
   <component
-    v-else-if="renderMode.mode === 'structured'"
     :is="structuredTag"
+    v-else-if="renderMode.mode === 'structured'"
     ref="htmlRef"
     class="html-block-node"
     v-bind="boundAttrs"
@@ -159,7 +161,7 @@ onBeforeUnmount(() => {
       <!-- Use dynamic rendering for custom components -->
       <DynamicRenderer v-if="renderMode.mode === 'dynamic'" :content="renderMode.content" :custom-components="customComponents" />
       <!-- Fallback to v-html for standard HTML -->
-      <div v-else v-bind="boundAttrs" v-html="renderContent" />
+      <div v-else v-bind="boundAttrs" v-html="renderMode.content" />
     </template>
     <div v-else class="html-block-node__placeholder">
       <slot name="placeholder" :node="node">
