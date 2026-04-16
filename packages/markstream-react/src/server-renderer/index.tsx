@@ -28,6 +28,7 @@ import {
 } from 'stream-markdown-parser'
 import { getCustomNodeComponents } from '../customComponents'
 import { BLOCK_LEVEL_TYPES, renderInline, renderNodeChildren, tokenAttrsToProps } from '../renderers/renderChildren'
+import { isParagraphBreakingCustomHtmlNode, resolveCustomHtmlTag } from '../utils/customHtmlTag'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { normalizeDomAttrs } from '../utils/htmlToReact'
 import { parseHtmlToReactNodes } from './html'
@@ -304,6 +305,7 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   const nodeChildren = node.children ?? []
+  const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
   const parts: React.ReactNode[] = []
   const inlineBuffer: ParsedNode[] = []
 
@@ -320,7 +322,7 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   nodeChildren.forEach((child, childIndex) => {
-    if (BLOCK_LEVEL_TYPES.has(child.type)) {
+    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, customComponents, ctx.customHtmlTags)) {
       flushInline()
       parts.push(
         <React.Fragment key={`${String(indexKey ?? 'paragraph')}-block-${childIndex}`}>
@@ -974,9 +976,10 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
   }
 
   if (node.type === 'html_block' || node.type === 'html_inline') {
-    const tag = String((node as any).tag ?? '').trim().toLowerCase() || getHtmlTagFromContent((node as any).content)
-    const isWhitelisted = (ctx.customHtmlTags ?? []).some((t: string) => t.toLowerCase() === tag)
-    const customForTag = tag ? (customComponents as Record<string, any>)[tag] : null
+    const resolvedCustomTag = resolveCustomHtmlTag(node as any, customComponents as any, ctx.customHtmlTags)
+    const tag = resolvedCustomTag?.tag ?? ''
+    const isWhitelisted = resolvedCustomTag?.isWhitelisted ?? false
+    const customForTag = resolvedCustomTag?.component ?? null
     if (isWhitelisted && customForTag) {
       const coerced = {
         ...(node as any),

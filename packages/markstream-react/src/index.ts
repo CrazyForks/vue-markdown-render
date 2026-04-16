@@ -57,9 +57,11 @@ export type { TooltipPlacement, TooltipProps } from './components/Tooltip/Toolti
 export { VmrContainerNode } from './components/VmrContainerNode/VmrContainerNode'
 export {
   clearGlobalCustomComponents,
+  getCustomComponentDisplay,
   getCustomNodeComponents,
   removeCustomComponents,
   setCustomComponents,
+  withMarkstreamComponentDisplay,
 } from './customComponents'
 export * from './i18n/useSafeI18n'
 export * from './renderers/renderNode'
@@ -92,6 +94,11 @@ export type { NodeComponentProps } from './types/node-component'
 export * from './utils/languageIcon'
 export * from './workers/katexWorkerClient'
 export * from './workers/mermaidWorkerClient'
+
+export type {
+  CustomComponentDisplayMode,
+  MarkstreamCustomComponent,
+} from './customComponents'
 
 export type CustomComponentMap = MarkstreamCustomComponentMap
 export type RenderContext = MarkstreamRenderContext

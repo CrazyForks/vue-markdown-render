@@ -5,9 +5,11 @@ export type { MarkdownCodeBlockNodeProps } from './components/MarkdownCodeBlockN
 export type { TooltipPlacement, TooltipProps } from './components/Tooltip/Tooltip'
 export {
   clearGlobalCustomComponents,
+  getCustomComponentDisplay,
   getCustomNodeComponents,
   removeCustomComponents,
   setCustomComponents,
+  withMarkstreamComponentDisplay,
 } from './customComponents'
 export { AdmonitionNode } from './server-renderer'
 export { BlockquoteNode } from './server-renderer'
@@ -57,3 +59,4 @@ export { renderNode } from './server-renderer'
 export type { NodeRendererCodeBlockProps, NodeRendererProps } from './types'
 export * from './types/component-props'
 export type { NodeComponentProps } from './types/node-component'
+export type { CustomComponentDisplayMode, MarkstreamCustomComponent } from './customComponents'

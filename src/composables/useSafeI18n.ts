@@ -1,3 +1,5 @@
+import { getCurrentInstance } from 'vue'
+
 function humanizeKey(key: string) {
   const s = key.split('.').pop() || key
   return s
@@ -36,11 +38,29 @@ export function setDefaultI18nMap(map: Record<keyof typeof defaultMap, string>) 
   Object.assign(defaultMap, map)
 }
 
+function resolveComponentTranslator() {
+  try {
+    const instance = getCurrentInstance()
+    const proxy = instance?.proxy as unknown as Record<string, unknown> | null | undefined
+    const proxyT = proxy?.$t
+    if (typeof proxyT === 'function')
+      return proxyT.bind(proxy)
+
+    const globalProperties = instance?.appContext?.config?.globalProperties as Record<string, unknown> | undefined
+    const appT = globalProperties?.$t
+    if (typeof appT === 'function')
+      return appT.bind(globalProperties)
+  }
+  catch {}
+  return null
+}
+
 export function useSafeI18n() {
+  const translator = resolveComponentTranslator()
+  if (translator)
+    return { t: translator as (key: string) => string }
+
   // Synchronous fallback in case `vue-i18n` is not installed.
-  // We attempt a dynamic import at runtime for consumers that do have `vue-i18n`.
-  // Note: dynamic import is async, but this function returns a synchronous
-  // API so callers can use `const { t } = useSafeI18n()` without awaiting.
   try {
     // Try to use global installed vue-i18n if available synchronously via composition API
     // This will work when the consumer has set up vue-i18n and the bundler left
@@ -61,31 +81,6 @@ export function useSafeI18n() {
 
   // Fallback synchronous translator
   const fallbackT = (key: string) => defaultMap[key] ?? humanizeKey(key)
-
-  // Kick off an async dynamic import to wire up real vue-i18n if available at runtime.
-  ;(async () => {
-    try {
-      const mod = await import('vue-i18n')
-      // prefer `useI18n` exported hook; if not present, ignore.
-      const useI18n = (mod as any).useI18n || ((mod as any).default && (mod as any).default.useI18n)
-      if (useI18n && typeof useI18n === 'function') {
-        try {
-          const i18n = useI18n()
-          if (i18n && typeof i18n.t === 'function') {
-            // Attach to global so next calls can pick it up synchronously
-            try {
-              (globalThis as any).$vueI18nUse = () => i18n
-            }
-            catch {}
-          }
-        }
-        catch {}
-      }
-    }
-    catch {
-      // ignore if not installed
-    }
-  })()
 
   return { t: fallbackT }
 }

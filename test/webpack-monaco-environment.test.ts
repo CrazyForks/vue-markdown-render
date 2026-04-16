@@ -39,4 +39,22 @@ describe('webpack MonacoEnvironment interop', () => {
 
     expect(streamMonaco.preloadMonacoWorkers).not.toHaveBeenCalled()
   })
+
+  it('retries preload after a transient worker warmup failure', async () => {
+    vi.resetModules()
+    delete (globalThis as any).MonacoEnvironment
+
+    const streamMonaco = await import('stream-monaco')
+    const preloadMock = streamMonaco.preloadMonacoWorkers as any
+    preloadMock.mockReset()
+    preloadMock
+      .mockRejectedValueOnce(new Error('warmup failed'))
+      .mockResolvedValue(undefined)
+
+    const { getUseMonaco } = await import('../src/components/CodeBlockNode/monaco')
+
+    await expect(getUseMonaco()).resolves.toBeNull()
+    await expect(getUseMonaco()).resolves.toBe(streamMonaco)
+    expect(preloadMock).toHaveBeenCalledTimes(2)
+  })
 })
