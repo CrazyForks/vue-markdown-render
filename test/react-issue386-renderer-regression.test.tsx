@@ -9,6 +9,7 @@ import React, { act } from '../packages/markstream-react/node_modules/react'
 import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
 import { renderToStaticMarkup } from '../packages/markstream-react/node_modules/react-dom/server'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
+import { removeCustomComponents, setCustomComponents, withMarkstreamComponentDisplay } from '../packages/markstream-react/src/customComponents'
 import { NodeRenderer as ServerNodeRenderer } from '../packages/markstream-react/src/server'
 import { clearKaTeXCache, clearKaTeXWorker, setKaTeXWorker } from '../packages/markstream-react/src/workers/katexWorkerClient'
 
@@ -77,19 +78,25 @@ async function renderMarkdown(content: string, extraProps: Record<string, unknow
   document.body.appendChild(host)
   const root = createRoot(host)
 
-  await act(async () => {
-    root.render(React.createElement(NodeRenderer as any, {
-      content,
-      viewportPriority: false,
-      deferNodesUntilVisible: false,
-      maxLiveNodes: 0,
-      ...extraProps,
-    }))
-  })
-  await flushReact()
+  const rerender = async (nextContent: string, nextProps: Record<string, unknown> = {}) => {
+    await act(async () => {
+      root.render(React.createElement(NodeRenderer as any, {
+        content: nextContent,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        maxLiveNodes: 0,
+        ...extraProps,
+        ...nextProps,
+      }))
+    })
+    await flushReact()
+  }
+
+  await rerender(content)
 
   return {
     host,
+    rerender,
     unmount: async () => {
       await act(async () => {
         root.unmount()
@@ -122,6 +129,16 @@ describe('markstream-react issue #386 renderer regressions', () => {
 
   it('renders superscript syntax immediately after inline math', async () => {
     const view = await renderMarkdown('$x$^[1]^')
+
+    expect(view.host.querySelector('.katex')).toBeTruthy()
+    expect(view.host.querySelector('sup.superscript-node')?.textContent).toBe('[1]')
+    expect(view.host.textContent).not.toContain('^[1]^')
+
+    await view.unmount()
+  })
+
+  it('renders superscript syntax after inline math even with separating whitespace', async () => {
+    const view = await renderMarkdown('$x$ ^[1]^')
 
     expect(view.host.querySelector('.katex')).toBeTruthy()
     expect(view.host.querySelector('sup.superscript-node')?.textContent).toBe('[1]')
@@ -163,6 +180,129 @@ describe('markstream-react issue #386 renderer regressions', () => {
     expect(html).toContain('B')
     expect(html).not.toContain('</p><span class="html-inline-node"')
     expect(html).not.toContain('</sup></div></div></div><div class="node-slot"')
+  })
+
+  it('recovers incomplete inline html during streaming updates without breaking the paragraph', async () => {
+    const view = await renderMarkdown('A<sup>[3]', { final: false })
+
+    expect(view.host.querySelectorAll('p.paragraph-node')).toHaveLength(1)
+    expect(view.host.querySelector('p.paragraph-node .html-inline-node sup')?.textContent).toBe('[3]')
+    expect(view.host.querySelector('p.paragraph-node')?.textContent).toBe('A[3]')
+    expect(view.host.textContent).not.toContain('<sup>[3]')
+
+    await view.rerender('A<sup>[3]</sup>B', { final: false })
+
+    expect(view.host.querySelectorAll('p.paragraph-node')).toHaveLength(1)
+    expect(view.host.querySelector('p.paragraph-node .html-inline-node sup')?.textContent).toBe('[3]')
+    expect(view.host.querySelector('p.paragraph-node')?.textContent).toBe('A[3]B')
+    expect(view.host.textContent).not.toContain('<sup>[3]')
+
+    await view.unmount()
+  })
+
+  it('keeps whitelisted custom inline tags embedded in the same paragraph', async () => {
+    const scopeId = 'react-inline-ref-regression'
+    const InlineRef: React.FC<{ node: { content?: string } }> = ({ node }) => (
+      <sup className="inline-ref-node">{node.content || ''}</sup>
+    )
+    setCustomComponents(scopeId, { 'inline-ref': InlineRef })
+
+    try {
+      const view = await renderMarkdown('A<inline-ref>[7]</inline-ref>B', {
+        customId: scopeId,
+        customHtmlTags: ['inline-ref'],
+        final: true,
+      })
+
+      expect(view.host.querySelectorAll('p.paragraph-node')).toHaveLength(1)
+      expect(view.host.querySelector('p.paragraph-node .inline-ref-node')?.textContent).toBe('[7]')
+      expect(view.host.querySelector('p.paragraph-node')?.textContent).toBe('A[7]B')
+
+      await view.unmount()
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('keeps whitelisted custom inline tags embedded in the same paragraph during SSR', () => {
+    const scopeId = 'react-inline-ref-ssr-regression'
+    const InlineRef: React.FC<{ node: { content?: string } }> = ({ node }) => (
+      <sup className="inline-ref-node">{node.content || ''}</sup>
+    )
+    setCustomComponents(scopeId, { 'inline-ref': InlineRef })
+
+    try {
+      const html = renderToStaticMarkup(React.createElement(ServerNodeRenderer as any, {
+        content: 'A<inline-ref>[7]</inline-ref>B',
+        customId: scopeId,
+        customHtmlTags: ['inline-ref'],
+        typewriter: false,
+      }))
+
+      expect(html).toContain('<p')
+      expect(html).toContain('A')
+      expect(html).toContain('<sup class="inline-ref-node">[7]</sup>')
+      expect(html).toContain('B')
+      expect(html).not.toContain('</p><sup class="inline-ref-node">[7]</sup>')
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('lets block-marked custom html tags break out of paragraph wrappers on the client', async () => {
+    const scopeId = 'react-blockish-inline-tag-client'
+    const BlockRef = withMarkstreamComponentDisplay((({ node }: { node: { content?: string } }) => (
+      <div className="block-ref-node">{node.content || ''}</div>
+    )), 'block')
+
+    setCustomComponents(scopeId, { 'inline-ref': BlockRef })
+
+    try {
+      const view = await renderMarkdown('A<inline-ref>[7]</inline-ref>B', {
+        customId: scopeId,
+        customHtmlTags: ['inline-ref'],
+        final: true,
+      })
+
+      expect(view.host.querySelectorAll('p.paragraph-node')).toHaveLength(2)
+      expect(view.host.querySelector('p.paragraph-node')?.textContent).toBe('A')
+      expect(view.host.querySelector('.block-ref-node')?.textContent).toBe('[7]')
+      expect(Array.from(view.host.querySelectorAll('p.paragraph-node')).at(1)?.textContent).toBe('B')
+      expect(view.host.innerHTML).not.toContain('<p dir="auto" class="paragraph-node">A<div')
+
+      await view.unmount()
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('lets block-marked custom html tags break out of paragraph wrappers during SSR', () => {
+    const scopeId = 'react-blockish-inline-tag-ssr'
+    const BlockRef = withMarkstreamComponentDisplay((({ node }: { node: { content?: string } }) => (
+      <div className="block-ref-node">{node.content || ''}</div>
+    )), 'block')
+
+    setCustomComponents(scopeId, { 'inline-ref': BlockRef })
+
+    try {
+      const html = renderToStaticMarkup(React.createElement(ServerNodeRenderer as any, {
+        content: 'A<inline-ref>[7]</inline-ref>B',
+        customId: scopeId,
+        customHtmlTags: ['inline-ref'],
+        typewriter: false,
+      }))
+
+      expect(html).toContain('<div class="block-ref-node">[7]</div>')
+      expect(html).not.toContain('<p dir="auto" class="paragraph-node">A<div class="block-ref-node">[7]</div>B</p>')
+      expect(html).toContain('<p dir="auto" class="paragraph-node"><span class="text-node whitespace-pre-wrap break-words">A</span></p>')
+      expect(html).toContain('<p dir="auto" class="paragraph-node"><span class="text-node whitespace-pre-wrap break-words">B</span></p>')
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
   })
 
   it('renders the real multiline issue-386 input in streaming mode without leaking raw superscript syntax', async () => {
