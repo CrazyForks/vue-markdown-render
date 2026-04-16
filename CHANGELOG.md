@@ -1,4 +1,4 @@
-## [0.0.13-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.1) (2026-04-16)
+## [0.0.13-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.2) (2026-04-16)
 
 
 ### Bug Fixes
@@ -13,6 +13,8 @@
 * add tooltip toggle for MarkdownCodeBlockNode ([#307](https://github.com/Simon-He95/markstream-vue/issues/307)) ([c9321f1](https://github.com/Simon-He95/markstream-vue/commit/c9321f1c41ca54cf2d85355720ee2ad78f1658cb))
 * add type declarations for markdown-it plugins ([ec1517c](https://github.com/Simon-He95/markstream-vue/commit/ec1517c852d74df04c5632b42cebe89607027060))
 * address code review feedback - Angular error state and lint fix ([074e8c4](https://github.com/Simon-He95/markstream-vue/commit/074e8c46595a594ab4a1f87c04e31cc9e963df26))
+* align angular live preview superscript rendering ([72714e3](https://github.com/Simon-He95/markstream-vue/commit/72714e3edfd932b2c793c33db79df2216dc24cf5))
+* align angular sandbox test page layout ([870cf3d](https://github.com/Simon-He95/markstream-vue/commit/870cf3d5d00a8edcaac628190e7188f504b25ff3))
 * align angular thinking fade with vue ([eefe7bf](https://github.com/Simon-He95/markstream-vue/commit/eefe7bf552aa0b3f93c57e0b16fdedf6731f6590))
 * align code block height behavior across React and Angular ([9512fea](https://github.com/Simon-He95/markstream-vue/commit/9512fea7861e979724bc3f6418fb319e09258b32))
 * align custom html tag handling across renderers ([9293a03](https://github.com/Simon-He95/markstream-vue/commit/9293a038d88055b9a1261b1345d0014e77bbaf4c))
@@ -134,6 +136,7 @@
 * restore next playground tailwind and tooltip demos ([ee92973](https://github.com/Simon-He95/markstream-vue/commit/ee92973e3859693f49af7f5ceb603515ac2ab210))
 * restore original styles changed during token migration ([784f7e9](https://github.com/Simon-He95/markstream-vue/commit/784f7e9bfaa27fa685788c355ce0e441edbc9881))
 * restore test and lint green ([3aee857](https://github.com/Simon-He95/markstream-vue/commit/3aee8579a6a0d5bdd70ad213ad48852caa650710))
+* sanitize raw html fallback rendering ([2f32bdd](https://github.com/Simon-He95/markstream-vue/commit/2f32bdd6d75e1059ad9e022439a60e75aed01e85))
 * sanitize structured html wrapper attrs ([02a0218](https://github.com/Simon-He95/markstream-vue/commit/02a0218756146f48be10043f673e5a4335565837))
 * serve docs landing page at root ([2f77476](https://github.com/Simon-He95/markstream-vue/commit/2f774763eae44d3c10a7316138d4be8c0393d749))
 * skip math delimiters inside image alt text ranges ([b0bf2d8](https://github.com/Simon-He95/markstream-vue/commit/b0bf2d8fe1201572b055314b8e3d5a9454634dfa)), closes [#related-issue](https://github.com/Simon-He95/markstream-vue/issues/related-issue)
