@@ -1,6 +1,7 @@
 const fs = require('node:fs')
-const path = require('node:path')
 const { createRequire } = require('node:module')
+const path = require('node:path')
+const process = require('node:process')
 
 const repoRoot = process.cwd()
 const packageJsonPaths = [
