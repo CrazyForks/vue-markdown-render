@@ -5244,7 +5244,7 @@ watch(mermaidEnabled, (enabled) => {
     grid-column: 1 / 7;
   }
 
-  .workspace-card--preview {
+  .workspace-card--preview:not(.workspace-card--share-preview) {
     order: 4;
     grid-column: 7 / -1;
   }
