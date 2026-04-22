@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useLocalStorage } from '@vueuse/core'
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
+import { resolveMarkdownTextareaPaste } from '../../playground-shared/markdownPaste'
 import MarkdownRender, {
   CodeBlockNode,
   disableKatex,
@@ -213,6 +214,23 @@ function openIssueInNewTab() {
     // fallback: set location
     window.location.href = issueUrl.value
   }
+}
+
+function handleEditorPaste(event: ClipboardEvent) {
+  const textarea = event.currentTarget
+  if (!(textarea instanceof HTMLTextAreaElement))
+    return
+
+  const pasted = event.clipboardData?.getData('text/plain') ?? ''
+  const next = resolveMarkdownTextareaPaste(textarea, pasted)
+  if (!next)
+    return
+
+  event.preventDefault()
+  textarea.value = next.nextValue
+  textarea.selectionStart = next.selectionStart
+  textarea.selectionEnd = next.selectionEnd
+  input.value = next.nextValue
 }
 
 function restoreFromUrl() {
@@ -464,7 +482,7 @@ function toggleStreamSettings() {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-hidden">
         <div>
           <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">输入</label>
-          <textarea v-model="input" rows="18" class="w-full p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 resize-none h-[calc(100%-2rem)]" />
+          <textarea v-model="input" rows="18" class="w-full p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 resize-none h-[calc(100%-2rem)]" @paste="handleEditorPaste" />
         </div>
 
         <div class="h-full overflow-hidden flex-col flex">

@@ -18,6 +18,7 @@ import {
   PreCodeNode,
 } from 'markstream-angular'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../playground-shared/testLabFixtures'
+import { resolveMarkdownTextareaPaste } from '../../playground-shared/markdownPaste'
 import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode, withMarkdownHash } from '../../playground-shared/testPageState'
 import {
   buildTestSandboxHref,
@@ -327,6 +328,7 @@ function basePageUrl() {
                 placeholder="在这里粘贴你的复现 markdown..."
                 [value]="input()"
                 (input)="updateInput($event)"
+                (paste)="handleEditorPaste($event)"
               ></textarea>
 
               <footer class="workspace-card__foot">
@@ -822,6 +824,25 @@ export class TestPageComponent implements OnInit, OnDestroy {
   updateInput(event: Event) {
     this.stopStreamRender()
     this.input.set(readTextInput(event, this.input()))
+    this.handleInputMutation()
+  }
+
+  handleEditorPaste(event: ClipboardEvent) {
+    const textarea = event.currentTarget
+    if (!(textarea instanceof HTMLTextAreaElement))
+      return
+
+    const pasted = event.clipboardData?.getData('text/plain') ?? ''
+    const next = resolveMarkdownTextareaPaste(textarea, pasted)
+    if (!next)
+      return
+
+    event.preventDefault()
+    textarea.value = next.nextValue
+    textarea.selectionStart = next.selectionStart
+    textarea.selectionEnd = next.selectionEnd
+    this.stopStreamRender()
+    this.input.set(next.nextValue)
     this.handleInputMutation()
   }
 

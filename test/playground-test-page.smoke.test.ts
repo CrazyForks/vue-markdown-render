@@ -114,6 +114,18 @@ async function mountTestPage() {
   return wrapper
 }
 
+function dispatchPaste(target: HTMLTextAreaElement, text: string) {
+  const event = new Event('paste', { bubbles: true, cancelable: true })
+  Object.defineProperty(event, 'clipboardData', {
+    configurable: true,
+    value: {
+      getData: (type: string) => type === 'text/plain' ? text : '',
+    },
+  })
+  target.dispatchEvent(event)
+  return event
+}
+
 function createLongMarkdown() {
   return Array.from(
     { length: 600 },
@@ -226,6 +238,38 @@ describe('playground /test smoke', () => {
 
     expect(href).toContain('/test#data=')
     expect(decodeMarkdownHash(hash)).toBe('## carried across frameworks')
+
+    wrapper.unmount()
+  })
+
+  it('converts pasted literal \\n sequences into real line breaks', async () => {
+    const wrapper = await mountTestPage()
+    const textarea = wrapper.get('textarea').element as HTMLTextAreaElement
+
+    textarea.value = ''
+    textarea.selectionStart = 0
+    textarea.selectionEnd = 0
+    dispatchPaste(textarea, 'a\\nbxxx\\n\\nc')
+    await nextTick()
+
+    expect(textarea.value).toBe('a\nbxxx\n\nc')
+    expect(wrapper.get('[data-testid="preview"]').text()).toBe('a\nbxxx\n\nc')
+
+    wrapper.unmount()
+  })
+
+  it('keeps escaped \\\\n sequences unchanged when pasting', async () => {
+    const wrapper = await mountTestPage()
+    const textarea = wrapper.get('textarea').element as HTMLTextAreaElement
+
+    textarea.value = ''
+    textarea.selectionStart = 0
+    textarea.selectionEnd = 0
+    dispatchPaste(textarea, 'a\\\\nb')
+    await nextTick()
+
+    expect(textarea.value).toBe('a\\\\nb')
+    expect(wrapper.get('[data-testid="preview"]').text()).toBe('a\\\\nb')
 
     wrapper.unmount()
   })

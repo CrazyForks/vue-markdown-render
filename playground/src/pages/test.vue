@@ -11,6 +11,7 @@ import { useDebounceFn, useLocalStorage, useResizeObserver } from '@vueuse/core'
 import { createDrauu } from 'drauu'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
+import { resolveMarkdownTextareaPaste } from '../../../playground-shared/markdownPaste'
 import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode, withTestPageViewMode } from '../../../playground-shared/testPageState'
 import {
   buildTestSandboxHref,
@@ -2265,6 +2266,26 @@ function annotationTextLines(content: string) {
   return content.split('\n')
 }
 
+function handleEditorPaste(event: ClipboardEvent) {
+  const textarea = event.currentTarget
+  if (!(textarea instanceof HTMLTextAreaElement))
+    return
+
+  const pasted = event.clipboardData?.getData('text/plain')
+  if (!pasted)
+    return
+
+  const next = resolveMarkdownTextareaPaste(textarea, pasted)
+  if (!next)
+    return
+
+  event.preventDefault()
+  textarea.value = next.nextValue
+  textarea.selectionStart = next.selectionStart
+  textarea.selectionEnd = next.selectionEnd
+  input.value = next.nextValue
+}
+
 function exportPreviewAsPdf() {
   if (annotationTextDraft.value?.content.trim())
     commitTextAnnotationDraft()
@@ -2867,6 +2888,7 @@ watch(mermaidEnabled, (enabled) => {
                 class="editor-textarea"
                 spellcheck="false"
                 placeholder="在这里粘贴你的复现 markdown..."
+                @paste="handleEditorPaste"
               />
             </div>
 
