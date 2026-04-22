@@ -18,7 +18,7 @@ const props = defineProps<{
 }>()
 
 const StructuredNodeRenderer = defineAsyncComponent({
-  loader: () => import('../NodeRenderer/async-entry'),
+  loader: () => import('../NodeRenderer'),
   suspensible: false,
 })
 
