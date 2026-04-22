@@ -1,4 +1,4 @@
-## [0.0.13-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.3) (2026-04-22)
+## [0.0.13-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.4) (2026-04-22)
 
 
 ### Bug Fixes
@@ -23,6 +23,7 @@
 * align react playground chat layout with vue ([ee8af05](https://github.com/Simon-He95/markstream-vue/commit/ee8af054a6ae6006243bae6ff2ff2e6148ac5ea3))
 * align streaming fade across packages and playgrounds ([6ef4a22](https://github.com/Simon-He95/markstream-vue/commit/6ef4a22aba4c196250fa5da85b429adc31da3c33))
 * allow vertical scroll chain in table ([3716491](https://github.com/Simon-He95/markstream-vue/commit/3716491080c513dda1a3b79df2911f02c2395e96)), closes [#271](https://github.com/Simon-He95/markstream-vue/issues/271)
+* avoid code block handoff expansion on restore ([7122acf](https://github.com/Simon-He95/markstream-vue/commit/7122acf918ef78a6b5a56324526e6e04ef054598))
 * broken issue link ([3137c7e](https://github.com/Simon-He95/markstream-vue/commit/3137c7e5441e375a13e4e6a85b2a08180f2e1d8f))
 * **buttons:** update button styles to use :where() for better specificity and maintain Tailwind utilities ([314ec46](https://github.com/Simon-He95/markstream-vue/commit/314ec466f2f360037a5d71503f4ca5edc8487278))
 * **changelog:** update release date and add missing bug fix entries ([6f453dc](https://github.com/Simon-He95/markstream-vue/commit/6f453dc8d158b2de24176c783860a3d6f5476d10))
@@ -103,6 +104,7 @@
 * **playground:** remove custom scrollbar styling, use native OS behavior ([6e81977](https://github.com/Simon-He95/markstream-vue/commit/6e81977e7fc1b127b637bbc4500a802d6853ed3b))
 * **playground:** remove duplicate .markstream-vue from stream page ([f8321de](https://github.com/Simon-He95/markstream-vue/commit/f8321de6fab75745dda250a6ccfa184db3e2cd57))
 * **playground:** remove h2 bottom border from default preset ([758fea8](https://github.com/Simon-He95/markstream-vue/commit/758fea82bf8daae1edf9e778e018ac546982d30f))
+* **playground:** replace raw test dropdowns ([dbe8832](https://github.com/Simon-He95/markstream-vue/commit/dbe883246ee66a513bdf960e426bf9e69d40bd67))
 * **playground:** scrollbar track visible with subtle background ([fcf8241](https://github.com/Simon-He95/markstream-vue/commit/fcf8241e4c90567948b811a7780a1880c21ebc85))
 * **playground:** use ::: admonition syntax, fix image URL ([105c188](https://github.com/Simon-He95/markstream-vue/commit/105c188aea665c3c60a6461ccd1b38a73a090241))
 * polish test page sharing ([70e53e6](https://github.com/Simon-He95/markstream-vue/commit/70e53e60c2ab41bd29074fc23705d3aa79cfc20c))
@@ -137,6 +139,7 @@
 * restore mermaid gantt progressive preview ([38d6493](https://github.com/Simon-He95/markstream-vue/commit/38d64933ae6c1474a4e6e517f84dae69a87f6b5b)), closes [#367](https://github.com/Simon-He95/markstream-vue/issues/367)
 * restore next playground tailwind and tooltip demos ([ee92973](https://github.com/Simon-He95/markstream-vue/commit/ee92973e3859693f49af7f5ceb603515ac2ab210))
 * restore original styles changed during token migration ([784f7e9](https://github.com/Simon-He95/markstream-vue/commit/784f7e9bfaa27fa685788c355ce0e441edbc9881))
+* restore structured html block renderer import ([daf929b](https://github.com/Simon-He95/markstream-vue/commit/daf929b8d23e46e51564cfd9d43bc48f1f7a7b30))
 * restore test and lint green ([3aee857](https://github.com/Simon-He95/markstream-vue/commit/3aee8579a6a0d5bdd70ad213ad48852caa650710))
 * sanitize raw html fallback rendering ([2f32bdd](https://github.com/Simon-He95/markstream-vue/commit/2f32bdd6d75e1059ad9e022439a60e75aed01e85))
 * sanitize structured html wrapper attrs ([02a0218](https://github.com/Simon-He95/markstream-vue/commit/02a0218756146f48be10043f673e5a4335565837))
