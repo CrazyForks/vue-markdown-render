@@ -176,7 +176,7 @@
 - 表述： “SSR 友好”, “减包体”
 - 步骤：
   - 用 `MarkdownCodeBlockNode`（Shiki）或开启 `render-code-blocks-as-pre`
-  - 如果用 Shiki：安装 `shiki` + `stream-markdown`
+  - 如果用 Shiki：安装 `stream-markdown`
 - 最小追问： “需要语法高亮还是纯文本就行？”
 - 文档：`docs/guide/code-blocks.md`, `docs/guide/components.md`
 

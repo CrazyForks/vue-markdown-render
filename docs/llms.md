@@ -176,7 +176,7 @@ Use these as “answer skeletons”: quick steps + minimal repro questions + whe
 - Signals: “SSR friendly”, “reduce bundle”
 - Steps:
   - Use `MarkdownCodeBlockNode` (Shiki) or `render-code-blocks-as-pre`
-  - If using Shiki, install `shiki` + `stream-markdown`
+  - If using Shiki, install `stream-markdown`
 - Ask: “Need highlighting or just plain code?”
 - Docs: `docs/guide/code-blocks.md`, `docs/guide/components.md`
 
