@@ -30,6 +30,7 @@ import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline
 import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
 import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
 import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
+import LabSelect from '../components/LabSelect.vue'
 import ThinkingNode from '../components/ThinkingNode.vue'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from '../composables/streamPresets'
 import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from '../composables/useStreamSimulator'
@@ -143,9 +144,26 @@ const ANNOTATION_ALIGN_OPTIONS = [
   { id: 'bottom', label: '底对齐', shortLabel: '底齐' },
 ] as const satisfies ReadonlyArray<{ id: AnnotationAlignMode, label: string, shortLabel: string }>
 const ANNOTATION_SHORTCUT_HINT = 'Shift+A 标注 / V Cursor'
+const STREAM_TRANSPORT_OPTIONS = [
+  { value: 'readable-stream', label: 'ReadableStream' },
+  { value: 'scheduler', label: 'Scheduler' },
+] as const satisfies ReadonlyArray<{ value: StreamTransportMode, label: string }>
+const STREAM_SLICE_OPTIONS = [
+  { value: 'pure-random', label: 'Pure Random' },
+  { value: 'boundary-aware', label: 'Boundary Aware' },
+] as const satisfies ReadonlyArray<{ value: StreamSliceMode, label: string }>
+const RENDER_MODE_OPTIONS = [
+  { value: 'monaco', label: 'Monaco' },
+  { value: 'markdown', label: 'MarkdownCodeBlock' },
+  { value: 'pre', label: 'PreCodeNode' },
+] as const satisfies ReadonlyArray<{ value: 'monaco' | 'markdown' | 'pre', label: string }>
 
 const frameworkCards = TEST_LAB_FRAMEWORKS
 const sampleCards = TEST_LAB_SAMPLES
+const sandboxFrameworkOptions = testSandboxFrameworks.map(framework => ({
+  value: framework.id,
+  label: framework.label,
+})) as ReadonlyArray<{ value: SandboxFrameworkId, label: string }>
 
 const diffHideUnchangedRegions = {
   enabled: true,
@@ -229,6 +247,16 @@ let initialAnnotationSnapshot: AnnotationSnapshot | null = null
 let preserveAnnotationsOnNextInputChange = false
 
 const activeSample = computed(() => sampleCards.find(sample => sample.id === selectedSampleId.value) ?? sampleCards[0])
+const streamPresetOptions = computed(() => [
+  ...STREAM_PRESETS.map(preset => ({
+    value: preset.id,
+    label: preset.label,
+  })),
+  {
+    value: CUSTOM_STREAM_PRESET_ID,
+    label: 'Custom',
+  },
+])
 const normalizedChunkSizeRange = computed(() => normalizeStreamRange(
   Number(streamChunkSizeMin.value),
   Number(streamChunkSizeMax.value),
@@ -2728,18 +2756,11 @@ watch(mermaidEnabled, (enabled) => {
             </div>
 
             <div class="control-stack control-stack--sandbox">
-              <label class="select-control">
-                <span>目标框架</span>
-                <select v-model="sandboxFrameworkId">
-                  <option
-                    v-for="framework in testSandboxFrameworks"
-                    :key="framework.id"
-                    :value="framework.id"
-                  >
-                    {{ framework.label }}
-                  </option>
-                </select>
-              </label>
+              <LabSelect
+                v-model="sandboxFrameworkId"
+                label="目标框架"
+                :options="sandboxFrameworkOptions"
+              />
               <label class="text-control">
                 <span>包版本</span>
                 <input
@@ -3309,41 +3330,23 @@ watch(mermaidEnabled, (enabled) => {
           </header>
 
           <div class="control-stack control-stack--stream">
-            <label class="select-control">
-              <span>Transport</span>
-              <select v-model="streamTransportMode">
-                <option value="readable-stream">
-                  ReadableStream
-                </option>
-                <option value="scheduler">
-                  Scheduler
-                </option>
-              </select>
-            </label>
+            <LabSelect
+              v-model="streamTransportMode"
+              label="Transport"
+              :options="STREAM_TRANSPORT_OPTIONS"
+            />
 
-            <label class="select-control">
-              <span>Slice Mode</span>
-              <select v-model="streamSliceMode">
-                <option value="pure-random">
-                  Pure Random
-                </option>
-                <option value="boundary-aware">
-                  Boundary Aware
-                </option>
-              </select>
-            </label>
+            <LabSelect
+              v-model="streamSliceMode"
+              label="Slice Mode"
+              :options="STREAM_SLICE_OPTIONS"
+            />
 
-            <label class="select-control">
-              <span>流式画像 preset</span>
-              <select v-model="selectedStreamPresetId">
-                <option v-for="preset in STREAM_PRESETS" :key="preset.id" :value="preset.id">
-                  {{ preset.label }}
-                </option>
-                <option :value="CUSTOM_STREAM_PRESET_ID">
-                  Custom
-                </option>
-              </select>
-            </label>
+            <LabSelect
+              v-model="selectedStreamPresetId"
+              label="流式画像 preset"
+              :options="streamPresetOptions"
+            />
 
             <p class="control-note">
               {{ streamPresetDescription }}
@@ -3426,20 +3429,11 @@ watch(mermaidEnabled, (enabled) => {
               </label>
             </div>
 
-            <label class="select-control">
-              <span>代码块模式</span>
-              <select v-model="renderMode">
-                <option value="monaco">
-                  Monaco
-                </option>
-                <option value="markdown">
-                  MarkdownCodeBlock
-                </option>
-                <option value="pre">
-                  PreCodeNode
-                </option>
-              </select>
-            </label>
+            <LabSelect
+              v-model="renderMode"
+              label="代码块模式"
+              :options="RENDER_MODE_OPTIONS"
+            />
           </div>
         </div>
       </dialog>
@@ -4073,8 +4067,7 @@ watch(mermaidEnabled, (enabled) => {
   border: 1px solid var(--lab-border);
 }
 
-.range-control span,
-.select-control span {
+.range-control span {
   color: var(--lab-muted);
   font-size: 0.84rem;
 }
@@ -4141,23 +4134,7 @@ watch(mermaidEnabled, (enabled) => {
   color: var(--lab-accent);
 }
 
-/* ─── Select & Text Controls ─── */
-.select-control select {
-  border: 1px solid var(--lab-border);
-  border-radius: 8px;
-  padding: 9px 12px;
-  background: var(--lab-surface-strong);
-  color: var(--lab-text);
-  font: inherit;
-  font-size: 0.86rem;
-}
-
-.select-control select:focus {
-  outline: none;
-  border-color: var(--lab-accent);
-  box-shadow: 0 0 0 3px var(--lab-accent-soft);
-}
-
+/* ─── Text Controls ─── */
 .text-control {
   display: grid;
   gap: 8px;
@@ -4188,7 +4165,6 @@ watch(mermaidEnabled, (enabled) => {
   box-shadow: 0 0 0 3px var(--lab-accent-soft);
 }
 
-.test-lab--dark .select-control select,
 .test-lab--dark .text-control input {
   background: rgba(15, 23, 42, 0.6);
   border-color: rgba(148, 163, 184, 0.12);
