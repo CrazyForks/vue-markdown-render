@@ -1,4 +1,4 @@
-## [0.0.13-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.2) (2026-04-16)
+## [0.0.13-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.3) (2026-04-22)
 
 
 ### Bug Fixes
@@ -48,6 +48,7 @@
 * enhance HTML inline parsing to handle malformed custom tags and maintain valid attributes ([fadb904](https://github.com/Simon-He95/markstream-vue/commit/fadb904f3b312291ce3457acdf6a6e0dfca84112)), closes [#305](https://github.com/Simon-He95/markstream-vue/issues/305)
 * enhance strong token parsing to correctly handle escaped asterisks ([97abc4a](https://github.com/Simon-He95/markstream-vue/commit/97abc4abd92aa1e8d16f72e635ee6d0396b9e6e1)), closes [#255](https://github.com/Simon-He95/markstream-vue/issues/255)
 * escape regex special characters in stripCustomHtmlWrapper ([6408e75](https://github.com/Simon-He95/markstream-vue/commit/6408e75366ec99cda6ce7504da570cd07f62511e))
+* exclude shared preview from desktop split layout ([ba09437](https://github.com/Simon-He95/markstream-vue/commit/ba09437d95a75dbbeaa840c6507ff4744e15b494))
 * extract Tailwind preset so playground gets token-mapped rounded-* ([d70701e](https://github.com/Simon-He95/markstream-vue/commit/d70701e80cc09a79ba775a400d085d926b9f5fc4))
 * forward --ms-radius to teleported popover menu ([6719221](https://github.com/Simon-He95/markstream-vue/commit/6719221914240ad1b0ce8a8c4bf3a1de920404d5))
 * gate sync KaTeX render to SSR only to avoid hydration divergence ([957b6fc](https://github.com/Simon-He95/markstream-vue/commit/957b6fc7ea27f18bba28ea9a1bbe5360c9ec8abd))
@@ -128,6 +129,7 @@
 * remove Teleport from code block dropdown, use absolute positioning ([9168f83](https://github.com/Simon-He95/markstream-vue/commit/9168f83c8c24c556a2f38a8deb304d6b019f9680))
 * remove unnecessary blank lines in documentation and component files ([5f877e6](https://github.com/Simon-He95/markstream-vue/commit/5f877e61079b95ef3a78f1c8de7fe12328d85133)), closes [#243](https://github.com/Simon-He95/markstream-vue/issues/243)
 * render images inline across renderers ([b690fec](https://github.com/Simon-He95/markstream-vue/commit/b690fec06a9697fcb9460f5e343b34b9c9d3f82c))
+* repair maintenance build checks ([5acb2fa](https://github.com/Simon-He95/markstream-vue/commit/5acb2fa81b3d82cea314e1876df46ddb180c58a7))
 * repair package entrypoints ([e2c1c21](https://github.com/Simon-He95/markstream-vue/commit/e2c1c214629f81bfe4ce67823d6d895936c8cfa6))
 * resolve issue 386 superscript html regressions ([e02d2ce](https://github.com/Simon-He95/markstream-vue/commit/e02d2cefed1531332f0c60294573a928cbe6c278))
 * restore dark mode for teleported layers and standalone components ([945a95b](https://github.com/Simon-He95/markstream-vue/commit/945a95b8914341b3d52545d1bef8019fdeb44422))
