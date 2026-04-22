@@ -313,6 +313,7 @@ const resolvedMonacoOptions = computed(() => {
 const desiredEditorKind = computed<'diff' | 'single'>(() => (isDiff.value ? 'diff' : 'single'))
 const currentEditorKind = ref<'diff' | 'single'>(desiredEditorKind.value)
 const usePreCodeRender = ref(false)
+const editorDisplayReady = ref(false)
 const preFallbackWrap = computed(() => {
   const wordWrap = props.monacoOptions?.wordWrap
   // Keep consistent with CodeBlockNode's default `wordWrap: 'on'`.
@@ -324,8 +325,9 @@ const showPreWhileMonacoLoads = computed(() => {
   // If Monaco isn't available at all, the component renders a standalone PreCodeNode.
   if (usePreCodeRender.value)
     return false
-  // Keep showing the fallback until Monaco finished mounting for this block.
-  return !editorMounted.value
+  // Keep showing the fallback until Monaco finished mounting and the host
+  // height settled, otherwise the first reveal can flash intermediate sizes.
+  return !editorDisplayReady.value
 })
 const showInlinePreview = ref(false)
 // Defer client-only editor initialization to the browser to avoid SSR errors
@@ -426,14 +428,24 @@ const estimatedVisibleContentHeight = computed(() => {
     ? Math.round(value)
     : null
 })
+const estimatedVisibleBlockHeight = computed(() => {
+  const value = props.estimatedHeightPx
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : null
+})
 const preFallbackStyle = computed(() => {
   const fontFamily = props.monacoOptions?.fontFamily
   return {
     fontSize: `${preFallbackFontSize.value}px`,
     lineHeight: `${preFallbackLineHeight.value}px`,
     tabSize: preFallbackTabSize.value,
+    boxSizing: 'border-box',
     ...(estimatedVisibleContentHeight.value != null
-      ? { minHeight: `${estimatedVisibleContentHeight.value}px` }
+      ? {
+          minHeight: `${estimatedVisibleContentHeight.value}px`,
+          '--markstream-code-padding-y': '0px',
+        }
       : {}),
     ...(typeof fontFamily === 'string' && fontFamily.trim()
       ? { '--markstream-code-font-family': fontFamily.trim() }
@@ -441,7 +453,7 @@ const preFallbackStyle = computed(() => {
   } as Record<string, string | number>
 })
 const shouldReserveEstimatedEditorHeight = computed(() => {
-  return estimatedVisibleContentHeight.value != null && !editorMounted.value
+  return estimatedVisibleContentHeight.value != null && !editorDisplayReady.value
 })
 const codeEditorContainerStyle = computed(() => {
   if (!shouldReserveEstimatedEditorHeight.value)
@@ -450,13 +462,51 @@ const codeEditorContainerStyle = computed(() => {
     minHeight: `${estimatedVisibleContentHeight.value}px`,
   }
 })
+const pendingEstimatedEditorHeightFloor = ref<number | null>(null)
 // Keep computed height tight to content. Extra padding caused visible bottom gap.
 const CONTENT_PADDING = 0
 // Fine-tuned to avoid bottom gap at default font size
 const LINE_EXTRA_PER_LINE = 1.5
 const PIXEL_EPSILON = 1
 
+function getPendingEstimatedEditorHeightFloor() {
+  const value = pendingEstimatedEditorHeightFloor.value
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : null
+}
+
+function armEstimatedEditorHeightFloor() {
+  const estimate = estimatedVisibleContentHeight.value
+  pendingEstimatedEditorHeightFloor.value = !editorMounted.value && estimate != null
+    ? estimate
+    : null
+}
+
+function clearEstimatedEditorHeightFloor() {
+  pendingEstimatedEditorHeightFloor.value = null
+}
+
+function resolveHeightWithEstimatedEditorFloor(height: number, clearWhenSatisfied = false) {
+  const roundedHeight = Math.ceil(height)
+  const floor = getPendingEstimatedEditorHeightFloor()
+  if (floor == null)
+    return roundedHeight
+  if (roundedHeight >= floor - PIXEL_EPSILON) {
+    if (clearWhenSatisfied && editorMounted.value)
+      clearEstimatedEditorHeightFloor()
+    return roundedHeight
+  }
+  return Math.max(roundedHeight, floor)
+}
+
 // Use shared safeRaf / safeCancelRaf from utils to avoid duplication
+
+function waitForAnimationFrame() {
+  return new Promise<void>((resolve) => {
+    safeRaf(() => resolve())
+  })
+}
 
 function measureLineHeightFromDom(): number | null {
   try {
@@ -968,12 +1018,22 @@ function updateExpandedHeight() {
     const oldHeight = container.getBoundingClientRect().height
     const h = computeContentHeight()
     if (h != null && h > 0) {
-      const nextHeight = Math.ceil(h)
-      container.style.minHeight = '0px'
+      const nextHeight = resolveHeightWithEstimatedEditorFloor(h, true)
+      const floor = getPendingEstimatedEditorHeightFloor()
+      container.style.minHeight = floor != null ? `${floor}px` : '0px'
       container.style.height = `${nextHeight}px`
       container.style.maxHeight = 'none'
       container.style.overflow = 'visible'
       adjustScrollAfterHeightChange(container, oldHeight, nextHeight)
+      return
+    }
+    const floor = getPendingEstimatedEditorHeightFloor()
+    if (floor != null) {
+      container.style.minHeight = `${floor}px`
+      container.style.height = `${floor}px`
+      container.style.maxHeight = 'none'
+      container.style.overflow = 'visible'
+      adjustScrollAfterHeightChange(container, oldHeight, floor)
     }
   }
   catch {}
@@ -1097,10 +1157,17 @@ function scheduleEditorHeightSync(allowDuringStreamingDiff = false) {
   })
 }
 
-function applyCollapsedContainerHeight(container: HTMLElement, contentHeight: number, maxHeight: number) {
+function applyCollapsedContainerHeight(
+  container: HTMLElement,
+  contentHeight: number,
+  maxHeight: number,
+  options: { clearEstimatedFloor?: boolean } = {},
+) {
   const cappedHeight = Math.min(contentHeight, maxHeight)
-  container.style.minHeight = '0px'
-  container.style.height = `${Math.ceil(cappedHeight)}px`
+  const nextHeight = resolveHeightWithEstimatedEditorFloor(cappedHeight, options.clearEstimatedFloor === true)
+  const floor = getPendingEstimatedEditorHeightFloor()
+  container.style.minHeight = floor != null ? `${Math.min(floor, Math.ceil(maxHeight))}px` : '0px'
+  container.style.height = `${nextHeight}px`
   container.style.maxHeight = `${Math.ceil(maxHeight)}px`
   if (isDiff.value) {
     container.style.overflow = 'hidden'
@@ -1109,7 +1176,7 @@ function applyCollapsedContainerHeight(container: HTMLElement, contentHeight: nu
     const shouldScroll = contentHeight > maxHeight + PIXEL_EPSILON
     container.style.overflow = shouldScroll ? 'auto' : 'hidden'
   }
-  return Math.ceil(cappedHeight)
+  return nextHeight
 }
 
 function bindEditorHeightSync() {
@@ -1201,7 +1268,7 @@ function updateCollapsedHeight() {
       const measuredHeight = shouldKeepLastStableCollapsedDiffHeight
         ? lastStableCollapsedDiffHeight.value!
         : shouldKeepCurrentCollapsedDiffHeight ? rectH : h0
-      const h = applyCollapsedContainerHeight(container, measuredHeight, max)
+      const h = applyCollapsedContainerHeight(container, measuredHeight, max, { clearEstimatedFloor: true })
       if (hasVisibleCollapsedDiffSummary && h < max - PIXEL_EPSILON) {
         lastStableCollapsedDiffHeight.value = h
         collapsedDiffSettleGuardUntil = Date.now() + 160
@@ -1244,6 +1311,13 @@ function updateCollapsedHeight() {
       return
     }
 
+    const floor = getPendingEstimatedEditorHeightFloor()
+    if (floor != null) {
+      const h = applyCollapsedContainerHeight(container, floor, max)
+      adjustScrollAfterHeightChange(container, oldHeight, h)
+      return
+    }
+
     // 4) 兜底：若有先前行高/字体，可估一个最小高度；否则保持现状，避免强制跳到 MAX
     const prev = Number.parseFloat(container.style.height)
     if (!Number.isNaN(prev) && prev > 0) {
@@ -1257,6 +1331,32 @@ function updateCollapsedHeight() {
     }
   }
   catch {}
+}
+
+async function stabilizeInitialEditorHeightHandoff() {
+  if (getPendingEstimatedEditorHeightFloor() == null)
+    return
+  syncInlineFoldProxies()
+  syncEditorHostHeight(false)
+  await nextTick()
+  await waitForAnimationFrame()
+  syncInlineFoldProxies()
+  syncEditorHostHeight(false)
+  await waitForAnimationFrame()
+  syncInlineFoldProxies()
+  syncEditorHostHeight(false)
+}
+
+async function settleInitialEditorDisplay() {
+  syncInlineFoldProxies()
+  syncEditorHostHeight(false)
+  await nextTick()
+  await waitForAnimationFrame()
+  syncInlineFoldProxies()
+  syncEditorHostHeight(false)
+  await waitForAnimationFrame()
+  syncInlineFoldProxies()
+  syncEditorHostHeight(false)
 }
 
 function getMaxHeightValue(): number {
@@ -1421,6 +1521,9 @@ const containerStyle = computed(() => {
     s.minWidth = min
   if (max)
     s.maxWidth = max
+  if (shouldReserveEstimatedEditorHeight.value) {
+    s.minHeight = `${estimatedVisibleBlockHeight.value ?? estimatedVisibleContentHeight.value}px`
+  }
   if (!isDiff.value) {
     s.color = 'var(--vscode-editor-foreground, var(--markstream-code-fallback-fg))'
     s.backgroundColor = 'var(--vscode-editor-background, var(--markstream-code-fallback-bg))'
@@ -1587,6 +1690,8 @@ async function runEditorCreation(el: HTMLElement) {
   if (!createEditor || isUnmounted)
     return
 
+  editorDisplayReady.value = false
+  armEstimatedEditorHeightFloor()
   clearEditorHeightSyncBindings()
   clearInlineFoldProxies()
   resetEditorHost(el)
@@ -1633,18 +1738,7 @@ async function runEditorCreation(el: HTMLElement) {
   if (!isExpanded.value && !isCollapsed.value)
     syncEditorHostHeight(false)
 
-  if (props.loading === false) {
-    await nextTick()
-    if (isUnmounted)
-      return
-    safeRaf(() => {
-      if (isUnmounted)
-        return
-      syncEditorHostHeight(false)
-    })
-  }
-
-  await nextTick()
+  await stabilizeInitialEditorHeightHandoff()
   if (isUnmounted)
     return
   editorMounted.value = true
@@ -1653,6 +1747,10 @@ async function runEditorCreation(el: HTMLElement) {
   syncInlineFoldProxies()
   refreshDiffStats()
   scheduleEditorHeightSync()
+  await settleInitialEditorDisplay()
+  if (isUnmounted)
+    return
+  editorDisplayReady.value = true
 }
 
 function ensureEditorCreation(el: HTMLElement) {
@@ -1700,6 +1798,7 @@ const stopCreateEditorWatch = watch(
       // Keep the `<pre>` fallback if Monaco fails to mount for this block.
       warnCodeBlockDev('Failed to mount Monaco editor', error)
       editorMounted.value = false
+      editorDisplayReady.value = false
     }
 
     stopCreateEditorWatch()
@@ -1737,6 +1836,7 @@ watch(
 
     try {
       editorMounted.value = false
+      editorDisplayReady.value = false
       editorCreated.value = false
       clearEditorHeightSyncBindings()
       clearInlineFoldProxies()
@@ -1748,6 +1848,7 @@ watch(
       warnCodeBlockDev('Failed to recreate Monaco editor after code block kind changed', error)
       // Keep fallback rendering if recreation fails.
       editorMounted.value = false
+      editorDisplayReady.value = false
     }
   },
 )
@@ -1999,6 +2100,7 @@ watch(
 
     try {
       editorMounted.value = false
+      editorDisplayReady.value = false
       editorCreated.value = false
       clearEditorHeightSyncBindings()
       clearInlineFoldProxies()
@@ -2009,6 +2111,7 @@ watch(
     catch (error) {
       warnCodeBlockDev('Failed to recreate Monaco editor after Monaco options changed', error)
       editorMounted.value = false
+      editorDisplayReady.value = false
     }
   },
   { flush: 'post' },
@@ -2091,7 +2194,7 @@ onUnmounted(() => {
     :style="containerStyle"
     class="code-block-container rounded-lg border"
     data-markstream-code-block="1"
-    :data-markstream-enhanced="editorMounted && !usePreCodeRender ? 'true' : 'false'"
+    :data-markstream-enhanced="editorDisplayReady && !usePreCodeRender ? 'true' : 'false'"
     :class="[
       { 'dark': props.isDark, 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
     ]"
@@ -2299,7 +2402,7 @@ onUnmounted(() => {
 }
 
 .code-editor-container {
-  transition: height var(--ms-duration-standard) var(--ms-ease-standard), max-height var(--ms-duration-standard) var(--ms-ease-standard);
+  transition: none;
 }
 
 .code-block-container.is-diff .code-editor-container {

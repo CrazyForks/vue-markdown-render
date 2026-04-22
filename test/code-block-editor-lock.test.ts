@@ -50,6 +50,18 @@ async function flushPendingMicrotasks() {
   await Promise.resolve()
   await Promise.resolve()
   await new Promise<void>(resolve => setTimeout(resolve, 0))
+  await new Promise<void>((resolve) => {
+    if (typeof globalThis.requestAnimationFrame === 'function')
+      globalThis.requestAnimationFrame(() => resolve())
+    else
+      setTimeout(resolve, 0)
+  })
+  await new Promise<void>((resolve) => {
+    if (typeof globalThis.requestAnimationFrame === 'function')
+      globalThis.requestAnimationFrame(() => resolve())
+    else
+      setTimeout(resolve, 0)
+  })
 }
 
 async function waitForCreateEditorCalls(expected: number, helpers: StreamMonacoHelpers, timeout = 1000) {
@@ -110,8 +122,52 @@ describe('codeBlockNode editor creation locking', () => {
       finish()
     await flushPendingMicrotasks()
 
-    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
-    expect(wrapper.find('.code-editor-container').classes()).not.toContain('is-hidden')
+    await vi.waitFor(() => {
+      expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+      expect(wrapper.find('.code-editor-container').classes()).not.toContain('is-hidden')
+    })
+
+    wrapper.unmount()
+  })
+
+  it('keeps the restored estimated height while Monaco swaps in', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.getEditorView.mockReturnValue({
+      getModel: () => ({ getLineCount: () => 1 }),
+      getOption: () => 14,
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+      getContentHeight: () => 0,
+    })
+    helpers.createEditor.mockImplementation(async (el: HTMLElement) => {
+      el.style.minHeight = ''
+      el.style.height = '0px'
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        estimatedHeightPx: 280,
+        estimatedContentHeightPx: 240,
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+
+    const host = wrapper.get('.code-editor-container').element as HTMLElement
+    const block = wrapper.get('.code-block-container').element as HTMLElement
+    expect(Number.parseFloat(host.style.height)).toBeGreaterThanOrEqual(240)
+    expect(host.style.minHeight).toBe('240px')
+    expect(block.style.minHeight).toBe('280px')
 
     wrapper.unmount()
   })
@@ -1089,7 +1145,9 @@ describe('codeBlockNode Monaco touch patch boundaries', () => {
     resolveCreate?.()
     await flushPendingMicrotasks()
 
-    expect(Element.prototype.addEventListener).toBe(originalAddEventListener)
+    await vi.waitFor(() => {
+      expect(Element.prototype.addEventListener).toBe(originalAddEventListener)
+    })
     wrapper.unmount()
   })
 
