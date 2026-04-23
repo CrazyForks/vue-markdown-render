@@ -165,9 +165,11 @@ describe('codeBlockNode editor creation locking', () => {
 
     const host = wrapper.get('.code-editor-container').element as HTMLElement
     const block = wrapper.get('.code-block-container').element as HTMLElement
-    expect(Number.parseFloat(host.style.height)).toBeGreaterThanOrEqual(240)
-    expect(host.style.minHeight).toBe('240px')
-    expect(block.style.minHeight).toBe('280px')
+    await vi.waitFor(() => {
+      expect(Number.parseFloat(host.style.height)).toBeGreaterThanOrEqual(240)
+      expect(host.style.minHeight).toBe('240px')
+      expect(block.style.minHeight).toBe('280px')
+    })
 
     wrapper.unmount()
   })
