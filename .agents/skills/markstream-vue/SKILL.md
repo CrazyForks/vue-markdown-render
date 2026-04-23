@@ -1,6 +1,6 @@
 ---
 name: markstream-vue
-description: Integrate markstream-vue into a Vue 3 app. Use when Codex needs to add the Vue 3 renderer, import CSS in the right order, choose between `content` and `nodes`, enable optional peers like Mermaid, KaTeX, D2, Monaco, or Shiki, or wire scoped custom components in a non-Nuxt Vue repository.
+description: Integrate markstream-vue into a Vue 3 app. Use when Codex needs to add the Vue 3 renderer, import CSS in the right order, choose between `content` and `nodes`, enable optional peers like Mermaid, KaTeX, D2, Monaco, or stream-markdown, or wire scoped custom components in a non-Nuxt Vue repository.
 ---
 
 # Markstream Vue 3
