@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useLocalStorage } from '@vueuse/core'
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
-import { resolveMarkdownTextareaPaste } from '../../playground-shared/markdownPaste'
 import MarkdownRender, {
   CodeBlockNode,
   disableKatex,
@@ -18,9 +17,10 @@ import MarkdownRender, {
   setMermaidWorker,
 } from 'markstream-vue'
 import KatexWorker from 'markstream-vue/workers/katexRenderer.worker?worker&inline'
-
 import MermaidWorker from 'markstream-vue/workers/mermaidParser.worker?worker&inline'
+
 import { onMounted, ref, watch } from 'vue'
+import { resolveMarkdownTextareaPaste } from '../../playground-shared/markdownPaste'
 import 'katex/dist/katex.min.css'
 
 // 用户输入（直接作为 preview 的内容）

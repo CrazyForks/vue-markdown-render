@@ -443,7 +443,7 @@ const preFallbackStyle = computed(() => {
     boxSizing: 'border-box',
     ...(estimatedVisibleContentHeight.value != null
       ? {
-          minHeight: `${estimatedVisibleContentHeight.value}px`,
+          'minHeight': `${estimatedVisibleContentHeight.value}px`,
           '--markstream-code-padding-y': '0px',
         }
       : {}),
