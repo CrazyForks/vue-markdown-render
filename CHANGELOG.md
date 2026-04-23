@@ -1,4 +1,4 @@
-## [0.0.13-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.4) (2026-04-22)
+## [0.0.13-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.5) (2026-04-23)
 
 
 ### Bug Fixes
@@ -87,6 +87,7 @@
 * non-whitelisted HTML tags cause content truncation ([4257b71](https://github.com/Simon-He95/markstream-vue/commit/4257b71e3a621de6e98d3fa74c382e89a56445ab))
 * normalize katex unicode units across packages ([91c27ce](https://github.com/Simon-He95/markstream-vue/commit/91c27ceeced3f0c12f8e9e7140ea2ea1e3f73d5c))
 * normalize markdown code block language labels ([9fcb93c](https://github.com/Simon-He95/markstream-vue/commit/9fcb93cfdcbf5013c390723f267aeb5271c68360))
+* normalize pasted literal newlines in playground test editors ([3e36851](https://github.com/Simon-He95/markstream-vue/commit/3e3685148e5cb4c26be0e6ddcdb36226322e113f))
 * **nuxt.config.ts:** set nitro preset to static ([580e83e](https://github.com/Simon-He95/markstream-vue/commit/580e83e34487446d423e11b403c8f270240f70ac))
 * **parser:** avoid duplicated hardbreak prefix before math ([aa3e434](https://github.com/Simon-He95/markstream-vue/commit/aa3e4344373793f3b0616b570a2e56e61aab08af)), closes [#324](https://github.com/Simon-He95/markstream-vue/issues/324)
 * **parser:** handle intraword asterisks and strict unmatched strong ([08ee3db](https://github.com/Simon-He95/markstream-vue/commit/08ee3db0aba56d650604be46eb406ff6b45351bb))
@@ -170,6 +171,7 @@
 * sync tooltip propagation to vue2 and react packages ([62f5171](https://github.com/Simon-He95/markstream-vue/commit/62f51711401e8f55b548f6df4fb426f25a32a913)), closes [#310](https://github.com/Simon-He95/markstream-vue/issues/310)
 * task list — hide bullet and indent via global :has() selector ([fe9464f](https://github.com/Simon-He95/markstream-vue/commit/fe9464fa2246dba3ab4032d26cffec3a0d71bc42))
 * **theme:** toggle fail ([39cd71a](https://github.com/Simon-He95/markstream-vue/commit/39cd71af0c499c95d9c50b9770972540ac83c3ef)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
+* tighten asterisk emphasis parsing ([02aa015](https://github.com/Simon-He95/markstream-vue/commit/02aa015fe64e9c198502b3c40ebc2a0c26c44e3a)), closes [#394](https://github.com/Simon-He95/markstream-vue/issues/394)
 * tighten monaco and i18n boundaries ([2a7f1ca](https://github.com/Simon-He95/markstream-vue/commit/2a7f1cadea3de9c8b0e75eda9a75137e9974d30a))
 * unify border-radius scale — rounded-lg = var(--ms-radius) ([bd24f4e](https://github.com/Simon-He95/markstream-vue/commit/bd24f4e5db4b0a4aec4113b5b46df48232f95e3c))
 * unify showTooltips behavior across renderers ([d84f755](https://github.com/Simon-He95/markstream-vue/commit/d84f7557a797eb1f0e05b2e1cffeef055780e5af))
