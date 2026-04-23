@@ -487,6 +487,22 @@ function clearEstimatedEditorHeightFloor() {
   pendingEstimatedEditorHeightFloor.value = null
 }
 
+function applyPendingEstimatedEditorHeightFloor() {
+  const container = codeEditor.value
+  const floor = getPendingEstimatedEditorHeightFloor()
+  if (!container || floor == null)
+    return
+
+  const current = Number.parseFloat(container.style.height)
+  if (!Number.isNaN(current) && current >= floor - PIXEL_EPSILON)
+    return
+
+  container.style.minHeight = `${floor}px`
+  container.style.height = `${floor}px`
+  container.style.maxHeight = 'none'
+  container.style.overflow = 'visible'
+}
+
 function resolveHeightWithEstimatedEditorFloor(height: number, clearWhenSatisfied = false) {
   const roundedHeight = Math.ceil(height)
   const floor = getPendingEstimatedEditorHeightFloor()
@@ -1716,6 +1732,7 @@ async function runEditorCreation(el: HTMLElement) {
   }
   if (isUnmounted)
     return
+  applyPendingEstimatedEditorHeightFloor()
 
   const editor = isDiff.value ? getDiffEditorView() : getEditorView()
   if (typeof props.monacoOptions?.fontSize === 'number') {
