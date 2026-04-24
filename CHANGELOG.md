@@ -1,4 +1,4 @@
-## [0.0.13-beta.6](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.6) (2026-04-23)
+## [0.0.13-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.7) (2026-04-24)
 
 
 ### Bug Fixes
@@ -149,6 +149,7 @@
 * soften inline code text color to 75% foreground opacity ([886bb35](https://github.com/Simon-He95/markstream-vue/commit/886bb354b6e0f520b4fa60801c3948ad396a5015))
 * soften link loading hint ([36512da](https://github.com/Simon-He95/markstream-vue/commit/36512da12c8a698305104ea2ddd9baa310e70434))
 * stabilize angular playground preview rendering ([1c61a62](https://github.com/Simon-He95/markstream-vue/commit/1c61a620a8b9c11cab773abc32b6c8a617f59170))
+* stabilize code block rendering ([c2e6f68](https://github.com/Simon-He95/markstream-vue/commit/c2e6f68520daf1208d142f4ea9c18c60d80c5231))
 * stabilize deferred rendering and inline code styles ([e798ef5](https://github.com/Simon-He95/markstream-vue/commit/e798ef53b6d494c2d9a7c8b2d78bf7c9f18f6293))
 * stabilize html parsing and share html policy ([7800870](https://github.com/Simon-He95/markstream-vue/commit/7800870b99cb9c3ce4c372e3ff36d5d250a214cb))
 * stabilize reference parsing and contrast ([357629a](https://github.com/Simon-He95/markstream-vue/commit/357629ad31fc304c2ce9f879bf3a3ddd19997e83)), closes [#327](https://github.com/Simon-He95/markstream-vue/issues/327)
