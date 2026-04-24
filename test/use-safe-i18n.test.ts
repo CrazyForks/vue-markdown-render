@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
+import { createI18n } from 'vue-i18n'
 import { useSafeI18n } from '../src/composables/useSafeI18n'
 
 const TestComponent = defineComponent({
@@ -14,6 +15,8 @@ const TestComponent = defineComponent({
 const originalVueI18nUse = (globalThis as any).$vueI18nUse
 
 afterEach(() => {
+  vi.restoreAllMocks()
+
   if (originalVueI18nUse === undefined)
     delete (globalThis as any).$vueI18nUse
   else
@@ -38,6 +41,29 @@ describe('useSafeI18n', () => {
     expect(wrapper.text()).toBe('Kopieren')
     expect(appT).toHaveBeenCalledWith('common.copy')
     expect((globalThis as any).$vueI18nUse).toBeUndefined()
+  })
+
+  it('uses the built-in fallback without triggering vue-i18n missing-key warnings', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const i18n = createI18n({
+      legacy: false,
+      globalInjection: true,
+      locale: 'zh',
+      fallbackLocale: 'en',
+      messages: {
+        zh: {},
+        en: {},
+      },
+    })
+
+    const wrapper = mount(TestComponent, {
+      global: {
+        plugins: [i18n],
+      },
+    })
+
+    expect(wrapper.text()).toBe('Copy')
+    expect(warn).not.toHaveBeenCalled()
   })
 
   it('still supports an explicitly provided global vue-i18n hook', () => {

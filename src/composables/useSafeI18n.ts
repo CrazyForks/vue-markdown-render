@@ -22,6 +22,7 @@ const defaultMap: Record<string, string> = {
   'common.source': 'Source',
   'common.export': 'Export',
   'common.open': 'Open',
+  'common.minimize': 'Minimize',
   'common.zoomIn': 'Zoom in',
   'common.zoomOut': 'Zoom out',
   'common.resetZoom': 'Reset zoom',
@@ -31,11 +32,16 @@ const defaultMap: Record<string, string> = {
 }
 
 /**
- * Replace the entire default translation map.
+ * Replace default fallback translations.
  * Consumers can call this to provide their own fallback translations (e.g. Chinese).
  */
-export function setDefaultI18nMap(map: Record<keyof typeof defaultMap, string>) {
+export function setDefaultI18nMap(map: Partial<Record<keyof typeof defaultMap, string>>) {
   Object.assign(defaultMap, map)
+}
+
+interface Translator {
+  t: (key: string) => string
+  te?: (key: string) => boolean
 }
 
 function resolveComponentTranslator() {
@@ -43,22 +49,46 @@ function resolveComponentTranslator() {
     const instance = getCurrentInstance()
     const proxy = instance?.proxy as unknown as Record<string, unknown> | null | undefined
     const proxyT = proxy?.$t
-    if (typeof proxyT === 'function')
-      return proxyT.bind(proxy)
+    if (typeof proxyT === 'function') {
+      const proxyTe = proxy?.$te
+      return {
+        t: proxyT.bind(proxy),
+        te: typeof proxyTe === 'function' ? proxyTe.bind(proxy) : undefined,
+      }
+    }
 
     const globalProperties = instance?.appContext?.config?.globalProperties as Record<string, unknown> | undefined
     const appT = globalProperties?.$t
-    if (typeof appT === 'function')
-      return appT.bind(globalProperties)
+    if (typeof appT === 'function') {
+      const appTe = globalProperties?.$te
+      return {
+        t: appT.bind(globalProperties),
+        te: typeof appTe === 'function' ? appTe.bind(globalProperties) : undefined,
+      }
+    }
   }
   catch {}
   return null
 }
 
+const fallbackT = (key: string) => defaultMap[key] ?? humanizeKey(key)
+
+function withFallback(translator: Translator) {
+  return {
+    t(key: string) {
+      if (translator.te && defaultMap[key] && !translator.te(key))
+        return fallbackT(key)
+
+      const translated = translator.t(key)
+      return translated === key && defaultMap[key] ? fallbackT(key) : translated
+    },
+  }
+}
+
 export function useSafeI18n() {
   const translator = resolveComponentTranslator()
   if (translator)
-    return { t: translator as (key: string) => string }
+    return withFallback(translator)
 
   // Synchronous fallback in case `vue-i18n` is not installed.
   try {
@@ -71,16 +101,16 @@ export function useSafeI18n() {
       try {
         const i18n = possible()
         if (i18n && typeof i18n.t === 'function') {
-          return { t: (i18n.t as any).bind(i18n) }
+          return withFallback({
+            t: (i18n.t as any).bind(i18n),
+            te: typeof i18n.te === 'function' ? (i18n.te as any).bind(i18n) : undefined,
+          })
         }
       }
       catch {}
     }
   }
   catch {}
-
-  // Fallback synchronous translator
-  const fallbackT = (key: string) => defaultMap[key] ?? humanizeKey(key)
 
   return { t: fallbackT }
 }
