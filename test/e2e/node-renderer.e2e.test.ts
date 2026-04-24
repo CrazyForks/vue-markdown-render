@@ -610,6 +610,55 @@ After`,
     }, 20000)
   }
 
+  it('resizes table columns from header drag handles', async () => {
+    const wrapper = await mountMarkdown('| Name | Role |\n| --- | --- |\n| Alice | Developer |')
+    try {
+      const headers = wrapper.findAll('thead th')
+      expect(headers).toHaveLength(2)
+
+      const headerWidths = [120, 240]
+      headers.forEach((header, index) => {
+        Object.defineProperty(header.element, 'getBoundingClientRect', {
+          configurable: true,
+          value: () => ({
+            bottom: 0,
+            height: 0,
+            left: 0,
+            right: 0,
+            top: 0,
+            width: headerWidths[index],
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          }),
+        })
+      })
+
+      const handle = headers[0].find('.table-node__resize-handle')
+      expect(handle.exists()).toBe(true)
+
+      handle.element.dispatchEvent(new MouseEvent('pointerdown', {
+        bubbles: true,
+        button: 0,
+        clientX: 120,
+      }))
+      window.dispatchEvent(new MouseEvent('pointermove', {
+        bubbles: true,
+        clientX: 180,
+      }))
+      window.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
+      await flushAll()
+
+      const columns = wrapper.findAll('col')
+      expect(columns).toHaveLength(2)
+      expect(columns[0].attributes('style')).toContain('width: 180px')
+      expect(columns[1].attributes('style')).toContain('width: 180px')
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
   it('allows overriding `list_item` via customComponents', async () => {
     const scopeId = 'custom-components-list-item'
     const CustomListItem = defineComponent({

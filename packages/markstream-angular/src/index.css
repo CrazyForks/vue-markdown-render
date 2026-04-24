@@ -333,8 +333,42 @@ markstream-angular {
 }
 
 .markstream-angular th {
+  position: relative;
   background: rgba(15, 23, 42, 0.05);
   font-weight: 700;
+}
+
+.markstream-angular .table-node__resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 1;
+  width: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.markstream-angular .table-node__resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0.35em;
+  bottom: 0.35em;
+  left: 50%;
+  width: 2px;
+  border-radius: 9999px;
+  background: rgba(94, 104, 121, 0.55);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 0.12s ease;
+}
+
+.markstream-angular .table-node__resize-handle:hover::after,
+.markstream-angular .table-node__resize-handle:focus-visible::after {
+  opacity: 1;
 }
 
 .markstream-angular table .markstream-angular-text-node,
