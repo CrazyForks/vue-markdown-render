@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { createI18n } from 'vue-i18n'
+import { useSafeI18n as useVue2SafeI18n } from '../packages/markstream-vue2/src/composables/useSafeI18n'
 import { useSafeI18n } from '../src/composables/useSafeI18n'
 
 const TestComponent = defineComponent({
@@ -77,5 +78,38 @@ describe('useSafeI18n', () => {
     expect(wrapper.text()).toBe('Global Copy')
     expect(globalHook).toHaveBeenCalledTimes(1)
     expect((globalThis as any).$vueI18nUse).toBe(globalHook)
+  })
+})
+
+describe('markstream-vue2 useSafeI18n', () => {
+  it('uses the built-in fallback without triggering hooked vue-i18n missing-key warnings', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const i18n = createI18n({
+      legacy: false,
+      globalInjection: true,
+      locale: 'zh',
+      fallbackLocale: 'en',
+      messages: {
+        zh: {},
+        en: {},
+      },
+    })
+    ;(globalThis as any).$vueI18nUse = () => i18n.global
+
+    const { t } = useVue2SafeI18n()
+
+    expect(t('common.copy')).toBe('Copy')
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('still supports hooked translations', () => {
+    ;(globalThis as any).$vueI18nUse = () => ({
+      t: (key: string) => key === 'common.copy' ? 'Copier' : key,
+      te: (key: string) => key === 'common.copy',
+    })
+
+    const { t } = useVue2SafeI18n()
+
+    expect(t('common.copy')).toBe('Copier')
   })
 })
