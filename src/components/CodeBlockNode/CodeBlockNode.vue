@@ -441,6 +441,8 @@ const preFallbackStyle = computed(() => {
     lineHeight: `${preFallbackLineHeight.value}px`,
     tabSize: preFallbackTabSize.value,
     boxSizing: 'border-box',
+    maxHeight: `${getMaxHeightValue()}px`,
+    overflow: 'auto',
     ...(estimatedVisibleContentHeight.value != null
       ? {
           'minHeight': `${estimatedVisibleContentHeight.value}px`,

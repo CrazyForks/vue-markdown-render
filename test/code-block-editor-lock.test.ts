@@ -130,6 +130,48 @@ describe('codeBlockNode editor creation locking', () => {
     wrapper.unmount()
   })
 
+  it('caps the `<pre>` fallback while Monaco is mounting', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'json',
+          code: Array.from({ length: 80 }, (_, index) => `  "key${index}": "value"`).join('\n'),
+          raw: '```json\n{}\n```',
+        },
+        loading: false,
+        stream: false,
+        showHeader: false,
+        monacoOptions: {
+          MAX_HEIGHT: 320,
+        },
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+    expect(fallback.style.maxHeight).toBe('320px')
+    expect(fallback.style.overflow).toBe('auto')
+
+    const finish = resolveCreate
+    if (finish)
+      finish()
+    await flushPendingMicrotasks()
+
+    wrapper.unmount()
+  })
+
   it('keeps the restored estimated height while Monaco swaps in', async () => {
     const helpers = getStreamMonacoHelpers()
     helpers.getEditorView.mockReturnValue({
