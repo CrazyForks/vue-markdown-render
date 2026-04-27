@@ -1,4 +1,4 @@
-## [0.0.13-beta.7](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13-beta.7) (2026-04-24)
+## [0.0.13](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13) (2026-04-27)
 
 
 ### Bug Fixes
@@ -24,6 +24,8 @@
 * align streaming fade across packages and playgrounds ([6ef4a22](https://github.com/Simon-He95/markstream-vue/commit/6ef4a22aba4c196250fa5da85b429adc31da3c33))
 * allow vertical scroll chain in table ([3716491](https://github.com/Simon-He95/markstream-vue/commit/3716491080c513dda1a3b79df2911f02c2395e96)), closes [#271](https://github.com/Simon-He95/markstream-vue/issues/271)
 * avoid code block handoff expansion on restore ([7122acf](https://github.com/Simon-He95/markstream-vue/commit/7122acf918ef78a6b5a56324526e6e04ef054598))
+* avoid i18n missing key warnings ([d3263f2](https://github.com/Simon-He95/markstream-vue/commit/d3263f2b3d84eae687f40ef8c6887326782c3f70))
+* avoid vue2 i18n missing key warnings ([619f26b](https://github.com/Simon-He95/markstream-vue/commit/619f26b48ec4161d1d6ba3efd823857cf84ec4cb))
 * broken issue link ([3137c7e](https://github.com/Simon-He95/markstream-vue/commit/3137c7e5441e375a13e4e6a85b2a08180f2e1d8f))
 * **buttons:** update button styles to use :where() for better specificity and maintain Tailwind utilities ([314ec46](https://github.com/Simon-He95/markstream-vue/commit/314ec466f2f360037a5d71503f4ca5edc8487278))
 * **changelog:** update release date and add missing bug fix entries ([6f453dc](https://github.com/Simon-He95/markstream-vue/commit/6f453dc8d158b2de24176c783860a3d6f5476d10))
@@ -93,6 +95,7 @@
 * **parser:** handle intraword asterisks and strict unmatched strong ([08ee3db](https://github.com/Simon-He95/markstream-vue/commit/08ee3db0aba56d650604be46eb406ff6b45351bb))
 * **parser:** keep backticked dollars/code literal and skip placeholder $...$ math ([747610c](https://github.com/Simon-He95/markstream-vue/commit/747610c2ba31d853172f80dc870f52cc97647114)), closes [#306](https://github.com/Simon-He95/markstream-vue/issues/306)
 * **parser:** keep complete html document as single html_block ([b376742](https://github.com/Simon-He95/markstream-vue/commit/b37674220c5ef2b1d1f8052a7b9508dadd986b6c))
+* **parser:** preserve explicit math blocks before setext headings ([81f0af7](https://github.com/Simon-He95/markstream-vue/commit/81f0af7cb4f74147f1c4d9806f99d942afc96b81))
 * **parser:** preserve inline formatting around math ([183a8ec](https://github.com/Simon-He95/markstream-vue/commit/183a8ec193bf7b7455f040b6cd0e9f447d073d42)), closes [#334](https://github.com/Simon-He95/markstream-vue/issues/334)
 * **parser:** preserve trailing content after strong links ([7ae8056](https://github.com/Simon-He95/markstream-vue/commit/7ae8056698f029c8a2aaf6c1bcab939049cd97ba)), closes [#336](https://github.com/Simon-He95/markstream-vue/issues/336)
 * **parser:** prevent list bleed after adjacent html blocks ([b922bc8](https://github.com/Simon-He95/markstream-vue/commit/b922bc82359f6ba41f415341a33239ce4f423fe0)), closes [#318](https://github.com/Simon-He95/markstream-vue/issues/318)
