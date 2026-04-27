@@ -1136,7 +1136,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       for (nextLine = startLine + 1; nextLine < endLine; nextLine++) {
         const lineStart = s.bMarks[nextLine] + s.tShift[nextLine]
         const lineEnd = s.eMarks[nextLine]
-        const currentLine = s.src.slice(lineStart - 1, lineEnd)
+        const currentLine = s.src.slice(lineStart, lineEnd)
         if (currentLine.trim() === closeDelim) {
           found = true
           break
@@ -1176,11 +1176,30 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     return true
   }
 
+  const explicitMathBlockBeforeSetext = (
+    state: unknown,
+    startLine: number,
+    endLine: number,
+    silent: boolean,
+  ) => {
+    const s = state as any
+    const startPos = s.bMarks[startLine] + s.tShift[startLine]
+    const lineText = s.src.slice(startPos, s.eMarks[startLine]).trim()
+
+    if (!lineText.startsWith('$$') && !lineText.startsWith('\\['))
+      return false
+
+    return mathBlock(state, startLine, endLine, silent)
+  }
+
   // Register math before the escape rule so inline math is tokenized
   // before markdown-it processes backslash escapes. This preserves
   // backslashes inside math content (e.g. "\\{") instead of having
   // the escape rule remove them from the token content.
   md.inline.ruler.before('escape', 'math', mathInline)
+  md.block.ruler.before('lheading', 'explicit_math_block', explicitMathBlockBeforeSetext, {
+    alt: ['paragraph', 'reference', 'blockquote', 'list'],
+  })
   md.block.ruler.before('paragraph', 'math_block', mathBlock, {
     alt: ['paragraph', 'reference', 'blockquote', 'list'],
   })
