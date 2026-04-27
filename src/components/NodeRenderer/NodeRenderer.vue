@@ -117,6 +117,7 @@ const headingProbeWrapperRefs = reactive<Record<number, HTMLElement | null>>({
 const viewportPriorityAutoDisabled = ref(false)
 const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 const isClient = typeof window !== 'undefined'
+const renderAsFragment = computed(() => props.renderAsFragment === true)
 const debugPerformanceEnabled = computed(() => props.debugPerformance && isClient && typeof console !== 'undefined')
 const attrs = useAttrs() as RendererAttrs
 const textStreamState = new Map<string, string>()
@@ -280,6 +281,7 @@ const heightExperimentConfig = computed(() => {
 })
 const heightExperimentEnabled = computed(() => Boolean(
   isClient
+  && !renderAsFragment.value
   && props.customId
   && !isNestedListItemRenderer
   && heightExperimentConfig.value?.enabled,
@@ -289,6 +291,8 @@ const codeBlockEstimationEnabled = computed(() => heightExperimentEnabled.value 
 const experimentProbeWidth = computed(() => Math.max(320, experimentContainerWidth.value || containerRef.value?.clientWidth || 640))
 const maxLiveNodesResolved = computed(() => Math.max(1, props.maxLiveNodes ?? 320))
 const virtualizationEnabled = computed(() => {
+  if (renderAsFragment.value)
+    return false
   if ((props.maxLiveNodes ?? 0) <= 0)
     return false
   return parsedNodes.value.length > maxLiveNodesResolved.value
@@ -330,7 +334,7 @@ const resolvedInitialBatch = computed(() => {
     return resolvedBatchSize.value
   return Math.max(0, initial)
 })
-const batchingEnabled = computed(() => props.batchRendering !== false && resolvedBatchSize.value > 0 && isClient && !isTestEnv)
+const batchingEnabled = computed(() => !renderAsFragment.value && props.batchRendering !== false && resolvedBatchSize.value > 0 && isClient && !isTestEnv)
 const renderedCount = ref(0)
 const previousRenderContext = ref<{ key: typeof props.indexKey, total: number }>({
   key: props.indexKey,
@@ -360,6 +364,8 @@ let restoreReconcileTimers: number[] = []
 let detachScrollHandler: (() => void) | null = null
 let pendingFocusSync: { id: number | ReturnType<typeof setTimeout>, viaTimeout: boolean } | null = null
 const deferNodes = computed(() => {
+  if (renderAsFragment.value)
+    return false
   if (props.deferNodesUntilVisible === false)
     return false
   // In the incremental/batched mode (`maxLiveNodes <= 0`), placeholders are
@@ -2250,10 +2256,37 @@ function handleContainerMouseout(event: MouseEvent) {
     return
   emit('mouseout', event)
 }
+
+function handleFragmentMouseover(event: MouseEvent) {
+  emit('mouseover', event)
+}
+
+function handleFragmentMouseout(event: MouseEvent) {
+  emit('mouseout', event)
+}
 </script>
 
 <template>
+  <template v-if="renderAsFragment">
+    <component
+      :is="item.component"
+      v-for="item in renderedItems"
+      :key="item.index"
+      :node="item.node"
+      :loading="item.node.loading"
+      :index-key="item.indexKey"
+      v-bind="item.bindings"
+      :custom-id="props.customId"
+      :is-dark="props.isDark"
+      @click="handleContainerClick"
+      @mouseover="handleFragmentMouseover"
+      @mouseout="handleFragmentMouseout"
+      @copy="emit('copy', $event)"
+      @handle-artifact-click="emit('handleArtifactClick', $event)"
+    />
+  </template>
   <div
+    v-else
     ref="containerRef"
     class="markstream-vue markdown-renderer"
     :class="[{ dark: props.isDark }, { virtualized: virtualizationEnabled }]"

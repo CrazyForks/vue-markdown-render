@@ -156,6 +156,7 @@ onBeforeUnmount(() => {
         :custom-id="customId"
         :batch-rendering="false"
         :defer-nodes-until-visible="false"
+        :render-as-fragment="true"
       />
       <!-- Use dynamic rendering for custom components -->
       <DynamicRenderer v-else-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />

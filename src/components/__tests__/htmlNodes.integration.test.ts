@@ -570,4 +570,132 @@ describe('component Behavior', () => {
     expect(wrapper.html()).toContain('<pre>')
     expect(wrapper.text()).toContain('- alpha')
   })
+
+  it('renders details summary as the first direct child for issue #397 content', async () => {
+    const markdown = `# Structural Stress
+
+> 这个样例用于检查复杂结构在 streaming 中是否抖动、错位或丢节点。
+
+## 列表
+
+1. 第一层
+   - 第二层
+     - 第三层
+2. 继续
+
+## 表格
+
+| Framework | Route | Purpose |
+| --- | --- | --- |
+| Vue 3 | \`/test\` | 主调试台 |
+| Vue 2 | \`/test\` | 兼容回归 |
+| React | \`/test\` | 跨框架对照 |
+| Angular | \`/test\` | baseline 对照 |
+
+## HTML
+
+<details>
+  <summary>展开看一段 HTML</summary>
+  <p>如果这里的结构错了，通常说明 HTML block / inline 的边界处理有问题。</p>
+</details>
+
+## 长段落
+
+Markstream 现在不仅要处理单次完整渲染，还要处理 AI 场景下不断追加的 markdown 内容，所以这个页面更像一个回归驾驶舱。你可以一边编辑左侧输入，一边切换 Vue 2、React 或 Angular 的 test page，用同一段内容观察差异，判断问题是解析层、组件层，还是框架适配层。`
+
+    const wrapper = mount(MarkdownRender, {
+      props: {
+        content: markdown,
+        final: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+        typewriter: false,
+      },
+      global: {
+        stubs: {
+          transition: false,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const details = wrapper.find('details.html-block-node')
+    expect(details.exists()).toBe(true)
+    expect(details.element.firstElementChild?.tagName).toBe('SUMMARY')
+    expect(details.find('summary').text()).toBe('展开看一段 HTML')
+    expect(wrapper.text()).not.toContain('<summary>')
+    expect(wrapper.text()).not.toContain('</details>')
+  })
+
+  it('keeps nested details summaries as the first direct child of each details node', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          tag: 'details',
+          content: '<details open><summary>outer</summary><p>outer body</p><details open><summary>inner</summary><p>inner body</p></details></details>',
+          attrs: [['open', '']],
+          children: [
+            {
+              type: 'html_block',
+              tag: 'summary',
+              content: '<summary>outer</summary>',
+              children: [
+                {
+                  type: 'paragraph',
+                  raw: 'outer',
+                  children: [{ type: 'text', raw: 'outer', content: 'outer' }],
+                },
+              ],
+            },
+            {
+              type: 'paragraph',
+              raw: 'outer body',
+              children: [{ type: 'text', raw: 'outer body', content: 'outer body' }],
+            },
+            {
+              type: 'html_block',
+              tag: 'details',
+              content: '<details open><summary>inner</summary><p>inner body</p></details>',
+              attrs: [['open', '']],
+              children: [
+                {
+                  type: 'html_block',
+                  tag: 'summary',
+                  content: '<summary>inner</summary>',
+                  children: [
+                    {
+                      type: 'paragraph',
+                      raw: 'inner',
+                      children: [{ type: 'text', raw: 'inner', content: 'inner' }],
+                    },
+                  ],
+                },
+                {
+                  type: 'paragraph',
+                  raw: 'inner body',
+                  children: [{ type: 'text', raw: 'inner body', content: 'inner body' }],
+                },
+              ],
+            },
+          ],
+          loading: false,
+        },
+      },
+      global: {
+        stubs: {
+          transition: false,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const detailsNodes = wrapper.findAll('details.html-block-node')
+    expect(detailsNodes).toHaveLength(2)
+    expect(detailsNodes[0].element.firstElementChild?.tagName).toBe('SUMMARY')
+    expect(detailsNodes[1].element.firstElementChild?.tagName).toBe('SUMMARY')
+    expect(detailsNodes[0].find('summary').text()).toBe('outer')
+    expect(detailsNodes[1].find('summary').text()).toBe('inner')
+  })
 })
