@@ -1,4 +1,4 @@
-## [0.0.13](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.13) (2026-04-27)
+## [0.0.14-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.0) (2026-04-28)
 
 
 ### Bug Fixes
@@ -116,6 +116,7 @@
 * prepare dts entry before bundling types ([e06064c](https://github.com/Simon-He95/markstream-vue/commit/e06064ca3b280b10e28cbbb4069710aa733e210a))
 * preserve escaped punctuation literals ([0328451](https://github.com/Simon-He95/markstream-vue/commit/032845108c735c55a98ff9ce72da43a27a045a7c)), closes [#322](https://github.com/Simon-He95/markstream-vue/issues/322)
 * preserve list text in streaming inline states ([22fa35e](https://github.com/Simon-He95/markstream-vue/commit/22fa35ed5693f218d2f8d4a6ec2b4c0b38005370))
+* preserve structured details summary rendering ([1e8ecea](https://github.com/Simon-He95/markstream-vue/commit/1e8ecea2e5d2c77c51d8ee15ab3a9400c9af9b1b))
 * preserve superscript and footnotes after inline math ([3bf0104](https://github.com/Simon-He95/markstream-vue/commit/3bf010477a39b44d2ba72f6780fc095532ad1da4))
 * preserve trailing text after custom html close ([7207288](https://github.com/Simon-He95/markstream-vue/commit/72072882576b93771417d17d118d96471c9aff47))
 * prevent dropping numeric-only documents in parseMarkdownToStructure ([bba733c](https://github.com/Simon-He95/markstream-vue/commit/bba733c9a8d4b77f0fbd0560d695a611e0822eef)), closes [#278](https://github.com/Simon-He95/markstream-vue/issues/278)
