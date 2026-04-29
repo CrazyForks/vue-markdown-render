@@ -1,4 +1,4 @@
-## [0.0.14-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.1) (2026-04-29)
+## [0.0.14-beta.2](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.2) (2026-04-29)
 
 
 ### Bug Fixes
@@ -156,6 +156,7 @@
 * stabilize angular playground preview rendering ([1c61a62](https://github.com/Simon-He95/markstream-vue/commit/1c61a620a8b9c11cab773abc32b6c8a617f59170))
 * stabilize code block rendering ([c2e6f68](https://github.com/Simon-He95/markstream-vue/commit/c2e6f68520daf1208d142f4ea9c18c60d80c5231))
 * stabilize deferred rendering and inline code styles ([e798ef5](https://github.com/Simon-He95/markstream-vue/commit/e798ef53b6d494c2d9a7c8b2d78bf7c9f18f6293))
+* stabilize heavy block remounts ([d810eff](https://github.com/Simon-He95/markstream-vue/commit/d810effb32ccd135677de8c81d519e8ab78d0db7))
 * stabilize html parsing and share html policy ([7800870](https://github.com/Simon-He95/markstream-vue/commit/7800870b99cb9c3ce4c372e3ff36d5d250a214cb))
 * stabilize reference parsing and contrast ([357629a](https://github.com/Simon-He95/markstream-vue/commit/357629ad31fc304c2ce9f879bf3a3ddd19997e83)), closes [#327](https://github.com/Simon-He95/markstream-vue/issues/327)
 * stabilize streamed text updates across renderers ([3187fa3](https://github.com/Simon-He95/markstream-vue/commit/3187fa31aa39f5e50d64d96a946a157922f7c4ae))
@@ -175,6 +176,7 @@
 * sync docs twoslash types ([150612d](https://github.com/Simon-He95/markstream-vue/commit/150612d3f4326c9d559cd400b0030ef7e0c42ca2))
 * sync link loading hint across frameworks ([e0cfba9](https://github.com/Simon-He95/markstream-vue/commit/e0cfba984d22ae7ac8551566fda08bbae5a9c690))
 * sync shiki code block theme with dark mode ([65ab675](https://github.com/Simon-He95/markstream-vue/commit/65ab6750cdb58ef8bc094d4732347eaa6df8afcf))
+* sync test preview theme state ([d12a6c5](https://github.com/Simon-He95/markstream-vue/commit/d12a6c5d3bc229f1a1df9b3c94a17c2db76396e5))
 * sync tooltip propagation to vue2 and react packages ([62f5171](https://github.com/Simon-He95/markstream-vue/commit/62f51711401e8f55b548f6df4fb426f25a32a913)), closes [#310](https://github.com/Simon-He95/markstream-vue/issues/310)
 * task list — hide bullet and indent via global :has() selector ([fe9464f](https://github.com/Simon-He95/markstream-vue/commit/fe9464fa2246dba3ab4032d26cffec3a0d71bc42))
 * **theme:** toggle fail ([39cd71a](https://github.com/Simon-He95/markstream-vue/commit/39cd71af0c499c95d9c50b9770972540ac83c3ef)), closes [#233](https://github.com/Simon-He95/markstream-vue/issues/233)
@@ -209,6 +211,7 @@
 * add '@floating-ui/dom' dependency to pnpm-lock.yaml ([6788d43](https://github.com/Simon-He95/markstream-vue/commit/6788d43d5e9b408531a03cf21c8b3d28d031231c))
 * add AntV Infographic guide pages and update navigation configuration. ([0b64836](https://github.com/Simon-He95/markstream-vue/commit/0b64836068def70cadea54a27df06ec40ab47ca4))
 * add attrs support to HeadingNode components and tests ([b148aea](https://github.com/Simon-He95/markstream-vue/commit/b148aea52265a204ef4d043d99b13d313c048a78))
+* add Brotli compression for playground share links ([bb9d6bc](https://github.com/Simon-He95/markstream-vue/commit/bb9d6bc469d31b98554bdcbd501228aaa6c0bf5a))
 * add D2 support across packages ([0c0f071](https://github.com/Simon-He95/markstream-vue/commit/0c0f07182b897e596b33f7a5988dcd899e9adfd5))
 * add D2BlockNode component to global components declaration ([2df44db](https://github.com/Simon-He95/markstream-vue/commit/2df44db819687018aecdbf548a9781eeb6d928d9))
 * add diff editor inline fold proxy and hunk hover actions ([8529b1c](https://github.com/Simon-He95/markstream-vue/commit/8529b1ce07c2e417971dd7d76b6de85cf1d298a0))
