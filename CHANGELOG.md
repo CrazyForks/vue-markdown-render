@@ -1,4 +1,4 @@
-## [0.0.14-beta.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.0) (2026-04-28)
+## [0.0.14-beta.1](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.1) (2026-04-29)
 
 
 ### Bug Fixes
@@ -67,6 +67,7 @@
 * improve reference detection in markdown parser and add related tests ([31e5b6e](https://github.com/Simon-He95/markstream-vue/commit/31e5b6eee57b85a838b0bdb2f71c29453c8d8902)), closes [#231](https://github.com/Simon-He95/markstream-vue/issues/231)
 * improve vue2 compatibility ([6e58454](https://github.com/Simon-He95/markstream-vue/commit/6e58454bf178f33c2b1e5dff468dba97c0cd0cfc))
 * keep bundled dts entry for size check ([3c51c34](https://github.com/Simon-He95/markstream-vue/commit/3c51c34f9430a8be689168a602e5a2a19d0de6b4))
+* keep markdown after html comments ([3da23cb](https://github.com/Simon-He95/markstream-vue/commit/3da23cbc63c5ef362f6ca885a076575588c3a713))
 * keep react inline html inside paragraphs ([27eee2c](https://github.com/Simon-He95/markstream-vue/commit/27eee2c84d7f6ee44c80c62d70bcedb2b38407d7))
 * limit streaming fade to appended text ([6f4ead3](https://github.com/Simon-He95/markstream-vue/commit/6f4ead3a836c986fa5aca87c8591d95be95914be))
 * **link:** inline code inside links rendering nested elements ([4f85231](https://github.com/Simon-He95/markstream-vue/commit/4f85231ef551391d1eb34f573e9a17563fe16c68)), closes [#256](https://github.com/Simon-He95/markstream-vue/issues/256)
@@ -166,6 +167,7 @@
 * standardize class attribute syntax in list item components and tests ([71af12b](https://github.com/Simon-He95/markstream-vue/commit/71af12b1638456fdbaf809849f3f230ea9505de0))
 * streamline class binding for streamed delta in InlineCodeNode and TextNode components ([bd7aa44](https://github.com/Simon-He95/markstream-vue/commit/bd7aa446c9d8fd3c03e6058e6587139d02c4791a))
 * support block custom html tags in react paragraphs ([634a9eb](https://github.com/Simon-He95/markstream-vue/commit/634a9ebe70ea1db3410d9f97306227d95c067e1c))
+* support pluggable code block language routing ([683667d](https://github.com/Simon-He95/markstream-vue/commit/683667d469f14f7324b62ff25f23c3e28aa8d5ee))
 * support structured html wrapper markdown rendering ([51063ca](https://github.com/Simon-He95/markstream-vue/commit/51063ca0727b46305fa474e90794233dae6196a6))
 * swap reversed expand/collapse icons and update tooltip on click ([ef5b1c2](https://github.com/Simon-He95/markstream-vue/commit/ef5b1c2ba781f3e74c38af25c585f52401f75b97))
 * sync custom component coercion for nodes prop to markstream-vue2 ([63e9e18](https://github.com/Simon-He95/markstream-vue/commit/63e9e185b20d0c44c1d0fe54e1ee9cf102a0888a))

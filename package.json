@@ -1,7 +1,7 @@
 {
   "name": "markstream-vue",
   "type": "module",
-  "version": "0.0.14-beta.0",
+  "version": "0.0.14-beta.1",
   "packageManager": "pnpm@10.33.0",
   "description": "Streaming-friendly Vue 3 Markdown renderer for docs sites, AI chat UIs, and large documents.",
   "author": "Simon He",
