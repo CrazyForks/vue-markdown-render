@@ -146,6 +146,7 @@ export interface PreCodeNodeProps {
 export interface MermaidBlockNodeProps {
   node: CodeBlockNode
   maxHeight?: string | null
+  estimatedPreviewHeightPx?: number
   loading?: boolean
   isDark?: boolean
   workerTimeoutMs?: number
@@ -216,6 +217,7 @@ export interface MathInlineNodeProps {
 export interface InfographicBlockNodeProps {
   node: CodeBlockNode
   maxHeight?: string | null
+  estimatedPreviewHeightPx?: number
   loading?: boolean
   isDark?: boolean
   showHeader?: boolean

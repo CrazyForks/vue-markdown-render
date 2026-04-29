@@ -10,18 +10,37 @@ const customId = 'vue2-heavy-props-test'
 const CustomMermaidProbe = defineComponent({
   name: 'CustomMermaidProbe',
   props: {
+    node: { type: Object, required: true },
     showHeader: Boolean,
     showZoomControls: Boolean,
     renderDebounceMs: Number,
     previewPollDelayMs: Number,
+    estimatedPreviewHeightPx: Number,
   },
   render() {
     return h('div', {
       'class': 'custom-mermaid-probe',
+      'data-language': String((this as any).node?.language ?? ''),
       'data-show-header': String(this.showHeader),
       'data-show-zoom-controls': String(this.showZoomControls),
       'data-render-debounce-ms': String(this.renderDebounceMs),
       'data-preview-poll-delay-ms': String(this.previewPollDelayMs),
+      'data-estimated-preview-height': String(this.estimatedPreviewHeightPx ?? ''),
+    })
+  },
+})
+
+const EstimatedPreviewProbe = defineComponent({
+  name: 'EstimatedPreviewProbe',
+  props: {
+    node: { type: Object, required: true },
+    estimatedPreviewHeightPx: Number,
+  },
+  render() {
+    return h('div', {
+      'class': 'estimated-preview-probe',
+      'data-language': String((this as any).node?.language ?? ''),
+      'data-estimated-preview-height': String((this as any).estimatedPreviewHeightPx ?? ''),
     })
   },
 })
@@ -89,6 +108,90 @@ const CustomD2LangProbe = defineComponent({
 describe('markstream-vue2 heavy-node prop forwarding', () => {
   afterEach(() => {
     removeCustomComponents(customId)
+  })
+
+  it('renders a reserved Mermaid shell before the async component resolves', () => {
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'mermaid',
+            code: 'flowchart TD\nA-->B\nB-->C\nC-->D\nD-->E\nE-->F\nF-->G\nG-->H\nH-->I\nI-->J\nJ-->K\nK-->L\n',
+            raw: '```mermaid\nflowchart TD\nA-->B\n```',
+          },
+        ],
+      },
+    })
+
+    const shell = wrapper.get('[data-markstream-mermaid="1"]')
+    expect(shell.attributes('data-markstream-mode')).toBe('pending')
+    expect((shell.get('.mermaid-preview-area').element as HTMLElement).style.height).toBe('500px')
+  })
+
+  it('renders a reserved Infographic shell before the async component resolves', () => {
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'infographic',
+            code: [
+              '# Release progress',
+              '- Plan: complete',
+              '- Build: active',
+              '- Verify: pending',
+            ].join('\n'),
+            raw: '```infographic\n# Release progress\n- Plan: complete\n```',
+          },
+        ],
+      },
+    })
+
+    const shell = wrapper.get('[data-markstream-infographic="1"]')
+    expect(shell.attributes('data-markstream-mode')).toBe('pending')
+    expect((shell.get('.infographic-preview').element as HTMLElement).style.height).toBe('500px')
+  })
+
+  it('injects stable preview height estimates for Mermaid and Infographic custom renderers', async () => {
+    setCustomComponents(customId, {
+      mermaid: EstimatedPreviewProbe as any,
+      infographic: EstimatedPreviewProbe as any,
+    })
+
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        customId,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'mermaid',
+            code: 'flowchart TD\nA-->B\nB-->C\nC-->D\nD-->E\nE-->F\nF-->G\nG-->H\nH-->I\nI-->J\nJ-->K\nK-->L\n',
+            raw: '```mermaid\nflowchart TD\nA-->B\n```',
+          },
+          {
+            type: 'code_block',
+            language: 'infographic',
+            code: [
+              '# Release progress',
+              '- Plan: complete',
+              '- Build: active',
+              '- Verify: pending',
+            ].join('\n'),
+            raw: '```infographic\n# Release progress\n- Plan: complete\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probes = wrapper.findAll('.estimated-preview-probe')
+    expect(probes).toHaveLength(2)
+    expect(probes[0].attributes('data-language')).toBe('mermaid')
+    expect(probes[0].attributes('data-estimated-preview-height')).toBe('500')
+    expect(probes[1].attributes('data-language')).toBe('infographic')
+    expect(probes[1].attributes('data-estimated-preview-height')).toBe('500')
   })
 
   it('prefers exact language overrides over code_block fallback for custom languages', async () => {
@@ -191,5 +294,6 @@ describe('markstream-vue2 heavy-node prop forwarding', () => {
     expect(probe.attributes('data-show-zoom-controls')).toBe('false')
     expect(probe.attributes('data-render-debounce-ms')).toBe('180')
     expect(probe.attributes('data-preview-poll-delay-ms')).toBe('500')
+    expect(probe.attributes('data-estimated-preview-height')).toBe('360')
   })
 })

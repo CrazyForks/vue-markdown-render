@@ -168,6 +168,7 @@ Use these as “answer skeletons”: quick steps + minimal repro questions + whe
 - Steps:
   - Install peer `stream-monaco`
   - Ensure Monaco workers are bundled (Vite plugin) and you’re on the client
+  - For app-level preloading, call `preloadCodeBlockRuntime()` from `markstream-vue`; do not import `stream-monaco` directly just to warm workers
 - Ask: “Any worker-related console errors? Are Monaco workers bundled in production?”
 - Docs: `docs/guide/monaco.md`, `docs/guide/components.md`
 

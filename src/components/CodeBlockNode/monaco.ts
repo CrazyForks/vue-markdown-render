@@ -1,5 +1,8 @@
 import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme } from '../../types/component-props'
 import { preload } from '../NodeRenderer/preloadMonaco'
+import { markCodeBlockRuntimeReady } from './runtime'
+
+export { isCodeBlockRuntimeReady } from './runtime'
 
 export interface MonacoDisposableLike {
   dispose?: () => void
@@ -70,6 +73,11 @@ let mod: MonacoModule | null = null
 let importFailed = false
 let loadingPromise: Promise<MonacoModule | null> | null = null
 
+export async function preloadCodeBlockRuntime() {
+  const runtime = await getUseMonaco()
+  return !!runtime
+}
+
 export async function getUseMonaco(): Promise<MonacoModule | null> {
   if (loadingPromise)
     return loadingPromise
@@ -89,6 +97,7 @@ export async function getUseMonaco(): Promise<MonacoModule | null> {
 
     try {
       await preload(mod)
+      markCodeBlockRuntimeReady()
       return mod
     }
     catch {

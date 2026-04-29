@@ -168,6 +168,7 @@
 - 步骤：
   - 安装 `stream-monaco` peer
   - 确认 Monaco workers 已正确打包（Vite plugin），并确保只在浏览器端执行
+  - 如果应用层要提前预热，调用 `markstream-vue` 的 `preloadCodeBlockRuntime()`；不要为了预热 worker 直接 import `stream-monaco`
 - 最小追问： “控制台是否有 worker/Monaco 报错？生产环境是否已打包 Monaco workers？”
 - 文档：`docs/guide/monaco.md`, `docs/guide/components.md`
 

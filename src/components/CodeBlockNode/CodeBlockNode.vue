@@ -15,7 +15,7 @@ import CodeBlockShell from './CodeBlockShell.vue'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
 import {
   getUseMonaco,
-
+  isCodeBlockRuntimeReady,
 } from './monaco'
 import { scheduleGlobalMonacoTheme } from './monacoThemeScheduler'
 
@@ -314,6 +314,7 @@ const desiredEditorKind = computed<'diff' | 'single'>(() => (isDiff.value ? 'dif
 const currentEditorKind = ref<'diff' | 'single'>(desiredEditorKind.value)
 const usePreCodeRender = ref(false)
 const editorDisplayReady = ref(false)
+const editorCreationFailed = ref(false)
 const preFallbackWrap = computed(() => {
   const wordWrap = props.monacoOptions?.wordWrap
   // Keep consistent with CodeBlockNode's default `wordWrap: 'on'`.
@@ -325,9 +326,10 @@ const showPreWhileMonacoLoads = computed(() => {
   // If Monaco isn't available at all, the component renders a standalone PreCodeNode.
   if (usePreCodeRender.value)
     return false
-  // Keep showing the fallback until Monaco finished mounting and the host
-  // height settled, otherwise the first reveal can flash intermediate sizes.
-  return !editorDisplayReady.value
+  if (editorCreationFailed.value)
+    return true
+  // Cold starts keep the fallback until Monaco settles; warm/preloaded mounts skip it.
+  return !isCodeBlockRuntimeReady() && !editorDisplayReady.value
 })
 const showInlinePreview = ref(false)
 // Defer client-only editor initialization to the browser to avoid SSR errors
@@ -407,13 +409,13 @@ const preFallbackFontSize = computed(() => {
   const fromState = codeFontSize.value
   if (typeof fromState === 'number' && Number.isFinite(fromState) && fromState > 0)
     return fromState
-  return 12
+  return 14
 })
 const preFallbackLineHeight = computed(() => {
   const fromOptions = props.monacoOptions?.lineHeight
   if (typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0)
     return fromOptions
-  return Math.round(preFallbackFontSize.value * 1.5)
+  return Math.max(12, Math.round(preFallbackFontSize.value * 1.35))
 })
 const preFallbackTabSize = computed(() => {
   const fromOptions = props.monacoOptions?.tabSize
@@ -422,16 +424,26 @@ const preFallbackTabSize = computed(() => {
   // Monaco default is 4.
   return 4
 })
+const preFallbackVerticalPadding = computed(() => {
+  const padding = props.monacoOptions?.padding
+  const top = typeof padding?.top === 'number' && Number.isFinite(padding.top) && padding.top > 0
+    ? padding.top
+    : 0
+  const bottom = typeof padding?.bottom === 'number' && Number.isFinite(padding.bottom) && padding.bottom > 0
+    ? padding.bottom
+    : 0
+  return { top, bottom }
+})
 const estimatedVisibleContentHeight = computed(() => {
   const value = props.estimatedContentHeightPx
   return typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? Math.round(value)
+    ? value
     : null
 })
 const estimatedVisibleBlockHeight = computed(() => {
   const value = props.estimatedHeightPx
   return typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? Math.round(value)
+    ? value
     : null
 })
 const preFallbackStyle = computed(() => {
@@ -443,10 +455,12 @@ const preFallbackStyle = computed(() => {
     boxSizing: 'border-box',
     maxHeight: `${getMaxHeightValue()}px`,
     overflow: 'auto',
+    paddingTop: `${preFallbackVerticalPadding.value.top}px`,
+    paddingBottom: `${preFallbackVerticalPadding.value.bottom}px`,
     ...(estimatedVisibleContentHeight.value != null
       ? {
-          'minHeight': `${estimatedVisibleContentHeight.value}px`,
-          '--markstream-code-padding-y': '0px',
+          height: `${estimatedVisibleContentHeight.value}px`,
+          minHeight: `${estimatedVisibleContentHeight.value}px`,
         }
       : {}),
     ...(typeof fontFamily === 'string' && fontFamily.trim()
@@ -455,7 +469,8 @@ const preFallbackStyle = computed(() => {
   } as Record<string, string | number>
 })
 const shouldReserveEstimatedEditorHeight = computed(() => {
-  return estimatedVisibleContentHeight.value != null && !editorDisplayReady.value
+  return estimatedVisibleContentHeight.value != null
+    && (!editorDisplayReady.value || getPendingEstimatedEditorHeightFloor() != null)
 })
 const codeEditorContainerStyle = computed(() => {
   if (!shouldReserveEstimatedEditorHeight.value)
@@ -494,12 +509,12 @@ function resolveHeightWithEstimatedEditorFloor(height: number, clearWhenSatisfie
   const floor = getPendingEstimatedEditorHeightFloor()
   if (floor == null)
     return roundedHeight
-  if (roundedHeight >= floor - PIXEL_EPSILON) {
+  if (roundedHeight >= floor) {
     if (clearWhenSatisfied && editorMounted.value)
       clearEstimatedEditorHeightFloor()
     return roundedHeight
   }
-  return Math.max(roundedHeight, floor)
+  return floor
 }
 
 // Use shared safeRaf / safeCancelRaf from utils to avoid duplication
@@ -1335,7 +1350,7 @@ function updateCollapsedHeight() {
   catch {}
 }
 
-async function stabilizeInitialEditorHeightHandoff() {
+async function stabilizeInitialEditorHeight() {
   if (getPendingEstimatedEditorHeightFloor() == null)
     return
   syncInlineFoldProxies()
@@ -1692,6 +1707,7 @@ async function runEditorCreation(el: HTMLElement) {
   if (!createEditor || isUnmounted)
     return
 
+  editorCreationFailed.value = false
   editorDisplayReady.value = false
   armEstimatedEditorHeightFloor()
   clearEditorHeightSyncBindings()
@@ -1740,7 +1756,7 @@ async function runEditorCreation(el: HTMLElement) {
   if (!isExpanded.value && !isCollapsed.value)
     syncEditorHostHeight(false)
 
-  await stabilizeInitialEditorHeightHandoff()
+  await stabilizeInitialEditorHeight()
   if (isUnmounted)
     return
   editorMounted.value = true
@@ -1801,6 +1817,7 @@ const stopCreateEditorWatch = watch(
       warnCodeBlockDev('Failed to mount Monaco editor', error)
       editorMounted.value = false
       editorDisplayReady.value = false
+      editorCreationFailed.value = true
     }
 
     stopCreateEditorWatch()
@@ -1851,6 +1868,7 @@ watch(
       // Keep fallback rendering if recreation fails.
       editorMounted.value = false
       editorDisplayReady.value = false
+      editorCreationFailed.value = true
     }
   },
 )
@@ -2114,6 +2132,7 @@ watch(
       warnCodeBlockDev('Failed to recreate Monaco editor after Monaco options changed', error)
       editorMounted.value = false
       editorDisplayReady.value = false
+      editorCreationFailed.value = true
     }
   },
   { flush: 'post' },

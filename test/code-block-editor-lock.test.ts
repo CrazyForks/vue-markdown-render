@@ -2,6 +2,8 @@ import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import CodeBlockNode from '../src/components/CodeBlockNode/CodeBlockNode.vue'
+import { isCodeBlockRuntimeReady, preloadCodeBlockRuntime } from '../src/components/CodeBlockNode/monaco'
+import { resetCodeBlockRuntimeReadyForTest } from '../src/components/CodeBlockNode/runtime'
 
 interface StreamMonacoHelpers {
   useMonaco: ReturnType<typeof vi.fn>
@@ -23,6 +25,7 @@ function getStreamMonacoHelpers(): StreamMonacoHelpers {
 }
 
 function resetStreamMonacoHelpers() {
+  resetCodeBlockRuntimeReadyForTest()
   const helpers = getStreamMonacoHelpers()
   const makeEditorView = () => ({
     getModel: () => ({ getLineCount: () => 1 }),
@@ -130,6 +133,248 @@ describe('codeBlockNode editor creation locking', () => {
     wrapper.unmount()
   })
 
+  it('matches fallback metrics to Monaco defaults while Monaco is mounting', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          MAX_HEIGHT: 320,
+        },
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateEditorCalls(1, helpers)
+
+      const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+      expect(fallback.style.fontSize).toBe('14px')
+      expect(fallback.style.lineHeight).toBe('19px')
+      expect(fallback.style.tabSize).toBe('4')
+      expect(fallback.style.paddingTop).toBe('0px')
+      expect(fallback.style.paddingBottom).toBe('0px')
+      expect(fallback.style.maxHeight).toBe('320px')
+      expect(fallback.style.overflow).toBe('auto')
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('applies Monaco font and padding options to the fallback metrics', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          fontSize: 16,
+          lineHeight: 22,
+          tabSize: 2,
+          padding: { top: 3, bottom: 5 },
+        },
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateEditorCalls(1, helpers)
+
+      const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+      expect(fallback.style.fontSize).toBe('16px')
+      expect(fallback.style.lineHeight).toBe('22px')
+      expect(fallback.style.tabSize).toBe('2')
+      expect(fallback.style.paddingTop).toBe('3px')
+      expect(fallback.style.paddingBottom).toBe('5px')
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('does not render the `<pre>` fallback on warm remounts after the runtime is ready', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const node = {
+      type: 'code_block',
+      language: 'js',
+      code: 'console.log(1)',
+      raw: '```js\nconsole.log(1)\n```',
+    }
+
+    const first = mount(CodeBlockNode, {
+      props: {
+        node,
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    expect(first.find('pre.code-pre-fallback').exists()).toBe(true)
+
+    const finish = resolveCreate
+    if (finish)
+      finish()
+    await flushPendingMicrotasks()
+    await vi.waitFor(() => {
+      expect(first.find('pre.code-pre-fallback').exists()).toBe(false)
+    })
+    expect(isCodeBlockRuntimeReady()).toBe(true)
+    first.unmount()
+
+    let resolveSecondCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSecondCreate = () => resolve()
+        }),
+    )
+    const second = mount(CodeBlockNode, {
+      props: {
+        node,
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(2, helpers)
+
+    expect(second.find('pre.code-pre-fallback').exists()).toBe(false)
+    expect(second.find('.code-editor-container').classes()).not.toContain('is-hidden')
+
+    resolveSecondCreate?.()
+    await flushPendingMicrotasks()
+    second.unmount()
+  })
+
+  it('lets callers preload the code block runtime before mounting', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    await expect(preloadCodeBlockRuntime()).resolves.toBe(true)
+    expect(isCodeBlockRuntimeReady()).toBe(true)
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+    expect(wrapper.find('.code-editor-container').classes()).not.toContain('is-hidden')
+
+    resolveCreate?.()
+    await flushPendingMicrotasks()
+    wrapper.unmount()
+  })
+
+  it('keeps the `<pre>` fallback if a warm runtime fails to create an editor', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await expect(preloadCodeBlockRuntime()).resolves.toBe(true)
+    const createFailed = async () => {
+      throw new Error('create failed')
+    }
+    helpers.createEditor
+      .mockImplementationOnce(createFailed)
+      .mockImplementationOnce(createFailed)
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    try {
+      await vi.waitFor(() => {
+        const fallback = wrapper.find('pre')
+        expect(fallback.exists()).toBe(true)
+        expect(fallback.text()).toContain('console.log(1)')
+      })
+    }
+    finally {
+      warn.mockRestore()
+    }
+
+    wrapper.unmount()
+  })
+
   it('caps the `<pre>` fallback while Monaco is mounting', async () => {
     const helpers = getStreamMonacoHelpers()
     let resolveCreate: (() => void) | null = null
@@ -212,6 +457,46 @@ describe('codeBlockNode editor creation locking', () => {
       expect(host.style.minHeight).toBe('240px')
       expect(block.style.minHeight).toBe('280px')
     })
+
+    wrapper.unmount()
+  })
+
+  it('keeps the estimated height floor after Monaco reports a shorter first layout', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.getEditorView.mockReturnValue({
+      getModel: () => ({ getLineCount: () => 5 }),
+      getOption: () => 18,
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+      getContentHeight: () => 238,
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'sh',
+          code: 'a\nb\nc\nd\ne',
+          raw: '```sh\na\nb\nc\nd\ne\n```',
+        },
+        estimatedHeightPx: 280,
+        estimatedContentHeightPx: 240,
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await vi.waitFor(() => {
+      expect(wrapper.get('.code-block-container').attributes('data-markstream-enhanced')).toBe('true')
+    })
+    await flushPendingMicrotasks()
+
+    const host = wrapper.get('.code-editor-container').element as HTMLElement
+    const block = wrapper.get('.code-block-container').element as HTMLElement
+    expect(host.style.minHeight).toBe('240px')
+    expect(block.style.minHeight).toBe('280px')
 
     wrapper.unmount()
   })

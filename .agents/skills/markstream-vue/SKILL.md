@@ -22,6 +22,7 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 
 - Vue 3 apps default to `content`.
 - Prefer local component registration unless the repo already uses a shared plugin entry.
+- When Monaco code blocks need app-level preloading, import `preloadCodeBlockRuntime` from `markstream-vue`. Existing `getUseMonaco()` preloads remain valid; do not import `stream-monaco` directly just to warm workers.
 - If the host is actually Nuxt, leave SSR-specific setup to `markstream-nuxt`.
 
 ## Useful Doc Targets

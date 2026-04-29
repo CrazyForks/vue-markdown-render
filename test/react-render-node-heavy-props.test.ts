@@ -28,6 +28,10 @@ function CustomMermaidProbe() {
   return null
 }
 
+function CustomInfographicProbe() {
+  return null
+}
+
 function CustomD2Probe() {
   return null
 }
@@ -72,6 +76,38 @@ describe('markstream-react heavy-node prop forwarding', () => {
 
     expect(element?.props?.showHeader).toBe(false)
     expect(element?.props?.renderDebounceMs).toBe(180)
+    expect(element?.props?.estimatedPreviewHeightPx).toBe(360)
+  })
+
+  it('injects stable preview height estimates for client Mermaid and Infographic custom renderers', () => {
+    const longMermaidCode = 'flowchart TD\nA-->B\nB-->C\nC-->D\nD-->E\nE-->F\nF-->G\nG-->H\nH-->I\nI-->J\nJ-->K\nK-->L\n'
+    const infographicCode = ['# Release progress', '- Plan: complete', '- Build: active', '- Verify: pending'].join('\n')
+    const ctx: RenderContext = {
+      ...baseCtx,
+      customComponents: {
+        mermaid: CustomMermaidProbe,
+        infographic: CustomInfographicProbe,
+      },
+    }
+
+    const mermaidElement = clientRenderNode({
+      type: 'code_block',
+      language: 'mermaid',
+      code: longMermaidCode,
+      raw: `\`\`\`mermaid\n${longMermaidCode}\`\`\``,
+    } as any, 'mermaid-client-estimate', ctx) as any
+
+    const infographicElement = clientRenderNode({
+      type: 'code_block',
+      language: 'infographic',
+      code: infographicCode,
+      raw: `\`\`\`infographic\n${infographicCode}\`\`\``,
+    } as any, 'infographic-client-estimate', ctx) as any
+
+    expect(mermaidElement?.type).toBe(CustomMermaidProbe)
+    expect(mermaidElement?.props?.estimatedPreviewHeightPx).toBe(500)
+    expect(infographicElement?.type).toBe(CustomInfographicProbe)
+    expect(infographicElement?.props?.estimatedPreviewHeightPx).toBe(500)
   })
 
   it('prefers exact language overrides over code_block fallback on the client renderer', () => {
@@ -131,6 +167,7 @@ describe('markstream-react heavy-node prop forwarding', () => {
     expect(element?.type).toBe(CustomMermaidProbe)
     expect(element?.props?.showHeader).toBe(false)
     expect(element?.props?.renderDebounceMs).toBe(180)
+    expect(element?.props?.estimatedPreviewHeightPx).toBe(360)
   })
 
   it('lets d2lang exact overrides beat d2 fallback on the client renderer', () => {
@@ -213,6 +250,38 @@ describe('markstream-react heavy-node prop forwarding', () => {
     expect(element?.type).toBe(CustomMermaidProbe)
     expect(element?.props?.showHeader).toBe(false)
     expect(element?.props?.renderDebounceMs).toBe(180)
+    expect(element?.props?.estimatedPreviewHeightPx).toBe(360)
+  })
+
+  it('injects stable preview height estimates for server Mermaid and Infographic custom renderers', () => {
+    const longMermaidCode = 'flowchart TD\nA-->B\nB-->C\nC-->D\nD-->E\nE-->F\nF-->G\nG-->H\nH-->I\nI-->J\nJ-->K\nK-->L\n'
+    const infographicCode = ['# Release progress', '- Plan: complete', '- Build: active', '- Verify: pending'].join('\n')
+    const ctx: RenderContext = {
+      ...baseCtx,
+      customComponents: {
+        mermaid: CustomMermaidProbe,
+        infographic: CustomInfographicProbe,
+      },
+    }
+
+    const mermaidElement = serverRenderNode({
+      type: 'code_block',
+      language: 'mermaid',
+      code: longMermaidCode,
+      raw: `\`\`\`mermaid\n${longMermaidCode}\`\`\``,
+    } as any, 'mermaid-server-estimate', ctx) as any
+
+    const infographicElement = serverRenderNode({
+      type: 'code_block',
+      language: 'infographic',
+      code: infographicCode,
+      raw: `\`\`\`infographic\n${infographicCode}\`\`\``,
+    } as any, 'infographic-server-estimate', ctx) as any
+
+    expect(mermaidElement?.type).toBe(CustomMermaidProbe)
+    expect(mermaidElement?.props?.estimatedPreviewHeightPx).toBe(500)
+    expect(infographicElement?.type).toBe(CustomInfographicProbe)
+    expect(infographicElement?.props?.estimatedPreviewHeightPx).toBe(500)
   })
 
   it('lets d2lang exact overrides beat d2 fallback on the server renderer', () => {

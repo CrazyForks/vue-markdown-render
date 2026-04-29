@@ -70,11 +70,112 @@ const CustomD2LangProbe = defineComponent({
   },
 })
 
+const EstimatedPreviewProbe = defineComponent({
+  name: 'EstimatedPreviewProbe',
+  props: {
+    node: { type: Object, required: true },
+    estimatedPreviewHeightPx: Number,
+  },
+  setup(props) {
+    return () => h('div', {
+      'class': 'estimated-preview-probe',
+      'data-language': String((props.node as any)?.language ?? ''),
+      'data-estimated-preview-height': String(props.estimatedPreviewHeightPx ?? ''),
+    })
+  },
+})
+
 afterEach(() => {
   removeCustomComponents(customId)
 })
 
 describe('nodeRenderer heavy-node prop forwarding', () => {
+  it('renders a reserved Mermaid shell before the async component resolves', () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'mermaid',
+            code: 'flowchart TD\nA-->B\nB-->C\nC-->D\nD-->E\nE-->F\nF-->G\nG-->H\nH-->I\nI-->J\nJ-->K\nK-->L\n',
+            raw: '```mermaid\nflowchart TD\nA-->B\n```',
+          },
+        ],
+      },
+    })
+
+    const shell = wrapper.get('[data-markstream-mermaid="1"]')
+    expect(shell.attributes('data-markstream-mode')).toBe('pending')
+    expect(shell.find('.mermaid-source-panel').exists()).toBe(false)
+    expect((shell.get('.mermaid-preview-area').element as HTMLElement).style.height).toBe('500px')
+  })
+
+  it('renders a reserved Infographic shell before the async component resolves', () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'infographic',
+            code: [
+              '# Release progress',
+              '- Plan: complete',
+              '- Build: active',
+              '- Verify: pending',
+            ].join('\n'),
+            raw: '```infographic\n# Release progress\n- Plan: complete\n```',
+          },
+        ],
+      },
+    })
+
+    const shell = wrapper.get('[data-markstream-infographic="1"]')
+    expect(shell.attributes('data-markstream-mode')).toBe('pending')
+    expect(shell.find('.infographic-source').exists()).toBe(false)
+    expect((shell.get('.infographic-preview').element as HTMLElement).style.height).toBe('500px')
+  })
+
+  it('injects stable preview height estimates for Mermaid and Infographic blocks', async () => {
+    setCustomComponents(customId, {
+      mermaid: EstimatedPreviewProbe,
+      infographic: EstimatedPreviewProbe,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'mermaid',
+            code: 'flowchart TD\nA-->B\nB-->C\nC-->D\nD-->E\nE-->F\nF-->G\nG-->H\nH-->I\nI-->J\nJ-->K\nK-->L\n',
+            raw: '```mermaid\nflowchart TD\nA-->B\n```',
+          },
+          {
+            type: 'code_block',
+            language: 'infographic',
+            code: [
+              '# Release progress',
+              '- Plan: complete',
+              '- Build: active',
+              '- Verify: pending',
+            ].join('\n'),
+            raw: '```infographic\n# Release progress\n- Plan: complete\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probes = wrapper.findAll('.estimated-preview-probe')
+    expect(probes).toHaveLength(2)
+    expect(probes[0].attributes('data-language')).toBe('mermaid')
+    expect(probes[0].attributes('data-estimated-preview-height')).toBe('500')
+    expect(probes[1].attributes('data-language')).toBe('infographic')
+    expect(probes[1].attributes('data-estimated-preview-height')).toBe('500')
+  })
+
   it('prefers exact language overrides over code_block fallback for custom languages', async () => {
     setCustomComponents(customId, {
       echarts: ExactLanguageProbe,

@@ -61,7 +61,7 @@ describe('markstream-angular NodeOutlet', () => {
       code: 'graph TD\nA-->B\n',
     } as any
     expect(resolveNodeOutletCodeMode(node, context as any)).toBe('mermaid')
-    expect(resolveNodeOutletCustomInputs(node, context as any)).toEqual({ renderDebounceMs: 180 })
+    expect(resolveNodeOutletCustomInputs(node, context as any)).toEqual({ renderDebounceMs: 180, estimatedPreviewHeightPx: 360 })
 
     node = {
       type: 'code_block',
@@ -77,7 +77,7 @@ describe('markstream-angular NodeOutlet', () => {
       code: 'infographic list-row-simple-horizontal-arrow',
     } as any
     expect(resolveNodeOutletCodeMode(node, context as any)).toBe('infographic')
-    expect(resolveNodeOutletCustomInputs(node, context as any)).toEqual({ showHeader: false })
+    expect(resolveNodeOutletCustomInputs(node, context as any)).toEqual({ showHeader: false, estimatedPreviewHeightPx: 360 })
 
     node = {
       type: 'code_block',
@@ -131,7 +131,27 @@ describe('markstream-angular NodeOutlet', () => {
     } as any
 
     expect(resolveNodeOutletCustomComponent(node, context)).toBe(MermaidComponent)
-    expect(resolveNodeOutletCustomInputs(node, context)).toEqual({ renderDebounceMs: 180 })
+    expect(resolveNodeOutletCustomInputs(node, context)).toEqual({ renderDebounceMs: 180, estimatedPreviewHeightPx: 360 })
+  })
+
+  it('injects stable preview height estimates for angular mermaid and infographic custom inputs', () => {
+    const context = {
+      events: {},
+    } as any
+
+    let node = {
+      type: 'code_block',
+      language: 'mermaid',
+      code: 'flowchart TD\nA-->B\nB-->C\nC-->D\nD-->E\nE-->F\nF-->G\nG-->H\nH-->I\nI-->J\nJ-->K\nK-->L\n',
+    } as any
+    expect(resolveNodeOutletCustomInputs(node, context)).toEqual({ estimatedPreviewHeightPx: 500 })
+
+    node = {
+      type: 'code_block',
+      language: 'infographic',
+      code: ['# Release progress', '- Plan: complete', '- Build: active', '- Verify: pending'].join('\n'),
+    } as any
+    expect(resolveNodeOutletCustomInputs(node, context)).toEqual({ estimatedPreviewHeightPx: 500 })
   })
 
   it('lets d2lang exact overrides beat d2 fallback while keeping d2 inputs', () => {

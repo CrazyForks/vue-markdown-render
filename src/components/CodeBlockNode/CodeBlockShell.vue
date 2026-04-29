@@ -379,8 +379,6 @@ const fontIncreaseDisabled = computed(() =>
   overflow: hidden;
   border-radius: 0 0 var(--ms-radius) var(--ms-radius);
   contain: content;
-  content-visibility: auto;
-  contain-intrinsic-size: 320px var(--ms-size-skeleton-min-height);
 }
 
 /* ── Menu transition ── */

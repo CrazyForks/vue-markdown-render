@@ -663,6 +663,7 @@ function previewCode() {
 <style scoped>
 /* ── Code content ── */
 .code-block-content {
+  display: grid;
   max-height: min(70vh, var(--ms-size-code-max-height));
   overflow: auto;
   transition: max-height var(--ms-duration-slow) var(--ms-ease-standard);
@@ -682,6 +683,12 @@ function previewCode() {
   line-height: var(--vscode-editor-line-height, 1.5);
 }
 
+.code-block-render,
+.code-fallback-plain {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
 .code-block-render {
   min-height: 1px;
 }
@@ -693,15 +700,19 @@ function previewCode() {
   line-height: inherit;
 }
 
-:deep(.code-block-content .shiki-fallback) {
-  padding: 1rem;
+:deep(.code-block-content pre) {
+  box-sizing: border-box;
   margin: 0;
-  background: transparent;
-  color: inherit;
-  white-space: pre;
+  padding: 1rem;
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
+}
+
+:deep(.code-block-content .shiki-fallback) {
+  background: transparent;
+  color: inherit;
+  white-space: pre;
 }
 
 .code-fallback-plain {
@@ -712,10 +723,6 @@ function previewCode() {
   font-size: inherit;
   line-height: inherit;
   font-family: inherit;
-}
-
-:deep(.code-block-content pre) {
-  padding: 1rem;
 }
 
 /* ── Loading placeholder ── */

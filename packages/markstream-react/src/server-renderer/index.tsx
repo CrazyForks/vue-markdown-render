@@ -25,6 +25,8 @@ import {
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
 } from 'stream-markdown-parser'
+import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber as parsePositiveInfographicNumber } from '../components/InfographicBlockNode/height'
+import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber as parsePositiveMermaidNumber } from '../components/MermaidBlockNode/height'
 import { getCustomNodeComponents } from '../customComponents'
 import { BLOCK_LEVEL_TYPES, renderInline, renderNodeChildren, tokenAttrsToProps } from '../renderers/renderChildren'
 import { isParagraphBreakingCustomHtmlNode, resolveCustomHtmlTag } from '../utils/customHtmlTag'
@@ -139,6 +141,30 @@ function createRenderContext(
   }
 }
 
+function getMermaidRenderProps(node: any, ctx: RenderContext) {
+  const next = { ...(ctx.mermaidProps || {}) } as Record<string, any>
+  if (parsePositiveMermaidNumber(next.estimatedPreviewHeightPx) == null) {
+    next.estimatedPreviewHeightPx = clampMermaidPreviewHeight(
+      estimateMermaidPreviewHeight(String(node?.code ?? '')),
+      undefined,
+      next.maxHeight === 'none' ? null : (parsePositiveMermaidNumber(next.maxHeight) ?? undefined),
+    )
+  }
+  return next
+}
+
+function getInfographicRenderProps(node: any, ctx: RenderContext) {
+  const next = { ...(ctx.infographicProps || {}) } as Record<string, any>
+  if (parsePositiveInfographicNumber(next.estimatedPreviewHeightPx) == null) {
+    next.estimatedPreviewHeightPx = clampInfographicPreviewHeight(
+      estimateInfographicPreviewHeight(String(node?.code ?? '')),
+      undefined,
+      next.maxHeight === 'none' ? null : (parsePositiveInfographicNumber(next.maxHeight) ?? undefined),
+    )
+  }
+  return next
+}
+
 function renderCodeBlock(
   node: any,
   key: React.Key,
@@ -152,13 +178,14 @@ function renderCodeBlock(
   const language = normalizeLanguageIdentifier(rawLanguage)
   const customForLanguage = rawLanguage ? customComponents[rawLanguage] : null
   if (language === 'mermaid') {
+    const mermaidProps = getMermaidRenderProps(node, ctx)
     const customMermaid = customForLanguage || customComponents.mermaid
     if (customMermaid) {
       return React.createElement(customMermaid as any, {
         key,
         node,
         isDark: ctx.isDark,
-        ...(ctx.mermaidProps || {}),
+        ...mermaidProps,
       })
     }
     return (
@@ -167,19 +194,20 @@ function renderCodeBlock(
         node={node as any}
         isDark={ctx.isDark}
         loading={Boolean(node.loading)}
-        {...(ctx.mermaidProps || {})}
+        {...mermaidProps}
       />
     )
   }
 
   if (language === 'infographic') {
+    const infographicProps = getInfographicRenderProps(node, ctx)
     const customInfographic = customForLanguage || customComponents.infographic
     if (customInfographic) {
       return React.createElement(customInfographic as any, {
         key,
         node,
         isDark: ctx.isDark,
-        ...(ctx.infographicProps || {}),
+        ...infographicProps,
       })
     }
     return (
@@ -188,7 +216,7 @@ function renderCodeBlock(
         node={node as any}
         isDark={ctx.isDark}
         loading={Boolean(node.loading)}
-        {...(ctx.infographicProps || {})}
+        {...infographicProps}
       />
     )
   }

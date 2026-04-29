@@ -1,4 +1,5 @@
 import type { AngularRenderableNode, AngularRenderContext } from './node-helpers'
+import { clampPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from './diagram-height'
 import { getHtmlTagFromContent, resolveCodeBlockLanguage, stripCustomHtmlWrapper } from './node-helpers'
 
 export type CodeBlockMode = 'mermaid' | 'd2' | 'infographic' | 'pre' | 'code'
@@ -55,13 +56,37 @@ export function resolveNodeOutletCustomInputs(
     return null
 
   const codeMode = resolveNodeOutletCodeMode(node, context)
-  if (codeMode === 'mermaid')
-    return context?.mermaidProps ?? null
+  if (codeMode === 'mermaid') {
+    return withEstimatedPreviewHeight(
+      context?.mermaidProps,
+      estimateMermaidPreviewHeight(getNodeCode(node)),
+    )
+  }
   if (codeMode === 'd2')
     return context?.d2Props ?? null
-  if (codeMode === 'infographic')
-    return context?.infographicProps ?? null
+  if (codeMode === 'infographic') {
+    return withEstimatedPreviewHeight(
+      context?.infographicProps,
+      estimateInfographicPreviewHeight(getNodeCode(node)),
+    )
+  }
   return context?.codeBlockProps ?? null
+}
+
+function getNodeCode(node: AngularRenderableNode) {
+  return String((node as any)?.code ?? '')
+}
+
+function withEstimatedPreviewHeight(props: Record<string, any> | null | undefined, estimatedHeight: number) {
+  const next = { ...(props || {}) }
+  if (parsePositiveNumber(next.estimatedPreviewHeightPx) == null) {
+    next.estimatedPreviewHeightPx = clampPreviewHeight(
+      estimatedHeight,
+      undefined,
+      next.maxHeight === 'none' ? null : (parsePositiveNumber(next.maxHeight) ?? undefined),
+    )
+  }
+  return next
 }
 
 export function resolveNodeOutletCustomComponent(

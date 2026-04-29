@@ -1,11 +1,12 @@
 import type { VisibilityHandle } from '../../context/viewportPriority'
 import type { InfographicBlockNodeProps, MermaidBlockEvent } from '../../types/component-props'
 import clsx from 'clsx'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
+import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber } from './height'
 import { getInfographic } from './infographic'
 
 // Inline Icon
@@ -49,9 +50,23 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   const [copying, setCopying] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [showSource, setShowSource] = useState(false)
-  const [containerHeight, setContainerHeight] = useState('360px')
   const [modalOpen, setModalOpen] = useState(false)
   const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
+  const baseCode = props.node.code
+  const maxPreviewHeight = useMemo(() => {
+    if (!props.maxHeight || props.maxHeight === 'none')
+      return null
+    return parsePositiveNumber(props.maxHeight)
+  }, [props.maxHeight])
+  const estimatedPreviewHeight = useMemo(() => {
+    return clampInfographicPreviewHeight(
+      parsePositiveNumber(props.estimatedPreviewHeightPx) ?? estimateInfographicPreviewHeight(baseCode),
+      undefined,
+      maxPreviewHeight,
+    )
+  }, [baseCode, maxPreviewHeight, props.estimatedPreviewHeightPx])
+  const [containerHeight, setContainerHeight] = useState(`${estimatedPreviewHeight}px`)
+  const [hasPreview, setHasPreview] = useState(false)
 
   // Zoom
   const [zoom, setZoom] = useState(1)
@@ -67,18 +82,16 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   const instanceRef = useRef<any>(null)
   const registerViewport = useViewportPriority()
 
-  const baseCode = props.node.code
-
   const resolveContainerHeight = useCallback((actualHeight: number) => {
     if (!props.maxHeight || props.maxHeight === 'none')
-      return `${actualHeight}px`
+      return `${Math.max(actualHeight, estimatedPreviewHeight)}px`
 
     const maxHeight = Number.parseFloat(String(props.maxHeight))
     if (!Number.isFinite(maxHeight))
-      return `${actualHeight}px`
+      return `${Math.max(actualHeight, estimatedPreviewHeight)}px`
 
-    return `${Math.min(actualHeight, maxHeight)}px`
-  }, [props.maxHeight])
+    return `${Math.max(Math.min(actualHeight, maxHeight), estimatedPreviewHeight)}px`
+  }, [estimatedPreviewHeight, props.maxHeight])
 
   const updateContainerHeight = useCallback(() => {
     const el = containerRef.current
@@ -89,6 +102,17 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
     if (actualHeight > 0)
       setContainerHeight(resolveContainerHeight(actualHeight))
   }, [resolveContainerHeight])
+
+  useEffect(() => {
+    if (showSource || isCollapsed)
+      return
+    setContainerHeight((current) => {
+      const currentHeight = parsePositiveNumber(current)
+      if (currentHeight != null && currentHeight >= estimatedPreviewHeight)
+        return current
+      return `${estimatedPreviewHeight}px`
+    })
+  }, [estimatedPreviewHeight, isCollapsed, showSource])
 
   const handleCopy = useCallback(async () => {
     try {
@@ -128,6 +152,7 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
       })
       instanceRef.current = instance
       instance.render(baseCode)
+      setHasPreview(true)
 
       // Update height
       setTimeout(() => {
@@ -136,6 +161,7 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
     }
     catch (error) {
       console.error('Failed to render infographic:', error)
+      setHasPreview(false)
       el.innerHTML = `<div class="text-red-500 p-4">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
     }
   }, [baseCode, updateContainerHeight, viewportReady])
@@ -282,7 +308,12 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
   // JSX Structure mirroring Vue template
   return (
     <>
-      <div ref={viewportTargetRef} className={clsx('my-4 rounded-lg border overflow-hidden shadow-sm', props.isDark ? 'border-gray-700/30' : 'border-gray-200', { 'is-rendering': props.loading })}>
+      <div
+        ref={viewportTargetRef}
+        data-markstream-infographic="1"
+        data-markstream-mode={showSource ? 'source' : hasPreview ? 'preview' : 'pending'}
+        className={clsx('my-4 rounded-lg border overflow-hidden shadow-sm', props.isDark ? 'border-gray-700/30' : 'border-gray-200', { 'is-rendering': props.loading })}
+      >
         {props.showHeader && (
           <div className={clsx('flex justify-between items-center px-4 py-2.5 border-b', props.isDark ? 'bg-gray-800 border-gray-700/30' : 'bg-gray-50 border-gray-200')}>
             <div className="flex items-center gap-x-2 overflow-hidden">
@@ -428,8 +459,8 @@ export function InfographicBlockNode(rawProps: InfographicBlockNodeProps & Infog
                       </div>
                     )}
                     <div
-                      className={clsx('min-h-[360px] relative transition-all duration-100 overflow-hidden block', props.isDark ? 'bg-gray-900' : 'bg-gray-50')}
-                      style={{ height: containerHeight }}
+                      className={clsx('infographic-preview min-h-[360px] relative transition-all duration-100 overflow-hidden block', props.isDark ? 'bg-gray-900' : 'bg-gray-50')}
+                      style={{ height: containerHeight, maxHeight: props.maxHeight ?? undefined }}
                       onMouseDown={onMouseDown}
                       onMouseMove={onMouseMove}
                       onMouseUp={stopDrag}
