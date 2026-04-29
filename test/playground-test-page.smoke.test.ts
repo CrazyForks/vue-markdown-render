@@ -1,8 +1,9 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
-import { buildTestPageHref, decodeMarkdownHash } from '../playground-shared/testPageState'
+import { buildTestPageHref, decodeMarkdownHashAsync } from '../playground-shared/testPageState'
 import TestPage from '../playground/src/pages/test.vue'
+import { flushAll } from './setup/flush-all'
 
 vi.mock('@iconify/vue', () => ({
   Icon: {
@@ -112,6 +113,16 @@ async function mountTestPage() {
   const wrapper = mount(TestPage)
   await nextTick()
   return wrapper
+}
+
+async function waitForClipboardWrite(callCount = 1) {
+  const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>
+  for (let attempt = 0; attempt < 250 && writeText.mock.calls.length < callCount; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 20))
+    await nextTick()
+  }
+  expect(writeText).toHaveBeenCalledTimes(callCount)
+  return writeText
 }
 
 function dispatchPaste(target: HTMLTextAreaElement, text: string) {
@@ -239,7 +250,7 @@ describe('playground /test smoke', () => {
     const hash = new URL(href, 'https://markstream.local').hash
 
     expect(href).toContain('/test#data=')
-    expect(decodeMarkdownHash(hash)).toBe('## carried across frameworks')
+    expect(await decodeMarkdownHashAsync(hash)).toBe('## carried across frameworks')
 
     wrapper.unmount()
   })
@@ -284,16 +295,14 @@ describe('playground /test smoke', () => {
     await nextTick()
 
     await wrapper.get('[data-testid="preview-share-button"]').trigger('click')
-
-    const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>
-    expect(writeText).toHaveBeenCalledTimes(1)
+    const writeText = await waitForClipboardWrite()
 
     const href = writeText.mock.calls[0][0]
     const url = new URL(href)
 
     expect(url.pathname).toBe('/test')
     expect(url.searchParams.get('view')).toBe('preview')
-    expect(decodeMarkdownHash(url.hash)).toBe('## shared preview')
+    expect(await decodeMarkdownHashAsync(url.hash)).toBe('## shared preview')
 
     wrapper.unmount()
   })
@@ -306,9 +315,7 @@ describe('playground /test smoke', () => {
     await textarea.setValue(longMarkdown)
     await nextTick()
     await wrapper.get('[data-testid="preview-share-button"]').trigger('click')
-
-    const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>
-    expect(writeText).toHaveBeenCalledTimes(1)
+    const writeText = await waitForClipboardWrite()
 
     const href = writeText.mock.calls[0][0]
     const url = new URL(href)
@@ -316,7 +323,7 @@ describe('playground /test smoke', () => {
     expect(url.pathname).toBe('/test')
     expect(url.searchParams.get('view')).toBe('preview')
     expect(url.searchParams.get('share')).toBeNull()
-    expect(decodeMarkdownHash(url.hash)).toBe(longMarkdown)
+    expect(await decodeMarkdownHashAsync(url.hash)).toBe(longMarkdown)
 
     wrapper.unmount()
   })
@@ -331,9 +338,7 @@ describe('playground /test smoke', () => {
     await textarea.setValue(oversizedMarkdown)
     await nextTick()
     await wrapper.get('[data-testid="preview-share-button"]').trigger('click')
-
-    const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>
-    expect(writeText).toHaveBeenCalledTimes(1)
+    const writeText = await waitForClipboardWrite()
 
     const href = writeText.mock.calls[0][0]
     const url = new URL(href)
@@ -452,11 +457,11 @@ describe('playground /test smoke', () => {
     expect(wrapper.get('[data-testid="immersive-preview-star-link"]').attributes('href')).toBe('https://github.com/Simon-He95/markstream-vue')
 
     await wrapper.get('[data-testid="immersive-preview-back-button"]').trigger('click')
-    await nextTick()
+    await flushAll()
 
     expect(wrapper.find('textarea').exists()).toBe(true)
     expect(window.location.search).toBe('')
-    expect(decodeMarkdownHash(window.location.hash)).toBe('## shared only')
+    expect(await decodeMarkdownHashAsync(window.location.hash)).toBe('## shared only')
 
     wrapper.unmount()
   })
@@ -474,11 +479,11 @@ describe('playground /test smoke', () => {
     expect(wrapper.get('[data-testid="preview"]').text()).toBe(longMarkdown)
 
     await wrapper.get('[data-testid="immersive-preview-back-button"]').trigger('click')
-    await nextTick()
+    await flushAll()
 
     expect(wrapper.find('textarea').exists()).toBe(true)
     expect(window.location.search).toBe('')
-    expect(decodeMarkdownHash(window.location.hash)).toBe(longMarkdown)
+    expect(await decodeMarkdownHashAsync(window.location.hash)).toBe(longMarkdown)
 
     wrapper.unmount()
   })

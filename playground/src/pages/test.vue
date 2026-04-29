@@ -12,7 +12,7 @@ import { createDrauu } from 'drauu'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { resolveMarkdownTextareaPaste } from '../../../playground-shared/markdownPaste'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
-import { buildTestPageHref, decodeMarkdownHash, resolveFrameworkTestHref, resolveTestPageViewMode, withTestPageViewMode } from '../../../playground-shared/testPageState'
+import { buildTestPageHref, buildTestPageHrefAsync, decodeMarkdownHashAsync, resolveFrameworkTestHref, resolveTestPageViewMode, withTestPageViewMode } from '../../../playground-shared/testPageState'
 import {
   buildTestSandboxHref,
   normalizeSandboxSource,
@@ -348,8 +348,9 @@ const previewD2MaxHeight = computed(() => 'none')
 const charCount = computed(() => input.value.length)
 const lineCount = computed(() => (input.value ? input.value.split('\n').length : 0))
 const isSharePreviewMode = computed(() => testPageViewMode.value === 'preview')
-const labShareUsesLocalStorage = computed(() => buildTestPageHref('/test', input.value, 'lab').length > MAX_URL_LEN)
-const previewShareUsesLocalStorage = computed(() => buildTestPageHref('/test', input.value, 'preview').length > MAX_URL_LEN)
+const labShareUsesLocalStorage = ref(false)
+const previewShareUsesLocalStorage = ref(false)
+let shareModeHintRequestId = 0
 const previewShareButtonLabel = computed(() => {
   if (isSharePreviewMode.value)
     return '复制当前分享链接'
@@ -578,8 +579,34 @@ function focusEditorSoon() {
   })
 }
 
-function generateShareLink(viewMode: TestPageViewMode = 'lab', options: { silent?: boolean } = {}) {
-  const full = buildTestPageHref(basePageUrl(), input.value, viewMode)
+async function resolveShareUsesLocalStorage(markdown: string, viewMode: TestPageViewMode) {
+  if (buildTestPageHref('/test', markdown, viewMode).length <= MAX_URL_LEN)
+    return false
+
+  return (await buildTestPageHrefAsync('/test', markdown, viewMode)).length > MAX_URL_LEN
+}
+
+async function refreshShareModeHints() {
+  const requestId = ++shareModeHintRequestId
+  const markdown = input.value
+  const [labUsesStorage, previewUsesStorage] = await Promise.all([
+    resolveShareUsesLocalStorage(markdown, 'lab'),
+    resolveShareUsesLocalStorage(markdown, 'preview'),
+  ])
+
+  if (requestId !== shareModeHintRequestId || markdown !== input.value)
+    return
+
+  labShareUsesLocalStorage.value = labUsesStorage
+  previewShareUsesLocalStorage.value = previewUsesStorage
+}
+
+const refreshShareModeHintsDebounced = useDebounceFn(() => {
+  void refreshShareModeHints()
+}, 240)
+
+async function generateShareLink(viewMode: TestPageViewMode = 'lab', options: { silent?: boolean } = {}) {
+  const full = await buildTestPageHrefAsync(basePageUrl(), input.value, viewMode)
   issueUrl.value = buildIssueUrl(input.value)
   if (full.length > MAX_URL_LEN) {
     const localHref = buildLocalShareHref(
@@ -587,12 +614,20 @@ function generateShareLink(viewMode: TestPageViewMode = 'lab', options: { silent
       viewMode,
     )
     shareUrl.value = localHref
+    if (viewMode === 'lab')
+      labShareUsesLocalStorage.value = true
+    else
+      previewShareUsesLocalStorage.value = true
     if (!options.silent)
       showToast('当前内容太长，已切换为本地分享链接；只能在你当前浏览器打开，分享给别人不会生效。', 'info', 4200)
     return localHref
   }
 
   shareUrl.value = full
+  if (viewMode === 'lab')
+    labShareUsesLocalStorage.value = false
+  else
+    previewShareUsesLocalStorage.value = false
   return full
 }
 
@@ -617,7 +652,7 @@ function showToast(message: string, type: 'success' | 'error' | 'info' = 'succes
 async function generateAndCopy() {
   isWorking.value = true
   copiedShareTarget.value = null
-  const target = generateShareLink('lab')
+  const target = await generateShareLink('lab')
 
   if (!target) {
     isWorking.value = false
@@ -641,7 +676,7 @@ async function generateAndCopy() {
 async function generateAndCopyPreview() {
   isWorking.value = true
   copiedShareTarget.value = null
-  const target = generateShareLink('preview')
+  const target = await generateShareLink('preview')
 
   if (!target) {
     isWorking.value = false
@@ -2302,8 +2337,8 @@ function exportPreviewAsPdf() {
   window.print()
 }
 
-function restoreFromUrl() {
-  const decoded = decodeMarkdownHash(window.location.hash || '')
+async function restoreFromUrl() {
+  const decoded = await decodeMarkdownHashAsync(window.location.hash || '')
   if (!decoded)
     return false
 
@@ -2330,16 +2365,16 @@ function restoreViewModeFromUrl() {
   testPageViewMode.value = resolveTestPageViewMode(window.location.search)
 }
 
-function exitSharedPreview() {
+async function exitSharedPreview() {
   testPageViewMode.value = 'lab'
-  const full = generateShareLink('lab', { silent: true })
+  const full = await generateShareLink('lab', { silent: true })
   shareUrl.value = full
   window.history.replaceState(undefined, '', full)
 }
 
 async function returnToEditableTestPage() {
   if (isSharePreviewMode.value) {
-    exitSharedPreview()
+    await exitSharedPreview()
     focusEditorSoon()
     return
   }
@@ -2415,9 +2450,9 @@ function frameworkHref(id: FrameworkId) {
   )
 }
 
-onMounted(() => {
+async function initializeTestPage() {
   restoreViewModeFromUrl()
-  const restored = restoreFromLocalShare() || restoreFromUrl()
+  const restored = restoreFromLocalShare() || await restoreFromUrl()
   if (!restored) {
     const sample = sampleCards.find(item => item.id === selectedSampleId.value) ?? sampleCards[0]
     input.value = sample.content
@@ -2445,6 +2480,11 @@ onMounted(() => {
   window.addEventListener('pointerup', onAnnotationSelectionPointerUp, { passive: false })
   window.addEventListener('pointercancel', onAnnotationSelectionPointerUp, { passive: false })
   window.addEventListener('keydown', onAnnotationShortcutKeydown)
+  void refreshShareModeHints()
+}
+
+onMounted(() => {
+  void initializeTestPage()
 })
 
 onBeforeUnmount(() => {
@@ -2493,6 +2533,7 @@ watch(input, (value, previousValue) => {
   copiedShareTarget.value = null
   if (!isStreaming.value && typeof window !== 'undefined')
     shareUrl.value = currentBasePageUrl()
+  refreshShareModeHintsDebounced()
   if (sandboxAutoSync.value)
     syncSandboxDebounced()
   persistAnnotationCacheDebounced()
