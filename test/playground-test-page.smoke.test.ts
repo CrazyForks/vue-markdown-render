@@ -153,6 +153,7 @@ describe('playground /test smoke', () => {
     mermaidEnabled = true
     window.localStorage.clear()
     window.history.replaceState({}, '', '/test')
+    document.documentElement.classList.remove('dark')
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: {
@@ -175,6 +176,7 @@ describe('playground /test smoke', () => {
   afterEach(() => {
     vi.useRealTimers()
     window.localStorage.clear()
+    document.documentElement.classList.remove('dark')
 
     if (originalFullscreenElement)
       Object.defineProperty(document, 'fullscreenElement', originalFullscreenElement)
@@ -408,9 +410,12 @@ describe('playground /test smoke', () => {
 
     const wrapper = await mountTestPage()
     previewCardElement = wrapper.get('.workspace-card--preview').element
+    const previewCard = wrapper.get('.workspace-card--preview')
     const button = wrapper.get('[data-testid="preview-fullscreen-button"]')
 
     expect(button.text()).toContain('全屏预览')
+    expect(previewCard.attributes('data-color-scheme')).toBe('light')
+    expect(previewCard.classes()).not.toContain('workspace-card--preview-dark')
 
     await button.trigger('click')
     await nextTick()
@@ -418,6 +423,13 @@ describe('playground /test smoke', () => {
     expect(requestFullscreen).toHaveBeenCalledTimes(1)
     expect(button.text()).toContain('退出全屏')
     expect(wrapper.get('[data-testid="immersive-preview-back-button"]').text()).toContain('返回编辑')
+
+    await wrapper.get('[data-testid="immersive-preview-theme-button"]').trigger('click')
+    await nextTick()
+
+    expect(previewCard.attributes('data-color-scheme')).toBe('dark')
+    expect(previewCard.classes()).toContain('workspace-card--preview-dark')
+    expect(previewCard.classes()).toContain('dark')
 
     await wrapper.get('[data-testid="immersive-preview-back-button"]').trigger('click')
     await nextTick()
@@ -530,6 +542,35 @@ describe('playground /test smoke', () => {
     await nextTick()
 
     expect(page.classes()).not.toContain('test-lab--dark')
+
+    wrapper.unmount()
+  })
+
+  it('uses the document dark class as the default /test appearance', async () => {
+    document.documentElement.classList.add('dark')
+
+    const wrapper = await mountTestPage()
+    const page = wrapper.get('.test-lab')
+    const previewCard = wrapper.get('.workspace-card--preview')
+
+    expect(page.classes()).toContain('test-lab--dark')
+    expect(previewCard.attributes('data-color-scheme')).toBe('dark')
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('syncs stored light mode back to the document theme class', async () => {
+    window.localStorage.setItem('vmr-test-dark', 'false')
+    document.documentElement.classList.add('dark')
+
+    const wrapper = await mountTestPage()
+    const page = wrapper.get('.test-lab')
+    const previewCard = wrapper.get('.workspace-card--preview')
+
+    expect(page.classes()).not.toContain('test-lab--dark')
+    expect(previewCard.attributes('data-color-scheme')).toBe('light')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
 
     wrapper.unmount()
   })

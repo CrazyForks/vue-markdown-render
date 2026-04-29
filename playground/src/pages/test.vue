@@ -173,6 +173,12 @@ const diffHideUnchangedRegions = {
   revealLineCount: 5,
 } as const
 
+function resolveInitialDarkMode() {
+  return typeof document !== 'undefined'
+    ? document.documentElement.classList.contains('dark')
+    : false
+}
+
 const testPageMonacoOptions = {
   renderSideBySide: false,
   useInlineViewWhenSpaceIsLimited: true,
@@ -194,7 +200,7 @@ const streamBurstiness = useLocalStorage<number>('vmr-test-stream-burstiness', 3
 const streamTransportMode = useLocalStorage<StreamTransportMode>('vmr-test-stream-transport-mode', 'readable-stream')
 const streamSliceMode = useLocalStorage<StreamSliceMode>('vmr-test-stream-slice-mode', 'pure-random')
 const streamDebug = useLocalStorage<boolean>('vmr-test-stream-debug', false)
-const isDark = useLocalStorage<boolean>('vmr-test-dark', false)
+const isDark = useLocalStorage<boolean>('vmr-test-dark', resolveInitialDarkMode())
 
 const renderMode = useLocalStorage<'monaco' | 'pre' | 'markdown'>('vmr-test-render-mode', 'monaco')
 const codeBlockStream = useLocalStorage<boolean>('vmr-test-code-stream', true)
@@ -2567,6 +2573,11 @@ watch(annotationTextItems, () => {
     syncAnnotationSelectionBoxSoon()
 }, { deep: true })
 
+watch(isDark, (value) => {
+  if (typeof document !== 'undefined')
+    document.documentElement.classList.toggle('dark', value)
+}, { immediate: true })
+
 watch(() => renderMode.value, (mode) => {
   if (mode === 'pre')
     setCustomComponents({ code_block: PreCodeNode, think: ThinkingNode, thinking: ThinkingNode })
@@ -2901,7 +2912,8 @@ watch(mermaidEnabled, (enabled) => {
           <article
             ref="previewCardRef"
             class="workspace-card workspace-card--pane workspace-card--preview"
-            :class="{ 'workspace-card--share-preview': isSharePreviewMode }"
+            :class="{ 'workspace-card--share-preview': isSharePreviewMode, 'workspace-card--preview-dark': isDark, 'dark': isDark }"
+            :data-color-scheme="isDark ? 'dark' : 'light'"
             :data-testid="isSharePreviewMode ? 'shared-preview-shell' : undefined"
           >
             <div
@@ -3491,6 +3503,7 @@ watch(mermaidEnabled, (enabled) => {
     radial-gradient(circle at 92% 84%, rgba(245, 158, 11, 0.1), transparent 46%),
     var(--lab-bg);
   color: var(--lab-text);
+  color-scheme: light;
   overflow: hidden;
 }
 
@@ -4430,6 +4443,11 @@ watch(mermaidEnabled, (enabled) => {
   border: 0;
   box-shadow: none;
   overflow: hidden;
+  color-scheme: light;
+}
+
+.workspace-card--share-preview.workspace-card--preview-dark {
+  color-scheme: dark;
 }
 
 /* ─── Immersive Preview Shell ─── */
@@ -4979,7 +4997,8 @@ watch(mermaidEnabled, (enabled) => {
 }
 
 .test-lab--dark .editor-shell__toolbar,
-.test-lab--dark .preview-stage-frame {
+.test-lab--dark .preview-stage-frame,
+.workspace-card--preview-dark .preview-stage-frame {
   background: rgba(15, 23, 42, 0.72);
   border-color: rgba(148, 163, 184, 0.1);
 }
@@ -4990,7 +5009,8 @@ watch(mermaidEnabled, (enabled) => {
   color: #cbd5e1;
 }
 
-.test-lab--dark .preview-surface__grid {
+.test-lab--dark .preview-surface__grid,
+.workspace-card--preview-dark .preview-surface__grid {
   background-image: linear-gradient(rgba(148, 163, 184, 0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.055) 1px, transparent 1px);
 }
 
@@ -5059,7 +5079,8 @@ watch(mermaidEnabled, (enabled) => {
   color: #e2e8f0;
 }
 
-.test-lab--dark .preview-surface {
+.test-lab--dark .preview-surface,
+.workspace-card--preview-dark .preview-surface {
   background: rgba(2, 6, 23, 0.8);
 }
 
@@ -5096,6 +5117,8 @@ watch(mermaidEnabled, (enabled) => {
   box-shadow: none;
   overflow: hidden;
   background: #fff;
+  color: #10203a;
+  color-scheme: light;
 }
 
 .workspace-card--preview:fullscreen::backdrop {
@@ -5119,11 +5142,15 @@ watch(mermaidEnabled, (enabled) => {
   background: #fff;
 }
 
-.test-lab--dark .workspace-card--preview:fullscreen {
+.test-lab--dark .workspace-card--preview:fullscreen,
+.workspace-card--preview.workspace-card--preview-dark:fullscreen {
   background: #020617;
+  color: #e2e8f0;
+  color-scheme: dark;
 }
 
-.test-lab--dark .workspace-card--preview:fullscreen .preview-surface {
+.test-lab--dark .workspace-card--preview:fullscreen .preview-surface,
+.workspace-card--preview.workspace-card--preview-dark:fullscreen .preview-surface {
   background: #020617;
 }
 
