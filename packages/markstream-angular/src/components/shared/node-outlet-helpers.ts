@@ -63,3 +63,39 @@ export function resolveNodeOutletCustomInputs(
     return context?.infographicProps ?? null
   return context?.codeBlockProps ?? null
 }
+
+export function resolveNodeOutletCustomComponent(
+  node: AngularRenderableNode,
+  context?: AngularRenderContext,
+  customComponents?: Record<string, any> | null,
+) {
+  const mapping = customComponents ?? context?.customComponents ?? null
+  const resolvedType = String((node as any)?.type || '')
+
+  if (resolvedType === 'code_block') {
+    const language = resolveCodeBlockLanguage(node)
+    const customForLanguage = language ? mapping?.[language] : null
+    if (customForLanguage)
+      return customForLanguage
+
+    const codeMode = resolveNodeOutletCodeMode(node, context)
+    if (codeMode === 'mermaid' && mapping?.mermaid)
+      return mapping.mermaid
+    if (codeMode === 'd2' && mapping?.d2)
+      return mapping.d2
+    if (codeMode === 'infographic' && mapping?.infographic)
+      return mapping.infographic
+    if (mapping?.code_block)
+      return mapping.code_block
+  }
+
+  const direct = mapping?.[resolvedType]
+  if (direct)
+    return direct
+
+  const tag = resolveHtmlTag(node)
+  if (tag && mapping?.[tag])
+    return mapping[tag]
+
+  return null
+}

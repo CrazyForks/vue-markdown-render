@@ -45,15 +45,44 @@ import { resolveCustomHtmlTag } from '../utils/customHtmlTag'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { renderNodeChildren } from './renderChildren'
 
+function getRawCodeBlockLanguage(node: any) {
+  const trimmed = String(node?.language || '').trim()
+  if (!trimmed)
+    return ''
+  const [firstToken] = trimmed.split(/\s+/)
+  const [base] = firstToken.split(':')
+  return base.toLowerCase()
+}
+
+function renderCustomCodeBlockComponent(
+  component: any,
+  node: any,
+  key: React.Key,
+  ctx: RenderContext,
+) {
+  return React.createElement(component, {
+    key,
+    node,
+    customId: ctx.customId,
+    isDark: ctx.isDark,
+    ctx,
+    renderNode,
+    indexKey: key,
+    typewriter: ctx.typewriter,
+  })
+}
+
 function renderCodeBlock(
   node: any,
   key: React.Key,
   ctx: RenderContext,
   customComponents: Record<string, any>,
 ) {
-  const language = normalizeLanguageIdentifier(String(node.language || ''))
+  const rawLanguage = getRawCodeBlockLanguage(node)
+  const language = normalizeLanguageIdentifier(rawLanguage)
+  const customForLanguage = rawLanguage ? customComponents[rawLanguage] : null
   if (language === 'mermaid') {
-    const customMermaid = customComponents.mermaid
+    const customMermaid = customForLanguage || customComponents.mermaid
     if (customMermaid)
       return React.createElement(customMermaid as any, { key, node, isDark: ctx.isDark, ...(ctx.mermaidProps || {}) })
     if (!ctx.renderCodeBlocksAsPre) {
@@ -70,7 +99,7 @@ function renderCodeBlock(
   }
 
   if (language === 'infographic') {
-    const customInfographic = customComponents.infographic
+    const customInfographic = customForLanguage || customComponents.infographic
     if (customInfographic)
       return React.createElement(customInfographic as any, { key, node, isDark: ctx.isDark, ...(ctx.infographicProps || {}) })
 
@@ -86,7 +115,7 @@ function renderCodeBlock(
   }
 
   if (language === 'd2' || language === 'd2lang') {
-    const customD2 = customComponents.d2
+    const customD2 = customForLanguage || customComponents.d2
     if (customD2)
       return React.createElement(customD2 as any, { key, node, isDark: ctx.isDark, ...(ctx.d2Props || {}) })
 
@@ -100,6 +129,13 @@ function renderCodeBlock(
       />
     )
   }
+
+  if (customForLanguage)
+    return renderCustomCodeBlockComponent(customForLanguage, node, key, ctx)
+
+  const customCodeBlock = customComponents.code_block
+  if (customCodeBlock)
+    return renderCustomCodeBlockComponent(customCodeBlock, node, key, ctx)
 
   if (ctx.renderCodeBlocksAsPre || language === 'mermaid') {
     return <PreCodeNode key={key} node={node} />
@@ -124,7 +160,9 @@ function renderCodeBlock(
 
 export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext) {
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
-  const custom = (customComponents as Record<string, any>)[node.type]
+  const custom = node.type === 'code_block'
+    ? null
+    : (customComponents as Record<string, any>)[node.type]
   if (custom) {
     return React.createElement(custom, {
       key,
