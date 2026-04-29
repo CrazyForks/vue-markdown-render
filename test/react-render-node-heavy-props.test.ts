@@ -16,6 +16,26 @@ const packageRequire = createRequire(new URL('../packages/markstream-react/packa
 const React = packageRequire('react') as typeof import('react')
 const { renderToStaticMarkup } = packageRequire('react-dom/server') as typeof import('react-dom/server')
 
+function ExactLanguageProbe() {
+  return null
+}
+
+function GenericCodeBlockProbe() {
+  return null
+}
+
+function CustomMermaidProbe() {
+  return null
+}
+
+function CustomD2Probe() {
+  return null
+}
+
+function CustomD2LangProbe() {
+  return null
+}
+
 describe('markstream-react heavy-node prop forwarding', () => {
   const baseCtx: RenderContext = {
     customId: 'react-heavy-props-test',
@@ -52,6 +72,170 @@ describe('markstream-react heavy-node prop forwarding', () => {
 
     expect(element?.props?.showHeader).toBe(false)
     expect(element?.props?.renderDebounceMs).toBe(180)
+  })
+
+  it('prefers exact language overrides over code_block fallback on the client renderer', () => {
+    const ctx: RenderContext = {
+      ...baseCtx,
+      codeBlockProps: {
+        showHeader: false,
+      },
+      customComponents: {
+        echarts: ExactLanguageProbe,
+        code_block: GenericCodeBlockProbe,
+      },
+    }
+
+    const exactElement = clientRenderNode({
+      type: 'code_block',
+      language: 'echarts',
+      code: 'option = {}',
+      raw: '```echarts\noption = {}\n```',
+    } as any, 'echarts-client', ctx) as any
+
+    const genericElement = clientRenderNode({
+      type: 'code_block',
+      language: 'ts',
+      code: 'export const value = 1',
+      raw: '```ts\nexport const value = 1\n```',
+    } as any, 'ts-client', ctx) as any
+
+    expect(exactElement?.type).toBe(ExactLanguageProbe)
+    expect(exactElement?.props?.node?.language).toBe('echarts')
+    expect(exactElement?.props?.ctx?.codeBlockProps).toEqual({ showHeader: false })
+    expect(genericElement?.type).toBe(GenericCodeBlockProbe)
+    expect(genericElement?.props?.node?.language).toBe('ts')
+    expect(genericElement?.props?.ctx?.codeBlockProps).toEqual({ showHeader: false })
+  })
+
+  it('keeps specialized mermaid routing ahead of code_block fallback on the client renderer', () => {
+    const ctx: RenderContext = {
+      ...baseCtx,
+      mermaidProps: {
+        showHeader: false,
+        renderDebounceMs: 180,
+      },
+      customComponents: {
+        mermaid: CustomMermaidProbe,
+        code_block: GenericCodeBlockProbe,
+      },
+    }
+
+    const element = clientRenderNode({
+      type: 'code_block',
+      language: 'mermaid',
+      code: 'graph LR\nA-->B\n',
+      raw: '```mermaid\ngraph LR\nA-->B\n```',
+    } as any, 'mermaid-client-priority', ctx) as any
+
+    expect(element?.type).toBe(CustomMermaidProbe)
+    expect(element?.props?.showHeader).toBe(false)
+    expect(element?.props?.renderDebounceMs).toBe(180)
+  })
+
+  it('lets d2lang exact overrides beat d2 fallback on the client renderer', () => {
+    const ctx: RenderContext = {
+      ...baseCtx,
+      d2Props: {
+        themeId: 7,
+      },
+      customComponents: {
+        d2: CustomD2Probe,
+        d2lang: CustomD2LangProbe,
+      },
+    }
+
+    const element = clientRenderNode({
+      type: 'code_block',
+      language: 'd2lang',
+      code: 'a -> b',
+      raw: '```d2lang\na -> b\n```',
+    } as any, 'd2lang-client', ctx) as any
+
+    expect(element?.type).toBe(CustomD2LangProbe)
+    expect(element?.props?.themeId).toBe(7)
+  })
+
+  it('prefers exact language overrides over code_block fallback on the server renderer', () => {
+    const ctx: RenderContext = {
+      ...baseCtx,
+      codeBlockProps: {
+        showHeader: false,
+      },
+      customComponents: {
+        echarts: ExactLanguageProbe,
+        code_block: GenericCodeBlockProbe,
+      },
+    }
+
+    const exactElement = serverRenderNode({
+      type: 'code_block',
+      language: 'echarts',
+      code: 'option = {}',
+      raw: '```echarts\noption = {}\n```',
+    } as any, 'echarts-server', ctx) as any
+
+    const genericElement = serverRenderNode({
+      type: 'code_block',
+      language: 'ts',
+      code: 'export const value = 1',
+      raw: '```ts\nexport const value = 1\n```',
+    } as any, 'ts-server', ctx) as any
+
+    expect(exactElement?.type).toBe(ExactLanguageProbe)
+    expect(exactElement?.props?.node?.language).toBe('echarts')
+    expect(exactElement?.props?.ctx?.codeBlockProps).toEqual({ showHeader: false })
+    expect(genericElement?.type).toBe(GenericCodeBlockProbe)
+    expect(genericElement?.props?.node?.language).toBe('ts')
+    expect(genericElement?.props?.ctx?.codeBlockProps).toEqual({ showHeader: false })
+  })
+
+  it('keeps specialized mermaid routing ahead of code_block fallback on the server renderer', () => {
+    const ctx: RenderContext = {
+      ...baseCtx,
+      mermaidProps: {
+        showHeader: false,
+        renderDebounceMs: 180,
+      },
+      customComponents: {
+        mermaid: CustomMermaidProbe,
+        code_block: GenericCodeBlockProbe,
+      },
+    }
+
+    const element = serverRenderNode({
+      type: 'code_block',
+      language: 'mermaid',
+      code: 'graph LR\nA-->B\n',
+      raw: '```mermaid\ngraph LR\nA-->B\n```',
+    } as any, 'mermaid-server-priority', ctx) as any
+
+    expect(element?.type).toBe(CustomMermaidProbe)
+    expect(element?.props?.showHeader).toBe(false)
+    expect(element?.props?.renderDebounceMs).toBe(180)
+  })
+
+  it('lets d2lang exact overrides beat d2 fallback on the server renderer', () => {
+    const ctx: RenderContext = {
+      ...baseCtx,
+      d2Props: {
+        themeId: 7,
+      },
+      customComponents: {
+        d2: CustomD2Probe,
+        d2lang: CustomD2LangProbe,
+      },
+    }
+
+    const element = serverRenderNode({
+      type: 'code_block',
+      language: 'd2lang',
+      code: 'a -> b',
+      raw: '```d2lang\na -> b\n```',
+    } as any, 'd2lang-server', ctx) as any
+
+    expect(element?.type).toBe(CustomD2LangProbe)
+    expect(element?.props?.themeId).toBe(7)
   })
 
   it('sanitizes dangerous attrs on the client structured html wrapper path', () => {

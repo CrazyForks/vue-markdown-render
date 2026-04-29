@@ -4,8 +4,15 @@ import {
   coerceBuiltinHtmlNode,
   coerceCustomHtmlNode,
   resolveNodeOutletCodeMode,
+  resolveNodeOutletCustomComponent,
   resolveNodeOutletCustomInputs,
 } from '../packages/markstream-angular/src/components/shared/node-outlet-helpers'
+
+class ExactLanguageComponent {}
+class GenericCodeBlockComponent {}
+class MermaidComponent {}
+class D2Component {}
+class D2LangComponent {}
 
 describe('markstream-angular NodeOutlet', () => {
   it('coerces custom html tags into tag-typed nodes for custom components', () => {
@@ -79,5 +86,70 @@ describe('markstream-angular NodeOutlet', () => {
     } as any
     expect(resolveNodeOutletCodeMode(node, context as any)).toBe('code')
     expect(resolveNodeOutletCustomInputs(node, context as any)).toEqual({ showHeader: false })
+  })
+
+  it('prefers exact language custom components over code_block fallback', () => {
+    const context = {
+      customComponents: {
+        echarts: ExactLanguageComponent as any,
+        code_block: GenericCodeBlockComponent as any,
+      },
+      codeBlockProps: { showHeader: false },
+      events: {},
+    } as any
+
+    let node = {
+      type: 'code_block',
+      language: 'echarts',
+      code: 'option = {}',
+    } as any
+    expect(resolveNodeOutletCustomComponent(node, context)).toBe(ExactLanguageComponent)
+    expect(resolveNodeOutletCustomInputs(node, context)).toEqual({ showHeader: false })
+
+    node = {
+      type: 'code_block',
+      language: 'ts',
+      code: 'const value = 1',
+    } as any
+    expect(resolveNodeOutletCustomComponent(node, context)).toBe(GenericCodeBlockComponent)
+    expect(resolveNodeOutletCustomInputs(node, context)).toEqual({ showHeader: false })
+  })
+
+  it('keeps specialized mermaid routing ahead of code_block fallback', () => {
+    const context = {
+      customComponents: {
+        mermaid: MermaidComponent as any,
+        code_block: GenericCodeBlockComponent as any,
+      },
+      mermaidProps: { renderDebounceMs: 180 },
+      events: {},
+    } as any
+    const node = {
+      type: 'code_block',
+      language: 'mermaid',
+      code: 'graph TD\nA-->B\n',
+    } as any
+
+    expect(resolveNodeOutletCustomComponent(node, context)).toBe(MermaidComponent)
+    expect(resolveNodeOutletCustomInputs(node, context)).toEqual({ renderDebounceMs: 180 })
+  })
+
+  it('lets d2lang exact overrides beat d2 fallback while keeping d2 inputs', () => {
+    const context = {
+      customComponents: {
+        d2: D2Component as any,
+        d2lang: D2LangComponent as any,
+      },
+      d2Props: { themeId: 7 },
+      events: {},
+    } as any
+    const node = {
+      type: 'code_block',
+      language: 'd2lang',
+      code: 'a -> b',
+    } as any
+
+    expect(resolveNodeOutletCustomComponent(node, context)).toBe(D2LangComponent)
+    expect(resolveNodeOutletCustomInputs(node, context)).toEqual({ themeId: 7 })
   })
 })

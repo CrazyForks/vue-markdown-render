@@ -145,9 +145,14 @@ function renderCodeBlock(
   ctx: RenderContext,
   customComponents: Record<string, any>,
 ) {
-  const language = normalizeLanguageIdentifier(String(node.language || ''))
+  const trimmedLanguage = String(node?.language || '').trim()
+  const rawLanguage = trimmedLanguage
+    ? String(trimmedLanguage.split(/\s+/)[0] ?? '').split(':')[0].toLowerCase()
+    : ''
+  const language = normalizeLanguageIdentifier(rawLanguage)
+  const customForLanguage = rawLanguage ? customComponents[rawLanguage] : null
   if (language === 'mermaid') {
-    const customMermaid = customComponents.mermaid
+    const customMermaid = customForLanguage || customComponents.mermaid
     if (customMermaid) {
       return React.createElement(customMermaid as any, {
         key,
@@ -168,7 +173,7 @@ function renderCodeBlock(
   }
 
   if (language === 'infographic') {
-    const customInfographic = customComponents.infographic
+    const customInfographic = customForLanguage || customComponents.infographic
     if (customInfographic) {
       return React.createElement(customInfographic as any, {
         key,
@@ -189,7 +194,7 @@ function renderCodeBlock(
   }
 
   if (language === 'd2' || language === 'd2lang') {
-    const customD2 = customComponents.d2
+    const customD2 = customForLanguage || customComponents.d2
     if (customD2) {
       return React.createElement(customD2 as any, {
         key,
@@ -207,6 +212,33 @@ function renderCodeBlock(
         {...(ctx.d2Props || {})}
       />
     )
+  }
+
+  if (customForLanguage) {
+    return React.createElement(customForLanguage as any, {
+      key,
+      node,
+      customId: ctx.customId,
+      isDark: ctx.isDark,
+      ctx,
+      renderNode,
+      indexKey: key,
+      typewriter: ctx.typewriter,
+    })
+  }
+
+  const customCodeBlock = customComponents.code_block
+  if (customCodeBlock) {
+    return React.createElement(customCodeBlock as any, {
+      key,
+      node,
+      customId: ctx.customId,
+      isDark: ctx.isDark,
+      ctx,
+      renderNode,
+      indexKey: key,
+      typewriter: ctx.typewriter,
+    })
   }
 
   if (ctx.renderCodeBlocksAsPre)
@@ -960,7 +992,9 @@ export function FallbackComponent(props: NodeComponentProps<{ type: string }>) {
 
 export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext) {
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
-  const custom = (customComponents as Record<string, any>)[node.type]
+  const custom = node.type === 'code_block'
+    ? null
+    : (customComponents as Record<string, any>)[node.type]
   if (custom) {
     return React.createElement(custom, {
       key,
