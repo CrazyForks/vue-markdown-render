@@ -100,7 +100,7 @@ function hasDomainAuthorityPrefix(text: string) {
 }
 
 function isUppercaseFilenameSegment(segment: string) {
-  const lettersOnly = segment.replace(/[^A-Za-z]/g, '')
+  const lettersOnly = segment.replace(/[^a-z]/gi, '')
   return lettersOnly.length >= 2 && lettersOnly === lettersOnly.toUpperCase()
 }
 
