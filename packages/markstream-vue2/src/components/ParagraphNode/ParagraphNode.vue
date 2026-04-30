@@ -160,16 +160,17 @@ function processChild(child: NodeChild): { child: NodeChild, component: any } {
 
 <template>
   <p dir="auto" class="paragraph-node">
-    <template
-      v-for="(child, index) in renderedChildren"
-      :key="`${indexKey || 'paragraph'}-${index}`"
-    >
-      <template v-if="isMediaOnlyParagraph && isWhitespaceText(child)">
+    <template v-for="(child, index) in renderedChildren">
+      <span
+        v-if="isMediaOnlyParagraph && isWhitespaceText(child)"
+        :key="`${indexKey || 'paragraph'}-${index}`"
+      >
         {{ getTextContent(child) }}
-      </template>
+      </span>
       <component
         :is="processChild(child).component"
         v-else
+        :key="`${indexKey || 'paragraph'}-${index}`"
         v-bind="getChildProps(processChild(child).child, index)"
       />
     </template>
