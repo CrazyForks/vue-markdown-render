@@ -887,7 +887,19 @@ function estimateDiffEditorContentHeight(): number | null {
 }
 
 function getColorLuminance(color: string) {
-  const channels = String(color ?? '').match(/\d+(?:\.\d+)?/g)
+  const normalized = String(color ?? '').trim()
+  const hex = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)?.[1]
+  if (hex) {
+    const full = hex.length === 3
+      ? hex.split('').map(char => `${char}${char}`).join('')
+      : hex
+    const r = Number.parseInt(full.slice(0, 2), 16)
+    const g = Number.parseInt(full.slice(2, 4), 16)
+    const b = Number.parseInt(full.slice(4, 6), 16)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+
+  const channels = normalized.match(/\d+(?:\.\d+)?/g)
   if (!channels || channels.length < 3)
     return null
   const [r, g, b] = channels.slice(0, 3).map(Number)
@@ -921,12 +933,6 @@ function syncEditorCssVars() {
   // Target: write --vscode-* vars to the editor container (Monaco zone),
   // NOT to rootEl (Shell zone). Shell no longer reads these variables.
   const targetEl = editorEl
-  if (isDiff.value) {
-    targetEl.style.removeProperty('--vscode-editor-foreground')
-    targetEl.style.removeProperty('--vscode-editor-background')
-    targetEl.style.removeProperty('--vscode-editor-selectionBackground')
-    return
-  }
   // Monaco usually applies theme variables on an element with class
   // 'monaco-editor' or on the editor root; try to read from either.
   const editorRoot = (editorEl.querySelector('.monaco-editor') || editorEl) as HTMLElement
@@ -958,6 +964,52 @@ function syncEditorCssVars() {
 
   const fg = fgVar || String(fgStyles?.color ?? rootStyles?.color ?? '').trim()
   const bg = bgVar || String(bgStyles?.backgroundColor ?? rootStyles?.backgroundColor ?? '').trim()
+
+  if (isDiff.value) {
+    if (fg) {
+      rootEl.style.setProperty('--markstream-diff-editor-fg', fg)
+      targetEl.style.setProperty('--vscode-editor-foreground', fg)
+      targetEl.style.setProperty('--stream-monaco-editor-fg', fg)
+    }
+    else {
+      rootEl.style.removeProperty('--markstream-diff-editor-fg')
+      targetEl.style.removeProperty('--vscode-editor-foreground')
+      targetEl.style.removeProperty('--stream-monaco-editor-fg')
+    }
+
+    if (bg) {
+      rootEl.style.setProperty('--markstream-diff-editor-bg', bg)
+      rootEl.style.setProperty('--markstream-diff-panel-bg', bg)
+      rootEl.style.setProperty('--markstream-diff-panel-bg-soft', bg)
+      rootEl.style.setProperty('--markstream-diff-panel-bg-strong', bg)
+      targetEl.style.setProperty('--vscode-editor-background', bg)
+      targetEl.style.setProperty('--stream-monaco-editor-bg', bg)
+      targetEl.style.setProperty('--stream-monaco-fixed-editor-bg', bg)
+      targetEl.style.setProperty('--stream-monaco-panel-bg', bg)
+      targetEl.style.setProperty('--stream-monaco-panel-bg-soft', bg)
+      targetEl.style.setProperty('--stream-monaco-panel-bg-strong', bg)
+      targetEl.style.backgroundColor = bg
+    }
+    else {
+      rootEl.style.removeProperty('--markstream-diff-editor-bg')
+      rootEl.style.removeProperty('--markstream-diff-panel-bg')
+      rootEl.style.removeProperty('--markstream-diff-panel-bg-soft')
+      rootEl.style.removeProperty('--markstream-diff-panel-bg-strong')
+      targetEl.style.removeProperty('--vscode-editor-background')
+      targetEl.style.removeProperty('--stream-monaco-editor-bg')
+      targetEl.style.removeProperty('--stream-monaco-fixed-editor-bg')
+      targetEl.style.removeProperty('--stream-monaco-panel-bg')
+      targetEl.style.removeProperty('--stream-monaco-panel-bg-soft')
+      targetEl.style.removeProperty('--stream-monaco-panel-bg-strong')
+      targetEl.style.backgroundColor = ''
+    }
+
+    if (selVar)
+      targetEl.style.setProperty('--vscode-editor-selectionBackground', selVar)
+    else
+      targetEl.style.removeProperty('--vscode-editor-selectionBackground')
+    return
+  }
 
   if (shouldPreferPlainTextFallbackSurface(bg, fg, rootEl.classList.contains('is-dark'))) {
     targetEl.style.removeProperty('--vscode-editor-foreground')
@@ -1272,7 +1324,14 @@ function updateCollapsedHeight() {
         return
       }
     }
-    const h0 = isDiff.value ? measureRenderedDiffHeight(container) : computeContentHeight()
+    const measuredDiffHeight = isDiff.value ? measureRenderedDiffHeight(container) : null
+    const h0 = isDiff.value
+      ? (
+          hasVisibleCollapsedDiffSummary
+            ? measuredDiffHeight
+            : Math.max(measuredDiffHeight ?? 0, estimatedDiffHeight ?? 0) || null
+        )
+      : computeContentHeight()
     // 1) 有实时内容高度 -> 采用并记忆原始内容高度（未裁剪前），用于下一次恢复
     if (h0 != null && h0 > 0) {
       const shouldKeepLastStableCollapsedDiffHeight = lastStableCollapsedDiffHeight.value != null
@@ -1421,15 +1480,23 @@ watch(
       String(originalCode ?? ''),
       String(updatedCode ?? ''),
     )
-    if (props.loading === false) {
+    const shouldRefreshSettledDiff = props.loading === false
+    if (shouldRefreshSettledDiff)
       syncRuntimeMonacoOptions()
-      refreshDiffPresentation()
-    }
-    updateDiffCode(
+
+    await updateDiffCode(
       pair.original,
       pair.updated,
       monacoLanguage.value,
     )
+    if (shouldRefreshSettledDiff) {
+      if (isUnmounted || !isDiff.value)
+        return
+      refreshDiffPresentation()
+      syncInlineFoldProxies()
+      refreshDiffStats()
+      scheduleEditorHeightSync()
+    }
 
     if (isExpanded.value) {
       safeRaf(() => updateExpandedHeight())
@@ -1890,16 +1957,26 @@ function getPreferredColorScheme(): CodeBlockMonacoTheme | undefined {
   return props.isDark ? props.darkTheme : props.lightTheme
 }
 
-function isFixedTheme(): boolean {
-  return props.theme !== undefined && !isPairedTheme(props.theme)
-}
-
 function getThemeName(theme: CodeBlockMonacoTheme | null | undefined) {
   if (typeof theme === 'string')
     return theme
   if (theme && typeof theme === 'object' && 'name' in theme)
     return String(theme.name)
   return null
+}
+
+function isSameRequestedTheme(a: CodeBlockMonacoTheme | null | undefined, b: CodeBlockMonacoTheme | null | undefined) {
+  if (a === b)
+    return true
+  const aName = getThemeName(a)
+  const bName = getThemeName(b)
+  return !!aName && aName === bName
+}
+
+function isFixedTheme(): boolean {
+  if (props.theme !== undefined)
+    return !isPairedTheme(props.theme)
+  return isSameRequestedTheme(props.darkTheme, props.lightTheme)
 }
 
 function resolveRequestedTheme() {
@@ -1929,7 +2006,12 @@ function resolveRequestedTheme() {
   return availableThemes[0]
 }
 
-function themeUpdate() {
+function themeUpdate(options: { appearanceOnly?: boolean } = {}) {
+  if (options.appearanceOnly) {
+    // Root/Shell already follow props.isDark; avoid asking stream-monaco to reapply the same theme.
+    return
+  }
+
   syncRuntimeMonacoOptions()
 
   const themeToSet = resolveRequestedTheme()
@@ -2086,10 +2168,11 @@ watch(
 
 watch(
   () => [resolveRequestedTheme(), effectiveDiffAppearance.value, monacoReady.value, editorCreated.value, viewportReady.value] as const,
-  () => {
+  ([theme], previous) => {
     if (!monacoReady.value || !editorCreated.value || !viewportReady.value)
       return
-    themeUpdate()
+    const sameRequestedTheme = previous != null && isSameRequestedTheme(theme, previous[0])
+    themeUpdate({ appearanceOnly: sameRequestedTheme })
   },
   { flush: 'post' },
 )
@@ -2162,6 +2245,17 @@ watch(
                 catch {}
               }
               syncRuntimeMonacoOptions()
+              const pair = resolveDiffRenderPair(
+                String(props.node.originalCode ?? ''),
+                String(props.node.updatedCode ?? ''),
+              )
+              await updateDiffCode(
+                pair.original,
+                pair.updated,
+                monacoLanguage.value,
+              )
+              if (isUnmounted || !isDiff.value)
+                return
               refreshDiffPresentation()
               syncInlineFoldProxies()
               refreshDiffStats()

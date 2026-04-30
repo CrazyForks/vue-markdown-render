@@ -783,8 +783,7 @@ onBeforeUnmount(() => {
   font-family: 'Avenir Next', 'SF Pro Display', 'Segoe UI', sans-serif;
   position: relative;
   min-height: 100vh;
-  height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 8% 8%, rgba(15, 118, 110, 0.12), transparent 46%),
     radial-gradient(circle at 86% 88%, rgba(14, 165, 233, 0.14), transparent 48%),
@@ -1088,7 +1087,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  min-height: 100vh;
   padding: 20px;
   transition: padding-right 0.3s ease;
 }
@@ -1101,7 +1100,7 @@ onBeforeUnmount(() => {
 .chat-container {
   width: 100%;
   max-width: 960px;
-  height: calc(100vh - 40px);
+  min-height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1332,9 +1331,9 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   flex-direction: column-reverse;
-  overflow-y: auto;
+  overflow-y: visible;
   scroll-behavior: smooth;
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
 }
 
 .chat-messages > .markdown-renderer {
@@ -1374,7 +1373,7 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
   .chat-wrapper { padding: 10px; }
   .chat-wrapper--with-sidebar { padding-right: 10px; }
-  .chat-container { border-radius: 18px; height: calc(100vh - 20px); }
+  .chat-container { border-radius: 18px; min-height: calc(100vh - 20px); }
   .chat-header__nav { gap: 4px; }
   .chat-overview { grid-template-columns: 1fr; padding: 14px 16px; }
   .chat-overview__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
