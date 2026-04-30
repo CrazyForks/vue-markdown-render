@@ -1,5 +1,6 @@
 import type { MarkdownIt } from 'markdown-it-ts'
 import type { MarkdownToken, ParsedNode, ParseOptions, TextNode } from '../../types'
+import { shouldDemoteFilenameLikeLinkify } from '../linkifyHeuristics'
 import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
@@ -259,6 +260,12 @@ function isWordOnly(text: string) {
   if (!text)
     return false
   return WORD_ONLY_RE.test(text)
+}
+
+function getTrailingTextChar(token: MarkdownToken | undefined) {
+  if (token?.type !== 'text' || typeof token.content !== 'string' || !token.content)
+    return ''
+  return token.content[token.content.length - 1] ?? ''
 }
 
 function getAsteriskRunInfo(content: string, start: number) {
@@ -1305,10 +1312,19 @@ export function parseInlineTokens(
 
     // mirror logic previously in the switch-case for 'link_open'
     resetCurrentTextNode()
+    const previousVisibleChar = getTrailingTextChar(tokens[i - 1])
 
     // 直接使用 parseLinkToken 来解析链接及其子节点，这能正确处理包含 code_inline 等复杂内容的链接
     const { node, nextIndex } = parseLinkToken(tokens, i, options as any)
     i = nextIndex
+
+    if (
+      token.markup === 'linkify'
+      && shouldDemoteFilenameLikeLinkify(node.text || node.href || '', previousVisibleChar)
+    ) {
+      pushText(node.text || node.href || '', node.text || node.href || '')
+      return
+    }
 
     const hasSingleTextChild = node.children.length === 1 && node.children[0]?.type === 'text'
     if (node.loading && raw && node.text === node.href && hasSingleTextChild) {
