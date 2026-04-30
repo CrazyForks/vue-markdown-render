@@ -34,12 +34,13 @@ describe('issue #402 filename-like linkify regression', () => {
   })
 
   it('preserves bare domains whose TLDs overlap with file extensions', () => {
-    const nodes = parseMarkdownToStructure('访问 example.ai 和 OpenAI.ai 获取更多信息。', md, { final: true })
+    const nodes = parseMarkdownToStructure('访问 example.ai、example.md 和 OpenAI.ai 获取更多信息。', md, { final: true })
     const linkNodes = links(nodes)
 
-    expect(linkNodes).toHaveLength(2)
+    expect(linkNodes).toHaveLength(3)
     expect(linkNodes.map(link => link.href)).toEqual([
       'http://example.ai',
+      'http://example.md',
       'http://OpenAI.ai',
     ])
   })
@@ -51,6 +52,15 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(linkNodes).toHaveLength(1)
     expect(linkNodes[0].href).toBe('http://example.ai')
     expect(textIncludes(linkNodes[0], 'example.ai')).toBe(true)
+  })
+
+  it('preserves punycoded bare domains whose tlds overlap with file extensions', () => {
+    const nodes = parseMarkdownToStructure('也可以访问 xn--fsqu00a.ai 查看说明。', md, { final: true })
+    const linkNodes = links(nodes)
+
+    expect(linkNodes).toHaveLength(1)
+    expect(linkNodes[0].href).toBe('http://xn--fsqu00a.ai')
+    expect(textIncludes(linkNodes[0], 'xn--fsqu00a.ai')).toBe(true)
   })
 
   it('keeps standalone uppercase filenames as text', () => {

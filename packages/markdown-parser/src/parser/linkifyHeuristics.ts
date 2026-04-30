@@ -3,9 +3,17 @@ const FILENAMEISH_SEGMENT_RE = /[_()[\]{}<>]/u
 const URL_PREFIX_HINT_RE = /^(?:https?:\/\/|ftp:\/\/|mailto:|www\.)/i
 const URL_QUERY_OR_AUTH_HINT_RE = /[?#@]/u
 const PATH_SEPARATOR_RE = /[\\/]/u
-const ASCII_DOMAIN_CHARS_RE = /^[A-Za-z0-9./\\-]+$/
+const DOMAINISH_TEXT_RE = /^[\p{L}\p{N}./\\-]+$/u
 const DOMAIN_LABEL_RE = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)$/u
 const PUNYCODE_TLD_RE = /^xn--[a-z0-9-]{2,59}$/i
+const AMBIGUOUS_BARE_DOMAIN_EXTENSIONS = new Set([
+  'ai',
+  'md',
+  'py',
+  'rs',
+  'sh',
+  'zip',
+])
 const FILENAMEISH_LINK_EXTENSIONS = new Set([
   '7z',
   'ai',
@@ -74,14 +82,6 @@ const FILENAMEISH_LINK_EXTENSIONS = new Set([
   'zsh',
 ])
 
-function hasNonAsciiChar(text: string) {
-  for (const char of text) {
-    if ((char.codePointAt(0) ?? 0) > 0x7F)
-      return true
-  }
-  return false
-}
-
 function isPlausibleBareDomain(text: string) {
   const labels = text.split('.')
   if (labels.length < 2)
@@ -105,10 +105,10 @@ function isUppercaseFilenameSegment(segment: string) {
 }
 
 function hasStrongFilenameSignals(linkText: string) {
-  if (hasNonAsciiChar(linkText) || FILENAMEISH_SEGMENT_RE.test(linkText))
+  if (FILENAMEISH_SEGMENT_RE.test(linkText))
     return true
 
-  if (!ASCII_DOMAIN_CHARS_RE.test(linkText))
+  if (!DOMAINISH_TEXT_RE.test(linkText))
     return true
 
   if (PATH_SEPARATOR_RE.test(linkText))
@@ -130,6 +130,13 @@ export function shouldDemoteFilenameLikeLinkify(linkText: string) {
   const extension = String(extensionMatch[1] ?? '').toLowerCase()
   if (!FILENAMEISH_LINK_EXTENSIONS.has(extension))
     return false
+
+  // Extensions like `.ai` and `.md` can be both real bare-domain TLDs and
+  // common filenames. Keep those linkified unless we also see stronger
+  // filename-only signals such as path separators, underscores, brackets, or
+  // all-uppercase filename segments like `README`.
+  if (!AMBIGUOUS_BARE_DOMAIN_EXTENSIONS.has(extension))
+    return true
 
   return hasStrongFilenameSignals(linkText)
 }
