@@ -42,6 +42,8 @@ const props = withDefaults(
     showFontSizeButtons?: boolean
     /** Toggle singleton tooltips for header action buttons */
     showTooltips?: boolean
+    autoScrollOnUpdate?: boolean
+    autoScrollInitial?: boolean
     estimatedHeightPx?: number
     estimatedContentHeightPx?: number
   }>(),
@@ -63,6 +65,8 @@ const props = withDefaults(
     showPreviewButton: true,
     showCollapseButton: true,
     showFontSizeButtons: true,
+    autoScrollOnUpdate: true,
+    autoScrollInitial: true,
   },
 )
 
@@ -105,8 +109,9 @@ if (typeof window !== 'undefined') {
 }
 
 // Auto-scroll state management
-const autoScrollEnabled = ref(true) // Start with auto-scroll enabled
+const autoScrollEnabled = ref(props.autoScrollInitial !== false)
 const lastScrollTop = ref(0) // Track last scroll position to detect scroll direction
+const shouldAutoScrollOnUpdate = computed(() => props.autoScrollOnUpdate !== false)
 
 // Font size control
 const codeFontMin = 10
@@ -399,6 +404,10 @@ watch(tooltipsEnabled, (enabled) => {
     hideTooltip()
 })
 
+watch(() => props.autoScrollInitial, (enabled) => {
+  autoScrollEnabled.value = enabled !== false
+})
+
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   const normalizedLang = normalizeLanguageIdentifier(lang)
   if (normalizedLang !== codeLanguage.value)
@@ -442,7 +451,7 @@ watch(
 
 // Auto-scroll to bottom when content changes (if not expanded and auto-scroll is enabled)
 watch(() => props.node.code, async () => {
-  if (isExpanded.value || !autoScrollEnabled.value)
+  if (isExpanded.value || !shouldAutoScrollOnUpdate.value || !autoScrollEnabled.value)
     return
 
   await nextTick()
@@ -466,7 +475,7 @@ function isAtBottom(element: HTMLElement, threshold = 50): boolean {
 // Handle scroll event to detect user interaction
 function handleScroll() {
   const content = codeBlockContent.value
-  if (!content || isExpanded.value)
+  if (!content || isExpanded.value || !shouldAutoScrollOnUpdate.value)
     return
 
   const currentScrollTop = content.scrollTop
@@ -534,13 +543,14 @@ function toggleExpand(e?: Event) {
   else {
     content.style.maxHeight = ''
     content.style.overflow = 'auto'
-    // When collapsing, re-enable auto-scroll and scroll to bottom
-    autoScrollEnabled.value = true
-    nextTick(() => {
-      if (content.scrollHeight > content.clientHeight) {
-        content.scrollTop = content.scrollHeight
-      }
-    })
+    if (shouldAutoScrollOnUpdate.value) {
+      autoScrollEnabled.value = true
+      nextTick(() => {
+        if (content.scrollHeight > content.clientHeight) {
+          content.scrollTop = content.scrollHeight
+        }
+      })
+    }
   }
 }
 
