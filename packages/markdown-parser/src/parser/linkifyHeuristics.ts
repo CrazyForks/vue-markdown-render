@@ -1,8 +1,11 @@
-const WORD_LIKE_CHAR_RE = /[\p{L}\p{N}]/u
 const FILENAMEISH_EXTENSION_RE = /\.([a-z0-9]{1,10})$/i
-const FILENAMEISH_SIGNAL_RE = /[A-Z_()[\]{}<>]/u
+const FILENAMEISH_SEGMENT_RE = /[_()[\]{}<>]/u
 const URL_PREFIX_HINT_RE = /^(?:https?:\/\/|ftp:\/\/|mailto:|www\.)/i
-const URL_PATH_HINT_RE = /[/?#@]/u
+const URL_QUERY_OR_AUTH_HINT_RE = /[?#@]/u
+const PATH_SEPARATOR_RE = /[\\/]/u
+const ASCII_DOMAIN_CHARS_RE = /^[A-Za-z0-9./\\-]+$/
+const DOMAIN_LABEL_RE = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)$/u
+const PUNYCODE_TLD_RE = /^xn--[a-z0-9-]{2,59}$/i
 const FILENAMEISH_LINK_EXTENSIONS = new Set([
   '7z',
   'ai',
@@ -71,10 +74,6 @@ const FILENAMEISH_LINK_EXTENSIONS = new Set([
   'zsh',
 ])
 
-function isWordLikeChar(ch?: string) {
-  return !!ch && WORD_LIKE_CHAR_RE.test(ch)
-}
-
 function hasNonAsciiChar(text: string) {
   for (const char of text) {
     if ((char.codePointAt(0) ?? 0) > 0x7F)
@@ -83,8 +82,45 @@ function hasNonAsciiChar(text: string) {
   return false
 }
 
-export function shouldDemoteFilenameLikeLinkify(linkText: string, previousVisibleChar = '') {
-  if (!linkText || URL_PREFIX_HINT_RE.test(linkText) || URL_PATH_HINT_RE.test(linkText))
+function isPlausibleBareDomain(text: string) {
+  const labels = text.split('.')
+  if (labels.length < 2)
+    return false
+
+  const tld = labels[labels.length - 1]?.toLowerCase() ?? ''
+  if (!(DOMAIN_LABEL_RE.test(tld) || PUNYCODE_TLD_RE.test(tld)))
+    return false
+
+  return labels.every(label => DOMAIN_LABEL_RE.test(label))
+}
+
+function hasDomainAuthorityPrefix(text: string) {
+  const prefix = text.split(/[\\/]/)[0] ?? ''
+  return isPlausibleBareDomain(prefix)
+}
+
+function isUppercaseFilenameSegment(segment: string) {
+  const lettersOnly = segment.replace(/[^A-Za-z]/g, '')
+  return lettersOnly.length >= 2 && lettersOnly === lettersOnly.toUpperCase()
+}
+
+function hasStrongFilenameSignals(linkText: string) {
+  if (hasNonAsciiChar(linkText) || FILENAMEISH_SEGMENT_RE.test(linkText))
+    return true
+
+  if (!ASCII_DOMAIN_CHARS_RE.test(linkText))
+    return true
+
+  if (PATH_SEPARATOR_RE.test(linkText))
+    return !hasDomainAuthorityPrefix(linkText)
+
+  const extensionless = linkText.replace(FILENAMEISH_EXTENSION_RE, '')
+  const filenameLikeSegments = extensionless.split('.').filter(Boolean)
+  return filenameLikeSegments.some(isUppercaseFilenameSegment)
+}
+
+export function shouldDemoteFilenameLikeLinkify(linkText: string) {
+  if (!linkText || URL_PREFIX_HINT_RE.test(linkText) || URL_QUERY_OR_AUTH_HINT_RE.test(linkText))
     return false
 
   const extensionMatch = linkText.match(FILENAMEISH_EXTENSION_RE)
@@ -95,9 +131,5 @@ export function shouldDemoteFilenameLikeLinkify(linkText: string, previousVisibl
   if (!FILENAMEISH_LINK_EXTENSIONS.has(extension))
     return false
 
-  return (
-    isWordLikeChar(previousVisibleChar)
-    || hasNonAsciiChar(linkText)
-    || FILENAMEISH_SIGNAL_RE.test(linkText)
-  )
+  return hasStrongFilenameSignals(linkText)
 }

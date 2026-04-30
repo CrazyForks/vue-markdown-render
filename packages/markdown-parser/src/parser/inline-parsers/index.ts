@@ -262,12 +262,6 @@ function isWordOnly(text: string) {
   return WORD_ONLY_RE.test(text)
 }
 
-function getTrailingTextChar(token: MarkdownToken | undefined) {
-  if (token?.type !== 'text' || typeof token.content !== 'string' || !token.content)
-    return ''
-  return token.content[token.content.length - 1] ?? ''
-}
-
 function getAsteriskRunInfo(content: string, start: number) {
   let end = start
   while (end < content.length && content[end] === '*')
@@ -1312,15 +1306,13 @@ export function parseInlineTokens(
 
     // mirror logic previously in the switch-case for 'link_open'
     resetCurrentTextNode()
-    const previousVisibleChar = getTrailingTextChar(tokens[i - 1])
-
     // 直接使用 parseLinkToken 来解析链接及其子节点，这能正确处理包含 code_inline 等复杂内容的链接
     const { node, nextIndex } = parseLinkToken(tokens, i, options as any)
     i = nextIndex
 
     if (
       token.markup === 'linkify'
-      && shouldDemoteFilenameLikeLinkify(node.text || node.href || '', previousVisibleChar)
+      && shouldDemoteFilenameLikeLinkify(node.text || node.href || '')
     ) {
       pushText(node.text || node.href || '', node.text || node.href || '')
       return

@@ -33,10 +33,38 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(linkNodes[0], 'example.com')).toBe(true)
   })
 
+  it('preserves bare domains whose TLDs overlap with file extensions', () => {
+    const nodes = parseMarkdownToStructure('访问 example.ai 和 OpenAI.ai 获取更多信息。', md, { final: true })
+    const linkNodes = links(nodes)
+
+    expect(linkNodes).toHaveLength(2)
+    expect(linkNodes.map(link => link.href)).toEqual([
+      'http://example.ai',
+      'http://OpenAI.ai',
+    ])
+  })
+
+  it('preserves adjacent cjk bare domains when they are intended as links', () => {
+    const nodes = parseMarkdownToStructure('请访问example.ai，获取更多信息。', md, { final: true })
+    const linkNodes = links(nodes)
+
+    expect(linkNodes).toHaveLength(1)
+    expect(linkNodes[0].href).toBe('http://example.ai')
+    expect(textIncludes(linkNodes[0], 'example.ai')).toBe(true)
+  })
+
   it('keeps standalone uppercase filenames as text', () => {
     const nodes = parseMarkdownToStructure('README.md', md, { final: true })
 
     expect(links(nodes)).toHaveLength(0)
     expect(textIncludes(nodes, 'README.md')).toBe(true)
+  })
+
+  it('keeps file-like paths as text instead of preserving linkify output', () => {
+    const nodes = parseMarkdownToStructure('请查看 docs/README.md 和 src/index.ts。', md, { final: true })
+
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'docs/README.md')).toBe(true)
+    expect(textIncludes(nodes, 'src/index.ts')).toBe(true)
   })
 })

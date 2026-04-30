@@ -109,12 +109,6 @@ function setHrefOnLinkOpen(token: any, href: string) {
     token.attrs.push(['href', href])
 }
 
-function getTrailingTextChar(token: MarkdownToken | undefined) {
-  if (token?.type !== 'text' || typeof token.content !== 'string' || !token.content)
-    return ''
-  return token.content[token.content.length - 1] ?? ''
-}
-
 function collectLinkifyText(tokens: MarkdownToken[], openIndex: number, closeIndex: number) {
   let text = ''
   for (let index = openIndex + 1; index < closeIndex; index++) {
@@ -184,7 +178,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         if (
           curToken.markup === 'linkify'
           && linkText
-          && shouldDemoteFilenameLikeLinkify(linkText, getTrailingTextChar(tokens[i - 1]))
+          && shouldDemoteFilenameLikeLinkify(linkText)
         ) {
           tokens.splice(i, closeIdx - i + 1, textToken(linkText) as any)
           continue
