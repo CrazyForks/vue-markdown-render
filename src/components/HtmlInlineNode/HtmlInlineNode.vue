@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import type { HtmlPolicy } from 'stream-markdown-parser'
 import { sanitizeHtmlContent } from 'stream-markdown-parser'
-import { computed, defineComponent } from 'vue'
+import { computed, defineComponent, inject } from 'vue'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 
@@ -13,7 +14,11 @@ const props = defineProps<{
     autoClosed?: boolean
   }
   customId?: string
+  htmlPolicy?: HtmlPolicy
 }>()
+
+const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
 
 // Get custom components from global registry
 const customComponents = computed(() => {
@@ -42,6 +47,9 @@ const renderMode = computed(() => {
   if (!content)
     return { mode: 'html', content: '' }
 
+  if (resolvedHtmlPolicy.value === 'escape')
+    return { mode: 'html', content: sanitizeHtmlContent(content, resolvedHtmlPolicy.value) }
+
   if (props.node.loading && !props.node.autoClosed)
     return { mode: 'text', content }
 
@@ -49,19 +57,19 @@ const renderMode = computed(() => {
   // auto-closed it for rendering (`autoClosed: true`), prefer VNode rendering.
   // Using `innerHTML` repeatedly replaces the subtree and can cause flicker.
   if (props.node.loading && props.node.autoClosed) {
-    const nodes = parseHtmlToVNodes(content, customComponents.value)
+    const nodes = parseHtmlToVNodes(content, customComponents.value, resolvedHtmlPolicy.value)
     if (nodes !== null)
       return { mode: 'dynamic', nodes }
   }
 
   // Check if content contains custom components
   if (!hasCustomComponents(content, customComponents.value))
-    return { mode: 'html', content: sanitizeHtmlContent(content) }
+    return { mode: 'html', content: sanitizeHtmlContent(content, resolvedHtmlPolicy.value) }
 
   // Parse and build VNode tree
-  const nodes = parseHtmlToVNodes(content, customComponents.value)
+  const nodes = parseHtmlToVNodes(content, customComponents.value, resolvedHtmlPolicy.value)
   if (nodes === null)
-    return { mode: 'html', content: sanitizeHtmlContent(content) } // Fallback to sanitized DOM rendering if parsing fails
+    return { mode: 'html', content: sanitizeHtmlContent(content, resolvedHtmlPolicy.value) } // Fallback to sanitized DOM rendering if parsing fails
 
   return { mode: 'dynamic', nodes }
 })

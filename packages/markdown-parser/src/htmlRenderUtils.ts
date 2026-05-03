@@ -7,12 +7,40 @@ import {
   VOID_HTML_TAGS,
 } from './htmlTags'
 
+export type HtmlPolicy = 'escape' | 'safe' | 'trusted'
+
 export interface HtmlToken {
   type: 'text' | 'tag_open' | 'tag_close' | 'self_closing'
   tagName?: string
   attrs?: Record<string, string>
   content?: string
 }
+
+const SAFE_BLOCKED_HTML_TAGS = new Set<string>([
+  ...BLOCKED_HTML_TAGS,
+  'base',
+  'button',
+  'datalist',
+  'dialog',
+  'embed',
+  'fieldset',
+  'form',
+  'iframe',
+  'input',
+  'legend',
+  'link',
+  'meta',
+  'object',
+  'optgroup',
+  'option',
+  'output',
+  'param',
+  'select',
+  'style',
+  'template',
+  'textarea',
+  'title',
+])
 
 const CUSTOM_TAG_REGEX = /<([a-z][a-z0-9-]*)\b[^>]*>/gi
 
@@ -47,6 +75,17 @@ function escapeAttr(value: unknown): string {
 
 function normalizeTagName(tagName: string | undefined): string {
   return String(tagName ?? '').trim().toLowerCase()
+}
+
+export function isHtmlTagBlocked(tagName: string | undefined, policy: HtmlPolicy = 'safe') {
+  const normalized = normalizeTagName(tagName)
+  if (!normalized)
+    return false
+  if (policy === 'escape')
+    return true
+  if (policy === 'trusted')
+    return BLOCKED_HTML_TAGS.has(normalized)
+  return SAFE_BLOCKED_HTML_TAGS.has(normalized)
 }
 
 function serializeAttrs(attrs: Record<string, string>): string {
@@ -90,12 +129,15 @@ export function isCustomHtmlComponentTag(
 export function sanitizeHtmlAttrs(attrs: Record<string, string>) {
   const clean: Record<string, string> = {}
   for (const [key, value] of Object.entries(attrs)) {
-    const lowerKey = key.toLowerCase()
+    const safeName = key.trim()
+    const lowerKey = safeName.toLowerCase()
+    if (!safeName || !isSafeAttrName(safeName))
+      continue
     if (DANGEROUS_HTML_ATTRS.has(lowerKey))
       continue
     if (URL_HTML_ATTRS.has(lowerKey) && value && isUnsafeHtmlUrl(value))
       continue
-    clean[key] = value
+    clean[safeName] = value
   }
   return clean
 }
@@ -360,9 +402,12 @@ export function hasCustomHtmlComponents(
   return false
 }
 
-export function sanitizeHtmlContent(content: string): string {
+export function sanitizeHtmlContent(content: string, policy: HtmlPolicy = 'safe'): string {
   if (!content)
     return ''
+
+  if (policy === 'escape')
+    return escapeHtml(content)
 
   const tokens = tokenizeHtmlPreservingText(content)
   const stack: string[] = []
@@ -380,7 +425,7 @@ export function sanitizeHtmlContent(content: string): string {
     if (!tagName)
       continue
 
-    if (BLOCKED_HTML_TAGS.has(tagName)) {
+    if (isHtmlTagBlocked(tagName, policy)) {
       if (token.type === 'tag_open')
         blockedDepth += 1
       else if (token.type === 'tag_close' && blockedDepth > 0)

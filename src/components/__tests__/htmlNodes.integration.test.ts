@@ -158,6 +158,89 @@ describe('htmlBlockNode - Custom Components Integration', () => {
     expect(wrapper.html()).not.toContain('alert(1)')
   })
 
+  it('should block active HTML tags by default', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          content: '<div>Safe</div><iframe src="https://example.com"></iframe><form><button>Submit</button></form>',
+          loading: false,
+        },
+        customId: testId,
+      },
+    })
+
+    await nextTick()
+
+    expect(wrapper.find('iframe').exists()).toBe(false)
+    expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.text()).toBe('Safe')
+  })
+
+  it('should allow broader HTML tags with trusted policy', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          content: '<iframe src="https://example.com"></iframe><div>Safe</div>',
+          loading: false,
+        },
+        customId: testId,
+        htmlPolicy: 'trusted',
+      },
+    })
+
+    await nextTick()
+
+    expect(wrapper.find('iframe').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Safe')
+  })
+
+  it('should render custom-looking HTML as text with escape policy', async () => {
+    const wrapper = mount(HtmlBlockNode, {
+      props: {
+        node: {
+          content: '<testcomp data-type="safe">Content</testcomp>',
+          loading: false,
+        },
+        customId: testId,
+        htmlPolicy: 'escape',
+      },
+    })
+
+    await nextTick()
+
+    expect(wrapper.find('.test-component').exists()).toBe(false)
+    expect(wrapper.text()).toContain('<testcomp data-type="safe">Content</testcomp>')
+  })
+
+  it('should inherit htmlPolicy through nested NodeRenderer instances', async () => {
+    const wrapper = mount(MarkdownRender, {
+      props: {
+        htmlPolicy: 'trusted',
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+        nodes: [
+          {
+            type: 'blockquote',
+            raw: '',
+            children: [
+              {
+                type: 'html_block',
+                content: '<iframe src="https://example.com"></iframe>',
+                raw: '<iframe src="https://example.com"></iframe>',
+                loading: false,
+              },
+            ],
+          },
+        ] as any,
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    expect(wrapper.find('blockquote iframe').exists()).toBe(true)
+  })
+
   it('should pass props correctly to custom components', () => {
     const wrapper = mount(HtmlBlockNode, {
       props: {

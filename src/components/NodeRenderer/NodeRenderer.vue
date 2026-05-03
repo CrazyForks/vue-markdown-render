@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { MarkdownIt, ParsedNode } from 'stream-markdown-parser'
+import type { HtmlPolicy, MarkdownIt, ParsedNode } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { CustomComponents } from '../../types'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
-import { computed, defineAsyncComponent, defineComponent, h, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
+import { computed, defineAsyncComponent, defineComponent, h, inject, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -135,7 +135,10 @@ const resolvedShowTooltips = computed<boolean | undefined>(() => {
     return false
   return undefined
 })
+const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
 provide('markstreamShowTooltips', resolvedShowTooltips)
+provide('markstreamHtmlPolicy', resolvedHtmlPolicy)
 provide('markstreamTypewriter', computed(() => props.typewriter !== false))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)

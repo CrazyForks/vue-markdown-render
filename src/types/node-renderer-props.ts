@@ -1,4 +1,4 @@
-import type { BaseNode, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
+import type { BaseNode, HtmlPolicy, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
 import type {
   CodeBlockMonacoOptions,
   CodeBlockMonacoTheme,
@@ -30,6 +30,8 @@ export interface NodeRendererProps {
    * and are emitted as custom nodes (e.g. ['thinking']). Forwarded to `getMarkdown()`.
    */
   customHtmlTags?: readonly string[]
+  /** HTML rendering policy for html_block/html_inline nodes. Default: safe */
+  htmlPolicy?: HtmlPolicy
   /** Enable priority rendering for visible viewport area */
   viewportPriority?: boolean
   /**

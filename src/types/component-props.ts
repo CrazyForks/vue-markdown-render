@@ -285,7 +285,7 @@ export interface MermaidBlockNodeProps {
   showCollapseButton?: boolean
   showZoomControls?: boolean
   enableWheelZoom?: boolean
-  // When false, relax all sanitization/security (not recommended)
+  // Defaults to true. Set false only for trusted diagrams that need loose Mermaid HTML labels.
   isStrict?: boolean
   showTooltips?: boolean
   // Custom error handler called when mermaid rendering fails.

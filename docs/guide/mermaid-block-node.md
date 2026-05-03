@@ -8,7 +8,7 @@
 - `loading?: boolean` — initial loading placeholder
 - `maxHeight?: string | null` — maximum height
 - `estimatedPreviewHeightPx?: number` — first-preview height reserved before Mermaid finishes rendering; `MarkdownRender` fills this automatically for Mermaid fences
-- `isStrict?: boolean` — run Mermaid in `securityLevel: 'strict'` with DOMPurify + HTML-label hardening; use this when rendering untrusted diagrams to strip inline scripts/`javascript:` URLs that could otherwise leak into the SVG
+- `isStrict?: boolean` — defaults to `true`; runs Mermaid in `securityLevel: 'strict'` with DOMPurify + HTML-label hardening. Set `false` only for trusted diagrams that require Mermaid HTML labels.
 - `onRenderError?: (error: unknown, code: string, container: HTMLElement) => boolean | void` — custom error handler called when mermaid rendering fails. Return `true` to prevent the default error display. Receives the error, the raw mermaid source code, and the container DOM element so you can render custom content.
 - Header / control props (all optional, default `true`):
   - `showHeader`, `showModeToggle`, `showCopyButton`, `showExportButton`, `showFullscreenButton`, `showCollapseButton`, `showZoomControls`, `showTooltips`
@@ -71,7 +71,7 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 ## Recommended usage
 - To implement custom export/upload behavior, call `preventDefault()` in the `export` listener and extract the SVG from the rendered DOM in your handler.
 - To fully replace the header UI, use the `header-*` slots and set the corresponding `show*` props to `false` to hide the default controls.
-- If Mermaid content originates from users/LLMs or any untrusted source, set `:is-strict="true"` so the component sanitizes the SVG and disables HTML labels; this closes the gap where crafted `javascript:` URLs or event handlers could sneak into the rendered output.
+- Mermaid strict mode is enabled by default, so user/LLM diagrams are sanitized and HTML labels are disabled. Set `:is-strict="false"` only for trusted diagrams that need loose Mermaid rendering.
 - In AI chat scenarios, use `onRenderError` to show raw mermaid source instead of the default error message:
 
 ```vue

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
-import { computed, defineAsyncComponent, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
+import type { HtmlPolicy } from 'stream-markdown-parser'
+import { isHtmlTagBlocked, NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
+import { computed, defineAsyncComponent, defineComponent, inject, onBeforeUnmount, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
@@ -15,7 +16,11 @@ const props = defineProps<{
     loading?: boolean
   }
   customId?: string
+  htmlPolicy?: HtmlPolicy
 }>()
+
+const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
 
 const StructuredNodeRenderer = defineAsyncComponent({
   loader: () => import('../NodeRenderer'),
@@ -56,7 +61,10 @@ const shouldRender = ref(typeof window === 'undefined')
 const renderContent = ref(props.node.content)
 const structuredChildren = computed(() => Array.isArray(props.node.children) ? props.node.children : [])
 const structuredTag = computed(() => String(props.node.tag || 'div'))
-const isBlockedStructuredTag = computed(() => NON_STRUCTURING_HTML_TAGS.has(structuredTag.value.trim().toLowerCase()))
+const isBlockedStructuredTag = computed(() => {
+  const tag = structuredTag.value.trim().toLowerCase()
+  return NON_STRUCTURING_HTML_TAGS.has(tag) || isHtmlTagBlocked(tag, resolvedHtmlPolicy.value)
+})
 const isStructured = computed(() => structuredChildren.value.length > 0 && !!props.node.tag && !isBlockedStructuredTag.value)
 
 // Computed property to determine render mode and content
@@ -72,11 +80,14 @@ const renderMode = computed(() => {
   if (!content)
     return { mode: 'html', content: '' }
 
+  if (resolvedHtmlPolicy.value === 'escape')
+    return { mode: 'html', content: sanitizeHtmlContent(content, resolvedHtmlPolicy.value) }
+
   // Streaming HTML blocks are expensive to re-render via `innerHTML` because it
   // replaces the whole subtree on every tick. Prefer the VNode parser while
   // the node is still in a loading mid-state to keep DOM stable.
   if (props.node.loading) {
-    const nodes = parseHtmlToVNodes(content, customComponents.value)
+    const nodes = parseHtmlToVNodes(content, customComponents.value, resolvedHtmlPolicy.value)
     if (nodes === null)
       return { mode: 'text', content: props.node.raw ?? content }
     return { mode: 'dynamic', nodes }
@@ -84,12 +95,12 @@ const renderMode = computed(() => {
 
   // Check if content contains custom components
   if (!hasCustomComponents(content, customComponents.value))
-    return { mode: 'html', content: sanitizeHtmlContent(content) }
+    return { mode: 'html', content: sanitizeHtmlContent(content, resolvedHtmlPolicy.value) }
 
   // Parse and build VNode tree
-  const nodes = parseHtmlToVNodes(content, customComponents.value)
+  const nodes = parseHtmlToVNodes(content, customComponents.value, resolvedHtmlPolicy.value)
   if (nodes === null)
-    return { mode: 'html', content: sanitizeHtmlContent(content) } // Fallback to sanitized HTML if parsing fails
+    return { mode: 'html', content: sanitizeHtmlContent(content, resolvedHtmlPolicy.value) } // Fallback to sanitized HTML if parsing fails
 
   return { mode: 'dynamic', nodes }
 })
@@ -157,6 +168,7 @@ onBeforeUnmount(() => {
         :batch-rendering="false"
         :defer-nodes-until-visible="false"
         :render-as-fragment="true"
+        :html-policy="resolvedHtmlPolicy"
       />
       <!-- Use dynamic rendering for custom components -->
       <DynamicRenderer v-else-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />
