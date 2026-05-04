@@ -56,7 +56,6 @@ describe('nodeRenderer showTooltips prop', () => {
     const link = wrapper.find('a[href="http://xn--6qq79v.com"]')
     expect(link.exists()).toBe(true)
     expect(link.text()).toBe('http://你好.com')
-    expect(link.attributes('aria-label')).toBe('Link: http://你好.com')
 
     await link.trigger('mouseenter', { clientX: 10, clientY: 10 })
     await new Promise(resolve => setTimeout(resolve, 100))

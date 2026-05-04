@@ -114,20 +114,6 @@ const safeHref = computed(() => {
   const href = String(props.node?.href ?? '')
   return sanitizeAttrs({ href }).href
 })
-const punycodeHostRe = /^(?:[a-z][a-z\d+.-]*:)?\/\/(?:[^/?#@]*@)?(?:[^/?#.]+\.)*xn--[^/?#.]*/i
-const urlTextProtocolRe = /^(?:[a-z][a-z\d+.-]*:\/\/|\/\/)/i
-const title = computed(() => {
-  const rawTitle = props.node?.title
-  if (typeof rawTitle === 'string' && rawTitle.trim().length > 0)
-    return rawTitle
-
-  const href = String(safeHref.value ?? '')
-  const text = String(props.node?.text ?? '')
-  if (text && !/\s/.test(text) && (urlTextProtocolRe.test(text) || text.includes('.')) && punycodeHostRe.test(href))
-    return text
-
-  return href
-})
 
 // Tooltip handlers using singleton tooltip
 function onAnchorEnter(e: Event) {
@@ -135,7 +121,8 @@ function onAnchorEnter(e: Event) {
     return
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
-  const txt = title.value || props.node?.text || ''
+  // show the link href in tooltip; fall back to title/text if href missing
+  const txt = props.node?.title || (safeHref.value?.includes('xn--') && props.node?.text?.includes('://') ? props.node.text : safeHref.value) || ''
   showTooltipForAnchor(e.currentTarget as HTMLElement, txt, 'top', false, origin)
 }
 
@@ -144,6 +131,12 @@ function onAnchorLeave() {
     return
   hideTooltip()
 }
+const title = computed(() => {
+  const rawTitle = props.node?.title
+  if (typeof rawTitle === 'string' && rawTitle.trim().length > 0)
+    return rawTitle
+  return String(safeHref.value ?? '')
+})
 </script>
 
 <template>
