@@ -30,6 +30,14 @@ const boundAttrs = computed(() => {
   const record = tokenAttrsToRecord(sanitizedAttrs)
   return Object.keys(record).length > 0 ? record : undefined
 })
+const structuredBoundAttrs = computed(() => {
+  const tagName = String(props.node.tag || '').trim()
+  const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs, resolvedHtmlPolicy.value, tagName)
+  if (!sanitizedAttrs)
+    return undefined
+  const record = tokenAttrsToRecord(sanitizedAttrs)
+  return Object.keys(record).length > 0 ? record : undefined
+})
 
 // Get custom components from global registry
 const customComponents = computed(() => {
@@ -148,7 +156,7 @@ onBeforeUnmount(() => {
     v-if="renderMode.mode === 'structured' && shouldRender"
     ref="htmlRef"
     class="html-block-node"
-    v-bind="boundAttrs"
+    v-bind="structuredBoundAttrs"
     v-html="structuredHtml"
   />
   <!-- eslint-enable vue/no-v-text-v-html-on-component -->
@@ -157,7 +165,7 @@ onBeforeUnmount(() => {
     v-else-if="renderMode.mode === 'structured'"
     ref="htmlRef"
     class="html-block-node"
-    v-bind="boundAttrs"
+    v-bind="structuredBoundAttrs"
   >
     <div class="html-block-node__placeholder">
       <slot name="placeholder" :node="node">

@@ -163,6 +163,22 @@ describe('markstream-angular html renderer', () => {
     expect(escapedHtml).toBe('&lt;div&gt;Escaped&lt;/div&gt;')
   })
 
+  it('applies htmlPolicy in static angular rendering helpers', () => {
+    const escapedHtml = renderMarkdownToHtml({
+      content: '<div>x</div>',
+      final: true,
+      htmlPolicy: 'escape',
+    })
+    const trustedHtml = renderMarkdownToHtml({
+      content: '<iframe src="https://example.com"></iframe>',
+      final: true,
+      htmlPolicy: 'trusted',
+    })
+
+    expect(escapedHtml).toContain('&lt;div&gt;x&lt;/div&gt;')
+    expect(trustedHtml).toContain('<iframe src="https://example.com"></iframe>')
+  })
+
   it('escapes unknown tags and strips safe-policy style/srcset hazards', () => {
     const safeHtml = sanitizeHtmlFragment('<unknown-tag style="position:fixed">Hello</unknown-tag><img src="cover.jpg" srcset="javascript:alert(1) 1x, cover-2x.jpg 2x"><span style="color:red">World</span>')
 
@@ -218,8 +234,9 @@ describe('markstream-angular html renderer', () => {
       } as any,
     )
 
-    expect(structuredHtml).toContain('<span style="font-size: 12px;">')
+    expect(structuredHtml).toContain('<span>')
     expect(structuredHtml).toContain('<ul><li>alpha</li><li>beta</li></ul>')
+    expect(structuredHtml).not.toContain('style=')
 
     const blockedHtml = renderMarkdownNodeToHtml(
       {
@@ -281,11 +298,13 @@ describe('markstream-angular html renderer', () => {
       {
         type: 'html_block',
         tag: 'a',
-        raw: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
-        content: '<a href="javascript:alert(1)" onclick="alert(1)" data-safe="ok"></a>',
+        raw: '<a href="javascript:alert(1)" onclick="alert(1)" target="_blank" rel="opener nofollow" data-safe="ok"></a>',
+        content: '<a href="javascript:alert(1)" onclick="alert(1)" target="_blank" rel="opener nofollow" data-safe="ok"></a>',
         attrs: [
           ['href', 'javascript:alert(1)'],
           ['onclick', 'alert(1)'],
+          ['target', '_blank'],
+          ['rel', 'opener nofollow'],
           ['data-safe', 'ok'],
         ],
         children: [
@@ -298,9 +317,10 @@ describe('markstream-angular html renderer', () => {
       } as any,
     )
 
-    expect(html).toContain('<a data-safe="ok">')
+    expect(html).toContain('<a target="_blank" rel="nofollow noopener noreferrer" data-safe="ok">')
     expect(html).toContain('<p>safe child</p>')
     expect(html).not.toContain('onclick=')
+    expect(html).not.toContain('rel="opener')
     expect(html).not.toContain('javascript:')
   })
 })

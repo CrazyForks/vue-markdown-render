@@ -117,13 +117,16 @@ const finalRel = computed(() => {
       .split(/\s+/)
       .filter(Boolean),
   )
+  const filteredTokens = new Set(
+    Array.from(tokens).filter(token => token.toLowerCase() !== 'opener'),
+  )
 
   if (isBlankTarget.value) {
-    tokens.add('noopener')
-    tokens.add('noreferrer')
+    filteredTokens.add('noopener')
+    filteredTokens.add('noreferrer')
   }
 
-  return tokens.size > 0 ? Array.from(tokens).join(' ') : undefined
+  return filteredTokens.size > 0 ? Array.from(filteredTokens).join(' ') : undefined
 })
 const anchorAttrs = computed(() => {
   const merged = {

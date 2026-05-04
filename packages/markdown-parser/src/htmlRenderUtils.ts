@@ -185,7 +185,28 @@ function shouldDropHtmlAttr(lowerKey: string, value: string, policy: HtmlPolicy)
   return false
 }
 
-function sanitizeHtmlContentAttrs(attrs: Record<string, string>, policy: HtmlPolicy = 'safe') {
+function hardenAnchorAttrs(clean: Record<string, string>, policy: HtmlPolicy, tagName?: string) {
+  if (policy !== 'safe' || normalizeTagName(tagName) !== 'a')
+    return clean
+
+  const target = String(clean.target ?? '').trim()
+  if (target.toLowerCase() !== '_blank')
+    return clean
+
+  const relTokens = new Set(
+    String(clean.rel ?? '')
+      .split(/\s+/)
+      .map(token => token.trim())
+      .filter(Boolean)
+      .filter(token => token.toLowerCase() !== 'opener'),
+  )
+  relTokens.add('noopener')
+  relTokens.add('noreferrer')
+  clean.rel = Array.from(relTokens).join(' ')
+  return clean
+}
+
+function sanitizeHtmlContentAttrs(attrs: Record<string, string>, policy: HtmlPolicy = 'safe', tagName?: string) {
   const clean: Record<string, string> = {}
 
   for (const [key, value] of Object.entries(attrs)) {
@@ -198,7 +219,7 @@ function sanitizeHtmlContentAttrs(attrs: Record<string, string>, policy: HtmlPol
     clean[safeName] = value
   }
 
-  return clean
+  return hardenAnchorAttrs(clean, policy, tagName)
 }
 
 export function isCustomHtmlComponentTag(
@@ -211,7 +232,7 @@ export function isCustomHtmlComponentTag(
   return hasOwn(customComponents, lowerTag) || hasOwn(customComponents, tagName)
 }
 
-export function sanitizeHtmlAttrs(attrs: Record<string, string>, policy: HtmlPolicy = 'safe') {
+export function sanitizeHtmlAttrs(attrs: Record<string, string>, policy: HtmlPolicy = 'safe', tagName?: string) {
   const clean: Record<string, string> = {}
   for (const [key, value] of Object.entries(attrs)) {
     const safeName = key.trim()
@@ -222,7 +243,7 @@ export function sanitizeHtmlAttrs(attrs: Record<string, string>, policy: HtmlPol
       continue
     clean[safeName] = value
   }
-  return clean
+  return hardenAnchorAttrs(clean, policy, tagName)
 }
 
 export function tokenAttrsToRecord(attrs?: Array<[string, string | null]> | null) {
@@ -239,8 +260,12 @@ export function tokenAttrsToRecord(attrs?: Array<[string, string | null]> | null
   return record
 }
 
-export function sanitizeHtmlTokenAttrs(attrs?: Array<[string, string | null]> | null, policy: HtmlPolicy = 'safe') {
-  const sanitized = sanitizeHtmlAttrs(tokenAttrsToRecord(attrs), policy)
+export function sanitizeHtmlTokenAttrs(
+  attrs?: Array<[string, string | null]> | null,
+  policy: HtmlPolicy = 'safe',
+  tagName?: string,
+) {
+  const sanitized = sanitizeHtmlAttrs(tokenAttrsToRecord(attrs), policy, tagName)
   const pairs = Object.entries(sanitized).map(([key, value]) => [key, value] as [string, string])
   return pairs.length > 0 ? pairs : undefined
 }
@@ -542,12 +567,12 @@ export function sanitizeHtmlContent(content: string, policy: HtmlPolicy = 'safe'
     }
 
     if (token.type === 'self_closing') {
-      output.push(`<${tagName}${serializeAttrs(sanitizeHtmlContentAttrs(token.attrs ?? {}, policy))}>`)
+      output.push(`<${tagName}${serializeAttrs(sanitizeHtmlContentAttrs(token.attrs ?? {}, policy, tagName))}>`)
       continue
     }
 
     if (token.type === 'tag_open') {
-      output.push(`<${tagName}${serializeAttrs(sanitizeHtmlContentAttrs(token.attrs ?? {}, policy))}>`)
+      output.push(`<${tagName}${serializeAttrs(sanitizeHtmlContentAttrs(token.attrs ?? {}, policy, tagName))}>`)
       if (!VOID_HTML_TAGS.has(tagName))
         stack.push(tagName)
       continue

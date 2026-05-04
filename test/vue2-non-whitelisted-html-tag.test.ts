@@ -9,6 +9,7 @@
  */
 import { mount } from '@vue/test-utils'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { parseHtmlToVNodes } from '../packages/markstream-vue2/src/utils/htmlRenderer'
 import { removeCustomComponents, setCustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
 
@@ -187,6 +188,21 @@ describe('vue2: non-whitelisted custom HTML tags', () => {
     finally {
       wrapper.unmount()
     }
+  })
+
+  it('keeps self-closing non-whitelisted tags literal in dynamic parsing', () => {
+    const nodes = parseHtmlToVNodes('<my-tag>Hello</my-tag><unknown-tag />', {
+      'my-tag': {
+        name: 'MyTag',
+        render() {
+          return null
+        },
+      } as any,
+    })
+
+    expect(nodes).not.toBeNull()
+    const stringNodes = (nodes || []).filter((node): node is string => typeof node === 'string')
+    expect(stringNodes).toContain('<unknown-tag />')
   })
 
   it('does not truncate surrounding markdown in list context', async () => {

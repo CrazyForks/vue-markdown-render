@@ -199,7 +199,7 @@ function createReactElement(
     ]
   }
 
-  const sanitizedAttrs = sanitizeHtmlAttrs(attrs, htmlPolicy)
+  const sanitizedAttrs = sanitizeHtmlAttrs(attrs, htmlPolicy, tagName)
   const explicitKey = (sanitizedAttrs as any).key
   const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : autoKey
 

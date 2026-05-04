@@ -136,7 +136,7 @@ export function parseHtmlToReactNodes(
           target.push(renderLiteralTagText(token.tagName, token.attrs, true))
           continue
         }
-        const attrs = sanitizeHtmlAttrs(token.attrs || {}, htmlPolicy)
+        const attrs = sanitizeHtmlAttrs(token.attrs || {}, htmlPolicy, token.tagName)
         const explicitKey = (attrs as any).key
         const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
         const Comp = customComponent
@@ -187,7 +187,7 @@ export function parseHtmlToReactNodes(
         continue
       }
 
-      const attrs = sanitizeHtmlAttrs(opening.attrs || {}, htmlPolicy)
+      const attrs = sanitizeHtmlAttrs(opening.attrs || {}, htmlPolicy, opening.tagName)
       const explicitKey = (attrs as any).key
       const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
       const Comp = opening.customComponent
@@ -219,7 +219,7 @@ export function parseHtmlToReactNodes(
         ])
         continue
       }
-      const attrs = sanitizeHtmlAttrs(unclosed.attrs || {}, htmlPolicy)
+      const attrs = sanitizeHtmlAttrs(unclosed.attrs || {}, htmlPolicy, unclosed.tagName)
       const explicitKey = (attrs as any).key
       const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
       const Comp = unclosed.customComponent

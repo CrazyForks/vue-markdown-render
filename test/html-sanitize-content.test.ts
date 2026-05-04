@@ -44,6 +44,13 @@ describe('sanitizeHtmlContent', () => {
     expect(unsafeHtml).toBe('<img src="cover.jpg">')
   })
 
+  it('hardens raw html anchors that open a new tab in safe mode', () => {
+    const html = sanitizeHtmlContent('<a href="https://example.com" target="_blank" rel="opener nofollow">Link</a>')
+
+    expect(html).toContain('<a href="https://example.com" target="_blank" rel="nofollow noopener noreferrer">Link</a>')
+    expect(html).not.toContain('rel="opener')
+  })
+
   it('can preserve broader HTML tags for trusted content', () => {
     const html = sanitizeHtmlContent('<iframe src="https://example.com"></iframe><style>body{color:red}</style><span style="color:red">Styled</span><video src="clip.mp4"></video><html><body>Doc</body></html><script>alert(1)</script>', 'trusted')
 

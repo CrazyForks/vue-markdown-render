@@ -157,7 +157,7 @@ export function buildVNodeTree(
       target.push(token.content!)
     }
     else if (token.type === 'self_closing') {
-      const vnode = createVNode(token.tagName!, token.attrs || {}, [], customComponents, createElement, htmlPolicy)
+      const vnode = createVNode(token.tagName!, token.attrs || {}, [], customComponents, createElement, htmlPolicy, true)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       pushRenderedNode(target, vnode)
     }
@@ -221,20 +221,23 @@ function createVNode(
   customComponents: Record<string, Component>,
   createElement?: CreateElementLike,
   htmlPolicy: HtmlPolicy = 'safe',
+  isSelfClosing = false,
 ): any {
   const customComponent = isCustomComponent(tagName, customComponents)
   if (BLOCKED_TAGS.has(tagName.toLowerCase()) || (!customComponent && isHtmlTagHardBlocked(tagName, htmlPolicy)))
     return null
 
   if (!customComponent && isHtmlTagBlocked(tagName, htmlPolicy)) {
-    return [
-      renderLiteralTagText(tagName, attrs),
-      ...children,
-      `</${tagName}>`,
-    ]
+    return isSelfClosing
+      ? [renderLiteralTagText(tagName, attrs, true)]
+      : [
+          renderLiteralTagText(tagName, attrs),
+          ...children,
+          `</${tagName}>`,
+        ]
   }
 
-  const sanitizedAttrs = sanitizeHtmlAttrs(attrs, htmlPolicy)
+  const sanitizedAttrs = sanitizeHtmlAttrs(attrs, htmlPolicy, tagName)
 
   if (customComponent) {
     // It's a custom Vue component

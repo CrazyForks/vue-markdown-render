@@ -15,8 +15,8 @@ interface HtmlToken {
   content?: string
 }
 
-function sanitizeAttrs(attrs: Record<string, string>, policy: HtmlPolicy): Record<string, string> {
-  return sanitizeHtmlAttrs(attrs, policy)
+function sanitizeAttrs(attrs: Record<string, string>, policy: HtmlPolicy, tagName?: string): Record<string, string> {
+  return sanitizeHtmlAttrs(attrs, policy, tagName)
 }
 
 function tokenizeHtml(html: string): HtmlToken[] {
@@ -188,12 +188,12 @@ export function sanitizeHtmlContent(content: string, policy: HtmlPolicy = 'safe'
     }
 
     if (token.type === 'self_closing') {
-      output.push(`<${tagName}${serializeAttrs(sanitizeAttrs(token.attrs ?? {}, policy))}>`)
+      output.push(`<${tagName}${serializeAttrs(sanitizeAttrs(token.attrs ?? {}, policy, tagName))}>`)
       continue
     }
 
     if (token.type === 'tag_open') {
-      output.push(`<${tagName}${serializeAttrs(sanitizeAttrs(token.attrs ?? {}, policy))}>`)
+      output.push(`<${tagName}${serializeAttrs(sanitizeAttrs(token.attrs ?? {}, policy, tagName))}>`)
       if (!VOID_ELEMENTS.has(tagName))
         stack.push(tagName)
       continue

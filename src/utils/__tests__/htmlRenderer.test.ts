@@ -293,6 +293,16 @@ describe('htmlRenderer', () => {
       expect(stringNodes).toEqual(['<unknown-tag>', 'keep', '</unknown-tag>'])
       expect((nodes || []).some((node: any) => typeof node === 'object' && typeof node?.type !== 'string')).toBe(true)
     })
+
+    it('should keep self-closing unknown tags literal in safe mode', () => {
+      const nodes = parseHtmlToVNodes('<mycomp data-type="test">ok</mycomp><unknown-tag />', {
+        mycomp: MockComponentA,
+      })
+
+      expect(nodes).not.toBeNull()
+      const stringNodes = (nodes || []).filter((node): node is string => typeof node === 'string')
+      expect(stringNodes).toContain('<unknown-tag />')
+    })
   })
 
   describe('hasCustomComponents', () => {
