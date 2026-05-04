@@ -23,10 +23,11 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
    - In Tailwind or UnoCSS projects, place `markstream-*/index.css` inside `@layer components`.
    - Import `katex/dist/katex.min.css` when math is enabled.
 4. Add the smallest working render example.
-   - Use `content` for static or low-frequency rendering.
-   - Use `nodes` plus `final` when the app receives streaming updates.
+    - Use `content` for static or low-frequency rendering.
+    - Use `nodes` plus `final` when the app receives streaming updates.
+    - Preserve the default hardening: HTML policies now default to `safe`, and Mermaid runs in strict mode by default.
 5. Keep customization scoped.
-   - If the task requires overrides, prefer `customId` / `custom-id` plus scoped `setCustomComponents(...)`.
+    - If the task requires overrides, prefer `customId` / `custom-id` plus scoped `setCustomComponents(...)`.
 6. Validate.
    - Run the smallest relevant build, typecheck, test, or docs build command.
    - Report which peers were installed, where CSS lives, and whether the repo should later adopt `nodes`.
@@ -37,6 +38,8 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
 - Prefer `content` unless the app is clearly SSE, chat, token-streaming, or worker-preparsed.
 - Treat CSS order as a first-class part of installation, not a later cleanup.
 - When the request includes SSR, explicitly gate browser-only peers behind client-only boundaries.
+- Do not widen HTML or Mermaid security defaults unless the user explicitly needs trusted legacy compatibility.
+- If compatibility requires it, scope the opt-out to the trusted surface with `htmlPolicy` / `html-policy="trusted"` and `mermaidProps.isStrict = false` instead of changing app-wide defaults blindly.
 
 ## Useful Doc Targets
 

@@ -40,6 +40,7 @@ The primary component for rendering markdown content in Vue 2.
 | `final` | `boolean` | `false` | Marks the input as end-of-stream; stops emitting streaming `loading` nodes |
 | `parse-options` | `ParseOptions` | - | Parser options and token hooks (only when `content` is provided) |
 | `custom-html-tags` | `string[]` | - | HTML-like tags emitted as custom nodes (e.g. `thinking`) |
+| `html-policy` | `'safe' \| 'escape' \| 'trusted'` | `'safe'` | Controls `html_block` / `html_inline` rendering. `safe` blocks active/embed/form tags, `escape` shows literal HTML text, and `trusted` restores the broader trusted HTML behavior while still stripping scripts and unsafe attrs. |
 | `custom-markdown-it` | `(md: MarkdownIt) => MarkdownIt` | - | Customize the internal MarkdownIt instance |
 | `debug-performance` | `boolean` | `false` | Log parse/render timing and virtualization stats (dev only) |
 | `is-dark` | `boolean` | `false` | Theme flag forwarded to heavy nodes; adds `.dark` to the root container |
@@ -105,7 +106,18 @@ The primary component for rendering markdown content in Vue 2.
 Streaming notes:
 - Keep `viewport-priority` enabled to prevent offscreen Mermaid / Monaco / D2 work from running while text is still streaming.
 - For high-frequency SSE, prefer passing `nodes` instead of reparsing the full `content` string every chunk.
+- Mermaid strict mode is now the default. Set `:mermaid-props="{ isStrict: false }"` only for trusted diagrams that need loose Mermaid HTML-label behavior.
 - Common Mermaid tuning keys: `renderDebounceMs`, `contentStableDelayMs`, `previewPollDelayMs`, `previewPollMaxDelayMs`, `previewPollMaxAttempts`.
+
+Trusted compatibility example:
+
+```vue
+<MarkdownRender
+  :content="trustedMarkdown"
+  html-policy="trusted"
+  :mermaid-props="{ isStrict: false }"
+/>
+```
 
 #### Events
 

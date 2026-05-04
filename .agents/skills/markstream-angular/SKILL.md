@@ -17,6 +17,7 @@ Use this skill when the host app is Angular and the task is to adopt the Angular
    - Use `MarkstreamAngularComponent` in `imports` and keep examples signal-friendly.
 5. Start with `[content]`.
    - Use `[final]`, `[codeBlockStream]`, and other streaming inputs only when the UI actually streams.
+   - Remember that `[htmlPolicy]` now defaults to `'safe'`, and Mermaid strict mode is on by default through `[mermaidProps]`.
 6. Use `[customHtmlTags]` and `[customComponents]` for trusted tag workflows.
 7. Validate with the smallest useful Angular dev or build command.
 
@@ -25,6 +26,8 @@ Use this skill when the host app is Angular and the task is to adopt the Angular
 - Standalone Angular first, NgModule-era patterns only when the repo still depends on them.
 - Treat streaming flags as opt-in.
 - Keep optional peers minimal and explicit.
+- Keep `[htmlPolicy]="'safe'"` and Mermaid strict mode unless the task is preserving trusted legacy rendering.
+- If a trusted surface needs broader old behavior, opt out locally with `[htmlPolicy]="'trusted'"` and `[mermaidProps]="{ isStrict: false }"`, and document that trust boundary.
 
 ## Useful Doc Targets
 

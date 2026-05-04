@@ -20,8 +20,9 @@ Read [references/adoption-checklist.md](references/adoption-checklist.md) before
    - `plugin-heavy`: remark, rehype, markdown-it, or other transform-heavy pipelines.
    - `security-heavy`: allow or deny lists, URL rewriting, sanitization, or raw HTML policies.
 3. Swap the renderer first.
-   - Introduce the correct Markstream package and CSS.
-   - Preserve user-visible behavior before adding richer Markstream-only features.
+    - Introduce the correct Markstream package and CSS.
+    - Preserve user-visible behavior before adding richer Markstream-only features.
+    - Audit whether the old renderer allowed broad raw HTML or Mermaid loose-mode HTML labels before claiming parity.
 4. Migrate custom renderers.
    - Convert tag-based renderers into node-type overrides with scoped `setCustomComponents`.
    - For trusted tag-like content, prefer `customHtmlTags`.
@@ -40,6 +41,7 @@ Read [references/adoption-checklist.md](references/adoption-checklist.md) before
 - Preserve safety over feature parity when HTML or security rules are involved.
 - Prefer explicit TODOs over vague claims.
 - Recommend against migration when the current stack depends heavily on transforms that Markstream does not mirror directly.
+- When preserving trusted legacy behavior is necessary, use scoped `htmlPolicy` / `html-policy="trusted"` and `mermaidProps.isStrict = false` instead of weakening defaults everywhere.
 
 ## Useful Doc Targets
 

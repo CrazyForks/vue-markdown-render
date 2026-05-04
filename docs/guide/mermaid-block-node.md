@@ -93,6 +93,29 @@ function handleMermaidError(_err: unknown, code: string, container: HTMLElement)
 </template>
 ```
 
+## Restoring loose mode for trusted diagrams
+
+If a trusted diagram used Mermaid HTML labels or relied on the old loose-mode rendering, opt out per component instead of disabling the safer default globally:
+
+```vue
+<script setup lang="ts">
+import { MermaidBlockNode } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'mermaid',
+  code: 'flowchart TD\n  A["<b>Trusted</b><br/>label"] --> B',
+  raw: 'flowchart TD\n  A["<b>Trusted</b><br/>label"] --> B',
+}
+</script>
+
+<template>
+  <MermaidBlockNode :node="node" :is-strict="false" />
+</template>
+```
+
+Use this only when the Mermaid source is trusted. For user content or LLM output, keep the default strict mode.
+
 ---
 
 Notes:

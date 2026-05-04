@@ -14,6 +14,7 @@ Use this skill when the host app is React or Next and the task is to wire Markst
 3. Import `markstream-react/index.css` from the app shell or client entry.
 4. Start with `content`.
    - Move to `nodes` plus `final` only when the UI receives streaming or high-frequency updates.
+   - Remember that `htmlPolicy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaidProps`.
 5. Respect SSR boundaries in Next.
    - Prefer `use client`, dynamic imports with `ssr: false`, or other client-only boundaries when browser-only peers are involved.
 6. Use scoped Markstream overrides before custom parser work.
@@ -24,6 +25,8 @@ Use this skill when the host app is React or Next and the task is to wire Markst
 - Renderer wiring first, migration cleanup second.
 - If the repo already uses `react-markdown`, pair this skill with `markstream-migration`.
 - Prefer the smallest client-only boundary that solves the SSR issue.
+- Keep `htmlPolicy="safe"` and Mermaid strict mode unless the request is preserving trusted legacy rendering.
+- If a trusted surface needs older behavior, use `htmlPolicy="trusted"` and `mermaidProps={{ isStrict: false }}` only on that surface and explain why.
 
 ## Useful Doc Targets
 

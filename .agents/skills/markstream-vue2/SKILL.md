@@ -14,6 +14,7 @@ Use this skill when the host app is Vue 2 and not specifically a Vue CLI / Webpa
    - Add `@vue/composition-api` only when the repo is Vue 2.6 and uses Composition API patterns.
 3. Import `markstream-vue2/index.css` after resets.
 4. Start with `<MarkdownRender :content="markdown" />`.
+   - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 5. Use scoped custom component mappings when the task needs overrides or trusted tags.
 6. Validate with the smallest useful dev or build command.
 
@@ -23,6 +24,8 @@ Use this skill when the host app is Vue 2 and not specifically a Vue CLI / Webpa
 - Vue 2.6 needs `@vue/composition-api` only when the codebase actually relies on Composition API.
 - If the repo is Vue CLI / Webpack 4, prefer `markstream-vue2-cli`.
 - If the repo is Vue 2 plus Vite worker imports, prefer `markstream-vue2-vite`.
+- Keep `html-policy="safe"` and Mermaid strict mode unless the task is preserving trusted legacy rendering.
+- If a trusted surface needs older behavior, use `html-policy="trusted"` and `:mermaid-props="{ isStrict: false }"` only on that surface and explain why.
 
 ## Useful Doc Targets
 

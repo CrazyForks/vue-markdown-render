@@ -23,6 +23,40 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 | `debug-performance` | `boolean` | `false` | Logs parse/render timing and virtualization stats (dev only). |
 | `typewriter` | `boolean` | `true` | Enables the subtle enter animation. Disable if you need zero animation for SSR snapshots. |
 
+### Security defaults and compatibility opt-outs
+
+`MarkdownRender` now defaults to safer HTML and Mermaid behavior:
+
+- `html-policy="safe"` blocks active/embed/form HTML tags by default.
+- `mermaid-props.isStrict` defaults to `true`, so Mermaid runs in strict mode unless you opt out.
+
+If a trusted surface needs the broader pre-hardening behavior, opt out explicitly and keep that decision scoped to the trusted content source:
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const trustedMarkdown = `
+<iframe src="https://example.com/embed"></iframe>
+
+\`\`\`mermaid
+flowchart TD
+  A["<b>Trusted HTML label</b><br/>line 2"] --> B
+\`\`\`
+`
+</script>
+
+<template>
+  <MarkdownRender
+    :content="trustedMarkdown"
+    html-policy="trusted"
+    :mermaid-props="{ isStrict: false }"
+  />
+</template>
+```
+
+Use `html-policy="escape"` when you want literal HTML text to stay visible instead of rendering any HTML.
+
 ## Streaming & heavy-node toggles
 
 | Flag | Default | What it does |
@@ -122,6 +156,7 @@ Example:
 
 `mermaid-props` is especially useful for streaming tuning. Common keys include:
 
+- `isStrict` (set `false` only for trusted diagrams that need Mermaid loose mode / HTML labels)
 - `renderDebounceMs`
 - `contentStableDelayMs`
 - `previewPollDelayMs`

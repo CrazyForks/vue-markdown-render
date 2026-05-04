@@ -15,6 +15,7 @@ Use this skill when the host app is Nuxt and SSR boundaries matter.
    - Prefer `<client-only>` wrappers, `.client` plugins, or guarded setup paths.
 4. Import `markstream-vue/index.css` from a client-safe app shell or plugin.
 5. Start with `content`, and move to `nodes` plus `final` only when the UI is streaming.
+   - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 6. Validate with the smallest relevant Nuxt dev, build, or typecheck command.
 
 ## Default Decisions
@@ -22,6 +23,8 @@ Use this skill when the host app is Nuxt and SSR boundaries matter.
 - SSR safety comes before feature completeness.
 - Avoid import-time access to browser globals from server code paths.
 - Treat Monaco, Mermaid workers, and similar heavy peers as client-only unless the repo already has a proven SSR pattern.
+- Keep `html-policy="safe"` and Mermaid strict mode unless the task is preserving trusted legacy rendering.
+- If a trusted client-only surface needs older behavior, opt out locally with `html-policy="trusted"` and `:mermaid-props="{ isStrict: false }"`, and document why that surface is trusted.
 
 ## Useful Doc Targets
 
