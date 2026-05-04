@@ -276,10 +276,12 @@ async function renderMermaid(
   options: EnhanceRenderedHtmlOptions,
   isActive: () => boolean,
 ) {
+  const strictMode = options.mermaidProps?.isStrict !== false
   const mermaid = await getMermaid({
     startOnLoad: false,
-    securityLevel: 'loose',
+    securityLevel: strictMode ? 'strict' : 'loose',
     suppressErrorRendering: true,
+    ...(strictMode ? { flowchart: { htmlLabels: false } } : {}),
   })
   if (!mermaid || !isActive())
     return
@@ -339,7 +341,10 @@ async function renderMermaid(
       const svg = typeof rendered === 'string' ? rendered : rendered?.svg
       if (!svg)
         continue
-      shell.body.innerHTML = svg
+      const safeSvg = strictMode ? toSafeSvgMarkup(svg) : svg
+      if (!safeSvg)
+        continue
+      shell.body.innerHTML = safeSvg
       shell.body.classList.add('markstream-angular-mermaid')
       shell.wrapper.dataset.markstreamMermaid = '1'
       rendered?.bindFunctions?.(shell.body)

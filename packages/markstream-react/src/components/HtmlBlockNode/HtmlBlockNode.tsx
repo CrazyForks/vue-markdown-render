@@ -1,6 +1,7 @@
+import type { HtmlPolicy } from 'stream-markdown-parser'
 import type { NodeComponentProps } from '../../types/node-component'
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs } from 'stream-markdown-parser'
+import { isHtmlTagBlocked, NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs } from 'stream-markdown-parser'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../../customComponents'
 import { renderNodeChildren, tokenAttrsToProps } from '../../renderers/renderChildren'
@@ -23,9 +24,11 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   loading?: boolean
 }> & {
   customComponents?: Record<string, React.ComponentType<any>>
+  htmlPolicy?: HtmlPolicy
   placeholder?: React.ReactNode
 }) {
   const { node, placeholder, customId } = props
+  const htmlPolicy = props.htmlPolicy ?? props.ctx?.htmlPolicy ?? 'safe'
   const registerViewport = useViewportPriority()
   const [hostEl, setHostEl] = useState<HTMLElement | null>(null)
   const handleRef = useRef<ReturnType<typeof registerViewport> | null>(null)
@@ -90,6 +93,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   const isStructured = structuredChildren.length > 0
     && !!structuredTag
     && !NON_STRUCTURING_HTML_TAGS.has(structuredTag.toLowerCase())
+    && !isHtmlTagBlocked(structuredTag, htmlPolicy)
     && !!props.ctx
     && !!props.renderNode
   const structuredWrapperProps = useMemo(
@@ -99,15 +103,17 @@ export function HtmlBlockNode(props: NodeComponentProps<{
 
   // Check if we should use dynamic rendering
   const useDynamic = useMemo(() => {
+    if (htmlPolicy === 'escape')
+      return false
     return hasCustomHtmlComponents(node.content ?? '', effectiveCustomComponents)
-  }, [effectiveCustomComponents, node.content])
+  }, [effectiveCustomComponents, htmlPolicy, node.content])
 
   const reactNodes = useMemo(() => {
     if (!useDynamic || !node.content)
       return null
-    return parseHtmlToReactNodes(node.content, effectiveCustomComponents)
-  }, [effectiveCustomComponents, node.content, useDynamic])
-  const safeHtmlContent = useMemo(() => sanitizeHtmlContent(renderContent ?? ''), [renderContent])
+    return parseHtmlToReactNodes(node.content, effectiveCustomComponents, htmlPolicy)
+  }, [effectiveCustomComponents, htmlPolicy, node.content, useDynamic])
+  const safeHtmlContent = useMemo(() => sanitizeHtmlContent(renderContent ?? '', htmlPolicy), [htmlPolicy, renderContent])
   const structuredContent = useMemo(() => {
     if (!isStructured || !props.ctx || !props.renderNode)
       return null

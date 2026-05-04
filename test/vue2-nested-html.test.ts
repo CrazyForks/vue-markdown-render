@@ -187,7 +187,8 @@ describe('vue2 nested html helper', () => {
       } as any,
     )
 
-    expect(blockedHtml).toBe('<script>\n\n- alpha\n\n</script>')
+    expect(blockedHtml).toBe('')
+    expect(blockedHtml).not.toContain('<script')
     expect(blockedHtml).not.toContain('<ul>')
 
     const literalHtml = renderMarkdownNodeToHtml(

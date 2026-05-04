@@ -1,8 +1,9 @@
 import type { ComponentType } from 'react'
+import type { HtmlPolicy } from 'stream-markdown-parser'
 import type { NodeComponentProps } from '../../types/node-component'
 import type { HtmlToken } from '../../utils/htmlToReact'
 import React, { useEffect, useRef, useState } from 'react'
-import { BLOCKED_HTML_TAGS as BLOCKED_TAGS, convertHtmlAttrsToProps, sanitizeHtmlContent } from 'stream-markdown-parser'
+import { BLOCKED_HTML_TAGS as BLOCKED_TAGS, convertHtmlAttrsToProps, isHtmlTagBlocked, sanitizeHtmlContent } from 'stream-markdown-parser'
 import { getCustomNodeComponents } from '../../customComponents'
 import {
   hasCustomHtmlComponents,
@@ -40,6 +41,7 @@ function convertAttrsToProps(attrs: Record<string, string>): Record<string, any>
 function buildReactElementTree(
   tokens: HtmlToken[],
   customComponents: Record<string, ComponentType<any>>,
+  htmlPolicy: HtmlPolicy = 'safe',
 ): React.ReactNode[] {
   let autoKeySeed = 0
   const stack: Array<{ tagName: string, children: React.ReactNode[], attrs?: Record<string, string> }> = []
@@ -51,7 +53,7 @@ function buildReactElementTree(
       target.push(token.content!)
     }
     else if (token.type === 'self_closing') {
-      const element = createReactElement(token.tagName!, token.attrs || {}, [], customComponents, `ms-html-${autoKeySeed++}`)
+      const element = createReactElement(token.tagName!, token.attrs || {}, [], customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       element != null && target.push(element)
     }
@@ -74,7 +76,7 @@ function buildReactElementTree(
         // Pop all tags until the matched one (auto-closing intermediate tags)
         while (stack.length > matchedIndex) {
           const opening = stack.pop()!
-          const element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `ms-html-${autoKeySeed++}`)
+          const element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy)
 
           if (stack.length > 0)
             element != null && stack[stack.length - 1].children.push(element)
@@ -97,7 +99,7 @@ function buildReactElementTree(
   // Handle any remaining unclosed tags
   while (stack.length > 0) {
     const unclosed = stack.pop()!
-    const element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `ms-html-${autoKeySeed++}`)
+    const element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy)
     element != null && rootNodes.push(element)
     warn(`Auto-closing unclosed tag: <${unclosed.tagName}>`)
   }
@@ -114,8 +116,9 @@ function createReactElement(
   children: React.ReactNode[],
   customComponents: Record<string, ComponentType<any>>,
   autoKey: string,
+  htmlPolicy: HtmlPolicy,
 ): React.ReactNode {
-  if (BLOCKED_TAGS.has(tagName.toLowerCase()))
+  if (BLOCKED_TAGS.has(tagName.toLowerCase()) || isHtmlTagBlocked(tagName, htmlPolicy))
     return null
 
   const sanitizedAttrs = sanitizeHtmlAttrs(attrs)
@@ -140,13 +143,14 @@ function createReactElement(
 function parseHtmlToReactNodes(
   content: string,
   customComponents: Record<string, ComponentType<any>>,
+  htmlPolicy: HtmlPolicy = 'safe',
 ): React.ReactNode[] | null {
   if (!content)
     return []
 
   try {
     const tokens = tokenizeHtml(content)
-    const nodes = buildReactElementTree(tokens, customComponents)
+    const nodes = buildReactElementTree(tokens, customComponents, htmlPolicy)
     return nodes
   }
   catch (error) {
@@ -160,8 +164,9 @@ export function HtmlInlineNode(props: NodeComponentProps<{
   content: string
   loading?: boolean
   autoClosed?: boolean
-}>) {
+}> & { htmlPolicy?: HtmlPolicy }) {
   const { node, customId } = props
+  const htmlPolicy = props.htmlPolicy ?? props.ctx?.htmlPolicy ?? 'safe'
   const containerRef = useRef<HTMLSpanElement>(null)
   const [isClient, setIsClient] = useState(false)
 
@@ -171,7 +176,7 @@ export function HtmlInlineNode(props: NodeComponentProps<{
 
   // Get custom components from global registry
   const customComponents = getCustomNodeComponents(customId)
-  const safeHtmlContent = React.useMemo(() => sanitizeHtmlContent(node.content ?? ''), [node.content])
+  const safeHtmlContent = React.useMemo(() => sanitizeHtmlContent(node.content ?? '', htmlPolicy), [htmlPolicy, node.content])
 
   // Computed property to determine render mode and content
   const renderMode = React.useMemo(() => {
@@ -179,17 +184,20 @@ export function HtmlInlineNode(props: NodeComponentProps<{
     if (!content)
       return { mode: 'html', content: '' }
 
+    if (htmlPolicy === 'escape')
+      return { mode: 'html', content }
+
     // Check if content contains custom components
     if (!hasCustomHtmlComponents(content, customComponents))
       return { mode: 'html', content }
 
     // Parse and build React element tree
-    const nodes = parseHtmlToReactNodes(content, customComponents)
+    const nodes = parseHtmlToReactNodes(content, customComponents, htmlPolicy)
     if (nodes === null)
       return { mode: 'html', content } // Fallback to dangerouslySetInnerHTML if parsing fails
 
     return { mode: 'dynamic', nodes }
-  }, [node.content, customComponents])
+  }, [customComponents, htmlPolicy, node.content])
 
   // Use DOM manipulation for pure HTML (mode: 'html')
   useEffect(() => {

@@ -1,9 +1,11 @@
 import type { ComponentType, ReactNode } from 'react'
+import type { HtmlPolicy } from 'stream-markdown-parser'
 import React from 'react'
 import {
   BLOCKED_HTML_TAGS as BLOCKED_TAGS,
   hasCustomHtmlComponents as hasCustomHtmlComponentsBase,
   isCustomHtmlComponentTag,
+  isHtmlTagBlocked,
   sanitizeHtmlAttrs as sanitizeHtmlAttrsBase,
   tokenizeHtml as tokenizeHtmlBase,
 } from 'stream-markdown-parser'
@@ -78,9 +80,12 @@ export function hasCustomHtmlComponents(
 export function parseHtmlToReactNodes(
   content: string,
   customComponents: Record<string, ComponentType<any>>,
+  htmlPolicy: HtmlPolicy = 'safe',
 ): ReactNode[] | null {
   if (!content)
     return []
+  if (htmlPolicy === 'escape')
+    return [content]
 
   try {
     const tokens = tokenizeHtml(content)
@@ -98,7 +103,7 @@ export function parseHtmlToReactNodes(
       }
 
       if (token.type === 'self_closing') {
-        if (BLOCKED_TAGS.has(token.tagName.toLowerCase()))
+        if (BLOCKED_TAGS.has(token.tagName.toLowerCase()) || isHtmlTagBlocked(token.tagName, htmlPolicy))
           continue
         const attrs = sanitizeHtmlAttrs(token.attrs || {})
         const explicitKey = (attrs as any).key
@@ -121,11 +126,12 @@ export function parseHtmlToReactNodes(
       }
 
       if (token.type === 'tag_open') {
+        const parentBlocked = stack.length > 0 && stack[stack.length - 1].blocked
         stack.push({
           tagName: token.tagName,
           children: [],
           attrs: token.attrs,
-          blocked: BLOCKED_TAGS.has(token.tagName.toLowerCase()),
+          blocked: parentBlocked || BLOCKED_TAGS.has(token.tagName.toLowerCase()) || isHtmlTagBlocked(token.tagName, htmlPolicy),
         })
         continue
       }

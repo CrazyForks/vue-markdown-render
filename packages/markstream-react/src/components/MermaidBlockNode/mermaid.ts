@@ -4,7 +4,7 @@ let lastInitKey: string | null = null
 let pendingImport: Promise<any | null> | null = null
 
 function computeInitKey(config: Record<string, any>) {
-  const securityLevel = String(config?.securityLevel ?? 'loose')
+  const securityLevel = String(config?.securityLevel ?? 'strict')
   const htmlLabels = config?.flowchart?.htmlLabels
   return `${securityLevel}|htmlLabels:${htmlLabels === false ? '0' : '1'}`
 }
@@ -56,7 +56,7 @@ export async function getMermaid(initConfig?: Record<string, any>) {
           cachedMermaid = candidate
         if (!cachedMermaid)
           throw new Error('Mermaid module did not export expected API')
-        ensureInitialized(cachedMermaid, initConfig ?? { startOnLoad: false, securityLevel: 'loose' })
+        ensureInitialized(cachedMermaid, initConfig ?? { startOnLoad: false, securityLevel: 'strict', flowchart: { htmlLabels: false } })
         return cachedMermaid
       }
       catch (err) {

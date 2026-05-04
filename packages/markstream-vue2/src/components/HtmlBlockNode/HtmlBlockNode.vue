@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
-import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue-demi'
+import type { HtmlPolicy } from 'stream-markdown-parser'
+import { isHtmlTagBlocked, NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
+import { computed, defineComponent, inject, onBeforeUnmount, ref, watch } from 'vue-demi'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { renderMarkdownNodesToHtml } from '../../utils/nestedHtml'
@@ -16,7 +17,11 @@ const props = defineProps<{
     loading?: boolean
   }
   customId?: string
+  htmlPolicy?: HtmlPolicy
 }>()
+
+const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
 
 const boundAttrs = computed(() => {
   const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs)
@@ -43,20 +48,27 @@ const DynamicRenderer = defineComponent({
       type: Object as () => Record<string, any>,
       required: true,
     },
+    htmlPolicy: {
+      type: String as () => HtmlPolicy,
+      default: 'safe',
+    },
   },
   render() {
-    const nodes = parseHtmlToVNodes(this.content, this.customComponents)
+    const nodes = parseHtmlToVNodes(this.content, this.customComponents, undefined, this.htmlPolicy)
     return (nodes || []) as any
   },
 })
 
 const structuredChildren = computed(() => Array.isArray(props.node.children) ? props.node.children : [])
 const structuredTag = computed(() => String(props.node.tag || 'div'))
-const isBlockedStructuredTag = computed(() => NON_STRUCTURING_HTML_TAGS.has(structuredTag.value.trim().toLowerCase()))
+const isBlockedStructuredTag = computed(() => {
+  const tag = structuredTag.value.trim().toLowerCase()
+  return NON_STRUCTURING_HTML_TAGS.has(tag) || isHtmlTagBlocked(tag, resolvedHtmlPolicy.value)
+})
 const structuredHtml = computed(() => {
   if (structuredChildren.value.length === 0 || !props.node.tag || isBlockedStructuredTag.value)
     return ''
-  return renderMarkdownNodesToHtml(structuredChildren.value as any)
+  return renderMarkdownNodesToHtml(structuredChildren.value as any, { htmlPolicy: resolvedHtmlPolicy.value })
 })
 
 // Computed property to determine render mode and content
@@ -68,9 +80,12 @@ const renderMode = computed(() => {
   if (!content)
     return { mode: 'html', content: '' }
 
+  if (resolvedHtmlPolicy.value === 'escape')
+    return { mode: 'html', content: sanitizeHtmlContent(content, resolvedHtmlPolicy.value) }
+
   // Check if content contains custom components
   if (!hasCustomComponents(content, customComponents.value))
-    return { mode: 'html', content: sanitizeHtmlContent(content) }
+    return { mode: 'html', content: sanitizeHtmlContent(content, resolvedHtmlPolicy.value) }
 
   return { mode: 'dynamic', content }
 })
@@ -159,7 +174,7 @@ onBeforeUnmount(() => {
   >
     <template v-if="shouldRender">
       <!-- Use dynamic rendering for custom components -->
-      <DynamicRenderer v-if="renderMode.mode === 'dynamic'" :content="renderMode.content" :custom-components="customComponents" />
+      <DynamicRenderer v-if="renderMode.mode === 'dynamic'" :content="renderMode.content" :custom-components="customComponents" :html-policy="resolvedHtmlPolicy" />
       <!-- Fallback to v-html for standard HTML -->
       <div v-else v-bind="boundAttrs" v-html="renderMode.content" />
     </template>

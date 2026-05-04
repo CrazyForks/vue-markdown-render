@@ -152,6 +152,81 @@ describe('react: non-whitelisted custom HTML tags', () => {
     root.unmount()
   })
 
+  it('blocks active html tags by default and allows them with trusted policy', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          nodes: [
+            {
+              type: 'html_block',
+              content: '<div>Safe</div><iframe src="https://example.com"></iframe><form><input name="q"></form>',
+              raw: '',
+            },
+          ],
+          final: true,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.querySelector('iframe')).toBeNull()
+    expect(host.querySelector('form')).toBeNull()
+    expect(host.querySelector('input')).toBeNull()
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          nodes: [
+            {
+              type: 'html_block',
+              content: '<iframe src="https://example.com"></iframe>',
+              raw: '',
+            },
+          ],
+          htmlPolicy: 'trusted',
+          final: true,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.querySelector('iframe')).toBeTruthy()
+
+    root.unmount()
+  })
+
+  it('escapes html when htmlPolicy is escape', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          nodes: [
+            {
+              type: 'html_block',
+              content: '<div>Escaped</div>',
+              raw: '',
+            },
+          ],
+          htmlPolicy: 'escape',
+          final: true,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.innerHTML).toContain('&lt;div&gt;Escaped&lt;/div&gt;')
+    expect(host.textContent).toContain('<div>Escaped</div>')
+
+    root.unmount()
+  })
+
   it('renders markdown children inside standard html wrappers exactly once', async () => {
     const scopeId = 'react-structured-html-wrapper'
     const markdown = `<span style="font-size: 12px;">

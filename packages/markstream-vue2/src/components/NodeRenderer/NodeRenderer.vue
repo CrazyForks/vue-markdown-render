@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from '../../types/component-props'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
 import { h as createVNode } from 'vue'
-import { computed, getCurrentInstance, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue-demi'
+import { computed, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -70,6 +70,7 @@ export interface NodeRendererProps {
    * and are emitted as custom nodes (e.g. ['thinking']). Forwarded to `getMarkdown()`.
    */
   customHtmlTags?: readonly string[]
+  htmlPolicy?: HtmlPolicy
   /** Enable priority rendering for visible viewport area */
   viewportPriority?: boolean
   /**
@@ -166,8 +167,11 @@ const resolvedShowTooltips = computed<boolean | undefined>(() => {
     return false
   return undefined
 })
+const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
 
 provide('markstreamShowTooltips', resolvedShowTooltips)
+provide('markstreamHtmlPolicy', resolvedHtmlPolicy)
 provide('markstreamTypewriter', computed(() => props.typewriter !== false))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)
@@ -1731,6 +1735,7 @@ const nonCodeBindings = computed(() => ({
   typewriter: props.typewriter,
   // Forward customHtmlTags for non-whitelisted tag detection in child components
   customHtmlTags: mergedParseOptions.value.customHtmlTags,
+  htmlPolicy: resolvedHtmlPolicy.value,
 }))
 const linkBindings = computed(() => ({
   ...nonCodeBindings.value,
@@ -2131,7 +2136,8 @@ function handleContainerMouseout(event: MouseEvent) {
       :code-block-props="props.codeBlockProps"
       :themes="props.themes"
       :is-dark="props.isDark"
-      :custom-html-tags="mergedParseOptions.value.customHtmlTags"
+      :custom-html-tags="mergedParseOptions.customHtmlTags"
+      :html-policy="resolvedHtmlPolicy"
       @copy="emit('copy', $event)"
       @handle-artifact-click="emit('handleArtifactClick', $event)"
     />

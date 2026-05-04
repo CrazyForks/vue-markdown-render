@@ -196,7 +196,7 @@ const DEFAULTS = {
   showCollapseButton: true,
   showZoomControls: true,
   enableWheelZoom: false,
-  isStrict: false,
+  isStrict: true,
 }
 
 export interface MermaidBlockNodeReactEvents {

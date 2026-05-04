@@ -1,5 +1,5 @@
 import type React from 'react'
-import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type {
   CodeBlockMonacoOptions,
   CodeBlockMonacoTheme,
@@ -28,6 +28,7 @@ export interface NodeRendererProps {
    * Forwarded to `getMarkdown()` and merged into parseOptions.
    */
   customHtmlTags?: readonly string[]
+  htmlPolicy?: HtmlPolicy
   viewportPriority?: boolean
   codeBlockStream?: boolean
   codeBlockDarkTheme?: CodeBlockMonacoTheme
@@ -71,6 +72,7 @@ export interface RenderContext {
   streamRenderVersion?: number
   customComponents?: Record<string, React.ComponentType<any>>
   customHtmlTags?: readonly string[]
+  htmlPolicy?: HtmlPolicy
   codeBlockProps?: NodeRendererCodeBlockProps
   mermaidProps?: Partial<Omit<MermaidBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   d2Props?: Partial<Omit<D2BlockNodeProps, 'node' | 'loading' | 'isDark'>>

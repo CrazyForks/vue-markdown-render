@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BaseNode, ParsedNode } from 'stream-markdown-parser'
+import type { BaseNode, HtmlPolicy, ParsedNode } from 'stream-markdown-parser'
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
 import { computed } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
@@ -55,6 +55,7 @@ const props = withDefaults(defineProps<{
   themes?: string[]
   isDark?: boolean
   customHtmlTags?: readonly string[]
+  htmlPolicy?: HtmlPolicy
 }>(), {
   codeBlockStream: true,
   showTooltips: true,
@@ -115,7 +116,7 @@ const codeBlockBindings = computed(() => ({
   maxWidth: props.codeBlockMaxWidth,
   ...(props.codeBlockProps || {}),
 }))
-const nonCodeBindings = computed(() => ({ typewriter: props.typewriter }))
+const nonCodeBindings = computed(() => ({ typewriter: props.typewriter, htmlPolicy: props.htmlPolicy ?? 'safe' }))
 const linkBindings = computed(() => ({
   ...nonCodeBindings.value,
   ...(typeof props.showTooltips === 'boolean' ? { showTooltip: props.showTooltips } : {}),

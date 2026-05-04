@@ -67,7 +67,7 @@ const props = withDefaults(
     showCollapseButton: true,
     showZoomControls: true,
     enableWheelZoom: false,
-    isStrict: false,
+    isStrict: true,
   },
 )
 
