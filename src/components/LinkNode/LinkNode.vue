@@ -109,6 +109,7 @@ const finalTarget = computed(() => {
   const normalized = typeof rawTarget === 'string' ? rawTarget.trim() : String(rawTarget ?? '').trim()
   return normalized || '_blank'
 })
+const isBlankTarget = computed(() => finalTarget.value.trim().toLowerCase() === '_blank')
 const finalRel = computed(() => {
   const rawRel = mergedAnchorAttrs.value.rel
   const tokens = new Set(
@@ -117,7 +118,7 @@ const finalRel = computed(() => {
       .filter(Boolean),
   )
 
-  if (finalTarget.value === '_blank') {
+  if (isBlankTarget.value) {
     tokens.add('noopener')
     tokens.add('noreferrer')
   }

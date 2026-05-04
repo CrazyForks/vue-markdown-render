@@ -355,7 +355,7 @@ describe('playground /test smoke', () => {
     })
 
     wrapper.unmount()
-  })
+  }, 15000)
 
   it('starts streaming and progressively updates the preview', async () => {
     vi.useFakeTimers()

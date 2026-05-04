@@ -27,6 +27,15 @@ describe('sanitizeHtmlContent', () => {
     expect(html).not.toContain('<span style=')
   })
 
+  it('keeps safe mode on a minimal allowlist instead of broad standard html', () => {
+    const html = sanitizeHtmlContent('<details><summary>More</summary><p>Body</p></details><video src="clip.mp4"></video><canvas></canvas><html><body>Document</body></html>')
+
+    expect(html).toContain('<details><summary>More</summary><p>Body</p></details>')
+    expect(html).toContain('&lt;video src="clip.mp4"&gt;&lt;/video&gt;')
+    expect(html).toContain('&lt;canvas&gt;&lt;/canvas&gt;')
+    expect(html).toContain('&lt;html&gt;&lt;body&gt;Document&lt;/body&gt;&lt;/html&gt;')
+  })
+
   it('sanitizes srcset candidates instead of treating the whole value as one URL', () => {
     const safeHtml = sanitizeHtmlContent('<img src="cover.jpg" srcset="cover-1x.jpg 1x, cover-2x.jpg 2x">')
     const unsafeHtml = sanitizeHtmlContent('<img src="cover.jpg" srcset="javascript:alert(1) 1x, cover-2x.jpg 2x">')
@@ -36,11 +45,13 @@ describe('sanitizeHtmlContent', () => {
   })
 
   it('can preserve broader HTML tags for trusted content', () => {
-    const html = sanitizeHtmlContent('<iframe src="https://example.com"></iframe><style>body{color:red}</style><span style="color:red">Styled</span><script>alert(1)</script>', 'trusted')
+    const html = sanitizeHtmlContent('<iframe src="https://example.com"></iframe><style>body{color:red}</style><span style="color:red">Styled</span><video src="clip.mp4"></video><html><body>Doc</body></html><script>alert(1)</script>', 'trusted')
 
     expect(html).toContain('<iframe src="https://example.com"></iframe>')
     expect(html).toContain('<style>body{color:red}</style>')
     expect(html).toContain('<span style="color:red">Styled</span>')
+    expect(html).toContain('<video src="clip.mp4"></video>')
+    expect(html).toContain('<html><body>Doc</body></html>')
     expect(html).not.toContain('<script')
     expect(html).not.toContain('alert(1)')
   })
