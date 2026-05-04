@@ -67,6 +67,7 @@ function resolveHtmlPreviewSandboxValue(htmlPreviewSandbox: unknown, htmlPreview
         <iframe
           class="html-preview-frame__iframe"
           [attr.sandbox]="sandboxValue"
+          referrerpolicy="no-referrer"
           [srcdoc]="srcdoc"
           [title]="resolvedTitle"
         ></iframe>

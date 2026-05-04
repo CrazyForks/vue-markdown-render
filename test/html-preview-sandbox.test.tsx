@@ -43,6 +43,7 @@ describe('html preview sandbox defaults', () => {
 
     expect(getIframe()).not.toBeNull()
     expect(getIframe()?.getAttribute('sandbox')).toBe('')
+    expect(getIframe()?.getAttribute('referrerpolicy')).toBe('no-referrer')
     expect(getIframe()?.getAttribute('sandbox')).not.toContain('allow-scripts')
     expect(getIframe()?.getAttribute('sandbox')).not.toContain('allow-same-origin')
 
@@ -61,6 +62,7 @@ describe('html preview sandbox defaults', () => {
   it('keeps Vue 2 previews script-disabled by default and opt-in for scripts only', () => {
     const componentSource = source('packages/markstream-vue2/src/components/CodeBlockNode/HtmlPreviewFrame.vue')
     expect(componentSource).toContain(':sandbox="sandboxValue"')
+    expect(componentSource).toContain('referrerpolicy="no-referrer"')
     expect(componentSource).toContain('typeof htmlPreviewSandbox === \'string\'')
     expect(componentSource).toContain('if (htmlPreviewSandbox !== undefined)')
     expect(componentSource).toContain('return htmlPreviewAllowScripts === true ? \'allow-scripts\' : \'\'')
@@ -82,6 +84,7 @@ describe('html preview sandbox defaults', () => {
 
     expect(getIframe()).not.toBeNull()
     expect(getIframe()?.getAttribute('sandbox')).toBe('')
+    expect(getIframe()?.getAttribute('referrerpolicy')).toBe('no-referrer')
     expect(getIframe()?.getAttribute('sandbox')).not.toContain('allow-scripts')
     expect(getIframe()?.getAttribute('sandbox')).not.toContain('allow-same-origin')
 
@@ -151,6 +154,7 @@ describe('html preview sandbox defaults', () => {
   it('keeps Angular previews script-disabled by default and only enables requested sandbox tokens', () => {
     const componentSource = source('packages/markstream-angular/src/components/CodeBlockNode/HtmlPreviewFrame.component.ts')
     expect(componentSource).toContain('[attr.sandbox]="sandboxValue"')
+    expect(componentSource).toContain('referrerpolicy="no-referrer"')
     expect(componentSource).toContain('@Input() htmlPreviewAllowScripts = false')
     expect(componentSource).toContain('@Input() htmlPreviewSandbox?: string')
     expect(componentSource).toContain('typeof htmlPreviewSandbox === \'string\'')

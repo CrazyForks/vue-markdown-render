@@ -123,6 +123,7 @@ onUnmounted(() => {
           <iframe
             class="html-preview-frame__iframe"
             :sandbox="sandboxValue"
+            referrerpolicy="no-referrer"
             :srcdoc="srcdoc"
           />
         </div>
