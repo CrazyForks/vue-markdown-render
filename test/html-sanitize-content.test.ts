@@ -19,11 +19,28 @@ describe('sanitizeHtmlContent', () => {
     expect(html).toBe('<div>Safe</div>')
   })
 
+  it('escapes unknown tags and removes style in safe mode', () => {
+    const html = sanitizeHtmlContent('<unknown-tag style="position:fixed">Hello</unknown-tag><span style="color:red">World</span>')
+
+    expect(html).toContain('&lt;unknown-tag style="position:fixed"&gt;Hello&lt;/unknown-tag&gt;')
+    expect(html).toContain('<span>World</span>')
+    expect(html).not.toContain('<span style=')
+  })
+
+  it('sanitizes srcset candidates instead of treating the whole value as one URL', () => {
+    const safeHtml = sanitizeHtmlContent('<img src="cover.jpg" srcset="cover-1x.jpg 1x, cover-2x.jpg 2x">')
+    const unsafeHtml = sanitizeHtmlContent('<img src="cover.jpg" srcset="javascript:alert(1) 1x, cover-2x.jpg 2x">')
+
+    expect(safeHtml).toContain('srcset="cover-1x.jpg 1x, cover-2x.jpg 2x"')
+    expect(unsafeHtml).toBe('<img src="cover.jpg">')
+  })
+
   it('can preserve broader HTML tags for trusted content', () => {
-    const html = sanitizeHtmlContent('<iframe src="https://example.com"></iframe><style>body{color:red}</style><script>alert(1)</script>', 'trusted')
+    const html = sanitizeHtmlContent('<iframe src="https://example.com"></iframe><style>body{color:red}</style><span style="color:red">Styled</span><script>alert(1)</script>', 'trusted')
 
     expect(html).toContain('<iframe src="https://example.com"></iframe>')
     expect(html).toContain('<style>body{color:red}</style>')
+    expect(html).toContain('<span style="color:red">Styled</span>')
     expect(html).not.toContain('<script')
     expect(html).not.toContain('alert(1)')
   })

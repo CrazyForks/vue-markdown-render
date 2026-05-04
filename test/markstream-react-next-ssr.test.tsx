@@ -558,7 +558,7 @@ describe('markstream-react next/server SSR', () => {
     }
   })
 
-  it('keeps closed unknown tags as raw HTML and escapes malformed ones in the server entry', async () => {
+  it('drops closed unknown tags in safe mode and still escapes malformed ones in the server entry', async () => {
     const serverEntry = await import('../packages/markstream-react/src/server')
 
     const closedHtml = renderToStaticMarkup(
@@ -567,7 +567,8 @@ describe('markstream-react next/server SSR', () => {
         final: true,
       }),
     )
-    expect(closedHtml).toContain('<question>ok</question>')
+    expect(closedHtml).not.toContain('<question>')
+    expect(closedHtml).not.toContain('ok</question>')
 
     const malformedHtml = renderToStaticMarkup(
       React.createElement(serverEntry.NodeRenderer, {
@@ -579,7 +580,7 @@ describe('markstream-react next/server SSR', () => {
     expect(malformedHtml).not.toContain('&amp;lt;')
   })
 
-  it('renders structured html wrappers on the server without structuring blocked tags', async () => {
+  it('renders structured html wrappers on the server without keeping safe-policy style attrs', async () => {
     const serverEntry = await import('../packages/markstream-react/src/server')
 
     const structuredHtml = renderToStaticMarkup(
@@ -603,7 +604,7 @@ describe('markstream-react next/server SSR', () => {
     )
 
     expect(structuredHtml).toContain('<span')
-    expect(structuredHtml).toContain('font-size:12px')
+    expect(structuredHtml).not.toContain('font-size:12px')
     expect(structuredHtml).toContain('<ul')
     expect(structuredHtml).toContain('alpha')
     expect(structuredHtml).toContain('beta')

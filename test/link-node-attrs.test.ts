@@ -42,8 +42,49 @@ describe('linkNode attrs passthrough', () => {
     await flushAll()
     const a = wrapper.get('a.link-node')
     expect(a.attributes('target')).toBe('_self')
-    expect(a.attributes('rel')).toBe('nofollow')
+    expect(a.attributes('rel')?.split(/\s+/).sort()).toEqual(['nofollow'])
     expect(a.attributes('data-track')).toBe('cta')
+  })
+
+  it('preserves noopener noreferrer whenever attrs keep target at _blank', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        typewriter: false,
+        batchRendering: false,
+        nodes: [
+          {
+            type: 'paragraph',
+            raw: '',
+            children: [
+              {
+                type: 'link',
+                href: 'https://example.com',
+                title: null,
+                text: 'Example',
+                raw: '[Example](https://example.com)',
+                attrs: [
+                  ['target', '_blank'],
+                  ['rel', 'opener nofollow'],
+                ],
+                children: [
+                  {
+                    type: 'text',
+                    content: 'Example',
+                    raw: 'Example',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+    const relTokens = new Set((wrapper.get('a.link-node').attributes('rel') ?? '').split(/\s+/).filter(Boolean))
+    expect(relTokens.has('nofollow')).toBe(true)
+    expect(relTokens.has('noopener')).toBe(true)
+    expect(relTokens.has('noreferrer')).toBe(true)
   })
 
   it('sanitizes dangerous node.attrs before binding', async () => {

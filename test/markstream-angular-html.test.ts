@@ -163,6 +163,16 @@ describe('markstream-angular html renderer', () => {
     expect(escapedHtml).toBe('&lt;div&gt;Escaped&lt;/div&gt;')
   })
 
+  it('escapes unknown tags and strips safe-policy style/srcset hazards', () => {
+    const safeHtml = sanitizeHtmlFragment('<unknown-tag style="position:fixed">Hello</unknown-tag><img src="cover.jpg" srcset="javascript:alert(1) 1x, cover-2x.jpg 2x"><span style="color:red">World</span>')
+
+    expect(safeHtml).toContain('&lt;unknown-tag style="position:fixed"&gt;Hello&lt;/unknown-tag&gt;')
+    expect(safeHtml).toContain('<img src="cover.jpg">')
+    expect(safeHtml).toContain('<span>World</span>')
+    expect(safeHtml).not.toContain('srcset=')
+    expect(safeHtml).not.toContain('<span style=')
+  })
+
   it('omits unsafe link hrefs in static html rendering', () => {
     const html = renderMarkdownNodeToHtml({
       type: 'link',

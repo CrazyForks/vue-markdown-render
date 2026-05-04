@@ -91,8 +91,8 @@ function renderStaticCodeShell(
   )
 }
 
-function mergeHtmlBlockWrapperProps(attrs?: [string, string | null][] | null) {
-  const normalized = normalizeDomAttrs((tokenAttrsToProps(sanitizeHtmlTokenAttrs(attrs ?? undefined)) as Record<string, string> | undefined) || {})
+function mergeHtmlBlockWrapperProps(attrs?: [string, string | null][] | null, htmlPolicy: HtmlPolicy = 'safe') {
+  const normalized = normalizeDomAttrs((tokenAttrsToProps(sanitizeHtmlTokenAttrs(attrs ?? undefined, htmlPolicy)) as Record<string, string> | undefined) || {})
   const next = { ...normalized }
   const existing = typeof next.className === 'string' ? next.className.trim() : ''
   next.className = existing ? `html-block-node ${existing}` : 'html-block-node'
@@ -953,7 +953,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   ) {
     return React.createElement(
       structuredTag,
-      mergeHtmlBlockWrapperProps((props.node as any)?.attrs ?? null),
+      mergeHtmlBlockWrapperProps((props.node as any)?.attrs ?? null, props.ctx?.htmlPolicy ?? 'safe'),
       renderNodeChildren(
         structuredChildren,
         props.ctx,

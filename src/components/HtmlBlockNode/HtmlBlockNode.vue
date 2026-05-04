@@ -28,7 +28,7 @@ const StructuredNodeRenderer = defineAsyncComponent({
 })
 
 const boundAttrs = computed(() => {
-  const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs)
+  const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs, resolvedHtmlPolicy.value)
   if (!sanitizedAttrs)
     return undefined
   const record = tokenAttrsToRecord(sanitizedAttrs)

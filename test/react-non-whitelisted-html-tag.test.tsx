@@ -287,7 +287,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
     root.unmount()
   })
 
-  it('renders closed non-whitelisted custom tag as raw HTML', async () => {
+  it('renders closed non-whitelisted custom tag as escaped text in safe mode', async () => {
     const scopeId = 'react-closed-unknown-tag'
     const markdown = `<echat-url>content</echat-url>`
     const host = document.createElement('div')
@@ -305,7 +305,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
     })
     await flushReact()
 
-    expect(host.innerHTML).toMatch(/<echat-url[^>]*>content<\/echat-url>/i)
+    expect(host.innerHTML).toContain('&lt;echat-url&gt;content&lt;/echat-url&gt;')
 
     root.unmount()
   })

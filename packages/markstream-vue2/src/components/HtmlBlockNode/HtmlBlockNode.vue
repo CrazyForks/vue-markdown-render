@@ -24,7 +24,7 @@ const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstre
 const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
 
 const boundAttrs = computed(() => {
-  const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs)
+  const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs, resolvedHtmlPolicy.value)
   if (!sanitizedAttrs)
     return undefined
   const record = tokenAttrsToRecord(sanitizedAttrs)

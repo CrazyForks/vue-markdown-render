@@ -98,15 +98,42 @@ const nodeAttrs = computed(() => {
 
   return sanitizeAttrs(normalized)
 })
-const anchorAttrs = computed(() => {
-  const merged = {
+const mergedAnchorAttrs = computed(() => {
+  return {
     ...(attrs as Record<string, unknown>),
     ...nodeAttrs.value,
+  } as Record<string, unknown>
+})
+const finalTarget = computed(() => {
+  const rawTarget = mergedAnchorAttrs.value.target
+  const normalized = typeof rawTarget === 'string' ? rawTarget.trim() : String(rawTarget ?? '').trim()
+  return normalized || '_blank'
+})
+const finalRel = computed(() => {
+  const rawRel = mergedAnchorAttrs.value.rel
+  const tokens = new Set(
+    (typeof rawRel === 'string' ? rawRel : String(rawRel ?? ''))
+      .split(/\s+/)
+      .filter(Boolean),
+  )
+
+  if (finalTarget.value === '_blank') {
+    tokens.add('noopener')
+    tokens.add('noreferrer')
+  }
+
+  return tokens.size > 0 ? Array.from(tokens).join(' ') : undefined
+})
+const anchorAttrs = computed(() => {
+  const merged = {
+    ...mergedAnchorAttrs.value,
   } as Record<string, unknown>
   // `title` is controlled by `showTooltip` behavior and should not be overridden.
   delete merged.title
   // `href` is controlled by safeHref so attrs cannot override node.href.
   delete merged.href
+  delete merged.target
+  delete merged.rel
   return merged
 })
 
@@ -147,8 +174,8 @@ const title = computed(() => {
     :title="tooltipEnabled ? '' : title"
     :aria-label="`Link: ${title}`"
     :aria-hidden="node.loading ? 'true' : 'false'"
-    target="_blank"
-    rel="noopener noreferrer"
+    :target="finalTarget"
+    :rel="finalRel"
     v-bind="anchorAttrs"
     :style="cssVars"
     @mouseenter="(e) => onAnchorEnter(e)"

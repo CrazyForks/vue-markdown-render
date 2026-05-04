@@ -78,12 +78,24 @@ describe('htmlRenderer', () => {
       const attrs = {
         'class': 'test-class',
         'id': 'test-id',
-        'style': 'color: red;',
         'data-type': 'custom',
         'aria-label': 'Test',
       }
       const result = sanitizeAttrs(attrs)
       expect(result).toEqual(attrs)
+    })
+
+    it('should remove style by default but preserve safe srcset candidates', () => {
+      const result = sanitizeAttrs({
+        'style': 'color: red;',
+        'srcset': 'cover-1x.jpg 1x, cover-2x.jpg 2x',
+        'data-type': 'custom',
+      })
+
+      expect(result).toEqual({
+        'srcset': 'cover-1x.jpg 1x, cover-2x.jpg 2x',
+        'data-type': 'custom',
+      })
     })
 
     it('should handle empty attributes', () => {
@@ -486,6 +498,14 @@ describe('htmlRenderer', () => {
       const nodes = parseHtmlToVNodes(html, {}, 'trusted')
       expect(nodes).not.toBeNull()
       expect((nodes || []).some((n: any) => typeof n === 'object' && n?.type === 'iframe')).toBe(true)
+    })
+
+    it('should not render unknown tags as live VNodes in safe mode', () => {
+      const html = '<unknown-tag>ok</unknown-tag><div>safe</div>'
+      const nodes = parseHtmlToVNodes(html, {})
+      expect(nodes).not.toBeNull()
+      expect((nodes || []).some((n: any) => typeof n === 'object' && n?.type === 'unknown-tag')).toBe(false)
+      expect((nodes || []).some((n: any) => typeof n === 'object' && n?.type === 'div')).toBe(true)
     })
   })
 })

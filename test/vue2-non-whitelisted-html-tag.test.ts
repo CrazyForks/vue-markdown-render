@@ -92,7 +92,7 @@ describe('vue2: non-whitelisted custom HTML tags', () => {
     }
   })
 
-  it('renders closed non-whitelisted custom tag as raw HTML', async () => {
+  it('renders closed non-whitelisted custom tag as escaped text in safe mode', async () => {
     const scopeId = 'vue2-closed-unknown-tag'
     const markdown = `<echat-url>content</echat-url>`
     const wrapper = await mount(MarkdownRender, {
@@ -105,7 +105,7 @@ describe('vue2: non-whitelisted custom HTML tags', () => {
     await flushAll()
     try {
       const html = wrapper.html()
-      expect(html).toMatch(/<echat-url[^>]*>content<\/echat-url>/i)
+      expect(html).toContain('&lt;echat-url&gt;content&lt;/echat-url&gt;')
     }
     finally {
       wrapper.unmount()
@@ -125,10 +125,10 @@ describe('vue2: non-whitelisted custom HTML tags', () => {
     })
     await flushAll()
     try {
-      const html = wrapper.html()
-      expect(html).toContain('Hello')
-      expect(html).toMatch(/<unknown-tag[^>]*>world<\/unknown-tag>/i)
-      expect(html).toContain('!')
+      const text = normalizeText(wrapper.text())
+      expect(text).toContain('Hello')
+      expect(text).toContain('world')
+      expect(text).toContain('!')
     }
     finally {
       wrapper.unmount()
@@ -208,13 +208,13 @@ After list.`
     })
     await flushAll()
     try {
-      const html = wrapper.html()
-      expect(html).toContain('Before list')
-      expect(html).toContain('After list')
-      expect(html).toContain('Item with')
-      expect(html).toMatch(/<custom-tag[^>]*>inline content<\/custom-tag>/i)
-      expect(html).toContain('and more text')
-      expect(html).toContain('Another item')
+      const text = normalizeText(wrapper.text())
+      expect(text).toContain('Before list')
+      expect(text).toContain('After list')
+      expect(text).toContain('Item with')
+      expect(text).toContain('inline content')
+      expect(text).toContain('and more text')
+      expect(text).toContain('Another item')
     }
     finally {
       wrapper.unmount()

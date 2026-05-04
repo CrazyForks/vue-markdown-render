@@ -204,12 +204,13 @@ function createVNode(
   createElement?: CreateElementLike,
   htmlPolicy: HtmlPolicy = 'safe',
 ): any {
-  if (BLOCKED_TAGS.has(tagName.toLowerCase()) || isHtmlTagBlocked(tagName, htmlPolicy))
+  const customComponent = isCustomComponent(tagName, customComponents)
+  if (BLOCKED_TAGS.has(tagName.toLowerCase()) || (!customComponent && isHtmlTagBlocked(tagName, htmlPolicy)))
     return null
 
-  const sanitizedAttrs = sanitizeAttrs(attrs)
+  const sanitizedAttrs = sanitizeHtmlAttrs(attrs, htmlPolicy)
 
-  if (isCustomComponent(tagName, customComponents)) {
+  if (customComponent) {
     // It's a custom Vue component
     const component = customComponents[tagName] || customComponents[tagName.toLowerCase()]
     const convertedAttrs = convertAttrsToProps(sanitizedAttrs)

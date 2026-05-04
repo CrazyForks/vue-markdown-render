@@ -118,14 +118,15 @@ function createReactElement(
   autoKey: string,
   htmlPolicy: HtmlPolicy,
 ): React.ReactNode {
-  if (BLOCKED_TAGS.has(tagName.toLowerCase()) || isHtmlTagBlocked(tagName, htmlPolicy))
+  const customComponent = isCustomHtmlComponent(tagName, customComponents)
+  if (BLOCKED_TAGS.has(tagName.toLowerCase()) || (!customComponent && isHtmlTagBlocked(tagName, htmlPolicy)))
     return null
 
-  const sanitizedAttrs = sanitizeHtmlAttrs(attrs)
+  const sanitizedAttrs = sanitizeHtmlAttrs(attrs, htmlPolicy)
   const explicitKey = (sanitizedAttrs as any).key
   const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : autoKey
 
-  if (isCustomHtmlComponent(tagName, customComponents)) {
+  if (customComponent) {
     // It's a custom React component
     const component = customComponents[tagName] || customComponents[tagName.toLowerCase()]
     const convertedAttrs = convertAttrsToProps(sanitizedAttrs)

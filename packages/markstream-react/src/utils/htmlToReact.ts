@@ -105,7 +105,7 @@ export function parseHtmlToReactNodes(
       if (token.type === 'self_closing') {
         if (BLOCKED_TAGS.has(token.tagName.toLowerCase()) || isHtmlTagBlocked(token.tagName, htmlPolicy))
           continue
-        const attrs = sanitizeHtmlAttrs(token.attrs || {})
+        const attrs = sanitizeHtmlAttrs(token.attrs || {}, htmlPolicy)
         const explicitKey = (attrs as any).key
         const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
         const Comp = isCustomHtmlComponent(token.tagName, customComponents)
@@ -140,7 +140,7 @@ export function parseHtmlToReactNodes(
       if (!opening || opening.blocked)
         continue
 
-      const attrs = sanitizeHtmlAttrs(opening.attrs || {})
+      const attrs = sanitizeHtmlAttrs(opening.attrs || {}, htmlPolicy)
       const explicitKey = (attrs as any).key
       const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
       const Comp = isCustomHtmlComponent(opening.tagName, customComponents)
@@ -164,7 +164,7 @@ export function parseHtmlToReactNodes(
       const unclosed = stack.pop()
       if (!unclosed || unclosed.blocked)
         continue
-      const attrs = sanitizeHtmlAttrs(unclosed.attrs || {})
+      const attrs = sanitizeHtmlAttrs(unclosed.attrs || {}, htmlPolicy)
       const explicitKey = (attrs as any).key
       const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
       const Comp = isCustomHtmlComponent(unclosed.tagName, customComponents)

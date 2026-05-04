@@ -85,9 +85,9 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   }, [isDeferred, node.content, shouldRender])
 
   const boundAttrs = useMemo(() => {
-    const rawAttrs = tokenAttrsToProps(sanitizeHtmlTokenAttrs(node.attrs ?? undefined))
+    const rawAttrs = tokenAttrsToProps(sanitizeHtmlTokenAttrs(node.attrs ?? undefined, htmlPolicy))
     return rawAttrs ? normalizeDomAttrs(rawAttrs as Record<string, string>) : undefined
-  }, [node.attrs])
+  }, [htmlPolicy, node.attrs])
   const structuredTag = useMemo(() => String(node.tag ?? '').trim(), [node.tag])
   const structuredChildren = useMemo(() => Array.isArray(node.children) ? node.children : [], [node.children])
   const isStructured = structuredChildren.length > 0
