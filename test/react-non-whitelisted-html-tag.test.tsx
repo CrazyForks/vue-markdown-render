@@ -199,6 +199,75 @@ describe('react: non-whitelisted custom HTML tags', () => {
     root.unmount()
   })
 
+  it('keeps registered custom components live while rendering unknown tags as literal text on the dynamic path', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const MyComp: React.FC<React.PropsWithChildren> = ({ children }) => (
+      <mark data-react-custom="1">{children}</mark>
+    )
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(HtmlBlockNode as any, {
+          node: {
+            type: 'html_block',
+            content: '<mycomp>ok</mycomp><unknown-tag>keep</unknown-tag>',
+            loading: false,
+          },
+          customId: 'react-dynamic-html-mixed',
+          customComponents: { mycomp: MyComp },
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.querySelector('[data-react-custom="1"]')?.textContent).toBe('ok')
+    expect(host.textContent).toContain('keep')
+    expect(host.querySelector('unknown-tag')).toBeNull()
+    expect(host.innerHTML).toContain('&lt;unknown-tag&gt;keep&lt;/unknown-tag&gt;')
+
+    root.unmount()
+  })
+
+  it('keeps registered custom components live for inline dynamic html while rendering unknown tags as literal text', async () => {
+    const scopeId = 'react-inline-dynamic-html-mixed'
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const MyComp: React.FC<React.PropsWithChildren> = ({ children }) => (
+      <mark data-react-inline-custom="1">{children}</mark>
+    )
+
+    setCustomComponents(scopeId, { mycomp: MyComp })
+
+    try {
+      await act(async () => {
+        root.render(
+          React.createElement(StrictMode, null, React.createElement(HtmlInlineNode as any, {
+            node: {
+              type: 'html_inline',
+              content: '<mycomp>ok</mycomp><unknown-tag>keep</unknown-tag>',
+              loading: false,
+              autoClosed: true,
+            },
+            customId: scopeId,
+          })),
+        )
+      })
+      await flushReact()
+
+      expect(host.querySelector('[data-react-inline-custom="1"]')?.textContent).toBe('ok')
+      expect(host.textContent).toContain('keep')
+      expect(host.querySelector('unknown-tag')).toBeNull()
+      expect(host.innerHTML).toContain('&lt;unknown-tag&gt;keep&lt;/unknown-tag&gt;')
+    }
+    finally {
+      root.unmount()
+      removeCustomComponents(scopeId)
+    }
+  })
+
   it('escapes html when htmlPolicy is escape', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

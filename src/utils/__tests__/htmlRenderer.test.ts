@@ -282,6 +282,17 @@ describe('htmlRenderer', () => {
       const nodes = parseHtmlToVNodes('', {})
       expect(nodes).toEqual([])
     })
+
+    it('should preserve custom components while keeping unknown tags as literal text in safe mode', () => {
+      const nodes = parseHtmlToVNodes('<mycomp data-type="test">ok</mycomp><unknown-tag>keep</unknown-tag>', {
+        mycomp: MockComponentA,
+      })
+
+      expect(nodes).not.toBeNull()
+      const stringNodes = (nodes || []).filter((node): node is string => typeof node === 'string')
+      expect(stringNodes).toEqual(['<unknown-tag>', 'keep', '</unknown-tag>'])
+      expect((nodes || []).some((node: any) => typeof node === 'object' && typeof node?.type !== 'string')).toBe(true)
+    })
   })
 
   describe('hasCustomComponents', () => {

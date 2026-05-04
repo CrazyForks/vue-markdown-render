@@ -9,6 +9,7 @@ import {
   hasCustomHtmlComponents,
   isCustomHtmlComponentTag,
   isHtmlTagBlocked,
+  isHtmlTagHardBlocked,
   sanitizeHtmlAttrs,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
@@ -121,6 +122,23 @@ export function convertAttrsToProps(attrs: Record<string, string>): Record<strin
   return convertHtmlAttrsToProps(attrs)
 }
 
+function renderLiteralTagText(tagName: string, attrs?: Record<string, string>, isSelfClosing = false) {
+  const pairs = Object.entries(attrs ?? {})
+  const serializedAttrs = pairs.length > 0
+    ? pairs.map(([name, value]) => value === '' ? ` ${name}` : ` ${name}="${value}"`).join('')
+    : ''
+  return isSelfClosing
+    ? `<${tagName}${serializedAttrs} />`
+    : `<${tagName}${serializedAttrs}>`
+}
+
+function pushRenderedNode(target: any[], rendered: any) {
+  if (Array.isArray(rendered))
+    target.push(...rendered)
+  else if (rendered != null)
+    target.push(rendered)
+}
+
 /**
  * Build VNode tree from tokens
  */
@@ -141,7 +159,7 @@ export function buildVNodeTree(
     else if (token.type === 'self_closing') {
       const vnode = createVNode(token.tagName!, token.attrs || {}, [], customComponents, createElement, htmlPolicy)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
-      vnode != null && target.push(vnode)
+      pushRenderedNode(target, vnode)
     }
     else if (token.type === 'tag_open') {
       stack.push({ tagName: token.tagName!, children: [], attrs: token.attrs })
@@ -165,9 +183,9 @@ export function buildVNodeTree(
           const vnode = createVNode(opening.tagName, opening.attrs || {}, opening.children, customComponents, createElement, htmlPolicy)
 
           if (stack.length > 0)
-            vnode != null && stack[stack.length - 1].children.push(vnode)
+            pushRenderedNode(stack[stack.length - 1].children, vnode)
           else
-            vnode != null && rootNodes.push(vnode)
+            pushRenderedNode(rootNodes, vnode)
 
           // Warn if auto-closing tags
           if (opening.tagName.toLowerCase() !== closingTag && stack.length > matchedIndex) {
@@ -186,7 +204,7 @@ export function buildVNodeTree(
   while (stack.length > 0) {
     const unclosed = stack.pop()!
     const vnode = createVNode(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, createElement, htmlPolicy)
-    vnode != null && rootNodes.push(vnode)
+    pushRenderedNode(rootNodes, vnode)
     warn(`Auto-closing unclosed tag: <${unclosed.tagName}>`)
   }
 
@@ -205,8 +223,16 @@ function createVNode(
   htmlPolicy: HtmlPolicy = 'safe',
 ): any {
   const customComponent = isCustomComponent(tagName, customComponents)
-  if (BLOCKED_TAGS.has(tagName.toLowerCase()) || (!customComponent && isHtmlTagBlocked(tagName, htmlPolicy)))
+  if (BLOCKED_TAGS.has(tagName.toLowerCase()) || (!customComponent && isHtmlTagHardBlocked(tagName, htmlPolicy)))
     return null
+
+  if (!customComponent && isHtmlTagBlocked(tagName, htmlPolicy)) {
+    return [
+      renderLiteralTagText(tagName, attrs),
+      ...children,
+      `</${tagName}>`,
+    ]
+  }
 
   const sanitizedAttrs = sanitizeHtmlAttrs(attrs, htmlPolicy)
 
