@@ -2,6 +2,39 @@ import React, { useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 
+const isDevEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV)
+let lastWarnedDangerousSandbox: string | null = null
+
+function normalizeSandboxTokens(value: string) {
+  return new Set(
+    value
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean),
+  )
+}
+
+function warnDangerousHtmlPreviewSandbox(value: string) {
+  if (!isDevEnv || typeof console === 'undefined' || lastWarnedDangerousSandbox === value)
+    return
+  const tokens = normalizeSandboxTokens(value)
+  if (tokens.has('allow-scripts') && tokens.has('allow-same-origin')) {
+    lastWarnedDangerousSandbox = value
+    console.warn('[markstream-react] htmlPreviewSandbox contains both allow-scripts and allow-same-origin. Use this only for fully trusted content served from an isolated origin.')
+  }
+}
+
+function resolveHtmlPreviewSandboxValue(htmlPreviewSandbox: unknown, htmlPreviewAllowScripts?: boolean) {
+  if (typeof htmlPreviewSandbox === 'string') {
+    warnDangerousHtmlPreviewSandbox(htmlPreviewSandbox)
+    return htmlPreviewSandbox
+  }
+  if (htmlPreviewSandbox !== undefined)
+    return ''
+  return htmlPreviewAllowScripts === true ? 'allow-scripts' : ''
+}
+
 export interface HtmlPreviewFrameProps {
   code: string
   isDark?: boolean
@@ -45,9 +78,7 @@ export function HtmlPreviewFrame(props: HtmlPreviewFrameProps) {
   }, [props.code, props.isDark])
 
   const sandboxValue = useMemo(() => {
-    if (props.htmlPreviewSandbox !== undefined)
-      return props.htmlPreviewSandbox
-    return props.htmlPreviewAllowScripts ? 'allow-scripts' : ''
+    return resolveHtmlPreviewSandboxValue(props.htmlPreviewSandbox, props.htmlPreviewAllowScripts)
   }, [props.htmlPreviewAllowScripts, props.htmlPreviewSandbox])
 
   useEffect(() => {

@@ -41,6 +41,8 @@ describe('cross-package security defaults', () => {
       'packages/markstream-react/src/components/CodeBlockNode/HtmlPreviewFrame.tsx',
       'packages/markstream-angular/src/components/CodeBlockNode/HtmlPreviewFrame.component.ts',
     ]) {
+      expect(source(path)).toContain('typeof htmlPreviewSandbox === \'string\'')
+      expect(source(path)).toContain('allow-scripts and allow-same-origin')
       expect(source(path)).not.toContain('allow-scripts allow-same-origin')
     }
   })

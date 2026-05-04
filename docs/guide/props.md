@@ -89,7 +89,7 @@ These props are forwarded to `CodeBlockNode` / `MarkdownCodeBlockNode` (but **no
 - `code-block-props` (extra code-block props such as `showHeader`, `showFontSizeButtons`, `showTooltips`, `htmlPreviewAllowScripts`, and `htmlPreviewSandbox`, plus any custom forwarded keys)
 - `themes` (theme list forwarded to `stream-monaco` when present)
 
-Note: `code-block-monaco-options` is only used by the Monaco-backed `CodeBlockNode`. If you override `code_block` with `MarkdownCodeBlockNode`, treat `code-block-dark-theme` / `code-block-light-theme` as Shiki theme names, and `themes` as the Shiki theme list to preload.
+Note: `code-block-monaco-options` is only used by the Monaco-backed `CodeBlockNode`. If you override `code_block` with `MarkdownCodeBlockNode`, treat `code-block-dark-theme` / `code-block-light-theme` as Shiki theme names, and `themes` as the Shiki theme list to preload. `htmlPreviewAllowScripts` and `htmlPreviewSandbox` only affect the built-in `CodeBlockNode` inline HTML iframe preview; they do not affect `previewCode` event handlers, `MarkdownCodeBlockNode`, or external artifact renderers.
 
 Only `ts twoslash` and `vue twoslash` fences in this docs site enable hoverable type details. Hover the object keys below, or `:code-block-monaco-options` in the template, instead of the imported type name.
 
@@ -176,7 +176,7 @@ Pass these props directly to `CodeBlockNode` / `MarkdownCodeBlockNode / MermaidB
 - `show-collapse-button`
 - `show-font-size-buttons`
 - `show-tooltips` (global tooltip switch for `LinkNode` + code-block nodes + mermaid-block nodes)
-- `html-preview-allow-scripts` / `html-preview-sandbox` (defaults to `sandbox=""`; only opt into scripts for trusted preview content)
+- `html-preview-allow-scripts` / `html-preview-sandbox` (built-in `CodeBlockNode` inline HTML preview only; `htmlPreviewSandbox` takes precedence, invalid non-string overrides such as `null` fall back to `sandbox=""`, omitting the override leaves `htmlPreviewAllowScripts` in control, and only trusted content should opt into scripts)
 
 See `/guide/codeblock-header` and the `CodeBlockNode` types for the exhaustive list.
 

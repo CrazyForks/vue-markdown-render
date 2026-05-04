@@ -1,12 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 /* eslint-disable antfu/no-import-node-modules-by-path */
 import React, { act } from '../packages/markstream-react/node_modules/react'
 import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
 import ReactHtmlPreviewFrame from '../packages/markstream-react/src/components/CodeBlockNode/HtmlPreviewFrame'
+import CodeBlockNode from '../src/components/CodeBlockNode/CodeBlockNode.vue'
+import CodeBlockShell from '../src/components/CodeBlockNode/CodeBlockShell.vue'
 import VueHtmlPreviewFrame from '../src/components/CodeBlockNode/HtmlPreviewFrame.vue'
+import MarkdownRender from '../src/components/NodeRenderer'
+import { flushAll } from './setup/flush-all'
 
 function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), 'utf8')
@@ -35,17 +39,21 @@ describe('html preview sandbox defaults', () => {
       props: { code: '<p>Preview</p>' },
     })
 
-    const iframe = document.body.querySelector('iframe')
-    expect(iframe).not.toBeNull()
-    expect(iframe?.getAttribute('sandbox')).toBe('')
-    expect(iframe?.getAttribute('sandbox')).not.toContain('allow-scripts')
-    expect(iframe?.getAttribute('sandbox')).not.toContain('allow-same-origin')
+    const getIframe = () => document.body.querySelector('iframe')
+
+    expect(getIframe()).not.toBeNull()
+    expect(getIframe()?.getAttribute('sandbox')).toBe('')
+    expect(getIframe()?.getAttribute('sandbox')).not.toContain('allow-scripts')
+    expect(getIframe()?.getAttribute('sandbox')).not.toContain('allow-same-origin')
 
     await wrapper.setProps({ htmlPreviewAllowScripts: true })
-    expect(iframe?.getAttribute('sandbox')).toBe('allow-scripts')
+    expect(getIframe()?.getAttribute('sandbox')).toBe('allow-scripts')
 
     await wrapper.setProps({ htmlPreviewSandbox: 'allow-popups' })
-    expect(iframe?.getAttribute('sandbox')).toBe('allow-popups')
+    expect(getIframe()?.getAttribute('sandbox')).toBe('allow-popups')
+
+    await wrapper.setProps({ htmlPreviewSandbox: null as any })
+    expect(getIframe()?.getAttribute('sandbox')).toBe('')
 
     wrapper.unmount()
   })
@@ -53,8 +61,10 @@ describe('html preview sandbox defaults', () => {
   it('keeps Vue 2 previews script-disabled by default and opt-in for scripts only', () => {
     const componentSource = source('packages/markstream-vue2/src/components/CodeBlockNode/HtmlPreviewFrame.vue')
     expect(componentSource).toContain(':sandbox="sandboxValue"')
-    expect(componentSource).toContain('return props.htmlPreviewAllowScripts ? \'allow-scripts\' : \'\'')
-    expect(componentSource).toContain('return props.htmlPreviewSandbox')
+    expect(componentSource).toContain('typeof htmlPreviewSandbox === \'string\'')
+    expect(componentSource).toContain('if (htmlPreviewSandbox !== undefined)')
+    expect(componentSource).toContain('return htmlPreviewAllowScripts === true ? \'allow-scripts\' : \'\'')
+    expect(componentSource).toContain('allow-scripts and allow-same-origin')
     expect(componentSource).not.toContain('allow-scripts allow-same-origin')
   })
 
@@ -68,11 +78,12 @@ describe('html preview sandbox defaults', () => {
     })
     await flushReact()
 
-    const iframe = document.body.querySelector('iframe')
-    expect(iframe).not.toBeNull()
-    expect(iframe?.getAttribute('sandbox')).toBe('')
-    expect(iframe?.getAttribute('sandbox')).not.toContain('allow-scripts')
-    expect(iframe?.getAttribute('sandbox')).not.toContain('allow-same-origin')
+    const getIframe = () => document.body.querySelector('iframe')
+
+    expect(getIframe()).not.toBeNull()
+    expect(getIframe()?.getAttribute('sandbox')).toBe('')
+    expect(getIframe()?.getAttribute('sandbox')).not.toContain('allow-scripts')
+    expect(getIframe()?.getAttribute('sandbox')).not.toContain('allow-same-origin')
 
     await act(async () => {
       root.render(React.createElement(ReactHtmlPreviewFrame, {
@@ -81,7 +92,7 @@ describe('html preview sandbox defaults', () => {
       }))
     })
     await flushReact()
-    expect(iframe?.getAttribute('sandbox')).toBe('allow-scripts')
+    expect(getIframe()?.getAttribute('sandbox')).toBe('allow-scripts')
 
     await act(async () => {
       root.render(React.createElement(ReactHtmlPreviewFrame, {
@@ -90,8 +101,48 @@ describe('html preview sandbox defaults', () => {
       }))
     })
     await flushReact()
-    expect(iframe?.getAttribute('sandbox')).toBe('allow-popups')
+    expect(getIframe()?.getAttribute('sandbox')).toBe('allow-popups')
 
+    await act(async () => {
+      root.render(React.createElement(ReactHtmlPreviewFrame, {
+        code: '<p>Preview</p>',
+        htmlPreviewSandbox: null as any,
+      }))
+    })
+    await flushReact()
+    expect(getIframe()?.getAttribute('sandbox')).toBe('')
+
+    await act(async () => {
+      root.render(React.createElement(ReactHtmlPreviewFrame, {
+        code: '<p>Preview</p>',
+        htmlPreviewSandbox: 0 as any,
+      }))
+    })
+    await flushReact()
+    expect(getIframe()?.getAttribute('sandbox')).toBe('')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('warns in dev when React override combines allow-scripts with allow-same-origin', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await act(async () => {
+      root.render(React.createElement(ReactHtmlPreviewFrame, {
+        code: '<p>Preview</p>',
+        htmlPreviewSandbox: 'allow-same-origin allow-scripts',
+      }))
+    })
+    await flushReact()
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('allow-scripts and allow-same-origin'))
+
+    warn.mockRestore()
     await act(async () => {
       root.unmount()
     })
@@ -102,7 +153,52 @@ describe('html preview sandbox defaults', () => {
     expect(componentSource).toContain('[attr.sandbox]="sandboxValue"')
     expect(componentSource).toContain('@Input() htmlPreviewAllowScripts = false')
     expect(componentSource).toContain('@Input() htmlPreviewSandbox?: string')
-    expect(componentSource).toContain('return this.htmlPreviewAllowScripts ? \'allow-scripts\' : \'\'')
+    expect(componentSource).toContain('typeof htmlPreviewSandbox === \'string\'')
+    expect(componentSource).toContain('if (htmlPreviewSandbox !== undefined)')
+    expect(componentSource).toContain('return htmlPreviewAllowScripts === true ? \'allow-scripts\' : \'\'')
+    expect(componentSource).toContain('allow-scripts and allow-same-origin')
     expect(componentSource).not.toContain('allow-scripts allow-same-origin')
+  })
+
+  it('forwards sandbox props through CodeBlockNode to the inline HTML preview', async () => {
+    const wrapper = mount(CodeBlockNode, {
+      attachTo: document.body,
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'html',
+          code: '<p>Preview</p>',
+          raw: '```html\n<p>Preview</p>\n```',
+        },
+        loading: false,
+        htmlPreviewAllowScripts: true,
+      },
+    })
+
+    wrapper.getComponent(CodeBlockShell).vm.$emit('preview')
+    await flushAll()
+
+    expect(document.body.querySelector('iframe')?.getAttribute('sandbox')).toBe('allow-scripts')
+    wrapper.unmount()
+  })
+
+  it('forwards MarkdownRender codeBlockProps to the inline HTML preview', async () => {
+    const wrapper = mount(MarkdownRender, {
+      attachTo: document.body,
+      props: {
+        content: '```html\n<p>Preview</p>\n```',
+        final: true,
+        codeBlockProps: {
+          htmlPreviewSandbox: null as any,
+        },
+      },
+    })
+
+    await flushAll()
+    wrapper.getComponent(CodeBlockShell).vm.$emit('preview')
+    await flushAll()
+
+    expect(document.body.querySelector('iframe')?.getAttribute('sandbox')).toBe('')
+    wrapper.unmount()
   })
 })

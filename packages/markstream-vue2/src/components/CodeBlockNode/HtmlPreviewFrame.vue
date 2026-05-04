@@ -12,6 +12,39 @@ const props = defineProps<{
   title?: string
 }>()
 
+const isDevEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV)
+let lastWarnedDangerousSandbox: string | null = null
+
+function normalizeSandboxTokens(value: string) {
+  return new Set(
+    value
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean),
+  )
+}
+
+function warnDangerousHtmlPreviewSandbox(value: string) {
+  if (!isDevEnv || typeof console === 'undefined' || lastWarnedDangerousSandbox === value)
+    return
+  const tokens = normalizeSandboxTokens(value)
+  if (tokens.has('allow-scripts') && tokens.has('allow-same-origin')) {
+    lastWarnedDangerousSandbox = value
+    console.warn('[markstream-vue2] htmlPreviewSandbox contains both allow-scripts and allow-same-origin. Use this only for fully trusted content served from an isolated origin.')
+  }
+}
+
+function resolveHtmlPreviewSandboxValue(htmlPreviewSandbox: unknown, htmlPreviewAllowScripts?: boolean) {
+  if (typeof htmlPreviewSandbox === 'string') {
+    warnDangerousHtmlPreviewSandbox(htmlPreviewSandbox)
+    return htmlPreviewSandbox
+  }
+  if (htmlPreviewSandbox !== undefined)
+    return ''
+  return htmlPreviewAllowScripts === true ? 'allow-scripts' : ''
+}
+
 const { t } = useSafeI18n()
 
 const srcdoc = computed(() => {
@@ -49,9 +82,7 @@ const srcdoc = computed(() => {
 })
 
 const sandboxValue = computed(() => {
-  if (props.htmlPreviewSandbox !== undefined)
-    return props.htmlPreviewSandbox
-  return props.htmlPreviewAllowScripts ? 'allow-scripts' : ''
+  return resolveHtmlPreviewSandboxValue(props.htmlPreviewSandbox, props.htmlPreviewAllowScripts)
 })
 
 function handleKeydown(e: KeyboardEvent) {

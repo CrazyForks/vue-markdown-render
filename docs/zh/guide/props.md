@@ -89,7 +89,7 @@ flowchart TD
 - `code-block-props`（额外代码块 props，例如 `showHeader`、`showFontSizeButtons`、`showTooltips`、`htmlPreviewAllowScripts`、`htmlPreviewSandbox`，同时保留自定义透传字段）
 - `themes`（在安装 `stream-monaco` 时，会转发给其主题系统）
 
-注意：`code-block-monaco-options` 仅作用于 Monaco 版 `CodeBlockNode`。如果你把 `code_block` 覆盖成 `MarkdownCodeBlockNode`，此时 `code-block-dark-theme` / `code-block-light-theme` 应填写 Shiki 主题名，`themes` 为需要预加载的 Shiki 主题列表。
+注意：`code-block-monaco-options` 仅作用于 Monaco 版 `CodeBlockNode`。如果你把 `code_block` 覆盖成 `MarkdownCodeBlockNode`，此时 `code-block-dark-theme` / `code-block-light-theme` 应填写 Shiki 主题名，`themes` 为需要预加载的 Shiki 主题列表。`htmlPreviewAllowScripts` 和 `htmlPreviewSandbox` 只影响内置 `CodeBlockNode` 的 inline HTML iframe preview；它们不会影响 `previewCode` 事件处理器、`MarkdownCodeBlockNode`，也不会影响外部 artifact renderer。
 
 只有 `ts twoslash` / `vue twoslash` 代码块才会在这个文档站里显示 hover 类型信息。更推荐 hover 下面对象里的字段，或者模板里的 `:code-block-monaco-options`，而不是只 hover 导入的类型名。
 
@@ -176,7 +176,7 @@ const codeBlockProps: NonNullable<NodeRendererProps['codeBlockProps']> = {
 - `show-collapse-button`
 - `show-font-size-buttons`
 - `show-tooltips`（全局控制 `LinkNode` + 代码块节点的 tooltip + Mermaid块节点的 tooltip）
-- `html-preview-allow-scripts` / `html-preview-sandbox`（默认 `sandbox=""`；只有可信 preview 内容才建议开启脚本）
+- `html-preview-allow-scripts` / `html-preview-sandbox`（仅作用于内置 `CodeBlockNode` inline HTML preview；`htmlPreviewSandbox` 优先级更高，`null` 这类无效非 string override 会回退到 `sandbox=""`，省略 override 时仍由 `htmlPreviewAllowScripts` 控制，只有可信内容才建议开启脚本）
 
 更多细节请参考 `/zh/guide/codeblock-header` 及类型定义。
 

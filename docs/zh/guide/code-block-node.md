@@ -19,7 +19,7 @@
 - 头部控制：`showHeader`、`showCollapseButton`、`showCopyButton`、`showExpandButton`、`showPreviewButton`、`showFontSizeButtons`、`showTooltips`
 - HTML preview sandbox：`htmlPreviewAllowScripts` 默认 `false`，`htmlPreviewSandbox` 可直接覆盖 iframe sandbox token
 
-HTML preview 默认使用 `sandbox=""`，因此不可信 HTML / SVG 预览不会默认执行脚本，也不会继承宿主页面 origin。只有在可信 demo 场景下才建议显式开启 `htmlPreviewAllowScripts`；对于不可信预览内容，不要把 `allow-scripts` 和 `allow-same-origin` 组合在一起。
+内置 inline HTML preview 默认使用 `sandbox=""`，因此不可信预览文档不会默认执行脚本，也不会继承宿主页面 origin。`htmlPreviewSandbox` 的优先级高于 `htmlPreviewAllowScripts`；传入 `htmlPreviewSandbox=""` 会保留完整 sandbox，不传 `htmlPreviewSandbox` 时由 `htmlPreviewAllowScripts` 控制，而 `null` 这类无效非 string override 会回退到安全默认值。只有在可信 demo 场景下才建议显式开启 `htmlPreviewAllowScripts`；对于不可信预览内容，不要把 `allow-scripts` 和 `allow-same-origin` 组合在一起。
 
 Monaco diff 模式下的默认行为：
 
