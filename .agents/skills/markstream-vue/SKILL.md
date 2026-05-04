@@ -15,6 +15,7 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
    - In Tailwind or UnoCSS projects, keep Markstream styles inside `@layer components`.
 4. Start with `<MarkdownRender :content="markdown" />`.
    - Switch to `nodes` plus `final` only for streaming, SSE, or high-frequency updates.
+   - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 5. Use `custom-id` plus scoped `setCustomComponents(...)` for overrides.
 6. Validate with the smallest useful dev, build, or typecheck command.
 
@@ -23,6 +24,8 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 - Vue 3 apps default to `content`.
 - Prefer local component registration unless the repo already uses a shared plugin entry.
 - When Monaco code blocks need app-level preloading, import `preloadCodeBlockRuntime` from `markstream-vue`. Existing `getUseMonaco()` preloads remain valid; do not import `stream-monaco` directly just to warm workers.
+- Keep `html-policy="safe"` and Mermaid strict mode unless the task is explicitly preserving trusted legacy behavior.
+- If a trusted surface needs pre-hardening behavior, opt out locally with `html-policy="trusted"` and `:mermaid-props="{ isStrict: false }"`, and call out the trust boundary in the final handoff.
 - If the host is actually Nuxt, leave SSR-specific setup to `markstream-nuxt`.
 
 ## Useful Doc Targets

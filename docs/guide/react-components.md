@@ -21,6 +21,7 @@ The primary component for rendering markdown content in React.
 | `final` | `boolean` | `false` | Marks end-of-stream; stops emitting streaming `loading` nodes |
 | `parseOptions` | `ParseOptions` | - | Parser options and token hooks (only when `content` is provided) |
 | `customHtmlTags` | `readonly string[]` | - | HTML-like tags emitted as custom nodes (e.g. `thinking`) |
+| `htmlPolicy` | `'safe' \| 'escape' \| 'trusted'` | `'safe'` | Controls `html_block` / `html_inline` rendering. `safe` blocks active/embed/form tags, `escape` shows literal HTML text, and `trusted` restores the broader trusted HTML behavior while still stripping scripts and unsafe attrs. |
 | `customMarkdownIt` | `(md: MarkdownIt) => MarkdownIt` | - | Customize the internal MarkdownIt instance |
 | `debugPerformance` | `boolean` | `false` | Log parse/render timing and virtualization stats (dev only) |
 | `isDark` | `boolean` | `false` | Theme flag forwarded to heavy nodes; adds `.dark` to the root container |
@@ -86,7 +87,18 @@ The primary component for rendering markdown content in React.
 Streaming notes:
 - Keep `viewportPriority` enabled to prevent offscreen Mermaid / Monaco / D2 work from running while text is still streaming.
 - For high-frequency SSE, prefer passing `nodes` instead of reparsing the full `content` string every chunk.
+- Mermaid strict mode is now the default. Set `mermaidProps` to `{ isStrict: false }` only for trusted diagrams that need loose Mermaid HTML-label behavior.
 - Common Mermaid tuning keys: `renderDebounceMs`, `contentStableDelayMs`, `previewPollDelayMs`, `previewPollMaxDelayMs`, `previewPollMaxAttempts`.
+
+Trusted compatibility example:
+
+```tsx
+<MarkdownRender
+  content={trustedMarkdown}
+  htmlPolicy="trusted"
+  mermaidProps={{ isStrict: false }}
+/>
+```
 
 `NodeRendererCodeBlockProps` follows the public `CodeBlockNode` prop surface except for `node`, so you get completion for flags like `showHeader`, `showFontSizeButtons`, and `showTooltips` without dropping to `any`.
 

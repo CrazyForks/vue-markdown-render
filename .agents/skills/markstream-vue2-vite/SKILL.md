@@ -15,6 +15,7 @@ Use this skill when the host app is Vue 2 and the bundler is Vite.
 4. Use Vite worker imports when the repo needs bundled workers.
    - `markstream-vue2/workers/... ?worker` or `?worker&inline` patterns are allowed here.
 5. Keep Composition API decisions explicit for Vue 2.6 repos.
+   - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 6. Validate with the smallest useful Vite dev or build command.
 
 ## Default Decisions
@@ -22,6 +23,8 @@ Use this skill when the host app is Vue 2 and the bundler is Vite.
 - Prefer bundled workers over CDN workers in Vite-based Vue 2 repos.
 - Keep UnoCSS or Tailwind resets before Markstream CSS.
 - Use the generic `markstream-vue2` skill only when the bundler-specific choice does not matter.
+- Keep `html-policy="safe"` and Mermaid strict mode unless the task is preserving trusted legacy rendering.
+- If a trusted surface needs older behavior, use `html-policy="trusted"` and `:mermaid-props="{ isStrict: false }"` only on that surface and explain why.
 
 ## Useful Doc Targets
 

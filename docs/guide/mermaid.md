@@ -69,7 +69,68 @@ B-->C[End]
 Need header controls, export buttons, or a pseudo-fullscreen modal? Use [`MermaidBlockNode`](/guide/mermaid-block-node) or override the default renderer via [setCustomComponents](/guide/mermaid-block-node-override). A runnable playground demo lives at `/mermaid-export-demo`.
 Mermaid strict mode and SVG sanitization are enabled by default. Set `:is-strict="false"` only for trusted diagrams that require Mermaid HTML labels.
 
-## 4. Troubleshooting checklist
+## 4. When strict mode changes rendering
+
+Moving Mermaid from loose mode to strict mode can change trusted diagrams that depended on Mermaid HTML labels or looser SVG/URL handling.
+
+Common symptoms after upgrading:
+
+1. Labels that relied on inline HTML such as `<br>`, `<span>`, or richer HTML fragments stop rendering as before.
+2. Links or interactions that depended on Mermaid's looser HTML handling disappear from the final SVG.
+3. Previously accepted diagram markup now falls back to plain text or renders a simpler label.
+
+If the diagram source is fully trusted and you need the old loose behavior, opt out explicitly instead of changing the global default.
+
+### Vue 3: switch a trusted Markdown surface back to loose mode
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+
+const trustedMarkdown = `
+\`\`\`mermaid
+flowchart TD
+  A["<b>Trusted HTML label</b><br/>line 2"] --> B
+\`\`\`
+`
+</script>
+
+<template>
+  <MarkdownRender
+    :content="trustedMarkdown"
+    :mermaid-props="{ isStrict: false }"
+  />
+</template>
+```
+
+### Direct component usage
+
+```vue
+<MermaidBlockNode :node="node" :is-strict="false" />
+```
+
+### Other framework entrypoints
+
+```tsx
+import MarkdownRender from 'markstream-react'
+
+<MarkdownRender content={trustedMarkdown} mermaidProps={{ isStrict: false }} />
+```
+
+```html
+<markstream-angular
+  [content]="trustedMarkdown()"
+  [mermaidProps]="{ isStrict: false }"
+/>
+```
+
+```vue
+<MarkdownRender :content="trustedMarkdown" :mermaid-props="{ isStrict: false }" />
+```
+
+Keep the default strict mode for user content, AI output, or any mixed-trust Markdown stream.
+
+## 5. Troubleshooting checklist
 
 1. **Peer not installed** — run `pnpm add mermaid`. Without it the renderer falls back to showing source text.
 2. **Async errors** — check the browser console for Mermaid logs. Versions prior to 11 are unsupported; upgrade to ≥ 11.

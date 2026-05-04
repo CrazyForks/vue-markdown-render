@@ -72,6 +72,29 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 - 如果你想要完全替换头部的 UI，使用 `header-*` 插槽并把相应 `show*` props 设为 `false` 来隐藏默认按钮。
 - Mermaid 严格模式默认开启，因此用户/LLM 图表会经过 SVG 清理并禁用 HTML labels。只有可信图表需要宽松 Mermaid 渲染时，才设置 `:is-strict="false"`。
 
+## 对可信图表恢复 loose 模式
+
+如果某个可信 Mermaid 图依赖 HTML labels，或者依赖旧的 loose 模式渲染结果，可以按组件粒度显式关闭 strict，而不是把更安全的默认值整体改回去：
+
+```vue
+<script setup lang="ts">
+import { MermaidBlockNode } from 'markstream-vue'
+
+const node = {
+  type: 'code_block',
+  language: 'mermaid',
+  code: 'flowchart TD\n  A["<b>可信</b><br/>label"] --> B',
+  raw: 'flowchart TD\n  A["<b>可信</b><br/>label"] --> B',
+}
+</script>
+
+<template>
+  <MermaidBlockNode :node="node" :is-strict="false" />
+</template>
+```
+
+只有 Mermaid 源内容可信时才建议这样做；用户内容或 LLM 输出仍建议保留默认 strict。
+
 ## 参考
 
 - 覆盖 `MermaidBlockNode`（在 `MarkdownRender` 中使用 `setCustomComponents`）的示例（中文）：[覆盖 MermaidBlockNode（MarkdownRender 示例）](./mermaid-block-node-override.md)

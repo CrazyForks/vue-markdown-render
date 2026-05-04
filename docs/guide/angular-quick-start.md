@@ -72,6 +72,36 @@ export class StreamingDemoComponent {
 }
 ```
 
+## Trusted Mermaid compatibility
+
+Mermaid strict mode is enabled by default. If a trusted diagram still needs the old loose-mode HTML-label behavior, scope that opt-out to the trusted surface:
+
+```ts
+import { Component, signal } from '@angular/core'
+import { MarkstreamAngularComponent } from 'markstream-angular'
+
+@Component({
+  selector: 'app-trusted-mermaid-demo',
+  standalone: true,
+  imports: [MarkstreamAngularComponent],
+  template: `
+    <markstream-angular
+      [content]="markdown()"
+      [htmlPolicy]="'trusted'"
+      [mermaidProps]="{ isStrict: false }"
+    />
+  `,
+})
+export class TrustedMermaidDemoComponent {
+  readonly markdown = signal(`
+\`\`\`mermaid
+flowchart TD
+  A["<b>Trusted HTML label</b><br/>line 2"] --> B
+\`\`\`
+`)
+}
+```
+
 ## TypeScript Props
 
 ```ts
