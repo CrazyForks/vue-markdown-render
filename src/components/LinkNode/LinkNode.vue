@@ -122,7 +122,7 @@ function onAnchorEnter(e: Event) {
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
   // show the link href in tooltip; fall back to title/text if href missing
-  const txt = props.node?.title || safeHref.value || props.node?.text || ''
+  const txt = props.node?.title || (safeHref.value?.includes('xn--') && props.node?.text?.includes('://') ? props.node.text : safeHref.value) || ''
   showTooltipForAnchor(e.currentTarget as HTMLElement, txt, 'top', false, origin)
 }
 
