@@ -10,7 +10,7 @@ let pendingImport: Promise<any | null> | null = null
 let mermaidLoader: MermaidLoader | null = defaultMermaidLoader
 
 function computeInitKey(config: Record<string, any>) {
-  const securityLevel = String(config?.securityLevel ?? 'loose')
+  const securityLevel = String(config?.securityLevel ?? 'strict')
   const htmlLabels = config?.flowchart?.htmlLabels
   return `${securityLevel}|htmlLabels:${htmlLabels === false ? '0' : '1'}`
 }

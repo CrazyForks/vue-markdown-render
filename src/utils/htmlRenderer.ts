@@ -1,4 +1,4 @@
-import type { HtmlToken } from 'stream-markdown-parser'
+import type { HtmlPolicy, HtmlToken } from 'stream-markdown-parser'
 import type { Component } from 'vue'
 import {
   BLOCKED_HTML_TAGS as BLOCKED_TAGS,
@@ -8,6 +8,7 @@ import {
   hasCompleteHtmlTagContent,
   hasCustomHtmlComponents,
   isCustomHtmlComponentTag,
+  isHtmlTagBlocked,
   sanitizeHtmlAttrs,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
@@ -18,12 +19,13 @@ import { h } from 'vue'
 export {
   getHtmlTagFromContent,
   hasCompleteHtmlTagContent,
+  isHtmlTagBlocked,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
   tokenizeHtml,
 }
 
-export type { HtmlToken } from 'stream-markdown-parser'
+export type { HtmlPolicy, HtmlToken } from 'stream-markdown-parser'
 
 const SHOULD_LOG = (() => {
   try {
@@ -68,6 +70,7 @@ export function convertAttrsToProps(attrs: Record<string, string>): Record<strin
 export function buildVNodeTree(
   tokens: HtmlToken[],
   customComponents: Record<string, Component>,
+  htmlPolicy: HtmlPolicy = 'safe',
 ): any[] {
   let autoKeySeed = 0
   const stack: Array<{ tagName: string, children: any[], attrs?: Record<string, string>, autoKey: string }> = []
@@ -79,7 +82,7 @@ export function buildVNodeTree(
       target.push(token.content!)
     }
     else if (token.type === 'self_closing') {
-      const vnode = createVNode(token.tagName!, token.attrs || {}, [], customComponents, `ms-html-${autoKeySeed++}`)
+      const vnode = createVNode(token.tagName!, token.attrs || {}, [], customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       vnode != null && target.push(vnode)
     }
@@ -109,7 +112,7 @@ export function buildVNodeTree(
         // Pop all tags until the matched one (auto-closing intermediate tags)
         while (stack.length > matchedIndex) {
           const opening = stack.pop()!
-          const vnode = createVNode(opening.tagName, opening.attrs || {}, opening.children, customComponents, opening.autoKey)
+          const vnode = createVNode(opening.tagName, opening.attrs || {}, opening.children, customComponents, opening.autoKey, htmlPolicy)
 
           if (stack.length > 0)
             vnode != null && stack[stack.length - 1].children.push(vnode)
@@ -132,7 +135,7 @@ export function buildVNodeTree(
   // Handle any remaining unclosed tags
   while (stack.length > 0) {
     const unclosed = stack.pop()!
-    const vnode = createVNode(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, unclosed.autoKey)
+    const vnode = createVNode(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, unclosed.autoKey, htmlPolicy)
     if (stack.length > 0)
       vnode != null && stack[stack.length - 1].children.push(vnode)
     else
@@ -152,8 +155,9 @@ function createVNode(
   children: any[],
   customComponents: Record<string, Component>,
   autoKey: string,
+  htmlPolicy: HtmlPolicy,
 ): any {
-  if (BLOCKED_TAGS.has(tagName.toLowerCase()))
+  if (BLOCKED_TAGS.has(tagName.toLowerCase()) || isHtmlTagBlocked(tagName, htmlPolicy))
     return null
 
   const sanitizedAttrs = sanitizeAttrs(attrs)
@@ -188,13 +192,14 @@ export function hasCustomComponents(
 export function parseHtmlToVNodes(
   content: string,
   customComponents: Record<string, Component>,
+  htmlPolicy: HtmlPolicy = 'safe',
 ): any[] | null {
   if (!content)
     return []
 
   try {
     const tokens = tokenizeHtml(content)
-    const nodes = buildVNodeTree(tokens, customComponents)
+    const nodes = buildVNodeTree(tokens, customComponents, htmlPolicy)
     return nodes
   }
   catch (error) {

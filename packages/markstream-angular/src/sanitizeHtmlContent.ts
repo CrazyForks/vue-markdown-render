@@ -1,6 +1,8 @@
+import type { HtmlPolicy } from 'stream-markdown-parser'
 import {
   BLOCKED_HTML_TAGS as BLOCKED_TAGS,
   DANGEROUS_HTML_ATTRS as DANGEROUS_ATTRS,
+  isHtmlTagBlocked,
   isUnsafeHtmlUrl as isUnsafeUrl,
   URL_HTML_ATTRS as URL_ATTRS,
   VOID_HTML_TAGS as VOID_ELEMENTS,
@@ -144,9 +146,12 @@ function serializeAttrs(attrs: Record<string, string>): string {
     .join('')
 }
 
-export function sanitizeHtmlContent(content: string): string {
+export function sanitizeHtmlContent(content: string, policy: HtmlPolicy = 'safe'): string {
   if (!content)
     return ''
+
+  if (policy === 'escape')
+    return escapeHtml(content)
 
   const tokens = tokenizeHtml(content)
   const stack: string[] = []
@@ -164,7 +169,7 @@ export function sanitizeHtmlContent(content: string): string {
     if (!tagName)
       continue
 
-    if (BLOCKED_TAGS.has(tagName)) {
+    if (BLOCKED_TAGS.has(tagName) || isHtmlTagBlocked(tagName, policy)) {
       if (token.type === 'tag_open')
         blockedDepth += 1
       else if (token.type === 'tag_close' && blockedDepth > 0)

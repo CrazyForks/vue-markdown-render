@@ -18,9 +18,11 @@ import type { NodeComponentProps } from '../types/node-component'
 import React from 'react'
 import {
   getMarkdown,
+  isHtmlTagBlocked,
   mergeCustomHtmlTags,
   NON_STRUCTURING_HTML_TAGS,
   parseMarkdownToStructure,
+  sanitizeHtmlAttrs,
   sanitizeHtmlTokenAttrs,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
@@ -107,6 +109,7 @@ function createRenderContext(
     customId: props.customId,
     customComponents,
     customHtmlTags,
+    htmlPolicy: props.htmlPolicy ?? 'safe',
     isDark: props.isDark,
     indexKey: indexPrefix,
     typewriter: props.typewriter,
@@ -764,9 +767,10 @@ export function LinkNode(props: NodeComponentProps<LinkNodeProps['node']> & {
       ? String(props.animationIteration)
       : (props.animationIteration ?? 'infinite'),
   } as React.CSSProperties
+  const safeHref = sanitizeHtmlAttrs({ href: String(node.href ?? '') }).href
   const title = typeof node.title === 'string' && node.title.trim().length > 0
     ? node.title
-    : String(node.href ?? '')
+    : String(safeHref ?? '')
 
   if (node.loading) {
     return (
@@ -789,7 +793,7 @@ export function LinkNode(props: NodeComponentProps<LinkNodeProps['node']> & {
   return (
     <a
       className="link-node"
-      href={node.href}
+      href={safeHref}
       title={title}
       aria-label={`Link: ${title}`}
       target="_blank"
@@ -943,6 +947,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
     structuredChildren.length > 0
     && structuredTag
     && !NON_STRUCTURING_HTML_TAGS.has(structuredTag)
+    && !isHtmlTagBlocked(structuredTag, props.ctx?.htmlPolicy ?? 'safe')
     && props.ctx
     && props.renderNode
   ) {
@@ -959,7 +964,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   }
 
   const customComponents = getCustomNodeComponents(props.customId)
-  const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents)
+  const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, props.ctx?.htmlPolicy ?? 'safe')
   if (nodes == null)
     return <>{String(props.node.content ?? '')}</>
   return <>{nodes}</>
@@ -967,7 +972,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
 
 export function HtmlInlineNode(props: NodeComponentProps<{ type: 'html_inline', content?: string }>) {
   const customComponents = getCustomNodeComponents(props.customId)
-  const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents)
+  const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, props.ctx?.htmlPolicy ?? 'safe')
   if (nodes == null)
     return <>{String(props.node.content ?? '')}</>
   return <>{nodes}</>
@@ -1174,7 +1179,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
     case 'html_block':
       return <HtmlBlockNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} customId={ctx.customId} />
     case 'html_inline':
-      return <HtmlInlineNode key={key} node={node as any} typewriter={ctx.typewriter} customId={ctx.customId} />
+      return <HtmlInlineNode key={key} node={node as any} ctx={ctx} typewriter={ctx.typewriter} customId={ctx.customId} />
     case 'vmr_container':
       return <VmrContainerNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} />
     case 'label_open':

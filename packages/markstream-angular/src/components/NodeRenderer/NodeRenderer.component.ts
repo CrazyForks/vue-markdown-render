@@ -121,6 +121,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   @Input() customMarkdownIt?: NodeRendererProps['customMarkdownIt']
   @Input() debugPerformance?: boolean
   @Input() customHtmlTags?: readonly string[]
+  @Input() htmlPolicy: NodeRendererProps['htmlPolicy'] = 'safe'
   @Input() viewportPriority?: boolean
   @Input() codeBlockStream = true
   @Input() codeBlockDarkTheme?: any

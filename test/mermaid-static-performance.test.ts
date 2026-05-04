@@ -103,6 +103,10 @@ describe('mermaid static render performance', () => {
     await flushVueUpdates()
 
     expect(fakeMermaid.render).toHaveBeenCalledTimes(1)
+    expect(fakeMermaid.initialize).toHaveBeenCalledWith(expect.objectContaining({
+      securityLevel: 'strict',
+      flowchart: { htmlLabels: false },
+    }))
     expect(canParseOffthread).not.toHaveBeenCalled()
     expect(findPrefixOffthread).not.toHaveBeenCalled()
 

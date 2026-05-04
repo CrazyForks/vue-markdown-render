@@ -105,7 +105,14 @@ const anchorAttrs = computed(() => {
   } as Record<string, unknown>
   // `title` is controlled by `showTooltip` behavior and should not be overridden.
   delete merged.title
+  // `href` is controlled by safeHref so attrs cannot override node.href.
+  delete merged.href
   return merged
+})
+
+const safeHref = computed(() => {
+  const href = String(props.node?.href ?? '')
+  return sanitizeAttrs({ href }).href
 })
 
 // Tooltip handlers using singleton tooltip
@@ -115,7 +122,7 @@ function onAnchorEnter(e: Event) {
   const ev = e as MouseEvent
   const origin = ev?.clientX != null && ev?.clientY != null ? { x: ev.clientX, y: ev.clientY } : undefined
   // show the link href in tooltip; fall back to title/text if href missing
-  const txt = props.node?.title || props.node?.href || props.node?.text || ''
+  const txt = props.node?.title || safeHref.value || props.node?.text || ''
   showTooltipForAnchor(e.currentTarget as HTMLElement, txt, 'top', false, origin)
 }
 
@@ -128,7 +135,7 @@ const title = computed(() => {
   const rawTitle = props.node?.title
   if (typeof rawTitle === 'string' && rawTitle.trim().length > 0)
     return rawTitle
-  return String(props.node?.href ?? '')
+  return String(safeHref.value ?? '')
 })
 </script>
 
@@ -136,7 +143,7 @@ const title = computed(() => {
   <a
     v-if="!node.loading"
     class="link-node"
-    :href="node.href"
+    :href="safeHref"
     :title="tooltipEnabled ? '' : title"
     :aria-label="`Link: ${title}`"
     :aria-hidden="node.loading ? 'true' : 'false'"

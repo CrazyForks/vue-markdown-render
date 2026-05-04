@@ -290,7 +290,7 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
   }
 
   get strictMode() {
-    return this.mergedProps.isStrict === true
+    return this.mergedProps.isStrict !== false
   }
 
   get resolvedLoading() {

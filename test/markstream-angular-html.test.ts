@@ -148,6 +148,36 @@ describe('markstream-angular html renderer', () => {
     expect(html).not.toContain('alert(1)')
   })
 
+  it('blocks active html tags by default and supports trusted or escape htmlPolicy', () => {
+    const safeHtml = sanitizeHtmlFragment('<div>Safe</div><iframe src="https://example.com"></iframe><form><input name="q"></form>')
+
+    expect(safeHtml).toContain('<div>Safe</div>')
+    expect(safeHtml).not.toContain('<iframe')
+    expect(safeHtml).not.toContain('<form')
+    expect(safeHtml).not.toContain('<input')
+
+    const trustedHtml = sanitizeHtmlFragment('<iframe src="https://example.com"></iframe>', 'trusted')
+    expect(trustedHtml).toContain('<iframe src="https://example.com">')
+
+    const escapedHtml = sanitizeHtmlFragment('<div>Escaped</div>', 'escape')
+    expect(escapedHtml).toBe('&lt;div&gt;Escaped&lt;/div&gt;')
+  })
+
+  it('omits unsafe link hrefs in static html rendering', () => {
+    const html = renderMarkdownNodeToHtml({
+      type: 'link',
+      href: 'javascript:alert(1)',
+      title: null,
+      text: 'Unsafe',
+      children: [],
+    } as any)
+
+    expect(html).toContain('<a')
+    expect(html).toContain('Unsafe')
+    expect(html).not.toContain('href=')
+    expect(html).not.toContain('javascript:')
+  })
+
   it('renders structured html wrappers while leaving blocked tags on the sanitized fallback path', () => {
     const structuredHtml = renderMarkdownNodeToHtml(
       {

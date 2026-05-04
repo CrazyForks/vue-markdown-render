@@ -1,7 +1,8 @@
-import type { BaseNode, CustomComponentAttrs, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { BaseNode, CustomComponentAttrs, HtmlPolicy, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import {
   DANGEROUS_HTML_ATTRS,
   getMarkdown,
+  isHtmlTagBlocked,
   isUnsafeHtmlUrl,
   NON_STRUCTURING_HTML_TAGS,
   normalizeCustomHtmlTagName,
@@ -23,12 +24,14 @@ export interface MarkstreamAngularRenderOptions {
   parseOptions?: ParseOptions
   customHtmlTags?: readonly string[]
   allowHtml?: boolean
+  htmlPolicy?: HtmlPolicy
 }
 
 export interface NestedMarkdownHtmlOptions {
   cacheKey?: string
   customHtmlTags?: readonly string[]
   allowHtml?: boolean
+  htmlPolicy?: HtmlPolicy
   customNodeTag?: string
   customNodeClass?: NestedClassValue | ((node: RenderableMarkdownNode) => NestedClassValue)
 }
@@ -41,7 +44,7 @@ export interface NestedMarkdownHtmlInput {
 
 interface RenderContext {
   markdown: ReturnType<typeof getMarkdown>
-  options: Required<Pick<NestedMarkdownHtmlOptions, 'allowHtml' | 'customNodeTag'>> & Pick<NestedMarkdownHtmlOptions, 'customNodeClass'>
+  options: Required<Pick<NestedMarkdownHtmlOptions, 'allowHtml' | 'customNodeTag' | 'htmlPolicy'>> & Pick<NestedMarkdownHtmlOptions, 'customNodeClass'>
 }
 
 const DEFAULT_CACHE_KEY = 'markstream-angular-html'
@@ -165,6 +168,7 @@ function createRenderContext(options: NestedMarkdownHtmlOptions): RenderContext 
     markdown,
     options: {
       allowHtml: options.allowHtml !== false,
+      htmlPolicy: options.htmlPolicy ?? 'safe',
       customNodeTag: normalizeCustomHtmlTagName(options.customNodeTag) || DEFAULT_CUSTOM_NODE_TAG,
       customNodeClass: options.customNodeClass,
     },
@@ -294,7 +298,7 @@ function renderLinkNode(node: RenderableMarkdownNode, ctx: RenderContext): strin
     ? renderNodesToHtml(getNodeList(node.children), ctx)
     : escapeHtml(getString(node.text || href))
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''
-  const hrefAttr = href ? ` href="${escapeAttr(href)}"` : ''
+  const hrefAttr = href && !isUnsafeHtmlUrl(href) ? ` href="${escapeAttr(href)}"` : ''
   return `<a${hrefAttr}${titleAttr} target="_blank" rel="noreferrer noopener">${content}</a>`
 }
 
@@ -397,13 +401,15 @@ function renderHtmlNode(node: RenderableMarkdownNode, ctx: RenderContext): strin
   const children = getNodeList(node.children)
   if (!ctx.options.allowHtml)
     return escapeHtml(rawContent)
+  if (ctx.options.htmlPolicy === 'escape')
+    return escapeHtml(rawContent)
   if (node.loading && !node.autoClosed)
     return escapeHtml(rawContent)
-  if (tag && children.length > 0 && !NON_STRUCTURING_HTML_TAGS.has(tag)) {
+  if (tag && children.length > 0 && !NON_STRUCTURING_HTML_TAGS.has(tag) && !isHtmlTagBlocked(tag, ctx.options.htmlPolicy)) {
     const attrs = serializeAttrs(node.attrs as CustomComponentAttrs | undefined)
     return `<${tag}${attrs}>${renderNodesToHtml(children, ctx)}</${tag}>`
   }
-  return sanitizeHtmlContent(rawContent)
+  return sanitizeHtmlContent(rawContent, ctx.options.htmlPolicy)
 }
 
 function renderCustomOrFallbackNode(node: RenderableMarkdownNode, ctx: RenderContext): string {

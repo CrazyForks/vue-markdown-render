@@ -66,4 +66,47 @@ describe('markstream-react link loading state', () => {
       root.unmount()
     })
   })
+
+  it('omits unsafe href values from rendered anchors', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(LinkNode as any, {
+        node: {
+          type: 'link',
+          href: 'javascript:alert(1)',
+          title: null,
+          text: 'Unsafe',
+          raw: '[Unsafe](javascript:alert(1))',
+          loading: false,
+          children: [],
+        },
+        indexKey: 'react-unsafe-link',
+        ctx: {
+          typewriter: false,
+          codeBlockProps: {},
+          mermaidProps: {},
+          d2Props: {},
+          infographicProps: {},
+          showTooltips: true,
+          codeBlockStream: true,
+          renderCodeBlocksAsPre: false,
+          events: {},
+        },
+      }))
+    })
+    await flushReact()
+
+    const link = host.querySelector('a.link-node')
+    expect(link).toBeTruthy()
+    expect(link?.getAttribute('href')).toBeNull()
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
 })

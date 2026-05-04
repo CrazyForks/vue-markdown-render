@@ -87,4 +87,39 @@ describe('linkNode attrs passthrough', () => {
     expect(a.attributes('href')).toBe('https://example.com')
     expect(a.attributes('data-safe')).toBe('1')
   })
+
+  it('omits unsafe node.href values', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        typewriter: false,
+        batchRendering: false,
+        nodes: [
+          {
+            type: 'paragraph',
+            raw: '',
+            children: [
+              {
+                type: 'link',
+                href: 'javascript:alert(1)',
+                title: null,
+                text: 'Example',
+                raw: '[Example](javascript:alert(1))',
+                children: [
+                  {
+                    type: 'text',
+                    content: 'Example',
+                    raw: 'Example',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+    const a = wrapper.get('a.link-node')
+    expect(a.attributes('href')).toBeUndefined()
+  })
 })

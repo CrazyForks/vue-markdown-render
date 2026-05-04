@@ -401,8 +401,10 @@ describe('htmlRenderer', () => {
         'onclick',
         'onerror',
         'onload',
+        'onanimationstart',
         'onmouseover',
         'onmouseout',
+        'onpointerover',
         'ontouchstart',
         'onwheel',
         'onscroll',
@@ -469,6 +471,21 @@ describe('htmlRenderer', () => {
       expect(nodes).not.toBeNull()
       const hasScript = (nodes || []).some((n: any) => typeof n === 'object' && n && n.type === 'script')
       expect(hasScript).toBe(false)
+    })
+
+    it('should drop safe-policy blocked tags from VNode output', () => {
+      const html = '<iframe src="https://example.com"></iframe><div>ok</div>'
+      const nodes = parseHtmlToVNodes(html, {})
+      expect(nodes).not.toBeNull()
+      expect((nodes || []).some((n: any) => typeof n === 'object' && n?.type === 'iframe')).toBe(false)
+      expect((nodes || []).some((n: any) => typeof n === 'object' && n?.type === 'div')).toBe(true)
+    })
+
+    it('should preserve broader tags for trusted VNode output', () => {
+      const html = '<iframe src="https://example.com"></iframe><div>ok</div>'
+      const nodes = parseHtmlToVNodes(html, {}, 'trusted')
+      expect(nodes).not.toBeNull()
+      expect((nodes || []).some((n: any) => typeof n === 'object' && n?.type === 'iframe')).toBe(true)
     })
   })
 })

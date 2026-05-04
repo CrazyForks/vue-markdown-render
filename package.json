@@ -60,28 +60,23 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "import": "./dist/index.js"
     },
     "./utils": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/exports.js",
-      "require": "./dist/exports.js"
+      "import": "./dist/exports.js"
     },
     "./utils/katex-threshold": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/exports.js",
-      "require": "./dist/exports.js"
+      "import": "./dist/exports.js"
     },
     "./utils/performance-monitor": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/exports.js",
-      "require": "./dist/exports.js"
+      "import": "./dist/exports.js"
     },
     "./utils/safeRaf": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/safeRaf.js",
-      "require": "./dist/safeRaf.js"
+      "import": "./dist/safeRaf.js"
     },
     "./index.css": "./dist/index.css",
     "./index.px.css": "./dist/index.px.css",
@@ -89,23 +84,19 @@
     "./tailwind": "./dist/tailwind.ts",
     "./workers/katexWorkerClient": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/exports.js",
-      "require": "./dist/exports.js"
+      "import": "./dist/exports.js"
     },
     "./workers/mermaidWorkerClient": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/exports.js",
-      "require": "./dist/exports.js"
+      "import": "./dist/exports.js"
     },
     "./workers/katexCdnWorker": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/exports.js",
-      "require": "./dist/exports.js"
+      "import": "./dist/exports.js"
     },
     "./workers/mermaidCdnWorker": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/exports.js",
-      "require": "./dist/exports.js"
+      "import": "./dist/exports.js"
     },
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
     "./workers/mermaidParser.worker": "./dist/workers/mermaidParser.worker.js"

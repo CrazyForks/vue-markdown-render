@@ -1,5 +1,5 @@
 import type { Type } from '@angular/core'
-import type { BaseNode, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme } from '../../types/monaco'
 import {
   getHtmlTagFromContent,
@@ -35,6 +35,7 @@ export interface NodeRendererProps {
   customMarkdownIt?: (md: MarkdownIt) => MarkdownIt
   debugPerformance?: boolean
   customHtmlTags?: readonly string[]
+  htmlPolicy?: HtmlPolicy
   viewportPriority?: boolean
   codeBlockStream?: boolean
   codeBlockDarkTheme?: CodeBlockMonacoTheme
@@ -78,6 +79,7 @@ export interface AngularRenderContext {
   codeBlockStream?: boolean
   renderCodeBlocksAsPre?: boolean
   allowHtml?: boolean
+  htmlPolicy?: HtmlPolicy
   customHtmlTags?: readonly string[]
   parseOptions?: ParseOptions
   customMarkdownIt?: (md: MarkdownIt) => MarkdownIt
@@ -140,6 +142,7 @@ export function buildRenderContext(
     codeBlockStream: props.codeBlockStream,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
     allowHtml: props.allowHtml !== false,
+    htmlPolicy: props.htmlPolicy ?? 'safe',
     customHtmlTags,
     parseOptions: props.parseOptions,
     customMarkdownIt: props.customMarkdownIt,

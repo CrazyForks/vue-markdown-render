@@ -8,7 +8,7 @@
 - `loading?: boolean` — 初始加载占位
 - `maxHeight?: string | null` — 最大高度
 - `estimatedPreviewHeightPx?: number` — Mermaid 完成渲染前预留的首屏 preview 高度；通过 `MarkdownRender` 渲染 Mermaid 围栏时会自动填入
-- `isStrict?: boolean` — 开启 `securityLevel: 'strict'` + DOMPurify，并禁用 HTML labels；用于渲染不可信的 Mermaid 输入（例如用户/LLM 生成的内容），防止 `<script>`、`javascript:` 链接或内联事件落入最终 SVG
+- `isStrict?: boolean` — 默认 `true`；开启 `securityLevel: 'strict'` + DOMPurify，并禁用 HTML labels。只有可信图表确实需要 Mermaid HTML labels 时才设为 `false`。
 - Header/按钮控制（全部可选，默认 `true`）:
   - `showHeader` / `showModeToggle` / `showCopyButton` / `showExportButton` / `showFullscreenButton` / `showCollapseButton` / `showZoomControls` / `showTooltips`
 - `enableWheelZoom?: boolean` — 开启 Ctrl/Cmd + 滚轮缩放（默认 `false`）
@@ -70,7 +70,7 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 ## 推荐用法
 - 如果你要实现自定义导出/上传，最佳做法是：在 `export` 监听器中 `preventDefault()`，并在监听回调中直接从组件渲染的 DOM 中读取 `svg`。
 - 如果你想要完全替换头部的 UI，使用 `header-*` 插槽并把相应 `show*` props 设为 `false` 来隐藏默认按钮。
-- 若 Mermaid 内容来自用户/LLM 或任何不可信来源，建议加上 `:is-strict="true"`，组件会对 SVG 进行清理并禁用 HTML labels，从而堵住恶意 `<script>` 或 `javascript:` 链接注入的风险。
+- Mermaid 严格模式默认开启，因此用户/LLM 图表会经过 SVG 清理并禁用 HTML labels。只有可信图表需要宽松 Mermaid 渲染时，才设置 `:is-strict="false"`。
 
 ## 参考
 

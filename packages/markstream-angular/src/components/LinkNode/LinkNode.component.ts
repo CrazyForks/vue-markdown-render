@@ -8,6 +8,7 @@ import {
   Input,
   ViewChild,
 } from '@angular/core'
+import { isUnsafeHtmlUrl } from 'stream-markdown-parser'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
 import { NestedRendererComponent } from '../NestedRenderer/NestedRenderer.component'
 import { getNodeList, getString } from '../shared/node-helpers'
@@ -73,7 +74,8 @@ export class LinkNodeComponent implements AfterViewInit, OnChanges, OnDestroy {
   private hovering = false
 
   get href() {
-    return getString((this.node as any)?.href)
+    const href = getString((this.node as any)?.href)
+    return href && !isUnsafeHtmlUrl(href) ? href : ''
   }
 
   get title() {

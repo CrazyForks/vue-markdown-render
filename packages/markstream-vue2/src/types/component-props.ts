@@ -167,6 +167,7 @@ export interface MermaidBlockNodeProps {
   showCollapseButton?: boolean
   showZoomControls?: boolean
   enableWheelZoom?: boolean
+  // Defaults to true. Set false only for trusted diagrams that need loose Mermaid HTML labels.
   isStrict?: boolean
   showTooltips?: boolean
   onRenderError?: (error: unknown, code: string, container: HTMLElement) => boolean | void
