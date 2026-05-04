@@ -188,6 +188,8 @@ interface MonacoHelpers {
       <markstream-angular-html-preview-frame
         *ngIf="inlinePreviewOpen && isPreviewable"
         [code]="resolvedCode"
+        [htmlPreviewAllowScripts]="mergedProps.htmlPreviewAllowScripts === true"
+        [htmlPreviewSandbox]="mergedProps.htmlPreviewSandbox"
         [isDark]="resolvedIsDark"
         [title]="previewTitle"
         [onClose]="closeInlinePreview"
