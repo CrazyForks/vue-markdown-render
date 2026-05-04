@@ -1,6 +1,5 @@
 import type { BaseNode, CustomComponentAttrs, HtmlPolicy, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import {
-  DANGEROUS_HTML_ATTRS,
   getMarkdown,
   isHtmlTagBlocked,
   isUnsafeHtmlUrl,
@@ -8,7 +7,7 @@ import {
   normalizeCustomHtmlTagName,
   normalizeCustomHtmlTags,
   parseMarkdownToStructure,
-  URL_HTML_ATTRS,
+  sanitizeHtmlAttrs,
 } from 'stream-markdown-parser'
 import { hydrateCustomTagContent } from './hydrateCustomTagContent'
 import { sanitizeHtmlContent } from './sanitizeHtmlContent'
@@ -96,6 +95,7 @@ export function renderMarkdownToHtml(input: MarkstreamAngularRenderOptions): str
   const ctx = createRenderContext({
     allowHtml: input.allowHtml,
     customHtmlTags: normalizedTags,
+    htmlPolicy: input.htmlPolicy,
   })
   const nodes = resolveParsedNodes(input, ctx)
   return renderNodesToHtml(nodes, ctx)
@@ -406,7 +406,7 @@ function renderHtmlNode(node: RenderableMarkdownNode, ctx: RenderContext): strin
   if (node.loading && !node.autoClosed)
     return escapeHtml(rawContent)
   if (tag && children.length > 0 && !NON_STRUCTURING_HTML_TAGS.has(tag) && !isHtmlTagBlocked(tag, ctx.options.htmlPolicy)) {
-    const attrs = serializeAttrs(node.attrs as CustomComponentAttrs | undefined)
+    const attrs = serializeAttrs(node.attrs as CustomComponentAttrs | undefined, '', ctx.options.htmlPolicy, tag)
     return `<${tag}${attrs}>${renderNodesToHtml(children, ctx)}</${tag}>`
   }
   return sanitizeHtmlContent(rawContent, ctx.options.htmlPolicy)
@@ -422,7 +422,7 @@ function renderCustomOrFallbackNode(node: RenderableMarkdownNode, ctx: RenderCon
     `markstream-nested-custom--${sanitizeClassToken(tagName) || 'node'}`,
     resolveCustomNodeClass(node, ctx.options.customNodeClass),
   ].filter(Boolean).join(' ')
-  const attrs = serializeAttrs(node.attrs as CustomComponentAttrs | undefined, classes)
+  const attrs = serializeAttrs(node.attrs as CustomComponentAttrs | undefined, classes, ctx.options.htmlPolicy)
   const body = resolveCustomNodeBody(node, ctx)
   const wrapperTag = ctx.options.customNodeTag
   return `<${wrapperTag}${attrs} data-markstream-custom-tag="${escapeAttr(tagName)}">${body}</${wrapperTag}>`
@@ -464,29 +464,29 @@ function serializeClassValue(value: NestedClassValue): string {
     : ''
 }
 
-function serializeAttrs(attrs?: CustomComponentAttrs | null, extraClass = ''): string {
+function serializeAttrs(
+  attrs?: CustomComponentAttrs | null,
+  extraClass = '',
+  policy: HtmlPolicy = 'safe',
+  tagName?: string,
+): string {
   const pairs = normalizeAttrs(attrs)
-  const rendered: string[] = []
+  const record: Record<string, string> = {}
   const mergedClasses = [extraClass]
 
   for (const [name, value] of pairs) {
     const safeName = String(name).trim()
-    const lowerName = safeName.toLowerCase()
-    if (!safeName || !isSafeAttrName(safeName))
+    if (!safeName)
       continue
-    if (DANGEROUS_HTML_ATTRS.has(lowerName))
-      continue
-    if (value !== true && URL_HTML_ATTRS.has(lowerName) && value && isUnsafeHtmlUrl(String(value)))
-      continue
-    if (lowerName === 'class') {
+    if (safeName.toLowerCase() === 'class') {
       mergedClasses.push(String(value))
       continue
     }
-    if (value === true)
-      rendered.push(` ${safeName}`)
-    else
-      rendered.push(` ${safeName}="${escapeAttr(String(value))}"`)
+    record[safeName] = value === true ? '' : String(value)
   }
+
+  const rendered = Object.entries(sanitizeHtmlAttrs(record, policy, tagName))
+    .map(([name, value]) => value === '' ? ` ${name}` : ` ${name}="${escapeAttr(String(value))}"`)
 
   const className = mergedClasses.map(value => value.trim()).filter(Boolean).join(' ')
   if (className)
@@ -522,10 +522,6 @@ function getString(value: unknown): string {
     : value == null
       ? ''
       : String(value)
-}
-
-function isSafeAttrName(value: string): boolean {
-  return /^[^\s"'<>`=]+$/.test(value) && !/^on/i.test(value)
 }
 
 function sanitizeClassToken(value: string): string {

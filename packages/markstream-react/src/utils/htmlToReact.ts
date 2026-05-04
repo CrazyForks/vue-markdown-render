@@ -6,6 +6,7 @@ import {
   hasCustomHtmlComponents as hasCustomHtmlComponentsBase,
   isCustomHtmlComponentTag,
   isHtmlTagBlocked,
+  isHtmlTagHardBlocked,
   sanitizeHtmlAttrs as sanitizeHtmlAttrsBase,
   tokenizeHtml as tokenizeHtmlBase,
 } from 'stream-markdown-parser'
@@ -77,6 +78,23 @@ export function hasCustomHtmlComponents(
   return hasCustomHtmlComponentsBase(content, customComponents as Record<string, unknown>)
 }
 
+function renderLiteralTagText(tagName: string, attrs?: Record<string, string>, isSelfClosing = false) {
+  const pairs = Object.entries(attrs ?? {})
+  const serializedAttrs = pairs.length > 0
+    ? pairs.map(([name, value]) => value === '' ? ` ${name}` : ` ${name}="${value}"`).join('')
+    : ''
+  return isSelfClosing
+    ? `<${tagName}${serializedAttrs} />`
+    : `<${tagName}${serializedAttrs}>`
+}
+
+function pushRenderedNode(target: ReactNode[], rendered: ReactNode | ReactNode[] | null) {
+  if (Array.isArray(rendered))
+    target.push(...rendered)
+  else if (rendered != null)
+    target.push(rendered)
+}
+
 export function parseHtmlToReactNodes(
   content: string,
   customComponents: Record<string, ComponentType<any>>,
@@ -90,12 +108,19 @@ export function parseHtmlToReactNodes(
   try {
     const tokens = tokenizeHtml(content)
     let autoKeySeed = 0
-    const stack: Array<{ tagName: string, children: ReactNode[], attrs?: Record<string, string>, blocked?: boolean }> = []
+    const stack: Array<{
+      tagName: string
+      children: ReactNode[]
+      attrs?: Record<string, string>
+      hardBlocked?: boolean
+      softBlocked?: boolean
+      customComponent?: boolean
+    }> = []
     const rootNodes: ReactNode[] = []
 
     for (const token of tokens) {
       if (token.type === 'text') {
-        if (stack.length > 0 && stack[stack.length - 1].blocked)
+        if (stack.length > 0 && stack[stack.length - 1].hardBlocked)
           continue
         const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
         target.push(token.content ?? '')
@@ -103,12 +128,18 @@ export function parseHtmlToReactNodes(
       }
 
       if (token.type === 'self_closing') {
-        if (BLOCKED_TAGS.has(token.tagName.toLowerCase()) || isHtmlTagBlocked(token.tagName, htmlPolicy))
+        const customComponent = isCustomHtmlComponent(token.tagName, customComponents)
+        if (BLOCKED_TAGS.has(token.tagName.toLowerCase()) || (!customComponent && isHtmlTagHardBlocked(token.tagName, htmlPolicy)))
           continue
-        const attrs = sanitizeHtmlAttrs(token.attrs || {})
+        if (!customComponent && isHtmlTagBlocked(token.tagName, htmlPolicy)) {
+          const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
+          target.push(renderLiteralTagText(token.tagName, token.attrs, true))
+          continue
+        }
+        const attrs = sanitizeHtmlAttrs(token.attrs || {}, htmlPolicy, token.tagName)
         const explicitKey = (attrs as any).key
         const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
-        const Comp = isCustomHtmlComponent(token.tagName, customComponents)
+        const Comp = customComponent
           ? (customComponents[token.tagName] || customComponents[token.tagName.toLowerCase()])
           : undefined
         const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
@@ -126,24 +157,40 @@ export function parseHtmlToReactNodes(
       }
 
       if (token.type === 'tag_open') {
-        const parentBlocked = stack.length > 0 && stack[stack.length - 1].blocked
+        const parentHardBlocked = stack.length > 0 && stack[stack.length - 1].hardBlocked
+        const customComponent = isCustomHtmlComponent(token.tagName, customComponents)
         stack.push({
           tagName: token.tagName,
           children: [],
           attrs: token.attrs,
-          blocked: parentBlocked || BLOCKED_TAGS.has(token.tagName.toLowerCase()) || isHtmlTagBlocked(token.tagName, htmlPolicy),
+          customComponent,
+          hardBlocked: parentHardBlocked || BLOCKED_TAGS.has(token.tagName.toLowerCase()) || (!customComponent && isHtmlTagHardBlocked(token.tagName, htmlPolicy)),
+          softBlocked: !parentHardBlocked && !customComponent && isHtmlTagBlocked(token.tagName, htmlPolicy),
         })
         continue
       }
 
       const opening = stack.pop()
-      if (!opening || opening.blocked)
+      if (!opening || opening.hardBlocked)
         continue
 
-      const attrs = sanitizeHtmlAttrs(opening.attrs || {})
+      if (opening.softBlocked) {
+        const rendered = [
+          renderLiteralTagText(opening.tagName, opening.attrs),
+          ...opening.children,
+          `</${opening.tagName}>`,
+        ]
+        if (stack.length > 0)
+          pushRenderedNode(stack[stack.length - 1].children, rendered)
+        else
+          pushRenderedNode(rootNodes, rendered)
+        continue
+      }
+
+      const attrs = sanitizeHtmlAttrs(opening.attrs || {}, htmlPolicy, opening.tagName)
       const explicitKey = (attrs as any).key
       const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
-      const Comp = isCustomHtmlComponent(opening.tagName, customComponents)
+      const Comp = opening.customComponent
         ? (customComponents[opening.tagName] || customComponents[opening.tagName.toLowerCase()])
         : undefined
       const element = Comp
@@ -162,12 +209,20 @@ export function parseHtmlToReactNodes(
 
     while (stack.length > 0) {
       const unclosed = stack.pop()
-      if (!unclosed || unclosed.blocked)
+      if (!unclosed || unclosed.hardBlocked)
         continue
-      const attrs = sanitizeHtmlAttrs(unclosed.attrs || {})
+      if (unclosed.softBlocked) {
+        pushRenderedNode(rootNodes, [
+          renderLiteralTagText(unclosed.tagName, unclosed.attrs),
+          ...unclosed.children,
+          `</${unclosed.tagName}>`,
+        ])
+        continue
+      }
+      const attrs = sanitizeHtmlAttrs(unclosed.attrs || {}, htmlPolicy, unclosed.tagName)
       const explicitKey = (attrs as any).key
       const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
-      const Comp = isCustomHtmlComponent(unclosed.tagName, customComponents)
+      const Comp = unclosed.customComponent
         ? (customComponents[unclosed.tagName] || customComponents[unclosed.tagName.toLowerCase()])
         : undefined
       const element = Comp

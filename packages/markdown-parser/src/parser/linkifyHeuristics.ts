@@ -4,7 +4,7 @@ const URL_PREFIX_HINT_RE = /^(?:https?:\/\/|ftp:\/\/|mailto:|www\.)/i
 const URL_QUERY_OR_AUTH_HINT_RE = /[?#@]/u
 const PATH_SEPARATOR_RE = /[\\/]/u
 const DOMAINISH_TEXT_RE = /^[\p{L}\p{N}./\\-]+$/u
-const DOMAIN_LABEL_RE = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)$/u
+const DOMAIN_LABEL_RE = /^[A-Za-z0-9-]{1,63}$/u
 const PUNYCODE_TLD_RE = /^xn--[a-z0-9-]{2,59}$/i
 const AMBIGUOUS_BARE_DOMAIN_EXTENSIONS = new Set([
   'ai',
@@ -82,16 +82,22 @@ const FILENAMEISH_LINK_EXTENSIONS = new Set([
   'zsh',
 ])
 
+function isValidDomainLabel(label: string) {
+  return DOMAIN_LABEL_RE.test(label)
+    && !label.startsWith('-')
+    && !label.endsWith('-')
+}
+
 function isPlausibleBareDomain(text: string) {
   const labels = text.split('.')
   if (labels.length < 2)
     return false
 
   const tld = labels[labels.length - 1]?.toLowerCase() ?? ''
-  if (!(DOMAIN_LABEL_RE.test(tld) || PUNYCODE_TLD_RE.test(tld)))
+  if (!(isValidDomainLabel(tld) || PUNYCODE_TLD_RE.test(tld)))
     return false
 
-  return labels.every(label => DOMAIN_LABEL_RE.test(label))
+  return labels.every(isValidDomainLabel)
 }
 
 function hasDomainAuthorityPrefix(text: string) {

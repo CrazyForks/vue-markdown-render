@@ -28,7 +28,15 @@ const StructuredNodeRenderer = defineAsyncComponent({
 })
 
 const boundAttrs = computed(() => {
-  const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs)
+  const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs, resolvedHtmlPolicy.value)
+  if (!sanitizedAttrs)
+    return undefined
+  const record = tokenAttrsToRecord(sanitizedAttrs)
+  return Object.keys(record).length > 0 ? record : undefined
+})
+const structuredBoundAttrs = computed(() => {
+  const tagName = String(props.node.tag || '').trim()
+  const sanitizedAttrs = sanitizeHtmlTokenAttrs(props.node.attrs, resolvedHtmlPolicy.value, tagName)
   if (!sanitizedAttrs)
     return undefined
   const record = tokenAttrsToRecord(sanitizedAttrs)
@@ -158,7 +166,7 @@ onBeforeUnmount(() => {
     :is="isStructured ? structuredTag : 'div'"
     ref="htmlRef"
     class="html-block-node"
-    v-bind="isStructured ? boundAttrs : undefined"
+    v-bind="isStructured ? structuredBoundAttrs : undefined"
   >
     <template v-if="shouldRender">
       <StructuredNodeRenderer

@@ -305,7 +305,7 @@ describe('vue 2 - HtmlBlockNode Custom Components Integration', () => {
 
     const root = wrapper.find('.html-block-node')
     expect(root.element.tagName).toBe('SPAN')
-    expect(root.attributes('style')).toContain('font-size: 12px;')
+    expect(root.attributes('style')).toBeUndefined()
     expect(wrapper.findAll('ul')).toHaveLength(1)
     expect(wrapper.findAll('li')).toHaveLength(2)
     expect((wrapper.text().match(/alpha/g) || []).length).toBe(1)

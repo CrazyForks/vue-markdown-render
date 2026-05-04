@@ -526,7 +526,7 @@ describe('component Behavior', () => {
     const htmlBlock = wrapper.find('.html-block-node')
     expect(htmlBlock.exists()).toBe(true)
     expect(htmlBlock.element.tagName).toBe('SPAN')
-    expect(htmlBlock.attributes('style')).toContain('font-size: 12px;')
+    expect(htmlBlock.attributes('style')).toBeUndefined()
     expect(wrapper.findAll('ul')).toHaveLength(1)
     expect(wrapper.findAll('ol')).toHaveLength(1)
 

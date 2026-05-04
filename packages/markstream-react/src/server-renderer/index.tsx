@@ -1,4 +1,4 @@
-import type { MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { HtmlPreviewFrameProps } from '../components/CodeBlockNode/HtmlPreviewFrame'
 import type { MarkdownCodeBlockNodeProps } from '../components/MarkdownCodeBlockNode/MarkdownCodeBlockNode'
 import type { TooltipProps } from '../components/Tooltip/Tooltip'
@@ -91,8 +91,12 @@ function renderStaticCodeShell(
   )
 }
 
-function mergeHtmlBlockWrapperProps(attrs?: [string, string | null][] | null) {
-  const normalized = normalizeDomAttrs((tokenAttrsToProps(sanitizeHtmlTokenAttrs(attrs ?? undefined)) as Record<string, string> | undefined) || {})
+function mergeHtmlBlockWrapperProps(
+  attrs?: [string, string | null][] | null,
+  htmlPolicy: HtmlPolicy = 'safe',
+  tagName?: string,
+) {
+  const normalized = normalizeDomAttrs((tokenAttrsToProps(sanitizeHtmlTokenAttrs(attrs ?? undefined, htmlPolicy, tagName)) as Record<string, string> | undefined) || {})
   const next = { ...normalized }
   const existing = typeof next.className === 'string' ? next.className.trim() : ''
   next.className = existing ? `html-block-node ${existing}` : 'html-block-node'
@@ -953,7 +957,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   ) {
     return React.createElement(
       structuredTag,
-      mergeHtmlBlockWrapperProps((props.node as any)?.attrs ?? null),
+      mergeHtmlBlockWrapperProps((props.node as any)?.attrs ?? null, props.ctx?.htmlPolicy ?? 'safe', structuredTag),
       renderNodeChildren(
         structuredChildren,
         props.ctx,

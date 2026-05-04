@@ -85,10 +85,14 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   }, [isDeferred, node.content, shouldRender])
 
   const boundAttrs = useMemo(() => {
-    const rawAttrs = tokenAttrsToProps(sanitizeHtmlTokenAttrs(node.attrs ?? undefined))
+    const rawAttrs = tokenAttrsToProps(sanitizeHtmlTokenAttrs(node.attrs ?? undefined, htmlPolicy))
     return rawAttrs ? normalizeDomAttrs(rawAttrs as Record<string, string>) : undefined
-  }, [node.attrs])
+  }, [htmlPolicy, node.attrs])
   const structuredTag = useMemo(() => String(node.tag ?? '').trim(), [node.tag])
+  const structuredBoundAttrs = useMemo(() => {
+    const rawAttrs = tokenAttrsToProps(sanitizeHtmlTokenAttrs(node.attrs ?? undefined, htmlPolicy, structuredTag))
+    return rawAttrs ? normalizeDomAttrs(rawAttrs as Record<string, string>) : undefined
+  }, [htmlPolicy, node.attrs, structuredTag])
   const structuredChildren = useMemo(() => Array.isArray(node.children) ? node.children : [], [node.children])
   const isStructured = structuredChildren.length > 0
     && !!structuredTag
@@ -97,8 +101,8 @@ export function HtmlBlockNode(props: NodeComponentProps<{
     && !!props.ctx
     && !!props.renderNode
   const structuredWrapperProps = useMemo(
-    () => mergeHtmlBlockClassName(boundAttrs as Record<string, any> | undefined),
-    [boundAttrs],
+    () => mergeHtmlBlockClassName(structuredBoundAttrs as Record<string, any> | undefined),
+    [structuredBoundAttrs],
   )
 
   // Check if we should use dynamic rendering

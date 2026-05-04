@@ -1,13 +1,12 @@
 import type { HtmlPolicy } from 'stream-markdown-parser'
 import {
   BLOCKED_HTML_TAGS as BLOCKED_TAGS,
-  DANGEROUS_HTML_ATTRS as DANGEROUS_ATTRS,
   isHtmlTagBlocked,
-  isUnsafeHtmlUrl as isUnsafeUrl,
-  URL_HTML_ATTRS as URL_ATTRS,
+  isHtmlTagHardBlocked,
+  sanitizeHtmlAttrs,
   VOID_HTML_TAGS as VOID_ELEMENTS,
 } from 'stream-markdown-parser'
-import { escapeAttr, escapeHtml, isSafeAttrName } from './components/shared/node-helpers'
+import { escapeAttr, escapeHtml } from './components/shared/node-helpers'
 
 interface HtmlToken {
   type: 'text' | 'tag_open' | 'tag_close' | 'self_closing'
@@ -16,22 +15,8 @@ interface HtmlToken {
   content?: string
 }
 
-function sanitizeAttrs(attrs: Record<string, string>): Record<string, string> {
-  const clean: Record<string, string> = {}
-
-  for (const [key, value] of Object.entries(attrs)) {
-    const safeName = key.trim()
-    const lowerKey = safeName.toLowerCase()
-    if (!safeName || !isSafeAttrName(safeName))
-      continue
-    if (DANGEROUS_ATTRS.has(lowerKey))
-      continue
-    if (URL_ATTRS.has(lowerKey) && value && isUnsafeUrl(value))
-      continue
-    clean[safeName] = value
-  }
-
-  return clean
+function sanitizeAttrs(attrs: Record<string, string>, policy: HtmlPolicy, tagName?: string): Record<string, string> {
+  return sanitizeHtmlAttrs(attrs, policy, tagName)
 }
 
 function tokenizeHtml(html: string): HtmlToken[] {
@@ -146,6 +131,23 @@ function serializeAttrs(attrs: Record<string, string>): string {
     .join('')
 }
 
+function serializeLiteralHtmlTag(token: HtmlToken) {
+  const tagName = String(token.tagName ?? '').trim()
+  if (!tagName)
+    return ''
+
+  if (token.type === 'tag_close')
+    return `&lt;/${escapeHtml(tagName)}&gt;`
+
+  const attrs = Object.entries(token.attrs ?? {})
+    .map(([name, value]) => value === '' ? ` ${escapeHtml(name)}` : ` ${escapeHtml(name)}="${escapeAttr(value)}"`)
+    .join('')
+
+  return token.type === 'self_closing'
+    ? `&lt;${escapeHtml(tagName)}${attrs} /&gt;`
+    : `&lt;${escapeHtml(tagName)}${attrs}&gt;`
+}
+
 export function sanitizeHtmlContent(content: string, policy: HtmlPolicy = 'safe'): string {
   if (!content)
     return ''
@@ -169,7 +171,7 @@ export function sanitizeHtmlContent(content: string, policy: HtmlPolicy = 'safe'
     if (!tagName)
       continue
 
-    if (BLOCKED_TAGS.has(tagName) || isHtmlTagBlocked(tagName, policy)) {
+    if (BLOCKED_TAGS.has(tagName) || isHtmlTagHardBlocked(tagName, policy)) {
       if (token.type === 'tag_open')
         blockedDepth += 1
       else if (token.type === 'tag_close' && blockedDepth > 0)
@@ -180,13 +182,18 @@ export function sanitizeHtmlContent(content: string, policy: HtmlPolicy = 'safe'
     if (blockedDepth > 0)
       continue
 
+    if (policy === 'safe' && isHtmlTagBlocked(tagName, policy)) {
+      output.push(serializeLiteralHtmlTag(token))
+      continue
+    }
+
     if (token.type === 'self_closing') {
-      output.push(`<${tagName}${serializeAttrs(sanitizeAttrs(token.attrs ?? {}))}>`)
+      output.push(`<${tagName}${serializeAttrs(sanitizeAttrs(token.attrs ?? {}, policy, tagName))}>`)
       continue
     }
 
     if (token.type === 'tag_open') {
-      output.push(`<${tagName}${serializeAttrs(sanitizeAttrs(token.attrs ?? {}))}>`)
+      output.push(`<${tagName}${serializeAttrs(sanitizeAttrs(token.attrs ?? {}, policy, tagName))}>`)
       if (!VOID_ELEMENTS.has(tagName))
         stack.push(tagName)
       continue
