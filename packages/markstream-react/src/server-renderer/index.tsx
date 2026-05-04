@@ -1,4 +1,4 @@
-import type { MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { HtmlPreviewFrameProps } from '../components/CodeBlockNode/HtmlPreviewFrame'
 import type { MarkdownCodeBlockNodeProps } from '../components/MarkdownCodeBlockNode/MarkdownCodeBlockNode'
 import type { TooltipProps } from '../components/Tooltip/Tooltip'
