@@ -1640,6 +1640,8 @@ onUnmounted(() => {
     <HtmlPreviewFrame
       v-if="showInlinePreview && !hasPreviewListener && isPreviewable && codeLanguage === 'html'"
       :code="node.code"
+      :html-preview-allow-scripts="props.htmlPreviewAllowScripts"
+      :html-preview-sandbox="props.htmlPreviewSandbox"
       :is-dark="props.isDark"
       :on-close="() => (showInlinePreview = false)"
     />

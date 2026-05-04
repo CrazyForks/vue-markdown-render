@@ -24,4 +24,24 @@ describe('cross-package security defaults', () => {
       expect(workerSource).toContain('htmlLabels: false')
     }
   })
+
+  it('defaults HTML preview sandboxes to least privilege across framework packages', () => {
+    expect(source('src/components/CodeBlockNode/HtmlPreviewFrame.vue')).toContain(':sandbox="sandboxValue"')
+    expect(source('packages/markstream-vue2/src/components/CodeBlockNode/HtmlPreviewFrame.vue')).toContain(':sandbox="sandboxValue"')
+    expect(source('packages/markstream-react/src/components/CodeBlockNode/HtmlPreviewFrame.tsx')).toContain('sandbox={sandboxValue}')
+    expect(source('packages/markstream-angular/src/components/CodeBlockNode/HtmlPreviewFrame.component.ts')).toContain('[attr.sandbox]="sandboxValue"')
+    expect(source('src/components/CodeBlockNode/CodeBlockNode.vue')).toContain(':html-preview-allow-scripts="props.htmlPreviewAllowScripts"')
+    expect(source('packages/markstream-vue2/src/components/CodeBlockNode/CodeBlockNode.vue')).toContain(':html-preview-allow-scripts="props.htmlPreviewAllowScripts"')
+    expect(source('packages/markstream-react/src/components/CodeBlockNode/CodeBlockNode.tsx')).toContain('htmlPreviewAllowScripts={props.htmlPreviewAllowScripts}')
+    expect(source('packages/markstream-angular/src/components/CodeBlockNode/CodeBlockNode.component.ts')).toContain('[htmlPreviewAllowScripts]="mergedProps.htmlPreviewAllowScripts === true"')
+
+    for (const path of [
+      'src/components/CodeBlockNode/HtmlPreviewFrame.vue',
+      'packages/markstream-vue2/src/components/CodeBlockNode/HtmlPreviewFrame.vue',
+      'packages/markstream-react/src/components/CodeBlockNode/HtmlPreviewFrame.tsx',
+      'packages/markstream-angular/src/components/CodeBlockNode/HtmlPreviewFrame.component.ts',
+    ]) {
+      expect(source(path)).not.toContain('allow-scripts allow-same-origin')
+    }
+  })
 })

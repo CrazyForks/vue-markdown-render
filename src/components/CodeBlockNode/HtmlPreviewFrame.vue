@@ -5,6 +5,8 @@ import { useSafeI18n } from '../../composables/useSafeI18n'
 const props = defineProps<{
   code: string
   isDark?: boolean
+  htmlPreviewAllowScripts?: boolean
+  htmlPreviewSandbox?: string
   onClose?: () => void
   title?: string
 }>()
@@ -45,6 +47,12 @@ const srcdoc = computed(() => {
 </html>`
 })
 
+const sandboxValue = computed(() => {
+  if (props.htmlPreviewSandbox !== undefined)
+    return props.htmlPreviewSandbox
+  return props.htmlPreviewAllowScripts ? 'allow-scripts' : ''
+})
+
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' || e.key === 'Esc')
     props.onClose?.()
@@ -81,7 +89,7 @@ onUnmounted(() => {
           </div>
           <iframe
             class="html-preview-frame__iframe"
-            sandbox="allow-scripts allow-same-origin"
+            :sandbox="sandboxValue"
             :srcdoc="srcdoc"
           />
         </div>

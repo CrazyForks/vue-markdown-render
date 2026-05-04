@@ -5,6 +5,8 @@ import { useSafeI18n } from '../../i18n/useSafeI18n'
 export interface HtmlPreviewFrameProps {
   code: string
   isDark?: boolean
+  htmlPreviewAllowScripts?: boolean
+  htmlPreviewSandbox?: string
   onClose?: () => void
   title?: string
 }
@@ -42,6 +44,12 @@ export function HtmlPreviewFrame(props: HtmlPreviewFrameProps) {
 </html>`
   }, [props.code, props.isDark])
 
+  const sandboxValue = useMemo(() => {
+    if (props.htmlPreviewSandbox !== undefined)
+      return props.htmlPreviewSandbox
+    return props.htmlPreviewAllowScripts ? 'allow-scripts' : ''
+  }, [props.htmlPreviewAllowScripts, props.htmlPreviewSandbox])
+
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' || event.key === 'Esc')
@@ -76,7 +84,7 @@ export function HtmlPreviewFrame(props: HtmlPreviewFrameProps) {
         </div>
         <iframe
           className="html-preview-frame__iframe"
-          sandbox="allow-scripts allow-same-origin"
+          sandbox={sandboxValue}
           src="about:blank"
           srcDoc={srcdoc}
           title={props.title || 'Preview'}

@@ -33,7 +33,7 @@ import { useSafeI18n } from '../../i18n/useSafeI18n'
         </div>
         <iframe
           class="html-preview-frame__iframe"
-          sandbox="allow-scripts allow-same-origin"
+          [attr.sandbox]="sandboxValue"
           [srcdoc]="srcdoc"
           [title]="resolvedTitle"
         ></iframe>
@@ -45,6 +45,8 @@ import { useSafeI18n } from '../../i18n/useSafeI18n'
 export class HtmlPreviewFrameComponent {
   @Input() code = ''
   @Input() isDark = false
+  @Input() htmlPreviewAllowScripts = false
+  @Input() htmlPreviewSandbox?: string
   @Input() title?: string
   @Input() onClose?: () => void
 
@@ -52,6 +54,12 @@ export class HtmlPreviewFrameComponent {
 
   get resolvedTitle() {
     return this.title || `HTML ${this.i18n.t('common.preview')}`
+  }
+
+  get sandboxValue() {
+    if (this.htmlPreviewSandbox !== undefined)
+      return this.htmlPreviewSandbox
+    return this.htmlPreviewAllowScripts ? 'allow-scripts' : ''
   }
 
   get srcdoc() {

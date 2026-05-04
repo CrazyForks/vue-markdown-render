@@ -86,7 +86,7 @@ flowchart TD
 - `code-block-dark-theme`, `code-block-light-theme`
 - `code-block-monaco-options`
 - `code-block-min-width`, `code-block-max-width`
-- `code-block-props`（额外代码块 props，例如 `showHeader`、`showFontSizeButtons`、`showTooltips`，同时保留自定义透传字段）
+- `code-block-props`（额外代码块 props，例如 `showHeader`、`showFontSizeButtons`、`showTooltips`、`htmlPreviewAllowScripts`、`htmlPreviewSandbox`，同时保留自定义透传字段）
 - `themes`（在安装 `stream-monaco` 时，会转发给其主题系统）
 
 注意：`code-block-monaco-options` 仅作用于 Monaco 版 `CodeBlockNode`。如果你把 `code_block` 覆盖成 `MarkdownCodeBlockNode`，此时 `code-block-dark-theme` / `code-block-light-theme` 应填写 Shiki 主题名，`themes` 为需要预加载的 Shiki 主题列表。
@@ -131,6 +131,7 @@ const codeBlockProps: NonNullable<NodeRendererProps['codeBlockProps']> = {
   showHeader: false,
   showFontSizeButtons: false,
   showTooltips: false,
+  htmlPreviewAllowScripts: false,
 }
 ```
 
@@ -175,6 +176,7 @@ const codeBlockProps: NonNullable<NodeRendererProps['codeBlockProps']> = {
 - `show-collapse-button`
 - `show-font-size-buttons`
 - `show-tooltips`（全局控制 `LinkNode` + 代码块节点的 tooltip + Mermaid块节点的 tooltip）
+- `html-preview-allow-scripts` / `html-preview-sandbox`（默认 `sandbox=""`；只有可信 preview 内容才建议开启脚本）
 
 更多细节请参考 `/zh/guide/codeblock-header` 及类型定义。
 

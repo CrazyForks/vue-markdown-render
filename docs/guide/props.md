@@ -86,7 +86,7 @@ These props are forwarded to `CodeBlockNode` / `MarkdownCodeBlockNode` (but **no
 - `code-block-dark-theme`, `code-block-light-theme`
 - `code-block-monaco-options`
 - `code-block-min-width`, `code-block-max-width`
-- `code-block-props` (extra code-block props such as `showHeader`, `showFontSizeButtons`, and `showTooltips`, plus any custom forwarded keys)
+- `code-block-props` (extra code-block props such as `showHeader`, `showFontSizeButtons`, `showTooltips`, `htmlPreviewAllowScripts`, and `htmlPreviewSandbox`, plus any custom forwarded keys)
 - `themes` (theme list forwarded to `stream-monaco` when present)
 
 Note: `code-block-monaco-options` is only used by the Monaco-backed `CodeBlockNode`. If you override `code_block` with `MarkdownCodeBlockNode`, treat `code-block-dark-theme` / `code-block-light-theme` as Shiki theme names, and `themes` as the Shiki theme list to preload.
@@ -131,6 +131,7 @@ const codeBlockProps: NonNullable<NodeRendererProps['codeBlockProps']> = {
   showHeader: false,
   showFontSizeButtons: false,
   showTooltips: false,
+  htmlPreviewAllowScripts: false,
 }
 ```
 
@@ -175,6 +176,7 @@ Pass these props directly to `CodeBlockNode` / `MarkdownCodeBlockNode / MermaidB
 - `show-collapse-button`
 - `show-font-size-buttons`
 - `show-tooltips` (global tooltip switch for `LinkNode` + code-block nodes + mermaid-block nodes)
+- `html-preview-allow-scripts` / `html-preview-sandbox` (defaults to `sandbox=""`; only opt into scripts for trusted preview content)
 
 See `/guide/codeblock-header` and the `CodeBlockNode` types for the exhaustive list.
 

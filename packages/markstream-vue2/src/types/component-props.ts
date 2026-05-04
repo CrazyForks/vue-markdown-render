@@ -100,6 +100,8 @@ export interface CodeBlockNodeProps {
   showCollapseButton?: boolean
   showFontSizeButtons?: boolean
   showTooltips?: boolean
+  htmlPreviewAllowScripts?: boolean
+  htmlPreviewSandbox?: string
   customId?: string
 }
 
