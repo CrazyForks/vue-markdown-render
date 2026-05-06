@@ -5,17 +5,19 @@
 
   import { untrack } from 'svelte'
 
+  type Props = {
+    node: SvelteRenderableNode;
+    fallbackSrc?: string;
+    lazy?: boolean;
+    usePlaceholder?: boolean;
+  }
+
   let {
     node,
     fallbackSrc = '',
     lazy = false,
     usePlaceholder = true
-  }: {
-    node: SvelteRenderableNode;
-    fallbackSrc?: string;
-    lazy?: boolean;
-    usePlaceholder?: boolean;
-  } = $props()
+  }: Props = $props()
 
   const { t } = useSafeI18n()
 

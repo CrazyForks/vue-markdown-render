@@ -10,6 +10,30 @@
   import { copyTextToClipboard, resolveCssSize } from './shared/rich-block-helpers'
   import { getString, sanitizeClassToken } from './shared/node-helpers'
 
+  type Props = {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext | undefined
+    isDark?: boolean | undefined
+    loading?: boolean | undefined
+    stream?: boolean | undefined
+    darkTheme?: CodeBlockMonacoTheme | undefined
+    lightTheme?: CodeBlockMonacoTheme | undefined
+    themes?: CodeBlockMonacoTheme[] | undefined
+    monacoOptions?: CodeBlockMonacoOptions | undefined
+    minWidth?: string | number | undefined
+    maxWidth?: string | number | undefined
+    isShowPreview?: boolean
+    enableFontSizeControl?: boolean
+    showHeader?: boolean
+    showCopyButton?: boolean
+    showExpandButton?: boolean
+    showPreviewButton?: boolean
+    showCollapseButton?: boolean
+    showFontSizeButtons?: boolean
+    htmlPreviewAllowScripts?: boolean
+    htmlPreviewSandbox?: string | undefined
+  }
+
   let {
     node,
     context = undefined,
@@ -32,29 +56,7 @@
     showFontSizeButtons = true,
     htmlPreviewAllowScripts = false,
     htmlPreviewSandbox = undefined
-  }: {
-    node: SvelteRenderableNode
-    context?: SvelteRenderContext | undefined
-    isDark?: boolean | undefined
-    loading?: boolean | undefined
-    stream?: boolean | undefined
-    darkTheme?: CodeBlockMonacoTheme | undefined
-    lightTheme?: CodeBlockMonacoTheme | undefined
-    themes?: CodeBlockMonacoTheme[] | undefined
-    monacoOptions?: CodeBlockMonacoOptions | undefined
-    minWidth?: string | number | undefined
-    maxWidth?: string | number | undefined
-    isShowPreview?: boolean
-    enableFontSizeControl?: boolean
-    showHeader?: boolean
-    showCopyButton?: boolean
-    showExpandButton?: boolean
-    showPreviewButton?: boolean
-    showCollapseButton?: boolean
-    showFontSizeButtons?: boolean
-    htmlPreviewAllowScripts?: boolean
-    htmlPreviewSandbox?: string | undefined
-  } = $props()
+  }: Props = $props()
 
   const { t } = useSafeI18n()
   const defaultDiffHideUnchangedRegions = Object.freeze({

@@ -9,6 +9,22 @@
   import { clearElement, copyTextToClipboard, downloadSvgMarkup } from './shared/rich-block-helpers'
   import { getString } from './shared/node-helpers'
 
+  type Props = {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext | undefined
+    maxHeight?: string | null | undefined
+    estimatedPreviewHeightPx?: number | undefined
+    loading?: boolean | undefined
+    isDark?: boolean | undefined
+    showHeader?: boolean
+    showModeToggle?: boolean
+    showCopyButton?: boolean
+    showCollapseButton?: boolean
+    showExportButton?: boolean
+    showFullscreenButton?: boolean
+    showZoomControls?: boolean
+  }
+
   let {
     node,
     context = undefined,
@@ -23,21 +39,7 @@
     showExportButton = true,
     showFullscreenButton = true,
     showZoomControls = true
-  }: {
-    node: SvelteRenderableNode
-    context?: SvelteRenderContext | undefined
-    maxHeight?: string | null | undefined
-    estimatedPreviewHeightPx?: number | undefined
-    loading?: boolean | undefined
-    isDark?: boolean | undefined
-    showHeader?: boolean
-    showModeToggle?: boolean
-    showCopyButton?: boolean
-    showCollapseButton?: boolean
-    showExportButton?: boolean
-    showFullscreenButton?: boolean
-    showZoomControls?: boolean
-  } = $props()
+  }: Props = $props()
 
   const { t } = useSafeI18n()
   const infographicIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="#5b8ff9" d="M5 4.25A2.25 2.25 0 0 1 7.25 2h2.5A2.25 2.25 0 0 1 12 4.25v2.5A2.25 2.25 0 0 1 9.75 9h-2.5A2.25 2.25 0 0 1 5 6.75z"/><path fill="#61d9a6" d="M12 17.25A2.25 2.25 0 0 1 14.25 15h2.5A2.25 2.25 0 0 1 19 17.25v2.5A2.25 2.25 0 0 1 16.75 22h-2.5A2.25 2.25 0 0 1 12 19.75z"/><path fill="#f6bd16" d="M12 4.25A2.25 2.25 0 0 1 14.25 2h2.5A2.25 2.25 0 0 1 19 4.25v2.5A2.25 2.25 0 0 1 16.75 9h-2.5A2.25 2.25 0 0 1 12 6.75z"/><path fill="#5ad8a6" d="M7.5 10.75h1.75a6.25 6.25 0 0 1 6.25 6.25v.25h-2V17a4.25 4.25 0 0 0-4.25-4.25H7.5z"/><path fill="#7262fd" d="M15.5 11.1l3.75 2.16v4.33l-3.75 2.16l-3.75-2.16v-4.33z"/></svg>'

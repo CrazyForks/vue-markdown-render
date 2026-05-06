@@ -6,7 +6,8 @@
   import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../workers/katexWorkerClient'
   import { getString } from './shared/node-helpers'
 
-  let { node }: { node: SvelteRenderableNode } = $props()
+  type Props = { node: SvelteRenderableNode }
+  let { node }: Props = $props()
 
   let mathEl: HTMLDivElement | null = $state(null)
   let rendering = $state(true)

@@ -13,6 +13,28 @@
 
   type MermaidTheme = 'light' | 'dark'
 
+  type Props = {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext
+    maxHeight?: string | null
+    estimatedPreviewHeightPx?: number
+    loading?: boolean
+    isDark?: boolean
+    workerTimeoutMs?: number
+    parseTimeoutMs?: number
+    renderTimeoutMs?: number
+    fullRenderTimeoutMs?: number
+    renderDebounceMs?: number
+    showHeader?: boolean
+    showModeToggle?: boolean
+    showCopyButton?: boolean
+    showExportButton?: boolean
+    showFullscreenButton?: boolean
+    showCollapseButton?: boolean
+    showZoomControls?: boolean
+    isStrict?: boolean
+  }
+
   let {
     node,
     context = undefined,
@@ -33,27 +55,7 @@
     showCollapseButton = true,
     showZoomControls = true,
     isStrict = true,
-  }: {
-    node: SvelteRenderableNode
-    context?: SvelteRenderContext
-    maxHeight?: string | null
-    estimatedPreviewHeightPx?: number
-    loading?: boolean
-    isDark?: boolean
-    workerTimeoutMs?: number
-    parseTimeoutMs?: number
-    renderTimeoutMs?: number
-    fullRenderTimeoutMs?: number
-    renderDebounceMs?: number
-    showHeader?: boolean
-    showModeToggle?: boolean
-    showCopyButton?: boolean
-    showExportButton?: boolean
-    showFullscreenButton?: boolean
-    showCollapseButton?: boolean
-    showZoomControls?: boolean
-    isStrict?: boolean
-  } = $props()
+  }: Props = $props()
 
   const { t } = useSafeI18n()
   const mermaidIcon = getLanguageIcon('mermaid')

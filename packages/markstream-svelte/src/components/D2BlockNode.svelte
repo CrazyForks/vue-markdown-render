@@ -29,6 +29,21 @@
     AB5: '#F59E0B',
   }
 
+  type Props = {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext | undefined
+    maxHeight?: string | null | undefined
+    loading?: boolean | undefined
+    isDark?: boolean | undefined
+    themeId?: number | null | undefined
+    darkThemeId?: number | null | undefined
+    showHeader?: boolean
+    showModeToggle?: boolean
+    showCopyButton?: boolean
+    showExportButton?: boolean
+    showCollapseButton?: boolean
+  }
+
   let {
     node,
     context = undefined,
@@ -42,20 +57,7 @@
     showCopyButton = true,
     showExportButton = true,
     showCollapseButton = true
-  }: {
-    node: SvelteRenderableNode
-    context?: SvelteRenderContext | undefined
-    maxHeight?: string | null | undefined
-    loading?: boolean | undefined
-    isDark?: boolean | undefined
-    themeId?: number | null | undefined
-    darkThemeId?: number | null | undefined
-    showHeader?: boolean
-    showModeToggle?: boolean
-    showCopyButton?: boolean
-    showExportButton?: boolean
-    showCollapseButton?: boolean
-  } = $props()
+  }: Props = $props()
 
   const { t } = useSafeI18n()
 
