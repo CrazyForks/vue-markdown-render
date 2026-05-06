@@ -71,6 +71,12 @@ description: 按任务组织的 markstream-vue 指南，帮助你在安装、流
 | [安装](/zh/guide/angular-installation) | Angular 专用安装 |
 | [快速开始](/zh/guide/angular-quick-start) | standalone Angular 示例 |
 
+### Svelte (markstream-svelte)
+
+| 页面 | 描述 |
+|------|------|
+| [快速开始](/zh/guide/svelte) | Svelte 5 渲染器、workers 与自定义组件示例 |
+
 ### Nuxt
 
 - [Nuxt SSR 指南](/zh/nuxt-ssr)：处理客户端边界、workers 和浏览器专属 peers。
