@@ -1,4 +1,4 @@
-## [0.0.14-beta.3](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.3) (2026-05-04)
+## [0.0.14-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.4) (2026-05-06)
 
 
 ### Bug Fixes
@@ -19,6 +19,7 @@
 * align angular thinking fade with vue ([eefe7bf](https://github.com/Simon-He95/markstream-vue/commit/eefe7bf552aa0b3f93c57e0b16fdedf6731f6590))
 * align code block height behavior across React and Angular ([9512fea](https://github.com/Simon-He95/markstream-vue/commit/9512fea7861e979724bc3f6418fb319e09258b32))
 * align custom html tag handling across renderers ([9293a03](https://github.com/Simon-He95/markstream-vue/commit/9293a038d88055b9a1261b1345d0014e77bbaf4c))
+* align footnote anchor links ([7d1a0ab](https://github.com/Simon-He95/markstream-vue/commit/7d1a0abd0422f84181dd7b1913f16750ceb62ffb))
 * align framework security defaults ([43c8c9d](https://github.com/Simon-He95/markstream-vue/commit/43c8c9d2e5171f4f5f394b07016f6214fe43627d))
 * align html hardening across renderers ([a5672d2](https://github.com/Simon-He95/markstream-vue/commit/a5672d2cfd5bbbf3fecc2512d17c4117039a6b02))
 * align plaintext monaco dark fallback ([37d6b5f](https://github.com/Simon-He95/markstream-vue/commit/37d6b5fbed02a3d39c9ff5c60edb8fe22fc283d4))
@@ -147,6 +148,7 @@
 * remove shadcn bridge tokens to prevent external variable pollution ([955a1fb](https://github.com/Simon-He95/markstream-vue/commit/955a1fb220d446d624b44711e603b4e0684dde9e))
 * remove Teleport from code block dropdown, use absolute positioning ([9168f83](https://github.com/Simon-He95/markstream-vue/commit/9168f83c8c24c556a2f38a8deb304d6b019f9680))
 * remove unnecessary blank lines in documentation and component files ([5f877e6](https://github.com/Simon-He95/markstream-vue/commit/5f877e61079b95ef3a78f1c8de7fe12328d85133)), closes [#243](https://github.com/Simon-He95/markstream-vue/issues/243)
+* render details summary inline ([586500f](https://github.com/Simon-He95/markstream-vue/commit/586500fb43764d35aa1bbb481c386fdafc7042cd))
 * render images inline across renderers ([b690fec](https://github.com/Simon-He95/markstream-vue/commit/b690fec06a9697fcb9460f5e343b34b9c9d3f82c))
 * repair maintenance build checks ([5acb2fa](https://github.com/Simon-He95/markstream-vue/commit/5acb2fa81b3d82cea314e1876df46ddb180c58a7))
 * repair package entrypoints ([e2c1c21](https://github.com/Simon-He95/markstream-vue/commit/e2c1c214629f81bfe4ce67823d6d895936c8cfa6))
@@ -242,6 +244,7 @@
 * add immersive preview toolbar controls ([1bbe82c](https://github.com/Simon-He95/markstream-vue/commit/1bbe82ca24c46f8f9180623959da0073550f1c52))
 * Add InfographicBlockNode component and integrate  rendering for code blocks. ([1c0e74d](https://github.com/Simon-He95/markstream-vue/commit/1c0e74d21ad9f6940699358d3e3d1db41b4009de))
 * add markdown code block auto-scroll controls ([273984e](https://github.com/Simon-He95/markstream-vue/commit/273984e5988bb9063d1c78f200ed153645377767))
+* add markstream-svelte package ([871a1e0](https://github.com/Simon-He95/markstream-vue/commit/871a1e06a468eb11d8cdaf32f609ef1b62acf7d3))
 * add normalization for custom HTML opening tags at line start ([aafd530](https://github.com/Simon-He95/markstream-vue/commit/aafd530d372b15888e72a960a5cff7d6c8e27f37))
 * add onRenderError callback prop to MermaidBlockNode for custom error handling ([8810b71](https://github.com/Simon-He95/markstream-vue/commit/8810b718ce72360d2e91dce029a6ea58f9244821))
 * add per-theme radius token and apply font-family on root ([8eb6efa](https://github.com/Simon-He95/markstream-vue/commit/8eb6efa72fba40cab07627d62fd5f2be73f9fcc2))
