@@ -397,12 +397,37 @@ After`,
       name: 'footnote nodes',
       markdown: 'A footnote reference[^1].\n\n[^1]: Footnote explanation',
       expectedText: ['A footnote reference', 'Footnote explanation'],
-      assert: (wrapper) => {
-        const footnoteBlock = wrapper.find('[id="fnref-1"]')
+      assert: async (wrapper) => {
+        const reference = wrapper.find('sup.footnote-reference')
+        expect(reference.exists()).toBe(true)
+        expect(reference.attributes('id')).toBe('fnref-1')
+        expect(reference.find('.footnote-link').attributes('href')).toBe('#fnref--1')
+
+        const footnoteBlock = wrapper.find('[id="fnref--1"]')
         expect(footnoteBlock.exists()).toBe(true)
-        expect(footnoteBlock.text()).toBe('[1]')
         const footerAnchor = wrapper.find('.footnote-anchor')
         expect(footerAnchor.exists()).toBe(true)
+        expect(footerAnchor.attributes('href')).toBe('#fnref-1')
+
+        const originalScrollIntoView = Element.prototype.scrollIntoView
+        const scrollIntoView = vi.fn()
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        ;(Element.prototype as any).scrollIntoView = scrollIntoView
+        document.body.appendChild(wrapper.element)
+        try {
+          await reference.trigger('click')
+          expect(scrollIntoView).toHaveBeenCalled()
+          expect(warnSpy).not.toHaveBeenCalled()
+        }
+        finally {
+          if (wrapper.element.parentNode === document.body)
+            document.body.removeChild(wrapper.element)
+          if (originalScrollIntoView)
+            Element.prototype.scrollIntoView = originalScrollIntoView
+          else
+            delete (Element.prototype as any).scrollIntoView
+          warnSpy.mockRestore()
+        }
       },
     },
     {
