@@ -4,15 +4,16 @@
   import NodeOutlet from './NodeOutlet.svelte'
   import { getNodeList, splitParagraphChildren } from './shared/node-helpers'
 
+  type Props = {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext
+    indexKey?: string | number
+  };
   let {
     node,
     context = undefined,
     indexKey = undefined
-  }: {
-    node: SvelteRenderableNode
-    context?: SvelteRenderContext
-    indexKey?: string | number
-  } = $props()
+  }: Props = $props()
 
   let prefix = $derived(String(indexKey ?? 'p'))
   let parts = $derived(splitParagraphChildren(getNodeList((node as any)?.children)))

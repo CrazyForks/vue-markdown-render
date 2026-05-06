@@ -50,15 +50,16 @@
     resolveNodeOutletCustomInputs,
   } from './shared/node-outlet-helpers'
 
+  type Props = {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext
+    indexKey?: string | number
+  };
   let {
     node,
     context = undefined,
     indexKey = undefined,
-  }: {
-    node: SvelteRenderableNode
-    context?: SvelteRenderContext
-    indexKey?: string | number
-  } = $props()
+  }: Props = $props()
 
   let resolvedType = $derived(String((node as any)?.type || ''))
   let customComponentMap = $derived(context?.customComponents || getCustomNodeComponents(context?.customId))

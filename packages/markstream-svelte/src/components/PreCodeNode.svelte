@@ -2,11 +2,12 @@
   import type { SvelteRenderableNode } from './shared/node-helpers'
   import { encodeDataPayload, getString, sanitizeClassToken } from './shared/node-helpers'
 
+  type Props = {
+    node: SvelteRenderableNode
+  };
   let {
     node
-  }: {
-    node: SvelteRenderableNode
-  } = $props()
+  }: Props = $props()
 
   let languageRaw = $derived(getString((node as any)?.language).trim())
   let language = $derived(sanitizeClassToken(languageRaw))
