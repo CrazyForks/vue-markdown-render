@@ -170,9 +170,9 @@ Footnotes are server-rendered.[^1]
             content: '<summary>展开看一段 HTML</summary>',
             children: [
               {
-                type: 'paragraph',
+                type: 'text',
+                content: '展开看一段 HTML',
                 raw: '展开看一段 HTML',
-                children: [{ type: 'text', content: '展开看一段 HTML', raw: '展开看一段 HTML' }],
               },
             ],
           },
@@ -186,6 +186,7 @@ Footnotes are server-rendered.[^1]
     })
 
     expect(html).toMatch(/<details[^>]*class="html-block-node"[^>]*>(?:<!--\[-->|<!--\]-->)*<summary[^>]*>/)
+    expect(html).not.toContain('<summary class="html-block-node"><p')
     expect(html).not.toContain('class="markstream-vue markdown-renderer"')
     expect(html).not.toContain('node-slot')
     expect(html).not.toContain('data-node-index=')

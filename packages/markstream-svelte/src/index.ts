@@ -39,15 +39,6 @@ export { default as ParagraphNode } from './components/ParagraphNode.svelte'
 export { default as PreCodeNode } from './components/PreCodeNode.svelte'
 export { default as ReferenceNode } from './components/ReferenceNode.svelte'
 export { default as RenderChildren } from './components/RenderChildren.svelte'
-export { default as StrikethroughNode } from './components/StrikethroughNode.svelte'
-export { default as StrongNode } from './components/StrongNode.svelte'
-export { default as SubscriptNode } from './components/SubscriptNode.svelte'
-export { default as SuperscriptNode } from './components/SuperscriptNode.svelte'
-export { default as TableNode } from './components/TableNode.svelte'
-export { default as TextNode } from './components/TextNode.svelte'
-export { default as ThematicBreakNode } from './components/ThematicBreakNode.svelte'
-export { default as Tooltip } from './components/Tooltip.svelte'
-export { default as VmrContainerNode } from './components/VmrContainerNode.svelte'
 export {
   buildRenderContext,
   resolveParsedNodes,
@@ -58,6 +49,15 @@ export type {
   SvelteRenderableNode,
   SvelteRenderContext,
 } from './components/shared/node-helpers'
+export { default as StrikethroughNode } from './components/StrikethroughNode.svelte'
+export { default as StrongNode } from './components/StrongNode.svelte'
+export { default as SubscriptNode } from './components/SubscriptNode.svelte'
+export { default as SuperscriptNode } from './components/SuperscriptNode.svelte'
+export { default as TableNode } from './components/TableNode.svelte'
+export { default as TextNode } from './components/TextNode.svelte'
+export { default as ThematicBreakNode } from './components/ThematicBreakNode.svelte'
+export { default as Tooltip } from './components/Tooltip.svelte'
+export { default as VmrContainerNode } from './components/VmrContainerNode.svelte'
 export {
   clearGlobalCustomComponents,
   getCustomComponentsRevision,
@@ -143,9 +143,9 @@ export {
   setLanguageIconResolver,
 } from './utils/languageIcon'
 export type { LanguageIconResolver } from './utils/languageIcon'
-export { KATEX_COMMANDS, normalizeStandaloneBackslashT, setDefaultMathOptions } from 'stream-markdown-parser'
-export type { MathOptions } from 'stream-markdown-parser'
 export * from './workers/katexCdnWorker'
 export * from './workers/katexWorkerClient'
 export * from './workers/mermaidCdnWorker'
 export * from './workers/mermaidWorkerClient'
+export { KATEX_COMMANDS, normalizeStandaloneBackslashT, setDefaultMathOptions } from 'stream-markdown-parser'
+export type { MathOptions } from 'stream-markdown-parser'

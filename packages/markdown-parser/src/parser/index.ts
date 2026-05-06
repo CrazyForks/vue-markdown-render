@@ -441,6 +441,18 @@ function parseDetailsFragmentChildren(
   return parseMarkdownToStructure(fragment, md, options)
 }
 
+function parseSummaryChildren(
+  fragment: string,
+  md: MarkdownIt,
+  options: ParseOptions,
+) {
+  const children = parseDetailsFragmentChildren(fragment, md, options)
+  const onlyChild = children[0] as ParsedNode & { children?: ParsedNode[] } | undefined
+  if (children.length === 1 && onlyChild?.type === 'paragraph' && Array.isArray(onlyChild.children))
+    return onlyChild.children
+  return children
+}
+
 function buildStructuredSummaryNode(
   summaryRaw: string,
   md: MarkdownIt,
@@ -452,7 +464,7 @@ function buildStructuredSummaryNode(
 
   if (openEnd !== -1 && closeStart !== -1 && closeStart >= openEnd + 1) {
     const summaryInner = summaryRaw.slice(openEnd + 1, closeStart)
-    const children = parseDetailsFragmentChildren(summaryInner, md, options)
+    const children = parseSummaryChildren(summaryInner, md, options)
     if (children.length > 0)
       summaryNode.children = children
   }

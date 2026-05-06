@@ -1,5 +1,5 @@
-export type MarkstreamSvelteComponent<P = any> = any
-export type CustomComponentMap = Record<string, MarkstreamSvelteComponent<any>>
+export type MarkstreamSvelteComponent = any
+export type CustomComponentMap = Record<string, MarkstreamSvelteComponent>
 
 const GLOBAL_KEY = '__global__'
 
