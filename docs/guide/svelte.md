@@ -1,13 +1,19 @@
 # Svelte
 
-`markstream-svelte` provides the Svelte 5 renderer with the same component names, worker helpers, and playground fixtures as the Vue and React packages.
+`markstream-svelte` provides the Svelte 5-only renderer with the same component names, worker helpers, and playground fixtures as the Vue and React packages. Svelte 4 is not supported.
+
+Install the package with Svelte 5:
+
+```bash
+pnpm add markstream-svelte svelte@^5
+```
 
 ```svelte
 <script lang="ts">
   import MarkdownRender from 'markstream-svelte'
   import 'markstream-svelte/index.css'
 
-  export let content = '# markstream-svelte'
+  let { content = '# markstream-svelte' }: { content?: string } = $props()
 </script>
 
 <MarkdownRender
@@ -28,7 +34,7 @@ For KaTeX and Mermaid worker parity:
   import MermaidWorker from 'markstream-svelte/workers/mermaidParser.worker?worker&inline'
 
   setKaTeXWorker(new KatexWorker())
-setMermaidWorker(new MermaidWorker())
+  setMermaidWorker(new MermaidWorker())
 </script>
 ```
 
@@ -51,6 +57,30 @@ Custom HTML tags use the same scoped component registry:
   {customId}
   customHtmlTags={['thinking']}
 />
+```
+
+Example `ThinkingNode.svelte`:
+
+```svelte
+<script lang="ts">
+  import MarkdownRender from 'markstream-svelte'
+
+  let {
+    node,
+    customId = undefined,
+  }: {
+    node: any
+    customId?: string
+  } = $props()
+</script>
+
+<section class="thinking-node">
+  <MarkdownRender
+    content={String(node?.content ?? '')}
+    {customId}
+    customHtmlTags={['thinking']}
+  />
+</section>
 ```
 
 Local playground:

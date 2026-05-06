@@ -75,7 +75,7 @@ This guide is organized by task first, framework second. Start with the shortest
 
 | Page | Description |
 |------|-------------|
-| [Quick Start](/guide/svelte) | Svelte 5 renderer usage, workers, and custom components |
+| [Quick Start](/guide/svelte) | Svelte 5-only renderer usage, workers, and custom components |
 
 ### Nuxt
 

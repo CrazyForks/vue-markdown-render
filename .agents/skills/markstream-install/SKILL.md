@@ -1,6 +1,6 @@
 ---
 name: markstream-install
-description: Install and wire markstream-vue, markstream-react, markstream-vue2, or markstream-angular into an existing repository. Use when Codex needs to choose the right package, install the smallest peer-dependency set, fix CSS/reset order, decide between `content` and `nodes`, or add a minimal working renderer example.
+description: Install and wire markstream-vue, markstream-react, markstream-vue2, markstream-angular, or markstream-svelte into an existing repository. Use when Codex needs to choose the right package, install the smallest peer-dependency set, fix CSS/reset order, decide between `content` and `nodes`, or add a minimal working renderer example.
 ---
 
 # Markstream Install
@@ -13,7 +13,8 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
 
 1. Detect the target framework and CSS stack.
    - Check `package.json`, app entry files, Tailwind or UnoCSS config, and whether the repo is SSR or streaming-focused.
-   - Choose the package that matches the host app: `markstream-vue`, `markstream-vue2`, `markstream-react`, or `markstream-angular`.
+   - Choose the package that matches the host app: `markstream-vue`, `markstream-vue2`, `markstream-react`, `markstream-angular`, or `markstream-svelte`.
+   - Use `markstream-svelte` only for Svelte 5 apps.
 2. Install the smallest peer set that matches the requested features.
    - Add peers only for features the user actually needs: Monaco, Mermaid, D2, KaTeX, or lightweight highlighting via `stream-markdown`.
    - Do not install every optional peer by default.

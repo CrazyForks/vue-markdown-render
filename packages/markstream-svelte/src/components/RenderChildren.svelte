@@ -2,9 +2,15 @@
   import type { SvelteRenderableNode, SvelteRenderContext } from './shared/node-helpers'
   import NodeOutlet from './NodeOutlet.svelte'
 
-  export let nodes: readonly SvelteRenderableNode[] | null | undefined = []
-  export let context: SvelteRenderContext | undefined = undefined
-  export let prefix = 'child'
+  let {
+    nodes = [],
+    context = undefined,
+    prefix = 'child',
+  }: {
+    nodes?: readonly SvelteRenderableNode[] | null
+    context?: SvelteRenderContext
+    prefix?: string
+  } = $props()
 </script>
 
 {#each nodes || [] as child, index (prefix + '-' + index)}

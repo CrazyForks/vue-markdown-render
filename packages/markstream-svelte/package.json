@@ -58,7 +58,7 @@
     "katex": ">=0.16.22",
     "mermaid": ">=11",
     "stream-monaco": ">=0.0.40",
-    "svelte": ">=5"
+    "svelte": ">=5 <6"
   },
   "peerDependenciesMeta": {
     "@antv/infographic": {

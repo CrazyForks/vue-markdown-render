@@ -8,6 +8,7 @@
 | Vue 2.6 / 2.7 | `markstream-vue2` |
 | React 18+ | `markstream-react` |
 | Angular 20+ | `markstream-angular` |
+| Svelte 5 | `markstream-svelte` |
 
 ## Peer selection
 
@@ -25,7 +26,7 @@
 - Markstream CSS after reset
 - in Tailwind or UnoCSS projects, keep Markstream CSS inside `@layer components`
 - import KaTeX CSS when math is used
-- when standalone node components are rendered directly, wrap them with `.markstream-vue`
+- when standalone node components are rendered directly, wrap them with the package root class such as `.markstream-vue`, `.markstream-react`, or `.markstream-svelte`
 
 ## Input choice
 

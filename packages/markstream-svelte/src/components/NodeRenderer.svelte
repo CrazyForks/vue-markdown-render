@@ -5,73 +5,80 @@
     SvelteRenderableNode,
     SvelteRenderContext,
   } from './shared/node-helpers'
-  import { afterUpdate, onDestroy, onMount, tick } from 'svelte'
+  import { onDestroy, onMount, tick } from 'svelte'
   import { getCustomNodeComponents, subscribeCustomComponents } from '../customComponents'
   import { disposeRenderedHtmlEnhancements, enhanceRenderedHtml } from '../enhanceRenderedHtml'
   import NodeOutlet from './NodeOutlet.svelte'
   import { buildRenderContext, resolveParsedNodes } from './shared/node-helpers'
 
-  export let content: NodeRendererProps['content'] = ''
-  export let nodes: NodeRendererProps['nodes'] = null
-  export let final: NodeRendererProps['final'] = undefined
-  export let parseOptions: NodeRendererProps['parseOptions'] = undefined
-  export let customMarkdownIt: NodeRendererProps['customMarkdownIt'] = undefined
-  export let debugPerformance = false
-  export let customHtmlTags: NodeRendererProps['customHtmlTags'] = undefined
-  export let htmlPolicy: NodeRendererProps['htmlPolicy'] = 'safe'
-  export let viewportPriority: NodeRendererProps['viewportPriority'] = true
-  export let codeBlockStream = true
-  export let codeBlockDarkTheme: NodeRendererProps['codeBlockDarkTheme'] = undefined
-  export let codeBlockLightTheme: NodeRendererProps['codeBlockLightTheme'] = undefined
-  export let codeBlockMonacoOptions: NodeRendererProps['codeBlockMonacoOptions'] = undefined
-  export let renderCodeBlocksAsPre = false
-  export let codeBlockMinWidth: NodeRendererProps['codeBlockMinWidth'] = undefined
-  export let codeBlockMaxWidth: NodeRendererProps['codeBlockMaxWidth'] = undefined
-  export let codeBlockProps: NodeRendererProps['codeBlockProps'] = undefined
-  export let mermaidProps: NodeRendererProps['mermaidProps'] = undefined
-  export let d2Props: NodeRendererProps['d2Props'] = undefined
-  export let infographicProps: NodeRendererProps['infographicProps'] = undefined
-  export let customComponents: NodeRendererProps['customComponents'] = undefined
-  export let showTooltips = true
-  export let themes: NodeRendererProps['themes'] = undefined
-  export let isDark = false
-  export let customId: NodeRendererProps['customId'] = undefined
-  export let indexKey: NodeRendererProps['indexKey'] = undefined
-  export let typewriter = true
-  export let batchRendering = true
-  export let initialRenderBatchSize = 40
-  export let renderBatchSize = 80
-  export let renderBatchDelay = 16
-  export let renderBatchBudgetMs = 6
-  export let renderBatchIdleTimeoutMs = 120
-  export let deferNodesUntilVisible = true
-  export let maxLiveNodes = 320
-  export let liveNodeBuffer = 60
-  export let allowHtml = true
-  export let className = ''
-  export let onCopy: NodeRendererEvents['onCopy'] = undefined
-  export let onHandleArtifactClick: NodeRendererEvents['onHandleArtifactClick'] = undefined
-  export let onClick: ((event: MouseEvent) => void) | undefined = undefined
-  export let onMouseover: ((event: MouseEvent) => void) | undefined = undefined
-  export let onMouseout: ((event: MouseEvent) => void) | undefined = undefined
+  type NodeRendererComponentProps = NodeRendererProps & NodeRendererEvents & {
+    className?: string
+    onClick?: (event: MouseEvent) => void
+    onMouseover?: (event: MouseEvent) => void
+    onMouseout?: (event: MouseEvent) => void
+  }
 
-  let rootEl: HTMLDivElement | null = null
-  let parsedNodes: SvelteRenderableNode[] = []
-  let renderContext: SvelteRenderContext = { events: {} }
-  let customComponentsRevision = 0
-  let streamRenderVersion = 0
-  let previousContent: typeof content = undefined
-  let previousNodes: typeof nodes = undefined
+  let {
+    content = '',
+    nodes = null,
+    final = undefined,
+    parseOptions = undefined,
+    customMarkdownIt = undefined,
+    debugPerformance = false,
+    customHtmlTags = undefined,
+    htmlPolicy = 'safe',
+    viewportPriority = true,
+    codeBlockStream = true,
+    codeBlockDarkTheme = undefined,
+    codeBlockLightTheme = undefined,
+    codeBlockMonacoOptions = undefined,
+    renderCodeBlocksAsPre = false,
+    codeBlockMinWidth = undefined,
+    codeBlockMaxWidth = undefined,
+    codeBlockProps = undefined,
+    mermaidProps = undefined,
+    d2Props = undefined,
+    infographicProps = undefined,
+    customComponents = undefined,
+    showTooltips = true,
+    themes = undefined,
+    isDark = false,
+    customId = undefined,
+    indexKey = undefined,
+    typewriter = true,
+    batchRendering = true,
+    initialRenderBatchSize = 40,
+    renderBatchSize = 80,
+    renderBatchDelay = 16,
+    renderBatchBudgetMs = 6,
+    renderBatchIdleTimeoutMs = 120,
+    deferNodesUntilVisible = true,
+    maxLiveNodes = 320,
+    liveNodeBuffer = 60,
+    allowHtml = true,
+    className = '',
+    onCopy = undefined,
+    onHandleArtifactClick = undefined,
+    onClick = undefined,
+    onMouseover = undefined,
+    onMouseout = undefined,
+  }: NodeRendererComponentProps = $props()
+
+  let rootEl: HTMLDivElement | null = $state(null)
+  let customComponentsRevision = $state(0)
+  let streamRenderVersion = $state(0)
+  let previousContent = $state<NodeRendererProps['content']>()
+  let previousNodes = $state<NodeRendererProps['nodes']>()
   let enhancementToken = 0
   let enhancementHandle: { dispose: () => void } | null = null
-  let renderedNodeCount = 0
+  let renderedNodeCount = $state(0)
   let renderBatchTimer: ReturnType<typeof setTimeout> | null = null
   let renderBatchFrame: number | null = null
   let renderBatchIdle: number | null = null
   let renderBatchToken = 0
   const textStreamState = new Map<string, string>()
 
-  $: props = {
+  let rendererProps = $derived({
     content,
     nodes,
     final,
@@ -109,37 +116,38 @@
     maxLiveNodes,
     liveNodeBuffer,
     allowHtml,
-  } satisfies NodeRendererProps
+  } satisfies NodeRendererProps)
 
-  $: {
+  $effect.pre(() => {
     if (previousContent !== content || previousNodes !== nodes) {
       streamRenderVersion += 1
       previousContent = content
       previousNodes = nodes
     }
-  }
+  })
 
-  $: {
+  let parsedNodes = $derived.by<SvelteRenderableNode[]>(() => {
     const start = debugPerformance && typeof performance !== 'undefined' ? performance.now() : 0
-    parsedNodes = resolveParsedNodes(props)
+    const nextParsedNodes = resolveParsedNodes(rendererProps)
     if (debugPerformance && typeof console !== 'undefined' && typeof performance !== 'undefined') {
       console.info('[markstream-svelte][perf] parse(sync)', {
         ms: Math.round(performance.now() - start),
-        nodes: parsedNodes.length,
+        nodes: nextParsedNodes.length,
         contentLength: content?.length ?? 0,
       })
     }
-  }
+    return nextParsedNodes
+  })
 
-  $: {
+  let renderContext = $derived.by<SvelteRenderContext>(() => {
     void customComponentsRevision
     const scopedCustomComponents = getCustomNodeComponents(customId)
     const mergedCustomComponents = customComponents
       ? { ...scopedCustomComponents, ...customComponents }
       : scopedCustomComponents
-    renderContext = buildRenderContext(
+    return buildRenderContext(
       {
-        ...props,
+        ...rendererProps,
         customComponents: mergedCustomComponents,
       },
       {
@@ -149,9 +157,9 @@
       textStreamState,
       streamRenderVersion,
     )
-  }
+  })
 
-  $: {
+  $effect(() => {
     void parsedNodes.length
     void batchRendering
     void initialRenderBatchSize
@@ -162,19 +170,31 @@
     void final
     void renderedNodeCount
     syncRenderedNodeWindow()
-  }
-  $: renderedNodes = parsedNodes.slice(0, Math.min(renderedNodeCount, parsedNodes.length))
+  })
+  let renderedNodes = $derived(parsedNodes.slice(0, Math.min(renderedNodeCount, parsedNodes.length)))
+
+  $effect(() => {
+    void rootEl
+    void final
+    void parsedNodes
+    void renderedNodes
+    void isDark
+    void renderCodeBlocksAsPre
+    void codeBlockMonacoOptions
+    void codeBlockProps
+    void mermaidProps
+    void d2Props
+    void infographicProps
+    void showTooltips
+    void onCopy
+    scheduleEnhancement()
+  })
 
   onMount(() => {
     const unsubscribe = subscribeCustomComponents(() => {
       customComponentsRevision += 1
     })
-    scheduleEnhancement()
     return unsubscribe
-  })
-
-  afterUpdate(() => {
-    scheduleEnhancement()
   })
 
   onDestroy(() => {

@@ -50,25 +50,31 @@
     resolveNodeOutletCustomInputs,
   } from './shared/node-outlet-helpers'
 
-  export let node: SvelteRenderableNode
-  export let context: SvelteRenderContext | undefined = undefined
-  export let indexKey: string | number | undefined = undefined
+  let {
+    node,
+    context = undefined,
+    indexKey = undefined,
+  }: {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext
+    indexKey?: string | number
+  } = $props()
 
-  $: resolvedType = String((node as any)?.type || '')
-  $: customComponentMap = context?.customComponents || getCustomNodeComponents(context?.customId)
-  $: CustomComponent = resolveNodeOutletCustomComponent(node, context, customComponentMap)
-  $: customNode = coerceCustomHtmlNode(node)
-  $: customInputs = resolveNodeOutletCustomInputs(node, context) || {}
-  $: codeMode = resolveNodeOutletCodeMode(node, context)
-  $: htmlTag = resolveHtmlTag(node)
-  $: shouldEscapeHtmlTag = resolveShouldEscapeHtmlTag()
-  $: htmlRenderNode = coerceBuiltinHtmlNode(node, resolvedType)
-  $: codeBlockInstanceKey = `${String(indexKey ?? 'code-block')}:${String((node as any)?.language ?? '')}:${(node as any)?.diff ? 'diff' : 'code'}`
-  $: escapedTextNode = {
+  let resolvedType = $derived(String((node as any)?.type || ''))
+  let customComponentMap = $derived(context?.customComponents || getCustomNodeComponents(context?.customId))
+  let CustomComponent = $derived(resolveNodeOutletCustomComponent(node, context, customComponentMap))
+  let customNode = $derived(coerceCustomHtmlNode(node))
+  let customInputs = $derived(resolveNodeOutletCustomInputs(node, context) || {})
+  let codeMode = $derived(resolveNodeOutletCodeMode(node, context))
+  let htmlTag = $derived(resolveHtmlTag(node))
+  let shouldEscapeHtmlTag = $derived(resolveShouldEscapeHtmlTag())
+  let htmlRenderNode = $derived(coerceBuiltinHtmlNode(node, resolvedType))
+  let codeBlockInstanceKey = $derived(`${String(indexKey ?? 'code-block')}:${String((node as any)?.language ?? '')}:${(node as any)?.diff ? 'diff' : 'code'}`)
+  let escapedTextNode = $derived({
     type: 'text',
     content: String((node as any)?.content ?? (node as any)?.raw ?? ''),
     raw: String((node as any)?.content ?? (node as any)?.raw ?? ''),
-  } as SvelteRenderableNode
+  } as SvelteRenderableNode)
 
   function resolveShouldEscapeHtmlTag() {
     if (resolvedType !== 'html_block' && resolvedType !== 'html_inline')
@@ -88,8 +94,7 @@
 </script>
 
 {#if CustomComponent}
-  <svelte:component
-    this={CustomComponent}
+  <CustomComponent
     node={customNode}
     context={context}
     ctx={context}
