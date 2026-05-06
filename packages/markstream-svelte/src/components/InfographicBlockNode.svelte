@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SvelteRenderableNode, SvelteRenderContext } from './shared/node-helpers'
-  import { afterUpdate, onDestroy, onMount, tick } from 'svelte'
+  import { onDestroy, onMount, tick, untrack } from 'svelte'
   import { useSafeI18n } from '../i18n/useSafeI18n'
   import { getInfographic } from '../optional/infographic'
   import { toSafeSvgMarkup } from '../sanitizeSvg'
@@ -9,70 +9,94 @@
   import { clearElement, copyTextToClipboard, downloadSvgMarkup } from './shared/rich-block-helpers'
   import { getString } from './shared/node-helpers'
 
-  export let node: SvelteRenderableNode
-  export let context: SvelteRenderContext | undefined = undefined
-  export let maxHeight: string | null | undefined = '500px'
-  export let estimatedPreviewHeightPx: number | undefined = undefined
-  export let loading: boolean | undefined = undefined
-  export let isDark: boolean | undefined = undefined
-  export let showHeader = true
-  export let showModeToggle = true
-  export let showCopyButton = true
-  export let showCollapseButton = true
-  export let showExportButton = true
-  export let showFullscreenButton = true
-  export let showZoomControls = true
+  type Props = {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext | undefined
+    maxHeight?: string | null | undefined
+    estimatedPreviewHeightPx?: number | undefined
+    loading?: boolean | undefined
+    isDark?: boolean | undefined
+    showHeader?: boolean
+    showModeToggle?: boolean
+    showCopyButton?: boolean
+    showCollapseButton?: boolean
+    showExportButton?: boolean
+    showFullscreenButton?: boolean
+    showZoomControls?: boolean
+  }
+
+  let {
+    node,
+    context = undefined,
+    maxHeight = '500px',
+    estimatedPreviewHeightPx = undefined,
+    loading = undefined,
+    isDark = undefined,
+    showHeader = true,
+    showModeToggle = true,
+    showCopyButton = true,
+    showCollapseButton = true,
+    showExportButton = true,
+    showFullscreenButton = true,
+    showZoomControls = true
+  }: Props = $props()
 
   const { t } = useSafeI18n()
   const infographicIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="#5b8ff9" d="M5 4.25A2.25 2.25 0 0 1 7.25 2h2.5A2.25 2.25 0 0 1 12 4.25v2.5A2.25 2.25 0 0 1 9.75 9h-2.5A2.25 2.25 0 0 1 5 6.75z"/><path fill="#61d9a6" d="M12 17.25A2.25 2.25 0 0 1 14.25 15h2.5A2.25 2.25 0 0 1 19 17.25v2.5A2.25 2.25 0 0 1 16.75 22h-2.5A2.25 2.25 0 0 1 12 19.75z"/><path fill="#f6bd16" d="M12 4.25A2.25 2.25 0 0 1 14.25 2h2.5A2.25 2.25 0 0 1 19 4.25v2.5A2.25 2.25 0 0 1 16.75 9h-2.5A2.25 2.25 0 0 1 12 6.75z"/><path fill="#5ad8a6" d="M7.5 10.75h1.75a6.25 6.25 0 0 1 6.25 6.25v.25h-2V17a4.25 4.25 0 0 0-4.25-4.25H7.5z"/><path fill="#7262fd" d="M15.5 11.1l3.75 2.16v4.33l-3.75 2.16l-3.75-2.16v-4.33z"/></svg>'
 
-  let renderHost: HTMLDivElement | null = null
-  let mounted = false
-  let renderToken = 0
-  let lastCompletedRenderSignature = ''
-  let activeRenderSignature = ''
-  let lastSuppressedErrorSignature = ''
-  let instance: any = null
-  let renderError = ''
-  let rendering = false
-  let rerenderQueued = false
-  let rerenderForce = false
-  let hasPreview = false
-  let copied = false
-  let collapsed = false
-  let showSource = false
-  let modalOpen = false
-  let modalMarkup = ''
-  let zoom = 1
+  let renderHost: HTMLDivElement | null = $state(null)
+  let mounted = $state(false)
+  let renderToken = $state(0)
+  let lastCompletedRenderSignature = $state('')
+  let activeRenderSignature = $state('')
+  let lastSuppressedErrorSignature = $state('')
+  let instance: any = $state(null)
+  let renderError = $state('')
+  let rendering = $state(false)
+  let rerenderQueued = $state(false)
+  let rerenderForce = $state(false)
+  let hasPreview = $state(false)
+  let copied = $state(false)
+  let collapsed = $state(false)
+  let showSource = $state(false)
+  let modalOpen = $state(false)
+  let modalMarkup = $state('')
+  let zoom = $state(1)
   let copyTimer: ReturnType<typeof setTimeout> | null = null
 
-  $: source = getString((node as any)?.code)
-  $: nodeLoading = typeof (node as any)?.loading === 'boolean' ? Boolean((node as any)?.loading) : true
-  $: resolvedLoading = loading ?? nodeLoading
-  $: final = context?.final ?? resolvedLoading === false
-  $: progressivePreview = resolvedLoading !== false || final === false
-  $: resolvedIsDark = isDark ?? context?.isDark ?? false
-  $: maxPreviewHeight = maxHeight === 'none' ? null : parsePositiveNumber(maxHeight)
-  $: previewHeight = clampPreviewHeight(
+  let source = $derived(getString((node as any)?.code))
+  let nodeLoading = $derived(typeof (node as any)?.loading === 'boolean' ? Boolean((node as any)?.loading) : true)
+  let resolvedLoading = $derived(loading ?? nodeLoading)
+  let final = $derived(context?.final ?? resolvedLoading === false)
+  let progressivePreview = $derived(resolvedLoading !== false || final === false)
+  let resolvedIsDark = $derived(isDark ?? context?.isDark ?? false)
+  let maxPreviewHeight = $derived(maxHeight === 'none' ? null : parsePositiveNumber(maxHeight))
+  let previewHeight = $derived(clampPreviewHeight(
     parsePositiveNumber(estimatedPreviewHeightPx) ?? estimateInfographicPreviewHeight(source),
     320,
     maxPreviewHeight ?? undefined,
-  )
-  $: previewStyle = [
+  ))
+  let previewStyle = $derived([
     `min-height: ${previewHeight}px`,
     maxHeight && maxHeight !== 'none' ? `max-height: ${maxHeight}` : '',
-  ].filter(Boolean).join('; ')
-  $: transformStyle = `transform: scale(${zoom}); transform-origin: center center;`
-  $: shouldRender = !(resolvedLoading && !source.trim())
+  ].filter(Boolean).join('; '))
+  let transformStyle = $derived(`transform: scale(${zoom}); transform-origin: center center;`)
+  let shouldRender = $derived(!(resolvedLoading && !source.trim()))
 
   onMount(() => {
     mounted = true
     queueInfographicRender(true)
   })
 
-  afterUpdate(() => {
-    if (mounted)
-      queueInfographicRender()
+  $effect(() => {
+    if (mounted) {
+      const _sig = `${source}\n${resolvedIsDark}\n${final}\n${progressivePreview}`
+      const _collapsed = collapsed
+      const _showSource = showSource
+      untrack(() => {
+        queueInfographicRender()
+      })
+    }
   })
 
   onDestroy(() => {

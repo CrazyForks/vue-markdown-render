@@ -1,8 +1,17 @@
 <script lang="ts">
   import type { SvelteRenderableNode, SvelteRenderContext } from './shared/node-helpers'
   import InlineWrapNode from './InlineWrapNode.svelte'
-  export let node: SvelteRenderableNode
-  export let context: SvelteRenderContext | undefined = undefined
-  export let indexKey: string | number | undefined = undefined
+
+  type Props = {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext
+    indexKey?: string | number
+  };
+  let {
+    node,
+    context = undefined,
+    indexKey = undefined
+  }: Props = $props()
 </script>
+
 <InlineWrapNode {node} {context} {indexKey} tag="sub" />

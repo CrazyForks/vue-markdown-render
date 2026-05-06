@@ -3,15 +3,21 @@
   import { hideTooltip, showTooltipForAnchor } from '../tooltip/singletonTooltip'
   import RenderChildren from './RenderChildren.svelte'
   import { getNodeList, getString } from './shared/node-helpers'
-  export let node: SvelteRenderableNode
-  export let context: SvelteRenderContext | undefined = undefined
-  export let indexKey: string | number | undefined = undefined
-  export let showTooltip: boolean | undefined = undefined
-  $: href = getString((node as any)?.href)
-  $: title = getString((node as any)?.title || href)
-  $: children = getNodeList((node as any)?.children)
-  $: tooltipEnabled = showTooltip ?? context?.showTooltips ?? true
-  $: isHashLink = href.startsWith('#') && href.length > 1
+  
+  interface Props {
+    node: SvelteRenderableNode;
+    context?: SvelteRenderContext;
+    indexKey?: string | number;
+    showTooltip?: boolean;
+  }
+  
+  let { node, context, indexKey, showTooltip }: Props = $props();
+
+  let href = $derived(getString((node as any)?.href));
+  let title = $derived(getString((node as any)?.title || href));
+  let children = $derived(getNodeList((node as any)?.children));
+  let tooltipEnabled = $derived(showTooltip ?? context?.showTooltips ?? true);
+  let isHashLink = $derived(href.startsWith('#') && href.length > 1);
 
   function showLinkTooltip(event: MouseEvent | FocusEvent) {
     if (!tooltipEnabled || !title)

@@ -2,8 +2,17 @@
   import type { SvelteRenderableNode, SvelteRenderContext } from './shared/node-helpers'
   import RenderChildren from './RenderChildren.svelte'
   import { getNodeList } from './shared/node-helpers'
-  export let node: SvelteRenderableNode
-  export let context: SvelteRenderContext | undefined = undefined
-  export let indexKey: string | number | undefined = undefined
+
+  type Props = {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext
+    indexKey?: string | number
+  };
+  let {
+    node,
+    context = undefined,
+    indexKey = undefined
+  }: Props = $props()
 </script>
-<li><RenderChildren nodes={getNodeList((node as any)?.children)} context={context} prefix={String(indexKey ?? 'li') + '-li'} /></li>
+
+<li><RenderChildren nodes={getNodeList((node as any)?.children)} {context} prefix={String(indexKey ?? 'li') + '-li'} /></li>

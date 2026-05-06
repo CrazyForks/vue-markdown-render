@@ -3,32 +3,47 @@
   import { useSafeI18n } from '../i18n/useSafeI18n'
   import { getString } from './shared/node-helpers'
 
-  export let node: SvelteRenderableNode
-  export let fallbackSrc = ''
-  export let lazy = false
-  export let usePlaceholder = true
+  import { untrack } from 'svelte'
+
+  type Props = {
+    node: SvelteRenderableNode;
+    fallbackSrc?: string;
+    lazy?: boolean;
+    usePlaceholder?: boolean;
+  }
+
+  let {
+    node,
+    fallbackSrc = '',
+    lazy = false,
+    usePlaceholder = true
+  }: Props = $props()
 
   const { t } = useSafeI18n()
 
-  let imageLoaded = false
-  let hasError = false
-  let fallbackTried = false
-  let currentSrc = ''
-  let previousSrc = ''
+  let src = $derived(getString((node as any)?.src))
+  let alt = $derived(getString((node as any)?.alt))
+  let title = $derived(getString((node as any)?.title))
+  let raw = $derived(getString((node as any)?.raw))
+  let isLoading = $derived(Boolean((node as any)?.loading))
+  let useEagerImagePath = $derived(!lazy)
 
-  $: src = getString((node as any)?.src)
-  $: alt = getString((node as any)?.alt)
-  $: title = getString((node as any)?.title)
-  $: raw = getString((node as any)?.raw)
-  $: isLoading = Boolean((node as any)?.loading)
-  $: useEagerImagePath = !lazy
-  $: if (src !== previousSrc) {
-    previousSrc = src
-    currentSrc = src
-    imageLoaded = false
-    hasError = false
-    fallbackTried = false
-  }
+  let initialSrc = untrack(() => getString((node as any)?.src))
+  let previousSrc = $state(initialSrc)
+  let currentSrc = $state(initialSrc)
+  let imageLoaded = $state(false)
+  let hasError = $state(false)
+  let fallbackTried = $state(false)
+
+  $effect.pre(() => {
+    if (src !== previousSrc) {
+      previousSrc = src
+      currentSrc = src
+      imageLoaded = false
+      hasError = false
+      fallbackTried = false
+    }
+  })
 
   function handleImageError() {
     if (fallbackSrc && !fallbackTried) {
@@ -56,9 +71,9 @@
 <span class="image-node-container">
   {#if !isLoading && !hasError}
     <img
+      class="image-node__img"
       class:is-loaded={useEagerImagePath || imageLoaded}
       class:is-loading={!useEagerImagePath && !imageLoaded}
-      class="image-node__img"
       src={currentSrc}
       alt={alt}
       title={title || alt || undefined}
