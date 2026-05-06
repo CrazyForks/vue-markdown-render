@@ -559,7 +559,7 @@ export function DefinitionListNode(props: NodeComponentProps<{ type: 'definition
 export function FootnoteNode(props: NodeComponentProps<{ type: 'footnote', id: string, children?: ParsedNode[] }>) {
   const { node, ctx, renderNode: renderNodeProp, indexKey } = props
   return (
-    <div id={`footnote-${node.id}`} className="footnote-node flex mt-2 mb-2 text-sm leading-relaxed border-t border-[#eaecef] pt-2">
+    <div id={`fnref--${node.id}`} className="footnote-node flex text-sm leading-relaxed border-t border-[var(--footnote-border,#eaecef)] pt-2">
       <div className="flex-1">
         {ctx && renderNodeProp ? renderNodeChildren(node.children, ctx, String(indexKey ?? `footnote-${node.id}`), renderNodeProp) : null}
       </div>
@@ -569,14 +569,14 @@ export function FootnoteNode(props: NodeComponentProps<{ type: 'footnote', id: s
 
 export function FootnoteReferenceNode(props: NodeComponentProps<{ type: 'footnote_reference', id: string }>) {
   const { node } = props
-  const href = `#footnote-${node.id}`
+  const href = `#fnref--${node.id}`
   return (
     <sup id={`fnref-${node.id}`} className="footnote-reference">
-      <a href={href} title={`View footnote ${node.id}`} className="footnote-link">
+      <span {...({ href } as React.HTMLAttributes<HTMLSpanElement> & { href: string })} title={`查看脚注 ${node.id}`} className="footnote-link cursor-pointer">
         [
         {node.id}
         ]
-      </a>
+      </span>
     </sup>
   )
 }
@@ -585,9 +585,9 @@ export function FootnoteAnchorNode(props: NodeComponentProps<{ type: 'footnote_a
   const { node } = props
   return (
     <a
-      className="footnote-anchor text-sm text-[#0366d6] hover:underline"
+      className="footnote-anchor text-sm hover:underline cursor-pointer"
       href={`#fnref-${node.id}`}
-      title={`Back to reference ${node.id}`}
+      title={`返回引用 ${node.id}`}
     >
       ↩︎
     </a>

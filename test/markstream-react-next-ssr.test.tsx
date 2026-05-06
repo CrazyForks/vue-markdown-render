@@ -558,6 +558,50 @@ describe('markstream-react next/server SSR', () => {
     }
   })
 
+  it('renders footnote exports with the markstream-vue anchor contract', async () => {
+    const serverEntry = await import('../packages/markstream-react/src/server')
+    const ctx = createRenderCtx(serverEntry)
+    const withRenderCtx = (props: Record<string, any>) => ({
+      ...props,
+      ctx,
+      renderNode: serverEntry.renderNode,
+      indexKey: 'matrix',
+      customId: 'matrix',
+    })
+    const entries = [
+      await import('../packages/markstream-react/src/index'),
+      serverEntry,
+    ]
+
+    for (const entry of entries) {
+      const referenceHtml = renderToStaticMarkup(React.createElement(entry.FootnoteReferenceNode, {
+        node: { type: 'footnote_reference', id: '1' },
+      }))
+      const footnoteHtml = renderToStaticMarkup(React.createElement(entry.FootnoteNode, withRenderCtx({
+        node: {
+          type: 'footnote',
+          id: '1',
+          children: [paragraphNode('Footnote body')],
+        },
+      })))
+      const anchorHtml = renderToStaticMarkup(React.createElement(entry.FootnoteAnchorNode, {
+        node: { type: 'footnote_anchor', id: '1' },
+      }))
+
+      expect(referenceHtml).toContain('id="fnref-1"')
+      expect(referenceHtml).toContain('href="#fnref--1"')
+      expect(referenceHtml).toContain('title="查看脚注 1"')
+      expect(referenceHtml).toContain('class="footnote-link cursor-pointer"')
+      expect(referenceHtml).not.toContain('href="#footnote-1"')
+      expect(referenceHtml).not.toContain('View footnote')
+      expect(footnoteHtml).toContain('id="fnref--1"')
+      expect(footnoteHtml).not.toContain('id="footnote-1"')
+      expect(anchorHtml).toContain('href="#fnref-1"')
+      expect(anchorHtml).toContain('title="返回引用 1"')
+      expect(anchorHtml).not.toContain('Back to reference')
+    }
+  })
+
   it('drops closed unknown tags in safe mode and still escapes malformed ones in the server entry', async () => {
     const serverEntry = await import('../packages/markstream-react/src/server')
 

@@ -309,11 +309,38 @@ li .paragraph-node {
 }
 
 .footnote-node {
-  border-left: 0.25rem solid #e2e8f0;
-  padding-left: 1rem;
-  margin: 1.5rem 0;
+  display: flex;
+  margin-top: var(--ms-flow-footnote-y, 0.5em);
+  margin-bottom: var(--ms-flow-footnote-y, 0.5em);
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--footnote-border, hsl(var(--border)));
   font-size: 0.875rem;
-  color: #475569;
+  line-height: 1.625;
+}
+
+.footnote-reference {
+  font-size: 0.75em;
+  line-height: 0;
+}
+
+.footnote-link {
+  color: var(--link-color, #0366d6);
+  text-decoration: none;
+}
+
+.footnote-link:hover {
+  text-decoration: underline;
+}
+
+.footnote-anchor {
+  margin-left: 0.5rem;
+  color: var(--link-color, #0366d6);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.footnote-anchor:hover {
+  text-decoration: underline;
 }
 
 .admonition-node {

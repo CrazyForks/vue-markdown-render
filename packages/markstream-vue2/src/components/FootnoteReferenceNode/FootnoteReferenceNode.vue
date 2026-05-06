@@ -43,7 +43,7 @@ function handleScroll() {
 }
 
 .footnote-link {
-  color: #0366d6;
+  color: var(--link-color, #0366d6);
   text-decoration: none;
 }
 

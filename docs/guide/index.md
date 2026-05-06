@@ -71,6 +71,12 @@ This guide is organized by task first, framework second. Start with the shortest
 | [Installation](/guide/angular-installation) | Angular specific setup |
 | [Quick Start](/guide/angular-quick-start) | Standalone Angular examples |
 
+### Svelte (markstream-svelte)
+
+| Page | Description |
+|------|-------------|
+| [Quick Start](/guide/svelte) | Svelte 5 renderer usage, workers, and custom components |
+
 ### Nuxt
 
 - [Nuxt SSR Guide](/nuxt-ssr) for client-only boundaries, workers, and browser-only peers.

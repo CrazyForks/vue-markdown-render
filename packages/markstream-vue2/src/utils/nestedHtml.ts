@@ -50,6 +50,7 @@ const KNOWN_NODE_TYPES = new Set([
   'emphasis',
   'footnote',
   'footnote_reference',
+  'footnote_anchor',
   'hardbreak',
   'heading',
   'highlight',
@@ -205,6 +206,8 @@ function renderNodeToHtml(node: NestedRenderableNode | null | undefined, ctx: Re
       return renderFootnoteNode(node, ctx)
     case 'footnote_reference':
       return renderFootnoteReferenceNode(node)
+    case 'footnote_anchor':
+      return renderFootnoteAnchorNode(node)
     case 'admonition':
       return renderAdmonitionNode(node, ctx)
     case 'checkbox':
@@ -294,13 +297,18 @@ function renderDefinitionItemNode(node: NestedRenderableNode, ctx: RenderContext
 
 function renderFootnoteNode(node: NestedRenderableNode, ctx: RenderContext): string {
   const id = escapeAttr(getString(node.id))
-  return `<div id="fnref--${id}" class="markstream-nested-footnote">${renderNodesToHtml(getNodeList(node.children), ctx)}</div>`
+  return `<div id="fnref--${id}" class="footnote-node markstream-nested-footnote"><div class="footnote-node__content">${renderNodesToHtml(getNodeList(node.children), ctx)}</div></div>`
 }
 
 function renderFootnoteReferenceNode(node: NestedRenderableNode): string {
   const id = escapeHtml(getString(node.id))
   const href = escapeAttr(getString(node.id))
-  return `<sup class="markstream-nested-footnote-ref"><a href="#fnref--${href}">[${id}]</a></sup>`
+  return `<sup id="fnref-${href}" class="footnote-reference markstream-nested-footnote-ref"><span href="#fnref--${href}" title="查看脚注 ${href}" class="footnote-link cursor-pointer">[${id}]</span></sup>`
+}
+
+function renderFootnoteAnchorNode(node: NestedRenderableNode): string {
+  const id = escapeAttr(getString(node.id))
+  return `<a class="footnote-anchor" href="#fnref-${id}" title="返回引用 ${id}" aria-label="返回引用 ${id}">↩︎</a>`
 }
 
 function renderAdmonitionNode(node: NestedRenderableNode, ctx: RenderContext): string {

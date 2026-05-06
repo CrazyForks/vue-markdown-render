@@ -7,7 +7,7 @@ import { defineConfig } from 'vitepress'
 
 const docsSiteUrl = 'https://markstream-vue-docs.simonhe.me'
 const docsOgImageUrl = `${docsSiteUrl}/og-image.svg`
-const docsDefaultDescription = 'Streaming-friendly Markdown renderer for Vue 3, Vue 2, React, and Angular'
+const docsDefaultDescription = 'Streaming-friendly Markdown renderer for Vue 3, Vue 2, React, Angular, and Svelte'
 const githubRepoUrl = 'https://github.com/Simon-He95/markstream-vue'
 const docsRootDir = fileURLToPath(new URL('..', import.meta.url))
 const workspaceRootDir = fileURLToPath(new URL('../..', import.meta.url))
@@ -20,6 +20,7 @@ const markdownParserSrcDir = path.dirname(markdownParserSrc)
 const playgroundItems = [
   { text: 'Vue 3', link: 'https://markstream-vue.simonhe.me/' },
   { text: 'React', link: 'https://markstream-react.pages.dev/' },
+  { text: 'Svelte', link: 'https://markstream-svelte.pages.dev/' },
   { text: 'Nuxt', link: 'https://markstream-nuxt.pages.dev/' },
   { text: 'Vue 2', link: 'https://markstream-vue2.pages.dev/' },
   { text: 'Angular', link: 'https://markstream-angular.pages.dev/' },
@@ -106,6 +107,7 @@ const englishGuideSidebar = [
       { text: 'React Components', link: '/guide/react-components' },
       { text: 'Migrate from react-markdown', link: '/guide/react-markdown-migration' },
       { text: 'Migration Cookbook', link: '/guide/react-markdown-migration-cookbook' },
+      { text: 'Svelte Quick Start', link: '/guide/svelte' },
       { text: 'Angular Quick Start', link: '/guide/angular-quick-start' },
       { text: 'Angular Installation', link: '/guide/angular-installation' },
       { text: 'AI / Skills workflows', link: '/guide/ai-workflows' },
@@ -188,6 +190,7 @@ const chineseGuideSidebar = [
       { text: 'React 组件', link: '/zh/guide/react-components' },
       { text: '从 react-markdown 迁移', link: '/zh/guide/react-markdown-migration' },
       { text: '迁移 Cookbook', link: '/zh/guide/react-markdown-migration-cookbook' },
+      { text: 'Svelte 快速开始', link: '/zh/guide/svelte' },
       { text: 'Angular 快速开始', link: '/zh/guide/angular-quick-start' },
       { text: 'Angular 安装', link: '/zh/guide/angular-installation' },
       { text: 'AI / Skills 工作流', link: '/zh/guide/ai-workflows' },
