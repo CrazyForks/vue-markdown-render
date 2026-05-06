@@ -75,7 +75,7 @@ description: 按任务组织的 markstream-vue 指南，帮助你在安装、流
 
 | 页面 | 描述 |
 |------|------|
-| [快速开始](/zh/guide/svelte) | Svelte 5 渲染器、workers 与自定义组件示例 |
+| [快速开始](/zh/guide/svelte) | Svelte 5-only 渲染器、workers 与自定义组件示例 |
 
 ### Nuxt
 

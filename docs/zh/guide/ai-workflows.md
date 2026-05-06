@@ -76,20 +76,20 @@ npx markstream-vue prompts show install-markstream
 这个仓库现在已经有可版本化、可复用的资产：
 
 - 任务型 skills：`markstream-install`、`markstream-custom-components`、`markstream-migration`
-- 框架入口 skills：`markstream-vue`、`markstream-nuxt`、`markstream-vue2`、`markstream-vue2-cli`、`markstream-vue2-vite`、`markstream-react`、`markstream-angular`
+- 框架入口 skills：`markstream-vue`、`markstream-nuxt`、`markstream-vue2`、`markstream-vue2-cli`、`markstream-vue2-vite`、`markstream-react`、`markstream-angular`、`markstream-svelte`
 - `prompts/install-markstream.md`
 - `prompts/override-built-in-components.md`
 - `prompts/add-custom-tag-thinking.md`
 - `prompts/migrate-react-markdown.md`
 - `prompts/audit-markstream-integration.md`
 
-`.agents/skills/` 适合放可复用、并且能被 GitHub 安装器自动发现的 Codex 工作流资产。任务型 skills 负责跨框架工作流，框架入口 skills 则让 Vue 3、Nuxt、Vue 2、Vue 2 CLI、Vue 2 Vite、React、Angular 这些场景更容易被直接发现；`prompts/` 适合放给人类或其他助手直接复制使用的提示词模板。
+`.agents/skills/` 适合放可复用、并且能被 GitHub 安装器自动发现的 Codex 工作流资产。任务型 skills 负责跨框架工作流，框架入口 skills 则让 Vue 3、Nuxt、Vue 2、Vue 2 CLI、Vue 2 Vite、React、Angular、Svelte 5 这些场景更容易被直接发现；`prompts/` 适合放给人类或其他助手直接复制使用的提示词模板。
 
 ## 1. 先把这五类信息告诉 AI
 
 在让 AI 开始改代码前，尽量先说明：
 
-- 框架和版本，例如 Vue 3、Nuxt 3、React 18、Angular 20
+- 框架和版本，例如 Vue 3、Nuxt 3、React 18、Angular 20、Svelte 5
 - CSS 技术栈，例如 Tailwind、UnoCSS、reset 库、设计系统
 - 渲染模式：静态文章、文档站、SSR，还是流式聊天
 - 需要哪些可选能力：Monaco、Mermaid、D2、KaTeX、Shiki

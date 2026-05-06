@@ -1,13 +1,19 @@
 # Svelte
 
-`markstream-svelte` 提供 Svelte 5 渲染器，组件名、worker helpers 和 playground fixtures 与 Vue / React / Angular 包保持一致。
+`markstream-svelte` 提供 Svelte 5-only 渲染器，组件名、worker helpers 和 playground fixtures 与 Vue / React / Angular 包保持一致。不支持 Svelte 4。
+
+使用 Svelte 5 安装：
+
+```bash
+pnpm add markstream-svelte svelte@^5
+```
 
 ```svelte
 <script lang="ts">
   import MarkdownRender from 'markstream-svelte'
   import 'markstream-svelte/index.css'
 
-  export let content = '# markstream-svelte'
+  let { content = '# markstream-svelte' }: { content?: string } = $props()
 </script>
 
 <MarkdownRender
@@ -51,6 +57,30 @@ KaTeX 和 Mermaid worker 入口与其它框架一致：
   {customId}
   customHtmlTags={['thinking']}
 />
+```
+
+示例 `ThinkingNode.svelte`：
+
+```svelte
+<script lang="ts">
+  import MarkdownRender from 'markstream-svelte'
+
+  let {
+    node,
+    customId = undefined,
+  }: {
+    node: any
+    customId?: string
+  } = $props()
+</script>
+
+<section class="thinking-node">
+  <MarkdownRender
+    content={String(node?.content ?? '')}
+    {customId}
+    customHtmlTags={['thinking']}
+  />
+</section>
 ```
 
 本地 playground：

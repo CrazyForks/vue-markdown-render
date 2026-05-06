@@ -1,11 +1,11 @@
 # markstream-svelte
 
-Svelte 5 renderer aligned with `markstream-vue`, `markstream-vue2`, and `markstream-react`.
+Svelte 5-only renderer aligned with `markstream-vue`, `markstream-vue2`, and `markstream-react`. Svelte 4 is not supported.
 
 ## Install
 
 ```bash
-pnpm add markstream-svelte svelte
+pnpm add markstream-svelte svelte@^5
 ```
 
 Optional heavy renderers stay as peer dependencies, matching the Vue and React packages:
@@ -52,6 +52,8 @@ flowchart LR
 
 ## Custom Components
 
+Register Svelte 5 components with the scoped registry:
+
 ```svelte
 <script lang="ts">
   import MarkdownRender, { setCustomComponents } from 'markstream-svelte'
@@ -68,6 +70,29 @@ flowchart LR
   {customId}
   customHtmlTags={['thinking']}
 />
+```
+
+```svelte
+<!-- ThinkingNode.svelte -->
+<script lang="ts">
+  import MarkdownRender from 'markstream-svelte'
+
+  let {
+    node,
+    customId = undefined,
+  }: {
+    node: any
+    customId?: string
+  } = $props()
+</script>
+
+<section class="thinking-node">
+  <MarkdownRender
+    content={String(node?.content ?? '')}
+    {customId}
+    customHtmlTags={['thinking']}
+  />
+</section>
 ```
 
 Run the local playground with:

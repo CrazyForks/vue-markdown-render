@@ -76,20 +76,20 @@ That is usually the easiest way for npm users to discover the maintained prompt 
 This repository now includes reusable assets you can version with the codebase:
 
 - Task skills: `markstream-install`, `markstream-custom-components`, `markstream-migration`
-- Framework entry skills: `markstream-vue`, `markstream-nuxt`, `markstream-vue2`, `markstream-vue2-cli`, `markstream-vue2-vite`, `markstream-react`, `markstream-angular`
+- Framework entry skills: `markstream-vue`, `markstream-nuxt`, `markstream-vue2`, `markstream-vue2-cli`, `markstream-vue2-vite`, `markstream-react`, `markstream-angular`, `markstream-svelte`
 - `prompts/install-markstream.md`
 - `prompts/override-built-in-components.md`
 - `prompts/add-custom-tag-thinking.md`
 - `prompts/migrate-react-markdown.md`
 - `prompts/audit-markstream-integration.md`
 
-Use `.agents/skills/` when you want reusable Codex workflow assets that GitHub-based installers can discover automatically. The task skills cover cross-framework work; the framework entry skills make Vue 3, Nuxt, Vue 2, Vue 2 CLI, Vue 2 Vite, React, and Angular scenarios directly discoverable. Use `prompts/` when you want copyable starting prompts for humans or other assistants.
+Use `.agents/skills/` when you want reusable Codex workflow assets that GitHub-based installers can discover automatically. The task skills cover cross-framework work; the framework entry skills make Vue 3, Nuxt, Vue 2, Vue 2 CLI, Vue 2 Vite, React, Angular, and Svelte 5 scenarios directly discoverable. Use `prompts/` when you want copyable starting prompts for humans or other assistants.
 
 ## 1. Give the AI these five facts first
 
 Before you ask for code changes, include:
 
-- framework and version, for example Vue 3, Nuxt 3, React 18, or Angular 20
+- framework and version, for example Vue 3, Nuxt 3, React 18, Angular 20, or Svelte 5
 - CSS stack, for example Tailwind, UnoCSS, reset libraries, or a design system
 - rendering mode: static article, docs site, SSR, or streaming chat
 - required peers: Monaco, Mermaid, D2, KaTeX, or Shiki

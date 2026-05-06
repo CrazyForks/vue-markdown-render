@@ -1,10 +1,17 @@
 <script lang="ts">
   import MarkdownRender from 'markstream-svelte'
 
-  export let node: any
-  export let customId: string | undefined = undefined
-  export let isDark = false
-  export let typewriter = true
+  let {
+    node,
+    customId = undefined,
+    isDark = false,
+    typewriter = true,
+  }: {
+    node: any
+    customId?: string
+    isDark?: boolean
+    typewriter?: boolean
+  } = $props()
 </script>
 
 <section class="thinking-node">
