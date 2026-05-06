@@ -1,4 +1,4 @@
 interface:
-  display_name: "Markstream Svelte"
-  short_description: "Install and wire markstream-svelte in Svelte 5"
-  default_prompt: "Use $markstream-svelte to integrate markstream-svelte into this Svelte 5 repository with the right CSS, optional peers, and custom component setup."
+  display_name: Markstream Svelte
+  short_description: Install and wire markstream-svelte in Svelte 5
+  default_prompt: Use $markstream-svelte to integrate markstream-svelte into this Svelte 5 repository with the right CSS, optional peers, and custom component setup.
