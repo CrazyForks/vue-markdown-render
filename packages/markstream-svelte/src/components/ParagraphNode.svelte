@@ -4,18 +4,24 @@
   import NodeOutlet from './NodeOutlet.svelte'
   import { getNodeList, splitParagraphChildren } from './shared/node-helpers'
 
-  export let node: SvelteRenderableNode
-  export let context: SvelteRenderContext | undefined = undefined
-  export let indexKey: string | number | undefined = undefined
+  let {
+    node,
+    context = undefined,
+    indexKey = undefined
+  }: {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext
+    indexKey?: string | number
+  } = $props()
 
-  $: prefix = String(indexKey ?? 'p')
-  $: parts = splitParagraphChildren(getNodeList((node as any)?.children))
+  let prefix = $derived(String(indexKey ?? 'p'))
+  let parts = $derived(splitParagraphChildren(getNodeList((node as any)?.children)))
 </script>
 
 {#each parts as part, index (prefix + '-' + index)}
   {#if part.kind === 'inline'}
-    <p class="paragraph-node"><RenderChildren nodes={part.nodes} context={context} prefix={prefix + '-' + index} /></p>
+    <p class="paragraph-node"><RenderChildren nodes={part.nodes} {context} prefix={prefix + '-' + index} /></p>
   {:else}
-    <NodeOutlet node={part.node} context={context} indexKey={prefix + '-' + index} />
+    <NodeOutlet node={part.node} {context} indexKey={prefix + '-' + index} />
   {/if}
 {/each}

@@ -2,11 +2,15 @@
   import type { SvelteRenderableNode } from './shared/node-helpers'
   import { getString } from './shared/node-helpers'
 
-  export let node: SvelteRenderableNode
+  interface Props {
+    node: SvelteRenderableNode
+  }
 
-  $: id = getString((node as any)?.id)
-  $: href = id ? `#fnref--${id}` : undefined
-  $: linkAttrs = href ? { href } : {}
+  let { node }: Props = $props()
+
+  let id = $derived(getString((node as any)?.id))
+  let href = $derived(id ? `#fnref--${id}` : undefined)
+  let linkAttrs = $derived(href ? { href } : {})
 
   function scrollToFootnote(event: MouseEvent) {
     event.preventDefault()

@@ -1,4 +1,4 @@
 <script lang="ts">
-  export let text = ''
+  let { text = '' }: { text?: string } = $props()
 </script>
 <span class="tooltip-element">{text}</span>

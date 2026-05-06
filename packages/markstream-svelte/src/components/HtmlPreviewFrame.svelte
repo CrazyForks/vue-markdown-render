@@ -1,11 +1,23 @@
 <script lang="ts">
-  export let code = ''
-  export let title = 'Preview'
-  export let isDark = false
-  export let htmlPreviewAllowScripts = false
-  export let htmlPreviewSandbox: string | undefined = undefined
-  export let onClose: (() => void) | undefined = undefined
-  $: sandbox = htmlPreviewSandbox ?? (htmlPreviewAllowScripts ? 'allow-scripts' : '')
+  interface Props {
+    code?: string;
+    title?: string;
+    isDark?: boolean;
+    htmlPreviewAllowScripts?: boolean;
+    htmlPreviewSandbox?: string;
+    onClose?: () => void;
+  }
+  
+  let {
+    code = '',
+    title = 'Preview',
+    isDark = false,
+    htmlPreviewAllowScripts = false,
+    htmlPreviewSandbox,
+    onClose
+  }: Props = $props();
+  
+  let sandbox = $derived(htmlPreviewSandbox ?? (htmlPreviewAllowScripts ? 'allow-scripts' : ''));
 </script>
 <div class:is-dark={isDark} class="html-preview-frame">
   <div class="html-preview-frame__header"><span>{title}</span><button type="button" onclick={() => onClose?.()}>Close</button></div>
