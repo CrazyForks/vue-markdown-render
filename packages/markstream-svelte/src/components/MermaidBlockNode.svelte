@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SvelteRenderableNode, SvelteRenderContext } from './shared/node-helpers'
-  import { afterUpdate, onDestroy, onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { useSafeI18n } from '../i18n/useSafeI18n'
   import { getMermaid } from '../optional/mermaid'
   import { toSafeSvgMarkup } from '../sanitizeSvg'
@@ -13,84 +13,110 @@
 
   type MermaidTheme = 'light' | 'dark'
 
-  export let node: SvelteRenderableNode
-  export let context: SvelteRenderContext | undefined = undefined
-  export let maxHeight: string | null | undefined = '500px'
-  export let estimatedPreviewHeightPx: number | undefined = undefined
-  export let loading: boolean | undefined = undefined
-  export let isDark: boolean | undefined = undefined
-  export let workerTimeoutMs = 1400
-  export let parseTimeoutMs = 1800
-  export let renderTimeoutMs = 2500
-  export let fullRenderTimeoutMs = 4000
-  export let renderDebounceMs = 300
-  export let showHeader = true
-  export let showModeToggle = true
-  export let showCopyButton = true
-  export let showExportButton = true
-  export let showFullscreenButton = true
-  export let showCollapseButton = true
-  export let showZoomControls = true
-  export let isStrict = true
+  let {
+    node,
+    context = undefined,
+    maxHeight = '500px',
+    estimatedPreviewHeightPx = undefined,
+    loading = undefined,
+    isDark = undefined,
+    workerTimeoutMs = 1400,
+    parseTimeoutMs = 1800,
+    renderTimeoutMs = 2500,
+    fullRenderTimeoutMs = 4000,
+    renderDebounceMs = 300,
+    showHeader = true,
+    showModeToggle = true,
+    showCopyButton = true,
+    showExportButton = true,
+    showFullscreenButton = true,
+    showCollapseButton = true,
+    showZoomControls = true,
+    isStrict = true,
+  }: {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext
+    maxHeight?: string | null
+    estimatedPreviewHeightPx?: number
+    loading?: boolean
+    isDark?: boolean
+    workerTimeoutMs?: number
+    parseTimeoutMs?: number
+    renderTimeoutMs?: number
+    fullRenderTimeoutMs?: number
+    renderDebounceMs?: number
+    showHeader?: boolean
+    showModeToggle?: boolean
+    showCopyButton?: boolean
+    showExportButton?: boolean
+    showFullscreenButton?: boolean
+    showCollapseButton?: boolean
+    showZoomControls?: boolean
+    isStrict?: boolean
+  } = $props()
 
   const { t } = useSafeI18n()
   const mermaidIcon = getLanguageIcon('mermaid')
 
-  let mounted = false
-  let renderToken = 0
-  let lastRenderSignature = ''
-  let lastProgressiveMissSignature = ''
-  let lastRenderedCode = ''
-  let svgMarkup = ''
-  let svgCache: Partial<Record<MermaidTheme, string>> = {}
-  let renderError = ''
-  let rendering = false
-  let hasRenderedOnce = false
-  let copied = false
-  let collapsed = false
-  let showSource = false
-  let modalOpen = false
-  let zoom = 1
-  let renderTimer: ReturnType<typeof setTimeout> | null = null
-  let copyTimer: ReturnType<typeof setTimeout> | null = null
+  let mounted = $state(false)
+  let renderToken = $state(0)
+  let lastRenderSignature = $state('')
+  let lastProgressiveMissSignature = $state('')
+  let lastRenderedCode = $state('')
+  let svgMarkup = $state('')
+  let svgCache: Partial<Record<MermaidTheme, string>> = $state({})
+  let renderError = $state('')
+  let rendering = $state(false)
+  let hasRenderedOnce = $state(false)
+  let copied = $state(false)
+  let collapsed = $state(false)
+  let showSource = $state(false)
+  let modalOpen = $state(false)
+  let zoom = $state(1)
+  let renderTimer: ReturnType<typeof setTimeout> | null = $state(null)
+  let copyTimer: ReturnType<typeof setTimeout> | null = $state(null)
 
-  $: source = normalizeMermaidSource(getString((node as any)?.code))
-  $: nodeLoading = typeof (node as any)?.loading === 'boolean' ? Boolean((node as any)?.loading) : true
-  $: resolvedLoading = loading ?? nodeLoading
-  $: resolvedIsDark = isDark ?? context?.isDark ?? false
-  $: theme = (resolvedIsDark ? 'dark' : 'light') as MermaidTheme
-  $: final = context?.final ?? resolvedLoading === false
-  $: progressivePreview = resolvedLoading !== false || final === false
-  $: maxPreviewHeight = maxHeight === 'none' ? null : parsePositiveNumber(maxHeight)
-  $: previewHeight = clampPreviewHeight(
+  let source = $derived(normalizeMermaidSource(getString((node as any)?.code)))
+  let nodeLoading = $derived(typeof (node as any)?.loading === 'boolean' ? Boolean((node as any)?.loading) : true)
+  let resolvedLoading = $derived(loading ?? nodeLoading)
+  let resolvedIsDark = $derived(isDark ?? context?.isDark ?? false)
+  let theme = $derived((resolvedIsDark ? 'dark' : 'light') as MermaidTheme)
+  let final = $derived(context?.final ?? resolvedLoading === false)
+  let progressivePreview = $derived(resolvedLoading !== false || final === false)
+  let maxPreviewHeight = $derived(maxHeight === 'none' ? null : parsePositiveNumber(maxHeight))
+  let previewHeight = $derived(clampPreviewHeight(
     parsePositiveNumber(estimatedPreviewHeightPx) ?? estimateMermaidPreviewHeight(source),
     undefined,
     maxPreviewHeight ?? undefined,
-  )
-  $: previewStyle = [
+  ))
+  let previewStyle = $derived([
     `min-height: ${previewHeight}px`,
     maxHeight && maxHeight !== 'none' ? `max-height: ${maxHeight}` : '',
     `transform: scale(${zoom})`,
-  ].filter(Boolean).join('; ')
-  $: shouldRender = !(resolvedLoading && !source.trim())
-  $: canUsePreview = Boolean(svgMarkup && !showSource)
+  ].filter(Boolean).join('; '))
+  let shouldRender = $derived(!(resolvedLoading && !source.trim()))
+  let canUsePreview = $derived(Boolean(svgMarkup && !showSource))
 
   onMount(() => {
     mounted = true
     scheduleRender(true)
+
+    return () => {
+      mounted = false
+      renderToken += 1
+      clearRenderTimer()
+      if (copyTimer)
+        clearTimeout(copyTimer)
+    }
   })
 
-  afterUpdate(() => {
-    if (mounted)
-      scheduleRender()
-  })
-
-  onDestroy(() => {
-    mounted = false
-    renderToken += 1
-    clearRenderTimer()
-    if (copyTimer)
-      clearTimeout(copyTimer)
+  $effect(() => {
+    if (mounted) {
+      getRenderSignature()
+      showSource
+      collapsed
+      untrack(() => scheduleRender())
+    }
   })
 
   function clearRenderTimer() {

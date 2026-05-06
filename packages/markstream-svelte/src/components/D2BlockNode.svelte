@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SvelteRenderableNode, SvelteRenderContext } from './shared/node-helpers'
-  import { afterUpdate, onDestroy, onMount } from 'svelte'
+  import { onDestroy, onMount, untrack } from 'svelte'
   import { useSafeI18n } from '../i18n/useSafeI18n'
   import { getD2 } from '../optional/d2'
   import { extractRenderedSvg, toSafeSvgMarkup } from '../sanitizeSvg'
@@ -29,50 +29,71 @@
     AB5: '#F59E0B',
   }
 
-  export let node: SvelteRenderableNode
-  export let context: SvelteRenderContext | undefined = undefined
-  export let maxHeight: string | null | undefined = '500px'
-  export let loading: boolean | undefined = undefined
-  export let isDark: boolean | undefined = undefined
-  export let themeId: number | null | undefined = undefined
-  export let darkThemeId: number | null | undefined = undefined
-  export let showHeader = true
-  export let showModeToggle = true
-  export let showCopyButton = true
-  export let showExportButton = true
-  export let showCollapseButton = true
+  let {
+    node,
+    context = undefined,
+    maxHeight = '500px',
+    loading = undefined,
+    isDark = undefined,
+    themeId = undefined,
+    darkThemeId = undefined,
+    showHeader = true,
+    showModeToggle = true,
+    showCopyButton = true,
+    showExportButton = true,
+    showCollapseButton = true
+  }: {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext | undefined
+    maxHeight?: string | null | undefined
+    loading?: boolean | undefined
+    isDark?: boolean | undefined
+    themeId?: number | null | undefined
+    darkThemeId?: number | null | undefined
+    showHeader?: boolean
+    showModeToggle?: boolean
+    showCopyButton?: boolean
+    showExportButton?: boolean
+    showCollapseButton?: boolean
+  } = $props()
 
   const { t } = useSafeI18n()
 
-  let mounted = false
-  let renderToken = 0
-  let lastSignature = ''
-  let activeRenderSignature = ''
-  let svgMarkup = ''
-  let renderError = ''
-  let rendering = false
-  let rerenderQueued = false
-  let rerenderForce = false
-  let copied = false
-  let collapsed = false
-  let showSource = false
+  let mounted = $state(false)
+  let renderToken = $state(0)
+  let lastSignature = $state('')
+  let activeRenderSignature = $state('')
+  let svgMarkup = $state('')
+  let renderError = $state('')
+  let rendering = $state(false)
+  let rerenderQueued = $state(false)
+  let rerenderForce = $state(false)
+  let copied = $state(false)
+  let collapsed = $state(false)
+  let showSource = $state(false)
   let copyTimer: ReturnType<typeof setTimeout> | null = null
 
-  $: source = getString((node as any)?.code)
-  $: resolvedLoading = loading ?? (node as any)?.loading === true
-  $: resolvedIsDark = isDark ?? context?.isDark ?? false
-  $: shouldRender = !(resolvedLoading && !source.trim())
-  $: showSourceFallback = showSource || !svgMarkup
-  $: renderStyle = maxHeight && maxHeight !== 'none' ? `max-height: ${maxHeight}` : ''
+  let source = $derived(getString((node as any)?.code))
+  let resolvedLoading = $derived(loading ?? (node as any)?.loading === true)
+  let resolvedIsDark = $derived(isDark ?? context?.isDark ?? false)
+  let shouldRender = $derived(!(resolvedLoading && !source.trim()))
+  let showSourceFallback = $derived(showSource || !svgMarkup)
+  let renderStyle = $derived(maxHeight && maxHeight !== 'none' ? `max-height: ${maxHeight}` : '')
 
   onMount(() => {
     mounted = true
     void renderD2(true)
   })
 
-  afterUpdate(() => {
-    if (mounted)
-      void renderD2()
+  $effect(() => {
+    if (mounted) {
+      const _sig = getRenderSignature()
+      const _collapsed = collapsed
+      const _showSource = showSource
+      untrack(() => {
+        void renderD2()
+      })
+    }
   })
 
   onDestroy(() => {

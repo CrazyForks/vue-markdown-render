@@ -10,27 +10,51 @@
   import { copyTextToClipboard, resolveCssSize } from './shared/rich-block-helpers'
   import { getString, sanitizeClassToken } from './shared/node-helpers'
 
-  export let node: SvelteRenderableNode
-  export let context: SvelteRenderContext | undefined = undefined
-  export let isDark: boolean | undefined = undefined
-  export let loading: boolean | undefined = undefined
-  export let stream: boolean | undefined = undefined
-  export let darkTheme: CodeBlockMonacoTheme | undefined = undefined
-  export let lightTheme: CodeBlockMonacoTheme | undefined = undefined
-  export let themes: CodeBlockMonacoTheme[] | undefined = undefined
-  export let monacoOptions: CodeBlockMonacoOptions | undefined = undefined
-  export let minWidth: string | number | undefined = undefined
-  export let maxWidth: string | number | undefined = undefined
-  export let isShowPreview = true
-  export let enableFontSizeControl = true
-  export let showHeader = true
-  export let showCopyButton = true
-  export let showExpandButton = true
-  export let showPreviewButton = true
-  export let showCollapseButton = true
-  export let showFontSizeButtons = true
-  export let htmlPreviewAllowScripts = false
-  export let htmlPreviewSandbox: string | undefined = undefined
+  let {
+    node,
+    context = undefined,
+    isDark = undefined,
+    loading = undefined,
+    stream = undefined,
+    darkTheme = undefined,
+    lightTheme = undefined,
+    themes = undefined,
+    monacoOptions = undefined,
+    minWidth = undefined,
+    maxWidth = undefined,
+    isShowPreview = true,
+    enableFontSizeControl = true,
+    showHeader = true,
+    showCopyButton = true,
+    showExpandButton = true,
+    showPreviewButton = true,
+    showCollapseButton = true,
+    showFontSizeButtons = true,
+    htmlPreviewAllowScripts = false,
+    htmlPreviewSandbox = undefined
+  }: {
+    node: SvelteRenderableNode
+    context?: SvelteRenderContext | undefined
+    isDark?: boolean | undefined
+    loading?: boolean | undefined
+    stream?: boolean | undefined
+    darkTheme?: CodeBlockMonacoTheme | undefined
+    lightTheme?: CodeBlockMonacoTheme | undefined
+    themes?: CodeBlockMonacoTheme[] | undefined
+    monacoOptions?: CodeBlockMonacoOptions | undefined
+    minWidth?: string | number | undefined
+    maxWidth?: string | number | undefined
+    isShowPreview?: boolean
+    enableFontSizeControl?: boolean
+    showHeader?: boolean
+    showCopyButton?: boolean
+    showExpandButton?: boolean
+    showPreviewButton?: boolean
+    showCollapseButton?: boolean
+    showFontSizeButtons?: boolean
+    htmlPreviewAllowScripts?: boolean
+    htmlPreviewSandbox?: string | undefined
+  } = $props()
 
   const { t } = useSafeI18n()
   const defaultDiffHideUnchangedRegions = Object.freeze({
@@ -95,82 +119,86 @@
     languageRetryTimer = setTimeout(retry, 50)
   }
 
-  let editorHost: HTMLDivElement | null = null
-  let helpers: any = null
-  let runtimeMonacoOptions: Record<string, any> | null = null
-  let ensureMonacoPromise: Promise<void> | null = null
-  let editorReady = false
-  let useFallback = false
-  let fallbackLanguage = ''
-  let editorKind: 'single' | 'diff' | null = null
-  let createEditorPromise: Promise<void> | null = null
-  let mounted = false
-  let collapsed = false
-  let expanded = false
-  let copied = false
-  let previewOpen = false
-  let codeFontSize = 13
-  let copyTimer: ReturnType<typeof setTimeout> | null = null
-  let lifecycleId = 0
-  let heightSyncRaf: number | null = null
-  let heightSyncDisposables: Array<{ dispose?: () => void } | (() => void)> = []
-  let lastLayoutWidth: number | null = null
-  let lastLayoutHeight: number | null = null
-  let lastThemeRequest = ''
-  let languageRetryTimer: ReturnType<typeof setTimeout> | null = null
-  let loadingSettledRefreshPromise: Promise<void> | null = null
-  let loadingSettledRefreshTimer: ReturnType<typeof setTimeout> | null = null
-  let lastSettledRefreshSignature = ''
-  let tokenizeTimer: ReturnType<typeof setTimeout> | null = null
-  let tokenizeRaf: number | null = null
-  let tokenizeShouldRefreshModelValue = false
+  let editorHost: HTMLDivElement | null = $state(null)
+  let helpers: any = $state(null)
+  let runtimeMonacoOptions: Record<string, any> | null = $state(null)
+  let ensureMonacoPromise: Promise<void> | null = $state(null)
+  let editorReady = $state(false)
+  let useFallback = $state(false)
+  let fallbackLanguage = $state('')
+  let editorKind: 'single' | 'diff' | null = $state(null)
+  let createEditorPromise: Promise<void> | null = $state(null)
+  let mounted = $state(false)
+  let collapsed = $state(false)
+  let expanded = $state(false)
+  let copied = $state(false)
+  let previewOpen = $state(false)
+  let codeFontSize = $state(13)
+  let copyTimer: ReturnType<typeof setTimeout> | null = $state(null)
+  let lifecycleId = $state(0)
+  let heightSyncRaf: number | null = $state(null)
+  let heightSyncDisposables: Array<{ dispose?: () => void } | (() => void)> = $state([])
+  let lastLayoutWidth: number | null = $state(null)
+  let lastLayoutHeight: number | null = $state(null)
+  let lastThemeRequest = $state('')
+  let languageRetryTimer: ReturnType<typeof setTimeout> | null = $state(null)
+  let loadingSettledRefreshPromise: Promise<void> | null = $state(null)
+  let loadingSettledRefreshTimer: ReturnType<typeof setTimeout> | null = $state(null)
+  let lastSettledRefreshSignature = $state('')
+  let tokenizeTimer: ReturnType<typeof setTimeout> | null = $state(null)
+  let tokenizeRaf: number | null = $state(null)
+  let tokenizeShouldRefreshModelValue = $state(false)
 
-  $: rawLanguage = getString((node as any)?.language).trim()
-  $: canonicalLanguage = normalizeLanguageIdentifier(rawLanguage)
-  $: monacoLanguage = resolveMonacoLanguageId(canonicalLanguage || rawLanguage || 'plaintext')
-  $: code = getResolvedCode(node)
-  $: diff = Boolean((node as any)?.diff)
-  $: originalCode = getString((node as any)?.originalCode)
-  $: updatedCode = getString((node as any)?.updatedCode)
-  $: nodeLoading = (node as any)?.loading === true
-  $: resolvedLoading = loading ?? nodeLoading
-  $: resolvedStream = stream ?? context?.codeBlockStream ?? true
-  $: resolvedIsDark = isDark ?? context?.isDark ?? false
-  $: resolvedThemes = context?.codeBlockThemes
-  $: mergedMonacoOptions = { ...(resolvedThemes?.monacoOptions || {}), ...(monacoOptions || {}) }
-  $: resolvedMonacoOptions = buildResolvedMonacoOptions()
-  $: requestedTheme = getThemeName(
+  let rawLanguage = $derived(getString((node as any)?.language).trim())
+  let canonicalLanguage = $derived(normalizeLanguageIdentifier(rawLanguage))
+  let monacoLanguage = $derived(resolveMonacoLanguageId(canonicalLanguage || rawLanguage || 'plaintext'))
+  let code = $derived(getResolvedCode(node))
+  let diff = $derived(Boolean((node as any)?.diff))
+  let originalCode = $derived(getString((node as any)?.originalCode))
+  let updatedCode = $derived(getString((node as any)?.updatedCode))
+  let nodeLoading = $derived((node as any)?.loading === true)
+  let resolvedLoading = $derived(loading ?? nodeLoading)
+  let resolvedStream = $derived(stream ?? context?.codeBlockStream ?? true)
+  let resolvedIsDark = $derived(isDark ?? context?.isDark ?? false)
+  let resolvedThemes = $derived(context?.codeBlockThemes)
+  let mergedMonacoOptions = $derived({ ...(resolvedThemes?.monacoOptions || {}), ...(monacoOptions || {}) })
+  let resolvedMonacoOptions = $derived(buildResolvedMonacoOptions())
+  let requestedTheme = $derived(getThemeName(
     resolvedIsDark
       ? darkTheme ?? resolvedThemes?.darkTheme
       : lightTheme ?? resolvedThemes?.lightTheme,
     resolvedIsDark ? 'vitesse-dark' : 'vitesse-light',
-  )
-  $: defaultCodeFontSize = Number(mergedMonacoOptions.fontSize) || 13
-  $: minWidthValue = resolveCssSize(minWidth ?? resolvedThemes?.minWidth)
-  $: maxWidthValue = resolveCssSize(maxWidth ?? resolvedThemes?.maxWidth)
-  $: containerStyle = [
+  ))
+  let defaultCodeFontSize = $derived(Number(mergedMonacoOptions.fontSize) || 13)
+  let minWidthValue = $derived(resolveCssSize(minWidth ?? resolvedThemes?.minWidth))
+  let maxWidthValue = $derived(resolveCssSize(maxWidth ?? resolvedThemes?.maxWidth))
+  let containerStyle = $derived([
     minWidthValue ? `min-width: ${minWidthValue}` : '',
     maxWidthValue ? `max-width: ${maxWidthValue}` : '',
-  ].filter(Boolean).join('; ')
-  $: languageIcon = getLanguageIcon(canonicalLanguage || rawLanguage || 'plain')
-  $: displayLanguage = languageMap[canonicalLanguage] || (rawLanguage ? rawLanguage.toUpperCase() : languageMap[''])
-  $: isPreviewable = isShowPreview !== false && (canonicalLanguage === 'html' || canonicalLanguage === 'svg')
-  $: previewTitle = canonicalLanguage === 'svg' ? t('artifacts.svgPreviewTitle') : t('artifacts.htmlPreviewTitle')
-  $: shouldDelayEditor = resolvedStream === false && resolvedLoading
-  $: documentStreaming = context?.final === false || resolvedLoading
-  $: shouldDeferStreamingLanguage = resolvedStream !== false && documentStreaming && (isLikelyIncompleteLanguageIdentifier(rawLanguage) || isStreamingLanguagePrefix(rawLanguage))
-  $: shouldRender = !(resolvedLoading && !code.trim())
-  $: preLanguageClass = sanitizeClassToken(rawLanguage || monacoLanguage)
-  $: showPreWhileMonacoLoads = !useFallback && !shouldDelayEditor && !shouldDeferStreamingLanguage && !editorReady
-  $: showPreFallback = useFallback || shouldDelayEditor || shouldDeferStreamingLanguage || showPreWhileMonacoLoads
-  $: settledRefreshSignature = diff
+  ].filter(Boolean).join('; '))
+  let languageIcon = $derived(getLanguageIcon(canonicalLanguage || rawLanguage || 'plain'))
+  let displayLanguage = $derived(languageMap[canonicalLanguage] || (rawLanguage ? rawLanguage.toUpperCase() : languageMap['']))
+  let isPreviewable = $derived(isShowPreview !== false && (canonicalLanguage === 'html' || canonicalLanguage === 'svg'))
+  let previewTitle = $derived(canonicalLanguage === 'svg' ? t('artifacts.svgPreviewTitle') : t('artifacts.htmlPreviewTitle'))
+  let shouldDelayEditor = $derived(resolvedStream === false && resolvedLoading)
+  let documentStreaming = $derived(context?.final === false || resolvedLoading)
+  let shouldDeferStreamingLanguage = $derived(resolvedStream !== false && documentStreaming && (isLikelyIncompleteLanguageIdentifier(rawLanguage) || isStreamingLanguagePrefix(rawLanguage)))
+  let shouldRender = $derived(!(resolvedLoading && !code.trim()))
+  let preLanguageClass = $derived(sanitizeClassToken(rawLanguage || monacoLanguage))
+  let showPreWhileMonacoLoads = $derived(!useFallback && !shouldDelayEditor && !shouldDeferStreamingLanguage && !editorReady)
+  let showPreFallback = $derived(useFallback || shouldDelayEditor || shouldDeferStreamingLanguage || showPreWhileMonacoLoads)
+  let settledRefreshSignature = $derived(diff
     ? `${monacoLanguage}\0${originalCode}\0${updatedCode || code}`
-    : `${monacoLanguage}\0${code}`
-  $: if (useFallback && fallbackLanguage && rawLanguage !== fallbackLanguage && isLikelyIncompleteLanguageIdentifier(fallbackLanguage)) {
-    useFallback = false
-    fallbackLanguage = ''
-  }
-  $: {
+    : `${monacoLanguage}\0${code}`)
+
+  $effect(() => {
+    if (useFallback && fallbackLanguage && rawLanguage !== fallbackLanguage && isLikelyIncompleteLanguageIdentifier(fallbackLanguage)) {
+      useFallback = false
+      fallbackLanguage = ''
+    }
+  })
+
+  $effect(() => {
     void mounted
     void resolvedLoading
     void settledRefreshSignature
@@ -182,8 +210,9 @@
         queueLoadingSettledRefresh()
       }
     }
-  }
-  $: {
+  })
+
+  $effect(() => {
     void mounted
     void editorHost
     void shouldRender
@@ -201,7 +230,7 @@
     void expanded
     if (mounted)
       void syncEditor()
-  }
+  })
 
   onMount(() => {
     mounted = true

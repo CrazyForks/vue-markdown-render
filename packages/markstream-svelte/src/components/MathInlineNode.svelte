@@ -6,28 +6,31 @@
   import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../workers/katexWorkerClient'
   import { getString } from './shared/node-helpers'
 
-  export let node: SvelteRenderableNode
+  let { node }: { node: SvelteRenderableNode } = $props()
 
-  let mathEl: HTMLSpanElement | null = null
-  let loading = true
+  let mathEl: HTMLSpanElement | null = $state(null)
+  let loading = $state(true)
   let destroyed = false
   let renderVersion = 0
   let hasRenderedOnce = false
 
-  $: source = getString((node as any)?.content || (node as any)?.markup || (node as any)?.raw)
-  $: raw = getString((node as any)?.raw || source)
-  $: nodeLoading = (node as any)?.loading === true
-  $: displayMode = String((node as any)?.markup || '') === '$$'
-  $: renderKey = `${source}\n${raw}\n${nodeLoading ? '1' : '0'}\n${displayMode ? '1' : '0'}`
-  $: if (mathEl)
-    void renderMath(renderKey, source, raw, nodeLoading, displayMode)
+  let source = $derived(getString((node as any)?.content || (node as any)?.markup || (node as any)?.raw))
+  let raw = $derived(getString((node as any)?.raw || source))
+  let nodeLoading = $derived((node as any)?.loading === true)
+  let displayMode = $derived(String((node as any)?.markup || '') === '$$')
+
+  $effect(() => {
+    if (mathEl) {
+      void renderMath(source, raw, nodeLoading, displayMode)
+    }
+  })
 
   onDestroy(() => {
     destroyed = true
     renderVersion += 1
   })
 
-  async function renderMath(_renderKey: string, currentSource: string, currentRaw: string, currentLoading: boolean, currentDisplayMode: boolean) {
+  async function renderMath(currentSource: string, currentRaw: string, currentLoading: boolean, currentDisplayMode: boolean) {
     const target = mathEl
     if (!target)
       return
@@ -93,7 +96,7 @@
 </script>
 
 <span class="math-inline-wrapper markstream-nested-math" data-display="inline" data-markstream-katex-managed="1">
-  <span bind:this={mathEl} class={'math-inline' + (loading ? ' math-inline--hidden' : '')}></span>
+  <span bind:this={mathEl} class={['math-inline', loading && 'math-inline--hidden']}></span>
   {#if loading}
     <span class="math-inline__loading" role="status" aria-live="polite">
       <span class="math-inline__spinner" aria-hidden="true"></span>

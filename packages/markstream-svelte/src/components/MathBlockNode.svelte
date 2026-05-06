@@ -6,27 +6,30 @@
   import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../workers/katexWorkerClient'
   import { getString } from './shared/node-helpers'
 
-  export let node: SvelteRenderableNode
+  let { node }: { node: SvelteRenderableNode } = $props()
 
-  let mathEl: HTMLDivElement | null = null
-  let rendering = true
+  let mathEl: HTMLDivElement | null = $state(null)
+  let rendering = $state(true)
   let destroyed = false
   let renderVersion = 0
   let hasRenderedOnce = false
 
-  $: source = getString((node as any)?.content || (node as any)?.markup || (node as any)?.raw)
-  $: raw = getString((node as any)?.raw || source)
-  $: nodeLoading = (node as any)?.loading === true
-  $: renderKey = `${source}\n${raw}\n${nodeLoading ? '1' : '0'}`
-  $: if (mathEl)
-    void renderMath(renderKey, source, raw, nodeLoading)
+  let source = $derived(getString((node as any)?.content || (node as any)?.markup || (node as any)?.raw))
+  let raw = $derived(getString((node as any)?.raw || source))
+  let nodeLoading = $derived((node as any)?.loading === true)
+
+  $effect(() => {
+    if (mathEl) {
+      void renderMath(source, raw, nodeLoading)
+    }
+  })
 
   onDestroy(() => {
     destroyed = true
     renderVersion += 1
   })
 
-  async function renderMath(_renderKey: string, currentSource: string, currentRaw: string, currentLoading: boolean) {
+  async function renderMath(currentSource: string, currentRaw: string, currentLoading: boolean) {
     const target = mathEl
     if (!target)
       return
@@ -92,5 +95,5 @@
 </script>
 
 <div class="math-block markstream-nested-math-block" data-markstream-katex-managed="1">
-  <div bind:this={mathEl} class:math-rendering={rendering} class="markstream-nested-math-block__render"></div>
+  <div bind:this={mathEl} class={['markstream-nested-math-block__render', rendering && 'math-rendering']}></div>
 </div>
