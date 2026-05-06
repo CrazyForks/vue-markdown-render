@@ -1,7 +1,7 @@
 {
   "name": "markstream-svelte",
   "type": "module",
-  "version": "0.0.1-beta.0",
+  "version": "0.0.1-beta.1",
   "description": "Svelte Markdown renderer for Markstream, aligned with markstream-vue and markstream-react.",
   "author": "Simon He",
   "license": "MIT",
