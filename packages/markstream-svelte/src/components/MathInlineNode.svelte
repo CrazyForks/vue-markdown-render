@@ -97,7 +97,7 @@
 </script>
 
 <span class="math-inline-wrapper markstream-nested-math" data-display="inline" data-markstream-katex-managed="1">
-  <span bind:this={mathEl} class={['math-inline', loading && 'math-inline--hidden']}></span>
+  <span bind:this={mathEl} class="math-inline" class:math-inline--hidden={loading}></span>
   {#if loading}
     <span class="math-inline__loading" role="status" aria-live="polite">
       <span class="math-inline__spinner" aria-hidden="true"></span>

@@ -14,6 +14,6 @@
   let tag = $derived('h' + level)
 </script>
 
-<svelte:element this={tag} class={'heading-node heading-' + level}>
+<svelte:element this={tag} class="heading-node heading-{level}">
   <RenderChildren nodes={getNodeList((node as any)?.children)} {context} prefix={String(indexKey ?? 'heading') + '-heading'} />
 </svelte:element>

@@ -49,4 +49,4 @@
   })
 </script>
 
-<span data-typewriter={typewriter !== false ? '1' : undefined} class:markstream-svelte-text--centered={centered} class="markstream-svelte-text-node text-node">{streamInfo.stableContent}{#if streamInfo.deltaContent}<span class={'markstream-svelte-text__stream-delta text-node-stream-delta ' + streamInfo.deltaClass}>{streamInfo.deltaContent}</span>{/if}</span>
+<span data-typewriter={typewriter !== false ? '1' : undefined} class:markstream-svelte-text--centered={centered} class="markstream-svelte-text-node text-node">{streamInfo.stableContent}{#if streamInfo.deltaContent}<span class="markstream-svelte-text__stream-delta text-node-stream-delta {streamInfo.deltaClass}">{streamInfo.deltaContent}</span>{/if}</span>

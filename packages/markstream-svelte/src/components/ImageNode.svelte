@@ -71,11 +71,9 @@
 <span class="image-node-container">
   {#if !isLoading && !hasError}
     <img
-      class={[
-        "image-node__img",
-        (useEagerImagePath || imageLoaded) && "is-loaded",
-        (!useEagerImagePath && !imageLoaded) && "is-loading"
-      ]}
+      class="image-node__img"
+      class:is-loaded={useEagerImagePath || imageLoaded}
+      class:is-loading={!useEagerImagePath && !imageLoaded}
       src={currentSrc}
       alt={alt}
       title={title || alt || undefined}

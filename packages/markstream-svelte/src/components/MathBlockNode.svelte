@@ -96,5 +96,5 @@
 </script>
 
 <div class="math-block markstream-nested-math-block" data-markstream-katex-managed="1">
-  <div bind:this={mathEl} class={['markstream-nested-math-block__render', rendering && 'math-rendering']}></div>
+  <div bind:this={mathEl} class="markstream-nested-math-block__render" class:math-rendering={rendering}></div>
 </div>
