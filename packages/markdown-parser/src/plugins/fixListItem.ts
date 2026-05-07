@@ -5,7 +5,7 @@ export function applyFixListItem(md: MarkdownIt) {
   // Normalize list-item related inline tokens after inline tokenization
   // so downstream parsers see corrected children.
   md.core.ruler.after('inline', 'fix_list_item_tokens', (state: unknown) => {
-    const s = state as unknown as { tokens?: Array<{ type?: string, children?: any[] }> }
+    const s = state as unknown as { tokens?: MarkdownToken[] }
     const toks = s.tokens ?? []
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i]

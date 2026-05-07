@@ -6,8 +6,15 @@ import { shouldDemoteFilenameLikeLinkify } from '../parser/linkifyHeuristics'
 // ASCII `!` is valid in URLs (path/query/fragment), so do not stop on it.
 const LINKIFY_HARD_STOP_CHARS = ['！'] as const
 
+type SyntheticLinkToken = MarkdownToken & {
+  href?: string
+  text?: string
+  title?: string
+  children?: MarkdownToken[] | null
+}
+
 // Small helpers to reduce repetition when building token fragments
-function textToken(content: string) {
+function textToken(content: string): MarkdownToken {
   return {
     type: 'text',
     content,
@@ -15,7 +22,7 @@ function textToken(content: string) {
   }
 }
 
-function pushEmOpen(arr: any[], type: number) {
+function pushEmOpen(arr: MarkdownToken[], type: number) {
   if (type === 1) {
     arr.push({ type: 'em_open', tag: 'em', nesting: 1 })
   }
@@ -28,7 +35,7 @@ function pushEmOpen(arr: any[], type: number) {
   }
 }
 
-function pushEmClose(arr: any[], type: number) {
+function pushEmClose(arr: MarkdownToken[], type: number) {
   if (type === 1) {
     arr.push({ type: 'em_close', tag: 'em', nesting: -1 })
   }
@@ -41,7 +48,7 @@ function pushEmClose(arr: any[], type: number) {
   }
 }
 
-function createLinkToken(text: string, href: string, loading: boolean) {
+function createLinkToken(text: string, href: string, loading: boolean): SyntheticLinkToken {
   let title = ''
   if (href.includes('"')) {
     const temps = href.split('"')
@@ -65,7 +72,7 @@ function createLinkToken(text: string, href: string, loading: boolean) {
   }
 }
 
-function appendToLinkToken(link: any, suffix: string) {
+function appendToLinkToken(link: SyntheticLinkToken, suffix: string) {
   if (!link || !suffix)
     return
   link.href = String(link.href ?? '') + suffix
@@ -93,16 +100,16 @@ function firstIndexOfAny(input: string, chars: readonly string[]) {
   return first
 }
 
-function getHrefFromLinkOpen(token: any) {
-  const href = token?.attrs?.find((attr: any) => attr?.[0] === 'href')?.[1]
+function getHrefFromLinkOpen(token: MarkdownToken) {
+  const href = token.attrs?.find(attr => attr?.[0] === 'href')?.[1]
   return typeof href === 'string' ? href : ''
 }
 
-function setHrefOnLinkOpen(token: any, href: string) {
+function setHrefOnLinkOpen(token: MarkdownToken, href: string) {
   if (!token)
     return
   token.attrs = Array.isArray(token.attrs) ? token.attrs : []
-  const idx = token.attrs.findIndex((attr: any) => attr?.[0] === 'href')
+  const idx = token.attrs.findIndex(attr => attr?.[0] === 'href')
   if (idx >= 0)
     token.attrs[idx][1] = href
   else
@@ -126,7 +133,7 @@ export function applyFixLinkTokens(md: MarkdownIt) {
   // so downstream code receives corrected token arrays during the same
   // parsing pass.
   md.core.ruler.after('inline', 'fix_link_tokens', (state: unknown) => {
-    const s = state as unknown as { tokens?: Array<{ type?: string, children?: any[] }> }
+    const s = state as unknown as { tokens?: MarkdownToken[] }
     const toks = s.tokens ?? []
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i]
@@ -180,11 +187,11 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
           && linkText
           && shouldDemoteFilenameLikeLinkify(linkText)
         ) {
-          tokens.splice(i, closeIdx - i + 1, textToken(linkText) as any)
+          tokens.splice(i, closeIdx - i + 1, textToken(linkText))
           continue
         }
 
-        const href = getHrefFromLinkOpen(curToken as any)
+        const href = getHrefFromLinkOpen(curToken)
         const hrefStop = firstIndexOfAny(href, LINKIFY_HARD_STOP_CHARS)
         // Prefer splitting by the visible text token, but also trim href if it contains stop chars.
         for (let j = i + 1; j < closeIdx; j++) {
@@ -198,7 +205,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
           const stopChar = t.content[stopAt]
           const before = t.content.slice(0, stopAt)
           let tail = t.content.slice(stopAt)
-          // Move any remaining text tokens that were inside the linkify span to the tail.
+          // Move remaining text tokens that were inside the linkify span to the tail.
           for (let k = j + 1; k < closeIdx; k++) {
             const tk = tokens[k]
             if (tk?.type === 'text' && typeof tk.content === 'string')
@@ -206,7 +213,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
           }
 
           t.content = before
-          ;(t as any).raw = before
+          t.raw = before
 
           const removeCount = closeIdx - (j + 1)
           if (removeCount > 0) {
@@ -232,10 +239,10 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
             }
           }
           if (newHref !== href)
-            setHrefOnLinkOpen(curToken as any, newHref)
+            setHrefOnLinkOpen(curToken, newHref)
 
           if (tail) {
-            tokens.splice(closeIdx + 1, 0, textToken(tail) as any)
+            tokens.splice(closeIdx + 1, 0, textToken(tail))
           }
 
           break
@@ -425,7 +432,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       let deleteCount = 2
       const beforeText = tokens[i - 3]?.content || ''
       const emphasisMatch = beforeText.match(/^(\*+)$/)
-      const replacerTokens: any[] = []
+      const replacerTokens: MarkdownToken[] = []
       if (emphasisMatch) {
         deleteCount += 1
         const type = emphasisMatch[1].length
@@ -452,7 +459,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
         }
       }
 
-      replacerTokens.push({
+      const linkToken: SyntheticLinkToken = {
         type: 'link',
         loading: false,
         href,
@@ -466,7 +473,8 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
           },
         ],
         raw: String(`[${text}](${href})`),
-      } as any)
+      }
+      replacerTokens.push(linkToken)
       if (emphasisMatch) {
         const type = emphasisMatch[1].length
         pushEmClose(replacerTokens, type)
@@ -609,9 +617,9 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
           href = tokens[i + 4].content || ''
         }
         const out: MarkdownToken[] = []
-        pushEmOpen(out as any[], 2)
+        pushEmOpen(out, 2)
         out.push(createLinkToken(finalLabel, href, false))
-        pushEmClose(out as any[], 2)
+        pushEmClose(out, 2)
         tokens.splice(i, 9, ...out)
         i -= (out.length - 1)
         continue
@@ -623,8 +631,8 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
   // it's meaningful (e.g. `?q=!`, `#!`). Merge a standalone leading `!` text token
   // back into the preceding autolink/linkify link when it ends with `=` or `#`.
   for (let i = 0; i < tokens.length - 1; i++) {
-    const t = tokens[i] as any
-    const next = tokens[i + 1] as any
+    const t = tokens[i] as SyntheticLinkToken
+    const next = tokens[i + 1]
     if (t?.type !== 'link' || next?.type !== 'text' || typeof next.content !== 'string')
       continue
     if (!next.content.startsWith('!'))

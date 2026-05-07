@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CodeBlockMonacoTheme, CodeBlockNodeProps } from '../../types/component-props'
+import type { CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload } from '../../types/component-props'
 import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLike, MonacoNamespaceLike, MonacoRuntimeOptions } from './monaco'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
@@ -44,7 +44,10 @@ const props = withDefaults(
   },
 )
 
-const emits = defineEmits(['previewCode', 'copy'])
+const emits = defineEmits<{
+  (e: 'previewCode', payload: CodeBlockPreviewPayload): void
+  (e: 'copy', code: string): void
+}>()
 
 // Chrome warns when Monaco registers non-passive touchstart listeners.
 // Scope the workaround to editor boot so the host page prototype is restored.
@@ -609,7 +612,7 @@ function getVerticalPaddingSafe(editor: MonacoEditorViewLike | null | undefined)
   }
   catch {}
 
-  const rawPadding = (resolvedMonacoOptions.value as Record<string, any> | undefined)?.padding as { top?: unknown, bottom?: unknown } | undefined
+  const rawPadding = (resolvedMonacoOptions.value as Record<string, unknown> | undefined)?.padding as { top?: unknown, bottom?: unknown } | undefined
   const top = typeof rawPadding?.top === 'number' ? rawPadding.top : 0
   const bottom = typeof rawPadding?.bottom === 'number' ? rawPadding.bottom : 0
   if (top > 0 || bottom > 0)

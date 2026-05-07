@@ -1,3 +1,4 @@
+import type { MathOptions } from 'stream-markdown-parser'
 import type { App, Component, Plugin } from 'vue'
 import type { CustomComponents as MarkstreamCustomComponents } from './types'
 import type { LanguageIconResolver } from './utils/languageIcon'
@@ -75,11 +76,13 @@ export type {
   CodeBlockMonacoTheme,
   CodeBlockMonacoThemeObject,
   CodeBlockNodeProps,
+  CodeBlockPreviewPayload,
   CodeBlockThemeProp,
   D2BlockNodeProps,
   ImageNodeProps,
   InfographicBlockNodeProps,
   LinkNodeProps,
+  MarkdownCodeBlockPreviewPayload,
   MathBlockNodeProps,
   MathInlineNodeProps,
   MermaidBlockEvent,
@@ -97,6 +100,12 @@ export { KATEX_COMMANDS, normalizeStandaloneBackslashT, setDefaultMathOptions } 
 export type { MathOptions } from 'stream-markdown-parser'
 
 export interface CustomComponents extends MarkstreamCustomComponents {}
+
+export interface MarkstreamVuePluginOptions {
+  getLanguageIcon?: LanguageIconResolver
+  iconTheme?: string
+  mathOptions?: MathOptions
+}
 
 export {
   AdmonitionNode,
@@ -202,7 +211,7 @@ const componentMap: Record<string, Component> = {
 }
 
 export const VueRendererMarkdown: Plugin = {
-  install(app: App, options?: { getLanguageIcon?: LanguageIconResolver, iconTheme?: string, mathOptions?: any }) {
+  install(app: App, options?: MarkstreamVuePluginOptions) {
     Object.entries(componentMap).forEach(([name, component]) => {
       app.component(name, component)
     })

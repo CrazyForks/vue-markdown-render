@@ -22,9 +22,77 @@ export {
 
 export type SvelteRenderableNode = (ParsedNode | BaseNode) & Record<string, unknown>
 
+export interface CodeBlockPreviewPayload {
+  node: SvelteRenderableNode
+  artifactType: 'text/html' | 'image/svg+xml'
+  artifactTitle: string
+  id: string
+}
+
+export type NodeRendererCodeBlockProps = Partial<{
+  stream: boolean
+  darkTheme: CodeBlockMonacoTheme
+  lightTheme: CodeBlockMonacoTheme
+  themes: CodeBlockMonacoTheme[]
+  monacoOptions: CodeBlockMonacoOptions
+  minWidth: string | number
+  maxWidth: string | number
+  isShowPreview: boolean
+  enableFontSizeControl: boolean
+  showHeader: boolean
+  showCopyButton: boolean
+  showExpandButton: boolean
+  showPreviewButton: boolean
+  showCollapseButton: boolean
+  showFontSizeButtons: boolean
+  htmlPreviewAllowScripts: boolean
+  htmlPreviewSandbox: string
+}> & Record<string, unknown>
+
+export type NodeRendererMermaidProps = Partial<{
+  maxHeight: string | null
+  estimatedPreviewHeightPx: number
+  workerTimeoutMs: number
+  parseTimeoutMs: number
+  renderTimeoutMs: number
+  fullRenderTimeoutMs: number
+  renderDebounceMs: number
+  showHeader: boolean
+  showModeToggle: boolean
+  showCopyButton: boolean
+  showExportButton: boolean
+  showFullscreenButton: boolean
+  showCollapseButton: boolean
+  showZoomControls: boolean
+  isStrict: boolean
+}> & Record<string, unknown>
+
+export type NodeRendererD2Props = Partial<{
+  maxHeight: string | null
+  themeId: number | null
+  darkThemeId: number | null
+  showHeader: boolean
+  showModeToggle: boolean
+  showCopyButton: boolean
+  showExportButton: boolean
+  showCollapseButton: boolean
+}> & Record<string, unknown>
+
+export type NodeRendererInfographicProps = Partial<{
+  maxHeight: string | null
+  estimatedPreviewHeightPx: number
+  showHeader: boolean
+  showModeToggle: boolean
+  showCopyButton: boolean
+  showCollapseButton: boolean
+  showExportButton: boolean
+  showFullscreenButton: boolean
+  showZoomControls: boolean
+}> & Record<string, unknown>
+
 export interface NodeRendererEvents {
   onCopy?: (code: string) => void
-  onHandleArtifactClick?: (payload: any) => void
+  onHandleArtifactClick?: (payload: CodeBlockPreviewPayload) => void
 }
 
 export interface NodeRendererProps {
@@ -44,10 +112,10 @@ export interface NodeRendererProps {
   renderCodeBlocksAsPre?: boolean
   codeBlockMinWidth?: string | number
   codeBlockMaxWidth?: string | number
-  codeBlockProps?: Record<string, any>
-  mermaidProps?: Record<string, any>
-  d2Props?: Record<string, any>
-  infographicProps?: Record<string, any>
+  codeBlockProps?: NodeRendererCodeBlockProps
+  mermaidProps?: NodeRendererMermaidProps
+  d2Props?: NodeRendererD2Props
+  infographicProps?: NodeRendererInfographicProps
   customComponents?: CustomComponentMap
   showTooltips?: boolean
   themes?: CodeBlockMonacoTheme[]
@@ -83,10 +151,10 @@ export interface SvelteRenderContext {
   customHtmlTags?: readonly string[]
   parseOptions?: ParseOptions
   customMarkdownIt?: (md: MarkdownIt) => MarkdownIt
-  codeBlockProps?: Record<string, any>
-  mermaidProps?: Record<string, any>
-  d2Props?: Record<string, any>
-  infographicProps?: Record<string, any>
+  codeBlockProps?: NodeRendererCodeBlockProps
+  mermaidProps?: NodeRendererMermaidProps
+  d2Props?: NodeRendererD2Props
+  infographicProps?: NodeRendererInfographicProps
   customComponents?: CustomComponentMap
   codeBlockThemes?: {
     themes?: CodeBlockMonacoTheme[]
@@ -125,7 +193,7 @@ export function buildRenderContext(
 ): SvelteRenderContext {
   const customHtmlTags = normalizeCustomHtmlTags([
     ...(props.customHtmlTags || []),
-    ...((((props.parseOptions as any)?.customHtmlTags) || []) as string[]),
+    ...(props.parseOptions?.customHtmlTags || []),
   ])
 
   return {
@@ -171,7 +239,7 @@ export function resolveParsedNodes(props: NodeRendererProps): SvelteRenderableNo
 
   const normalizedTags = normalizeCustomHtmlTags([
     ...(props.customHtmlTags || []),
-    ...((((props.parseOptions as any)?.customHtmlTags) || []) as string[]),
+    ...(props.parseOptions?.customHtmlTags || []),
   ])
   const cacheKey = `${props.customId || 'markstream-svelte'}::${normalizedTags.join(',')}`
   let markdown = markdownCache.get(cacheKey)
@@ -190,7 +258,7 @@ export function resolveParsedNodes(props: NodeRendererProps): SvelteRenderableNo
   if (typeof props.final === 'boolean')
     options.final = props.final
   if (normalizedTags.length > 0)
-    (options as any).customHtmlTags = normalizedTags
+    options.customHtmlTags = normalizedTags
 
   return hydrateCustomTagContent(
     parseMarkdownToStructure(content, parser, options) as SvelteRenderableNode[],

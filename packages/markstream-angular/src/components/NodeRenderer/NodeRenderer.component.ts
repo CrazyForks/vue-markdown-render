@@ -3,6 +3,7 @@ import type { RenderedHtmlEnhancementHandle } from '../../enhanceRenderedHtml'
 import type {
   AngularRenderableNode,
   AngularRenderContext,
+  CodeBlockPreviewPayload,
   NodeRendererEvents,
   NodeRendererProps,
 } from '../shared/node-helpers'
@@ -124,16 +125,16 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   @Input() htmlPolicy: NodeRendererProps['htmlPolicy'] = 'safe'
   @Input() viewportPriority?: boolean
   @Input() codeBlockStream = true
-  @Input() codeBlockDarkTheme?: any
-  @Input() codeBlockLightTheme?: any
-  @Input() codeBlockMonacoOptions?: Record<string, any>
+  @Input() codeBlockDarkTheme?: NodeRendererProps['codeBlockDarkTheme']
+  @Input() codeBlockLightTheme?: NodeRendererProps['codeBlockLightTheme']
+  @Input() codeBlockMonacoOptions?: NodeRendererProps['codeBlockMonacoOptions']
   @Input() renderCodeBlocksAsPre = false
   @Input() codeBlockMinWidth?: string | number
   @Input() codeBlockMaxWidth?: string | number
-  @Input() codeBlockProps?: Record<string, any>
-  @Input() mermaidProps?: Record<string, any>
-  @Input() d2Props?: Record<string, any>
-  @Input() infographicProps?: Record<string, any>
+  @Input() codeBlockProps?: NodeRendererProps['codeBlockProps']
+  @Input() mermaidProps?: NodeRendererProps['mermaidProps']
+  @Input() d2Props?: NodeRendererProps['d2Props']
+  @Input() infographicProps?: NodeRendererProps['infographicProps']
   @Input() customComponents?: NodeRendererProps['customComponents']
   @Input() showTooltips = true
   @Input() themes?: string[]
@@ -153,7 +154,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   @Input() allowHtml = true
 
   @Output() copy = new EventEmitter<string>()
-  @Output() handleArtifactClick = new EventEmitter<any>()
+  @Output() handleArtifactClick = new EventEmitter<CodeBlockPreviewPayload>()
   @Output() click = new EventEmitter<MouseEvent>()
   @Output() mouseover = new EventEmitter<MouseEvent>()
   @Output() mouseout = new EventEmitter<MouseEvent>()

@@ -250,7 +250,8 @@
         lastRenderedCode = normalized
         svgCache[theme] = safeSvg
       }
-      rendered?.bindFunctions?.(document.createElement('div'))
+      if (typeof rendered !== 'string')
+        rendered?.bindFunctions?.(document.createElement('div'))
     }
     catch (error) {
       if (token === renderToken) {

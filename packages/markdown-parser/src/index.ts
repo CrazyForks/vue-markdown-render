@@ -1,5 +1,6 @@
 import type { MarkdownIt, MarkdownItPlugin } from 'markdown-it-ts'
 import type { FactoryOptions } from './factory'
+import type { MarkdownToken } from './types'
 import markdownItFootnote from 'markdown-it-footnote'
 import markdownItIns from 'markdown-it-ins'
 import markdownItMark from 'markdown-it-mark'
@@ -17,9 +18,11 @@ import {
 // Module-level registry for callers that want to add plugins to every
 // `getMarkdown()` instance without modifying call sites. Useful for tests
 // or apps that want a central place to `use` plugins.
-const _registeredMarkdownPlugins: Array<unknown> = []
+export type MarkdownPluginRegistration = MarkdownItPlugin | readonly [MarkdownItPlugin, ...unknown[]]
 
-export function registerMarkdownPlugin(plugin: unknown) {
+const _registeredMarkdownPlugins: MarkdownPluginRegistration[] = []
+
+export function registerMarkdownPlugin(plugin: MarkdownPluginRegistration) {
   _registeredMarkdownPlugins.push(plugin)
 }
 
@@ -50,7 +53,7 @@ export { applyMath, KATEX_COMMANDS, normalizeStandaloneBackslashT } from './plug
 export * from './types'
 
 export interface GetMarkdownOptions extends FactoryOptions {
-  plugin?: Array<unknown>
+  plugin?: MarkdownPluginRegistration[]
   apply?: Array<(md: MarkdownIt) => void>
   /**
    * Custom translation function or translation map for UI texts
@@ -86,10 +89,9 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
       // allow both [plugin, opts] tuple or plugin function
       const pluginItem = p as unknown
       if (Array.isArray(pluginItem)) {
-        const fn = pluginItem[0]
-        const opts = pluginItem[1]
+        const [fn, ...params] = pluginItem
         if (typeof fn === 'function')
-          md.use(fn, opts)
+          md.use(fn, ...params)
       }
       else if (typeof pluginItem === 'function') {
         md.use(pluginItem as MarkdownItPlugin)
@@ -112,14 +114,13 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
     }
   }
 
-  // Apply any globally registered plugins (via registerMarkdownPlugin)
+  // Apply globally registered plugins (via registerMarkdownPlugin)
   if (_registeredMarkdownPlugins.length) {
     for (const p of _registeredMarkdownPlugins) {
       if (Array.isArray(p)) {
-        const fn = p[0] as any
-        const opts = p[1]
+        const [fn, ...params] = p
         if (typeof fn === 'function')
-          md.use(fn, opts)
+          md.use(fn, ...params)
       }
       else if (typeof p === 'function') {
         md.use(p as MarkdownItPlugin)
@@ -179,7 +180,7 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
 
   // wave rule (legacy)
   const waveRule = (state: unknown, silent?: boolean) => {
-    const s = state as unknown as { pos: number, src: string, push: (type: string, tag?: string, nesting?: number) => any }
+    const s = state as unknown as { pos: number, src: string, push: (type: string, tag?: string, nesting?: number) => MarkdownToken }
     const start = s.pos
     if (s.src[start] !== '~')
       return false
@@ -245,7 +246,7 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
     return !/^\d+$/.test(nextLabel)
   }
   const referenceInline = (state: unknown, silent?: boolean) => {
-    const s = state as unknown as { src: string, pos: number, push: (type: string, tag?: string, nesting?: number) => any }
+    const s = state as unknown as { src: string, pos: number, push: (type: string, tag?: string, nesting?: number) => MarkdownToken }
     if (s.src[s.pos] !== '[')
       return false
     const match = RE_REFERENCE.exec(s.src.slice(s.pos))

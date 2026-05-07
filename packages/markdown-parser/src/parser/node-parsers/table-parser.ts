@@ -21,7 +21,7 @@ function extractAlign(attrs: MarkdownToken['attrs']): 'left' | 'right' | 'center
     if (key === 'style') {
       const m = /text-align\s*:\s*(left|right|center)/i.exec(value)
       if (m)
-        return m[1].toLowerCase() as any
+        return m[1].toLowerCase() as TableCellNode['align']
     }
   }
   return 'left'
@@ -64,7 +64,7 @@ export function parseTable(
           cells.push({
             type: 'table_cell',
             header: isHeaderCell || isHeader,
-            children: parseInlineTokens(contentToken.children || [], content, undefined, options as any),
+            children: parseInlineTokens(contentToken.children || [], content, undefined, options),
             raw: content,
             align,
           })

@@ -1,7 +1,17 @@
-import type { HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type {
+  DefinitionItemNode as DefinitionItemNodeType,
+  HtmlPolicy,
+  ListItemNode as ListItemNodeType,
+  MarkdownIt,
+  ParsedNode,
+  ParseOptions,
+  TableCellNode as TableCellNodeType,
+  TableRowNode as TableRowNodeType,
+} from 'stream-markdown-parser'
 import type { HtmlPreviewFrameProps } from '../components/CodeBlockNode/HtmlPreviewFrame'
 import type { MarkdownCodeBlockNodeProps } from '../components/MarkdownCodeBlockNode/MarkdownCodeBlockNode'
 import type { TooltipProps } from '../components/Tooltip/Tooltip'
+import type { CustomComponentMap } from '../customComponents'
 import type { NodeRendererProps, RenderContext } from '../types'
 import type {
   CodeBlockNodeProps,
@@ -105,7 +115,7 @@ function mergeHtmlBlockWrapperProps(
 
 function createRenderContext(
   props: NodeRendererProps,
-  customComponents: Record<string, React.ComponentType<any>>,
+  customComponents: CustomComponentMap,
   indexPrefix: string,
   customHtmlTags: readonly string[],
 ): RenderContext {
@@ -460,11 +470,11 @@ export function ListItemNode(props: NodeComponentProps<{ type: 'list_item', chil
   )
 }
 
-export function ListNode(props: NodeComponentProps<{ type: 'list', ordered?: boolean, start?: number, items?: any[] }>) {
+export function ListNode(props: NodeComponentProps<{ type: 'list', ordered?: boolean, start?: number, items?: ListItemNodeType[] }>) {
   const { node, ctx, renderNode: renderNodeProp, indexKey } = props
   const Tag = node.ordered ? 'ol' : 'ul'
   const startAttr = node.ordered && node.start ? node.start : undefined
-  const ListItemComponent = ((ctx && getCustomNodeComponents(ctx.customId).list_item) || ListItemNode) as any
+  const ListItemComponent = ((ctx && getCustomNodeComponents(ctx.customId).list_item) || ListItemNode) as React.ComponentType<NodeComponentProps<ListItemNodeType> & { value?: number }>
   return (
     <Tag
       className={node.ordered
@@ -472,7 +482,7 @@ export function ListNode(props: NodeComponentProps<{ type: 'list', ordered?: boo
         : 'list-node my-5 pl-[calc(13/8*1em)] list-disc max-lg:my-[calc(4/3*1em)] max-lg:pl-[calc(14/9*1em)]'}
       start={startAttr}
     >
-      {node.items?.map((item: any, idx: number) => (
+      {node.items?.map((item, idx: number) => (
         <ListItemComponent
           key={`${String(indexKey ?? 'list')}-${idx}`}
           node={item}
@@ -489,7 +499,7 @@ export function ListNode(props: NodeComponentProps<{ type: 'list', ordered?: boo
   )
 }
 
-export function TableNode(props: NodeComponentProps<{ type: 'table', header?: any, rows?: any[], loading?: boolean }>) {
+export function TableNode(props: NodeComponentProps<{ type: 'table', header?: TableRowNodeType, rows?: TableRowNodeType[], loading?: boolean }>) {
   const { node, ctx, renderNode: renderNodeProp, indexKey } = props
   const headerCells = Array.isArray(node?.header?.cells) ? node.header.cells : []
   const isLoading = Boolean(node?.loading)
@@ -508,7 +518,7 @@ export function TableNode(props: NodeComponentProps<{ type: 'table', header?: an
       <table className={`my-8 text-sm table-node${isLoading ? ' table-node--loading' : ''}`} aria-busy={isLoading}>
         <thead className="border-[var(--table-border,#cbd5e1)]">
           <tr className="border-b">
-            {headerCells.map((cell: any, idx: number) => (
+            {headerCells.map((cell: TableCellNodeType, idx: number) => (
               <th key={`header-${idx}`} className={`font-semibold p-[calc(4/7*1em)] ${getAlignClass(cell.align)}`} dir="auto">
                 {ctx && renderNodeProp ? renderInline(cell.children, ctx, `${String(indexKey ?? 'table')}-th-${idx}`, renderNodeProp) : null}
               </th>
@@ -516,9 +526,9 @@ export function TableNode(props: NodeComponentProps<{ type: 'table', header?: an
           </tr>
         </thead>
         <tbody>
-          {bodyRows.map((row: any, rowIdx: number) => (
+          {bodyRows.map((row: TableRowNodeType, rowIdx: number) => (
             <tr key={`row-${rowIdx}`} className={rowIdx < bodyRows.length - 1 ? 'border-[var(--table-border,#cbd5e1)] border-b' : 'border-[var(--table-border,#cbd5e1)]'}>
-              {row.cells?.map((cell: any, cellIdx: number) => (
+              {row.cells?.map((cell: TableCellNodeType, cellIdx: number) => (
                 <td key={`cell-${rowIdx}-${cellIdx}`} className={`p-[calc(4/7*1em)] ${getAlignClass(cell.align)}`} dir="auto">
                   {ctx && renderNodeProp ? renderInline(cell.children, ctx, `${String(indexKey ?? 'table')}-row-${rowIdx}-${cellIdx}`, renderNodeProp) : null}
                 </td>
@@ -537,12 +547,12 @@ export function TableNode(props: NodeComponentProps<{ type: 'table', header?: an
   )
 }
 
-export function DefinitionListNode(props: NodeComponentProps<{ type: 'definition_list', items?: any[] }>) {
+export function DefinitionListNode(props: NodeComponentProps<{ type: 'definition_list', items?: DefinitionItemNodeType[] }>) {
   const { node, ctx, renderNode: renderNodeProp, indexKey } = props
   const items = Array.isArray(node.items) ? node.items : []
   return (
     <dl className="definition-list" data-index-key={indexKey}>
-      {items.map((item: any, idx: number) => (
+      {items.map((item, idx: number) => (
         <div key={`${String(indexKey ?? 'definition')}-${idx}`} className="mb-4">
           <dt className="definition-term font-semibold">
             {ctx && renderNodeProp ? renderInline(item.term, ctx, `${String(indexKey ?? 'definition')}-term-${idx}`, renderNodeProp) : null}

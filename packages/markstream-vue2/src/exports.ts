@@ -1,3 +1,5 @@
+import type { MathOptions } from 'stream-markdown-parser'
+import type { Component } from 'vue-demi'
 import type { CustomComponents as MarkstreamCustomComponents } from './types'
 import type { LanguageIconResolver } from './utils/languageIcon'
 import { setDefaultMathOptions } from 'stream-markdown-parser'
@@ -70,10 +72,12 @@ export type {
   CodeBlockMonacoTheme,
   CodeBlockMonacoThemeObject,
   CodeBlockNodeProps,
+  CodeBlockPreviewPayload,
   D2BlockNodeProps,
   ImageNodeProps,
   InfographicBlockNodeProps,
   LinkNodeProps,
+  MarkdownCodeBlockPreviewPayload,
   MathBlockNodeProps,
   MathInlineNodeProps,
   MermaidBlockEvent,
@@ -89,6 +93,25 @@ export { KATEX_COMMANDS, normalizeStandaloneBackslashT, setDefaultMathOptions } 
 export type { MathOptions } from 'stream-markdown-parser'
 
 export interface CustomComponents extends MarkstreamCustomComponents {}
+
+export interface MarkstreamVue2PluginOptions {
+  getLanguageIcon?: LanguageIconResolver
+  mathOptions?: MathOptions
+}
+
+interface Vue2InstanceLike {
+  _setupProxy?: unknown
+}
+
+interface Vue2ConstructorLike {
+  version?: string
+  prototype: Record<string, unknown>
+  component: (name: string, component: Component) => void
+  mixin: (mixin: { beforeCreate?: (this: Vue2InstanceLike) => void }) => void
+  __composition_api_installed__?: boolean
+  __compositionApiInstalled?: boolean
+  __markstreamVue2SetupProxyPatched?: boolean
+}
 
 export {
   AdmonitionNode,
@@ -153,7 +176,7 @@ export {
 
 export default MarkdownRender
 
-function getVue2MinorVersion(Vue: any) {
+function getVue2MinorVersion(Vue: Vue2ConstructorLike) {
   const version = typeof Vue?.version === 'string' ? Vue.version : ''
   const [major, minor] = version.split('.').map(Number)
   if (!Number.isFinite(major) || !Number.isFinite(minor) || major !== 2)
@@ -161,7 +184,7 @@ function getVue2MinorVersion(Vue: any) {
   return minor
 }
 
-function ensureVue2CompositionApi(Vue: any) {
+function ensureVue2CompositionApi(Vue: Vue2ConstructorLike) {
   const minor = getVue2MinorVersion(Vue)
   if (minor == null || minor >= 7)
     return
@@ -173,7 +196,7 @@ function ensureVue2CompositionApi(Vue: any) {
   }
 }
 
-function ensureVue2SetupProxy(Vue: any) {
+function ensureVue2SetupProxy(Vue: Vue2ConstructorLike) {
   const minor = getVue2MinorVersion(Vue)
   if (minor == null || minor >= 7)
     return
@@ -210,7 +233,7 @@ function ensureVue2SetupProxy(Vue: any) {
   })
 }
 
-const componentMap: Record<string, any> = {
+const componentMap: Record<string, Component> = {
   AdmonitionNode,
   BlockquoteNode,
   CheckboxNode,
@@ -253,7 +276,7 @@ const componentMap: Record<string, any> = {
 }
 
 export const VueRendererMarkdown = {
-  install(Vue: any, options?: { getLanguageIcon?: LanguageIconResolver, mathOptions?: any }) {
+  install(Vue: Vue2ConstructorLike, options?: MarkstreamVue2PluginOptions) {
     ensureVue2CompositionApi(Vue)
     ensureVue2SetupProxy(Vue)
     Object.entries(componentMap).forEach(([name, component]) => {

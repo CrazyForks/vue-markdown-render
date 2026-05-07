@@ -1,6 +1,6 @@
 import type { Component } from 'svelte'
 
-export type MarkstreamSvelteComponent = Component<Record<string, any>>
+export type MarkstreamSvelteComponent = Component<never>
 export type CustomComponentMap = Record<string, MarkstreamSvelteComponent>
 
 const GLOBAL_KEY = '__global__'
