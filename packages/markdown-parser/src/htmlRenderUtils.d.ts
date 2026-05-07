@@ -9,7 +9,7 @@ export interface HtmlToken {
 export declare const SAFE_ALLOWED_HTML_TAGS: Set<string>;
 export declare function isHtmlTagBlocked(tagName: string | undefined, policy?: HtmlPolicy): boolean;
 export declare function isHtmlTagHardBlocked(tagName: string | undefined, policy?: HtmlPolicy): boolean;
-export declare function isCustomHtmlComponentTag(tagName: string, customComponents: Record<string, unknown>): boolean;
+export declare function isCustomHtmlComponentTag(tagName: string, customComponents: Record<string, unknown>): any;
 export declare function sanitizeHtmlAttrs(attrs: Record<string, string>, policy?: HtmlPolicy, tagName?: string): Record<string, string>;
 export declare function tokenAttrsToRecord(attrs?: Array<[string, string | null]> | null): Record<string, string>;
 export declare function sanitizeHtmlTokenAttrs(attrs?: Array<[string, string | null]> | null, policy?: HtmlPolicy, tagName?: string): [string, string][];

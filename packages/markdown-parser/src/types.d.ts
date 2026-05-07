@@ -338,3 +338,4 @@ export interface InternalParseOptions extends ParseOptions {
     __sourceMarkdown?: string;
 }
 export type PostTransformNodesHook = (nodes: ParsedNode[]) => ParsedNode[];
+export {};
