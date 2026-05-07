@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import type { HtmlPolicy } from 'stream-markdown-parser'
+import type { CustomComponentMap } from '../../customComponents'
 import type { NodeComponentProps } from '../../types/node-component'
 import type { HtmlToken } from '../../utils/htmlToReact'
 import React, { useEffect, useRef, useState } from 'react'
@@ -57,7 +58,7 @@ function pushRenderedNode(target: React.ReactNode[], rendered: React.ReactNode |
  */
 function buildReactElementTree(
   tokens: HtmlToken[],
-  customComponents: Record<string, ComponentType<any>>,
+  customComponents: CustomComponentMap,
   htmlPolicy: HtmlPolicy = 'safe',
 ): React.ReactNode[] {
   let autoKeySeed = 0
@@ -183,7 +184,7 @@ function createReactElement(
   tagName: string,
   attrs: Record<string, string>,
   children: React.ReactNode[],
-  customComponents: Record<string, ComponentType<any>>,
+  customComponents: CustomComponentMap,
   autoKey: string,
   htmlPolicy: HtmlPolicy,
 ): React.ReactNode {
@@ -207,7 +208,7 @@ function createReactElement(
     // It's a custom React component
     const component = customComponents[tagName] || customComponents[tagName.toLowerCase()]
     const convertedAttrs = convertAttrsToProps(sanitizedAttrs)
-    return React.createElement(component as ComponentType<any>, { ...convertedAttrs, key: elementKey }, ...children)
+    return React.createElement(component as ComponentType<Record<string, unknown>>, { ...convertedAttrs, key: elementKey }, ...children)
   }
   else {
     // It's a standard HTML element
@@ -220,7 +221,7 @@ function createReactElement(
  */
 function parseHtmlToReactNodes(
   content: string,
-  customComponents: Record<string, ComponentType<any>>,
+  customComponents: CustomComponentMap,
   htmlPolicy: HtmlPolicy = 'safe',
 ): React.ReactNode[] | null {
   if (!content)

@@ -124,7 +124,7 @@ export function parseList(
           trimInlineTokenTail(contentToken)
           itemChildren.push({
             type: 'paragraph',
-            children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken, options as any),
+            children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken, options),
             raw: String(contentToken.content ?? ''),
           })
           k += 3 // Skip paragraph_open, inline, paragraph_close

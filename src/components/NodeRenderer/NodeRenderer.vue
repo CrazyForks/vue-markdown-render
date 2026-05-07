@@ -2,6 +2,7 @@
 import type { HtmlPolicy, MarkdownIt, ParsedNode } from 'stream-markdown-parser'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { CustomComponents } from '../../types'
+import type { CodeBlockPreviewPayload } from '../../types/component-props'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
@@ -99,8 +100,13 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
   liveNodeBuffer: 60,
 })
 
-// 定义事件
-const emit = defineEmits(['copy', 'handleArtifactClick', 'click', 'mouseover', 'mouseout'])
+const emit = defineEmits<{
+  (e: 'copy', code: string): void
+  (e: 'handleArtifactClick', payload: CodeBlockPreviewPayload): void
+  (e: 'click', event: MouseEvent): void
+  (e: 'mouseover', event: MouseEvent): void
+  (e: 'mouseout', event: MouseEvent): void
+}>()
 const MAX_DEFERRED_NODE_COUNT = 900
 const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200

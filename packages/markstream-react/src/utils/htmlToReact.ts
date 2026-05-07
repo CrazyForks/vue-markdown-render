@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
 import type { HtmlPolicy } from 'stream-markdown-parser'
+import type { CustomComponentMap } from '../customComponents'
 import React from 'react'
 import {
   BLOCKED_HTML_TAGS as BLOCKED_TAGS,
@@ -42,7 +43,7 @@ function parseInlineStyle(style: string): Record<string, string> | undefined {
 }
 
 export function normalizeDomAttrs(attrs: Record<string, string>) {
-  const next: Record<string, any> = { ...attrs }
+  const next: Record<string, unknown> = { ...attrs }
   if (Object.prototype.hasOwnProperty.call(next, 'class')) {
     next.className = next.class
     delete next.class
@@ -66,14 +67,14 @@ export const sanitizeHtmlAttrs = sanitizeHtmlAttrsBase
 
 export function isCustomHtmlComponent(
   tagName: string,
-  customComponents: Record<string, ComponentType<any>>,
+  customComponents: CustomComponentMap,
 ) {
   return isCustomHtmlComponentTag(tagName, customComponents as Record<string, unknown>)
 }
 
 export function hasCustomHtmlComponents(
   content: string,
-  customComponents: Record<string, ComponentType<any>>,
+  customComponents: CustomComponentMap,
 ) {
   return hasCustomHtmlComponentsBase(content, customComponents as Record<string, unknown>)
 }
@@ -97,7 +98,7 @@ function pushRenderedNode(target: ReactNode[], rendered: ReactNode | ReactNode[]
 
 export function parseHtmlToReactNodes(
   content: string,
-  customComponents: Record<string, ComponentType<any>>,
+  customComponents: CustomComponentMap,
   htmlPolicy: HtmlPolicy = 'safe',
 ): ReactNode[] | null {
   if (!content)
@@ -144,7 +145,7 @@ export function parseHtmlToReactNodes(
           : undefined
         const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
         if (Comp) {
-          target.push(React.createElement(Comp, { ...attrs, key: elementKey }))
+          target.push(React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...attrs, key: elementKey }))
         }
         else {
           target.push(React.createElement(token.tagName, {
@@ -194,7 +195,7 @@ export function parseHtmlToReactNodes(
         ? (customComponents[opening.tagName] || customComponents[opening.tagName.toLowerCase()])
         : undefined
       const element = Comp
-        ? React.createElement(Comp, { ...attrs, key: elementKey }, ...opening.children)
+        ? React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...attrs, key: elementKey }, ...opening.children)
         : React.createElement(opening.tagName, {
             ...normalizeDomAttrs(attrs),
             key: elementKey,
@@ -226,7 +227,7 @@ export function parseHtmlToReactNodes(
         ? (customComponents[unclosed.tagName] || customComponents[unclosed.tagName.toLowerCase()])
         : undefined
       const element = Comp
-        ? React.createElement(Comp, { ...attrs, key: elementKey }, ...unclosed.children)
+        ? React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...attrs, key: elementKey }, ...unclosed.children)
         : React.createElement(unclosed.tagName, {
             ...normalizeDomAttrs(attrs),
             key: elementKey,

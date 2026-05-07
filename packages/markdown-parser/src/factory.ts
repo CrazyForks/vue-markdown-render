@@ -46,7 +46,7 @@ export function factory(opts: FactoryOptions = {}) {
   // Fix indented code blocks that should be paragraphs (streaming scenario)
   if (opts.enableFixIndentedCodeBlock !== false)
     applyFixIndentedCodeBlock(md)
-  // Retain the core-stage fix as a fallback for any cases the inline
+  // Retain the core-stage fix as a fallback for cases the inline
   // tokenizer does not handle.
   applyFixLinkTokens(md)
   // Also apply strong-token normalization at the same stage.

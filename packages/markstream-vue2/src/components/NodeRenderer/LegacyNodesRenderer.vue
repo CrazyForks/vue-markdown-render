@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BaseNode, HtmlPolicy, ParsedNode } from 'stream-markdown-parser'
+import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload } from '../../types/component-props'
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
 import { computed } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
@@ -45,14 +46,14 @@ const props = withDefaults(defineProps<{
   typewriter?: boolean
   showTooltips?: boolean
   codeBlockStream?: boolean
-  codeBlockDarkTheme?: any
-  codeBlockLightTheme?: any
-  codeBlockMonacoOptions?: Record<string, any>
+  codeBlockDarkTheme?: CodeBlockMonacoTheme
+  codeBlockLightTheme?: CodeBlockMonacoTheme
+  codeBlockMonacoOptions?: CodeBlockMonacoOptions
   codeBlockMinWidth?: string | number
   codeBlockMaxWidth?: string | number
-  codeBlockProps?: Record<string, any>
+  codeBlockProps?: Partial<Omit<CodeBlockNodeProps, 'node'>>
   renderCodeBlocksAsPre?: boolean
-  themes?: string[]
+  themes?: CodeBlockMonacoTheme[]
   isDark?: boolean
   customHtmlTags?: readonly string[]
   htmlPolicy?: HtmlPolicy
@@ -62,7 +63,11 @@ const props = withDefaults(defineProps<{
   typewriter: true,
 })
 
-const emit = defineEmits(['copy', 'handleArtifactClick'])
+const emit = defineEmits<{
+  (e: 'copy', code: string): void
+  (e: 'handleArtifactClick', payload: CodeBlockPreviewPayload): void
+  (e: 'click', event: MouseEvent): void
+}>()
 
 const nodeComponents = {
   text: TextNode,
@@ -252,7 +257,7 @@ function getBindingsFor(node: ParsedNode, language?: string) {
 }
 
 function handleClick(event: MouseEvent) {
-  emit('handleArtifactClick', event)
+  emit('click', event)
 }
 </script>
 

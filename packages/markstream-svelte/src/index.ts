@@ -44,7 +44,12 @@ export {
   resolveParsedNodes,
 } from './components/shared/node-helpers'
 export type {
+  CodeBlockPreviewPayload,
+  NodeRendererCodeBlockProps,
+  NodeRendererD2Props,
   NodeRendererEvents,
+  NodeRendererInfographicProps,
+  NodeRendererMermaidProps,
   NodeRendererProps,
   SvelteRenderableNode,
   SvelteRenderContext,

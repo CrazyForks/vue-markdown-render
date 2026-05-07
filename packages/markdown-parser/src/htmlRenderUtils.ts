@@ -8,6 +8,7 @@ import {
 } from './htmlTags'
 
 export type HtmlPolicy = 'escape' | 'safe' | 'trusted'
+export type HtmlPropValue = string | number | boolean
 
 export interface HtmlToken {
   type: 'text' | 'tag_open' | 'tag_close' | 'self_closing'
@@ -270,7 +271,7 @@ export function sanitizeHtmlTokenAttrs(
   return pairs.length > 0 ? pairs : undefined
 }
 
-export function convertHtmlPropValue(value: string, key: string): any {
+export function convertHtmlPropValue(value: string, key: string): HtmlPropValue {
   const lowerKey = key.toLowerCase()
 
   if (['checked', 'disabled', 'readonly', 'required', 'autofocus', 'multiple', 'hidden'].includes(lowerKey))
@@ -286,7 +287,7 @@ export function convertHtmlPropValue(value: string, key: string): any {
 }
 
 export function convertHtmlAttrsToProps(attrs: Record<string, string>) {
-  const result: Record<string, any> = {}
+  const result: Record<string, HtmlPropValue> = {}
   for (const [key, value] of Object.entries(attrs))
     result[key] = convertHtmlPropValue(value, key)
   return result

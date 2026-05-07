@@ -1,3 +1,5 @@
+import type { NodeRendererCodeBlockProps, NodeRendererD2Props, NodeRendererInfographicProps, NodeRendererMermaidProps } from './components/shared/node-helpers'
+import type { CodeBlockMonacoOptions } from './types/monaco'
 import { getD2 } from './optional/d2'
 import { getInfographic } from './optional/infographic'
 import { getKatex } from './optional/katex'
@@ -55,14 +57,14 @@ export interface EnhanceRenderedHtmlOptions {
   final?: boolean
   isDark?: boolean
   renderCodeBlocksAsPre?: boolean
-  monacoOptions?: Record<string, any>
+  monacoOptions?: CodeBlockMonacoOptions
   d2ThemeId?: number | null
   d2DarkThemeId?: number | null
   showTooltips?: boolean
-  codeBlockProps?: Record<string, any>
-  mermaidProps?: Record<string, any>
-  d2Props?: Record<string, any>
-  infographicProps?: Record<string, any>
+  codeBlockProps?: NodeRendererCodeBlockProps
+  mermaidProps?: NodeRendererMermaidProps
+  d2Props?: NodeRendererD2Props
+  infographicProps?: NodeRendererInfographicProps
   onCopy?: (code: string) => void
   isCancelled?: () => boolean
 }
@@ -347,7 +349,8 @@ async function renderMermaid(
       shell.body.innerHTML = safeSvg
       shell.body.classList.add('markstream-angular-mermaid')
       shell.wrapper.dataset.markstreamMermaid = '1'
-      rendered?.bindFunctions?.(shell.body)
+      if (typeof rendered !== 'string')
+        rendered?.bindFunctions?.(shell.body)
       cleanupFns.push(() => {
         if (shell.wrapper.isConnected)
           shell.wrapper.replaceWith(originalPre.cloneNode(true))

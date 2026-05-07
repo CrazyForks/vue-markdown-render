@@ -6,7 +6,7 @@ export function applyFixTableTokens(md: MarkdownIt) {
   // children) are present. We replace the token array with the
   // fixed version returned by `fixTableTokens`.
   md.core.ruler.after('block', 'fix_table_tokens', (state: unknown) => {
-    const s = state as unknown as { tokens?: any[] }
+    const s = state as unknown as { tokens?: MarkdownToken[] }
     try {
       const toks = s.tokens ?? []
       const fixed = fixTableTokens(toks)

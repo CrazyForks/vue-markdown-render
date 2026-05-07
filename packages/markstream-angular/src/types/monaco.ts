@@ -9,7 +9,7 @@ export interface CodeBlockMonacoThemeObject {
 
 export type CodeBlockMonacoTheme = string | CodeBlockMonacoThemeObject
 
-export type CodeBlockMonacoLanguage = string | ((...args: any[]) => unknown)
+export type CodeBlockMonacoLanguage = string | ((...args: unknown[]) => unknown)
 
 export interface CodeBlockDiffHideUnchangedRegionsOptions {
   enabled?: boolean
@@ -73,6 +73,6 @@ export interface CodeBlockMonacoOptions {
   diffHunkActionsOnHover?: boolean
   diffHunkHoverHideDelayMs?: number
   onDiffHunkAction?: (context: CodeBlockDiffHunkActionContext) => void | boolean | Promise<void | boolean>
-  scrollbar?: Record<string, any>
-  [key: string]: any
+  scrollbar?: Record<string, unknown>
+  [key: string]: unknown
 }

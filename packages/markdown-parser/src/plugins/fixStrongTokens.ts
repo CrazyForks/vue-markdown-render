@@ -6,7 +6,7 @@ export function applyFixStrongTokens(md: MarkdownIt) {
   // each inline token's children. This ensures downstream inline
   // parsers receive a normalized token list.
   md.core.ruler.after('inline', 'fix_strong_tokens', (state: unknown) => {
-    const s = state as unknown as { tokens?: Array<{ type?: string, children?: any[] }> }
+    const s = state as unknown as { tokens?: MarkdownToken[] }
     const toks = s.tokens ?? []
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i]

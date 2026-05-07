@@ -16,6 +16,12 @@ interface CustomTagOpen {
   openEnd: number
 }
 
+type HydratableNode = BaseNode & {
+  tag?: string
+  content?: string
+  [key: string]: unknown
+}
+
 const TAG_TOKEN_RE = /<\/?([A-Z][\w:-]*)(?:\s[^<>]*)?>/gi
 
 export function hydrateCustomTagContent<T extends BaseNode>(
@@ -35,7 +41,7 @@ export function hydrateCustomTagContent<T extends BaseNode>(
   let segmentIndex = 0
   const cloned = nodes.map(node => cloneNodeTree(node))
 
-  const visitNode = (node: any) => {
+  const visitNode = (node: HydratableNode) => {
     if (!node || typeof node !== 'object')
       return
 
@@ -55,8 +61,10 @@ export function hydrateCustomTagContent<T extends BaseNode>(
     for (const value of Object.values(node)) {
       if (!Array.isArray(value))
         continue
-      for (const child of value)
-        visitNode(child)
+      for (const child of value) {
+        if (child && typeof child === 'object')
+          visitNode(child as HydratableNode)
+      }
     }
   }
 
@@ -150,7 +158,7 @@ function consumeNextSegment(
   return null
 }
 
-function resolveCustomTagName(node: Record<string, any>, tagSet: Set<string>) {
+function resolveCustomTagName(node: Record<string, unknown>, tagSet: Set<string>) {
   const byTag = normalizeTagName(node.tag)
   if (byTag && tagSet.has(byTag))
     return byTag
@@ -165,12 +173,13 @@ function cloneNodeTree<T extends BaseNode>(node: T): T {
 
   const cloned = Array.isArray(node)
     ? node.map(item => cloneNodeTree(item)) as unknown as T
-    : { ...(node as any) }
+    : { ...node }
 
   if (!Array.isArray(cloned)) {
     for (const [key, value] of Object.entries(cloned as Record<string, unknown>)) {
-      if (Array.isArray(value))
-        (cloned as any)[key] = value.map(item => cloneNodeTree(item as BaseNode))
+      if (Array.isArray(value)) {
+        (cloned as Record<string, unknown>)[key] = value.map(item => cloneNodeTree(item as BaseNode))
+      }
     }
   }
 

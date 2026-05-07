@@ -1,9 +1,11 @@
 import type React from 'react'
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { CustomComponentMap } from './customComponents'
 import type {
   CodeBlockMonacoOptions,
   CodeBlockMonacoTheme,
   CodeBlockNodeProps,
+  CodeBlockPreviewPayload,
   D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,
@@ -57,7 +59,7 @@ export interface NodeRendererProps {
   maxLiveNodes?: number
   liveNodeBuffer?: number
   onCopy?: (code: string) => void
-  onHandleArtifactClick?: (payload: any) => void
+  onHandleArtifactClick?: (payload: CodeBlockPreviewPayload) => void
   onClick?: (event: React.MouseEvent<HTMLDivElement>) => void
   onMouseOver?: (event: React.MouseEvent<HTMLElement>) => void
   onMouseOut?: (event: React.MouseEvent<HTMLElement>) => void
@@ -70,7 +72,7 @@ export interface RenderContext {
   typewriter?: boolean
   textStreamState?: Map<string, string>
   streamRenderVersion?: number
-  customComponents?: Record<string, React.ComponentType<any>>
+  customComponents?: CustomComponentMap
   customHtmlTags?: readonly string[]
   htmlPolicy?: HtmlPolicy
   codeBlockProps?: NodeRendererCodeBlockProps
@@ -90,7 +92,7 @@ export interface RenderContext {
   }
   events: {
     onCopy?: (code: string) => void
-    onHandleArtifactClick?: (payload: any) => void
+    onHandleArtifactClick?: (payload: CodeBlockPreviewPayload) => void
   }
 }
 

@@ -1,4 +1,4 @@
-export type MermaidLoader = () => Promise<any> | any
+export type MermaidLoader = () => Promise<unknown> | unknown
 
 const defaultMermaidLoader: MermaidLoader = () => import('mermaid')
 const GLOBAL_MERMAID_KEY = '__MARKSTREAM_ANGULAR_MERMAID__'
@@ -6,10 +6,33 @@ const GLOBAL_MERMAID_KEY = '__MARKSTREAM_ANGULAR_MERMAID__'
 let cachedMermaid: any = null
 let importAttempted = false
 let lastInitKey: string | null = null
-let pendingImport: Promise<any | null> | null = null
+let pendingImport: Promise<MermaidModule | null> | null = null
 let mermaidLoader: MermaidLoader | null = defaultMermaidLoader
 
-function computeInitKey(config: Record<string, any>) {
+export interface MermaidModule {
+  render: (id: string, source: string) => Promise<MermaidRenderResult> | MermaidRenderResult
+  parse?: (source: string) => Promise<unknown> | unknown
+  initialize?: (config?: Record<string, unknown>) => unknown
+  mermaidAPI?: {
+    render?: MermaidModule['render']
+    parse?: MermaidModule['parse']
+    initialize?: MermaidModule['initialize']
+  }
+}
+
+export type MermaidRenderResult = string | {
+  svg?: string
+  bindFunctions?: (element: Element) => unknown
+}
+
+interface MermaidInitConfig extends Record<string, unknown> {
+  securityLevel?: unknown
+  flowchart?: {
+    htmlLabels?: unknown
+  }
+}
+
+function computeInitKey(config: MermaidInitConfig) {
   const securityLevel = String(config?.securityLevel ?? 'strict')
   const htmlLabels = config?.flowchart?.htmlLabels
   return `${securityLevel}|htmlLabels:${htmlLabels === false ? '0' : '1'}`
@@ -34,13 +57,13 @@ function normalizeMermaidModule(mod: any) {
           return candidate.initialize(opts)
         return api.initialize ? api.initialize(opts) : undefined
       },
-    }
+    } as MermaidModule
   }
 
   if (mod?.mermaid && typeof mod.mermaid.render === 'function')
-    return mod.mermaid
+    return mod.mermaid as MermaidModule
 
-  return candidate
+  return candidate as MermaidModule
 }
 
 function patchInitialize(target: any) {
@@ -63,7 +86,7 @@ function patchInitialize(target: any) {
   }
 }
 
-function ensureInitialized(instance: any, config?: Record<string, any>) {
+function ensureInitialized(instance: any, config?: MermaidInitConfig) {
   if (!instance || !config)
     return
 
@@ -132,7 +155,7 @@ export function isMermaidEnabled() {
   return typeof mermaidLoader === 'function'
 }
 
-export async function getMermaid(initConfig?: Record<string, any>) {
+export async function getMermaid(initConfig?: MermaidInitConfig): Promise<MermaidModule | null> {
   if (cachedMermaid) {
     ensureInitialized(cachedMermaid, initConfig)
     return cachedMermaid

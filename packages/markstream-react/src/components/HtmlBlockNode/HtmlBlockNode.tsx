@@ -1,4 +1,5 @@
-import type { HtmlPolicy } from 'stream-markdown-parser'
+import type { HtmlPolicy, ParsedNode } from 'stream-markdown-parser'
+import type { CustomComponentMap } from '../../customComponents'
 import type { NodeComponentProps } from '../../types/node-component'
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { isHtmlTagBlocked, NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs } from 'stream-markdown-parser'
@@ -20,10 +21,10 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   raw?: string
   tag?: string
   attrs?: [string, string | null][] | null
-  children?: any[]
+  children?: ParsedNode[]
   loading?: boolean
 }> & {
-  customComponents?: Record<string, React.ComponentType<any>>
+  customComponents?: CustomComponentMap
   htmlPolicy?: HtmlPolicy
   placeholder?: React.ReactNode
 }) {

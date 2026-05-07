@@ -90,7 +90,7 @@ const KNOWN_NODE_TYPES = new Set([
 export function renderMarkdownToHtml(input: MarkstreamAngularRenderOptions): string {
   const normalizedTags = normalizeCustomHtmlTags([
     ...(input.customHtmlTags || []),
-    ...((((input.parseOptions as any)?.customHtmlTags) || []) as string[]),
+    ...(input.parseOptions?.customHtmlTags || []),
   ])
   const ctx = createRenderContext({
     allowHtml: input.allowHtml,
@@ -135,7 +135,7 @@ function resolveParsedNodes(input: MarkstreamAngularRenderOptions, ctx: RenderCo
 
   const normalizedTags = normalizeCustomHtmlTags([
     ...(input.customHtmlTags || []),
-    ...((((input.parseOptions as any)?.customHtmlTags) || []) as string[]),
+    ...(input.parseOptions?.customHtmlTags || []),
   ])
   const mergedParseOptions: ParseOptions = {
     ...(input.parseOptions ?? {}),
@@ -143,7 +143,7 @@ function resolveParsedNodes(input: MarkstreamAngularRenderOptions, ctx: RenderCo
   if (typeof input.final === 'boolean')
     mergedParseOptions.final = input.final
   if (normalizedTags.length > 0)
-    (mergedParseOptions as any).customHtmlTags = normalizedTags
+    mergedParseOptions.customHtmlTags = normalizedTags
 
   return hydrateCustomTagContent(
     parseMarkdownToStructure(content, ctx.markdown, mergedParseOptions) as RenderableMarkdownNode[],

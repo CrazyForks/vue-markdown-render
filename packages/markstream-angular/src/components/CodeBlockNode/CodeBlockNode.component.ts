@@ -1,4 +1,5 @@
 import type { AfterViewInit, ElementRef, OnChanges, OnDestroy } from '@angular/core'
+import type { CodeBlockMonacoTheme } from '../../types/monaco'
 import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
 import {
@@ -25,7 +26,7 @@ interface MonacoHelpers {
   safeClean?: () => void
   getEditorView?: () => any
   getDiffEditorView?: () => any
-  setTheme?: (theme?: string) => Promise<unknown> | unknown
+  setTheme?: (theme?: CodeBlockMonacoTheme) => Promise<unknown> | unknown
 }
 
 @Component({

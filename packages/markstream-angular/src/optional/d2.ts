@@ -1,10 +1,23 @@
-export type D2Loader = () => Promise<any> | any
+export interface D2Instance {
+  D2?: D2Constructor
+  compile?: (source: string, options?: Record<string, unknown>) => Promise<unknown> | unknown
+  render?: (input: unknown, options?: Record<string, unknown>) => Promise<unknown> | unknown
+}
+
+export interface D2Constructor {
+  new (): D2Instance
+  D2?: D2Constructor
+  compile?: D2Instance['compile']
+}
+
+export type D2Module = D2Constructor | D2Instance
+export type D2Loader = () => Promise<unknown> | unknown
 
 const defaultD2Loader: D2Loader = () => import('@terrastruct/d2')
 
 let cachedD2: any = null
 let d2Loader: D2Loader | null = defaultD2Loader
-let pendingImport: Promise<any | null> | null = null
+let pendingImport: Promise<unknown | null> | null = null
 
 function resetCachedD2() {
   cachedD2 = null
@@ -43,7 +56,7 @@ export function isD2Enabled() {
   return typeof d2Loader === 'function'
 }
 
-export async function getD2() {
+export async function getD2(): Promise<D2Module | null> {
   if (cachedD2)
     return cachedD2
   if (pendingImport)

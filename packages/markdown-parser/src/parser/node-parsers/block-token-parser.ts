@@ -1,4 +1,4 @@
-import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions, VmrContainerNode } from '../../types'
+import type { AdmonitionNode, InternalParseOptions, MarkdownToken, ParagraphNode, ParsedNode, ParseOptions, VmrContainerNode } from '../../types'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes } from '../../htmlTagUtils'
 import { normalizeCustomTag } from '../customHtmlTags'
 import { buildAllowedHtmlTagSet } from '../index'
@@ -46,7 +46,7 @@ function getHtmlTagSets(customTags?: readonly string[]) {
     return entry
   }
   const entry = {
-    allowedTagSet: buildAllowedHtmlTagSet({ customHtmlTags: customTags as any }),
+    allowedTagSet: buildAllowedHtmlTagSet({ customHtmlTags: customTags }),
     customTagSet: new Set(normalized),
   }
   HTML_TAG_SET_CACHE.set(customTags, entry)
@@ -56,7 +56,7 @@ function getHtmlTagSets(customTags?: readonly string[]) {
 function parseVmrContainer(
   tokens: MarkdownToken[],
   index: number,
-  options?: ParseOptions,
+  options?: InternalParseOptions,
 ): [VmrContainerNode, number] {
   const openToken = tokens[index]
 
@@ -101,7 +101,7 @@ function parseVmrContainer(
         const childrenArr = (contentToken.children as MarkdownToken[]) || []
         children.push({
           type: 'paragraph',
-          children: parseInlineTokens(childrenArr || [], undefined, undefined, options as any),
+          children: parseInlineTokens(childrenArr || [], undefined, undefined, options),
           raw: String(contentToken.content ?? ''),
         })
       }
@@ -332,7 +332,7 @@ function lineToIndex(source: string, line: number) {
 export function parseBasicBlockToken(
   tokens: MarkdownToken[],
   index: number,
-  options?: ParseOptions,
+  options?: InternalParseOptions,
 ): [ParsedNode, number] | null {
   const token = tokens[index]
   switch (token.type) {
@@ -353,14 +353,15 @@ export function parseBasicBlockToken(
       const htmlBlockNode = parseHtmlBlock(token)
       const tagSets = htmlBlockNode.tag ? getHtmlTagSets(options?.customHtmlTags) : null
       if (htmlBlockNode.tag && htmlBlockNode.loading && tagSets && !tagSets.allowedTagSet.has(htmlBlockNode.tag)) {
-        const raw = String((token as any)?.content ?? '')
+        const raw = String(token.content ?? '')
         const content = raw.replace(/\n+$/, '')
+        const paragraphNode: ParagraphNode = {
+          type: 'paragraph',
+          children: content ? [{ type: 'text', content, raw: content }] : [],
+          raw: content,
+        }
         return [
-          {
-            type: 'paragraph',
-            children: content ? [{ type: 'text', content, raw: content }] : [],
-            raw: content,
-          } as any,
+          paragraphNode,
           index + 1,
         ]
       }
@@ -368,20 +369,20 @@ export function parseBasicBlockToken(
         const tag = htmlBlockNode.tag
         // markdown-it can normalize html_block token.content and lose original lines.
         // Re-extract the next full <tag>...</tag> block from the original source.
-        const source = String((options as any)?.__sourceMarkdown ?? '')
-        const cursor = Number((options as any)?.__customHtmlBlockCursor ?? 0)
+        const source = String((options)?.__sourceMarkdown ?? '')
+        const cursor = Number((options)?.__customHtmlBlockCursor ?? 0)
 
         // If markdown-it provides a source map for this token, prefer anchoring the
         // re-extraction to that line range. This avoids accidentally matching an
         // earlier occurrence of the same custom tag that was tokenized as inline.
-        const mappedLineStart = Array.isArray((token as any).map)
-          ? lineToIndex(source, Number((token as any).map?.[0] ?? 0))
+        const mappedLineStart = Array.isArray(token.map)
+          ? lineToIndex(source, Number(token.map?.[0] ?? 0))
           : 0
         const searchStart = Math.max(clampNonNegative(cursor), clampNonNegative(mappedLineStart))
 
         const fromSource = findNextCustomHtmlBlockFromSource(source, tag, searchStart)
-        if (fromSource)
-          (options as any).__customHtmlBlockCursor = fromSource.end
+        if (fromSource && options)
+          (options).__customHtmlBlockCursor = fromSource.end
 
         const rawHtml = String(fromSource?.raw ?? htmlBlockNode.raw ?? '')
 

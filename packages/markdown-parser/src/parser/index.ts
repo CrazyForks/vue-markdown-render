@@ -1,5 +1,5 @@
 import type { MarkdownIt, Token } from 'markdown-it-ts'
-import type { MarkdownToken, ParsedNode, ParseOptions } from '../types'
+import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, ParseOptions } from '../types'
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
@@ -11,6 +11,16 @@ import { parseHardBreak } from './node-parsers/hardbreak-parser'
 import { parseHtmlBlock } from './node-parsers/html-block-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
+
+type ParsedNodeWithFields = ParsedNode & {
+  children?: ParsedNode[]
+  content?: unknown
+  tag?: unknown
+}
+
+function getNodeFields(node: ParsedNode) {
+  return node as ParsedNodeWithFields
+}
 
 function getCustomHtmlTagSet(options?: ParseOptions) {
   const custom = options?.customHtmlTags
@@ -34,15 +44,15 @@ export function buildAllowedHtmlTagSet(options?: ParseOptions) {
 }
 
 function stringifyInlineNodeRaw(node: ParsedNode) {
-  const raw = (node as any)?.raw
+  const raw = node.raw
   if (typeof raw === 'string')
     return raw
 
-  const content = (node as any)?.content
+  const content = getNodeFields(node).content
   if (typeof content === 'string')
     return content
 
-  if ((node as any)?.type === 'hardbreak')
+  if (node.type === 'hardbreak')
     return '<br>'
 
   return ''
@@ -60,7 +70,8 @@ function maybePromoteCustomNodeFromParagraph(node: ParsedNode, options?: ParseOp
   if (node.type !== 'paragraph')
     return null
 
-  const children = Array.isArray((node as any).children) ? ((node as any).children as ParsedNode[]) : []
+  const nodeChildren = getNodeFields(node).children
+  const children: ParsedNode[] = Array.isArray(nodeChildren) ? nodeChildren : []
   if (children.length === 0)
     return null
 
@@ -75,7 +86,7 @@ function maybePromoteCustomNodeFromParagraph(node: ParsedNode, options?: ParseOp
       continue
 
     const prefixChildren = children.slice(0, i)
-    const childContent = String((child as any)?.content ?? '')
+    const childContent = String(getNodeFields(child).content ?? '')
     if (!childContent.trim())
       continue
     const prefixHasHardbreak = prefixChildren.some(prefixChild => prefixChild?.type === 'hardbreak')
@@ -129,11 +140,11 @@ function parseStandaloneHtmlDocument(markdown: string): ParsedNode[] | null {
 }
 
 function getMergeableNodeRaw(node: ParsedNode) {
-  const raw = (node as any)?.raw
+  const raw = node.raw
   if (typeof raw === 'string')
     return raw
 
-  const content = (node as any)?.content
+  const content = getNodeFields(node).content
   if (typeof content === 'string')
     return content
 
@@ -144,7 +155,7 @@ function isCloseOnlyHtmlBlockForTag(node: ParsedNode, tag: string) {
   if (node.type !== 'html_block' || !tag)
     return false
 
-  const raw = String((node as any)?.raw ?? (node as any)?.content ?? '')
+  const raw = String(node.raw ?? node.content ?? '')
   return new RegExp(String.raw`^\s*<\s*\/\s*${escapeTagForRegExp(tag)}\s*>\s*$`, 'i').test(raw)
 }
 
@@ -305,19 +316,19 @@ function extendHtmlBlockCloseToLineEnding(source: string, startIndex: number) {
   return startIndex
 }
 
-function isDetailsOpenHtmlBlock(node: ParsedNode) {
+function isDetailsOpenHtmlBlock(node: ParsedNode): node is HtmlBlockNode {
   if (node.type !== 'html_block')
     return false
-  if (String((node as any).tag ?? '').toLowerCase() !== 'details')
+  if (String(node.tag ?? '').toLowerCase() !== 'details')
     return false
-  const raw = String((node as any).raw ?? (node as any).content ?? '')
+  const raw = String(node.raw ?? node.content ?? '')
   return /^\s*<details\b/i.test(raw)
 }
 
-function isDetailsCloseHtmlBlock(node: ParsedNode) {
+function isDetailsCloseHtmlBlock(node: ParsedNode): node is HtmlBlockNode {
   if (node.type !== 'html_block')
     return false
-  const raw = String((node as any).raw ?? (node as any).content ?? '')
+  const raw = String(node.raw ?? node.content ?? '')
   return /^\s*<\/details\b/i.test(raw)
 }
 
@@ -373,7 +384,8 @@ function shouldStructureGenericHtmlBlockChildren(
   if (children.some((child) => {
     if (child?.type !== 'html_block')
       return false
-    return Array.isArray((child as any)?.children) && (child as any).children.length > 0
+    const childFields = getNodeFields(child)
+    return Array.isArray(childFields.children) && childFields.children.length > 0
   })) {
     return true
   }
@@ -398,11 +410,12 @@ function structureGenericHtmlBlockChildren(
     if (node?.type !== 'html_block')
       return node
 
-    const tag = String((node as any)?.tag ?? '').toLowerCase()
-    if (!tag || tag === 'details' || NON_STRUCTURING_HTML_TAGS.has(tag) || Array.isArray((node as any)?.children))
+    const fields = getNodeFields(node)
+    const tag = String(fields.tag ?? '').toLowerCase()
+    if (!tag || tag === 'details' || NON_STRUCTURING_HTML_TAGS.has(tag) || Array.isArray(fields.children))
       return node
 
-    const raw = String((node as any)?.raw ?? (node as any)?.content ?? '')
+    const raw = String(node.raw ?? fields.content ?? '')
     if (!raw)
       return node
 
@@ -526,7 +539,7 @@ function combineStructuredDetailsHtmlBlocks(
       continue
     }
 
-    const openRaw = String((node as any).raw ?? getMergeableNodeRaw(node) ?? '')
+    const openRaw = String(node.raw ?? getMergeableNodeRaw(node) ?? '')
     const openStart = nodePos !== -1 ? nodePos : source.indexOf(openRaw, Math.max(0, cursor - openRaw.length))
     if (openStart === -1) {
       merged.push(node)
@@ -579,7 +592,7 @@ function combineStructuredDetailsHtmlBlocks(
 
     const closeRaw = closeIndex === -1
       ? '</details>'
-      : String((nodes[closeIndex] as any)?.raw ?? getMergeableNodeRaw(nodes[closeIndex]) ?? '</details>')
+      : String(nodes[closeIndex].raw ?? getMergeableNodeRaw(nodes[closeIndex]) ?? '</details>')
     const explicitClose = selfContained || (closeIndex !== -1 && exact?.closed === true)
     const trimmedCloseRaw = closeRaw.replace(/[\t\r\n ]+$/, '')
     const closeStart = explicitClose
@@ -596,7 +609,7 @@ function combineStructuredDetailsHtmlBlocks(
     const middleTokens = md.parse(middleSource, { __markstreamFinal: final }) as unknown as MarkdownToken[]
     const renderedMiddle = md.renderer.render(
       middleTokens as unknown as Token[],
-      (md as any).options,
+      md.options,
       { __markstreamFinal: final },
     )
     const closeMarkupEnd = closeStart + trimmedCloseRaw.length
@@ -615,7 +628,7 @@ function combineStructuredDetailsHtmlBlocks(
       : openRaw
 
     merged.push({
-      ...(node as any),
+      ...node,
       tag: 'details',
       attrs: parseTagAttrs(openRaw.slice(0, openTagEndIndex + 1)),
       raw: mergedRaw,
@@ -642,7 +655,7 @@ function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, sourc
   let sourceHtmlCursor = 0
 
   for (let i = 0; i < merged.length; i++) {
-    const node = merged[i] as any
+    const node = merged[i]
     const nodeRaw = getMergeableNodeRaw(node)
     const nodePos = nodeRaw ? source.indexOf(nodeRaw, sourceHtmlCursor) : -1
     if (node?.type !== 'html_block') {
@@ -651,7 +664,7 @@ function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, sourc
       continue
     }
 
-    const tag = String(node?.tag ?? '').toLowerCase()
+    const tag = String(node.tag ?? '').toLowerCase()
     if (!tag)
       continue
     if (tag === 'details') {
@@ -669,11 +682,11 @@ function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, sourc
       continue
     sourceHtmlCursor = exact.end
 
-    const currentContent = String(node?.content ?? nodeRaw)
-    const currentRaw = String(node?.raw ?? currentContent)
+    const currentContent = String(node.content ?? nodeRaw)
+    const currentRaw = String(node.raw ?? currentContent)
     const nextContent = buildHtmlBlockContent(exact.raw, tag, exact.closed)
     const desiredLoading = !final && !exact.closed
-    const needsExpansion = currentContent !== nextContent || currentRaw !== exact.raw || Boolean(node?.loading) !== desiredLoading
+    const needsExpansion = currentContent !== nextContent || currentRaw !== exact.raw || Boolean(node.loading) !== desiredLoading
     const exactOpenEnd = findTagCloseIndexOutsideQuotes(exact.raw)
     const exactOpenTag = exactOpenEnd === -1 ? '' : exact.raw.slice(0, exactOpenEnd + 1)
     const exactAttrs = exactOpenTag ? parseTagAttrs(exactOpenTag) : []
@@ -1991,13 +2004,13 @@ export function parseMarkdownToStructure(
   // bypass the tokenizer's link rule, e.g. synthetic links from fixLinkTokens).
   const mdAny = md as { options?: { validateLink?: (url: string) => boolean }, validateLink?: (url: string) => boolean }
   const validateLink = options.validateLink ?? mdAny.options?.validateLink ?? (typeof mdAny.validateLink === 'function' ? mdAny.validateLink : undefined)
-  const internalOptions = {
+  const internalOptions: InternalParseOptions = {
     ...options,
     validateLink,
     __markdownIt: md,
     __sourceMarkdown: safeMarkdown,
     __customHtmlBlockCursor: 0,
-  } as any
+  }
   let result = processTokens(transformedTokens, internalOptions)
 
   // Backwards compatible token-level post hook: if provided and returns
@@ -2151,7 +2164,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         //   historical behavior and emit them as top-level blocks (not wrapped in
         //   a paragraph), since they represent block-like HTML structures.
         {
-          const parsed = parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, options as any)
+          const parsed = parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, options)
           if (parsed.length === 0) {
             // no-op (matches previous behavior)
           }

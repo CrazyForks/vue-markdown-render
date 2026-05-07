@@ -40,7 +40,12 @@ export { ReferenceNodeComponent as ReferenceNode } from './components/ReferenceN
 export type {
   AngularRenderableNode,
   AngularRenderContext,
+  CodeBlockPreviewPayload,
+  NodeRendererCodeBlockProps,
+  NodeRendererD2Props,
   NodeRendererEvents,
+  NodeRendererInfographicProps,
+  NodeRendererMermaidProps,
   NodeRendererProps,
 } from './components/shared/node-helpers'
 export {
