@@ -1,4 +1,4 @@
-## [0.0.14-beta.4](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.4) (2026-05-06)
+## [0.0.14-beta.5](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.5) (2026-05-07)
 
 
 ### Bug Fixes
@@ -70,6 +70,7 @@
 * **image:** inline with math parse wrong ([edc7a44](https://github.com/Simon-He95/markstream-vue/commit/edc7a44d36598bb2ee2c0d3061a62c1201293646)), closes [#246](https://github.com/Simon-He95/markstream-vue/issues/246)
 * improve fullscreen diagram previews ([160622e](https://github.com/Simon-He95/markstream-vue/commit/160622efd6477befd798ebba3a870e0cd10ef2bb))
 * improve HTML tag matching to support uppercase tag names in inline parsing ([7a3342d](https://github.com/Simon-He95/markstream-vue/commit/7a3342dda33f71c3e9b41e1ceb8e23c6e3b12304))
+* improve markstream type inference ([058fed6](https://github.com/Simon-He95/markstream-vue/commit/058fed61379cd1f13acbb6f5369a9b222216d9f1))
 * improve mobile immersive preview layout ([6c72110](https://github.com/Simon-He95/markstream-vue/commit/6c721103c0b0ed8485840882ab01e23afe0408a1))
 * improve playground share url compression ([24443d9](https://github.com/Simon-He95/markstream-vue/commit/24443d94824818042fa3a132f13216d4e826d388))
 * improve reference detection in markdown parser and add related tests ([31e5b6e](https://github.com/Simon-He95/markstream-vue/commit/31e5b6eee57b85a838b0bdb2f71c29453c8d8902)), closes [#231](https://github.com/Simon-He95/markstream-vue/issues/231)
@@ -154,6 +155,7 @@
 * repair package entrypoints ([e2c1c21](https://github.com/Simon-He95/markstream-vue/commit/e2c1c214629f81bfe4ce67823d6d895936c8cfa6))
 * resolve dark mode not taking effect for code block rendering ([d402687](https://github.com/Simon-He95/markstream-vue/commit/d40268792a3da2f4b672ed851a28eba6164e60d3)), closes [#404](https://github.com/Simon-He95/markstream-vue/issues/404)
 * resolve issue 386 superscript html regressions ([e02d2ce](https://github.com/Simon-He95/markstream-vue/commit/e02d2cefed1531332f0c60294573a928cbe6c278))
+* resolve stream-markdown-parser in svelte package correctly ([db6ba7f](https://github.com/Simon-He95/markstream-vue/commit/db6ba7f7c1d7c5a88aaaec0d3dc86f14b54c2ef5))
 * restore dark mode for teleported layers and standalone components ([945a95b](https://github.com/Simon-He95/markstream-vue/commit/945a95b8914341b3d52545d1bef8019fdeb44422))
 * restore default infographic rendering ([00283b8](https://github.com/Simon-He95/markstream-vue/commit/00283b8db0daafe377ed09deeef5111d3022c66c))
 * restore mermaid gantt progressive preview ([38d6493](https://github.com/Simon-He95/markstream-vue/commit/38d64933ae6c1474a4e6e517f84dae69a87f6b5b)), closes [#367](https://github.com/Simon-He95/markstream-vue/issues/367)
@@ -301,6 +303,7 @@
 * improve link parsing to handle multiple adjacent links correctly ([42ba963](https://github.com/Simon-He95/markstream-vue/commit/42ba963fb1c7d100d5519f213622380255d3d349)), closes [#240](https://github.com/Simon-He95/markstream-vue/issues/240)
 * improve playground preview annotations ([848b652](https://github.com/Simon-He95/markstream-vue/commit/848b652b5b2d480bc256d6afec11496e0d66f4d6))
 * integrate Tailwind CSS support and update styles for markstream-react ([4e4db11](https://github.com/Simon-He95/markstream-vue/commit/4e4db117f8f951bfa18e852f33cd77748f85d98b))
+* make markstream-svelte Svelte 5 only ([5273412](https://github.com/Simon-He95/markstream-vue/commit/527341213462010d6ab4d9a9333350f20e81f781))
 * **markdown-code-block:** add showCollapseButton prop ([89a9150](https://github.com/Simon-He95/markstream-vue/commit/89a91509034b0c73c8a755a4882643dc5440b79f))
 * optimize streaming rendering across packages ([fd8975f](https://github.com/Simon-He95/markstream-vue/commit/fd8975f2b07c77f22ebd3c85a92b318aeca1b3a8))
 * overhaul docs experience and AI workflows ([4a56dad](https://github.com/Simon-He95/markstream-vue/commit/4a56dad430803f852fa44abd04a79d5fd1ce5e1e))
