@@ -1087,7 +1087,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  height: 100vh;
   padding: 20px;
   transition: padding-right 0.3s ease;
 }
@@ -1100,7 +1100,7 @@ onBeforeUnmount(() => {
 .chat-container {
   width: 100%;
   max-width: 960px;
-  min-height: calc(100vh - 40px);
+  height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1331,9 +1331,9 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   flex-direction: column-reverse;
-  overflow-y: visible;
+  overflow-y: auto;
   scroll-behavior: smooth;
-  overscroll-behavior: auto;
+  overscroll-behavior: contain;
 }
 
 .chat-messages > .markdown-renderer {
@@ -1373,7 +1373,7 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
   .chat-wrapper { padding: 10px; }
   .chat-wrapper--with-sidebar { padding-right: 10px; }
-  .chat-container { border-radius: 18px; min-height: calc(100vh - 20px); }
+  .chat-container { border-radius: 18px; height: calc(100vh - 20px); }
   .chat-header__nav { gap: 4px; }
   .chat-overview { grid-template-columns: 1fr; padding: 14px 16px; }
   .chat-overview__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -145,8 +145,8 @@ const streamedDeltaClass = computed(() => (
   width: 100%;
 }
 .text-node-stream-delta {
-  animation-duration: var(--stream-update-fade-duration, var(--typewriter-fade-duration, 900ms));
-  animation-timing-function: var(--stream-update-fade-ease, var(--typewriter-fade-ease, ease-out));
+  animation-duration: var(--stream-update-fade-duration, var(--typewriter-fade-duration, 280ms));
+  animation-timing-function: var(--stream-update-fade-ease, var(--typewriter-fade-ease, cubic-bezier(0.33, 0, 0.67, 1)));
   animation-fill-mode: both;
   will-change: opacity;
 }

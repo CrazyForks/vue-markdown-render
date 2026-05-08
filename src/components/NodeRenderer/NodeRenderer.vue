@@ -2519,8 +2519,8 @@ function handleFragmentMouseout(event: MouseEvent) {
   opacity: 0;
 }
 .markstream-vue .typewriter-enter-active {
-  transition: opacity var(--typewriter-fade-duration, 900ms)
-    var(--typewriter-fade-ease, ease-out);
+  transition: opacity var(--typewriter-fade-duration, 280ms)
+    var(--typewriter-fade-ease, cubic-bezier(0.33, 0, 0.67, 1));
   will-change: opacity;
 }
 .markstream-vue .typewriter-enter-to {

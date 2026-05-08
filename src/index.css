@@ -359,7 +359,7 @@
   --ms-duration-overlay: 200ms;
   --ms-duration-emphasis: 220ms;
   --ms-duration-slow: 300ms;
-  --ms-duration-stream: 900ms;
+  --ms-duration-stream: 280ms;
   --ms-ease-linear: linear;
   --ms-ease-standard: ease;
   --ms-ease-out: ease-out;
