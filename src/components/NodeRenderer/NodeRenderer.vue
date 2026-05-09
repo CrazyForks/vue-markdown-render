@@ -87,7 +87,8 @@ type RuntimeHtmlNode = ParsedNode & {
 const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
   showTooltips: true,
-  typewriter: true,
+  typewriter: false,
+  fade: true,
   batchRendering: true,
   debugPerformance: false,
   initialRenderBatchSize: 40,
@@ -144,10 +145,14 @@ const resolvedShowTooltips = computed<boolean | undefined>(() => {
   return undefined
 })
 const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const inheritedTypewriterCursor = inject<{ value?: boolean } | undefined>('markstreamTypewriterCursor', undefined)
 const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
+const ownsTypewriterCursor = computed(() => inheritedTypewriterCursor?.value !== true)
 provide('markstreamShowTooltips', resolvedShowTooltips)
 provide('markstreamHtmlPolicy', resolvedHtmlPolicy)
 provide('markstreamTypewriter', computed(() => props.typewriter !== false))
+provide('markstreamFade', computed(() => props.fade !== false))
+provide('markstreamTypewriterCursor', computed(() => true))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)
 
@@ -2066,9 +2071,8 @@ const infographicBindings = computed(() => ({
   ...(props.infographicProps || {}),
 }))
 const nonCodeBindings = computed(() => ({
-  // Forward `typewriter` flag to non-code node components so they can
-  // opt in/out of enter transitions or other typewriter-like behaviour.
   typewriter: props.typewriter,
+  fade: props.fade,
   // Forward customHtmlTags for non-whitelisted tag detection in child components
   customHtmlTags: mergedParseOptions.value.customHtmlTags,
 }))
@@ -2304,6 +2308,159 @@ function handleFragmentMouseover(event: MouseEvent) {
 function handleFragmentMouseout(event: MouseEvent) {
   emit('mouseout', event)
 }
+
+const typewriterCursorRef = ref<HTMLElement | null>(null)
+const showTypewriterCursor = ref(false)
+let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
+let lastTypewriterContentLength = 0
+const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table'])
+
+function shouldSkipTypewriterCursorForNode(node: unknown) {
+  if (!node || typeof node !== 'object')
+    return false
+  const type = (node as Record<string, unknown>).type
+  return typeof type === 'string' && TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES.has(type)
+}
+
+function shouldShowTypewriterCursorForCurrentNodes() {
+  const lastNode = parsedNodes.value[parsedNodes.value.length - 1]
+  return !shouldSkipTypewriterCursorForNode(lastNode)
+}
+
+function getNodeTextLength(node: unknown): number {
+  if (!node || typeof node !== 'object')
+    return 0
+
+  const record = node as Record<string, unknown>
+  const direct = record.raw ?? record.content ?? record.code
+  if (typeof direct === 'string')
+    return direct.length
+
+  const children = record.children
+  if (Array.isArray(children))
+    return children.reduce((total, child) => total + getNodeTextLength(child), 0)
+
+  const items = record.items
+  if (Array.isArray(items))
+    return items.reduce((total, item) => total + getNodeTextLength(item), 0)
+
+  return 0
+}
+
+function getTypewriterContentLength() {
+  if (typeof props.content === 'string')
+    return props.content.length
+  return (props.nodes ?? []).reduce((total, node) => total + getNodeTextLength(node), 0)
+}
+
+function clearTypewriterCursorTimeout() {
+  if (!typewriterCursorTimeout)
+    return
+  clearTimeout(typewriterCursorTimeout)
+  typewriterCursorTimeout = undefined
+}
+
+function getLastTextNode(root: HTMLElement) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const text = node.textContent ?? ''
+      if (!text.trim())
+        return NodeFilter.FILTER_REJECT
+
+      const parent = node.parentElement
+      if (!parent)
+        return NodeFilter.FILTER_REJECT
+      if (parent.closest('.typewriter-cursor, .height-estimation-probes, [data-node-type="code_block"], [data-node-type="admonition"], [data-node-type="table"], script, style'))
+        return NodeFilter.FILTER_REJECT
+
+      return NodeFilter.FILTER_ACCEPT
+    },
+  })
+
+  let last: Text | null = null
+  let current = walker.nextNode()
+  while (current) {
+    last = current as Text
+    current = walker.nextNode()
+  }
+
+  return last
+}
+
+function updateTypewriterCursorPosition() {
+  if (!isClient || !showTypewriterCursor.value || !containerRef.value || !typewriterCursorRef.value)
+    return
+
+  const root = containerRef.value
+  const cursor = typewriterCursorRef.value
+  const lastText = getLastTextNode(root)
+  const rootRect = root.getBoundingClientRect()
+  let left = 0
+  let top = 0
+  let height = 20
+
+  if (lastText?.textContent) {
+    const range = document.createRange()
+    const end = lastText.textContent.length
+    range.setStart(lastText, Math.max(0, end - 1))
+    range.setEnd(lastText, end)
+    const rects = typeof range.getClientRects === 'function'
+      ? range.getClientRects()
+      : undefined
+    const rect = rects?.[rects.length - 1] ?? lastText.parentElement?.getBoundingClientRect()
+    if (rect) {
+      left = rect.right - rootRect.left + root.scrollLeft
+      top = rect.top - rootRect.top + root.scrollTop
+      height = rect.height || height
+    }
+    range.detach()
+  }
+
+  cursor.style.transform = `translate(${Math.max(0, left)}px, ${Math.max(0, top)}px)`
+  cursor.style.height = `${height}px`
+}
+
+watch(
+  [() => props.content, () => props.nodes, () => props.typewriter],
+  async () => {
+    if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value)
+      return
+
+    const nextLength = getTypewriterContentLength()
+    const cursorAllowed = shouldShowTypewriterCursorForCurrentNodes()
+    if (props.typewriter === false || !cursorAllowed || nextLength <= lastTypewriterContentLength) {
+      if (props.typewriter === false || !cursorAllowed)
+        showTypewriterCursor.value = false
+      lastTypewriterContentLength = nextLength
+      return
+    }
+
+    lastTypewriterContentLength = nextLength
+    showTypewriterCursor.value = true
+    clearTypewriterCursorTimeout()
+    await nextTick()
+    updateTypewriterCursorPosition()
+    typewriterCursorTimeout = setTimeout(() => {
+      showTypewriterCursor.value = false
+    }, 3000)
+  },
+  { flush: 'post', immediate: true },
+)
+
+watch(
+  showTypewriterCursor,
+  async (visible) => {
+    if (!visible)
+      return
+    await nextTick()
+    updateTypewriterCursorPosition()
+  },
+  { flush: 'post' },
+)
+
+onBeforeUnmount(() => {
+  clearTypewriterCursorTimeout()
+})
 </script>
 
 <template>
@@ -2396,8 +2553,8 @@ function handleFragmentMouseout(event: MouseEvent) {
         >
           <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
           <transition
-            v-if="!item.isCodeBlock && props.typewriter !== false"
-            name="typewriter"
+            v-if="!item.isCodeBlock && props.fade !== false"
+            name="fade"
             appear
           >
             <component
@@ -2433,6 +2590,12 @@ function handleFragmentMouseout(event: MouseEvent) {
         />
       </div>
     </template>
+    <span
+      v-if="showTypewriterCursor"
+      ref="typewriterCursorRef"
+      class="typewriter-cursor"
+      aria-hidden="true"
+    />
     <div
       v-if="virtualizationEnabled"
       class="node-spacer"
@@ -2511,19 +2674,39 @@ function handleFragmentMouseout(event: MouseEvent) {
   font-style: italic;
   margin: var(--ms-flow-paragraph-y) 0;
 }
+
+.typewriter-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  min-height: 1em;
+  background: var(--typewriter-cursor-color, currentColor);
+  pointer-events: none;
+  animation: typewriter-cursor-blink 1s steps(1, end) infinite;
+}
+
+@keyframes typewriter-cursor-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
 </style>
 
 <style>
-/* Global (unscoped) CSS for TransitionGroup enter animations */
-.markstream-vue .typewriter-enter-from {
+/* Global (unscoped) CSS for enter animations */
+.markstream-vue .fade-enter-from {
   opacity: 0;
 }
-.markstream-vue .typewriter-enter-active {
-  transition: opacity var(--typewriter-fade-duration, 280ms)
-    var(--typewriter-fade-ease, cubic-bezier(0.33, 0, 0.67, 1));
+.markstream-vue .fade-enter-active {
+  transition: opacity var(--fade-duration, 280ms)
+    var(--fade-ease, cubic-bezier(0.33, 0, 0.67, 1));
   will-change: opacity;
 }
-.markstream-vue .typewriter-enter-to {
+.markstream-vue .fade-enter-to {
   opacity: 1;
 }
 </style>

@@ -46,7 +46,7 @@ function sanitizeSnapshotHtml(html: string, name: string) {
     const normalized = classNames
       .split(/\s+/)
       .filter(Boolean)
-      .filter(className => !/^typewriter-(?:enter|leave)(?:-(?:from|to|active))?$/.test(className))
+      .filter(className => !/^fade-(?:enter|leave)(?:-(?:from|to|active))?$/.test(className))
       .join(' ')
 
     return normalized ? `class="${normalized}"` : ''
@@ -694,6 +694,7 @@ After`,
         value: Number,
         customId: String,
         typewriter: Boolean,
+        fade: Boolean,
       },
       setup(props) {
         return () => h('li', { 'class': 'custom-list-item', 'data-value': props.value == null ? '' : String(props.value) }, [
@@ -702,6 +703,7 @@ After`,
             customId: props.customId,
             indexKey: `custom-list-item-${String(props.indexKey ?? '')}`,
             typewriter: props.typewriter,
+            fade: props.fade,
             batchRendering: false,
           }),
         ])
@@ -755,6 +757,54 @@ After`,
     }
     finally {
       wrapper.unmount()
+    }
+  })
+
+  it('keeps fade independent from typewriter cursor', async () => {
+    const wrapper = await mountMarkdown('Hello', { typewriter: false })
+    try {
+      await wrapper.setProps({ content: 'Hello world' })
+      await flushAll()
+
+      expect(wrapper.find('.text-node-stream-delta').exists()).toBe(true)
+      expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('allows disabling fade without disabling the typewriter cursor', async () => {
+    const wrapper = await mountMarkdown('Hello', { fade: false, typewriter: true })
+    try {
+      await wrapper.setProps({ content: 'Hello world' })
+      await flushAll()
+
+      expect(wrapper.find('.text-node-stream-delta').exists()).toBe(false)
+      expect(wrapper.find('.typewriter-cursor').exists()).toBe(true)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('does not show the typewriter cursor for code-like blocks, admonitions, or tables', async () => {
+    const examples = [
+      { content: '```ts\nconsole.log(1)\n```', props: { renderCodeBlocksAsPre: true } },
+      { content: '```mermaid\ngraph TD\nA-->B\n```' },
+      { content: '```infographic\n{\"title\":\"Demo\"}\n```' },
+      { content: '::: warning\nBe careful\n:::' },
+      { content: '| 姓名 | 年龄 | 职业 |\n| --- | --- | --- |\n| 张三 | 28 | 工程师 |' },
+    ]
+
+    for (const example of examples) {
+      const wrapper = await mountMarkdown(example.content, { ...example.props, typewriter: true })
+      try {
+        expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+      }
+      finally {
+        wrapper.unmount()
+      }
     }
   })
 

@@ -758,6 +758,7 @@ onBeforeUnmount(() => {
             :code-block-light-theme="selectedTheme || undefined"
             :code-block-monaco-options="playgroundMonacoOptions"
             :themes="themes"
+            typewriter
             :custom-html-tags="['thinking']"
             :escape-html-tags="['question', 'answer']"
             :is-dark="isDark"

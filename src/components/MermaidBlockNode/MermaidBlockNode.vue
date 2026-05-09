@@ -73,6 +73,20 @@ function neutralizeScriptProtocols(raw: string) {
 
 const DISALLOWED_STYLE_PATTERNS = [/javascript:/i, /expression\s*\(/i, /url\s*\(\s*javascript:/i, /@import/i]
 const SAFE_URL_PROTOCOLS = /^(?:https?:|mailto:|tel:|#|\/|data:image\/(?:png|gif|jpe?g|webp);)/i
+const RENDERABLE_SVG_TAGS = new Set([
+  'circle',
+  'ellipse',
+  'foreignobject',
+  'image',
+  'line',
+  'path',
+  'polygon',
+  'polyline',
+  'rect',
+  'text',
+  'tspan',
+  'use',
+])
 
 function sanitizeUrl(value: string | null | undefined) {
   if (!value)
@@ -138,19 +152,50 @@ function toSafeSvgElement(svg: string | null | undefined): SVGElement | null {
 function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null | undefined) {
   if (!target)
     return ''
+  const safeElement = toSafeSvgElement(svg)
+  if (!safeElement)
+    return ''
+  appendBufferedSvgLayer(target, safeElement)
+  return safeElement.outerHTML
+}
+
+function removeNodesAfterNextPaint(nodes: ChildNode[]) {
+  const remove = () => {
+    for (const node of nodes)
+      node.parentNode?.removeChild(node)
+  }
+  if (typeof requestAnimationFrame !== 'function') {
+    setTimeout(remove, 32)
+    return
+  }
+  requestAnimationFrame(() => {
+    requestAnimationFrame(remove)
+  })
+}
+
+function appendBufferedSvgLayer(target: HTMLElement, svgElement: SVGElement) {
+  const previousNodes = Array.from(target.childNodes)
+  const layer = document.createElement('div')
+  layer.dataset.mermaidSvgLayer = '1'
+  layer.style.zIndex = '1'
+  layer.appendChild(svgElement)
+  target.insertBefore(layer, target.firstChild)
+  if (previousNodes.length > 0)
+    removeNodesAfterNextPaint(previousNodes)
+}
+
+function createLooseSvgElement(svg: string) {
+  const template = document.createElement('template')
   try {
-    target.replaceChildren()
+    template.innerHTML = svg
   }
   catch {
-    // fallback for older environments
-    target.innerHTML = ''
+    return null
   }
-  const safeElement = toSafeSvgElement(svg)
-  if (safeElement) {
-    target.appendChild(safeElement)
-    return target.innerHTML
-  }
-  return ''
+  const svgElement = template.content.firstElementChild
+  return svgElement?.nodeName.toLowerCase() === 'svg'
+    ? svgElement as unknown as SVGElement
+    : null
 }
 
 function clearElement(target: HTMLElement | null | undefined) {
@@ -167,24 +212,16 @@ function clearElement(target: HTMLElement | null | undefined) {
 function renderSvgToTarget(target: HTMLElement | null | undefined, svg: string | null | undefined) {
   if (!target)
     return ''
+  if (isBrokenMermaidSvg(svg))
+    return ''
   if (mermaidSecurityLevel.value === 'strict') {
     return setSafeSvg(target, svg)
   }
-  try {
-    target.replaceChildren()
-  }
-  catch {
-    target.innerHTML = ''
-  }
-  if (svg) {
-    try {
-      target.insertAdjacentHTML('afterbegin', svg)
-    }
-    catch {
-      target.innerHTML = svg
-    }
-  }
-  return target.innerHTML
+  const svgElement = createLooseSvgElement(svg!)
+  if (!svgElement)
+    return ''
+  appendBufferedSvgLayer(target, svgElement)
+  return svgElement.outerHTML
 }
 
 function isBrokenMermaidSvg(svg: string | null | undefined) {
@@ -208,7 +245,10 @@ function isBrokenMermaidSvg(svg: string | null | undefined) {
   }
 
   const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll('*'))]
+  let hasRenderableNode = false
   for (const node of nodes) {
+    if (RENDERABLE_SVG_TAGS.has(node.nodeName.toLowerCase()))
+      hasRenderableNode = true
     for (const attr of Array.from(node.attributes)) {
       if (/\bNaN\b/i.test(attr.value))
         return true
@@ -217,7 +257,7 @@ function isBrokenMermaidSvg(svg: string | null | undefined) {
     }
   }
 
-  return false
+  return !hasRenderableNode
 }
 
 const { t } = useSafeI18n()
@@ -275,10 +315,28 @@ function clampPreviewHeight(height: number) {
   return clampMermaidPreviewHeight(height, minHeight, maxHeight)
 }
 
-function resolveInitialContainerHeight() {
-  return `${clampPreviewHeight(
+function resolveEstimatedPreviewHeight() {
+  return clampPreviewHeight(
     parsePositiveNumber(props.estimatedPreviewHeightPx) ?? estimateMermaidPreviewHeight(baseFixedCode.value),
-  )}px`
+  )
+}
+
+function resolveInitialContainerHeight() {
+  return `${resolveEstimatedPreviewHeight()}px`
+}
+
+const lastSvgSnapshot = ref<string | null>(null)
+
+function hasPreviewSvg() {
+  return !!mermaidContent.value?.querySelector('svg')
+}
+
+function shouldFreezeStreamingPreviewHeight() {
+  return props.loading !== false && hasPreviewSvg()
+}
+
+function shouldKeepPreviewForEmptyStreamingSource() {
+  return props.loading !== false && (hasPreviewSvg() || !!lastSvgSnapshot.value)
 }
 
 // Zoom state
@@ -369,7 +427,6 @@ const svgCache = ref<{
   dark?: string
 }>({})
 
-const lastSvgSnapshot = ref<string | null>(null)
 // 新增：记录上一次渲染的 code（去除所有空白字符）
 const lastRenderedCode = ref<string>('')
 const renderToken = ref(0)
@@ -781,8 +838,10 @@ function resolveMaxContainerHeight() {
  * 健壮地计算并更新容器高度，优先使用viewBox，并提供getBBox作为后备
  * @param newContainerWidth - 可选的容器宽度，由ResizeObserver提供以确保精确
  */
-function updateContainerHeight(newContainerWidth?: number) {
+function updateContainerHeight(newContainerWidth?: number, options?: { force?: boolean }) {
   if (!mermaidContainer.value || !mermaidContent.value)
+    return
+  if (!options?.force && shouldFreezeStreamingPreviewHeight())
     return
 
   const svgElement = mermaidContent.value.querySelector('svg')
@@ -846,7 +905,7 @@ function updateContainerHeight(newContainerWidth?: number) {
     const maxHeight = resolveMaxContainerHeight()
     const newHeight = containerWidth * aspectRatio
     const resolvedHeight = maxHeight == null ? newHeight : Math.min(newHeight, maxHeight)
-    containerHeight.value = `${resolvedHeight}px`
+    containerHeight.value = `${Math.max(resolvedHeight, resolveEstimatedPreviewHeight())}px`
   }
 }
 
@@ -1321,6 +1380,8 @@ function normalizeMermaidSource(code: string) {
 async function renderStaticDiagram() {
   const base = baseFixedCode.value
   if (!base.trim()) {
+    if (shouldKeepPreviewForEmptyStreamingSource())
+      return
     if (mermaidContent.value)
       clearElement(mermaidContent.value)
     lastSvgSnapshot.value = null
@@ -1409,6 +1470,8 @@ async function progressiveRender() {
   // 新增：去除所有空白字符后做比较
   const normalizedBase = base.replace(/\s+/g, '')
   if (!base.trim()) {
+    if (shouldKeepPreviewForEmptyStreamingSource())
+      return
     if (mermaidContent.value)
       clearElement(mermaidContent.value)
     lastSvgSnapshot.value = null
@@ -1600,9 +1663,11 @@ function startPreviewPolling() {
 // Watch for code changes (only base code, not theme changes)
 watch(
   () => baseFixedCode.value,
-  () => {
-    hasRenderedOnce.value = false
-    svgCache.value = {}
+  (code) => {
+    if (code.trim() || props.loading === false) {
+      hasRenderedOnce.value = false
+      svgCache.value = {}
+    }
     if (!usesProgressivePreview.value) {
       stopPreviewPolling()
       if (canScheduleViewportWork() && !showSource.value)
@@ -1720,8 +1785,14 @@ watch(
   async (loaded, prev) => {
     if (prev === true && loaded === false) {
       const base = baseFixedCode.value.trim()
-      if (!base)
+      if (!base) {
+        if (mermaidContent.value)
+          clearElement(mermaidContent.value)
+        lastSvgSnapshot.value = null
+        lastRenderedCode.value = ''
+        hasRenderError.value = false
         return cleanupAfterLoadingSettled()
+      }
       const theme = props.isDark ? 'dark' : 'light'
       const normalizedBase = base.replace(/\s+/g, '')
 
@@ -1732,6 +1803,7 @@ watch(
         if (mermaidContent.value && !mermaidContent.value.querySelector('svg') && svgCache.value[theme]) {
           renderSvgToTarget(mermaidContent.value, svgCache.value[theme]!)
         }
+        updateContainerHeight(undefined, { force: true })
         // 渲染已完成，清理后台任务
         cleanupAfterLoadingSettled()
         return
@@ -1825,7 +1897,7 @@ watch(
 watch(
   [() => props.estimatedPreviewHeightPx, () => baseFixedCode.value],
   () => {
-    if (!hasRenderedOnce.value && !showSource.value)
+    if (!hasRenderedOnce.value && !hasPreviewSvg() && !showSource.value)
       containerHeight.value = resolveInitialContainerHeight()
   },
 )
@@ -2248,10 +2320,21 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
 
 /* ── Mermaid SVG content ── */
 ._mermaid {
+  position: relative;
   font-family: inherit;
   content-visibility: auto;
   contain: content;
   contain-intrinsic-size: var(--ms-size-diagram-min-height) 240px;
+}
+
+._mermaid :deep([data-mermaid-svg-layer]) {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100%;
 }
 
 ._mermaid :deep(svg) {

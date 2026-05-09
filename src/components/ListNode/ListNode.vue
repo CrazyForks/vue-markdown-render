@@ -17,7 +17,7 @@ interface ListItem {
   raw: string
 }
 
-const { node, customId, indexKey, typewriter, showTooltips } = defineProps<{
+const { node, customId, indexKey, typewriter, fade, showTooltips } = defineProps<{
   node: {
     type: 'list'
     ordered: boolean
@@ -28,6 +28,7 @@ const { node, customId, indexKey, typewriter, showTooltips } = defineProps<{
   customId?: string
   indexKey?: number | string
   typewriter?: boolean
+  fade?: boolean
   showTooltips?: boolean
 }>()
 
@@ -55,6 +56,7 @@ const listItemComponent = computed(() => {
       :custom-id="customId"
       :index-key="`${indexKey || 'list'}-${index}`"
       :typewriter="typewriter"
+      :fade="fade"
       :value="node.ordered ? (node.start ?? 1) + index : undefined"
       @copy="$emit('copy', $event)"
     />

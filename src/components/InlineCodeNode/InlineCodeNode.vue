@@ -10,21 +10,21 @@ const props = defineProps<{
 }>()
 
 const attrs = useAttrs()
-const inheritedTypewriter = inject<{ value?: boolean } | undefined>('markstreamTypewriter', undefined)
+const inheritedFade = inject<{ value?: boolean } | undefined>('markstreamFade', undefined)
 const inheritedTextStreamState = inject<Map<string, string> | undefined>('markstreamTextStreamState', undefined)
-const explicitTypewriter = computed<boolean | undefined>(() => {
-  const raw = attrs.typewriter
+const explicitFade = computed<boolean | undefined>(() => {
+  const raw = attrs.fade
   if (raw === '' || raw === true || raw === 'true')
     return true
   if (raw === false || raw === 'false')
     return false
   return undefined
 })
-const typewriterEnabled = computed(() => {
-  if (typeof explicitTypewriter.value === 'boolean')
-    return explicitTypewriter.value
-  if (typeof inheritedTypewriter?.value === 'boolean')
-    return inheritedTypewriter.value
+const fadeEnabled = computed(() => {
+  if (typeof explicitFade.value === 'boolean')
+    return explicitFade.value
+  if (typeof inheritedFade?.value === 'boolean')
+    return inheritedFade.value
   return true
 })
 const streamStateKey = computed(() => {
@@ -54,7 +54,7 @@ function settleStreamedDelta() {
 }
 
 watch(
-  [() => props.node.code, streamStateKey, typewriterEnabled],
+  [() => props.node.code, streamStateKey, fadeEnabled],
   ([next]) => {
     const normalized = String(next ?? '')
     const rendered = getRenderedContent()
@@ -64,7 +64,7 @@ watch(
       : undefined
     const previousContent = previousPersisted ?? rendered
 
-    if (!typewriterEnabled.value) {
+    if (!fadeEnabled.value) {
       setFullContent(normalized)
       if (key)
         inheritedTextStreamState?.set(key, normalized)
@@ -95,7 +95,7 @@ watch(
 )
 
 watch(
-  typewriterEnabled,
+  fadeEnabled,
   (enabled) => {
     if (enabled)
       return
@@ -143,8 +143,8 @@ const streamedDeltaClass = computed(() => (
 }
 
 .inline-code-stream-delta {
-  animation-duration: var(--stream-update-fade-duration, var(--typewriter-fade-duration, 280ms));
-  animation-timing-function: var(--stream-update-fade-ease, var(--typewriter-fade-ease, cubic-bezier(0.33, 0, 0.67, 1)));
+  animation-duration: var(--stream-update-fade-duration, var(--fade-duration, 280ms));
+  animation-timing-function: var(--stream-update-fade-ease, var(--fade-ease, cubic-bezier(0.33, 0, 0.67, 1)));
   animation-fill-mode: both;
   will-change: opacity;
 }

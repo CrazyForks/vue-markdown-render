@@ -22,7 +22,7 @@ describe('mermaid static render performance', () => {
     const fakeMermaid = {
       initialize: vi.fn(),
       render: vi.fn(async () => ({
-        svg: '<svg viewBox="0 0 100 100"><g /></svg>',
+        svg: '<svg viewBox="0 0 100 100"><rect width="1" height="1" /></svg>',
       })),
     }
 

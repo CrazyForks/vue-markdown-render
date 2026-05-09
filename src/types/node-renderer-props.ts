@@ -69,8 +69,10 @@ export interface NodeRendererProps {
   /** Scope key used by `setCustomComponents()` and `data-custom-id` style overrides. */
   customId?: string
   indexKey?: number | string
-  /** Enable/disable the non-code-node enter transition (typewriter). Default: true */
+  /** Show a blinking typewriter cursor while streamed content grows. Default: false */
   typewriter?: boolean
+  /** Enable/disable non-code-node enter and streamed-text fade animations. Default: true */
+  fade?: boolean
   /** Enable incremental/batched rendering of nodes to avoid large single flush costs. Default: true */
   batchRendering?: boolean
   /** How many nodes to render immediately before batching kicks in. Default: 40 */

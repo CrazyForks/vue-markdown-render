@@ -362,6 +362,8 @@ async function renderInfographic(force = false) {
     return
 
   renderInFlight = true
+  const previousHtml = infographicContainer.value.innerHTML
+  const previousHasPreview = hasPreview.value
 
   try {
     const InfographicClass = await getInfographic()
@@ -418,11 +420,19 @@ async function renderInfographic(force = false) {
     })
   }
   catch (error) {
-    console.error('Failed to render infographic:', error)
-    hasPreview.value = false
-    lastCompletedRenderSignature = ''
-    if (infographicContainer.value) {
-      infographicContainer.value.innerHTML = `<div style="padding: var(--ms-inset-panel-body); color: hsl(var(--ms-destructive))">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
+    if (props.loading === false) {
+      console.error('Failed to render infographic:', error)
+      hasPreview.value = false
+      lastCompletedRenderSignature = ''
+      if (infographicContainer.value) {
+        infographicContainer.value.innerHTML = `<div style="padding: var(--ms-inset-panel-body); color: hsl(var(--ms-destructive))">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
+      }
+    }
+    else {
+      hasPreview.value = previousHasPreview
+      if (previousHasPreview && infographicContainer.value) {
+        infographicContainer.value.innerHTML = previousHtml
+      }
     }
   }
   finally {
@@ -451,6 +461,14 @@ watch(
   () => baseCode.value,
   () => {
     queueInfographicRender(true)
+  },
+)
+
+watch(
+  () => props.loading,
+  (loading, prev) => {
+    if (prev && !loading)
+      queueInfographicRender(true)
   },
 )
 

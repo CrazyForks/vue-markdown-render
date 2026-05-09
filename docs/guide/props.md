@@ -21,7 +21,8 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 | `html-policy` | `'safe' \| 'escape' \| 'trusted'` | `'safe'` | Controls `html_block` / `html_inline` rendering. `safe` blocks active/embed/form tags, `escape` shows literal HTML text, and `trusted` keeps the older broad HTML behavior while still removing scripts and unsafe attrs. |
 | `custom-markdown-it` | `(md: MarkdownIt) => MarkdownIt` | – | Customize the internal MarkdownIt instance (add plugins, tweak options). |
 | `debug-performance` | `boolean` | `false` | Logs parse/render timing and virtualization stats (dev only). |
-| `typewriter` | `boolean` | `true` | Enables the subtle enter animation. Disable if you need zero animation for SSR snapshots. |
+| `typewriter` | `boolean` | `false` | Shows the blinking typewriter cursor while streamed content grows. |
+| `fade` | `boolean` | `true` | Enables non-code-node enter fade and appended-text fade. Disable if you need zero animation for SSR snapshots. |
 
 ### Security defaults and compatibility opt-outs
 
