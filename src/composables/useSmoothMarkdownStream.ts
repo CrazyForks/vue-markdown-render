@@ -41,23 +41,44 @@ interface GraphemeSegmenter {
   segment: (input: string) => Iterable<GraphemeSegment>
 }
 
+function toPositiveFiniteNumber(value: unknown, fallback: number, min = 1) {
+  const normalized = Number(value)
+  return Number.isFinite(normalized)
+    ? Math.max(min, normalized)
+    : fallback
+}
+
+function toNonNegativeFiniteNumber(value: unknown, fallback: number) {
+  const normalized = Number(value)
+  return Number.isFinite(normalized)
+    ? Math.max(0, normalized)
+    : fallback
+}
+
 export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {}): SmoothMarkdownStreamController {
   const {
     minCharsPerSecond: rawMinCps = 40,
     maxCharsPerSecond: rawMaxCps = 1000,
-    targetLatencyMs = 900,
-    catchUpLatencyMs = 350,
-    catchUpThreshold = 600,
+    targetLatencyMs: rawTargetLatencyMs = 900,
+    catchUpLatencyMs: rawCatchUpLatencyMs = 350,
+    catchUpThreshold: rawCatchUpThreshold = 600,
     maxCommitFps: rawMaxFps = 30,
-    startDelayMs = 80,
+    startDelayMs: rawStartDelayMs = 80,
     maxCharsPerCommit: rawMaxChars = 80,
     flushOnFinish = false,
   } = options
 
-  const minCharsPerSecond = Math.max(1, rawMinCps)
-  const maxCharsPerSecond = Math.max(minCharsPerSecond, rawMaxCps)
-  const maxCommitFps = Math.max(1, Math.trunc(rawMaxFps || 30))
-  const maxCharsPerCommit = Math.max(1, Math.trunc(rawMaxChars || 1))
+  const minCharsPerSecond = toPositiveFiniteNumber(rawMinCps, 40, 1)
+  const maxCharsPerSecond = Math.max(
+    minCharsPerSecond,
+    toPositiveFiniteNumber(rawMaxCps, 1000, 1),
+  )
+  const normalizedTargetLatencyMs = toPositiveFiniteNumber(rawTargetLatencyMs, 900, 1)
+  const normalizedCatchUpLatencyMs = toPositiveFiniteNumber(rawCatchUpLatencyMs, 350, 1)
+  const normalizedCatchUpThreshold = toNonNegativeFiniteNumber(rawCatchUpThreshold, 600)
+  const normalizedStartDelayMs = toNonNegativeFiniteNumber(rawStartDelayMs, 80)
+  const maxCommitFps = Math.trunc(toPositiveFiniteNumber(rawMaxFps, 30, 1))
+  const maxCharsPerCommit = Math.trunc(toPositiveFiniteNumber(rawMaxChars, 80, 1))
 
   const source = ref('')
   const visible = ref('')
@@ -93,7 +114,7 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
       // If the stream already had content and wasn't finished, skip the delay
       // so subsequent appends resume smoothly without an artificial pause.
       startedAt = hadSource && hasStarted
-        ? t - startDelayMs
+        ? t - normalizedStartDelayMs
         : t
       lastTick = t
       charBudget = 0
@@ -178,7 +199,7 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
       return
     }
 
-    if (timestamp - startedAt < startDelayMs) {
+    if (timestamp - startedAt < normalizedStartDelayMs) {
       rafId = requestAnimationFrame(tick)
       return
     }
@@ -193,7 +214,7 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
 
     lastTick = timestamp
     const pending = pendingChars.value
-    const latencyMs = pending > catchUpThreshold ? catchUpLatencyMs : targetLatencyMs
+    const latencyMs = pending > normalizedCatchUpThreshold ? normalizedCatchUpLatencyMs : normalizedTargetLatencyMs
 
     const targetCps = clamp(
       pending / Math.max(0.001, latencyMs / 1000),

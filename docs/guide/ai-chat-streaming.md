@@ -38,7 +38,6 @@ const final = ref(false)
     :content="streamedText"
     :final="final"
     :max-live-nodes="0"
-    :smooth-streaming="true"
     :batch-rendering="true"
     :render-batch-size="16"
     :render-batch-delay="8"
@@ -55,6 +54,7 @@ Why this path works better:
 - Backlog-aware pacing speeds up automatically when pending text grows.
 - Final parsing waits for visible content to catch up, so end-of-stream settling is stable.
 - `custom-id="chat"` gives you a scoped place to theme the chat surface or override one renderer safely.
+- The default `smooth-streaming="auto"` already enables smooth pacing when `typewriter` is on or `max-live-nodes <= 0`. Only use `:smooth-streaming="true"` if you want first-screen content to also start from blank with the typewriter effect—this bypasses the mounted gate and can cause hydration mismatch or blank flash in SSR scenarios.
 
 Turn it off per surface with `:smooth-streaming="false"` if you want raw chunk cadence. If you already parse in a worker/store and need AST control, keep using `nodes` + `final`.
 

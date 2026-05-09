@@ -139,7 +139,7 @@ describe('useSmoothMarkdownStream', () => {
   it('normalizes extreme option values', () => {
     const wrapper = mountStream({
       maxCharsPerCommit: 0,
-      maxCommitFps: 0,
+      maxCommitFPS: 0,
       minCharsPerSecond: 0,
       maxCharsPerSecond: -10,
     })
@@ -148,6 +148,25 @@ describe('useSmoothMarkdownStream', () => {
     ;(wrapper.vm as any).enqueue('test')
     ;(wrapper.vm as any).flush()
     expect((wrapper.vm as any).visible).toBe('test')
+    wrapper.unmount()
+  })
+
+  it('normalizes NaN and infinite numeric options', () => {
+    const wrapper = mountStream({
+      minCharsPerSecond: Number.NaN,
+      maxCharsPerSecond: Number.POSITIVE_INFINITY,
+      targetLatencyMs: Number.NaN,
+      catchUpLatencyMs: Number.NaN,
+      catchUpThreshold: Number.NaN,
+      startDelayMs: Number.NaN,
+      maxCommitFps: Number.NaN,
+      maxCharsPerCommit: Number.NaN,
+    })
+
+    ;(wrapper.vm as any).enqueue('hello')
+    ;(wrapper.vm as any).flush()
+
+    expect((wrapper.vm as any).visible).toBe('hello')
     wrapper.unmount()
   })
 
