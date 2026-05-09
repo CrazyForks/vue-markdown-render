@@ -271,4 +271,82 @@ describe('node renderer smooth streaming', () => {
 
     childWrapper.unmount()
   })
+
+  it('nodes mode never enables smooth streaming', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [
+          { type: 'paragraph', raw: 'hello', children: [{ type: 'text', content: 'hello', raw: 'hello' }] },
+        ],
+        typewriter: true,
+        smoothStreaming: 'auto',
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await nextTick()
+    // When nodes are provided, smooth streaming must not activate
+    // regardless of typewriter or smoothStreaming='auto'
+    expect(wrapper.text()).toContain('hello')
+    expect(queuedFrames.length).toBe(0)
+
+    wrapper.unmount()
+  })
+
+  it('final is gated by caughtUp when smooth streaming is active', async () => {
+    // When smooth streaming is pacing content, final=true should not
+    // reach the parser until visible has caught up with source.
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      // Stash but don't invoke — visible stays behind source
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: true,
+        smoothStreaming: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await nextTick()
+    queuedFrames.length = 0
+
+    // Feed content + final=true — but rAF is stalled so visible stays empty
+    await wrapper.setProps({ content: 'Hello world', final: true })
+    await nextTick()
+
+    // Because visible hasn't caught up (rAF never ticked), the content
+    // should not be visible in the DOM yet.
+    expect(wrapper.text()).not.toContain('Hello world')
+
+    // Now drain the rAF queue to let visible catch up with source
+    const baseline = performance.now()
+    for (let step = 1; step <= 40 && queuedFrames.length > 0; step++) {
+      const cb = queuedFrames.shift()!
+      cb(baseline + step * 50)
+      await nextTick()
+    }
+
+    // After visible catches up, content should be rendered and final
+    // should have been forwarded to the parser (closing any open constructs).
+    expect(wrapper.text()).toContain('Hello world')
+
+    wrapper.unmount()
+  })
 })

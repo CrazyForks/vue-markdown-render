@@ -32,7 +32,15 @@ function toOptionalBoolean(value: unknown) {
 }
 
 const resolvedTypewriter = computed(() => toOptionalBoolean(props.typewriter) ?? inheritedTypewriter?.value ?? true)
-const resolvedSmoothStreaming = computed(() => inheritedSmoothStreaming?.value)
+const resolvedSmoothStreaming = computed<boolean | 'auto' | undefined>(() => {
+  if (inheritedSmoothStreaming?.value === true)
+    return 'auto'
+
+  if (inheritedSmoothStreaming?.value === false)
+    return false
+
+  return undefined
+})
 </script>
 
 <template>
