@@ -150,4 +150,25 @@ describe('useSmoothMarkdownStream', () => {
     expect((wrapper.vm as any).visible).toBe('test')
     wrapper.unmount()
   })
+
+  it('respects low chars-per-second values instead of emitting once per frame', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountStream({
+      minCharsPerSecond: 1,
+      maxCharsPerSecond: 1,
+      maxCommitFps: 60,
+      startDelayMs: 0,
+    })
+
+    ;(wrapper.vm as any).enqueue('abcdefghij')
+
+    // After 100ms at 1 char/s, at most 1 character should be visible.
+    // Without the fix, each frame would emit at least 1 grapheme,
+    // producing ~6 characters in 100ms at 60fps.
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect((wrapper.vm as any).visible.length).toBeLessThanOrEqual(1)
+
+    wrapper.unmount()
+  })
 })

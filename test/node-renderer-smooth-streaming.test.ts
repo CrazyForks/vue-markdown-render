@@ -233,4 +233,42 @@ describe('node renderer smooth streaming', () => {
     wrapper.unmount()
     childWrapper.unmount()
   })
+
+  it('nested renderer with smoothStreaming=true does force-enable even under inherited parent smooth', async () => {
+    // smoothStreaming === true is an explicit opt-in that intentionally
+    // bypasses the auto-suppression. This is by design — the user explicitly
+    // wants pacing regardless of the parent's state.
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const childWrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        smoothStreaming: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+      global: {
+        provide: {
+          markstreamSmoothStreaming: { value: true },
+        },
+      },
+    })
+
+    await nextTick()
+    queuedFrames.length = 0
+
+    await childWrapper.setProps({ content: 'forced smooth' })
+    await nextTick()
+
+    // smoothStreaming: true should schedule rAF even when parent is already smoothing
+    expect(queuedFrames.length).toBeGreaterThan(0)
+
+    childWrapper.unmount()
+  })
 })

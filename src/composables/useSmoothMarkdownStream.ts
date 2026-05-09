@@ -204,7 +204,12 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
     currentCps += (targetCps - currentCps) * 0.2
     charBudget += currentCps * (dt / 1000)
 
-    const desiredCount = clamp(Math.floor(charBudget), 1, maxCharsPerCommit)
+    if (charBudget < 1) {
+      ensureLoop()
+      return
+    }
+
+    const desiredCount = Math.min(Math.floor(charBudget), maxCharsPerCommit)
     const rest = source.value.slice(visible.value.length)
     const nextSlice = takeGraphemes(rest, desiredCount, segmenter)
 
