@@ -139,7 +139,7 @@ describe('useSmoothMarkdownStream', () => {
   it('normalizes extreme option values', () => {
     const wrapper = mountStream({
       maxCharsPerCommit: 0,
-      maxCommitFPS: 0,
+      maxCommitFps: 0,
       minCharsPerSecond: 0,
       maxCharsPerSecond: -10,
     })

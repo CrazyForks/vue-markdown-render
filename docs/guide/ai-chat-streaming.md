@@ -95,7 +95,39 @@ See [Override Built-in Components](/guide/component-overrides).
 
 Start here when visuals look wrong: [Troubleshooting](/guide/troubleshooting#css-looks-wrong-start-here)
 
-## 6. When not to use this path
+## 6. Manual composable usage with `nodes`
+
+If you parse `nodes` yourself (worker, store, or custom AST pipeline), the built-in smooth streaming inside `MarkdownRender` does **not** activate — it only applies to the `content` path. Use `useSmoothMarkdownStream` directly to pace the raw text before parsing.
+
+```ts
+import { useSmoothMarkdownStream, getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+import { ref, watch } from 'vue'
+
+const stream = useSmoothMarkdownStream()
+
+// Feed incoming chunks from your event source
+eventSource.onmessage = (event) => {
+  stream.enqueue(event.data)
+})
+
+eventSource.addEventListener('done', () => {
+  stream.finish()
+})
+
+// Parse only the visible portion; final parsing waits until caught up
+const md = getMarkdown('chat')
+const nodes = ref([])
+
+watch([stream.visible, stream.final], () => {
+  nodes.value = parseMarkdownToStructure(stream.visible.value, md, {
+    final: stream.final.value,
+  })
+})
+```
+
+The composable returns reactive refs: `visible`, `source`, `caughtUp`, and `final`. Use `visible` for rendering and wait until `caughtUp` is `true` before considering the stream complete.
+
+## 7. When not to use this path
 
 - Use `content` when updates are infrequent or the page is basically static.
 - Use server-side preparse + `nodes` when another layer already owns Markdown parsing.

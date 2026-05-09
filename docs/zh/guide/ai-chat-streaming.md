@@ -89,7 +89,39 @@ const nodes = computed(() =>
 
 页面效果不对时，先从这里开始排： [故障排除](/zh/guide/troubleshooting#css-looks-wrong-start-here)
 
-## 6. 什么时候不该走这条路径
+## 6. 手动使用 composable 搭配 `nodes`
+
+如果你自己在 worker、store 或自定义 AST 管线中解析 `nodes`，`MarkdownRender` 内置的 smooth streaming **不会**启用——它只作用于 `content` 路径。你可以直接使用 `useSmoothMarkdownStream`，在解析前对原始文本做 pacing。
+
+```ts
+import { useSmoothMarkdownStream, getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+import { ref, watch } from 'vue'
+
+const stream = useSmoothMarkdownStream()
+
+// 从事件源喂入新 chunk
+eventSource.onmessage = (event) => {
+  stream.enqueue(event.data)
+})
+
+eventSource.addEventListener('done', () => {
+  stream.finish()
+})
+
+// 只解析可见部分；最终解析等 caughtUp 后再触发
+const md = getMarkdown('chat')
+const nodes = ref([])
+
+watch([stream.visible, stream.final], () => {
+  nodes.value = parseMarkdownToStructure(stream.visible.value, md, {
+    final: stream.final.value,
+  })
+})
+```
+
+该 composable 返回响应式 ref：`visible`、`source`、`caughtUp` 和 `final`。用 `visible` 渲染，等 `caughtUp` 为 `true` 后再认为流结束。
+
+## 7. 什么时候不该走这条路径
 
 - 更新频率不高、页面基本静态时，用 `content` 更简单
 - 如果服务端或别的层已经接管 Markdown 解析，就直接用预解析后的 `nodes`
