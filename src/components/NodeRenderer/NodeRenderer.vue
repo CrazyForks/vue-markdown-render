@@ -157,15 +157,6 @@ provide('markstreamTypewriterCursor', computed(() => true))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)
 
-watch(
-  [() => props.content, () => props.nodes],
-  () => {
-    mathBlockMinHeightCache.clear()
-    streamRenderVersion.value += 1
-  },
-  { immediate: true },
-)
-
 function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)
     return
@@ -211,6 +202,14 @@ const instanceMsgId = props.customId
 const mathBlockMinHeightCache = createMathBlockMinHeightCache(instanceMsgId)
 const mathBlockCacheScope = computed(() => `${instanceMsgId}:${streamRenderVersion.value}`)
 provideMathBlockMinHeightCache(mathBlockMinHeightCache)
+watch(
+  [() => props.content, () => props.nodes],
+  () => {
+    mathBlockMinHeightCache.clear()
+    streamRenderVersion.value += 1
+  },
+  { immediate: true },
+)
 const defaultMd = getMarkdown(instanceMsgId)
 const customTagCache = new Map<string, MarkdownIt>()
 const customComponentsMap = computed<Partial<CustomComponents>>(() => {
