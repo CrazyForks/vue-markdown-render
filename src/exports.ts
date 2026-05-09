@@ -43,6 +43,7 @@ import ThematicBreakNode from './components/ThematicBreakNode'
 import Tooltip from './components/Tooltip'
 import VmrContainerNode from './components/VmrContainerNode'
 import { setDefaultI18nMap } from './composables/useSafeI18n'
+import { useSmoothMarkdownStream } from './composables/useSmoothMarkdownStream'
 import { setIconTheme } from './icon-themes'
 import { setLanguageIconResolver } from './utils/languageIcon'
 import { clearGlobalCustomComponents, getCustomNodeComponents, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
@@ -62,6 +63,10 @@ export type { D2Loader } from './components/D2BlockNode/d2'
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
+export type {
+  SmoothMarkdownStreamController,
+  SmoothMarkdownStreamOptions,
+} from './composables/useSmoothMarkdownStream'
 export type {
   CodeBlockDiffAppearance,
   CodeBlockDiffHideUnchangedRegions,
@@ -164,6 +169,7 @@ export {
   TextNode,
   ThematicBreakNode,
   Tooltip,
+  useSmoothMarkdownStream,
   VmrContainerNode,
 }
 

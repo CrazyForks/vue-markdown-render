@@ -5,7 +5,7 @@ import type { CustomComponents } from '../../types'
 import type { CodeBlockPreviewPayload } from '../../types/component-props'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
-import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
+import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, useAttrs, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -35,6 +35,7 @@ import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
+import { useSmoothMarkdownStream } from '../../composables/useSmoothMarkdownStream'
 import { provideViewportPriority } from '../../composables/viewportPriority'
 import {
   buildBlockTextProfile,
@@ -89,6 +90,7 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
   showTooltips: true,
   typewriter: false,
+  smoothStreaming: 'auto',
   fade: true,
   batchRendering: true,
   debugPerformance: false,
@@ -133,6 +135,7 @@ const debugPerformanceEnabled = computed(() => props.debugPerformance && isClien
 const attrs = useAttrs() as RendererAttrs
 const textStreamState = new Map<string, string>()
 const streamRenderVersion = ref(0)
+const smoothStream = useSmoothMarkdownStream(props.smoothStreamingOptions)
 const experimentContainerWidth = ref(0)
 const simpleTextProbeProfile = ref(createEmptySimpleTextProbeProfile())
 const resolvedShowTooltips = computed<boolean | undefined>(() => {
@@ -147,6 +150,7 @@ const resolvedShowTooltips = computed<boolean | undefined>(() => {
 })
 const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
 const inheritedTypewriterCursor = inject<{ value?: boolean } | undefined>('markstreamTypewriterCursor', undefined)
+const inheritedSmoothStreaming = inject<{ value?: boolean } | undefined>('markstreamSmoothStreaming', undefined)
 const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
 const ownsTypewriterCursor = computed(() => inheritedTypewriterCursor?.value !== true)
 provide('markstreamShowTooltips', resolvedShowTooltips)
@@ -156,6 +160,85 @@ provide('markstreamFade', computed(() => props.fade !== false))
 provide('markstreamTypewriterCursor', computed(() => true))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)
+
+const smoothStreamingEligible = computed(() => {
+  if (props.smoothStreaming === false)
+    return false
+  if (props.nodes?.length)
+    return false
+  // When the parent renderer is already pacing content, avoid double-pacing
+  // in nested renderers (e.g. thinking blocks, custom tag content).
+  // Only applies in 'auto' mode — smoothStreaming === true explicitly opts in.
+  if (props.smoothStreaming !== true && inheritedSmoothStreaming?.value)
+    return false
+  if (props.smoothStreaming === true)
+    return true
+  // 'auto': only enable when typewriter/incremental mode is active
+  return props.typewriter === true || (props.maxLiveNodes ?? 0) <= 0
+})
+
+// Mounted gate: prevent smooth streaming from pacing initial static content
+// on the first client render (avoids SSR hydration mismatch and blank flash).
+// Only applies in 'auto' mode — when smoothStreaming === true, the user
+// explicitly opted in and the gate is always open.
+const hasMountedForSmoothStreaming = ref(!isClient || props.smoothStreaming === true)
+
+onMounted(() => {
+  hasMountedForSmoothStreaming.value = true
+})
+
+const smoothStreamingEnabled = computed(() => (
+  hasMountedForSmoothStreaming.value
+  && smoothStreamingEligible.value
+))
+provide('markstreamSmoothStreaming', smoothStreamingEnabled)
+const renderContent = computed(() => (
+  smoothStreamingEnabled.value
+    ? smoothStream.visible.value
+    : (props.content ?? '')
+))
+
+const requestedFinal = computed<boolean | undefined>(() => {
+  const base = (props.parseOptions ?? {}) as RendererParseOptions
+  return props.final ?? base.final
+})
+
+watch(
+  [() => props.content, () => props.nodes, smoothStreamingEnabled, requestedFinal],
+  ([content, nodes, enabled, finalRequested]) => {
+    if (nodes?.length) {
+      smoothStream.reset('')
+      return
+    }
+
+    const nextContent = content ?? ''
+
+    if (!enabled) {
+      smoothStream.reset(nextContent)
+      if (finalRequested)
+        smoothStream.finish({ flush: true })
+      return
+    }
+
+    const source = smoothStream.source.value
+    if (!nextContent) {
+      smoothStream.reset('')
+    }
+    else if (nextContent === source) {
+      // no-op
+    }
+    else if (nextContent.startsWith(source)) {
+      smoothStream.enqueue(nextContent.slice(source.length))
+    }
+    else {
+      smoothStream.reset(nextContent)
+    }
+
+    if (finalRequested)
+      smoothStream.finish()
+  },
+  { immediate: true },
+)
 
 function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)
@@ -202,8 +285,14 @@ const instanceMsgId = props.customId
 const mathBlockMinHeightCache = createMathBlockMinHeightCache(instanceMsgId)
 const mathBlockCacheScope = computed(() => `${instanceMsgId}:${streamRenderVersion.value}`)
 provideMathBlockMinHeightCache(mathBlockMinHeightCache)
+const renderVersionSource = computed(() => {
+  if (props.nodes?.length)
+    return props.nodes
+  return renderContent.value
+})
+
 watch(
-  [() => props.content, () => props.nodes],
+  renderVersionSource,
   () => {
     mathBlockMinHeightCache.clear()
     streamRenderVersion.value += 1
@@ -237,7 +326,9 @@ const mdInstance = computed(() => {
 
 const mergedParseOptions = computed(() => {
   const base = (props.parseOptions ?? {}) as RendererParseOptions
-  const resolvedFinal = props.final ?? base.final
+  let resolvedFinal = requestedFinal.value
+  if (smoothStreamingEnabled.value && resolvedFinal != null)
+    resolvedFinal = resolvedFinal ? smoothStream.caughtUp.value : false
   const merged = effectiveCustomHtmlTags.value
   const hasFinal = resolvedFinal != null
   const hasCustom = merged.length > 0
@@ -269,17 +360,18 @@ const parsedNodes = computed<ParsedNode[]>(() => {
   // the array length doesn't change.
   if (props.nodes?.length)
     return markRaw((props.nodes as unknown as ParsedNode[]).slice())
-  if (props.content) {
+  const contentToParse = renderContent.value
+  if (contentToParse) {
     // Prefer an explicitly passed `markdown` prop, then a globally
     // provided markdown via `setGlobalMarkdown`, otherwise fall back
     // to the legacy `getMarkdown()` factory.
     const parseStart = debugPerformanceEnabled.value ? performance.now() : 0
-    const parsed = parseMarkdownToStructure(props.content, mdInstance.value, mergedParseOptions.value)
+    const parsed = parseMarkdownToStructure(contentToParse, mdInstance.value, mergedParseOptions.value)
     if (debugPerformanceEnabled.value) {
       logPerf('parse(sync)', {
         ms: Math.round(performance.now() - parseStart),
         nodes: parsed.length,
-        contentLength: props.content.length,
+        contentLength: contentToParse.length,
       })
     }
     return markRaw(parsed)
@@ -2358,9 +2450,9 @@ function getNodeTextLength(node: unknown): number {
 }
 
 function getTypewriterContentLength() {
-  if (typeof props.content === 'string')
-    return props.content.length
-  return (props.nodes ?? []).reduce((total, node) => total + getNodeTextLength(node), 0)
+  if (props.nodes?.length)
+    return props.nodes.reduce((total, node) => total + getNodeTextLength(node), 0)
+  return renderContent.value.length
 }
 
 function clearTypewriterCursorTimeout() {
@@ -2431,7 +2523,7 @@ function updateTypewriterCursorPosition() {
 }
 
 watch(
-  [() => props.content, () => props.nodes, () => props.typewriter],
+  [renderContent, () => props.nodes, () => props.typewriter],
   async () => {
     if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value)
       return

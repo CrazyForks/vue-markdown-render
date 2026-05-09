@@ -14,7 +14,10 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 3. Import `markstream-vue/index.css` after resets.
    - In Tailwind or UnoCSS projects, keep Markstream styles inside `@layer components`.
 4. Start with `<MarkdownRender :content="markdown" />`.
-   - Switch to `nodes` plus `final` only for streaming, SSE, or high-frequency updates.
+   - For AI chat or streaming UIs, use `typewriter` or `:max-live-nodes="0"` — smooth streaming is auto-enabled (`smooth-streaming="auto"`, the default) and paces visible output so bursty chunks appear steadily.
+   - Set `:smooth-streaming="false"` to preserve raw chunk cadence; set `:smooth-streaming="true"` to force smooth pacing even on first-screen content (may cause hydration mismatch in SSR).
+   - When smooth streaming is on, pair it with `:fade="false"` to avoid delta fade (280 ms) stacking with high-commit pacing.
+   - Switch to `nodes` plus `final` only when the app needs custom AST control, worker preparsing, or structural updates beyond pacing.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 5. Use `custom-id` plus scoped `setCustomComponents(...)` for overrides.
 6. Validate with the smallest useful dev, build, or typecheck command.
@@ -22,6 +25,8 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 ## Default Decisions
 
 - Vue 3 apps default to `content`.
+- Smooth streaming (`smooth-streaming="auto"`) is on by default when `typewriter` or `max-live-nodes <= 0`. It only paces the `content` path; `nodes` mode is never affected.
+- For manual pacing with `nodes`, use `useSmoothMarkdownStream` directly: `enqueue()` chunks, `finish()` when done, render from `visible`, and wait for `caughtUp` before final parsing.
 - Prefer local component registration unless the repo already uses a shared plugin entry.
 - When Monaco code blocks need app-level preloading, import `preloadCodeBlockRuntime` from `markstream-vue`. Existing `getUseMonaco()` preloads remain valid; do not import `stream-monaco` directly just to warm workers.
 - Keep `html-policy="safe"` and Mermaid strict mode unless the task is explicitly preserving trusted legacy behavior.
@@ -33,4 +38,5 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 - `docs/guide/quick-start.md`
 - `docs/guide/installation.md`
 - `docs/guide/usage.md`
+- `docs/guide/ai-chat-streaming.md`
 - `docs/guide/component-overrides.md`

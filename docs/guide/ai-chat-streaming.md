@@ -21,36 +21,42 @@ Install only the peers you actually expect to show up in responses.
 
 ## 2. Recommended data flow
 
-For frequent updates, keep parsing outside `MarkdownRender` and pass `nodes` + `final`.
+For jittery token streams, use built-in smooth pacing on `MarkdownRender`.
 
 ```vue
 <script setup lang="ts">
-import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
-import { computed, ref } from 'vue'
+import MarkdownRender from 'markstream-vue'
+import { ref } from 'vue'
 
 const streamedText = ref('')
 const final = ref(false)
-const md = getMarkdown('chat-message')
-
-const nodes = computed(() =>
-  parseMarkdownToStructure(streamedText.value, md, { final: final.value }),
-)
 </script>
 
 <template>
   <MarkdownRender
     custom-id="chat"
-    :nodes="nodes"
+    :content="streamedText"
     :final="final"
+    :max-live-nodes="0"
+    :batch-rendering="true"
+    :render-batch-size="16"
+    :render-batch-delay="8"
+    :render-batch-budget-ms="4"
+    :fade="false"
+    :typewriter="true"
   />
 </template>
 ```
 
 Why this path works better:
 
-- `MarkdownRender` does not need to reparse the full string on every tiny token update.
-- You can move parsing into a store, worker, or message pipeline later without changing the renderer contract.
+- Incoming chunks can be bursty while visible output remains steady.
+- Backlog-aware pacing speeds up automatically when pending text grows.
+- Final parsing waits for visible content to catch up, so end-of-stream settling is stable.
 - `custom-id="chat"` gives you a scoped place to theme the chat surface or override one renderer safely.
+- The default `smooth-streaming="auto"` already enables smooth pacing when `typewriter` is on or `max-live-nodes <= 0`. Only use `:smooth-streaming="true"` if you want first-screen content to also start from blank with the typewriter effect—this bypasses the mounted gate and can cause hydration mismatch or blank flash in SSR scenarios.
+
+Turn it off per surface with `:smooth-streaming="false"` if you want raw chunk cadence. If you already parse in a worker/store and need AST control, keep using `nodes` + `final`.
 
 ## 3. Renderer settings that usually work well
 
@@ -89,7 +95,39 @@ See [Override Built-in Components](/guide/component-overrides).
 
 Start here when visuals look wrong: [Troubleshooting](/guide/troubleshooting#css-looks-wrong-start-here)
 
-## 6. When not to use this path
+## 6. Manual composable usage with `nodes`
+
+If you parse `nodes` yourself (worker, store, or custom AST pipeline), the built-in smooth streaming inside `MarkdownRender` does **not** activate — it only applies to the `content` path. Use `useSmoothMarkdownStream` directly to pace the raw text before parsing.
+
+```ts
+import { getMarkdown, parseMarkdownToStructure, useSmoothMarkdownStream } from 'markstream-vue'
+import { ref, watch } from 'vue'
+
+const stream = useSmoothMarkdownStream()
+
+// Feed incoming chunks from your event source
+eventSource.onmessage = (event) => {
+  stream.enqueue(event.data)
+}
+
+eventSource.addEventListener('done', () => {
+  stream.finish()
+})
+
+// Parse only the visible portion; final parsing waits until caught up
+const md = getMarkdown('chat')
+const nodes = ref([])
+
+watch([stream.visible, stream.final], () => {
+  nodes.value = parseMarkdownToStructure(stream.visible.value, md, {
+    final: stream.final.value,
+  })
+})
+```
+
+The composable returns reactive refs: `visible`, `source`, `caughtUp`, and `final`. Use `visible` for rendering and wait until `caughtUp` is `true` before considering the stream complete.
+
+## 7. When not to use this path
 
 - Use `content` when updates are infrequent or the page is basically static.
 - Use server-side preparse + `nodes` when another layer already owns Markdown parsing.

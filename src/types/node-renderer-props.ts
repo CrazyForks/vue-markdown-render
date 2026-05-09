@@ -1,4 +1,5 @@
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
+import type { SmoothMarkdownStreamOptions } from '../composables/useSmoothMarkdownStream'
 import type {
   CodeBlockMonacoOptions,
   CodeBlockMonacoTheme,
@@ -71,6 +72,17 @@ export interface NodeRendererProps {
   indexKey?: number | string
   /** Show a blinking typewriter cursor while streamed content grows. Default: false */
   typewriter?: boolean
+  /**
+   * Enable built-in smooth pacing for streaming `content` updates.
+   * - `true`: force-enable smooth streaming (content mode only)
+   * - `false`: force-disable smooth streaming
+   * - `'auto'` (default): enable only when typewriter/incremental mode is active
+   * Applies when rendering from `content` (not `nodes`).
+   * Default: 'auto'
+   */
+  smoothStreaming?: boolean | 'auto'
+  /** Options forwarded to the built-in smooth streaming composable. */
+  smoothStreamingOptions?: SmoothMarkdownStreamOptions
   /** Enable/disable non-code-node enter and streamed-text fade animations. Default: true */
   fade?: boolean
   /** Enable incremental/batched rendering of nodes to avoid large single flush costs. Default: true */
