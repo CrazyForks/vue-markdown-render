@@ -244,6 +244,7 @@ export interface MathBlockNodeProps {
     raw: string
     loading?: boolean
   }
+  indexKey?: number | string
 }
 
 export interface MathInlineNodeProps {

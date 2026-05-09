@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { MathBlockNodeProps } from '../../types/component-props'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 
 import { getKatex, getKatexSync } from '../MathInlineNode/katex'
+import { mathBlockMinHeightCache } from './minHeightCache'
 
 const props = defineProps<MathBlockNodeProps>()
 const containerEl = ref<HTMLElement | null>(null)
@@ -59,10 +60,43 @@ let isUnmounted = false
 let currentAbortController: AbortController | null = null
 const registerVisibility = useViewportPriority()
 let visibilityHandle: ReturnType<typeof registerVisibility> | null = null
+let resizeObserver: ResizeObserver | null = null
 const renderingLoading = ref(initialState.loading)
+const lockedMinHeight = ref(resolveCachedMinHeight())
 
 if (initialState.html || initialState.text)
   hasRenderedOnce = true
+
+function getHeightCacheKey() {
+  return props.indexKey != null
+    ? `math-block:${String(props.indexKey)}`
+    : ''
+}
+
+function resolveCachedMinHeight() {
+  const cacheKey = getHeightCacheKey()
+  return cacheKey ? (mathBlockMinHeightCache.get(cacheKey) ?? 0) : 0
+}
+
+function updateLockedMinHeight(height: number) {
+  if (!Number.isFinite(height) || height <= 0)
+    return
+
+  const nextMinHeight = Math.max(lockedMinHeight.value, height)
+  if (nextMinHeight === lockedMinHeight.value)
+    return
+
+  lockedMinHeight.value = nextMinHeight
+  const cacheKey = getHeightCacheKey()
+  if (cacheKey)
+    mathBlockMinHeightCache.set(cacheKey, nextMinHeight)
+}
+
+function captureHeight() {
+  nextTick(() => {
+    updateLockedMinHeight(containerEl.value?.offsetHeight ?? 0)
+  })
+}
 
 // Function to render math using KaTeX
 async function renderMath() {
@@ -73,6 +107,7 @@ async function renderMath() {
     renderedHtml.value = ''
     renderedText.value = props.node.raw
     hasRenderedOnce = true
+    captureHeight()
     return
   }
 
@@ -114,6 +149,7 @@ async function renderMath() {
       renderedText.value = ''
       hasRenderedOnce = true
       renderingLoading.value = false
+      captureHeight()
     })
     .catch(async (err: any) => {
       // ignore if a newer render was requested or component unmounted
@@ -145,6 +181,7 @@ async function renderMath() {
             renderedText.value = ''
             hasRenderedOnce = true
             renderingLoading.value = false
+            captureHeight()
             // populate worker client cache so future calls hit cache
             setKaTeXCache(mathContent.value, true, html)
           }
@@ -160,6 +197,7 @@ async function renderMath() {
         renderingLoading.value = false
         renderedHtml.value = ''
         renderedText.value = props.node.raw
+        captureHeight()
         return
       }
 
@@ -170,6 +208,7 @@ async function renderMath() {
         renderingLoading.value = false
         renderedHtml.value = ''
         renderedText.value = props.node.raw
+        captureHeight()
       }
     })
 }
@@ -180,7 +219,25 @@ watch(
     renderMath()
   },
 )
+
+watch(
+  () => props.indexKey,
+  () => {
+    lockedMinHeight.value = resolveCachedMinHeight()
+    captureHeight()
+  },
+)
+
 onMounted(() => {
+  if (typeof ResizeObserver !== 'undefined' && containerEl.value) {
+    resizeObserver = new ResizeObserver(() => {
+      updateLockedMinHeight(containerEl.value?.offsetHeight ?? 0)
+    })
+    resizeObserver.observe(containerEl.value)
+  }
+
+  captureHeight()
+
   if (renderedHtml.value)
     return
   renderMath()
@@ -193,6 +250,8 @@ onBeforeUnmount(() => {
     currentAbortController.abort()
     currentAbortController = null
   }
+  resizeObserver?.disconnect()
+  resizeObserver = null
   visibilityHandle?.destroy?.()
   visibilityHandle = null
 })
@@ -204,6 +263,7 @@ onBeforeUnmount(() => {
     class="math-block text-center overflow-x-auto relative"
     data-markstream-math="block"
     :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
+    :style="lockedMinHeight ? { minHeight: `${lockedMinHeight}px` } : undefined"
   >
     <Transition name="math-fade">
       <div v-if="renderingLoading && !renderedHtml && !renderedText" class="math-loading-overlay">
@@ -224,6 +284,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .math-block {
   min-height: var(--ms-size-math-min-height);
+  transition: min-height var(--ms-duration-overlay) var(--ms-ease-standard);
 }
 
 .math-loading-overlay {
@@ -267,7 +328,7 @@ onBeforeUnmount(() => {
 
 .math-fade-enter-active,
 .math-fade-leave-active {
-  transition: opacity var(--ms-duration-slow) var(--ms-ease-standard);
+  transition: all var(--ms-duration-slow) var(--ms-ease-standard);
 }
 
 .math-fade-enter-from,
