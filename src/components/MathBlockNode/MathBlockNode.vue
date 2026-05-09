@@ -6,7 +6,7 @@ import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 
 import { getKatex, getKatexSync } from '../MathInlineNode/katex'
-import { mathBlockMinHeightCache } from './minHeightCache'
+import { useMathBlockMinHeightCache } from './minHeightCache'
 
 const props = defineProps<MathBlockNodeProps>()
 const containerEl = ref<HTMLElement | null>(null)
@@ -58,6 +58,7 @@ let hasRenderedOnce = false
 let currentRenderId = 0
 let isUnmounted = false
 let currentAbortController: AbortController | null = null
+const minHeightCacheContext = useMathBlockMinHeightCache()
 const registerVisibility = useViewportPriority()
 let visibilityHandle: ReturnType<typeof registerVisibility> | null = null
 let resizeObserver: ResizeObserver | null = null
@@ -68,14 +69,19 @@ if (initialState.html || initialState.text)
   hasRenderedOnce = true
 
 function getHeightCacheKey() {
-  return props.indexKey != null
-    ? `math-block:${String(props.indexKey)}`
+  if (props.indexKey == null)
+    return ''
+
+  const scope = props.cacheScope ?? minHeightCacheContext?.scope
+  const scopedPrefix = scope != null && String(scope).length > 0
+    ? `${String(scope)}:`
     : ''
+  return `${scopedPrefix}math-block:${String(props.indexKey)}`
 }
 
 function resolveCachedMinHeight() {
   const cacheKey = getHeightCacheKey()
-  return cacheKey ? (mathBlockMinHeightCache.get(cacheKey) ?? 0) : 0
+  return cacheKey ? (minHeightCacheContext?.cache.get(cacheKey) ?? 0) : 0
 }
 
 function updateLockedMinHeight(height: number) {
@@ -89,7 +95,7 @@ function updateLockedMinHeight(height: number) {
   lockedMinHeight.value = nextMinHeight
   const cacheKey = getHeightCacheKey()
   if (cacheKey)
-    mathBlockMinHeightCache.set(cacheKey, nextMinHeight)
+    minHeightCacheContext?.cache.set(cacheKey, nextMinHeight)
 }
 
 function captureHeight() {
@@ -221,7 +227,7 @@ watch(
 )
 
 watch(
-  () => props.indexKey,
+  [() => props.indexKey, () => props.cacheScope],
   () => {
     lockedMinHeight.value = resolveCachedMinHeight()
     captureHeight()
