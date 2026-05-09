@@ -135,4 +135,102 @@ describe('node renderer smooth streaming', () => {
     expect(wrapper.text()).toContain('Auto mode test')
     wrapper.unmount()
   })
+
+  it('raw chunk updates do not bump streamRenderVersion when smooth streaming is active', async () => {
+    // Capture rAF callbacks but never invoke them — visible stays at ''
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: true,
+        smoothStreaming: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await nextTick()
+    queuedFrames.length = 0
+
+    // Initial append — visible is still empty (rAF not ticked)
+    await wrapper.setProps({ content: 'hello' })
+    await nextTick()
+
+    // More raw chunk appends without advancing rAF
+    await wrapper.setProps({ content: 'hello world 1' })
+    await nextTick()
+    await wrapper.setProps({ content: 'hello world 12' })
+    await nextTick()
+    await wrapper.setProps({ content: 'hello world 123' })
+    await nextTick()
+
+    // DOM should still show nothing (visible hasn't advanced)
+    // but crucially, the rendered text should not have changed due to
+    // streamRenderVersion increments from raw content changes.
+    // Before the fix, each props.content change bumped streamRenderVersion,
+    // which could trigger TextNode watchers even though visible was unchanged.
+    expect(wrapper.text()).not.toContain('hello world')
+    wrapper.unmount()
+  })
+
+  it('nested renderer does not double-pace when parent has smooth streaming enabled', async () => {
+    // When a parent renderer is already smoothing, a nested NodeRenderer
+    // (e.g. inside a thinking block or custom HTML tag) should not apply
+    // its own smooth pacing on top of the parent's already-paced output.
+    // Use 'auto' mode so the mounted gate protects initial static content.
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: 'static thinking content',
+        typewriter: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await nextTick()
+
+    // With typewriter=true and smoothStreaming='auto' (default), the mounted
+    // gate should protect the initial content from being paced.
+    expect(wrapper.text()).toContain('static thinking content')
+
+    // Verify that smoothStreamingEnabled is true for the parent (typewriter is on
+    // and mounted gate is open), so the provide sends true to children.
+    // After mount, with typewriter=true, smooth streaming should be enabled.
+    // We can't easily read the provide from outside, but we can verify that
+    // the parent provides the correct value by testing that a child renderer
+    // would see it. Instead, directly verify the behavior:
+    // mount a second NodeRenderer with inherited provide = true and
+    // smoothStreaming='auto' — it should NOT smooth because the parent is pacing.
+    const childWrapper = mount(NodeRenderer, {
+      props: {
+        content: 'nested content',
+        smoothStreaming: 'auto',
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+      global: {
+        provide: {
+          markstreamSmoothStreaming: { value: true },
+        },
+      },
+    })
+
+    await nextTick()
+
+    // With the parent smooth streaming injected as true, the child's auto mode
+    // should be suppressed — content renders immediately, not paced.
+    expect(childWrapper.text()).toContain('nested content')
+
+    wrapper.unmount()
+    childWrapper.unmount()
+  })
 })

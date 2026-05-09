@@ -150,12 +150,12 @@ const resolvedShowTooltips = computed<boolean | undefined>(() => {
 })
 const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
 const inheritedTypewriterCursor = inject<{ value?: boolean } | undefined>('markstreamTypewriterCursor', undefined)
+const inheritedSmoothStreaming = inject<{ value?: boolean } | undefined>('markstreamSmoothStreaming', undefined)
 const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
 const ownsTypewriterCursor = computed(() => inheritedTypewriterCursor?.value !== true)
 provide('markstreamShowTooltips', resolvedShowTooltips)
 provide('markstreamHtmlPolicy', resolvedHtmlPolicy)
 provide('markstreamTypewriter', computed(() => props.typewriter !== false))
-provide('markstreamSmoothStreaming', computed(() => props.smoothStreaming !== false))
 provide('markstreamFade', computed(() => props.fade !== false))
 provide('markstreamTypewriterCursor', computed(() => true))
 provide('markstreamTextStreamState', textStreamState)
@@ -165,6 +165,11 @@ const smoothStreamingEligible = computed(() => {
   if (props.smoothStreaming === false)
     return false
   if (props.nodes?.length)
+    return false
+  // When the parent renderer is already pacing content, avoid double-pacing
+  // in nested renderers (e.g. thinking blocks, custom tag content).
+  // Only applies in 'auto' mode — smoothStreaming === true explicitly opts in.
+  if (props.smoothStreaming !== true && inheritedSmoothStreaming?.value)
     return false
   if (props.smoothStreaming === true)
     return true
@@ -186,6 +191,7 @@ const smoothStreamingEnabled = computed(() => (
   hasMountedForSmoothStreaming.value
   && smoothStreamingEligible.value
 ))
+provide('markstreamSmoothStreaming', smoothStreamingEnabled)
 const renderContent = computed(() => (
   smoothStreamingEnabled.value
     ? smoothStream.visible.value
@@ -279,8 +285,14 @@ const instanceMsgId = props.customId
 const mathBlockMinHeightCache = createMathBlockMinHeightCache(instanceMsgId)
 const mathBlockCacheScope = computed(() => `${instanceMsgId}:${streamRenderVersion.value}`)
 provideMathBlockMinHeightCache(mathBlockMinHeightCache)
+const renderVersionSource = computed(() => {
+  if (props.nodes?.length)
+    return props.nodes
+  return renderContent.value
+})
+
 watch(
-  [() => props.content, () => props.nodes],
+  renderVersionSource,
   () => {
     mathBlockMinHeightCache.clear()
     streamRenderVersion.value += 1

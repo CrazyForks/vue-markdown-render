@@ -1,5 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref } from 'vue'
 
 export interface SmoothMarkdownStreamOptions {
   minCharsPerSecond?: number
@@ -226,7 +226,8 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
     rafId = 0
   }
 
-  onBeforeUnmount(cancelLoop)
+  if (getCurrentScope())
+    onScopeDispose(cancelLoop)
 
   return {
     source,

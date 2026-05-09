@@ -1,3 +1,4 @@
+import type { SmoothMarkdownStreamOptions } from '../src/composables/useSmoothMarkdownStream'
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
@@ -21,7 +22,7 @@ function hasUnpairedSurrogate(input: string) {
   return false
 }
 
-function mountStream(options = {}) {
+function mountStream(options: SmoothMarkdownStreamOptions = {}) {
   return mount(defineComponent({
     setup() {
       return useSmoothMarkdownStream(options)
@@ -138,7 +139,7 @@ describe('useSmoothMarkdownStream', () => {
   it('normalizes extreme option values', () => {
     const wrapper = mountStream({
       maxCharsPerCommit: 0,
-      maxCommitFPS: 0,
+      maxCommitFps: 0,
       minCharsPerSecond: 0,
       maxCharsPerSecond: -10,
     })
