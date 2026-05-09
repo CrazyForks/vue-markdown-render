@@ -858,8 +858,38 @@ export function parseInlineTokens(
     }
   }
 
+  function pushInlineTextContent(content: string, token: MarkdownToken) {
+    if (!content)
+      return
+
+    const parsed = parseInlineTokens([
+      { ...token, type: 'text', content, raw: content } as MarkdownToken,
+    ], content, pPreToken, options)
+
+    if (parsed.length === 1 && parsed[0]?.type === 'text') {
+      const text = parsed[0] as TextNode
+      pushText(String(text.content ?? ''), String(text.raw ?? text.content ?? ''))
+      return
+    }
+
+    for (const node of parsed)
+      pushNode(node)
+  }
+
   function hasEscapedMarkup(token: MarkdownToken, escapedPrefix: string) {
     return String(token.markup ?? '').startsWith(escapedPrefix)
+  }
+
+  function isMarkdownLinkBeforeLinkifiedUrl(content: string) {
+    if (!content.endsWith(']('))
+      return false
+
+    return tokens[i + 1]?.type === 'link_open'
+      && tokens[i + 1]?.markup === 'linkify'
+      && tokens[i + 2]?.type === 'text'
+      && tokens[i + 3]?.type === 'link_close'
+      && tokens[i + 4]?.type === 'text'
+      && String(tokens[i + 4]?.content ?? '').startsWith(')')
   }
 
   function stripTrailingMidStateMarker(content: string, token: MarkdownToken) {
@@ -1277,7 +1307,7 @@ export function parseInlineTokens(
     // Avoid synthesizing links from raw text only when the next token is
     // already a structured link_open. This prevents duplicates while still
     // allowing fallback for later tricky links in the same inline run.
-    if (tokens[i + 1]?.type !== 'link_open' && handleInlineLinkContent(content, token))
+    if ((tokens[i + 1]?.type !== 'link_open' || isMarkdownLinkBeforeLinkifiedUrl(content)) && handleInlineLinkContent(content, token))
       return
 
     const reparsedNodes = tryReparseCollapsedInlineText(rawContent)
@@ -1682,17 +1712,25 @@ export function parseInlineTokens(
         const last = tokens[i + 4]
         let index = 4
         let loading = true
-        if (last?.type === 'text' && last.content === ')') {
-          index++
-          loading = false
-        }
-        else if (last?.type === 'text' && last.content === '.') {
-          i++
+        if (last?.type === 'text') {
+          const lastContent = String(last.content ?? '')
+          if (lastContent.startsWith(')')) {
+            loading = false
+            const trailing = lastContent.slice(1)
+            if (trailing) {
+              last.content = trailing
+              last.raw = trailing
+            }
+            else {
+              index++
+            }
+          }
+          else if (lastContent === '.') {
+            i++
+          }
         }
 
-        if (textNodeContent) {
-          pushText(textNodeContent, textNodeContent)
-        }
+        pushInlineTextContent(textNodeContent, _token)
         const hrefFromToken = String(textToken.content ?? '')
         if (options?.validateLink && !options.validateLink(hrefFromToken)) {
           pushText(text, text)
@@ -1718,9 +1756,7 @@ export function parseInlineTokens(
       if (emphasisMatch) {
         textNodeContent = textNodeContent.replace(/\*+$/, '')
       }
-      if (textNodeContent) {
-        pushText(textNodeContent, textNodeContent)
-      }
+      pushInlineTextContent(textNodeContent, _token)
       if (!emphasisMatch)
         emphasisMatch = text.match(/^\*+/)
       if (!requireClosingStrong && emphasisMatch) {
