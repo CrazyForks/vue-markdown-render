@@ -14,13 +14,17 @@ Use this skill when the host app is Nuxt and SSR boundaries matter.
 3. Keep browser-only peers behind client-only boundaries.
    - Prefer `<client-only>` wrappers, `.client` plugins, or guarded setup paths.
 4. Import `markstream-vue/index.css` from a client-safe app shell or plugin.
-5. Start with `content`, and move to `nodes` plus `final` only when the UI is streaming.
+5. Start with `content`, and move to `nodes` plus `final` only when the UI needs custom AST control.
+   - For streaming AI chat, use `typewriter` or `:max-live-nodes="0"` — smooth streaming (`smooth-streaming="auto"`) paces visible output automatically.
+   - When smooth streaming is on, pair it with `:fade="false"` to avoid delta fade stacking with high-commit pacing.
+   - In SSR, avoid `smooth-streaming="true"` on first-screen content; the mounted gate inside `auto` prevents hydration mismatch.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 6. Validate with the smallest relevant Nuxt dev, build, or typecheck command.
 
 ## Default Decisions
 
 - SSR safety comes before feature completeness.
+- Smooth streaming is SSR-safe in `auto` mode (the default) because it gates on mount. Do not use `smooth-streaming="true"` for first-screen SSR content — it bypasses the mounted gate and can cause hydration mismatch or blank flash.
 - Avoid import-time access to browser globals from server code paths.
 - Treat Monaco, Mermaid workers, and similar heavy peers as client-only unless the repo already has a proven SSR pattern.
 - Keep `html-policy="safe"` and Mermaid strict mode unless the task is preserving trusted legacy rendering.

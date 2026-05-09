@@ -94,7 +94,7 @@ const nodes = computed(() =>
 如果你自己在 worker、store 或自定义 AST 管线中解析 `nodes`，`MarkdownRender` 内置的 smooth streaming **不会**启用——它只作用于 `content` 路径。你可以直接使用 `useSmoothMarkdownStream`，在解析前对原始文本做 pacing。
 
 ```ts
-import { useSmoothMarkdownStream, getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+import { getMarkdown, parseMarkdownToStructure, useSmoothMarkdownStream } from 'markstream-vue'
 import { ref, watch } from 'vue'
 
 const stream = useSmoothMarkdownStream()
@@ -102,7 +102,7 @@ const stream = useSmoothMarkdownStream()
 // 从事件源喂入新 chunk
 eventSource.onmessage = (event) => {
   stream.enqueue(event.data)
-})
+}
 
 eventSource.addEventListener('done', () => {
   stream.finish()

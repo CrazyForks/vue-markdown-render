@@ -100,7 +100,7 @@ Start here when visuals look wrong: [Troubleshooting](/guide/troubleshooting#css
 If you parse `nodes` yourself (worker, store, or custom AST pipeline), the built-in smooth streaming inside `MarkdownRender` does **not** activate — it only applies to the `content` path. Use `useSmoothMarkdownStream` directly to pace the raw text before parsing.
 
 ```ts
-import { useSmoothMarkdownStream, getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+import { getMarkdown, parseMarkdownToStructure, useSmoothMarkdownStream } from 'markstream-vue'
 import { ref, watch } from 'vue'
 
 const stream = useSmoothMarkdownStream()
@@ -108,7 +108,7 @@ const stream = useSmoothMarkdownStream()
 // Feed incoming chunks from your event source
 eventSource.onmessage = (event) => {
   stream.enqueue(event.data)
-})
+}
 
 eventSource.addEventListener('done', () => {
   stream.finish()

@@ -29,8 +29,10 @@ Read [references/adoption-checklist.md](references/adoption-checklist.md) before
 5. Review gaps honestly.
    - Do not claim 1:1 parity where none exists.
    - Call out parser, plugin, security, or HTML behavior that still needs manual review.
-6. Treat streaming as a second pass unless clearly required now.
-   - Move to `nodes` only when the app receives streaming or high-frequency updates.
+6. Consider smooth streaming before jumping to `nodes`.
+   - If the app streams `content` and only needs pacing, `smooth-streaming="auto"` (the default) handles it without requiring `nodes`.
+   - Move to `nodes` only when the app needs custom AST control, worker preparsing, or high-frequency structural updates.
+   - When smooth streaming is on, pair it with `:fade="false"`.
 7. Validate and summarize.
    - Run the smallest relevant tests or build.
    - Report direct mappings, TODOs, and remaining verification work.
@@ -38,6 +40,7 @@ Read [references/adoption-checklist.md](references/adoption-checklist.md) before
 ## Default Decisions
 
 - Renderer swap first, streaming optimization second.
+- Smooth streaming is an intermediate option between "just content" and "full nodes migration": it paces visible output without requiring AST control.
 - Preserve safety over feature parity when HTML or security rules are involved.
 - Prefer explicit TODOs over vague claims.
 - Recommend against migration when the current stack depends heavily on transforms that Markstream does not mirror directly.
@@ -47,6 +50,7 @@ Read [references/adoption-checklist.md](references/adoption-checklist.md) before
 
 - `docs/guide/react-markdown-migration.md`
 - `docs/guide/react-markdown-migration-cookbook.md`
+- `docs/guide/ai-chat-streaming.md`
 - `docs/guide/installation.md`
 - `docs/guide/component-overrides.md`
 - `docs/guide/advanced.md`

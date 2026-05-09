@@ -25,7 +25,9 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
    - Import `katex/dist/katex.min.css` when math is enabled.
 4. Add the smallest working render example.
     - Use `content` for static or low-frequency rendering.
-    - Use `nodes` plus `final` when the app receives streaming updates.
+    - For streaming AI chat, use `typewriter` or `:max-live-nodes="0"` — smooth streaming (`smooth-streaming="auto"`) paces visible output automatically. Pair with `:fade="false"`.
+    - Use `nodes` plus `final` when the app needs custom AST control, worker preparsing, or structural updates beyond pacing.
+    - For manual pacing with `nodes`, use `useSmoothMarkdownStream`: `enqueue()` chunks, `finish()` when done, render from `visible`, wait for `caughtUp` before final parsing.
     - Preserve the default hardening: HTML policies now default to `safe`, and Mermaid runs in strict mode by default.
 5. Keep customization scoped.
     - If the task requires overrides, prefer `customId` / `custom-id` plus scoped `setCustomComponents(...)`.
@@ -37,6 +39,7 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
 
 - Prefer the minimal peer set over "install everything".
 - Prefer `content` unless the app is clearly SSE, chat, token-streaming, or worker-preparsed.
+- When using `content` for streaming, smooth streaming (`smooth-streaming="auto"`) is on by default for `typewriter` or `max-live-nodes <= 0`. Set `:smooth-streaming="false"` to preserve raw chunk cadence.
 - Treat CSS order as a first-class part of installation, not a later cleanup.
 - When the request includes SSR, explicitly gate browser-only peers behind client-only boundaries.
 - Do not widen HTML or Mermaid security defaults unless the user explicitly needs trusted legacy compatibility.
