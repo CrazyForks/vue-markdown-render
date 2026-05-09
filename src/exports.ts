@@ -63,7 +63,10 @@ export type { D2Loader } from './components/D2BlockNode/d2'
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
-export type { SmoothMarkdownStreamOptions } from './composables/useSmoothMarkdownStream'
+export type {
+  SmoothMarkdownStreamController,
+  SmoothMarkdownStreamOptions,
+} from './composables/useSmoothMarkdownStream'
 export type {
   CodeBlockDiffAppearance,
   CodeBlockDiffHideUnchangedRegions,

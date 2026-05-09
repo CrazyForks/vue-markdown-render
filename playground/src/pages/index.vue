@@ -789,6 +789,7 @@ onBeforeUnmount(() => {
           <MarkdownRender
             :content="content"
             :smooth-streaming="smoothStreaming"
+            typewriter
             :code-block-dark-theme="selectedTheme || undefined"
             :code-block-light-theme="selectedTheme || undefined"
             :code-block-monaco-options="playgroundMonacoOptions"

@@ -5,7 +5,7 @@ import type { CustomComponents } from '../../types'
 import type { CodeBlockPreviewPayload } from '../../types/component-props'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
-import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, useAttrs, watch } from 'vue'
+import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, useAttrs, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -90,7 +90,7 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
   showTooltips: true,
   typewriter: false,
-  smoothStreaming: true,
+  smoothStreaming: 'auto',
   fade: true,
   batchRendering: true,
   debugPerformance: false,
@@ -135,7 +135,7 @@ const debugPerformanceEnabled = computed(() => props.debugPerformance && isClien
 const attrs = useAttrs() as RendererAttrs
 const textStreamState = new Map<string, string>()
 const streamRenderVersion = ref(0)
-const smoothStream = useSmoothMarkdownStream()
+const smoothStream = useSmoothMarkdownStream(props.smoothStreamingOptions)
 const experimentContainerWidth = ref(0)
 const simpleTextProbeProfile = ref(createEmptySimpleTextProbeProfile())
 const resolvedShowTooltips = computed<boolean | undefined>(() => {
@@ -161,10 +161,30 @@ provide('markstreamTypewriterCursor', computed(() => true))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)
 
+const smoothStreamingEligible = computed(() => {
+  if (props.smoothStreaming === false)
+    return false
+  if (props.nodes?.length)
+    return false
+  if (props.smoothStreaming === true)
+    return true
+  // 'auto': only enable when typewriter/incremental mode is active
+  return props.typewriter === true || (props.maxLiveNodes ?? 0) <= 0
+})
+
+// Mounted gate: prevent smooth streaming from pacing initial static content
+// on the first client render (avoids SSR hydration mismatch and blank flash).
+// Only applies in 'auto' mode — when smoothStreaming === true, the user
+// explicitly opted in and the gate is always open.
+const hasMountedForSmoothStreaming = ref(!isClient || props.smoothStreaming === true)
+
+onMounted(() => {
+  hasMountedForSmoothStreaming.value = true
+})
+
 const smoothStreamingEnabled = computed(() => (
-  props.smoothStreaming !== false
-  && !props.nodes?.length
-  && (props.typewriter === true || (props.maxLiveNodes ?? 0) <= 0)
+  hasMountedForSmoothStreaming.value
+  && smoothStreamingEligible.value
 ))
 const renderContent = computed(() => (
   smoothStreamingEnabled.value

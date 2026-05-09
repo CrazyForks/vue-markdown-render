@@ -43,16 +43,21 @@ interface GraphemeSegmenter {
 
 export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {}): SmoothMarkdownStreamController {
   const {
-    minCharsPerSecond = 40,
-    maxCharsPerSecond = 1000,
+    minCharsPerSecond: rawMinCps = 40,
+    maxCharsPerSecond: rawMaxCps = 1000,
     targetLatencyMs = 900,
     catchUpLatencyMs = 350,
     catchUpThreshold = 600,
-    maxCommitFps = 30,
+    maxCommitFps: rawMaxFps = 30,
     startDelayMs = 80,
-    maxCharsPerCommit = 80,
+    maxCharsPerCommit: rawMaxChars = 80,
     flushOnFinish = false,
   } = options
+
+  const minCharsPerSecond = Math.max(1, rawMinCps)
+  const maxCharsPerSecond = Math.max(minCharsPerSecond, rawMaxCps)
+  const maxCommitFps = Math.max(1, Math.trunc(rawMaxFps || 30))
+  const maxCharsPerCommit = Math.max(1, Math.trunc(rawMaxChars || 1))
 
   const source = ref('')
   const visible = ref('')
@@ -69,21 +74,32 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
   let lastTick = 0
   let charBudget = 0
   let currentCps = minCharsPerSecond
+  let hasStarted = false
 
   function enqueue(chunk: string) {
     if (!chunk)
       return
 
+    if (done.value)
+      done.value = false
+
+    const hadSource = source.value.length > 0
     const wasIdle = pendingChars.value <= 0
     source.value += chunk
 
     if (wasIdle) {
       const t = now()
-      startedAt = t
+      // Only apply startDelay for the very first batch of a new stream.
+      // If the stream already had content and wasn't finished, skip the delay
+      // so subsequent appends resume smoothly without an artificial pause.
+      startedAt = hadSource && hasStarted
+        ? t - startDelayMs
+        : t
       lastTick = t
       charBudget = 0
     }
 
+    hasStarted = true
     ensureLoop()
   }
 
@@ -112,6 +128,7 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
     visible.value = initialMarkdown
     done.value = false
     paused.value = false
+    hasStarted = false
 
     startedAt = 0
     lastTick = 0

@@ -121,4 +121,32 @@ describe('useSmoothMarkdownStream', () => {
     expect((wrapper.vm as any).pendingChars).toBe(0)
     wrapper.unmount()
   })
+
+  it('reopens the stream when enqueue is called after finish', async () => {
+    const wrapper = mountStream()
+
+    ;(wrapper.vm as any).enqueue('hello')
+    ;(wrapper.vm as any).finish({ flush: true })
+    expect((wrapper.vm as any).final).toBe(true)
+
+    ;(wrapper.vm as any).enqueue(' world')
+    expect((wrapper.vm as any).done).toBe(false)
+    expect((wrapper.vm as any).final).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('normalizes extreme option values', () => {
+    const wrapper = mountStream({
+      maxCharsPerCommit: 0,
+      maxCommitFPS: 0,
+      minCharsPerSecond: 0,
+      maxCharsPerSecond: -10,
+    })
+
+    // Should not throw and should still function
+    ;(wrapper.vm as any).enqueue('test')
+    ;(wrapper.vm as any).flush()
+    expect((wrapper.vm as any).visible).toBe('test')
+    wrapper.unmount()
+  })
 })
