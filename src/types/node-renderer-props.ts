@@ -71,6 +71,12 @@ export interface NodeRendererProps {
   indexKey?: number | string
   /** Show a blinking typewriter cursor while streamed content grows. Default: false */
   typewriter?: boolean
+  /**
+   * Enable built-in smooth pacing for streaming `content` updates.
+   * Applies when rendering from `content` (not `nodes`) and typewriter/incremental mode is active.
+   * Default: true
+   */
+  smoothStreaming?: boolean
   /** Enable/disable non-code-node enter and streamed-text fade animations. Default: true */
   fade?: boolean
   /** Enable incremental/batched rendering of nodes to avoid large single flush costs. Default: true */

@@ -18,6 +18,7 @@ describe('playground Vue thinking node', () => {
         customId,
         deferNodesUntilVisible: false,
         maxLiveNodes: 0,
+        smoothStreaming: false,
         typewriter: true,
         viewportPriority: false,
       },

@@ -28,6 +28,7 @@ async function mountMarkdown(markdown: string, props: Record<string, any> = {}, 
   const wrapper = mount(MarkdownRender, {
     props: {
       content: markdown,
+      smoothStreaming: false,
       ...props,
       customMarkdownIt: (md: any) => md.use(markdownItEmoji),
     },

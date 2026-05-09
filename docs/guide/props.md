@@ -22,6 +22,7 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 | `custom-markdown-it` | `(md: MarkdownIt) => MarkdownIt` | – | Customize the internal MarkdownIt instance (add plugins, tweak options). |
 | `debug-performance` | `boolean` | `false` | Logs parse/render timing and virtualization stats (dev only). |
 | `typewriter` | `boolean` | `false` | Shows the blinking typewriter cursor while streamed content grows. |
+| `smooth-streaming` | `boolean` | `true` | Enables built-in pacing for streaming `content` updates in typewriter/incremental mode. Set `false` to render with raw chunk cadence. |
 | `fade` | `boolean` | `true` | Enables non-code-node enter fade and appended-text fade. Disable if you need zero animation for SSR snapshots. |
 
 ### Security defaults and compatibility opt-outs
@@ -74,6 +75,7 @@ Use `html-policy="escape"` when you want literal HTML text to stay visible inste
 | `max-live-nodes` | `320` | Virtualization threshold; set `0` to disable virtualization (renders everything). |
 | `live-node-buffer` | `60` | Overscan window (how many nodes to keep before/after the focus range). |
 | `batch-rendering` | `true` | Incremental rendering batches (only when `max-live-nodes <= 0`). |
+| `smooth-streaming` | `true` | Built-in stream pacing in typewriter/incremental mode (`typewriter` or `max-live-nodes <= 0`). |
 | `initial-render-batch-size` | `40` | How many nodes render immediately before batching begins. |
 | `render-batch-size` | `80` | How many nodes render per batch tick. |
 | `render-batch-delay` | `16` | Extra delay (ms) before each batch after rAF. |

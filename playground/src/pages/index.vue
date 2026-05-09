@@ -57,6 +57,7 @@ const streamChunkSizeMax = useLocalStorage<number>('vmr-settings-stream-chunk-si
 const streamBurstiness = useLocalStorage<number>('vmr-settings-stream-burstiness', 35)
 const streamTransportMode = useLocalStorage<StreamTransportMode>('vmr-settings-stream-transport-mode', 'readable-stream')
 const streamSliceMode = useLocalStorage<StreamSliceMode>('vmr-settings-stream-slice-mode', 'pure-random')
+const smoothStreaming = useLocalStorage<boolean>('vmr-settings-smooth-streaming', true)
 const normalizedChunkDelayRange = computed(() => normalizeStreamRange(
   Number(streamChunkDelayMin.value),
   Number(streamChunkDelayMax.value),
@@ -647,6 +648,30 @@ onBeforeUnmount(() => {
             </div>
           </button>
         </div>
+
+        <div class="setting-row-inline">
+          <label class="setting-label">Smooth Stream</label>
+          <button
+            class="theme-toggle"
+            :class="{ 'theme-toggle--dark': smoothStreaming }"
+            @click.stop="smoothStreaming = !smoothStreaming"
+          >
+            <div class="theme-toggle__thumb">
+              <Transition
+                enter-active-class="transition-all duration-300 ease-out"
+                leave-active-class="transition-all duration-200 ease-in"
+                enter-from-class="opacity-0 scale-0 rotate-90"
+                enter-to-class="opacity-100 scale-100 rotate-0"
+                leave-from-class="opacity-100 scale-100 rotate-0"
+                leave-to-class="opacity-0 scale-0 rotate-90"
+                mode="out-in"
+              >
+                <Icon v-if="smoothStreaming" key="smooth-on" icon="carbon:checkmark" class="theme-toggle__icon theme-toggle__icon--moon" />
+                <Icon v-else key="smooth-off" icon="carbon:close" class="theme-toggle__icon theme-toggle__icon--sun" />
+              </Transition>
+            </div>
+          </button>
+        </div>
       </aside>
     </Transition>
 
@@ -763,11 +788,11 @@ onBeforeUnmount(() => {
         <main ref="messagesContainer" class="chat-messages chatbot-messages">
           <MarkdownRender
             :content="content"
+            :smooth-streaming="smoothStreaming"
             :code-block-dark-theme="selectedTheme || undefined"
             :code-block-light-theme="selectedTheme || undefined"
             :code-block-monaco-options="playgroundMonacoOptions"
             :themes="themes"
-            typewriter
             :custom-html-tags="['thinking']"
             :escape-html-tags="['question', 'answer']"
             :is-dark="isDark"

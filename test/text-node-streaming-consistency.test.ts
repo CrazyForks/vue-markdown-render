@@ -13,6 +13,7 @@ describe('text node streaming consistency', () => {
       props: {
         content: '1. **记忆化递归（动态规划',
         batchRendering: false,
+        smoothStreaming: false,
         viewportPriority: false,
         deferNodesUntilVisible: false,
         maxLiveNodes: 0,
@@ -62,6 +63,7 @@ describe('text node streaming consistency', () => {
       props: {
         content: initial,
         batchRendering: false,
+        smoothStreaming: false,
         deferNodesUntilVisible: false,
         viewportPriority: false,
         maxLiveNodes: 0,

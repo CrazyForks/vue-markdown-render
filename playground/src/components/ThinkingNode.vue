@@ -17,6 +17,7 @@ const props = defineProps<{
 }>()
 
 const inheritedTypewriter = inject<{ value?: boolean } | undefined>('markstreamTypewriter', undefined)
+const inheritedSmoothStreaming = inject<{ value?: boolean } | undefined>('markstreamSmoothStreaming', undefined)
 const resolvedContent = computed(() => String(props.node.content ?? ''))
 const resolvedCustomHtmlTags = computed(() => props.customHtmlTags?.length ? props.customHtmlTags : ['thinking', 'think'])
 const resolvedFinal = computed(() => typeof props.node.loading === 'boolean' ? !props.node.loading : undefined)
@@ -31,6 +32,7 @@ function toOptionalBoolean(value: unknown) {
 }
 
 const resolvedTypewriter = computed(() => toOptionalBoolean(props.typewriter) ?? inheritedTypewriter?.value ?? true)
+const resolvedSmoothStreaming = computed(() => inheritedSmoothStreaming?.value)
 </script>
 
 <template>
@@ -43,6 +45,7 @@ const resolvedTypewriter = computed(() => toOptionalBoolean(props.typewriter) ??
       :index-key="nestedIndexKey"
       :is-dark="isDark"
       :typewriter="resolvedTypewriter"
+      :smooth-streaming="resolvedSmoothStreaming"
       :viewport-priority="false"
       :defer-nodes-until-visible="false"
       :batch-rendering="false"

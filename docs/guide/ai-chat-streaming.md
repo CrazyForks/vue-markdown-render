@@ -21,36 +21,42 @@ Install only the peers you actually expect to show up in responses.
 
 ## 2. Recommended data flow
 
-For frequent updates, keep parsing outside `MarkdownRender` and pass `nodes` + `final`.
+For jittery token streams, use built-in smooth pacing on `MarkdownRender`.
 
 ```vue
 <script setup lang="ts">
-import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
-import { computed, ref } from 'vue'
+import MarkdownRender from 'markstream-vue'
+import { ref } from 'vue'
 
 const streamedText = ref('')
 const final = ref(false)
-const md = getMarkdown('chat-message')
-
-const nodes = computed(() =>
-  parseMarkdownToStructure(streamedText.value, md, { final: final.value }),
-)
 </script>
 
 <template>
   <MarkdownRender
     custom-id="chat"
-    :nodes="nodes"
+    :content="streamedText"
     :final="final"
+    :max-live-nodes="0"
+    :smooth-streaming="true"
+    :batch-rendering="true"
+    :render-batch-size="16"
+    :render-batch-delay="8"
+    :render-batch-budget-ms="4"
+    :fade="false"
+    :typewriter="true"
   />
 </template>
 ```
 
 Why this path works better:
 
-- `MarkdownRender` does not need to reparse the full string on every tiny token update.
-- You can move parsing into a store, worker, or message pipeline later without changing the renderer contract.
+- Incoming chunks can be bursty while visible output remains steady.
+- Backlog-aware pacing speeds up automatically when pending text grows.
+- Final parsing waits for visible content to catch up, so end-of-stream settling is stable.
 - `custom-id="chat"` gives you a scoped place to theme the chat surface or override one renderer safely.
+
+Turn it off per surface with `:smooth-streaming="false"` if you want raw chunk cadence. If you already parse in a worker/store and need AST control, keep using `nodes` + `final`.
 
 ## 3. Renderer settings that usually work well
 

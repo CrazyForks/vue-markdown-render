@@ -259,35 +259,37 @@ export default defineNuxtPlugin((nuxtApp) => {
 
 ## ⏱️ 30 秒流式接入
 
-用 SSE / WebSocket 增量渲染 Markdown：
+用 SSE / WebSocket 结合内置平滑节奏渲染 Markdown：
 
 ```ts
-import type { ParsedNode } from 'markstream-vue'
-import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
 
-const nodes = ref<ParsedNode[]>([])
-const buffer = ref('')
-const md = getMarkdown()
+const content = ref('')
+const final = ref(false)
 
-function addChunk(chunk: string) {
-  buffer.value += chunk
-  nodes.value = parseMarkdownToStructure(buffer.value, md)
+eventSource.onmessage = (event) => {
+  content.value += event.data
 }
-
-// 例如在 SSE / onmessage 处理器中
-eventSource.onmessage = event => addChunk(event.data)
+eventSource.addEventListener('done', () => {
+  final.value = true
+})
 
 // template
 // <MarkdownRender
-//   :nodes="nodes"
+//   :content="content"
+//   :final="final"
 //   :max-live-nodes="0"
-//   :batch-rendering="{
-//     renderBatchSize: 16,
-//     renderBatchDelay: 8,
-//   }"
+//   :batch-rendering="true"
+//   :render-batch-size="16"
+//   :render-batch-delay="8"
+//   :render-batch-budget-ms="4"
+//   :fade="false"
+//   :typewriter="true"
 // />
 ```
+
+`smooth-streaming` 在打字机/增量模式（`typewriter` 或 `max-live-nodes <= 0`）默认开启；如果希望严格按原始 chunk 节奏显示，可按实例设置 `:smooth-streaming="false"`。
 
 按页面需要切换渲染风格：
 

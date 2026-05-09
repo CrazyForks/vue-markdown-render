@@ -258,35 +258,37 @@ Then use `<MarkdownRender :content="md" />` in your pages.
 
 ## ⏱️ Streaming in 30 seconds
 
-Render streamed Markdown (SSE/websocket) with incremental updates:
+Render streamed Markdown (SSE/websocket) with built-in smooth pacing:
 
 ```ts
-import type { ParsedNode } from 'markstream-vue'
-import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
 import { ref } from 'vue'
 
-const nodes = ref<ParsedNode[]>([])
-const buffer = ref('')
-const md = getMarkdown()
+const content = ref('')
+const final = ref(false)
 
-function addChunk(chunk: string) {
-  buffer.value += chunk
-  nodes.value = parseMarkdownToStructure(buffer.value, md)
+eventSource.onmessage = (event) => {
+  content.value += event.data
 }
-
-// e.g., inside your SSE/onmessage handler
-eventSource.onmessage = event => addChunk(event.data)
+eventSource.addEventListener('done', () => {
+  final.value = true
+})
 
 // template
 // <MarkdownRender
-//   :nodes="nodes"
+//   :content="content"
+//   :final="final"
 //   :max-live-nodes="0"
-//   :batch-rendering="{
-//     renderBatchSize: 16,
-//     renderBatchDelay: 8,
-//   }"
+//   :batch-rendering="true"
+//   :render-batch-size="16"
+//   :render-batch-delay="8"
+//   :render-batch-budget-ms="4"
+//   :fade="false"
+//   :typewriter="true"
 // />
 ```
+
+`smooth-streaming` is enabled by default in typewriter/incremental mode (`typewriter` or `max-live-nodes <= 0`). Disable per surface with `:smooth-streaming="false"` if you want raw chunk cadence.
 
 Switch rendering style per surface:
 
@@ -332,7 +334,7 @@ const md = getMarkdown() // match server setup
 
 function addChunk(chunk: string) {
   buffer.value += chunk
-  nodes.value = parseMarkdownToStructure(buffer.value, md)
+  nodes.value = parseMarkdownToStructure(buffer.value, md, { final: false })
 }
 ```
 
