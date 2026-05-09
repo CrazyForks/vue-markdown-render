@@ -125,6 +125,7 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.7.6",
+    "markstream-core": "workspace:*",
     "stream-markdown-parser": "workspace:*",
     "vue-demi": "^0.14.10"
   },

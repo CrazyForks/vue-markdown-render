@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { resolveStreamingTextUpdate } from 'markstream-core'
 import { computed, inject, ref, useAttrs, watch } from 'vue'
 import { useKatexReady } from '../../composables/useKatexReady'
 
@@ -39,6 +40,7 @@ const streamStateKey = computed(() => {
 })
 const settledContent = ref(props.node.content)
 const streamedDelta = ref('')
+let lastStreamVersion: number | undefined = inheritedStreamVersion?.value
 const streamFadeVersion = ref(0)
 
 function getRenderedContent() {
@@ -59,42 +61,25 @@ function settleStreamedDelta() {
 
 watch(
   [() => props.node.content, streamStateKey, fadeEnabled, () => inheritedStreamVersion?.value],
-  ([next]) => {
+  ([next, _key, _fade, version]) => {
     const normalized = String(next ?? '')
-    const rendered = getRenderedContent()
     const key = streamStateKey.value
-    const previousPersisted = key
-      ? inheritedTextStreamState?.get(key)
-      : undefined
-    const previousContent = previousPersisted ?? rendered
+    const versionChanged = version !== lastStreamVersion
+    lastStreamVersion = version
 
-    if (!fadeEnabled.value) {
-      setFullContent(normalized)
-      if (key)
-        inheritedTextStreamState?.set(key, normalized)
-      return
-    }
+    const result = resolveStreamingTextUpdate({
+      nextContent: normalized,
+      persistedContent: key ? inheritedTextStreamState?.get(key) : undefined,
+      currentState: { settledContent: settledContent.value, streamedDelta: streamedDelta.value },
+      typewriterEnabled: fadeEnabled.value,
+      streamRenderVersionChanged: versionChanged,
+    })
 
-    if (normalized === previousContent) {
-      if (streamedDelta.value)
-        settleStreamedDelta()
-      else if (rendered !== normalized)
-        setFullContent(normalized)
-      if (key)
-        inheritedTextStreamState?.set(key, normalized)
-      return
-    }
-
-    if (previousContent && normalized.startsWith(previousContent) && normalized.length > previousContent.length) {
-      settledContent.value = previousContent
-      streamedDelta.value = normalized.slice(previousContent.length)
+    settledContent.value = result.settledContent
+    streamedDelta.value = result.streamedDelta
+    if (result.appended)
       streamFadeVersion.value += 1
-      if (key)
-        inheritedTextStreamState?.set(key, normalized)
-      return
-    }
 
-    setFullContent(normalized)
     if (key)
       inheritedTextStreamState?.set(key, normalized)
   },

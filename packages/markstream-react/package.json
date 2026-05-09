@@ -126,6 +126,7 @@
   "dependencies": {
     "@floating-ui/dom": "^1.7.6",
     "clsx": "^2.1.1",
+    "markstream-core": "workspace:*",
     "stream-markdown-parser": "workspace:*"
   },
   "devDependencies": {

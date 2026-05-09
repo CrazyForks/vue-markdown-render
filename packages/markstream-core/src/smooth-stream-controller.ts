@@ -1,0 +1,322 @@
+import type { SmoothMarkdownStreamOptions, SmoothStreamNotify } from './types'
+
+interface GraphemeSlice {
+  text: string
+  graphemeCount: number
+}
+
+interface GraphemeSegment {
+  segment: string
+}
+
+interface GraphemeSegmenter {
+  segment: (input: string) => Iterable<GraphemeSegment>
+}
+
+function toPositiveFiniteNumber(value: unknown, fallback: number, min = 1) {
+  const normalized = Number(value)
+  return Number.isFinite(normalized)
+    ? Math.max(min, normalized)
+    : fallback
+}
+
+function toNonNegativeFiniteNumber(value: unknown, fallback: number) {
+  const normalized = Number(value)
+  return Number.isFinite(normalized)
+    ? Math.max(0, normalized)
+    : fallback
+}
+
+export class SmoothMarkdownStreamController {
+  source: string = ''
+  visible: string = ''
+  done: boolean = false
+  paused: boolean = false
+
+  private readonly minCharsPerSecond: number
+  private readonly maxCharsPerSecond: number
+  private readonly normalizedTargetLatencyMs: number
+  private readonly normalizedCatchUpLatencyMs: number
+  private readonly normalizedCatchUpThreshold: number
+  private readonly normalizedStartDelayMs: number
+  private readonly maxCommitFps: number
+  private readonly maxCharsPerCommit: number
+  private readonly flushOnFinish: boolean
+  private readonly segmenter: GraphemeSegmenter | null
+  private readonly notify: SmoothStreamNotify | undefined
+
+  private rafId = 0
+  private startedAt = 0
+  private lastTick = 0
+  private charBudget = 0
+  private currentCps: number
+  private hasStarted = false
+
+  constructor(options: SmoothMarkdownStreamOptions = {}, notify?: SmoothStreamNotify) {
+    const {
+      minCharsPerSecond: rawMinCps = 40,
+      maxCharsPerSecond: rawMaxCps = 1000,
+      targetLatencyMs: rawTargetLatencyMs = 900,
+      catchUpLatencyMs: rawCatchUpLatencyMs = 350,
+      catchUpThreshold: rawCatchUpThreshold = 600,
+      maxCommitFps: rawMaxFps = 30,
+      startDelayMs: rawStartDelayMs = 80,
+      maxCharsPerCommit: rawMaxChars = 80,
+      flushOnFinish = false,
+    } = options
+
+    this.minCharsPerSecond = toPositiveFiniteNumber(rawMinCps, 40, 1)
+    this.maxCharsPerSecond = Math.max(
+      this.minCharsPerSecond,
+      toPositiveFiniteNumber(rawMaxCps, 1000, 1),
+    )
+    this.normalizedTargetLatencyMs = toPositiveFiniteNumber(rawTargetLatencyMs, 900, 1)
+    this.normalizedCatchUpLatencyMs = toPositiveFiniteNumber(rawCatchUpLatencyMs, 350, 1)
+    this.normalizedCatchUpThreshold = toNonNegativeFiniteNumber(rawCatchUpThreshold, 600)
+    this.normalizedStartDelayMs = toNonNegativeFiniteNumber(rawStartDelayMs, 80)
+    this.maxCommitFps = Math.trunc(toPositiveFiniteNumber(rawMaxFps, 30, 1))
+    this.maxCharsPerCommit = Math.trunc(toPositiveFiniteNumber(rawMaxChars, 80, 1))
+    this.flushOnFinish = flushOnFinish
+    this.segmenter = createGraphemeSegmenter()
+    this.notify = notify
+    this.currentCps = this.minCharsPerSecond
+  }
+
+  get pendingChars(): number {
+    return Math.max(0, this.source.length - this.visible.length)
+  }
+
+  get caughtUp(): boolean {
+    return this.pendingChars === 0
+  }
+
+  get final(): boolean {
+    return this.done && this.caughtUp
+  }
+
+  enqueue(chunk: string): void {
+    if (!chunk)
+      return
+
+    if (this.done) {
+      this.done = false
+      this.emit('done')
+    }
+
+    const hadSource = this.source.length > 0
+    const wasIdle = this.pendingChars <= 0
+    this.source += chunk
+    this.emit('source')
+
+    if (wasIdle) {
+      const t = now()
+      // Only apply startDelay for the very first batch of a new stream.
+      // If the stream already had content and wasn't finished, skip the delay
+      // so subsequent appends resume smoothly without an artificial pause.
+      this.startedAt = hadSource && this.hasStarted
+        ? t - this.normalizedStartDelayMs
+        : t
+      this.lastTick = t
+      this.charBudget = 0
+    }
+
+    this.hasStarted = true
+    this.ensureLoop()
+  }
+
+  finish(finishOptions: { flush?: boolean } = {}): void {
+    this.done = true
+    this.emit('done')
+
+    if (finishOptions.flush ?? this.flushOnFinish) {
+      this.flush()
+      return
+    }
+
+    this.ensureLoop()
+  }
+
+  flush(): void {
+    this.visible = this.source
+    this.charBudget = 0
+    this.currentCps = this.minCharsPerSecond
+    this.cancelLoop()
+    this.emit('visible')
+  }
+
+  reset(initialMarkdown = ''): void {
+    this.cancelLoop()
+
+    this.source = initialMarkdown
+    this.visible = initialMarkdown
+    this.done = false
+    this.paused = false
+    this.hasStarted = false
+
+    this.startedAt = 0
+    this.lastTick = 0
+    this.charBudget = 0
+    this.currentCps = this.minCharsPerSecond
+
+    this.emit('source')
+    this.emit('visible')
+    this.emit('done')
+    this.emit('paused')
+  }
+
+  pause(): void {
+    this.paused = true
+    this.cancelLoop()
+    this.emit('paused')
+  }
+
+  resume(): void {
+    if (!this.paused)
+      return
+
+    this.paused = false
+    const t = now()
+    this.lastTick = t
+    this.startedAt ||= t
+    this.emit('paused')
+    this.ensureLoop()
+  }
+
+  destroy(): void {
+    this.cancelLoop()
+  }
+
+  private ensureLoop(): void {
+    if (this.rafId || this.paused || this.pendingChars <= 0)
+      return
+
+    if (typeof requestAnimationFrame !== 'function') {
+      this.flush()
+      return
+    }
+
+    this.rafId = requestAnimationFrame(this.tick)
+  }
+
+  private tick = (timestamp: number): void => {
+    this.rafId = 0
+
+    if (this.paused)
+      return
+
+    if (this.pendingChars <= 0) {
+      this.startedAt = 0
+      this.lastTick = 0
+      this.charBudget = 0
+      this.currentCps = this.minCharsPerSecond
+      return
+    }
+
+    if (timestamp - this.startedAt < this.normalizedStartDelayMs) {
+      this.rafId = requestAnimationFrame(this.tick)
+      return
+    }
+
+    const minFrameMs = 1000 / Math.max(1, this.maxCommitFps)
+    const dt = Math.min(100, Math.max(0, timestamp - this.lastTick))
+
+    if (dt < minFrameMs) {
+      this.rafId = requestAnimationFrame(this.tick)
+      return
+    }
+
+    this.lastTick = timestamp
+    const pending = this.pendingChars
+    const latencyMs = pending > this.normalizedCatchUpThreshold ? this.normalizedCatchUpLatencyMs : this.normalizedTargetLatencyMs
+
+    const targetCps = clamp(
+      pending / Math.max(0.001, latencyMs / 1000),
+      this.minCharsPerSecond,
+      this.maxCharsPerSecond,
+    )
+
+    this.currentCps += (targetCps - this.currentCps) * 0.2
+    this.charBudget += this.currentCps * (dt / 1000)
+
+    if (this.charBudget < 1) {
+      this.ensureLoop()
+      return
+    }
+
+    const desiredCount = Math.min(Math.floor(this.charBudget), this.maxCharsPerCommit)
+    const rest = this.source.slice(this.visible.length)
+    const nextSlice = takeGraphemes(rest, desiredCount, this.segmenter)
+
+    if (nextSlice.text) {
+      this.visible += nextSlice.text
+      this.charBudget = Math.max(0, this.charBudget - nextSlice.graphemeCount)
+      this.emit('visible')
+    }
+
+    this.ensureLoop()
+  }
+
+  private cancelLoop(): void {
+    if (!this.rafId)
+      return
+
+    if (typeof cancelAnimationFrame === 'function')
+      cancelAnimationFrame(this.rafId)
+
+    this.rafId = 0
+  }
+
+  private emit(event: 'source' | 'visible' | 'done' | 'paused'): void {
+    this.notify?.(event)
+  }
+}
+
+function createGraphemeSegmenter(): GraphemeSegmenter | null {
+  if (typeof Intl === 'undefined')
+    return null
+
+  const SegmenterCtor = (Intl as unknown as {
+    Segmenter?: new (locale?: string, options?: { granularity?: 'grapheme' }) => GraphemeSegmenter
+  }).Segmenter
+
+  if (!SegmenterCtor)
+    return null
+
+  return new SegmenterCtor(undefined, { granularity: 'grapheme' })
+}
+
+function takeGraphemes(input: string, count: number, segmenter: GraphemeSegmenter | null): GraphemeSlice {
+  if (!input || count <= 0)
+    return { text: '', graphemeCount: 0 }
+
+  if (!segmenter) {
+    const parts = Array.from(input).slice(0, count)
+    return {
+      text: parts.join(''),
+      graphemeCount: parts.length,
+    }
+  }
+
+  let output = ''
+  let used = 0
+
+  for (const part of segmenter.segment(input)) {
+    if (used >= count)
+      break
+    output += part.segment
+    used++
+  }
+
+  return {
+    text: output,
+    graphemeCount: used,
+  }
+}
+
+function now() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now()
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
