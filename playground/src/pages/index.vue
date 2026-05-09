@@ -702,6 +702,15 @@ onBeforeUnmount(() => {
             </button>
 
             <button
+              class="nav-btn nav-btn--retry"
+              :disabled="isStreaming && !isPaused"
+              @click="() => { stopStreamSimulation(); startStreamSimulation() }"
+            >
+              <Icon icon="carbon:restart" class="nav-btn__icon" />
+              <span class="nav-btn__text">Retry</span>
+            </button>
+
+            <button
               class="nav-btn nav-btn--stream"
               :disabled="!isStreaming"
               @click="toggleStreamPause"
@@ -1323,6 +1332,7 @@ onBeforeUnmount(() => {
 .nav-btn--github { background: #24292f; }
 .nav-btn--docs { background: #0f766e; }
 .nav-btn--themes { background: #0e7490; }
+.nav-btn--retry { background: #0f766e; }
 .nav-btn--stream { background: #c2410c; }
 .nav-btn--test { background: #0369a1; }
 .nav-btn--cdn { background: #475569; }
