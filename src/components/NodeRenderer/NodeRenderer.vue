@@ -51,6 +51,7 @@ import { customComponentsRevision, getCustomNodeComponents } from '../../utils/n
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import MarkdownCodeBlockNode from '../MarkdownCodeBlockNode'
+import { createMathBlockMinHeightCache, provideMathBlockMinHeightCache } from '../MathBlockNode/minHeightCache'
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import FallbackComponent from './FallbackComponent.vue'
 import { InfographicBlockNodeLoading } from './InfographicBlockNodeLoading'
@@ -159,6 +160,7 @@ provide('markstreamStreamVersion', streamRenderVersion)
 watch(
   [() => props.content, () => props.nodes],
   () => {
+    mathBlockMinHeightCache.clear()
     streamRenderVersion.value += 1
   },
   { immediate: true },
@@ -206,6 +208,9 @@ function resolveViewportRoot(node?: HTMLElement | null) {
 const instanceMsgId = props.customId
   ? `renderer-${props.customId}`
   : `renderer-${Date.now()}-${Math.random().toString(36).slice(2)}`
+const mathBlockMinHeightCache = createMathBlockMinHeightCache(instanceMsgId)
+const mathBlockCacheScope = computed(() => `${instanceMsgId}:${streamRenderVersion.value}`)
+provideMathBlockMinHeightCache(mathBlockMinHeightCache)
 const defaultMd = getMarkdown(instanceMsgId)
 const customTagCache = new Map<string, MarkdownIt>()
 const customComponentsMap = computed<Partial<CustomComponents>>(() => {
@@ -2192,6 +2197,12 @@ const renderedItems = computed(() => {
         ),
       }
     }
+    if (node.type === 'math_block') {
+      bindings = {
+        ...bindings,
+        cacheScope: mathBlockCacheScope.value,
+      }
+    }
 
     return {
       ...item,
@@ -2460,6 +2471,7 @@ watch(
 
 onBeforeUnmount(() => {
   clearTypewriterCursorTimeout()
+  mathBlockMinHeightCache.clear()
 })
 </script>
 
