@@ -1,5 +1,5 @@
 ---
-description: 用 nodes 加 final 模式构建 AI 聊天与流式 Markdown 界面，并掌握性能、可信标签与 SSR 安全接入方式。
+description: 使用 content 与内置 smooth streaming 构建 AI 聊天与流式 Markdown 界面，并掌握性能、可信标签与 SSR 安全接入方式。
 ---
 
 # AI 聊天与流式输出
