@@ -2779,12 +2779,16 @@ onBeforeUnmount(() => {
 }
 
 .typewriter-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: inline-block;
   width: 0.55em;
   height: 1em;
   margin-left: 0.08em;
   vertical-align: -0.12em;
   border-right: 2px solid currentColor;
+  pointer-events: none;
   animation: typewriter-cursor-blink 1s steps(1, end) infinite;
 }
 
