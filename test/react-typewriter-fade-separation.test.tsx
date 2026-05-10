@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 
+import React, { act, StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import React, { act, StrictMode } from '../packages/markstream-react/node_modules/react'
-import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
 
 async function flushReact() {
@@ -43,7 +43,9 @@ describe('react typewriter/fade separation', () => {
     const cursor = host.querySelector('.typewriter-cursor')
     expect(cursor).toBeNull()
 
-    await act(async () => { root.unmount() })
+    await act(async () => {
+      root.unmount()
+    })
   })
 
   it('typewriter=true shows cursor span', async () => {
@@ -70,7 +72,9 @@ describe('react typewriter/fade separation', () => {
     const cursor = host.querySelector('.typewriter-cursor')
     expect(cursor).not.toBeNull()
 
-    await act(async () => { root.unmount() })
+    await act(async () => {
+      root.unmount()
+    })
   })
 
   it('fade defaults to true: streamed delta fade still works without typewriter', async () => {
@@ -109,7 +113,9 @@ describe('react typewriter/fade separation', () => {
     // So content should appear immediately (not paced).
     expect(host.textContent).toContain('Appended content')
 
-    await act(async () => { root.unmount() })
+    await act(async () => {
+      root.unmount()
+    })
   })
 
   it('smoothStreaming=auto should NOT enable because fade=true (default)', async () => {
@@ -144,7 +150,9 @@ describe('react typewriter/fade separation', () => {
     // Content should appear immediately (not paced).
     expect(host.textContent).toContain('Not paced by fade')
 
-    await act(async () => { root.unmount() })
+    await act(async () => {
+      root.unmount()
+    })
   })
 
   it('typewriter=true auto-enables smooth streaming', async () => {
@@ -178,7 +186,9 @@ describe('react typewriter/fade separation', () => {
     // Content should be paced (not immediately visible).
     expect(host.textContent).not.toContain('Paced by typewriter')
 
-    await act(async () => { root.unmount() })
+    await act(async () => {
+      root.unmount()
+    })
   })
 
   it('fade=false does not affect typewriter cursor', async () => {
@@ -206,7 +216,9 @@ describe('react typewriter/fade separation', () => {
     const cursor = host.querySelector('.typewriter-cursor')
     expect(cursor).not.toBeNull()
 
-    await act(async () => { root.unmount() })
+    await act(async () => {
+      root.unmount()
+    })
   })
 
   it('final=true hides typewriter cursor immediately', async () => {
@@ -252,7 +264,9 @@ describe('react typewriter/fade separation', () => {
 
     expect(host.querySelector('.typewriter-cursor')).toBeNull()
 
-    await act(async () => { root.unmount() })
+    await act(async () => {
+      root.unmount()
+    })
   })
 
   it('final=false keeps typewriter cursor visible even after timers advance', async () => {
@@ -290,6 +304,8 @@ describe('react typewriter/fade separation', () => {
     expect(host.querySelector('.typewriter-cursor')).not.toBeNull()
 
     vi.useRealTimers()
-    await act(async () => { root.unmount() })
+    await act(async () => {
+      root.unmount()
+    })
   })
 })

@@ -5,8 +5,8 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
-import NodeRenderer from '../packages/markstream-vue2/src/components/NodeRenderer'
 import MarkdownRenderCompat from '../packages/markstream-vue2/src/components/MarkdownRenderCompat.vue'
+import NodeRenderer from '../packages/markstream-vue2/src/components/NodeRenderer'
 
 async function flushVue() {
   await nextTick()
@@ -22,7 +22,7 @@ describe('vue2 typewriter/fade separation', () => {
     document.body.innerHTML = ''
   })
 
-  it('MarkdownRenderCompat defaults fade to true when not passed', () => {
+  it('markdownRenderCompat defaults fade to true when not passed', () => {
     // Test the prop definition directly rather than mounting,
     // because MarkdownRenderCompat uses Vue 2 render(h) which
     // doesn't work in a Vue 3 test environment.
@@ -31,7 +31,7 @@ describe('vue2 typewriter/fade separation', () => {
     expect(propsDef.fade.default).toBe(true)
   })
 
-  it('MarkdownRenderCompat passes fade=false when explicitly set', () => {
+  it('markdownRenderCompat passes fade=false when explicitly set', () => {
     const propsDef = (MarkdownRenderCompat as any).props
     expect(propsDef.fade.type).toBe(Boolean)
     // Explicit false should override the default true

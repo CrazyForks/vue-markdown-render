@@ -2,7 +2,6 @@
  * @vitest-environment jsdom
  */
 
-import { createSmoothMarkdownStream } from 'markstream-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 /**
@@ -20,7 +19,7 @@ function createHarness(options: {
   const {
     smoothStreaming = 'auto',
     typewriter = false,
-    fade = true,
+    fade: _fade = true,
     maxLiveNodes = 320,
     hasNodes = false,
     parentSmoothStreamingEnabled = false,
