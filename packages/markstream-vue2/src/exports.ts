@@ -60,6 +60,7 @@ export type { KatexLoader } from './components/MathInlineNode/katex'
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
 export type { NodeRendererProps } from './components/NodeRenderer/NodeRenderer.vue'
 export type {
+  SmoothMarkdownStreamController,
   SmoothMarkdownStreamControllerVue2,
   SmoothMarkdownStreamOptions,
 } from './composables/useSmoothMarkdownStream'

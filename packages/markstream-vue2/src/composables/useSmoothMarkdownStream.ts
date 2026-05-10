@@ -20,6 +20,8 @@ export interface SmoothMarkdownStreamControllerVue2 {
   resume: () => void
 }
 
+export type SmoothMarkdownStreamController = SmoothMarkdownStreamControllerVue2
+
 export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {}): SmoothMarkdownStreamControllerVue2 {
   const source = ref('')
   const visible = ref('')

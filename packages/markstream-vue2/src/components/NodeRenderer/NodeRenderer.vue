@@ -226,6 +226,10 @@ const renderContent = computed(() => (
     ? smoothStream.visible.value
     : (props.content ?? '')
 ))
+const rawContent = computed(() => props.content ?? '')
+const smoothSourceSynced = computed(() => (
+  Boolean(props.nodes?.length) || smoothStream.source.value === rawContent.value
+))
 
 const requestedFinal = computed<boolean | undefined>(() => {
   const base = (props.parseOptions ?? {}) as ParseOptions
@@ -359,8 +363,13 @@ const mergedParseOptions = computed(() => {
   const base = props.parseOptions ?? {}
   let resolvedFinal = requestedFinal.value
 
-  if (smoothStreamingEnabled.value && resolvedFinal != null)
-    resolvedFinal = resolvedFinal ? smoothStream.caughtUp.value : false
+  if (smoothStreamingEnabled.value && resolvedFinal != null) {
+    resolvedFinal = Boolean(
+      resolvedFinal
+      && smoothSourceSynced.value
+      && smoothStream.caughtUp.value,
+    )
+  }
 
   const merged = effectiveCustomHtmlTags.value
   const hasFinal = resolvedFinal != null

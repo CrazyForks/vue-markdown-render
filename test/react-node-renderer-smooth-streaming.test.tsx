@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
 /* eslint-disable antfu/no-import-node-modules-by-path */
 import * as parser from 'stream-markdown-parser'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import React, { act, StrictMode } from '../packages/markstream-react/node_modules/react'
 import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'

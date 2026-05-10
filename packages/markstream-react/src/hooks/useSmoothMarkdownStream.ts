@@ -27,6 +27,9 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
 
     return () => {
       unsubscribe()
+      // Keep controller state across React StrictMode effect replay.
+      // pause() stops the loop/subscription without clearing source/visible.
+      // On real unmount, the component releases this controller instance.
       controller.pause()
     }
   }, [controller])
