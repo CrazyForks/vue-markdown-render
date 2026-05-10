@@ -30,5 +30,10 @@
 
 ## Input choice
 
-- `content`: docs pages, static articles, low-frequency updates
-- `nodes` + `final`: SSE, token streaming, AI chat, worker-preparsed content
+- `content`: docs pages, static articles, low-frequency updates, and most SSE / token streaming / AI chat surfaces.
+- `content` + built-in smooth streaming: jittery AI streams where visible output should be paced independently from raw chunk cadence.
+  - `smoothStreaming="auto"` / `smooth-streaming="auto"` is the default.
+  - Auto mode enables pacing when `typewriter=true` or `maxLiveNodes <= 0` / `max-live-nodes <= 0`.
+  - `typewriter` only controls the blinking cursor and defaults to `false`.
+  - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
+- `nodes` + `final`: worker-preparsed content, shared AST stores, custom AST transforms, or cases where another layer already owns parsing.

@@ -25,8 +25,13 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
    - Import `katex/dist/katex.min.css` when math is enabled.
 4. Add the smallest working render example.
     - Use `content` for static or low-frequency rendering.
-    - For streaming AI chat, use `typewriter` or `:max-live-nodes="0"` — smooth streaming (`smooth-streaming="auto"`) paces visible output automatically. Pair with `:fade="false"`.
-    - Use `nodes` plus `final` when the app needs custom AST control, worker preparsing, or structural updates beyond pacing.
+    - For streaming AI chat, start with `content` and built-in smooth streaming.
+      - Auto mode is the default: `smoothStreaming="auto"` / `smooth-streaming="auto"`.
+      - Auto pacing activates when `typewriter=true` or `maxLiveNodes <= 0` / `max-live-nodes <= 0`.
+      - `typewriter` only controls the blinking cursor and defaults to `false`.
+      - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
+      - For high-frequency smooth streams, consider `fade=false` / `:fade="false"` / `[fade]="false"` to avoid fade stacking.
+    - Use `nodes` + `final` only for worker preparsing, shared AST stores, or custom AST control.
     - For manual pacing with `nodes`, use `useSmoothMarkdownStream`: `enqueue()` chunks, `finish()` when done, render from `visible`, wait for `caughtUp` before final parsing.
     - Preserve the default hardening: HTML policies now default to `safe`, and Mermaid runs in strict mode by default.
 5. Keep customization scoped.
@@ -38,7 +43,8 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
 ## Default Decisions
 
 - Prefer the minimal peer set over "install everything".
-- Prefer `content` unless the app is clearly SSE, chat, token-streaming, or worker-preparsed.
+- Prefer `content` for most streaming chat now that built-in smooth streaming is available across Vue 3, Vue 2, React, Svelte, and Angular.
+- Move to `nodes` only when another layer owns parsing or AST transforms.
 - When using `content` for streaming, smooth streaming (`smooth-streaming="auto"`) is on by default for `typewriter` or `max-live-nodes <= 0`. Set `:smooth-streaming="false"` to preserve raw chunk cadence.
 - Treat CSS order as a first-class part of installation, not a later cleanup.
 - When the request includes SSR, explicitly gate browser-only peers behind client-only boundaries.

@@ -16,6 +16,11 @@ Use this skill when the host app is Vue 2 on Vue CLI or another Webpack 4-style 
    - Use `createKaTeXWorkerFromCDN(...)` and `createMermaidWorkerFromCDN(...)` when workers are needed.
 5. Prefer stable code block defaults over brittle Monaco wiring.
    - `MarkdownCodeBlockNode` plus `stream-markdown` is safer than Monaco in Webpack 4-era repos.
+   - For AI chat or streaming UIs, keep `content` and use built-in smooth streaming first.
+     - `smooth-streaming="auto"` is the default and activates when `typewriter=true` or `max-live-nodes <= 0`.
+     - `typewriter` only controls the blinking cursor and defaults to `false`.
+     - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
+   - Move to `nodes` + `final` only for worker-preparsed content, shared AST stores, or custom AST control.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 6. Validate with the smallest useful local dev or build command.
 

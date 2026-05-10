@@ -142,7 +142,7 @@ npx markstream-vue prompts show install-markstream
 - 自动识别框架和包管理器
 - 按需求只安装必要的 peers
 - 遇到 Tailwind / UnoCSS 时，把 CSS 放在 reset 之后，并放进 `@layer components`
-- 普通渲染优先用 `content`，流式输出优先用 `nodes` + `final`
+- 普通渲染和大多数流式聊天优先用 `content`；token 抖动场景使用内置 smooth streaming；只有 worker 预解析、自定义 AST 或独立状态层接管解析时，才优先用 `nodes` + `final`
 - 组件覆盖默认走 `custom-id` 作用域
 - 改完后告诉用户下一步应该看哪一页文档
 

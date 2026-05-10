@@ -14,6 +14,11 @@ Use this skill when the host app is Vue 2 and not specifically a Vue CLI / Webpa
    - Add `@vue/composition-api` only when the repo is Vue 2.6 and uses Composition API patterns.
 3. Import `markstream-vue2/index.css` after resets.
 4. Start with `<MarkdownRender :content="markdown" />`.
+   - For AI chat or streaming UIs, keep `content` and use built-in smooth streaming first.
+     - `smooth-streaming="auto"` is the default and activates when `typewriter=true` or `max-live-nodes <= 0`.
+     - `typewriter` only controls the blinking cursor and defaults to `false`.
+     - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
+   - Move to `nodes` + `final` only for worker-preparsed content, shared AST stores, or custom AST control.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 5. Use scoped custom component mappings when the task needs overrides or trusted tags.
 6. Validate with the smallest useful dev or build command.

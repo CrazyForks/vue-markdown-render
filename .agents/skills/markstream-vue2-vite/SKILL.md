@@ -15,6 +15,11 @@ Use this skill when the host app is Vue 2 and the bundler is Vite.
 4. Use Vite worker imports when the repo needs bundled workers.
    - `markstream-vue2/workers/... ?worker` or `?worker&inline` patterns are allowed here.
 5. Keep Composition API decisions explicit for Vue 2.6 repos.
+   - For AI chat or streaming UIs, keep `content` and use built-in smooth streaming first.
+     - `smooth-streaming="auto"` is the default and activates when `typewriter=true` or `max-live-nodes <= 0`.
+     - `typewriter` only controls the blinking cursor and defaults to `false`.
+     - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
+   - Move to `nodes` + `final` only for worker-preparsed content, shared AST stores, or custom AST control.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 6. Validate with the smallest useful Vite dev or build command.
 

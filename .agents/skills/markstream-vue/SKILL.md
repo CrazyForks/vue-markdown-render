@@ -15,6 +15,8 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
    - In Tailwind or UnoCSS projects, keep Markstream styles inside `@layer components`.
 4. Start with `<MarkdownRender :content="markdown" />`.
    - For AI chat or streaming UIs, use `typewriter` or `:max-live-nodes="0"` — smooth streaming is auto-enabled (`smooth-streaming="auto"`, the default) and paces visible output so bursty chunks appear steadily.
+   - `typewriter` only controls the blinking cursor and defaults to `false`.
+   - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
    - Set `:smooth-streaming="false"` to preserve raw chunk cadence; set `:smooth-streaming="true"` to force smooth pacing even on first-screen content (may cause hydration mismatch in SSR).
    - When smooth streaming is on, pair it with `:fade="false"` to avoid delta fade (280 ms) stacking with high-commit pacing.
    - Switch to `nodes` plus `final` only when the app needs custom AST control, worker preparsing, or structural updates beyond pacing.
