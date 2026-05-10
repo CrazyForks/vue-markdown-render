@@ -533,6 +533,7 @@ interface NodeComponentProps<TNode = unknown> {
   customId?: string // Custom ID for scoping
   isDark?: boolean
   typewriter?: boolean
+  fade?: boolean // Enable/disable fade animations
   children?: React.ReactNode
 }
 ```
