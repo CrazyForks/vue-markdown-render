@@ -717,11 +717,24 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     return props.final ?? (base as any).final
   }, [props.final, props.parseOptions])
 
+  const rawContent = props.content ?? ''
+  const smoothSourceSynced = hasNodes || smoothStream.source === rawContent
+
   const effectiveFinal = useMemo(() => {
-    if (smoothStreamingEnabled && requestedFinal != null)
-      return requestedFinal ? smoothStream.caughtUp : false
+    if (smoothStreamingEnabled && requestedFinal != null) {
+      return Boolean(
+        requestedFinal
+        && smoothSourceSynced
+        && smoothStream.caughtUp,
+      )
+    }
     return requestedFinal
-  }, [requestedFinal, smoothStream.caughtUp, smoothStreamingEnabled])
+  }, [
+    requestedFinal,
+    smoothSourceSynced,
+    smoothStream.caughtUp,
+    smoothStreamingEnabled,
+  ])
 
   const renderVersionSource = hasNodes ? props.nodes : renderContent
   if (previousRenderVersionSourceRef.current !== renderVersionSource) {

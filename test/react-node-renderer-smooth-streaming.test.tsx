@@ -400,4 +400,104 @@ describe('react node renderer smooth streaming', () => {
       root.unmount()
     })
   })
+
+  it('eventually reveals paced content after timers advance', async () => {
+    vi.useFakeTimers()
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    const content = 'Eventually revealed smooth streaming content'
+
+    const renderMarkdown = (props: Record<string, unknown>) =>
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, props))
+
+    // Mount empty
+    await act(async () => {
+      root.render(renderMarkdown({
+        content: '',
+        typewriter: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      }))
+    })
+    await flushReact()
+
+    // Update with content; should be paced, not immediate
+    await act(async () => {
+      root.render(renderMarkdown({
+        content,
+        typewriter: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      }))
+    })
+    await flushReact()
+
+    expect(host.textContent).not.toContain(content)
+
+    // Run all timers to let pacing complete
+    await act(async () => {
+      await vi.runAllTimersAsync()
+    })
+    await flushReact()
+
+    // After all timers, content should be fully revealed
+    expect(host.textContent).toContain(content)
+
+    await act(async () => {
+      root.unmount()
+    })
+    vi.useRealTimers()
+  })
+
+  it('strictMode smoothStreaming=true initial content eventually reveals', async () => {
+    vi.useFakeTimers()
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    const initialContent = 'StrictMode initial force paced content'
+
+    const renderMarkdown = (content: string) =>
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        typewriter: false,
+        smoothStreaming: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      }))
+
+    // Mount with initial content and smoothStreaming=true in StrictMode
+    // StrictMode will replay effects, but controller should survive and continue pacing
+    await act(async () => {
+      root.render(renderMarkdown(initialContent))
+    })
+    await flushReact()
+
+    // Initial content should be paced, not immediately visible
+    expect(host.textContent).not.toContain(initialContent)
+
+    // Run all timers to let pacing complete
+    await act(async () => {
+      await vi.runAllTimersAsync()
+    })
+    await flushReact()
+
+    // After all timers, initial content should be fully revealed
+    // This verifies controller survived StrictMode effect replay
+    expect(host.textContent).toContain(initialContent)
+
+    await act(async () => {
+      root.unmount()
+    })
+    vi.useRealTimers()
+  })
 })

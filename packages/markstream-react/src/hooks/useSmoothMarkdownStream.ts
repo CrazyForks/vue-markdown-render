@@ -22,11 +22,12 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
       setSnapshot(controller.getSnapshot())
     })
 
+    controller.resume()
     setSnapshot(controller.getSnapshot())
 
     return () => {
       unsubscribe()
-      controller.destroy()
+      controller.pause()
     }
   }, [controller])
 
