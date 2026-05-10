@@ -34,6 +34,8 @@ export { MathInlineNodeComponent as MathInlineNode } from './components/MathInli
 export { MermaidBlockNodeComponent as MermaidBlockNode } from './components/MermaidBlockNode/MermaidBlockNode.component'
 export { NestedRendererComponent as NestedRenderer } from './components/NestedRenderer/NestedRenderer.component'
 export { NodeRendererComponent as NodeRenderer } from './components/NodeRenderer/NodeRenderer.component'
+export { MARKSTREAM_SMOOTH_STREAMING_SCOPE } from './components/NodeRenderer/NodeRenderer.component'
+export type { SmoothStreamingScope } from './components/NodeRenderer/NodeRenderer.component'
 export { ParagraphNodeComponent as ParagraphNode } from './components/ParagraphNode/ParagraphNode.component'
 export { PreCodeNodeComponent as PreCodeNode } from './components/PreCodeNode/PreCodeNode.component'
 export { ReferenceNodeComponent as ReferenceNode } from './components/ReferenceNode/ReferenceNode.component'

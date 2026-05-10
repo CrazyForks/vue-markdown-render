@@ -71,6 +71,12 @@ export {
   useSmoothMarkdownStream,
 } from './composables/useSmoothMarkdownStream.svelte'
 export {
+  SMOOTH_STREAMING_CONTEXT,
+} from './context/smoothStreaming'
+export type {
+  SmoothStreamingContextValue,
+} from './context/smoothStreaming'
+export {
   clearGlobalCustomComponents,
   getCustomComponentsRevision,
   getCustomNodeComponents,

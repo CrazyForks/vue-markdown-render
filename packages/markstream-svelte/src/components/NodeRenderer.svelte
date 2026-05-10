@@ -5,12 +5,14 @@
     SvelteRenderableNode,
     SvelteRenderContext,
   } from './shared/node-helpers'
-  import { onDestroy, onMount, tick } from 'svelte'
+  import { getContext, onDestroy, onMount, setContext, tick } from 'svelte'
   import { getCustomNodeComponents, subscribeCustomComponents } from '../customComponents'
   import { disposeRenderedHtmlEnhancements, enhanceRenderedHtml } from '../enhanceRenderedHtml'
   import NodeOutlet from './NodeOutlet.svelte'
   import { buildRenderContext, resolveParsedNodes } from './shared/node-helpers'
   import { useSmoothMarkdownStream } from '../composables/useSmoothMarkdownStream.svelte'
+  import { SMOOTH_STREAMING_CONTEXT } from '../context/smoothStreaming'
+  import type { SmoothStreamingContextValue } from '../context/smoothStreaming'
 
   type NodeRendererComponentProps = NodeRendererProps & NodeRendererEvents & {
     className?: string
@@ -83,17 +85,39 @@
 
   const smoothStream = useSmoothMarkdownStream(smoothStreamingOptions)
   let hasMountedForSmoothStreaming = $state(typeof window === 'undefined' || smoothStreaming === true)
-  const hasNodes = $derived(Array.isArray(nodes) && nodes.length > 0)
+  const hasNodes = $derived(Array.isArray(nodes))
+  const parentSmoothStreaming = getContext<SmoothStreamingContextValue | undefined>(
+    SMOOTH_STREAMING_CONTEXT,
+  )
   const smoothStreamingEligible = $derived.by(() => {
     if (smoothStreaming === false)
       return false
     if (hasNodes)
+      return false
+    // When the parent renderer is already pacing content, avoid double-pacing
+    // in nested renderers (e.g. thinking blocks, custom tag content).
+    // Only applies in 'auto' mode — smoothStreaming === true explicitly opts in.
+    if (smoothStreaming !== true && parentSmoothStreaming?.())
       return false
     if (smoothStreaming === true)
       return true
     return typewriter === true || (maxLiveNodes ?? 0) <= 0
   })
   const smoothStreamingEnabled = $derived(hasMountedForSmoothStreaming && smoothStreamingEligible)
+  setContext(SMOOTH_STREAMING_CONTEXT, () => smoothStreamingEnabled)
+
+  // Baseline sync: in auto mode with initial static content, ensure the smooth
+  // stream source/visible is already synced before smooth streaming activates.
+  // This prevents a blank flash when the mount gate opens and renderContent
+  // switches from raw content to smoothStream.visible (which would be empty).
+  if (
+    smoothStreaming !== true
+    && !Array.isArray(nodes)
+    && content
+  ) {
+    smoothStream.reset(content)
+  }
+
   const renderContent = $derived(smoothStreamingEnabled ? smoothStream.visible : (content ?? ''))
   const rawContent = $derived(content ?? '')
   const smoothSourceSynced = $derived(hasNodes || smoothStream.source === rawContent)

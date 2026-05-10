@@ -16,18 +16,37 @@ export class SmoothMarkdownStreamService implements OnDestroy {
     final: true,
   }
 
+  private readonly listeners = new Set<() => void>()
+  private unsubscribeFromController?: () => void
+
   init(options: SmoothMarkdownStreamOptions = {}): void {
     if (this.controller)
       return
     this.controller = createSmoothMarkdownStream(options)
     this.syncSnapshot()
-    this.controller.subscribe(() => this.syncSnapshot())
+    this.unsubscribeFromController = this.controller.subscribe(() => this.syncSnapshot())
   }
 
   ngOnDestroy(): void {
+    this.unsubscribeFromController?.()
+    this.unsubscribeFromController = undefined
     if (this.controller) {
       this.controller.destroy()
       this.controller = null
+    }
+    this.listeners.clear()
+  }
+
+  /**
+   * Subscribe to snapshot updates. Called when the controller's visible
+   * content advances during smooth streaming. The listener is invoked
+   * after each snapshot sync so that Angular components can trigger
+   * rebuild / markForCheck.
+   */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
     }
   }
 
@@ -48,5 +67,7 @@ export class SmoothMarkdownStreamService implements OnDestroy {
   private syncSnapshot(): void {
     if (this.controller)
       this.snapshot = this.controller.getSnapshot()
+    for (const listener of this.listeners)
+      listener()
   }
 }

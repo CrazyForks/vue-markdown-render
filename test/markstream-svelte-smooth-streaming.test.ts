@@ -33,4 +33,14 @@ describe('markstream-svelte smooth streaming props', () => {
     })
     expect(nodes.length).toBeGreaterThan(0)
   })
+
+  it('treats nodes=[] as nodes mode (empty array, not content mode)', () => {
+    const nodes = resolveParsedNodes({
+      content: '# Hello',
+      nodes: [],
+      smoothStreaming: 'auto',
+    })
+    // nodes=[] should return empty array (nodes mode), not parse content
+    expect(nodes).toEqual([])
+  })
 })

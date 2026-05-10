@@ -15,7 +15,9 @@ import {
   Component,
   ElementRef,
   EventEmitter,
+  forwardRef,
   inject,
+  InjectionToken,
   Input,
   Output,
   ViewChild,
@@ -54,12 +56,25 @@ interface IdleDeadlineLike {
   timeRemaining?: () => number
 }
 
+export interface SmoothStreamingScope {
+  isSmoothStreamingEnabled: () => boolean
+}
+
+export const MARKSTREAM_SMOOTH_STREAMING_SCOPE
+  = new InjectionToken<SmoothStreamingScope>('MARKSTREAM_SMOOTH_STREAMING_SCOPE')
+
 const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 
 @Component({
   selector: 'markstream-angular',
   standalone: true,
   imports: [CommonModule, NodeOutletComponent],
+  providers: [
+    {
+      provide: MARKSTREAM_SMOOTH_STREAMING_SCOPE,
+      useExisting: forwardRef(() => NodeRendererComponent),
+    },
+  ],
   template: `
     <div
       #root
@@ -115,6 +130,10 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   private readonly cdr = inject(ChangeDetectorRef)
   private readonly hostRef = inject(ElementRef<HTMLElement>)
   private readonly smoothStream = new SmoothMarkdownStreamService()
+  private readonly parentSmoothStreamingScope = inject(
+    MARKSTREAM_SMOOTH_STREAMING_SCOPE,
+    { optional: true, skipSelf: true },
+  )
 
   @ViewChild('root') private rootRef?: ElementRef<HTMLElement>
 
@@ -194,15 +213,24 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   private postRenderTimer: number | null = null
   private unsubscribeCustomComponents?: () => void
   private hasMountedForSmoothStreaming = false
+  private unsubscribeSmoothStream?: () => void
+  private previousRenderContent = ''
+  private previousEffectiveFinal: boolean | undefined
+  private previousRenderVersionSource: unknown
 
   get hasNodes(): boolean {
-    return Array.isArray(this.nodes) && this.nodes.length > 0
+    return Array.isArray(this.nodes)
   }
 
   get smoothStreamingEligible(): boolean {
     if (this.smoothStreaming === false)
       return false
     if (this.hasNodes)
+      return false
+    // When the parent renderer is already pacing content, avoid double-pacing
+    // in nested renderers (e.g. thinking blocks, custom tag content).
+    // Only applies in 'auto' mode — smoothStreaming === true explicitly opts in.
+    if (this.smoothStreaming !== true && this.parentSmoothStreamingScope?.isSmoothStreamingEnabled())
       return false
     if (this.smoothStreaming === true)
       return true
@@ -238,6 +266,10 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
 
   get resolvedIndexPrefix() {
     return this.indexKey != null ? String(this.indexKey) : 'renderer'
+  }
+
+  isSmoothStreamingEnabled(): boolean {
+    return this.smoothStreamingEnabled
   }
 
   get resolvedInitialBatchSize() {
@@ -291,9 +323,8 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     return this.deferNodesActive || this.virtualizationEnabled
   }
 
-  ngOnChanges(changes: SimpleChanges) {
-    if (changes.content || changes.nodes)
-      this.streamRenderVersion += 1
+  ngOnChanges(_changes: SimpleChanges) {
+    this.ensureSmoothStreamInitialized()
     this.syncSmoothStream()
     this.rebuild()
   }
@@ -301,6 +332,19 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   ngOnInit() {
     this.smoothStream.init(this.smoothStreamingOptions)
     this.hasMountedForSmoothStreaming = true
+    this.unsubscribeSmoothStream = this.smoothStream.subscribe(() => {
+      const nextRenderContent = this.renderContent
+      const nextEffectiveFinal = this.effectiveFinal
+
+      if (
+        nextRenderContent !== this.previousRenderContent
+        || nextEffectiveFinal !== this.previousEffectiveFinal
+      ) {
+        this.rebuild()
+      }
+    })
+    this.syncSmoothStream()
+    this.rebuild()
     this.unsubscribeCustomComponents = subscribeCustomComponents(() => {
       this.rebuild()
     })
@@ -311,6 +355,8 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   }
 
   ngOnDestroy() {
+    this.unsubscribeSmoothStream?.()
+    this.unsubscribeSmoothStream = undefined
     this.stopBatching()
     this.clearPostRenderWork()
     this.enhancementToken += 1
@@ -343,6 +389,11 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     const target = event.target as HTMLElement | null
     if (target?.closest('[data-node-index]'))
       this.mouseout.emit(event)
+  }
+
+  private ensureSmoothStreamInitialized(): void {
+    if (this.smoothStream)
+      this.smoothStream.init(this.smoothStreamingOptions)
   }
 
   private syncSmoothStream() {
@@ -386,6 +437,15 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     this.stopBatching()
     this.disposeEnhancements()
     this.cleanupTransientState()
+
+    // Bump streamRenderVersion based on renderContent/nodes (not raw content)
+    const renderVersionSource = this.hasNodes ? this.nodes : this.renderContent
+    if (this.previousRenderVersionSource !== renderVersionSource) {
+      this.streamRenderVersion += 1
+      this.previousRenderVersionSource = renderVersionSource
+    }
+    this.previousRenderContent = this.renderContent
+    this.previousEffectiveFinal = this.effectiveFinal
 
     const scopedCustomComponents = getCustomNodeComponents(this.customId)
     const mergedCustomComponents = this.customComponents

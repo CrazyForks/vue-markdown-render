@@ -79,7 +79,7 @@ describe('markstream-angular SmoothMarkdownStreamService', () => {
     const service = new SmoothMarkdownStreamService()
     service.init({
       maxCharsPerCommit: 0,
-      maxCommitFPS: 0,
+      maxCommitFps: 0,
       minCharsPerSecond: 0,
       maxCharsPerSecond: -10,
     })
@@ -128,6 +128,71 @@ describe('markstream-angular SmoothMarkdownStreamService', () => {
 
     service.ngOnDestroy()
   })
+
+  it('subscribe notifies listeners on visible advance', async () => {
+    vi.useFakeTimers()
+    const service = new SmoothMarkdownStreamService()
+    service.init({ startDelayMs: 0 })
+
+    const calls: string[] = []
+    const unsubscribe = service.subscribe(() => {
+      calls.push(service.visible)
+    })
+
+    service.enqueue('hello world')
+    // The subscribe callback should fire when the controller syncs
+    expect(calls.length).toBeGreaterThanOrEqual(1)
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(calls.length).toBeGreaterThanOrEqual(2)
+
+    unsubscribe()
+    service.ngOnDestroy()
+  })
+
+  it('subscribe returns an unsubscribe function that stops callbacks', async () => {
+    vi.useFakeTimers()
+    const service = new SmoothMarkdownStreamService()
+    service.init({ startDelayMs: 0 })
+
+    const calls: string[] = []
+    const unsubscribe = service.subscribe(() => {
+      calls.push(service.visible)
+    })
+
+    service.enqueue('abc')
+    const countBeforeUnsubscribe = calls.length
+
+    unsubscribe()
+    service.enqueue('def')
+
+    await vi.advanceTimersByTimeAsync(2000)
+    // No additional calls after unsubscribe
+    expect(calls.length).toBe(countBeforeUnsubscribe)
+
+    service.ngOnDestroy()
+  })
+
+  it('ngOnDestroy cleans up controller and listeners', async () => {
+    vi.useFakeTimers()
+    const service = new SmoothMarkdownStreamService()
+    service.init()
+
+    const calls: string[] = []
+    service.subscribe(() => {
+      calls.push(service.visible)
+    })
+
+    service.enqueue('test')
+    expect(calls.length).toBeGreaterThanOrEqual(1)
+
+    service.ngOnDestroy()
+
+    // After destroy, source/visible should be stale (no further updates)
+    const visibleAfterDestroy = service.visible
+    service.enqueue('more')
+    expect(service.visible).toBe(visibleAfterDestroy)
+  })
 })
 
 describe('markstream-angular smooth streaming props', () => {
@@ -154,5 +219,15 @@ describe('markstream-angular smooth streaming props', () => {
       smoothStreaming: false,
     })
     expect(nodes.length).toBeGreaterThan(0)
+  })
+
+  it('treats nodes=[] as nodes mode (empty array, not content mode)', () => {
+    const nodes = resolveParsedNodes({
+      content: '# Hello',
+      nodes: [],
+      smoothStreaming: 'auto',
+    })
+    // nodes=[] should return empty array (nodes mode), not parse content
+    expect(nodes).toEqual([])
   })
 })
