@@ -190,4 +190,25 @@ describe('useSmoothMarkdownStream', () => {
 
     wrapper.unmount()
   })
+
+  it('disposes the core controller when Vue scope is disposed', async () => {
+    vi.useFakeTimers()
+    let stream: ReturnType<typeof useSmoothMarkdownStream> | undefined
+    const wrapper = mount(defineComponent({
+      setup() {
+        stream = useSmoothMarkdownStream({ startDelayMs: 0 })
+        return {}
+      },
+      template: '<div />',
+    }))
+
+    stream!.enqueue('x'.repeat(1800))
+    await vi.advanceTimersByTimeAsync(60)
+    const beforeUnmount = stream!.visible.value.length
+
+    wrapper.unmount()
+    await vi.advanceTimersByTimeAsync(500)
+
+    expect(stream!.visible.value.length).toBe(beforeUnmount)
+  })
 })

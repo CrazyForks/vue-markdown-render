@@ -6,6 +6,7 @@ describe('public types', () => {
   it('factory return type matches exported controller interface', () => {
     const stream: SmoothMarkdownStreamController = createSmoothMarkdownStream()
     stream.enqueue('hello')
+    stream.dispose()
     expectTypeOf(stream).toEqualTypeOf<SmoothMarkdownStreamController>()
   })
 })

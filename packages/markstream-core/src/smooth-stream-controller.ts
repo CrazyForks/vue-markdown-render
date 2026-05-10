@@ -56,6 +56,7 @@ class SmoothMarkdownStreamControllerImpl {
   private charBudget = 0
   private currentCps: number
   private hasStarted = false
+  private destroyed = false
 
   constructor(options: SmoothMarkdownStreamOptions = {}, notify?: SmoothStreamNotify) {
     const {
@@ -111,6 +112,9 @@ class SmoothMarkdownStreamControllerImpl {
   })
 
   subscribe = (listener: SmoothStreamNotify): (() => void) => {
+    if (this.destroyed)
+      return () => {}
+
     this.listeners.add(listener)
     return () => {
       this.listeners.delete(listener)
@@ -118,7 +122,7 @@ class SmoothMarkdownStreamControllerImpl {
   }
 
   enqueue = (chunk: string): void => {
-    if (!chunk)
+    if (this.destroyed || !chunk)
       return
 
     if (this.done) {
@@ -147,6 +151,9 @@ class SmoothMarkdownStreamControllerImpl {
   }
 
   finish = (finishOptions: { flush?: boolean } = {}): void => {
+    if (this.destroyed)
+      return
+
     this.done = true
 
     if (finishOptions.flush ?? this.flushOnFinish) {
@@ -163,6 +170,9 @@ class SmoothMarkdownStreamControllerImpl {
   }
 
   flush = (): void => {
+    if (this.destroyed)
+      return
+
     this.visible = this.source
     this.charBudget = 0
     this.currentCps = this.minCharsPerSecond
@@ -171,6 +181,9 @@ class SmoothMarkdownStreamControllerImpl {
   }
 
   reset = (initialMarkdown = ''): void => {
+    if (this.destroyed)
+      return
+
     this.cancelLoop()
 
     this.source = initialMarkdown
@@ -188,6 +201,9 @@ class SmoothMarkdownStreamControllerImpl {
   }
 
   pause = (): void => {
+    if (this.destroyed)
+      return
+
     if (this.paused)
       return
 
@@ -197,6 +213,9 @@ class SmoothMarkdownStreamControllerImpl {
   }
 
   resume = (): void => {
+    if (this.destroyed)
+      return
+
     if (!this.paused)
       return
 
@@ -209,12 +228,20 @@ class SmoothMarkdownStreamControllerImpl {
   }
 
   destroy = (): void => {
+    if (this.destroyed)
+      return
+
+    this.destroyed = true
     this.cancelLoop()
     this.listeners.clear()
   }
 
+  dispose = (): void => {
+    this.destroy()
+  }
+
   private ensureLoop(): void {
-    if (this.rafId || this.paused || this.pendingChars <= 0)
+    if (this.destroyed || this.rafId || this.paused || this.pendingChars <= 0)
       return
 
     if (typeof requestAnimationFrame !== 'function') {
@@ -227,6 +254,9 @@ class SmoothMarkdownStreamControllerImpl {
 
   private tick = (timestamp: number): void => {
     this.rafId = 0
+
+    if (this.destroyed)
+      return
 
     if (this.paused)
       return
@@ -294,6 +324,9 @@ class SmoothMarkdownStreamControllerImpl {
   }
 
   private emit(): void {
+    if (this.destroyed)
+      return
+
     for (const listener of this.listeners)
       listener()
   }
@@ -314,6 +347,7 @@ export function createSmoothMarkdownStream(
     pause: controller.pause,
     resume: controller.resume,
     destroy: controller.destroy,
+    dispose: controller.dispose,
   }
 }
 

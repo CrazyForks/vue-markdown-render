@@ -32,6 +32,7 @@ export interface SmoothMarkdownStreamController {
   pause: () => void
   resume: () => void
   destroy: () => void
+  dispose: () => void
 }
 
 export interface ResolveStreamingTextStateOptions {

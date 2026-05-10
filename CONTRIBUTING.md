@@ -46,7 +46,7 @@ This repository publishes multiple packages (`markstream-vue`, `markstream-vue2`
 - `markstream-core@<version>`
 - `stream-markdown-parser@<version>`
 
-When releasing framework packages that depend on `markstream-core`, publish `markstream-core` first.
+Framework package releases now run an automated check that blocks publish when the required `markstream-core` version is not on npm yet. If it fails, release `markstream-core` first.
 
 Avoid creating bare `v<version>` tags (they mix different package versions in a monorepo).
 

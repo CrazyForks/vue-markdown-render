@@ -34,6 +34,7 @@ controller.flush()
 controller.pause()
 controller.resume()
 controller.destroy()
+controller.dispose() // alias of destroy()
 unsubscribe()
 ```
 

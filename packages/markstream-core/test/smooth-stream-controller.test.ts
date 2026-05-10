@@ -251,4 +251,26 @@ describe('smoothMarkdownStreamController', () => {
     await vi.advanceTimersByTimeAsync(500)
     expect(controller.getSnapshot().visible.length).toBe(beforeDestroy)
   })
+
+  it('does not mutate state after destroy', () => {
+    const controller = createController()
+    controller.destroy()
+
+    controller.enqueue('hello')
+    controller.finish()
+    controller.flush()
+    controller.reset('ignored')
+    controller.pause()
+    controller.resume()
+
+    expect(controller.getSnapshot()).toEqual({
+      source: '',
+      visible: '',
+      done: false,
+      paused: false,
+      pendingChars: 0,
+      caughtUp: true,
+      final: false,
+    })
+  })
 })

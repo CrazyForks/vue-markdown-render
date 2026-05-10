@@ -84,7 +84,8 @@
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
     "validate:dist": "node ./scripts/validate-dist-entries.mjs",
     "size:check": "MAX_PACK_UNPACKED_BYTES=800000 node ../../scripts/check-package-size.mjs",
-    "release": "bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
+    "check:core-published": "node ../../scripts/check-core-published.mjs --package-json package.json --core-package-json ../markstream-core/package.json",
+    "release": "pnpm run check:core-published && bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {
     "@antv/infographic": "^0.2.3",
