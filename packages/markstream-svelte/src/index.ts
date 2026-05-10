@@ -63,6 +63,19 @@ export { default as TextNode } from './components/TextNode.svelte'
 export { default as ThematicBreakNode } from './components/ThematicBreakNode.svelte'
 export { default as Tooltip } from './components/Tooltip.svelte'
 export { default as VmrContainerNode } from './components/VmrContainerNode.svelte'
+export type {
+  SmoothMarkdownStreamControllerSvelte,
+  SmoothMarkdownStreamOptions,
+} from './composables/useSmoothMarkdownStream.svelte'
+export {
+  useSmoothMarkdownStream,
+} from './composables/useSmoothMarkdownStream.svelte'
+export {
+  SMOOTH_STREAMING_CONTEXT,
+} from './context/smoothStreaming'
+export type {
+  SmoothStreamingContextValue,
+} from './context/smoothStreaming'
 export {
   clearGlobalCustomComponents,
   getCustomComponentsRevision,

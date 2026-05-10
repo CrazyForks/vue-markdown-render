@@ -1,3 +1,4 @@
+import type { SmoothMarkdownStreamOptions } from 'markstream-core'
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { CustomComponentMap } from '../../customComponents'
 import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme } from '../../types/monaco'
@@ -133,6 +134,8 @@ export interface NodeRendererProps {
   maxLiveNodes?: number
   liveNodeBuffer?: number
   allowHtml?: boolean
+  smoothStreaming?: boolean | 'auto'
+  smoothStreamingOptions?: SmoothMarkdownStreamOptions
 }
 
 export interface SvelteRenderContext {

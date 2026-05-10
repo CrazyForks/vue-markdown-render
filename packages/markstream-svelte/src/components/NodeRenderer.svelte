@@ -5,11 +5,14 @@
     SvelteRenderableNode,
     SvelteRenderContext,
   } from './shared/node-helpers'
-  import { onDestroy, onMount, tick } from 'svelte'
+  import { getContext, onDestroy, onMount, setContext, tick } from 'svelte'
   import { getCustomNodeComponents, subscribeCustomComponents } from '../customComponents'
   import { disposeRenderedHtmlEnhancements, enhanceRenderedHtml } from '../enhanceRenderedHtml'
   import NodeOutlet from './NodeOutlet.svelte'
   import { buildRenderContext, resolveParsedNodes } from './shared/node-helpers'
+  import { useSmoothMarkdownStream } from '../composables/useSmoothMarkdownStream.svelte'
+  import { SMOOTH_STREAMING_CONTEXT } from '../context/smoothStreaming'
+  import type { SmoothStreamingContextValue } from '../context/smoothStreaming'
 
   type NodeRendererComponentProps = NodeRendererProps & NodeRendererEvents & {
     className?: string
@@ -56,6 +59,8 @@
     maxLiveNodes = 320,
     liveNodeBuffer = 60,
     allowHtml = true,
+    smoothStreaming = 'auto' as boolean | 'auto',
+    smoothStreamingOptions = undefined,
     className = '',
     onCopy = undefined,
     onHandleArtifactClick = undefined,
@@ -78,10 +83,91 @@
   let renderBatchToken = 0
   const textStreamState = new Map<string, string>()
 
+  const smoothStream = useSmoothMarkdownStream(smoothStreamingOptions)
+  let hasMountedForSmoothStreaming = $state(typeof window === 'undefined' || smoothStreaming === true)
+  const hasNodes = $derived(Array.isArray(nodes))
+  const parentSmoothStreaming = getContext<SmoothStreamingContextValue | undefined>(
+    SMOOTH_STREAMING_CONTEXT,
+  )
+  const smoothStreamingEligible = $derived.by(() => {
+    if (smoothStreaming === false)
+      return false
+    if (hasNodes)
+      return false
+    // When the parent renderer is already pacing content, avoid double-pacing
+    // in nested renderers (e.g. thinking blocks, custom tag content).
+    // Only applies in 'auto' mode — smoothStreaming === true explicitly opts in.
+    if (smoothStreaming !== true && parentSmoothStreaming?.())
+      return false
+    if (smoothStreaming === true)
+      return true
+    return typewriter === true || (maxLiveNodes ?? 0) <= 0
+  })
+  const smoothStreamingEnabled = $derived(hasMountedForSmoothStreaming && smoothStreamingEligible)
+  setContext(SMOOTH_STREAMING_CONTEXT, () => smoothStreamingEnabled)
+
+  // Baseline sync: in auto mode with initial static content, ensure the smooth
+  // stream source/visible is already synced before smooth streaming activates.
+  // This prevents a blank flash when the mount gate opens and renderContent
+  // switches from raw content to smoothStream.visible (which would be empty).
+  if (
+    smoothStreaming !== true
+    && !Array.isArray(nodes)
+    && content
+  ) {
+    smoothStream.reset(content)
+  }
+
+  const renderContent = $derived(smoothStreamingEnabled ? smoothStream.visible : (content ?? ''))
+  const rawContent = $derived(content ?? '')
+  const smoothSourceSynced = $derived(hasNodes || smoothStream.source === rawContent)
+  const requestedFinal = $derived.by(() => {
+    const base = parseOptions ?? {}
+    return final ?? (base as any).final
+  })
+  const effectiveFinal = $derived.by(() => {
+    if (smoothStreamingEnabled && requestedFinal != null)
+      return Boolean(requestedFinal && smoothSourceSynced && smoothStream.caughtUp)
+    return requestedFinal
+  })
+
+  onMount(() => {
+    hasMountedForSmoothStreaming = true
+  })
+
+  $effect(() => {
+    const nextContent = content ?? ''
+    if (hasNodes) {
+      smoothStream.reset('')
+      return
+    }
+    if (!smoothStreamingEnabled) {
+      smoothStream.reset(nextContent)
+      if (requestedFinal)
+        smoothStream.finish({ flush: true })
+      return
+    }
+    const source = smoothStream.source
+    if (!nextContent) {
+      smoothStream.reset('')
+    }
+    else if (nextContent === source) {
+      // no-op
+    }
+    else if (nextContent.startsWith(source)) {
+      smoothStream.enqueue(nextContent.slice(source.length))
+    }
+    else {
+      smoothStream.reset(nextContent)
+    }
+    if (requestedFinal)
+      smoothStream.finish()
+  })
+
   let rendererProps = $derived({
-    content,
+    content: renderContent,
     nodes,
-    final,
+    final: effectiveFinal,
     parseOptions,
     customMarkdownIt,
     debugPerformance,
@@ -116,12 +202,14 @@
     maxLiveNodes,
     liveNodeBuffer,
     allowHtml,
+    smoothStreaming,
+    smoothStreamingOptions,
   } satisfies NodeRendererProps)
 
   $effect.pre(() => {
-    if (previousContent !== content || previousNodes !== nodes) {
+    if (previousContent !== renderContent || previousNodes !== nodes) {
       streamRenderVersion += 1
-      previousContent = content
+      previousContent = renderContent
       previousNodes = nodes
     }
   })
@@ -133,7 +221,7 @@
       console.info('[markstream-svelte][perf] parse(sync)', {
         ms: Math.round(performance.now() - start),
         nodes: nextParsedNodes.length,
-        contentLength: content?.length ?? 0,
+        contentLength: renderContent?.length ?? 0,
       })
     }
     return nextParsedNodes
@@ -167,7 +255,7 @@
     void renderBatchDelay
     void renderBatchBudgetMs
     void renderBatchIdleTimeoutMs
-    void final
+    void effectiveFinal
     void renderedNodeCount
     syncRenderedNodeWindow()
   })
@@ -175,7 +263,7 @@
 
   $effect(() => {
     void rootEl
-    void final
+    void effectiveFinal
     void parsedNodes
     void renderedNodes
     void isDark
@@ -213,7 +301,7 @@
   function syncRenderedNodeWindow() {
     const total = parsedNodes.length
     const initialCount = Math.min(total, toPositiveInteger(initialRenderBatchSize, 40))
-    const shouldBatch = final !== false && batchRendering !== false && total > initialCount
+    const shouldBatch = effectiveFinal !== false && batchRendering !== false && total > initialCount
 
     if (!shouldBatch) {
       cancelRenderBatch()
@@ -296,7 +384,7 @@
   async function scheduleEnhancement() {
     if (!rootEl || typeof window === 'undefined')
       return
-    const enhancementFinal = typeof final === 'boolean' ? final : !hasLoadingNodes(parsedNodes)
+    const enhancementFinal = typeof effectiveFinal === 'boolean' ? effectiveFinal : !hasLoadingNodes(parsedNodes)
     if (!enhancementFinal) {
       enhancementToken += 1
       enhancementHandle?.dispose()
