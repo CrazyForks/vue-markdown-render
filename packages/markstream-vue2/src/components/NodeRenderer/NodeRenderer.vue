@@ -2186,12 +2186,12 @@ function handleContainerMouseout(event: MouseEvent) {
   emit('mouseout', event)
 }
 
-const hasNodes = computed(() => parsedNodes.value.length > 0)
+const hasExplicitNodes = computed(() => Array.isArray(props.nodes) && props.nodes.length > 0)
 const effectiveFinal = computed(() => {
   const base = (props.parseOptions ?? {}) as ParseOptions
   return props.final ?? base.final
 })
-const showTypewriterCursor = computed(() => props.typewriter === true && effectiveFinal !== true && !hasNodes.value)
+const showTypewriterCursor = computed(() => props.typewriter === true && effectiveFinal.value !== true && !hasExplicitNodes.value)
 </script>
 
 <template>
@@ -2399,13 +2399,12 @@ const showTypewriterCursor = computed(() => props.typewriter === true && effecti
 }
 
 .typewriter-cursor {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 1px;
-  min-height: 1em;
-  background: var(--typewriter-cursor-color, currentColor);
-  pointer-events: none;
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 0.08em;
+  vertical-align: -0.12em;
+  border-right: 2px solid currentColor;
   animation: typewriter-cursor-blink 1s steps(1, end) infinite;
 }
 

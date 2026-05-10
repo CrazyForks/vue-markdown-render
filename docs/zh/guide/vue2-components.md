@@ -44,7 +44,7 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 | `debug-performance` | `boolean` | `false` | 输出解析/渲染耗时与虚拟化统计（仅 dev） |
 | `is-dark` | `boolean` | `false` | 暗色主题标记，转发给重型节点并在根容器加 `.dark` |
 | `index-key` | `number \| string` | - | 列表渲染时的 key 前缀 |
-| `typewriter` | `boolean` | `true` | 非代码节点进入动画 |
+| `typewriter` | `boolean` | `false` | 流式内容增长时显示闪烁的打字光标 |
 | `show-tooltips` | `boolean` | `true` | 全局控制 `LinkNode` 与代码块节点 tooltip |
 
 #### 流式与重节点开关

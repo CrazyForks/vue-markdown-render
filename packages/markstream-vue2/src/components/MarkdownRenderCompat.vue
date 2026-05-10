@@ -39,7 +39,10 @@ export default defineComponent({
     customId: [String, Number],
     indexKey: [String, Number],
     typewriter: Boolean,
-    fade: Boolean,
+    fade: {
+      type: Boolean,
+      default: true,
+    },
     batchRendering: Boolean,
     initialRenderBatchSize: Number,
     renderBatchSize: Number,

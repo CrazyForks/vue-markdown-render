@@ -26,7 +26,7 @@ The primary component for rendering markdown content in React.
 | `debugPerformance` | `boolean` | `false` | Log parse/render timing and virtualization stats (dev only) |
 | `isDark` | `boolean` | `false` | Theme flag forwarded to heavy nodes; adds `.dark` to the root container |
 | `indexKey` | `number \| string` | - | Key prefix when rendering multiple instances in lists |
-| `typewriter` | `boolean` | `true` | Enable the non-code-node enter transition |
+| `typewriter` | `boolean` | `false` | Shows the blinking typewriter cursor while streamed content grows |
 | `showTooltips` | `boolean` | `true` | Global tooltip switch for `LinkNode` and code block nodes |
 | `smoothStreaming` | `boolean \| 'auto'` | `'auto'` | Enables built-in pacing for streaming `content` updates. `'auto'` only enables when `typewriter=true` or `maxLiveNodes<=0`. Set `true` to force-enable, `false` to render with raw chunk cadence. |
 | `smoothStreamingOptions` | `SmoothMarkdownStreamOptions` | - | Options for built-in stream pacing (`minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`). Read when the renderer is created; recreate the renderer with a different `key` if you need to change them dynamically. |
@@ -91,7 +91,8 @@ The primary component for rendering markdown content in React.
 
 Streaming notes:
 - Keep `viewportPriority` enabled to prevent offscreen Mermaid / Monaco / D2 work from running while text is still streaming.
-- For high-frequency SSE, prefer passing `nodes` instead of reparsing the full `content` string every chunk.
+- For jittery SSE or AI token streams, start with `content` + built-in `smoothStreaming`.
+- Use `nodes` when a worker, store, or custom AST pipeline already owns parsing.
 - Mermaid strict mode is now the default. Set `mermaidProps` to `{ isStrict: false }` only for trusted diagrams that need loose Mermaid HTML-label behavior.
 - Common Mermaid tuning keys: `renderDebounceMs`, `contentStableDelayMs`, `previewPollDelayMs`, `previewPollMaxDelayMs`, `previewPollMaxAttempts`.
 
@@ -682,7 +683,6 @@ Use `smoothStreamingOptions` to fine-tune pacing:
     catchUpLatencyMs: 350,
   }}
 />
-```
 ```
 
 ## TypeScript Support

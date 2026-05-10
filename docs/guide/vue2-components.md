@@ -45,7 +45,7 @@ The primary component for rendering markdown content in Vue 2.
 | `debug-performance` | `boolean` | `false` | Log parse/render timing and virtualization stats (dev only) |
 | `is-dark` | `boolean` | `false` | Theme flag forwarded to heavy nodes; adds `.dark` to the root container |
 | `index-key` | `number \| string` | - | Key prefix when rendering multiple instances in lists |
-| `typewriter` | `boolean` | `true` | Enable the non-code-node enter transition |
+| `typewriter` | `boolean` | `false` | Shows the blinking typewriter cursor while streamed content grows |
 | `show-tooltips` | `boolean` | `true` | Global tooltip switch for `LinkNode` and code block nodes |
 
 #### Streaming & heavy-node toggles

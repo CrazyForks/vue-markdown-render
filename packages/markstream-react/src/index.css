@@ -1644,13 +1644,12 @@ li .paragraph-node {
 
 /* Typewriter cursor */
 .typewriter-cursor {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 1px;
-  min-height: 1em;
-  background: var(--typewriter-cursor-color, currentColor);
-  pointer-events: none;
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 0.08em;
+  vertical-align: -0.12em;
+  border-right: 2px solid currentColor;
   animation: typewriter-cursor-blink 1s steps(1, end) infinite;
 }
 

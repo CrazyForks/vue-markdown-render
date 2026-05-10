@@ -102,7 +102,7 @@
       return false
     if (smoothStreaming === true)
       return true
-    return fade !== false || (maxLiveNodes ?? 0) <= 0
+    return typewriter === true || (maxLiveNodes ?? 0) <= 0
   })
   const smoothStreamingEnabled = $derived(hasMountedForSmoothStreaming && smoothStreamingEligible)
   setContext(SMOOTH_STREAMING_CONTEXT, () => smoothStreamingEnabled)

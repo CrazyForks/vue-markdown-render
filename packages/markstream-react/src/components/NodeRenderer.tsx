@@ -711,14 +711,13 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
       return false
     if (props.smoothStreaming === true)
       return true
-    return props.typewriter === true || props.fade !== false || (props.maxLiveNodes ?? 0) <= 0
+    return props.typewriter === true || (props.maxLiveNodes ?? 0) <= 0
   }, [
     hasNodes,
     parentSmoothStreaming,
     props.maxLiveNodes,
     props.smoothStreaming,
     props.typewriter,
-    props.fade,
   ])
   const smoothStreamingEnabled = hasMountedForSmoothStreaming && smoothStreamingEligible
 
