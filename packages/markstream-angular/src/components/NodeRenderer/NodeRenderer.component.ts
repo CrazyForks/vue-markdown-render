@@ -339,10 +339,16 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     // actually advanced. The smooth stream subscription already calls rebuild()
     // when visible ticks forward, so skipping here avoids redundant parse/rebuild
     // cycles driven by raw chunk cadence.
+    // Only skip when *only* raw stream inputs (content/final) changed — if any
+    // other input (isDark, customHtmlTags, codeBlockProps, etc.) also changed in
+    // this cycle, we must rebuild to honour those changes.
+    const changeKeys = Object.keys(changes)
+    const onlyRawStreamChanges = changeKeys.every(key => key === 'content' || key === 'final')
+
     if (
       this.smoothStreamingEnabled
+      && onlyRawStreamChanges
       && changes.content
-      && !changes.nodes
       && previousRenderContent === this.renderContent
       && previousEffectiveFinal === this.effectiveFinal
     ) {

@@ -131,7 +131,7 @@ function createHarness(options: {
   }
 
   // Simulate ngOnChanges (with rebuild-skip logic)
-  function ngOnChanges(changes: { content?: boolean, nodes?: boolean }) {
+  function ngOnChanges(changes: Record<string, boolean>) {
     smoothStream.init()
 
     const previousRenderContent = getRenderContent()
@@ -139,10 +139,13 @@ function createHarness(options: {
 
     syncSmoothStream()
 
+    const changeKeys = Object.keys(changes)
+    const onlyRawStreamChanges = changeKeys.every(key => key === 'content' || key === 'final')
+
     if (
       getSmoothStreamingEnabled()
+      && onlyRawStreamChanges
       && changes.content
-      && !changes.nodes
       && previousRenderContent === getRenderContent()
       && previousEffectiveFinal === getEffectiveFinal()
     ) {
@@ -400,5 +403,41 @@ describe('markstream-angular NodeRenderer smooth streaming contract', () => {
     // Only one rebuild from ngOnChanges, not an additional one from the
     // subscription callback firing during syncSmoothStream
     expect(harness.rebuildCount).toBe(rebuildsBefore + 1)
+  })
+
+  it('does not skip rebuild when non-stream inputs change alongside content', () => {
+    vi.useFakeTimers()
+    const harness = createHarness({ smoothStreaming: true, typewriter: false })
+
+    harness.setContent('abc')
+    harness.ngOnInit()
+    const rebuildsAfterInit = harness.rebuildCount
+
+    // Append content AND change a non-stream input (e.g. isDark) in the same cycle
+    harness.setContent('abcdef')
+    harness.ngOnChanges({ content: true, isDark: true })
+
+    // Even though visible hasn't advanced, the non-stream input change must
+    // trigger a rebuild — the skip-rebuild guard should only apply when
+    // *only* raw stream inputs (content/final) changed.
+    expect(harness.rebuildCount).toBe(rebuildsAfterInit + 1)
+
+    harness.smoothStream.ngOnDestroy()
+  })
+
+  it('does not skip rebuild when customHtmlTags changes alongside content', () => {
+    vi.useFakeTimers()
+    const harness = createHarness({ smoothStreaming: true, typewriter: false })
+
+    harness.setContent('abc')
+    harness.ngOnInit()
+    const rebuildsAfterInit = harness.rebuildCount
+
+    harness.setContent('abcdef')
+    harness.ngOnChanges({ content: true, customHtmlTags: true })
+
+    expect(harness.rebuildCount).toBe(rebuildsAfterInit + 1)
+
+    harness.smoothStream.ngOnDestroy()
   })
 })
