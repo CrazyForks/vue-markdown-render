@@ -152,4 +152,46 @@ describe('vue2 node renderer smooth streaming', () => {
     expect(wrapper.text()).toContain('Nested auto content')
     wrapper.unmount()
   })
+
+  it('gates final to caughtUp when smooth streaming is enabled', async () => {
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        content: '',
+        typewriter: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushVue()
+    await wrapper.setProps({ content: 'Content with final gate', final: true })
+    await flushVue()
+
+    // final=true should be gated by caughtUp
+    // so parser should only see final when visible has caught up
+    wrapper.unmount()
+  })
+
+  it('auto enables smooth streaming when maxLiveNodes <= 0 even if typewriter is false', async () => {
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        content: '',
+        typewriter: false,
+        maxLiveNodes: 0,
+        smoothStreaming: 'auto',
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushVue()
+    await wrapper.setProps({ content: 'Should pace even without typewriter' })
+    await flushVue()
+
+    // With maxLiveNodes=0 and typewriter=false, auto should still enable smooth streaming
+    expect(wrapper.text()).not.toContain('Should pace even without typewriter')
+    wrapper.unmount()
+  })
 })

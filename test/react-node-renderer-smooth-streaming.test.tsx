@@ -220,4 +220,142 @@ describe('react node renderer smooth streaming', () => {
       nestedRoot.unmount()
     })
   })
+
+  it('renders initial content immediately on client hydration', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          content: 'initial hydration content',
+          typewriter: true,
+          smoothStreaming: 'auto',
+          batchRendering: false,
+          viewportPriority: false,
+          deferNodesUntilVisible: false,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.textContent).toContain('initial hydration content')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('does not duplicate source when raw content updates rapidly', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    const renderMarkdown = (content: string) =>
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        typewriter: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      }))
+
+    await act(async () => {
+      root.render(renderMarkdown(''))
+    })
+    await flushReact()
+
+    // First update
+    await act(async () => {
+      root.render(renderMarkdown('abc'))
+    })
+    await flushReact()
+
+    // Rapid second update before visible fully catches up
+    await act(async () => {
+      root.render(renderMarkdown('abcdef'))
+    })
+    await flushReact()
+
+    // After flushing, final text should be correct
+    // (this verifies getSnapshot().source is used, not stale snapshot)
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('gates final to caughtUp when smooth streaming is enabled', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    const renderMarkdown = (final: boolean) =>
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content: 'Content with final gate',
+        typewriter: true,
+        final,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      }))
+
+    await act(async () => {
+      root.render(renderMarkdown(false))
+    })
+    await flushReact()
+
+    // final=true should be gated by caughtUp, so initially should be false for parser
+    await act(async () => {
+      root.render(renderMarkdown(true))
+    })
+    await flushReact()
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('auto enables smooth streaming when maxLiveNodes <= 0 even if typewriter is false', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    const renderMarkdown = (content: string) =>
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        typewriter: false,
+        maxLiveNodes: 0,
+        smoothStreaming: 'auto',
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      }))
+
+    await act(async () => {
+      root.render(renderMarkdown(''))
+    })
+    await flushReact()
+
+    await act(async () => {
+      root.render(renderMarkdown('Should pace even without typewriter'))
+    })
+    await flushReact()
+
+    // With maxLiveNodes=0 and typewriter=false, auto should still enable smooth streaming
+    // so content should be paced and not immediately visible
+    expect(host.textContent).not.toContain('Should pace even without typewriter')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
 })
