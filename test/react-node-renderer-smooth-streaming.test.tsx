@@ -4,6 +4,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 /* eslint-disable antfu/no-import-node-modules-by-path */
+import * as parser from 'stream-markdown-parser'
 import React, { act, StrictMode } from '../packages/markstream-react/node_modules/react'
 import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
@@ -324,8 +325,57 @@ describe('react node renderer smooth streaming', () => {
     })
   })
 
-  it('gates final to caughtUp when smooth streaming is enabled', async () => {
+  it('does not duplicate source when smooth content updates rapidly before visible catches up', async () => {
+    vi.useFakeTimers()
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    const renderMarkdown = (content: string) =>
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        typewriter: true,
+        smoothStreaming: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      }))
+
+    await act(async () => {
+      root.render(renderMarkdown(''))
+    })
+    await flushReact()
+
+    await act(async () => {
+      root.render(renderMarkdown('abc'))
+    })
+    await flushReact()
+
+    await act(async () => {
+      root.render(renderMarkdown('abcdef'))
+    })
+    await flushReact()
+
+    await act(async () => {
+      await vi.runAllTimersAsync()
+    })
+    await flushReact()
+
+    expect(host.textContent).toContain('abcdef')
+    expect(host.textContent).not.toContain('abcabcdef')
+
+    await act(async () => {
+      root.unmount()
+    })
+    vi.useRealTimers()
+  })
+
+  it('gates final to caughtUp when smooth streaming is enabled', async () => {
+    vi.useFakeTimers()
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    const parseSpy = vi.spyOn(parser, 'parseMarkdownToStructure')
 
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -335,33 +385,51 @@ describe('react node renderer smooth streaming', () => {
       React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
         content,
         typewriter: true,
+        smoothStreaming: true,
         final,
         batchRendering: false,
         viewportPriority: false,
         deferNodesUntilVisible: false,
       }))
 
-    // Start with final=false
     await act(async () => {
-      root.render(renderMarkdown('', false))
+      root.render(renderMarkdown('seed', false))
+    })
+    await act(async () => {
+      await vi.runAllTimersAsync()
+    })
+    await flushReact()
+    parseSpy.mockClear()
+
+    await act(async () => {
+      root.render(renderMarkdown('seed plus tail', true))
     })
     await flushReact()
 
-    // Update with content and final=true; smooth streaming is active
-    // so visible hasn't caught up yet, final should be gated
+    const callsBeforeCatchup = parseSpy.mock.calls
+      .map(call => call[2] as { final?: boolean } | undefined)
+      .filter(options => options && typeof options.final === 'boolean')
+    expect(callsBeforeCatchup.some(options => options?.final === true)).toBe(false)
+
     await act(async () => {
-      root.render(renderMarkdown('Content with final gate', true))
+      await vi.runAllTimersAsync()
+    })
+    await flushReact()
+    await act(async () => {
+      root.render(renderMarkdown('seed plus tail', true))
     })
     await flushReact()
 
-    // The parser should not immediately apply final when visible hasn't caught up
-    // We verify this by the fact that the test doesn't crash and content can still be updated
-    // This test primarily ensures the gating logic doesn't break on prop updates
-    expect(host.textContent).toBeDefined()
+    const callsAfterCatchup = parseSpy.mock.calls
+      .map(call => call[2] as { final?: boolean } | undefined)
+      .filter(options => options && typeof options.final === 'boolean')
+    expect(callsAfterCatchup.some(options => options?.final === true)).toBe(true)
 
     await act(async () => {
       root.unmount()
     })
+    parseSpy.mockRestore()
+    vi.useRealTimers()
   })
 
   it('auto enables smooth streaming when maxLiveNodes <= 0 even if typewriter is false', async () => {

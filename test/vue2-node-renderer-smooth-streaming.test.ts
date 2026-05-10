@@ -4,6 +4,7 @@
 
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as parser from 'stream-markdown-parser'
 import { defineComponent, h, nextTick, provide } from 'vue'
 import NodeRenderer from '../packages/markstream-vue2/src/components/NodeRenderer'
 
@@ -154,10 +155,13 @@ describe('vue2 node renderer smooth streaming', () => {
   })
 
   it('gates final to caughtUp when smooth streaming is enabled', async () => {
+    const parseSpy = vi.spyOn(parser, 'parseMarkdownToStructure')
+
     const wrapper = mount(NodeRenderer as any, {
       props: {
-        content: '',
+        content: 'seed',
         typewriter: true,
+        smoothStreaming: true,
         final: false,
         batchRendering: false,
         viewportPriority: false,
@@ -166,18 +170,18 @@ describe('vue2 node renderer smooth streaming', () => {
     })
 
     await flushVue()
+    parseSpy.mockClear()
 
-    // Update with content and final=true; smooth streaming is active
-    // so visible hasn't caught up yet, final should be gated
-    await wrapper.setProps({ content: 'Content with final gate', final: true })
+    await wrapper.setProps({ content: 'seed plus tail', final: true })
     await flushVue()
 
-    // The parser should not immediately apply final when visible hasn't caught up
-    // We verify this by the fact that the test doesn't crash and content can still be updated
-    // This test primarily ensures the gating logic doesn't break on prop updates
-    expect(wrapper.vm).toBeDefined()
+    const callsBeforeCatchup = parseSpy.mock.calls
+      .map(call => call[2] as { final?: boolean } | undefined)
+      .filter(options => options && typeof options.final === 'boolean')
+    expect(callsBeforeCatchup.some(options => options?.final === true)).toBe(false)
 
     wrapper.unmount()
+    parseSpy.mockRestore()
   })
 
   it('auto enables smooth streaming when maxLiveNodes <= 0 even if typewriter is false', async () => {
