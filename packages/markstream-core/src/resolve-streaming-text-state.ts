@@ -4,8 +4,6 @@ import type {
   StreamingTextStateResult,
 } from './types'
 
-export { type StreamingRenderState } from './types'
-
 /**
  * Resolve the next streaming text state given previous content.
  * This is the basic variant used by all frameworks for simple
