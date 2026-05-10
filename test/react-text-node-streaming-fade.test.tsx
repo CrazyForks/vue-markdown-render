@@ -3,9 +3,8 @@
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
-/* eslint-disable antfu/no-import-node-modules-by-path */
-import React, { act, StrictMode } from '../packages/markstream-react/node_modules/react'
-import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
+import React, { act, StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import { LinkNode } from '../packages/markstream-react/src/components/LinkNode/LinkNode'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
 import { TextNode } from '../packages/markstream-react/src/components/TextNode/TextNode'

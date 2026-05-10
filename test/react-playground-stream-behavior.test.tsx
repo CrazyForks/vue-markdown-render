@@ -3,9 +3,8 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-/* eslint-disable antfu/no-import-node-modules-by-path */
-import React, { act, useEffect } from '../playground-react18/node_modules/react'
-import { createRoot } from '../playground-react18/node_modules/react-dom/client'
+import React, { act, useEffect } from 'react'
+import { createRoot } from 'react-dom/client'
 import { useStreamSimulator } from '../playground-react18/src/shared/useStreamSimulator'
 
 interface HarnessProps {

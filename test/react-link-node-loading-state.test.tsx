@@ -2,10 +2,9 @@
  * @vitest-environment jsdom
  */
 
-/* eslint-disable antfu/no-import-node-modules-by-path */
 import { afterEach, describe, expect, it } from 'vitest'
-import React, { act } from '../packages/markstream-react/node_modules/react'
-import { createRoot } from '../packages/markstream-react/node_modules/react-dom/client'
+import React, { act } from 'react'
+import { createRoot } from 'react-dom/client'
 import { LinkNode } from '../packages/markstream-react/src/components/LinkNode/LinkNode'
 
 async function flushReact() {
