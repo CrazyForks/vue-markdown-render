@@ -1,4 +1,5 @@
 import type { AfterViewInit, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core'
+import type { SmoothMarkdownStreamOptions } from 'markstream-core'
 import type { RenderedHtmlEnhancementHandle } from '../../enhanceRenderedHtml'
 import type {
   AngularRenderableNode,
@@ -21,6 +22,7 @@ import {
 } from '@angular/core'
 import { getCustomNodeComponents, subscribeCustomComponents } from '../../customComponents'
 import { disposeRenderedHtmlEnhancements, enhanceRenderedHtml } from '../../enhanceRenderedHtml'
+import { SmoothMarkdownStreamService } from '../../services/smooth-markdown-stream.service'
 import { NodeOutletComponent } from '../NodeOutlet/NodeOutlet.component'
 import {
   buildRenderContext,
@@ -112,6 +114,7 @@ const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnInit, AfterViewInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef)
   private readonly hostRef = inject(ElementRef<HTMLElement>)
+  private readonly smoothStream = new SmoothMarkdownStreamService()
 
   @ViewChild('root') private rootRef?: ElementRef<HTMLElement>
 
@@ -152,6 +155,8 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   @Input() maxLiveNodes = 320
   @Input() liveNodeBuffer = 60
   @Input() allowHtml = true
+  @Input() smoothStreaming: boolean | 'auto' = 'auto'
+  @Input() smoothStreamingOptions?: SmoothMarkdownStreamOptions
 
   @Output() copy = new EventEmitter<string>()
   @Output() handleArtifactClick = new EventEmitter<CodeBlockPreviewPayload>()
@@ -188,6 +193,48 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   private enhancementHandle: RenderedHtmlEnhancementHandle | null = null
   private postRenderTimer: number | null = null
   private unsubscribeCustomComponents?: () => void
+  private hasMountedForSmoothStreaming = false
+
+  get hasNodes(): boolean {
+    return Array.isArray(this.nodes) && this.nodes.length > 0
+  }
+
+  get smoothStreamingEligible(): boolean {
+    if (this.smoothStreaming === false)
+      return false
+    if (this.hasNodes)
+      return false
+    if (this.smoothStreaming === true)
+      return true
+    return this.typewriter === true || (this.maxLiveNodes ?? 0) <= 0
+  }
+
+  get smoothStreamingEnabled(): boolean {
+    return this.hasMountedForSmoothStreaming && this.smoothStreamingEligible
+  }
+
+  get renderContent(): string {
+    return this.smoothStreamingEnabled ? this.smoothStream.visible : (this.content ?? '')
+  }
+
+  get rawContent(): string {
+    return this.content ?? ''
+  }
+
+  get smoothSourceSynced(): boolean {
+    return this.hasNodes || this.smoothStream.source === this.rawContent
+  }
+
+  get requestedFinal(): boolean | undefined {
+    const base = this.parseOptions ?? {} as any
+    return this.final ?? base.final
+  }
+
+  get effectiveFinal(): boolean | undefined {
+    if (this.smoothStreamingEnabled && this.requestedFinal != null)
+      return Boolean(this.requestedFinal && this.smoothSourceSynced && this.smoothStream.caughtUp)
+    return this.requestedFinal
+  }
 
   get resolvedIndexPrefix() {
     return this.indexKey != null ? String(this.indexKey) : 'renderer'
@@ -247,10 +294,13 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   ngOnChanges(changes: SimpleChanges) {
     if (changes.content || changes.nodes)
       this.streamRenderVersion += 1
+    this.syncSmoothStream()
     this.rebuild()
   }
 
   ngOnInit() {
+    this.smoothStream.init(this.smoothStreamingOptions)
+    this.hasMountedForSmoothStreaming = true
     this.unsubscribeCustomComponents = subscribeCustomComponents(() => {
       this.rebuild()
     })
@@ -268,6 +318,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     this.unsubscribeCustomComponents?.()
     this.unsubscribeCustomComponents = undefined
     this.disconnectObserver()
+    this.smoothStream.ngOnDestroy()
     if (this.enhancementTimer != null && typeof window !== 'undefined') {
       window.clearTimeout(this.enhancementTimer)
       this.enhancementTimer = null
@@ -294,6 +345,43 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
       this.mouseout.emit(event)
   }
 
+  private syncSmoothStream() {
+    if (!this.smoothStream)
+      return
+
+    const nextContent = this.content ?? ''
+
+    if (this.hasNodes) {
+      this.smoothStream.reset('')
+      return
+    }
+
+    if (!this.smoothStreamingEnabled) {
+      this.smoothStream.reset(nextContent)
+      if (this.requestedFinal)
+        this.smoothStream.finish({ flush: true })
+      return
+    }
+
+    const source = this.smoothStream.source
+
+    if (!nextContent) {
+      this.smoothStream.reset('')
+    }
+    else if (nextContent === source) {
+      // no-op
+    }
+    else if (nextContent.startsWith(source)) {
+      this.smoothStream.enqueue(nextContent.slice(source.length))
+    }
+    else {
+      this.smoothStream.reset(nextContent)
+    }
+
+    if (this.requestedFinal)
+      this.smoothStream.finish()
+  }
+
   private rebuild() {
     this.stopBatching()
     this.disposeEnhancements()
@@ -315,13 +403,19 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     this.renderContext = buildRenderContext(
       {
         ...this,
+        content: this.renderContent,
+        final: this.effectiveFinal,
         customComponents: mergedCustomComponents,
       },
       events,
       this.textStreamState,
       this.streamRenderVersion,
     )
-    this.parsedNodes = resolveParsedNodes(this)
+    this.parsedNodes = resolveParsedNodes({
+      ...this,
+      content: this.renderContent,
+      final: this.effectiveFinal,
+    })
     this.trimMeasuredState()
 
     const total = this.parsedNodes.length
@@ -729,7 +823,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
       return
 
     const handle = await enhanceRenderedHtml(root, {
-      final: this.final,
+      final: this.effectiveFinal,
       isDark: this.isDark,
       renderCodeBlocksAsPre: this.renderCodeBlocksAsPre,
       monacoOptions: this.codeBlockMonacoOptions,

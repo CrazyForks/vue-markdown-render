@@ -123,6 +123,8 @@ export type {
   RenderableMarkdownNode,
 } from './renderMarkdownHtml'
 export { sanitizeHtmlContent } from './sanitizeHtmlContent'
+export { SmoothMarkdownStreamService } from './services/smooth-markdown-stream.service'
+export type { SmoothMarkdownStreamOptions } from './services/smooth-markdown-stream.service'
 export type {
   CodeBlockDiffAppearance,
   CodeBlockDiffHideUnchangedRegions,
