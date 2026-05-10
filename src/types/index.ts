@@ -175,6 +175,11 @@ export interface FootnoteReferenceNode extends BaseNode {
   id: string
 }
 
+export interface FootnoteAnchorNode extends BaseNode {
+  type: 'footnote_anchor'
+  id: string
+}
+
 export interface AdmonitionNode extends BaseNode {
   type: 'admonition'
   kind: string // 'note' | 'warning' | 'danger' | 'info' | 'tip' 等
@@ -300,6 +305,7 @@ export type ParsedNode
     | DefinitionItemNode
     | FootnoteNode
     | FootnoteReferenceNode
+    | FootnoteAnchorNode
     | AdmonitionNode
     | HardBreakNode
     | MathInlineNode
