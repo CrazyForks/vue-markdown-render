@@ -1,11 +1,14 @@
-export { SmoothMarkdownStreamController } from './smooth-stream-controller'
 export { resolveStreamingTextState, resolveStreamingTextUpdate } from './resolve-streaming-text-state'
+export { SmoothMarkdownStreamController } from './smooth-stream-controller'
+export { createSmoothMarkdownStream } from './smooth-stream-controller'
 export type {
-  SmoothMarkdownStreamOptions,
-  SmoothStreamEvent,
-  SmoothStreamNotify,
   ResolveStreamingTextStateOptions,
   ResolveStreamingTextUpdateOptions,
-  StreamingTextStateResult,
+  SmoothMarkdownStreamController as SmoothMarkdownStreamControllerApi,
+  SmoothMarkdownStreamOptions,
+  SmoothMarkdownStreamSnapshot,
+  SmoothStreamEvent,
+  SmoothStreamNotify,
   StreamingRenderState,
+  StreamingTextStateResult,
 } from './types'

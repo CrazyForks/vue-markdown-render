@@ -1,6 +1,6 @@
 import type { SmoothMarkdownStreamOptions } from '../src/types'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SmoothMarkdownStreamController } from '../src/smooth-stream-controller'
+import { createSmoothMarkdownStream, SmoothMarkdownStreamController } from '../src/smooth-stream-controller'
 
 function hasUnpairedSurrogate(input: string) {
   for (let index = 0; index < input.length; index++) {
@@ -24,7 +24,7 @@ function createController(options: SmoothMarkdownStreamOptions = {}) {
   return new SmoothMarkdownStreamController(options)
 }
 
-describe('SmoothMarkdownStreamController', () => {
+describe('smoothMarkdownStreamController', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
@@ -189,14 +189,34 @@ describe('SmoothMarkdownStreamController', () => {
     })
 
     controller.enqueue('hello')
-    expect(events).toContain('source')
+    expect(events).toContain('state')
 
     controller.flush()
-    expect(events).toContain('visible')
+    expect(events).toContain('state')
 
     controller.finish()
-    expect(events).toContain('done')
+    expect(events).toContain('state')
 
+    controller.destroy()
+  })
+
+  it('exposes subscribe and getSnapshot API', () => {
+    const controller = createSmoothMarkdownStream()
+    const snapshots = new Array<string>()
+    const unsubscribe = controller.subscribe(() => {
+      snapshots.push(controller.getSnapshot().visible)
+    })
+
+    controller.enqueue('hello')
+    controller.flush()
+    const snapshot = controller.getSnapshot()
+
+    expect(snapshot.source).toBe('hello')
+    expect(snapshot.visible).toBe('hello')
+    expect(snapshot.final).toBe(false)
+    expect(snapshots.length).toBeGreaterThan(0)
+
+    unsubscribe()
     controller.destroy()
   })
 

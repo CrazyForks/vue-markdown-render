@@ -1,7 +1,7 @@
 import type { NodeComponentProps } from '../../types/node-component'
 import clsx from 'clsx'
-import React, { useEffect, useRef, useState } from 'react'
 import { resolveStreamingTextUpdate } from 'markstream-core'
+import React, { useEffect, useRef, useState } from 'react'
 
 export function TextNode(props: NodeComponentProps<{ type: 'text', content: string, center?: boolean }>) {
   const { node, children, ctx, indexKey, typewriter } = props

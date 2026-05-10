@@ -12,20 +12,21 @@ npm install markstream-core
 
 ## API
 
-### `SmoothMarkdownStreamController`
+### `createSmoothMarkdownStream`
 
-A callback-based streaming controller that progressively reveals text at a configurable pace using `requestAnimationFrame`.
+Factory API for a framework-agnostic streaming controller with snapshot + subscribe semantics.
 
 ```ts
-import { SmoothMarkdownStreamController } from 'markstream-core'
+import { createSmoothMarkdownStream } from 'markstream-core'
 
-const controller = new SmoothMarkdownStreamController(
-  { minCharsPerSecond: 40, maxCharsPerSecond: 1000 },
-  (event) => {
-    if (event === 'visible') updateUI(controller.visible)
-    if (event === 'done') onStreamDone()
-  }
-)
+const controller = createSmoothMarkdownStream({ minCharsPerSecond: 40, maxCharsPerSecond: 1000 })
+
+const unsubscribe = controller.subscribe(() => {
+  const snapshot = controller.getSnapshot()
+  updateUI(snapshot.visible)
+  if (snapshot.final)
+    onStreamDone()
+})
 
 controller.enqueue(chunk)
 controller.finish()
@@ -33,7 +34,10 @@ controller.flush()
 controller.pause()
 controller.resume()
 controller.destroy()
+unsubscribe()
 ```
+
+`SmoothMarkdownStreamController` class is still exported for advanced use-cases, but `createSmoothMarkdownStream` is the recommended public API.
 
 #### Options (`SmoothMarkdownStreamOptions`)
 

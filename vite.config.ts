@@ -116,6 +116,7 @@ export default defineConfig(({ mode }) => {
             'stream-monaco',
             'stream-markdown',
             'stream-markdown-parser',
+            'markstream-core',
             'monaco-editor',
             'shiki',
           ].includes(id)
@@ -151,6 +152,8 @@ export default defineConfig(({ mode }) => {
     alias['markstream-vue'] = '/src/exports.ts'
     alias['stream-markdown-parser'] = '/packages/markdown-parser/src/index.ts'
     alias['stream-markdown-parser/*'] = '/packages/markdown-parser/src/*'
+    alias['markstream-core'] = '/packages/markstream-core/src/index.ts'
+    alias['markstream-core/*'] = '/packages/markstream-core/src/*'
   }
 
   return {

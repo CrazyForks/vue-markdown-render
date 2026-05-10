@@ -1,6 +1,6 @@
 import type { SmoothMarkdownStreamOptions } from 'markstream-core'
 import type { ComputedRef, Ref } from 'vue'
-import { SmoothMarkdownStreamController as CoreController } from 'markstream-core'
+import { createSmoothMarkdownStream } from 'markstream-core'
 import { computed, getCurrentScope, onScopeDispose, ref } from 'vue'
 
 export type { SmoothMarkdownStreamOptions }
@@ -28,26 +28,26 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
   const visible = ref('')
   const done = ref(false)
 
-  const controller = new CoreController(options, (event) => {
-    if (event === 'source')
-      source.value = controller.source
-    if (event === 'visible')
-      visible.value = controller.visible
-    if (event === 'done')
-      done.value = controller.done
-  })
-
-  // Initialize refs from controller state
-  source.value = controller.source
-  visible.value = controller.visible
-  done.value = controller.done
+  const controller = createSmoothMarkdownStream(options)
+  const sync = () => {
+    const snapshot = controller.getSnapshot()
+    source.value = snapshot.source
+    visible.value = snapshot.visible
+    done.value = snapshot.done
+  }
+  const unsubscribe = controller.subscribe(sync)
+  sync()
 
   const pendingChars = computed(() => Math.max(0, source.value.length - visible.value.length))
   const caughtUp = computed(() => pendingChars.value === 0)
   const final = computed(() => done.value && caughtUp.value)
 
-  if (getCurrentScope())
-    onScopeDispose(() => controller.destroy())
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      unsubscribe()
+      controller.destroy()
+    })
+  }
 
   return {
     source,
@@ -59,12 +59,7 @@ export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {
     enqueue: (chunk: string) => controller.enqueue(chunk),
     finish: (finishOptions?: { flush?: boolean }) => controller.finish(finishOptions),
     flush: () => controller.flush(),
-    reset: (initialMarkdown?: string) => {
-      controller.reset(initialMarkdown)
-      source.value = controller.source
-      visible.value = controller.visible
-      done.value = controller.done
-    },
+    reset: (initialMarkdown?: string) => controller.reset(initialMarkdown),
     pause: () => controller.pause(),
     resume: () => controller.resume(),
   }

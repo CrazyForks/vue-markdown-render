@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { resolveStreamingTextState } from 'markstream-core'
 import { computed, getCurrentInstance, inject, ref, watch } from 'vue-demi'
 import { useKatexReady } from '../../composables/useKatexReady'
-import { resolveStreamingTextState } from 'markstream-core'
 
 const props = defineProps<{
   node: {

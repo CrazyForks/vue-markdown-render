@@ -1,4 +1,10 @@
-import type { SmoothMarkdownStreamOptions, SmoothStreamNotify } from './types'
+import type {
+  SmoothMarkdownStreamController as SmoothMarkdownStreamControllerApi,
+  SmoothMarkdownStreamOptions,
+  SmoothMarkdownStreamSnapshot,
+  SmoothStreamEvent,
+  SmoothStreamNotify,
+} from './types'
 
 interface GraphemeSlice {
   text: string
@@ -43,7 +49,7 @@ export class SmoothMarkdownStreamController {
   private readonly maxCharsPerCommit: number
   private readonly flushOnFinish: boolean
   private readonly segmenter: GraphemeSegmenter | null
-  private readonly notify: SmoothStreamNotify | undefined
+  private readonly listeners = new Set<SmoothStreamNotify>()
 
   private rafId = 0
   private startedAt = 0
@@ -78,7 +84,8 @@ export class SmoothMarkdownStreamController {
     this.maxCharsPerCommit = Math.trunc(toPositiveFiniteNumber(rawMaxChars, 80, 1))
     this.flushOnFinish = flushOnFinish
     this.segmenter = createGraphemeSegmenter()
-    this.notify = notify
+    if (notify)
+      this.listeners.add(notify)
     this.currentCps = this.minCharsPerSecond
   }
 
@@ -94,19 +101,34 @@ export class SmoothMarkdownStreamController {
     return this.done && this.caughtUp
   }
 
-  enqueue(chunk: string): void {
+  getSnapshot = (): SmoothMarkdownStreamSnapshot => ({
+    source: this.source,
+    visible: this.visible,
+    done: this.done,
+    paused: this.paused,
+    pendingChars: this.pendingChars,
+    caughtUp: this.caughtUp,
+    final: this.final,
+  })
+
+  subscribe = (listener: SmoothStreamNotify): (() => void) => {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
+  enqueue = (chunk: string): void => {
     if (!chunk)
       return
 
     if (this.done) {
       this.done = false
-      this.emit('done')
     }
 
     const hadSource = this.source.length > 0
     const wasIdle = this.pendingChars <= 0
     this.source += chunk
-    this.emit('source')
 
     if (wasIdle) {
       const t = now()
@@ -121,30 +143,35 @@ export class SmoothMarkdownStreamController {
     }
 
     this.hasStarted = true
+    this.emit()
     this.ensureLoop()
   }
 
-  finish(finishOptions: { flush?: boolean } = {}): void {
+  finish = (finishOptions: { flush?: boolean } = {}): void => {
     this.done = true
-    this.emit('done')
 
     if (finishOptions.flush ?? this.flushOnFinish) {
-      this.flush()
+      this.visible = this.source
+      this.charBudget = 0
+      this.currentCps = this.minCharsPerSecond
+      this.cancelLoop()
+      this.emit()
       return
     }
 
+    this.emit()
     this.ensureLoop()
   }
 
-  flush(): void {
+  flush = (): void => {
     this.visible = this.source
     this.charBudget = 0
     this.currentCps = this.minCharsPerSecond
     this.cancelLoop()
-    this.emit('visible')
+    this.emit()
   }
 
-  reset(initialMarkdown = ''): void {
+  reset = (initialMarkdown = ''): void => {
     this.cancelLoop()
 
     this.source = initialMarkdown
@@ -158,19 +185,19 @@ export class SmoothMarkdownStreamController {
     this.charBudget = 0
     this.currentCps = this.minCharsPerSecond
 
-    this.emit('source')
-    this.emit('visible')
-    this.emit('done')
-    this.emit('paused')
+    this.emit()
   }
 
-  pause(): void {
+  pause = (): void => {
+    if (this.paused)
+      return
+
     this.paused = true
     this.cancelLoop()
-    this.emit('paused')
+    this.emit()
   }
 
-  resume(): void {
+  resume = (): void => {
     if (!this.paused)
       return
 
@@ -178,12 +205,13 @@ export class SmoothMarkdownStreamController {
     const t = now()
     this.lastTick = t
     this.startedAt ||= t
-    this.emit('paused')
+    this.emit()
     this.ensureLoop()
   }
 
-  destroy(): void {
+  destroy = (): void => {
     this.cancelLoop()
+    this.listeners.clear()
   }
 
   private ensureLoop(): void {
@@ -250,7 +278,7 @@ export class SmoothMarkdownStreamController {
     if (nextSlice.text) {
       this.visible += nextSlice.text
       this.charBudget = Math.max(0, this.charBudget - nextSlice.graphemeCount)
-      this.emit('visible')
+      this.emit()
     }
 
     this.ensureLoop()
@@ -266,8 +294,27 @@ export class SmoothMarkdownStreamController {
     this.rafId = 0
   }
 
-  private emit(event: 'source' | 'visible' | 'done' | 'paused'): void {
-    this.notify?.(event)
+  private emit(event: SmoothStreamEvent = 'state'): void {
+    for (const listener of this.listeners)
+      listener(event)
+  }
+}
+
+export function createSmoothMarkdownStream(
+  options: SmoothMarkdownStreamOptions = {},
+  notify?: SmoothStreamNotify,
+): SmoothMarkdownStreamControllerApi {
+  const controller = new SmoothMarkdownStreamController(options, notify)
+  return {
+    getSnapshot: controller.getSnapshot,
+    subscribe: controller.subscribe,
+    enqueue: controller.enqueue,
+    finish: controller.finish,
+    flush: controller.flush,
+    reset: controller.reset,
+    pause: controller.pause,
+    resume: controller.resume,
+    destroy: controller.destroy,
   }
 }
 

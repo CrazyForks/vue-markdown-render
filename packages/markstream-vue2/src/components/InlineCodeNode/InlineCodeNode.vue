@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, getCurrentInstance, inject, ref, watch } from 'vue-demi'
 import { resolveStreamingTextState } from 'markstream-core'
+import { computed, getCurrentInstance, inject, ref, watch } from 'vue-demi'
 
 const props = defineProps<{
   node: {

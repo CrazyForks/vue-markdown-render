@@ -41,7 +41,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build --mode npm",
+    "build": "pnpm --dir ../markstream-core build && vite build --mode npm",
     "dev": "vite dev",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

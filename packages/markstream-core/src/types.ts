@@ -10,9 +10,31 @@ export interface SmoothMarkdownStreamOptions {
   flushOnFinish?: boolean
 }
 
-export type SmoothStreamEvent = 'visible' | 'source' | 'done' | 'paused'
+export interface SmoothMarkdownStreamSnapshot {
+  source: string
+  visible: string
+  done: boolean
+  paused: boolean
+  pendingChars: number
+  caughtUp: boolean
+  final: boolean
+}
+
+export type SmoothStreamEvent = 'state' | 'visible' | 'source' | 'done' | 'paused'
 
 export type SmoothStreamNotify = (event: SmoothStreamEvent) => void
+
+export interface SmoothMarkdownStreamController {
+  getSnapshot: () => SmoothMarkdownStreamSnapshot
+  subscribe: (listener: SmoothStreamNotify) => () => void
+  enqueue: (chunk: string) => void
+  finish: (options?: { flush?: boolean }) => void
+  flush: () => void
+  reset: (initialMarkdown?: string) => void
+  pause: () => void
+  resume: () => void
+  destroy: () => void
+}
 
 export interface ResolveStreamingTextStateOptions {
   nextContent: string
