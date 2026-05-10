@@ -61,6 +61,7 @@ import { MarkstreamAngularComponent } from 'markstream-angular'
       [content]="content()"
       [final]="done()"
       [codeBlockStream]="true"
+      [maxLiveNodes]="0"
       [batchRendering]="true"
       [typewriter]="true"
     />
@@ -70,6 +71,18 @@ export class StreamingDemoComponent {
   readonly content = signal('# Partial output')
   readonly done = signal(false)
 }
+```
+
+The default `smoothStreaming="auto"` enables pacing when `typewriter` is on or `maxLiveNodes <= 0`. Use `[smoothStreaming]="true"` only if you want first-screen content to also start from blank — this bypasses the mounted gate and can cause hydration mismatch or blank flash in SSR scenarios.
+
+Fine-tune pacing with `smoothStreamingOptions`:
+
+```html
+<markstream-angular
+  [content]="content()"
+  [final]="done()"
+  [smoothStreamingOptions]="{ minCharsPerSecond: 45, maxCharsPerSecond: 1200, targetLatencyMs: 900, catchUpLatencyMs: 350 }"
+/>
 ```
 
 ## Trusted Mermaid compatibility

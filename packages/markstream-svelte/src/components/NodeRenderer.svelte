@@ -48,7 +48,8 @@
     isDark = false,
     customId = undefined,
     indexKey = undefined,
-    typewriter = true,
+    typewriter = false,
+    fade = true,
     batchRendering = true,
     initialRenderBatchSize = 40,
     renderBatchSize = 80,
@@ -192,6 +193,7 @@
     customId,
     indexKey,
     typewriter,
+    fade,
     batchRendering,
     initialRenderBatchSize,
     renderBatchSize,
@@ -450,9 +452,10 @@
 >
   {#each renderedNodes as node, index ((indexKey != null ? String(indexKey) : 'markdown-renderer') + '-' + index)}
     <div class="node-slot" data-node-index={index} data-node-type={(node as any)?.type}>
-      <div class:typewriter-node={typewriter !== false && String((node as any)?.type || '') !== 'code_block'} class="node-content" data-node-index={index}>
+      <div class:fade-node={fade !== false && String((node as any)?.type || '') !== 'code_block'} class:typewriter-node={fade !== false && String((node as any)?.type || '') !== 'code_block'} class="node-content" data-node-index={index}>
         <NodeOutlet node={node} context={renderContext} indexKey={(indexKey != null ? String(indexKey) : 'markdown-renderer') + '-' + index} />
       </div>
     </div>
   {/each}
+  {#if typewriter === true && effectiveFinal !== true && !hasNodes}<span class="typewriter-cursor" aria-hidden="true"></span>{/if}
 </div>

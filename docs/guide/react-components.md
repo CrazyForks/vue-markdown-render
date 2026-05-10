@@ -26,8 +26,11 @@ The primary component for rendering markdown content in React.
 | `debugPerformance` | `boolean` | `false` | Log parse/render timing and virtualization stats (dev only) |
 | `isDark` | `boolean` | `false` | Theme flag forwarded to heavy nodes; adds `.dark` to the root container |
 | `indexKey` | `number \| string` | - | Key prefix when rendering multiple instances in lists |
-| `typewriter` | `boolean` | `true` | Enable the non-code-node enter transition |
+| `typewriter` | `boolean` | `false` | Shows the blinking typewriter cursor while streamed content grows |
 | `showTooltips` | `boolean` | `true` | Global tooltip switch for `LinkNode` and code block nodes |
+| `smoothStreaming` | `boolean \| 'auto'` | `'auto'` | Enables built-in pacing for streaming `content` updates. `'auto'` only enables when `typewriter=true` or `maxLiveNodes<=0`. Set `true` to force-enable, `false` to render with raw chunk cadence. |
+| `smoothStreamingOptions` | `SmoothMarkdownStreamOptions` | - | Options for built-in stream pacing (`minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`). Read when the renderer is created; recreate the renderer with a different `key` if you need to change them dynamically. |
+| `fade` | `boolean` | `true` | Enables non-code-node enter fade and appended-text fade |
 
 #### Streaming & heavy-node toggles
 
@@ -45,6 +48,8 @@ The primary component for rendering markdown content in React.
 | `maxLiveNodes` | `320` | Max fully rendered nodes kept in DOM (set `0` to disable virtualization) |
 | `liveNodeBuffer` | `60` | Overscan buffer around the focus range |
 | `batchRendering` | `true` | Incremental batch rendering when virtualization is disabled |
+| `smoothStreaming` | `'auto'` | Built-in stream pacing in typewriter/incremental mode (`typewriter` or `maxLiveNodes <= 0`). Set `true` to force-enable, `false` for raw chunk cadence. |
+| `smoothStreamingOptions` | - | Fine-tune pacing: `minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`. Read once when the renderer is created; use a different component `key` to apply new options dynamically. |
 | `initialRenderBatchSize` | `40` | Nodes rendered immediately before batching starts |
 | `renderBatchSize` | `80` | Nodes rendered per batch tick |
 | `renderBatchDelay` | `16` | Extra delay (ms) before each batch after rAF |
@@ -86,7 +91,8 @@ The primary component for rendering markdown content in React.
 
 Streaming notes:
 - Keep `viewportPriority` enabled to prevent offscreen Mermaid / Monaco / D2 work from running while text is still streaming.
-- For high-frequency SSE, prefer passing `nodes` instead of reparsing the full `content` string every chunk.
+- For jittery SSE or AI token streams, start with `content` + built-in `smoothStreaming`.
+- Use `nodes` when a worker, store, or custom AST pipeline already owns parsing.
 - Mermaid strict mode is now the default. Set `mermaidProps` to `{ isStrict: false }` only for trusted diagrams that need loose Mermaid HTML-label behavior.
 - Common Mermaid tuning keys: `renderDebounceMs`, `contentStableDelayMs`, `previewPollDelayMs`, `previewPollMaxDelayMs`, `previewPollMaxAttempts`.
 
@@ -527,6 +533,7 @@ interface NodeComponentProps<TNode = unknown> {
   customId?: string // Custom ID for scoping
   isDark?: boolean
   typewriter?: boolean
+  fade?: boolean // Enable/disable fade animations
   children?: React.ReactNode
 }
 ```
@@ -620,7 +627,7 @@ This uses a custom heading component.
 
 ## Streaming Support
 
-markstream-react supports streaming markdown content:
+markstream-react supports streaming markdown content with built-in smooth pacing:
 
 ```tsx
 import MarkdownRender from 'markstream-react'
@@ -628,6 +635,7 @@ import { useEffect, useState } from 'react'
 
 function StreamingDemo() {
   const [content, setContent] = useState('')
+  const [final, setFinal] = useState(false)
   const fullContent = `# Streaming Demo
 
 This content streams in **small chunks**.
@@ -641,6 +649,7 @@ This content streams in **small chunks**.
         i++
       }
       else {
+        setFinal(true)
         clearInterval(interval)
       }
     }, 30)
@@ -648,8 +657,33 @@ This content streams in **small chunks**.
     return () => clearInterval(interval)
   }, [])
 
-  return <MarkdownRender content={content} />
+  return (
+    <MarkdownRender
+      content={content}
+      final={final}
+      maxLiveNodes={0}
+      batchRendering
+      typewriter
+    />
+  )
 }
+```
+
+The default `smoothStreaming="auto"` enables pacing automatically when `typewriter` is on or `maxLiveNodes <= 0`. Use `smoothStreaming={true}` only if you want first-screen content to also start from blank — this bypasses the mounted gate and can cause hydration mismatch or blank flash in SSR scenarios.
+
+Use `smoothStreamingOptions` to fine-tune pacing:
+
+```tsx
+<MarkdownRender
+  content={content}
+  final={final}
+  smoothStreamingOptions={{
+    minCharsPerSecond: 45,
+    maxCharsPerSecond: 1200,
+    targetLatencyMs: 900,
+    catchUpLatencyMs: 350,
+  }}
+/>
 ```
 
 ## TypeScript Support

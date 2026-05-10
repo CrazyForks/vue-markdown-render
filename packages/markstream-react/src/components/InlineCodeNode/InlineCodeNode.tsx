@@ -4,15 +4,16 @@ import { resolveStreamingTextUpdate } from 'markstream-core'
 import React, { useEffect, useRef, useState } from 'react'
 
 export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', code: string }>) {
-  const { node, children, ctx, indexKey, typewriter } = props
+  const { node, children, ctx, indexKey, fade } = props
   const content = String(node.code ?? '')
-  const typewriterEnabled = typewriter ?? ctx?.typewriter ?? true
+  const fadeEnabled = fade ?? ctx?.fade ?? true
   const streamStateKey = indexKey == null || indexKey === ''
     ? ''
     : String(indexKey)
   const [settledContent, setSettledContent] = useState(content)
   const [streamedDelta, setStreamedDelta] = useState('')
   const [streamFadeVersion, setStreamFadeVersion] = useState(0)
+  const lastStreamRenderVersionRef = useRef(ctx?.streamRenderVersion)
   const renderedContentRef = useRef({
     settledContent: content,
     streamedDelta: '',
@@ -33,8 +34,12 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
   }
 
   useEffect(() => {
+    const streamRenderVersion = ctx?.streamRenderVersion
+    const streamRenderVersionChanged = streamRenderVersion !== lastStreamRenderVersionRef.current
+
     if (children != null) {
       setRenderedContent('', '')
+      lastStreamRenderVersionRef.current = streamRenderVersion
       return
     }
 
@@ -47,7 +52,8 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
       nextContent: content,
       persistedContent,
       currentState,
-      typewriterEnabled,
+      typewriterEnabled: fadeEnabled,
+      streamRenderVersionChanged,
     })
 
     setRenderedContent(nextState.settledContent, nextState.streamedDelta)
@@ -55,7 +61,16 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
       setStreamFadeVersion(version => version + 1)
     if (streamStateKey)
       textStreamState?.set(streamStateKey, content)
-  }, [children, content, ctx?.textStreamState, streamStateKey, typewriterEnabled])
+    lastStreamRenderVersionRef.current = streamRenderVersion
+  }, [children, content, ctx?.textStreamState, ctx?.streamRenderVersion, streamStateKey, fadeEnabled])
+
+  // Immediately settle when fade animations are disabled
+  useEffect(() => {
+    if (fadeEnabled)
+      return
+    const full = getRenderedContent()
+    setRenderedContent(full, '')
+  }, [fadeEnabled])
 
   const handleStreamedDeltaAnimationEnd = () => {
     if (!renderedContentRef.current.streamedDelta)

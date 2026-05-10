@@ -49,7 +49,10 @@ export interface NodeRendererProps {
   isDark?: boolean
   customId?: string
   indexKey?: number | string
+  /** Show a blinking typewriter cursor while streamed content grows. Default: false */
   typewriter?: boolean
+  /** Enable/disable non-code-node enter and streamed-text fade animations. Default: true */
+  fade?: boolean
   /**
    * Enable built-in smooth pacing for streaming `content` updates.
    * - `true`: force-enable smooth streaming (content mode only)
@@ -81,6 +84,8 @@ export interface RenderContext {
   isDark?: boolean
   indexKey?: string
   typewriter?: boolean
+  /** Enable/disable fade animations. Default: true */
+  fade?: boolean
   textStreamState?: Map<string, string>
   streamRenderVersion?: number
   customComponents?: CustomComponentMap

@@ -103,6 +103,7 @@
     isDark={context?.isDark}
     indexKey={indexKey}
     typewriter={context?.typewriter}
+    fade={context?.fade}
     {...customInputs}
   />
 {:else if resolvedType === 'text' || resolvedType === 'text_special'}
@@ -136,7 +137,7 @@
 {:else if resolvedType === 'image'}
   <ImageNode {node} />
 {:else if resolvedType === 'inline_code'}
-  <InlineCodeNode {node} />
+  <InlineCodeNode {node} {context} {indexKey} />
 {:else if resolvedType === 'strong'}
   <StrongNode {node} {context} {indexKey} />
 {:else if resolvedType === 'emphasis'}
