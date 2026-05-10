@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import React, { act, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useStreamSimulator } from '../playground-react18/src/shared/useStreamSimulator'
 
 interface HarnessProps {

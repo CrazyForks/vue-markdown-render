@@ -1,3 +1,5 @@
+import React, { act, StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 /**
  * @vitest-environment jsdom
  *
@@ -8,8 +10,6 @@
  * This prevents content loss and ensures surrounding Markdown renders correctly.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import React, { act, StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
 import { HtmlBlockNode } from '../packages/markstream-react/src/components/HtmlBlockNode/HtmlBlockNode'
 import { HtmlInlineNode } from '../packages/markstream-react/src/components/HtmlInlineNode/HtmlInlineNode'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'

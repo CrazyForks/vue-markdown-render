@@ -3,10 +3,10 @@
  */
 
 import katex from 'katex'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
 import { removeCustomComponents, setCustomComponents, withMarkstreamComponentDisplay } from '../packages/markstream-react/src/customComponents'
 import { NodeRenderer as ServerNodeRenderer } from '../packages/markstream-react/src/server'

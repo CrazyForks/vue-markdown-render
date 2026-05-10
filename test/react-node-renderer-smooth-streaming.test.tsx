@@ -2,10 +2,10 @@
  * @vitest-environment jsdom
  */
 
-import * as parser from 'stream-markdown-parser'
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import React, { act, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import * as parser from 'stream-markdown-parser'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
 import { SmoothStreamingContext } from '../packages/markstream-react/src/context/smoothStreaming'
 

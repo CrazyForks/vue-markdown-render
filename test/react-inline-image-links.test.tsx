@@ -2,10 +2,10 @@
  * @vitest-environment jsdom
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
 import React, { act, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { afterEach, describe, expect, it } from 'vitest'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
 import { NodeRenderer as ServerNodeRenderer } from '../packages/markstream-react/src/server'
 

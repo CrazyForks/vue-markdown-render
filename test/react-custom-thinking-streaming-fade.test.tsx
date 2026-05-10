@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { afterEach, describe, expect, it } from 'vitest'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
 import { removeCustomComponents, setCustomComponents } from '../packages/markstream-react/src/customComponents'
 

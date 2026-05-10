@@ -1,7 +1,7 @@
 import katex from 'katex'
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 class FakeKaTeXWorker {
   onmessage: ((event: MessageEvent) => void) | null = null
