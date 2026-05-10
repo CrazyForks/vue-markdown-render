@@ -21,36 +21,42 @@ description: 用 nodes 加 final 模式构建 AI 聊天与流式 Markdown 界面
 
 ## 2. 推荐的数据流
 
-对于高频更新场景，把解析放到 `MarkdownRender` 外面，然后传 `nodes` + `final`。
+对于高频 token 流，使用 `MarkdownRender` 内置的 smooth pacing。
 
 ```vue
 <script setup lang="ts">
-import MarkdownRender, { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
-import { computed, ref } from 'vue'
+import MarkdownRender from 'markstream-vue'
+import { ref } from 'vue'
 
 const streamedText = ref('')
 const final = ref(false)
-const md = getMarkdown('chat-message')
-
-const nodes = computed(() =>
-  parseMarkdownToStructure(streamedText.value, md, { final: final.value }),
-)
 </script>
 
 <template>
   <MarkdownRender
     custom-id="chat"
-    :nodes="nodes"
+    :content="streamedText"
     :final="final"
+    :max-live-nodes="0"
+    :batch-rendering="true"
+    :render-batch-size="16"
+    :render-batch-delay="8"
+    :render-batch-budget-ms="4"
+    :fade="false"
+    :typewriter="true"
   />
 </template>
 ```
 
 这样做的好处：
 
-- 每次 token 更新时，不需要在 `MarkdownRender` 内部整篇重解析。
-- 未来想把解析移到 store、worker 或消息流水线里时，不用改渲染器接法。
+- Incoming chunk 可能是突发式的，但可见输出可以保持平稳。
+- Backlog-aware pacing 在积压文本增多时会自动加速。
+- 最终解析会等到可见内容追上后再触发，避免流结束时的不稳定状态。
 - `custom-id="chat"` 给了你一个安全的作用域，用来定制聊天界面样式或替换单个节点。
+- 默认 `smooth-streaming="auto"` 已经在 `typewriter` 开启或 `max-live-nodes <= 0` 时自动启用 smooth pacing。只有在需要首屏内容也从空白开始 pacing 时才用 `:smooth-streaming="true"`——这会跳过 mounted 门控，在 SSR 场景下可能导致 hydration 不匹配或空白闪烁。
+
+如果某个渲染面需要原始 chunk 节奏，可以用 `:smooth-streaming="false"` 关闭。如果你已经在 worker/store 中自行解析并需要 AST 控制，可以继续用 `nodes` + `final`。
 
 ## 3. 这几个渲染配置通常最稳
 

@@ -88,3 +88,44 @@ Local playground:
 ```bash
 pnpm play:svelte
 ```
+
+## Streaming with smooth pacing
+
+For chat-style token streams, use built-in smooth pacing with the `content` prop:
+
+```svelte
+<script lang="ts">
+  import MarkdownRender from 'markstream-svelte'
+  import 'markstream-svelte/index.css'
+
+  let content = $state('')
+  let final = $state(false)
+
+  // Feed your event source here
+  // eventSource.onmessage = (e) => { content += e.data }
+  // eventSource.addEventListener('done', () => { final = true })
+</script>
+
+<MarkdownRender
+  {content}
+  {final}
+  maxLiveNodes={0}
+  batchRendering={true}
+  typewriter={true}
+/>
+```
+
+The default `smoothStreaming="auto"` enables pacing when `typewriter` is on or `maxLiveNodes <= 0`. Use `smoothStreaming={true}` only if you want first-screen content to also start from blank. Fine-tune with `smoothStreamingOptions`:
+
+```svelte
+<MarkdownRender
+  {content}
+  {final}
+  smoothStreamingOptions={{
+    minCharsPerSecond: 45,
+    maxCharsPerSecond: 1200,
+    targetLatencyMs: 900,
+    catchUpLatencyMs: 350,
+  }}
+/>
+```

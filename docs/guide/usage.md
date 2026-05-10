@@ -11,7 +11,7 @@ This page shows how to wire `markstream-vue` into common stacks, how the parser 
 | Situation | Recommended input |
 |-----------|-------------------|
 | Docs pages, static articles, low-frequency updates | `content` |
-| SSE, token streaming, AI chat, or frequent incremental updates | `nodes` + `final` |
+| SSE, token streaming, AI chat, or frequent incremental updates | `content` + `smooth-streaming` |
 | SSR or worker-preparsed content | `nodes` |
 
 If you only need built-in configuration, stay in this page and [Props & Options](/guide/props). If you need to replace rendering behavior, jump to [Override Built-in Components](/guide/component-overrides).
@@ -93,7 +93,9 @@ const nodes = parseMarkdownToStructure('# Title', md)
 
 ## Streaming recommendation
 
-For low-frequency updates, passing `content` directly is convenient. For chat-style token streams or long documents, prefer parsing outside the component and passing `nodes` so Vue only reconciles the AST you hand it:
+For low-frequency updates, passing `content` directly is convenient. For chat-style token streams or long documents, the built-in smooth streaming on `MarkdownRender` paces `content` updates so visible output stays steady even when incoming chunks are bursty. The default `smooth-streaming="auto"` enables pacing automatically when `typewriter` is on or `max-live-nodes <= 0`.
+
+If you already parse in a worker/store and need full AST control, keep using `nodes` + `final` — but note that the built-in smooth streaming only applies to the `content` path; for the `nodes` path use `useSmoothMarkdownStream` directly to pace the raw text before parsing.
 
 ```ts twoslash
 import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
@@ -118,7 +120,7 @@ const isFinalChunk = false
 </template>
 ```
 
-That avoids reparsing the full Markdown string inside `MarkdownRender` on every tiny content update, which is usually the biggest win for SSE / AI output.
+That approach avoids reparsing the full Markdown string inside `MarkdownRender` on every tiny content update, which is usually the biggest win for SSE / AI output when you need AST control. For most streaming scenarios, the simpler `content` + `smooth-streaming` path is now recommended instead.
 
 For a full end-to-end rollout order, peer selection, and chat-specific tuning, continue with [AI Chat & Streaming](/guide/ai-chat-streaming).
 
