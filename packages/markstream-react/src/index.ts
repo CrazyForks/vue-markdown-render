@@ -67,6 +67,11 @@ export type {
   CustomComponentDisplayMode,
   MarkstreamCustomComponent,
 } from './customComponents'
+export { useSmoothMarkdownStream } from './hooks/useSmoothMarkdownStream'
+export type {
+  SmoothMarkdownStreamOptions,
+  SmoothMarkdownStreamSnapshot,
+} from './hooks/useSmoothMarkdownStream'
 export * from './i18n/useSafeI18n'
 export * from './renderers/renderNode'
 export type { NodeRendererCodeBlockProps, NodeRendererProps } from './types'

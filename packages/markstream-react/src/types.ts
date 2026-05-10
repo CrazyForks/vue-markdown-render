@@ -1,6 +1,7 @@
 import type React from 'react'
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { CustomComponentMap } from './customComponents'
+import type { SmoothMarkdownStreamOptions } from './hooks/useSmoothMarkdownStream'
 import type {
   CodeBlockMonacoOptions,
   CodeBlockMonacoTheme,
@@ -49,6 +50,16 @@ export interface NodeRendererProps {
   customId?: string
   indexKey?: number | string
   typewriter?: boolean
+  /**
+   * Enable built-in smooth pacing for streaming `content` updates.
+   * - `true`: force-enable smooth streaming (content mode only)
+   * - `false`: force-disable smooth streaming
+   * - `'auto'` (default): enable only when typewriter/incremental mode is active
+   * Applies when rendering from `content` (not `nodes`).
+   */
+  smoothStreaming?: boolean | 'auto'
+  /** Options forwarded to the built-in smooth streaming composable. */
+  smoothStreamingOptions?: SmoothMarkdownStreamOptions
   batchRendering?: boolean
   initialRenderBatchSize?: number
   renderBatchSize?: number

@@ -7,8 +7,10 @@ import {
   mergeCustomHtmlTags,
   parseMarkdownToStructure,
 } from 'stream-markdown-parser'
+import { SmoothStreamingContext } from '../context/smoothStreaming'
 import { useViewportPriority, ViewportPriorityProvider } from '../context/viewportPriority'
 import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../customComponents'
+import { useSmoothMarkdownStream } from '../hooks/useSmoothMarkdownStream'
 import { renderNode } from '../renderers/renderNode'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { getUseMonaco } from './CodeBlockNode/monaco'
@@ -16,6 +18,7 @@ import { setDesiredMonacoTheme } from './CodeBlockNode/monacoThemeRegistry'
 
 const DEFAULT_PROPS: Required<Pick<NodeRendererProps, 'codeBlockStream'
   | 'typewriter'
+  | 'smoothStreaming'
   | 'batchRendering'
   | 'initialRenderBatchSize'
   | 'renderBatchSize'
@@ -27,6 +30,7 @@ const DEFAULT_PROPS: Required<Pick<NodeRendererProps, 'codeBlockStream'
   | 'liveNodeBuffer'>> = {
   codeBlockStream: true,
   typewriter: true,
+  smoothStreaming: 'auto',
   batchRendering: true,
   initialRenderBatchSize: 40,
   renderBatchSize: 80,
@@ -672,21 +676,58 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const desiredThemeKeyRef = useRef<string | null>(null)
   const textStreamStateRef = useRef(new Map<string, string>())
-  const previousStreamInputsRef = useRef<{
-    content?: NodeRendererProps['content']
-    nodes?: NodeRendererProps['nodes']
-  } | null>(null)
   const streamRenderVersionRef = useRef(0)
+  const previousRenderVersionSourceRef = useRef<unknown>(null)
+  const smoothStream = useSmoothMarkdownStream(props.smoothStreamingOptions)
+  const isClient = typeof window !== 'undefined'
+  const parentSmoothStreaming = React.useContext(SmoothStreamingContext)
+  const [hasMountedForSmoothStreaming, setHasMountedForSmoothStreaming] = useState(
+    !isClient || props.smoothStreaming === true,
+  )
 
-  if (
-    previousStreamInputsRef.current?.content !== props.content
-    || previousStreamInputsRef.current?.nodes !== props.nodes
-  ) {
+  useEffect(() => {
+    setHasMountedForSmoothStreaming(true)
+  }, [])
+
+  const hasNodes = Array.isArray(props.nodes) && props.nodes.length > 0
+  const smoothStreamingEligible = useMemo(() => {
+    if (props.smoothStreaming === false)
+      return false
+    if (hasNodes)
+      return false
+    if (props.smoothStreaming !== true && parentSmoothStreaming)
+      return false
+    if (props.smoothStreaming === true)
+      return true
+    return props.typewriter === true || (props.maxLiveNodes ?? 0) <= 0
+  }, [
+    hasNodes,
+    parentSmoothStreaming,
+    props.maxLiveNodes,
+    props.smoothStreaming,
+    props.typewriter,
+  ])
+  const smoothStreamingEnabled = hasMountedForSmoothStreaming && smoothStreamingEligible
+
+  const renderContent = smoothStreamingEnabled
+    ? smoothStream.visible
+    : (props.content ?? '')
+
+  const requestedFinal = useMemo(() => {
+    const base = props.parseOptions ?? {}
+    return props.final ?? (base as any).final
+  }, [props.final, props.parseOptions])
+
+  const effectiveFinal = useMemo(() => {
+    if (smoothStreamingEnabled && requestedFinal != null)
+      return requestedFinal ? smoothStream.caughtUp : false
+    return requestedFinal
+  }, [requestedFinal, smoothStream.caughtUp, smoothStreamingEnabled])
+
+  const renderVersionSource = hasNodes ? props.nodes : renderContent
+  if (previousRenderVersionSourceRef.current !== renderVersionSource) {
     streamRenderVersionRef.current += 1
-    previousStreamInputsRef.current = {
-      content: props.content,
-      nodes: props.nodes,
-    }
+    previousRenderVersionSourceRef.current = renderVersionSource
   }
 
   const customComponentsRevision = useSyncExternalStore(
@@ -732,7 +773,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
 
   const mergedParseOptions = useMemo(() => {
     const base = props.parseOptions ?? {}
-    const resolvedFinal = props.final ?? (base as any).final
+    const resolvedFinal = effectiveFinal
     const hasFinal = resolvedFinal != null
     const hasCustom = effectiveCustomHtmlTags.length > 0
 
@@ -744,7 +785,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
       ...(hasFinal ? { final: resolvedFinal } : {}),
       ...(hasCustom ? { customHtmlTags: effectiveCustomHtmlTags } : {}),
     } as any
-  }, [effectiveCustomHtmlTags, props.final, props.parseOptions])
+  }, [effectiveCustomHtmlTags, effectiveFinal, props.parseOptions])
 
   const parsedNodes = useMemo<ParsedNode[]>(() => {
     const debugEnabled = Boolean(props.debugPerformance)
@@ -753,25 +794,26 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     const parseStart = debugEnabled ? performance.now() : 0
 
     let result: ParsedNode[] = []
-    if (Array.isArray(props.nodes) && props.nodes.length) {
+    if (hasNodes) {
       result = (props.nodes as ParsedNode[]).map(node => ({ ...node }))
     }
-    else if (props.content) {
-      result = parseMarkdownToStructure(props.content, mdInstance ?? fallbackMarkdown, mergedParseOptions)
+    else if (renderContent) {
+      result = parseMarkdownToStructure(renderContent, mdInstance ?? fallbackMarkdown, mergedParseOptions)
     }
 
     if (debugEnabled) {
       console.info('[markstream-react][perf] parse(sync)', {
         ms: Math.round(performance.now() - parseStart),
         nodes: result.length,
-        contentLength: props.content?.length ?? 0,
+        contentLength: renderContent.length,
       })
     }
 
     return result
   }, [
-    props.content,
     props.debugPerformance,
+    renderContent,
+    hasNodes,
     props.nodes,
     mergedParseOptions,
     mdInstance,
@@ -779,6 +821,40 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     customComponentsRevision,
     effectiveCustomHtmlTags,
   ])
+
+  useEffect(() => {
+    if (hasNodes) {
+      smoothStream.reset('')
+      return
+    }
+
+    const nextContent = props.content ?? ''
+
+    if (!smoothStreamingEnabled) {
+      smoothStream.reset(nextContent)
+      if (requestedFinal)
+        smoothStream.finish({ flush: true })
+      return
+    }
+
+    const source = smoothStream.source
+
+    if (!nextContent) {
+      smoothStream.reset('')
+    }
+    else if (nextContent === source) {
+      // no-op
+    }
+    else if (nextContent.startsWith(source)) {
+      smoothStream.enqueue(nextContent.slice(source.length))
+    }
+    else {
+      smoothStream.reset(nextContent)
+    }
+
+    if (requestedFinal)
+      smoothStream.finish()
+  }, [hasNodes, props.content, requestedFinal, smoothStreamingEnabled])
 
   useEffect(() => {
     if (typeof window === 'undefined')
@@ -906,18 +982,20 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   ])
 
   return (
-    <ViewportPriorityProvider
-      getRoot={() => containerRef.current}
-      enabled={props.viewportPriority !== false}
-    >
-      <MemoNodeRendererInner
-        props={props}
-        parsedNodes={parsedNodes}
-        renderCtx={renderCtx}
-        indexPrefix={indexPrefix}
-        containerRef={containerRef}
-      />
-    </ViewportPriorityProvider>
+    <SmoothStreamingContext.Provider value={smoothStreamingEnabled}>
+      <ViewportPriorityProvider
+        getRoot={() => containerRef.current}
+        enabled={props.viewportPriority !== false}
+      >
+        <MemoNodeRendererInner
+          props={props}
+          parsedNodes={parsedNodes}
+          renderCtx={renderCtx}
+          indexPrefix={indexPrefix}
+          containerRef={containerRef}
+        />
+      </ViewportPriorityProvider>
+    </SmoothStreamingContext.Provider>
   )
 }
 

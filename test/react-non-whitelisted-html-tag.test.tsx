@@ -64,6 +64,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
             customId: scopeId,
             customHtmlTags: ['my-tag'],
             final: true,
+            smoothStreaming: false,
           })),
         )
       })
@@ -93,6 +94,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
           content: markdown,
           customId: scopeId,
           final: true,
+          smoothStreaming: false,
         })),
       )
     })
@@ -168,6 +170,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
             },
           ],
           final: true,
+          smoothStreaming: false,
         })),
       )
     })
@@ -189,6 +192,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
           ],
           htmlPolicy: 'trusted',
           final: true,
+          smoothStreaming: false,
         })),
       )
     })
@@ -285,6 +289,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
           ],
           htmlPolicy: 'escape',
           final: true,
+          smoothStreaming: false,
         })),
       )
     })
@@ -314,6 +319,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
           content: markdown,
           customId: scopeId,
           final: true,
+          smoothStreaming: false,
         })),
       )
     })
@@ -345,6 +351,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
           content: markdown,
           customId: scopeId,
           final: true,
+          smoothStreaming: false,
         })),
       )
     })
@@ -369,6 +376,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
           content: markdown,
           customId: scopeId,
           final: true,
+          smoothStreaming: false,
         })),
       )
     })
@@ -393,6 +401,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
           content: markdown,
           customId: scopeId,
           final: true,
+          smoothStreaming: false,
           // NOT adding 'unknown-tag' to customHtmlTags
         })),
       )
@@ -424,6 +433,7 @@ describe('react: non-whitelisted custom HTML tags', () => {
           content: markdown,
           customId: scopeId,
           final: true,
+          smoothStreaming: false,
           // NOT adding 'echat-url' to customHtmlTags
         })),
       )
@@ -487,6 +497,7 @@ After list.`
           content: markdown,
           customId: scopeId,
           final: true,
+          smoothStreaming: false,
           // NOT adding 'custom-tag' to customHtmlTags
         })),
       )

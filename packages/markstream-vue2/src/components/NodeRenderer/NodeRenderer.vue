@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
+import type { SmoothMarkdownStreamOptions } from '../../composables/useSmoothMarkdownStream'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from '../../types/component-props'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
@@ -34,6 +35,7 @@ import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
+import { useSmoothMarkdownStream } from '../../composables/useSmoothMarkdownStream'
 import { provideViewportPriority } from '../../composables/viewportPriority'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
@@ -106,6 +108,16 @@ export interface NodeRendererProps {
   indexKey?: number | string
   /** Enable/disable the non-code-node enter transition (typewriter). Default: true */
   typewriter?: boolean
+  /**
+   * Enable built-in smooth pacing for streaming `content` updates.
+   * - true: force-enable smooth streaming
+   * - false: force-disable smooth streaming
+   * - 'auto': enable when typewriter/incremental mode is active
+   * Applies to content mode only, not nodes mode.
+   */
+  smoothStreaming?: boolean | 'auto'
+  /** Options forwarded to the built-in smooth streaming controller. */
+  smoothStreamingOptions?: SmoothMarkdownStreamOptions
   /** Enable incremental/batched rendering of nodes to avoid large single flush costs. Default: true */
   batchRendering?: boolean
   /** How many nodes to render immediately before batching kicks in. Default: 40 */
@@ -130,6 +142,7 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
   showTooltips: true,
   typewriter: true,
+  smoothStreaming: 'auto',
   batchRendering: true,
   debugPerformance: false,
   initialRenderBatchSize: 40,
@@ -162,6 +175,7 @@ const debugPerformanceEnabled = computed(() => props.debugPerformance && isClien
 const attrs = computed<Record<string, unknown>>(() => ((instance?.proxy as any)?.$attrs ?? {}) as Record<string, unknown>)
 const textStreamState = new Map<string, string>()
 const streamRenderVersion = ref(0)
+const smoothStream = useSmoothMarkdownStream(props.smoothStreamingOptions)
 const resolvedShowTooltips = computed<boolean | undefined>(() => {
   if (typeof props.showTooltips === 'boolean')
     return props.showTooltips
@@ -173,6 +187,7 @@ const resolvedShowTooltips = computed<boolean | undefined>(() => {
   return undefined
 })
 const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const inheritedSmoothStreaming = inject<{ value?: boolean } | undefined>('markstreamSmoothStreaming', undefined)
 const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
 
 provide('markstreamShowTooltips', resolvedShowTooltips)
@@ -181,8 +196,88 @@ provide('markstreamTypewriter', computed(() => props.typewriter !== false))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)
 
+const smoothStreamingEligible = computed(() => {
+  if (props.smoothStreaming === false)
+    return false
+  if (props.nodes?.length)
+    return false
+  if (props.smoothStreaming !== true && inheritedSmoothStreaming?.value)
+    return false
+  if (props.smoothStreaming === true)
+    return true
+  return props.typewriter === true || (props.maxLiveNodes ?? 0) <= 0
+})
+
+const hasMountedForSmoothStreaming = ref(!isClient || props.smoothStreaming === true)
+
+onMounted(() => {
+  hasMountedForSmoothStreaming.value = true
+})
+
+const smoothStreamingEnabled = computed(() => (
+  hasMountedForSmoothStreaming.value
+  && smoothStreamingEligible.value
+))
+
+provide('markstreamSmoothStreaming', smoothStreamingEnabled)
+
+const renderContent = computed(() => (
+  smoothStreamingEnabled.value
+    ? smoothStream.visible.value
+    : (props.content ?? '')
+))
+
+const requestedFinal = computed<boolean | undefined>(() => {
+  const base = (props.parseOptions ?? {}) as ParseOptions
+  return props.final ?? base.final
+})
+
+const renderVersionSource = computed(() => {
+  if (props.nodes?.length)
+    return props.nodes
+  return renderContent.value
+})
+
 watch(
-  [() => props.content, () => props.nodes],
+  [() => props.content, () => props.nodes, smoothStreamingEnabled, requestedFinal],
+  ([content, nodes, enabled, finalRequested]) => {
+    if (nodes?.length) {
+      smoothStream.reset('')
+      return
+    }
+
+    const nextContent = content ?? ''
+
+    if (!enabled) {
+      smoothStream.reset(nextContent)
+      if (finalRequested)
+        smoothStream.finish({ flush: true })
+      return
+    }
+
+    const source = smoothStream.source.value
+
+    if (!nextContent) {
+      smoothStream.reset('')
+    }
+    else if (nextContent === source) {
+      // no-op
+    }
+    else if (nextContent.startsWith(source)) {
+      smoothStream.enqueue(nextContent.slice(source.length))
+    }
+    else {
+      smoothStream.reset(nextContent)
+    }
+
+    if (finalRequested)
+      smoothStream.finish()
+  },
+  { immediate: true },
+)
+
+watch(
+  renderVersionSource,
   () => {
     streamRenderVersion.value += 1
   },
@@ -262,7 +357,11 @@ function cloneParsedNodeList(nodes: ParsedNode[]) {
 
 const mergedParseOptions = computed(() => {
   const base = props.parseOptions ?? {}
-  const resolvedFinal = props.final ?? (base as any).final
+  let resolvedFinal = requestedFinal.value
+
+  if (smoothStreamingEnabled.value && resolvedFinal != null)
+    resolvedFinal = resolvedFinal ? smoothStream.caughtUp.value : false
+
   const merged = effectiveCustomHtmlTags.value
   const hasFinal = resolvedFinal != null
   const hasCustom = merged.length > 0
@@ -296,17 +395,18 @@ const parsedNodes = computed<ParsedNode[]>(() => {
   // the array length doesn't change.
   if (props.nodes?.length)
     return markRaw(cloneParsedNodeList(props.nodes as unknown as ParsedNode[]))
-  if (props.content) {
+  const contentToParse = renderContent.value
+  if (contentToParse) {
     // Prefer an explicitly passed `markdown` prop, then a globally
     // provided markdown via `setGlobalMarkdown`, otherwise fall back
     // to the legacy `getMarkdown()` factory.
     const parseStart = debugPerformanceEnabled.value ? performance.now() : 0
-    const parsed = parseMarkdownToStructure(props.content, mdInstance.value, mergedParseOptions.value)
+    const parsed = parseMarkdownToStructure(contentToParse, mdInstance.value, mergedParseOptions.value)
     if (debugPerformanceEnabled.value) {
       logPerf('parse(sync)', {
         ms: Math.round(performance.now() - parseStart),
         nodes: parsed.length,
-        contentLength: props.content.length,
+        contentLength: contentToParse.length,
       })
     }
     return markRaw(cloneParsedNodeList(parsed))
