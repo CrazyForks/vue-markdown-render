@@ -44,6 +44,7 @@ const props = withDefaults(defineProps<{
   customId?: string
   indexKey?: number | string
   typewriter?: boolean
+  fade?: boolean
   showTooltips?: boolean
   codeBlockStream?: boolean
   codeBlockDarkTheme?: CodeBlockMonacoTheme
@@ -60,7 +61,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   codeBlockStream: true,
   showTooltips: true,
-  typewriter: true,
+  typewriter: false,
+  fade: true,
 })
 
 const emit = defineEmits<{
@@ -121,7 +123,7 @@ const codeBlockBindings = computed(() => ({
   maxWidth: props.codeBlockMaxWidth,
   ...(props.codeBlockProps || {}),
 }))
-const nonCodeBindings = computed(() => ({ typewriter: props.typewriter, htmlPolicy: props.htmlPolicy ?? 'safe' }))
+const nonCodeBindings = computed(() => ({ typewriter: props.typewriter, fade: props.fade, htmlPolicy: props.htmlPolicy ?? 'safe' }))
 const linkBindings = computed(() => ({
   ...nonCodeBindings.value,
   ...(typeof props.showTooltips === 'boolean' ? { showTooltip: props.showTooltips } : {}),

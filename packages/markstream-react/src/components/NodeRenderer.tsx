@@ -18,6 +18,7 @@ import { setDesiredMonacoTheme } from './CodeBlockNode/monacoThemeRegistry'
 
 const DEFAULT_PROPS: Required<Pick<NodeRendererProps, 'codeBlockStream'
   | 'typewriter'
+  | 'fade'
   | 'smoothStreaming'
   | 'batchRendering'
   | 'initialRenderBatchSize'
@@ -29,7 +30,8 @@ const DEFAULT_PROPS: Required<Pick<NodeRendererProps, 'codeBlockStream'
   | 'maxLiveNodes'
   | 'liveNodeBuffer'>> = {
   codeBlockStream: true,
-  typewriter: true,
+  typewriter: false,
+  fade: true,
   smoothStreaming: 'auto',
   batchRendering: true,
   initialRenderBatchSize: 40,
@@ -56,6 +58,7 @@ interface NodeRendererInnerProps {
   renderCtx: RenderContext
   indexPrefix: string
   containerRef: React.RefObject<HTMLDivElement | null>
+  showTypewriterCursor: boolean
 }
 
 const DEFAULT_NODE_HEIGHT = 32
@@ -67,6 +70,7 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
   renderCtx,
   indexPrefix,
   containerRef,
+  showTypewriterCursor,
 }) => {
   const registerNodeVisibility = useViewportPriority()
   const isClient = typeof window !== 'undefined'
@@ -605,7 +609,7 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
       {visibleNodes.map(({ node, index }) => {
         const canRender = shouldRenderNode(index)
         const placeholderHeight = nodeHeightsRef.current.get(index) ?? averageNodeHeight
-        const shouldAnimate = props.typewriter !== false
+        const shouldAnimate = props.fade !== false
           && node.type !== 'code_block'
           && !nodeSeenRef.current.has(index)
           && canRender
@@ -623,7 +627,7 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
               ? (
                   <div
                     ref={getNodeContentRef(index)}
-                    className={`node-content${shouldAnimate ? ' typewriter-node' : ''}`}
+                    className={`node-content${shouldAnimate ? ' fade-node typewriter-node' : ''}`}
                   >
                     {renderNode(node, `${indexPrefix}-${index}`, renderCtx)}
                   </div>
@@ -635,6 +639,9 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
         )
       })}
       {bottomSpacer}
+      {showTypewriterCursor && (
+        <span className="typewriter-cursor" aria-hidden="true" />
+      )}
     </div>
   )
 }
@@ -648,11 +655,14 @@ function areNodeRendererInnerPropsEqual(prev: NodeRendererInnerProps, next: Node
     return false
   if (prev.containerRef !== next.containerRef)
     return false
+  if (prev.showTypewriterCursor !== next.showTypewriterCursor)
+    return false
 
   const a = prev.props
   const b = next.props
   return a.isDark === b.isDark
     && a.typewriter === b.typewriter
+    && a.fade === b.fade
     && a.batchRendering === b.batchRendering
     && a.initialRenderBatchSize === b.initialRenderBatchSize
     && a.renderBatchSize === b.renderBatchSize
@@ -678,6 +688,9 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const textStreamStateRef = useRef(new Map<string, string>())
   const streamRenderVersionRef = useRef(0)
   const previousRenderVersionSourceRef = useRef<unknown>(null)
+  const [showTypewriterCursor, setShowTypewriterCursor] = useState(false)
+  const typewriterCursorTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const lastTypewriterContentLengthRef = useRef(0)
   const smoothStream = useSmoothMarkdownStream(props.smoothStreamingOptions)
   const parentSmoothStreaming = React.useContext(SmoothStreamingContext)
   const [hasMountedForSmoothStreaming, setHasMountedForSmoothStreaming] = useState(
@@ -698,13 +711,14 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
       return false
     if (props.smoothStreaming === true)
       return true
-    return props.typewriter === true || (props.maxLiveNodes ?? 0) <= 0
+    return props.typewriter === true || props.fade !== false || (props.maxLiveNodes ?? 0) <= 0
   }, [
     hasNodes,
     parentSmoothStreaming,
     props.maxLiveNodes,
     props.smoothStreaming,
     props.typewriter,
+    props.fade,
   ])
   const smoothStreamingEnabled = hasMountedForSmoothStreaming && smoothStreamingEligible
 
@@ -868,6 +882,36 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
       smoothStream.finish()
   }, [hasNodes, props.content, requestedFinal, smoothStreamingEnabled])
 
+  // Typewriter cursor: show a blinking cursor while content is still streaming
+  useEffect(() => {
+    if (props.typewriter !== true) {
+      setShowTypewriterCursor(false)
+      return
+    }
+
+    const nextLength = (props.content ?? '').length
+    if (nextLength <= lastTypewriterContentLengthRef.current) {
+      lastTypewriterContentLengthRef.current = nextLength
+      return
+    }
+
+    lastTypewriterContentLengthRef.current = nextLength
+    setShowTypewriterCursor(true)
+
+    if (typewriterCursorTimeoutRef.current != null)
+      clearTimeout(typewriterCursorTimeoutRef.current)
+    typewriterCursorTimeoutRef.current = setTimeout(() => {
+      setShowTypewriterCursor(false)
+    }, 3000)
+
+    return () => {
+      if (typewriterCursorTimeoutRef.current != null) {
+        clearTimeout(typewriterCursorTimeoutRef.current)
+        typewriterCursorTimeoutRef.current = undefined
+      }
+    }
+  }, [props.typewriter, props.content])
+
   useEffect(() => {
     if (typeof window === 'undefined')
       return
@@ -947,6 +991,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     isDark: props.isDark,
     indexKey: indexPrefix,
     typewriter: props.typewriter,
+    fade: props.fade,
     textStreamState: textStreamStateRef.current,
     streamRenderVersion: streamRenderVersionRef.current,
     customComponents,
@@ -974,6 +1019,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.isDark,
     indexPrefix,
     props.typewriter,
+    props.fade,
     props.showTooltips,
     props.htmlPolicy,
     props.renderCodeBlocksAsPre,
@@ -1005,6 +1051,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
           renderCtx={renderCtx}
           indexPrefix={indexPrefix}
           containerRef={containerRef}
+          showTypewriterCursor={showTypewriterCursor}
         />
       </ViewportPriorityProvider>
     </SmoothStreamingContext.Provider>

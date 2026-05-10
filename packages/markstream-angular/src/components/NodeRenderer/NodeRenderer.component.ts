@@ -94,6 +94,7 @@ const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
         <div
           *ngIf="entry.render; else nodePlaceholder"
           class="node-content"
+          [class.fade-node]="entry.animate"
           [class.typewriter-node]="entry.animate"
           [attr.data-node-index]="entry.index"
         >
@@ -115,6 +116,12 @@ const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
         [style.height.px]="bottomSpacerHeight"
         aria-hidden="true"
       ></div>
+
+      <span
+        *ngIf="typewriter === true && effectiveFinal !== true && !hasNodes"
+        class="typewriter-cursor"
+        aria-hidden="true"
+      ></span>
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -156,7 +163,10 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   @Input() isDark = false
   @Input() customId?: string
   @Input() indexKey?: number | string
-  @Input() typewriter = true
+  /** Show a blinking typewriter cursor while streamed content grows. Default: false */
+  @Input() typewriter = false
+  /** Enable/disable non-code-node enter and streamed-text fade animations. Default: true */
+  @Input() fade = true
   @Input() batchRendering = true
   @Input() initialRenderBatchSize = 40
   @Input() renderBatchSize = 80
@@ -516,6 +526,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
         ...this,
         content: this.renderContent,
         final: this.effectiveFinal,
+        fade: this.fade,
         customComponents: mergedCustomComponents,
       },
       events,
@@ -596,7 +607,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
       let animate = false
       if (
         render
-        && this.typewriter !== false
+        && this.fade !== false
         && String((node as any)?.type || '') !== 'code_block'
         && !this.nodeSeen.has(index)
       ) {

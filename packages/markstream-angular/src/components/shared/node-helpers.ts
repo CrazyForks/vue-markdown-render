@@ -124,6 +124,8 @@ export interface NodeRendererProps {
   customId?: string
   indexKey?: number | string
   typewriter?: boolean
+  /** Enable/disable non-code-node enter and streamed-text fade animations. Default: true */
+  fade?: boolean
   batchRendering?: boolean
   initialRenderBatchSize?: number
   renderBatchSize?: number
@@ -144,6 +146,7 @@ export interface AngularRenderContext {
   indexKey?: string
   final?: boolean
   typewriter?: boolean
+  fade?: boolean
   textStreamState?: Map<string, string>
   streamRenderVersion?: number
   showTooltips?: boolean
@@ -207,6 +210,7 @@ export function buildRenderContext(
     indexKey: props.indexKey != null ? String(props.indexKey) : undefined,
     final: props.final,
     typewriter: props.typewriter,
+    fade: props.fade,
     textStreamState,
     streamRenderVersion,
     showTooltips: props.showTooltips,

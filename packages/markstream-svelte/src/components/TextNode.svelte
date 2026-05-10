@@ -24,6 +24,7 @@
   const content = $derived(getString((node as any)?.content ?? (node as any)?.raw))
   const centered = $derived(Boolean((node as any)?.center))
   const streamKey = $derived(String(context?.customId ?? 'global') + ':' + String(context?.streamRenderVersion ?? 0) + ':' + String(indexKey ?? 'node'))
+  const fadeEnabled = $derived(context?.fade !== false)
 
   const streamInfo = $derived.by(() => {
     const state = context?.textStreamState
@@ -32,7 +33,7 @@
     const result = resolveStreamingTextState({
       nextContent: content,
       previousContent: previous,
-      typewriterEnabled: typewriter !== false,
+      typewriterEnabled: fadeEnabled,
     })
 
     if (result.appended)
@@ -46,4 +47,4 @@
   })
 </script>
 
-<span data-typewriter={typewriter !== false ? '1' : undefined} class:markstream-svelte-text--centered={centered} class="markstream-svelte-text-node text-node">{streamInfo.stableContent}{#if streamInfo.deltaContent}<span class="markstream-svelte-text__stream-delta text-node-stream-delta {streamInfo.deltaClass}">{streamInfo.deltaContent}</span>{/if}</span>
+<span data-typewriter={context?.typewriter === true ? '1' : undefined} class:markstream-svelte-text--centered={centered} class="markstream-svelte-text-node text-node">{streamInfo.stableContent}{#if streamInfo.deltaContent}<span class="markstream-svelte-text__stream-delta text-node-stream-delta {streamInfo.deltaClass}">{streamInfo.deltaContent}</span>{/if}</span>

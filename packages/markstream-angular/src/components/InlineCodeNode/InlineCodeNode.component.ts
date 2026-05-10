@@ -26,6 +26,7 @@ export class InlineCodeNodeComponent implements OnChanges {
   @Input() context?: AngularRenderContext
   @Input() indexKey?: string
   @Input() typewriter?: boolean
+  @Input() fade?: boolean
 
   settledCode = ''
   streamedDelta = ''
@@ -44,7 +45,7 @@ export class InlineCodeNodeComponent implements OnChanges {
     const nextState = resolveStreamingTextState({
       nextContent: nextCode,
       previousContent: previousCode,
-      typewriterEnabled: this.typewriterEnabled,
+      typewriterEnabled: this.fadeEnabled,
     })
 
     this.settledCode = nextState.settledContent
@@ -61,12 +62,20 @@ export class InlineCodeNodeComponent implements OnChanges {
       : 'markstream-angular-text__stream-delta--b'
   }
 
+  get fadeEnabled() {
+    if (typeof this.fade === 'boolean')
+      return this.fade
+    if (typeof this.context?.fade === 'boolean')
+      return this.context.fade
+    return true
+  }
+
   get typewriterEnabled() {
     if (typeof this.typewriter === 'boolean')
       return this.typewriter
     if (typeof this.context?.typewriter === 'boolean')
       return this.context.typewriter
-    return true
+    return false
   }
 
   settleStreamedDelta() {

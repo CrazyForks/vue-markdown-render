@@ -106,8 +106,10 @@ export interface NodeRendererProps {
   isDark?: boolean
   customId?: string
   indexKey?: number | string
-  /** Enable/disable the non-code-node enter transition (typewriter). Default: true */
+  /** Enable/disable the typewriter cursor (blinking cursor at stream end). Default: false */
   typewriter?: boolean
+  /** Enable/disable the non-code-node enter transition (fade animation). Default: true */
+  fade?: boolean
   /**
    * Enable built-in smooth pacing for streaming `content` updates.
    * - true: force-enable smooth streaming
@@ -141,7 +143,8 @@ export interface NodeRendererProps {
 const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
   showTooltips: true,
-  typewriter: true,
+  typewriter: false,
+  fade: true,
   smoothStreaming: 'auto',
   batchRendering: true,
   debugPerformance: false,
@@ -192,7 +195,8 @@ const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheri
 
 provide('markstreamShowTooltips', resolvedShowTooltips)
 provide('markstreamHtmlPolicy', resolvedHtmlPolicy)
-provide('markstreamTypewriter', computed(() => props.typewriter !== false))
+provide('markstreamTypewriter', computed(() => props.typewriter === true))
+provide('markstreamFade', computed(() => props.fade !== false))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)
 
@@ -1845,8 +1849,10 @@ const infographicBindings = computed(() => ({
 }))
 const nonCodeBindings = computed(() => ({
   // Forward `typewriter` flag to non-code node components so they can
-  // opt in/out of enter transitions or other typewriter-like behaviour.
+  // opt in/out of typewriter cursor behavior.
   typewriter: props.typewriter,
+  // Forward `fade` flag to non-code node components for enter animations.
+  fade: props.fade,
   // Forward customHtmlTags for non-whitelisted tag detection in child components
   customHtmlTags: mergedParseOptions.value.customHtmlTags,
   htmlPolicy: resolvedHtmlPolicy.value,
@@ -2179,6 +2185,13 @@ function handleContainerMouseout(event: MouseEvent) {
     return
   emit('mouseout', event)
 }
+
+const hasNodes = computed(() => parsedNodes.value.length > 0)
+const effectiveFinal = computed(() => {
+  const base = (props.parseOptions ?? {}) as ParseOptions
+  return props.final ?? base.final
+})
+const showTypewriterCursor = computed(() => props.typewriter === true && effectiveFinal !== true && !hasNodes.value)
 </script>
 
 <template>
@@ -2201,8 +2214,8 @@ function handleContainerMouseout(event: MouseEvent) {
       >
         <div class="node-content">
           <transition
-            v-if="!item.isCodeBlock && props.typewriter !== false"
-            name="typewriter"
+            v-if="!item.isCodeBlock && props.fade !== false"
+            name="fade"
             appear
           >
             <component
@@ -2239,6 +2252,7 @@ function handleContainerMouseout(event: MouseEvent) {
       :custom-id="props.customId"
       :index-key="props.indexKey"
       :typewriter="props.typewriter"
+      :fade="props.fade"
       :show-tooltips="props.showTooltips"
       :code-block-stream="props.codeBlockStream"
       :code-block-dark-theme="props.codeBlockDarkTheme"
@@ -2277,8 +2291,8 @@ function handleContainerMouseout(event: MouseEvent) {
         >
           <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
           <transition
-            v-if="!item.isCodeBlock && props.typewriter !== false"
-            name="typewriter"
+            v-if="!item.isCodeBlock && props.fade !== false"
+            name="fade"
             appear
           >
             <component
@@ -2320,6 +2334,7 @@ function handleContainerMouseout(event: MouseEvent) {
         aria-hidden="true"
       />
     </template>
+    <span v-if="showTypewriterCursor" class="typewriter-cursor" aria-hidden="true" />
   </div>
 </template>
 
@@ -2382,10 +2397,48 @@ function handleContainerMouseout(event: MouseEvent) {
   font-style: italic;
   margin: 1rem 0;
 }
+
+.typewriter-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  min-height: 1em;
+  background: var(--typewriter-cursor-color, currentColor);
+  pointer-events: none;
+  animation: typewriter-cursor-blink 1s steps(1, end) infinite;
+}
+
+@keyframes typewriter-cursor-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typewriter-cursor {
+    animation: none !important;
+  }
+}
 </style>
 
 <style>
 /* Global (unscoped) CSS for TransitionGroup enter animations */
+.markstream-vue2 .fade-enter-from {
+  opacity: 0;
+}
+.markstream-vue2 .fade-enter-active {
+  transition: opacity var(--fade-duration, var(--typewriter-fade-duration, 280ms))
+    var(--fade-ease, var(--typewriter-fade-ease, cubic-bezier(0.33, 0, 0.67, 1)));
+  will-change: opacity;
+}
+.markstream-vue2 .fade-enter-to {
+  opacity: 1;
+}
+
 .markstream-vue2 .typewriter-enter-from {
   opacity: 0;
 }
