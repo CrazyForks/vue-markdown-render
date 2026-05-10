@@ -85,6 +85,7 @@ async function renderMarkdown(content: string, extraProps: Record<string, unknow
         viewportPriority: false,
         deferNodesUntilVisible: false,
         maxLiveNodes: 0,
+        smoothStreaming: false,
         ...extraProps,
         ...nextProps,
       }))

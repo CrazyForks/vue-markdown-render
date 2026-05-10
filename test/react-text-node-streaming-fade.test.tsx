@@ -104,6 +104,7 @@ describe('markstream-react text streaming fade', () => {
         content,
         deferNodesUntilVisible: false,
         viewportPriority: false,
+        smoothStreaming: false,
       }))
 
     await act(async () => {
@@ -149,6 +150,7 @@ describe('markstream-react text streaming fade', () => {
         deferNodesUntilVisible: false,
         viewportPriority: false,
         maxLiveNodes: 0,
+        smoothStreaming: false,
       }))
 
     await act(async () => {
@@ -197,6 +199,7 @@ describe('markstream-react text streaming fade', () => {
         content,
         deferNodesUntilVisible: false,
         viewportPriority: false,
+        smoothStreaming: false,
       }))
 
     await act(async () => {
@@ -233,6 +236,7 @@ describe('markstream-react text streaming fade', () => {
         content,
         deferNodesUntilVisible: false,
         viewportPriority: false,
+        smoothStreaming: false,
       }))
 
     await act(async () => {
@@ -315,6 +319,7 @@ describe('markstream-react text streaming fade', () => {
         content,
         deferNodesUntilVisible: false,
         viewportPriority: false,
+        smoothStreaming: false,
       }))
 
     await act(async () => {
@@ -358,6 +363,7 @@ describe('markstream-react text streaming fade', () => {
         deferNodesUntilVisible: false,
         viewportPriority: false,
         maxLiveNodes: 0,
+        smoothStreaming: false,
       }))
 
     await act(async () => {

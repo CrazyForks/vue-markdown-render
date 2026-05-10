@@ -19,7 +19,9 @@ describe('markstream-vue2 text node streaming consistency', () => {
 
     expect(nodeRendererSource).toContain('const streamRenderVersion = ref(0)')
     expect(nodeRendererSource).toContain('provide(\'markstreamStreamVersion\', streamRenderVersion)')
-    expect(nodeRendererSource).toContain('[() => props.content, () => props.nodes]')
+    expect(nodeRendererSource).toContain('const renderVersionSource = computed(() => {')
+    expect(nodeRendererSource).toContain('watch(')
+    expect(nodeRendererSource).toContain('renderVersionSource,')
 
     expect(textNodeSource).toContain('inject<{ value?: number } | undefined>(\'markstreamStreamVersion\', undefined)')
     expect(textNodeSource).toContain('[() => props.node.content, streamStateKey, typewriterEnabled, () => inheritedStreamVersion?.value]')

@@ -27,6 +27,7 @@ function ThinkingNode(props: any) {
         deferNodesUntilVisible={false}
         batchRendering={false}
         maxLiveNodes={0}
+        smoothStreaming={false}
       />
     </section>
   )
@@ -61,6 +62,7 @@ describe('markstream-react custom thinking streaming fade', () => {
         customHtmlTags: ['thinking'],
         deferNodesUntilVisible: false,
         viewportPriority: false,
+        smoothStreaming: false,
       })
 
     await act(async () => {
