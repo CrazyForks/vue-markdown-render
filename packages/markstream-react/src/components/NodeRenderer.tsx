@@ -1,4 +1,5 @@
 import type { ParsedNode } from 'stream-markdown-parser'
+import type { StreamStateRef } from '../context/streamState'
 import type { VisibilityHandle } from '../context/viewportPriority'
 import type { NodeRendererProps, RenderContext } from '../types'
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
@@ -8,6 +9,7 @@ import {
   parseMarkdownToStructure,
 } from 'stream-markdown-parser'
 import { SmoothStreamingContext } from '../context/smoothStreaming'
+import { StreamStateRefContext } from '../context/streamState'
 import { useViewportPriority, ViewportPriorityProvider } from '../context/viewportPriority'
 import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../customComponents'
 import { useSmoothMarkdownStream } from '../hooks/useSmoothMarkdownStream'
@@ -47,6 +49,90 @@ const DEFAULT_PROPS: Required<Pick<NodeRendererProps, 'codeBlockStream'
 const fallbackMarkdown = getMarkdown()
 
 type ResolvedProps = NodeRendererProps & typeof DEFAULT_PROPS
+
+/**
+ * Determine whether a parsed node is structurally identical to a previous
+ * version at the same index.  When the content has not changed we reuse the
+ * previous object reference so that React.memo checks (reference equality)
+ * can skip re-rendering the node.
+ *
+ * Comparison is intentionally lightweight – we check the fields that affect
+ * the visual output rather than doing a deep-equal walk.
+ */
+function isNodeStable(prev: ParsedNode, next: ParsedNode): boolean {
+  if (prev.type !== next.type)
+    return false
+  // `raw` is the original markdown source for the node.  If it hasn't
+  // changed the parsed output should be identical (parser is deterministic).
+  if (prev.raw !== next.raw)
+    return false
+  // Loading state on code blocks can flip independently of `raw`.
+  if (prev.type === 'code_block' || next.type === 'code_block') {
+    if ((prev as any).loading !== (next as any).loading)
+      return false
+    if ((prev as any).diff !== (next as any).diff)
+      return false
+  }
+  return true
+}
+
+/**
+ * Given a freshly-parsed node array and the previous stabilized array,
+ * return a new array where structurally-identical nodes keep their previous
+ * object reference.  This enables React.memo on NodeSlotContent to skip
+ * re-rendering unchanged nodes.
+ */
+function stabilizeParsedNodes(newNodes: ParsedNode[], prevNodes: ParsedNode[]): ParsedNode[] {
+  if (!prevNodes.length)
+    return newNodes
+  const result: ParsedNode[] = new Array(newNodes.length)
+  let identical = newNodes.length === prevNodes.length
+  for (let i = 0; i < newNodes.length; i++) {
+    const prev = i < prevNodes.length ? prevNodes[i] : null
+    if (prev && isNodeStable(prev, newNodes[i])) {
+      result[i] = prev
+    }
+    else {
+      result[i] = newNodes[i]
+      identical = false
+    }
+  }
+  // Fast path: if every node kept its previous reference, return the
+  // previous array directly so the outer reference is also stable.
+  if (identical)
+    return prevNodes
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// NodeSlotContent – memoized wrapper around renderNode
+// ---------------------------------------------------------------------------
+
+interface NodeSlotContentProps {
+  node: ParsedNode
+  nodeKey: string
+  renderCtx: RenderContext
+}
+
+/**
+ * Memoized wrapper that calls `renderNode` for a single node.
+ * Only re-renders when the node reference or renderCtx reference changes.
+ *
+ * Because `stabilizeParsedNodes` reuses previous object references for
+ * unchanged nodes, the reference-equality check here is sufficient to skip
+ * re-rendering stable nodes during streaming.
+ */
+const NodeSlotContent = React.memo(
+  ({ node, nodeKey, renderCtx }: NodeSlotContentProps) => {
+    return renderNode(node, nodeKey, renderCtx)
+  },
+  (prev: NodeSlotContentProps, next: NodeSlotContentProps) => {
+    // Reference equality on node (stabilized) and renderCtx (stable during
+    // streaming) is sufficient.  The nodeKey is derived from the index so it
+    // is always the same for the same position.
+    return prev.node === next.node && prev.renderCtx === next.renderCtx && prev.nodeKey === next.nodeKey
+  },
+)
 
 interface IdleDeadlineLike {
   timeRemaining?: () => number
@@ -629,7 +715,11 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
                     ref={getNodeContentRef(index)}
                     className={`node-content${shouldAnimate ? ' fade-node typewriter-node' : ''}`}
                   >
-                    {renderNode(node, `${indexPrefix}-${index}`, renderCtx)}
+                    <NodeSlotContent
+                      node={node}
+                      nodeKey={`${indexPrefix}-${index}`}
+                      renderCtx={renderCtx}
+                    />
                   </div>
                 )
               : (
@@ -647,8 +737,6 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
 }
 
 function areNodeRendererInnerPropsEqual(prev: NodeRendererInnerProps, next: NodeRendererInnerProps) {
-  if (prev.parsedNodes !== next.parsedNodes)
-    return false
   if (prev.renderCtx !== next.renderCtx)
     return false
   if (prev.indexPrefix !== next.indexPrefix)
@@ -657,6 +745,19 @@ function areNodeRendererInnerPropsEqual(prev: NodeRendererInnerProps, next: Node
     return false
   if (prev.showTypewriterCursor !== next.showTypewriterCursor)
     return false
+
+  // Compare parsedNodes by individual references (stabilized nodes keep
+  // their previous reference when content has not changed).
+  const prevNodes = prev.parsedNodes
+  const nextNodes = next.parsedNodes
+  if (prevNodes === nextNodes)
+    return true
+  if (prevNodes.length !== nextNodes.length)
+    return false
+  for (let i = 0; i < prevNodes.length; i++) {
+    if (prevNodes[i] !== nextNodes[i])
+      return false
+  }
 
   const a = prev.props
   const b = next.props
@@ -813,7 +914,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     } as any
   }, [effectiveCustomHtmlTags, effectiveFinal, props.parseOptions])
 
-  const parsedNodes = useMemo<ParsedNode[]>(() => {
+  const rawParsedNodes = useMemo<ParsedNode[]>(() => {
     const debugEnabled = Boolean(props.debugPerformance)
       && typeof console !== 'undefined'
       && typeof performance !== 'undefined'
@@ -847,6 +948,13 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     customComponentsRevision,
     effectiveCustomHtmlTags,
   ])
+
+  // Stabilize node references so that structurally-identical nodes keep
+  // their previous object reference.  This is the key enabler for
+  // NodeSlotContent's React.memo to skip re-rendering unchanged nodes.
+  const prevStableNodesRef = useRef<ParsedNode[]>([])
+  const parsedNodes = stabilizeParsedNodes(rawParsedNodes, prevStableNodesRef.current)
+  prevStableNodesRef.current = parsedNodes
 
   useEffect(() => {
     if (hasNodes) {
@@ -1003,28 +1111,47 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.codeBlockMonacoOptions,
     props.codeBlockMinWidth,
     props.codeBlockMaxWidth,
-    streamRenderVersionRef.current,
     props.onCopy,
     props.onHandleArtifactClick,
     customComponents,
   ])
 
+  // Keep stream version and text state up-to-date via mutation so the
+  // renderCtx object reference stays stable during streaming.  TextNode and
+  // InlineCodeNode read the latest values from the StreamStateRefContext
+  // (which never triggers a React re-render) or from renderCtx when they
+  // re-render for other reasons (e.g. their own content changed).
+  renderCtx.streamRenderVersion = streamRenderVersionRef.current
+  renderCtx.textStreamState = textStreamStateRef.current
+
+  // Create a stable StreamStateRef that provides mutable access to
+  // stream version and text state without causing re-renders.
+  const streamStateRef = useRef<StreamStateRef | null>(null)
+  if (!streamStateRef.current) {
+    streamStateRef.current = {
+      textStreamState: textStreamStateRef.current,
+      getStreamRenderVersion: () => streamRenderVersionRef.current,
+    }
+  }
+
   return (
-    <SmoothStreamingContext.Provider value={smoothStreamingEnabled}>
-      <ViewportPriorityProvider
-        getRoot={() => containerRef.current}
-        enabled={props.viewportPriority !== false}
-      >
-        <MemoNodeRendererInner
-          props={props}
-          parsedNodes={parsedNodes}
-          renderCtx={renderCtx}
-          indexPrefix={indexPrefix}
-          containerRef={containerRef}
-          showTypewriterCursor={showTypewriterCursor}
-        />
-      </ViewportPriorityProvider>
-    </SmoothStreamingContext.Provider>
+    <StreamStateRefContext.Provider value={streamStateRef.current}>
+      <SmoothStreamingContext.Provider value={smoothStreamingEnabled}>
+        <ViewportPriorityProvider
+          getRoot={() => containerRef.current}
+          enabled={props.viewportPriority !== false}
+        >
+          <MemoNodeRendererInner
+            props={props}
+            parsedNodes={parsedNodes}
+            renderCtx={renderCtx}
+            indexPrefix={indexPrefix}
+            containerRef={containerRef}
+            showTypewriterCursor={showTypewriterCursor}
+          />
+        </ViewportPriorityProvider>
+      </SmoothStreamingContext.Provider>
+    </StreamStateRefContext.Provider>
   )
 }
 

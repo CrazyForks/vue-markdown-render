@@ -2,6 +2,7 @@ import type { NodeComponentProps } from '../../types/node-component'
 import clsx from 'clsx'
 import { resolveStreamingTextUpdate } from 'markstream-core'
 import React, { useEffect, useRef, useState } from 'react'
+import { useStreamStateRef } from '../../context/streamState'
 
 export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', code: string }>) {
   const { node, children, ctx, indexKey, fade } = props
@@ -13,7 +14,8 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
   const [settledContent, setSettledContent] = useState(content)
   const [streamedDelta, setStreamedDelta] = useState('')
   const [streamFadeVersion, setStreamFadeVersion] = useState(0)
-  const lastStreamRenderVersionRef = useRef(ctx?.streamRenderVersion)
+  const streamStateRef = useStreamStateRef()
+  const lastStreamRenderVersionRef = useRef<number | undefined>(undefined)
   const renderedContentRef = useRef({
     settledContent: content,
     streamedDelta: '',
@@ -34,7 +36,7 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
   }
 
   useEffect(() => {
-    const streamRenderVersion = ctx?.streamRenderVersion
+    const streamRenderVersion = streamStateRef?.getStreamRenderVersion() ?? ctx?.streamRenderVersion
     const streamRenderVersionChanged = streamRenderVersion !== lastStreamRenderVersionRef.current
 
     if (children != null) {
@@ -43,7 +45,7 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
       return
     }
 
-    const textStreamState = ctx?.textStreamState
+    const textStreamState = streamStateRef?.textStreamState ?? ctx?.textStreamState
     const currentState = renderedContentRef.current
     const persistedContent = streamStateKey
       ? textStreamState?.get(streamStateKey)
@@ -62,7 +64,7 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
     if (streamStateKey)
       textStreamState?.set(streamStateKey, content)
     lastStreamRenderVersionRef.current = streamRenderVersion
-  }, [children, content, ctx?.textStreamState, ctx?.streamRenderVersion, streamStateKey, fadeEnabled])
+  }, [children, content, streamStateRef, ctx?.textStreamState, ctx?.streamRenderVersion, streamStateKey, fadeEnabled])
 
   // Immediately settle when fade animations are disabled
   useEffect(() => {
