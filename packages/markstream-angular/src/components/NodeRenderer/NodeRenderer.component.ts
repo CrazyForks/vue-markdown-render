@@ -17,7 +17,6 @@ import {
   EventEmitter,
   forwardRef,
   inject,
-  InjectionToken,
   Input,
   Output,
   ViewChild,
@@ -37,6 +36,7 @@ import {
   resolveDeferNodes,
   resolveVirtualizationEnabled,
 } from '../shared/render-window'
+import { MARKSTREAM_SMOOTH_STREAMING_SCOPE } from '../shared/smooth-streaming-scope'
 
 interface VisibleNodeEntry {
   node: AngularRenderableNode
@@ -55,13 +55,6 @@ interface ObserverConfig {
 interface IdleDeadlineLike {
   timeRemaining?: () => number
 }
-
-export interface SmoothStreamingScope {
-  isSmoothStreamingEnabled: () => boolean
-}
-
-export const MARKSTREAM_SMOOTH_STREAMING_SCOPE
-  = new InjectionToken<SmoothStreamingScope>('MARKSTREAM_SMOOTH_STREAMING_SCOPE')
 
 const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 
@@ -238,7 +231,16 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   }
 
   get smoothStreamingEnabled(): boolean {
-    return this.hasMountedForSmoothStreaming && this.smoothStreamingEligible
+    // Mounted gate: prevent smooth streaming from pacing initial static content
+    // on the first client render (avoids blank flash).
+    // Only applies in 'auto' mode — smoothStreaming === true explicitly opts in
+    // and the gate is always open. SSR (typeof window === 'undefined') also opens
+    // the gate because the core controller has no RAF and will flush immediately.
+    const gateOpen = typeof window === 'undefined'
+      || this.hasMountedForSmoothStreaming
+      || this.smoothStreaming === true
+
+    return gateOpen && this.smoothStreamingEligible
   }
 
   get renderContent(): string {
@@ -323,9 +325,29 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     return this.deferNodesActive || this.virtualizationEnabled
   }
 
-  ngOnChanges(_changes: SimpleChanges) {
+  ngOnChanges(changes: SimpleChanges) {
     this.ensureSmoothStreamInitialized()
+
+    const previousRenderContent = this.renderContent
+    const previousEffectiveFinal = this.effectiveFinal
+
     this.syncSmoothStream()
+
+    // When smooth streaming is active, raw content/final appends should not
+    // trigger a full rebuild unless the visible (renderContent) or effectiveFinal
+    // actually advanced. The smooth stream subscription already calls rebuild()
+    // when visible ticks forward, so skipping here avoids redundant parse/rebuild
+    // cycles driven by raw chunk cadence.
+    if (
+      this.smoothStreamingEnabled
+      && changes.content
+      && !changes.nodes
+      && previousRenderContent === this.renderContent
+      && previousEffectiveFinal === this.effectiveFinal
+    ) {
+      return
+    }
+
     this.rebuild()
   }
 

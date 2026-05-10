@@ -13,7 +13,7 @@ export class SmoothMarkdownStreamService implements OnDestroy {
     paused: false,
     pendingChars: 0,
     caughtUp: true,
-    final: true,
+    final: false,
   }
 
   private readonly listeners = new Set<() => void>()

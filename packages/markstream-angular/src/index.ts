@@ -34,8 +34,6 @@ export { MathInlineNodeComponent as MathInlineNode } from './components/MathInli
 export { MermaidBlockNodeComponent as MermaidBlockNode } from './components/MermaidBlockNode/MermaidBlockNode.component'
 export { NestedRendererComponent as NestedRenderer } from './components/NestedRenderer/NestedRenderer.component'
 export { NodeRendererComponent as NodeRenderer } from './components/NodeRenderer/NodeRenderer.component'
-export { MARKSTREAM_SMOOTH_STREAMING_SCOPE } from './components/NodeRenderer/NodeRenderer.component'
-export type { SmoothStreamingScope } from './components/NodeRenderer/NodeRenderer.component'
 export { ParagraphNodeComponent as ParagraphNode } from './components/ParagraphNode/ParagraphNode.component'
 export { PreCodeNodeComponent as PreCodeNode } from './components/PreCodeNode/PreCodeNode.component'
 export { ReferenceNodeComponent as ReferenceNode } from './components/ReferenceNode/ReferenceNode.component'
@@ -55,6 +53,8 @@ export {
   resolveParsedNodes,
 } from './components/shared/node-helpers'
 export { SafeAttrsDirective } from './components/shared/safe-attrs.directive'
+export { MARKSTREAM_SMOOTH_STREAMING_SCOPE } from './components/shared/smooth-streaming-scope'
+export type { SmoothStreamingScope } from './components/shared/smooth-streaming-scope'
 export { StrikethroughNodeComponent as StrikethroughNode } from './components/StrikethroughNode/StrikethroughNode.component'
 export { StrongNodeComponent as StrongNode } from './components/StrongNode/StrongNode.component'
 export { SubscriptNodeComponent as SubscriptNode } from './components/SubscriptNode/SubscriptNode.component'
