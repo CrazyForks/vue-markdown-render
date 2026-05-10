@@ -212,6 +212,7 @@
     "tag:prune:v:all": "node scripts/prune-tags.mjs --pattern 'v*' --apply --local --remote-delete",
     "check:peer-deps": "node ./scripts/check-peer-deps.cjs",
     "test:e2e:link-tooltip-streaming": "node scripts/e2e-link-tooltip-streaming.mjs",
+    "test:smoke:vue2-cjs": "pnpm run -C packages/markstream-core build && pnpm run -C packages/markstream-vue2 build && node -e \"const { createRequire } = require('node:module'); const path = require('node:path'); const req = createRequire(path.resolve('./packages/markstream-vue2/dist/index.cjs')); req('markstream-core')\"",
     "test:e2e:vue2-cli-smoke": "node scripts/e2e-vue2-cli-smoke.mjs",
     "test:e2e:math-streaming-stability": "node scripts/e2e-math-streaming-stability.mjs",
     "test:e2e:next14-ssr": "node scripts/e2e-next-ssr.mjs --playground playground-next14 --version next14",

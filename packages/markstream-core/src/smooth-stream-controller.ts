@@ -1,8 +1,7 @@
 import type {
-  SmoothMarkdownStreamController as SmoothMarkdownStreamControllerApi,
+  SmoothMarkdownStreamController,
   SmoothMarkdownStreamOptions,
   SmoothMarkdownStreamSnapshot,
-  SmoothStreamEvent,
   SmoothStreamNotify,
 } from './types'
 
@@ -33,7 +32,7 @@ function toNonNegativeFiniteNumber(value: unknown, fallback: number) {
     : fallback
 }
 
-export class SmoothMarkdownStreamController {
+class SmoothMarkdownStreamControllerImpl {
   source: string = ''
   visible: string = ''
   done: boolean = false
@@ -294,17 +293,17 @@ export class SmoothMarkdownStreamController {
     this.rafId = 0
   }
 
-  private emit(event: SmoothStreamEvent = 'state'): void {
+  private emit(): void {
     for (const listener of this.listeners)
-      listener(event)
+      listener()
   }
 }
 
 export function createSmoothMarkdownStream(
   options: SmoothMarkdownStreamOptions = {},
   notify?: SmoothStreamNotify,
-): SmoothMarkdownStreamControllerApi {
-  const controller = new SmoothMarkdownStreamController(options, notify)
+): SmoothMarkdownStreamController {
+  const controller = new SmoothMarkdownStreamControllerImpl(options, notify)
   return {
     getSnapshot: controller.getSnapshot,
     subscribe: controller.subscribe,

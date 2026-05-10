@@ -20,9 +20,7 @@ export interface SmoothMarkdownStreamSnapshot {
   final: boolean
 }
 
-export type SmoothStreamEvent = 'state' | 'visible' | 'source' | 'done' | 'paused'
-
-export type SmoothStreamNotify = (event: SmoothStreamEvent) => void
+export type SmoothStreamNotify = () => void
 
 export interface SmoothMarkdownStreamController {
   getSnapshot: () => SmoothMarkdownStreamSnapshot

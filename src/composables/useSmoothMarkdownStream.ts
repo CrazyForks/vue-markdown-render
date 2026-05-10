@@ -20,7 +20,7 @@ export interface SmoothMarkdownStreamControllerVue {
   resume: () => void
 }
 
-/** @deprecated Use SmoothMarkdownStreamControllerVue for the Vue-specific interface, or SmoothMarkdownStreamController from markstream-core for the framework-agnostic class */
+/** @deprecated Use SmoothMarkdownStreamControllerVue for the Vue-specific interface, or SmoothMarkdownStreamController from markstream-core for the framework-agnostic interface */
 export type SmoothMarkdownStreamController = SmoothMarkdownStreamControllerVue
 
 export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {}): SmoothMarkdownStreamControllerVue {

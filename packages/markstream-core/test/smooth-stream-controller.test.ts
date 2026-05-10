@@ -1,6 +1,6 @@
 import type { SmoothMarkdownStreamOptions } from '../src/types'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSmoothMarkdownStream, SmoothMarkdownStreamController } from '../src/smooth-stream-controller'
+import { createSmoothMarkdownStream } from '../src/smooth-stream-controller'
 
 function hasUnpairedSurrogate(input: string) {
   for (let index = 0; index < input.length; index++) {
@@ -21,7 +21,7 @@ function hasUnpairedSurrogate(input: string) {
 }
 
 function createController(options: SmoothMarkdownStreamOptions = {}) {
-  return new SmoothMarkdownStreamController(options)
+  return createSmoothMarkdownStream(options)
 }
 
 describe('smoothMarkdownStreamController', () => {
@@ -36,11 +36,11 @@ describe('smoothMarkdownStreamController', () => {
 
     controller.enqueue('a'.repeat(1800))
 
-    expect(controller.visible.length).toBeLessThan(controller.source.length)
+    expect(controller.getSnapshot().visible.length).toBeLessThan(controller.getSnapshot().source.length)
 
     await vi.advanceTimersByTimeAsync(400)
 
-    expect(controller.visible.length).toBeLessThan(controller.source.length)
+    expect(controller.getSnapshot().visible.length).toBeLessThan(controller.getSnapshot().source.length)
     controller.destroy()
   })
 
@@ -68,7 +68,7 @@ describe('smoothMarkdownStreamController', () => {
 
     await vi.advanceTimersByTimeAsync(700)
 
-    expect(fastController.visible.length).toBeGreaterThan(slowController.visible.length)
+    expect(fastController.getSnapshot().visible.length).toBeGreaterThan(slowController.getSnapshot().visible.length)
     fastController.destroy()
     slowController.destroy()
   })
@@ -80,12 +80,12 @@ describe('smoothMarkdownStreamController', () => {
     controller.enqueue('x'.repeat(1400))
     controller.finish()
 
-    expect(controller.done).toBe(true)
-    expect(controller.final).toBe(false)
+    expect(controller.getSnapshot().done).toBe(true)
+    expect(controller.getSnapshot().final).toBe(false)
 
     controller.flush()
 
-    expect(controller.final).toBe(true)
+    expect(controller.getSnapshot().final).toBe(true)
     controller.destroy()
   })
 
@@ -97,7 +97,7 @@ describe('smoothMarkdownStreamController', () => {
     controller.enqueue(emojiText)
     await vi.advanceTimersByTimeAsync(600)
 
-    expect(hasUnpairedSurrogate(controller.visible)).toBe(false)
+    expect(hasUnpairedSurrogate(controller.getSnapshot().visible)).toBe(false)
     controller.destroy()
   })
 
@@ -110,9 +110,9 @@ describe('smoothMarkdownStreamController', () => {
     controller.reset()
     await vi.advanceTimersByTimeAsync(200)
 
-    expect(controller.source).toBe('')
-    expect(controller.visible).toBe('')
-    expect(controller.pendingChars).toBe(0)
+    expect(controller.getSnapshot().source).toBe('')
+    expect(controller.getSnapshot().visible).toBe('')
+    expect(controller.getSnapshot().pendingChars).toBe(0)
     controller.destroy()
   })
 
@@ -121,11 +121,11 @@ describe('smoothMarkdownStreamController', () => {
 
     controller.enqueue('hello')
     controller.finish({ flush: true })
-    expect(controller.final).toBe(true)
+    expect(controller.getSnapshot().final).toBe(true)
 
     controller.enqueue(' world')
-    expect(controller.done).toBe(false)
-    expect(controller.final).toBe(false)
+    expect(controller.getSnapshot().done).toBe(false)
+    expect(controller.getSnapshot().final).toBe(false)
     controller.destroy()
   })
 
@@ -140,7 +140,7 @@ describe('smoothMarkdownStreamController', () => {
     // Should not throw and should still function
     controller.enqueue('test')
     controller.flush()
-    expect(controller.visible).toBe('test')
+    expect(controller.getSnapshot().visible).toBe('test')
     controller.destroy()
   })
 
@@ -159,7 +159,7 @@ describe('smoothMarkdownStreamController', () => {
     controller.enqueue('hello')
     controller.flush()
 
-    expect(controller.visible).toBe('hello')
+    expect(controller.getSnapshot().visible).toBe('hello')
     controller.destroy()
   })
 
@@ -177,25 +177,25 @@ describe('smoothMarkdownStreamController', () => {
     // After 100ms at 1 char/s, at most 1 character should be visible.
     await vi.advanceTimersByTimeAsync(100)
 
-    expect(controller.visible.length).toBeLessThanOrEqual(1)
+    expect(controller.getSnapshot().visible.length).toBeLessThanOrEqual(1)
 
     controller.destroy()
   })
 
   it('calls notify callback on state changes', () => {
-    const events: string[] = []
-    const controller = new SmoothMarkdownStreamController({}, (event) => {
-      events.push(event)
+    const events: number[] = []
+    const controller = createSmoothMarkdownStream({}, () => {
+      events.push(1)
     })
 
     controller.enqueue('hello')
-    expect(events).toContain('state')
+    expect(events.length).toBeGreaterThan(0)
 
     controller.flush()
-    expect(events).toContain('state')
+    expect(events.length).toBeGreaterThan(1)
 
     controller.finish()
-    expect(events).toContain('state')
+    expect(events.length).toBeGreaterThan(2)
 
     controller.destroy()
   })
@@ -226,15 +226,15 @@ describe('smoothMarkdownStreamController', () => {
 
     controller.enqueue('x'.repeat(500))
     await vi.advanceTimersByTimeAsync(100)
-    const beforePause = controller.visible.length
+    const beforePause = controller.getSnapshot().visible.length
 
     controller.pause()
     await vi.advanceTimersByTimeAsync(500)
-    expect(controller.visible.length).toBe(beforePause)
+    expect(controller.getSnapshot().visible.length).toBe(beforePause)
 
     controller.resume()
     await vi.advanceTimersByTimeAsync(500)
-    expect(controller.visible.length).toBeGreaterThan(beforePause)
+    expect(controller.getSnapshot().visible.length).toBeGreaterThan(beforePause)
 
     controller.destroy()
   })
@@ -245,10 +245,10 @@ describe('smoothMarkdownStreamController', () => {
 
     controller.enqueue('x'.repeat(2000))
     await vi.advanceTimersByTimeAsync(50)
-    const beforeDestroy = controller.visible.length
+    const beforeDestroy = controller.getSnapshot().visible.length
 
     controller.destroy()
     await vi.advanceTimersByTimeAsync(500)
-    expect(controller.visible.length).toBe(beforeDestroy)
+    expect(controller.getSnapshot().visible.length).toBe(beforeDestroy)
   })
 })

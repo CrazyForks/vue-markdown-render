@@ -37,6 +37,14 @@ export default defineConfig({
         find: /^stream-markdown-parser$/,
         replacement: path.resolve(__dirname, '../packages/markdown-parser/src/index.ts'),
       },
+      {
+        find: /^markstream-core$/,
+        replacement: path.resolve(__dirname, '../packages/markstream-core/src/index.ts'),
+      },
+      {
+        find: /^markstream-core\//,
+        replacement: `${path.resolve(__dirname, '../packages/markstream-core/src')}/`,
+      },
     ],
   },
   optimizeDeps: {

@@ -37,7 +37,7 @@ controller.destroy()
 unsubscribe()
 ```
 
-`SmoothMarkdownStreamController` class is still exported for advanced use-cases, but `createSmoothMarkdownStream` is the recommended public API.
+`SmoothMarkdownStreamController` is the public controller interface type returned by `createSmoothMarkdownStream`.
 
 #### Options (`SmoothMarkdownStreamOptions`)
 
@@ -85,10 +85,8 @@ const result = resolveStreamingTextUpdate({
 ## Framework Adapters
 
 - **Vue 3**: `useSmoothMarkdownStream` in `markstream-vue` wraps the core controller with Vue reactivity.
-- **React**: Direct import from `markstream-core` or via `markstream-react` re-exports.
-- **Vue 2**: Re-exports via `markstream-vue2`.
-- **Angular**: Re-exports via `markstream-angular`.
-- **Svelte**: Re-exports via `markstream-svelte`.
+- **React / Vue 2 / Angular / Svelte**: Framework packages depend on `markstream-core` internally.
+  Import core APIs directly from `markstream-core` when needed.
 
 ## License
 
