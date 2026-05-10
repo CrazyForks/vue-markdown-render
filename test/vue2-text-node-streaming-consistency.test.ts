@@ -24,7 +24,7 @@ describe('markstream-vue2 text node streaming consistency', () => {
     expect(nodeRendererSource).toContain('renderVersionSource,')
 
     expect(textNodeSource).toContain('inject<{ value?: number } | undefined>(\'markstreamStreamVersion\', undefined)')
-    expect(textNodeSource).toContain('[() => props.node.content, streamStateKey, typewriterEnabled, () => inheritedStreamVersion?.value]')
+    expect(textNodeSource).toContain('[() => props.node.content, streamStateKey, fadeEnabled, () => inheritedStreamVersion?.value]')
     expect(textNodeSource).toContain('if (normalized === previousContent)')
     expect(textNodeSource).toContain('if (streamedDelta.value)')
     expect(textNodeSource).toContain('settleStreamedDelta()')
