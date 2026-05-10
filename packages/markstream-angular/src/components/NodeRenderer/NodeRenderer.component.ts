@@ -205,6 +205,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   private enhancementHandle: RenderedHtmlEnhancementHandle | null = null
   private postRenderTimer: number | null = null
   private unsubscribeCustomComponents?: () => void
+  private isSyncingSmoothStream = false
   private hasMountedForSmoothStreaming = false
   private unsubscribeSmoothStream?: () => void
   private previousRenderContent = ''
@@ -353,8 +354,11 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
 
   ngOnInit() {
     this.smoothStream.init(this.smoothStreamingOptions)
-    this.hasMountedForSmoothStreaming = true
+
     this.unsubscribeSmoothStream = this.smoothStream.subscribe(() => {
+      if (this.isSyncingSmoothStream)
+        return
+
       const nextRenderContent = this.renderContent
       const nextEffectiveFinal = this.effectiveFinal
 
@@ -365,8 +369,20 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
         this.rebuild()
       }
     })
+
+    const previousRenderContent = this.renderContent
+    const previousEffectiveFinal = this.effectiveFinal
+
+    this.hasMountedForSmoothStreaming = true
     this.syncSmoothStream()
-    this.rebuild()
+
+    if (
+      previousRenderContent !== this.renderContent
+      || previousEffectiveFinal !== this.effectiveFinal
+    ) {
+      this.rebuild()
+    }
+
     this.unsubscribeCustomComponents = subscribeCustomComponents(() => {
       this.rebuild()
     })
@@ -422,37 +438,44 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     if (!this.smoothStream)
       return
 
-    const nextContent = this.content ?? ''
+    this.isSyncingSmoothStream = true
 
-    if (this.hasNodes) {
-      this.smoothStream.reset('')
-      return
-    }
+    try {
+      const nextContent = this.content ?? ''
 
-    if (!this.smoothStreamingEnabled) {
-      this.smoothStream.reset(nextContent)
+      if (this.hasNodes) {
+        this.smoothStream.reset('')
+        return
+      }
+
+      if (!this.smoothStreamingEnabled) {
+        this.smoothStream.reset(nextContent)
+        if (this.requestedFinal)
+          this.smoothStream.finish({ flush: true })
+        return
+      }
+
+      const source = this.smoothStream.source
+
+      if (!nextContent) {
+        this.smoothStream.reset('')
+      }
+      else if (nextContent === source) {
+        // no-op
+      }
+      else if (nextContent.startsWith(source)) {
+        this.smoothStream.enqueue(nextContent.slice(source.length))
+      }
+      else {
+        this.smoothStream.reset(nextContent)
+      }
+
       if (this.requestedFinal)
-        this.smoothStream.finish({ flush: true })
-      return
+        this.smoothStream.finish()
     }
-
-    const source = this.smoothStream.source
-
-    if (!nextContent) {
-      this.smoothStream.reset('')
+    finally {
+      this.isSyncingSmoothStream = false
     }
-    else if (nextContent === source) {
-      // no-op
-    }
-    else if (nextContent.startsWith(source)) {
-      this.smoothStream.enqueue(nextContent.slice(source.length))
-    }
-    else {
-      this.smoothStream.reset(nextContent)
-    }
-
-    if (this.requestedFinal)
-      this.smoothStream.finish()
   }
 
   private rebuild() {

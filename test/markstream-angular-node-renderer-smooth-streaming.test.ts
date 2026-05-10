@@ -33,6 +33,9 @@ function createHarness(options: {
   let rebuildCount = 0
   let parsedContent = ''
 
+  let previousRenderContent = ''
+  let previousEffectiveFinal: boolean | undefined
+
   const parentScope: SmoothStreamingScope | null = parentSmoothStreamingEnabled
     ? { isSmoothStreamingEnabled: () => true }
     : null
@@ -73,46 +76,58 @@ function createHarness(options: {
     return requested
   }
 
+  let isSyncingSmoothStream = false
+  let subscriptionCallback: (() => void) | null = null
+
   function syncSmoothStream() {
     if (!smoothStream)
       return
 
-    const nextContent = content ?? ''
+    isSyncingSmoothStream = true
 
-    if (hasNodes) {
-      smoothStream.reset('')
-      return
-    }
+    try {
+      const nextContent = content ?? ''
 
-    if (!getSmoothStreamingEnabled()) {
-      smoothStream.reset(nextContent)
+      if (hasNodes) {
+        smoothStream.reset('')
+        return
+      }
+
+      if (!getSmoothStreamingEnabled()) {
+        smoothStream.reset(nextContent)
+        if (getRequestedFinal())
+          smoothStream.finish({ flush: true })
+        return
+      }
+
+      const source = smoothStream.source
+
+      if (!nextContent) {
+        smoothStream.reset('')
+      }
+      else if (nextContent === source) {
+        // no-op
+      }
+      else if (nextContent.startsWith(source)) {
+        smoothStream.enqueue(nextContent.slice(source.length))
+      }
+      else {
+        smoothStream.reset(nextContent)
+      }
+
       if (getRequestedFinal())
-        smoothStream.finish({ flush: true })
-      return
+        smoothStream.finish()
     }
-
-    const source = smoothStream.source
-
-    if (!nextContent) {
-      smoothStream.reset('')
+    finally {
+      isSyncingSmoothStream = false
     }
-    else if (nextContent === source) {
-      // no-op
-    }
-    else if (nextContent.startsWith(source)) {
-      smoothStream.enqueue(nextContent.slice(source.length))
-    }
-    else {
-      smoothStream.reset(nextContent)
-    }
-
-    if (getRequestedFinal())
-      smoothStream.finish()
   }
 
   function rebuild() {
     rebuildCount += 1
     parsedContent = getRenderContent()
+    previousRenderContent = getRenderContent()
+    previousEffectiveFinal = getEffectiveFinal()
   }
 
   // Simulate ngOnChanges (with rebuild-skip logic)
@@ -141,8 +156,34 @@ function createHarness(options: {
   function ngOnInit() {
     smoothStream.init()
     hasMountedForSmoothStreaming = true
+
+    // Subscription callback respects isSyncingSmoothStream guard
+    subscriptionCallback = () => {
+      if (isSyncingSmoothStream)
+        return
+
+      const nextRenderContent = getRenderContent()
+      const nextEffectiveFinal = getEffectiveFinal()
+
+      if (
+        nextRenderContent !== previousRenderContent
+        || nextEffectiveFinal !== previousEffectiveFinal
+      ) {
+        rebuild()
+      }
+    }
+
+    const preRenderContent = getRenderContent()
+    const preEffectiveFinal = getEffectiveFinal()
+
     syncSmoothStream()
-    rebuild()
+
+    if (
+      preRenderContent !== getRenderContent()
+      || preEffectiveFinal !== getEffectiveFinal()
+    ) {
+      rebuild()
+    }
   }
 
   return {
@@ -156,6 +197,7 @@ function createHarness(options: {
     getEffectiveFinal,
     get rebuildCount() { return rebuildCount },
     get parsedContent() { return parsedContent },
+    triggerSubscriptionCallback() { subscriptionCallback?.() },
   }
 }
 
@@ -324,5 +366,39 @@ describe('markstream-angular NodeRenderer smooth streaming contract', () => {
     // Before init, the default snapshot should have final: false
     expect(service.final).toBe(false)
     service.ngOnDestroy()
+  })
+
+  it('does not rebuild twice for initial static auto content', () => {
+    const harness = createHarness({ smoothStreaming: 'auto', typewriter: true })
+
+    harness.setContent('static initial content')
+    harness.ngOnChanges({ content: true })
+
+    // ngOnChanges already rebuilt once for the initial content
+    const rebuildsAfterChanges = harness.rebuildCount
+
+    // ngOnInit should not rebuild again because renderContent/effectiveFinal
+    // did not change after the mounted gate opened + syncSmoothStream
+    harness.ngOnInit()
+
+    expect(harness.rebuildCount).toBe(rebuildsAfterChanges)
+  })
+
+  it('does not re-enter rebuild while syncing smooth stream', () => {
+    const harness = createHarness({ smoothStreaming: false, typewriter: true })
+
+    harness.setContent('initial content')
+    harness.ngOnInit()
+
+    const rebuildsBefore = harness.rebuildCount
+
+    // smoothStreaming=false triggers reset() which synchronously notifies
+    // listeners — the subscription callback should be suppressed during sync
+    harness.setContent('updated content')
+    harness.ngOnChanges({ content: true })
+
+    // Only one rebuild from ngOnChanges, not an additional one from the
+    // subscription callback firing during syncSmoothStream
+    expect(harness.rebuildCount).toBe(rebuildsBefore + 1)
   })
 })
