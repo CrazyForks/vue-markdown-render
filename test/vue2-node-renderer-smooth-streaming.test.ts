@@ -3,8 +3,8 @@
  */
 
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as parser from 'stream-markdown-parser'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, provide } from 'vue'
 import NodeRenderer from '../packages/markstream-vue2/src/components/NodeRenderer'
 
