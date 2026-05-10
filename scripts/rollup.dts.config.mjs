@@ -34,6 +34,7 @@ export default [
     ],
     external: [
       /^stream-markdown-parser(?:\/.*)?$/,
+      /^markstream-core(?:\/.*)?$/,
     ],
     output: [
       {

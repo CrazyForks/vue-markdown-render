@@ -41,12 +41,13 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build --mode npm",
+    "build": "pnpm --dir ../markstream-core build && vite build --mode npm",
     "dev": "vite dev",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm run build",
-    "release": "bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
+    "prepublishOnly": "pnpm run build && pnpm run check:core-published",
+    "check:core-published": "node ../../scripts/check-core-published.mjs --package-json package.json --core-package-json ../markstream-core/package.json",
+    "release": "pnpm run check:core-published && bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {
     "@angular/common": ">=20",
@@ -76,6 +77,7 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.7.6",
+    "markstream-core": "workspace:*",
     "stream-markdown-parser": "workspace:*"
   },
   "devDependencies": {

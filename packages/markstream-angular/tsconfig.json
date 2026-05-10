@@ -9,7 +9,9 @@
     "moduleResolution": "Bundler",
     "paths": {
       "stream-markdown-parser": ["../markdown-parser/src/index.ts"],
-      "stream-markdown-parser/*": ["../markdown-parser/src/*"]
+      "stream-markdown-parser/*": ["../markdown-parser/src/*"],
+      "markstream-core": ["../markstream-core/src/index.ts"],
+      "markstream-core/*": ["../markstream-core/src/*"]
     },
     "types": ["vite/client"],
     "strict": false,

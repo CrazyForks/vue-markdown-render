@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SvelteRenderableNode, SvelteRenderContext } from './shared/node-helpers'
+  import { resolveStreamingTextState } from 'markstream-core'
   import { getString } from './shared/node-helpers'
 
   interface Props {
@@ -27,25 +28,21 @@
   const streamInfo = $derived.by(() => {
     const state = context?.textStreamState
     const previous = streamKey === previousKey ? previousContent : (state?.get(streamKey) ?? '')
-    
-    let stableContent = ''
-    let deltaContent = ''
 
-    if (previous && content.startsWith(previous) && content.length > previous.length) {
-      stableContent = previous
-      deltaContent = content.slice(previous.length)
+    const result = resolveStreamingTextState({
+      nextContent: content,
+      previousContent: previous,
+      typewriterEnabled: typewriter !== false,
+    })
+
+    if (result.appended)
       deltaClass = deltaClass.endsWith('--a') ? 'markstream-svelte-text__stream-delta--b' : 'markstream-svelte-text__stream-delta--a'
-    }
-    else {
-      stableContent = content
-      deltaContent = ''
-    }
-    
+
     previousKey = streamKey
     previousContent = content
     state?.set(streamKey, content)
 
-    return { stableContent, deltaContent, deltaClass }
+    return { stableContent: result.settledContent, deltaContent: result.streamedDelta, deltaClass }
   })
 </script>
 

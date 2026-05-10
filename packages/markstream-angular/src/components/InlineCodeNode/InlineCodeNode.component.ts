@@ -2,8 +2,8 @@ import type { OnChanges } from '@angular/core'
 import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core'
+import { resolveStreamingTextState } from 'markstream-core'
 import { getString } from '../shared/node-helpers'
-import { resolveStreamingTextState } from '../TextNode/streamingTextState'
 
 @Component({
   selector: 'markstream-angular-inline-code-node',

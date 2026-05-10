@@ -1,7 +1,7 @@
 import type { NodeComponentProps } from '../../types/node-component'
 import clsx from 'clsx'
+import { resolveStreamingTextUpdate } from 'markstream-core'
 import React, { useEffect, useRef, useState } from 'react'
-import { resolveStreamingTextUpdate } from '../../utils/streamingTextState'
 
 export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', code: string }>) {
   const { node, children, ctx, indexKey, typewriter } = props
