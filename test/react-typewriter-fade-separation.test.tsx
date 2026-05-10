@@ -208,4 +208,88 @@ describe('react typewriter/fade separation', () => {
 
     await act(async () => { root.unmount() })
   })
+
+  it('final=true hides typewriter cursor immediately', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    // First render: streaming (no smooth streaming), cursor should be visible
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          content: 'Streaming',
+          typewriter: true,
+          final: false,
+          smoothStreaming: false,
+          batchRendering: false,
+          viewportPriority: false,
+          deferNodesUntilVisible: false,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.querySelector('.typewriter-cursor')).not.toBeNull()
+
+    // Second render: final=true, cursor should disappear immediately
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          content: 'Streaming done',
+          typewriter: true,
+          final: true,
+          smoothStreaming: false,
+          batchRendering: false,
+          viewportPriority: false,
+          deferNodesUntilVisible: false,
+        })),
+      )
+    })
+    await flushReact()
+
+    expect(host.querySelector('.typewriter-cursor')).toBeNull()
+
+    await act(async () => { root.unmount() })
+  })
+
+  it('final=false keeps typewriter cursor visible even after timers advance', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    vi.useFakeTimers()
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(
+        React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+          content: 'Still streaming',
+          typewriter: true,
+          final: false,
+          batchRendering: false,
+          viewportPriority: false,
+          deferNodesUntilVisible: false,
+        })),
+      )
+    })
+    await flushReact()
+
+    const cursor = host.querySelector('.typewriter-cursor')
+    expect(cursor).not.toBeNull()
+
+    // Advance all timers — cursor should remain visible because final=false
+    // and the cursor is now a derived value, not timeout-based
+    await act(async () => {
+      vi.advanceTimersByTime(5000)
+    })
+    await flushReact()
+
+    expect(host.querySelector('.typewriter-cursor')).not.toBeNull()
+
+    vi.useRealTimers()
+    await act(async () => { root.unmount() })
+  })
 })

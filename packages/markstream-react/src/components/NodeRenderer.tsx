@@ -688,9 +688,6 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const textStreamStateRef = useRef(new Map<string, string>())
   const streamRenderVersionRef = useRef(0)
   const previousRenderVersionSourceRef = useRef<unknown>(null)
-  const [showTypewriterCursor, setShowTypewriterCursor] = useState(false)
-  const typewriterCursorTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const lastTypewriterContentLengthRef = useRef(0)
   const smoothStream = useSmoothMarkdownStream(props.smoothStreamingOptions)
   const parentSmoothStreaming = React.useContext(SmoothStreamingContext)
   const [hasMountedForSmoothStreaming, setHasMountedForSmoothStreaming] = useState(
@@ -748,6 +745,10 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     smoothStream.caughtUp,
     smoothStreamingEnabled,
   ])
+
+  const showTypewriterCursor = props.typewriter === true
+    && effectiveFinal !== true
+    && !hasNodes
 
   const renderVersionSource = hasNodes ? props.nodes : renderContent
   if (previousRenderVersionSourceRef.current !== renderVersionSource) {
@@ -880,36 +881,6 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     if (requestedFinal)
       smoothStream.finish()
   }, [hasNodes, props.content, requestedFinal, smoothStreamingEnabled])
-
-  // Typewriter cursor: show a blinking cursor while content is still streaming
-  useEffect(() => {
-    if (props.typewriter !== true) {
-      setShowTypewriterCursor(false)
-      return
-    }
-
-    const nextLength = (props.content ?? '').length
-    if (nextLength <= lastTypewriterContentLengthRef.current) {
-      lastTypewriterContentLengthRef.current = nextLength
-      return
-    }
-
-    lastTypewriterContentLengthRef.current = nextLength
-    setShowTypewriterCursor(true)
-
-    if (typewriterCursorTimeoutRef.current != null)
-      clearTimeout(typewriterCursorTimeoutRef.current)
-    typewriterCursorTimeoutRef.current = setTimeout(() => {
-      setShowTypewriterCursor(false)
-    }, 3000)
-
-    return () => {
-      if (typewriterCursorTimeoutRef.current != null) {
-        clearTimeout(typewriterCursorTimeoutRef.current)
-        typewriterCursorTimeoutRef.current = undefined
-      }
-    }
-  }, [props.typewriter, props.content])
 
   useEffect(() => {
     if (typeof window === 'undefined')

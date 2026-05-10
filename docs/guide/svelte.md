@@ -115,7 +115,7 @@ For chat-style token streams, use built-in smooth pacing with the `content` prop
 />
 ```
 
-The default `smoothStreaming="auto"` enables pacing when `typewriter` is on or `maxLiveNodes <= 0`. Use `smoothStreaming={true}` only if you want first-screen content to also start from blank. Fine-tune with `smoothStreamingOptions`:
+The default `smoothStreaming="auto"` enables pacing when `typewriter` is on or `maxLiveNodes <= 0`. Use `smoothStreaming={true}` only if you want first-screen content to also start from blank — this bypasses the mounted gate and can cause hydration mismatch or blank flash in SSR scenarios. Fine-tune with `smoothStreamingOptions`:
 
 ```svelte
 <MarkdownRender

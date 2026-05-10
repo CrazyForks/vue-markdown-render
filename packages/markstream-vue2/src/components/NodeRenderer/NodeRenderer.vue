@@ -240,6 +240,20 @@ const requestedFinal = computed<boolean | undefined>(() => {
   return props.final ?? base.final
 })
 
+const effectiveFinal = computed<boolean | undefined>(() => {
+  const finalRequested = requestedFinal.value
+
+  if (smoothStreamingEnabled.value && finalRequested != null) {
+    return Boolean(
+      finalRequested
+      && smoothSourceSynced.value
+      && smoothStream.caughtUp.value,
+    )
+  }
+
+  return finalRequested
+})
+
 const renderVersionSource = computed(() => {
   if (props.nodes?.length)
     return props.nodes
@@ -365,15 +379,7 @@ function cloneParsedNodeList(nodes: ParsedNode[]) {
 
 const mergedParseOptions = computed(() => {
   const base = props.parseOptions ?? {}
-  let resolvedFinal = requestedFinal.value
-
-  if (smoothStreamingEnabled.value && resolvedFinal != null) {
-    resolvedFinal = Boolean(
-      resolvedFinal
-      && smoothSourceSynced.value
-      && smoothStream.caughtUp.value,
-    )
-  }
+  const resolvedFinal = effectiveFinal.value
 
   const merged = effectiveCustomHtmlTags.value
   const hasFinal = resolvedFinal != null
@@ -2187,10 +2193,6 @@ function handleContainerMouseout(event: MouseEvent) {
 }
 
 const hasExplicitNodes = computed(() => Array.isArray(props.nodes) && props.nodes.length > 0)
-const effectiveFinal = computed(() => {
-  const base = (props.parseOptions ?? {}) as ParseOptions
-  return props.final ?? base.final
-})
 const showTypewriterCursor = computed(() => props.typewriter === true && effectiveFinal.value !== true && !hasExplicitNodes.value)
 </script>
 
