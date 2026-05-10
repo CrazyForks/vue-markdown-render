@@ -58,7 +58,7 @@ export interface NodeRendererProps {
    * Applies when rendering from `content` (not `nodes`).
    */
   smoothStreaming?: boolean | 'auto'
-  /** Options forwarded to the built-in smooth streaming composable. */
+  /** Options forwarded to the built-in smooth streaming controller. Read once when the renderer is created. */
   smoothStreamingOptions?: SmoothMarkdownStreamOptions
   batchRendering?: boolean
   initialRenderBatchSize?: number

@@ -116,7 +116,7 @@ export interface NodeRendererProps {
    * Applies to content mode only, not nodes mode.
    */
   smoothStreaming?: boolean | 'auto'
-  /** Options forwarded to the built-in smooth streaming controller. */
+  /** Options forwarded to the built-in smooth streaming controller. Read once when the renderer is created. */
   smoothStreamingOptions?: SmoothMarkdownStreamOptions
   /** Enable incremental/batched rendering of nodes to avoid large single flush costs. Default: true */
   batchRendering?: boolean

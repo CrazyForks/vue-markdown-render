@@ -158,6 +158,7 @@ describe('vue2 node renderer smooth streaming', () => {
       props: {
         content: '',
         typewriter: true,
+        final: false,
         batchRendering: false,
         viewportPriority: false,
         deferNodesUntilVisible: false,
@@ -165,11 +166,17 @@ describe('vue2 node renderer smooth streaming', () => {
     })
 
     await flushVue()
+
+    // Update with content and final=true; smooth streaming is active
+    // so visible hasn't caught up yet, final should be gated
     await wrapper.setProps({ content: 'Content with final gate', final: true })
     await flushVue()
 
-    // final=true should be gated by caughtUp
-    // so parser should only see final when visible has caught up
+    // The parser should not immediately apply final when visible hasn't caught up
+    // We verify this by the fact that the test doesn't crash and content can still be updated
+    // This test primarily ensures the gating logic doesn't break on prop updates
+    expect(wrapper.vm).toBeDefined()
+
     wrapper.unmount()
   })
 

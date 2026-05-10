@@ -680,7 +680,9 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const previousRenderVersionSourceRef = useRef<unknown>(null)
   const smoothStream = useSmoothMarkdownStream(props.smoothStreamingOptions)
   const parentSmoothStreaming = React.useContext(SmoothStreamingContext)
-  const [hasMountedForSmoothStreaming, setHasMountedForSmoothStreaming] = useState(false)
+  const [hasMountedForSmoothStreaming, setHasMountedForSmoothStreaming] = useState(
+    () => props.smoothStreaming === true,
+  )
 
   useEffect(() => {
     setHasMountedForSmoothStreaming(true)

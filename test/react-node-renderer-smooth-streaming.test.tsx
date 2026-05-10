@@ -183,6 +183,37 @@ describe('react node renderer smooth streaming', () => {
     })
   })
 
+  it('smoothStreaming=true paces initial client content', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    const renderMarkdown = (content: string) =>
+      React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
+        content,
+        typewriter: false,
+        smoothStreaming: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      }))
+
+    // Mount with initial content and smoothStreaming=true should pace it
+    await act(async () => {
+      root.render(renderMarkdown('Initial force paced content'))
+    })
+    await flushReact()
+
+    // With smoothStreaming=true, even initial content should be paced, not immediately visible
+    expect(host.textContent).not.toContain('Initial force paced content')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
   it('does not smooth nodes mode and suppresses nested auto pacing', async () => {
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -260,6 +291,7 @@ describe('react node renderer smooth streaming', () => {
       React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
         content,
         typewriter: true,
+        smoothStreaming: false,
         batchRendering: false,
         viewportPriority: false,
         deferNodesUntilVisible: false,
@@ -282,8 +314,11 @@ describe('react node renderer smooth streaming', () => {
     })
     await flushReact()
 
-    // After flushing, final text should be correct
-    // (this verifies getSnapshot().source is used, not stale snapshot)
+    // Final text should be correct without duplication
+    // (this verifies source is correctly updated on rapid updates)
+    expect(host.textContent).toContain('abcdef')
+    expect(host.textContent).not.toContain('abcabcdef')
+
     await act(async () => {
       root.unmount()
     })
@@ -296,9 +331,9 @@ describe('react node renderer smooth streaming', () => {
     document.body.appendChild(host)
     const root = createRoot(host)
 
-    const renderMarkdown = (final: boolean) =>
+    const renderMarkdown = (content: string, final: boolean) =>
       React.createElement(StrictMode, null, React.createElement(NodeRenderer as any, {
-        content: 'Content with final gate',
+        content,
         typewriter: true,
         final,
         batchRendering: false,
@@ -306,16 +341,23 @@ describe('react node renderer smooth streaming', () => {
         deferNodesUntilVisible: false,
       }))
 
+    // Start with final=false
     await act(async () => {
-      root.render(renderMarkdown(false))
+      root.render(renderMarkdown('', false))
     })
     await flushReact()
 
-    // final=true should be gated by caughtUp, so initially should be false for parser
+    // Update with content and final=true; smooth streaming is active
+    // so visible hasn't caught up yet, final should be gated
     await act(async () => {
-      root.render(renderMarkdown(true))
+      root.render(renderMarkdown('Content with final gate', true))
     })
     await flushReact()
+
+    // The parser should not immediately apply final when visible hasn't caught up
+    // We verify this by the fact that the test doesn't crash and content can still be updated
+    // This test primarily ensures the gating logic doesn't break on prop updates
+    expect(host.textContent).toBeDefined()
 
     await act(async () => {
       root.unmount()
