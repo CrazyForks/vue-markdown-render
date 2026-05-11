@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@iconify/react": "^4.1.1",
+    "@iconify/react": "^5.2.1",
     "markstream-react": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
