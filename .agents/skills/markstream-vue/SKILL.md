@@ -19,6 +19,10 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
    - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
    - Set `:smooth-streaming="false"` to preserve raw chunk cadence; set `:smooth-streaming="true"` to force smooth pacing even on first-screen content (may cause hydration mismatch in SSR).
    - When smooth streaming is on, pair it with `:fade="false"` to avoid delta fade (280 ms) stacking with high-commit pacing.
+   - **Streaming vs recovering history**: in chat UIs the same `MarkdownRender` starts streaming and later switches to history when `final=true`.
+     - Streaming: `smooth-streaming="auto"`, `fade=false`, `typewriter=true`. Smooth pacing handles gradual appearance; fade would flicker.
+     - Recovering history: `smooth-streaming=false`, `fade=true`, `typewriter=false`. Content is already complete — pacing would slow it down, but fade gives a polished entry animation.
+     - Dynamic switch: `:smooth-streaming="isStreaming ? 'auto' : false"`, `:fade="!isStreaming"`.
    - Switch to `nodes` plus `final` only when the app needs custom AST control, worker preparsing, or structural updates beyond pacing.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 5. Use `custom-id` plus scoped `setCustomComponents(...)` for overrides.
@@ -29,6 +33,7 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 - Vue 3 apps default to `content`.
 - Smooth streaming (`smooth-streaming="auto"`) is on by default when `typewriter` or `max-live-nodes <= 0`. It only paces the `content` path; `nodes` mode is never affected.
 - For manual pacing with `nodes`, use `useSmoothMarkdownStream` directly: `enqueue()` chunks, `finish()` when done, render from `visible`, and wait for `caughtUp` before final parsing.
+- Streaming vs recovering history: when a chat message transitions from streaming to history (e.g. `final` becomes `true`), switch props dynamically — `smooth-streaming="auto"`, `fade=false` for streaming; `smooth-streaming=false`, `fade=true` for history. See `docs/guide/ai-chat-streaming.md` for full examples.
 - Prefer local component registration unless the repo already uses a shared plugin entry.
 - When Monaco code blocks need app-level preloading, import `preloadCodeBlockRuntime` from `markstream-vue`. Existing `getUseMonaco()` preloads remain valid; do not import `stream-monaco` directly just to warm workers.
 - Keep `html-policy="safe"` and Mermaid strict mode unless the task is explicitly preserving trusted legacy behavior.

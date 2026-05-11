@@ -33,6 +33,7 @@ Read [references/adoption-checklist.md](references/adoption-checklist.md) before
    - If the app streams `content` and only needs pacing, `smooth-streaming="auto"` (the default) handles it without requiring `nodes`.
    - Move to `nodes` only when the app needs custom AST control, worker preparsing, or high-frequency structural updates.
    - When smooth streaming is on, pair it with `:fade="false"`.
+   - **Streaming vs recovering history**: when migrating a chat UI, handle the streaming → history transition. Streaming: `smooth-streaming="auto"`, `fade=false`. Recovering history: `smooth-streaming=false`, `fade=true`. Dynamic switch: `:smooth-streaming="isStreaming ? 'auto' : false"`, `:fade="!isStreaming"`.
 7. Validate and summarize.
    - Run the smallest relevant tests or build.
    - Report direct mappings, TODOs, and remaining verification work.

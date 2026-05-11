@@ -31,6 +31,10 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
       - `typewriter` only controls the blinking cursor and defaults to `false`.
       - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
       - For high-frequency smooth streams, consider `fade=false` / `:fade="false"` / `[fade]="false"` to avoid fade stacking.
+    - **Streaming vs recovering history**: in chat UIs the same renderer starts streaming and later switches to history when `final` becomes `true`.
+      - Streaming: `smoothStreaming="auto"` / `smooth-streaming="auto"`, `fade=false`, `typewriter=true`. Smooth pacing handles gradual appearance; fade would flicker.
+      - Recovering history: `smoothStreaming=false` / `smooth-streaming=false`, `fade=true`, `typewriter=false`. Content is already complete — pacing would slow it down, but fade gives a polished entry animation.
+      - Dynamic switch: `smoothStreaming={isStreaming ? 'auto' : false}`, `fade={!isStreaming}`.
     - Use `nodes` + `final` only for worker preparsing, shared AST stores, or custom AST control.
     - For manual pacing with `nodes`, use `useSmoothMarkdownStream`: `enqueue()` chunks, `finish()` when done, render from `visible`, wait for `caughtUp` before final parsing.
     - Preserve the default hardening: HTML policies now default to `safe`, and Mermaid runs in strict mode by default.
@@ -46,6 +50,7 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
 - Prefer `content` for most streaming chat now that built-in smooth streaming is available across Vue 3, Vue 2, React, Svelte, and Angular.
 - Move to `nodes` only when another layer owns parsing or AST transforms.
 - When using `content` for streaming, smooth streaming (`smooth-streaming="auto"`) is on by default for `typewriter` or `max-live-nodes <= 0`. Set `:smooth-streaming="false"` to preserve raw chunk cadence.
+- Streaming vs recovering history: when a chat message transitions from streaming to history, switch props dynamically — `smooth-streaming="auto"`, `fade=false` for streaming; `smooth-streaming=false`, `fade=true` for history. See `docs/guide/ai-chat-streaming.md` for full examples.
 - Treat CSS order as a first-class part of installation, not a later cleanup.
 - When the request includes SSR, explicitly gate browser-only peers behind client-only boundaries.
 - Do not widen HTML or Mermaid security defaults unless the user explicitly needs trusted legacy compatibility.

@@ -18,6 +18,10 @@ Use this skill when the host app is Vue 2 and not specifically a Vue CLI / Webpa
      - `smooth-streaming="auto"` is the default and activates when `typewriter=true` or `max-live-nodes <= 0`.
      - `typewriter` only controls the blinking cursor and defaults to `false`.
      - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
+   - **Streaming vs recovering history**: in chat UIs the same `MarkdownRender` starts streaming and later switches to history when `final=true`.
+     - Streaming: `smooth-streaming="auto"`, `:fade="false"`, `typewriter=true`. Smooth pacing handles gradual appearance; fade would flicker.
+     - Recovering history: `:smooth-streaming="false"`, `:fade="true"`, `typewriter=false`. Content is already complete — pacing would slow it down, but fade gives a polished entry animation.
+     - Dynamic switch: `:smooth-streaming="isStreaming ? 'auto' : false"`, `:fade="!isStreaming"`.
    - Move to `nodes` + `final` only for worker-preparsed content, shared AST stores, or custom AST control.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 5. Use scoped custom component mappings when the task needs overrides or trusted tags.

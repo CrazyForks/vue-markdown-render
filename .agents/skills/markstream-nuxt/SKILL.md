@@ -19,6 +19,10 @@ Use this skill when the host app is Nuxt and SSR boundaries matter.
    - `typewriter` only controls the blinking cursor and defaults to `false`.
    - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
    - When smooth streaming is on, pair it with `:fade="false"` to avoid delta fade stacking with high-commit pacing.
+   - **Streaming vs recovering history**: in chat UIs the same `MarkdownRender` starts streaming and later switches to history when `final=true`.
+     - Streaming: `smooth-streaming="auto"`, `fade=false`, `typewriter=true`. Smooth pacing handles gradual appearance; fade would flicker.
+     - Recovering history: `smooth-streaming=false`, `fade=true`, `typewriter=false`. Content is already complete — pacing would slow it down, but fade gives a polished entry animation.
+     - Dynamic switch: `:smooth-streaming="isStreaming ? 'auto' : false"`, `:fade="!isStreaming"`.
    - In SSR, avoid `smooth-streaming="true"` on first-screen content; the mounted gate inside `auto` prevents hydration mismatch.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 6. Validate with the smallest relevant Nuxt dev, build, or typecheck command.

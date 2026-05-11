@@ -20,6 +20,10 @@ Use this skill when the host app is Angular and the task is to adopt the Angular
      - `[smoothStreaming]="'auto'"` is the default and activates when `[typewriter]="true"` or `[maxLiveNodes]="0"`.
      - `[typewriter]` only controls the blinking cursor and defaults to `false`.
      - `[fade]` controls node enter and streamed-text fade animations and defaults to `true`.
+   - **Streaming vs recovering history**: in chat UIs the same component starts streaming and later switches to history when `[final]="true"`.
+     - Streaming: `[smoothStreaming]="'auto'"`, `[fade]="false"`, `[typewriter]="true"`. Smooth pacing handles gradual appearance; fade would flicker.
+     - Recovering history: `[smoothStreaming]="false"`, `[fade]="true"`, `[typewriter]="false"`. Content is already complete — pacing would slow it down, but fade gives a polished entry animation.
+     - Dynamic switch: `[smoothStreaming]="isStreaming ? 'auto' : false"`, `[fade]="!isStreaming"`.
    - Use `[final]` for end-of-stream state; final parsing is gated until visible content catches up when smooth streaming is active.
    - Move to `nodes` + `final` only for worker-preparsed content, shared AST stores, or custom AST control.
    - Remember that `[htmlPolicy]` now defaults to `'safe'`, and Mermaid strict mode is on by default through `[mermaidProps]`.

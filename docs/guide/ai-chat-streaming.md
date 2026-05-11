@@ -127,7 +127,93 @@ watch([stream.visible, stream.final], () => {
 
 The composable returns reactive refs: `visible`, `source`, `caughtUp`, and `final`. Use `visible` for rendering and wait until `caughtUp` is `true` before considering the stream complete.
 
-## 7. When not to use this path
+## 7. Streaming vs recovering history — switching props at runtime
+
+In a chat UI the same `MarkdownRender` instance typically handles two very different modes:
+
+- **Streaming**: the model is generating tokens in real-time — `content` grows incrementally, `final` is `false`.
+- **Recovering history**: a previously completed message is loaded from cache or a store — the full Markdown string is available immediately.
+
+These two modes need different combinations of `smooth-streaming` and `fade`:
+
+### Streaming (tokens arriving in real-time)
+
+```vue
+<MarkdownRender
+  :content="streamedText"
+  :final="false"
+  smooth-streaming="auto"
+  :fade="false"
+  :typewriter="true"
+  :max-live-nodes="0"
+/>
+```
+
+- `smooth-streaming="auto"` paces the visible output so bursty chunks appear steadily. It already gives the "text appears gradually" effect at the content layer.
+- `fade=false` because the 280 ms opacity animation conflicts with high-frequency smooth-streaming updates — each small content batch interrupts the previous fade, causing flicker instead of a smooth fade.
+- `typewriter=true` adds a blinking cursor at the end of the stream.
+- `max-live-nodes=0` disables virtualization and enables incremental/batched rendering for streaming.
+
+### Recovering history (complete Markdown loaded at once)
+
+```vue
+<MarkdownRender
+  :content="historyText"
+  :final="true"
+  :smooth-streaming="false"
+  :fade="true"
+  :typewriter="false"
+/>
+```
+
+- `smooth-streaming=false` because the content is already complete — pacing would artificially slow down a message the user wants to see immediately.
+- `fade=true` gives each paragraph and node a polished opacity entry animation (280 ms), which works well because content only arrives once, not every frame.
+- `typewriter=false` — no cursor needed for completed messages.
+- `final=true` tells the parser this is the complete document, so it won't leave trailing delimiters in a loading state.
+
+### Dynamic switching in one component
+
+A typical pattern is a single `MarkdownRender` that starts in streaming mode and switches to history mode when the response completes:
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+import { computed, ref } from 'vue'
+
+const content = ref('')
+const final = ref(false)
+const isStreaming = computed(() => !final.value)
+</script>
+
+<template>
+  <MarkdownRender
+    custom-id="chat"
+    :content="content"
+    :final="final"
+    :smooth-streaming="isStreaming ? 'auto' : false"
+    :fade="!isStreaming"
+    :typewriter="isStreaming"
+    :max-live-nodes="isStreaming ? 0 : undefined"
+  />
+</template>
+```
+
+When the stream ends, set `final.value = true`. The renderer instantly switches from smooth pacing + no-fade to no-pacing + fade-in, giving history content a clean entry animation without the flicker that would occur if both features were on simultaneously.
+
+### Static / SSR snapshot (no animation)
+
+```vue
+<MarkdownRender
+  :content="staticText"
+  :final="true"
+  :smooth-streaming="false"
+  :fade="false"
+/>
+```
+
+Zero animation — best for server-rendered output, print, or PDF pipelines.
+
+## 8. When not to use this path
 
 - Use `content` when updates are infrequent or the page is basically static.
 - Use server-side preparse + `nodes` when another layer already owns Markdown parsing.

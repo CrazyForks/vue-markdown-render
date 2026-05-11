@@ -30,6 +30,28 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 For SSR with static initial content, prefer `smooth-streaming="auto"` (the default). The `auto` mode includes a mounted gate that prevents pacing initial content from blank on the first client render. Use `smooth-streaming=true` only when you explicitly want to pace the first client-side content as well — this can cause a hydration mismatch or a first-paint flash of empty content in SSR setups.
 :::
 
+### smooth-streaming and fade — pick one, not both
+
+`smooth-streaming` and `fade` both produce a "text appears gradually" effect, but at different layers:
+
+| | `smooth-streaming` | `fade` |
+|---|---|---|
+| **How it works** | Throttles how fast the `content` string is exposed to the renderer | Renders content immediately, but new text gets an opacity 0→1 CSS animation (280 ms) |
+| **Where it operates** | String / content layer | DOM / visual layer |
+| **Best for** | Streaming / real-time token output | Static or history content |
+
+Enabling both simultaneously causes **visual flicker**: smooth-streaming updates `content` in small batches every frame (~30 fps), and each batch triggers a new fade animation on the delta text. Because the next batch arrives before the 280 ms animation finishes, the delta is snapped from ~8 % opacity to 100 % on every frame — producing a rapid flicker instead of a smooth fade.
+
+**Recommended combinations:**
+
+| Scenario | `smooth-streaming` | `fade` | Why |
+|---|---|---|---|
+| **Streaming** (tokens arriving in real-time) | `'auto'` or `true` | `false` | Smooth pacing already gives the "gradually appearing" effect; fade adds nothing and causes flicker |
+| **Recovering history** (complete Markdown loaded at once) | `false` | `true` | Content arrives all at once — no throttling needed — but fade gives a polished entry animation |
+| **Static / SSR snapshot** | `false` | `false` | Zero animation; best for server-rendered output or print pipelines |
+
+In a chat UI, the same `MarkdownRender` typically starts in streaming mode and switches to history mode when the response completes. See [AI Chat & Streaming → Streaming vs recovering history](/guide/ai-chat-streaming#streaming-vs-recovering-history-switching-props-at-runtime) for concrete code examples.
+
 ### Advanced smooth streaming configuration
 
 Use `smooth-streaming-options` to fine-tune pacing behaviour:
