@@ -88,7 +88,7 @@ See [Override Built-in Components](/guide/component-overrides).
 
 ## 5. CSS and SSR checklist
 
-- Load your reset first, then import `markstream-vue/index.css` inside `@layer components`.
+- Load your reset first, then use `@import 'markstream-vue/index.css' layer(components);`.
 - Import `katex/dist/katex.min.css` only if math is enabled.
 - Gate browser-only peers such as Mermaid, D2, or Monaco behind client-only boundaries in SSR setups.
 - If styles leak, scope your chat tweaks under `[data-custom-id="chat"]`.

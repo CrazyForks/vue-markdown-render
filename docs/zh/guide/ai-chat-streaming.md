@@ -88,7 +88,7 @@ const final = ref(false)
 
 ## 5. CSS 与 SSR 检查清单
 
-- 先引入 reset，再在 `@layer components` 中导入 `markstream-vue/index.css`
+- 先引入 reset，再使用 `@import 'markstream-vue/index.css' layer(components);`
 - 只有启用数学公式时，才额外导入 `katex/dist/katex.min.css`
 - SSR 场景下，把 Mermaid、D2、Monaco 这类浏览器专属依赖放到 client-only 边界之后
 - 如果样式串到别的区域，所有聊天界面的定制都收口到 `[data-custom-id="chat"]`

@@ -8,14 +8,12 @@
 pnpm add mermaid
 ```
 
-Mermaid 不需要额外的 CSS 文件。使用 Tailwind/UnoCSS 时，请在 reset 之后、`@layer components` 中导入库的 CSS，避免 utilities 覆盖：
+Mermaid 不需要额外的 CSS 文件。使用 Tailwind/UnoCSS 时，请在 reset 之后使用 `@import '...' layer(components)` 导入库的 CSS，避免 utilities 覆盖：
 
 ```css
 @import 'modern-css-reset';
 
-@layer components {
-  @import 'markstream-vue/index.css';
-}
+@import 'markstream-vue/index.css' layer(components);
 ```
 
 ## 2. 流式示例

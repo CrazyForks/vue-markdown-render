@@ -108,7 +108,7 @@ const doc = '<thinking>Need a plan</thinking>'
 
 ## 样式 & 排障提醒
 
-- 先引入 reset，再在 `@layer components` 导入 `markstream-vue/index.css`，防止 Tailwind/UnoCSS 覆盖。参考 [Tailwind 指南](/zh/guide/tailwind)。
+- 先引入 reset，再使用 `@import 'markstream-vue/index.css' layer(components);`，防止 Tailwind/UnoCSS 覆盖。参考 [Tailwind 指南](/zh/guide/tailwind)。
 - 同伴依赖中，KaTeX 需要自己的 CSS；Mermaid 不需要。缺失 KaTeX 样式时通常表现为空白公式。
 - 使用 `custom-id` + `[data-custom-id="docs"]` 来局部覆盖样式。
 - 遇到样式异常时，依照 [排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) 逐项检查。

@@ -8,14 +8,12 @@ Mermaid diagrams stream progressively in `markstream-vue`: as soon as the syntax
 pnpm add mermaid
 ```
 
-No extra Mermaid CSS import is required. Keep `markstream-vue/index.css` after your reset and inside `@layer components` when using Tailwind/UnoCSS so utility layers do not override the renderer styles.
+No extra Mermaid CSS import is required. Keep `markstream-vue/index.css` after your reset and use `@import '...' layer(components)` when using Tailwind/UnoCSS so utility layers do not override the renderer styles.
 
 ```css
 @import 'modern-css-reset';
 
-@layer components {
-  @import 'markstream-vue/index.css';
-}
+@import 'markstream-vue/index.css' layer(components);
 ```
 
 ## 2. Streaming example

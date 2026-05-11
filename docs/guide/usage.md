@@ -37,9 +37,7 @@ const doc = '# Usage example\n\nSupports **streaming** nodes.'
 ```css
 @import 'modern-css-reset';
 
-@layer components {
-  @import 'markstream-vue/index.css';
-}
+@import 'markstream-vue/index.css' layer(components);
 ```
 
 ## VitePress + custom tags
@@ -137,7 +135,7 @@ For a full list of components and props, visit [Components & node renderers](/gu
 ## Styling reminders
 
 1. **Reset first** (`modern-css-reset`, `@tailwind base`, `@unocss/reset`), then import `markstream-vue` styles.
-2. **Use CSS layers** when Tailwind/UnoCSS is active (`@layer components { @import 'markstream-vue/index.css' }`).
+2. **Use CSS layers** when Tailwind/UnoCSS is active (`@import 'markstream-vue/index.css' layer(components);`).
 3. **UNO/Tailwind conflicts** — follow the [Tailwind guide](/guide/tailwind) (includes UnoCSS examples) to prevent utilities from overriding renderer styles.
 4. **Peer CSS** — KaTeX needs its own CSS; Mermaid/D2 do not. Monaco does not require extra CSS.
 

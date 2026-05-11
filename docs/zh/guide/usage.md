@@ -39,9 +39,7 @@ const doc = '# 使用示例\n\n支持 **streaming** 渲染。'
 ```css
 @import 'modern-css-reset';
 
-@layer components {
-  @import 'markstream-vue/index.css';
-}
+@import 'markstream-vue/index.css' layer(components);
 ```
 
 ## VitePress + 自定义标签
@@ -137,7 +135,7 @@ const final = false
 ## 样式提醒
 
 1. **先 reset** —— `modern-css-reset`、`@tailwind base` 或 `@unocss/reset`，之后再导入库的 CSS。
-2. **使用 CSS layer** —— Tailwind/UnoCSS 项目请在 `@layer components { ... }` 中导入 `markstream-vue/index.css`。
+2. **使用 CSS layer** —— Tailwind/UnoCSS 项目请使用 `@import 'markstream-vue/index.css' layer(components);`。
 3. **处理 Uno/Tailwind 冲突** —— 参见 [Tailwind 指南](/zh/guide/tailwind)（包含 UnoCSS 示例）。
 4. **同伴 CSS** —— KaTeX 需要对应的 CSS；Mermaid/D2 不需要。Monaco 不需要额外导入 CSS。
 

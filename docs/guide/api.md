@@ -114,7 +114,7 @@ For parser types and hooks, see [/guide/parser-api](/guide/parser-api) (or the `
 
 ## Styling + troubleshooting reminders
 
-- Always include a reset before `markstream-vue/index.css` and wrap it with `@layer components` when using Tailwind or UnoCSS. See the [Tailwind guide](/guide/tailwind) and the [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here).
+- Always include a reset before `markstream-vue/index.css` and use `@import '...' layer(components)` when using Tailwind or UnoCSS. See the [Tailwind guide](/guide/tailwind) and the [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here).
 - Code/graph peers: KaTeX needs its own CSS import; Mermaid does not. Missing KaTeX styles often manifest as invisible formulas.
 - Use `custom-id` to scope overrides and avoid global selector conflicts.
 

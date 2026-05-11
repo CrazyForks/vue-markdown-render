@@ -12,7 +12,7 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 1. Confirm the repo is Vue 3 and not Nuxt.
 2. Install `markstream-vue` plus only the optional peers required by the requested features.
 3. Import `markstream-vue/index.css` after resets.
-   - In Tailwind or UnoCSS projects, keep Markstream styles inside `@layer components`.
+   - In Tailwind or UnoCSS projects, use `@import 'markstream-vue/index.css' layer(components);`.
 4. Start with `<MarkdownRender :content="markdown" />`.
    - For AI chat or streaming UIs, use `typewriter` or `:max-live-nodes="0"` — smooth streaming is auto-enabled (`smooth-streaming="auto"`, the default) and paces visible output so bursty chunks appear steadily.
    - `typewriter` only controls the blinking cursor and defaults to `false`.

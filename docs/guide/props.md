@@ -239,7 +239,7 @@ const md = '# Title\n\nSome content here.'
 
 ## Styling & troubleshooting reminders
 
-1. **Import a reset first** (`modern-css-reset`, `@tailwind base`, or `@unocss/reset`), then wrap `markstream-vue/index.css` inside `@layer components` so Tailwind/Uno utilities don’t override node styles. See the [Tailwind guide](/guide/tailwind) for concrete snippets.
+1. **Import a reset first** (`modern-css-reset`, `@tailwind base`, or `@unocss/reset`), then use `@import 'markstream-vue/index.css' layer(components);` so Tailwind/Uno utilities don’t override node styles. See the [Tailwind guide](/guide/tailwind) for concrete snippets.
 2. **Scope overrides** with `custom-id` and `[data-custom-id="docs"]` selectors.
 3. **Confirm peer CSS** (KaTeX) is imported; Mermaid/D2 do not require extra CSS.
 4. **Check the [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here)** whenever visuals look off.

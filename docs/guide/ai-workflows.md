@@ -141,7 +141,7 @@ If you are building a reusable prompt, template, or coding skill around markstre
 
 - detect the framework and package manager
 - install only the required peers for the requested features
-- place CSS after resets and inside `@layer components` when utility frameworks are involved
+- place CSS after resets and use `@import '...' layer(components)` when utility frameworks are involved
 - choose `content` for simple rendering and most streaming chat; use built-in smooth streaming for jittery token streams; choose `nodes` plus `final` only for worker-preparsed/custom AST flows
 - use `custom-id` for overrides by default
 - point the user to the right docs page after making changes

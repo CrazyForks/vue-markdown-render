@@ -239,7 +239,7 @@ const md = '# 标题\n\n演示 props 用法。'
 
 ## 样式与排障提示
 
-1. **先引入 reset**（`modern-css-reset`、`@tailwind base`、`@unocss/reset`），再在 `@layer components` 中导入 `markstream-vue/index.css`，避免被 utilities 覆盖。详见 [Tailwind 指南](/zh/guide/tailwind)。
+1. **先引入 reset**（`modern-css-reset`、`@tailwind base`、`@unocss/reset`），再使用 `@import 'markstream-vue/index.css' layer(components);`，避免被 utilities 覆盖。详见 [Tailwind 指南](/zh/guide/tailwind)。
 2. **使用 `custom-id`** 与 `[data-custom-id="docs"]` 限定覆盖范围。
 3. **检查同伴 CSS** 是否导入（KaTeX），Mermaid/D2 不需要额外 CSS。
 4. **查阅 [样式排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here)**，确保 reset、layer、Uno/Tailwind 配置正确。

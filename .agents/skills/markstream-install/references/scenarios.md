@@ -24,7 +24,7 @@
 
 - reset first
 - Markstream CSS after reset
-- in Tailwind or UnoCSS projects, keep Markstream CSS inside `@layer components`
+- in Tailwind or UnoCSS projects, use `@import '...' layer(components)`
 - import KaTeX CSS when math is used
 - when standalone node components are rendered directly, wrap them with the package root class such as `.markstream-vue`, `.markstream-react`, or `.markstream-svelte`
 

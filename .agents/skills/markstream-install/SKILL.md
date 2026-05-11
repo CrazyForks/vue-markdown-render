@@ -21,7 +21,7 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
    - For Vue 3 Monaco preloading, use `preloadCodeBlockRuntime` from `markstream-vue` so the renderer runtime knows Monaco is warm. Existing `getUseMonaco()` calls are still compatible.
 3. Fix CSS order.
    - Put reset styles before Markstream styles.
-   - In Tailwind or UnoCSS projects, place `markstream-*/index.css` inside `@layer components`.
+   - In Tailwind or UnoCSS projects, use `@import 'markstream-*/index.css' layer(components);`.
    - Import `katex/dist/katex.min.css` when math is enabled.
 4. Add the smallest working render example.
     - Use `content` for static or low-frequency rendering.
