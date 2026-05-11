@@ -84,8 +84,9 @@
   let renderBatchToken = 0
   const textStreamState = new Map<string, string>()
 
-  const smoothStream = useSmoothMarkdownStream(smoothStreamingOptions)
-  let hasMountedForSmoothStreaming = $state(typeof window === 'undefined' || smoothStreaming === true)
+  let hasMounted = $state(false)
+  const smoothStream = useSmoothMarkdownStream(() => smoothStreamingOptions)
+  const hasMountedForSmoothStreaming = $derived(smoothStreaming === true || hasMounted)
   const hasNodes = $derived(Array.isArray(nodes))
   const parentSmoothStreaming = getContext<SmoothStreamingContextValue | undefined>(
     SMOOTH_STREAMING_CONTEXT,
@@ -107,18 +108,6 @@
   const smoothStreamingEnabled = $derived(hasMountedForSmoothStreaming && smoothStreamingEligible)
   setContext(SMOOTH_STREAMING_CONTEXT, () => smoothStreamingEnabled)
 
-  // Baseline sync: in auto mode with initial static content, ensure the smooth
-  // stream source/visible is already synced before smooth streaming activates.
-  // This prevents a blank flash when the mount gate opens and renderContent
-  // switches from raw content to smoothStream.visible (which would be empty).
-  if (
-    smoothStreaming !== true
-    && !Array.isArray(nodes)
-    && content
-  ) {
-    smoothStream.reset(content)
-  }
-
   const renderContent = $derived(smoothStreamingEnabled ? smoothStream.visible : (content ?? ''))
   const rawContent = $derived(content ?? '')
   const smoothSourceSynced = $derived(hasNodes || smoothStream.source === rawContent)
@@ -133,7 +122,7 @@
   })
 
   onMount(() => {
-    hasMountedForSmoothStreaming = true
+    hasMounted = true
   })
 
   $effect(() => {

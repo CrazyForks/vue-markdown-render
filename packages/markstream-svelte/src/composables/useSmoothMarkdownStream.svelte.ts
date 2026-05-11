@@ -19,7 +19,8 @@ export interface SmoothMarkdownStreamControllerSvelte {
   resume: () => void
 }
 
-export function useSmoothMarkdownStream(options: SmoothMarkdownStreamOptions = {}): SmoothMarkdownStreamControllerSvelte {
+export function useSmoothMarkdownStream(optionsOrGetter: SmoothMarkdownStreamOptions | (() => SmoothMarkdownStreamOptions) = {}): SmoothMarkdownStreamControllerSvelte {
+  const options = typeof optionsOrGetter === 'function' ? optionsOrGetter() : optionsOrGetter
   let source = $state('')
   let visible = $state('')
   let done = $state(false)
