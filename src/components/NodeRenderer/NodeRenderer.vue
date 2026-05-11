@@ -203,6 +203,13 @@ const requestedFinal = computed<boolean | undefined>(() => {
   return props.final ?? base.final
 })
 
+const effectiveFinal = computed<boolean | undefined>(() => {
+  const finalRequested = requestedFinal.value
+  if (smoothStreamingEnabled.value && finalRequested != null)
+    return finalRequested ? smoothStream.caughtUp.value : false
+  return finalRequested
+})
+
 watch(
   [() => props.content, () => props.nodes, smoothStreamingEnabled, requestedFinal],
   ([content, nodes, enabled, finalRequested]) => {
@@ -326,9 +333,7 @@ const mdInstance = computed(() => {
 
 const mergedParseOptions = computed(() => {
   const base = (props.parseOptions ?? {}) as RendererParseOptions
-  let resolvedFinal = requestedFinal.value
-  if (smoothStreamingEnabled.value && resolvedFinal != null)
-    resolvedFinal = resolvedFinal ? smoothStream.caughtUp.value : false
+  const resolvedFinal = effectiveFinal.value
   const merged = effectiveCustomHtmlTags.value
   const hasFinal = resolvedFinal != null
   const hasCustom = merged.length > 0
@@ -2452,7 +2457,11 @@ function getNodeTextLength(node: unknown): number {
 function getTypewriterContentLength() {
   if (props.nodes?.length)
     return props.nodes.reduce((total, node) => total + getNodeTextLength(node), 0)
-  return renderContent.value.length
+  // Use raw content length, not renderContent (which may be the paced-out
+  // visible portion when smooth streaming is active).  The cursor should
+  // appear as long as the source content is growing, even if the visible
+  // stream hasn't caught up yet.
+  return (props.content ?? '').length
 }
 
 function clearTypewriterCursorTimeout() {
@@ -2523,10 +2532,18 @@ function updateTypewriterCursorPosition() {
 }
 
 watch(
-  [renderContent, () => props.nodes, () => props.typewriter],
+  [renderContent, () => props.content, () => props.nodes, () => props.typewriter, effectiveFinal],
   async () => {
     if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value)
       return
+
+    // When the stream is final (and effective — smooth streaming has caught up),
+    // hide the cursor immediately.
+    if (effectiveFinal.value) {
+      showTypewriterCursor.value = false
+      clearTypewriterCursorTimeout()
+      return
+    }
 
     const nextLength = getTypewriterContentLength()
     const cursorAllowed = shouldShowTypewriterCursorForCurrentNodes()
