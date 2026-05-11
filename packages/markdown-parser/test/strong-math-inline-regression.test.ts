@@ -44,6 +44,43 @@ describe('parseMarkdownToStructure - strong around multiple inline math spans', 
     expect(textContent).not.toContain('**')
   })
 
+  it('keeps a caption strong when the first math span is a coordinate tuple', () => {
+    const md = getMarkdown('strong-coordinate-tuple-inline-math')
+    const input = '**图 2: \\((d,n)\\) 和 \\((\\log d,\\log n)\\) 的散点图。在 (a) 中，我们绘制 \\(n\\) 与 \\(d\\) 的关系，在 (b) 中，我们绘制 \\(\\log n\\) 与 \\(\\log d\\) 的关系。如 (b) 所示，我们选择 \\(n\\) 和 \\(d\\) 使其在对数后形成均匀间隔的网格。**'
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    const paragraph = nodes[0] as any
+    expect(paragraph.type).toBe('paragraph')
+    expect(paragraph.children).toHaveLength(1)
+
+    const strong = paragraph.children[0]
+    expect(strong.type).toBe('strong')
+
+    const mathContents = strong.children
+      .filter((child: any) => child.type === 'math_inline')
+      .map((child: any) => child.content)
+
+    expect(mathContents).toEqual([
+      '(d,n)',
+      '(\\log d,\\log n)',
+      'n',
+      'd',
+      '\\log n',
+      '\\log d',
+      'n',
+      'd',
+    ])
+
+    const textContent = strong.children
+      .filter((child: any) => child.type === 'text')
+      .map((child: any) => child.content)
+      .join('')
+
+    expect(textContent).toBe('图 2:  和  的散点图。在 (a) 中，我们绘制  与  的关系，在 (b) 中，我们绘制  与  的关系。如 (b) 所示，我们选择  和  使其在对数后形成均匀间隔的网格。')
+    expect(textContent).not.toContain('**')
+    expect(textContent).not.toContain('((d,n))')
+  })
+
   it('keeps strong intact when the first child is inline math', () => {
     const md = getMarkdown('strong-starts-with-inline-math')
     const nodes = parseMarkdownToStructure('**\\(x\\) 开头 math 后面文字 \\(y\\)**', md, { final: true })
