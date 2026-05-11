@@ -2222,7 +2222,7 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
   align-items: center;
   justify-content: center;
 }
-.icon-slot :deep(svg) {
+.icon-slot svg {
   display: block;
   width: 100%;
   height: 100%;
