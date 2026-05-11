@@ -2347,7 +2347,6 @@ watch(
   },
   { flush: 'post' },
 )
-
 </script>
 
 <template>
