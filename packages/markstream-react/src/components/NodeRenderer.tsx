@@ -145,6 +145,7 @@ interface NodeRendererInnerProps {
   indexPrefix: string
   containerRef: React.RefObject<HTMLDivElement | null>
   showTypewriterCursor: boolean
+  typewriterCursorRef: React.RefObject<HTMLSpanElement | null>
 }
 
 const DEFAULT_NODE_HEIGHT = 32
@@ -157,6 +158,7 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
   indexPrefix,
   containerRef,
   showTypewriterCursor,
+  typewriterCursorRef,
 }) => {
   const registerNodeVisibility = useViewportPriority()
   const isClient = typeof window !== 'undefined'
@@ -730,7 +732,7 @@ const NodeRendererInner: React.FC<NodeRendererInnerProps> = ({
       })}
       {bottomSpacer}
       {showTypewriterCursor && (
-        <span className="typewriter-cursor" aria-hidden="true" />
+        <span ref={typewriterCursorRef} className="typewriter-cursor" aria-hidden="true" />
       )}
     </div>
   )
@@ -847,9 +849,121 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     smoothStreamingEnabled,
   ])
 
-  const showTypewriterCursor = props.typewriter === true
-    && effectiveFinal !== true
-    && !hasNodes
+  // ── Typewriter cursor ──
+  const typewriterCursorRef = useRef<HTMLSpanElement | null>(null)
+  const [showTypewriterCursor, setShowTypewriterCursor] = useState(false)
+  const typewriterCursorTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const lastTypewriterContentLengthRef = useRef(0)
+
+  const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = useMemo(
+    () => new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image']),
+    [],
+  )
+
+  const shouldSkipTypewriterCursorForNode = useCallback((node: unknown) => {
+    if (!node || typeof node !== 'object')
+      return false
+    const type = (node as Record<string, unknown>).type
+    return typeof type === 'string' && TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES.has(type)
+  }, [TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES])
+
+  const getNodeTextLength = useCallback((node: unknown): number => {
+    if (!node || typeof node !== 'object')
+      return 0
+    const record = node as Record<string, unknown>
+    const direct = record.raw ?? record.content ?? record.code
+    if (typeof direct === 'string')
+      return direct.length
+    const children = record.children
+    if (Array.isArray(children))
+      return children.reduce((total: number, child: unknown) => total + getNodeTextLength(child), 0)
+    const items = record.items
+    if (Array.isArray(items))
+      return items.reduce((total: number, item: unknown) => total + getNodeTextLength(item), 0)
+    return 0
+  }, [])
+
+  const getTypewriterContentLength = useCallback((): number => {
+    if (props.nodes?.length)
+      return (props.nodes as unknown[]).reduce<number>((total, node) => total + getNodeTextLength(node), 0)
+    return renderContent.length
+  }, [props.nodes, renderContent, getNodeTextLength])
+
+  const clearTypewriterCursorTimeout = useCallback(() => {
+    if (!typewriterCursorTimeoutRef.current)
+      return
+    clearTimeout(typewriterCursorTimeoutRef.current)
+    typewriterCursorTimeoutRef.current = undefined
+  }, [])
+
+  const getLastTextNode = useCallback((root: HTMLElement) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const text = node.textContent ?? ''
+        if (!text.trim())
+          return NodeFilter.FILTER_REJECT
+        const parent = node.parentElement
+        if (!parent)
+          return NodeFilter.FILTER_REJECT
+        if (parent.closest('.typewriter-cursor, .height-estimation-probes, [data-node-type="code_block"], [data-node-type="admonition"], [data-node-type="table"], [data-node-type="math_block"], [data-node-type="html_block"], [data-node-type="image"], script, style'))
+          return NodeFilter.FILTER_REJECT
+        return NodeFilter.FILTER_ACCEPT
+      },
+    })
+    let last: Text | null = null
+    let current = walker.nextNode()
+    while (current) {
+      last = current as Text
+      current = walker.nextNode()
+    }
+    return last
+  }, [])
+
+  const updateTypewriterCursorPosition = useCallback(() => {
+    if (typeof window === 'undefined' || !showTypewriterCursor || !containerRef.current || !typewriterCursorRef.current)
+      return
+    const root = containerRef.current
+    const cursor = typewriterCursorRef.current
+    const lastText = getLastTextNode(root)
+    const rootRect = root.getBoundingClientRect()
+    let left = 0
+    let top = 0
+    let height = 20
+
+    if (lastText?.textContent) {
+      const range = document.createRange()
+      const end = lastText.textContent.length
+      range.setStart(lastText, Math.max(0, end - 1))
+      range.setEnd(lastText, end)
+      const rects = typeof range.getClientRects === 'function'
+        ? range.getClientRects()
+        : undefined
+      const rect = rects?.[rects.length - 1] ?? lastText.parentElement?.getBoundingClientRect()
+      if (rect) {
+        left = rect.right - rootRect.left + root.scrollLeft
+        top = rect.top - rootRect.top + root.scrollTop
+        height = rect.height || height
+      }
+      range.detach()
+    }
+
+    cursor.style.transform = `translate(${Math.max(0, left)}px, ${Math.max(0, top)}px)`
+    cursor.style.height = `${height}px`
+  }, [showTypewriterCursor, containerRef, getLastTextNode])
+
+  useEffect(() => {
+    if (!showTypewriterCursor)
+      return
+    requestAnimationFrame(() => {
+      updateTypewriterCursorPosition()
+    })
+  }, [showTypewriterCursor, updateTypewriterCursorPosition])
+
+  useEffect(() => {
+    return () => {
+      clearTypewriterCursorTimeout()
+    }
+  }, [clearTypewriterCursorTimeout])
 
   const renderVersionSource = hasNodes ? props.nodes : renderContent
   if (previousRenderVersionSourceRef.current !== renderVersionSource) {
@@ -947,6 +1061,50 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.customId,
     customComponentsRevision,
     effectiveCustomHtmlTags,
+  ])
+
+  // ── Typewriter cursor (depends on rawParsedNodes) ──
+  const shouldShowTypewriterCursorForCurrentNodes = useCallback(() => {
+    const lastNode = rawParsedNodes[rawParsedNodes.length - 1]
+    return !shouldSkipTypewriterCursorForNode(lastNode)
+  }, [rawParsedNodes, shouldSkipTypewriterCursorForNode])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || hasNodes)
+      return
+
+    const nextLength = getTypewriterContentLength()
+    const cursorAllowed = shouldShowTypewriterCursorForCurrentNodes()
+    if (props.typewriter === false || !cursorAllowed || nextLength <= lastTypewriterContentLengthRef.current) {
+      if (props.typewriter === false || !cursorAllowed)
+        setShowTypewriterCursor(false)
+      lastTypewriterContentLengthRef.current = nextLength
+      return
+    }
+
+    lastTypewriterContentLengthRef.current = nextLength
+    setShowTypewriterCursor(true)
+    clearTypewriterCursorTimeout()
+    requestAnimationFrame(() => {
+      updateTypewriterCursorPosition()
+    })
+    typewriterCursorTimeoutRef.current = setTimeout(() => {
+      setShowTypewriterCursor(false)
+    }, 3000)
+
+    return () => {
+      clearTypewriterCursorTimeout()
+    }
+  }, [
+    renderContent,
+    props.nodes,
+    props.typewriter,
+    rawParsedNodes.length,
+    hasNodes,
+    getTypewriterContentLength,
+    shouldShowTypewriterCursorForCurrentNodes,
+    clearTypewriterCursorTimeout,
+    updateTypewriterCursorPosition,
   ])
 
   // Stabilize node references so that structurally-identical nodes keep
@@ -1148,6 +1306,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
             indexPrefix={indexPrefix}
             containerRef={containerRef}
             showTypewriterCursor={showTypewriterCursor}
+            typewriterCursorRef={typewriterCursorRef}
           />
         </ViewportPriorityProvider>
       </SmoothStreamingContext.Provider>

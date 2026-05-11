@@ -118,7 +118,8 @@ const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
       ></div>
 
       <span
-        *ngIf="typewriter === true && effectiveFinal !== true && !hasNodes"
+        *ngIf="showTypewriterCursor"
+        #typewriterCursor
         class="typewriter-cursor"
         aria-hidden="true"
       ></span>
@@ -136,6 +137,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   )
 
   @ViewChild('root') private rootRef?: ElementRef<HTMLElement>
+  @ViewChild('typewriterCursor') private typewriterCursorRef?: ElementRef<HTMLSpanElement>
 
   @Input() content = ''
   @Input() nodes?: readonly AngularRenderableNode[] | null
@@ -221,6 +223,12 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   private previousRenderContent = ''
   private previousEffectiveFinal: boolean | undefined
   private previousRenderVersionSource: unknown
+
+  // ── Typewriter cursor ──
+  showTypewriterCursor = false
+  private typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
+  private lastTypewriterContentLength = 0
+  private static readonly TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image'])
 
   get hasNodes(): boolean {
     return Array.isArray(this.nodes)
@@ -423,6 +431,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
       window.clearTimeout(this.enhancementTimer)
       this.enhancementTimer = null
     }
+    this.clearTypewriterCursorTimeout()
   }
 
   trackByEntry = (_index: number, entry: VisibleNodeEntry) => {
@@ -557,6 +566,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
       this.nodeVisibility.clear()
 
     this.refreshVisibleEntries()
+    this.updateTypewriterCursorState()
     this.cdr.markForCheck()
     this.schedulePostRenderWork()
 
@@ -976,5 +986,127 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
     const root = this.rootRef?.nativeElement || this.hostRef.nativeElement.querySelector('.markstream-angular') as HTMLElement | null
     if (root)
       disposeRenderedHtmlEnhancements(root)
+  }
+
+  // ── Typewriter cursor ──
+  private shouldSkipTypewriterCursorForNode(node: unknown): boolean {
+    if (!node || typeof node !== 'object')
+      return false
+    const type = (node as Record<string, unknown>).type
+    return typeof type === 'string' && NodeRendererComponent.TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES.has(type)
+  }
+
+  private shouldShowTypewriterCursorForCurrentNodes(): boolean {
+    const lastNode = this.parsedNodes[this.parsedNodes.length - 1]
+    return !this.shouldSkipTypewriterCursorForNode(lastNode)
+  }
+
+  private getNodeTextLength(node: unknown): number {
+    if (!node || typeof node !== 'object')
+      return 0
+    const record = node as Record<string, unknown>
+    const direct = record.raw ?? record.content ?? record.code
+    if (typeof direct === 'string')
+      return direct.length
+    const children = record.children
+    if (Array.isArray(children))
+      return children.reduce((total: number, child: unknown) => total + this.getNodeTextLength(child), 0)
+    const items = record.items
+    if (Array.isArray(items))
+      return items.reduce((total: number, item: unknown) => total + this.getNodeTextLength(item), 0)
+    return 0
+  }
+
+  private getTypewriterContentLength(): number {
+    if (this.nodes?.length)
+      return (this.nodes as unknown[]).reduce((total: number, node: unknown) => total + this.getNodeTextLength(node), 0)
+    return this.renderContent.length
+  }
+
+  private clearTypewriterCursorTimeout() {
+    if (!this.typewriterCursorTimeout)
+      return
+    clearTimeout(this.typewriterCursorTimeout)
+    this.typewriterCursorTimeout = undefined
+  }
+
+  private getLastTextNode(root: HTMLElement): Text | null {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const text = node.textContent ?? ''
+        if (!text.trim())
+          return NodeFilter.FILTER_REJECT
+        const parent = node.parentElement
+        if (!parent)
+          return NodeFilter.FILTER_REJECT
+        if (parent.closest('.typewriter-cursor, .height-estimation-probes, [data-node-type="code_block"], [data-node-type="admonition"], [data-node-type="table"], [data-node-type="math_block"], [data-node-type="html_block"], [data-node-type="image"], script, style'))
+          return NodeFilter.FILTER_REJECT
+        return NodeFilter.FILTER_ACCEPT
+      },
+    })
+    let last: Text | null = null
+    let current = walker.nextNode()
+    while (current) {
+      last = current as Text
+      current = walker.nextNode()
+    }
+    return last
+  }
+
+  private updateTypewriterCursorPosition() {
+    if (typeof window === 'undefined' || !this.showTypewriterCursor || !this.rootRef?.nativeElement || !this.typewriterCursorRef?.nativeElement)
+      return
+    const root = this.rootRef.nativeElement
+    const cursor = this.typewriterCursorRef.nativeElement
+    const lastText = this.getLastTextNode(root)
+    const rootRect = root.getBoundingClientRect()
+    let left = 0
+    let top = 0
+    let height = 20
+
+    if (lastText?.textContent) {
+      const range = document.createRange()
+      const end = lastText.textContent.length
+      range.setStart(lastText, Math.max(0, end - 1))
+      range.setEnd(lastText, end)
+      const rects = typeof range.getClientRects === 'function'
+        ? range.getClientRects()
+        : undefined
+      const rect = rects?.[rects.length - 1] ?? lastText.parentElement?.getBoundingClientRect()
+      if (rect) {
+        left = rect.right - rootRect.left + root.scrollLeft
+        top = rect.top - rootRect.top + root.scrollTop
+        height = rect.height || height
+      }
+      range.detach()
+    }
+
+    cursor.style.transform = `translate(${Math.max(0, left)}px, ${Math.max(0, top)}px)`
+    cursor.style.height = `${height}px`
+  }
+
+  private updateTypewriterCursorState() {
+    if (typeof window === 'undefined' || this.hasNodes)
+      return
+
+    const nextLength = this.getTypewriterContentLength()
+    const cursorAllowed = this.shouldShowTypewriterCursorForCurrentNodes()
+    if (this.typewriter === false || !cursorAllowed || nextLength <= this.lastTypewriterContentLength) {
+      if (this.typewriter === false || !cursorAllowed)
+        this.showTypewriterCursor = false
+      this.lastTypewriterContentLength = nextLength
+      return
+    }
+
+    this.lastTypewriterContentLength = nextLength
+    this.showTypewriterCursor = true
+    this.clearTypewriterCursorTimeout()
+    requestAnimationFrame(() => {
+      this.updateTypewriterCursorPosition()
+    })
+    this.typewriterCursorTimeout = setTimeout(() => {
+      this.showTypewriterCursor = false
+      this.cdr.markForCheck()
+    }, 3000)
   }
 }

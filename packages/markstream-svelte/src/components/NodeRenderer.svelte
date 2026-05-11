@@ -293,6 +293,7 @@
     enhancementHandle?.dispose()
     enhancementHandle = null
     disposeRenderedHtmlEnhancements(rootEl)
+    clearTypewriterCursorTimeout()
   })
 
   function toPositiveInteger(value: unknown, fallback: number) {
@@ -425,6 +426,145 @@
     return false
   }
 
+  // ── Typewriter cursor ──
+  let typewriterCursorEl: HTMLSpanElement | null = $state(null)
+  let showTypewriterCursor = $state(false)
+  let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
+  let lastTypewriterContentLength = 0
+  const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image'])
+
+  function shouldSkipTypewriterCursorForNode(node: unknown) {
+    if (!node || typeof node !== 'object')
+      return false
+    const type = (node as Record<string, unknown>).type
+    return typeof type === 'string' && TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES.has(type)
+  }
+
+  function shouldShowTypewriterCursorForCurrentNodes() {
+    const lastNode = parsedNodes[parsedNodes.length - 1]
+    return !shouldSkipTypewriterCursorForNode(lastNode)
+  }
+
+  function getNodeTextLength(node: unknown): number {
+    if (!node || typeof node !== 'object')
+      return 0
+    const record = node as Record<string, unknown>
+    const direct = record.raw ?? record.content ?? record.code
+    if (typeof direct === 'string')
+      return direct.length
+    const children = record.children
+    if (Array.isArray(children))
+      return children.reduce((total: number, child: unknown) => total + getNodeTextLength(child), 0)
+    const items = record.items
+    if (Array.isArray(items))
+      return items.reduce((total: number, item: unknown) => total + getNodeTextLength(item), 0)
+    return 0
+  }
+
+  function getTypewriterContentLength() {
+    if (nodes?.length)
+      return nodes.reduce((total: number, node: unknown) => total + getNodeTextLength(node), 0)
+    return renderContent.length
+  }
+
+  function clearTypewriterCursorTimeout() {
+    if (!typewriterCursorTimeout)
+      return
+    clearTimeout(typewriterCursorTimeout)
+    typewriterCursorTimeout = undefined
+  }
+
+  function getLastTextNode(root: HTMLElement) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const text = node.textContent ?? ''
+        if (!text.trim())
+          return NodeFilter.FILTER_REJECT
+        const parent = node.parentElement
+        if (!parent)
+          return NodeFilter.FILTER_REJECT
+        if (parent.closest('.typewriter-cursor, .height-estimation-probes, [data-node-type="code_block"], [data-node-type="admonition"], [data-node-type="table"], [data-node-type="math_block"], [data-node-type="html_block"], [data-node-type="image"], script, style'))
+          return NodeFilter.FILTER_REJECT
+        return NodeFilter.FILTER_ACCEPT
+      },
+    })
+    let last: Text | null = null
+    let current = walker.nextNode()
+    while (current) {
+      last = current as Text
+      current = walker.nextNode()
+    }
+    return last
+  }
+
+  function updateTypewriterCursorPosition() {
+    if (typeof window === 'undefined' || !showTypewriterCursor || !rootEl || !typewriterCursorEl)
+      return
+    const root = rootEl
+    const cursor = typewriterCursorEl
+    const lastText = getLastTextNode(root)
+    const rootRect = root.getBoundingClientRect()
+    let left = 0
+    let top = 0
+    let height = 20
+
+    if (lastText?.textContent) {
+      const range = document.createRange()
+      const end = lastText.textContent.length
+      range.setStart(lastText, Math.max(0, end - 1))
+      range.setEnd(lastText, end)
+      const rects = typeof range.getClientRects === 'function'
+        ? range.getClientRects()
+        : undefined
+      const rect = rects?.[rects.length - 1] ?? lastText.parentElement?.getBoundingClientRect()
+      if (rect) {
+        left = rect.right - rootRect.left + root.scrollLeft
+        top = rect.top - rootRect.top + root.scrollTop
+        height = rect.height || height
+      }
+      range.detach()
+    }
+
+    cursor.style.transform = `translate(${Math.max(0, left)}px, ${Math.max(0, top)}px)`
+    cursor.style.height = `${height}px`
+  }
+
+  $effect(() => {
+    void renderContent
+    void nodes
+    void typewriter
+    void parsedNodes.length
+    if (typeof window === 'undefined' || hasNodes)
+      return
+
+    const nextLength = getTypewriterContentLength()
+    const cursorAllowed = shouldShowTypewriterCursorForCurrentNodes()
+    if (typewriter === false || !cursorAllowed || nextLength <= lastTypewriterContentLength) {
+      if (typewriter === false || !cursorAllowed)
+        showTypewriterCursor = false
+      lastTypewriterContentLength = nextLength
+      return
+    }
+
+    lastTypewriterContentLength = nextLength
+    showTypewriterCursor = true
+    clearTypewriterCursorTimeout()
+    tick().then(() => {
+      updateTypewriterCursorPosition()
+    })
+    typewriterCursorTimeout = setTimeout(() => {
+      showTypewriterCursor = false
+    }, 3000)
+  })
+
+  $effect(() => {
+    if (!showTypewriterCursor)
+      return
+    tick().then(() => {
+      updateTypewriterCursorPosition()
+    })
+  })
+
   function handleMouseover(event: MouseEvent) {
     const target = event.target as HTMLElement | null
     if (target?.closest('[data-node-index]'))
@@ -457,5 +597,5 @@
       </div>
     </div>
   {/each}
-  {#if typewriter === true && effectiveFinal !== true && !hasNodes}<span class="typewriter-cursor" aria-hidden="true"></span>{/if}
+  {#if showTypewriterCursor}<span bind:this={typewriterCursorEl} class="typewriter-cursor" aria-hidden="true"></span>{/if}
 </div>

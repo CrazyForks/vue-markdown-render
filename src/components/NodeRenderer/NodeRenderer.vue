@@ -2415,7 +2415,7 @@ const typewriterCursorRef = ref<HTMLElement | null>(null)
 const showTypewriterCursor = ref(false)
 let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
 let lastTypewriterContentLength = 0
-const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table'])
+const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image'])
 
 function shouldSkipTypewriterCursorForNode(node: unknown) {
   if (!node || typeof node !== 'object')
@@ -2472,7 +2472,7 @@ function getLastTextNode(root: HTMLElement) {
       const parent = node.parentElement
       if (!parent)
         return NodeFilter.FILTER_REJECT
-      if (parent.closest('.typewriter-cursor, .height-estimation-probes, [data-node-type="code_block"], [data-node-type="admonition"], [data-node-type="table"], script, style'))
+      if (parent.closest('.typewriter-cursor, .height-estimation-probes, [data-node-type="code_block"], [data-node-type="admonition"], [data-node-type="table"], [data-node-type="math_block"], [data-node-type="html_block"], [data-node-type="image"], script, style'))
         return NodeFilter.FILTER_REJECT
 
       return NodeFilter.FILTER_ACCEPT

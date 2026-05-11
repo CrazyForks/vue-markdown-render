@@ -1624,6 +1624,7 @@ onBeforeUnmount(() => {
     clearVisibilityFallback(index)
   cleanupScrollListener()
   cancelScheduledFocusSync()
+  clearTypewriterCursorTimeout()
 })
 
 // 异步按需加载 CodeBlock 组件；失败时退回为 InlineCodeNode（内联代码渲染）
@@ -2193,7 +2194,148 @@ function handleContainerMouseout(event: MouseEvent) {
 }
 
 const hasExplicitNodes = computed(() => Array.isArray(props.nodes) && props.nodes.length > 0)
-const showTypewriterCursor = computed(() => props.typewriter === true && effectiveFinal.value !== true && !hasExplicitNodes.value)
+
+// ── Typewriter cursor ──
+const typewriterCursorRef = ref<HTMLElement | null>(null)
+const showTypewriterCursor = ref(false)
+let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
+let lastTypewriterContentLength = 0
+const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image'])
+
+function shouldSkipTypewriterCursorForNode(node: unknown) {
+  if (!node || typeof node !== 'object')
+    return false
+  const type = (node as Record<string, unknown>).type
+  return typeof type === 'string' && TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES.has(type)
+}
+
+function shouldShowTypewriterCursorForCurrentNodes() {
+  const lastNode = parsedNodes.value[parsedNodes.value.length - 1]
+  return !shouldSkipTypewriterCursorForNode(lastNode)
+}
+
+function getNodeTextLength(node: unknown): number {
+  if (!node || typeof node !== 'object')
+    return 0
+  const record = node as Record<string, unknown>
+  const direct = record.raw ?? record.content ?? record.code
+  if (typeof direct === 'string')
+    return direct.length
+  const children = record.children
+  if (Array.isArray(children))
+    return children.reduce((total: number, child: unknown) => total + getNodeTextLength(child), 0)
+  const items = record.items
+  if (Array.isArray(items))
+    return items.reduce((total: number, item: unknown) => total + getNodeTextLength(item), 0)
+  return 0
+}
+
+function getTypewriterContentLength() {
+  if (props.nodes?.length)
+    return props.nodes.reduce((total: number, node: unknown) => total + getNodeTextLength(node), 0)
+  return renderContent.value.length
+}
+
+function clearTypewriterCursorTimeout() {
+  if (!typewriterCursorTimeout)
+    return
+  clearTimeout(typewriterCursorTimeout)
+  typewriterCursorTimeout = undefined
+}
+
+function getLastTextNode(root: HTMLElement) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const text = node.textContent ?? ''
+      if (!text.trim())
+        return NodeFilter.FILTER_REJECT
+      const parent = node.parentElement
+      if (!parent)
+        return NodeFilter.FILTER_REJECT
+      if (parent.closest('.typewriter-cursor, .height-estimation-probes, [data-node-type="code_block"], [data-node-type="admonition"], [data-node-type="table"], [data-node-type="math_block"], [data-node-type="html_block"], [data-node-type="image"], script, style'))
+        return NodeFilter.FILTER_REJECT
+      return NodeFilter.FILTER_ACCEPT
+    },
+  })
+  let last: Text | null = null
+  let current = walker.nextNode()
+  while (current) {
+    last = current as Text
+    current = walker.nextNode()
+  }
+  return last
+}
+
+function updateTypewriterCursorPosition() {
+  if (typeof window === 'undefined' || !showTypewriterCursor.value || !containerRef.value || !typewriterCursorRef.value)
+    return
+  const root = containerRef.value
+  const cursor = typewriterCursorRef.value
+  const lastText = getLastTextNode(root)
+  const rootRect = root.getBoundingClientRect()
+  let left = 0
+  let top = 0
+  let height = 20
+
+  if (lastText?.textContent) {
+    const range = document.createRange()
+    const end = lastText.textContent.length
+    range.setStart(lastText, Math.max(0, end - 1))
+    range.setEnd(lastText, end)
+    const rects = typeof range.getClientRects === 'function'
+      ? range.getClientRects()
+      : undefined
+    const rect = rects?.[rects.length - 1] ?? lastText.parentElement?.getBoundingClientRect()
+    if (rect) {
+      left = rect.right - rootRect.left + root.scrollLeft
+      top = rect.top - rootRect.top + root.scrollTop
+      height = rect.height || height
+    }
+    range.detach()
+  }
+
+  cursor.style.transform = `translate(${Math.max(0, left)}px, ${Math.max(0, top)}px)`
+  cursor.style.height = `${height}px`
+}
+
+watch(
+  [renderContent, () => props.nodes, () => props.typewriter],
+  async () => {
+    if (typeof window === 'undefined' || hasExplicitNodes.value)
+      return
+
+    const nextLength = getTypewriterContentLength()
+    const cursorAllowed = shouldShowTypewriterCursorForCurrentNodes()
+    if (props.typewriter === false || !cursorAllowed || nextLength <= lastTypewriterContentLength) {
+      if (props.typewriter === false || !cursorAllowed)
+        showTypewriterCursor.value = false
+      lastTypewriterContentLength = nextLength
+      return
+    }
+
+    lastTypewriterContentLength = nextLength
+    showTypewriterCursor.value = true
+    clearTypewriterCursorTimeout()
+    await nextTick()
+    updateTypewriterCursorPosition()
+    typewriterCursorTimeout = setTimeout(() => {
+      showTypewriterCursor.value = false
+    }, 3000)
+  },
+  { flush: 'post', immediate: true },
+)
+
+watch(
+  showTypewriterCursor,
+  async (visible) => {
+    if (!visible)
+      return
+    await nextTick()
+    updateTypewriterCursorPosition()
+  },
+  { flush: 'post' },
+)
+
 </script>
 
 <template>
@@ -2336,7 +2478,7 @@ const showTypewriterCursor = computed(() => props.typewriter === true && effecti
         aria-hidden="true"
       />
     </template>
-    <span v-if="showTypewriterCursor" class="typewriter-cursor" aria-hidden="true" />
+    <span v-if="showTypewriterCursor" ref="typewriterCursorRef" class="typewriter-cursor" aria-hidden="true" />
   </div>
 </template>
 
@@ -2401,12 +2543,16 @@ const showTypewriterCursor = computed(() => props.typewriter === true && effecti
 }
 
 .typewriter-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: inline-block;
   width: 0.55em;
   height: 1em;
   margin-left: 0.08em;
   vertical-align: -0.12em;
   border-right: 2px solid currentColor;
+  pointer-events: none;
   animation: typewriter-cursor-blink 1s steps(1, end) infinite;
 }
 
