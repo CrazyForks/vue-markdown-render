@@ -1020,7 +1020,9 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   private getTypewriterContentLength(): number {
     if (this.nodes?.length)
       return (this.nodes as unknown[]).reduce((total: number, node: unknown) => total + this.getNodeTextLength(node), 0)
-    return this.renderContent.length
+    // Use raw content length, not renderContent (which may be the paced-out
+    // visible portion when smooth streaming is active).
+    return (this.content ?? '').length
   }
 
   private clearTypewriterCursorTimeout() {
@@ -1088,6 +1090,14 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
   private updateTypewriterCursorState() {
     if (typeof window === 'undefined' || this.hasNodes)
       return
+
+    // When the stream is final (and effective — smooth streaming has caught up),
+    // hide the cursor immediately.
+    if (this.effectiveFinal) {
+      this.showTypewriterCursor = false
+      this.clearTypewriterCursorTimeout()
+      return
+    }
 
     const nextLength = this.getTypewriterContentLength()
     const cursorAllowed = this.shouldShowTypewriterCursorForCurrentNodes()

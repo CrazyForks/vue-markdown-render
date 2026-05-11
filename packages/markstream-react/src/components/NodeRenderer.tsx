@@ -886,8 +886,12 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const getTypewriterContentLength = useCallback((): number => {
     if (props.nodes?.length)
       return (props.nodes as unknown[]).reduce<number>((total, node) => total + getNodeTextLength(node), 0)
-    return renderContent.length
-  }, [props.nodes, renderContent, getNodeTextLength])
+    // Use raw content length, not renderContent (which may be the paced-out
+    // visible portion when smooth streaming is active).  The cursor should
+    // appear as long as the source content is growing, even if the visible
+    // stream hasn't caught up yet.
+    return (props.content ?? '').length
+  }, [props.nodes, props.content, getNodeTextLength])
 
   const clearTypewriterCursorTimeout = useCallback(() => {
     if (!typewriterCursorTimeoutRef.current)
@@ -1073,6 +1077,14 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     if (typeof window === 'undefined' || hasNodes)
       return
 
+    // When the stream is final (and effective — smooth streaming has caught up),
+    // hide the cursor immediately.
+    if (effectiveFinal) {
+      setShowTypewriterCursor(false)
+      clearTypewriterCursorTimeout()
+      return
+    }
+
     const nextLength = getTypewriterContentLength()
     const cursorAllowed = shouldShowTypewriterCursorForCurrentNodes()
     if (props.typewriter === false || !cursorAllowed || nextLength <= lastTypewriterContentLengthRef.current) {
@@ -1099,6 +1111,8 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     renderContent,
     props.nodes,
     props.typewriter,
+    props.content,
+    effectiveFinal,
     rawParsedNodes.length,
     hasNodes,
     getTypewriterContentLength,

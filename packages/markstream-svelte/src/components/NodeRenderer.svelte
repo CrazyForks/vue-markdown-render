@@ -464,7 +464,9 @@
   function getTypewriterContentLength() {
     if (nodes?.length)
       return nodes.reduce((total: number, node: unknown) => total + getNodeTextLength(node), 0)
-    return renderContent.length
+    // Use raw content length, not renderContent (which may be the paced-out
+    // visible portion when smooth streaming is active).
+    return (content ?? '').length
   }
 
   function clearTypewriterCursorTimeout() {
@@ -534,8 +536,17 @@
     void nodes
     void typewriter
     void parsedNodes.length
+    void effectiveFinal
     if (typeof window === 'undefined' || hasNodes)
       return
+
+    // When the stream is final (and effective — smooth streaming has caught up),
+    // hide the cursor immediately.
+    if (effectiveFinal) {
+      showTypewriterCursor = false
+      clearTypewriterCursorTimeout()
+      return
+    }
 
     const nextLength = getTypewriterContentLength()
     const cursorAllowed = shouldShowTypewriterCursorForCurrentNodes()

@@ -2233,7 +2233,11 @@ function getNodeTextLength(node: unknown): number {
 function getTypewriterContentLength() {
   if (props.nodes?.length)
     return props.nodes.reduce((total: number, node: unknown) => total + getNodeTextLength(node), 0)
-  return renderContent.value.length
+  // Use raw content length, not renderContent (which may be the paced-out
+  // visible portion when smooth streaming is active).  The cursor should
+  // appear as long as the source content is growing, even if the visible
+  // stream hasn't caught up yet.
+  return rawContent.value.length
 }
 
 function clearTypewriterCursorTimeout() {
@@ -2299,10 +2303,18 @@ function updateTypewriterCursorPosition() {
 }
 
 watch(
-  [renderContent, () => props.nodes, () => props.typewriter],
+  [renderContent, rawContent, () => props.nodes, () => props.typewriter, effectiveFinal],
   async () => {
     if (typeof window === 'undefined' || hasExplicitNodes.value)
       return
+
+    // When the stream is final (and effective — smooth streaming has caught up),
+    // hide the cursor immediately.
+    if (effectiveFinal.value) {
+      showTypewriterCursor.value = false
+      clearTypewriterCursorTimeout()
+      return
+    }
 
     const nextLength = getTypewriterContentLength()
     const cursorAllowed = shouldShowTypewriterCursorForCurrentNodes()
@@ -2335,7 +2347,6 @@ watch(
   },
   { flush: 'post' },
 )
-
 </script>
 
 <template>
