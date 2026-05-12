@@ -55,6 +55,7 @@ import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
 import { useResolvedRendererOptions } from './composables/useResolvedRendererOptions'
 import { useSmoothStreamingBridge } from './composables/useSmoothStreamingBridge'
+import { useViewportRoot } from './composables/useViewportRoot'
 import FallbackComponent from './FallbackComponent.vue'
 import { InfographicBlockNodeLoading } from './InfographicBlockNodeLoading'
 import { MermaidBlockNodeLoading } from './MermaidBlockNodeLoading'
@@ -123,7 +124,6 @@ const headingProbeWrapperRefs = reactive<Record<number, HTMLElement | null>>({
   6: null,
 })
 const viewportPriorityAutoDisabled = ref(false)
-const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 const textStreamState = new Map<string, string>()
 const streamRenderVersion = ref(0)
 const experimentContainerWidth = ref(0)
@@ -137,6 +137,15 @@ const {
   inheritedSmoothStreaming,
   ownsTypewriterCursor,
 } = useResolvedRendererOptions(props)
+const {
+  resolveViewportRoot,
+  resolveScrollContainer,
+  isReverseFlexScrollRoot,
+  getNormalizedScrollTop,
+  getOffsetTopWithinRoot,
+} = useViewportRoot(containerRef, {
+  isClient,
+})
 provide('markstreamShowTooltips', resolvedShowTooltips)
 provide('markstreamHtmlPolicy', resolvedHtmlPolicy)
 provide('markstreamTypewriter', computed(() => props.typewriter !== false))
@@ -159,40 +168,6 @@ function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)
     return
   console.info(`[markstream-vue][perf] ${label}`, data)
-}
-
-function hasOverflowScrollStyle(style: CSSStyleDeclaration | null | undefined) {
-  if (!style)
-    return false
-  const overflowY = (style.overflowY || '').toLowerCase()
-  const overflow = (style.overflow || '').toLowerCase()
-  return SCROLL_PARENT_OVERFLOW_RE.test(overflowY) || SCROLL_PARENT_OVERFLOW_RE.test(overflow)
-}
-
-function isActuallyScrollableElement(element: HTMLElement) {
-  const verticalOverflow = Math.ceil(element.scrollHeight) > Math.ceil(element.clientHeight) + 1
-  const horizontalOverflow = Math.ceil(element.scrollWidth) > Math.ceil(element.clientWidth) + 1
-  return verticalOverflow || horizontalOverflow
-}
-
-function resolveViewportRoot(node?: HTMLElement | null) {
-  if (typeof window === 'undefined')
-    return null
-  const base = node ?? containerRef.value
-  if (!base)
-    return null
-  const doc = base.ownerDocument || document
-  const rootScrollable = doc.scrollingElement || doc.documentElement
-  let current: HTMLElement | null = base
-  while (current) {
-    if (current === doc.body || current === rootScrollable)
-      break
-    const style = window.getComputedStyle(current)
-    if (hasOverflowScrollStyle(style) && isActuallyScrollableElement(current))
-      return current
-    current = current.parentElement
-  }
-  return null
 }
 const instanceMsgId = props.customId
   ? `renderer-${props.customId}`
@@ -413,52 +388,6 @@ function ensureExperimentProbeNodes() {
 
 function getHeadingProbeNode(level: number) {
   return headingProbeNodes.value?.[level] ?? null
-}
-
-function resolveScrollContainer(node?: HTMLElement | null) {
-  const resolved = resolveViewportRoot(node ?? containerRef.value ?? null)
-  if (resolved)
-    return resolved
-  const host = node?.ownerDocument ?? containerRef.value?.ownerDocument ?? (typeof document !== 'undefined' ? document : null)
-  return host?.scrollingElement as HTMLElement || host?.documentElement || null
-}
-
-function isReverseFlexScrollRoot(root: HTMLElement) {
-  if (!isClient)
-    return false
-  try {
-    const style = window.getComputedStyle(root)
-    const display = (style.display || '').toLowerCase()
-    if (!display.includes('flex'))
-      return false
-    const dir = (style.flexDirection || '').toLowerCase()
-    return dir.endsWith('reverse')
-  }
-  catch {
-    return false
-  }
-}
-
-function getNormalizedScrollTop(root: HTMLElement, doc: Document, isViewportRoot: boolean) {
-  if (isViewportRoot)
-    return (doc?.documentElement?.scrollTop ?? doc?.body?.scrollTop ?? 0)
-  const raw = root.scrollTop
-  if (!isReverseFlexScrollRoot(root))
-    return raw
-  const distanceFromBottom = raw < 0 ? -raw : raw
-  const max = Math.max(0, (root.scrollHeight ?? 0) - (root.clientHeight ?? 0))
-  return max - distanceFromBottom
-}
-
-function getOffsetTopWithinRoot(node: HTMLElement, root: HTMLElement) {
-  let current: HTMLElement | null = node
-  let total = 0
-  let guard = 0
-  while (current && current !== root && guard++ < 64) {
-    total += current.offsetTop || 0
-    current = current.offsetParent as HTMLElement | null
-  }
-  return total
 }
 
 function cleanupScrollListener() {
