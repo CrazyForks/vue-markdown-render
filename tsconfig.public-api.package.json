@@ -10,5 +10,10 @@
     "noEmit": true,
     "skipLibCheck": false
   },
-  "include": ["test/public-api/public-api-usage.ts", "test/public-api/PublicApiComponents.vue"]
+  "include": [
+    "test/public-api/public-api-usage.ts",
+    "test/public-api/public-api-package-usage.ts",
+    "test/public-api/public-api-package-negative.ts",
+    "test/public-api/PublicApiComponents.vue"
+  ]
 }

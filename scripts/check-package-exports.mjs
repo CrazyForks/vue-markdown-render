@@ -61,6 +61,8 @@ const runtimeSubpathChecks = [
 ]
 
 const failures = []
+const rootTypesTarget = typeof pkg.exports?.['.'] === 'object' ? pkg.exports['.'].types : undefined
+const rootImportTarget = typeof pkg.exports?.['.'] === 'object' ? pkg.exports['.'].import : undefined
 
 function normalizeTargets(entry) {
   if (typeof entry === 'string')
@@ -110,6 +112,25 @@ for (const subpath of requiredSubpaths) {
 
   for (const { condition, target } of targets)
     assertTargetExists(subpath, condition, target)
+
+  if (
+    subpath !== '.'
+    && entry
+    && typeof entry === 'object'
+    && typeof entry.types === 'string'
+    && typeof entry.import === 'string'
+    && typeof rootTypesTarget === 'string'
+    && typeof rootImportTarget === 'string'
+  ) {
+    const usesRootTypes = entry.types === rootTypesTarget
+    const usesRootImport = entry.import === rootImportTarget
+
+    if (usesRootTypes !== usesRootImport) {
+      failures.push(
+        `${subpath} mixes root and dedicated surfaces (types: ${entry.types}, import: ${entry.import})`,
+      )
+    }
+  }
 }
 
 for (const { subpath, exports: requiredExports } of runtimeSubpathChecks) {

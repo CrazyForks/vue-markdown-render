@@ -64,19 +64,19 @@
     },
     "./utils": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/utils/index.js"
+      "import": "./dist/index.js"
     },
     "./utils/katex-threshold": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/utils/katex-threshold.js"
+      "import": "./dist/index.js"
     },
     "./utils/performance-monitor": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/utils/performance-monitor.js"
+      "import": "./dist/index.js"
     },
     "./utils/safeRaf": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/utils/safeRaf.js"
+      "import": "./dist/index.js"
     },
     "./index.css": "./dist/index.css",
     "./index.px.css": "./dist/index.px.css",
@@ -84,19 +84,19 @@
     "./tailwind": "./dist/tailwind.ts",
     "./workers/katexWorkerClient": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/workers/katexWorkerClient.js"
+      "import": "./dist/index.js"
     },
     "./workers/mermaidWorkerClient": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/workers/mermaidWorkerClient.js"
+      "import": "./dist/index.js"
     },
     "./workers/katexCdnWorker": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/workers/katexCdnWorker.js"
+      "import": "./dist/index.js"
     },
     "./workers/mermaidCdnWorker": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/workers/mermaidCdnWorker.js"
+      "import": "./dist/index.js"
     },
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
     "./workers/mermaidParser.worker": "./dist/workers/mermaidParser.worker.js"

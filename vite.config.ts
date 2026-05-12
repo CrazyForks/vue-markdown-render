@@ -75,21 +75,10 @@ export default defineConfig(({ mode }) => {
       },
       sourcemap: false,
       lib: {
-        entry: {
-          'index': './src/exports.ts',
-          'utils/index': './src/entries/utils.ts',
-          'utils/katex-threshold': './src/entries/utils-katex-threshold.ts',
-          'utils/performance-monitor': './src/entries/utils-performance-monitor.ts',
-          'utils/safeRaf': './src/entries/utils-safeRaf.ts',
-          'workers/katexWorkerClient': './src/entries/workers-katexWorkerClient.ts',
-          'workers/mermaidWorkerClient': './src/entries/workers-mermaidWorkerClient.ts',
-          'workers/katexCdnWorker': './src/entries/workers-katexCdnWorker.ts',
-          'workers/mermaidCdnWorker': './src/entries/workers-mermaidCdnWorker.ts',
-        },
-        // produce ESM output for the main entry and dedicated subpath entries
+        entry: './src/exports.ts',
         formats: ['es'],
         name,
-        fileName: (_format: string, entryName: string) => `${entryName}.js`,
+        fileName: () => 'index.js',
       },
       rollupOptions: {
         external: (id: string) => {
@@ -137,8 +126,7 @@ export default defineConfig(({ mode }) => {
             vue: 'Vue',
           },
           exports: 'named',
-          // Don't override entryFileNames here - let lib.fileName control the main library output
-          // Workers will be handled by worker.rollupOptions.output below
+          // Workers are handled by worker.rollupOptions.output below.
           chunkFileNames: '[name].js',
           assetFileNames: (assetInfo: any) => {
             try {

@@ -6,22 +6,13 @@
     "moduleResolution": "Bundler",
     "paths": {
       "markstream-vue": ["./dist/index.d.ts"],
-      "markstream-vue/utils": ["./dist/index.d.ts"],
-      "markstream-vue/utils/katex-threshold": ["./dist/index.d.ts"],
-      "markstream-vue/utils/performance-monitor": ["./dist/index.d.ts"],
-      "markstream-vue/utils/safeRaf": ["./dist/index.d.ts"],
-      "markstream-vue/workers/katexWorkerClient": ["./dist/index.d.ts"],
-      "markstream-vue/workers/mermaidWorkerClient": ["./dist/index.d.ts"],
-      "markstream-vue/workers/katexCdnWorker": ["./dist/index.d.ts"],
-      "markstream-vue/workers/mermaidCdnWorker": ["./dist/index.d.ts"],
       "markstream-core": ["./packages/markstream-core/dist/index.d.ts"],
       "stream-markdown-parser": ["./packages/markdown-parser/dist/index.d.ts"]
     },
     "types": ["node"],
     "strict": true,
     "noEmit": true,
-    // This config is intentionally consumer-usage focused: it verifies the
-    // fixture against dist/index.d.ts without requiring package exports lookup.
+    // This config validates the root declaration bundle directly.
     "skipLibCheck": true
   },
   "include": ["test/public-api/public-api-usage.ts", "test/public-api/PublicApiComponents.vue"]

@@ -1,9 +1,12 @@
 import type { MarkdownIt, MarkdownItPlugin } from './markdown-it-types';
 import type { FactoryOptions } from './factory';
 import { parseInlineTokens, parseMarkdownToStructure, processTokens } from './parser';
-export type MarkdownPluginRegistration<TParams extends unknown[] = any[]>
+type CompatibleMarkdownItPlugin<TParams extends unknown[] = any[]>
   = | MarkdownItPlugin<TParams>
-    | readonly [MarkdownItPlugin<TParams>, ...TParams];
+    | ((md: any, ...params: TParams) => unknown);
+export type MarkdownPluginRegistration<TParams extends unknown[] = any[]>
+  = | CompatibleMarkdownItPlugin<TParams>
+    | readonly [CompatibleMarkdownItPlugin<TParams>, ...TParams];
 export declare function registerMarkdownPlugin(plugin: MarkdownPluginRegistration): void;
 export declare function clearRegisteredMarkdownPlugins(): void;
 export { setDefaultMathOptions } from './config';
