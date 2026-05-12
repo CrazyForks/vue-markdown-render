@@ -48,6 +48,7 @@ VueRendererMarkdown
 
 # Configuration & control functions
 clearGlobalCustomComponents
+clearRegisteredMarkdownPlugins
 disableD2
 disableKatex
 disableMermaid
@@ -56,6 +57,9 @@ enableKatex
 enableMermaid
 getCustomNodeComponents
 getMarkdown
+isD2Enabled
+isKatexEnabled
+isMermaidEnabled
 removeCustomComponents
 setCustomComponents
 setD2Loader

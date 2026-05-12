@@ -14,27 +14,39 @@ if (!existsSync(dtsPath))
 
 // Read compiler options from tsconfig.public-api.json instead of hardcoding
 const tsconfigPath = join(root, 'tsconfig.public-api.json')
-const { options: compilerOptions } = ts.readConfigFile(tsconfigPath, ts.sys.readFile).config
-  ? (() => {
-      const configFileName = tsconfigPath
-      const configFile = ts.readConfigFile(configFileName, ts.sys.readFile)
-      if (configFile.error)
-        fail(`Failed to read ${relative(root, configFileName)}: ${ts.flattenDiagnosticMessageText(configFile.error.messageText, '\n')}`)
-      const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, root)
-      return { options: parsed.options }
-    })()
-  : {
-      // Fallback only if tsconfig is unreadable
-      options: {
-        module: ts.ModuleKind.ESNext,
-        moduleResolution: ts.ModuleResolutionKind.Bundler,
-        noEmit: true,
-        skipLibCheck: false,
-        strict: true,
-        target: ts.ScriptTarget.ESNext,
-        types: ['node'],
-      },
+
+function readPublicApiCompilerOptions() {
+  const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile)
+
+  if (configFile.error) {
+    fail(
+      ts.flattenDiagnosticMessageText(
+        configFile.error.messageText,
+        '\n',
+      ),
+    )
+  }
+
+  const parsed = ts.parseJsonConfigFileContent(
+    configFile.config,
+    ts.sys,
+    root,
+  )
+
+  if (parsed.errors.length > 0) {
+    const formatHost = {
+      getCanonicalFileName: fileName => fileName,
+      getCurrentDirectory: () => root,
+      getNewLine: () => '\n',
     }
+
+    fail(ts.formatDiagnosticsWithColorAndContext(parsed.errors, formatHost))
+  }
+
+  return parsed.options
+}
+
+const compilerOptions = readPublicApiCompilerOptions()
 
 const allExports = collectPublicApiExports(dtsPath, compilerOptions)
 const requiredNames = loadRequiredExportNames(requiredListPath)
