@@ -12,14 +12,6 @@ const entryPoints = [
     ],
   },
   {
-    output: 'dist/utils/index.d.ts',
-    candidates: [
-      './dist/types/src/entries/utils.d.ts',
-      './dist/types/entries/utils.d.ts',
-      './dist/utils/index.d.ts',
-    ],
-  },
-  {
     output: 'dist/utils/katex-threshold.d.ts',
     candidates: [
       './dist/types/src/entries/utils-katex-threshold.d.ts',

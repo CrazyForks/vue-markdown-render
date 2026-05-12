@@ -84,7 +84,7 @@ export interface MarkdownIt {
   configure: (preset: string | { options?: MarkdownItOptions, components?: unknown }) => this
   enable: (list: string | string[], ignoreInvalid?: boolean) => this
   disable: (list: string | string[], ignoreInvalid?: boolean) => this
-  use: <TParams extends unknown[] = any[]>(plugin: MarkdownItPlugin<TParams>, ...params: TParams) => this
+  use: <TParams extends unknown[] = any[]>(plugin: CompatibleMarkdownItPlugin<TParams>, ...params: TParams) => this
   parse: (src: string, env?: Record<string, unknown>) => Token[]
   parseInline: (src: string, env?: Record<string, unknown>) => Token[]
   render: (src: string, env?: Record<string, unknown>) => string
@@ -94,4 +94,8 @@ export interface MarkdownIt {
 export type MarkdownItPlugin<TParams extends unknown[] = any[]> = (
   md: MarkdownIt,
   ...params: TParams
-) => void
+) => unknown
+
+export type CompatibleMarkdownItPlugin<TParams extends unknown[] = any[]>
+  = | MarkdownItPlugin<TParams>
+    | ((md: any, ...params: TParams) => unknown)

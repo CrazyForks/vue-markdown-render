@@ -128,6 +128,9 @@ const tuplePlugin: MarkdownPluginRegistration = [
   { name: 'public_api_core_rule' },
 ]
 
+const markdownForUse = getMarkdown('public-api-use-plugin')
+markdownForUse.use(markdownItEmojiFull)
+
 registerMarkdownPlugin(mdPlugin)
 registerMarkdownPlugin(tuplePlugin)
 registerMarkdownPlugin(markdownItEmojiFull)
@@ -161,6 +164,7 @@ void codeNode
 void mathNode
 void mdPlugin
 void tuplePlugin
+void markdownForUse
 void markdownItEmojiFull
 void registerMarkdownPlugin
 void clearRegisteredMarkdownPlugins

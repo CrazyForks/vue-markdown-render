@@ -1,9 +1,6 @@
-import type { MarkdownIt, MarkdownItPlugin } from './markdown-it-types';
+import type { CompatibleMarkdownItPlugin, MarkdownIt } from './markdown-it-types';
 import type { FactoryOptions } from './factory';
 import { parseInlineTokens, parseMarkdownToStructure, processTokens } from './parser';
-type CompatibleMarkdownItPlugin<TParams extends unknown[] = any[]>
-  = | MarkdownItPlugin<TParams>
-    | ((md: any, ...params: TParams) => unknown);
 export type MarkdownPluginRegistration<TParams extends unknown[] = any[]>
   = | CompatibleMarkdownItPlugin<TParams>
     | readonly [CompatibleMarkdownItPlugin<TParams>, ...TParams];

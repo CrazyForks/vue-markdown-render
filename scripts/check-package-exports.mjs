@@ -25,6 +25,8 @@ const requiredSubpaths = [
   './workers/mermaidParser.worker',
 ]
 
+const isolatedRootExports = ['MarkdownRender', 'VueRendererMarkdown', 'CodeBlockNode']
+
 const runtimeSubpathChecks = [
   {
     subpath: './utils',
@@ -33,30 +35,37 @@ const runtimeSubpathChecks = [
   {
     subpath: './utils/katex-threshold',
     exports: ['recommendWorkerThreshold'],
+    forbiddenExports: isolatedRootExports,
   },
   {
     subpath: './utils/performance-monitor',
     exports: ['disablePerfMonitoring', 'enablePerfMonitoring', 'getPerfReport'],
+    forbiddenExports: isolatedRootExports,
   },
   {
     subpath: './utils/safeRaf',
     exports: ['safeCancelRaf', 'safeRaf'],
+    forbiddenExports: isolatedRootExports,
   },
   {
     subpath: './workers/katexWorkerClient',
     exports: ['renderKaTeXInWorker'],
+    forbiddenExports: isolatedRootExports,
   },
   {
     subpath: './workers/mermaidWorkerClient',
     exports: ['findPrefixOffthread'],
+    forbiddenExports: isolatedRootExports,
   },
   {
     subpath: './workers/katexCdnWorker',
     exports: ['createKaTeXWorkerFromCDN'],
+    forbiddenExports: isolatedRootExports,
   },
   {
     subpath: './workers/mermaidCdnWorker',
     exports: ['createMermaidWorkerFromCDN'],
+    forbiddenExports: isolatedRootExports,
   },
 ]
 
@@ -127,7 +136,7 @@ for (const subpath of requiredSubpaths) {
   }
 }
 
-for (const { subpath, exports: requiredExports } of runtimeSubpathChecks) {
+for (const { subpath, exports: requiredExports, forbiddenExports = [] } of runtimeSubpathChecks) {
   const specifier = getPackageSpecifier(subpath)
 
   try {
@@ -136,6 +145,11 @@ for (const { subpath, exports: requiredExports } of runtimeSubpathChecks) {
     for (const exportName of requiredExports) {
       if (!(exportName in mod))
         failures.push(`${subpath} is missing runtime export "${exportName}"`)
+    }
+
+    for (const exportName of forbiddenExports) {
+      if (exportName in mod)
+        failures.push(`${subpath} unexpectedly exposes root export "${exportName}"`)
     }
   }
   catch (error) {

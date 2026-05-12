@@ -1,5 +1,9 @@
 import type { FactoryOptions } from './factory'
-import type { MarkdownIt, MarkdownItPlugin } from './markdown-it-types'
+import type {
+  CompatibleMarkdownItPlugin,
+  MarkdownIt,
+  MarkdownItPlugin,
+} from './markdown-it-types'
 import type { MarkdownToken } from './types'
 import markdownItFootnote from 'markdown-it-footnote'
 import markdownItIns from 'markdown-it-ins'
@@ -14,10 +18,6 @@ import {
   parseMarkdownToStructure,
   processTokens,
 } from './parser'
-
-type CompatibleMarkdownItPlugin<TParams extends unknown[] = any[]>
-  = | MarkdownItPlugin<TParams>
-    | ((md: any, ...params: TParams) => unknown)
 
 // Module-level registry for callers that want to add plugins to every
 // `getMarkdown()` instance without modifying call sites. Useful for tests
