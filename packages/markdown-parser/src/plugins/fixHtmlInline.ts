@@ -1,4 +1,4 @@
-import type { MarkdownIt } from 'markdown-it-ts'
+import type { MarkdownIt } from '../markdown-it-types'
 import type { MarkdownToken } from '../types'
 import { normalizeCustomHtmlTagName } from '../customHtmlTags'
 import { STANDARD_BLOCK_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'

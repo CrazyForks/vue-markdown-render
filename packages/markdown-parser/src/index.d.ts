@@ -1,7 +1,9 @@
-import type { MarkdownIt, MarkdownItPlugin } from 'markdown-it-ts';
+import type { CompatibleMarkdownItPlugin, MarkdownIt } from './markdown-it-types';
 import type { FactoryOptions } from './factory';
 import { parseInlineTokens, parseMarkdownToStructure, processTokens } from './parser';
-export type MarkdownPluginRegistration = MarkdownItPlugin | readonly [MarkdownItPlugin, ...unknown[]];
+export type MarkdownPluginRegistration<TParams extends unknown[] = any[]>
+  = | CompatibleMarkdownItPlugin<TParams>
+    | readonly [CompatibleMarkdownItPlugin<TParams>, ...TParams];
 export declare function registerMarkdownPlugin(plugin: MarkdownPluginRegistration): void;
 export declare function clearRegisteredMarkdownPlugins(): void;
 export { setDefaultMathOptions } from './config';

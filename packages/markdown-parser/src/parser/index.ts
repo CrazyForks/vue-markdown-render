@@ -1,4 +1,4 @@
-import type { MarkdownIt, Token } from 'markdown-it-ts'
+import type { MarkdownIt, Token } from '../markdown-it-types'
 import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, ParseOptions } from '../types'
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'

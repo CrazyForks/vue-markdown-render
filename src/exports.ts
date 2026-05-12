@@ -1,6 +1,14 @@
 import type { MathOptions } from 'stream-markdown-parser'
-import type { App, Component, Plugin } from 'vue'
+import type { App, Component, DefineComponent, Plugin } from 'vue'
 import type { CustomComponents as MarkstreamCustomComponents } from './types'
+import type {
+  CodeBlockNodeProps,
+  D2BlockNodeProps,
+  InfographicBlockNodeProps,
+  MathBlockNodeProps,
+  MathInlineNodeProps,
+  MermaidBlockNodeProps,
+} from './types/component-props'
 import type { LanguageIconResolver } from './utils/languageIcon'
 import { setDefaultMathOptions } from 'stream-markdown-parser'
 import { defineAsyncComponent } from 'vue'
@@ -52,12 +60,18 @@ import './index.css'
 import './workers/katexRenderer.worker?worker'
 import './workers/mermaidParser.worker?worker'
 
-const CodeBlockNode = defineAsyncComponent(() => import('./components/CodeBlockNode'))
-const MathBlockNode = defineAsyncComponent(() => import('./components/MathBlockNode'))
-const MathInlineNode = defineAsyncComponent(() => import('./components/MathInlineNode'))
-const MermaidBlockNode = defineAsyncComponent(() => import('./components/MermaidBlockNode'))
-const InfographicBlockNode = defineAsyncComponent(() => import('./components/InfographicBlockNode'))
-const D2BlockNode = defineAsyncComponent(() => import('./components/D2BlockNode'))
+function definePublicAsyncComponent<TProps extends object>(
+  loader: () => Promise<{ default: Component }>,
+): DefineComponent<TProps> {
+  return defineAsyncComponent(loader) as DefineComponent<TProps>
+}
+
+const CodeBlockNode = definePublicAsyncComponent<CodeBlockNodeProps>(() => import('./components/CodeBlockNode'))
+const MathBlockNode = definePublicAsyncComponent<MathBlockNodeProps>(() => import('./components/MathBlockNode'))
+const MathInlineNode = definePublicAsyncComponent<MathInlineNodeProps>(() => import('./components/MathInlineNode'))
+const MermaidBlockNode = definePublicAsyncComponent<MermaidBlockNodeProps>(() => import('./components/MermaidBlockNode'))
+const InfographicBlockNode = definePublicAsyncComponent<InfographicBlockNodeProps>(() => import('./components/InfographicBlockNode'))
+const D2BlockNode = definePublicAsyncComponent<D2BlockNodeProps>(() => import('./components/D2BlockNode'))
 
 export type { D2Loader } from './components/D2BlockNode/d2'
 export type { KatexLoader } from './components/MathInlineNode/katex'

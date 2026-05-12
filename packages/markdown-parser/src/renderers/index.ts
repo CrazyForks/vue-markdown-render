@@ -1,4 +1,4 @@
-import type { MarkdownIt } from 'markdown-it-ts'
+import type { MarkdownIt } from '../markdown-it-types'
 
 export function applyRenderRules(md: MarkdownIt) {
   // Narrow external loose surface to `unknown` and use local casts where

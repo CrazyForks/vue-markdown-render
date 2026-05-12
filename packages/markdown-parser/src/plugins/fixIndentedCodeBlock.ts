@@ -9,7 +9,7 @@
  * code blocks that don't look like code into paragraphs.
  */
 
-import type { MarkdownIt } from 'markdown-it-ts'
+import type { MarkdownIt } from '../markdown-it-types'
 import type { MarkdownToken } from '../types'
 
 export interface FixIndentedCodeBlockOptions {

@@ -8,7 +8,7 @@
  * This plugin runs at the core stage to convert single-line indented
  * code blocks that don't look like code into paragraphs.
  */
-import type { MarkdownIt } from 'markdown-it-ts';
+import type { MarkdownIt } from '../markdown-it-types';
 export interface FixIndentedCodeBlockOptions {
     /**
      * Whether to enable this fix. Default: true

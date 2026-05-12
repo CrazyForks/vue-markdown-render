@@ -1,5 +1,9 @@
-import type { MarkdownIt, MarkdownItPlugin } from 'markdown-it-ts'
 import type { FactoryOptions } from './factory'
+import type {
+  CompatibleMarkdownItPlugin,
+  MarkdownIt,
+  MarkdownItPlugin,
+} from './markdown-it-types'
 import type { MarkdownToken } from './types'
 import markdownItFootnote from 'markdown-it-footnote'
 import markdownItIns from 'markdown-it-ins'
@@ -18,7 +22,9 @@ import {
 // Module-level registry for callers that want to add plugins to every
 // `getMarkdown()` instance without modifying call sites. Useful for tests
 // or apps that want a central place to `use` plugins.
-export type MarkdownPluginRegistration = MarkdownItPlugin | readonly [MarkdownItPlugin, ...unknown[]]
+export type MarkdownPluginRegistration<TParams extends unknown[] = any[]>
+  = | CompatibleMarkdownItPlugin<TParams>
+    | readonly [CompatibleMarkdownItPlugin<TParams>, ...TParams]
 
 const _registeredMarkdownPlugins: MarkdownPluginRegistration[] = []
 
@@ -36,13 +42,13 @@ export { setDefaultMathOptions } from './config'
 // Re-export parser functions
 export { parseInlineTokens, parseMarkdownToStructure, processTokens }
 export type { MathOptions } from './config'
-export type { MarkdownIt }
 
 // Re-export utilities
 export * from './customHtmlTags'
 export { findMatchingClose } from './findMatchingClose'
 export * from './htmlRenderUtils'
 export * from './htmlTags'
+export type { MarkdownIt } from './markdown-it-types'
 export { parseFenceToken } from './parser/inline-parsers/fence-parser'
 
 // Re-export plugins
@@ -91,7 +97,7 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
       if (Array.isArray(pluginItem)) {
         const [fn, ...params] = pluginItem
         if (typeof fn === 'function')
-          md.use(fn, ...params)
+          md.use(fn as MarkdownItPlugin, ...params)
       }
       else if (typeof pluginItem === 'function') {
         md.use(pluginItem as MarkdownItPlugin)

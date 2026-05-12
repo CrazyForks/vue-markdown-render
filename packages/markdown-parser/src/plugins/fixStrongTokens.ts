@@ -1,5 +1,5 @@
-import type { MarkdownIt } from 'markdown-it-ts'
-import type { MarkdownToken } from 'stream-markdown-parser'
+import type { MarkdownIt } from '../markdown-it-types'
+import type { MarkdownToken } from '../types'
 
 export function applyFixStrongTokens(md: MarkdownIt) {
   // Run after inline tokenization to normalize strong/em tokens in
