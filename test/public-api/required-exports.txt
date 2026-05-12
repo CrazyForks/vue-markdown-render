@@ -1,5 +1,7 @@
 # Required public exports.
-# The snapshot freezes the full public export surface.
+# required-exports.txt protects stable/core exports.
+# public-api.snapshot.txt tracks the full currently visible export surface,
+# including legacy and experimental exports.
 # This file lists exports that must always be present even if snapshot update is requested.
 # One export name per line. Lines starting with # are comments. Blank lines ignored.
 #

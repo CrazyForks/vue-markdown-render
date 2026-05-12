@@ -18,7 +18,9 @@ import {
 // Module-level registry for callers that want to add plugins to every
 // `getMarkdown()` instance without modifying call sites. Useful for tests
 // or apps that want a central place to `use` plugins.
-export type MarkdownPluginRegistration = MarkdownItPlugin | readonly [MarkdownItPlugin, ...unknown[]]
+export type MarkdownPluginRegistration<TParams extends unknown[] = any[]>
+  = | MarkdownItPlugin<TParams>
+    | readonly [MarkdownItPlugin<TParams>, ...TParams]
 
 const _registeredMarkdownPlugins: MarkdownPluginRegistration[] = []
 

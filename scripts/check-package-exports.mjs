@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 
 const root = process.cwd()
 
@@ -22,6 +23,41 @@ const requiredSubpaths = [
   './workers/mermaidCdnWorker',
   './workers/katexRenderer.worker',
   './workers/mermaidParser.worker',
+]
+
+const runtimeSubpathChecks = [
+  {
+    subpath: './utils',
+    exports: ['getLanguageIcon', 'normalizeLanguageIdentifier'],
+  },
+  {
+    subpath: './utils/katex-threshold',
+    exports: ['recommendWorkerThreshold'],
+  },
+  {
+    subpath: './utils/performance-monitor',
+    exports: ['disablePerfMonitoring', 'enablePerfMonitoring', 'getPerfReport'],
+  },
+  {
+    subpath: './utils/safeRaf',
+    exports: ['safeCancelRaf', 'safeRaf'],
+  },
+  {
+    subpath: './workers/katexWorkerClient',
+    exports: ['renderKaTeXInWorker'],
+  },
+  {
+    subpath: './workers/mermaidWorkerClient',
+    exports: ['findPrefixOffthread'],
+  },
+  {
+    subpath: './workers/katexCdnWorker',
+    exports: ['createKaTeXWorkerFromCDN'],
+  },
+  {
+    subpath: './workers/mermaidCdnWorker',
+    exports: ['createMermaidWorkerFromCDN'],
+  },
 ]
 
 const failures = []
@@ -50,6 +86,13 @@ function assertTargetExists(subpath, condition, target) {
   }
 }
 
+function getPackageSpecifier(subpath) {
+  if (subpath === '.')
+    return pkg.name
+
+  return `${pkg.name}/${subpath.slice(2)}`
+}
+
 for (const subpath of requiredSubpaths) {
   const entry = pkg.exports?.[subpath]
 
@@ -69,12 +112,29 @@ for (const subpath of requiredSubpaths) {
     assertTargetExists(subpath, condition, target)
 }
 
+for (const { subpath, exports: requiredExports } of runtimeSubpathChecks) {
+  const specifier = getPackageSpecifier(subpath)
+
+  try {
+    const mod = await import(specifier)
+
+    for (const exportName of requiredExports) {
+      if (!(exportName in mod))
+        failures.push(`${subpath} is missing runtime export "${exportName}"`)
+    }
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    failures.push(`${subpath} failed runtime import check: ${message}`)
+  }
+}
+
 if (failures.length > 0) {
   console.error('[package-exports] Package export check failed:')
   for (const failure of failures)
     console.error(`  - ${failure}`)
-  console.error(`\nIf this was intentional, update the requiredSubpaths list in ${relative(root, import.meta.url.slice('file://'.length))}`)
+  console.error(`\nIf this was intentional, update the requiredSubpaths list in ${relative(root, fileURLToPath(import.meta.url))}`)
   process.exit(1)
 }
 
-console.log(`[package-exports] All ${requiredSubpaths.length} package export subpaths and targets are valid.`)
+console.log(`[package-exports] All ${requiredSubpaths.length} package export subpaths, targets, and runtime imports are valid.`)

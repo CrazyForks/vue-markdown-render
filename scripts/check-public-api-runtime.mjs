@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import process from 'node:process'
+import { pathToFileURL } from 'node:url'
 
 const root = process.cwd()
 const snapshotPath = join(root, 'test', 'public-api', 'public-api.snapshot.txt')
@@ -24,7 +25,7 @@ const valueExports = snapshot
   .filter(line => /\[(?:[^\]]*\+)?value(?:\+[^\]]*)?\]$/.test(line))
   .map(line => line.replace(/\s+\[[^\]]+\]$/, ''))
 
-const mod = await import(join(root, 'dist', 'index.js'))
+const mod = await import(pathToFileURL(distPath).href)
 
 const missing = []
 
