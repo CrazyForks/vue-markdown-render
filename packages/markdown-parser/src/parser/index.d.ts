@@ -1,4 +1,4 @@
-import type { MarkdownIt } from 'markdown-it-ts';
+import type { MarkdownIt } from '../markdown-it-types';
 import type { MarkdownToken, ParsedNode, ParseOptions } from '../types';
 import { parseInlineTokens } from './inline-parsers';
 export declare function buildAllowedHtmlTagSet(options?: ParseOptions): Set<string>;

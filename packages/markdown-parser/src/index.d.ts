@@ -1,4 +1,4 @@
-import type { MarkdownIt, MarkdownItPlugin } from 'markdown-it-ts';
+import type { MarkdownIt, MarkdownItPlugin } from './markdown-it-types';
 import type { FactoryOptions } from './factory';
 import { parseInlineTokens, parseMarkdownToStructure, processTokens } from './parser';
 export type MarkdownPluginRegistration = MarkdownItPlugin | readonly [MarkdownItPlugin, ...unknown[]];

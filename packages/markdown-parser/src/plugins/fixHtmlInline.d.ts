@@ -1,4 +1,4 @@
-import type { MarkdownIt } from 'markdown-it-ts';
+import type { MarkdownIt } from '../markdown-it-types';
 export interface FixHtmlInlineOptions {
     /**
      * Custom HTML-like tag names that should participate in streaming
