@@ -1,6 +1,8 @@
 import {
   getLanguageIcon,
   normalizeLanguageIdentifier,
+  parseMarkdownToStructure,
+  safeRaf,
 } from 'markstream-vue/utils'
 import {
   recommendWorkerThreshold,
@@ -12,7 +14,6 @@ import {
 } from 'markstream-vue/utils/performance-monitor'
 import {
   safeCancelRaf,
-  safeRaf,
 } from 'markstream-vue/utils/safeRaf'
 import {
   createKaTeXWorkerFromCDN,
@@ -31,6 +32,8 @@ void safeRaf
 void safeCancelRaf
 void getLanguageIcon
 void normalizeLanguageIdentifier
+void parseMarkdownToStructure
+void safeRaf
 void recommendWorkerThreshold
 void enablePerfMonitoring
 void disablePerfMonitoring

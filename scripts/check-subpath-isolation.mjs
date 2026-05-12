@@ -6,7 +6,6 @@ const rootTypes = pkg.exports?.['.']?.types
 const rootImport = pkg.exports?.['.']?.import
 
 const isolatedSubpaths = [
-  './utils',
   './utils/katex-threshold',
   './utils/performance-monitor',
   './utils/safeRaf',

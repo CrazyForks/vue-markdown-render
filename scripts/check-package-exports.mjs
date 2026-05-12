@@ -28,7 +28,7 @@ const requiredSubpaths = [
 const runtimeSubpathChecks = [
   {
     subpath: './utils',
-    exports: ['getLanguageIcon', 'normalizeLanguageIdentifier'],
+    exports: ['getLanguageIcon', 'normalizeLanguageIdentifier', 'parseMarkdownToStructure', 'safeRaf'],
   },
   {
     subpath: './utils/katex-threshold',
@@ -62,7 +62,9 @@ const runtimeSubpathChecks = [
 
 const failures = []
 const rootImportTarget = typeof pkg.exports?.['.'] === 'object' ? pkg.exports['.'].import : undefined
-const rootBackedSubpathsAllowed = new Set()
+const rootBackedSubpathsAllowed = new Set([
+  './utils',
+])
 
 function normalizeTargets(entry) {
   if (typeof entry === 'string')

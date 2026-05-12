@@ -8,7 +8,7 @@ const dtsPath = join(root, 'dist', 'index.d.ts')
 const snapshotPath = join(root, 'test', 'public-api', 'public-api.snapshot.txt')
 const requiredListPath = join(root, 'test', 'public-api', 'required-exports.txt')
 const shouldUpdate = process.argv.includes('--update')
-const strictVisibleSnapshot = process.env.PUBLIC_API_STRICT === 'true'
+const strictVisibleSnapshot = process.env.PUBLIC_API_STRICT === 'true' || process.argv.includes('--strict')
 
 if (!existsSync(dtsPath))
   fail(`Missing ${relative(root, dtsPath)}. Run pnpm build first.`)
@@ -87,7 +87,7 @@ if (currentSnapshot !== nextSnapshot) {
     fail(diff)
 
   console.warn(diff)
-  console.warn('[public-api] Visible export surface changed, but PUBLIC_API_STRICT is not true.')
+  console.warn('[public-api] Visible export surface changed, but --strict / PUBLIC_API_STRICT was not set.')
 }
 
 // Log the required/other split as informational
