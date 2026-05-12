@@ -21,8 +21,8 @@ const snapshot = readFileSync(snapshotPath, 'utf8')
 const valueExports = snapshot
   .split('\n')
   .map(line => line.trim())
-  .filter(line => line.endsWith('[value]'))
-  .map(line => line.replace(/\s+\[value\]$/, ''))
+  .filter(line => /\[(?:[^\]]*\+)?value(?:\+[^\]]*)?\]$/.test(line))
+  .map(line => line.replace(/\s+\[[^\]]+\]$/, ''))
 
 const mod = await import(join(root, 'dist', 'index.js'))
 

@@ -36,7 +36,7 @@ export interface RuleOptions {
   alt?: string[]
 }
 
-export type RuleHandler = (...args: any[]) => unknown
+export type RuleHandler = (...args: unknown[]) => unknown
 
 export interface RuleManager {
   before: (name: string, ruleName: string, fn: RuleHandler, options?: RuleOptions) => void

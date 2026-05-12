@@ -129,7 +129,16 @@ const mdPlugin: MarkdownPluginRegistration = (md: MarkdownIt) => {
   return md
 }
 
+// Verify MarkdownIt tuple plugin registration type is usable
+const tuplePlugin: MarkdownPluginRegistration = [
+  (md: MarkdownIt, opts?: { name?: string }) => {
+    md.core.ruler.push(opts?.name ?? 'public_api_core_rule', () => false)
+  },
+  { name: 'public_api_core_rule' },
+]
+
 registerMarkdownPlugin(mdPlugin)
+registerMarkdownPlugin(tuplePlugin)
 clearRegisteredMarkdownPlugins()
 
 void component
@@ -163,5 +172,6 @@ void safeCancelRaf
 void createKaTeXWorkerFromCDN
 void createMermaidWorkerFromCDN
 void mdPlugin
+void tuplePlugin
 void registerMarkdownPlugin
 void clearRegisteredMarkdownPlugins

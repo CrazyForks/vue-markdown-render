@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 // SSR import smoke test: importing the library entry should not throw in Node
-describe('sSR import safety', () => {
+describe('SSR import safety', () => {
   it('can import library entry without throwing', async () => {
     let mod: any = null
     let threw = false
