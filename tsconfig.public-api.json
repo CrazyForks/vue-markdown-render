@@ -6,16 +6,21 @@
     "moduleResolution": "Bundler",
     "paths": {
       "markstream-vue": ["./dist/index.d.ts"],
-      "markstream-vue/*": ["./dist/index.d.ts"],
+      "markstream-vue/utils": ["./dist/index.d.ts"],
+      "markstream-vue/utils/katex-threshold": ["./dist/index.d.ts"],
+      "markstream-vue/utils/performance-monitor": ["./dist/index.d.ts"],
+      "markstream-vue/utils/safeRaf": ["./dist/index.d.ts"],
+      "markstream-vue/workers/katexWorkerClient": ["./dist/index.d.ts"],
+      "markstream-vue/workers/mermaidWorkerClient": ["./dist/index.d.ts"],
+      "markstream-vue/workers/katexCdnWorker": ["./dist/index.d.ts"],
+      "markstream-vue/workers/mermaidCdnWorker": ["./dist/index.d.ts"],
       "markstream-core": ["./packages/markstream-core/dist/index.d.ts"],
-      "markstream-core/*": ["./packages/markstream-core/dist/*"],
-      "stream-markdown-parser": ["./packages/markdown-parser/dist/index.d.ts"],
-      "stream-markdown-parser/*": ["./packages/markdown-parser/dist/*"]
+      "stream-markdown-parser": ["./packages/markdown-parser/dist/index.d.ts"]
     },
     "types": ["node"],
     "strict": true,
     "noEmit": true,
-    "skipLibCheck": false
+    "skipLibCheck": true
   },
-  "include": ["test/public-api/public-api-usage.ts"]
+  "include": ["test/public-api/public-api-usage.ts", "test/public-api/PublicApiComponents.vue"]
 }

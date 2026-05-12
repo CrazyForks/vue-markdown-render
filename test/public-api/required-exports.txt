@@ -1,4 +1,6 @@
-# Stable core API exports — these are the exports CI will freeze.
+# Required public exports.
+# The snapshot freezes the full public export surface.
+# This file lists exports that must always be present even if snapshot update is requested.
 # One export name per line. Lines starting with # are comments. Blank lines ignored.
 #
 # Components (user-facing Vue components)

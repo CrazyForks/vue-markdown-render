@@ -52,8 +52,10 @@ import './index.css'
 import './workers/katexRenderer.worker?worker'
 import './workers/mermaidParser.worker?worker'
 
-function definePublicAsyncComponent(loader: () => Promise<{ default: Component }>): Component {
-  return defineAsyncComponent(loader) as Component
+function definePublicAsyncComponent<T extends Component>(
+  loader: () => Promise<{ default: T }>,
+): T {
+  return defineAsyncComponent(loader) as T
 }
 
 const CodeBlockNode = definePublicAsyncComponent(() => import('./components/CodeBlockNode'))

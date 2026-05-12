@@ -6,7 +6,7 @@ import ts from 'typescript'
 const root = process.cwd()
 const dtsPath = join(root, 'dist', 'index.d.ts')
 const snapshotPath = join(root, 'test', 'public-api', 'public-api.snapshot.txt')
-const stableListPath = join(root, 'test', 'public-api', 'stable-exports.txt')
+const requiredListPath = join(root, 'test', 'public-api', 'required-exports.txt')
 const shouldUpdate = process.argv.includes('--update')
 
 if (!existsSync(dtsPath))
@@ -37,7 +37,7 @@ const { options: compilerOptions } = ts.readConfigFile(tsconfigPath, ts.sys.read
     }
 
 const allExports = collectPublicApiExports(dtsPath, compilerOptions)
-const stableNames = loadStableExportNames(stableListPath)
+const requiredNames = loadRequiredExportNames(requiredListPath)
 
 const nextSnapshot = `${allExports.map(e => e.line).join('\n')}\n`
 
@@ -56,22 +56,22 @@ const currentSnapshot = normalizeSnapshot(readFileSync(snapshotPath, 'utf8'))
 if (currentSnapshot !== nextSnapshot)
   fail(formatSnapshotDiff(currentSnapshot, nextSnapshot))
 
-// Check that every declared stable export is present in the full surface
+// Check that every required export is present in the full surface
 const presentNames = new Set(allExports.map(e => e.name))
-const missingStable = stableNames.filter(name => !presentNames.has(name))
-if (missingStable.length > 0) {
+const missingRequired = requiredNames.filter(name => !presentNames.has(name))
+if (missingRequired.length > 0) {
   fail(
-    `[public-api] Stable core exports missing from dist/index.d.ts:\n${
-      missingStable.map(n => `  - ${n}`).join('\n')
-    }\n\nIf this was intentional, update test/public-api/stable-exports.txt.`,
+    `[public-api] Required exports missing from dist/index.d.ts:\n${
+      missingRequired.map(n => `  - ${n}`).join('\n')
+    }\n\nIf this was intentional, update test/public-api/required-exports.txt.`,
   )
 }
 
-// Log the stable/unstable split as informational
-const stablePresent = stableNames.filter(n => presentNames.has(n))
-const unstablePresent = [...presentNames].filter(n => !stableNames.includes(n))
+// Log the required/other split as informational
+const requiredPresent = requiredNames.filter(n => presentNames.has(n))
+const otherPresent = [...presentNames].filter(n => !requiredNames.includes(n))
 console.log(`[public-api] Snapshot matches ${relative(root, snapshotPath)}`)
-console.log(`[public-api] Stable core: ${stablePresent.length} exports, Unstable/extra: ${unstablePresent.length} exports`)
+console.log(`[public-api] Required exports: ${requiredPresent.length}, Other exports: ${otherPresent.length}`)
 
 // ---- helpers ----
 
@@ -121,7 +121,7 @@ function collectPublicApiExports(entryPath, compilerOptions) {
     .sort((left, right) => left.line.localeCompare(right.line))
 }
 
-function loadStableExportNames(filePath) {
+function loadRequiredExportNames(filePath) {
   if (!existsSync(filePath))
     fail(`Missing ${relative(root, filePath)}. Create it with one export name per line.`)
 
