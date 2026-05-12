@@ -75,10 +75,20 @@ export default defineConfig(({ mode }) => {
       },
       sourcemap: false,
       lib: {
-        entry: './src/exports.ts',
+        entry: {
+          'index': './src/exports.ts',
+          'utils/index': './src/entries/utils.ts',
+          'utils/katex-threshold': './src/entries/utils-katex-threshold.ts',
+          'utils/performance-monitor': './src/entries/utils-performance-monitor.ts',
+          'utils/safeRaf': './src/entries/utils-safeRaf.ts',
+          'workers/katexWorkerClient': './src/entries/workers-katexWorkerClient.ts',
+          'workers/mermaidWorkerClient': './src/entries/workers-mermaidWorkerClient.ts',
+          'workers/katexCdnWorker': './src/entries/workers-katexCdnWorker.ts',
+          'workers/mermaidCdnWorker': './src/entries/workers-mermaidCdnWorker.ts',
+        },
         formats: ['es'],
         name,
-        fileName: () => 'index.js',
+        fileName: (_, entryName) => `${entryName}.js`,
       },
       rollupOptions: {
         external: (id: string) => {

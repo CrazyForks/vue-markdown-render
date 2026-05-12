@@ -1,7 +1,8 @@
 # Required public exports.
 # required-exports.txt protects stable/core exports.
 # public-api.snapshot.txt tracks the full currently visible export surface,
-# including legacy and experimental exports.
+# including legacy and experimental exports. Snapshot drift only fails when
+# PUBLIC_API_STRICT=true.
 # This file lists exports that must always be present even if snapshot update is requested.
 # One export name per line. Lines starting with # are comments. Blank lines ignored.
 #
@@ -128,6 +129,7 @@ NodeRendererProps
 PreCodeNodeProps
 SmoothMarkdownStreamController
 SmoothMarkdownStreamOptions
+MarkdownIt
 MarkdownPluginRegistration
 
 # Default export

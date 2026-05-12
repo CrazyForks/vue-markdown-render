@@ -61,8 +61,8 @@ const runtimeSubpathChecks = [
 ]
 
 const failures = []
-const rootTypesTarget = typeof pkg.exports?.['.'] === 'object' ? pkg.exports['.'].types : undefined
 const rootImportTarget = typeof pkg.exports?.['.'] === 'object' ? pkg.exports['.'].import : undefined
+const rootBackedSubpathsAllowed = new Set()
 
 function normalizeTargets(entry) {
   if (typeof entry === 'string')
@@ -115,21 +115,13 @@ for (const subpath of requiredSubpaths) {
 
   if (
     subpath !== '.'
-    && entry
     && typeof entry === 'object'
-    && typeof entry.types === 'string'
     && typeof entry.import === 'string'
-    && typeof rootTypesTarget === 'string'
     && typeof rootImportTarget === 'string'
+    && entry.import === rootImportTarget
+    && !rootBackedSubpathsAllowed.has(subpath)
   ) {
-    const usesRootTypes = entry.types === rootTypesTarget
-    const usesRootImport = entry.import === rootImportTarget
-
-    if (usesRootTypes !== usesRootImport) {
-      failures.push(
-        `${subpath} mixes root and dedicated surfaces (types: ${entry.types}, import: ${entry.import})`,
-      )
-    }
+    failures.push(`${subpath} should not import the root bundle (${rootImportTarget})`)
   }
 }
 

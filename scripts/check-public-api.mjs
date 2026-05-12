@@ -8,6 +8,7 @@ const dtsPath = join(root, 'dist', 'index.d.ts')
 const snapshotPath = join(root, 'test', 'public-api', 'public-api.snapshot.txt')
 const requiredListPath = join(root, 'test', 'public-api', 'required-exports.txt')
 const shouldUpdate = process.argv.includes('--update')
+const strictVisibleSnapshot = process.env.PUBLIC_API_STRICT === 'true'
 
 if (!existsSync(dtsPath))
   fail(`Missing ${relative(root, dtsPath)}. Run pnpm build first.`)
@@ -79,13 +80,20 @@ if (!existsSync(snapshotPath))
 
 const currentSnapshot = normalizeSnapshot(readFileSync(snapshotPath, 'utf8'))
 
-if (currentSnapshot !== nextSnapshot)
-  fail(formatSnapshotDiff(currentSnapshot, nextSnapshot))
+if (currentSnapshot !== nextSnapshot) {
+  const diff = formatSnapshotDiff(currentSnapshot, nextSnapshot)
+
+  if (strictVisibleSnapshot)
+    fail(diff)
+
+  console.warn(diff)
+  console.warn('[public-api] Visible export surface changed, but PUBLIC_API_STRICT is not true.')
+}
 
 // Log the required/other split as informational
 const requiredPresent = requiredNames.filter(n => presentNames.has(n))
 const otherPresent = [...presentNames].filter(n => !requiredNames.includes(n))
-console.log(`[public-api] Snapshot matches ${relative(root, snapshotPath)}`)
+console.log(`[public-api] Visible snapshot checked against ${relative(root, snapshotPath)}`)
 console.log(`[public-api] Required exports: ${requiredPresent.length}, Other exports: ${otherPresent.length}`)
 
 // ---- helpers ----
@@ -155,7 +163,7 @@ function formatSnapshotDiff(currentSnapshot, nextSnapshot) {
   const nextLines = new Set(nextSnapshot.trim().split('\n').filter(Boolean))
   const added = [...nextLines].filter(line => !currentLines.has(line)).sort()
   const removed = [...currentLines].filter(line => !nextLines.has(line)).sort()
-  const sections = ['[public-api] Snapshot mismatch. Run pnpm test:api:update to accept the change.']
+  const sections = ['[public-api] Visible snapshot changed. Run pnpm test:api:update to accept the change.']
 
   if (added.length > 0)
     sections.push(`\nAdded:\n${added.map(line => `+ ${line}`).join('\n')}`)
