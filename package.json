@@ -117,8 +117,8 @@
   "scripts": {
     "dev": "pnpm run -C playground dev",
     "test": "vitest",
-    "test:api": "pnpm run build && pnpm exec tsc -p tsconfig.public-api.json && node scripts/check-public-api.mjs",
-    "test:api:update": "pnpm run build && pnpm exec tsc -p tsconfig.public-api.json && node scripts/check-public-api.mjs --update",
+    "test:api": "pnpm run build:parser && pnpm run build && pnpm exec tsc -p tsconfig.public-api.json && node scripts/check-public-api.mjs",
+    "test:api:update": "pnpm run build:parser && pnpm run build && pnpm exec tsc -p tsconfig.public-api.json && node scripts/check-public-api.mjs --update",
     "test:perf:height-estimation-experiment": "node scripts/benchmark-height-estimation-experiment.mjs",
     "test:e2e:diff-folding": "node scripts/e2e-diff-folding.mjs",
     "test:e2e:codeblock-highlight-stability": "node scripts/e2e-codeblock-highlight-stability.mjs",

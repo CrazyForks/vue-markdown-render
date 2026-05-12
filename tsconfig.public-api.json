@@ -9,7 +9,7 @@
     "types": ["node"],
     "strict": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": false
   },
   "include": ["test/public-api/public-api-usage.ts"]
 }

@@ -1,4 +1,5 @@
 import type { MathOptions } from './config'
+import type { MarkdownIt as MarkdownItInstance } from './markdown-it-types'
 import MarkdownIt from 'markdown-it-ts'
 import { getDefaultMathOptions } from './config'
 import { applyContainers } from './plugins/containers'
@@ -28,14 +29,14 @@ export interface FactoryOptions extends Record<string, unknown> {
   enableFixIndentedCodeBlock?: boolean
 }
 
-export function factory(opts: FactoryOptions = {}) {
+export function factory(opts: FactoryOptions = {}): MarkdownItInstance {
   const md = new MarkdownIt({
     html: true,
     linkify: true,
     typographer: true,
     stream: true,
     ...(opts.markdownItOptions ?? {}),
-  })
+  }) as unknown as MarkdownItInstance
 
   if (opts.enableMath ?? true) {
     const mergedMathOptions: MathOptions = { ...(getDefaultMathOptions() ?? {}), ...(opts.mathOptions ?? {}) }

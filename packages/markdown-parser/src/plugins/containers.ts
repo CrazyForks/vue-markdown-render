@@ -1,4 +1,4 @@
-import type { MarkdownIt, Token } from 'markdown-it-ts'
+import type { MarkdownIt, Token } from '../markdown-it-types'
 import type { MarkdownToken } from '../types'
 import markdownItContainer from 'markdown-it-container'
 

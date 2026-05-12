@@ -52,12 +52,16 @@ import './index.css'
 import './workers/katexRenderer.worker?worker'
 import './workers/mermaidParser.worker?worker'
 
-const CodeBlockNode = defineAsyncComponent(() => import('./components/CodeBlockNode'))
-const MathBlockNode = defineAsyncComponent(() => import('./components/MathBlockNode'))
-const MathInlineNode = defineAsyncComponent(() => import('./components/MathInlineNode'))
-const MermaidBlockNode = defineAsyncComponent(() => import('./components/MermaidBlockNode'))
-const InfographicBlockNode = defineAsyncComponent(() => import('./components/InfographicBlockNode'))
-const D2BlockNode = defineAsyncComponent(() => import('./components/D2BlockNode'))
+function definePublicAsyncComponent(loader: () => Promise<{ default: Component }>): Component {
+  return defineAsyncComponent(loader) as Component
+}
+
+const CodeBlockNode = definePublicAsyncComponent(() => import('./components/CodeBlockNode'))
+const MathBlockNode = definePublicAsyncComponent(() => import('./components/MathBlockNode'))
+const MathInlineNode = definePublicAsyncComponent(() => import('./components/MathInlineNode'))
+const MermaidBlockNode = definePublicAsyncComponent(() => import('./components/MermaidBlockNode'))
+const InfographicBlockNode = definePublicAsyncComponent(() => import('./components/InfographicBlockNode'))
+const D2BlockNode = definePublicAsyncComponent(() => import('./components/D2BlockNode'))
 
 export type { D2Loader } from './components/D2BlockNode/d2'
 export type { KatexLoader } from './components/MathInlineNode/katex'

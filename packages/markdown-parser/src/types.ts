@@ -1,4 +1,4 @@
-import type { MarkdownIt, Token } from 'markdown-it-ts'
+import type { MarkdownIt, Token } from './markdown-it-types'
 
 export interface BaseNode {
   type: string

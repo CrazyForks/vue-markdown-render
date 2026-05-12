@@ -1,5 +1,5 @@
-import type { MarkdownIt, MarkdownItPlugin } from 'markdown-it-ts'
 import type { FactoryOptions } from './factory'
+import type { MarkdownIt, MarkdownItPlugin } from './markdown-it-types'
 import type { MarkdownToken } from './types'
 import markdownItFootnote from 'markdown-it-footnote'
 import markdownItIns from 'markdown-it-ins'
@@ -36,13 +36,13 @@ export { setDefaultMathOptions } from './config'
 // Re-export parser functions
 export { parseInlineTokens, parseMarkdownToStructure, processTokens }
 export type { MathOptions } from './config'
-export type { MarkdownIt }
 
 // Re-export utilities
 export * from './customHtmlTags'
 export { findMatchingClose } from './findMatchingClose'
 export * from './htmlRenderUtils'
 export * from './htmlTags'
+export type { MarkdownIt } from './markdown-it-types'
 export { parseFenceToken } from './parser/inline-parsers/fence-parser'
 
 // Re-export plugins

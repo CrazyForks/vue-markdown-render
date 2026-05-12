@@ -1,4 +1,4 @@
-import type { MarkdownIt } from 'markdown-it-ts'
+import type { MarkdownIt } from '../markdown-it-types'
 import type { MarkdownToken } from '../types'
 import { shouldDemoteFilenameLikeLinkify } from '../parser/linkifyHeuristics'
 

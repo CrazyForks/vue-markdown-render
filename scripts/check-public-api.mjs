@@ -35,7 +35,7 @@ function collectPublicApiSnapshot(entryPath) {
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     noEmit: true,
-    skipLibCheck: true,
+    skipLibCheck: false,
     strict: true,
     target: ts.ScriptTarget.ESNext,
     types: ['node'],
@@ -84,7 +84,7 @@ function collectPublicApiSnapshot(entryPath) {
 }
 
 function normalizeSnapshot(snapshot) {
-  return snapshot.replace(/\r\n/g, '\n')
+  return `${snapshot.replace(/\r\n/g, '\n').trimEnd()}\n`
 }
 
 function formatSnapshotDiff(currentSnapshot, nextSnapshot) {

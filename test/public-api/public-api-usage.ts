@@ -31,6 +31,16 @@ import MarkdownRender, {
   useSmoothMarkdownStream,
   VueRendererMarkdown,
 } from 'markstream-vue'
+import {
+  safeCancelRaf,
+  safeRaf,
+} from 'markstream-vue/utils/safeRaf'
+import {
+  createKaTeXWorkerFromCDN,
+} from 'markstream-vue/workers/katexCdnWorker'
+import {
+  createMermaidWorkerFromCDN,
+} from 'markstream-vue/workers/mermaidCdnWorker'
 
 const component = MarkdownRender
 const plugin = VueRendererMarkdown
@@ -95,3 +105,7 @@ void mermaidProps
 void mathProps
 void imageProps
 void linkProps
+void safeRaf
+void safeCancelRaf
+void createKaTeXWorkerFromCDN
+void createMermaidWorkerFromCDN
