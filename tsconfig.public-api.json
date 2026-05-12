@@ -20,8 +20,8 @@
     "types": ["node"],
     "strict": true,
     "noEmit": true,
-    // Keep true for now because this fixture validates consumer-facing usage,
-    // while full declaration integrity is covered by build:dts and snapshot.
+    // This config is intentionally consumer-usage focused: it verifies the
+    // fixture against dist/index.d.ts without requiring package exports lookup.
     "skipLibCheck": true
   },
   "include": ["test/public-api/public-api-usage.ts", "test/public-api/PublicApiComponents.vue"]

@@ -12,10 +12,9 @@ const shouldUpdate = process.argv.includes('--update')
 if (!existsSync(dtsPath))
   fail(`Missing ${relative(root, dtsPath)}. Run pnpm build first.`)
 
-// Read compiler options from tsconfig.public-api.json instead of hardcoding
-const tsconfigPath = join(root, 'tsconfig.public-api.json')
+const integrityTsconfigPath = join(root, 'tsconfig.public-api.package.json')
 
-function readPublicApiCompilerOptions() {
+function readCompilerOptions(tsconfigPath) {
   const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile)
 
   if (configFile.error) {
@@ -46,7 +45,10 @@ function readPublicApiCompilerOptions() {
   return parsed.options
 }
 
-const compilerOptions = readPublicApiCompilerOptions()
+const compilerOptions = {
+  ...readCompilerOptions(integrityTsconfigPath),
+  skipLibCheck: false,
+}
 
 const allExports = collectPublicApiExports(dtsPath, compilerOptions)
 const requiredNames = loadRequiredExportNames(requiredListPath)

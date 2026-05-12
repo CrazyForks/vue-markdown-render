@@ -75,11 +75,21 @@ export default defineConfig(({ mode }) => {
       },
       sourcemap: false,
       lib: {
-        entry: './src/exports.ts',
-        // produce both ESM Only
+        entry: {
+          'index': './src/exports.ts',
+          'utils/index': './src/entries/utils.ts',
+          'utils/katex-threshold': './src/entries/utils-katex-threshold.ts',
+          'utils/performance-monitor': './src/entries/utils-performance-monitor.ts',
+          'utils/safeRaf': './src/entries/utils-safeRaf.ts',
+          'workers/katexWorkerClient': './src/entries/workers-katexWorkerClient.ts',
+          'workers/mermaidWorkerClient': './src/entries/workers-mermaidWorkerClient.ts',
+          'workers/katexCdnWorker': './src/entries/workers-katexCdnWorker.ts',
+          'workers/mermaidCdnWorker': './src/entries/workers-mermaidCdnWorker.ts',
+        },
+        // produce ESM output for the main entry and dedicated subpath entries
         formats: ['es'],
         name,
-        fileName: (format: string) => (format === 'cjs' ? 'index.cjs' : 'index.js'),
+        fileName: (_format: string, entryName: string) => `${entryName}.js`,
       },
       rollupOptions: {
         external: (id: string) => {

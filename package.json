@@ -64,19 +64,19 @@
     },
     "./utils": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/utils/index.js"
     },
     "./utils/katex-threshold": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/utils/katex-threshold.js"
     },
     "./utils/performance-monitor": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/utils/performance-monitor.js"
     },
     "./utils/safeRaf": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/utils/safeRaf.js"
     },
     "./index.css": "./dist/index.css",
     "./index.px.css": "./dist/index.px.css",
@@ -84,19 +84,19 @@
     "./tailwind": "./dist/tailwind.ts",
     "./workers/katexWorkerClient": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/workers/katexWorkerClient.js"
     },
     "./workers/mermaidWorkerClient": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/workers/mermaidWorkerClient.js"
     },
     "./workers/katexCdnWorker": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/workers/katexCdnWorker.js"
     },
     "./workers/mermaidCdnWorker": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/workers/mermaidCdnWorker.js"
     },
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
     "./workers/mermaidParser.worker": "./dist/workers/mermaidParser.worker.js"
@@ -117,8 +117,8 @@
   "scripts": {
     "dev": "pnpm run -C playground dev",
     "test": "vitest",
-    "test:api": "pnpm run build:parser && pnpm run build && pnpm exec vue-tsc -p tsconfig.public-api.json --noEmit && node scripts/check-public-api.mjs && node scripts/check-public-api-runtime.mjs && node scripts/check-package-exports.mjs",
-    "test:api:update": "pnpm run build:parser && pnpm run build && pnpm exec vue-tsc -p tsconfig.public-api.json --noEmit && node scripts/check-public-api.mjs --update && node scripts/check-public-api-runtime.mjs && node scripts/check-package-exports.mjs",
+    "test:api": "pnpm run build:parser && pnpm run build && pnpm exec vue-tsc -p tsconfig.public-api.json --noEmit && pnpm exec vue-tsc -p tsconfig.public-api.package.json --noEmit && node scripts/check-public-api.mjs && node scripts/check-public-api-runtime.mjs && node scripts/check-package-exports.mjs",
+    "test:api:update": "pnpm run build:parser && pnpm run build && pnpm exec vue-tsc -p tsconfig.public-api.json --noEmit && pnpm exec vue-tsc -p tsconfig.public-api.package.json --noEmit && node scripts/check-public-api.mjs --update && node scripts/check-public-api-runtime.mjs && node scripts/check-package-exports.mjs",
     "test:perf:height-estimation-experiment": "node scripts/benchmark-height-estimation-experiment.mjs",
     "test:e2e:diff-folding": "node scripts/e2e-diff-folding.mjs",
     "test:e2e:codeblock-highlight-stability": "node scripts/e2e-codeblock-highlight-stability.mjs",
