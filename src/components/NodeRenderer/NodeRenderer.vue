@@ -201,6 +201,7 @@ const {
   debugPerformanceEnabled,
   logPerf,
 })
+const parsedNodesIdentity = computed(() => parsedNodes.value)
 const parsedNodeCount = computed(() => parsedNodes.value.length)
 const paragraphProbeNode = ref<ParsedNode | null>(null)
 const listItemProbeNode = ref<ParsedNode | null>(null)
@@ -332,6 +333,7 @@ const {
   props,
   isClient,
   isTestEnv,
+  parsedNodesIdentity,
   parsedNodeCount,
   desiredRenderedCount,
   batchingEnabled,
@@ -355,7 +357,6 @@ const {
     if (virtualizationEnabled.value)
       scheduleFocusSync({ immediate: true })
   },
-  logPerf,
 })
 
 function ensureExperimentProbeNodes() {

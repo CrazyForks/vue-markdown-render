@@ -11,6 +11,7 @@ export interface BatchRenderingSchedulerOptions {
   isClient: boolean
   isTestEnv: boolean
 
+  parsedNodesIdentity: ComputedRef<unknown>
   parsedNodeCount: ComputedRef<number>
   desiredRenderedCount: ComputedRef<number>
 
@@ -39,7 +40,6 @@ export interface BatchRenderingSchedulerOptions {
   cleanupNodeVisibility: (maxIndex: number) => void
   onDatasetKeyChanged: (total: number) => void
   onDatasetChanged: () => void
-  logPerf: (label: string, data: Record<string, unknown>) => void
 }
 
 export interface BatchRenderingScheduler {
@@ -53,6 +53,7 @@ export function useBatchRenderingScheduler(
     props,
     isClient,
     isTestEnv,
+    parsedNodesIdentity,
     parsedNodeCount,
     desiredRenderedCount,
     batchingEnabled,
@@ -199,14 +200,13 @@ export function useBatchRenderingScheduler(
 
   watch(
     [
+      parsedNodesIdentity,
       parsedNodeCount,
-      () => props.indexKey,
-      batchingEnabled,
       incrementalRenderingActive,
-      resolvedInitialBatch,
       resolvedBatchSize,
+      resolvedInitialBatch,
       () => props.renderBatchDelay,
-      () => props.renderBatchBudgetMs,
+      () => props.indexKey,
     ],
     () => {
       const total = parsedNodeCount.value
