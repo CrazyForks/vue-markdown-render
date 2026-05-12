@@ -52,6 +52,7 @@ import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import MarkdownCodeBlockNode from '../MarkdownCodeBlockNode'
 import { createMathBlockMinHeightCache, provideMathBlockMinHeightCache } from '../MathBlockNode/minHeightCache'
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
+import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
 import { useResolvedRendererOptions } from './composables/useResolvedRendererOptions'
 import { useSmoothStreamingBridge } from './composables/useSmoothStreamingBridge'
@@ -263,23 +264,20 @@ const processEnv = typeof globalThis !== 'undefined' && 'process' in globalThis
   : undefined
 const isTestEnv = processEnv?.NODE_ENV === 'test'
 const hasIdleCallback = isClient && typeof window.requestIdleCallback === 'function'
-const resolvedBatchSize = computed(() => {
-  const size = Math.trunc(props.renderBatchSize ?? 80)
-  return Number.isFinite(size) ? Math.max(0, size) : 0
+const {
+  resolvedBatchSize,
+  resolvedInitialBatch,
+  batchingEnabled,
+  incrementalRenderingActive,
+  renderedCount,
+  previousRenderContext,
+  adaptiveBatchSize,
+  previousBatchConfig,
+} = useBatchRenderingState(props, {
+  isClient,
+  isTestEnv,
+  renderAsFragment,
 })
-const resolvedInitialBatch = computed(() => {
-  const initial = Math.trunc(props.initialRenderBatchSize ?? resolvedBatchSize.value)
-  if (!Number.isFinite(initial))
-    return resolvedBatchSize.value
-  return Math.max(0, initial)
-})
-const batchingEnabled = computed(() => !renderAsFragment.value && props.batchRendering !== false && resolvedBatchSize.value > 0 && isClient && !isTestEnv)
-const renderedCount = ref(0)
-const previousRenderContext = ref<{ key: typeof props.indexKey, total: number }>({
-  key: props.indexKey,
-  total: 0,
-})
-const adaptiveBatchSize = ref(Math.max(1, resolvedBatchSize.value || 1))
 const visibleNodeIndices = ref<Set<number>>(new Set())
 const nodeVisibilityHandles = new Map<number, VisibilityHandle>()
 const nodeVisibilityWatchStops = new Map<number, () => void>()
@@ -319,13 +317,6 @@ const deferNodes = computed(() => {
   if (parsedNodes.value.length > MAX_DEFERRED_NODE_COUNT)
     return false
   return viewportPriorityEnabled.value
-})
-const incrementalRenderingActive = computed(() => batchingEnabled.value && (props.maxLiveNodes ?? 0) <= 0)
-const previousBatchConfig = ref({
-  batchSize: resolvedBatchSize.value,
-  initial: resolvedInitialBatch.value,
-  delay: props.renderBatchDelay ?? 16,
-  enabled: incrementalRenderingActive.value,
 })
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
 const liveNodeBufferResolved = computed(() => Math.max(0, props.liveNodeBuffer ?? 60))
