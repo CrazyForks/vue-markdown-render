@@ -137,7 +137,7 @@
     "test:ui": "vitest --ui",
     "test:update": "vitest -u",
     "typecheck": "vue-tsc --noEmit",
-    "check:ssr": "vitest --run -t \"SSR import safety\"",
+    "check:ssr": "vitest --run test/ssr-import.test.ts test/ssr-render-to-string.test.ts",
     "prepublishOnly": "npm run build && pnpm run check:core-published",
     "play": "pnpm run -C playground dev",
     "play:angular": "pnpm run -C playground-angular dev",
