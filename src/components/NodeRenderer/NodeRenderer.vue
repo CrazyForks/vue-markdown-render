@@ -52,6 +52,7 @@ import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import MarkdownCodeBlockNode from '../MarkdownCodeBlockNode'
 import { createMathBlockMinHeightCache, provideMathBlockMinHeightCache } from '../MathBlockNode/minHeightCache'
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
+import { useBatchRenderingScheduler } from './composables/useBatchRenderingScheduler'
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
 import { useResolvedRendererOptions } from './composables/useResolvedRendererOptions'
@@ -61,12 +62,6 @@ import { useViewportRoot } from './composables/useViewportRoot'
 import FallbackComponent from './FallbackComponent.vue'
 import { InfographicBlockNodeLoading } from './InfographicBlockNodeLoading'
 import { MermaidBlockNodeLoading } from './MermaidBlockNodeLoading'
-
-// 组件接收的 props
-// 增加用于统一设置所有 code_block 主题和 Monaco 选项的外部 API
-interface IdleDeadlineLike {
-  timeRemaining?: () => number
-}
 
 type RuntimeCodeBlockNode = ParsedNode & {
   type: 'code_block'
@@ -206,6 +201,7 @@ const {
   debugPerformanceEnabled,
   logPerf,
 })
+const parsedNodeCount = computed(() => parsedNodes.value.length)
 const paragraphProbeNode = ref<ParsedNode | null>(null)
 const listItemProbeNode = ref<ParsedNode | null>(null)
 const listProbeNode = ref<ParsedNode | null>(null)
@@ -329,6 +325,37 @@ const desiredRenderedCount = computed(() => {
   const windowEnd = Math.max(liveRange.end + overscan, resolvedInitialBatch.value)
   const target = Math.min(parsedNodes.value.length, windowEnd)
   return Math.max(renderedCount.value, target)
+})
+const {
+  cleanupBatchScheduler,
+} = useBatchRenderingScheduler({
+  props,
+  isClient,
+  isTestEnv,
+  parsedNodeCount,
+  desiredRenderedCount,
+  batchingEnabled,
+  incrementalRenderingActive,
+  resolvedBatchSize,
+  resolvedInitialBatch,
+  renderedCount,
+  adaptiveBatchSize,
+  previousRenderContext,
+  previousBatchConfig,
+  requestFrame,
+  cancelFrame,
+  hasIdleCallback,
+  cleanupNodeVisibility,
+  onDatasetKeyChanged: (total) => {
+    resetHeightMeasurements()
+    if (total > 0)
+      rebuildHeightTrees(total)
+  },
+  onDatasetChanged: () => {
+    if (virtualizationEnabled.value)
+      scheduleFocusSync({ immediate: true })
+  },
+  logPerf,
 })
 
 function ensureExperimentProbeNodes() {
@@ -1324,32 +1351,8 @@ watch(
   { immediate: true },
 )
 
-let batchRaf: number | null = null
-let batchTimeout: number | null = null
-let batchPending = false
-let pendingIncrement: number | null = null
-let batchIdle: number | null = null
 const VIEWPORT_FALLBACK_DELAY = 1800
 const VIEWPORT_FALLBACK_MARGIN_PX = 500
-
-function cancelBatchTimers() {
-  if (!isClient)
-    return
-  if (batchRaf != null) {
-    cancelFrame?.(batchRaf)
-    batchRaf = null
-  }
-  if (batchTimeout != null) {
-    window.clearTimeout(batchTimeout)
-    batchTimeout = null
-  }
-  if (batchIdle != null && typeof window.cancelIdleCallback === 'function') {
-    window.cancelIdleCallback(batchIdle)
-    batchIdle = null
-  }
-  batchPending = false
-  pendingIncrement = null
-}
 
 function clearVisibilityFallback(index: number) {
   if (!isClient)
@@ -1416,184 +1419,6 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
   nodeVisibilityFallbackTimers.clear()
   resetNodeVisibleState()
 }
-
-function scheduleBatch(increment: number, opts: { immediate?: boolean } = {}) {
-  if (!incrementalRenderingActive.value)
-    return
-  const target = desiredRenderedCount.value
-  if (renderedCount.value >= target)
-    return
-
-  const amount = Math.max(1, increment)
-  const run = (deadline?: IdleDeadlineLike) => {
-    batchRaf = null
-    batchTimeout = null
-    batchIdle = null
-    batchPending = false
-    const applied = pendingIncrement != null ? pendingIncrement : amount
-    pendingIncrement = null
-    const budgetMs = Math.max(2, props.renderBatchBudgetMs ?? 6)
-
-    const applyAndMeasure = (size: number) => {
-      const start = typeof performance !== 'undefined' ? performance.now() : Date.now()
-      renderedCount.value = Math.min(target, renderedCount.value + Math.max(1, size))
-      cleanupNodeVisibility(renderedCount.value)
-      const end = typeof performance !== 'undefined' ? performance.now() : Date.now()
-      const elapsed = end - start
-      adjustAdaptiveBatchSize(elapsed)
-      return elapsed
-    }
-
-    let nextSize = applied
-    while (true) {
-      applyAndMeasure(nextSize)
-      if (renderedCount.value >= target)
-        break
-      if (!deadline)
-        break
-      const remaining = typeof deadline.timeRemaining === 'function'
-        ? deadline.timeRemaining()
-        : 0
-      if (remaining <= budgetMs * 0.5)
-        break
-      nextSize = Math.max(1, Math.round(adaptiveBatchSize.value))
-    }
-
-    if (renderedCount.value < target)
-      queueNextBatch()
-  }
-
-  if (!isClient || opts.immediate) {
-    run()
-    return
-  }
-
-  const delay = Math.max(0, props.renderBatchDelay ?? 16)
-  pendingIncrement = pendingIncrement != null ? Math.max(pendingIncrement, amount) : amount
-  if (batchPending)
-    return
-  batchPending = true
-
-  if (!isTestEnv && hasIdleCallback && window.requestIdleCallback) {
-    const timeout = Math.max(0, props.renderBatchIdleTimeoutMs ?? 120)
-    batchIdle = window.requestIdleCallback((deadline) => {
-      run(deadline)
-    }, { timeout })
-    return
-  }
-
-  if (!requestFrame || isTestEnv) {
-    batchTimeout = window.setTimeout(() => run(), delay)
-    return
-  }
-  batchRaf = requestFrame(() => {
-    if (delay === 0) {
-      run()
-      return
-    }
-    batchTimeout = window.setTimeout(() => run(), delay)
-  })
-}
-
-function queueNextBatch() {
-  if (!incrementalRenderingActive.value)
-    return
-  const dynamicSize = batchingEnabled.value
-    ? Math.max(1, Math.round(adaptiveBatchSize.value))
-    : Math.max(1, resolvedBatchSize.value)
-  scheduleBatch(dynamicSize)
-}
-
-function adjustAdaptiveBatchSize(elapsed: number) {
-  if (!incrementalRenderingActive.value)
-    return
-  const budget = Math.max(2, props.renderBatchBudgetMs ?? 6)
-  const maxSize = Math.max(1, resolvedBatchSize.value || 1)
-  const minSize = Math.max(1, Math.floor(maxSize / 4))
-  if (elapsed > budget * 1.2) {
-    adaptiveBatchSize.value = Math.max(minSize, Math.floor(adaptiveBatchSize.value * 0.7))
-  }
-  else if (elapsed < budget * 0.5 && adaptiveBatchSize.value < maxSize) {
-    adaptiveBatchSize.value = Math.min(maxSize, Math.ceil(adaptiveBatchSize.value * 1.2))
-  }
-}
-
-watch(
-  [
-    () => parsedNodes.value,
-    () => parsedNodes.value.length,
-    () => incrementalRenderingActive.value,
-    () => resolvedBatchSize.value,
-    () => resolvedInitialBatch.value,
-    () => props.renderBatchDelay,
-    () => props.indexKey,
-  ],
-  () => {
-    const nodes = parsedNodes.value
-    const total = nodes.length
-    const prevCtx = previousRenderContext.value
-    const datasetKey = props.indexKey
-    const datasetKeyChanged = datasetKey !== undefined && datasetKey !== prevCtx.key
-    const lengthChanged = total !== prevCtx.total
-    const datasetChanged = datasetKeyChanged || lengthChanged
-    previousRenderContext.value = { key: datasetKey, total }
-
-    const prevBatch = previousBatchConfig.value
-    const currentDelay = props.renderBatchDelay ?? 16
-    const batchConfigChanged
-      = prevBatch.batchSize !== resolvedBatchSize.value
-        || prevBatch.initial !== resolvedInitialBatch.value
-        || prevBatch.delay !== currentDelay
-        || prevBatch.enabled !== incrementalRenderingActive.value
-
-    previousBatchConfig.value = {
-      batchSize: resolvedBatchSize.value,
-      initial: resolvedInitialBatch.value,
-      delay: currentDelay,
-      enabled: incrementalRenderingActive.value,
-    }
-
-    if (datasetKeyChanged) {
-      resetHeightMeasurements()
-      if (total > 0)
-        rebuildHeightTrees(total)
-    }
-    if (datasetChanged || batchConfigChanged || !incrementalRenderingActive.value)
-      cancelBatchTimers()
-    if (datasetChanged || batchConfigChanged)
-      adaptiveBatchSize.value = Math.max(1, resolvedBatchSize.value || 1)
-    if (datasetChanged && virtualizationEnabled.value)
-      scheduleFocusSync({ immediate: true })
-
-    const targetCount = desiredRenderedCount.value
-
-    if (!total) {
-      renderedCount.value = 0
-      cleanupNodeVisibility(0)
-      return
-    }
-
-    if (!incrementalRenderingActive.value) {
-      renderedCount.value = targetCount
-      cleanupNodeVisibility(renderedCount.value)
-      return
-    }
-
-    const shouldResetRenderedCount = datasetKeyChanged || prevCtx.total === 0
-
-    if (shouldResetRenderedCount || batchConfigChanged)
-      renderedCount.value = Math.min(targetCount, resolvedInitialBatch.value)
-    else
-      renderedCount.value = Math.min(renderedCount.value, targetCount)
-
-    const baseInitial = Math.max(1, resolvedInitialBatch.value || resolvedBatchSize.value || total)
-    if (renderedCount.value < targetCount)
-      scheduleBatch(baseInitial, { immediate: !isClient })
-    else
-      cleanupNodeVisibility(renderedCount.value)
-  },
-  { immediate: true },
-)
 
 watch(
   () => virtualizationEnabled.value,
@@ -1771,18 +1596,6 @@ watch(
 )
 
 watch(
-  () => desiredRenderedCount.value,
-  (target, prev) => {
-    if (!incrementalRenderingActive.value)
-      return
-    if (typeof prev === 'number' && target <= prev)
-      return
-    if (target > renderedCount.value)
-      queueNextBatch()
-  },
-)
-
-watch(
   [() => props.customId],
   ([customId], _prev, onCleanup) => {
     if (!customId || isNestedListItemRenderer)
@@ -1801,7 +1614,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  cancelBatchTimers()
+  cleanupBatchScheduler()
   for (const handle of nodeVisibilityHandles.values())
     handle.destroy()
   nodeVisibilityHandles.clear()
