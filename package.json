@@ -117,9 +117,9 @@
   "scripts": {
     "dev": "pnpm run -C playground dev",
     "test": "vitest",
-    "test:api": "pnpm run build:parser && pnpm run build && pnpm exec vue-tsc -p tsconfig.public-api.json --noEmit && pnpm exec vue-tsc -p tsconfig.public-api.package.json --noEmit && node scripts/check-public-api.mjs --strict && node scripts/check-public-api-runtime.mjs && node scripts/check-package-exports.mjs && node scripts/check-subpath-isolation.mjs",
+    "test:api": "pnpm test:api:loose",
     "test:api:loose": "pnpm run build:parser && pnpm run build && pnpm exec vue-tsc -p tsconfig.public-api.json --noEmit && pnpm exec vue-tsc -p tsconfig.public-api.package.json --noEmit && node scripts/check-public-api.mjs && node scripts/check-public-api-runtime.mjs && node scripts/check-package-exports.mjs && node scripts/check-subpath-isolation.mjs",
-    "test:api:strict": "pnpm test:api",
+    "test:api:strict": "pnpm run build:parser && pnpm run build && pnpm exec vue-tsc -p tsconfig.public-api.json --noEmit && pnpm exec vue-tsc -p tsconfig.public-api.package.json --noEmit && node scripts/check-public-api.mjs --strict && node scripts/check-public-api-runtime.mjs && node scripts/check-package-exports.mjs && node scripts/check-subpath-isolation.mjs",
     "test:api:update": "pnpm run build:parser && pnpm run build && pnpm exec vue-tsc -p tsconfig.public-api.json --noEmit && pnpm exec vue-tsc -p tsconfig.public-api.package.json --noEmit && node scripts/check-public-api.mjs --update && node scripts/check-public-api-runtime.mjs && node scripts/check-package-exports.mjs && node scripts/check-subpath-isolation.mjs",
     "test:perf:height-estimation-experiment": "node scripts/benchmark-height-estimation-experiment.mjs",
     "test:e2e:diff-folding": "node scripts/e2e-diff-folding.mjs",
