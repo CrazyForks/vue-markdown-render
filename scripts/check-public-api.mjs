@@ -6,12 +6,40 @@ import ts from 'typescript'
 const root = process.cwd()
 const dtsPath = join(root, 'dist', 'index.d.ts')
 const snapshotPath = join(root, 'test', 'public-api', 'public-api.snapshot.txt')
+const stableListPath = join(root, 'test', 'public-api', 'stable-exports.txt')
 const shouldUpdate = process.argv.includes('--update')
 
 if (!existsSync(dtsPath))
   fail(`Missing ${relative(root, dtsPath)}. Run pnpm build first.`)
 
-const nextSnapshot = `${collectPublicApiSnapshot(dtsPath).join('\n')}\n`
+// Read compiler options from tsconfig.public-api.json instead of hardcoding
+const tsconfigPath = join(root, 'tsconfig.public-api.json')
+const { options: compilerOptions } = ts.readConfigFile(tsconfigPath, ts.sys.readFile).config
+  ? (() => {
+      const configFileName = tsconfigPath
+      const configFile = ts.readConfigFile(configFileName, ts.sys.readFile)
+      if (configFile.error)
+        fail(`Failed to read ${relative(root, configFileName)}: ${ts.flattenDiagnosticMessageText(configFile.error.messageText, '\n')}`)
+      const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, root)
+      return { options: parsed.options }
+    })()
+  : {
+      // Fallback only if tsconfig is unreadable
+      options: {
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        noEmit: true,
+        skipLibCheck: false,
+        strict: true,
+        target: ts.ScriptTarget.ESNext,
+        types: ['node'],
+      },
+    }
+
+const allExports = collectPublicApiExports(dtsPath, compilerOptions)
+const stableNames = loadStableExportNames(stableListPath)
+
+const nextSnapshot = `${allExports.map(e => e.line).join('\n')}\n`
 
 if (shouldUpdate) {
   mkdirSync(dirname(snapshotPath), { recursive: true })
@@ -28,18 +56,26 @@ const currentSnapshot = normalizeSnapshot(readFileSync(snapshotPath, 'utf8'))
 if (currentSnapshot !== nextSnapshot)
   fail(formatSnapshotDiff(currentSnapshot, nextSnapshot))
 
-console.log(`[public-api] Snapshot matches ${relative(root, snapshotPath)}`)
+// Check that every declared stable export is present in the full surface
+const presentNames = new Set(allExports.map(e => e.name))
+const missingStable = stableNames.filter(name => !presentNames.has(name))
+if (missingStable.length > 0) {
+  fail(
+    `[public-api] Stable core exports missing from dist/index.d.ts:\n${
+      missingStable.map(n => `  - ${n}`).join('\n')
+    }\n\nIf this was intentional, update test/public-api/stable-exports.txt.`,
+  )
+}
 
-function collectPublicApiSnapshot(entryPath) {
-  const compilerOptions = {
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    noEmit: true,
-    skipLibCheck: false,
-    strict: true,
-    target: ts.ScriptTarget.ESNext,
-    types: ['node'],
-  }
+// Log the stable/unstable split as informational
+const stablePresent = stableNames.filter(n => presentNames.has(n))
+const unstablePresent = [...presentNames].filter(n => !stableNames.includes(n))
+console.log(`[public-api] Snapshot matches ${relative(root, snapshotPath)}`)
+console.log(`[public-api] Stable core: ${stablePresent.length} exports, Unstable/extra: ${unstablePresent.length} exports`)
+
+// ---- helpers ----
+
+function collectPublicApiExports(entryPath, compilerOptions) {
   const host = ts.createCompilerHost(compilerOptions, true)
   const program = ts.createProgram([entryPath], compilerOptions, host)
   const diagnostics = ts.getPreEmitDiagnostics(program)
@@ -78,9 +114,21 @@ function collectPublicApiSnapshot(entryPath) {
       if (resolved.flags & ts.SymbolFlags.Namespace)
         kinds.push('namespace')
 
-      return `${symbol.getName()} [${kinds.join('+') || 'unknown'}]`
+      const name = symbol.getName()
+      const kind = kinds.join('+') || 'unknown'
+      return { name, kind, line: `${name} [${kind}]` }
     })
-    .sort((left, right) => left.localeCompare(right))
+    .sort((left, right) => left.line.localeCompare(right.line))
+}
+
+function loadStableExportNames(filePath) {
+  if (!existsSync(filePath))
+    fail(`Missing ${relative(root, filePath)}. Create it with one export name per line.`)
+
+  return readFileSync(filePath, 'utf8')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'))
 }
 
 function normalizeSnapshot(snapshot) {

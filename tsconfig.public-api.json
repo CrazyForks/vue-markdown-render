@@ -1,10 +1,16 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "paths": {
-      "markstream-vue": ["./dist/index.d.ts"]
+      "markstream-vue": ["./dist/index.d.ts"],
+      "markstream-vue/*": ["./dist/index.d.ts"],
+      "markstream-core": ["./packages/markstream-core/dist/index.d.ts"],
+      "markstream-core/*": ["./packages/markstream-core/dist/*"],
+      "stream-markdown-parser": ["./packages/markdown-parser/dist/index.d.ts"],
+      "stream-markdown-parser/*": ["./packages/markdown-parser/dist/*"]
     },
     "types": ["node"],
     "strict": true,
