@@ -55,6 +55,7 @@ import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
 import { useResolvedRendererOptions } from './composables/useResolvedRendererOptions'
+import { useSchedulerPlatform } from './composables/useSchedulerPlatform'
 import { useSmoothStreamingBridge } from './composables/useSmoothStreamingBridge'
 import { useViewportRoot } from './composables/useViewportRoot'
 import FallbackComponent from './FallbackComponent.vue'
@@ -253,17 +254,14 @@ const registerNodeVisibility = provideViewportPriority(
   target => resolveViewportRoot(target ?? containerRef.value ?? null),
   viewportPriorityEnabled,
 )
-const requestFrame = isClient && typeof window.requestAnimationFrame === 'function'
-  ? window.requestAnimationFrame.bind(window)
-  : null
-const cancelFrame = isClient && typeof window.cancelAnimationFrame === 'function'
-  ? window.cancelAnimationFrame.bind(window)
-  : null
-const processEnv = typeof globalThis !== 'undefined' && 'process' in globalThis
-  ? (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env
-  : undefined
-const isTestEnv = processEnv?.NODE_ENV === 'test'
-const hasIdleCallback = isClient && typeof window.requestIdleCallback === 'function'
+const {
+  requestFrame,
+  cancelFrame,
+  hasIdleCallback,
+  isTestEnv,
+} = useSchedulerPlatform({
+  isClient,
+})
 const {
   resolvedBatchSize,
   resolvedInitialBatch,
