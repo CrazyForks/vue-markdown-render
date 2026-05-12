@@ -39,6 +39,18 @@ const { options: compilerOptions } = ts.readConfigFile(tsconfigPath, ts.sys.read
 const allExports = collectPublicApiExports(dtsPath, compilerOptions)
 const requiredNames = loadRequiredExportNames(requiredListPath)
 
+// Check that every required export is present before any snapshot logic.
+// This ensures required-exports.txt is enforced even when --update is passed.
+const presentNames = new Set(allExports.map(e => e.name))
+const missingRequired = requiredNames.filter(name => !presentNames.has(name))
+if (missingRequired.length > 0) {
+  fail(
+    `[public-api] Required exports missing from dist/index.d.ts:\n${
+      missingRequired.map(n => `  - ${n}`).join('\n')
+    }\n\nIf this was intentional, update test/public-api/required-exports.txt.`,
+  )
+}
+
 const nextSnapshot = `${allExports.map(e => e.line).join('\n')}\n`
 
 if (shouldUpdate) {
@@ -55,17 +67,6 @@ const currentSnapshot = normalizeSnapshot(readFileSync(snapshotPath, 'utf8'))
 
 if (currentSnapshot !== nextSnapshot)
   fail(formatSnapshotDiff(currentSnapshot, nextSnapshot))
-
-// Check that every required export is present in the full surface
-const presentNames = new Set(allExports.map(e => e.name))
-const missingRequired = requiredNames.filter(name => !presentNames.has(name))
-if (missingRequired.length > 0) {
-  fail(
-    `[public-api] Required exports missing from dist/index.d.ts:\n${
-      missingRequired.map(n => `  - ${n}`).join('\n')
-    }\n\nIf this was intentional, update test/public-api/required-exports.txt.`,
-  )
-}
 
 // Log the required/other split as informational
 const requiredPresent = requiredNames.filter(n => presentNames.has(n))

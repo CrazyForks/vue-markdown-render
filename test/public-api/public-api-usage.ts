@@ -5,6 +5,8 @@ import type {
   ImageNodeProps,
   InfographicBlockNodeProps,
   LinkNodeProps,
+  MarkdownIt,
+  MarkdownPluginRegistration,
   MathBlockNodeProps,
   MathInlineNodeProps,
   MermaidBlockNodeProps,
@@ -13,6 +15,7 @@ import type {
 } from 'markstream-vue'
 import MarkdownRender, {
   clearGlobalCustomComponents,
+  clearRegisteredMarkdownPlugins,
   CodeBlockNode,
   D2BlockNode,
   disableD2,
@@ -31,6 +34,7 @@ import MarkdownRender, {
   MathInlineNode,
   MermaidBlockNode,
   parseMarkdownToStructure,
+  registerMarkdownPlugin,
   removeCustomComponents,
   setCustomComponents,
   setD2Loader,
@@ -118,7 +122,18 @@ const mathNode = {
   raw: '$$x^2$$',
 } satisfies MathBlockNodeProps['node']
 
+// Verify MarkdownIt plugin registration types are usable
+const mdPlugin: MarkdownPluginRegistration = (md: MarkdownIt) => {
+  md.inline.ruler.before('escape', 'public_api_rule', () => false)
+  md.renderer.rules.text = (tokens, idx) => tokens[idx]?.content ?? ''
+  return md
+}
+
+registerMarkdownPlugin(mdPlugin)
+clearRegisteredMarkdownPlugins()
+
 void component
+void plugin
 void plugin
 void props
 void scopedComponents
@@ -147,3 +162,6 @@ void safeRaf
 void safeCancelRaf
 void createKaTeXWorkerFromCDN
 void createMermaidWorkerFromCDN
+void mdPlugin
+void registerMarkdownPlugin
+void clearRegisteredMarkdownPlugins
