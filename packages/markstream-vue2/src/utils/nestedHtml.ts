@@ -402,7 +402,7 @@ function serializeAttrs(attrs?: CustomComponentAttrs | null, extraClass = ''): s
       continue
     if (DANGEROUS_HTML_ATTRS.has(lowerName))
       continue
-    if (value !== true && URL_HTML_ATTRS.has(lowerName) && value && isUnsafeHtmlUrl(String(value)))
+    if (value !== true && URL_HTML_ATTRS.has(lowerName) && value && isUnsafeHtmlUrl(String(value), { attrName: lowerName }))
       continue
     if (lowerName === 'class') {
       mergedClasses.push(String(value))

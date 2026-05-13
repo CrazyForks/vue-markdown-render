@@ -166,6 +166,7 @@ export const URL_HTML_ATTR_NAMES = [
   'href',
   'src',
   'srcset',
+  'poster',
   'xlink:href',
   'formaction',
 ] as const
@@ -212,14 +213,18 @@ export function stripHtmlControlAndWhitespace(value: string) {
   return out
 }
 
-const SAFE_ABSOLUTE_URL_PROTOCOLS = new Set([
+const HREF_URL_PROTOCOLS = new Set([
   'http',
   'https',
   'mailto',
   'tel',
 ])
+const RESOURCE_URL_PROTOCOLS = new Set([
+  'http',
+  'https',
+])
 
-export interface HtmlUrlContext {
+interface HtmlUrlContext {
   tagName?: string
   attrName?: string
 }
@@ -227,6 +232,34 @@ export interface HtmlUrlContext {
 function getUrlScheme(normalized: string) {
   const match = normalized.match(/^([a-z][a-z0-9+.-]*):/i)
   return match?.[1]?.toLowerCase() ?? ''
+}
+
+function getAllowedUrlProtocols(tagName: string, attrName: string) {
+  if (attrName === 'href')
+    return HREF_URL_PROTOCOLS
+
+  if (attrName === 'xlink:href')
+    return HREF_URL_PROTOCOLS
+
+  if (attrName === 'src')
+    return RESOURCE_URL_PROTOCOLS
+
+  if (attrName === 'srcset')
+    return RESOURCE_URL_PROTOCOLS
+
+  if (attrName === 'poster')
+    return RESOURCE_URL_PROTOCOLS
+
+  if (attrName === 'action' || attrName === 'formaction')
+    return RESOURCE_URL_PROTOCOLS
+
+  if (attrName === 'data')
+    return RESOURCE_URL_PROTOCOLS
+
+  if (tagName === 'a' || tagName === 'area')
+    return HREF_URL_PROTOCOLS
+
+  return HREF_URL_PROTOCOLS
 }
 
 export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
@@ -258,10 +291,10 @@ export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
   if (!scheme)
     return false
 
-  return !SAFE_ABSOLUTE_URL_PROTOCOLS.has(scheme)
+  return !getAllowedUrlProtocols(tagName, attrName).has(scheme)
 }
 
-export function sanitizeUrlAttr(value: unknown, context: HtmlUrlContext = {}) {
+function sanitizeUrlAttr(value: unknown, context: HtmlUrlContext = {}) {
   const url = String(value ?? '').trim()
   if (!url)
     return ''

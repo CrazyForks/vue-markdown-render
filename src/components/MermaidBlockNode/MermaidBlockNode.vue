@@ -46,9 +46,8 @@ const emits = defineEmits(['copy', 'export', 'openModal', 'toggleMode'])
 
 const DOMPURIFY_CONFIG = {
   USE_PROFILES: { svg: true },
-  FORBID_TAGS: ['script'],
+  FORBID_TAGS: ['script', 'style'],
   FORBID_ATTR: [/^on/i],
-  ADD_TAGS: ['style'],
   ADD_ATTR: ['style'],
   SAFE_FOR_TEMPLATES: true,
 } as const

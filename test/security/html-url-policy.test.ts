@@ -58,6 +58,17 @@ describe('html URL policy', () => {
       expect(sanitizeAttrs({ href: value }, 'safe', 'a').href).toBe(value)
   })
 
+  it('applies URL protocols by attribute context', () => {
+    expect(sanitizeAttrs({ href: 'mailto:a@example.com' }, 'safe', 'a').href).toBe('mailto:a@example.com')
+    expect(sanitizeAttrs({ href: 'tel:+123456789' }, 'safe', 'a').href).toBe('tel:+123456789')
+    expect(sanitizeAttrs({ src: 'mailto:a@example.com' }, 'safe', 'img').src).toBeUndefined()
+    expect(sanitizeAttrs({ poster: 'tel:+123456789' }, 'safe', 'video').poster).toBeUndefined()
+    expect(sanitizeAttrs({ action: 'mailto:a@example.com' }, 'trusted', 'form').action).toBeUndefined()
+    expect(sanitizeAttrs({ data: 'tel:+123456789' }, 'trusted', 'object').data).toBeUndefined()
+    expect(sanitizeAttrs({ src: 'https://example.com/a.png' }, 'safe', 'img').src).toBe('https://example.com/a.png')
+    expect(sanitizeAttrs({ poster: 'https://example.com/poster.png' }, 'trusted', 'video').poster).toBe('https://example.com/poster.png')
+  })
+
   it('rejects unsafe data documents but allows image data URLs', () => {
     expect(sanitizeAttrs({ href: 'data:text/html,<script>alert(1)</script>' }).href).toBeUndefined()
     expect(sanitizeAttrs({ src: 'data:text/html,<script>alert(1)</script>' }).src).toBeUndefined()

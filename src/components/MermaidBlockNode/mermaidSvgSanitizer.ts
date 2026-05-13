@@ -1,4 +1,4 @@
-import { sanitizeUrlAttr } from 'stream-markdown-parser'
+import { isUnsafeHtmlUrl } from 'stream-markdown-parser'
 
 const DISALLOWED_STYLE_PATTERNS = [/javascript:/i, /vbscript:/i, /data:text\/html/i, /expression\s*\(/i, /url\s*\(\s*javascript:/i, /@import/i]
 const ALLOWED_SVG_TAGS = new Set([
@@ -18,7 +18,6 @@ const ALLOWED_SVG_TAGS = new Set([
   'tspan',
   'title',
   'desc',
-  'style',
   'use',
   'image',
   'lineargradient',
@@ -62,7 +61,10 @@ function neutralizeScriptProtocols(raw: string) {
 }
 
 function sanitizeUrl(value: string | null | undefined) {
-  return sanitizeUrlAttr(value, { tagName: 'svg', attrName: 'href' })
+  const url = String(value ?? '').trim()
+  if (!url)
+    return ''
+  return isUnsafeHtmlUrl(url, { tagName: 'svg', attrName: 'href' }) ? '' : url
 }
 
 function readCssUrl(value: string, start: number) {

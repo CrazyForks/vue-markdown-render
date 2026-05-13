@@ -85,6 +85,19 @@ describe('mermaid SVG sanitizer', () => {
     expect(svg).not.toMatch(/javascript:/i)
   })
 
+  it('removes SVG style tags in sanitized Mermaid output', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <style>.node { pointer-events: all; }</style>
+        <rect width="10" height="10" />
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).not.toContain('<style')
+    expect(svg).not.toMatch(/pointer-events/i)
+  })
+
   it('removes dangerous style URLs', () => {
     const svg = sanitizeMermaidSvg(`
       <svg viewBox="0 0 10 10">

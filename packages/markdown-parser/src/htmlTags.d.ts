@@ -4,7 +4,7 @@ export declare const BLOCK_HTML_TAG_NAMES: readonly ["article", "aside", "blockq
 export declare const SVG_HTML_TAG_NAMES: readonly ["svg", "g", "path"];
 export declare const EXTENDED_STANDARD_HTML_TAG_NAMES: readonly ["address", "audio", "body", "canvas", "caption", "colgroup", "datalist", "dd", "dialog", "dl", "dt", "fieldset", "form", "head", "hgroup", "html", "iframe", "legend", "map", "menu", "meter", "noscript", "object", "optgroup", "option", "output", "picture", "progress", "rp", "rt", "ruby", "script", "select", "style", "template", "textarea", "tfoot", "title", "video"];
 export declare const DANGEROUS_HTML_ATTR_NAMES: readonly ["onclick", "onerror", "onload", "onmouseover", "onmouseout", "onmousedown", "onmouseup", "onkeydown", "onkeyup", "onfocus", "onblur", "onsubmit", "onreset", "onchange", "onselect", "ondblclick", "ontouchstart", "ontouchend", "ontouchmove", "ontouchcancel", "onwheel", "onscroll", "oncopy", "oncut", "onpaste", "oninput", "oninvalid", "onsearch", "srcdoc"];
-export declare const URL_HTML_ATTR_NAMES: readonly ["action", "data", "href", "src", "srcset", "xlink:href", "formaction"];
+export declare const URL_HTML_ATTR_NAMES: readonly ["action", "data", "href", "src", "srcset", "poster", "xlink:href", "formaction"];
 export declare const BLOCKED_HTML_TAG_NAMES: readonly ["script"];
 export declare const NON_STRUCTURING_HTML_TAG_NAMES: readonly ["pre", "script", "style", "textarea", "title"];
 export declare const VOID_HTML_TAGS: Set<string>;
@@ -16,10 +16,9 @@ export declare const URL_HTML_ATTRS: Set<string>;
 export declare const BLOCKED_HTML_TAGS: Set<string>;
 export declare const NON_STRUCTURING_HTML_TAGS: Set<string>;
 export declare function stripHtmlControlAndWhitespace(value: string): string;
-export interface HtmlUrlContext {
+interface HtmlUrlContext {
     tagName?: string;
     attrName?: string;
 }
 export declare function isUnsafeHtmlUrl(value: string, context?: HtmlUrlContext): boolean;
-export declare function sanitizeUrlAttr(value: unknown, context?: HtmlUrlContext): string;
 export declare function sanitizeImageSrc(value: unknown): string;

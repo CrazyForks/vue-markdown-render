@@ -50,10 +50,24 @@ function packWorkspacePackage(cwd) {
   return tarball
 }
 
+function ensureBuiltArtifacts() {
+  const parserDist = join(root, 'packages/markdown-parser/dist/index.js')
+  const rootDist = join(root, 'dist/index.js')
+
+  if (!existsSync(parserDist))
+    run('pnpm', ['run', 'build:parser'])
+
+  if (!existsSync(rootDist))
+    run('pnpm', ['run', 'build'])
+}
+
 try {
   if (process.env.MARKSTREAM_SMOKE_SKIP_BUILD !== '1') {
     run('pnpm', ['run', 'build:parser'])
     run('pnpm', ['build'])
+  }
+  else {
+    ensureBuiltArtifacts()
   }
 
   packedParserTarball = packWorkspacePackage(join(root, 'packages/markdown-parser'))
