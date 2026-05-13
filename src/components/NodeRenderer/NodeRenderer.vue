@@ -58,6 +58,7 @@ import { useHeightMeasurements } from './composables/useHeightMeasurements'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
 import { useResolvedRendererOptions } from './composables/useResolvedRendererOptions'
 import { useSchedulerPlatform } from './composables/useSchedulerPlatform'
+import { useScrollRestore } from './composables/useScrollRestore'
 import { useSmoothStreamingBridge } from './composables/useSmoothStreamingBridge'
 import { useViewportRoot } from './composables/useViewportRoot'
 import FallbackComponent from './FallbackComponent.vue'
@@ -288,9 +289,30 @@ const sortedNodeSlots = computed(() => {
   return Array.from(nodeSlotElements.entries()).sort((a, b) => a[0] - b[0])
 })
 const scrollRootElement = ref<HTMLElement | null>(null)
-const activeRestoreAnchor = ref<{ nodeIndex: number, offsetWithinNodePx: number } | null>(null)
-let restoreReconcileRaf: number | null = null
-let restoreReconcileTimers: number[] = []
+const {
+  activeRestoreAnchor,
+  clearRestoreReconcile,
+  scheduleRestoreReconcile,
+  captureRestoreAnchor,
+  restoreAnchor,
+  getAnchorDrift,
+} = useScrollRestore({
+  isClient,
+  containerRef,
+  parsedNodeCount,
+
+  requestFrame,
+  cancelFrame,
+
+  resolveScrollContainer: () => scrollRootElement.value || resolveScrollContainer(),
+  getNormalizedScrollTop,
+  getOffsetTopWithinRoot,
+
+  estimateIndexForOffset,
+  estimateHeightRange,
+  getFallbackNodeHeight,
+  clamp,
+})
 const {
   nodeHeights,
   heightStats,
@@ -695,113 +717,6 @@ const estimatedNodeHeights = computed(() => {
 
 function getFallbackNodeHeight(index: number) {
   return nodeHeights[index] ?? estimatedNodeHeights.value[index]?.height ?? averageNodeHeight.value
-}
-
-function getRelativeScrollTopWithinContainer() {
-  const root = scrollRootElement.value || resolveScrollContainer()
-  const container = containerRef.value
-  if (!root || !container)
-    return null
-  const doc = root.ownerDocument || container.ownerDocument || document
-  const isViewportRoot = root === doc.documentElement || root === doc.body || root === doc.scrollingElement
-  if (isViewportRoot) {
-    const containerRect = container.getBoundingClientRect()
-    return Math.max(0, -containerRect.top)
-  }
-  return Math.max(0, getNormalizedScrollTop(root, doc, false) - getOffsetTopWithinRoot(container, root))
-}
-
-function setRelativeScrollTopWithinContainer(target: number) {
-  const root = scrollRootElement.value || resolveScrollContainer()
-  const container = containerRef.value
-  if (!root || !container)
-    return
-  const next = Math.max(0, target)
-  const doc = root.ownerDocument || container.ownerDocument || document
-  const view = doc.defaultView || (typeof window !== 'undefined' ? window : null)
-  const isViewportRoot = root === doc.documentElement || root === doc.body || root === doc.scrollingElement
-  if (isViewportRoot) {
-    const current = getNormalizedScrollTop(root, doc, true)
-    const containerDocTop = current + container.getBoundingClientRect().top
-    view?.scrollTo?.(0, Math.max(0, containerDocTop + next))
-    return
-  }
-  root.scrollTop = getOffsetTopWithinRoot(container, root) + next
-}
-
-function resolveAnchorOffset(anchor: { nodeIndex: number, offsetWithinNodePx: number }) {
-  const boundedIndex = clamp(anchor.nodeIndex, 0, Math.max(0, parsedNodes.value.length - 1))
-  return estimateHeightRange(0, boundedIndex) + Math.max(0, anchor.offsetWithinNodePx)
-}
-
-function clearRestoreReconcile() {
-  if (restoreReconcileRaf != null) {
-    cancelFrame?.(restoreReconcileRaf)
-    restoreReconcileRaf = null
-  }
-  if (isClient) {
-    for (const timer of restoreReconcileTimers)
-      window.clearTimeout(timer)
-  }
-  restoreReconcileTimers = []
-}
-
-function applyRestoreAnchor(anchor: { nodeIndex: number, offsetWithinNodePx: number }) {
-  setRelativeScrollTopWithinContainer(resolveAnchorOffset(anchor))
-}
-
-function scheduleRestoreReconcile() {
-  if (!activeRestoreAnchor.value || !isClient)
-    return
-  if (restoreReconcileRaf != null)
-    return
-  restoreReconcileRaf = requestFrame
-    ? requestFrame(() => {
-        restoreReconcileRaf = null
-        if (activeRestoreAnchor.value)
-          applyRestoreAnchor(activeRestoreAnchor.value)
-      })
-    : null
-  if (restoreReconcileRaf == null && activeRestoreAnchor.value)
-    applyRestoreAnchor(activeRestoreAnchor.value)
-}
-
-function captureRestoreAnchor() {
-  const relativeScrollTop = getRelativeScrollTopWithinContainer()
-  const total = parsedNodes.value.length
-  if (relativeScrollTop == null || total <= 0)
-    return null
-  const nodeIndex = clamp(estimateIndexForOffset(relativeScrollTop + 1), 0, total - 1)
-  const nodeStart = estimateHeightRange(0, nodeIndex)
-  const nodeHeight = getFallbackNodeHeight(nodeIndex)
-  return {
-    nodeIndex,
-    offsetWithinNodePx: clamp(relativeScrollTop - nodeStart, 0, Math.max(0, nodeHeight - 1)),
-  }
-}
-
-function restoreAnchor(anchor: { nodeIndex: number, offsetWithinNodePx: number }) {
-  activeRestoreAnchor.value = {
-    nodeIndex: clamp(anchor.nodeIndex, 0, Math.max(0, parsedNodes.value.length - 1)),
-    offsetWithinNodePx: Math.max(0, anchor.offsetWithinNodePx),
-  }
-  clearRestoreReconcile()
-  applyRestoreAnchor(activeRestoreAnchor.value)
-  if (!isClient)
-    return
-  for (const delay of [0, 120, 280, 480]) {
-    restoreReconcileTimers.push(window.setTimeout(() => {
-      if (activeRestoreAnchor.value)
-        applyRestoreAnchor(activeRestoreAnchor.value)
-    }, delay))
-  }
-}
-
-function getAnchorDrift(anchor: { nodeIndex: number, offsetWithinNodePx: number }) {
-  const relativeScrollTop = getRelativeScrollTopWithinContainer()
-  if (relativeScrollTop == null)
-    return null
-  return relativeScrollTop - resolveAnchorOffset(anchor)
 }
 
 watch(
