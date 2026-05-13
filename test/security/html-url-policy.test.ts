@@ -26,6 +26,38 @@ describe('html URL policy', () => {
       expect(sanitizeAttrs({ href: payload }, 'safe', 'a').href).toBeUndefined()
   })
 
+  it('rejects non-allowlisted absolute URL schemes', () => {
+    const unsafe = [
+      'file:///etc/passwd',
+      'ftp://example.com/file',
+      'blob:https://example.com/id',
+      'filesystem:https://example.com/id',
+      'intent://scan/#Intent;scheme=zxing;end',
+      'chrome://settings',
+    ]
+
+    for (const value of unsafe)
+      expect(sanitizeAttrs({ href: value }, 'safe', 'a').href).toBeUndefined()
+  })
+
+  it('allows common safe URL forms', () => {
+    const safe = [
+      'https://example.com',
+      'http://example.com',
+      'mailto:a@example.com',
+      'tel:+123456789',
+      '/docs',
+      './relative',
+      '../relative',
+      '#section',
+      '?q=1',
+      '//cdn.example.com/a.png',
+    ]
+
+    for (const value of safe)
+      expect(sanitizeAttrs({ href: value }, 'safe', 'a').href).toBe(value)
+  })
+
   it('rejects unsafe data documents but allows image data URLs', () => {
     expect(sanitizeAttrs({ href: 'data:text/html,<script>alert(1)</script>' }).href).toBeUndefined()
     expect(sanitizeAttrs({ src: 'data:text/html,<script>alert(1)</script>' }).src).toBeUndefined()

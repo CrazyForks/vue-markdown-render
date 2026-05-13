@@ -212,9 +212,21 @@ export function stripHtmlControlAndWhitespace(value: string) {
   return out
 }
 
+const SAFE_ABSOLUTE_URL_PROTOCOLS = new Set([
+  'http',
+  'https',
+  'mailto',
+  'tel',
+])
+
 export interface HtmlUrlContext {
   tagName?: string
   attrName?: string
+}
+
+function getUrlScheme(normalized: string) {
+  const match = normalized.match(/^([a-z][a-z0-9+.-]*):/i)
+  return match?.[1]?.toLowerCase() ?? ''
 }
 
 export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
@@ -222,8 +234,8 @@ export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
   const tagName = String(context.tagName ?? '').toLowerCase()
   const attrName = String(context.attrName ?? '').toLowerCase()
 
-  if (normalized.startsWith('javascript:') || normalized.startsWith('vbscript:'))
-    return true
+  if (!normalized)
+    return false
 
   if (normalized.startsWith('data:')) {
     const isBitmapImageData = /^data:image\/(?:png|gif|jpe?g|webp|avif|bmp);/i.test(normalized)
@@ -232,5 +244,19 @@ export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
     return true
   }
 
-  return false
+  if (
+    normalized.startsWith('/')
+    || normalized.startsWith('./')
+    || normalized.startsWith('../')
+    || normalized.startsWith('#')
+    || normalized.startsWith('?')
+  ) {
+    return false
+  }
+
+  const scheme = getUrlScheme(normalized)
+  if (!scheme)
+    return false
+
+  return !SAFE_ABSOLUTE_URL_PROTOCOLS.has(scheme)
 }

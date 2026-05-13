@@ -98,20 +98,6 @@ function appendBufferedSvgLayer(target: HTMLElement, svgElement: SVGElement) {
     removeNodesAfterNextPaint(previousNodes)
 }
 
-function createLooseSvgElement(svg: string) {
-  const template = document.createElement('template')
-  try {
-    template.innerHTML = svg
-  }
-  catch {
-    return null
-  }
-  const svgElement = template.content.firstElementChild
-  return svgElement?.nodeName.toLowerCase() === 'svg'
-    ? svgElement as unknown as SVGElement
-    : null
-}
-
 function clearElement(target: HTMLElement | null | undefined) {
   if (!target)
     return
@@ -128,14 +114,7 @@ function renderSvgToTarget(target: HTMLElement | null | undefined, svg: string |
     return ''
   if (isBrokenMermaidSvg(svg))
     return ''
-  if (mermaidSecurityLevel.value === 'strict') {
-    return setSafeSvg(target, svg)
-  }
-  const svgElement = createLooseSvgElement(svg!)
-  if (!svgElement)
-    return ''
-  appendBufferedSvgLayer(target, svgElement)
-  return svgElement.outerHTML
+  return setSafeSvg(target, svg)
 }
 
 const { t } = useSafeI18n()
