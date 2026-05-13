@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ParsedNode } from 'stream-markdown-parser'
-import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { CustomComponents } from '../../types'
 import type { CodeBlockPreviewPayload } from '../../types/component-props'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
@@ -58,6 +57,7 @@ import { useFocusSyncScheduler } from './composables/useFocusSyncScheduler'
 import { useHeightMeasurements } from './composables/useHeightMeasurements'
 import { useLiveRangeState } from './composables/useLiveRangeState'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
+import { useNodeVisibilityState } from './composables/useNodeVisibilityState'
 import { useResolvedRendererOptions } from './composables/useResolvedRendererOptions'
 import { useSchedulerPlatform } from './composables/useSchedulerPlatform'
 import { useScrollListener } from './composables/useScrollListener'
@@ -278,10 +278,6 @@ const {
   isTestEnv,
   renderAsFragment,
 })
-const visibleNodeIndices = ref<Set<number>>(new Set())
-const nodeVisibilityHandles = new Map<number, VisibilityHandle>()
-const nodeVisibilityWatchStops = new Map<number, () => void>()
-const nodeVisibilityFallbackTimers = new Map<number, number>()
 const nodeSlotElements = new Map<number, HTMLElement | null>()
 const nodeContentResizeObservers = new Map<number, ResizeObserver>()
 const codeBlockRenderCache = new WeakMap<object, { signature: string, node: ParsedNode }>()
@@ -433,6 +429,32 @@ const {
   requestFrame,
   cancelFrame,
   syncFocusToScroll,
+})
+
+const {
+  visibleNodeIndices,
+  nodeVisibilityHandles,
+  nodeVisibilityWatchStops,
+  nodeVisibilityFallbackTimers,
+  clearVisibilityFallback,
+  markNodeVisible,
+  resetNodeVisibleState,
+  cleanupNodeVisibility,
+  destroyNodeVisibilityState,
+} = useNodeVisibilityState({
+  isClient,
+  shouldTrackVisibleNodeIndices: () => deferNodes.value,
+  shouldCleanupNodeVisibility: () => virtualizationEnabled.value,
+  onNodeMarkedVisible: (index) => {
+    if (virtualizationEnabled.value)
+      scheduleFocusSync()
+    else
+      focusIndex.value = clamp(index, 0, Math.max(0, parsedNodes.value.length - 1))
+  },
+  onNodeVisibilityCleaned: (index) => {
+    if (nodeSlotElements.delete(index))
+      bumpNodeSlotVersion()
+  },
 })
 
 const {
@@ -872,64 +894,6 @@ function bumpNodeSlotVersion() {
   nodeSlotVersion.value += 1
 }
 
-function setNodeVisibleState(index: number, visible: boolean) {
-  const current = visibleNodeIndices.value
-  const hasIndex = current.has(index)
-  if (visible) {
-    if (hasIndex)
-      return
-    const next = new Set(current)
-    next.add(index)
-    visibleNodeIndices.value = next
-    return
-  }
-  if (!hasIndex)
-    return
-  const next = new Set(current)
-  next.delete(index)
-  visibleNodeIndices.value = next
-}
-
-function resetNodeVisibleState() {
-  if (visibleNodeIndices.value.size === 0)
-    return
-  visibleNodeIndices.value = new Set()
-}
-
-function cleanupNodeVisibility(maxIndex: number) {
-  if (!nodeVisibilityHandles.size)
-    return
-  // When virtualization is disabled the DOM retains every slot, so keep
-  // observers intact; they will be cleaned up when the slot unmounts.
-  if (!virtualizationEnabled.value)
-    return
-  let slotsChanged = false
-  for (const [index, handle] of nodeVisibilityHandles) {
-    if (index >= maxIndex) {
-      handle.destroy()
-      nodeVisibilityHandles.delete(index)
-      if (deferNodes.value)
-        setNodeVisibleState(index, false)
-      clearVisibilityFallback(index)
-      if (nodeSlotElements.delete(index))
-        slotsChanged = true
-    }
-  }
-  if (slotsChanged)
-    bumpNodeSlotVersion()
-}
-
-function markNodeVisible(index: number, visible: boolean) {
-  if (deferNodes.value)
-    setNodeVisibleState(index, visible)
-  if (visible) {
-    if (virtualizationEnabled.value)
-      scheduleFocusSync()
-    else
-      focusIndex.value = clamp(index, 0, Math.max(0, parsedNodes.value.length - 1))
-  }
-}
-
 function shouldRenderNode(index: number) {
   // Respect incremental rendering budget only when incremental batching
   // is active (virtualization disabled). Otherwise render immediately.
@@ -1104,16 +1068,6 @@ watch(
 const VIEWPORT_FALLBACK_DELAY = 1800
 const VIEWPORT_FALLBACK_MARGIN_PX = 500
 
-function clearVisibilityFallback(index: number) {
-  if (!isClient)
-    return
-  const timer = nodeVisibilityFallbackTimers.get(index)
-  if (timer != null) {
-    window.clearTimeout(timer)
-    nodeVisibilityFallbackTimers.delete(index)
-  }
-}
-
 function scheduleVisibilityFallback(index: number) {
   if (!isClient || !deferNodes.value)
     return
@@ -1159,14 +1113,6 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV && typeof console !== 'undefined')
     console.warn('[markstream-vue] viewportPriority auto-disabled:', reason)
 
-  for (const handle of nodeVisibilityHandles.values())
-    handle.destroy()
-  nodeVisibilityHandles.clear()
-  if (isClient) {
-    for (const timer of nodeVisibilityFallbackTimers.values())
-      window.clearTimeout(timer)
-  }
-  nodeVisibilityFallbackTimers.clear()
   resetNodeVisibleState()
 }
 
@@ -1300,11 +1246,6 @@ watch(
   () => deferNodes.value,
   (enabled) => {
     if (!enabled) {
-      for (const handle of nodeVisibilityHandles.values())
-        handle.destroy()
-      nodeVisibilityHandles.clear()
-      for (const index of Array.from(nodeVisibilityFallbackTimers.keys()))
-        clearVisibilityFallback(index)
       resetNodeVisibleState()
       for (const [index, el] of nodeSlotElements) {
         if (el)
@@ -1397,9 +1338,7 @@ watch(
 
 onBeforeUnmount(() => {
   cleanupBatchScheduler()
-  for (const handle of nodeVisibilityHandles.values())
-    handle.destroy()
-  nodeVisibilityHandles.clear()
+  destroyNodeVisibilityState()
   for (const observer of nodeContentResizeObservers.values())
     observer.disconnect()
   nodeContentResizeObservers.clear()
@@ -1408,11 +1347,6 @@ onBeforeUnmount(() => {
       window.clearTimeout(id)
   }
   nodeContentDeferredMeasureTimers.clear()
-  for (const stopWatchingVisibility of nodeVisibilityWatchStops.values())
-    stopWatchingVisibility()
-  nodeVisibilityWatchStops.clear()
-  for (const index of Array.from(nodeVisibilityFallbackTimers.keys()))
-    clearVisibilityFallback(index)
   cleanupExperimentResizeObserver()
   clearRestoreReconcile()
   cleanupScrollListener()
