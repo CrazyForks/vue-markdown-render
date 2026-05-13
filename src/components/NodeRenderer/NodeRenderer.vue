@@ -55,6 +55,7 @@ import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import { useBatchRenderingScheduler } from './composables/useBatchRenderingScheduler'
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useHeightMeasurements } from './composables/useHeightMeasurements'
+import { useLiveRangeState } from './composables/useLiveRangeState'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
 import { useResolvedRendererOptions } from './composables/useResolvedRendererOptions'
 import { useSchedulerPlatform } from './composables/useSchedulerPlatform'
@@ -352,9 +353,17 @@ const deferNodes = computed(() => {
   return viewportPriorityEnabled.value
 })
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
-const liveNodeBufferResolved = computed(() => Math.max(0, props.liveNodeBuffer ?? 60))
-const focusIndex = ref(0)
-const liveRange = reactive({ start: 0, end: 0 })
+const {
+  liveNodeBufferResolved,
+  focusIndex,
+  liveRange,
+  updateLiveRange,
+} = useLiveRangeState(props, {
+  parsedNodeCount,
+  virtualizationEnabled,
+  maxLiveNodesResolved,
+  clamp,
+})
 const nodeContentElements = new Map<number, HTMLElement | null>()
 const nodeContentDeferredMeasureTimers = new Map<number, number[]>()
 const desiredRenderedCount = computed(() => {
@@ -557,19 +566,6 @@ function syncFocusToScroll(force = false) {
 }
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
-}
-function updateLiveRange() {
-  const total = parsedNodes.value.length
-  if (!virtualizationEnabled.value || total === 0) {
-    liveRange.start = 0
-    liveRange.end = total
-    return
-  }
-  const windowSize = Math.min(maxLiveNodesResolved.value, total)
-  const buffer = liveNodeBufferResolved.value
-  const desiredStart = clamp(focusIndex.value - buffer, 0, Math.max(0, total - windowSize))
-  liveRange.start = desiredStart
-  liveRange.end = Math.min(total, desiredStart + windowSize)
 }
 
 function getProbeRoot(wrapper: HTMLElement | null | undefined) {
