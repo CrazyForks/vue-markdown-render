@@ -2,6 +2,7 @@
 import type { ImageNodeProps } from '../../types/component-props'
 import { computed, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
+import { sanitizeAttrs } from '../../utils/htmlRenderer'
 
 const props = withDefaults(defineProps<ImageNodeProps>(), {
   fallbackSrc: '',
@@ -15,10 +16,12 @@ const imageLoaded = ref(false)
 const hasError = ref(false)
 const fallbackTried = ref(false)
 
-const displaySrc = computed(() => hasError.value && props.fallbackSrc ? props.fallbackSrc : props.node.src)
+const safeNodeSrc = computed(() => sanitizeAttrs({ src: String(props.node.src ?? '') }).src ?? '')
+const safeFallbackSrc = computed(() => sanitizeAttrs({ src: String(props.fallbackSrc ?? '') }).src ?? '')
+const displaySrc = computed(() => hasError.value && safeFallbackSrc.value ? safeFallbackSrc.value : safeNodeSrc.value)
 const useEagerImagePath = computed(() => !props.lazy)
 
-const showImage = computed(() => !props.node.loading && !hasError.value)
+const showImage = computed(() => !props.node.loading && !hasError.value && displaySrc.value.length > 0)
 
 // Shimmer overlay only for lazy images while downloading (eager images display immediately)
 const showShimmer = computed(() => !useEagerImagePath.value && !imageLoaded.value && !hasError.value)

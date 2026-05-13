@@ -157,9 +157,12 @@ export const DANGEROUS_HTML_ATTR_NAMES = [
   'oninput',
   'oninvalid',
   'onsearch',
+  'srcdoc',
 ] as const
 
 export const URL_HTML_ATTR_NAMES = [
+  'action',
+  'data',
   'href',
   'src',
   'srcset',

@@ -1,0 +1,50 @@
+[
+  {
+    "name": "script tag",
+    "html": "<script>alert(1)</script>"
+  },
+  {
+    "name": "image event handler",
+    "html": "<img src=x onerror=alert(1)>"
+  },
+  {
+    "name": "javascript link",
+    "html": "<a href=\"javascript:alert(1)\">x</a>"
+  },
+  {
+    "name": "vbscript link",
+    "html": "<a href=\"vbscript:msgbox(1)\">x</a>"
+  },
+  {
+    "name": "iframe srcdoc",
+    "html": "<iframe srcdoc=\"<script>alert(1)</script>\"></iframe>"
+  },
+  {
+    "name": "svg event handler",
+    "html": "<svg onload=alert(1)>"
+  },
+  {
+    "name": "math javascript href",
+    "html": "<math href=\"javascript:alert(1)\">"
+  },
+  {
+    "name": "style javascript url",
+    "html": "<div style=\"background:url(javascript:alert(1))\">x</div>"
+  },
+  {
+    "name": "style import",
+    "html": "<div style=\"@import url(javascript:alert(1))\">x</div>"
+  },
+  {
+    "name": "object javascript data",
+    "html": "<object data=\"javascript:alert(1)\"></object>"
+  },
+  {
+    "name": "embed javascript src",
+    "html": "<embed src=\"javascript:alert(1)\">"
+  },
+  {
+    "name": "form javascript action",
+    "html": "<form action=\"javascript:alert(1)\"></form>"
+  }
+]
