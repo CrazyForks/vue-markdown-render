@@ -260,3 +260,14 @@ export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
 
   return !SAFE_ABSOLUTE_URL_PROTOCOLS.has(scheme)
 }
+
+export function sanitizeUrlAttr(value: unknown, context: HtmlUrlContext = {}) {
+  const url = String(value ?? '').trim()
+  if (!url)
+    return ''
+  return isUnsafeHtmlUrl(url, context) ? '' : url
+}
+
+export function sanitizeImageSrc(value: unknown) {
+  return sanitizeUrlAttr(value, { tagName: 'img', attrName: 'src' })
+}

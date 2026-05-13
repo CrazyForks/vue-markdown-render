@@ -34,6 +34,7 @@ import {
   parseMarkdownToStructure,
   sanitizeHtmlAttrs,
   sanitizeHtmlTokenAttrs,
+  sanitizeImageSrc,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
 } from 'stream-markdown-parser'
@@ -830,9 +831,13 @@ export function LinkNode(props: NodeComponentProps<LinkNodeProps['node']> & {
 
 export function ImageNode(rawProps: ImageNodeProps) {
   const props = rawProps
+  const src = sanitizeImageSrc(props.node.src) || sanitizeImageSrc(props.fallbackSrc)
+  if (!src)
+    return null
+
   return (
     <img
-      src={props.node.src}
+      src={src}
       alt={String(props.node.alt ?? props.node.title ?? '')}
       title={String(props.node.title ?? props.node.alt ?? '')}
       className="image-node__img is-loaded"

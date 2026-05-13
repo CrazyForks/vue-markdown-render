@@ -8,6 +8,7 @@ import {
   normalizeCustomHtmlTagName,
   normalizeCustomHtmlTags,
   sanitizeHtmlContent,
+  sanitizeImageSrc,
   URL_HTML_ATTRS,
 } from 'stream-markdown-parser'
 
@@ -241,7 +242,9 @@ function renderLinkNode(node: NestedRenderableNode, ctx: RenderContext): string 
 }
 
 function renderImageNode(node: NestedRenderableNode): string {
-  const src = getString(node.src)
+  const src = sanitizeImageSrc(node.src)
+  if (!src)
+    return ''
   const alt = getString(node.alt)
   const title = getString(node.title)
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''

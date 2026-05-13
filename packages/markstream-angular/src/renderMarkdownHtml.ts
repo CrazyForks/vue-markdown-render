@@ -8,6 +8,7 @@ import {
   normalizeCustomHtmlTags,
   parseMarkdownToStructure,
   sanitizeHtmlAttrs,
+  sanitizeImageSrc,
 } from 'stream-markdown-parser'
 import { hydrateCustomTagContent } from './hydrateCustomTagContent'
 import { sanitizeHtmlContent } from './sanitizeHtmlContent'
@@ -313,7 +314,9 @@ function renderMathBlockNode(node: RenderableMarkdownNode) {
 }
 
 function renderImageNode(node: RenderableMarkdownNode): string {
-  const src = getString(node.src)
+  const src = sanitizeImageSrc(node.src)
+  if (!src)
+    return ''
   const alt = getString(node.alt)
   const title = getString(node.title)
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''

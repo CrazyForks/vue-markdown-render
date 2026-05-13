@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const tmp = mkdtempSync(join(tmpdir(), 'markstream-vue-minimal-'))
 let packedTarball = ''
+let packedParserTarball = ''
 
 function run(command, args, options = {}) {
   execFileSync(command, args, {
@@ -28,12 +29,9 @@ function writeProjectFile(path, content) {
   writeFileSync(fullPath, content)
 }
 
-try {
-  if (process.env.MARKSTREAM_SMOKE_SKIP_BUILD !== '1')
-    run('pnpm', ['build'])
-
+function packWorkspacePackage(cwd) {
   const packOutput = execFileSync('pnpm', ['pack', '--pack-destination', tmp, '--json'], {
-    cwd: root,
+    cwd,
     encoding: 'utf8',
     env: process.env,
   }).trim()
@@ -46,14 +44,33 @@ try {
     resolve(packedFilename),
     resolve(tmp, basename(packedFilename)),
   ]
-  packedTarball = candidateTarballs.find(existsSync) ?? ''
-  if (!packedTarball)
+  const tarball = candidateTarballs.find(existsSync) ?? ''
+  if (!tarball)
     throw new Error(`Packed tarball not found: ${packedFilename}`)
+  return tarball
+}
+
+try {
+  if (process.env.MARKSTREAM_SMOKE_SKIP_BUILD !== '1') {
+    run('pnpm', ['run', 'build:parser'])
+    run('pnpm', ['build'])
+  }
+
+  packedParserTarball = packWorkspacePackage(join(root, 'packages/markdown-parser'))
+  packedTarball = packWorkspacePackage(root)
 
   const packedPackageJson = JSON.parse(execFileSync('tar', ['-xOf', packedTarball, 'package/package.json'], { encoding: 'utf8' }))
-  for (const [name, version] of Object.entries(packedPackageJson.dependencies ?? {})) {
-    if (String(version).startsWith('workspace:'))
-      throw new Error(`Packed dependency leaked workspace protocol: ${name}@${version}`)
+  const dependencySections = [
+    'dependencies',
+    'peerDependencies',
+    'optionalDependencies',
+    'devDependencies',
+  ]
+  for (const section of dependencySections) {
+    for (const [name, version] of Object.entries(packedPackageJson[section] ?? {})) {
+      if (String(version).startsWith('workspace:'))
+        throw new Error(`Packed ${section} leaked workspace protocol: ${name}@${version}`)
+    }
   }
 
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
@@ -73,9 +90,13 @@ try {
     devDependencies: {},
     pnpm: {
       onlyBuiltDependencies: ['esbuild'],
+      overrides: {
+        'stream-markdown-parser': `file:${packedParserTarball}`,
+      },
     },
   }
   smokePackage.scripts['ssr:import'] = 'node ./ssr-import.mjs'
+  smokePackage.dependencies['stream-markdown-parser'] = `file:${packedParserTarball}`
   smokePackage.dependencies['@vue/server-renderer'] = '^3.5.31'
   smokePackage.dependencies['@vitejs/plugin-vue'] = '^5.2.4'
   writeProjectFile('package.json', `${JSON.stringify(smokePackage, null, 2)}\n`)
@@ -83,8 +104,24 @@ try {
   writeProjectFile('index.html', '<div id="app"></div><script type="module" src="/src/main.ts"></script>\n')
   writeProjectFile('vite.config.ts', `import vue from '@vitejs/plugin-vue'\nimport { defineConfig } from 'vite'\n\nexport default defineConfig({ plugins: [vue()] })\n`)
   writeProjectFile('src/main.ts', `import { createApp } from 'vue'\nimport MarkdownRender from 'markstream-vue'\nimport 'markstream-vue/index.css'\nimport App from './App.vue'\n\ncreateApp(App).component('MarkdownRender', MarkdownRender).mount('#app')\n`)
-  writeProjectFile('src/App.vue', `<script setup lang="ts">\nconst content = '# Hello\\\\n\\\\n~~~ts\\\\nconsole.log(1)\\\\n~~~\\\\n\\\\n<div><a href="javascript:alert(1)">bad</a><span>safe</span></div>'\n</script>\n\n<template>\n  <MarkdownRender :content="content" :final="true" :render-code-blocks-as-pre="true" />\n  <MarkdownRender :content="content" :final="true" />\n</template>\n`)
-  writeProjectFile('ssr-import.mjs', `import { existsSync } from 'node:fs'\nimport { fileURLToPath } from 'node:url'\nimport { createSSRApp, h } from 'vue'\nimport { renderToString } from '@vue/server-renderer'\nimport MarkdownRender, { MarkdownRender as NamedMarkdownRender } from 'markstream-vue'\n\nconst mod = await import('markstream-vue')\nif (!mod.default || !mod.MarkdownRender || !NamedMarkdownRender)\n  throw new Error('Root package import did not expose MarkdownRender')\n\nconst cssUrl = import.meta.resolve('markstream-vue/index.css')\nif (!existsSync(fileURLToPath(cssUrl)))\n  throw new Error('CSS export did not resolve to a file')\n\nconst html = await renderToString(createSSRApp({\n  render: () => h(MarkdownRender, {\n    content: '~~~ts\\\\nconsole.log(1)\\\\n~~~',\n    final: true,\n  }),\n}))\n\nif (!html || !html.includes('console.log'))\n  throw new Error('SSR render did not include default code block content')\n`)
+  const smokeMarkdown = [
+    '# Hello',
+    '',
+    '~~~ts',
+    'console.log(1)',
+    '~~~',
+    '',
+    '<div><a href="javascript:alert(1)">bad</a><span>safe</span></div>',
+  ].join('\n')
+  writeProjectFile('src/App.vue', `<script setup lang="ts">\nconst content = ${JSON.stringify(smokeMarkdown)}\n</script>\n\n<template>\n  <MarkdownRender :content="content" :final="true" :render-code-blocks-as-pre="true" />\n  <MarkdownRender :content="content" :final="true" />\n</template>\n`)
+  const ssrMarkdown = [
+    '~~~ts',
+    'console.log(1)',
+    '~~~',
+    '',
+    '<a href="javascript:alert(1)">bad</a>',
+  ].join('\n')
+  writeProjectFile('ssr-import.mjs', `import { existsSync } from 'node:fs'\nimport { fileURLToPath } from 'node:url'\nimport { createSSRApp, h } from 'vue'\nimport { renderToString } from '@vue/server-renderer'\nimport MarkdownRender, { MarkdownRender as NamedMarkdownRender } from 'markstream-vue'\n\nconst mod = await import('markstream-vue')\nif (!mod.default || !mod.MarkdownRender || !NamedMarkdownRender)\n  throw new Error('Root package import did not expose MarkdownRender')\n\nconst cssUrl = import.meta.resolve('markstream-vue/index.css')\nif (!existsSync(fileURLToPath(cssUrl)))\n  throw new Error('CSS export did not resolve to a file')\n\nconst html = await renderToString(createSSRApp({\n  render: () => h(MarkdownRender, {\n    content: ${JSON.stringify(ssrMarkdown)},\n    final: true,\n  }),\n}))\n\nif (!html || !html.includes('console.log'))\n  throw new Error('SSR render did not include code content')\n\nif (/javascript:alert/i.test(html))\n  throw new Error('SSR render kept unsafe javascript URL')\n`)
 
   run('pnpm', ['install', '--ignore-workspace'], { cwd: tmp })
   run('pnpm', ['run', 'build'], { cwd: tmp })
@@ -93,8 +130,10 @@ try {
   console.log(`[smoke-minimal-install] Passed in ${tmp}`)
 }
 finally {
-  if (packedTarball && existsSync(packedTarball))
-    rmSync(packedTarball)
+  for (const tarball of [packedTarball, packedParserTarball]) {
+    if (tarball && existsSync(tarball))
+      rmSync(tarball)
+  }
   if (process.env.KEEP_MARKSTREAM_SMOKE_DIR !== '1')
     rmSync(tmp, { recursive: true, force: true })
   else

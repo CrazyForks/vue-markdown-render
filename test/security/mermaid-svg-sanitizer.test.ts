@@ -113,6 +113,47 @@ describe('mermaid SVG sanitizer', () => {
     expect(svg).not.toMatch(/data:text\/html/i)
   })
 
+  it('preserves linked Mermaid visual children while sanitizing href', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <a href="javascript:alert(1)">
+          <text>x</text>
+          <rect width="10" height="10" />
+        </a>
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).toMatch(/<a/i)
+    expect(svg).toMatch(/<text/i)
+    expect(svg).toMatch(/<rect/i)
+    expect(svg).not.toMatch(/href=/i)
+    expect(svg).not.toMatch(/javascript:/i)
+  })
+
+  it('removes data SVG CSS URLs but preserves internal paint servers', () => {
+    const unsafe = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <rect style="fill:url(data:image/svg+xml,%3Csvg%20onload%3Dalert(1)%3E)" />
+        <rect width="10" height="10" />
+      </svg>
+    `)
+    const safe = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <defs>
+          <linearGradient id="g"><stop offset="0%" /></linearGradient>
+        </defs>
+        <rect fill="url(#g)" width="10" height="10" />
+      </svg>
+    `)
+
+    expect(unsafe).toBeTruthy()
+    expect(unsafe).not.toMatch(/data:image\/svg\+xml/i)
+    expect(unsafe).not.toMatch(/\sstyle=/i)
+    expect(safe).toBeTruthy()
+    expect(safe).toMatch(/url\(#g\)/)
+  })
+
   it.each(readMermaidSvgFixtures())('preserves renderable Mermaid SVG fixture $name', ({ svg }) => {
     const sanitized = sanitizeMermaidSvg(svg)
 

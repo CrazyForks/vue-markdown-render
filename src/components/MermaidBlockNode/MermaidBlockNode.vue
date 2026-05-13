@@ -67,7 +67,7 @@ function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null |
   if (!target)
     return ''
   const safeElement = toSafeSvgElement(svg)
-  if (!safeElement)
+  if (!safeElement || isBrokenMermaidSvg(safeElement.outerHTML))
     return ''
   appendBufferedSvgLayer(target, safeElement)
   return safeElement.outerHTML

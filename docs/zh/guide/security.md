@@ -8,6 +8,8 @@
 
 允许常见结构化 HTML，例如链接、图片、列表、表格和 details。危险标签、事件属性、不安全 URL 协议和内联样式会在渲染前被移除或转义。
 
+`safe` 是受限渲染策略，不代表可以渲染任意 active HTML。公开用户内容或第三方 feed 请优先使用 `htmlPolicy="escape"`。
+
 适合 AI 聊天、受控文档流水线，以及需要有限 HTML 能力的 Markdown 场景。
 
 ### `htmlPolicy="escape"`

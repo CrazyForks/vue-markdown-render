@@ -3,11 +3,11 @@
  */
 
 import { mount } from '@vue/test-utils'
+import { sanitizeImageSrc } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
 import { nextTick } from 'vue'
 import ImageNode from '../../src/components/ImageNode/ImageNode.vue'
 import NodeRenderer from '../../src/components/NodeRenderer'
-import { sanitizeImageSrc } from '../../src/utils/htmlRenderer'
 import { flushAll } from '../setup/flush-all'
 
 describe('link and image URL policy', () => {

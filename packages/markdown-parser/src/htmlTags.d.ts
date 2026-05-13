@@ -21,3 +21,5 @@ export interface HtmlUrlContext {
     attrName?: string;
 }
 export declare function isUnsafeHtmlUrl(value: string, context?: HtmlUrlContext): boolean;
+export declare function sanitizeUrlAttr(value: unknown, context?: HtmlUrlContext): string;
+export declare function sanitizeImageSrc(value: unknown): string;

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { ImageNodeProps } from '../../types/component-props'
+import { sanitizeImageSrc } from 'stream-markdown-parser'
 import { computed, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
-import { sanitizeImageSrc } from '../../utils/htmlRenderer'
 
 const props = withDefaults(defineProps<ImageNodeProps>(), {
   fallbackSrc: '',

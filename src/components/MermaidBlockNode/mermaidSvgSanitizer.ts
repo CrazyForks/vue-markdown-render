@@ -1,8 +1,10 @@
+import { sanitizeUrlAttr } from 'stream-markdown-parser'
+
 const DISALLOWED_STYLE_PATTERNS = [/javascript:/i, /vbscript:/i, /data:text\/html/i, /expression\s*\(/i, /url\s*\(\s*javascript:/i, /@import/i]
-const SAFE_URL_PROTOCOLS = /^(?:https?:|mailto:|tel:|#|\/|data:image\/(?:png|gif|jpe?g|webp|avif|bmp);)/i
 const ALLOWED_SVG_TAGS = new Set([
   'svg',
   'g',
+  'a',
   'defs',
   'marker',
   'path',
@@ -60,12 +62,58 @@ function neutralizeScriptProtocols(raw: string) {
 }
 
 function sanitizeUrl(value: string | null | undefined) {
-  if (!value)
-    return ''
-  const trimmed = value.trim()
-  if (SAFE_URL_PROTOCOLS.test(trimmed))
-    return trimmed
-  return ''
+  return sanitizeUrlAttr(value, { tagName: 'svg', attrName: 'href' })
+}
+
+function readCssUrl(value: string, start: number) {
+  let pos = start + 4
+  while (pos < value.length && /\s/.test(value[pos] ?? ''))
+    pos++
+
+  const quote = value[pos]
+  if (quote === '"' || quote === '\'') {
+    const urlStart = pos + 1
+    const urlEnd = value.indexOf(quote, urlStart)
+    if (urlEnd === -1)
+      return { next: value.length, url: '' }
+    pos = urlEnd + 1
+    while (pos < value.length && /\s/.test(value[pos] ?? ''))
+      pos++
+    return {
+      next: pos < value.length && value[pos] === ')' ? pos + 1 : pos,
+      url: value.slice(urlStart, urlEnd),
+    }
+  }
+
+  const urlStart = pos
+  while (pos < value.length && value[pos] !== ')')
+    pos++
+  return {
+    next: pos < value.length ? pos + 1 : pos,
+    url: value.slice(urlStart, pos),
+  }
+}
+
+function hasUnsafeCssUrl(value: string) {
+  const lower = value.toLowerCase()
+  let pos = 0
+  while (pos < lower.length) {
+    const start = lower.indexOf('url(', pos)
+    if (start === -1)
+      return false
+    const cssUrl = readCssUrl(value, start)
+    pos = Math.max(cssUrl.next, start + 4)
+    const rawUrl = cssUrl.url.trim()
+    if (rawUrl.startsWith('#'))
+      continue
+    if (!rawUrl || !sanitizeUrl(rawUrl))
+      return true
+  }
+  return false
+}
+
+function hasUnsafeStyle(value: string) {
+  return DISALLOWED_STYLE_PATTERNS.some(re => re.test(value)) || hasUnsafeCssUrl(value)
 }
 
 function scrubSvgElement(svgEl: SVGElement) {
@@ -77,7 +125,7 @@ function scrubSvgElement(svgEl: SVGElement) {
       continue
     }
 
-    if (tag === 'style' && DISALLOWED_STYLE_PATTERNS.some(re => re.test(node.textContent ?? ''))) {
+    if (tag === 'style' && hasUnsafeStyle(node.textContent ?? '')) {
       node.remove()
       continue
     }
@@ -91,7 +139,7 @@ function scrubSvgElement(svgEl: SVGElement) {
       }
 
       if (name === 'style' && attr.value) {
-        if (DISALLOWED_STYLE_PATTERNS.some(re => re.test(attr.value))) {
+        if (hasUnsafeStyle(attr.value)) {
           node.removeAttribute(attr.name)
           continue
         }
@@ -133,6 +181,8 @@ export function toSafeSvgElement(svg: string | null | undefined): SVGElement | n
     return null
   const svgElement = svgEl as unknown as SVGElement
   scrubSvgElement(svgElement)
+  if (isBrokenMermaidSvg(svgElement.outerHTML))
+    return null
   return svgElement
 }
 

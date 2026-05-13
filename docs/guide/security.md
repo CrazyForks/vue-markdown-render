@@ -8,6 +8,8 @@
 
 Allows common structural HTML such as links, images, lists, tables, and details blocks. Dangerous tags, event attributes, unsafe URL protocols, and inline styles are removed or escaped before rendering.
 
+`safe` is a constrained rendering policy, not a permission to render arbitrary active HTML. For public UGC or third-party feeds, prefer `htmlPolicy="escape"`.
+
 Use this for AI chat, docs generated from trusted pipelines, and general Markdown surfaces where limited HTML is useful.
 
 ### `htmlPolicy="escape"`
