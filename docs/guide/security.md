@@ -51,3 +51,7 @@ defineProps<{ node: { content?: string } }>()
 ## Links and images
 
 Markdown links and rendered HTML attrs are checked for unsafe protocols such as `javascript:`, `vbscript:`, and HTML `data:` documents. Bitmap image data URLs are allowed only on image source attributes.
+
+Protocol-relative URLs such as `//cdn.example.com/a.png` are allowed by the URL policy. They can still load external resources, so prefer `htmlPolicy="escape"` for public or third-party content that should not be able to request remote assets.
+
+Mermaid SVG output is sanitized before mounting in both strict and loose Mermaid modes. `isStrict=false` controls Mermaid's parse/render configuration; it does not mean raw SVG insertion.

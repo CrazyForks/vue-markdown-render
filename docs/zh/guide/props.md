@@ -206,7 +206,7 @@ const codeBlockProps: NonNullable<NodeRendererProps['codeBlockProps']> = {
 
 其中 `mermaid-props` 很适合用于流式调优，常用项包括：
 
-- `isStrict`（只有可信图表确实需要 Mermaid loose 模式 / HTML labels 时才设为 `false`）
+- `isStrict`（只有可信图表确实需要 Mermaid loose 配置时才设为 `false`；最终 SVG 仍会被清理）
 - `renderDebounceMs`
 - `contentStableDelayMs`
 - `previewPollDelayMs`

@@ -206,7 +206,7 @@ Example:
 
 `mermaid-props` is especially useful for streaming tuning. Common keys include:
 
-- `isStrict` (set `false` only for trusted diagrams that need Mermaid loose mode / HTML labels)
+- `isStrict` (set `false` only for trusted diagrams that need Mermaid's loose config; SVG output is still sanitized)
 - `renderDebounceMs`
 - `contentStableDelayMs`
 - `previewPollDelayMs`

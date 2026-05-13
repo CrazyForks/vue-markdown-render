@@ -1,3 +1,13 @@
+## Unreleased
+
+### Behavior Changes
+
+* Mermaid SVG output is sanitized before mounting in both strict and loose modes. `isStrict=false` only controls Mermaid's parse/render configuration and no longer means raw SVG insertion.
+
+### Bug Fixes
+
+* ImageNode now falls back or shows an error when the sanitized primary image source is empty, avoiding blank and persistent lazy-shimmer states.
+
 ## [0.0.14-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.8) (2026-05-11)
 
 

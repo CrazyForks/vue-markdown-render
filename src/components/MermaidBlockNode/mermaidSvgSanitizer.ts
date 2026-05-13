@@ -19,6 +19,12 @@ const ALLOWED_SVG_TAGS = new Set([
   'style',
   'use',
   'image',
+  'lineargradient',
+  'radialgradient',
+  'stop',
+  'clippath',
+  'mask',
+  'pattern',
 ])
 const URL_LIKE_SVG_ATTRS = new Set([
   'href',

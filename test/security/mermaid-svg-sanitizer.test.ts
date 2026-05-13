@@ -2,8 +2,21 @@
  * @vitest-environment jsdom
  */
 
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { isBrokenMermaidSvg, sanitizeMermaidSvg } from '../../src/components/MermaidBlockNode/mermaidSvgSanitizer'
+
+const mermaidSvgFixtureDir = join(process.cwd(), 'test/fixtures/mermaid-svg')
+
+function readMermaidSvgFixtures() {
+  return readdirSync(mermaidSvgFixtureDir)
+    .filter(name => name.endsWith('.svg'))
+    .map(name => ({
+      name,
+      svg: readFileSync(join(mermaidSvgFixtureDir, name), 'utf8'),
+    }))
+}
 
 describe('mermaid SVG sanitizer', () => {
   it('removes executable SVG markup', () => {
@@ -98,6 +111,32 @@ describe('mermaid SVG sanitizer', () => {
     expect(svg).toBeTruthy()
     expect(svg).not.toMatch(/xlink:href=/i)
     expect(svg).not.toMatch(/data:text\/html/i)
+  })
+
+  it.each(readMermaidSvgFixtures())('preserves renderable Mermaid SVG fixture $name', ({ svg }) => {
+    const sanitized = sanitizeMermaidSvg(svg)
+
+    expect(sanitized).toBeTruthy()
+    expect(sanitized).toContain('<svg')
+    expect(sanitized).toMatch(/<(?:path|rect|text|line|polygon|polyline|circle|ellipse)\b/i)
+    expect(sanitized).not.toMatch(/<script/i)
+    expect(sanitized).not.toMatch(/\son[a-z]+\s*=/i)
+    expect(sanitized).not.toMatch(/javascript:/i)
+    expect(sanitized).not.toMatch(/vbscript:/i)
+    expect(sanitized).not.toMatch(/data:text\/html/i)
+
+    if (svg.match(/<linearGradient/i))
+      expect(sanitized).toMatch(/<linearGradient/i)
+    if (svg.match(/<radialGradient/i))
+      expect(sanitized).toMatch(/<radialGradient/i)
+    if (svg.match(/<stop/i))
+      expect(sanitized).toMatch(/<stop/i)
+    if (svg.match(/<clipPath/i))
+      expect(sanitized).toMatch(/<clipPath/i)
+    if (svg.match(/<mask/i))
+      expect(sanitized).toMatch(/<mask/i)
+    if (svg.match(/<pattern/i))
+      expect(sanitized).toMatch(/<pattern/i)
   })
 
   it('detects broken Mermaid SVG output', () => {

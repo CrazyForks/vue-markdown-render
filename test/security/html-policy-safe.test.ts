@@ -5,9 +5,18 @@
 import { mount } from '@vue/test-utils'
 import { sanitizeHtmlContent } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
+import { defineComponent, h } from 'vue'
 import MarkdownRender from '../../src/components/NodeRenderer'
+import { parseHtmlToVNodes } from '../../src/utils/htmlRenderer'
 import payloads from '../fixtures/security/html-xss-corpus.json'
 import { flushAll } from '../setup/flush-all'
+
+const SafeCard = defineComponent({
+  name: 'SafeCard',
+  setup(_, { attrs, slots }) {
+    return () => h('section', attrs, slots.default?.())
+  },
+})
 
 function expectNoExecutableMarkup(html: string) {
   const root = document.createElement('div')
@@ -34,9 +43,55 @@ function expectNoExecutableMarkup(html: string) {
   }
 }
 
+function collectProps(nodes: any[], out: Record<string, unknown>[] = []) {
+  for (const node of nodes) {
+    if (!node || typeof node !== 'object')
+      continue
+
+    out.push(node.props ?? {})
+
+    const children = node.children
+    if (Array.isArray(children))
+      collectProps(children, out)
+  }
+
+  return out
+}
+
+function expectNoExecutableProps(props: Record<string, unknown>) {
+  for (const [name, value] of Object.entries(props)) {
+    const attrName = name.toLowerCase()
+    expect(attrName).not.toMatch(/^on/i)
+    expect(attrName).not.toBe('srcdoc')
+
+    if (typeof value !== 'string')
+      continue
+
+    if (['href', 'src', 'xlink:href', 'action', 'data', 'srcdoc', 'formaction', 'poster'].includes(attrName)) {
+      expect(value).not.toMatch(/javascript:/i)
+      expect(value).not.toMatch(/vbscript:/i)
+      expect(value).not.toMatch(/data:text\/html/i)
+    }
+
+    if (attrName === 'style') {
+      expect(value).not.toMatch(/javascript:/i)
+      expect(value).not.toMatch(/expression\s*\(/i)
+      expect(value).not.toMatch(/@import/i)
+    }
+  }
+}
+
 describe('htmlPolicy safe security corpus', () => {
   it.each(payloads)('does not create executable DOM for $name', ({ html }) => {
     expectNoExecutableMarkup(sanitizeHtmlContent(html, 'safe'))
+  })
+
+  it.each(payloads)('does not create executable VNode props for $name', ({ html }) => {
+    const nodes = parseHtmlToVNodes(html, { 'safe-card': SafeCard }, 'safe') ?? []
+    const props = collectProps(nodes)
+
+    for (const prop of props)
+      expectNoExecutableProps(prop)
   })
 
   it('scrubs unsafe URLs from allowed HTML elements', () => {

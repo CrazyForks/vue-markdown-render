@@ -176,7 +176,7 @@ export interface MermaidBlockNodeProps {
   showCollapseButton?: boolean
   showZoomControls?: boolean
   enableWheelZoom?: boolean
-  // Defaults to true. Set false only for trusted diagrams that need loose Mermaid HTML labels.
+  // Defaults to true. Set false only for trusted diagrams that need Mermaid's loose render config. SVG output is still sanitized.
   isStrict?: boolean
   showTooltips?: boolean
   // Custom error handler called when mermaid rendering fails.

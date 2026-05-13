@@ -15,7 +15,7 @@ afterEach(() => {
 })
 
 describe('mermaid block SVG sanitizer', () => {
-  it('sanitizes rendered SVG before mounting in loose Mermaid mode', async () => {
+  it('sanitizes rendered SVG even when Mermaid securityLevel is loose', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('IntersectionObserver', undefined as any)
 
@@ -70,6 +70,7 @@ describe('mermaid block SVG sanitizer', () => {
       securityLevel: 'loose',
     }))
     expect(wrapper.find('div._mermaid svg').exists()).toBe(true)
+    expect(html).toMatch(/<rect/i)
     expect(html).not.toMatch(/<script/i)
     expect(html).not.toMatch(/\son[a-z]+\s*=/i)
     expect(html).not.toMatch(/foreignObject/i)

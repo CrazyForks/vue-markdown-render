@@ -25,8 +25,8 @@ const useEagerImagePath = computed(() => !props.lazy)
 const showImage = computed(() => !props.node.loading && imageStage.value !== 'failed' && activeSrc.value.length > 0)
 const showError = computed(() => imageStage.value === 'failed')
 
-// Shimmer overlay only for lazy images while downloading (eager images display immediately)
-const showShimmer = computed(() => !useEagerImagePath.value && !imageLoaded.value && !hasError.value)
+// Shimmer overlay only for lazy images while a renderable image is downloading.
+const showShimmer = computed(() => !useEagerImagePath.value && !imageLoaded.value && !hasError.value && imageStage.value !== 'failed' && activeSrc.value.length > 0)
 
 function handleImageError() {
   if (imageStage.value === 'primary' && safeFallbackSrc.value) {
@@ -60,10 +60,30 @@ const { t } = useSafeI18n()
 watch(
   [safeNodeSrc, safeFallbackSrc, () => props.node.loading],
   () => {
-    activeSrc.value = safeNodeSrc.value
-    imageStage.value = 'primary'
     imageLoaded.value = false
     hasError.value = false
+
+    if (props.node.loading) {
+      activeSrc.value = safeNodeSrc.value
+      imageStage.value = 'primary'
+      return
+    }
+
+    if (safeNodeSrc.value) {
+      activeSrc.value = safeNodeSrc.value
+      imageStage.value = 'primary'
+      return
+    }
+
+    if (safeFallbackSrc.value) {
+      activeSrc.value = safeFallbackSrc.value
+      imageStage.value = 'fallback'
+      return
+    }
+
+    activeSrc.value = ''
+    imageStage.value = 'failed'
+    hasError.value = true
   },
   { immediate: true },
 )
