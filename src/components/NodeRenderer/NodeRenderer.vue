@@ -438,7 +438,6 @@ const {
   nodeVisibilityFallbackTimers,
   clearVisibilityFallback,
   markNodeVisible,
-  resetNodeVisibleState,
   cleanupNodeVisibility,
   destroyNodeVisibilityState,
 } = useNodeVisibilityState({
@@ -1113,7 +1112,7 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV && typeof console !== 'undefined')
     console.warn('[markstream-vue] viewportPriority auto-disabled:', reason)
 
-  resetNodeVisibleState()
+  destroyNodeVisibilityState()
 }
 
 const {
@@ -1246,7 +1245,7 @@ watch(
   () => deferNodes.value,
   (enabled) => {
     if (!enabled) {
-      resetNodeVisibleState()
+      destroyNodeVisibilityState()
       for (const [index, el] of nodeSlotElements) {
         if (el)
           markNodeVisible(index, true)

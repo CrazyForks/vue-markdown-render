@@ -86,7 +86,9 @@ export function useNodeVisibilityState(
   }
 
   function markNodeVisible(index: number, visible = true) {
-    clearVisibilityFallback(index)
+    if (visible)
+      clearVisibilityFallback(index)
+
     setNodeVisibleState(index, visible)
 
     if (visible)
@@ -95,18 +97,6 @@ export function useNodeVisibilityState(
 
   function resetNodeVisibleState() {
     visibleNodeIndices.value = new Set()
-
-    for (const stop of nodeVisibilityWatchStops.values())
-      stop()
-
-    nodeVisibilityWatchStops.clear()
-
-    for (const handle of nodeVisibilityHandles.values())
-      handle.destroy()
-
-    nodeVisibilityHandles.clear()
-
-    clearAllVisibilityFallbacks()
   }
 
   function cleanupNodeVisibility(maxIndex: number) {
@@ -153,6 +143,18 @@ export function useNodeVisibilityState(
 
   function destroyNodeVisibilityState() {
     resetNodeVisibleState()
+
+    for (const stop of nodeVisibilityWatchStops.values())
+      stop()
+
+    nodeVisibilityWatchStops.clear()
+
+    for (const handle of nodeVisibilityHandles.values())
+      handle.destroy()
+
+    nodeVisibilityHandles.clear()
+
+    clearAllVisibilityFallbacks()
   }
 
   return {
