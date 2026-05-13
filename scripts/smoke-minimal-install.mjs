@@ -60,6 +60,7 @@ try {
   const smokePackage = {
     private: true,
     type: 'module',
+    packageManager: pkg.packageManager,
     scripts: {
       build: 'vite build',
     },
@@ -70,6 +71,9 @@ try {
       vue: '^3.5.31',
     },
     devDependencies: {},
+    pnpm: {
+      onlyBuiltDependencies: ['esbuild'],
+    },
   }
   smokePackage.scripts['ssr:import'] = 'node ./ssr-import.mjs'
   smokePackage.dependencies['@vue/server-renderer'] = '^3.5.31'

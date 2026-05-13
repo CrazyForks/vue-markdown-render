@@ -145,4 +145,84 @@ describe('link and image URL policy', () => {
     expect(wrapper.find('img').exists()).toBe(false)
     expect(wrapper.find('.image-error').exists()).toBe(true)
   })
+
+  it('renders safe fallback when primary image fails', async () => {
+    const wrapper = mount(ImageNode, {
+      props: {
+        node: {
+          type: 'image',
+          src: 'https://example.com/broken.png',
+          alt: 'x',
+          title: null,
+          raw: '![x](https://example.com/broken.png)',
+          loading: false,
+        },
+        fallbackSrc: 'https://example.com/fallback.png',
+      },
+    })
+
+    await wrapper.get('img').trigger('error')
+    await nextTick()
+
+    expect(wrapper.get('img').attributes('src')).toBe('https://example.com/fallback.png')
+    expect(wrapper.find('.image-error').exists()).toBe(false)
+  })
+
+  it('shows error after fallback image also fails', async () => {
+    const wrapper = mount(ImageNode, {
+      props: {
+        node: {
+          type: 'image',
+          src: 'https://example.com/broken.png',
+          alt: 'x',
+          title: null,
+          raw: '![x](https://example.com/broken.png)',
+          loading: false,
+        },
+        fallbackSrc: 'https://example.com/fallback.png',
+      },
+    })
+
+    await wrapper.get('img').trigger('error')
+    await nextTick()
+    await wrapper.get('img').trigger('error')
+    await nextTick()
+
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.find('.image-error').exists()).toBe(true)
+  })
+
+  it('resets to primary image when node src changes', async () => {
+    const wrapper = mount(ImageNode, {
+      props: {
+        node: {
+          type: 'image',
+          src: 'https://example.com/broken.png',
+          alt: 'x',
+          title: null,
+          raw: '![x](https://example.com/broken.png)',
+          loading: false,
+        },
+        fallbackSrc: 'https://example.com/fallback.png',
+      },
+    })
+
+    await wrapper.get('img').trigger('error')
+    await nextTick()
+    await wrapper.setProps({
+      node: {
+        type: 'image',
+        src: 'https://example.com/next.png',
+        alt: 'x',
+        title: null,
+        raw: '![x](https://example.com/next.png)',
+        loading: false,
+      },
+      fallbackSrc: 'https://example.com/fallback.png',
+    })
+    await nextTick()
+
+    expect(wrapper.get('img').attributes('src')).toBe('https://example.com/next.png')
+    expect(wrapper.find('.image-error').exists()).toBe(false)
+  })
 })

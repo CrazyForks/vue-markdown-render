@@ -9,6 +9,23 @@ describe('html URL policy', () => {
     expect(sanitizeAttrs({ src: 'vb\rscript:msgbox(1)' }).src).toBeUndefined()
   })
 
+  it('rejects URL payload variants', () => {
+    const payloads = [
+      ' javascript:alert(1)',
+      '\njavascript:alert(1)',
+      '\tjavascript:alert(1)',
+      'JaVaScRiPt:alert(1)',
+      'java\nscript:alert(1)',
+      'java\u0000script:alert(1)',
+      'vbscript:msgbox(1)',
+      'data:text/html,<script>alert(1)</script>',
+      'data:image/svg+xml,<svg onload=alert(1)>',
+    ]
+
+    for (const payload of payloads)
+      expect(sanitizeAttrs({ href: payload }, 'safe', 'a').href).toBeUndefined()
+  })
+
   it('rejects unsafe data documents but allows image data URLs', () => {
     expect(sanitizeAttrs({ href: 'data:text/html,<script>alert(1)</script>' }).href).toBeUndefined()
     expect(sanitizeAttrs({ src: 'data:text/html,<script>alert(1)</script>' }).src).toBeUndefined()
@@ -20,6 +37,7 @@ describe('html URL policy', () => {
 
   it('rejects unsafe srcset candidates', () => {
     expect(sanitizeAttrs({ srcset: 'cover.png 1x, javascript:alert(1) 2x' }, 'safe', 'img').srcset).toBeUndefined()
+    expect(sanitizeAttrs({ srcset: 'data:image/png;base64,iVBORw0KGgo= 1x' }, 'safe', 'img').srcset).toBeUndefined()
     expect(sanitizeAttrs({ srcset: 'cover.png 1x, cover@2x.png 2x' }, 'safe', 'img').srcset).toBe('cover.png 1x, cover@2x.png 2x')
   })
 })

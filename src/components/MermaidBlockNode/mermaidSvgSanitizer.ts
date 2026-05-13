@@ -1,4 +1,4 @@
-const DISALLOWED_STYLE_PATTERNS = [/javascript:/i, /expression\s*\(/i, /url\s*\(\s*javascript:/i, /@import/i]
+const DISALLOWED_STYLE_PATTERNS = [/javascript:/i, /vbscript:/i, /data:text\/html/i, /expression\s*\(/i, /url\s*\(\s*javascript:/i, /@import/i]
 const SAFE_URL_PROTOCOLS = /^(?:https?:|mailto:|tel:|#|\/|data:image\/(?:png|gif|jpe?g|webp|avif|bmp);)/i
 const ALLOWED_SVG_TAGS = new Set([
   'svg',
@@ -104,6 +104,13 @@ function scrubSvgElement(svgEl: SVGElement) {
         }
         if (safe !== attr.value)
           node.setAttribute(attr.name, safe)
+        continue
+      }
+
+      if (attr.value) {
+        const neutralized = neutralizeScriptProtocols(attr.value)
+        if (neutralized !== attr.value)
+          node.setAttribute(attr.name, neutralized)
       }
     }
   }
@@ -114,8 +121,7 @@ export function toSafeSvgElement(svg: string | null | undefined): SVGElement | n
     return null
   if (!svg)
     return null
-  const neutralized = neutralizeScriptProtocols(svg)
-  const parsed = new DOMParser().parseFromString(neutralized, 'image/svg+xml')
+  const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
   const svgEl = parsed.documentElement
   if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
     return null

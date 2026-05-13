@@ -67,8 +67,37 @@ describe('mermaid SVG sanitizer', () => {
     `)
 
     expect(svg).toBeTruthy()
+    expect(svg).not.toContain('<style')
     expect(svg).not.toMatch(/@import/i)
     expect(svg).not.toMatch(/javascript:/i)
+  })
+
+  it('removes dangerous style URLs', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <style>.x { background: url(javascript:alert(1)); }</style>
+        <rect width="10" height="10" style="background:url(javascript:alert(1))" />
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).not.toContain('<style')
+    expect(svg).not.toMatch(/\sstyle=/i)
+    expect(svg).not.toMatch(/javascript:/i)
+  })
+
+  it('removes unsafe SVG href attributes', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <use xlink:href="javascript:alert(1)" />
+        <image href="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==" />
+        <rect width="10" height="10" />
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).not.toMatch(/xlink:href=/i)
+    expect(svg).not.toMatch(/data:text\/html/i)
   })
 
   it('detects broken Mermaid SVG output', () => {

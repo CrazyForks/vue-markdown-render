@@ -227,7 +227,7 @@ export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
 
   if (normalized.startsWith('data:')) {
     const isBitmapImageData = /^data:image\/(?:png|gif|jpe?g|webp|avif|bmp);/i.test(normalized)
-    if (tagName === 'img' && (attrName === 'src' || attrName === 'srcset'))
+    if (tagName === 'img' && attrName === 'src')
       return !isBitmapImageData
     return true
   }

@@ -14,28 +14,32 @@ const emit = defineEmits<{ (e: 'load', src: string): void, (e: 'error', src: str
 
 const imageLoaded = ref(false)
 const hasError = ref(false)
-const fallbackTried = ref(false)
+const activeSrc = ref('')
+const imageStage = ref<'primary' | 'fallback' | 'failed'>('primary')
 
 const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))
 const safeFallbackSrc = computed(() => sanitizeImageSrc(props.fallbackSrc))
-const displaySrc = computed(() => hasError.value && safeFallbackSrc.value ? safeFallbackSrc.value : safeNodeSrc.value)
-const hasSafeFallback = computed(() => safeFallbackSrc.value.length > 0)
+const displaySrc = computed(() => activeSrc.value)
 const useEagerImagePath = computed(() => !props.lazy)
 
-const showImage = computed(() => !props.node.loading && !hasError.value && displaySrc.value.length > 0)
+const showImage = computed(() => !props.node.loading && imageStage.value !== 'failed' && activeSrc.value.length > 0)
+const showError = computed(() => imageStage.value === 'failed')
 
 // Shimmer overlay only for lazy images while downloading (eager images display immediately)
 const showShimmer = computed(() => !useEagerImagePath.value && !imageLoaded.value && !hasError.value)
 
 function handleImageError() {
-  if (hasSafeFallback.value && !fallbackTried.value) {
-    fallbackTried.value = true
-    hasError.value = true
+  if (imageStage.value === 'primary' && safeFallbackSrc.value) {
+    imageStage.value = 'fallback'
+    activeSrc.value = safeFallbackSrc.value
+    imageLoaded.value = false
+    hasError.value = false
+    return
   }
-  else {
-    hasError.value = true
-    emit('error', displaySrc.value)
-  }
+
+  imageStage.value = 'failed'
+  hasError.value = true
+  emit('error', activeSrc.value)
 }
 
 function handleImageLoad() {
@@ -53,10 +57,16 @@ function handleClick(e: Event) {
 
 const { t } = useSafeI18n()
 
-watch(displaySrc, () => {
-  imageLoaded.value = false
-  hasError.value = false
-})
+watch(
+  [safeNodeSrc, safeFallbackSrc, () => props.node.loading],
+  () => {
+    activeSrc.value = safeNodeSrc.value
+    imageStage.value = 'primary'
+    imageLoaded.value = false
+    hasError.value = false
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -112,7 +122,7 @@ watch(displaySrc, () => {
       </span>
     </transition>
 
-    <span v-if="hasError && !hasSafeFallback" class="image-error">
+    <span v-if="showError" class="image-error">
       <slot name="error" :node="props.node" :display-src="displaySrc" :image-loaded="imageLoaded" :has-error="hasError" :fallback-src="props.fallbackSrc" :lazy="props.lazy">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M2 2h20v10h-2V4H4v9.586l5-5L14.414 14L13 15.414l-4-4l-5 5V20h8v2H2zm13.547 5a1 1 0 1 0 0 2a1 1 0 0 0 0-2m-3 1a3 3 0 1 1 6 0a3 3 0 0 1-6 0m3.625 6.757L19 17.586l2.828-2.829l1.415 1.415L20.414 19l2.829 2.828l-1.415 1.415L19 20.414l-2.828 2.829l-1.415-1.415L17.586 19l-2.829-2.828z" /></svg>
         <span>{{ t('image.loadError') }}</span>
