@@ -1,9 +1,38 @@
 const DISALLOWED_STYLE_PATTERNS = [/javascript:/i, /expression\s*\(/i, /url\s*\(\s*javascript:/i, /@import/i]
-const SAFE_URL_PROTOCOLS = /^(?:https?:|mailto:|tel:|#|\/|data:image\/(?:png|gif|jpe?g|webp);)/i
+const SAFE_URL_PROTOCOLS = /^(?:https?:|mailto:|tel:|#|\/|data:image\/(?:png|gif|jpe?g|webp|avif|bmp);)/i
+const ALLOWED_SVG_TAGS = new Set([
+  'svg',
+  'g',
+  'defs',
+  'marker',
+  'path',
+  'rect',
+  'circle',
+  'ellipse',
+  'line',
+  'polyline',
+  'polygon',
+  'text',
+  'tspan',
+  'title',
+  'desc',
+  'style',
+  'use',
+  'image',
+])
+const URL_LIKE_SVG_ATTRS = new Set([
+  'href',
+  'xlink:href',
+  'src',
+  'srcdoc',
+  'action',
+  'data',
+  'formaction',
+  'poster',
+])
 const RENDERABLE_SVG_TAGS = new Set([
   'circle',
   'ellipse',
-  'foreignobject',
   'image',
   'line',
   'path',
@@ -34,35 +63,47 @@ function sanitizeUrl(value: string | null | undefined) {
 }
 
 function scrubSvgElement(svgEl: SVGElement) {
-  const forbiddenTags = new Set(['script'])
-  const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll<SVGElement>('*'))]
+  const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll<Element>('*'))]
   for (const node of nodes) {
-    if (forbiddenTags.has(node.tagName.toLowerCase())) {
+    const tag = node.tagName.toLowerCase()
+    if (!ALLOWED_SVG_TAGS.has(tag)) {
       node.remove()
       continue
     }
+
+    if (tag === 'style' && DISALLOWED_STYLE_PATTERNS.some(re => re.test(node.textContent ?? ''))) {
+      node.remove()
+      continue
+    }
+
     const attrs = Array.from(node.attributes)
     for (const attr of attrs) {
-      const name = attr.name
+      const name = attr.name.toLowerCase()
       if (/^on/i.test(name)) {
-        node.removeAttribute(name)
+        node.removeAttribute(attr.name)
         continue
       }
+
       if (name === 'style' && attr.value) {
-        const val = attr.value
-        if (DISALLOWED_STYLE_PATTERNS.some(re => re.test(val))) {
-          node.removeAttribute(name)
+        if (DISALLOWED_STYLE_PATTERNS.some(re => re.test(attr.value))) {
+          node.removeAttribute(attr.name)
           continue
         }
       }
-      if ((name === 'href' || name === 'xlink:href') && attr.value) {
+
+      if (name === 'srcdoc') {
+        node.removeAttribute(attr.name)
+        continue
+      }
+
+      if (URL_LIKE_SVG_ATTRS.has(name) && attr.value) {
         const safe = sanitizeUrl(attr.value)
         if (!safe) {
-          node.removeAttribute(name)
+          node.removeAttribute(attr.name)
           continue
         }
         if (safe !== attr.value)
-          node.setAttribute(name, safe)
+          node.setAttribute(attr.name, safe)
       }
     }
   }

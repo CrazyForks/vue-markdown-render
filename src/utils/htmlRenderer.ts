@@ -53,8 +53,25 @@ export function isCustomComponent(
   return isCustomHtmlComponentTag(tagName, customComponents as Record<string, unknown>)
 }
 
-export function sanitizeAttrs(attrs: Record<string, string>): Record<string, string> {
-  return sanitizeHtmlAttrs(attrs)
+export function sanitizeAttrs(attrs: Record<string, string>, policy: HtmlPolicy = 'safe', tagName?: string): Record<string, string> {
+  return sanitizeHtmlAttrs(attrs, policy, tagName)
+}
+
+const SAFE_RASTER_IMAGE_DATA_URL = /^data:image\/(?:png|gif|jpe?g|webp|avif|bmp);/i
+
+export function sanitizeImageSrc(value: unknown) {
+  const src = String(value ?? '').trim()
+  if (!src)
+    return ''
+
+  const clean = sanitizeAttrs({ src }, 'safe', 'img').src ?? ''
+  if (!clean)
+    return ''
+
+  if (/^data:/i.test(clean) && !SAFE_RASTER_IMAGE_DATA_URL.test(clean))
+    return ''
+
+  return clean
 }
 
 export function convertPropValue(value: string, key: string): any {

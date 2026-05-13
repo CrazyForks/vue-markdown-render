@@ -46,5 +46,45 @@
   {
     "name": "form javascript action",
     "html": "<form action=\"javascript:alert(1)\"></form>"
+  },
+  {
+    "name": "data image svg href",
+    "html": "<a href=\"data:image/svg+xml,<svg onload=alert(1)>\">x</a>"
+  },
+  {
+    "name": "mixed case javascript",
+    "html": "<a href=\"JaVaScRiPt:alert(1)\">x</a>"
+  },
+  {
+    "name": "encoded entity protocol",
+    "html": "<a href=\"jav&#x61;script:alert(1)\">x</a>"
+  },
+  {
+    "name": "encoded whitespace javascript",
+    "html": "<a href=\"java&#x0A;script:alert(1)\">x</a>"
+  },
+  {
+    "name": "leading whitespace protocol",
+    "html": "<a href=\"   javascript:alert(1)\">x</a>"
+  },
+  {
+    "name": "svg data image",
+    "html": "<img src=\"data:image/svg+xml,<svg onload=alert(1)></svg>\">"
+  },
+  {
+    "name": "meta refresh",
+    "html": "<meta http-equiv=\"refresh\" content=\"0;url=javascript:alert(1)\">"
+  },
+  {
+    "name": "formaction javascript",
+    "html": "<button formaction=\"javascript:alert(1)\">x</button>"
+  },
+  {
+    "name": "style tag import",
+    "html": "<style>@import url(javascript:alert(1));</style>"
+  },
+  {
+    "name": "foreignObject iframe srcdoc",
+    "html": "<svg><foreignObject><iframe srcdoc=\"<script>alert(1)</script>\"></iframe></foreignObject></svg>"
   }
 ]

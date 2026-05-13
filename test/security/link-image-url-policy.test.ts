@@ -4,6 +4,8 @@
 
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { nextTick } from 'vue'
+import ImageNode from '../../src/components/ImageNode/ImageNode.vue'
 import NodeRenderer from '../../src/components/NodeRenderer'
 import { flushAll } from '../setup/flush-all'
 
@@ -91,5 +93,56 @@ describe('link and image URL policy', () => {
 
     await flushAll()
     expect(wrapper.get('img').attributes('src')).toBe(src)
+  })
+
+  it('rejects SVG data URLs for direct image nodes', async () => {
+    const src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>'
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        typewriter: false,
+        batchRendering: false,
+        nodes: [
+          {
+            type: 'paragraph',
+            raw: '',
+            children: [
+              {
+                type: 'image',
+                src,
+                alt: 'bad',
+                title: null,
+                raw: `![bad](${src})`,
+                loading: false,
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+    expect(wrapper.find('img').exists()).toBe(false)
+  })
+
+  it('shows error instead of blank when fallbackSrc is unsafe', async () => {
+    const wrapper = mount(ImageNode, {
+      props: {
+        node: {
+          type: 'image',
+          src: 'https://example.com/missing.png',
+          alt: 'x',
+          title: null,
+          raw: '![x](https://example.com/missing.png)',
+          loading: false,
+        },
+        fallbackSrc: 'javascript:alert(1)',
+      },
+    })
+
+    await wrapper.get('img').trigger('error')
+    await nextTick()
+
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.find('.image-error').exists()).toBe(true)
   })
 })

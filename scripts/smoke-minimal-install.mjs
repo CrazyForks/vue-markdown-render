@@ -29,7 +29,8 @@ function writeProjectFile(path, content) {
 }
 
 try {
-  run('pnpm', ['build'])
+  if (process.env.MARKSTREAM_SMOKE_SKIP_BUILD !== '1')
+    run('pnpm', ['build'])
 
   const packOutput = execFileSync('pnpm', ['pack', '--pack-destination', tmp, '--json'], {
     cwd: root,
@@ -40,7 +41,14 @@ try {
   const packedFilename = Array.isArray(packInfo) ? packInfo[0]?.filename : packInfo?.filename
   if (!packedFilename)
     throw new Error('pnpm pack did not return a tarball name')
-  packedTarball = packedFilename
+
+  const candidateTarballs = [
+    resolve(packedFilename),
+    resolve(tmp, basename(packedFilename)),
+  ]
+  packedTarball = candidateTarballs.find(existsSync) ?? ''
+  if (!packedTarball)
+    throw new Error(`Packed tarball not found: ${packedFilename}`)
 
   const packedPackageJson = JSON.parse(execFileSync('tar', ['-xOf', packedTarball, 'package/package.json'], { encoding: 'utf8' }))
   for (const [name, version] of Object.entries(packedPackageJson.dependencies ?? {})) {
@@ -64,14 +72,15 @@ try {
     devDependencies: {},
   }
   smokePackage.scripts['ssr:import'] = 'node ./ssr-import.mjs'
+  smokePackage.dependencies['@vue/server-renderer'] = '^3.5.31'
   smokePackage.dependencies['@vitejs/plugin-vue'] = '^5.2.4'
   writeProjectFile('package.json', `${JSON.stringify(smokePackage, null, 2)}\n`)
 
   writeProjectFile('index.html', '<div id="app"></div><script type="module" src="/src/main.ts"></script>\n')
   writeProjectFile('vite.config.ts', `import vue from '@vitejs/plugin-vue'\nimport { defineConfig } from 'vite'\n\nexport default defineConfig({ plugins: [vue()] })\n`)
   writeProjectFile('src/main.ts', `import { createApp } from 'vue'\nimport MarkdownRender from 'markstream-vue'\nimport 'markstream-vue/index.css'\nimport App from './App.vue'\n\ncreateApp(App).component('MarkdownRender', MarkdownRender).mount('#app')\n`)
-  writeProjectFile('src/App.vue', `<script setup lang="ts">\nconst content = '# Hello\\\\n\\\\n~~~ts\\\\nconsole.log(1)\\\\n~~~\\\\n\\\\n<div><a href="javascript:alert(1)">bad</a><span>safe</span></div>'\n</script>\n\n<template>\n  <MarkdownRender :content="content" :final="true" :render-code-blocks-as-pre="true" />\n</template>\n`)
-  writeProjectFile('ssr-import.mjs', `import { existsSync } from 'node:fs'\nimport { fileURLToPath } from 'node:url'\n\nconst mod = await import('markstream-vue')\nif (!mod.default || !mod.MarkdownRender)\n  throw new Error('Root package import did not expose MarkdownRender')\n\nconst cssUrl = import.meta.resolve('markstream-vue/index.css')\nif (!existsSync(fileURLToPath(cssUrl)))\n  throw new Error('CSS export did not resolve to a file')\n`)
+  writeProjectFile('src/App.vue', `<script setup lang="ts">\nconst content = '# Hello\\\\n\\\\n~~~ts\\\\nconsole.log(1)\\\\n~~~\\\\n\\\\n<div><a href="javascript:alert(1)">bad</a><span>safe</span></div>'\n</script>\n\n<template>\n  <MarkdownRender :content="content" :final="true" :render-code-blocks-as-pre="true" />\n  <MarkdownRender :content="content" :final="true" />\n</template>\n`)
+  writeProjectFile('ssr-import.mjs', `import { existsSync } from 'node:fs'\nimport { fileURLToPath } from 'node:url'\nimport { createSSRApp, h } from 'vue'\nimport { renderToString } from '@vue/server-renderer'\nimport MarkdownRender, { MarkdownRender as NamedMarkdownRender } from 'markstream-vue'\n\nconst mod = await import('markstream-vue')\nif (!mod.default || !mod.MarkdownRender || !NamedMarkdownRender)\n  throw new Error('Root package import did not expose MarkdownRender')\n\nconst cssUrl = import.meta.resolve('markstream-vue/index.css')\nif (!existsSync(fileURLToPath(cssUrl)))\n  throw new Error('CSS export did not resolve to a file')\n\nconst html = await renderToString(createSSRApp({\n  render: () => h(MarkdownRender, {\n    content: '~~~ts\\\\nconsole.log(1)\\\\n~~~',\n    final: true,\n  }),\n}))\n\nif (!html || !html.includes('console.log'))\n  throw new Error('SSR render did not include default code block content')\n`)
 
   run('pnpm', ['install', '--ignore-workspace'], { cwd: tmp })
   run('pnpm', ['run', 'build'], { cwd: tmp })

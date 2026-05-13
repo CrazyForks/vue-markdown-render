@@ -16,4 +16,8 @@ export declare const URL_HTML_ATTRS: Set<string>;
 export declare const BLOCKED_HTML_TAGS: Set<string>;
 export declare const NON_STRUCTURING_HTML_TAGS: Set<string>;
 export declare function stripHtmlControlAndWhitespace(value: string): string;
-export declare function isUnsafeHtmlUrl(value: string): boolean;
+export interface HtmlUrlContext {
+    tagName?: string;
+    attrName?: string;
+}
+export declare function isUnsafeHtmlUrl(value: string, context?: HtmlUrlContext): boolean;

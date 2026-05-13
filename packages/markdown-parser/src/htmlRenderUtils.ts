@@ -159,7 +159,7 @@ function serializeAttrs(attrs: Record<string, string>): string {
     .join('')
 }
 
-function isUnsafeSrcset(value: string) {
+function isUnsafeSrcset(value: string, tagName?: string) {
   const candidates = value
     .split(',')
     .map(candidate => candidate.trim())
@@ -170,18 +170,18 @@ function isUnsafeSrcset(value: string) {
 
   return candidates.some((candidate) => {
     const url = candidate.split(/\s+/, 1)[0] ?? ''
-    return !url || isUnsafeHtmlUrl(url)
+    return !url || isUnsafeHtmlUrl(url, { tagName, attrName: 'srcset' })
   })
 }
 
-function shouldDropHtmlAttr(lowerKey: string, value: string, policy: HtmlPolicy) {
+function shouldDropHtmlAttr(lowerKey: string, value: string, policy: HtmlPolicy, tagName?: string) {
   if (DANGEROUS_HTML_ATTRS.has(lowerKey))
     return true
   if (policy === 'safe' && lowerKey === 'style')
     return true
   if (lowerKey === 'srcset')
-    return isUnsafeSrcset(value)
-  if (URL_HTML_ATTRS.has(lowerKey) && value && isUnsafeHtmlUrl(value))
+    return isUnsafeSrcset(value, tagName)
+  if (URL_HTML_ATTRS.has(lowerKey) && value && isUnsafeHtmlUrl(value, { tagName, attrName: lowerKey }))
     return true
   return false
 }
@@ -215,7 +215,7 @@ function sanitizeHtmlContentAttrs(attrs: Record<string, string>, policy: HtmlPol
     const lowerKey = safeName.toLowerCase()
     if (!safeName || !isSafeAttrName(safeName))
       continue
-    if (shouldDropHtmlAttr(lowerKey, value, policy))
+    if (shouldDropHtmlAttr(lowerKey, value, policy, tagName))
       continue
     clean[safeName] = value
   }
@@ -240,7 +240,7 @@ export function sanitizeHtmlAttrs(attrs: Record<string, string>, policy: HtmlPol
     const lowerKey = safeName.toLowerCase()
     if (!safeName || !isSafeAttrName(safeName))
       continue
-    if (shouldDropHtmlAttr(lowerKey, value, policy))
+    if (shouldDropHtmlAttr(lowerKey, value, policy, tagName))
       continue
     clean[safeName] = value
   }

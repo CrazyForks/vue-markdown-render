@@ -96,7 +96,7 @@ const nodeAttrs = computed(() => {
     }
   }
 
-  return sanitizeAttrs(normalized)
+  return sanitizeAttrs(normalized, 'safe', 'a')
 })
 const mergedAnchorAttrs = computed(() => {
   return {
@@ -143,7 +143,7 @@ const anchorAttrs = computed(() => {
 
 const safeHref = computed(() => {
   const href = String(props.node?.href ?? '')
-  return sanitizeAttrs({ href }).href
+  return sanitizeAttrs({ href }, 'safe', 'a').href
 })
 
 // Tooltip handlers using singleton tooltip

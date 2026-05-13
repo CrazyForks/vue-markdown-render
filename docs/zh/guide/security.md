@@ -26,6 +26,7 @@
 ### `htmlPolicy="trusted"`
 
 保留更宽的 HTML 集合，但仍会移除 script 等硬阻断标签。只应用在你完全控制的内容上。
+它可能保留内联样式和更宽的 HTML 集。不要用于模型输出或用户生成内容。
 
 ## 自定义组件
 
@@ -49,4 +50,4 @@ defineProps<{ node: { content?: string } }>()
 
 ## 链接和图片
 
-Markdown 链接和渲染出的 HTML attrs 会检查 `javascript:`、`vbscript:`、HTML `data:` 文档等不安全协议。图片 data URL 仅允许浏览器按图片处理的媒体类型。
+Markdown 链接和渲染出的 HTML attrs 会检查 `javascript:`、`vbscript:`、HTML `data:` 文档等不安全协议。bitmap 图片 data URL 只允许出现在图片源属性上。

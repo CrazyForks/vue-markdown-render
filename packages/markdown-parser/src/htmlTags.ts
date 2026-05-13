@@ -212,18 +212,24 @@ export function stripHtmlControlAndWhitespace(value: string) {
   return out
 }
 
-export function isUnsafeHtmlUrl(value: string) {
+export interface HtmlUrlContext {
+  tagName?: string
+  attrName?: string
+}
+
+export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
   const normalized = stripHtmlControlAndWhitespace(value).toLowerCase()
+  const tagName = String(context.tagName ?? '').toLowerCase()
+  const attrName = String(context.attrName ?? '').toLowerCase()
 
   if (normalized.startsWith('javascript:') || normalized.startsWith('vbscript:'))
     return true
 
   if (normalized.startsWith('data:')) {
-    return !(
-      normalized.startsWith('data:image/')
-      || normalized.startsWith('data:video/')
-      || normalized.startsWith('data:audio/')
-    )
+    const isBitmapImageData = /^data:image\/(?:png|gif|jpe?g|webp|avif|bmp);/i.test(normalized)
+    if (tagName === 'img' && (attrName === 'src' || attrName === 'srcset'))
+      return !isBitmapImageData
+    return true
   }
 
   return false

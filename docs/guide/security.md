@@ -26,6 +26,7 @@ Use this for untrusted user-generated content, public comments, third-party feed
 ### `htmlPolicy="trusted"`
 
 Keeps a broader HTML set while still dropping hard-blocked tags such as scripts. Use it only for content you fully control.
+It may keep inline styles and broader HTML. Do not use it for model output or user-generated content.
 
 ## Custom components
 
@@ -49,4 +50,4 @@ defineProps<{ node: { content?: string } }>()
 
 ## Links and images
 
-Markdown links and rendered HTML attrs are checked for unsafe protocols such as `javascript:`, `vbscript:`, and HTML `data:` documents. Image data URLs are allowed only for media types that browsers treat as images.
+Markdown links and rendered HTML attrs are checked for unsafe protocols such as `javascript:`, `vbscript:`, and HTML `data:` documents. Bitmap image data URLs are allowed only on image source attributes.
