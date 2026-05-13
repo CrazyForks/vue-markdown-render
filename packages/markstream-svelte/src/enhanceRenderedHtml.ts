@@ -1,5 +1,6 @@
 import type { NodeRendererCodeBlockProps, NodeRendererD2Props, NodeRendererInfographicProps, NodeRendererMermaidProps } from './components/shared/node-helpers'
 import type { CodeBlockMonacoOptions } from './types/monaco'
+import { toSafeMermaidSvgMarkup } from 'stream-markdown-parser'
 import { getD2 } from './optional/d2'
 import { getInfographic } from './optional/infographic'
 import { getKatex } from './optional/katex'
@@ -347,7 +348,7 @@ async function renderMermaid(
       const svg = typeof rendered === 'string' ? rendered : rendered?.svg
       if (!svg)
         continue
-      const safeSvg = strictMode ? toSafeSvgMarkup(svg) : svg
+      const safeSvg = toSafeMermaidSvgMarkup(svg)
       if (!safeSvg)
         continue
       shell.body.innerHTML = safeSvg

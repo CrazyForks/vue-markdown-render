@@ -65,7 +65,7 @@ B-->C[End]
 ## 3. Advanced component: `MermaidBlockNode`
 
 Need header controls, export buttons, or a pseudo-fullscreen modal? Use [`MermaidBlockNode`](/guide/mermaid-block-node) or override the default renderer via [setCustomComponents](/guide/mermaid-block-node-override). A runnable playground demo lives at `/mermaid-export-demo`.
-Mermaid strict mode and SVG sanitization are enabled by default. Set `:is-strict="false"` only for trusted diagrams that need Mermaid's loose parse/render config. The Vue renderer still sanitizes Mermaid SVG output before mounting.
+Mermaid strict mode and SVG sanitization are enabled by default. Set `:is-strict="false"` only for trusted diagrams that need Mermaid's loose parse/render config. Markstream still sanitizes Mermaid SVG output before mounting.
 
 ## 4. When strict mode changes rendering
 
@@ -77,7 +77,7 @@ Common symptoms after upgrading:
 2. Links or interactions that depended on Mermaid's looser HTML handling disappear from the final SVG.
 3. Previously accepted diagram markup now falls back to plain text or renders a simpler label.
 
-If the diagram source is fully trusted and you need Mermaid's loose config, opt out explicitly instead of changing the global default. In the Vue renderer, `isStrict=false` does not mean raw SVG insertion; the final SVG is still sanitized, so `foreignObject` and active HTML labels may be removed.
+If the diagram source is fully trusted and you need Mermaid's loose config, opt out explicitly instead of changing the global default. In Markstream renderers, `isStrict=false` does not mean raw SVG insertion; the final SVG is still sanitized, so `foreignObject` and active HTML labels may be removed.
 
 ### Vue 3: switch a trusted Markdown surface to loose Mermaid config
 

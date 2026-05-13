@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Exported props interface for MermaidBlockNode
 import type { MermaidBlockEvent } from '../../types/component-props'
+import { isBrokenMermaidSvg, toSafeSvgElement } from 'stream-markdown-parser'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
@@ -91,79 +92,6 @@ const mermaidInitConfig = computed(() => ({
   flowchart: mermaidSecurityLevel.value === 'strict' ? { htmlLabels: false } : undefined,
 }))
 
-function neutralizeScriptProtocols(raw: string) {
-  return raw
-    .replace(/["']\s*javascript:/gi, '#')
-    .replace(/\bjavascript:/gi, '#')
-    .replace(/["']\s*vbscript:/gi, '#')
-    .replace(/\bvbscript:/gi, '#')
-    .replace(/\bdata:text\/html/gi, '#')
-}
-
-const DISALLOWED_STYLE_PATTERNS = [/javascript:/i, /expression\s*\(/i, /url\s*\(\s*javascript:/i, /@import/i]
-const SAFE_URL_PROTOCOLS = /^(?:https?:|mailto:|tel:|#|\/|data:image\/(?:png|gif|jpe?g|webp);)/i
-
-function sanitizeUrl(value: string | null | undefined) {
-  if (!value)
-    return ''
-  const trimmed = value.trim()
-  if (SAFE_URL_PROTOCOLS.test(trimmed))
-    return trimmed
-  return ''
-}
-
-function scrubSvgElement(svgEl: SVGElement) {
-  const forbiddenTags = new Set(['script'])
-  const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll<SVGElement>('*'))]
-  for (const node of nodes) {
-    if (forbiddenTags.has(node.tagName.toLowerCase())) {
-      node.remove()
-      continue
-    }
-    const attrs = Array.from(node.attributes)
-    for (const attr of attrs) {
-      const name = attr.name
-      if (/^on/i.test(name)) {
-        node.removeAttribute(name)
-        continue
-      }
-      if (name === 'style' && attr.value) {
-        const val = attr.value
-        if (DISALLOWED_STYLE_PATTERNS.some(re => re.test(val))) {
-          node.removeAttribute(name)
-          continue
-        }
-      }
-      if ((name === 'href' || name === 'xlink:href') && attr.value) {
-        const safe = sanitizeUrl(attr.value)
-        if (!safe) {
-          node.removeAttribute(name)
-          continue
-        }
-        // ensure sanitized value is applied
-        if (safe !== attr.value)
-          node.setAttribute(name, safe)
-      }
-    }
-  }
-}
-
-function toSafeSvgElement(svg: string | null | undefined): SVGElement | null {
-  if (typeof window === 'undefined' || typeof DOMParser === 'undefined')
-    return null
-  if (!svg)
-    return null
-  const neutralized = neutralizeScriptProtocols(svg)
-  // DOMPurify may strip harmless label styles/text; rely on manual scrub after parse
-  const parsed = new DOMParser().parseFromString(neutralized, 'image/svg+xml')
-  const svgEl = parsed.documentElement
-  if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
-    return null
-  const svgElement = svgEl as unknown as SVGElement
-  scrubSvgElement(svgElement)
-  return svgElement
-}
-
 function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null | undefined) {
   if (!target)
     return ''
@@ -196,57 +124,9 @@ function clearElement(target: HTMLElement | null | undefined) {
 function renderSvgToTarget(target: HTMLElement | null | undefined, svg: string | null | undefined) {
   if (!target)
     return ''
-  if (mermaidSecurityLevel.value === 'strict') {
-    return setSafeSvg(target, svg)
-  }
-  try {
-    target.replaceChildren()
-  }
-  catch {
-    target.innerHTML = ''
-  }
-  if (svg) {
-    try {
-      target.insertAdjacentHTML('afterbegin', svg)
-    }
-    catch {
-      target.innerHTML = svg
-    }
-  }
-  return target.innerHTML
-}
-
-function isBrokenMermaidSvg(svg: string | null | undefined) {
-  if (!svg || typeof DOMParser === 'undefined')
-    return !svg
-
-  const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
-  const svgEl = parsed.documentElement
-  if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
-    return true
-
-  const viewBox = svgEl.getAttribute('viewBox')
-  if (viewBox) {
-    const parts = viewBox.trim().split(/[\s,]+/)
-    if (parts.length === 4) {
-      const width = Number.parseFloat(parts[2] || '')
-      const height = Number.parseFloat(parts[3] || '')
-      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
-        return true
-    }
-  }
-
-  const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll('*'))]
-  for (const node of nodes) {
-    for (const attr of Array.from(node.attributes)) {
-      if (/\bNaN\b/i.test(attr.value))
-        return true
-      if (attr.name === 'style' && /max-width:\s*0(?:px)?/i.test(attr.value))
-        return true
-    }
-  }
-
-  return false
+  if (isBrokenMermaidSvg(svg))
+    return ''
+  return setSafeSvg(target, svg)
 }
 
 const { t } = useSafeI18n()

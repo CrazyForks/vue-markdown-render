@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { SvelteRenderableNode, SvelteRenderContext } from './shared/node-helpers'
   import { onMount, untrack } from 'svelte'
+  import { toSafeMermaidSvgMarkup } from 'stream-markdown-parser'
   import { useSafeI18n } from '../i18n/useSafeI18n'
   import { getMermaid } from '../optional/mermaid'
-  import { toSafeSvgMarkup } from '../sanitizeSvg'
   import { hideTooltip, showTooltipForAnchor, type TooltipPlacement } from '../tooltip/singletonTooltip'
   import { getLanguageIcon } from '../utils/languageIcon'
   import { canParseOffthread, findPrefixOffthread } from '../workers/mermaidWorkerClient'
@@ -239,7 +239,7 @@
         return
 
       const rawSvg = typeof rendered === 'string' ? rendered : rendered?.svg
-      const safeSvg = isStrict ? toSafeSvgMarkup(rawSvg) : rawSvg
+      const safeSvg = toSafeMermaidSvgMarkup(rawSvg)
       if (!safeSvg)
         throw new Error('Mermaid rendered empty SVG.')
       svgMarkup = safeSvg

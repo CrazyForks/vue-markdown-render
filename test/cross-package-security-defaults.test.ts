@@ -25,6 +25,16 @@ describe('cross-package security defaults', () => {
     }
   })
 
+  it('keeps Mermaid SVG mounting sanitized across loose-mode paths', () => {
+    expect(source('packages/markstream-react/src/components/MermaidBlockNode/MermaidBlockNode.tsx')).toContain('return setSafeSvg(target, svg)')
+    expect(source('packages/markstream-react/src/components/MermaidBlockNode/MermaidBlockNode.tsx')).not.toContain('target.insertAdjacentHTML(\'afterbegin\', svg)')
+    expect(source('packages/markstream-vue2/src/components/MermaidBlockNode/MermaidBlockNode.vue')).toContain('return setSafeSvg(target, svg)')
+    expect(source('packages/markstream-vue2/src/components/MermaidBlockNode/MermaidBlockNode.vue')).not.toContain('target.insertAdjacentHTML(\'afterbegin\', svg)')
+    expect(source('packages/markstream-svelte/src/components/MermaidBlockNode.svelte')).toContain('toSafeMermaidSvgMarkup(rawSvg)')
+    expect(source('packages/markstream-angular/src/enhanceRenderedHtml.ts')).toContain('toSafeMermaidSvgMarkup(svg)')
+    expect(source('packages/markstream-svelte/src/enhanceRenderedHtml.ts')).toContain('toSafeMermaidSvgMarkup(svg)')
+  })
+
   it('defaults HTML preview sandboxes to least privilege across framework packages', () => {
     expect(source('src/components/CodeBlockNode/HtmlPreviewFrame.vue')).toContain(':sandbox="sandboxValue"')
     expect(source('packages/markstream-vue2/src/components/CodeBlockNode/HtmlPreviewFrame.vue')).toContain(':sandbox="sandboxValue"')

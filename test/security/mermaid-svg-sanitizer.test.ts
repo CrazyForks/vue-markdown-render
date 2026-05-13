@@ -4,8 +4,8 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { isBrokenMermaidSvg, sanitizeMermaidSvg } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
-import { isBrokenMermaidSvg, sanitizeMermaidSvg } from '../../src/components/MermaidBlockNode/mermaidSvgSanitizer'
 
 const mermaidSvgFixtureDir = join(process.cwd(), 'test/fixtures/mermaid-svg')
 
@@ -85,17 +85,19 @@ describe('mermaid SVG sanitizer', () => {
     expect(svg).not.toMatch(/javascript:/i)
   })
 
-  it('removes SVG style tags in sanitized Mermaid output', () => {
+  it('preserves safe SVG style tags in sanitized Mermaid output', () => {
     const svg = sanitizeMermaidSvg(`
       <svg viewBox="0 0 10 10">
-        <style>.node { pointer-events: all; }</style>
+        <style onload="alert(1)">.node rect { fill: #fff; stroke: #333; }</style>
         <rect width="10" height="10" />
       </svg>
     `)
 
     expect(svg).toBeTruthy()
-    expect(svg).not.toContain('<style')
-    expect(svg).not.toMatch(/pointer-events/i)
+    expect(svg).toContain('<style')
+    expect(svg).toContain('fill')
+    expect(svg).toContain('stroke')
+    expect(svg).not.toMatch(/\son[a-z]+\s*=/i)
   })
 
   it('removes dangerous style URLs', () => {
@@ -167,6 +169,26 @@ describe('mermaid SVG sanitizer', () => {
     expect(safe).toMatch(/url\(#g\)/)
   })
 
+  it('uses SVG tag and attribute context when sanitizing URL attributes', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <image href="mailto:a@example.com" />
+        <image src="data:image/png;base64,AAAA" />
+        <use href="https://evil.example/sprite.svg#x" />
+        <use href="#local-symbol" />
+        <a href="mailto:a@example.com"><text>x</text></a>
+        <rect width="10" height="10" />
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).not.toMatch(/<image[^>]+mailto:/i)
+    expect(svg).toMatch(/<image[^>]+data:image\/png/i)
+    expect(svg).not.toMatch(/<use[^>]+https:/i)
+    expect(svg).toMatch(/<use[^>]+#local-symbol/i)
+    expect(svg).toMatch(/<a[^>]+mailto:/i)
+  })
+
   it.each(readMermaidSvgFixtures())('preserves renderable Mermaid SVG fixture $name', ({ svg }) => {
     const sanitized = sanitizeMermaidSvg(svg)
 
@@ -191,6 +213,8 @@ describe('mermaid SVG sanitizer', () => {
       expect(sanitized).toMatch(/<mask/i)
     if (svg.match(/<pattern/i))
       expect(sanitized).toMatch(/<pattern/i)
+    if (svg.match(/<style/i))
+      expect(sanitized).toMatch(/<style/i)
   })
 
   it('detects broken Mermaid SVG output', () => {

@@ -53,7 +53,7 @@ describe('markstream-react diagram parity', () => {
       initialize: vi.fn(),
       parse: vi.fn(async () => true),
       render: vi.fn(async () => ({
-        svg: '<svg viewBox="0 0 100 200"><g /></svg>',
+        svg: '<svg viewBox="0 0 100 200"><rect width="1" height="1" /></svg>',
         bindFunctions: vi.fn(),
       })),
     }

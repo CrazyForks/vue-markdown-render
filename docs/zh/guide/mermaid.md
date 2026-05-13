@@ -63,7 +63,7 @@ B-->C[End]
 ## 3. 进阶组件：`MermaidBlockNode`
 
 若需要头部控制、导出按钮、伪全屏等能力，请参考 [`MermaidBlockNode`](/zh/guide/mermaid-block-node) 或通过 [setCustomComponents 进行覆盖](/zh/guide/mermaid-block-node-override)。仓库内的 playground 提供 `/mermaid-export-demo` 路由可直接试用。
-Mermaid 严格模式与 SVG 清理默认开启。只有可信图表确实需要 Mermaid loose 解析/渲染配置时，才设置 `:is-strict="false"`。Vue 渲染器在挂载前仍会清理 Mermaid SVG 输出。
+Mermaid 严格模式与 SVG 清理默认开启。只有可信图表确实需要 Mermaid loose 解析/渲染配置时，才设置 `:is-strict="false"`。Markstream 在挂载前仍会清理 Mermaid SVG 输出。
 
 ## 4. strict 默认开启后，哪些图可能会变
 
@@ -75,7 +75,7 @@ Mermaid 严格模式与 SVG 清理默认开启。只有可信图表确实需要 
 2. 依赖宽松 HTML 处理的链接或交互，在最终 SVG 里被去掉。
 3. 以前能渲染的图，现在退化成更简单的纯文本 label，或者和旧版本效果不一致。
 
-如果图表来源是完全可信的，而且确实需要 Mermaid loose 配置，请按具体渲染面显式关闭 strict，而不是改回全局默认值。在 Vue 渲染器中，`isStrict=false` 不代表原始 SVG 插入；最终 SVG 仍会被清理，因此 `foreignObject` 和 active HTML labels 可能会被移除。
+如果图表来源是完全可信的，而且确实需要 Mermaid loose 配置，请按具体渲染面显式关闭 strict，而不是改回全局默认值。在 Markstream 渲染器中，`isStrict=false` 不代表原始 SVG 插入；最终 SVG 仍会被清理，因此 `foreignObject` 和 active HTML labels 可能会被移除。
 
 ### Vue 3：让可信 Markdown 面使用 Mermaid loose 配置
 

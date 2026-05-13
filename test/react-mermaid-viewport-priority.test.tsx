@@ -66,7 +66,7 @@ describe('markstream-react mermaid viewport priority', () => {
       initialize: vi.fn(),
       parse: vi.fn(async () => true),
       render: vi.fn(async () => ({
-        svg: '<svg viewBox="0 0 10 10"><g /></svg>',
+        svg: '<svg viewBox="0 0 10 10"><rect width="1" height="1" /></svg>',
         bindFunctions: vi.fn(),
       })),
     }

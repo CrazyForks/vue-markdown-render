@@ -48,6 +48,7 @@ export * from './customHtmlTags'
 export { findMatchingClose } from './findMatchingClose'
 export * from './htmlRenderUtils'
 export * from './htmlTags'
+export * from './mermaidSvgSanitizer'
 export type { MarkdownIt } from './markdown-it-types'
 export { parseFenceToken } from './parser/inline-parsers/fence-parser'
 

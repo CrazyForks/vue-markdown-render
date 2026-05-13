@@ -46,8 +46,9 @@ const emits = defineEmits(['copy', 'export', 'openModal', 'toggleMode'])
 
 const DOMPURIFY_CONFIG = {
   USE_PROFILES: { svg: true },
-  FORBID_TAGS: ['script', 'style'],
+  FORBID_TAGS: ['script'],
   FORBID_ATTR: [/^on/i],
+  ADD_TAGS: ['style'],
   ADD_ATTR: ['style'],
   SAFE_FOR_TEMPLATES: true,
 } as const
@@ -66,7 +67,7 @@ function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null |
   if (!target)
     return ''
   const safeElement = toSafeSvgElement(svg)
-  if (!safeElement || isBrokenMermaidSvg(safeElement.outerHTML))
+  if (!safeElement)
     return ''
   appendBufferedSvgLayer(target, safeElement)
   return safeElement.outerHTML

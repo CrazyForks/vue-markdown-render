@@ -10,8 +10,8 @@ import {
   Input,
   ViewChild,
 } from '@angular/core'
+import { toSafeMermaidSvgMarkup } from 'stream-markdown-parser'
 import { getMermaid } from '../../optional/mermaid'
-import { toSafeSvgMarkup } from '../../sanitizeSvg'
 import { canParseOffthread, findPrefixOffthread } from '../../workers/mermaidWorkerClient'
 import { clampPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../shared/diagram-height'
 import { getString } from '../shared/node-helpers'
@@ -491,7 +491,7 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
       const svg = typeof rendered === 'string' ? rendered : rendered?.svg
       if (this.isBrokenMermaidSvg(svg))
         throw new Error('Mermaid produced invalid SVG during preview')
-      const safeSvg = toSafeSvgMarkup(svg)
+      const safeSvg = toSafeMermaidSvgMarkup(svg)
       if (!safeSvg)
         throw new Error('Mermaid returned empty output.')
 
