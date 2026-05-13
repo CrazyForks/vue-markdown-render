@@ -327,37 +327,6 @@ const desiredRenderedCount = computed(() => {
   const target = Math.min(parsedNodes.value.length, windowEnd)
   return Math.max(renderedCount.value, target)
 })
-const {
-  cleanupBatchScheduler,
-} = useBatchRenderingScheduler({
-  props,
-  isClient,
-  isTestEnv,
-  parsedNodesIdentity,
-  parsedNodeCount,
-  desiredRenderedCount,
-  batchingEnabled,
-  incrementalRenderingActive,
-  resolvedBatchSize,
-  resolvedInitialBatch,
-  renderedCount,
-  adaptiveBatchSize,
-  previousRenderContext,
-  previousBatchConfig,
-  requestFrame,
-  cancelFrame,
-  hasIdleCallback,
-  cleanupNodeVisibility,
-  onDatasetKeyChanged: (total) => {
-    resetHeightMeasurements()
-    if (total > 0)
-      rebuildHeightTrees(total)
-  },
-  onDatasetChanged: () => {
-    if (virtualizationEnabled.value)
-      scheduleFocusSync({ immediate: true })
-  },
-})
 
 function ensureExperimentProbeNodes() {
   if (paragraphProbeNode.value && listItemProbeNode.value && listProbeNode.value && headingProbeNodes.value?.[1])
@@ -1420,6 +1389,38 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
   nodeVisibilityFallbackTimers.clear()
   resetNodeVisibleState()
 }
+
+const {
+  cleanupBatchScheduler,
+} = useBatchRenderingScheduler({
+  props,
+  isClient,
+  isTestEnv,
+  parsedNodesIdentity,
+  parsedNodeCount,
+  desiredRenderedCount,
+  batchingEnabled,
+  incrementalRenderingActive,
+  resolvedBatchSize,
+  resolvedInitialBatch,
+  renderedCount,
+  adaptiveBatchSize,
+  previousRenderContext,
+  previousBatchConfig,
+  requestFrame,
+  cancelFrame,
+  hasIdleCallback,
+  cleanupNodeVisibility,
+  onDatasetKeyChanged: (total) => {
+    resetHeightMeasurements()
+    if (total > 0)
+      rebuildHeightTrees(total)
+  },
+  onDatasetChanged: () => {
+    if (virtualizationEnabled.value)
+      scheduleFocusSync({ immediate: true })
+  },
+})
 
 watch(
   () => virtualizationEnabled.value,
