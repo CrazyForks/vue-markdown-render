@@ -60,6 +60,7 @@ import { useLiveRangeState } from './composables/useLiveRangeState'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
 import { useResolvedRendererOptions } from './composables/useResolvedRendererOptions'
 import { useSchedulerPlatform } from './composables/useSchedulerPlatform'
+import { useScrollListener } from './composables/useScrollListener'
 import { useScrollRestore } from './composables/useScrollRestore'
 import { useSmoothStreamingBridge } from './composables/useSmoothStreamingBridge'
 import { useViewportRoot } from './composables/useViewportRoot'
@@ -333,7 +334,6 @@ const {
       scheduleRestoreReconcile()
   },
 })
-let detachScrollHandler: (() => void) | null = null
 const deferNodes = computed(() => {
   if (renderAsFragment.value)
     return false
@@ -435,28 +435,16 @@ const {
   syncFocusToScroll,
 })
 
-function cleanupScrollListener() {
-  if (detachScrollHandler) {
-    detachScrollHandler()
-    detachScrollHandler = null
-  }
-  scrollRootElement.value = null
-}
-
-function setupScrollListener() {
-  if (!isClient || !virtualizationEnabled.value)
-    return
-  const root = resolveScrollContainer()
-  if (!root || scrollRootElement.value === root)
-    return
-  cleanupScrollListener()
-  const handler = () => scheduleFocusSync()
-  root.addEventListener('scroll', handler, { passive: true })
-  scrollRootElement.value = root
-  detachScrollHandler = () => {
-    root.removeEventListener('scroll', handler)
-  }
-}
+const {
+  cleanupScrollListener,
+  setupScrollListener,
+} = useScrollListener({
+  isClient,
+  virtualizationEnabled,
+  scrollRootElement,
+  resolveScrollContainer,
+  scheduleFocusSync,
+})
 
 function syncFocusToScroll(force = false) {
   if (!virtualizationEnabled.value)
