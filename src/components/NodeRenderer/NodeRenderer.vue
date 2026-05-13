@@ -54,6 +54,7 @@ import { createMathBlockMinHeightCache, provideMathBlockMinHeightCache } from '.
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import { useBatchRenderingScheduler } from './composables/useBatchRenderingScheduler'
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
+import { useFocusSyncScheduler } from './composables/useFocusSyncScheduler'
 import { useHeightMeasurements } from './composables/useHeightMeasurements'
 import { useLiveRangeState } from './composables/useLiveRangeState'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
@@ -333,7 +334,6 @@ const {
   },
 })
 let detachScrollHandler: (() => void) | null = null
-let pendingFocusSync: { id: number | ReturnType<typeof setTimeout>, viaTimeout: boolean } | null = null
 const deferNodes = computed(() => {
   if (renderAsFragment.value)
     return false
@@ -423,6 +423,18 @@ function getHeadingProbeNode(level: number) {
   return headingProbeNodes.value?.[level] ?? null
 }
 
+const {
+  cancelScheduledFocusSync,
+  scheduleFocusSync,
+} = useFocusSyncScheduler({
+  isClient,
+  containerRef,
+  virtualizationEnabled,
+  requestFrame,
+  cancelFrame,
+  syncFocusToScroll,
+})
+
 function cleanupScrollListener() {
   if (detachScrollHandler) {
     detachScrollHandler()
@@ -443,45 +455,6 @@ function setupScrollListener() {
   scrollRootElement.value = root
   detachScrollHandler = () => {
     root.removeEventListener('scroll', handler)
-  }
-}
-
-function cancelScheduledFocusSync() {
-  if (!pendingFocusSync)
-    return
-  const win = containerRef.value?.ownerDocument?.defaultView ?? (typeof window !== 'undefined' ? window : null)
-  if (pendingFocusSync.viaTimeout)
-    win ? win.clearTimeout(pendingFocusSync.id as number) : clearTimeout(pendingFocusSync.id as ReturnType<typeof setTimeout>)
-  else
-    cancelFrame?.(pendingFocusSync.id as number)
-  pendingFocusSync = null
-}
-
-function scheduleFocusSync(options: { immediate?: boolean } = {}) {
-  if (!virtualizationEnabled.value)
-    return
-  if (!isClient) {
-    syncFocusToScroll(true)
-    return
-  }
-  if (options.immediate) {
-    cancelScheduledFocusSync()
-    syncFocusToScroll(true)
-    return
-  }
-  if (pendingFocusSync)
-    return
-  const run = () => {
-    pendingFocusSync = null
-    syncFocusToScroll()
-  }
-  if (requestFrame) {
-    pendingFocusSync = { id: requestFrame(run), viaTimeout: false }
-  }
-  else {
-    const win = containerRef.value?.ownerDocument?.defaultView ?? (typeof window !== 'undefined' ? window : null)
-    const timeoutId = win ? win.setTimeout(run, 16) : setTimeout(run, 16)
-    pendingFocusSync = { id: timeoutId, viaTimeout: true }
   }
 }
 
@@ -564,6 +537,7 @@ function syncFocusToScroll(force = false) {
     return
   focusIndex.value = clamp(midpoint, 0, Math.max(0, parsedNodes.value.length - 1))
 }
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
