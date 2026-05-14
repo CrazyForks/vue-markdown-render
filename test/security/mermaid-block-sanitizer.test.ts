@@ -52,10 +52,12 @@ describe('mermaid block SVG sanitizer', () => {
     vi.useFakeTimers()
     vi.stubGlobal('IntersectionObserver', undefined as any)
 
+    const bindFunctions = vi.fn()
     const fakeMermaid = {
       initialize: vi.fn(),
       render: vi.fn(async () => ({
         svg: unsafeMermaidSvg,
+        bindFunctions,
       })),
     }
 
@@ -96,6 +98,7 @@ describe('mermaid block SVG sanitizer', () => {
       securityLevel: 'loose',
     }))
     expectSanitizedMermaidHtml(html)
+    expect(bindFunctions).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })
@@ -105,12 +108,13 @@ describe('mermaid block SVG sanitizer', () => {
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
     vi.stubGlobal('IntersectionObserver', undefined as any)
 
+    const bindFunctions = vi.fn()
     const fakeMermaid = {
       initialize: vi.fn(),
       parse: vi.fn(async () => true),
       render: vi.fn(async () => ({
         svg: unsafeMermaidSvg,
-        bindFunctions: vi.fn(),
+        bindFunctions,
       })),
     }
 
@@ -151,20 +155,124 @@ describe('mermaid block SVG sanitizer', () => {
       securityLevel: 'loose',
     }))
     expectSanitizedMermaidHtml(host.innerHTML)
+    expect(bindFunctions).not.toHaveBeenCalled()
 
     await act(async () => {
       root.unmount()
     })
   })
 
+  it('calls React Mermaid bindFunctions only when interactions are enabled', async () => {
+    vi.useFakeTimers()
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const bindFunctions = vi.fn()
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      parse: vi.fn(async () => true),
+      render: vi.fn(async () => ({
+        svg: '<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>',
+        bindFunctions,
+      })),
+    }
+
+    vi.doMock('../../packages/markstream-react/src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../../packages/markstream-react/src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+    }))
+
+    const { MermaidBlockNode } = await import('../../packages/markstream-react/src/components/MermaidBlockNode/MermaidBlockNode')
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(MermaidBlockNode as any, {
+        node: {
+          type: 'code_block',
+          language: 'mermaid',
+          code: 'flowchart TD\nA-->B\n',
+          raw: '```mermaid\nflowchart TD\nA-->B\n```',
+        },
+        loading: false,
+        enableMermaidInteractions: true,
+      }))
+    })
+    await flushReactUpdates()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    await flushReactUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(1)
+    expect(bindFunctions.mock.calls[0]?.[0]).toBeInstanceOf(HTMLElement)
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('gates Mermaid bindFunctions in static Svelte and Angular HTML enhancers', async () => {
+    const bindFunctions = vi.fn()
+    const fakeMermaid = {
+      render: vi.fn(async () => ({
+        svg: unsafeMermaidSvg,
+        bindFunctions,
+      })),
+    }
+    const workerMock = {
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+    }
+
+    vi.doMock('../../packages/markstream-svelte/src/optional/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+    }))
+    vi.doMock('../../packages/markstream-svelte/src/workers/mermaidWorkerClient', () => workerMock)
+    vi.doMock('../../packages/markstream-angular/src/optional/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+    }))
+    vi.doMock('../../packages/markstream-angular/src/workers/mermaidWorkerClient', () => workerMock)
+
+    const { enhanceRenderedHtml: enhanceSvelteHtml } = await import('../../packages/markstream-svelte/src/enhanceRenderedHtml')
+    const { enhanceRenderedHtml: enhanceAngularHtml } = await import('../../packages/markstream-angular/src/enhanceRenderedHtml')
+    const enhancers = [enhanceSvelteHtml, enhanceAngularHtml]
+
+    for (const enhance of enhancers) {
+      const root = document.createElement('div')
+      root.innerHTML = '<pre><code class="language-mermaid">flowchart TD\nA-->B</code></pre>'
+      await enhance(root, { final: true })
+      expectSanitizedMermaidHtml(root.innerHTML)
+    }
+    expect(bindFunctions).not.toHaveBeenCalled()
+
+    for (const enhance of enhancers) {
+      const root = document.createElement('div')
+      root.innerHTML = '<pre><code class="language-mermaid">flowchart TD\nA-->B</code></pre>'
+      await enhance(root, {
+        final: true,
+        mermaidProps: { enableMermaidInteractions: true },
+      })
+      expectSanitizedMermaidHtml(root.innerHTML)
+    }
+    expect(bindFunctions).toHaveBeenCalledTimes(enhancers.length)
+  })
+
   it('sanitizes Vue 2 rendered SVG even when Mermaid securityLevel is loose', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('IntersectionObserver', undefined as any)
 
+    const bindFunctions = vi.fn()
     const fakeMermaid = {
       initialize: vi.fn(),
       render: vi.fn(async () => ({
         svg: unsafeMermaidSvg,
+        bindFunctions,
       })),
     }
 
@@ -203,6 +311,7 @@ describe('mermaid block SVG sanitizer', () => {
       securityLevel: 'loose',
     }))
     expectSanitizedMermaidHtml(wrapper.get('div._mermaid').html())
+    expect(bindFunctions).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })

@@ -85,6 +85,7 @@ const DEFAULTS = {
   showZoomControls: true,
   enableWheelZoom: false,
   isStrict: true,
+  enableMermaidInteractions: false,
 }
 
 export interface MermaidBlockNodeReactEvents {
@@ -165,6 +166,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   const streaming = Boolean(props.node?.loading ?? props.loading)
   const theme: Theme = props.isDark ? 'dark' : 'light'
   const strictMode = Boolean(props.isStrict)
+  const enableMermaidInteractions = props.enableMermaidInteractions === true
   const mermaidInitConfig = useMemo(() => {
     if (!strictMode) {
       return {
@@ -340,7 +342,8 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       if (!result?.svg || isBrokenMermaidSvg(result.svg))
         return false
       const rendered = renderSvgToTarget(contentRef.current, result.svg)
-      result.bindFunctions?.(contentRef.current)
+      if (enableMermaidInteractions)
+        result.bindFunctions?.(contentRef.current)
       updateContainerHeight()
       svgCacheRef.current[t] = rendered
       setHasRenderedOnce(true)
@@ -363,7 +366,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     finally {
       setRendering(false)
     }
-  }, [fullRenderTimeout, streaming, updateContainerHeight])
+  }, [enableMermaidInteractions, fullRenderTimeout, streaming, updateContainerHeight])
 
   const renderPartial = useCallback(async (code: string, t: Theme, signal?: AbortSignal) => {
     if (!mermaidRef.current || !contentRef.current)
@@ -379,7 +382,8 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       ) as any
       if (res?.svg && !isBrokenMermaidSvg(res.svg)) {
         renderSvgToTarget(contentRef.current, res.svg)
-        res.bindFunctions?.(contentRef.current)
+        if (enableMermaidInteractions)
+          res.bindFunctions?.(contentRef.current)
         updateContainerHeight()
       }
     }
@@ -389,7 +393,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     finally {
       setRendering(false)
     }
-  }, [renderTimeout, streaming, updateContainerHeight])
+  }, [enableMermaidInteractions, renderTimeout, streaming, updateContainerHeight])
 
   const progressiveRender = useCallback(async (code: string, signal?: AbortSignal) => {
     if (!code.trim()) {

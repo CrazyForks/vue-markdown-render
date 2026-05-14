@@ -170,6 +170,8 @@ export interface MermaidBlockNodeProps {
   enableWheelZoom?: boolean
   // Defaults to true. Set false only for trusted diagrams that need loose Mermaid HTML labels.
   isStrict?: boolean
+  // Defaults to false. Set true only for trusted diagrams that need Mermaid-generated click bindings after sanitized SVG mount.
+  enableMermaidInteractions?: boolean
   showTooltips?: boolean
   onRenderError?: (error: unknown, code: string, container: HTMLElement) => boolean | void
 }

@@ -76,6 +76,7 @@ Available keys: `minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `ca
 
 - `html-policy="safe"` blocks active/embed/form HTML tags by default.
 - `mermaid-props.isStrict` defaults to `true`, so Mermaid runs in strict mode unless you opt out.
+- `mermaid-props.enableMermaidInteractions` defaults to `false`, so Mermaid-generated click bindings are not applied unless trusted content opts in.
 
 If a trusted surface needs the broader pre-hardening behavior, opt out explicitly and keep that decision scoped to the trusted content source:
 
@@ -207,6 +208,7 @@ Example:
 `mermaid-props` is especially useful for streaming tuning. Common keys include:
 
 - `isStrict` (set `false` only for trusted diagrams that need Mermaid's loose config; SVG output is still sanitized)
+- `enableMermaidInteractions` (set `true` only for trusted diagrams that need Mermaid-generated click bindings)
 - `renderDebounceMs`
 - `contentStableDelayMs`
 - `previewPollDelayMs`

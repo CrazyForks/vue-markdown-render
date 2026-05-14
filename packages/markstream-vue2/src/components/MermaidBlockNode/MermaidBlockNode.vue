@@ -38,6 +38,7 @@ interface MermaidBlockNodeProps {
   showZoomControls?: boolean
   enableWheelZoom?: boolean
   isStrict?: boolean
+  enableMermaidInteractions?: boolean
   // Custom error handler called when mermaid rendering fails.
   // Receives the error, the raw mermaid code, and the container element.
   // Return true to prevent the default error display.
@@ -69,6 +70,7 @@ const props = withDefaults(
     showZoomControls: true,
     enableWheelZoom: false,
     isStrict: true,
+    enableMermaidInteractions: false,
   },
 )
 
@@ -1153,6 +1155,8 @@ async function initMermaid() {
 
       if (mermaidContent.value) {
         const rendered = renderSvgToTarget(mermaidContent.value, svg)
+        if (props.enableMermaidInteractions)
+          res?.bindFunctions?.(mermaidContent.value)
         // Successful full render clears Partial preview state
         if (!hasRenderedOnce.value && !isThemeRendering.value) {
           updateContainerHeight()
@@ -1240,6 +1244,8 @@ async function renderPartial(code: string) {
     const svg = res?.svg
     if (mermaidContent.value && svg && !isBrokenMermaidSvg(svg)) {
       renderSvgToTarget(mermaidContent.value, svg)
+      if (props.enableMermaidInteractions)
+        res?.bindFunctions?.(mermaidContent.value)
       updateContainerHeight()
     }
   }

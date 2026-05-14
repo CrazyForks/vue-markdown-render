@@ -354,7 +354,7 @@ async function renderMermaid(
       shell.body.innerHTML = safeSvg
       shell.body.classList.add('markstream-svelte-mermaid')
       shell.wrapper.dataset.markstreamMermaid = '1'
-      if (typeof rendered !== 'string')
+      if (options.mermaidProps?.enableMermaidInteractions === true && typeof rendered !== 'string')
         rendered?.bindFunctions?.(shell.body)
       cleanupFns.push(() => {
         if (shell.wrapper.isConnected)

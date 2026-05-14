@@ -9,6 +9,7 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const tmp = mkdtempSync(join(tmpdir(), 'markstream-vue-minimal-'))
 let packedTarball = ''
 let packedParserTarball = ''
+let packedCoreTarball = ''
 
 function run(command, args, options = {}) {
   execFileSync(command, args, {
@@ -52,10 +53,14 @@ function packWorkspacePackage(cwd) {
 
 function ensureBuiltArtifacts() {
   const parserDist = join(root, 'packages/markdown-parser/dist/index.js')
+  const coreDist = join(root, 'packages/markstream-core/dist/index.js')
   const rootDist = join(root, 'dist/index.js')
 
   if (!existsSync(parserDist))
     run('pnpm', ['run', 'build:parser'])
+
+  if (!existsSync(coreDist))
+    run('pnpm', ['run', 'build:core'])
 
   if (!existsSync(rootDist))
     run('pnpm', ['run', 'build'])
@@ -71,6 +76,7 @@ try {
   }
 
   packedParserTarball = packWorkspacePackage(join(root, 'packages/markdown-parser'))
+  packedCoreTarball = packWorkspacePackage(join(root, 'packages/markstream-core'))
   packedTarball = packWorkspacePackage(root)
 
   const packedPackageJson = JSON.parse(execFileSync('tar', ['-xOf', packedTarball, 'package/package.json'], { encoding: 'utf8' }))
@@ -115,11 +121,13 @@ try {
       onlyBuiltDependencies: ['esbuild'],
       overrides: {
         'stream-markdown-parser': `file:${packedParserTarball}`,
+        'markstream-core': `file:${packedCoreTarball}`,
       },
     },
   }
   smokePackage.scripts['ssr:import'] = 'node ./ssr-import.mjs'
   smokePackage.dependencies['stream-markdown-parser'] = `file:${packedParserTarball}`
+  smokePackage.dependencies['markstream-core'] = `file:${packedCoreTarball}`
   smokePackage.dependencies['@vue/server-renderer'] = '^3.5.31'
   smokePackage.dependencies['@vitejs/plugin-vue'] = '^5.2.4'
   writeProjectFile('package.json', `${JSON.stringify(smokePackage, null, 2)}\n`)
@@ -153,7 +161,7 @@ try {
   console.log(`[smoke-minimal-install] Passed in ${tmp}`)
 }
 finally {
-  for (const tarball of [packedTarball, packedParserTarball]) {
+  for (const tarball of [packedTarball, packedParserTarball, packedCoreTarball]) {
     if (tarball && existsSync(tarball))
       rmSync(tarball)
   }

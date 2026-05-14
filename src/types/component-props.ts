@@ -178,6 +178,8 @@ export interface MermaidBlockNodeProps {
   enableWheelZoom?: boolean
   // Defaults to true. Set false only for trusted diagrams that need Mermaid's loose render config. SVG output is still sanitized.
   isStrict?: boolean
+  // Defaults to false. Set true only for trusted diagrams that need Mermaid-generated click bindings after sanitized SVG mount.
+  enableMermaidInteractions?: boolean
   showTooltips?: boolean
   // Custom error handler called when mermaid rendering fails.
   // Receives the error, the raw mermaid code, and the container element.

@@ -59,3 +59,5 @@ Markdown image URLs use a strict default policy. Allowed image sources are `http
 Protocol-relative URLs such as `//cdn.example.com/a.png` are allowed by the URL policy. They can still load external resources, so prefer `htmlPolicy="escape"` for public or third-party content that should not be able to request remote assets.
 
 Mermaid SVG output is sanitized before mounting in both strict and loose Mermaid modes. `isStrict=false` controls Mermaid's parse/render configuration; it does not mean raw SVG insertion.
+
+Mermaid-generated `bindFunctions` click handlers are disabled by default after sanitized SVG mount. Set `mermaidProps.enableMermaidInteractions=true` only for trusted diagrams that need Mermaid click bindings.

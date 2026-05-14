@@ -1,6 +1,11 @@
+/**
+ * @vitest-environment jsdom
+ */
+
+import { mount } from '@vue/test-utils'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { renderMarkdownNodeToHtml as renderAngularNodeToHtml } from '../../packages/markstream-angular/src/renderMarkdownHtml'
 import { LinkNode as ReactLinkNode } from '../../packages/markstream-react/src/components/LinkNode/LinkNode'
 import { LinkNode as ReactServerLinkNode } from '../../packages/markstream-react/src/server-renderer'
@@ -37,6 +42,19 @@ function expectRelHardened(html: string) {
   expect(rel.split(/\s+/)).toContain('noreferrer')
 }
 
+async function loadVueLinkNode() {
+  const StubNode = { props: ['node'], template: '<span />' }
+  vi.doMock('../../src/components/EmphasisNode/EmphasisNode.vue', () => ({ default: StubNode }))
+  vi.doMock('../../src/components/HighlightNode', () => ({ default: StubNode }))
+  vi.doMock('../../src/components/HtmlInlineNode', () => ({ default: StubNode }))
+  vi.doMock('../../src/components/ImageNode', () => ({ default: StubNode }))
+  vi.doMock('../../src/components/InlineCodeNode', () => ({ default: StubNode }))
+  vi.doMock('../../src/components/StrikethroughNode', () => ({ default: StubNode }))
+  vi.doMock('../../src/components/StrongNode', () => ({ default: StubNode }))
+  const mod = await import('../../src/components/LinkNode/LinkNode.vue')
+  return mod.default
+}
+
 describe('cross-framework link URL policy', () => {
   it('omits unsafe hrefs in framework renderers', () => {
     const unsafe = [
@@ -53,6 +71,31 @@ describe('cross-framework link URL policy', () => {
         expect(rendered).not.toMatch(/vbscript:/i)
         expect(rendered).not.toMatch(/data:text\/html/i)
       }
+    }
+  })
+
+  it('omits unsafe hrefs in the Vue 3 LinkNode component path', async () => {
+    const VueLinkNode = await loadVueLinkNode()
+    const unsafe = [
+      'javascript:alert(1)',
+      'java\u0000script:alert(1)',
+      'vbscript:msgbox(1)',
+      'data:text/html,<script>alert(1)</script>',
+    ]
+
+    for (const href of unsafe) {
+      const wrapper = mount(VueLinkNode as any, {
+        props: {
+          node: linkNode(href),
+          indexKey: 'x',
+          showTooltip: false,
+        },
+      })
+      const anchor = wrapper.get('a').element as HTMLAnchorElement
+
+      expect(wrapper.get('a').attributes('href')).toBeUndefined()
+      expect(anchor.protocol).not.toBe('javascript:')
+      wrapper.unmount()
     }
   })
 

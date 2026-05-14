@@ -104,6 +104,28 @@ describe('htmlPolicy safe security corpus', () => {
     expectNoExecutableMarkup(html)
   })
 
+  it('does not leave browser-parsed javascript link protocols after URL entity decoding', () => {
+    const payloads = [
+      'java&#x09;script:alert(1)',
+      'java&#x0D;script:alert(1)',
+      'java&#x0A;script:alert(1)',
+      'jav&#97;script:alert(1)',
+      'javascript&#x3A;alert(1)',
+      'javascrip&#x74;:alert(1)',
+      '\u000Bjavascript:alert(1)',
+      '\fjavascript:alert(1)',
+    ]
+
+    for (const payload of payloads) {
+      const root = document.createElement('div')
+      root.innerHTML = sanitizeHtmlContent(`<a href="${payload}">x</a>`, 'safe')
+      const anchor = root.querySelector('a') as HTMLAnchorElement | null
+
+      expect(anchor?.protocol).not.toBe('javascript:')
+      expect(anchor?.getAttribute('href') ?? '').not.toMatch(/^javascript:/i)
+    }
+  })
+
   it('sanitizes executable HTML through MarkdownRender safe mode', async () => {
     const wrapper = mount(MarkdownRender, {
       props: {

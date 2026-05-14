@@ -66,6 +66,7 @@ export type NodeRendererMermaidProps = Partial<{
   showCollapseButton: boolean
   showZoomControls: boolean
   isStrict: boolean
+  enableMermaidInteractions: boolean
 }> & Record<string, unknown>
 
 export type NodeRendererD2Props = Partial<{

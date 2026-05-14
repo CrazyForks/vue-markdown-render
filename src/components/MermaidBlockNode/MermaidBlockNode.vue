@@ -38,6 +38,7 @@ const props = withDefaults(
     showZoomControls: true,
     enableWheelZoom: false,
     isStrict: true,
+    enableMermaidInteractions: false,
     showTooltips: true,
   },
 )
@@ -1177,6 +1178,8 @@ async function initMermaid() {
 
       if (mermaidContent.value) {
         const rendered = renderSvgToTarget(mermaidContent.value, svg)
+        if (props.enableMermaidInteractions)
+          res?.bindFunctions?.(mermaidContent.value)
         // Successful full render clears Partial preview state
         if (!hasRenderedOnce.value && !isThemeRendering.value) {
           safeRaf(() => updateContainerHeight())
@@ -1300,6 +1303,8 @@ async function renderPartial(code: string) {
     const svg = res?.svg
     if (mermaidContent.value && svg && !isBrokenMermaidSvg(svg)) {
       renderSvgToTarget(mermaidContent.value, svg)
+      if (props.enableMermaidInteractions)
+        res?.bindFunctions?.(mermaidContent.value)
       safeRaf(() => updateContainerHeight())
     }
   }
