@@ -94,7 +94,7 @@ const nodes = parseMarkdownToStructure('# API test', markdown, { final: true })
 const controller = useSmoothMarkdownStream(options)
 const safeMermaidSvg: string | null = sanitizeMermaidSvg('<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>')
 const safeMermaidSvgMarkup: string = toSafeMermaidSvgMarkup('<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>')
-const safeMermaidSvgElement: SVGElement | null = toSafeSvgElement('<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>')
+const safeMermaidSvgElement: SVGElement | null = toSafeSvgElement<SVGElement>('<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>')
 const brokenMermaidSvg: boolean = isBrokenMermaidSvg('<svg viewBox="0 0 0 10"><rect width="10" height="10" /></svg>')
 
 const codeBlockProps: Partial<CodeBlockNodeProps> = {}

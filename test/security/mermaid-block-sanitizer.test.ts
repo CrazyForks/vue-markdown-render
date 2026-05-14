@@ -43,6 +43,12 @@ function findButtonByText(host: HTMLElement, text: string) {
   return Array.from(host.querySelectorAll('button')).find(button => button.textContent?.includes(text)) as HTMLButtonElement | undefined
 }
 
+function findButtonBySvgPath(host: HTMLElement, pathStart: string) {
+  return Array.from(host.querySelectorAll('button')).find((button) => {
+    return Array.from(button.querySelectorAll('path')).some(path => path.getAttribute('d')?.startsWith(pathStart))
+  }) as HTMLButtonElement | undefined
+}
+
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
@@ -342,6 +348,16 @@ describe('mermaid block SVG sanitizer', () => {
 
     expect(bindFunctions).toHaveBeenCalledTimes(1)
     expect(bindFunctions.mock.calls[0]?.[0]).toBeInstanceOf(HTMLElement)
+
+    await act(async () => {
+      findButtonBySvgPath(host, 'M15 3h6v6')?.click()
+    })
+    await flushReactUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(2)
+    const modalTarget = bindFunctions.mock.calls[1]?.[0] as HTMLElement | undefined
+    expect(modalTarget).toBeInstanceOf(HTMLElement)
+    expect(modalTarget?.classList.contains('mermaid-modal-content')).toBe(true)
 
     await act(async () => {
       root.unmount()

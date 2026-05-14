@@ -78,8 +78,10 @@
   let modalOpen = $state(false)
   let zoom = $state(1)
   let previewHost: HTMLElement | null = $state(null)
+  let modalHost: HTMLElement | null = $state(null)
   let renderTimer: ReturnType<typeof setTimeout> | null = $state(null)
   let copyTimer: ReturnType<typeof setTimeout> | null = $state(null)
+  let lastMermaidBindFunctions: ((element: Element) => unknown) | null = null
 
   let source = $derived(normalizeMermaidSource(getString((node as any)?.code)))
   let nodeLoading = $derived(typeof (node as any)?.loading === 'boolean' ? Boolean((node as any)?.loading) : true)
@@ -122,6 +124,11 @@
       collapsed
       untrack(() => scheduleRender())
     }
+  })
+
+  $effect(() => {
+    if (mounted && modalOpen && svgMarkup && modalHost && enableMermaidInteractions)
+      untrack(() => void tick().then(() => bindCurrentMermaidInteractions(modalHost)))
   })
 
   function clearRenderTimer() {
@@ -246,6 +253,7 @@
       if (!safeSvg)
         throw new Error('Mermaid rendered empty SVG.')
       svgMarkup = safeSvg
+      lastMermaidBindFunctions = typeof rendered === 'string' ? null : rendered?.bindFunctions ?? null
       renderError = ''
       lastProgressiveMissSignature = ''
       if (fullRender) {
@@ -255,8 +263,11 @@
       }
       if (enableMermaidInteractions && typeof rendered !== 'string') {
         await tick()
-        if (mounted && token === renderToken && previewHost)
-          rendered?.bindFunctions?.(previewHost)
+        if (mounted && token === renderToken) {
+          bindCurrentMermaidInteractions(previewHost)
+          if (modalOpen)
+            bindCurrentMermaidInteractions(modalHost)
+        }
       }
     }
     catch (error) {
@@ -407,6 +418,15 @@
         reject(error)
       })
     })
+  }
+
+  function bindCurrentMermaidInteractions(element: Element | null | undefined) {
+    if (!enableMermaidInteractions || !element?.querySelector('svg'))
+      return
+    try {
+      lastMermaidBindFunctions?.(element)
+    }
+    catch {}
   }
 
   async function copy() {
@@ -582,7 +602,7 @@
               </button>
             </div>
             <div class="mermaid-modal-body">
-              <div class="mermaid-modal-content markstream-svelte-mermaid" style={`transform: scale(${zoom});`}>{@html svgMarkup}</div>
+              <div bind:this={modalHost} class="mermaid-modal-content markstream-svelte-mermaid" style={`transform: scale(${zoom});`}>{@html svgMarkup}</div>
             </div>
           </div>
         </div>

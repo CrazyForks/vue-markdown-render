@@ -136,7 +136,8 @@ try {
     type: 'module',
     packageManager: pkg.packageManager,
     scripts: {
-      build: 'vite build',
+      'build': 'vite build',
+      'typecheck:node-no-dom': 'tsc -p tsconfig.node-no-dom.json',
     },
     dependencies: {
       [pkg.name]: `file:${packedTarball}`,
@@ -173,6 +174,20 @@ try {
     '<div><a href="javascript:alert(1)">bad</a><span>safe</span></div>',
   ].join('\n')
   writeProjectFile('src/App.vue', `<script setup lang="ts">\nconst content = ${JSON.stringify(smokeMarkdown)}\n</script>\n\n<template>\n  <MarkdownRender :content="content" :final="true" :render-code-blocks-as-pre="true" />\n  <MarkdownRender :content="content" :final="true" />\n</template>\n`)
+  writeProjectFile('node-no-dom.ts', `import { parseMarkdownToStructure, sanitizeMermaidSvg, toSafeMermaidSvgMarkup, toSafeSvgElement } from 'stream-markdown-parser'\n\nvoid parseMarkdownToStructure\nvoid sanitizeMermaidSvg\nvoid toSafeMermaidSvgMarkup\nvoid toSafeSvgElement\n`)
+  writeProjectFile('tsconfig.node-no-dom.json', `${JSON.stringify({
+    compilerOptions: {
+      target: 'ES2020',
+      module: 'ESNext',
+      moduleResolution: 'Bundler',
+      lib: ['ES2020'],
+      strict: true,
+      skipLibCheck: false,
+      noEmit: true,
+      types: [],
+    },
+    include: ['node-no-dom.ts'],
+  }, null, 2)}\n`)
   const ssrMarkdown = [
     '~~~ts',
     'console.log(1)',
@@ -183,6 +198,7 @@ try {
   writeProjectFile('ssr-import.mjs', `import { existsSync } from 'node:fs'\nimport { fileURLToPath } from 'node:url'\nimport { createSSRApp, h } from 'vue'\nimport { renderToString } from '@vue/server-renderer'\nimport MarkdownRender, { MarkdownRender as NamedMarkdownRender } from 'markstream-vue'\n\nconst mod = await import('markstream-vue')\nif (!mod.default || !mod.MarkdownRender || !NamedMarkdownRender)\n  throw new Error('Root package import did not expose MarkdownRender')\n\nconst cssUrl = import.meta.resolve('markstream-vue/index.css')\nif (!existsSync(fileURLToPath(cssUrl)))\n  throw new Error('CSS export did not resolve to a file')\n\nconst html = await renderToString(createSSRApp({\n  render: () => h(MarkdownRender, {\n    content: ${JSON.stringify(ssrMarkdown)},\n    final: true,\n  }),\n}))\n\nif (!html || !html.includes('console.log'))\n  throw new Error('SSR render did not include code content')\n\nif (/javascript:alert/i.test(html))\n  throw new Error('SSR render kept unsafe javascript URL')\n`)
 
   run('pnpm', ['install', '--ignore-workspace'], { cwd: tmp })
+  run('pnpm', ['run', 'typecheck:node-no-dom'], { cwd: tmp })
   run('pnpm', ['run', 'build'], { cwd: tmp })
   run('pnpm', ['run', 'ssr:import'], { cwd: tmp })
 

@@ -229,7 +229,7 @@ function scrubSvgElement(svgEl: SVGElement) {
  * Sanitizes Mermaid SVG with DOMParser and returns a detached SVG element.
  * Returns null in non-DOM runtimes such as plain Node.js.
  */
-export function toSafeSvgElement(svg: string | null | undefined): SVGElement | null {
+export function toSafeSvgElement<TElement = unknown>(svg: string | null | undefined): TElement | null {
   if (typeof DOMParser === 'undefined')
     return null
   if (!svg)
@@ -242,7 +242,7 @@ export function toSafeSvgElement(svg: string | null | undefined): SVGElement | n
   scrubSvgElement(svgElement)
   if (isBrokenMermaidSvg(svgElement.outerHTML))
     return null
-  return svgElement
+  return svgElement as unknown as TElement
 }
 
 /**
@@ -250,7 +250,7 @@ export function toSafeSvgElement(svg: string | null | undefined): SVGElement | n
  * Returns null in non-DOM runtimes such as plain Node.js.
  */
 export function sanitizeMermaidSvg(svg: string | null | undefined): string | null {
-  return toSafeSvgElement(svg)?.outerHTML ?? null
+  return toSafeSvgElement<SVGElement>(svg)?.outerHTML ?? null
 }
 
 /**

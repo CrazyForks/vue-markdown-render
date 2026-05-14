@@ -52,7 +52,7 @@ function clearElement(target: HTMLElement | null | undefined) {
 function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null | undefined) {
   if (!target)
     return ''
-  const safeElement = toSafeSvgElement(svg)
+  const safeElement = toSafeSvgElement<SVGElement>(svg)
   if (safeElement) {
     clearElement(target)
     target.appendChild(safeElement)
@@ -77,6 +77,19 @@ function renderSvgToTarget(
   if (!rendered && !options.keepPreviousOnFailure)
     clearElement(target)
   return rendered
+}
+
+function bindMermaidInteractionsTo(
+  element: Element | null | undefined,
+  bindFunctions: ((element: Element) => unknown) | null | undefined,
+  enabled: boolean,
+) {
+  if (!enabled || !element?.querySelector('svg'))
+    return
+  try {
+    bindFunctions?.(element)
+  }
+  catch {}
 }
 
 const DEFAULTS = {
@@ -166,6 +179,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   const dragStartRef = useRef({ x: 0, y: 0 })
   const renderTokenRef = useRef(0)
   const svgCacheRef = useRef<{ light?: CachedSvg, dark?: CachedSvg }>({})
+  const lastMermaidBindFunctionsRef = useRef<((element: Element) => unknown) | null>(null)
   const lastRenderedCodeRef = useRef('')
   const userToggledRef = useRef(false)
   const viewportHandleRef = useRef<VisibilityHandle | null>(null)
@@ -340,8 +354,10 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     const cached = svgCacheRef.current[theme]
     if (!showSource && contentRef.current && cached?.svg) {
       const rendered = renderSvgToTarget(contentRef.current, cached.svg)
-      if (rendered && enableMermaidInteractions)
-        cached.bindFunctions?.(contentRef.current)
+      if (rendered) {
+        lastMermaidBindFunctionsRef.current = cached.bindFunctions ?? null
+        bindMermaidInteractionsTo(contentRef.current, cached.bindFunctions, enableMermaidInteractions)
+      }
       safeRaf(() => updateContainerHeight())
     }
   }, [enableMermaidInteractions, showSource, theme, updateContainerHeight])
@@ -362,8 +378,8 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       const rendered = renderSvgToTarget(contentRef.current, result.svg)
       if (!rendered)
         return false
-      if (enableMermaidInteractions)
-        result.bindFunctions?.(contentRef.current)
+      lastMermaidBindFunctionsRef.current = result.bindFunctions ?? null
+      bindMermaidInteractionsTo(contentRef.current, result.bindFunctions, enableMermaidInteractions)
       updateContainerHeight()
       svgCacheRef.current[t] = { svg: rendered, bindFunctions: result.bindFunctions }
       setHasRenderedOnce(true)
@@ -402,8 +418,10 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       ) as any
       if (res?.svg && !isBrokenMermaidSvg(res.svg)) {
         const rendered = renderSvgToTarget(contentRef.current, res.svg, { keepPreviousOnFailure: true })
-        if (rendered && enableMermaidInteractions)
-          res.bindFunctions?.(contentRef.current)
+        if (rendered) {
+          lastMermaidBindFunctionsRef.current = res.bindFunctions ?? null
+          bindMermaidInteractionsTo(contentRef.current, res.bindFunctions, enableMermaidInteractions)
+        }
         if (rendered)
           updateContainerHeight()
       }
@@ -608,7 +626,12 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
     }
     clearElement(host)
     host.appendChild(clone)
-  }, [modalOpen])
+    bindMermaidInteractionsTo(
+      host,
+      lastMermaidBindFunctionsRef.current ?? svgCacheRef.current[theme]?.bindFunctions,
+      enableMermaidInteractions,
+    )
+  }, [enableMermaidInteractions, modalOpen, theme])
 
   useEffect(() => {
     if (!modalOpen)

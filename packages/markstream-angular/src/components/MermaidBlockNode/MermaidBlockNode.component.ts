@@ -547,7 +547,10 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
   private bindMermaidInteractions(element: Element | null | undefined) {
     if (this.mergedProps.enableMermaidInteractions !== true || !this.svgMarkup || !element?.querySelector('svg'))
       return
-    this.lastMermaidBindFunctions?.(element)
+    try {
+      this.lastMermaidBindFunctions?.(element)
+    }
+    catch {}
   }
 
   private scheduleHostSync() {

@@ -350,8 +350,12 @@ async function renderMermaid(
       shell.body.innerHTML = safeSvg
       shell.body.classList.add('markstream-angular-mermaid')
       shell.wrapper.dataset.markstreamMermaid = '1'
-      if (options.mermaidProps?.enableMermaidInteractions === true && typeof rendered !== 'string')
-        rendered?.bindFunctions?.(shell.body)
+      if (options.mermaidProps?.enableMermaidInteractions === true && typeof rendered !== 'string') {
+        try {
+          rendered?.bindFunctions?.(shell.body)
+        }
+        catch {}
+      }
       cleanupFns.push(() => {
         if (shell.wrapper.isConnected)
           shell.wrapper.replaceWith(originalPre.cloneNode(true))

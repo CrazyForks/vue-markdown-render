@@ -67,7 +67,7 @@ const mermaidInitConfig = computed(() => ({
 function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null | undefined) {
   if (!target)
     return ''
-  const safeElement = toSafeSvgElement(svg)
+  const safeElement = toSafeSvgElement<SVGElement>(svg)
   if (!safeElement)
     return ''
   appendBufferedSvgLayer(target, safeElement)
@@ -135,7 +135,10 @@ let lastMermaidBindFunctions: MermaidBindFunctions | null = null
 function bindMermaidInteractions(element: Element | null | undefined) {
   if (!props.enableMermaidInteractions || !element?.querySelector('svg'))
     return
-  lastMermaidBindFunctions?.(element)
+  try {
+    lastMermaidBindFunctions?.(element)
+  }
+  catch {}
 }
 
 const { t } = useSafeI18n()
