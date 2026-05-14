@@ -227,6 +227,29 @@ describe('link and image URL policy', () => {
     expect(wrapper.find('.image-error').exists()).toBe(false)
   })
 
+  it('shows error when fallbackSrc equals failed primary src', async () => {
+    const src = 'https://example.com/broken.png'
+    const wrapper = mount(ImageNode, {
+      props: {
+        node: {
+          type: 'image',
+          src,
+          alt: 'x',
+          title: null,
+          raw: `![x](${src})`,
+          loading: false,
+        },
+        fallbackSrc: src,
+      },
+    })
+
+    await wrapper.get('img').trigger('error')
+    await nextTick()
+
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.find('.image-error').exists()).toBe(true)
+  })
+
   it('uses safe fallback when primary src is unsafe', async () => {
     const wrapper = mount(ImageNode, {
       props: {

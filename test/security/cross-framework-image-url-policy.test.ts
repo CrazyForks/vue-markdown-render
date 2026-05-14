@@ -3,9 +3,10 @@
  */
 
 import { mount } from '@vue/test-utils'
-import React from 'react'
+import React, { act } from 'react'
+import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { renderMarkdownNodeToHtml as renderAngularNodeToHtml } from '../../packages/markstream-angular/src/renderMarkdownHtml'
 import { ImageNode as ReactImageNode } from '../../packages/markstream-react/src/components/ImageNode/ImageNode'
 import { ImageNode as ReactServerImageNode } from '../../packages/markstream-react/src/server-renderer'
@@ -23,6 +24,18 @@ function imageNode(src: string) {
     loading: false,
   } as any
 }
+
+async function flushReact() {
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
+afterEach(() => {
+  document.body.innerHTML = ''
+  ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = false
+})
 
 describe('cross-framework image URL policy', () => {
   it('omits unsafe image URLs in static framework renderers', () => {
@@ -78,5 +91,38 @@ describe('cross-framework image URL policy', () => {
     expect(renderAngularNodeToHtml(node)).toContain('<img')
     expect(renderToStaticMarkup(React.createElement(ReactServerImageNode as any, { node }))).toContain('<img')
     expect(renderToStaticMarkup(React.createElement(ReactImageNode as any, { node, lazy: false }))).toContain('<img')
+  })
+
+  it('shows React client error when fallbackSrc equals failed primary src', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const src = 'https://example.com/broken.png'
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactImageNode as any, {
+        node: imageNode(src),
+        fallbackSrc: src,
+        lazy: false,
+      }))
+    })
+    await flushReact()
+
+    const image = host.querySelector('img')
+    expect(image).not.toBeNull()
+
+    await act(async () => {
+      image!.dispatchEvent(new Event('error', { bubbles: true }))
+    })
+    await flushReact()
+
+    expect(host.querySelector('img')).toBeNull()
+    expect(host.querySelector('.image-node__error')).not.toBeNull()
+
+    await act(async () => {
+      root.unmount()
+    })
   })
 })

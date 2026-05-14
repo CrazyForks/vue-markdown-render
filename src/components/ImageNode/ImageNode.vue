@@ -29,7 +29,7 @@ const showError = computed(() => imageStage.value === 'failed')
 const showShimmer = computed(() => !useEagerImagePath.value && !imageLoaded.value && !hasError.value && imageStage.value !== 'failed' && activeSrc.value.length > 0)
 
 function handleImageError() {
-  if (imageStage.value === 'primary' && safeFallbackSrc.value) {
+  if (imageStage.value === 'primary' && safeFallbackSrc.value && safeFallbackSrc.value !== activeSrc.value) {
     imageStage.value = 'fallback'
     activeSrc.value = safeFallbackSrc.value
     imageLoaded.value = false

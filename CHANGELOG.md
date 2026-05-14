@@ -8,7 +8,7 @@
 
 ### Bug Fixes
 
-* ImageNode now falls back or shows an error when the sanitized primary image source is empty, avoiding blank and persistent lazy-shimmer states.
+* ImageNode now falls back or shows an error when the sanitized primary image source is empty or unchanged by fallback, avoiding blank and persistent lazy-shimmer states.
 
 ## [0.0.14-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.8) (2026-05-11)
 

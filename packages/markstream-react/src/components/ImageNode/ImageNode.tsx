@@ -45,7 +45,7 @@ export function ImageNode(rawProps: ImageNodeProps & ImageNodeReactEvents) {
   }, [safeNodeSrc, safeFallbackSrc, props.node.loading])
 
   const handleImageError = () => {
-    if (imageStage === 'primary' && safeFallbackSrc) {
+    if (imageStage === 'primary' && safeFallbackSrc && safeFallbackSrc !== activeSrc) {
       setActiveSrc(safeFallbackSrc)
       setImageStage('fallback')
       setImageLoaded(false)

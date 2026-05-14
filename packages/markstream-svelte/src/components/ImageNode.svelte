@@ -66,7 +66,7 @@
   })
 
   function handleImageError() {
-    if (imageStage === 'primary' && safeFallbackSrc) {
+    if (imageStage === 'primary' && safeFallbackSrc && safeFallbackSrc !== currentSrc) {
       currentSrc = safeFallbackSrc
       imageStage = 'fallback'
       imageLoaded = false

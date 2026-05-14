@@ -36,7 +36,7 @@ const showImage = computed(() => !props.node.loading && imageStage.value !== 'fa
 const showError = computed(() => !props.node.loading && imageStage.value === 'failed')
 
 function handleImageError() {
-  if (imageStage.value === 'primary' && safeFallbackSrc.value) {
+  if (imageStage.value === 'primary' && safeFallbackSrc.value && safeFallbackSrc.value !== activeSrc.value) {
     imageStage.value = 'fallback'
     activeSrc.value = safeFallbackSrc.value
     imageLoaded.value = false
