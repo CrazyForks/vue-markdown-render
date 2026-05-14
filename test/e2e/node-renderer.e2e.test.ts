@@ -891,6 +891,40 @@ After`,
     }
   })
 
+  it('keeps inline custom tag slots inside the paragraph without nested paragraphs', async () => {
+    const scopeId = 'custom-components-inline-tag-slot'
+    const Mention = defineComponent({
+      name: 'Mention',
+      setup(_, { slots }) {
+        return () => h('span', { class: 'mention' }, slots.default?.())
+      },
+    })
+
+    setCustomComponents(scopeId, { mention: Mention })
+
+    try {
+      const wrapper = await mountMarkdown('Hello <mention>**Simon**</mention>!', {
+        customId: scopeId,
+        final: true,
+      })
+      try {
+        expect(wrapper.findAll('p.paragraph-node')).toHaveLength(1)
+
+        const paragraph = wrapper.get('p.paragraph-node')
+        const mention = paragraph.get('.mention')
+        expect(paragraph.text()).toBe('Hello Simon!')
+        expect(mention.get('strong').text()).toBe('Simon')
+        expect(mention.find('p').exists()).toBe(false)
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
   it('replays a fade animation when a streamed non-code node updates in place', async () => {
     const wrapper = await mountMarkdown('Hello')
     try {

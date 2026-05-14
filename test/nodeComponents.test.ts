@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { clearGlobalCustomComponents, getCustomNodeComponents, mergeCustomNodeComponents, removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
+import { clearGlobalCustomComponents, getCustomNodeComponents, isReservedNodeComponentKey, mergeCustomNodeComponents, removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 
 describe('nodeComponents scoped API', () => {
   const clearMappings = () => {
@@ -74,5 +74,11 @@ describe('nodeComponents scoped API', () => {
     })
 
     expect(mapping.thinking).toBe('ScopedThinking')
+  })
+
+  it('normalizes reserved node component keys before matching', () => {
+    expect(isReservedNodeComponentKey('Text')).toBe(true)
+    expect(isReservedNodeComponentKey(' Code_Block ')).toBe(true)
+    expect(isReservedNodeComponentKey('thinking')).toBe(false)
   })
 })

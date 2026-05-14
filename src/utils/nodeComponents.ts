@@ -71,7 +71,7 @@ export const RESERVED_NODE_COMPONENT_KEYS = new Set([
 ])
 
 export function isReservedNodeComponentKey(key: string) {
-  return RESERVED_NODE_COMPONENT_KEYS.has(key)
+  return RESERVED_NODE_COMPONENT_KEYS.has(String(key).trim().toLowerCase())
 }
 
 export function createCustomComponentsRef(mapping: Partial<CustomComponents> = {}) {

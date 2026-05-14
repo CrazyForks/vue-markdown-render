@@ -99,7 +99,7 @@ npx skills add Simon-He95/markstream-vue
 Recommended usage:
 
 - `npx skills add Simon-He95/markstream-vue` is the primary path for Codex-compatible skill discovery because it reads `.agents/skills` directly from the GitHub repository
-- `markstream-vue@1.0` does not publish a CLI `bin`; repository scripts such as `pnpm skills:list` and `pnpm prompts:list` are contributor-only helpers for cloned checkouts
+- `markstream-vue@1.0` no longer exposes the `markstream-vue` CLI or any CLI `bin`; repository scripts such as `pnpm skills:list` and `pnpm prompts:list` are contributor-only helpers for cloned checkouts
 - prompts remain in the repository under `prompts/` for direct copying or future separate-package work
 
 Other `npx skills add` forms also work:
