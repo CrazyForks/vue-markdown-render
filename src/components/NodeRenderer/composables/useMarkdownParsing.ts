@@ -12,50 +12,9 @@ import {
   resolveCustomHtmlTags,
 } from 'stream-markdown-parser'
 import { computed, markRaw } from 'vue'
+import { isReservedNodeComponentKey } from '../../../utils/nodeComponents'
 
 type RendererParseOptions = NonNullable<NodeRendererProps['parseOptions']>
-const RESERVED_NODE_COMPONENT_KEYS = new Set([
-  'text',
-  'paragraph',
-  'heading',
-  'code_block',
-  'list',
-  'list_item',
-  'blockquote',
-  'table',
-  'table_row',
-  'table_cell',
-  'definition_list',
-  'definition_item',
-  'footnote',
-  'footnote_reference',
-  'footnote_anchor',
-  'admonition',
-  'hardbreak',
-  'link',
-  'image',
-  'thematic_break',
-  'math_inline',
-  'math_block',
-  'strong',
-  'emphasis',
-  'strikethrough',
-  'highlight',
-  'insert',
-  'subscript',
-  'superscript',
-  'emoji',
-  'checkbox',
-  'checkbox_input',
-  'inline_code',
-  'html_inline',
-  'html_block',
-  'reference',
-  'mermaid',
-  'infographic',
-  'd2',
-  'vmr_container',
-])
 
 export interface MarkdownParsingOptions {
   instanceMsgId: string
@@ -76,7 +35,7 @@ export interface MarkdownParsingState {
 }
 
 function getAutoCustomHtmlTags(mapping: Partial<CustomComponents>) {
-  return Object.keys(mapping).filter(key => !RESERVED_NODE_COMPONENT_KEYS.has(key))
+  return Object.keys(mapping).filter(key => !isReservedNodeComponentKey(key))
 }
 
 export function useMarkdownParsing(

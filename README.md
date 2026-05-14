@@ -26,7 +26,7 @@ Looking for other frameworks?
 
 `markstream-vue@1.0` is scoped to the Vue 3 renderer package. The stable surface is `MarkdownRender`, streaming content rendering, pre-parsed node rendering, the safe HTML policy, optional Mermaid / KaTeX / Monaco / D2 / Infographic integrations, CSS exports, worker client subpaths, and SSR imports for Vite / Nuxt / VitePress.
 
-Experimental surfaces are the cross-framework adapters, CLI skills/prompts, low-level worker entrypoints beyond documented clients, and internal performance/debug props such as `indexKey`, `renderAsFragment`, `debugPerformance`, batch budget internals, and height-estimation experiments.
+Experimental surfaces are the cross-framework adapters, repository skills/prompts, low-level worker entrypoints beyond documented clients, and internal performance/debug props such as `indexKey`, `renderAsFragment`, `debugPerformance`, batch budget internals, and height-estimation experiments.
 
 For the full release contract and Go / No-Go checklist, see [1.0 Release Readiness](./docs/guide/release-1-0.md).
 
@@ -88,23 +88,19 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 - Nuxt playground: `pnpm play:nuxt`
 - Discord: https://discord.gg/vkzdkjeRCW
 
-## CLI helpers for skills and prompts
+## Repository skills and prompts
 
-If you want the packaged AI assets without cloning the repo:
+If you want the AI assets without cloning the repo:
 
 ```bash
 npx skills add Simon-He95/markstream-vue
-npx markstream-vue skills list
-npx markstream-vue skills install
-npx markstream-vue prompts list
-npx markstream-vue prompts show install-markstream
 ```
 
 Recommended usage:
 
 - `npx skills add Simon-He95/markstream-vue` is the primary path for Codex-compatible skill discovery because it reads `.agents/skills` directly from the GitHub repository
-- `skills install` installs the bundled skills into your agent skill directory (default: `~/.agents/skills`)
-- `prompts list` and `prompts show` to discover and copy maintained prompt templates
+- `markstream-vue@1.0` does not publish a CLI `bin`; repository scripts such as `pnpm skills:list` and `pnpm prompts:list` are contributor-only helpers for cloned checkouts
+- prompts remain in the repository under `prompts/` for direct copying or future separate-package work
 
 Other `npx skills add` forms also work:
 

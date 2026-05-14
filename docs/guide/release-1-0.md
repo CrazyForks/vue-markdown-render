@@ -20,12 +20,16 @@ description: Define the markstream-vue 1.0 stable scope, API tiers, package vali
 ## Experimental or internal
 
 - Cross-framework packages and playgrounds: Vue 2, React, Angular, Svelte, Next.
-- CLI skills/prompts and bundled agent assets.
+- Repository CLI helpers, skills/prompts, and bundled agent assets.
 - Low-level worker implementation files such as `*.worker` subpaths.
 - Height-estimation experiment APIs.
 - Internal renderer props: `indexKey`, `renderAsFragment`, `debugPerformance`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, `renderBatchBudgetMs`, `renderBatchIdleTimeoutMs`, and `viewportPriority`.
 
-These may still exist in the package, but they are not part of the 1.x compatibility promise unless promoted in the API docs.
+These may still exist in the repository, but they are not part of the 1.x compatibility promise unless promoted in the API docs.
+
+## Published package surface
+
+The 1.0 npm package publishes `dist` only. It must not include a `bin` field or leak `bin/`, `.agents/`, or `prompts/` into the tarball. CLI helpers for skills and prompts remain repository/internal tooling or future separate-package work.
 
 ## Stable public API
 

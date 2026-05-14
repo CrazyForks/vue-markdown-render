@@ -4,7 +4,7 @@ import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, inject } from 'vue'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText } from '../../utils/htmlRenderer'
-import { useCustomNodeComponents } from '../../utils/nodeComponents'
+import { isReservedNodeComponentKey, useCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmojiNode from '../EmojiNode'
 import EmphasisNode from '../EmphasisNode'
@@ -174,7 +174,7 @@ function processChild(child: NodeChild): { child: NodeChild, component: any, isC
   return {
     child,
     component: (nodeComponents.value as any)[child.type],
-    isCustomComponent: Boolean((overrides.value as any)[child.type]),
+    isCustomComponent: Boolean((overrides.value as any)[child.type] && !isReservedNodeComponentKey(String(child.type))),
   }
 }
 

@@ -13,7 +13,7 @@ description: 为 thinking 等可信标签接入自定义组件，在不改解析
 3. 只在兼容旧接入或一次性客户端应用时继续使用全局 `setCustomComponents`
 
 自定义组件请使用标签式名字，比如 `thinking`、`answer-box`、`my_component`。
-像 `foo:bar` 这种 namespaced 形式会被忽略；`code_block` 这类内置 override key 会继续保留给节点渲染器覆盖。通过 `VueRendererMarkdown` 或 `setCustomComponents` 注册的组件 key 会自动合并进 renderer 的 custom-tag set。
+像 `foo:bar` 这种 namespaced 形式会被忽略；`code_block` 这类内置 override key 会继续保留给节点渲染器覆盖，不会被当成自定义标签。通过 `VueRendererMarkdown` 或 `setCustomComponents` 注册的非 reserved 组件 key 会自动合并进 renderer 的 custom-tag set。
 
 只有当这条路径不够用时，再去碰解析器钩子。
 
@@ -51,7 +51,7 @@ const markdown = '<thinking>Step by step</thinking>'
 </template>
 ```
 
-通过 `VueRendererMarkdown` 或 `setCustomComponents` 注册组件后，这些 key 会进入 renderer 的 custom-tag set。解析器会直接产出 `type` 等于标签名本身的自定义节点。
+通过 `VueRendererMarkdown` 或 `setCustomComponents` 注册非 reserved 标签组件后，这些 key 会进入 renderer 的 custom-tag set。解析器会直接产出 `type` 等于标签名本身的自定义节点。
 
 旧接入仍然可以使用 scoped global API：
 

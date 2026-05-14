@@ -81,23 +81,19 @@
 - Nuxt playground：`pnpm play:nuxt`
 - Discord： https://discord.gg/vkzdkjeRCW
 
-## skills 和 prompts 的 CLI
+## 仓库内的 skills 和 prompts
 
-如果你想直接拿到打包后的 AI 资产，而不是先克隆仓库：
+如果你想直接拿到 AI 资产，而不是先克隆仓库：
 
 ```bash
 npx skills add Simon-He95/markstream-vue
-npx markstream-vue skills list
-npx markstream-vue skills install
-npx markstream-vue prompts list
-npx markstream-vue prompts show install-markstream
 ```
 
 推荐这样理解：
 
 - `npx skills add Simon-He95/markstream-vue` 是最推荐的安装方式，因为它会直接读取 GitHub 仓库里的 `.agents/skills`
-- `skills install` 会把打包好的 skills 安装到你的 agent skills 目录，默认是 `~/.agents/skills`
-- `prompts list` / `prompts show` 用来发现并直接复制官方维护的 prompt 模板
+- `markstream-vue@1.0` 不发布 CLI `bin`；`pnpm skills:list`、`pnpm prompts:list` 这类脚本只面向克隆仓库后的维护者
+- prompts 继续保留在仓库的 `prompts/` 目录下，供直接复制或后续拆成独立包
 
 `npx skills add` 也支持这些来源：
 

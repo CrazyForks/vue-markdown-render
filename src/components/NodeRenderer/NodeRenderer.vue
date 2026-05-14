@@ -45,7 +45,7 @@ import {
 } from '../../internal/heightEstimationExperiment'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
-import { useCustomNodeComponents } from '../../utils/nodeComponents'
+import { isReservedNodeComponentKey, useCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import MarkdownCodeBlockNode from '../MarkdownCodeBlockNode'
@@ -1504,8 +1504,9 @@ function getCodeBlockRenderNode(node: ParsedNode) {
   return cloned
 }
 
-function isCustomNodeComponent(node: ParsedNode, component: unknown) {
-  return Boolean(customComponentsMap.value[String(node.type)] === component)
+function isCustomTagComponent(node: ParsedNode, component: unknown) {
+  const type = String(node.type)
+  return !isReservedNodeComponentKey(type) && customComponentsMap.value[type] === component
 }
 
 function hasSlotChildren(node: ParsedNode) {
@@ -1602,7 +1603,7 @@ const renderedItems = computed(() => {
       }
     }
 
-    const rendersCustomNode = isCustomNodeComponent(node, component)
+    const rendersCustomNode = isCustomTagComponent(node, component)
     const customAttrs = rendersCustomNode
       ? getCustomNodeAttrs(node as any, resolvedHtmlPolicy.value)
       : undefined

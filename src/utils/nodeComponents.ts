@@ -27,6 +27,53 @@ export const customComponentsRevision = store.revision
 
 export const MARKSTREAM_CUSTOM_COMPONENTS_KEY: InjectionKey<Ref<Partial<CustomComponents>>> = Symbol('markstreamCustomComponents')
 
+export const RESERVED_NODE_COMPONENT_KEYS = new Set([
+  'text',
+  'paragraph',
+  'heading',
+  'code_block',
+  'list',
+  'list_item',
+  'blockquote',
+  'table',
+  'table_row',
+  'table_cell',
+  'definition_list',
+  'definition_item',
+  'footnote',
+  'footnote_reference',
+  'footnote_anchor',
+  'admonition',
+  'hardbreak',
+  'link',
+  'image',
+  'thematic_break',
+  'math_inline',
+  'math_block',
+  'strong',
+  'emphasis',
+  'strikethrough',
+  'highlight',
+  'insert',
+  'subscript',
+  'superscript',
+  'emoji',
+  'checkbox',
+  'checkbox_input',
+  'inline_code',
+  'html_inline',
+  'html_block',
+  'reference',
+  'mermaid',
+  'infographic',
+  'd2',
+  'vmr_container',
+])
+
+export function isReservedNodeComponentKey(key: string) {
+  return RESERVED_NODE_COMPONENT_KEYS.has(key)
+}
+
 export function createCustomComponentsRef(mapping: Partial<CustomComponents> = {}) {
   return shallowRef(mapping)
 }
