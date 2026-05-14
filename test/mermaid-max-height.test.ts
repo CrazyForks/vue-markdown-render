@@ -36,17 +36,19 @@ async function renderWithMaxHeight(maxHeight: string) {
   setupState.updateContainerHeight()
   await nextTick()
 
-  return { wrapper, container }
+  return { wrapper, container, content }
 }
 
 describe('mermaid block max height', () => {
   it('caps preview height unless maxHeight is none', async () => {
     const capped = await renderWithMaxHeight('500px')
     expect(capped.container.style.height).toBe('500px')
+    expect(capped.content.style.height).toBe('2000px')
     capped.wrapper.unmount()
 
     const uncapped = await renderWithMaxHeight('none')
     expect(uncapped.container.style.height).toBe('2000px')
+    expect(uncapped.content.style.height).toBe('2000px')
     uncapped.wrapper.unmount()
   })
 
@@ -84,12 +86,22 @@ describe('mermaid block max height', () => {
     await nextTick()
 
     expect(container.style.height).toBe('360px')
+    expect(content.style.height).toBe('2000px')
 
     await wrapper.setProps({ loading: false })
     setupState.updateContainerHeight(undefined, { force: true })
     await nextTick()
 
     expect(container.style.height).toBe('500px')
+    wrapper.unmount()
+  })
+
+  it('sizes capped preview content to the full SVG height', async () => {
+    const { wrapper } = await renderWithMaxHeight('500px')
+    const content = wrapper.get('div._mermaid').element as HTMLElement
+
+    expect(content.style.height).toBe('2000px')
+
     wrapper.unmount()
   })
 })

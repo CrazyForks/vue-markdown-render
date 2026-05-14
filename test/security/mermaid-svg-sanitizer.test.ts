@@ -71,6 +71,23 @@ describe('mermaid SVG sanitizer', () => {
     expect(svg).toMatch(/<rect/i)
   })
 
+  it('preserves Mermaid foreignObject label text as safe SVG text', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 100 50">
+        <g class="label" transform="translate(10, 10)">
+          <foreignObject width="80" height="24">
+            <div xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel">八戒叫阵火云洞</span></div>
+          </foreignObject>
+        </g>
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).not.toMatch(/foreignObject/i)
+    expect(svg).toMatch(/<text/i)
+    expect(svg).toContain('八戒叫阵火云洞')
+  })
+
   it('removes non-SVG tags from Mermaid output', () => {
     const svg = sanitizeMermaidSvg(`
       <svg viewBox="0 0 10 10">

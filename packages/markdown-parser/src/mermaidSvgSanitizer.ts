@@ -1,6 +1,8 @@
 import { isUnsafeHtmlUrl } from './htmlTags'
 
 const DISALLOWED_STYLE_PATTERNS = [/javascript:/i, /vbscript:/i, /data:text\/html/i, /expression\s*\(/i, /@import/i]
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const FOREIGN_OBJECT_IGNORED_TAGS = new Set(['script', 'style', 'iframe', 'object', 'embed', 'link', 'meta'])
 const ALLOWED_SVG_TAGS = new Set([
   'svg',
   'style',
@@ -204,7 +206,85 @@ function hardenSvgAnchorAttrs(node: Element) {
   node.setAttribute('rel', Array.from(relTokens).join(' '))
 }
 
+function parseSvgNumber(value: string | null | undefined) {
+  const parsed = Number.parseFloat(String(value ?? ''))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function collectForeignObjectText(node: Node, parts: string[]) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = node.textContent ?? ''
+    if (text)
+      parts.push(text)
+    return
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE)
+    return
+
+  const element = node as Element
+  const tag = element.tagName.toLowerCase()
+  if (FOREIGN_OBJECT_IGNORED_TAGS.has(tag))
+    return
+
+  if (tag === 'br') {
+    parts.push('\n')
+    return
+  }
+
+  for (const child of Array.from(element.childNodes))
+    collectForeignObjectText(child, parts)
+}
+
+function replaceForeignObjectLabels(svgEl: SVGElement) {
+  for (const node of Array.from(svgEl.querySelectorAll<Element>('foreignObject'))) {
+    const parts: string[] = []
+    collectForeignObjectText(node, parts)
+    const lines = parts
+      .join('')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+    if (!lines.length) {
+      node.remove()
+      continue
+    }
+
+    const width = parseSvgNumber(node.getAttribute('width'))
+    const height = parseSvgNumber(node.getAttribute('height'))
+    const x = parseSvgNumber(node.getAttribute('x'))
+    const y = parseSvgNumber(node.getAttribute('y'))
+    const text = svgEl.ownerDocument.createElementNS(SVG_NS, 'text')
+    text.setAttribute('x', String(x + width / 2))
+    text.setAttribute('y', String(y + height / 2))
+    text.setAttribute('text-anchor', 'middle')
+    text.setAttribute('dominant-baseline', 'central')
+
+    const label = node.querySelector('.nodeLabel')
+    if (label?.getAttribute('class'))
+      text.setAttribute('class', label.getAttribute('class')!)
+
+    if (lines.length === 1) {
+      text.textContent = lines[0]!
+    }
+    else {
+      const firstDy = -0.6 * (lines.length - 1)
+      for (const [index, line] of lines.entries()) {
+        const tspan = svgEl.ownerDocument.createElementNS(SVG_NS, 'tspan')
+        tspan.setAttribute('x', String(x + width / 2))
+        tspan.setAttribute('dy', index === 0 ? `${firstDy}em` : '1.2em')
+        tspan.textContent = line
+        text.appendChild(tspan)
+      }
+    }
+
+    node.parentNode?.replaceChild(text, node)
+  }
+}
+
 function scrubSvgElement(svgEl: SVGElement) {
+  replaceForeignObjectLabels(svgEl)
+
   const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll<Element>('*'))]
   for (const node of nodes) {
     const tag = node.tagName.toLowerCase()

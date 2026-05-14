@@ -185,7 +185,10 @@ const baseFixedCode = computed(() => {
 function getCodeWithTheme(theme: 'light' | 'dark', code = baseFixedCode.value) {
   const baseCode = code
   const themeValue = theme === 'dark' ? 'dark' : 'default'
-  const themeConfig = `%%{init: {"theme": "${themeValue}"}}%%\n`
+  const initConfig: Record<string, unknown> = { theme: themeValue }
+  if (mermaidSecurityLevel.value === 'strict')
+    initConfig.flowchart = { htmlLabels: false }
+  const themeConfig = `%%{init: ${JSON.stringify(initConfig)}}%%\n`
   if (baseCode.trim().startsWith('%%{')) {
     return baseCode
   }
@@ -307,6 +310,7 @@ function scheduleRenderRetry(delayMs = 600) {
 }
 
 const containerHeight = ref<string>(resolveInitialContainerHeight())
+const contentHeight = ref<string>(containerHeight.value)
 let resizeObserver: ResizeObserver | null = null
 
 // rendering state management
@@ -471,6 +475,7 @@ function renderErrorToContainer(error: unknown) {
     ? getComputedStyle(mermaidContent.value).getPropertyValue('--ms-size-diagram-min-height').trim()
     : ''
   containerHeight.value = tokenH || '360px'
+  contentHeight.value = containerHeight.value
   hasRenderError.value = true
   // 在错误显示时，停止任何预览轮询，避免错误被覆盖
   stopPreviewPolling()
@@ -524,7 +529,10 @@ function onCopyHover(e: Event) {
 // Apply theme header to arbitrary code snippet
 function applyThemeTo(code: string, theme: 'light' | 'dark') {
   const themeValue = theme === 'dark' ? 'dark' : 'default'
-  const themeConfig = `%%{init: {"theme": "${themeValue}"}}%%\n`
+  const initConfig: Record<string, unknown> = { theme: themeValue }
+  if (mermaidSecurityLevel.value === 'strict')
+    initConfig.flowchart = { htmlLabels: false }
+  const themeConfig = `%%{init: ${JSON.stringify(initConfig)}}%%\n`
   const trimmed = code.trimStart()
   if (trimmed.startsWith('%%{'))
     return code
@@ -731,8 +739,7 @@ function resolveMaxContainerHeight() {
 function updateContainerHeight(newContainerWidth?: number, options?: { force?: boolean }) {
   if (!mermaidContainer.value || !mermaidContent.value)
     return
-  if (!options?.force && shouldFreezeStreamingPreviewHeight())
-    return
+  const freezePreviewHeight = !options?.force && shouldFreezeStreamingPreviewHeight()
 
   const svgElement = mermaidContent.value.querySelector('svg')
   if (!svgElement)
@@ -792,10 +799,15 @@ function updateContainerHeight(newContainerWidth?: number, options?: { force?: b
     // 如果外部传入了宽度，则使用它，否则自己获取
     const containerWidth
       = newContainerWidth ?? mermaidContainer.value.clientWidth
+    const renderedSvgWidth = svgElement.getBoundingClientRect().width
+    const effectiveWidth = renderedSvgWidth > 0 ? renderedSvgWidth : containerWidth
     const maxHeight = resolveMaxContainerHeight()
-    const newHeight = containerWidth * aspectRatio
+    const newHeight = effectiveWidth * aspectRatio
     const resolvedHeight = maxHeight == null ? newHeight : Math.min(newHeight, maxHeight)
-    containerHeight.value = `${Math.max(resolvedHeight, resolveEstimatedPreviewHeight())}px`
+    const previewHeight = Math.max(resolvedHeight, resolveEstimatedPreviewHeight())
+    contentHeight.value = `${Math.max(newHeight, previewHeight)}px`
+    if (!freezePreviewHeight)
+      containerHeight.value = `${previewHeight}px`
   }
 }
 
@@ -1831,8 +1843,10 @@ watch(
 watch(
   [() => props.estimatedPreviewHeightPx, () => baseFixedCode.value],
   () => {
-    if (!hasRenderedOnce.value && !hasPreviewSvg() && !showSource.value)
+    if (!hasRenderedOnce.value && !hasPreviewSvg() && !showSource.value) {
       containerHeight.value = resolveInitialContainerHeight()
+      contentHeight.value = containerHeight.value
+    }
   },
 )
 
@@ -2083,6 +2097,7 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
             <div
               ref="mermaidContent"
               class="_mermaid w-full text-center flex items-center justify-center min-h-full"
+              :style="{ height: contentHeight }"
             />
           </div>
         </div>
