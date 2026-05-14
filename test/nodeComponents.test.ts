@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { clearGlobalCustomComponents, getCustomNodeComponents, isReservedNodeComponentKey, mergeCustomNodeComponents, removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
+import { clearGlobalCustomComponents, getCustomNodeComponents, isReservedNodeComponentKey, mergeCustomNodeComponents, normalizeCustomComponentMapping, removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 
 describe('nodeComponents scoped API', () => {
   const clearMappings = () => {
@@ -80,5 +80,28 @@ describe('nodeComponents scoped API', () => {
     expect(isReservedNodeComponentKey('Text')).toBe(true)
     expect(isReservedNodeComponentKey(' Code_Block ')).toBe(true)
     expect(isReservedNodeComponentKey('thinking')).toBe(false)
+  })
+
+  it('adds normalized aliases for PascalCase custom tag keys', () => {
+    const mapping = normalizeCustomComponentMapping({
+      Thinking: 'ThinkingNode',
+      Link: 'LinkNode',
+    } as any)
+
+    expect(mapping.Thinking).toBe('ThinkingNode')
+    expect(mapping.thinking).toBe('ThinkingNode')
+    expect((mapping as any).Link).toBe('LinkNode')
+    expect(mapping.link).toBeUndefined()
+  })
+
+  it('filters undefined custom component values before custom tag inference', () => {
+    const mapping = normalizeCustomComponentMapping({
+      thinking: undefined,
+      Answer: 'AnswerNode',
+    } as any)
+
+    expect(Object.prototype.hasOwnProperty.call(mapping, 'thinking')).toBe(false)
+    expect(mapping.Answer).toBe('AnswerNode')
+    expect(mapping.answer).toBe('AnswerNode')
   })
 })

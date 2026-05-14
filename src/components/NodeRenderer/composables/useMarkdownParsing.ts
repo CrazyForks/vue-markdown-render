@@ -35,7 +35,9 @@ export interface MarkdownParsingState {
 }
 
 function getAutoCustomHtmlTags(mapping: Partial<CustomComponents>) {
-  return Object.keys(mapping).filter(key => !isReservedNodeComponentKey(key))
+  return Object.entries(mapping)
+    .filter(([key, component]) => component != null && !isReservedNodeComponentKey(key))
+    .map(([key]) => key)
 }
 
 export function useMarkdownParsing(

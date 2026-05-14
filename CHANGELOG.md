@@ -4,6 +4,7 @@
 
 * Added the 1.0 release contract and marked Vue 3 renderer APIs as the stable 1.x scope while keeping cross-framework adapters, repository AI assets, and internal performance props experimental.
 * `VueRendererMarkdown` now accepts an app-scoped `components` option for SSR-safe custom component registration.
+* Non-reserved keys registered through `VueRendererMarkdown({ components })` or `setCustomComponents()` are now inferred as custom HTML tags. Built-in node override keys such as `text`, `link`, and `code_block` remain reserved and are not inferred as custom tags.
 * The published npm package now ships only `dist` and intentionally does not expose a CLI `bin`; skills and prompts remain repository assets or future separate-package work.
 * Mermaid SVG output is sanitized before mounting in both strict and loose modes. `isStrict=false` only controls Mermaid's parse/render configuration and no longer means raw SVG insertion.
 * Mermaid interaction callbacks are disabled by default. Use `mermaidProps.enableMermaidInteractions = true` only for trusted diagrams.

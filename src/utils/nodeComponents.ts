@@ -1,5 +1,6 @@
 import type { ComputedRef, InjectionKey, Ref } from 'vue'
 import type { CustomComponents } from '../types'
+import { normalizeCustomHtmlTagName } from 'stream-markdown-parser'
 import { computed, inject, shallowRef } from 'vue'
 
 // Store mappings per scope id. A special key is kept for the legacy/global mapping.
@@ -74,8 +75,30 @@ export function isReservedNodeComponentKey(key: string) {
   return RESERVED_NODE_COMPONENT_KEYS.has(String(key).trim().toLowerCase())
 }
 
+export function normalizeCustomComponentMapping(mapping: Partial<CustomComponents> = {}) {
+  const normalized: Partial<CustomComponents> = {}
+
+  for (const [key, component] of Object.entries(mapping)) {
+    if (component == null)
+      continue
+
+    normalized[key] = component
+
+    const normalizedKey = normalizeCustomHtmlTagName(key)
+    if (
+      normalizedKey
+      && !isReservedNodeComponentKey(normalizedKey)
+      && !Object.prototype.hasOwnProperty.call(normalized, normalizedKey)
+    ) {
+      normalized[normalizedKey] = component
+    }
+  }
+
+  return normalized
+}
+
 export function createCustomComponentsRef(mapping: Partial<CustomComponents> = {}) {
-  return shallowRef(mapping)
+  return shallowRef(normalizeCustomComponentMapping(mapping))
 }
 
 // Overloads for nicer TypeScript API
@@ -87,11 +110,11 @@ export function setCustomComponents(
 ): void {
   if (typeof customIdOrMapping === 'string') {
     // scoped API: setCustomComponents('my-id', { ... })
-    store.scopedCustomComponents[customIdOrMapping] = maybeMapping || {}
+    store.scopedCustomComponents[customIdOrMapping] = normalizeCustomComponentMapping(maybeMapping || {})
   }
   else {
     // legacy/global API: setCustomComponents({ ... })
-    store.scopedCustomComponents[GLOBAL_KEY] = customIdOrMapping || {}
+    store.scopedCustomComponents[GLOBAL_KEY] = normalizeCustomComponentMapping(customIdOrMapping || {})
   }
   customComponentsRevision.value++
 }
@@ -101,11 +124,11 @@ export function setCustomComponents(
  * If no id is provided, returns the legacy/global mapping (if any).
  */
 export function getCustomNodeComponents(customId?: string) {
-  const globalMapping = store.scopedCustomComponents[GLOBAL_KEY] || {}
+  const globalMapping = normalizeCustomComponentMapping(store.scopedCustomComponents[GLOBAL_KEY] || {})
   if (!customId)
     return globalMapping
 
-  const scopedMapping = store.scopedCustomComponents[customId] || {}
+  const scopedMapping = normalizeCustomComponentMapping(store.scopedCustomComponents[customId] || {})
   if (!globalMapping || Object.keys(globalMapping).length === 0)
     return scopedMapping
   if (!scopedMapping || Object.keys(scopedMapping).length === 0)
@@ -131,9 +154,9 @@ export function mergeCustomNodeComponents(
   void customComponentsRevision.value
 
   return {
-    ...getGlobalCustomNodeComponents(),
-    ...appScopedMapping,
-    ...getScopedOnlyCustomNodeComponents(customId),
+    ...normalizeCustomComponentMapping(getGlobalCustomNodeComponents()),
+    ...normalizeCustomComponentMapping(appScopedMapping),
+    ...normalizeCustomComponentMapping(getScopedOnlyCustomNodeComponents(customId)),
   }
 }
 

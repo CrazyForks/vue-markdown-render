@@ -172,6 +172,38 @@ Footnotes are server-rendered.[^1]
     expect(htmlB).toContain('tenant B')
   })
 
+  it('renders app-scoped custom tag registered with PascalCase key', async () => {
+    const ThinkingNode = defineComponent({
+      name: 'PascalCaseThinkingNode',
+      props: {
+        node: {
+          type: Object,
+          required: true,
+        },
+      },
+      setup(props) {
+        return () => h('aside', { 'data-ssr-thinking': 'pascal' }, String((props.node as any).content ?? ''))
+      },
+    })
+
+    const app = createSSRApp({
+      render: () => h(MarkdownRender, {
+        content: '<thinking>Pascal tag</thinking>',
+        final: true,
+      }),
+    })
+    app.use(VueRendererMarkdown, {
+      components: {
+        Thinking: ThinkingNode,
+      },
+    })
+
+    const html = await renderToString(app)
+
+    expect(html).toContain('data-ssr-thinking="pascal"')
+    expect(html).toContain('Pascal tag')
+  })
+
   it('uses scoped custom components as SSR app override and custom-tag source', async () => {
     const scopeId = 'ssr-render-scoped-over-app-components'
     const AppThinkingNode = defineComponent({
