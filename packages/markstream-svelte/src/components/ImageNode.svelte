@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SvelteRenderableNode } from './shared/node-helpers'
+  import { sanitizeImageSrc } from 'stream-markdown-parser'
   import { useSafeI18n } from '../i18n/useSafeI18n'
   import { getString } from './shared/node-helpers'
 
@@ -21,38 +22,58 @@
 
   const { t } = useSafeI18n()
 
-  let src = $derived(getString((node as any)?.src))
+  type ImageStage = 'primary' | 'fallback' | 'failed'
+
+  function resolveImageState(primarySrc: string, fallbackSrc: string, loading: boolean): { src: string; stage: ImageStage } {
+    if (loading || primarySrc)
+      return { src: primarySrc, stage: 'primary' }
+    if (fallbackSrc)
+      return { src: fallbackSrc, stage: 'fallback' }
+    return { src: '', stage: 'failed' }
+  }
+
+  let safeNodeSrc = $derived(sanitizeImageSrc((node as any)?.src))
+  let safeFallbackSrc = $derived(sanitizeImageSrc(fallbackSrc))
   let alt = $derived(getString((node as any)?.alt))
   let title = $derived(getString((node as any)?.title))
   let raw = $derived(getString((node as any)?.raw))
   let isLoading = $derived(Boolean((node as any)?.loading))
   let useEagerImagePath = $derived(!lazy)
 
-  let initialSrc = untrack(() => getString((node as any)?.src))
-  let previousSrc = $state(initialSrc)
-  let currentSrc = $state(initialSrc)
+  let initialSafeNodeSrc = untrack(() => sanitizeImageSrc((node as any)?.src))
+  let initialSafeFallbackSrc = untrack(() => sanitizeImageSrc(fallbackSrc))
+  let initialIsLoading = untrack(() => Boolean((node as any)?.loading))
+  let initialImageState = resolveImageState(initialSafeNodeSrc, initialSafeFallbackSrc, initialIsLoading)
+  let previousSafeNodeSrc = $state(initialSafeNodeSrc)
+  let previousSafeFallbackSrc = $state(initialSafeFallbackSrc)
+  let previousIsLoading = $state(initialIsLoading)
+  let currentSrc = $state(initialImageState.src)
+  let imageStage = $state<ImageStage>(initialImageState.stage)
   let imageLoaded = $state(false)
-  let hasError = $state(false)
-  let fallbackTried = $state(false)
+  let hasError = $state(initialImageState.stage === 'failed')
 
   $effect.pre(() => {
-    if (src !== previousSrc) {
-      previousSrc = src
-      currentSrc = src
+    if (safeNodeSrc !== previousSafeNodeSrc || safeFallbackSrc !== previousSafeFallbackSrc || isLoading !== previousIsLoading) {
+      previousSafeNodeSrc = safeNodeSrc
+      previousSafeFallbackSrc = safeFallbackSrc
+      previousIsLoading = isLoading
+      const next = resolveImageState(safeNodeSrc, safeFallbackSrc, isLoading)
+      currentSrc = next.src
+      imageStage = next.stage
       imageLoaded = false
-      hasError = false
-      fallbackTried = false
+      hasError = next.stage === 'failed'
     }
   })
 
   function handleImageError() {
-    if (fallbackSrc && !fallbackTried) {
-      fallbackTried = true
-      currentSrc = fallbackSrc
+    if (imageStage === 'primary' && safeFallbackSrc && safeFallbackSrc !== currentSrc) {
+      currentSrc = safeFallbackSrc
+      imageStage = 'fallback'
       imageLoaded = false
       hasError = false
       return
     }
+    imageStage = 'failed'
     hasError = true
     imageLoaded = false
   }
@@ -69,7 +90,7 @@
 </script>
 
 <span class="image-node-container">
-  {#if !isLoading && !hasError}
+  {#if !isLoading && !hasError && currentSrc}
     <img
       class="image-node__img"
       class:is-loaded={useEagerImagePath || imageLoaded}

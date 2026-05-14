@@ -28,6 +28,7 @@ import MarkdownRender, {
   getCustomNodeComponents,
   getMarkdown,
   InfographicBlockNode,
+  isBrokenMermaidSvg,
   isD2Enabled,
   isKatexEnabled,
   isMermaidEnabled,
@@ -37,11 +38,14 @@ import MarkdownRender, {
   parseMarkdownToStructure,
   registerMarkdownPlugin,
   removeCustomComponents,
+  sanitizeMermaidSvg,
   setCustomComponents,
   setD2Loader,
   setDefaultMathOptions,
   setKatexLoader,
   setMermaidLoader,
+  toSafeMermaidSvgMarkup,
+  toSafeSvgElement,
   useSmoothMarkdownStream,
   VueRendererMarkdown,
 } from 'markstream-vue'
@@ -88,6 +92,10 @@ setDefaultMathOptions({})
 const markdown = getMarkdown('public-api-test')
 const nodes = parseMarkdownToStructure('# API test', markdown, { final: true })
 const controller = useSmoothMarkdownStream(options)
+const safeMermaidSvg: string | null = sanitizeMermaidSvg('<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>')
+const safeMermaidSvgMarkup: string = toSafeMermaidSvgMarkup('<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>')
+const safeMermaidSvgElement: SVGElement | null = toSafeSvgElement<SVGElement>('<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>')
+const brokenMermaidSvg: boolean = isBrokenMermaidSvg('<svg viewBox="0 0 0 10"><rect width="10" height="10" /></svg>')
 
 const codeBlockProps: Partial<CodeBlockNodeProps> = {}
 const mermaidProps: Partial<MermaidBlockNodeProps> = {}
@@ -146,6 +154,10 @@ void mermaidEnabled
 void d2Enabled
 void nodes
 void controller
+void safeMermaidSvg
+void safeMermaidSvgMarkup
+void safeMermaidSvgElement
+void brokenMermaidSvg
 void codeBlockProps
 void mermaidProps
 void mathProps

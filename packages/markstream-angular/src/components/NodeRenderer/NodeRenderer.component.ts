@@ -1019,7 +1019,7 @@ export class NodeRendererComponent implements NodeRendererProps, OnChanges, OnIn
 
   private getTypewriterContentLength(): number {
     if (this.nodes?.length)
-      return (this.nodes as unknown[]).reduce((total: number, node: unknown) => total + this.getNodeTextLength(node), 0)
+      return (this.nodes as unknown[]).reduce<number>((total, node) => total + this.getNodeTextLength(node), 0)
     // Use raw content length, not renderContent (which may be the paced-out
     // visible portion when smooth streaming is active).
     return (this.content ?? '').length

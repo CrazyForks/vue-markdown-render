@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // 定义链接节点
+import { shouldOpenLinkInNewTab } from 'stream-markdown-parser'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, useAttrs } from 'vue-demi'
 import { ensureTooltipMounted, hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { sanitizeAttrs } from '../../utils/htmlRenderer'
@@ -145,12 +146,15 @@ const anchorAttrs = computed(() => {
   // `title` is controlled by `showTooltip` behavior and should not be overridden.
   delete (merged as Record<string, unknown>).title
   delete (merged as Record<string, unknown>).href
+  delete (merged as Record<string, unknown>).target
+  delete (merged as Record<string, unknown>).rel
   return merged
 })
 const safeHref = computed(() => {
   const href = String(props.node?.href ?? '')
   return sanitizeAttrs({ href }).href
 })
+const openInNewTab = computed(() => shouldOpenLinkInNewTab(safeHref.value))
 
 function getTooltipText() {
   return props.node?.title || safeHref.value || props.node?.text || ''
@@ -236,8 +240,8 @@ onBeforeUnmount(() => {
     :title="showTooltip ? '' : title"
     :aria-label="`Link: ${title}`"
     :aria-hidden="node.loading ? 'true' : 'false'"
-    target="_blank"
-    rel="noopener noreferrer"
+    :target="openInNewTab ? '_blank' : undefined"
+    :rel="openInNewTab ? 'noopener noreferrer' : undefined"
     v-bind="anchorAttrs"
     :style="cssVars"
     @mouseenter="(e) => onAnchorEnter(e)"

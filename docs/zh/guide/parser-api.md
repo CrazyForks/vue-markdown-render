@@ -68,6 +68,8 @@ setDefaultMathOptions({
 - `findMatchingClose(src, startIdx, open, close)` — 查找匹配的闭合符号
 - `parseFenceToken(token)` — 将 code fence 转为 `CodeBlockNode`
 - `normalizeStandaloneBackslashT(content, options?)` — 规范化数学内容中的特殊转义
+- `sanitizeImageSrc(value)` — 使用与内置图片渲染器一致的严格图片 URL 策略
+- `sanitizeMermaidSvg(svg)` / `toSafeMermaidSvgMarkup(svg)` / `toSafeSvgElement(svg)` / `isBrokenMermaidSvg(svg)` — 使用 `DOMParser` 清理或校验 Mermaid SVG；在没有 `DOMParser` 的纯 Node 环境中，这些清理 helper 分别返回 `null` / `''` / `null`
 
 ## 解析钩子（高级）
 传入 `ParseOptions` 可使用以下钩子：

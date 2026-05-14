@@ -34,6 +34,8 @@ import {
   parseMarkdownToStructure,
   sanitizeHtmlAttrs,
   sanitizeHtmlTokenAttrs,
+  sanitizeImageSrc,
+  shouldOpenLinkInNewTab,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
 } from 'stream-markdown-parser'
@@ -785,6 +787,7 @@ export function LinkNode(props: NodeComponentProps<LinkNodeProps['node']> & {
   const title = typeof node.title === 'string' && node.title.trim().length > 0
     ? node.title
     : String(safeHref ?? '')
+  const openInNewTab = shouldOpenLinkInNewTab(safeHref)
 
   if (node.loading) {
     return (
@@ -807,11 +810,11 @@ export function LinkNode(props: NodeComponentProps<LinkNodeProps['node']> & {
   return (
     <a
       className="link-node"
-      href={safeHref}
+      href={safeHref || undefined}
       title={title}
       aria-label={`Link: ${title}`}
-      target="_blank"
-      rel="noopener noreferrer"
+      target={openInNewTab ? '_blank' : undefined}
+      rel={openInNewTab ? 'noopener noreferrer' : undefined}
       style={cssVars}
     >
       {ctx && renderNodeProp
@@ -830,9 +833,13 @@ export function LinkNode(props: NodeComponentProps<LinkNodeProps['node']> & {
 
 export function ImageNode(rawProps: ImageNodeProps) {
   const props = rawProps
+  const src = sanitizeImageSrc(props.node.src) || sanitizeImageSrc(props.fallbackSrc)
+  if (!src)
+    return null
+
   return (
     <img
-      src={props.node.src}
+      src={src}
       alt={String(props.node.alt ?? props.node.title ?? '')}
       title={String(props.node.title ?? props.node.alt ?? '')}
       className="image-node__img is-loaded"

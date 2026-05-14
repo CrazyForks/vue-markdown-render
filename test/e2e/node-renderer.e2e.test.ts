@@ -297,6 +297,8 @@ After`,
         expect(links[0].find('img').exists()).toBe(true)
         expect(links[1].find('img').exists()).toBe(true)
         expect(links[1].attributes('href')).toBe('README.zh-CN.md')
+        expect(links[1].attributes('target')).toBeUndefined()
+        expect(links[1].attributes('rel')).toBeUndefined()
       },
     },
     {

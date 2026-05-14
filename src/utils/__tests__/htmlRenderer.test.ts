@@ -458,7 +458,7 @@ describe('htmlRenderer', () => {
     })
 
     it('should allow safe data URLs for media', () => {
-      const result = sanitizeAttrs({ src: 'data:image/png;base64,iVBORw0KGgo=' })
+      const result = sanitizeAttrs({ src: 'data:image/png;base64,iVBORw0KGgo=' }, 'safe', 'img')
       expect(result.src).toBe('data:image/png;base64,iVBORw0KGgo=')
     })
 

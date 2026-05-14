@@ -8,7 +8,8 @@
 - `loading?: boolean` — initial loading placeholder
 - `maxHeight?: string | null` — maximum height
 - `estimatedPreviewHeightPx?: number` — first-preview height reserved before Mermaid finishes rendering; `MarkdownRender` fills this automatically for Mermaid fences
-- `isStrict?: boolean` — defaults to `true`; runs Mermaid in `securityLevel: 'strict'` with DOMPurify + HTML-label hardening. Set `false` only for trusted diagrams that require Mermaid HTML labels.
+- `isStrict?: boolean` — defaults to `true`; runs Mermaid in `securityLevel: 'strict'` with DOMPurify + HTML-label hardening. Set `false` only for trusted diagrams that need Mermaid's loose parse/render config. The rendered SVG is still sanitized before mounting and export.
+- `enableMermaidInteractions?: boolean` — defaults to `false`; enables Mermaid-generated click bindings after sanitized SVG mount. Use only for trusted diagrams.
 - `onRenderError?: (error: unknown, code: string, container: HTMLElement) => boolean | void` — custom error handler called when mermaid rendering fails. Return `true` to prevent the default error display. Receives the error, the raw mermaid source code, and the container DOM element so you can render custom content.
 - Header / control props (all optional, default `true`):
   - `showHeader`, `showModeToggle`, `showCopyButton`, `showExportButton`, `showFullscreenButton`, `showCollapseButton`, `showZoomControls`, `showTooltips`
@@ -71,7 +72,8 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 ## Recommended usage
 - To implement custom export/upload behavior, call `preventDefault()` in the `export` listener and extract the SVG from the rendered DOM in your handler.
 - To fully replace the header UI, use the `header-*` slots and set the corresponding `show*` props to `false` to hide the default controls.
-- Mermaid strict mode is enabled by default, so user/LLM diagrams are sanitized and HTML labels are disabled. Set `:is-strict="false"` only for trusted diagrams that need loose Mermaid rendering.
+- Mermaid strict mode is enabled by default, so user/LLM diagrams are rendered with Mermaid's strict config and sanitized before mounting. Set `:is-strict="false"` only for trusted diagrams that need Mermaid's loose config; the SVG output is still sanitized.
+- Mermaid click bindings are disabled by default. Set `:enable-mermaid-interactions="true"` only for trusted diagrams that need Mermaid `click` callbacks.
 - In AI chat scenarios, use `onRenderError` to show raw mermaid source instead of the default error message:
 
 ```vue
@@ -93,9 +95,9 @@ function handleMermaidError(_err: unknown, code: string, container: HTMLElement)
 </template>
 ```
 
-## Restoring loose mode for trusted diagrams
+## Opting into loose Mermaid config
 
-If a trusted diagram used Mermaid HTML labels or relied on the old loose-mode rendering, opt out per component instead of disabling the safer default globally:
+If a trusted diagram needs Mermaid's loose parse/render config, opt out per component instead of disabling the safer default globally. This does not re-enable raw SVG insertion: Markstream sanitizes Mermaid SVG output in both strict and loose modes, so `foreignObject` and active HTML labels may be removed.
 
 ```vue
 <script setup lang="ts">

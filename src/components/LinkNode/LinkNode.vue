@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 定义链接节点
 import type { LinkNodeProps } from '../../types/component-props'
+import { shouldOpenLinkInNewTab } from 'stream-markdown-parser'
 import { computed, inject, useAttrs } from 'vue'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { sanitizeAttrs } from '../../utils/htmlRenderer'
@@ -96,7 +97,7 @@ const nodeAttrs = computed(() => {
     }
   }
 
-  return sanitizeAttrs(normalized)
+  return sanitizeAttrs(normalized, 'safe', 'a')
 })
 const mergedAnchorAttrs = computed(() => {
   return {
@@ -104,13 +105,23 @@ const mergedAnchorAttrs = computed(() => {
     ...nodeAttrs.value,
   } as Record<string, unknown>
 })
+const safeHref = computed(() => {
+  const href = String(props.node?.href ?? '')
+  return sanitizeAttrs({ href }, 'safe', 'a').href
+})
 const finalTarget = computed(() => {
+  if (!safeHref.value)
+    return undefined
+
   const rawTarget = mergedAnchorAttrs.value.target
   const normalized = typeof rawTarget === 'string' ? rawTarget.trim() : String(rawTarget ?? '').trim()
-  return normalized || '_blank'
+  return normalized || (shouldOpenLinkInNewTab(safeHref.value) ? '_blank' : undefined)
 })
-const isBlankTarget = computed(() => finalTarget.value.trim().toLowerCase() === '_blank')
+const isBlankTarget = computed(() => String(finalTarget.value ?? '').trim().toLowerCase() === '_blank')
 const finalRel = computed(() => {
+  if (!safeHref.value)
+    return undefined
+
   const rawRel = mergedAnchorAttrs.value.rel
   const tokens = new Set(
     (typeof rawRel === 'string' ? rawRel : String(rawRel ?? ''))
@@ -139,11 +150,6 @@ const anchorAttrs = computed(() => {
   delete merged.target
   delete merged.rel
   return merged
-})
-
-const safeHref = computed(() => {
-  const href = String(props.node?.href ?? '')
-  return sanitizeAttrs({ href }).href
 })
 
 // Tooltip handlers using singleton tooltip

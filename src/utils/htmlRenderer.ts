@@ -11,6 +11,7 @@ import {
   isHtmlTagBlocked,
   isHtmlTagHardBlocked,
   sanitizeHtmlAttrs,
+  sanitizeImageSrc,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
   tokenizeHtml,
@@ -21,6 +22,7 @@ export {
   getHtmlTagFromContent,
   hasCompleteHtmlTagContent,
   isHtmlTagBlocked,
+  sanitizeImageSrc,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
   tokenizeHtml,
@@ -53,8 +55,8 @@ export function isCustomComponent(
   return isCustomHtmlComponentTag(tagName, customComponents as Record<string, unknown>)
 }
 
-export function sanitizeAttrs(attrs: Record<string, string>): Record<string, string> {
-  return sanitizeHtmlAttrs(attrs)
+export function sanitizeAttrs(attrs: Record<string, string>, policy: HtmlPolicy = 'safe', tagName?: string): Record<string, string> {
+  return sanitizeHtmlAttrs(attrs, policy, tagName)
 }
 
 export function convertPropValue(value: string, key: string): any {

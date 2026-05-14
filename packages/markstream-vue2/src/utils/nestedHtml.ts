@@ -8,6 +8,8 @@ import {
   normalizeCustomHtmlTagName,
   normalizeCustomHtmlTags,
   sanitizeHtmlContent,
+  sanitizeImageSrc,
+  shouldOpenLinkInNewTab,
   URL_HTML_ATTRS,
 } from 'stream-markdown-parser'
 
@@ -236,12 +238,16 @@ function renderLinkNode(node: NestedRenderableNode, ctx: RenderContext): string 
     ? renderNodesToHtml(getNodeList(node.children), ctx)
     : escapeHtml(getString(node.text || href))
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''
-  const hrefAttr = href && !isUnsafeHtmlUrl(href) ? ` href="${escapeAttr(href)}"` : ''
-  return `<a${hrefAttr}${titleAttr} target="_blank" rel="noreferrer noopener">${content}</a>`
+  const safeHref = href && !isUnsafeHtmlUrl(href) ? href : ''
+  const hrefAttr = safeHref ? ` href="${escapeAttr(safeHref)}"` : ''
+  const externalAttrs = shouldOpenLinkInNewTab(safeHref) ? ' target="_blank" rel="noreferrer noopener"' : ''
+  return `<a${hrefAttr}${titleAttr}${externalAttrs}>${content}</a>`
 }
 
 function renderImageNode(node: NestedRenderableNode): string {
-  const src = getString(node.src)
+  const src = sanitizeImageSrc(node.src)
+  if (!src)
+    return ''
   const alt = getString(node.alt)
   const title = getString(node.title)
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''
@@ -399,7 +405,7 @@ function serializeAttrs(attrs?: CustomComponentAttrs | null, extraClass = ''): s
       continue
     if (DANGEROUS_HTML_ATTRS.has(lowerName))
       continue
-    if (value !== true && URL_HTML_ATTRS.has(lowerName) && value && isUnsafeHtmlUrl(String(value)))
+    if (value !== true && URL_HTML_ATTRS.has(lowerName) && value && isUnsafeHtmlUrl(String(value), { attrName: lowerName }))
       continue
     if (lowerName === 'class') {
       mergedClasses.push(String(value))

@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { SvelteRenderableNode, SvelteRenderContext } from './shared/node-helpers'
-  import { onMount, untrack } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
+  import { toSafeMermaidSvgMarkup } from 'stream-markdown-parser'
   import { useSafeI18n } from '../i18n/useSafeI18n'
   import { getMermaid } from '../optional/mermaid'
-  import { toSafeSvgMarkup } from '../sanitizeSvg'
   import { hideTooltip, showTooltipForAnchor, type TooltipPlacement } from '../tooltip/singletonTooltip'
   import { getLanguageIcon } from '../utils/languageIcon'
   import { canParseOffthread, findPrefixOffthread } from '../workers/mermaidWorkerClient'
@@ -33,6 +33,7 @@
     showCollapseButton?: boolean
     showZoomControls?: boolean
     isStrict?: boolean
+    enableMermaidInteractions?: boolean
   }
 
   let {
@@ -55,6 +56,7 @@
     showCollapseButton = true,
     showZoomControls = true,
     isStrict = true,
+    enableMermaidInteractions = false,
   }: Props = $props()
 
   const { t } = useSafeI18n()
@@ -75,8 +77,11 @@
   let showSource = $state(false)
   let modalOpen = $state(false)
   let zoom = $state(1)
+  let previewHost: HTMLElement | null = $state(null)
+  let modalHost: HTMLElement | null = $state(null)
   let renderTimer: ReturnType<typeof setTimeout> | null = $state(null)
   let copyTimer: ReturnType<typeof setTimeout> | null = $state(null)
+  let lastMermaidBindFunctions: ((element: Element) => unknown) | null = null
 
   let source = $derived(normalizeMermaidSource(getString((node as any)?.code)))
   let nodeLoading = $derived(typeof (node as any)?.loading === 'boolean' ? Boolean((node as any)?.loading) : true)
@@ -119,6 +124,11 @@
       collapsed
       untrack(() => scheduleRender())
     }
+  })
+
+  $effect(() => {
+    if (mounted && modalOpen && svgMarkup && modalHost && enableMermaidInteractions)
+      untrack(() => void tick().then(() => bindCurrentMermaidInteractions(modalHost)))
   })
 
   function clearRenderTimer() {
@@ -239,10 +249,11 @@
         return
 
       const rawSvg = typeof rendered === 'string' ? rendered : rendered?.svg
-      const safeSvg = isStrict ? toSafeSvgMarkup(rawSvg) : rawSvg
+      const safeSvg = toSafeMermaidSvgMarkup(rawSvg)
       if (!safeSvg)
         throw new Error('Mermaid rendered empty SVG.')
       svgMarkup = safeSvg
+      lastMermaidBindFunctions = typeof rendered === 'string' ? null : rendered?.bindFunctions ?? null
       renderError = ''
       lastProgressiveMissSignature = ''
       if (fullRender) {
@@ -250,8 +261,14 @@
         lastRenderedCode = normalized
         svgCache[theme] = safeSvg
       }
-      if (typeof rendered !== 'string')
-        rendered?.bindFunctions?.(document.createElement('div'))
+      if (enableMermaidInteractions && typeof rendered !== 'string') {
+        await tick()
+        if (mounted && token === renderToken) {
+          bindCurrentMermaidInteractions(previewHost)
+          if (modalOpen)
+            bindCurrentMermaidInteractions(modalHost)
+        }
+      }
     }
     catch (error) {
       if (token === renderToken) {
@@ -385,7 +402,7 @@
   }
 
   function getRenderSignature() {
-    return `${source}\n${theme}\n${isStrict}\n${final}\n${progressivePreview}`
+    return `${source}\n${theme}\n${isStrict}\n${enableMermaidInteractions}\n${final}\n${progressivePreview}`
   }
 
   function withTimeout<T>(run: () => Promise<T>, timeoutMs: number) {
@@ -401,6 +418,15 @@
         reject(error)
       })
     })
+  }
+
+  function bindCurrentMermaidInteractions(element: Element | null | undefined) {
+    if (!enableMermaidInteractions || !element?.querySelector('svg'))
+      return
+    try {
+      lastMermaidBindFunctions?.(element)
+    }
+    catch {}
   }
 
   async function copy() {
@@ -543,7 +569,7 @@
               <button type="button" class="mermaid-btn mermaid-action-btn mermaid-zoom-reset" aria-label={t('common.resetZoom')} onblur={() => hideTooltip()} onclick={() => (zoom = 1)} onfocus={(event) => showButtonTooltip(event, t('common.resetZoom') || 'Reset zoom')} onmouseleave={() => hideTooltip()} onmouseenter={(event) => showButtonTooltip(event, t('common.resetZoom') || 'Reset zoom')}>{Math.round(zoom * 100)}%</button>
             </div>
           {/if}
-          <div class="mermaid-preview markstream-svelte-mermaid" style={previewStyle}>
+          <div bind:this={previewHost} class="mermaid-preview markstream-svelte-mermaid" style={previewStyle}>
             {#if svgMarkup}
               {@html svgMarkup}
             {:else if renderError}
@@ -576,7 +602,7 @@
               </button>
             </div>
             <div class="mermaid-modal-body">
-              <div class="mermaid-modal-content markstream-svelte-mermaid" style={`transform: scale(${zoom});`}>{@html svgMarkup}</div>
+              <div bind:this={modalHost} class="mermaid-modal-content markstream-svelte-mermaid" style={`transform: scale(${zoom});`}>{@html svgMarkup}</div>
             </div>
           </div>
         </div>

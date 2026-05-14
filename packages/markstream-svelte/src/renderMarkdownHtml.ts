@@ -8,6 +8,8 @@ import {
   normalizeCustomHtmlTags,
   parseMarkdownToStructure,
   sanitizeHtmlAttrs,
+  sanitizeImageSrc,
+  shouldOpenLinkInNewTab,
 } from 'stream-markdown-parser'
 import { hydrateCustomTagContent } from './hydrateCustomTagContent'
 import { sanitizeHtmlContent } from './sanitizeHtmlContent'
@@ -301,8 +303,9 @@ function renderLinkNode(node: RenderableMarkdownNode, ctx: RenderContext): strin
     ? renderNodesToHtml(getNodeList(node.children), ctx)
     : escapeHtml(getString(node.text || href))
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''
-  const hrefAttr = href && !isUnsafeHtmlUrl(href) ? ` href="${escapeAttr(href)}"` : ''
-  const externalAttrs = href.startsWith('#') ? '' : ' target="_blank" rel="noreferrer noopener"'
+  const safeHref = href && !isUnsafeHtmlUrl(href) ? href : ''
+  const hrefAttr = safeHref ? ` href="${escapeAttr(safeHref)}"` : ''
+  const externalAttrs = shouldOpenLinkInNewTab(safeHref) ? ' target="_blank" rel="noreferrer noopener"' : ''
   return `<a${hrefAttr}${titleAttr}${externalAttrs}>${content}</a>`
 }
 
@@ -317,7 +320,9 @@ function renderMathBlockNode(node: RenderableMarkdownNode) {
 }
 
 function renderImageNode(node: RenderableMarkdownNode): string {
-  const src = getString(node.src)
+  const src = sanitizeImageSrc(node.src)
+  if (!src)
+    return ''
   const alt = getString(node.alt)
   const title = getString(node.title)
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''

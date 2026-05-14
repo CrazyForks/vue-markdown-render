@@ -1,3 +1,15 @@
+## Unreleased
+
+### Behavior Changes
+
+* Mermaid SVG output is sanitized before mounting in both strict and loose modes. `isStrict=false` only controls Mermaid's parse/render configuration and no longer means raw SVG insertion.
+* Mermaid interaction callbacks are disabled by default. Use `mermaidProps.enableMermaidInteractions = true` only for trusted diagrams.
+* Markdown and HTML URL attributes now use a strict protocol allowlist. Links allow `http:`, `https:`, `mailto:`, and `tel:`. Resource URLs allow `http:` and `https:`. Markdown image `src` additionally allows relative URLs and bitmap `data:image/png|gif|jpg|jpeg|webp|avif|bmp` URLs. `blob:`, `file:`, `filesystem:`, `data:text/html`, and `data:image/svg+xml` are blocked by default.
+
+### Bug Fixes
+
+* ImageNode now falls back or shows an error when the sanitized primary image source is empty or unchanged by fallback, avoiding blank and persistent lazy-shimmer states.
+
 ## [0.0.14-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.8) (2026-05-11)
 
 
@@ -2030,6 +2042,5 @@
 
 
 ## 0.0.3 (2025-05-26)
-
 
 

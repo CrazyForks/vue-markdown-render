@@ -1,7 +1,7 @@
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { NodeComponentProps } from '../../types/node-component'
 import React, { useCallback, useMemo } from 'react'
-import { sanitizeHtmlAttrs } from 'stream-markdown-parser'
+import { sanitizeHtmlAttrs, shouldOpenLinkInNewTab } from 'stream-markdown-parser'
 import { renderNodeChildren } from '../../renderers/renderChildren'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
 import { TextNode } from '../TextNode/TextNode'
@@ -64,6 +64,7 @@ export function LinkNode(props: NodeComponentProps<{
   const title = typeof node.title === 'string' && node.title.trim().length > 0
     ? node.title
     : String(safeHref ?? '')
+  const openInNewTab = shouldOpenLinkInNewTab(safeHref)
 
   const onAnchorEnter = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
     if (!showTip)
@@ -104,11 +105,11 @@ export function LinkNode(props: NodeComponentProps<{
   return (
     <a
       className="link-node"
-      href={safeHref}
+      href={safeHref || undefined}
       title={showTip ? '' : title}
       aria-label={`Link: ${title}`}
-      target="_blank"
-      rel="noopener noreferrer"
+      target={openInNewTab ? '_blank' : undefined}
+      rel={openInNewTab ? 'noopener noreferrer' : undefined}
       style={cssVars}
       onMouseEnter={onAnchorEnter}
       onMouseLeave={onAnchorLeave}

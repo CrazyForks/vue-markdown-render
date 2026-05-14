@@ -8,7 +8,8 @@
 - `loading?: boolean` — 初始加载占位
 - `maxHeight?: string | null` — 最大高度
 - `estimatedPreviewHeightPx?: number` — Mermaid 完成渲染前预留的首屏 preview 高度；通过 `MarkdownRender` 渲染 Mermaid 围栏时会自动填入
-- `isStrict?: boolean` — 默认 `true`；开启 `securityLevel: 'strict'` + DOMPurify，并禁用 HTML labels。只有可信图表确实需要 Mermaid HTML labels 时才设为 `false`。
+- `isStrict?: boolean` — 默认 `true`；开启 `securityLevel: 'strict'` + DOMPurify，并禁用 HTML labels。只有可信图表确实需要 Mermaid loose 解析/渲染配置时才设为 `false`；最终 SVG 挂载和导出前仍会清理。
+- `enableMermaidInteractions?: boolean` — 默认 `false`；在清理后的 SVG 挂载后启用 Mermaid 生成的点击绑定。只建议用于可信图表。
 - Header/按钮控制（全部可选，默认 `true`）:
   - `showHeader` / `showModeToggle` / `showCopyButton` / `showExportButton` / `showFullscreenButton` / `showCollapseButton` / `showZoomControls` / `showTooltips`
 - `enableWheelZoom?: boolean` — 开启 Ctrl/Cmd + 滚轮缩放（默认 `false`）
@@ -70,11 +71,12 @@ function onExport(ev: any /* MermaidBlockEvent */) {
 ## 推荐用法
 - 如果你要实现自定义导出/上传，最佳做法是：在 `export` 监听器中 `preventDefault()`，并在监听回调中直接从组件渲染的 DOM 中读取 `svg`。
 - 如果你想要完全替换头部的 UI，使用 `header-*` 插槽并把相应 `show*` props 设为 `false` 来隐藏默认按钮。
-- Mermaid 严格模式默认开启，因此用户/LLM 图表会经过 SVG 清理并禁用 HTML labels。只有可信图表需要宽松 Mermaid 渲染时，才设置 `:is-strict="false"`。
+- Mermaid 严格模式默认开启，因此用户/LLM 图表会使用 Mermaid strict 配置渲染，并在挂载前清理 SVG。只有可信图表需要 Mermaid loose 配置时，才设置 `:is-strict="false"`；最终 SVG 仍会被清理。
+- Mermaid 点击绑定默认关闭。只有可信图表需要 Mermaid `click` 回调时，才设置 `:enable-mermaid-interactions="true"`。
 
-## 对可信图表恢复 loose 模式
+## 为可信图表启用 Mermaid loose 配置
 
-如果某个可信 Mermaid 图依赖 HTML labels，或者依赖旧的 loose 模式渲染结果，可以按组件粒度显式关闭 strict，而不是把更安全的默认值整体改回去：
+如果某个可信 Mermaid 图确实需要 Mermaid loose 解析/渲染配置，可以按组件粒度显式关闭 strict，而不是把更安全的默认值整体改回去。这不会恢复原始 SVG 插入：Markstream 在 strict 和 loose 模式下都会清理 Mermaid SVG 输出，因此 `foreignObject` 和 active HTML labels 可能会被移除。
 
 ```vue
 <script setup lang="ts">
