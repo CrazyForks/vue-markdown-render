@@ -158,6 +158,7 @@ export const DANGEROUS_HTML_ATTR_NAMES = [
   'oninvalid',
   'onsearch',
   'srcdoc',
+  'ping',
 ] as const
 
 export const URL_HTML_ATTR_NAMES = [

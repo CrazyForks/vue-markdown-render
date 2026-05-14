@@ -114,4 +114,13 @@ describe('html URL policy', () => {
     expect(rel).toContain('noreferrer')
     expect(rel).not.toContain('opener')
   })
+
+  it('drops ping from sanitized anchor attrs', () => {
+    expect(
+      sanitizeAttrs({
+        href: 'https://example.com',
+        ping: 'https://attacker.example/collect',
+      }, 'safe', 'a').ping,
+    ).toBeUndefined()
+  })
 })

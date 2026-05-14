@@ -40,7 +40,8 @@ function expectSanitizedMermaidHtml(html: string) {
 }
 
 function findButtonByText(host: HTMLElement, text: string) {
-  return Array.from(host.querySelectorAll('button')).find(button => button.textContent?.includes(text)) as HTMLButtonElement | undefined
+  const needle = text.toLowerCase()
+  return Array.from(host.querySelectorAll('button')).find(button => button.textContent?.toLowerCase().includes(needle)) as HTMLButtonElement | undefined
 }
 
 function findButtonBySvgPath(host: HTMLElement, pathStart: string) {
@@ -169,6 +170,137 @@ describe('mermaid block SVG sanitizer', () => {
     const modalTarget = bindFunctions.mock.calls[1]?.[0] as HTMLElement | undefined
     expect(modalTarget).toBeInstanceOf(HTMLElement)
     expect(modalTarget?.classList.contains('fullscreen')).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('rebinds Vue Mermaid functions when restoring cached preview SVG', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const bindFunctions = vi.fn()
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn(async () => ({
+        svg: '<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>',
+        bindFunctions,
+      })),
+    }
+
+    vi.doMock('../../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'mermaid',
+          code: 'flowchart TD\nA-->B\n',
+          raw: '```mermaid\nflowchart TD\nA-->B\n```',
+        },
+        loading: false,
+        enableMermaidInteractions: true,
+      },
+    })
+
+    await flushVueUpdates()
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).showSource = false
+    ;(wrapper.vm as any).viewportReady = true
+    await flushVueUpdates()
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushVueUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(1)
+
+    ;(wrapper.vm as any).showSource = true
+    await flushVueUpdates()
+    ;(wrapper.vm as any).showSource = false
+    await flushVueUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(2)
+    expect(fakeMermaid.render).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it('binds Vue Mermaid functions to the new buffered SVG layer', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const bindFunctions = vi.fn()
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn()
+        .mockResolvedValueOnce({
+          svg: '<svg data-render="old" viewBox="0 0 10 10"><rect width="10" height="10" /></svg>',
+          bindFunctions,
+        })
+        .mockResolvedValueOnce({
+          svg: '<svg data-render="new" viewBox="0 0 10 10"><circle cx="5" cy="5" r="5" /></svg>',
+          bindFunctions,
+        }),
+    }
+
+    vi.doMock('../../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'mermaid',
+          code: 'flowchart TD\nA-->B\n',
+          raw: '```mermaid\nflowchart TD\nA-->B\n```',
+        },
+        loading: false,
+        enableMermaidInteractions: true,
+      },
+    })
+
+    await flushVueUpdates()
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).showSource = false
+    ;(wrapper.vm as any).viewportReady = true
+    await flushVueUpdates()
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushVueUpdates()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'mermaid',
+        code: 'flowchart TD\nA-->C\n',
+        raw: '```mermaid\nflowchart TD\nA-->C\n```',
+      },
+    })
+    await flushVueUpdates()
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushVueUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(2)
+    const secondTarget = bindFunctions.mock.calls[1]?.[0] as HTMLElement | undefined
+    expect(secondTarget).toBeInstanceOf(HTMLElement)
+    expect(secondTarget?.dataset.mermaidSvgLayer).toBe('1')
+    expect(secondTarget?.querySelectorAll('svg')).toHaveLength(1)
+    expect(secondTarget?.innerHTML).toContain('data-render="new"')
+    expect(secondTarget?.innerHTML).not.toContain('data-render="old"')
 
     wrapper.unmount()
   })
@@ -576,6 +708,63 @@ describe('mermaid block SVG sanitizer', () => {
 
     expect(bindFunctions).toHaveBeenCalledTimes(1)
     expect(bindFunctions.mock.calls[0]?.[0]).toBeInstanceOf(HTMLElement)
+
+    wrapper.unmount()
+  })
+
+  it('rebinds Vue 2 Mermaid functions when restoring cached preview SVG', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const bindFunctions = vi.fn()
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn(async () => ({
+        svg: '<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>',
+        bindFunctions,
+      })),
+    }
+
+    vi.doMock('../../packages/markstream-vue2/src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../../packages/markstream-vue2/src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+    }))
+
+    const MermaidBlockNode = (await import('../../packages/markstream-vue2/src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'mermaid',
+          code: 'flowchart TD\nA-->B\n',
+          raw: '```mermaid\nflowchart TD\nA-->B\n```',
+        },
+        loading: false,
+        enableMermaidInteractions: true,
+      },
+    })
+
+    await flushVueUpdates()
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).showSource = false
+    ;(wrapper.vm as any).viewportReady = true
+    await flushVueUpdates()
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushVueUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(1)
+
+    ;(wrapper.vm as any).showSource = true
+    await flushVueUpdates()
+    ;(wrapper.vm as any).showSource = false
+    await flushVueUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(2)
+    expect(fakeMermaid.render).toHaveBeenCalledTimes(1)
 
     wrapper.unmount()
   })

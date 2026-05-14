@@ -94,16 +94,31 @@ const mermaidInitConfig = computed(() => ({
   flowchart: mermaidSecurityLevel.value === 'strict' ? { htmlLabels: false } : undefined,
 }))
 
-function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null | undefined) {
+type MermaidBindFunctions = (element: Element) => unknown
+
+interface RenderedMermaidSvg {
+  svg: string
+  bindTarget: Element
+}
+
+interface CachedMermaidSvg {
+  svg: string
+  bindFunctions?: MermaidBindFunctions | null
+}
+
+function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null | undefined): RenderedMermaidSvg | null {
   if (!target)
-    return ''
+    return null
   const safeElement = toSafeSvgElement<SVGElement>(svg)
   if (safeElement) {
     clearElement(target)
     target.appendChild(safeElement)
-    return target.innerHTML
+    return {
+      svg: target.innerHTML,
+      bindTarget: target,
+    }
   }
-  return ''
+  return null
 }
 
 function clearElement(target: HTMLElement | null | undefined) {
@@ -121,16 +136,14 @@ function renderSvgToTarget(
   target: HTMLElement | null | undefined,
   svg: string | null | undefined,
   options: { keepPreviousOnFailure?: boolean } = {},
-) {
+): RenderedMermaidSvg | null {
   if (!target)
-    return ''
+    return null
   const rendered = setSafeSvg(target, svg)
   if (!rendered && !options.keepPreviousOnFailure)
     clearElement(target)
   return rendered
 }
-
-type MermaidBindFunctions = (element: Element) => unknown
 
 let lastMermaidBindFunctions: MermaidBindFunctions | null = null
 
@@ -321,8 +334,8 @@ watch(
 const hasRenderedOnce = ref(false)
 const isThemeRendering = ref(false)
 const svgCache = ref<{
-  light?: string
-  dark?: string
+  light?: CachedMermaidSvg
+  dark?: CachedMermaidSvg
 }>({})
 
 const lastSvgSnapshot = ref<string | null>(null)
@@ -1186,8 +1199,9 @@ async function initMermaid() {
             isThemeRendering.value = false
           return false
         }
-        lastMermaidBindFunctions = res?.bindFunctions ?? null
-        bindMermaidInteractions(mermaidContent.value)
+        const bindFunctions = res?.bindFunctions ?? null
+        lastMermaidBindFunctions = bindFunctions
+        bindMermaidInteractions(rendered.bindTarget)
         // Successful full render clears Partial preview state
         if (!hasRenderedOnce.value && !isThemeRendering.value) {
           updateContainerHeight()
@@ -1201,7 +1215,7 @@ async function initMermaid() {
         }
         const currentTheme = props.isDark ? 'dark' : 'light'
         if (rendered)
-          svgCache.value[currentTheme] = rendered
+          svgCache.value[currentTheme] = { svg: rendered.svg, bindFunctions }
         if (isThemeRendering.value) {
           isThemeRendering.value = false
         }
@@ -1277,7 +1291,7 @@ async function renderPartial(code: string) {
       const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: true })
       if (rendered) {
         lastMermaidBindFunctions = res?.bindFunctions ?? null
-        bindMermaidInteractions(mermaidContent.value)
+        bindMermaidInteractions(rendered.bindTarget)
         updateContainerHeight()
       }
     }
@@ -1356,8 +1370,11 @@ async function progressiveRender() {
   // If we cannot apply partial and also shouldn't restore cached (e.g., error state), bail
   const cached = svgCache.value[theme]
   if (cached && mermaidContent.value) {
-    renderSvgToTarget(mermaidContent.value, cached)
-    bindMermaidInteractions(mermaidContent.value)
+    const rendered = renderSvgToTarget(mermaidContent.value, cached.svg)
+    if (rendered) {
+      lastMermaidBindFunctions = cached.bindFunctions ?? null
+      bindMermaidInteractions(rendered.bindTarget)
+    }
   }
   // else: keep current DOM (could be empty on very first run)
 }
@@ -1524,8 +1541,11 @@ watch(() => props.isDark, async () => {
   const cachedForTheme = svgCache.value[targetTheme]
   if (cachedForTheme) {
     if (mermaidContent.value) {
-      renderSvgToTarget(mermaidContent.value, cachedForTheme)
-      bindMermaidInteractions(mermaidContent.value)
+      const rendered = renderSvgToTarget(mermaidContent.value, cachedForTheme.svg)
+      if (rendered) {
+        lastMermaidBindFunctions = cachedForTheme.bindFunctions ?? null
+        bindMermaidInteractions(rendered.bindTarget)
+      }
     }
     return
   }
@@ -1570,8 +1590,12 @@ watch(
       if (hasRenderedOnce.value && svgCache.value[currentTheme]) {
         await nextTick()
         if (mermaidContent.value) {
-          renderSvgToTarget(mermaidContent.value, svgCache.value[currentTheme]!)
-          bindMermaidInteractions(mermaidContent.value)
+          const cached = svgCache.value[currentTheme]!
+          const rendered = renderSvgToTarget(mermaidContent.value, cached.svg)
+          if (rendered) {
+            lastMermaidBindFunctions = cached.bindFunctions ?? null
+            bindMermaidInteractions(rendered.bindTarget)
+          }
         }
         // Restoring full render from cache -> hide Partial badge
         zoom.value = savedTransformState.value.zoom
@@ -1619,8 +1643,12 @@ watch(
         await nextTick()
         // 保险：如果 DOM 被清空但有缓存，恢复一次，不触发重新渲染
         if (mermaidContent.value && !mermaidContent.value.querySelector('svg') && svgCache.value[theme]) {
-          renderSvgToTarget(mermaidContent.value, svgCache.value[theme]!)
-          bindMermaidInteractions(mermaidContent.value)
+          const cached = svgCache.value[theme]!
+          const rendered = renderSvgToTarget(mermaidContent.value, cached.svg)
+          if (rendered) {
+            lastMermaidBindFunctions = cached.bindFunctions ?? null
+            bindMermaidInteractions(rendered.bindTarget)
+          }
         }
         // 渲染已完成，清理后台任务
         cleanupAfterLoadingSettled()

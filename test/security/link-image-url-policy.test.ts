@@ -68,6 +68,35 @@ describe('link and image URL policy', () => {
     expect(attrs.rel).toBeUndefined()
   })
 
+  it('does not forward ping from direct link node attrs', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        typewriter: false,
+        batchRendering: false,
+        nodes: [
+          {
+            type: 'paragraph',
+            raw: '',
+            children: [
+              {
+                type: 'link',
+                href: 'https://example.com',
+                title: null,
+                text: 'safe',
+                raw: '[safe](https://example.com)',
+                attrs: [['ping', 'https://attacker.example/collect']],
+                children: [{ type: 'text', content: 'safe', raw: 'safe' }],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+    expect(wrapper.get('a.link-node').attributes('ping')).toBeUndefined()
+  })
+
   it('does not render unsafe direct image node URLs', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
