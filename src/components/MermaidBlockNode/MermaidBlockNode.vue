@@ -1209,7 +1209,7 @@ async function initMermaid() {
       const svg = res?.svg
 
       if (mermaidContent.value) {
-        const rendered = renderSvgToTarget(mermaidContent.value, svg)
+        const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: props.loading !== false })
         if (!rendered) {
           if (isThemeRendering.value)
             isThemeRendering.value = false

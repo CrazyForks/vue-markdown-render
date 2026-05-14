@@ -85,6 +85,23 @@ describe('mermaid SVG sanitizer', () => {
     expect(svg).not.toMatch(/javascript:/i)
   })
 
+  it('removes external CSS imports from SVG style elements', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <style>
+          @import url(https://attacker.test/x.css);
+          .x { background: url(javascript:alert(1)); }
+        </style>
+        <rect class="x" width="10" height="10" />
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).not.toContain('<style')
+    expect(svg).not.toMatch(/@import/i)
+    expect(svg).not.toMatch(/javascript:/i)
+  })
+
   it('preserves safe SVG style tags in sanitized Mermaid output', () => {
     const svg = sanitizeMermaidSvg(`
       <svg viewBox="0 0 10 10">
@@ -280,6 +297,26 @@ describe('mermaid SVG sanitizer', () => {
     expect(isBrokenMermaidSvg('<svg viewBox="0 0 0 10"><rect width="10" height="10" /></svg>')).toBe(true)
     expect(isBrokenMermaidSvg('<svg viewBox="0 0 10 10"><rect width="NaN" height="10" /></svg>')).toBe(true)
     expect(isBrokenMermaidSvg('<div></div>')).toBe(true)
+  })
+
+  it('does not throw when SVG parsing fails', () => {
+    const OriginalDOMParser = globalThis.DOMParser
+
+    class ThrowingDOMParser {
+      parseFromString() {
+        throw new Error('parse failed')
+      }
+    }
+
+    globalThis.DOMParser = ThrowingDOMParser as unknown as typeof DOMParser
+    try {
+      expect(() => sanitizeMermaidSvg('<not-svg')).not.toThrow()
+      expect(sanitizeMermaidSvg('<not-svg')).toBeNull()
+      expect(isBrokenMermaidSvg('<not-svg')).toBe(true)
+    }
+    finally {
+      globalThis.DOMParser = OriginalDOMParser
+    }
   })
 
   it('parses once when converting SVG markup to a safe element', () => {

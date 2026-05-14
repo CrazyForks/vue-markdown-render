@@ -51,11 +51,16 @@ describe('html URL policy', () => {
       '../relative',
       '#section',
       '?q=1',
-      '//cdn.example.com/a.png',
     ]
 
     for (const value of safe)
       expect(sanitizeAttrs({ href: value }, 'safe', 'a').href).toBe(value)
+  })
+
+  it('rejects protocol-relative URLs', () => {
+    expect(sanitizeAttrs({ href: '//evil.example' }, 'safe', 'a').href).toBeUndefined()
+    expect(sanitizeAttrs({ src: '//evil.example/x.png' }, 'safe', 'img').src).toBeUndefined()
+    expect(sanitizeAttrs({ srcset: '//evil.example/x.png 1x' }, 'safe', 'img').srcset).toBeUndefined()
   })
 
   it('applies URL protocols by attribute context', () => {
@@ -81,6 +86,7 @@ describe('html URL policy', () => {
 
   it('rejects unsafe srcset candidates', () => {
     expect(sanitizeAttrs({ srcset: 'cover.png 1x, javascript:alert(1) 2x' }, 'safe', 'img').srcset).toBeUndefined()
+    expect(sanitizeAttrs({ srcset: 'javascript:alert(1) 1x, data:text/html,<svg> 2x' }, 'safe', 'img').srcset).toBeUndefined()
     expect(sanitizeAttrs({ srcset: 'data:image/png;base64,iVBORw0KGgo= 1x' }, 'safe', 'img').srcset).toBeUndefined()
     expect(sanitizeAttrs({ srcset: 'cover.png 1x, cover@2x.png 2x' }, 'safe', 'img').srcset).toBe('cover.png 1x, cover@2x.png 2x')
   })

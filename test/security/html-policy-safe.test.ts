@@ -3,7 +3,7 @@
  */
 
 import { mount } from '@vue/test-utils'
-import { sanitizeHtmlContent } from 'stream-markdown-parser'
+import { SAFE_ALLOWED_HTML_TAGS, sanitizeHtmlContent } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
 import MarkdownRender from '../../src/components/NodeRenderer'
@@ -82,6 +82,37 @@ function expectNoExecutableProps(props: Record<string, unknown>) {
 }
 
 describe('htmlPolicy safe security corpus', () => {
+  it('does not include safe-blocked tags in the safe allowlist', () => {
+    const blocked = [
+      'script',
+      'base',
+      'button',
+      'datalist',
+      'dialog',
+      'embed',
+      'fieldset',
+      'form',
+      'iframe',
+      'input',
+      'legend',
+      'link',
+      'meta',
+      'object',
+      'optgroup',
+      'option',
+      'output',
+      'param',
+      'select',
+      'style',
+      'template',
+      'textarea',
+      'title',
+    ]
+    const overlap = blocked.filter(tag => SAFE_ALLOWED_HTML_TAGS.has(tag))
+
+    expect(overlap).toEqual([])
+  })
+
   it.each(payloads)('does not create executable DOM for $name', ({ html }) => {
     expectNoExecutableMarkup(sanitizeHtmlContent(html, 'safe'))
   })

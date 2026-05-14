@@ -258,15 +258,20 @@ export function toSafeSvgElement<TElement = unknown>(svg: string | null | undefi
     return null
   if (!svg)
     return null
-  const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
-  const svgEl = parsed.documentElement
-  if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
+  try {
+    const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
+    const svgEl = parsed.documentElement
+    if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
+      return null
+    const svgElement = svgEl as unknown as SVGElement
+    scrubSvgElement(svgElement)
+    if (isBrokenMermaidSvgElement(svgElement))
+      return null
+    return svgElement as unknown as TElement
+  }
+  catch {
     return null
-  const svgElement = svgEl as unknown as SVGElement
-  scrubSvgElement(svgElement)
-  if (isBrokenMermaidSvgElement(svgElement))
-    return null
-  return svgElement as unknown as TElement
+  }
 }
 
 /**
@@ -291,12 +296,17 @@ export function isBrokenMermaidSvg(svg: string | null | undefined) {
   if (typeof DOMParser === 'undefined')
     return true
 
-  const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
-  const svgEl = parsed.documentElement
-  if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
-    return true
+  try {
+    const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
+    const svgEl = parsed.documentElement
+    if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
+      return true
 
-  return isBrokenMermaidSvgElement(svgEl)
+    return isBrokenMermaidSvgElement(svgEl)
+  }
+  catch {
+    return true
+  }
 }
 
 function isBrokenMermaidSvgElement(svgEl: Element) {

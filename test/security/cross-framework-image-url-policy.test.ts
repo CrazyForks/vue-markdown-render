@@ -30,6 +30,7 @@ describe('cross-framework image URL policy', () => {
       'javascript:alert(1)',
       'data:image/svg+xml,<svg onload=alert(1)>',
       'blob:https://example.com/abc',
+      '//evil.example/x.png',
     ]
 
     for (const src of unsafe) {
@@ -47,6 +48,7 @@ describe('cross-framework image URL policy', () => {
       'javascript:alert(1)',
       'data:image/svg+xml,<svg onload=alert(1)>',
       'blob:https://example.com/abc',
+      '//evil.example/x.png',
     ]
 
     for (const src of unsafe) {
