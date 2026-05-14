@@ -58,6 +58,19 @@ describe('mermaid SVG sanitizer', () => {
     expect(svg).not.toMatch(/script/i)
   })
 
+  it('strips foreignObject output while preserving renderable SVG children', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <foreignObject><div>label</div></foreignObject>
+        <rect width="10" height="10" />
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).not.toMatch(/foreignObject/i)
+    expect(svg).toMatch(/<rect/i)
+  })
+
   it('removes non-SVG tags from Mermaid output', () => {
     const svg = sanitizeMermaidSvg(`
       <svg viewBox="0 0 10 10">
@@ -99,6 +112,24 @@ describe('mermaid SVG sanitizer', () => {
     expect(svg).toBeTruthy()
     expect(svg).not.toContain('<style')
     expect(svg).not.toMatch(/@import/i)
+    expect(svg).not.toMatch(/javascript:/i)
+  })
+
+  it('removes CSS escape-obfuscated url functions and protocols', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <style>
+          .x { background: u\\72l(https://attacker.example/x.png); }
+          .y { background: url(java\\73cript:alert(1)); }
+          @imp\\6Frt url(https://attacker.example/x.css);
+        </style>
+        <rect class="x" width="10" height="10" />
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).not.toContain('<style')
+    expect(svg).not.toMatch(/attacker\.example/i)
     expect(svg).not.toMatch(/javascript:/i)
   })
 

@@ -8,7 +8,7 @@
 
 Allows common structural HTML such as links, images, lists, tables, and details blocks. Dangerous tags, event attributes, unsafe URL protocols, and inline styles are removed or escaped before rendering.
 
-`safe` is a constrained rendering policy, not a permission to render arbitrary active HTML. For public UGC or third-party feeds, prefer `htmlPolicy="escape"`.
+`safe` is a constrained rendering policy, not a permission to render arbitrary active HTML. It still allows ordinary `http:` / `https:` links and images. If your threat model forbids third-party network requests, use `htmlPolicy="escape"`, a custom ImageNode, or enforce a CSP / image proxy.
 
 Use this for AI chat, docs generated from trusted pipelines, and general Markdown surfaces where limited HTML is useful.
 
@@ -62,6 +62,8 @@ If your application needs trusted `blob:` image URLs, render images through a cu
 
 Protocol-relative URLs such as `//cdn.example.com/a.png` are blocked because they can silently load external resources.
 
-Mermaid SVG output is sanitized before mounting in both strict and loose Mermaid modes. `isStrict=false` controls Mermaid's parse/render configuration; it does not mean raw SVG insertion.
+Mermaid SVG output is sanitized before mounting in both strict and loose Mermaid modes. `isStrict=false` controls Mermaid's parse/render configuration; it does not mean raw SVG insertion. Unsupported active SVG/HTML structures such as `foreignObject` are still stripped by the built-in sanitizer. If you need full trusted Mermaid HTML-label output, render it through a trusted custom component outside the built-in sanitizer.
 
 Mermaid-generated `bindFunctions` click handlers are disabled by default after sanitized SVG mount. Set `mermaidProps.enableMermaidInteractions=true` only for trusted diagrams that need Mermaid click bindings.
+
+`sanitizeMermaidSvg`, `toSafeMermaidSvgMarkup`, and `toSafeSvgElement` require a `DOMParser`-compatible runtime. In plain Node.js without `DOMParser`, they return `null`, `''`, and `null` respectively; use them in browser, jsdom, or linkedom contexts for server-side SVG sanitizing.

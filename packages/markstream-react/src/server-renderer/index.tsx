@@ -35,6 +35,7 @@ import {
   sanitizeHtmlAttrs,
   sanitizeHtmlTokenAttrs,
   sanitizeImageSrc,
+  shouldOpenLinkInNewTab,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
 } from 'stream-markdown-parser'
@@ -786,6 +787,7 @@ export function LinkNode(props: NodeComponentProps<LinkNodeProps['node']> & {
   const title = typeof node.title === 'string' && node.title.trim().length > 0
     ? node.title
     : String(safeHref ?? '')
+  const openInNewTab = shouldOpenLinkInNewTab(safeHref)
 
   if (node.loading) {
     return (
@@ -811,8 +813,8 @@ export function LinkNode(props: NodeComponentProps<LinkNodeProps['node']> & {
       href={safeHref || undefined}
       title={title}
       aria-label={`Link: ${title}`}
-      target={safeHref ? '_blank' : undefined}
-      rel={safeHref ? 'noopener noreferrer' : undefined}
+      target={openInNewTab ? '_blank' : undefined}
+      rel={openInNewTab ? 'noopener noreferrer' : undefined}
       style={cssVars}
     >
       {ctx && renderNodeProp

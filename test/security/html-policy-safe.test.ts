@@ -171,6 +171,20 @@ describe('htmlPolicy safe security corpus', () => {
     }
   })
 
+  it('does not re-enable entity-obfuscated javascript URLs in sanitized HTML output', () => {
+    const html = sanitizeHtmlContent('<a href="jav&#x61;script:alert(1)">x</a>', 'safe')
+
+    expect(html).not.toMatch(/javascript:/i)
+    expect(html).not.toMatch(/href=["']?javascript/i)
+  })
+
+  it('does not re-enable entity-obfuscated javascript URLs in VNode output', () => {
+    const nodes = parseHtmlToVNodes('<a href="jav&#x61;script:alert(1)">x</a>', {}, 'safe') ?? []
+    const props = (nodes[0] as any)?.props ?? {}
+
+    expect(props.href).toBeUndefined()
+  })
+
   it('sanitizes executable HTML through MarkdownRender safe mode', async () => {
     const wrapper = mount(MarkdownRender, {
       props: {

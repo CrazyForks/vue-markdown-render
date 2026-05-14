@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 定义链接节点
 import type { LinkNodeProps } from '../../types/component-props'
+import { shouldOpenLinkInNewTab } from 'stream-markdown-parser'
 import { computed, inject, useAttrs } from 'vue'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { sanitizeAttrs } from '../../utils/htmlRenderer'
@@ -114,7 +115,7 @@ const finalTarget = computed(() => {
 
   const rawTarget = mergedAnchorAttrs.value.target
   const normalized = typeof rawTarget === 'string' ? rawTarget.trim() : String(rawTarget ?? '').trim()
-  return normalized || '_blank'
+  return normalized || (shouldOpenLinkInNewTab(safeHref.value) ? '_blank' : undefined)
 })
 const isBlankTarget = computed(() => String(finalTarget.value ?? '').trim().toLowerCase() === '_blank')
 const finalRel = computed(() => {

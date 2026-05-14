@@ -146,14 +146,31 @@ function readCssUrl(value: string, start: number) {
   }
 }
 
+function decodeCssEscapes(input: string) {
+  return input.replace(/\\([0-9a-f]{1,6}\s?|.)/gi, (_match, body: string) => {
+    const hex = body.trim()
+    if (/^[0-9a-f]+$/i.test(hex)) {
+      const code = Number.parseInt(hex, 16)
+      try {
+        return Number.isFinite(code) ? String.fromCodePoint(code) : ''
+      }
+      catch {
+        return ''
+      }
+    }
+    return String(body).trim()
+  })
+}
+
 function hasUnsafeCssUrl(value: string) {
-  const lower = value.toLowerCase()
+  const decoded = decodeCssEscapes(value)
+  const lower = decoded.toLowerCase()
   let pos = 0
   while (pos < lower.length) {
     const start = lower.indexOf('url(', pos)
     if (start === -1)
       return false
-    const cssUrl = readCssUrl(value, start)
+    const cssUrl = readCssUrl(decoded, start)
     pos = Math.max(cssUrl.next, start + 4)
     const rawUrl = cssUrl.url.trim()
     if (!rawUrl.startsWith('#'))
@@ -163,7 +180,8 @@ function hasUnsafeCssUrl(value: string) {
 }
 
 function hasUnsafeStyle(value: string) {
-  return DISALLOWED_STYLE_PATTERNS.some(re => re.test(value)) || hasUnsafeCssUrl(value)
+  const decoded = decodeCssEscapes(value)
+  return DISALLOWED_STYLE_PATTERNS.some(re => re.test(decoded)) || hasUnsafeCssUrl(decoded)
 }
 
 function hardenSvgAnchorAttrs(node: Element) {

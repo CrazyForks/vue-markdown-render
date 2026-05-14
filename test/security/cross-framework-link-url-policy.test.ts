@@ -131,4 +131,34 @@ describe('cross-framework link URL policy', () => {
     for (const rendered of renderAllLinkOutputs('https://example.com'))
       expectRelHardened(rendered)
   })
+
+  it.each(['#section', '/docs', './a', '../a', '?q=1', 'mailto:a@example.com', 'tel:+123456789'])(
+    'does not force target blank for internal and non-http links: %s',
+    (href) => {
+      for (const rendered of renderAllLinkOutputs(href)) {
+        expect(rendered).toContain(`href="${href}"`)
+        expect(rendered).not.toMatch(/\starget="_blank"/i)
+        expect(rendered).not.toMatch(/\srel=/i)
+      }
+    },
+  )
+
+  it('does not force target blank for internal links in the Vue 3 LinkNode component path', async () => {
+    const VueLinkNode = await loadVueLinkNode()
+
+    for (const href of ['#section', '/docs', './a', '../a', '?q=1', 'mailto:a@example.com', 'tel:+123456789']) {
+      const wrapper = mount(VueLinkNode as any, {
+        props: {
+          node: linkNode(href),
+          indexKey: 'x',
+          showTooltip: false,
+        },
+      })
+
+      expect(wrapper.get('a').attributes('href')).toBe(href)
+      expect(wrapper.get('a').attributes('target')).toBeUndefined()
+      expect(wrapper.get('a').attributes('rel')).toBeUndefined()
+      wrapper.unmount()
+    }
+  })
 })

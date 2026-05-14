@@ -9,6 +9,7 @@ import {
   parseMarkdownToStructure,
   sanitizeHtmlAttrs,
   sanitizeImageSrc,
+  shouldOpenLinkInNewTab,
 } from 'stream-markdown-parser'
 import { hydrateCustomTagContent } from './hydrateCustomTagContent'
 import { sanitizeHtmlContent } from './sanitizeHtmlContent'
@@ -301,7 +302,7 @@ function renderLinkNode(node: RenderableMarkdownNode, ctx: RenderContext): strin
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''
   const safeHref = href && !isUnsafeHtmlUrl(href) ? href : ''
   const hrefAttr = safeHref ? ` href="${escapeAttr(safeHref)}"` : ''
-  const externalAttrs = safeHref ? ' target="_blank" rel="noreferrer noopener"' : ''
+  const externalAttrs = shouldOpenLinkInNewTab(safeHref) ? ' target="_blank" rel="noreferrer noopener"' : ''
   return `<a${hrefAttr}${titleAttr}${externalAttrs}>${content}</a>`
 }
 

@@ -214,6 +214,33 @@ export function stripHtmlControlAndWhitespace(value: string) {
   return out
 }
 
+const HTML_URL_ENTITY_MAP: Record<string, string> = {
+  amp: '&',
+  bsol: '\\',
+  colon: ':',
+  newline: '\n',
+  sol: '/',
+  tab: '\t',
+}
+
+function decodeHtmlUrlEntities(value: string) {
+  return value.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z][a-z0-9]+));?/gi, (match, decimal: string | undefined, hex: string | undefined, named: string | undefined) => {
+    const rawCode = decimal ?? hex
+    if (rawCode) {
+      const code = Number.parseInt(rawCode, decimal ? 10 : 16)
+      try {
+        return Number.isFinite(code) ? String.fromCodePoint(code) : ''
+      }
+      catch {
+        return ''
+      }
+    }
+
+    const decoded = HTML_URL_ENTITY_MAP[String(named ?? '').toLowerCase()]
+    return decoded ?? match
+  })
+}
+
 const HREF_URL_PROTOCOLS = new Set([
   'http',
   'https',
@@ -264,7 +291,7 @@ function getAllowedUrlProtocols(tagName: string, attrName: string) {
 }
 
 export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
-  const normalized = stripHtmlControlAndWhitespace(value).toLowerCase()
+  const normalized = stripHtmlControlAndWhitespace(decodeHtmlUrlEntities(value)).toLowerCase()
   const tagName = String(context.tagName ?? '').toLowerCase()
   const attrName = String(context.attrName ?? '').toLowerCase()
 
@@ -296,6 +323,25 @@ export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
     return false
 
   return !getAllowedUrlProtocols(tagName, attrName).has(scheme)
+}
+
+export function shouldOpenLinkInNewTab(href: string | null | undefined) {
+  const value = decodeHtmlUrlEntities(String(href ?? '')).trim()
+  if (!value)
+    return false
+
+  if (
+    value.startsWith('#')
+    || value.startsWith('/')
+    || value.startsWith('./')
+    || value.startsWith('../')
+    || value.startsWith('?')
+  ) {
+    return false
+  }
+
+  const scheme = getUrlScheme(stripHtmlControlAndWhitespace(value).toLowerCase())
+  return scheme === 'http' || scheme === 'https'
 }
 
 function sanitizeUrlAttr(value: unknown, context: HtmlUrlContext = {}) {

@@ -97,7 +97,15 @@ function ensureBuiltArtifacts() {
 
 function ensureOptionalPeersAbsent() {
   const fixtureRequire = createRequire(join(tmp, 'package.json'))
-  for (const pkg of ['stream-monaco', 'mermaid', 'katex', '@terrastruct/d2']) {
+  for (const pkg of [
+    'stream-monaco',
+    'mermaid',
+    'katex',
+    '@terrastruct/d2',
+    '@antv/infographic',
+    'vue-i18n',
+    'stream-markdown',
+  ]) {
     try {
       fixtureRequire.resolve(pkg)
     }
@@ -213,6 +221,10 @@ try {
     '~~~',
     '',
     '<div><a href="javascript:alert(1)">bad</a><span>safe</span></div>',
+    '',
+    '```infographic',
+    'infographic list-row-simple-horizontal-arrow',
+    '```',
   ].join('\n')
   writeProjectFile('src/App.vue', `<script setup lang="ts">\nconst content = ${JSON.stringify(smokeMarkdown)}\n</script>\n\n<template>\n  <MarkdownRender :content="content" :final="true" :render-code-blocks-as-pre="true" />\n  <MarkdownRender :content="content" :final="true" />\n</template>\n`)
   writeProjectFile('node-no-dom.ts', `import { parseMarkdownToStructure, sanitizeMermaidSvg, toSafeMermaidSvgMarkup, toSafeSvgElement } from 'stream-markdown-parser'\n\nvoid parseMarkdownToStructure\nvoid sanitizeMermaidSvg\nvoid toSafeMermaidSvgMarkup\nvoid toSafeSvgElement\n`)
