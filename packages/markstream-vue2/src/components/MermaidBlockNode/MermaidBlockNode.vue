@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Exported props interface for MermaidBlockNode
 import type { MermaidBlockEvent } from '../../types/component-props'
-import { isBrokenMermaidSvg, toSafeSvgElement } from 'stream-markdown-parser'
+import { toSafeSvgElement } from 'stream-markdown-parser'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
@@ -124,11 +124,6 @@ function renderSvgToTarget(
 ) {
   if (!target)
     return ''
-  if (isBrokenMermaidSvg(svg)) {
-    if (!options.keepPreviousOnFailure)
-      clearElement(target)
-    return ''
-  }
   const rendered = setSafeSvg(target, svg)
   if (!rendered && !options.keepPreviousOnFailure)
     clearElement(target)
@@ -1183,8 +1178,6 @@ async function initMermaid() {
         { timeoutMs: timeouts.value.fullRender },
       )
       const svg = res?.svg
-      if (isBrokenMermaidSvg(svg))
-        throw new Error('Mermaid produced invalid SVG during preview')
 
       if (mermaidContent.value) {
         const rendered = renderSvgToTarget(mermaidContent.value, svg)
@@ -1280,7 +1273,7 @@ async function renderPartial(code: string) {
       { timeoutMs: timeouts.value.render },
     )
     const svg = res?.svg
-    if (mermaidContent.value && svg && !isBrokenMermaidSvg(svg)) {
+    if (mermaidContent.value && svg) {
       const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: true })
       if (rendered) {
         lastMermaidBindFunctions = res?.bindFunctions ?? null

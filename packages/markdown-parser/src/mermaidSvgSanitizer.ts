@@ -264,7 +264,7 @@ export function toSafeSvgElement<TElement = unknown>(svg: string | null | undefi
     return null
   const svgElement = svgEl as unknown as SVGElement
   scrubSvgElement(svgElement)
-  if (isBrokenMermaidSvg(svgElement.outerHTML))
+  if (isBrokenMermaidSvgElement(svgElement))
     return null
   return svgElement as unknown as TElement
 }
@@ -296,6 +296,10 @@ export function isBrokenMermaidSvg(svg: string | null | undefined) {
   if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
     return true
 
+  return isBrokenMermaidSvgElement(svgEl)
+}
+
+function isBrokenMermaidSvgElement(svgEl: Element) {
   const viewBox = svgEl.getAttribute('viewBox')
   if (viewBox) {
     const parts = viewBox.trim().split(/[\s,]+/)

@@ -58,6 +58,8 @@ Markdown image URLs use a strict default policy. Allowed image sources are `http
 
 Bitmap data URLs are only allowed for Markdown image / `img src` handling. `srcset` keeps the narrower resource URL policy and rejects data URLs.
 
+If your application needs trusted `blob:` image URLs, render images through a custom ImageNode/custom component and apply your own URL policy.
+
 Protocol-relative URLs such as `//cdn.example.com/a.png` are allowed by the URL policy. They can still load external resources, so prefer `htmlPolicy="escape"` for public or third-party content that should not be able to request remote assets.
 
 Mermaid SVG output is sanitized before mounting in both strict and loose Mermaid modes. `isStrict=false` controls Mermaid's parse/render configuration; it does not mean raw SVG insertion.

@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { basename, join, resolve } from 'node:path'
+import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { gunzipSync } from 'node:zlib'
@@ -108,6 +108,35 @@ function ensureOptionalPeersAbsent() {
   }
 }
 
+function writeNodeNoDomTypecheckConfig() {
+  const smokeRoot = realpathSync(tmp)
+  const markstreamPackageDir = realpathSync(join(tmp, 'node_modules/markstream-vue'))
+  const parserPackageDir = resolve(markstreamPackageDir, '..', 'stream-markdown-parser')
+  const parserPackageJsonPath = join(parserPackageDir, 'package.json')
+  const parserPackageJson = JSON.parse(readFileSync(parserPackageJsonPath, 'utf8'))
+  const parserTypes = resolve(parserPackageDir, parserPackageJson.types ?? 'dist/index.d.ts')
+  if (!existsSync(parserTypes))
+    throw new Error(`stream-markdown-parser types not found for no-DOM check: ${parserTypes}`)
+
+  writeProjectFile('tsconfig.node-no-dom.json', `${JSON.stringify({
+    compilerOptions: {
+      target: 'ES2020',
+      module: 'ESNext',
+      moduleResolution: 'Bundler',
+      lib: ['ES2020'],
+      strict: true,
+      skipLibCheck: false,
+      noEmit: true,
+      types: [],
+      baseUrl: '.',
+      paths: {
+        'stream-markdown-parser': [relative(smokeRoot, parserTypes).replace(/\\/g, '/')],
+      },
+    },
+    include: ['node-no-dom.ts'],
+  }, null, 2)}\n`)
+}
+
 try {
   if (process.env.MARKSTREAM_SMOKE_SKIP_BUILD !== '1') {
     run('pnpm', ['run', 'build:parser'])
@@ -155,9 +184,11 @@ try {
     },
     dependencies: {
       [pkg.name]: `file:${packedTarball}`,
-      typescript: '^5.9.3',
-      vite: '^7.3.1',
-      vue: '^3.5.31',
+      '@vitejs/plugin-vue': '^5.2.4',
+      '@vue/server-renderer': '^3.5.31',
+      'typescript': '^5.9.3',
+      'vite': '^7.3.1',
+      'vue': '^3.5.31',
     },
     devDependencies: {},
     pnpm: {
@@ -169,10 +200,6 @@ try {
     },
   }
   smokePackage.scripts['ssr:import'] = 'node ./ssr-import.mjs'
-  smokePackage.dependencies['stream-markdown-parser'] = `file:${packedParserTarball}`
-  smokePackage.dependencies['markstream-core'] = `file:${packedCoreTarball}`
-  smokePackage.dependencies['@vue/server-renderer'] = '^3.5.31'
-  smokePackage.dependencies['@vitejs/plugin-vue'] = '^5.2.4'
   writeProjectFile('package.json', `${JSON.stringify(smokePackage, null, 2)}\n`)
 
   writeProjectFile('index.html', '<div id="app"></div><script type="module" src="/src/main.ts"></script>\n')
@@ -189,19 +216,6 @@ try {
   ].join('\n')
   writeProjectFile('src/App.vue', `<script setup lang="ts">\nconst content = ${JSON.stringify(smokeMarkdown)}\n</script>\n\n<template>\n  <MarkdownRender :content="content" :final="true" :render-code-blocks-as-pre="true" />\n  <MarkdownRender :content="content" :final="true" />\n</template>\n`)
   writeProjectFile('node-no-dom.ts', `import { parseMarkdownToStructure, sanitizeMermaidSvg, toSafeMermaidSvgMarkup, toSafeSvgElement } from 'stream-markdown-parser'\n\nvoid parseMarkdownToStructure\nvoid sanitizeMermaidSvg\nvoid toSafeMermaidSvgMarkup\nvoid toSafeSvgElement\n`)
-  writeProjectFile('tsconfig.node-no-dom.json', `${JSON.stringify({
-    compilerOptions: {
-      target: 'ES2020',
-      module: 'ESNext',
-      moduleResolution: 'Bundler',
-      lib: ['ES2020'],
-      strict: true,
-      skipLibCheck: false,
-      noEmit: true,
-      types: [],
-    },
-    include: ['node-no-dom.ts'],
-  }, null, 2)}\n`)
   const ssrMarkdown = [
     '~~~ts',
     'console.log(1)',
@@ -213,6 +227,7 @@ try {
 
   run('pnpm', ['install', '--ignore-workspace'], { cwd: tmp })
   ensureOptionalPeersAbsent()
+  writeNodeNoDomTypecheckConfig()
   run('pnpm', ['run', 'typecheck:node-no-dom'], { cwd: tmp })
   run('pnpm', ['run', 'build'], { cwd: tmp })
   run('pnpm', ['run', 'ssr:import'], { cwd: tmp })

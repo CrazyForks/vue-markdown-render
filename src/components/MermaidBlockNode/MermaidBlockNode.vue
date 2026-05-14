@@ -11,7 +11,7 @@ import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
 
 import { getMermaid, isMermaidEnabled } from './mermaid'
-import { isBrokenMermaidSvg, toSafeSvgElement } from './mermaidSvgSanitizer'
+import { toSafeSvgElement } from './mermaidSvgSanitizer'
 
 const props = withDefaults(
   // 全屏按钮禁用状态
@@ -117,11 +117,6 @@ function renderSvgToTarget(
 ) {
   if (!target)
     return ''
-  if (isBrokenMermaidSvg(svg)) {
-    if (!options.keepPreviousOnFailure)
-      clearElement(target)
-    return ''
-  }
   const rendered = setSafeSvg(target, svg)
   if (!rendered && !options.keepPreviousOnFailure)
     clearElement(target)
@@ -1212,8 +1207,6 @@ async function initMermaid() {
         { timeoutMs: timeouts.value.fullRender },
       )
       const svg = res?.svg
-      if (isBrokenMermaidSvg(svg))
-        throw new Error('Mermaid produced invalid SVG during preview')
 
       if (mermaidContent.value) {
         const rendered = renderSvgToTarget(mermaidContent.value, svg)
@@ -1345,7 +1338,7 @@ async function renderPartial(code: string) {
       { timeoutMs: timeouts.value.render },
     )
     const svg = res?.svg
-    if (mermaidContent.value && svg && !isBrokenMermaidSvg(svg)) {
+    if (mermaidContent.value && svg) {
       const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: true })
       if (rendered) {
         lastMermaidBindFunctions = res?.bindFunctions ?? null

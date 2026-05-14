@@ -10,7 +10,7 @@ import React, {
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { isBrokenMermaidSvg, toSafeSvgElement } from 'stream-markdown-parser'
+import { toSafeSvgElement } from 'stream-markdown-parser'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
@@ -68,11 +68,6 @@ function renderSvgToTarget(
 ) {
   if (!target)
     return ''
-  if (isBrokenMermaidSvg(svg)) {
-    if (!options.keepPreviousOnFailure)
-      clearElement(target)
-    return ''
-  }
   const rendered = setSafeSvg(target, svg)
   if (!rendered && !options.keepPreviousOnFailure)
     clearElement(target)
@@ -373,7 +368,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
         () => (mermaidRef.current as any).render(id, themed),
         { timeoutMs: fullRenderTimeout, signal },
       ) as any
-      if (!result?.svg || isBrokenMermaidSvg(result.svg))
+      if (!result?.svg)
         return false
       const rendered = renderSvgToTarget(contentRef.current, result.svg)
       if (!rendered)
@@ -416,7 +411,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
         () => (mermaidRef.current as any).render(id, themed),
         { timeoutMs: renderTimeout, signal },
       ) as any
-      if (res?.svg && !isBrokenMermaidSvg(res.svg)) {
+      if (res?.svg) {
         const rendered = renderSvgToTarget(contentRef.current, res.svg, { keepPreviousOnFailure: true })
         if (rendered) {
           lastMermaidBindFunctionsRef.current = res.bindFunctions ?? null

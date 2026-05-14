@@ -58,6 +58,8 @@ Markdown 图片 URL 默认使用 strict 策略。允许的图片源包括 `http:
 
 Bitmap data URL 只对 Markdown 图片 / `img src` 处理放开。`srcset` 继续使用更窄的资源 URL 策略，并拒绝 data URL。
 
+如果你的应用需要受信任的 `blob:` 图片 URL，请通过自定义 ImageNode/custom component 渲染图片，并应用自己的 URL policy。
+
 URL 策略允许 `//cdn.example.com/a.png` 这类 protocol-relative URL。它们仍可能加载外部资源；如果公开用户内容或第三方内容不应该发起远程资源请求，请优先使用 `htmlPolicy="escape"`。
 
 Mermaid SVG 输出在 strict 和 loose Mermaid 模式下都会在挂载前清理。`isStrict=false` 只控制 Mermaid 的解析/渲染配置，不代表原始 SVG 插入。

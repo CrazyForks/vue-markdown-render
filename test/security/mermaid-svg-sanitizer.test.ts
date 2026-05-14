@@ -4,7 +4,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { isBrokenMermaidSvg, sanitizeMermaidSvg, toSafeMermaidSvgMarkup } from 'stream-markdown-parser'
+import { isBrokenMermaidSvg, sanitizeMermaidSvg, toSafeMermaidSvgMarkup, toSafeSvgElement } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
 
 const mermaidSvgFixtureDir = join(process.cwd(), 'test/fixtures/mermaid-svg')
@@ -280,6 +280,30 @@ describe('mermaid SVG sanitizer', () => {
     expect(isBrokenMermaidSvg('<svg viewBox="0 0 0 10"><rect width="10" height="10" /></svg>')).toBe(true)
     expect(isBrokenMermaidSvg('<svg viewBox="0 0 10 10"><rect width="NaN" height="10" /></svg>')).toBe(true)
     expect(isBrokenMermaidSvg('<div></div>')).toBe(true)
+  })
+
+  it('parses once when converting SVG markup to a safe element', () => {
+    const OriginalDOMParser = globalThis.DOMParser
+    let parseCount = 0
+
+    class CountingDOMParser {
+      private parser = new OriginalDOMParser()
+
+      parseFromString(markup: string, type: DOMParserSupportedType) {
+        parseCount++
+        return this.parser.parseFromString(markup, type)
+      }
+    }
+
+    globalThis.DOMParser = CountingDOMParser as unknown as typeof DOMParser
+    try {
+      const el = toSafeSvgElement<SVGElement>('<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>')
+      expect(el).toBeTruthy()
+      expect(parseCount).toBe(1)
+    }
+    finally {
+      globalThis.DOMParser = OriginalDOMParser
+    }
   })
 
   it.each([

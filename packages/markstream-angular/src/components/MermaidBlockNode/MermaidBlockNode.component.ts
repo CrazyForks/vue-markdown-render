@@ -491,11 +491,9 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
         return
 
       const svg = typeof rendered === 'string' ? rendered : rendered?.svg
-      if (this.isBrokenMermaidSvg(svg))
-        throw new Error('Mermaid produced invalid SVG during preview')
       const safeSvg = toSafeMermaidSvgMarkup(svg)
       if (!safeSvg)
-        throw new Error('Mermaid returned empty output.')
+        throw new Error('Mermaid produced invalid SVG during preview')
 
       this.svgMarkup = safeSvg
       this.lastMermaidBindFunctions = typeof rendered === 'string' ? null : rendered?.bindFunctions ?? null
@@ -707,41 +705,6 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
       lines.pop()
     }
     return lines.join('\n')
-  }
-
-  private isBrokenMermaidSvg(svg: string | null | undefined) {
-    if (!svg)
-      return true
-    if (typeof DOMParser === 'undefined')
-      return true
-
-    const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
-    const svgEl = parsed.documentElement
-    if (!svgEl || svgEl.nodeName.toLowerCase() !== 'svg')
-      return true
-
-    const viewBox = svgEl.getAttribute('viewBox')
-    if (viewBox) {
-      const parts = viewBox.trim().split(/[\s,]+/)
-      if (parts.length === 4) {
-        const width = Number.parseFloat(parts[2] || '')
-        const height = Number.parseFloat(parts[3] || '')
-        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
-          return true
-      }
-    }
-
-    const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll('*'))]
-    for (const node of nodes) {
-      for (const attr of Array.from(node.attributes)) {
-        if (/\bNaN\b/i.test(attr.value))
-          return true
-        if (attr.name === 'style' && /max-width:\s*0(?:px)?/i.test(attr.value))
-          return true
-      }
-    }
-
-    return false
   }
 
   private withTimeout<T>(run: () => Promise<T>, timeoutMs: number) {

@@ -4,6 +4,7 @@
 
 * Mermaid SVG output is sanitized before mounting in both strict and loose modes. `isStrict=false` only controls Mermaid's parse/render configuration and no longer means raw SVG insertion.
 * Mermaid interaction callbacks are disabled by default. Use `mermaidProps.enableMermaidInteractions = true` only for trusted diagrams.
+* Markdown and HTML URL attributes now use a strict protocol allowlist. Links allow `http:`, `https:`, `mailto:`, and `tel:`. Resource URLs allow `http:` and `https:`. Markdown image `src` additionally allows relative URLs and bitmap `data:image/png|gif|jpg|jpeg|webp|avif|bmp` URLs. `blob:`, `file:`, `filesystem:`, `data:text/html`, and `data:image/svg+xml` are blocked by default.
 
 ### Bug Fixes
 
@@ -2041,6 +2042,5 @@
 
 
 ## 0.0.3 (2025-05-26)
-
 
 
