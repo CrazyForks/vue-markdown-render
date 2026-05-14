@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizeAttrs } from '../../src/utils/htmlRenderer'
+import { sanitizeAttrs, sanitizeImageSrc } from '../../src/utils/htmlRenderer'
 
 describe('html URL policy', () => {
   it('rejects script protocols with whitespace and control characters', () => {
     expect(sanitizeAttrs({ href: 'java\nscript:alert(1)' }).href).toBeUndefined()
     expect(sanitizeAttrs({ href: 'jav\tascript:alert(1)' }).href).toBeUndefined()
     expect(sanitizeAttrs({ href: 'java\u0000script:alert(1)' }).href).toBeUndefined()
+    expect(sanitizeAttrs({ href: 'java\u0085script:alert(1)' }, 'safe', 'a').href).toBeUndefined()
     expect(sanitizeAttrs({ src: 'vb\rscript:msgbox(1)' }).src).toBeUndefined()
   })
 
@@ -61,6 +62,21 @@ describe('html URL policy', () => {
     expect(sanitizeAttrs({ href: '//evil.example' }, 'safe', 'a').href).toBeUndefined()
     expect(sanitizeAttrs({ src: '//evil.example/x.png' }, 'safe', 'img').src).toBeUndefined()
     expect(sanitizeAttrs({ srcset: '//evil.example/x.png 1x' }, 'safe', 'img').srcset).toBeUndefined()
+  })
+
+  it('rejects backslash protocol-relative URL variants', () => {
+    const values = [
+      '\\\\evil.example/x',
+      '\\/evil.example/x',
+      '/\\evil.example/x',
+    ]
+
+    for (const value of values) {
+      expect(sanitizeAttrs({ href: value }, 'safe', 'a').href).toBeUndefined()
+      expect(sanitizeAttrs({ src: value }, 'safe', 'img').src).toBeUndefined()
+      expect(sanitizeAttrs({ srcset: `${value} 1x` }, 'safe', 'img').srcset).toBeUndefined()
+      expect(sanitizeImageSrc(value)).toBe('')
+    }
   })
 
   it('applies URL protocols by attribute context', () => {

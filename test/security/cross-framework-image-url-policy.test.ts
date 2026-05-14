@@ -31,6 +31,9 @@ describe('cross-framework image URL policy', () => {
       'data:image/svg+xml,<svg onload=alert(1)>',
       'blob:https://example.com/abc',
       '//evil.example/x.png',
+      '\\\\evil.example/x.png',
+      '\\/evil.example/x.png',
+      '/\\evil.example/x.png',
     ]
 
     for (const src of unsafe) {
@@ -49,6 +52,9 @@ describe('cross-framework image URL policy', () => {
       'data:image/svg+xml,<svg onload=alert(1)>',
       'blob:https://example.com/abc',
       '//evil.example/x.png',
+      '\\\\evil.example/x.png',
+      '\\/evil.example/x.png',
+      '/\\evil.example/x.png',
     ]
 
     for (const src of unsafe) {

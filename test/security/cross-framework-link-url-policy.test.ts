@@ -63,6 +63,9 @@ describe('cross-framework link URL policy', () => {
       'vbscript:msgbox(1)',
       'data:text/html,<script>alert(1)</script>',
       '//evil.example/x',
+      '\\\\evil.example/x',
+      '\\/evil.example/x',
+      '/\\evil.example/x',
     ]
 
     for (const href of unsafe) {
@@ -85,6 +88,9 @@ describe('cross-framework link URL policy', () => {
       'vbscript:msgbox(1)',
       'data:text/html,<script>alert(1)</script>',
       '//evil.example/x',
+      '\\\\evil.example/x',
+      '\\/evil.example/x',
+      '/\\evil.example/x',
     ]
 
     for (const href of unsafe) {

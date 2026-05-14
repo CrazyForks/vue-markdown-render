@@ -277,7 +277,7 @@ export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
     return true
   }
 
-  if (normalized.startsWith('//'))
+  if (/^[\\/]{2}/.test(normalized))
     return true
 
   if (
