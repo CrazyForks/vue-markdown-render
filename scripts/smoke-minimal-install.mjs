@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { gunzipSync } from 'node:zlib'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const tmp = mkdtempSync(join(tmpdir(), 'markstream-vue-minimal-'))
@@ -51,6 +52,33 @@ function packWorkspacePackage(cwd) {
   return tarball
 }
 
+function readTarString(buffer) {
+  const end = buffer.indexOf(0)
+  return buffer.subarray(0, end === -1 ? buffer.length : end).toString('utf8').trim()
+}
+
+function readTgzEntry(tarball, entryName) {
+  const archive = gunzipSync(readFileSync(tarball))
+  let offset = 0
+  while (offset + 512 <= archive.length) {
+    const header = archive.subarray(offset, offset + 512)
+    if (header.every(byte => byte === 0))
+      break
+
+    const name = readTarString(header.subarray(0, 100))
+    const prefix = readTarString(header.subarray(345, 500))
+    const path = prefix ? `${prefix}/${name}` : name
+    const size = Number.parseInt(readTarString(header.subarray(124, 136)) || '0', 8)
+    const bodyOffset = offset + 512
+
+    if (path === entryName)
+      return archive.subarray(bodyOffset, bodyOffset + size).toString('utf8')
+
+    offset = bodyOffset + Math.ceil(size / 512) * 512
+  }
+  throw new Error(`Packed tarball entry not found: ${entryName}`)
+}
+
 function ensureBuiltArtifacts() {
   const parserDist = join(root, 'packages/markdown-parser/dist/index.js')
   const coreDist = join(root, 'packages/markstream-core/dist/index.js')
@@ -79,7 +107,7 @@ try {
   packedCoreTarball = packWorkspacePackage(join(root, 'packages/markstream-core'))
   packedTarball = packWorkspacePackage(root)
 
-  const packedPackageJson = JSON.parse(execFileSync('tar', ['-xOf', packedTarball, 'package/package.json'], { encoding: 'utf8' }))
+  const packedPackageJson = JSON.parse(readTgzEntry(packedTarball, 'package/package.json'))
   const dependencySections = [
     'dependencies',
     'peerDependencies',

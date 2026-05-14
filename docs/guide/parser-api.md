@@ -75,6 +75,8 @@ setDefaultMathOptions({
 - `findMatchingClose(src, startIdx, open, close)` — find matching delimiter
 - `parseFenceToken(token)` — parse code fence into `CodeBlockNode`
 - `normalizeStandaloneBackslashT(content, options?)` — normalize backslash-t sequences in math content
+- `sanitizeImageSrc(value)` — apply the same strict image URL policy used by the built-in image renderers
+- `sanitizeMermaidSvg(svg)` / `toSafeMermaidSvgMarkup(svg)` — sanitize Mermaid SVG with `DOMParser`; in plain Node runtimes without `DOMParser`, they return `null` / `''`
 
 ## Parse hooks (advanced)
 When calling `parseMarkdownToStructure` you can pass `ParseOptions` with these hooks:

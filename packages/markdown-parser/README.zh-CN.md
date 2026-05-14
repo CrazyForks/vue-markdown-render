@@ -46,6 +46,8 @@ yarn add stream-markdown-parser
 - `registerMarkdownPlugin(plugin)` / `clearRegisteredMarkdownPlugins()` — 全局注册/清除插件，在所有 `getMarkdown()` 调用中生效（适合特性开关或测试环境）。
 - `parseMarkdownToStructure(markdown, md, parseOptions)` — 将 Markdown 转换为可供 `markstream-vue` 等渲染器使用的 AST。
 - `processTokens(tokens)` / `parseInlineTokens(children, content?, preToken?, options?)` — 更底层的 token → 节点工具，方便自定义管线。
+- `sanitizeImageSrc(value)` — 使用与 Markstream 图片渲染器一致的严格图片 URL 策略。
+- `sanitizeMermaidSvg(svg)` / `toSafeMermaidSvgMarkup(svg)` — 使用 `DOMParser` 清理 Mermaid SVG；在没有 `DOMParser` 的纯 Node 环境中分别返回 `null` / `''`。
 - `applyMath`、`applyContainers`、`normalizeStandaloneBackslashT`、`findMatchingClose` 等 — 用于构建自定义解析、lint 或内容清洗流程。
 
 ## 使用

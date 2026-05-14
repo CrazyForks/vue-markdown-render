@@ -47,21 +47,31 @@ function clearElement(target: HTMLElement | null | undefined) {
 function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null | undefined) {
   if (!target)
     return ''
-  clearElement(target)
   const safeElement = toSafeSvgElement(svg)
   if (safeElement) {
+    clearElement(target)
     target.appendChild(safeElement)
     return target.innerHTML
   }
   return ''
 }
 
-function renderSvgToTarget(target: HTMLElement | null | undefined, svg: string | null | undefined) {
+function renderSvgToTarget(
+  target: HTMLElement | null | undefined,
+  svg: string | null | undefined,
+  options: { keepPreviousOnFailure?: boolean } = {},
+) {
   if (!target)
     return ''
-  if (isBrokenMermaidSvg(svg))
+  if (isBrokenMermaidSvg(svg)) {
+    if (!options.keepPreviousOnFailure)
+      clearElement(target)
     return ''
-  return setSafeSvg(target, svg)
+  }
+  const rendered = setSafeSvg(target, svg)
+  if (!rendered && !options.keepPreviousOnFailure)
+    clearElement(target)
+  return rendered
 }
 
 const DEFAULTS = {
@@ -342,6 +352,8 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       if (!result?.svg || isBrokenMermaidSvg(result.svg))
         return false
       const rendered = renderSvgToTarget(contentRef.current, result.svg)
+      if (!rendered)
+        return false
       if (enableMermaidInteractions)
         result.bindFunctions?.(contentRef.current)
       updateContainerHeight()
@@ -381,10 +393,11 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
         { timeoutMs: renderTimeout, signal },
       ) as any
       if (res?.svg && !isBrokenMermaidSvg(res.svg)) {
-        renderSvgToTarget(contentRef.current, res.svg)
-        if (enableMermaidInteractions)
+        const rendered = renderSvgToTarget(contentRef.current, res.svg, { keepPreviousOnFailure: true })
+        if (rendered && enableMermaidInteractions)
           res.bindFunctions?.(contentRef.current)
-        updateContainerHeight()
+        if (rendered)
+          updateContainerHeight()
       }
     }
     catch {

@@ -56,6 +56,8 @@ Markdown links and rendered HTML attrs are checked for unsafe protocols such as 
 
 Markdown image URLs use a strict default policy. Allowed image sources are `http:`, `https:`, relative URLs, `#hash` / `?query` URLs, protocol-relative URLs, and bitmap `data:image/png|gif|jpg|jpeg|webp|avif|bmp` URLs. Blocked image sources include `javascript:`, `vbscript:`, `data:text/html`, `data:image/svg+xml`, `blob:`, `file:`, and `filesystem:`.
 
+Bitmap data URLs are only allowed for Markdown image / `img src` handling. `srcset` keeps the narrower resource URL policy and rejects data URLs.
+
 Protocol-relative URLs such as `//cdn.example.com/a.png` are allowed by the URL policy. They can still load external resources, so prefer `htmlPolicy="escape"` for public or third-party content that should not be able to request remote assets.
 
 Mermaid SVG output is sanitized before mounting in both strict and loose Mermaid modes. `isStrict=false` controls Mermaid's parse/render configuration; it does not mean raw SVG insertion.

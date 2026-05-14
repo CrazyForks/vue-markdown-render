@@ -97,15 +97,9 @@ const mermaidInitConfig = computed(() => ({
 function setSafeSvg(target: HTMLElement | null | undefined, svg: string | null | undefined) {
   if (!target)
     return ''
-  try {
-    target.replaceChildren()
-  }
-  catch {
-    // fallback for older environments
-    target.innerHTML = ''
-  }
   const safeElement = toSafeSvgElement(svg)
   if (safeElement) {
+    clearElement(target)
     target.appendChild(safeElement)
     return target.innerHTML
   }
@@ -123,12 +117,22 @@ function clearElement(target: HTMLElement | null | undefined) {
   }
 }
 
-function renderSvgToTarget(target: HTMLElement | null | undefined, svg: string | null | undefined) {
+function renderSvgToTarget(
+  target: HTMLElement | null | undefined,
+  svg: string | null | undefined,
+  options: { keepPreviousOnFailure?: boolean } = {},
+) {
   if (!target)
     return ''
-  if (isBrokenMermaidSvg(svg))
+  if (isBrokenMermaidSvg(svg)) {
+    if (!options.keepPreviousOnFailure)
+      clearElement(target)
     return ''
-  return setSafeSvg(target, svg)
+  }
+  const rendered = setSafeSvg(target, svg)
+  if (!rendered && !options.keepPreviousOnFailure)
+    clearElement(target)
+  return rendered
 }
 
 const { t } = useSafeI18n()
@@ -1155,6 +1159,11 @@ async function initMermaid() {
 
       if (mermaidContent.value) {
         const rendered = renderSvgToTarget(mermaidContent.value, svg)
+        if (!rendered) {
+          if (isThemeRendering.value)
+            isThemeRendering.value = false
+          return false
+        }
         if (props.enableMermaidInteractions)
           res?.bindFunctions?.(mermaidContent.value)
         // Successful full render clears Partial preview state
@@ -1243,10 +1252,11 @@ async function renderPartial(code: string) {
     )
     const svg = res?.svg
     if (mermaidContent.value && svg && !isBrokenMermaidSvg(svg)) {
-      renderSvgToTarget(mermaidContent.value, svg)
-      if (props.enableMermaidInteractions)
+      const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: true })
+      if (rendered && props.enableMermaidInteractions)
         res?.bindFunctions?.(mermaidContent.value)
-      updateContainerHeight()
+      if (rendered)
+        updateContainerHeight()
     }
   }
   catch {

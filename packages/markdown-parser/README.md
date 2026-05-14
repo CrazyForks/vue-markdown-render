@@ -46,6 +46,8 @@ yarn add stream-markdown-parser
 - `registerMarkdownPlugin(plugin)` / `clearRegisteredMarkdownPlugins()` — add or remove global plugins that run for every `getMarkdown()` call (useful for feature flags or tests).
 - `parseMarkdownToStructure(markdown, md, parseOptions)` — convert Markdown into the streaming-friendly AST consumed by `markstream-vue` and other renderers.
 - `processTokens(tokens)` / `parseInlineTokens(children, content?, preToken?, options?)` — low-level helpers if you want to bypass the built-in AST pipeline.
+- `sanitizeImageSrc(value)` — apply the same strict image URL policy used by Markstream image renderers.
+- `sanitizeMermaidSvg(svg)` / `toSafeMermaidSvgMarkup(svg)` — sanitize Mermaid SVG with `DOMParser`; in plain Node runtimes without `DOMParser`, they return `null` / `''`.
 - `applyMath`, `applyContainers`, `normalizeStandaloneBackslashT`, `findMatchingClose`, etc. — utilities for custom parsing or linting workflows.
 
 ## Usage

@@ -103,6 +103,124 @@ describe('mermaid block SVG sanitizer', () => {
     wrapper.unmount()
   })
 
+  it('calls Vue Mermaid bindFunctions only when interactions are enabled', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const bindFunctions = vi.fn()
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn(async () => ({
+        svg: '<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>',
+        bindFunctions,
+      })),
+    }
+
+    vi.doMock('../../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'mermaid',
+          code: 'flowchart TD\nA-->B\n',
+          raw: '```mermaid\nflowchart TD\nA-->B\n```',
+        },
+        loading: false,
+        enableMermaidInteractions: true,
+      },
+    })
+
+    await flushVueUpdates()
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).showSource = false
+    ;(wrapper.vm as any).viewportReady = true
+    await flushVueUpdates()
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushVueUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(1)
+    expect(bindFunctions.mock.calls[0]?.[0]).toBeInstanceOf(HTMLElement)
+
+    wrapper.unmount()
+  })
+
+  it('clears stale Vue Mermaid DOM when the final sanitized SVG is empty', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn()
+        .mockResolvedValueOnce({
+          svg: '<svg viewBox="0 0 10 10"><rect data-safe="1" width="10" height="10" /></svg>',
+        })
+        .mockResolvedValueOnce({
+          svg: '<svg viewBox="0 0 10 10"><video><rect data-stale="1" width="10" height="10" /></video></svg>',
+        }),
+    }
+
+    vi.doMock('../../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'mermaid',
+          code: 'flowchart TD\nA-->B\n',
+          raw: '```mermaid\nflowchart TD\nA-->B\n```',
+        },
+        loading: false,
+      },
+    })
+
+    await flushVueUpdates()
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).showSource = false
+    ;(wrapper.vm as any).viewportReady = true
+    await flushVueUpdates()
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushVueUpdates()
+
+    expect(wrapper.get('div._mermaid').html()).toContain('data-safe')
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'mermaid',
+        code: 'flowchart TD\nA-->C\n',
+        raw: '```mermaid\nflowchart TD\nA-->C\n```',
+      },
+    })
+    await flushVueUpdates()
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushVueUpdates()
+
+    const html = wrapper.get('div._mermaid').html()
+    expect(html).not.toContain('data-safe')
+    expect(html).not.toContain('data-stale')
+
+    wrapper.unmount()
+  })
+
   it('sanitizes React rendered SVG even when Mermaid securityLevel is loose', async () => {
     vi.useFakeTimers()
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
@@ -312,6 +430,56 @@ describe('mermaid block SVG sanitizer', () => {
     }))
     expectSanitizedMermaidHtml(wrapper.get('div._mermaid').html())
     expect(bindFunctions).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('calls Vue 2 Mermaid bindFunctions only when interactions are enabled', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const bindFunctions = vi.fn()
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn(async () => ({
+        svg: '<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>',
+        bindFunctions,
+      })),
+    }
+
+    vi.doMock('../../packages/markstream-vue2/src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../../packages/markstream-vue2/src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+    }))
+
+    const MermaidBlockNode = (await import('../../packages/markstream-vue2/src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'mermaid',
+          code: 'flowchart TD\nA-->B\n',
+          raw: '```mermaid\nflowchart TD\nA-->B\n```',
+        },
+        loading: false,
+        enableMermaidInteractions: true,
+      },
+    })
+
+    await flushVueUpdates()
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).showSource = false
+    ;(wrapper.vm as any).viewportReady = true
+    await flushVueUpdates()
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushVueUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(1)
+    expect(bindFunctions.mock.calls[0]?.[0]).toBeInstanceOf(HTMLElement)
 
     wrapper.unmount()
   })

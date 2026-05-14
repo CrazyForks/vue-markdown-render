@@ -189,6 +189,48 @@ describe('mermaid SVG sanitizer', () => {
     expect(svg).toMatch(/<a[^>]+mailto:/i)
   })
 
+  it('allows local SVG references but rejects external paint-server URLs', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <defs><linearGradient id="g" /></defs>
+        <rect fill="url(#g)" width="10" height="10" />
+        <rect stroke="url(https://evil.test/g)" width="10" height="10" />
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).toMatch(/url\(#g\)/)
+    expect(svg).not.toContain('https://evil.test')
+  })
+
+  it('rejects external use references', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <use href="https://evil.test/icon#x" />
+        <use href="#local-icon" />
+        <rect width="10" height="10" />
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).not.toContain('https://evil.test')
+    expect(svg).toMatch(/<use[^>]+#local-icon/i)
+  })
+
+  it('rejects image href with SVG data URL but allows bitmap data URL', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <image href="data:image/svg+xml,%3Csvg%20onload%3Dalert(1)%3E" />
+        <image href="data:image/png;base64,iVBORw0KGgo=" />
+        <rect width="10" height="10" />
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).not.toMatch(/data:image\/svg\+xml/i)
+    expect(svg).toContain('data:image/png')
+  })
+
   it.each(readMermaidSvgFixtures())('preserves renderable Mermaid SVG fixture $name', ({ svg }) => {
     const sanitized = sanitizeMermaidSvg(svg)
 
