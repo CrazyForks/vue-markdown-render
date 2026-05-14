@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { clearGlobalCustomComponents, getCustomNodeComponents, removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
+import { clearGlobalCustomComponents, getCustomNodeComponents, mergeCustomNodeComponents, removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 
 describe('nodeComponents scoped API', () => {
   beforeEach(() => {
@@ -40,5 +40,17 @@ describe('nodeComponents scoped API', () => {
     expect(getCustomNodeComponents().code_block).toBeUndefined()
     // attempting to remove global via removeCustomComponents should throw
     expect(() => removeCustomComponents('__global__')).toThrow()
+  })
+
+  it('uses scoped mappings over app-scoped defaults', () => {
+    setCustomComponents('test-scope', { thinking: 'ScopedThinking' })
+
+    const mapping = mergeCustomNodeComponents('test-scope', {
+      thinking: 'AppThinking',
+      code_block: 'AppCodeBlock',
+    })
+
+    expect(mapping.thinking).toBe('ScopedThinking')
+    expect(mapping.code_block).toBe('AppCodeBlock')
   })
 })

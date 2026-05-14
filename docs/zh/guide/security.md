@@ -2,6 +2,19 @@
 
 `MarkdownRender` 默认使用 `htmlPolicy="safe"`。这个默认值适合 AI 输出，以及需要保留少量安全 HTML 的内容面。
 
+## 安全模型
+
+`safe` 表示 active HTML 会在交给 Vue 渲染前被移除：
+
+- `script`、`style`、`form`、`iframe`、`object`、`embed`、`template` 以及相关 active/embed/form 标签会被阻断。
+- `on*` 事件属性会被移除。
+- `javascript:`、`vbscript:`、不安全的 `data:`、protocol-relative URL 等不安全 URL 协议会被阻断。
+- 带脚本 URL、CSS expression 或 import 的内联样式会被移除。
+- 带 `target="_blank"` 的 Markdown 链接会保留 `noopener noreferrer`。
+- 流式中间态和最终内容使用同一套清理规则。
+
+`trusted` 表示内容来源完全受你的应用控制。不要把它用于 LLM 输出、公开评论、客服工单、用户导入文档，或任何其他用户生成内容。
+
 ## HTML 策略
 
 ### `htmlPolicy="safe"`

@@ -16,7 +16,7 @@ import { disableKatex, enableKatex, setKatexLoader } from '../src/components/Mat
 import { disableMermaid, enableMermaid } from '../src/components/MermaidBlockNode/mermaid'
 import MarkdownRender from '../src/components/NodeRenderer'
 import { VueRendererMarkdown } from '../src/exports'
-import { clearGlobalCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
+import { clearGlobalCustomComponents, removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 
 const BASIC_SCOPE = 'ssr-render-basic'
 const defaultInfographicLoader = () => import('@antv/infographic')
@@ -170,6 +170,94 @@ Footnotes are server-rendered.[^1]
     expect(htmlA).toContain('tenant A')
     expect(htmlB).not.toContain('data-ssr-thinking')
     expect(htmlB).toContain('tenant B')
+  })
+
+  it('uses scoped custom components as SSR app override and custom-tag source', async () => {
+    const scopeId = 'ssr-render-scoped-over-app-components'
+    const AppThinkingNode = defineComponent({
+      name: 'SsrAppThinkingNode',
+      props: {
+        node: {
+          type: Object,
+          required: true,
+        },
+      },
+      setup(props) {
+        return () => h('aside', { 'data-ssr-thinking': 'app' }, String((props.node as any).content ?? ''))
+      },
+    })
+    const ScopedThinkingNode = defineComponent({
+      name: 'SsrScopedThinkingNode',
+      props: {
+        node: {
+          type: Object,
+          required: true,
+        },
+      },
+      setup(props) {
+        return () => h('aside', { 'data-ssr-thinking': 'scoped' }, String((props.node as any).content ?? ''))
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      thinking: ScopedThinkingNode,
+    })
+
+    try {
+      const app = createSSRApp({
+        render: () => h(MarkdownRender, {
+          content: '<thinking>scoped tenant</thinking>',
+          customId: scopeId,
+          final: true,
+        }),
+      })
+      app.use(VueRendererMarkdown, {
+        components: {
+          thinking: AppThinkingNode,
+        },
+      })
+
+      const html = await renderToString(app)
+
+      expect(html).toContain('data-ssr-thinking="scoped"')
+      expect(html).not.toContain('data-ssr-thinking="app"')
+      expect(html).toContain('scoped tenant')
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('auto-registers scoped custom component keys as SSR custom tags', async () => {
+    const scopeId = 'ssr-render-scoped-auto-tags'
+    const ScopedThinkingNode = defineComponent({
+      name: 'SsrScopedAutoTagThinkingNode',
+      props: {
+        node: {
+          type: Object,
+          required: true,
+        },
+      },
+      setup(props) {
+        return () => h('aside', { 'data-ssr-auto-tag-thinking': '1' }, String((props.node as any).content ?? ''))
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      thinking: ScopedThinkingNode,
+    })
+
+    try {
+      const html = await renderMarkdown('<thinking>scoped only</thinking>', {
+        customId: scopeId,
+      })
+
+      expect(html).toContain('data-ssr-auto-tag-thinking="1"')
+      expect(html).toContain('scoped only')
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
   })
 
   it('renders structured html wrappers on the server without duplicating nested markdown or keeping safe-policy style attrs', async () => {

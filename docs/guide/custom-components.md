@@ -13,7 +13,7 @@ The recommended app-level path is:
 3. keep global `setCustomComponents` only for compatibility or one-off client apps
 
 Use tag-like names for custom components, for example `thinking`, `answer-box`, or `my_component`.
-Namespaced forms like `foo:bar` are ignored. Built-in override keys such as `code_block` stay reserved for node renderer overrides. When you use the legacy `setCustomComponents` API, declare trusted custom tags explicitly via `custom-html-tags`.
+Namespaced forms like `foo:bar` are ignored. Built-in override keys such as `code_block` stay reserved for node renderer overrides. Component keys registered through either `VueRendererMarkdown` or `setCustomComponents` are included in the renderer's custom-tag set.
 
 Reach for parser hooks only after this flow stops being enough.
 
@@ -51,7 +51,7 @@ const markdown = '<thinking>Step by step</thinking>'
 </template>
 ```
 
-When components are registered through `VueRendererMarkdown`, their keys are included in the renderer's custom-tag set. The parser emits a custom node whose `type` is the tag name itself.
+When components are registered through `VueRendererMarkdown` or `setCustomComponents`, their keys are included in the renderer's custom-tag set. The parser emits a custom node whose `type` is the tag name itself.
 
 For older integrations, the scoped global API still works:
 
@@ -67,7 +67,6 @@ setCustomComponents('chat', { thinking: ThinkingNode })
 ```vue
 <MarkdownRender
   custom-id="chat"
-  :custom-html-tags="['thinking']"
   :content="markdown"
 />
 ```

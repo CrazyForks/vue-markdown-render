@@ -79,8 +79,8 @@ export function mergeCustomNodeComponents(
   if (!scopedMapping || Object.keys(scopedMapping).length === 0)
     return appScopedMapping
   return {
-    ...scopedMapping,
     ...appScopedMapping,
+    ...scopedMapping,
   }
 }
 
