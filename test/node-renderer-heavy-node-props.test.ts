@@ -85,6 +85,13 @@ const EstimatedPreviewProbe = defineComponent({
   },
 })
 
+const AnswerBox = defineComponent({
+  name: 'AnswerBox',
+  setup(_, { slots }) {
+    return () => h('section', { class: 'answer-box' }, slots.default?.())
+  },
+})
+
 afterEach(() => {
   removeCustomComponents(customId)
 })
@@ -215,6 +222,42 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     expect(exact.attributes('data-stream')).toBe('false')
     expect(generic.attributes('data-language')).toBe('ts')
     expect(generic.attributes('data-show-header')).toBe('false')
+  })
+
+  it('inherits renderer props inside custom tag default slots', async () => {
+    setCustomComponents(customId, {
+      'answer-box': AnswerBox,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        content: [
+          '<answer-box>',
+          '```ts',
+          'console.log(1)',
+          '```',
+          '</answer-box>',
+          '',
+          'Inline <answer-box>[Vue](https://vuejs.org)</answer-box>',
+        ].join('\n'),
+        customHtmlTags: ['answer-box'],
+        final: true,
+        renderCodeBlocksAsPre: true,
+        showTooltips: false,
+      },
+    })
+
+    await flushAll()
+
+    const boxes = wrapper.findAll('.answer-box')
+    expect(boxes).toHaveLength(2)
+    expect(boxes[0].find('pre[data-markstream-pre="1"]').exists()).toBe(true)
+    expect(boxes[0].find('[data-markstream-code-block="1"]').exists()).toBe(false)
+    expect(boxes[0].find('code').text()).toBe('console.log(1)')
+
+    const link = boxes[1].get('a[href="https://vuejs.org"]')
+    expect(link.attributes('title')).toBe('https://vuejs.org')
   })
 
   it('lets d2lang exact overrides beat d2 fallback while keeping d2 props', async () => {

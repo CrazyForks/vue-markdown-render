@@ -208,6 +208,32 @@ const {
   customComponentsMap,
   logPerf,
 })
+const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
+  customId: props.customId,
+  customHtmlTags: mergedParseOptions.value.customHtmlTags,
+  parseOptions: props.parseOptions,
+  customMarkdownIt: props.customMarkdownIt,
+  htmlPolicy: resolvedHtmlPolicy.value,
+  viewportPriority: props.viewportPriority,
+  codeBlockStream: props.codeBlockStream,
+  codeBlockDarkTheme: props.codeBlockDarkTheme,
+  codeBlockLightTheme: props.codeBlockLightTheme,
+  codeBlockMonacoOptions: props.codeBlockMonacoOptions,
+  renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
+  codeBlockMinWidth: props.codeBlockMinWidth,
+  codeBlockMaxWidth: props.codeBlockMaxWidth,
+  codeBlockProps: props.codeBlockProps,
+  mermaidProps: props.mermaidProps,
+  d2Props: props.d2Props,
+  infographicProps: props.infographicProps,
+  showTooltips: resolvedShowTooltips.value,
+  themes: props.themes,
+  isDark: props.isDark,
+  typewriter: props.typewriter,
+  smoothStreamingOptions: props.smoothStreamingOptions,
+  fade: props.fade,
+}))
+provide('markstreamNestedRendererProps', nestedRendererProps)
 const parsedNodesIdentity = computed(() => parsedNodes.value)
 const parsedNodeCount = computed(() => parsedNodes.value.length)
 const paragraphProbeNode = ref<ParsedNode | null>(null)
@@ -1947,27 +1973,19 @@ onBeforeUnmount(() => {
       >
         <NodeRenderer
           v-if="item.hasSlotChildren"
+          v-bind="nestedRendererProps"
           :nodes="(item.node as any).children"
-          :custom-id="props.customId"
           :index-key="item.indexKey"
-          :custom-html-tags="mergedParseOptions.customHtmlTags"
-          :parse-options="props.parseOptions"
-          :custom-markdown-it="props.customMarkdownIt"
-          :html-policy="resolvedHtmlPolicy"
           :batch-rendering="false"
           :defer-nodes-until-visible="false"
           :render-as-fragment="true"
         />
         <NodeRenderer
           v-else-if="item.slotContent"
+          v-bind="nestedRendererProps"
           :content="item.slotContent"
           :final="!item.node.loading"
-          :custom-id="props.customId"
           :index-key="`${item.indexKey}-content`"
-          :custom-html-tags="mergedParseOptions.customHtmlTags"
-          :parse-options="props.parseOptions"
-          :custom-markdown-it="props.customMarkdownIt"
-          :html-policy="resolvedHtmlPolicy"
           :smooth-streaming="false"
           :batch-rendering="false"
           :defer-nodes-until-visible="false"
@@ -2080,27 +2098,19 @@ onBeforeUnmount(() => {
             >
               <NodeRenderer
                 v-if="item.hasSlotChildren"
+                v-bind="nestedRendererProps"
                 :nodes="(item.node as any).children"
-                :custom-id="props.customId"
                 :index-key="item.indexKey"
-                :custom-html-tags="mergedParseOptions.customHtmlTags"
-                :parse-options="props.parseOptions"
-                :custom-markdown-it="props.customMarkdownIt"
-                :html-policy="resolvedHtmlPolicy"
                 :batch-rendering="false"
                 :defer-nodes-until-visible="false"
                 :render-as-fragment="true"
               />
               <NodeRenderer
                 v-else-if="item.slotContent"
+                v-bind="nestedRendererProps"
                 :content="item.slotContent"
                 :final="!item.node.loading"
-                :custom-id="props.customId"
                 :index-key="`${item.indexKey}-content`"
-                :custom-html-tags="mergedParseOptions.customHtmlTags"
-                :parse-options="props.parseOptions"
-                :custom-markdown-it="props.customMarkdownIt"
-                :html-policy="resolvedHtmlPolicy"
                 :smooth-streaming="false"
                 :batch-rendering="false"
                 :defer-nodes-until-visible="false"
@@ -2135,27 +2145,19 @@ onBeforeUnmount(() => {
           >
             <NodeRenderer
               v-if="item.hasSlotChildren"
+              v-bind="nestedRendererProps"
               :nodes="(item.node as any).children"
-              :custom-id="props.customId"
               :index-key="item.indexKey"
-              :custom-html-tags="mergedParseOptions.customHtmlTags"
-              :parse-options="props.parseOptions"
-              :custom-markdown-it="props.customMarkdownIt"
-              :html-policy="resolvedHtmlPolicy"
               :batch-rendering="false"
               :defer-nodes-until-visible="false"
               :render-as-fragment="true"
             />
             <NodeRenderer
               v-else-if="item.slotContent"
+              v-bind="nestedRendererProps"
               :content="item.slotContent"
               :final="!item.node.loading"
-              :custom-id="props.customId"
               :index-key="`${item.indexKey}-content`"
-              :custom-html-tags="mergedParseOptions.customHtmlTags"
-              :parse-options="props.parseOptions"
-              :custom-markdown-it="props.customMarkdownIt"
-              :html-policy="resolvedHtmlPolicy"
               :smooth-streaming="false"
               :batch-rendering="false"
               :defer-nodes-until-visible="false"

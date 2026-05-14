@@ -15,13 +15,17 @@ description: Define the markstream-vue 1.0 stable scope, API tiers, package vali
 - Optional Mermaid, KaTeX, D2, Infographic, and Monaco integrations.
 - SSR import and render-to-string support for Vue / Vite / Nuxt / VitePress.
 - Published CSS exports: `index.css`, `index.tailwind.css`, and `index.px.css`.
-- Documented worker client exports under `markstream-vue/workers/*WorkerClient`.
+- Documented worker client exports:
+  - `markstream-vue/workers/katexWorkerClient`
+  - `markstream-vue/workers/mermaidWorkerClient`
+- `markstream-vue/tailwind` default and named safelist exports.
 
 ## Experimental or internal
 
 - Cross-framework packages and playgrounds: Vue 2, React, Angular, Svelte, Next.
 - Repository CLI helpers, skills/prompts, and bundled agent assets.
-- Low-level worker implementation files such as `*.worker` subpaths.
+- CDN worker helper subpaths: `markstream-vue/workers/katexCdnWorker` and `markstream-vue/workers/mermaidCdnWorker`.
+- Low-level worker implementation files such as `markstream-vue/workers/katexRenderer.worker` and `markstream-vue/workers/mermaidParser.worker`. These are exported for bundler compatibility only and are not part of the 1.x compatibility promise.
 - Height-estimation experiment APIs.
 - Internal renderer props: `indexKey`, `renderAsFragment`, `debugPerformance`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, `renderBatchBudgetMs`, `renderBatchIdleTimeoutMs`, and `viewportPriority`.
 
@@ -36,14 +40,31 @@ The 1.0 npm package publishes `dist` only. It must not include a `bin` field or 
 ```ts
 import MarkdownRender, {
   clearGlobalCustomComponents,
+  CodeBlockNode,
+  D2BlockNode,
   disableD2,
   disableKatex,
   disableMermaid,
   enableD2,
   enableKatex,
   enableMermaid,
+  getCustomNodeComponents,
+  InfographicBlockNode,
+  isD2Enabled,
+  isKatexEnabled,
+  isMermaidEnabled,
+  MarkdownCodeBlockNode,
+  MathBlockNode,
+  MathInlineNode,
+  MermaidBlockNode,
+  PreCodeNode,
   removeCustomComponents,
   setCustomComponents,
+  setD2Loader,
+  setDefaultI18nMap,
+  setDefaultMathOptions,
+  setKatexLoader,
+  setMermaidLoader,
   useSmoothMarkdownStream,
   VueRendererMarkdown,
 } from 'markstream-vue'
@@ -60,6 +81,20 @@ app.use(VueRendererMarkdown, {
 ```
 
 The legacy/global `setCustomComponents()` API remains supported, but SSR and multi-tenant apps should prefer app-scoped registration.
+
+Root exports are tiered for 1.x compatibility:
+
+| Export | 1.x status |
+| --- | --- |
+| `MarkdownRender`, `VueRendererMarkdown`, `useSmoothMarkdownStream` | Stable renderer API. |
+| `CustomComponents`, `MarkstreamVuePluginOptions`, `NodeRendererProps`, component prop types | Stable TypeScript surface. |
+| `setCustomComponents`, `removeCustomComponents`, `clearGlobalCustomComponents` | Stable legacy/global custom component registry. Prefer app-scoped `components` for SSR and multi-tenant apps. |
+| `getCustomNodeComponents` | Legacy registry inspection only. It reads global/customId mappings and does not include app-scoped `components`, because those are provided through Vue injection. |
+| `enableKatex` / `disableKatex` / `isKatexEnabled` / `setKatexLoader`, `enableMermaid` / `disableMermaid` / `isMermaidEnabled` / `setMermaidLoader`, `enableD2` / `disableD2` / `isD2Enabled` / `setD2Loader` | Stable optional integration controls. |
+| `setDefaultI18nMap`, `setDefaultMathOptions` | Stable customization hooks. |
+| Individual node components such as `CodeBlockNode`, `PreCodeNode`, `MarkdownCodeBlockNode`, `MermaidBlockNode`, `MathBlockNode`, `MathInlineNode`, `D2BlockNode`, and `InfographicBlockNode` | Stable override surface for custom renderers when used with documented props. |
+| Parser utilities re-exported from `stream-markdown-parser` and documented markdown plugin utilities | Stable as documented, subject to the parser/core version policy below. |
+| Low-level utility exports under `markstream-vue/utils/*` | Advanced utility surface; only documented utilities are covered by the 1.x compatibility promise. |
 
 ## Parser and core version policy
 
@@ -82,7 +117,7 @@ pnpm test:smoke:pack
 pnpm test:smoke:pack:optional
 ```
 
-The smoke packs the workspace packages, installs the tarball into a fresh Vite app, verifies root imports, CSS exports, Tailwind safelist export, worker client subpaths, SSR import/render, app-scoped custom components, and optional-peer absence. The optional variant installs Mermaid, KaTeX, D2, Infographic, Monaco, `stream-markdown`, and `vue-i18n`.
+The smoke packs the workspace packages, installs the tarball into a fresh Vite app, verifies root imports, CSS exports, Tailwind safelist export, stable worker client subpaths, experimental worker subpaths remain importable, SSR import/render, app-scoped custom components, and optional-peer absence. The optional variant installs Mermaid, KaTeX, D2, Infographic, Monaco, `stream-markdown`, and `vue-i18n`.
 
 ## Security release gate
 

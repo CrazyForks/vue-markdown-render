@@ -50,9 +50,22 @@ const overrides = useCustomNodeComponents(() => props.customId)
 const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
 const inheritedParseOptions = inject<{ value?: NodeRendererProps['parseOptions'] } | undefined>('markstreamParseOptions', undefined)
 const inheritedCustomMarkdownIt = inject<{ value?: NodeRendererProps['customMarkdownIt'] } | undefined>('markstreamCustomMarkdownIt', undefined)
+const inheritedNestedRendererProps = inject<{ value?: Partial<NodeRendererProps> } | undefined>('markstreamNestedRendererProps', undefined)
 const resolvedHtmlPolicy = computed<HtmlPolicy>(() => inheritedHtmlPolicy?.value ?? 'safe')
 const resolvedParseOptions = computed(() => props.parseOptions ?? inheritedParseOptions?.value)
 const resolvedCustomMarkdownIt = computed(() => props.customMarkdownIt ?? inheritedCustomMarkdownIt?.value)
+const resolvedCustomHtmlTags = computed(() => props.customHtmlTags ?? inheritedNestedRendererProps?.value?.customHtmlTags)
+const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => {
+  const inherited = inheritedNestedRendererProps?.value ?? {}
+  return {
+    ...inherited,
+    customId: props.customId ?? inherited.customId,
+    customHtmlTags: resolvedCustomHtmlTags.value,
+    parseOptions: resolvedParseOptions.value,
+    customMarkdownIt: resolvedCustomMarkdownIt.value,
+    htmlPolicy: resolvedHtmlPolicy.value,
+  }
+})
 const StructuredNodeRenderer = defineAsyncComponent({
   loader: () => import('../NodeRenderer'),
   suspensible: false,
@@ -86,7 +99,7 @@ const isMediaOnlyParagraph = computed(() => (
 ))
 
 const customHtmlTagsSet = computed<Set<string>>(() => {
-  return new Set(normalizeCustomHtmlTags(props.customHtmlTags))
+  return new Set(normalizeCustomHtmlTags(resolvedCustomHtmlTags.value))
 })
 
 const renderedChildren = computed(() => {
@@ -121,7 +134,7 @@ function getChildProps(child: NodeChild, index: number) {
     'node': child,
     'index-key': `${props.indexKey}-${index}`,
     'custom-id': props.customId,
-    'custom-html-tags': props.customHtmlTags,
+    'custom-html-tags': resolvedCustomHtmlTags.value,
   }
 }
 
@@ -210,31 +223,23 @@ const processedChildren = computed(() => renderedChildren.value.map((child, inde
         :node="item.child"
         :index-key="item.key"
         :custom-id="props.customId"
-        :custom-html-tags="props.customHtmlTags"
+        :custom-html-tags="resolvedCustomHtmlTags"
       >
         <StructuredNodeRenderer
           v-if="item.hasSlotChildren"
+          v-bind="nestedRendererProps"
           :nodes="(item.child as any).children"
-          :custom-id="props.customId"
           :index-key="item.key"
-          :custom-html-tags="props.customHtmlTags"
-          :parse-options="resolvedParseOptions"
-          :custom-markdown-it="resolvedCustomMarkdownIt"
-          :html-policy="resolvedHtmlPolicy"
           :batch-rendering="false"
           :defer-nodes-until-visible="false"
           :render-as-fragment="true"
         />
         <StructuredNodeRenderer
           v-else-if="item.slotContent"
+          v-bind="nestedRendererProps"
           :content="item.slotContent"
           :final="!(item.child as any).loading"
-          :custom-id="props.customId"
           :index-key="`${item.key}-content`"
-          :custom-html-tags="props.customHtmlTags"
-          :parse-options="resolvedParseOptions"
-          :custom-markdown-it="resolvedCustomMarkdownIt"
-          :html-policy="resolvedHtmlPolicy"
           :smooth-streaming="false"
           :batch-rendering="false"
           :defer-nodes-until-visible="false"

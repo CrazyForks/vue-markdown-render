@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HtmlPolicy } from 'stream-markdown-parser'
+import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { isHtmlTagBlocked, NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, defineComponent, inject, onBeforeUnmount, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
@@ -20,7 +21,16 @@ const props = defineProps<{
 }>()
 
 const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const inheritedNestedRendererProps = inject<{ value?: Partial<NodeRendererProps> } | undefined>('markstreamNestedRendererProps', undefined)
 const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
+const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => {
+  const inherited = inheritedNestedRendererProps?.value ?? {}
+  return {
+    ...inherited,
+    customId: props.customId ?? inherited.customId,
+    htmlPolicy: resolvedHtmlPolicy.value,
+  }
+})
 
 const StructuredNodeRenderer = defineAsyncComponent({
   loader: () => import('../NodeRenderer'),
@@ -166,12 +176,11 @@ onBeforeUnmount(() => {
     <template v-if="shouldRender">
       <StructuredNodeRenderer
         v-if="renderMode.mode === 'structured'"
+        v-bind="nestedRendererProps"
         :nodes="structuredChildren"
-        :custom-id="customId"
         :batch-rendering="false"
         :defer-nodes-until-visible="false"
         :render-as-fragment="true"
-        :html-policy="resolvedHtmlPolicy"
       />
       <!-- Use dynamic rendering for custom components -->
       <DynamicRenderer v-else-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />
