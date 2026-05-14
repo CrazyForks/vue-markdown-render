@@ -39,6 +39,10 @@ function expectSanitizedMermaidHtml(html: string) {
   expect(html).not.toMatch(/javascript:/i)
 }
 
+function findButtonByText(host: HTMLElement, text: string) {
+  return Array.from(host.querySelectorAll('button')).find(button => button.textContent?.includes(text)) as HTMLButtonElement | undefined
+}
+
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
@@ -329,6 +333,73 @@ describe('mermaid block SVG sanitizer', () => {
 
     expect(bindFunctions).toHaveBeenCalledTimes(1)
     expect(bindFunctions.mock.calls[0]?.[0]).toBeInstanceOf(HTMLElement)
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('rebinds React Mermaid functions when restoring cached preview SVG', async () => {
+    vi.useFakeTimers()
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const bindFunctions = vi.fn()
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      parse: vi.fn(async () => true),
+      render: vi.fn(async () => ({
+        svg: '<svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>',
+        bindFunctions,
+      })),
+    }
+
+    vi.doMock('../../packages/markstream-react/src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../../packages/markstream-react/src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+    }))
+
+    const { MermaidBlockNode } = await import('../../packages/markstream-react/src/components/MermaidBlockNode/MermaidBlockNode')
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(MermaidBlockNode as any, {
+        node: {
+          type: 'code_block',
+          language: 'mermaid',
+          code: 'flowchart TD\nA-->B\n',
+          raw: '```mermaid\nflowchart TD\nA-->B\n```',
+        },
+        loading: false,
+        enableMermaidInteractions: true,
+      }))
+    })
+    await flushReactUpdates()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    await flushReactUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      findButtonByText(host, 'Source')?.click()
+    })
+    await flushReactUpdates()
+
+    await act(async () => {
+      findButtonByText(host, 'Preview')?.click()
+    })
+    await flushReactUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(2)
+    expect(fakeMermaid.render).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       root.unmount()

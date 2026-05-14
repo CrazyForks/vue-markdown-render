@@ -142,6 +142,26 @@ function hasUnsafeStyle(value: string) {
   return DISALLOWED_STYLE_PATTERNS.some(re => re.test(value)) || hasUnsafeCssUrl(value)
 }
 
+function hardenSvgAnchorAttrs(node: Element) {
+  if (node.tagName.toLowerCase() !== 'a')
+    return
+
+  const target = node.getAttribute('target')?.trim().toLowerCase()
+  if (target !== '_blank')
+    return
+
+  const relTokens = new Set(
+    String(node.getAttribute('rel') ?? '')
+      .split(/\s+/)
+      .map(token => token.trim())
+      .filter(Boolean)
+      .filter(token => token.toLowerCase() !== 'opener'),
+  )
+  relTokens.add('noopener')
+  relTokens.add('noreferrer')
+  node.setAttribute('rel', Array.from(relTokens).join(' '))
+}
+
 function scrubSvgElement(svgEl: SVGElement) {
   const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll<Element>('*'))]
   for (const node of nodes) {
@@ -200,6 +220,8 @@ function scrubSvgElement(svgEl: SVGElement) {
           node.setAttribute(attr.name, neutralized)
       }
     }
+
+    hardenSvgAnchorAttrs(node)
   }
 }
 

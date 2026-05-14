@@ -22,6 +22,11 @@ import { getMermaid } from './mermaid'
 
 type Theme = 'light' | 'dark'
 
+interface CachedSvg {
+  svg: string
+  bindFunctions?: (element: Element) => unknown
+}
+
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
 const DOMPURIFY_CONFIG = {
@@ -160,7 +165,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
   const modalCloneWrapperRef = useRef<HTMLElement | null>(null)
   const dragStartRef = useRef({ x: 0, y: 0 })
   const renderTokenRef = useRef(0)
-  const svgCacheRef = useRef<{ light?: string, dark?: string }>({})
+  const svgCacheRef = useRef<{ light?: CachedSvg, dark?: CachedSvg }>({})
   const lastRenderedCodeRef = useRef('')
   const userToggledRef = useRef(false)
   const viewportHandleRef = useRef<VisibilityHandle | null>(null)
@@ -332,11 +337,14 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
 
   // Restore cached SVG when switching from source to preview
   useLayoutEffect(() => {
-    if (!showSource && contentRef.current && svgCacheRef.current[theme]) {
-      renderSvgToTarget(contentRef.current, svgCacheRef.current[theme]!)
+    const cached = svgCacheRef.current[theme]
+    if (!showSource && contentRef.current && cached?.svg) {
+      const rendered = renderSvgToTarget(contentRef.current, cached.svg)
+      if (rendered && enableMermaidInteractions)
+        cached.bindFunctions?.(contentRef.current)
       safeRaf(() => updateContainerHeight())
     }
-  }, [showSource, theme, updateContainerHeight])
+  }, [enableMermaidInteractions, showSource, theme, updateContainerHeight])
 
   const renderFull = useCallback(async (code: string, t: Theme, signal?: AbortSignal) => {
     if (!mermaidRef.current || !contentRef.current)
@@ -357,7 +365,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       if (enableMermaidInteractions)
         result.bindFunctions?.(contentRef.current)
       updateContainerHeight()
-      svgCacheRef.current[t] = rendered
+      svgCacheRef.current[t] = { svg: rendered, bindFunctions: result.bindFunctions }
       setHasRenderedOnce(true)
       setError(null)
       return true

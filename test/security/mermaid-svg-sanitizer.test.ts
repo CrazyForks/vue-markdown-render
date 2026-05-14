@@ -146,6 +146,22 @@ describe('mermaid SVG sanitizer', () => {
     expect(svg).not.toMatch(/javascript:/i)
   })
 
+  it('hardens SVG anchor target blank rel', () => {
+    const svg = sanitizeMermaidSvg(`
+      <svg viewBox="0 0 10 10">
+        <a href="https://example.com" target="_blank" rel="opener">
+          <text>x</text>
+        </a>
+      </svg>
+    `)
+
+    expect(svg).toBeTruthy()
+    expect(svg).toContain('target="_blank"')
+    expect(svg).toMatch(/rel="[^"]*noopener[^"]*"/)
+    expect(svg).toMatch(/rel="[^"]*noreferrer[^"]*"/)
+    expect(svg).not.toMatch(/\bopener\b/i)
+  })
+
   it('removes data SVG CSS URLs but preserves internal paint servers', () => {
     const unsafe = sanitizeMermaidSvg(`
       <svg viewBox="0 0 10 10">
