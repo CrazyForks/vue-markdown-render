@@ -440,6 +440,17 @@ function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
   return /\d/.test(String(nextChar ?? ''))
 }
 
+function isLikelyCurrencyAmountStart(content: string) {
+  const stripped = String(content ?? '').trimStart()
+  const amount = stripped.match(/^\d+(?:,\d{3})*(?:\.\d+)?/)
+  if (!amount)
+    return false
+  const rest = stripped.slice(amount[0].length)
+  if (/^\s*(?:[+\-*/^_=<>]|\\[a-z]+)/i.test(rest))
+    return false
+  return rest === '' || /^[)\s,.!?;:]/.test(rest)
+}
+
 function isLikelyPlaceholderDollar(content: string) {
   const stripped = String(content ?? '').trim()
   if (!stripped)
@@ -753,7 +764,8 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           }
           if (endIdx === -1) {
             // Do not treat segments containing inline code as math
-            if (allowLoading && !strict && isMathLike(content) && !content.includes('`')) {
+            const isCurrencyAmount = open === '$' && isLikelyCurrencyAmountStart(content)
+            if (allowLoading && !strict && !isCurrencyAmount && isMathLike(content) && !content.includes('`')) {
               searchPos = index + open.length
               foundAny = true
               if (!silent) {
