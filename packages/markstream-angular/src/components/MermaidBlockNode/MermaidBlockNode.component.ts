@@ -27,6 +27,7 @@ let mermaidRenderSequence = 0
 let mermaidRenderQueue: Promise<void> = Promise.resolve()
 
 type MermaidTheme = 'light' | 'dark'
+type MermaidBindFunctions = (element: Element) => unknown
 
 function enqueueMermaidRender<T>(run: () => Promise<T>) {
   const next = mermaidRenderQueue.then(run, run)
@@ -201,6 +202,7 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
   private destroyed = false
   private renderToken = 0
   private copyTimer: number | null = null
+  private lastMermaidBindFunctions: MermaidBindFunctions | null = null
 
   get mergedProps() {
     return {
@@ -496,11 +498,10 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
         throw new Error('Mermaid returned empty output.')
 
       this.svgMarkup = safeSvg
+      this.lastMermaidBindFunctions = typeof rendered === 'string' ? null : rendered?.bindFunctions ?? null
       if (!this.svgMarkup)
         this.showSource = true
       this.syncSvgHosts()
-      if (this.mergedProps.enableMermaidInteractions === true && typeof rendered !== 'string' && this.previewHost?.nativeElement)
-        rendered?.bindFunctions?.(this.previewHost.nativeElement)
     }
     catch (error) {
       if (this.destroyed || token !== this.renderToken)
@@ -538,6 +539,15 @@ export class MermaidBlockNodeComponent implements AfterViewInit, OnChanges, OnDe
       setElementHtml(this.modalHost?.nativeElement, this.svgMarkup)
     else
       setElementHtml(this.modalHost?.nativeElement, '')
+    this.bindMermaidInteractions(this.previewHost?.nativeElement)
+    if (this.modalOpen)
+      this.bindMermaidInteractions(this.modalHost?.nativeElement)
+  }
+
+  private bindMermaidInteractions(element: Element | null | undefined) {
+    if (this.mergedProps.enableMermaidInteractions !== true || !this.svgMarkup || !element?.querySelector('svg'))
+      return
+    this.lastMermaidBindFunctions?.(element)
   }
 
   private scheduleHostSync() {

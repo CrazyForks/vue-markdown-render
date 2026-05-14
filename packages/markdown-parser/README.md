@@ -47,7 +47,7 @@ yarn add stream-markdown-parser
 - `parseMarkdownToStructure(markdown, md, parseOptions)` — convert Markdown into the streaming-friendly AST consumed by `markstream-vue` and other renderers.
 - `processTokens(tokens)` / `parseInlineTokens(children, content?, preToken?, options?)` — low-level helpers if you want to bypass the built-in AST pipeline.
 - `sanitizeImageSrc(value)` — apply the same strict image URL policy used by Markstream image renderers.
-- `sanitizeMermaidSvg(svg)` / `toSafeMermaidSvgMarkup(svg)` — sanitize Mermaid SVG with `DOMParser`; in plain Node runtimes without `DOMParser`, they return `null` / `''`.
+- `sanitizeMermaidSvg(svg)` / `toSafeMermaidSvgMarkup(svg)` / `toSafeSvgElement(svg)` / `isBrokenMermaidSvg(svg)` — sanitize or validate Mermaid SVG with `DOMParser`; in plain Node runtimes without `DOMParser`, the sanitizer helpers return `null` / `''` / `null`.
 - `applyMath`, `applyContainers`, `normalizeStandaloneBackslashT`, `findMatchingClose`, etc. — utilities for custom parsing or linting workflows.
 
 ## Usage

@@ -155,6 +155,15 @@ describe('mermaid block SVG sanitizer', () => {
     expect(bindFunctions).toHaveBeenCalledTimes(1)
     expect(bindFunctions.mock.calls[0]?.[0]).toBeInstanceOf(HTMLElement)
 
+    ;(wrapper.vm as any).openModal()
+    await flushVueUpdates()
+    await flushVueUpdates()
+
+    expect(bindFunctions).toHaveBeenCalledTimes(2)
+    const modalTarget = bindFunctions.mock.calls[1]?.[0] as HTMLElement | undefined
+    expect(modalTarget).toBeInstanceOf(HTMLElement)
+    expect(modalTarget?.classList.contains('fullscreen')).toBe(true)
+
     wrapper.unmount()
   })
 

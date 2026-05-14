@@ -229,7 +229,7 @@ function scrubSvgElement(svgEl: SVGElement) {
  * Sanitizes Mermaid SVG with DOMParser and returns a detached SVG element.
  * Returns null in non-DOM runtimes such as plain Node.js.
  */
-export function toSafeSvgElement(svg: string | null | undefined): any | null {
+export function toSafeSvgElement(svg: string | null | undefined): SVGElement | null {
   if (typeof DOMParser === 'undefined')
     return null
   if (!svg)

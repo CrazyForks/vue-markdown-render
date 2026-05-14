@@ -135,6 +135,16 @@ function renderSvgToTarget(
   return rendered
 }
 
+type MermaidBindFunctions = (element: Element) => unknown
+
+let lastMermaidBindFunctions: MermaidBindFunctions | null = null
+
+function bindMermaidInteractions(element: Element | null | undefined) {
+  if (!props.enableMermaidInteractions || !element?.querySelector('svg'))
+    return
+  lastMermaidBindFunctions?.(element)
+}
+
 const { t } = useSafeI18n()
 
 async function resolveMermaidInstance() {
@@ -780,6 +790,36 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+function mountModalClone() {
+  if (!mermaidContainer.value || !modalContent.value)
+    return false
+  if (modalContent.value.firstElementChild?.getAttribute('data-mermaid-modal-clone') === '1')
+    return true
+
+  // clone the container for modal and add fullscreen to the clone (not original)
+  const clone = mermaidContainer.value.cloneNode(true) as HTMLElement
+  clone.dataset.mermaidModalClone = '1'
+  clone.classList.add('fullscreen')
+  clone.style.height = '100%'
+  clone.style.maxHeight = '100%'
+
+  // find the wrapper inside the clone using the data attribute and keep a ref
+  const wrapper = clone.querySelector(
+    '[data-mermaid-wrapper]',
+  ) as HTMLElement | null
+  if (wrapper) {
+    modalCloneWrapper.value = wrapper
+    // apply current transform to the clone so it matches the original state
+    wrapper.style.transform = (transformStyle.value as any).transform
+  }
+
+  // clear any previous content and append the clone
+  clearElement(modalContent.value)
+  modalContent.value.appendChild(clone)
+  bindMermaidInteractions(clone)
+  return true
+}
+
 function openModal() {
   isModalOpen.value = true
   if (typeof document !== 'undefined') {
@@ -796,27 +836,8 @@ function openModal() {
   }
 
   nextTick(() => {
-    if (mermaidContainer.value && modalContent.value) {
-      // clone the container for modal and add fullscreen to the clone (not original)
-      const clone = mermaidContainer.value.cloneNode(true) as HTMLElement
-      clone.classList.add('fullscreen')
-      clone.style.height = '100%'
-      clone.style.maxHeight = '100%'
-
-      // find the wrapper inside the clone using the data attribute and keep a ref
-      const wrapper = clone.querySelector(
-        '[data-mermaid-wrapper]',
-      ) as HTMLElement | null
-      if (wrapper) {
-        modalCloneWrapper.value = wrapper
-        // apply current transform to the clone so it matches the original state
-        wrapper.style.transform = (transformStyle.value as any).transform
-      }
-
-      // clear any previous content and append the clone
-      clearElement(modalContent.value)
-      modalContent.value.appendChild(clone)
-    }
+    if (!mountModalClone())
+      nextTick(mountModalClone)
   })
 }
 
@@ -840,6 +861,11 @@ function closeModal() {
     catch {}
   }
 }
+
+watch(modalContent, (element) => {
+  if (isModalOpen.value && element)
+    mountModalClone()
+})
 
 function checkContentStability() {
   if (!showSource.value) {
@@ -1164,8 +1190,8 @@ async function initMermaid() {
             isThemeRendering.value = false
           return false
         }
-        if (props.enableMermaidInteractions)
-          res?.bindFunctions?.(mermaidContent.value)
+        lastMermaidBindFunctions = res?.bindFunctions ?? null
+        bindMermaidInteractions(mermaidContent.value)
         // Successful full render clears Partial preview state
         if (!hasRenderedOnce.value && !isThemeRendering.value) {
           updateContainerHeight()
@@ -1253,10 +1279,11 @@ async function renderPartial(code: string) {
     const svg = res?.svg
     if (mermaidContent.value && svg && !isBrokenMermaidSvg(svg)) {
       const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: true })
-      if (rendered && props.enableMermaidInteractions)
-        res?.bindFunctions?.(mermaidContent.value)
-      if (rendered)
+      if (rendered) {
+        lastMermaidBindFunctions = res?.bindFunctions ?? null
+        bindMermaidInteractions(mermaidContent.value)
         updateContainerHeight()
+      }
     }
   }
   catch {
@@ -1334,6 +1361,7 @@ async function progressiveRender() {
   const cached = svgCache.value[theme]
   if (cached && mermaidContent.value) {
     renderSvgToTarget(mermaidContent.value, cached)
+    bindMermaidInteractions(mermaidContent.value)
   }
   // else: keep current DOM (could be empty on very first run)
 }
@@ -1501,6 +1529,7 @@ watch(() => props.isDark, async () => {
   if (cachedForTheme) {
     if (mermaidContent.value) {
       renderSvgToTarget(mermaidContent.value, cachedForTheme)
+      bindMermaidInteractions(mermaidContent.value)
     }
     return
   }
@@ -1546,6 +1575,7 @@ watch(
         await nextTick()
         if (mermaidContent.value) {
           renderSvgToTarget(mermaidContent.value, svgCache.value[currentTheme]!)
+          bindMermaidInteractions(mermaidContent.value)
         }
         // Restoring full render from cache -> hide Partial badge
         zoom.value = savedTransformState.value.zoom
@@ -1594,6 +1624,7 @@ watch(
         // 保险：如果 DOM 被清空但有缓存，恢复一次，不触发重新渲染
         if (mermaidContent.value && !mermaidContent.value.querySelector('svg') && svgCache.value[theme]) {
           renderSvgToTarget(mermaidContent.value, svgCache.value[theme]!)
+          bindMermaidInteractions(mermaidContent.value)
         }
         // 渲染已完成，清理后台任务
         cleanupAfterLoadingSettled()
