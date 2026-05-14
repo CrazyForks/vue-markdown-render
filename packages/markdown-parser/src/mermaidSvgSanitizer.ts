@@ -228,8 +228,10 @@ export function toSafeMermaidSvgMarkup(svg: string | null | undefined) {
 }
 
 export function isBrokenMermaidSvg(svg: string | null | undefined) {
-  if (!svg || typeof DOMParser === 'undefined')
-    return !svg
+  if (!svg)
+    return true
+  if (typeof DOMParser === 'undefined')
+    return true
 
   const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
   const svgEl = parsed.documentElement

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SvelteRenderableNode, SvelteRenderContext } from './shared/node-helpers'
+  import { sanitizeHtmlAttrs } from 'stream-markdown-parser'
   import { hideTooltip, showTooltipForAnchor } from '../tooltip/singletonTooltip'
   import RenderChildren from './RenderChildren.svelte'
   import { getNodeList, getString } from './shared/node-helpers'
@@ -13,7 +14,7 @@
   
   let { node, context, indexKey, showTooltip }: Props = $props();
 
-  let href = $derived(getString((node as any)?.href));
+  let href = $derived(sanitizeHtmlAttrs({ href: getString((node as any)?.href) }, 'safe', 'a').href ?? '');
   let title = $derived(getString((node as any)?.title || href));
   let children = $derived(getNodeList((node as any)?.children));
   let tooltipEnabled = $derived(showTooltip ?? context?.showTooltips ?? true);

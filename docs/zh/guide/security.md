@@ -52,7 +52,9 @@ defineProps<{ node: { content?: string } }>()
 
 ## 链接和图片
 
-Markdown 链接和渲染出的 HTML attrs 会检查 `javascript:`、`vbscript:`、HTML `data:` 文档等不安全协议。bitmap 图片 data URL 只允许出现在图片源属性上。
+Markdown 链接和渲染出的 HTML attrs 会检查 `javascript:`、`vbscript:`、HTML `data:` 文档等不安全协议。
+
+Markdown 图片 URL 默认使用 strict 策略。允许的图片源包括 `http:`、`https:`、相对 URL、`#hash` / `?query` URL、protocol-relative URL，以及 bitmap `data:image/png|gif|jpg|jpeg|webp|avif|bmp` URL。阻断的图片源包括 `javascript:`、`vbscript:`、`data:text/html`、`data:image/svg+xml`、`blob:`、`file:` 和 `filesystem:`。
 
 URL 策略允许 `//cdn.example.com/a.png` 这类 protocol-relative URL。它们仍可能加载外部资源；如果公开用户内容或第三方内容不应该发起远程资源请求，请优先使用 `htmlPolicy="escape"`。
 

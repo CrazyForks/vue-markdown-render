@@ -23,6 +23,7 @@ describe('link and image URL policy', () => {
       expect(sanitizeImageSrc('vbscript:msgbox(1)')).toBe('')
       expect(sanitizeImageSrc('data:text/html,<script>alert(1)</script>')).toBe('')
       expect(sanitizeImageSrc('data:image/svg+xml,<svg onload=alert(1)>')).toBe('')
+      expect(sanitizeImageSrc('blob:https://example.com/abc')).toBe('')
     })
 
     it('returns an empty string for nullish values', () => {

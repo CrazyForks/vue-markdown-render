@@ -23,6 +23,7 @@ describe('cross-framework image URL policy', () => {
     const unsafe = [
       'javascript:alert(1)',
       'data:image/svg+xml,<svg onload=alert(1)>',
+      'blob:https://example.com/abc',
     ]
 
     for (const src of unsafe) {

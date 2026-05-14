@@ -86,6 +86,15 @@ try {
         throw new Error(`Packed ${section} leaked workspace protocol: ${name}@${version}`)
     }
   }
+  for (const name of ['stream-markdown-parser', 'markstream-core']) {
+    const version = packedPackageJson.dependencies?.[name]
+    if (!version)
+      throw new Error(`${name} missing from packed dependencies`)
+    if (String(version).startsWith('workspace:'))
+      throw new Error(`${name} leaked workspace protocol`)
+    if (String(version).startsWith('file:'))
+      throw new Error(`${name} leaked file protocol`)
+  }
 
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
   const smokePackage = {
