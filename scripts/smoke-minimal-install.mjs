@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -92,6 +93,19 @@ function ensureBuiltArtifacts() {
 
   if (!existsSync(rootDist))
     run('pnpm', ['run', 'build'])
+}
+
+function ensureOptionalPeersAbsent() {
+  const fixtureRequire = createRequire(join(tmp, 'package.json'))
+  for (const pkg of ['stream-monaco', 'mermaid', 'katex', '@terrastruct/d2']) {
+    try {
+      fixtureRequire.resolve(pkg)
+    }
+    catch {
+      continue
+    }
+    throw new Error(`${pkg} should not be installed in minimal smoke`)
+  }
 }
 
 try {
@@ -198,6 +212,7 @@ try {
   writeProjectFile('ssr-import.mjs', `import { existsSync } from 'node:fs'\nimport { fileURLToPath } from 'node:url'\nimport { createSSRApp, h } from 'vue'\nimport { renderToString } from '@vue/server-renderer'\nimport MarkdownRender, { MarkdownRender as NamedMarkdownRender } from 'markstream-vue'\n\nconst mod = await import('markstream-vue')\nif (!mod.default || !mod.MarkdownRender || !NamedMarkdownRender)\n  throw new Error('Root package import did not expose MarkdownRender')\n\nconst cssUrl = import.meta.resolve('markstream-vue/index.css')\nif (!existsSync(fileURLToPath(cssUrl)))\n  throw new Error('CSS export did not resolve to a file')\n\nconst html = await renderToString(createSSRApp({\n  render: () => h(MarkdownRender, {\n    content: ${JSON.stringify(ssrMarkdown)},\n    final: true,\n  }),\n}))\n\nif (!html || !html.includes('console.log'))\n  throw new Error('SSR render did not include code content')\n\nif (/javascript:alert/i.test(html))\n  throw new Error('SSR render kept unsafe javascript URL')\n`)
 
   run('pnpm', ['install', '--ignore-workspace'], { cwd: tmp })
+  ensureOptionalPeersAbsent()
   run('pnpm', ['run', 'typecheck:node-no-dom'], { cwd: tmp })
   run('pnpm', ['run', 'build'], { cwd: tmp })
   run('pnpm', ['run', 'ssr:import'], { cwd: tmp })

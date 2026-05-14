@@ -808,11 +808,11 @@ export function LinkNode(props: NodeComponentProps<LinkNodeProps['node']> & {
   return (
     <a
       className="link-node"
-      href={safeHref}
+      href={safeHref || undefined}
       title={title}
       aria-label={`Link: ${title}`}
-      target="_blank"
-      rel="noopener noreferrer"
+      target={safeHref ? '_blank' : undefined}
+      rel={safeHref ? 'noopener noreferrer' : undefined}
       style={cssVars}
     >
       {ctx && renderNodeProp

@@ -145,6 +145,8 @@ const anchorAttrs = computed(() => {
   // `title` is controlled by `showTooltip` behavior and should not be overridden.
   delete (merged as Record<string, unknown>).title
   delete (merged as Record<string, unknown>).href
+  delete (merged as Record<string, unknown>).target
+  delete (merged as Record<string, unknown>).rel
   return merged
 })
 const safeHref = computed(() => {
@@ -236,8 +238,8 @@ onBeforeUnmount(() => {
     :title="showTooltip ? '' : title"
     :aria-label="`Link: ${title}`"
     :aria-hidden="node.loading ? 'true' : 'false'"
-    target="_blank"
-    rel="noopener noreferrer"
+    :target="safeHref ? '_blank' : undefined"
+    :rel="safeHref ? 'noopener noreferrer' : undefined"
     v-bind="anchorAttrs"
     :style="cssVars"
     @mouseenter="(e) => onAnchorEnter(e)"

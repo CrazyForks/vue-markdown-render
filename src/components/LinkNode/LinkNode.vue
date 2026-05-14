@@ -104,13 +104,23 @@ const mergedAnchorAttrs = computed(() => {
     ...nodeAttrs.value,
   } as Record<string, unknown>
 })
+const safeHref = computed(() => {
+  const href = String(props.node?.href ?? '')
+  return sanitizeAttrs({ href }, 'safe', 'a').href
+})
 const finalTarget = computed(() => {
+  if (!safeHref.value)
+    return undefined
+
   const rawTarget = mergedAnchorAttrs.value.target
   const normalized = typeof rawTarget === 'string' ? rawTarget.trim() : String(rawTarget ?? '').trim()
   return normalized || '_blank'
 })
-const isBlankTarget = computed(() => finalTarget.value.trim().toLowerCase() === '_blank')
+const isBlankTarget = computed(() => String(finalTarget.value ?? '').trim().toLowerCase() === '_blank')
 const finalRel = computed(() => {
+  if (!safeHref.value)
+    return undefined
+
   const rawRel = mergedAnchorAttrs.value.rel
   const tokens = new Set(
     (typeof rawRel === 'string' ? rawRel : String(rawRel ?? ''))
@@ -139,11 +149,6 @@ const anchorAttrs = computed(() => {
   delete merged.target
   delete merged.rel
   return merged
-})
-
-const safeHref = computed(() => {
-  const href = String(props.node?.href ?? '')
-  return sanitizeAttrs({ href }, 'safe', 'a').href
 })
 
 // Tooltip handlers using singleton tooltip

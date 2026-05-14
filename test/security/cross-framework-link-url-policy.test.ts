@@ -67,6 +67,8 @@ describe('cross-framework link URL policy', () => {
     for (const href of unsafe) {
       for (const rendered of renderAllLinkOutputs(href)) {
         expect(rendered).not.toMatch(/\shref=/i)
+        expect(rendered).not.toMatch(/\starget=/i)
+        expect(rendered).not.toMatch(/\srel=/i)
         expect(rendered).not.toMatch(/javascript:/i)
         expect(rendered).not.toMatch(/vbscript:/i)
         expect(rendered).not.toMatch(/data:text\/html/i)
@@ -94,6 +96,8 @@ describe('cross-framework link URL policy', () => {
       const anchor = wrapper.get('a').element as HTMLAnchorElement
 
       expect(wrapper.get('a').attributes('href')).toBeUndefined()
+      expect(wrapper.get('a').attributes('target')).toBeUndefined()
+      expect(wrapper.get('a').attributes('rel')).toBeUndefined()
       expect(anchor.protocol).not.toBe('javascript:')
       wrapper.unmount()
     }

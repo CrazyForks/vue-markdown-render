@@ -104,11 +104,11 @@ export function LinkNode(props: NodeComponentProps<{
   return (
     <a
       className="link-node"
-      href={safeHref}
+      href={safeHref || undefined}
       title={showTip ? '' : title}
       aria-label={`Link: ${title}`}
-      target="_blank"
-      rel="noopener noreferrer"
+      target={safeHref ? '_blank' : undefined}
+      rel={safeHref ? 'noopener noreferrer' : undefined}
       style={cssVars}
       onMouseEnter={onAnchorEnter}
       onMouseLeave={onAnchorLeave}

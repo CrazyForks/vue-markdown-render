@@ -4,7 +4,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { isBrokenMermaidSvg, sanitizeMermaidSvg } from 'stream-markdown-parser'
+import { isBrokenMermaidSvg, sanitizeMermaidSvg, toSafeMermaidSvgMarkup } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
 
 const mermaidSvgFixtureDir = join(process.cwd(), 'test/fixtures/mermaid-svg')
@@ -280,5 +280,15 @@ describe('mermaid SVG sanitizer', () => {
     expect(isBrokenMermaidSvg('<svg viewBox="0 0 0 10"><rect width="10" height="10" /></svg>')).toBe(true)
     expect(isBrokenMermaidSvg('<svg viewBox="0 0 10 10"><rect width="NaN" height="10" /></svg>')).toBe(true)
     expect(isBrokenMermaidSvg('<div></div>')).toBe(true)
+  })
+
+  it.each([
+    '<svg><use href="javascript:alert(1)" /></svg>',
+    '<svg><image href="javascript:alert(1)" /></svg>',
+  ])('treats SVG nodes without safe href as non-renderable %#', (svg) => {
+    const sanitized = toSafeMermaidSvgMarkup(svg)
+
+    expect(sanitized).not.toContain('javascript:')
+    expect(isBrokenMermaidSvg(sanitized)).toBe(true)
   })
 })

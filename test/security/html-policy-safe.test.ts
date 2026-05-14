@@ -104,6 +104,20 @@ describe('htmlPolicy safe security corpus', () => {
     expectNoExecutableMarkup(html)
   })
 
+  it.each([
+    ['<iframe></script><p>leaked</p></iframe><p>ok</p>'],
+    ['<script><iframe></iframe>alert(1)</script><p>ok</p>'],
+    ['<style></iframe>.x{background:red}</style><p>ok</p>'],
+  ])('does not leave hard-blocked subtree on mismatched closing tags %#', (input) => {
+    const html = sanitizeHtmlContent(input, 'safe')
+
+    expect(html).not.toContain('leaked')
+    expect(html).not.toContain('alert(1)')
+    expect(html).not.toContain('background:red')
+    expect(html).toContain('<p>ok</p>')
+    expectNoExecutableMarkup(html)
+  })
+
   it('does not leave browser-parsed javascript link protocols after URL entity decoding', () => {
     const payloads = [
       'java&#x09;script:alert(1)',

@@ -302,8 +302,9 @@ function renderLinkNode(node: RenderableMarkdownNode, ctx: RenderContext): strin
     ? renderNodesToHtml(getNodeList(node.children), ctx)
     : escapeHtml(getString(node.text || href))
   const titleAttr = title ? ` title="${escapeAttr(title)}"` : ''
-  const hrefAttr = href && !isUnsafeHtmlUrl(href) ? ` href="${escapeAttr(href)}"` : ''
-  const externalAttrs = href.startsWith('#') ? '' : ' target="_blank" rel="noreferrer noopener"'
+  const safeHref = href && !isUnsafeHtmlUrl(href) ? href : ''
+  const hrefAttr = safeHref ? ` href="${escapeAttr(safeHref)}"` : ''
+  const externalAttrs = safeHref && !safeHref.startsWith('#') ? ' target="_blank" rel="noreferrer noopener"' : ''
   return `<a${hrefAttr}${titleAttr}${externalAttrs}>${content}</a>`
 }
 

@@ -204,7 +204,7 @@ export function stripHtmlControlAndWhitespace(value: string) {
   let out = ''
   for (const ch of value) {
     const code = ch.charCodeAt(0)
-    if (code <= 0x1F || code === 0x7F)
+    if (code <= 0x1F || (code >= 0x7F && code <= 0x9F))
       continue
     if (/\s/u.test(ch))
       continue

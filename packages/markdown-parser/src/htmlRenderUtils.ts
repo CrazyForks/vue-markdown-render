@@ -186,16 +186,34 @@ function shouldDropHtmlAttr(lowerKey: string, value: string, policy: HtmlPolicy,
   return false
 }
 
-function hardenAnchorAttrs(clean: Record<string, string>, policy: HtmlPolicy, tagName?: string) {
+function findHtmlAttrName(attrs: Record<string, string>, attrName: string) {
+  const normalized = attrName.toLowerCase()
+  return Object.keys(attrs).find(key => key.toLowerCase() === normalized)
+}
+
+function hardenAnchorAttrs(clean: Record<string, string>, policy: HtmlPolicy, tagName?: string, hadHref = false) {
   if (policy !== 'safe' || normalizeTagName(tagName) !== 'a')
     return clean
 
-  const target = String(clean.target ?? '').trim()
+  const hrefKey = findHtmlAttrName(clean, 'href')
+  if (hadHref && (!hrefKey || !clean[hrefKey])) {
+    const targetKey = findHtmlAttrName(clean, 'target')
+    const relKey = findHtmlAttrName(clean, 'rel')
+    if (targetKey)
+      delete clean[targetKey]
+    if (relKey)
+      delete clean[relKey]
+    return clean
+  }
+
+  const targetKey = findHtmlAttrName(clean, 'target')
+  const target = targetKey ? String(clean[targetKey]).trim() : ''
   if (target.toLowerCase() !== '_blank')
     return clean
 
+  const relKey = findHtmlAttrName(clean, 'rel')
   const relTokens = new Set(
-    String(clean.rel ?? '')
+    String(relKey ? clean[relKey] : '')
       .split(/\s+/)
       .map(token => token.trim())
       .filter(Boolean)
@@ -203,6 +221,8 @@ function hardenAnchorAttrs(clean: Record<string, string>, policy: HtmlPolicy, ta
   )
   relTokens.add('noopener')
   relTokens.add('noreferrer')
+  if (relKey && relKey !== 'rel')
+    delete clean[relKey]
   clean.rel = Array.from(relTokens).join(' ')
   return clean
 }
@@ -220,7 +240,7 @@ function sanitizeHtmlContentAttrs(attrs: Record<string, string>, policy: HtmlPol
     clean[safeName] = value
   }
 
-  return hardenAnchorAttrs(clean, policy, tagName)
+  return hardenAnchorAttrs(clean, policy, tagName, Boolean(findHtmlAttrName(attrs, 'href')))
 }
 
 export function isCustomHtmlComponentTag(
@@ -244,7 +264,7 @@ export function sanitizeHtmlAttrs(attrs: Record<string, string>, policy: HtmlPol
       continue
     clean[safeName] = value
   }
-  return hardenAnchorAttrs(clean, policy, tagName)
+  return hardenAnchorAttrs(clean, policy, tagName, Boolean(findHtmlAttrName(attrs, 'href')))
 }
 
 export function tokenAttrsToRecord(attrs?: Array<[string, string | null]> | null) {
@@ -538,11 +558,11 @@ export function sanitizeHtmlContent(content: string, policy: HtmlPolicy = 'safe'
   const tokens = tokenizeHtmlPreservingText(content)
   const stack: string[] = []
   const output: string[] = []
-  let blockedDepth = 0
+  const blockedStack: string[] = []
 
   for (const token of tokens) {
     if (token.type === 'text') {
-      if (blockedDepth === 0)
+      if (blockedStack.length === 0)
         output.push(escapeHtml(token.content ?? ''))
       continue
     }
@@ -553,13 +573,13 @@ export function sanitizeHtmlContent(content: string, policy: HtmlPolicy = 'safe'
 
     if (isHtmlTagHardBlocked(tagName, policy)) {
       if (token.type === 'tag_open')
-        blockedDepth += 1
-      else if (token.type === 'tag_close' && blockedDepth > 0)
-        blockedDepth -= 1
+        blockedStack.push(tagName)
+      else if (token.type === 'tag_close' && blockedStack[blockedStack.length - 1] === tagName)
+        blockedStack.pop()
       continue
     }
 
-    if (blockedDepth > 0)
+    if (blockedStack.length > 0)
       continue
 
     if (policy === 'safe' && isHtmlTagBlocked(tagName, policy)) {

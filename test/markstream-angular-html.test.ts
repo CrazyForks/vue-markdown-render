@@ -317,9 +317,11 @@ describe('markstream-angular html renderer', () => {
       } as any,
     )
 
-    expect(html).toContain('<a target="_blank" rel="nofollow noopener noreferrer" data-safe="ok">')
+    expect(html).toContain('<a data-safe="ok">')
     expect(html).toContain('<p>safe child</p>')
     expect(html).not.toContain('onclick=')
+    expect(html).not.toContain('target=')
+    expect(html).not.toContain('rel=')
     expect(html).not.toContain('rel="opener')
     expect(html).not.toContain('javascript:')
   })

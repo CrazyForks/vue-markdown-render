@@ -3,7 +3,7 @@
  */
 
 import { mount } from '@vue/test-utils'
-import { sanitizeImageSrc } from 'stream-markdown-parser'
+import { isUnsafeHtmlUrl, sanitizeImageSrc } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
 import { nextTick } from 'vue'
 import ImageNode from '../../src/components/ImageNode/ImageNode.vue'
@@ -32,6 +32,11 @@ describe('link and image URL policy', () => {
     })
   })
 
+  it('rejects javascript URLs obfuscated with C1 controls', () => {
+    expect(isUnsafeHtmlUrl('java\u0085script:alert(1)', { attrName: 'href', tagName: 'a' })).toBe(true)
+    expect(isUnsafeHtmlUrl('jav\u009Fascript:alert(1)', { attrName: 'href', tagName: 'a' })).toBe(true)
+  })
+
   it('omits unsafe href values from direct link nodes', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
@@ -57,7 +62,10 @@ describe('link and image URL policy', () => {
     })
 
     await flushAll()
-    expect(wrapper.get('a.link-node').attributes('href')).toBeUndefined()
+    const attrs = wrapper.get('a.link-node').attributes()
+    expect(attrs.href).toBeUndefined()
+    expect(attrs.target).toBeUndefined()
+    expect(attrs.rel).toBeUndefined()
   })
 
   it('does not render unsafe direct image node URLs', async () => {

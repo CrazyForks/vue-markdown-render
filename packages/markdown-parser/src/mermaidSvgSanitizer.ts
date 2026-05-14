@@ -62,6 +62,30 @@ const RENDERABLE_SVG_TAGS = new Set([
   'use',
 ])
 
+function hasSafeSvgHref(node: Element) {
+  const href = node.getAttribute('href') || node.getAttribute('xlink:href')
+  return href?.startsWith('#') === true
+}
+
+function hasImageSource(node: Element) {
+  return Boolean(node.getAttribute('href') || node.getAttribute('xlink:href') || node.getAttribute('src'))
+}
+
+function isRenderableSvgNode(node: Element) {
+  const tag = node.nodeName.toLowerCase()
+
+  if (tag === 'use')
+    return hasSafeSvgHref(node)
+
+  if (tag === 'image')
+    return hasImageSource(node)
+
+  if (tag === 'text' || tag === 'tspan')
+    return Boolean(node.textContent?.trim())
+
+  return RENDERABLE_SVG_TAGS.has(tag)
+}
+
 function neutralizeScriptProtocols(raw: string) {
   return raw
     .replace(/(["'])\s*javascript:/gi, '$1#')
@@ -286,7 +310,7 @@ export function isBrokenMermaidSvg(svg: string | null | undefined) {
   const nodes = [svgEl, ...Array.from(svgEl.querySelectorAll('*'))]
   let hasRenderableNode = false
   for (const node of nodes) {
-    if (RENDERABLE_SVG_TAGS.has(node.nodeName.toLowerCase()))
+    if (isRenderableSvgNode(node))
       hasRenderableNode = true
     for (const attr of Array.from(node.attributes)) {
       if (/\bNaN\b/i.test(attr.value))
