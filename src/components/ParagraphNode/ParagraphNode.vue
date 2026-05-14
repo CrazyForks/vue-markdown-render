@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import type { HtmlPolicy } from 'stream-markdown-parser'
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
-import { computed } from 'vue'
-import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText } from '../../utils/htmlRenderer'
+import { computed, defineAsyncComponent, inject } from 'vue'
+import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText } from '../../utils/htmlRenderer'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmojiNode from '../EmojiNode'
@@ -43,6 +44,12 @@ const props = defineProps<{
 }>()
 
 const overrides = useCustomNodeComponents(() => props.customId)
+const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const resolvedHtmlPolicy = computed<HtmlPolicy>(() => inheritedHtmlPolicy?.value ?? 'safe')
+const StructuredNodeRenderer = defineAsyncComponent({
+  loader: () => import('../NodeRenderer'),
+  suspensible: false,
+})
 
 function isWhitespaceText(child: NodeChild) {
   return child.type === 'text' && String((child as any).content ?? '').trim() === ''
@@ -137,7 +144,7 @@ const nodeComponents = computed(() => ({
 }))
 
 // Process children to handle non-whitelisted custom HTML tags
-function processChild(child: NodeChild): { child: NodeChild, component: any } {
+function processChild(child: NodeChild): { child: NodeChild, component: any, isCustomComponent: boolean } {
   if (child.type === 'html_block' || child.type === 'html_inline') {
     const tag = String((child as any).tag ?? '').trim().toLowerCase()
       || getHtmlTagFromContent((child as any).content)
@@ -152,27 +159,71 @@ function processChild(child: NodeChild): { child: NodeChild, component: any } {
           raw: rawContent,
         } as NodeChild,
         component: TextNode,
+        isCustomComponent: false,
       }
     }
   }
 
-  return { child, component: (nodeComponents.value as any)[child.type] }
+  return {
+    child,
+    component: (nodeComponents.value as any)[child.type],
+    isCustomComponent: Boolean((overrides.value as any)[child.type]),
+  }
 }
+
+const processedChildren = computed(() => renderedChildren.value.map((child, index) => {
+  const processed = processChild(child)
+  return {
+    ...processed,
+    index,
+    key: `${props.indexKey || 'paragraph'}-${index}`,
+    customAttrs: processed.isCustomComponent
+      ? getCustomNodeAttrs(processed.child as any, resolvedHtmlPolicy.value)
+      : undefined,
+    hasSlotChildren: Array.isArray((processed.child as any).children) && (processed.child as any).children.length > 0,
+    slotContent: String((processed.child as any).content ?? ''),
+    originalChild: child,
+  }
+}))
 </script>
 
 <template>
   <p dir="auto" class="paragraph-node">
     <template
-      v-for="(child, index) in renderedChildren"
-      :key="`${indexKey || 'paragraph'}-${index}`"
+      v-for="item in processedChildren"
+      :key="item.key"
     >
-      <template v-if="isMediaOnlyParagraph && isWhitespaceText(child)">
-        {{ getTextContent(child) }}
+      <template v-if="isMediaOnlyParagraph && isWhitespaceText(item.originalChild)">
+        {{ getTextContent(item.originalChild) }}
       </template>
       <component
-        :is="processChild(child).component"
+        :is="item.component"
+        v-else-if="item.isCustomComponent"
+        v-bind="item.customAttrs"
+        :node="item.child"
+        :index-key="item.key"
+        :custom-id="props.customId"
+        :custom-html-tags="props.customHtmlTags"
+      >
+        <StructuredNodeRenderer
+          v-if="item.hasSlotChildren"
+          :nodes="(item.child as any).children"
+          :custom-id="props.customId"
+          :index-key="item.key"
+          :custom-html-tags="props.customHtmlTags"
+          :html-policy="resolvedHtmlPolicy"
+          :batch-rendering="false"
+          :defer-nodes-until-visible="false"
+          :render-as-fragment="true"
+        />
+        <template v-else>
+          {{ item.slotContent }}
+        </template>
+      </component>
+      <component
+        :is="item.component"
         v-else
-        v-bind="getChildProps(processChild(child).child, index)"
+        v-bind="getChildProps(item.child, item.index)"
       />
     </template>
   </p>

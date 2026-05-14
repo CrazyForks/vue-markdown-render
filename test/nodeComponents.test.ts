@@ -1,17 +1,19 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { clearGlobalCustomComponents, getCustomNodeComponents, mergeCustomNodeComponents, removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 
 describe('nodeComponents scoped API', () => {
-  beforeEach(() => {
-    // clear any global state by removing known ids
-    try {
-      removeCustomComponents('test-scope')
-      // clear global via clearGlobalCustomComponents when needed
+  const clearMappings = () => {
+    clearGlobalCustomComponents()
+    for (const id of ['test-scope', 'other-scope']) {
+      try {
+        removeCustomComponents(id)
+      }
+      catch {}
     }
-    catch {
-      // ignore
-    }
-  })
+  }
+
+  beforeEach(clearMappings)
+  afterEach(clearMappings)
 
   it('sets and retrieves a scoped mapping', () => {
     setCustomComponents('test-scope', { custom_node: 'MyComp' })
@@ -52,5 +54,25 @@ describe('nodeComponents scoped API', () => {
 
     expect(mapping.thinking).toBe('ScopedThinking')
     expect(mapping.code_block).toBe('AppCodeBlock')
+  })
+
+  it('uses app-scoped mapping over legacy global mapping for the same key', () => {
+    setCustomComponents({ thinking: 'GlobalThinking' })
+
+    const mapping = mergeCustomNodeComponents(undefined, {
+      thinking: 'AppThinking',
+    })
+
+    expect(mapping.thinking).toBe('AppThinking')
+  })
+
+  it('uses customId scoped mapping over app-scoped mapping for the same key', () => {
+    setCustomComponents('test-scope', { thinking: 'ScopedThinking' })
+
+    const mapping = mergeCustomNodeComponents('test-scope', {
+      thinking: 'AppThinking',
+    })
+
+    expect(mapping.thinking).toBe('ScopedThinking')
   })
 })

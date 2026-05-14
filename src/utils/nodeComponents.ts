@@ -69,18 +69,24 @@ export function getCustomNodeComponents(customId?: string) {
   }
 }
 
+function getGlobalCustomNodeComponents() {
+  return store.scopedCustomComponents[GLOBAL_KEY] || {}
+}
+
+function getScopedOnlyCustomNodeComponents(customId?: string) {
+  return customId ? store.scopedCustomComponents[customId] || {} : {}
+}
+
 export function mergeCustomNodeComponents(
   customId?: string,
   appScopedMapping: Partial<CustomComponents> = {},
 ): Partial<CustomComponents> {
-  const scopedMapping = getCustomNodeComponents(customId)
-  if (!appScopedMapping || Object.keys(appScopedMapping).length === 0)
-    return scopedMapping
-  if (!scopedMapping || Object.keys(scopedMapping).length === 0)
-    return appScopedMapping
+  void customComponentsRevision.value
+
   return {
+    ...getGlobalCustomNodeComponents(),
     ...appScopedMapping,
-    ...scopedMapping,
+    ...getScopedOnlyCustomNodeComponents(customId),
   }
 }
 

@@ -11,9 +11,11 @@ import {
   isHtmlTagBlocked,
   isHtmlTagHardBlocked,
   sanitizeHtmlAttrs,
+  sanitizeHtmlTokenAttrs,
   sanitizeImageSrc,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
+  tokenAttrsToRecord,
   tokenizeHtml,
 } from 'stream-markdown-parser'
 import { h } from 'vue'
@@ -65,6 +67,18 @@ export function convertPropValue(value: string, key: string): any {
 
 export function convertAttrsToProps(attrs: Record<string, string>): Record<string, any> {
   return convertHtmlAttrsToProps(attrs)
+}
+
+export function getCustomNodeAttrs(
+  node: { type?: string, tag?: string, attrs?: Array<[string, string | null]> | null },
+  htmlPolicy: HtmlPolicy = 'safe',
+): Record<string, any> | undefined {
+  const tagName = String(node.tag || node.type || '').trim()
+  const sanitizedAttrs = sanitizeHtmlTokenAttrs(node.attrs, htmlPolicy, tagName)
+  if (!sanitizedAttrs)
+    return undefined
+  const props = convertAttrsToProps(tokenAttrsToRecord(sanitizedAttrs))
+  return Object.keys(props).length > 0 ? props : undefined
 }
 
 function renderLiteralTagText(tagName: string, attrs?: Record<string, string>, isSelfClosing = false) {

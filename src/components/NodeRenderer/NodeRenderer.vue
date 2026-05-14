@@ -44,7 +44,7 @@ import {
   registerHeightEstimationRendererController,
 } from '../../internal/heightEstimationExperiment'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
-import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
+import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
@@ -83,6 +83,8 @@ type RuntimeHtmlNode = ParsedNode & {
   tag?: string
   content?: string
 }
+
+defineOptions({ name: 'NodeRenderer' })
 
 const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
@@ -1500,6 +1502,14 @@ function getCodeBlockRenderNode(node: ParsedNode) {
   return cloned
 }
 
+function isCustomNodeComponent(node: ParsedNode, component: unknown) {
+  return Boolean(customComponentsMap.value[String(node.type)] === component)
+}
+
+function hasSlotChildren(node: ParsedNode) {
+  return Array.isArray((node as any).children) && (node as any).children.length > 0
+}
+
 const renderedItems = computed(() => {
   return visibleNodes.value.map((item) => {
     // Reuse the previous shallow clone for code blocks unless the visible
@@ -1590,11 +1600,23 @@ const renderedItems = computed(() => {
       }
     }
 
+    const rendersCustomNode = isCustomNodeComponent(node, component)
+    const customAttrs = rendersCustomNode
+      ? getCustomNodeAttrs(node as any, resolvedHtmlPolicy.value)
+      : undefined
+
     return {
       ...item,
       node,
       component,
       bindings,
+      customBindings: {
+        ...(customAttrs ?? {}),
+        ...bindings,
+      },
+      rendersCustomNode,
+      hasSlotChildren: hasSlotChildren(node),
+      slotContent: String((node as any).content ?? ''),
       isCodeBlock: node.type === 'code_block',
       indexKey: `${indexPrefix.value}-${item.index}`,
     }
@@ -1901,22 +1923,66 @@ onBeforeUnmount(() => {
 
 <template>
   <template v-if="renderAsFragment">
-    <component
-      :is="item.component"
+    <template
       v-for="item in renderedItems"
       :key="item.index"
-      :node="item.node"
-      :loading="item.node.loading"
-      :index-key="item.indexKey"
-      v-bind="item.bindings"
-      :custom-id="props.customId"
-      :is-dark="props.isDark"
-      @click="handleContainerClick"
-      @mouseover="handleFragmentMouseover"
-      @mouseout="handleFragmentMouseout"
-      @copy="emit('copy', $event)"
-      @handle-artifact-click="emit('handleArtifactClick', $event)"
-    />
+    >
+      <component
+        :is="item.component"
+        v-if="item.rendersCustomNode"
+        v-bind="item.customBindings"
+        :node="item.node"
+        :loading="item.node.loading"
+        :index-key="item.indexKey"
+        :custom-id="props.customId"
+        :is-dark="props.isDark"
+        @click="handleContainerClick"
+        @mouseover="handleFragmentMouseover"
+        @mouseout="handleFragmentMouseout"
+        @copy="emit('copy', $event)"
+        @handle-artifact-click="emit('handleArtifactClick', $event)"
+      >
+        <NodeRenderer
+          v-if="item.hasSlotChildren"
+          :nodes="(item.node as any).children"
+          :custom-id="props.customId"
+          :index-key="item.indexKey"
+          :custom-html-tags="mergedParseOptions.customHtmlTags"
+          :html-policy="resolvedHtmlPolicy"
+          :batch-rendering="false"
+          :defer-nodes-until-visible="false"
+          :render-as-fragment="true"
+        />
+        <NodeRenderer
+          v-else-if="item.slotContent"
+          :content="item.slotContent"
+          :final="!item.node.loading"
+          :custom-id="props.customId"
+          :index-key="`${item.indexKey}-content`"
+          :custom-html-tags="mergedParseOptions.customHtmlTags"
+          :html-policy="resolvedHtmlPolicy"
+          :smooth-streaming="false"
+          :batch-rendering="false"
+          :defer-nodes-until-visible="false"
+          :render-as-fragment="true"
+        />
+      </component>
+      <component
+        :is="item.component"
+        v-else
+        :node="item.node"
+        :loading="item.node.loading"
+        :index-key="item.indexKey"
+        v-bind="item.bindings"
+        :custom-id="props.customId"
+        :is-dark="props.isDark"
+        @click="handleContainerClick"
+        @mouseover="handleFragmentMouseover"
+        @mouseout="handleFragmentMouseout"
+        @copy="emit('copy', $event)"
+        @handle-artifact-click="emit('handleArtifactClick', $event)"
+      />
+    </template>
   </template>
   <div
     v-else
@@ -1995,6 +2061,44 @@ onBeforeUnmount(() => {
           >
             <component
               :is="item.component"
+              v-if="item.rendersCustomNode"
+              v-bind="item.customBindings"
+              :node="item.node"
+              :loading="item.node.loading"
+              :index-key="item.indexKey"
+              :custom-id="props.customId"
+              :is-dark="props.isDark"
+              @copy="emit('copy', $event)"
+              @handle-artifact-click="emit('handleArtifactClick', $event)"
+            >
+              <NodeRenderer
+                v-if="item.hasSlotChildren"
+                :nodes="(item.node as any).children"
+                :custom-id="props.customId"
+                :index-key="item.indexKey"
+                :custom-html-tags="mergedParseOptions.customHtmlTags"
+                :html-policy="resolvedHtmlPolicy"
+                :batch-rendering="false"
+                :defer-nodes-until-visible="false"
+                :render-as-fragment="true"
+              />
+              <NodeRenderer
+                v-else-if="item.slotContent"
+                :content="item.slotContent"
+                :final="!item.node.loading"
+                :custom-id="props.customId"
+                :index-key="`${item.indexKey}-content`"
+                :custom-html-tags="mergedParseOptions.customHtmlTags"
+                :html-policy="resolvedHtmlPolicy"
+                :smooth-streaming="false"
+                :batch-rendering="false"
+                :defer-nodes-until-visible="false"
+                :render-as-fragment="true"
+              />
+            </component>
+            <component
+              :is="item.component"
+              v-else
               :node="item.node"
               :loading="item.node.loading"
               :index-key="item.indexKey"
@@ -2006,6 +2110,43 @@ onBeforeUnmount(() => {
             />
           </transition>
 
+          <component
+            :is="item.component"
+            v-else-if="item.rendersCustomNode"
+            v-bind="item.customBindings"
+            :node="item.node"
+            :loading="item.node.loading"
+            :index-key="item.indexKey"
+            :custom-id="props.customId"
+            :is-dark="props.isDark"
+            @copy="emit('copy', $event)"
+            @handle-artifact-click="emit('handleArtifactClick', $event)"
+          >
+            <NodeRenderer
+              v-if="item.hasSlotChildren"
+              :nodes="(item.node as any).children"
+              :custom-id="props.customId"
+              :index-key="item.indexKey"
+              :custom-html-tags="mergedParseOptions.customHtmlTags"
+              :html-policy="resolvedHtmlPolicy"
+              :batch-rendering="false"
+              :defer-nodes-until-visible="false"
+              :render-as-fragment="true"
+            />
+            <NodeRenderer
+              v-else-if="item.slotContent"
+              :content="item.slotContent"
+              :final="!item.node.loading"
+              :custom-id="props.customId"
+              :index-key="`${item.indexKey}-content`"
+              :custom-html-tags="mergedParseOptions.customHtmlTags"
+              :html-policy="resolvedHtmlPolicy"
+              :smooth-streaming="false"
+              :batch-rendering="false"
+              :defer-nodes-until-visible="false"
+              :render-as-fragment="true"
+            />
+          </component>
           <component
             :is="item.component"
             v-else
