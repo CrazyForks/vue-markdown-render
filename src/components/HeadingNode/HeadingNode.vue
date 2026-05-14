@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { getCustomNodeComponents } from '../../utils/nodeComponents'
+import { computed } from 'vue'
+import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmojiNode from '../EmojiNode'
 import EmphasisNode from '../EmphasisNode'
@@ -38,9 +39,9 @@ const props = defineProps<{
   indexKey?: number | string
 }>()
 
-const overrides = getCustomNodeComponents(props.customId)
+const overrides = useCustomNodeComponents(() => props.customId)
 
-const nodeComponents = {
+const nodeComponents = computed(() => ({
   text: TextNode,
   inline_code: InlineCodeNode,
   link: LinkNode,
@@ -59,8 +60,8 @@ const nodeComponents = {
   hardbreak: HardBreakNode,
   math_inline: MathInlineNodeAsync,
   reference: ReferenceNode,
-  ...overrides,
-}
+  ...overrides.value,
+}))
 </script>
 
 <template>

@@ -2,13 +2,21 @@
 
 ### Behavior Changes
 
+* Added the 1.0 release contract and marked Vue 3 renderer APIs as the stable 1.x scope while keeping cross-framework adapters, CLI assets, and internal performance props experimental.
+* `VueRendererMarkdown` now accepts an app-scoped `components` option for SSR-safe custom component registration.
 * Mermaid SVG output is sanitized before mounting in both strict and loose modes. `isStrict=false` only controls Mermaid's parse/render configuration and no longer means raw SVG insertion.
 * Mermaid interaction callbacks are disabled by default. Use `mermaidProps.enableMermaidInteractions = true` only for trusted diagrams.
 * Markdown and HTML URL attributes now use a strict protocol allowlist. Links allow `http:`, `https:`, `mailto:`, and `tel:`. Resource URLs allow `http:` and `https:`. Markdown image `src` additionally allows relative URLs and bitmap `data:image/png|gif|jpg|jpeg|webp|avif|bmp` URLs. `blob:`, `file:`, `filesystem:`, `data:text/html`, and `data:image/svg+xml` are blocked by default.
+* `markstream-vue/tailwind` now exports generated JavaScript and a declaration file instead of a `.ts` package target.
 
 ### Bug Fixes
 
+* Escaped legacy `getMarkdown().render()` fence language labels, DOM ids, and translated copy labels to avoid attribute injection.
 * ImageNode now falls back or shows an error when the sanitized primary image source is empty or unchanged by fallback, avoiding blank and persistent lazy-shimmer states.
+
+### Tests
+
+* Added packed-package smoke coverage for CSS exports, worker client subpaths, Tailwind export, SSR rendering, app-scoped custom components, and optional peer install mode.
 
 ## [0.0.14-beta.8](https://github.com/Simon-He95/markstream-vue/compare/v0.0.4-beta.8...v0.0.14-beta.8) (2026-05-11)
 
@@ -2042,5 +2050,4 @@
 
 
 ## 0.0.3 (2025-05-26)
-
 

@@ -18,6 +18,61 @@ Performance tips:
 - Scope custom components to enable GC
 - Use `setDefaultMathOptions` at bootstrap
 
+## Recommended presets
+
+Small docs can favor simplicity:
+
+```vue
+<MarkdownRender
+  :content="doc"
+  :batch-rendering="false"
+  :max-live-nodes="0"
+/>
+```
+
+AI chat defaults should keep heavy nodes and long transcripts bounded:
+
+```vue
+<MarkdownRender
+  :content="stream"
+  :final="final"
+  :batch-rendering="true"
+  :defer-nodes-until-visible="true"
+  :max-live-nodes="320"
+  :live-node-buffer="60"
+/>
+```
+
+Huge documents should use a smaller live window:
+
+```vue
+<MarkdownRender
+  :nodes="nodes"
+  :batch-rendering="true"
+  :defer-nodes-until-visible="true"
+  :max-live-nodes="180"
+  :live-node-buffer="40"
+/>
+```
+
+Use `content` for small and medium documents, ordinary docs pages, and moderate streaming. For very large documents or very high-frequency streams, parse outside the component and pass `nodes` so parsing and rendering can be scheduled independently.
+
+## Benchmark contract for 1.0
+
+Before publishing 1.0, benchmark at least these cases:
+
+| Case | Purpose |
+| --- | --- |
+| 10 KB Markdown | Normal docs page |
+| 100 KB Markdown | AI streaming response |
+| 1 MB Markdown | Large document |
+| 1000 code blocks | Code-heavy docs |
+| 100 Mermaid blocks | Diagram-heavy docs |
+| 10k parsed nodes | Large pre-parsed AST |
+| Reverse-flex chat scroll | Chat viewport behavior |
+
+Track initial render time, average stream update cost, p95 frame cost, max long task duration, memory after unmount, scroll position drift, and DOM node count.
+
 ## Bundle size workflow (maintainers)
 
 If you are changing code paths that can impact build size (renderers, code blocks, optional peers), run this flow before merging:

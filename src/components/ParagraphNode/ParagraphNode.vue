@@ -2,7 +2,7 @@
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
 import { computed } from 'vue'
 import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText } from '../../utils/htmlRenderer'
-import { getCustomNodeComponents } from '../../utils/nodeComponents'
+import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmojiNode from '../EmojiNode'
 import EmphasisNode from '../EmphasisNode'
@@ -42,7 +42,7 @@ const props = defineProps<{
   customHtmlTags?: readonly string[]
 }>()
 
-const overrides = getCustomNodeComponents(props.customId)
+const overrides = useCustomNodeComponents(() => props.customId)
 
 function isWhitespaceText(child: NodeChild) {
   return child.type === 'text' && String((child as any).content ?? '').trim() === ''
@@ -111,7 +111,7 @@ function getChildProps(child: NodeChild, index: number) {
   }
 }
 
-const nodeComponents = {
+const nodeComponents = computed(() => ({
   inline_code: InlineCodeNode,
   image: ImageNode,
   link: LinkNode,
@@ -133,8 +133,8 @@ const nodeComponents = {
   footnote_anchor: FootnoteAnchorNode,
   footnote_reference: FootnoteReferenceNode,
   text: TextNode,
-  ...overrides,
-}
+  ...overrides.value,
+}))
 
 // Process children to handle non-whitelisted custom HTML tags
 function processChild(child: NodeChild): { child: NodeChild, component: any } {
@@ -156,7 +156,7 @@ function processChild(child: NodeChild): { child: NodeChild, component: any } {
     }
   }
 
-  return { child, component: (nodeComponents as any)[child.type] }
+  return { child, component: (nodeComponents.value as any)[child.type] }
 }
 </script>
 

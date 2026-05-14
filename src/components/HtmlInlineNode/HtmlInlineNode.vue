@@ -3,7 +3,7 @@ import type { HtmlPolicy } from 'stream-markdown-parser'
 import { sanitizeHtmlContent } from 'stream-markdown-parser'
 import { computed, defineComponent, inject } from 'vue'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
-import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
+import { useCustomNodeComponents } from '../../utils/nodeComponents'
 
 const props = defineProps<{
   node: {
@@ -20,12 +20,7 @@ const props = defineProps<{
 const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
 const resolvedHtmlPolicy = computed<HtmlPolicy>(() => props.htmlPolicy ?? inheritedHtmlPolicy?.value ?? 'safe')
 
-// Get custom components from global registry
-const customComponents = computed(() => {
-  // Track revision so we re-parse when mappings change.
-  void customComponentsRevision.value
-  return getCustomNodeComponents(props.customId)
-})
+const customComponents = useCustomNodeComponents(() => props.customId)
 
 // Dynamic wrapper component for rendering VNodes
 const DynamicRenderer = defineComponent({

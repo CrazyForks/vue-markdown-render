@@ -33,7 +33,24 @@ Both helpers are framework-agnostic and can run in Node or the browser. For larg
 
 ## Custom components & scoping
 
-Use `setCustomComponents(customId?, mapping)` to override any node renderer. Pair it with the `custom-id` prop on `MarkdownRender` so replacements stay scoped.
+For SSR, prefer app-scoped registration through `VueRendererMarkdown`:
+
+```ts
+import { VueRendererMarkdown } from 'markstream-vue'
+import { createApp } from 'vue'
+import App from './App.vue'
+import ThinkingNode from './ThinkingNode.vue'
+
+createApp(App).use(VueRendererMarkdown, {
+  components: {
+    thinking: ThinkingNode,
+  },
+})
+```
+
+This map is stored on the Vue app instance, so concurrent SSR requests do not share custom components.
+
+Use `setCustomComponents(customId?, mapping)` to override any node renderer in older integrations. Pair it with the `custom-id` prop on `MarkdownRender` so replacements stay scoped.
 
 ```ts twoslash
 import type { Component } from 'vue'

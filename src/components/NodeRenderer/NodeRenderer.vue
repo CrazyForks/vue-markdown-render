@@ -45,7 +45,7 @@ import {
 } from '../../internal/heightEstimationExperiment'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
-import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
+import { useAppCustomNodeComponents, useCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import MarkdownCodeBlockNode from '../MarkdownCodeBlockNode'
@@ -191,10 +191,8 @@ watch(
   },
   { immediate: true },
 )
-const customComponentsMap = computed<Partial<CustomComponents>>(() => {
-  void customComponentsRevision.value
-  return getCustomNodeComponents(props.customId)
-})
+const appCustomComponentsMap = useAppCustomNodeComponents()
+const customComponentsMap = useCustomNodeComponents(() => props.customId)
 const {
   effectiveCustomHtmlTagsSet,
   mergedParseOptions,
@@ -204,6 +202,7 @@ const {
   renderContent,
   effectiveFinal,
   debugPerformanceEnabled,
+  customComponentsMap: appCustomComponentsMap,
   logPerf,
 })
 const parsedNodesIdentity = computed(() => parsedNodes.value)

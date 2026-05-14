@@ -22,6 +22,14 @@ Looking for other frameworks?
 - Vue 2.6: use [`markstream-vue2`](./packages/markstream-vue2/README.md) (a baseline port with fewer advanced features)
 - React: see `packages/markstream-react` at [`packages/markstream-react/README.md`](./packages/markstream-react/README.md) (first-pass port)
 
+## 1.0 stability scope
+
+`markstream-vue@1.0` is scoped to the Vue 3 renderer package. The stable surface is `MarkdownRender`, streaming content rendering, pre-parsed node rendering, the safe HTML policy, optional Mermaid / KaTeX / Monaco / D2 / Infographic integrations, CSS exports, worker client subpaths, and SSR imports for Vite / Nuxt / VitePress.
+
+Experimental surfaces are the cross-framework adapters, CLI skills/prompts, low-level worker entrypoints beyond documented clients, and internal performance/debug props such as `indexKey`, `renderAsFragment`, `debugPerformance`, batch budget internals, and height-estimation experiments.
+
+For the full release contract and Go / No-Go checklist, see [1.0 Release Readiness](./docs/guide/release-1-0.md).
+
 ## Contents
 
 - [TL;DR Highlights](#tldr-highlights)

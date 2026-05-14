@@ -5,7 +5,7 @@ import { shouldOpenLinkInNewTab } from 'stream-markdown-parser'
 import { computed, inject, useAttrs } from 'vue'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { sanitizeAttrs } from '../../utils/htmlRenderer'
-import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
+import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import EmphasisNode from '../EmphasisNode/EmphasisNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode'
 import ImageNode from '../ImageNode'
@@ -59,10 +59,7 @@ const nodeComponents = {
   inline_code: InlineCodeNode,
 }
 
-const customComponents = computed(() => {
-  void customComponentsRevision.value
-  return getCustomNodeComponents(props.customId)
-})
+const customComponents = useCustomNodeComponents(() => props.customId)
 
 // 获取子节点组件，优先使用用户自定义组件
 function getChildComponent(child: any) {

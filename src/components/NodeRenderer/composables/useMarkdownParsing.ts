@@ -3,6 +3,7 @@ import type {
   ParsedNode,
 } from 'stream-markdown-parser'
 import type { ComputedRef } from 'vue'
+import type { CustomComponents } from '../../../types'
 import type { NodeRendererProps } from '../../../types/node-renderer-props'
 import {
   getMarkdown,
@@ -19,6 +20,7 @@ export interface MarkdownParsingOptions {
   renderContent: ComputedRef<string>
   effectiveFinal: ComputedRef<boolean | undefined>
   debugPerformanceEnabled: ComputedRef<boolean>
+  customComponentsMap?: ComputedRef<Partial<CustomComponents>>
   logPerf: (label: string, data: Record<string, unknown>) => void
 }
 
@@ -42,6 +44,7 @@ export function useMarkdownParsing(
     return mergeCustomHtmlTags(
       props.customHtmlTags,
       props.parseOptions?.customHtmlTags,
+      Object.keys(options.customComponentsMap?.value ?? {}),
     )
   })
 

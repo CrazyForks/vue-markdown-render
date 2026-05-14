@@ -1,5 +1,6 @@
+import type { ComputedRef, InjectionKey, Ref } from 'vue'
 import type { CustomComponents } from '../types'
-import { shallowRef } from 'vue'
+import { computed, inject, shallowRef } from 'vue'
 
 // Store mappings per scope id. A special key is kept for the legacy/global mapping.
 const GLOBAL_KEY = '__global__'
@@ -23,6 +24,12 @@ const store: CustomComponentsStore = (() => {
 
 // Reactive revision counter so renderers can re-parse when mappings change.
 export const customComponentsRevision = store.revision
+
+export const MARKSTREAM_CUSTOM_COMPONENTS_KEY: InjectionKey<Ref<Partial<CustomComponents>>> = Symbol('markstreamCustomComponents')
+
+export function createCustomComponentsRef(mapping: Partial<CustomComponents> = {}) {
+  return shallowRef(mapping)
+}
 
 // Overloads for nicer TypeScript API
 export function setCustomComponents(id: string, mapping: Partial<CustomComponents>): void
@@ -60,6 +67,36 @@ export function getCustomNodeComponents(customId?: string) {
     ...globalMapping,
     ...scopedMapping,
   }
+}
+
+export function mergeCustomNodeComponents(
+  customId?: string,
+  appScopedMapping: Partial<CustomComponents> = {},
+): Partial<CustomComponents> {
+  const scopedMapping = getCustomNodeComponents(customId)
+  if (!appScopedMapping || Object.keys(appScopedMapping).length === 0)
+    return scopedMapping
+  if (!scopedMapping || Object.keys(scopedMapping).length === 0)
+    return appScopedMapping
+  return {
+    ...scopedMapping,
+    ...appScopedMapping,
+  }
+}
+
+export function useCustomNodeComponents(customId?: () => string | undefined): ComputedRef<Partial<CustomComponents>> {
+  const appScopedMapping = inject(MARKSTREAM_CUSTOM_COMPONENTS_KEY, null)
+
+  return computed(() => {
+    void customComponentsRevision.value
+    return mergeCustomNodeComponents(customId?.(), appScopedMapping?.value ?? {})
+  })
+}
+
+export function useAppCustomNodeComponents(): ComputedRef<Partial<CustomComponents>> {
+  const appScopedMapping = inject(MARKSTREAM_CUSTOM_COMPONENTS_KEY, null)
+
+  return computed(() => appScopedMapping?.value ?? {})
 }
 
 /**

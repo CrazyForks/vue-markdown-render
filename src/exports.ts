@@ -54,7 +54,7 @@ import { setDefaultI18nMap } from './composables/useSafeI18n'
 import { useSmoothMarkdownStream } from './composables/useSmoothMarkdownStream'
 import { setIconTheme } from './icon-themes'
 import { setLanguageIconResolver } from './utils/languageIcon'
-import { clearGlobalCustomComponents, getCustomNodeComponents, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
+import { clearGlobalCustomComponents, createCustomComponentsRef, getCustomNodeComponents, MARKSTREAM_CUSTOM_COMPONENTS_KEY, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
 import './index.css'
 // Re-add top-level worker imports so builds emit worker bundles into `dist/`
 import './workers/katexRenderer.worker?worker'
@@ -121,6 +121,7 @@ export type { MathOptions } from 'stream-markdown-parser'
 export interface CustomComponents extends MarkstreamCustomComponents {}
 
 export interface MarkstreamVuePluginOptions {
+  components?: Partial<MarkstreamCustomComponents>
   getLanguageIcon?: LanguageIconResolver
   iconTheme?: string
   mathOptions?: MathOptions
@@ -244,5 +245,7 @@ export const VueRendererMarkdown: Plugin = {
     // avoid importing inside module scope to keep SSR safe
     if (options?.mathOptions)
       setDefaultMathOptions(options.mathOptions)
+    if (options?.components)
+      app.provide(MARKSTREAM_CUSTOM_COMPONENTS_KEY, createCustomComponentsRef(options.components))
   },
 }

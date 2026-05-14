@@ -15,6 +15,7 @@ import MathInlineNode from '../src/components/MathInlineNode'
 import { disableKatex, enableKatex, setKatexLoader } from '../src/components/MathInlineNode/katex'
 import { disableMermaid, enableMermaid } from '../src/components/MermaidBlockNode/mermaid'
 import MarkdownRender from '../src/components/NodeRenderer'
+import { VueRendererMarkdown } from '../src/exports'
 import { clearGlobalCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 
 const BASIC_SCOPE = 'ssr-render-basic'
@@ -126,6 +127,49 @@ Footnotes are server-rendered.[^1]
     expect(html).toContain('src="/vue-markdown-icon.svg"')
     expect(html).not.toContain('<figure')
     expect(html).toContain('Footnote body')
+  })
+
+  it('keeps plugin custom components scoped to each SSR app instance', async () => {
+    const ThinkingNode = defineComponent({
+      name: 'SsrThinkingNode',
+      props: {
+        node: {
+          type: Object,
+          required: true,
+        },
+      },
+      setup(props) {
+        return () => h('aside', { 'data-ssr-thinking': 'tenant-a' }, String((props.node as any).content ?? ''))
+      },
+    })
+
+    const appA = createSSRApp({
+      render: () => h(MarkdownRender, {
+        content: '<thinking>tenant A</thinking>',
+        final: true,
+      }),
+    })
+    appA.use(VueRendererMarkdown, {
+      components: {
+        thinking: ThinkingNode,
+      },
+    })
+
+    const appB = createSSRApp({
+      render: () => h(MarkdownRender, {
+        content: '<thinking>tenant B</thinking>',
+        final: true,
+      }),
+    })
+    appB.use(VueRendererMarkdown)
+
+    const htmlA = await renderToString(appA)
+    const htmlB = await renderToString(appB)
+
+    expect(htmlA).toContain('data-ssr-thinking="tenant-a"')
+    expect(htmlA).toContain('tenant A')
+    expect(htmlB).not.toContain('data-ssr-thinking')
+    expect(htmlB).toContain('tenant B')
   })
 
   it('renders structured html wrappers on the server without duplicating nested markdown or keeping safe-policy style attrs', async () => {

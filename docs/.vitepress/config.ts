@@ -120,6 +120,7 @@ const englishGuideSidebar = [
     items: [
       { text: 'API Overview', link: '/guide/api' },
       { text: 'Performance', link: '/guide/performance' },
+      { text: '1.0 Release Readiness', link: '/guide/release-1-0' },
       { text: 'Why use it?', link: '/guide/why' },
       { text: 'Compared', link: '/guide/compared' },
       { text: 'Monaco Internals', link: '/guide/monaco-internals' },
