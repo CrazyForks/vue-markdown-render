@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HtmlPolicy } from 'stream-markdown-parser'
+import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, inject } from 'vue'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText } from '../../utils/htmlRenderer'
@@ -41,11 +42,17 @@ const props = defineProps<{
   customId?: string
   indexKey?: number | string
   customHtmlTags?: readonly string[]
+  parseOptions?: NodeRendererProps['parseOptions']
+  customMarkdownIt?: NodeRendererProps['customMarkdownIt']
 }>()
 
 const overrides = useCustomNodeComponents(() => props.customId)
 const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const inheritedParseOptions = inject<{ value?: NodeRendererProps['parseOptions'] } | undefined>('markstreamParseOptions', undefined)
+const inheritedCustomMarkdownIt = inject<{ value?: NodeRendererProps['customMarkdownIt'] } | undefined>('markstreamCustomMarkdownIt', undefined)
 const resolvedHtmlPolicy = computed<HtmlPolicy>(() => inheritedHtmlPolicy?.value ?? 'safe')
+const resolvedParseOptions = computed(() => props.parseOptions ?? inheritedParseOptions?.value)
+const resolvedCustomMarkdownIt = computed(() => props.customMarkdownIt ?? inheritedCustomMarkdownIt?.value)
 const StructuredNodeRenderer = defineAsyncComponent({
   loader: () => import('../NodeRenderer'),
   suspensible: false,
@@ -211,14 +218,28 @@ const processedChildren = computed(() => renderedChildren.value.map((child, inde
           :custom-id="props.customId"
           :index-key="item.key"
           :custom-html-tags="props.customHtmlTags"
+          :parse-options="resolvedParseOptions"
+          :custom-markdown-it="resolvedCustomMarkdownIt"
           :html-policy="resolvedHtmlPolicy"
           :batch-rendering="false"
           :defer-nodes-until-visible="false"
           :render-as-fragment="true"
         />
-        <template v-else>
-          {{ item.slotContent }}
-        </template>
+        <StructuredNodeRenderer
+          v-else-if="item.slotContent"
+          :content="item.slotContent"
+          :final="!(item.child as any).loading"
+          :custom-id="props.customId"
+          :index-key="`${item.key}-content`"
+          :custom-html-tags="props.customHtmlTags"
+          :parse-options="resolvedParseOptions"
+          :custom-markdown-it="resolvedCustomMarkdownIt"
+          :html-policy="resolvedHtmlPolicy"
+          :smooth-streaming="false"
+          :batch-rendering="false"
+          :defer-nodes-until-visible="false"
+          :render-as-fragment="true"
+        />
       </component>
       <component
         :is="item.component"

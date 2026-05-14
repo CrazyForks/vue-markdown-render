@@ -157,6 +157,8 @@ provide('markstreamFade', computed(() => props.fade !== false))
 provide('markstreamTypewriterCursor', computed(() => true))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)
+provide('markstreamParseOptions', computed(() => props.parseOptions))
+provide('markstreamCustomMarkdownIt', computed(() => props.customMarkdownIt))
 
 const {
   smoothStreamingEnabled,
@@ -1948,6 +1950,8 @@ onBeforeUnmount(() => {
           :custom-id="props.customId"
           :index-key="item.indexKey"
           :custom-html-tags="mergedParseOptions.customHtmlTags"
+          :parse-options="props.parseOptions"
+          :custom-markdown-it="props.customMarkdownIt"
           :html-policy="resolvedHtmlPolicy"
           :batch-rendering="false"
           :defer-nodes-until-visible="false"
@@ -1960,6 +1964,8 @@ onBeforeUnmount(() => {
           :custom-id="props.customId"
           :index-key="`${item.indexKey}-content`"
           :custom-html-tags="mergedParseOptions.customHtmlTags"
+          :parse-options="props.parseOptions"
+          :custom-markdown-it="props.customMarkdownIt"
           :html-policy="resolvedHtmlPolicy"
           :smooth-streaming="false"
           :batch-rendering="false"
@@ -2077,6 +2083,8 @@ onBeforeUnmount(() => {
                 :custom-id="props.customId"
                 :index-key="item.indexKey"
                 :custom-html-tags="mergedParseOptions.customHtmlTags"
+                :parse-options="props.parseOptions"
+                :custom-markdown-it="props.customMarkdownIt"
                 :html-policy="resolvedHtmlPolicy"
                 :batch-rendering="false"
                 :defer-nodes-until-visible="false"
@@ -2089,6 +2097,8 @@ onBeforeUnmount(() => {
                 :custom-id="props.customId"
                 :index-key="`${item.indexKey}-content`"
                 :custom-html-tags="mergedParseOptions.customHtmlTags"
+                :parse-options="props.parseOptions"
+                :custom-markdown-it="props.customMarkdownIt"
                 :html-policy="resolvedHtmlPolicy"
                 :smooth-streaming="false"
                 :batch-rendering="false"
@@ -2128,6 +2138,8 @@ onBeforeUnmount(() => {
               :custom-id="props.customId"
               :index-key="item.indexKey"
               :custom-html-tags="mergedParseOptions.customHtmlTags"
+              :parse-options="props.parseOptions"
+              :custom-markdown-it="props.customMarkdownIt"
               :html-policy="resolvedHtmlPolicy"
               :batch-rendering="false"
               :defer-nodes-until-visible="false"
@@ -2140,6 +2152,8 @@ onBeforeUnmount(() => {
               :custom-id="props.customId"
               :index-key="`${item.indexKey}-content`"
               :custom-html-tags="mergedParseOptions.customHtmlTags"
+              :parse-options="props.parseOptions"
+              :custom-markdown-it="props.customMarkdownIt"
               :html-policy="resolvedHtmlPolicy"
               :smooth-streaming="false"
               :batch-rendering="false"

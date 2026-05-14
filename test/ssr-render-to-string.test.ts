@@ -260,6 +260,62 @@ Footnotes are server-rendered.[^1]
     }
   })
 
+  it('does not auto-register built-in renderer override keys as custom tags', async () => {
+    const scopeId = 'ssr-render-reserved-auto-tags'
+    const CodeBlockNode = defineComponent({
+      name: 'SsrReservedCodeBlockNode',
+      props: {
+        node: {
+          type: Object,
+          required: true,
+        },
+      },
+      setup(props) {
+        return () => h('pre', { 'data-ssr-code-block-override': '1' }, String((props.node as any).code ?? (props.node as any).content ?? ''))
+      },
+    })
+    const ThinkingNode = defineComponent({
+      name: 'SsrReservedThinkingNode',
+      props: {
+        node: {
+          type: Object,
+          required: true,
+        },
+      },
+      setup(props) {
+        return () => h('aside', { 'data-ssr-thinking': '1' }, String((props.node as any).content ?? ''))
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      code_block: CodeBlockNode,
+      thinking: ThinkingNode,
+    })
+
+    try {
+      const html = await renderMarkdown([
+        '```js',
+        'console.log(1)',
+        '```',
+        '',
+        '<code_block>not trusted</code_block>',
+        '',
+        '<thinking>trusted</thinking>',
+      ].join('\n'), {
+        customId: scopeId,
+      })
+
+      expect(html.match(/data-ssr-code-block-override/g)?.length).toBe(1)
+      expect(html).toContain('console.log(1)')
+      expect(html).toContain('data-ssr-thinking="1"')
+      expect(html).toContain('trusted')
+      expect(html).toContain('&lt;code_block&gt;not trusted&lt;/code_block&gt;')
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
   it('renders structured html wrappers on the server without duplicating nested markdown or keeping safe-policy style attrs', async () => {
     const html = await renderMarkdown(`<span style="font-size: 12px;">
 
@@ -727,6 +783,78 @@ data
     expect(html).toContain('Scoped custom node content')
     expect(html).toContain('data-ssr-custom-tag="1"')
     expect(html).toContain('Trusted custom tag content')
+  })
+
+  it('renders pre-parsed custom node attrs and raw slot content during SSR', async () => {
+    const scopeId = 'ssr-render-custom-node-attrs'
+    const AttrCard = defineComponent({
+      name: 'SsrAttrCard',
+      inheritAttrs: false,
+      setup(_, { attrs, slots }) {
+        return () => h('section', { 'data-ssr-attrs-card': '1', ...attrs }, slots.default?.() ?? [])
+      },
+    })
+    const InlineAttr = defineComponent({
+      name: 'SsrInlineAttr',
+      inheritAttrs: false,
+      setup(_, { attrs, slots }) {
+        return () => h('span', { 'data-ssr-inline-attrs': '1', ...attrs }, slots.default?.() ?? [])
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      ssr_attr_card: AttrCard,
+      ssr_inline_attr: InlineAttr,
+    })
+
+    try {
+      const html = await renderMarkdown('', {
+        customId: scopeId,
+        nodes: [
+          {
+            type: 'ssr_attr_card',
+            tag: 'ssr_attr_card',
+            raw: '**record slot**',
+            content: '**record slot**',
+            attrs: {
+              'id': 'record-card',
+              'onclick': 'alert(1)',
+              'hidden': false,
+              'data-safe': 'ok',
+            },
+          },
+          paragraphNode([
+            textNode('before '),
+            {
+              type: 'ssr_inline_attr',
+              tag: 'ssr_inline_attr',
+              raw: '<ssr_inline_attr>**inline slot**</ssr_inline_attr>',
+              content: '**inline slot**',
+              attrs: [
+                { name: 'data-inline', value: 'yes' },
+                { name: 'onclick', value: 'bad' },
+                { name: 'disabled', value: false },
+              ],
+            },
+            textNode(' after'),
+          ]),
+        ],
+      })
+
+      expect(html).toContain('data-ssr-attrs-card="1"')
+      expect(html).toContain('id="record-card"')
+      expect(html).toContain('data-safe="ok"')
+      expect(html).toContain('data-ssr-inline-attrs="1"')
+      expect(html).toContain('data-inline="yes"')
+      expect(html).toMatch(/<strong[^>]*>[\s\S]*record slot/)
+      expect(html).toMatch(/<strong[^>]*>[\s\S]*inline slot/)
+      expect(html).not.toContain('onclick')
+      expect(html).not.toContain('hidden')
+      expect(html).not.toContain('disabled')
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
   })
 
   it('renders stable raw math fallback when KaTeX is disabled or unavailable', async () => {

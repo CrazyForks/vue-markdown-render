@@ -180,7 +180,9 @@ try {
   packedTarball = packWorkspacePackage(root)
 
   const packedPackageJson = JSON.parse(readTgzEntry(packedTarball, 'package/package.json'))
-  for (const internalPath of ['package/.agents', 'package/prompts']) {
+  if (packedPackageJson.bin)
+    throw new Error('Packed package must not publish a CLI bin')
+  for (const internalPath of ['package/.agents', 'package/prompts', 'package/bin']) {
     if (hasTgzPathPrefix(packedTarball, internalPath))
       throw new Error(`Packed tarball leaked internal path: ${internalPath}`)
   }
