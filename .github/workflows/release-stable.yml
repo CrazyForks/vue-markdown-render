@@ -46,7 +46,7 @@ jobs:
 
       - name: Install pnpm
         if: ${{ steps.meta.outputs.pkg == 'markstream-vue' }}
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node
         if: ${{ steps.meta.outputs.pkg == 'markstream-vue' }}

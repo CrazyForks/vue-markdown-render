@@ -172,7 +172,7 @@ Footnotes are server-rendered.[^1]
     expect(htmlB).toContain('tenant B')
   })
 
-  it('renders app-scoped custom tag registered with PascalCase key', async () => {
+  it('renders app-scoped custom tags registered with PascalCase keys', async () => {
     const ThinkingNode = defineComponent({
       name: 'PascalCaseThinkingNode',
       props: {
@@ -185,15 +185,22 @@ Footnotes are server-rendered.[^1]
         return () => h('aside', { 'data-ssr-thinking': 'pascal' }, String((props.node as any).content ?? ''))
       },
     })
+    const AnswerBox = defineComponent({
+      name: 'AnswerBox',
+      setup(_, { slots }) {
+        return () => h('section', { 'data-ssr-answer-box': 'pascal' }, slots.default?.())
+      },
+    })
 
     const app = createSSRApp({
       render: () => h(MarkdownRender, {
-        content: '<thinking>Pascal tag</thinking>',
+        content: '<thinking>Pascal tag</thinking>\n\n<answer-box>**ok**</answer-box>',
         final: true,
       }),
     })
     app.use(VueRendererMarkdown, {
       components: {
+        AnswerBox,
         Thinking: ThinkingNode,
       },
     })
@@ -202,6 +209,9 @@ Footnotes are server-rendered.[^1]
 
     expect(html).toContain('data-ssr-thinking="pascal"')
     expect(html).toContain('Pascal tag')
+    expect(html).toContain('data-ssr-answer-box="pascal"')
+    expect(html).toContain('class="strong-node"')
+    expect(html).toContain('ok')
   })
 
   it('uses scoped custom components as SSR app override and custom-tag source', async () => {

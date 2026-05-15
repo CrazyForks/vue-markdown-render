@@ -75,6 +75,14 @@ export function isReservedNodeComponentKey(key: string) {
   return RESERVED_NODE_COMPONENT_KEYS.has(String(key).trim().toLowerCase())
 }
 
+function toKebabCaseComponentName(key: string) {
+  return key
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[_\s]+/g, '-')
+    .toLowerCase()
+}
+
 export function normalizeCustomComponentMapping(mapping: Partial<CustomComponents> = {}) {
   const normalized: Partial<CustomComponents> = {}
 
@@ -84,13 +92,17 @@ export function normalizeCustomComponentMapping(mapping: Partial<CustomComponent
 
     normalized[key] = component
 
-    const normalizedKey = normalizeCustomHtmlTagName(key)
-    if (
-      normalizedKey
-      && !isReservedNodeComponentKey(normalizedKey)
-      && !Object.prototype.hasOwnProperty.call(normalized, normalizedKey)
-    ) {
-      normalized[normalizedKey] = component
+    for (const normalizedKey of new Set([
+      normalizeCustomHtmlTagName(key),
+      normalizeCustomHtmlTagName(toKebabCaseComponentName(key)),
+    ])) {
+      if (
+        normalizedKey
+        && !isReservedNodeComponentKey(normalizedKey)
+        && !Object.prototype.hasOwnProperty.call(normalized, normalizedKey)
+      ) {
+        normalized[normalizedKey] = component
+      }
     }
   }
 

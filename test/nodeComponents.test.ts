@@ -85,11 +85,15 @@ describe('nodeComponents scoped API', () => {
   it('adds normalized aliases for PascalCase custom tag keys', () => {
     const mapping = normalizeCustomComponentMapping({
       Thinking: 'ThinkingNode',
+      AnswerBox: 'AnswerBoxNode',
       Link: 'LinkNode',
     } as any)
 
     expect(mapping.Thinking).toBe('ThinkingNode')
     expect(mapping.thinking).toBe('ThinkingNode')
+    expect(mapping.AnswerBox).toBe('AnswerBoxNode')
+    expect(mapping.answerbox).toBe('AnswerBoxNode')
+    expect(mapping['answer-box']).toBe('AnswerBoxNode')
     expect((mapping as any).Link).toBe('LinkNode')
     expect(mapping.link).toBeUndefined()
   })

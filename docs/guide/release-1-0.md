@@ -157,4 +157,6 @@ Track initial render time, stream update cost, p95 frame cost, max long task, me
 - [ ] `pnpm test:smoke:pack:optional` passes.
 - [ ] CSS, Tailwind, and worker subpath exports smoke-tested.
 - [ ] Unit, SSR, public API, and package export checks are green.
+- [ ] Nuxt SSR smoke or preview deployment is green.
+- [ ] VitePress docs build is green.
 - [ ] Migration notes and changelog describe beta-to-1.0 breaking changes.
