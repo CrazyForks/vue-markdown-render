@@ -120,6 +120,7 @@ const englishGuideSidebar = [
     items: [
       { text: 'API Overview', link: '/guide/api' },
       { text: 'Performance', link: '/guide/performance' },
+      { text: '1.0 Release Readiness', link: '/guide/release-1-0' },
       { text: 'Why use it?', link: '/guide/why' },
       { text: 'Compared', link: '/guide/compared' },
       { text: 'Monaco Internals', link: '/guide/monaco-internals' },
@@ -205,6 +206,7 @@ const chineseGuideSidebar = [
       { text: 'API 总览', link: '/zh/guide/api' },
       { text: '搜索', link: '/zh/guide/search' },
       { text: '性能', link: '/zh/guide/performance' },
+      { text: '1.0 发布就绪', link: '/zh/guide/release-1-0' },
       { text: '为什么使用？', link: '/zh/guide/why' },
       { text: '对比', link: '/zh/guide/compared' },
       { text: 'Monaco 内部', link: '/zh/guide/monaco-internals' },

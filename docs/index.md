@@ -87,7 +87,7 @@ A streaming-friendly Markdown renderer with progressive Mermaid support, streami
 
 ### I want help from AI tools
 
-- Use [AI / Skills workflows](/guide/ai-workflows) for packaged skills, copyable prompts, and rollout order.
+- Use [AI / Skills workflows](/guide/ai-workflows) for repository skills, copyable prompts, and rollout order.
 - Use [AI / LLM context](/llms) if your assistant can read repository context files.
 
 ## Choose Your Framework

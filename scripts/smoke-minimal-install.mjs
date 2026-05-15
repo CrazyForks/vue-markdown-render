@@ -80,6 +80,27 @@ function readTgzEntry(tarball, entryName) {
   throw new Error(`Packed tarball entry not found: ${entryName}`)
 }
 
+function hasTgzPathPrefix(tarball, pathPrefix) {
+  const archive = gunzipSync(readFileSync(tarball))
+  let offset = 0
+  while (offset + 512 <= archive.length) {
+    const header = archive.subarray(offset, offset + 512)
+    if (header.every(byte => byte === 0))
+      break
+
+    const name = readTarString(header.subarray(0, 100))
+    const prefix = readTarString(header.subarray(345, 500))
+    const path = prefix ? `${prefix}/${name}` : name
+    const size = Number.parseInt(readTarString(header.subarray(124, 136)) || '0', 8)
+
+    if (path === pathPrefix || path.startsWith(`${pathPrefix}/`))
+      return true
+
+    offset += 512 + Math.ceil(size / 512) * 512
+  }
+  return false
+}
+
 function ensureBuiltArtifacts() {
   const parserDist = join(root, 'packages/markdown-parser/dist/index.js')
   const coreDist = join(root, 'packages/markstream-core/dist/index.js')
@@ -159,6 +180,12 @@ try {
   packedTarball = packWorkspacePackage(root)
 
   const packedPackageJson = JSON.parse(readTgzEntry(packedTarball, 'package/package.json'))
+  if (packedPackageJson.bin)
+    throw new Error('Packed package must not publish a CLI bin')
+  for (const internalPath of ['package/.agents', 'package/prompts', 'package/bin']) {
+    if (hasTgzPathPrefix(packedTarball, internalPath))
+      throw new Error(`Packed tarball leaked internal path: ${internalPath}`)
+  }
   const dependencySections = [
     'dependencies',
     'peerDependencies',
@@ -182,6 +209,7 @@ try {
   }
 
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+  const installOptionalPeers = process.env.MARKSTREAM_SMOKE_WITH_OPTIONAL_PEERS === '1'
   const smokePackage = {
     private: true,
     type: 'module',
@@ -207,12 +235,24 @@ try {
       },
     },
   }
+  if (installOptionalPeers) {
+    Object.assign(smokePackage.dependencies, {
+      '@antv/infographic': '^0.2.3',
+      '@terrastruct/d2': '>=0.1.33',
+      'katex': '>=0.16.22',
+      'mermaid': '>=11',
+      'monaco-editor': '>=0.52.2 <0.56.0',
+      'stream-markdown': '>=0.0.15',
+      'stream-monaco': '>=0.0.40',
+      'vue-i18n': '>=9',
+    })
+  }
   smokePackage.scripts['ssr:import'] = 'node ./ssr-import.mjs'
   writeProjectFile('package.json', `${JSON.stringify(smokePackage, null, 2)}\n`)
 
   writeProjectFile('index.html', '<div id="app"></div><script type="module" src="/src/main.ts"></script>\n')
   writeProjectFile('vite.config.ts', `import vue from '@vitejs/plugin-vue'\nimport { defineConfig } from 'vite'\n\nexport default defineConfig({ plugins: [vue()] })\n`)
-  writeProjectFile('src/main.ts', `import { createApp } from 'vue'\nimport MarkdownRender from 'markstream-vue'\nimport 'markstream-vue/index.css'\nimport App from './App.vue'\n\ncreateApp(App).component('MarkdownRender', MarkdownRender).mount('#app')\n`)
+  writeProjectFile('src/main.ts', `import { createApp, defineComponent, h } from 'vue'\nimport MarkdownRender, { VueRendererMarkdown, useSmoothMarkdownStream } from 'markstream-vue'\nimport safeList from 'markstream-vue/tailwind'\nimport { renderKaTeXInWorker } from 'markstream-vue/workers/katexWorkerClient'\nimport { findPrefixOffthread } from 'markstream-vue/workers/mermaidWorkerClient'\nimport { createKaTeXWorkerFromCDN } from 'markstream-vue/workers/katexCdnWorker'\nimport { createMermaidWorkerFromCDN } from 'markstream-vue/workers/mermaidCdnWorker'\nimport 'markstream-vue/index.css'\nimport 'markstream-vue/index.tailwind.css'\nimport 'markstream-vue/index.px.css'\nimport App from './App.vue'\n\nvoid useSmoothMarkdownStream\nvoid safeList\nvoid renderKaTeXInWorker\nvoid findPrefixOffthread\nvoid createKaTeXWorkerFromCDN\nvoid createMermaidWorkerFromCDN\n\nconst ThinkingNode = defineComponent({\n  name: 'SmokeThinkingNode',\n  setup(_, { slots }) {\n    return () => h('aside', { 'data-smoke-thinking': '1' }, slots.default?.() ?? [])\n  },\n})\n\ncreateApp(App)\n  .use(VueRendererMarkdown, { components: { thinking: ThinkingNode } })\n  .component('MarkdownRender', MarkdownRender)\n  .mount('#app')\n`)
   const smokeMarkdown = [
     '# Hello',
     '',
@@ -221,6 +261,15 @@ try {
     '~~~',
     '',
     '<div><a href="javascript:alert(1)">bad</a><span>safe</span></div>',
+    '',
+    '$$E = mc^2$$',
+    '',
+    '```mermaid',
+    'flowchart TD',
+    'A-->B',
+    '```',
+    '',
+    '<thinking>app scoped component</thinking>',
     '',
     '```infographic',
     'infographic list-row-simple-horizontal-arrow',
@@ -235,10 +284,11 @@ try {
     '',
     '<a href="javascript:alert(1)">bad</a>',
   ].join('\n')
-  writeProjectFile('ssr-import.mjs', `import { existsSync } from 'node:fs'\nimport { fileURLToPath } from 'node:url'\nimport { createSSRApp, h } from 'vue'\nimport { renderToString } from '@vue/server-renderer'\nimport MarkdownRender, { MarkdownRender as NamedMarkdownRender } from 'markstream-vue'\n\nconst mod = await import('markstream-vue')\nif (!mod.default || !mod.MarkdownRender || !NamedMarkdownRender)\n  throw new Error('Root package import did not expose MarkdownRender')\n\nconst cssUrl = import.meta.resolve('markstream-vue/index.css')\nif (!existsSync(fileURLToPath(cssUrl)))\n  throw new Error('CSS export did not resolve to a file')\n\nconst html = await renderToString(createSSRApp({\n  render: () => h(MarkdownRender, {\n    content: ${JSON.stringify(ssrMarkdown)},\n    final: true,\n  }),\n}))\n\nif (!html || !html.includes('console.log'))\n  throw new Error('SSR render did not include code content')\n\nif (/javascript:alert/i.test(html))\n  throw new Error('SSR render kept unsafe javascript URL')\n`)
+  writeProjectFile('ssr-import.mjs', `import { existsSync } from 'node:fs'\nimport { fileURLToPath } from 'node:url'\nimport { createSSRApp, defineComponent, h } from 'vue'\nimport { renderToString } from '@vue/server-renderer'\nimport MarkdownRender, { MarkdownRender as NamedMarkdownRender, VueRendererMarkdown } from 'markstream-vue'\n\nconst mod = await import('markstream-vue')\nif (!mod.default || !mod.MarkdownRender || !NamedMarkdownRender)\n  throw new Error('Root package import did not expose MarkdownRender')\n\nfor (const cssSpecifier of ['markstream-vue/index.css', 'markstream-vue/index.tailwind.css', 'markstream-vue/index.px.css']) {\n  const cssUrl = import.meta.resolve(cssSpecifier)\n  if (!existsSync(fileURLToPath(cssUrl)))\n    throw new Error(\`\${cssSpecifier} export did not resolve to a file\`)\n}\n\nawait import('markstream-vue/workers/katexWorkerClient')\nawait import('markstream-vue/workers/mermaidWorkerClient')\nawait import('markstream-vue/workers/katexCdnWorker')\nawait import('markstream-vue/workers/mermaidCdnWorker')\n\nfor (const workerSpecifier of ['markstream-vue/workers/katexRenderer.worker', 'markstream-vue/workers/mermaidParser.worker']) {\n  const workerUrl = import.meta.resolve(workerSpecifier)\n  if (!existsSync(fileURLToPath(workerUrl)))\n    throw new Error(\`\${workerSpecifier} export did not resolve to a packed file\`)\n}\n\nconst tailwind = await import('markstream-vue/tailwind')\nif (typeof tailwind.default !== 'string' || !tailwind.default.includes('markstream-vue'))\n  throw new Error('Tailwind export did not expose the generated safelist')\n\nconst ThinkingNode = defineComponent({\n  name: 'SsrSmokeThinkingNode',\n  setup(_, { slots }) {\n    return () => h('aside', { 'data-ssr-smoke-thinking': '1' }, slots.default?.() ?? [])\n  },\n})\n\nconst app = createSSRApp({\n  render: () => h(MarkdownRender, {\n    content: ${JSON.stringify(`${ssrMarkdown}\\n\\n<thinking>ssr app component</thinking>`)},\n    final: true,\n  }),\n})\napp.use(VueRendererMarkdown, { components: { thinking: ThinkingNode } })\n\nconst html = await renderToString(app)\n\nif (!html || !html.includes('console.log'))\n  throw new Error('SSR render did not include code content')\n\nif (!html.includes('data-ssr-smoke-thinking'))\n  throw new Error('SSR app-scoped custom component did not render')\n\nif (/javascript:alert/i.test(html))\n  throw new Error('SSR render kept unsafe javascript URL')\n`)
 
   run('pnpm', ['install', '--ignore-workspace'], { cwd: tmp })
-  ensureOptionalPeersAbsent()
+  if (!installOptionalPeers)
+    ensureOptionalPeersAbsent()
   writeNodeNoDomTypecheckConfig()
   run('pnpm', ['run', 'typecheck:node-no-dom'], { cwd: tmp })
   run('pnpm', ['run', 'build'], { cwd: tmp })

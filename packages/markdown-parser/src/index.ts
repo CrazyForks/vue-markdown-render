@@ -69,6 +69,25 @@ export interface GetMarkdownOptions extends FactoryOptions {
   i18n?: ((key: string) => string) | Record<string, string>
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function sanitizeFenceLanguage(info: string) {
+  const firstToken = String(info || 'text').trim().split(/\s+/)[0] || 'text'
+  const normalized = firstToken.replace(/[^\w+.#:-]/g, '-').replace(/-+/g, '-')
+  return normalized || 'text'
+}
+
+function makeSafeDomId(value: string) {
+  return value.replace(/[^\w:.+-]/g, '-').replace(/-+/g, '-')
+}
+
 export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: GetMarkdownOptions = {}) {
   // keep legacy behaviour but delegate to new factory and reapply project-specific rules
   const md = factory(options)
@@ -214,15 +233,15 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
     const info = String(tokenShape.info ?? '').trim()
     const str = String(tokenShape.content ?? '')
     const encodedCode = btoa(unescape(encodeURIComponent(str)))
-    const language = String(info ?? 'text')
-    const uniqueId = `editor-${msgId}-${idx}-${language}`
+    const language = sanitizeFenceLanguage(info)
+    const escapedLanguage = escapeHtml(language)
+    const uniqueId = makeSafeDomId(`editor-${msgId}-${idx}-${language}`)
+    const copyLabel = escapeHtml(t('common.copy'))
 
-    return `<div class="code-block" data-code="${encodedCode}" data-lang="${language}" id="${uniqueId}">
+    return `<div class="code-block" data-code="${encodedCode}" data-lang="${escapedLanguage}" id="${uniqueId}">
       <div class="code-header">
-        <span class="code-lang">${language.toUpperCase()}</span>
-        <button class="copy-button" data-code="${encodedCode}">${t(
-          'common.copy',
-        )}</button>
+        <span class="code-lang">${escapeHtml(language.toUpperCase())}</span>
+        <button class="copy-button" data-code="${encodedCode}">${copyLabel}</button>
       </div>
       <div class="code-editor"></div>
     </div>`

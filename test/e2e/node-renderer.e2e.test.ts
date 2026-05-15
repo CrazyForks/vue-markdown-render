@@ -733,6 +733,198 @@ After`,
     }
   })
 
+  it('does not re-parse text override content as markdown', async () => {
+    const scopeId = 'custom-components-text-override'
+    const literal = 'Literal **x** and [y](https://example.com)'
+    const CustomText = defineComponent({
+      name: 'CustomText',
+      props: {
+        node: { type: Object, required: true },
+      },
+      setup(props, { slots }) {
+        return () => h('span', {
+          'class': 'custom-text',
+          'data-has-slot': String(Boolean(slots.default)),
+        }, slots.default?.() ?? String((props.node as any).content ?? ''))
+      },
+    })
+
+    setCustomComponents(scopeId, { text: CustomText })
+
+    try {
+      const wrapper = mount(MarkdownRender, {
+        props: {
+          customId: scopeId,
+          final: true,
+          nodes: [
+            {
+              type: 'paragraph',
+              raw: literal,
+              children: [
+                {
+                  type: 'text',
+                  content: literal,
+                  raw: literal,
+                },
+              ],
+            },
+          ],
+        },
+      })
+      await flushAll()
+
+      try {
+        const text = wrapper.get('.custom-text')
+        expect(text.attributes('data-has-slot')).toBe('false')
+        expect(text.text()).toBe(literal)
+        expect(text.find('strong').exists()).toBe(false)
+        expect(text.find('a').exists()).toBe(false)
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('preserves node-props contract for strong and link overrides', async () => {
+    const scopeId = 'custom-components-inline-overrides'
+    const CustomStrong = defineComponent({
+      name: 'CustomStrong',
+      props: {
+        node: { type: Object, required: true },
+        indexKey: [String, Number],
+        customId: String,
+      },
+      setup(props, { slots }) {
+        return () => h('strong', {
+          'class': 'custom-strong',
+          'data-has-slot': String(Boolean(slots.default)),
+          'data-child-types': String(((props.node as any).children ?? []).map((child: any) => child.type).join(',')),
+          'data-custom-id': String(props.customId ?? ''),
+          'data-index-key': String(props.indexKey ?? ''),
+        }, String(((props.node as any).children ?? []).map((child: any) => child.content ?? '').join('')))
+      },
+    })
+    const CustomLink = defineComponent({
+      name: 'CustomLink',
+      props: {
+        node: { type: Object, required: true },
+        indexKey: [String, Number],
+        customId: String,
+      },
+      setup(props, { slots }) {
+        return () => h('a', {
+          'class': 'custom-link',
+          'data-has-slot': String(Boolean(slots.default)),
+          'data-href': String((props.node as any).href ?? ''),
+          'data-custom-id': String(props.customId ?? ''),
+          'data-index-key': String(props.indexKey ?? ''),
+        }, String(((props.node as any).children ?? []).map((child: any) => child.content ?? '').join('')))
+      },
+    })
+
+    setCustomComponents(scopeId, {
+      strong: CustomStrong,
+      link: CustomLink,
+    })
+
+    try {
+      const wrapper = await mountMarkdown('**Bold** and [docs](https://example.com)', { customId: scopeId, final: true })
+      try {
+        const strong = wrapper.get('.custom-strong')
+        const link = wrapper.get('.custom-link')
+        expect(strong.attributes('data-has-slot')).toBe('false')
+        expect(strong.attributes('data-child-types')).toBe('text')
+        expect(strong.attributes('data-custom-id')).toBe(scopeId)
+        expect(strong.text()).toBe('Bold')
+        expect(link.attributes('data-has-slot')).toBe('false')
+        expect(link.attributes('data-href')).toBe('https://example.com')
+        expect(link.attributes('data-custom-id')).toBe(scopeId)
+        expect(link.text()).toBe('docs')
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('keeps non-reserved custom tags on sanitized attrs and rendered default slot', async () => {
+    const scopeId = 'custom-components-tag-slot'
+    const AnswerBox = defineComponent({
+      name: 'AnswerBox',
+      setup(_, { attrs, slots }) {
+        return () => h('section', {
+          'class': 'answer-box',
+          'data-ok': String(attrs['data-ok'] ?? ''),
+          'data-onclick': String((attrs as any).onclick ?? ''),
+          'data-has-slot': String(Boolean(slots.default)),
+        }, slots.default?.())
+      },
+    })
+
+    setCustomComponents(scopeId, { 'answer-box': AnswerBox })
+
+    try {
+      const wrapper = await mountMarkdown('<answer-box data-ok="yes" onclick="alert(1)">**Safe**</answer-box>', {
+        customId: scopeId,
+        final: true,
+      })
+      try {
+        const answerBox = wrapper.get('.answer-box')
+        expect(answerBox.attributes('data-ok')).toBe('yes')
+        expect(answerBox.attributes('data-onclick')).toBe('')
+        expect(answerBox.attributes('data-has-slot')).toBe('true')
+        expect(answerBox.get('strong').text()).toBe('Safe')
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('keeps inline custom tag slots inside the paragraph without nested paragraphs', async () => {
+    const scopeId = 'custom-components-inline-tag-slot'
+    const Mention = defineComponent({
+      name: 'Mention',
+      setup(_, { slots }) {
+        return () => h('span', { class: 'mention' }, slots.default?.())
+      },
+    })
+
+    setCustomComponents(scopeId, { mention: Mention })
+
+    try {
+      const wrapper = await mountMarkdown('Hello <mention>**Simon**</mention>!', {
+        customId: scopeId,
+        final: true,
+      })
+      try {
+        expect(wrapper.findAll('p.paragraph-node')).toHaveLength(1)
+
+        const paragraph = wrapper.get('p.paragraph-node')
+        const mention = paragraph.get('.mention')
+        expect(paragraph.text()).toBe('Hello Simon!')
+        expect(mention.get('strong').text()).toBe('Simon')
+        expect(mention.find('p').exists()).toBe(false)
+      }
+      finally {
+        wrapper.unmount()
+      }
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
   it('replays a fade animation when a streamed non-code node updates in place', async () => {
     const wrapper = await mountMarkdown('Hello')
     try {

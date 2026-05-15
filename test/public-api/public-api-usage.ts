@@ -7,6 +7,7 @@ import type {
   LinkNodeProps,
   MarkdownIt,
   MarkdownPluginRegistration,
+  MarkstreamVuePluginOptions,
   MathBlockNodeProps,
   MathInlineNodeProps,
   MermaidBlockNodeProps,
@@ -63,6 +64,9 @@ const props: NodeRendererProps = {
 
 const options: SmoothMarkdownStreamOptions = {}
 const customComponents: CustomComponents = {}
+const pluginOptions: MarkstreamVuePluginOptions = {
+  components: customComponents,
+}
 
 setCustomComponents('docs', customComponents)
 setCustomComponents(customComponents)
@@ -146,6 +150,7 @@ clearRegisteredMarkdownPlugins()
 
 void component
 void plugin
+void pluginOptions
 void plugin
 void props
 void scopedComponents

@@ -1,5 +1,6 @@
 import type { HtmlPolicy, HtmlToken } from 'stream-markdown-parser'
 import type { Component } from 'vue'
+import type { CustomComponentAttrs } from '../types'
 import {
   BLOCKED_HTML_TAGS as BLOCKED_TAGS,
   convertHtmlAttrsToProps,
@@ -11,9 +12,11 @@ import {
   isHtmlTagBlocked,
   isHtmlTagHardBlocked,
   sanitizeHtmlAttrs,
+  sanitizeHtmlTokenAttrs,
   sanitizeImageSrc,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
+  tokenAttrsToRecord,
   tokenizeHtml,
 } from 'stream-markdown-parser'
 import { h } from 'vue'
@@ -65,6 +68,54 @@ export function convertPropValue(value: string, key: string): any {
 
 export function convertAttrsToProps(attrs: Record<string, string>): Record<string, any> {
   return convertHtmlAttrsToProps(attrs)
+}
+
+type CustomNodeAttrs = CustomComponentAttrs | Array<[string, string | null]> | null | undefined
+
+function normalizeCustomAttrValue(value: string | boolean | null | undefined) {
+  if (value === true)
+    return ''
+  if (value === false)
+    return 'false'
+  return value == null ? null : String(value)
+}
+
+function normalizeCustomAttrs(attrs: CustomNodeAttrs): Array<[string, string | null]> | null {
+  if (!attrs)
+    return null
+
+  if (Array.isArray(attrs)) {
+    if (attrs.every(Array.isArray)) {
+      return (attrs as Array<[string, string | null]>).map(([name, value]) => [
+        String(name),
+        normalizeCustomAttrValue(value),
+      ] as [string, string | null])
+    }
+
+    return attrs
+      .filter(item => item && typeof item === 'object' && !Array.isArray(item) && 'name' in item)
+      .map(item => [
+        String((item as { name: unknown }).name),
+        normalizeCustomAttrValue((item as { value?: string | boolean | null }).value),
+      ] as [string, string | null])
+  }
+
+  return Object.entries(attrs).map(([key, value]) => [
+    key,
+    normalizeCustomAttrValue(value),
+  ] as [string, string | null])
+}
+
+export function getCustomNodeAttrs(
+  node: { type?: string, tag?: string, attrs?: CustomNodeAttrs },
+  htmlPolicy: HtmlPolicy = 'safe',
+): Record<string, any> | undefined {
+  const tagName = String(node.tag || node.type || '').trim()
+  const sanitizedAttrs = sanitizeHtmlTokenAttrs(normalizeCustomAttrs(node.attrs), htmlPolicy, tagName)
+  if (!sanitizedAttrs)
+    return undefined
+  const props = convertAttrsToProps(tokenAttrsToRecord(sanitizedAttrs))
+  return Object.keys(props).length > 0 ? props : undefined
 }
 
 function renderLiteralTagText(tagName: string, attrs?: Record<string, string>, isSelfClosing = false) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
+import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import ListItemNode from '../ListItemNode'
 
 // 节点子元素类型
@@ -34,10 +34,9 @@ const { node, customId, indexKey, typewriter, fade, showTooltips } = defineProps
 
 defineEmits(['copy'])
 
+const customComponents = useCustomNodeComponents(() => customId)
 const listItemComponent = computed(() => {
-  void customComponentsRevision.value
-  const customComponents = getCustomNodeComponents(customId)
-  return (customComponents as any).list_item || ListItemNode
+  return (customComponents.value as any).list_item || ListItemNode
 })
 </script>
 

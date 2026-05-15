@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => {
         tsconfigPath: './tsconfig.build.json',
       }),
       UnpluginClassExtractor({
-        output: 'dist/tailwind.ts',
+        output: 'dist/tailwind.js',
         include: [/\/src\/components\/(?:[^/]+\/)*[^/]+\.vue(\?.*)?$/],
       }) as any,
     ]

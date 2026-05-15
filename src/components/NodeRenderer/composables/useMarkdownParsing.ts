@@ -3,14 +3,19 @@ import type {
   ParsedNode,
 } from 'stream-markdown-parser'
 import type { ComputedRef } from 'vue'
+import type { CustomComponents } from '../../../types'
 import type { NodeRendererProps } from '../../../types/node-renderer-props'
 import {
+  BLOCKED_HTML_TAGS,
+  EXTENDED_STANDARD_HTML_TAGS,
   getMarkdown,
   mergeCustomHtmlTags,
+  normalizeCustomHtmlTagName,
   parseMarkdownToStructure,
   resolveCustomHtmlTags,
 } from 'stream-markdown-parser'
 import { computed, markRaw } from 'vue'
+import { isReservedNodeComponentKey } from '../../../utils/nodeComponents'
 
 type RendererParseOptions = NonNullable<NodeRendererProps['parseOptions']>
 
@@ -19,6 +24,7 @@ export interface MarkdownParsingOptions {
   renderContent: ComputedRef<string>
   effectiveFinal: ComputedRef<boolean | undefined>
   debugPerformanceEnabled: ComputedRef<boolean>
+  customComponentsMap?: ComputedRef<Partial<CustomComponents>>
   logPerf: (label: string, data: Record<string, unknown>) => void
 }
 
@@ -29,6 +35,21 @@ export interface MarkdownParsingState {
   mdInstance: ComputedRef<MarkdownIt>
   mergedParseOptions: ComputedRef<RendererParseOptions>
   parsedNodes: ComputedRef<ParsedNode[]>
+}
+
+function getAutoCustomHtmlTags(mapping: Partial<CustomComponents>) {
+  return Object.entries(mapping)
+    .map(([key, component]) => {
+      const normalized = normalizeCustomHtmlTagName(key)
+      return component != null
+        && normalized
+        && !isReservedNodeComponentKey(normalized)
+        && !EXTENDED_STANDARD_HTML_TAGS.has(normalized)
+        && !BLOCKED_HTML_TAGS.has(normalized)
+        ? normalized
+        : ''
+    })
+    .filter(Boolean)
 }
 
 export function useMarkdownParsing(
@@ -42,6 +63,7 @@ export function useMarkdownParsing(
     return mergeCustomHtmlTags(
       props.customHtmlTags,
       props.parseOptions?.customHtmlTags,
+      getAutoCustomHtmlTags(options.customComponentsMap?.value ?? {}),
     )
   })
 

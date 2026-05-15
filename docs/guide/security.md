@@ -2,6 +2,19 @@
 
 `MarkdownRender` defaults to `htmlPolicy="safe"`. This is the right default for AI output and other content that should allow a small, sanitized HTML subset.
 
+## Security model
+
+`safe` means active HTML is removed before Vue renders it:
+
+- `script`, `style`, `form`, `iframe`, `object`, `embed`, `template`, and related active/embed/form tags are blocked.
+- `on*` event attributes are removed.
+- Unsafe URL protocols such as `javascript:`, `vbscript:`, unsafe `data:`, and protocol-relative URLs are blocked.
+- Inline styles with script URLs, CSS expressions, or imports are removed.
+- Markdown links with `target="_blank"` keep `noopener noreferrer`.
+- Streaming mid-states are sanitized the same way as final content.
+
+`trusted` means the content source is fully controlled by your application. Do not use it for LLM output, public comments, support tickets, imported docs from users, or any other user-generated content.
+
 ## HTML policies
 
 ### `htmlPolicy="safe"`

@@ -6,12 +6,12 @@ This page is intentionally practical: copyable prompts, rollout checklists, and 
 
 ## Start with your goal
 
-- Want packaged skills you can install right now: jump to [Install the packaged skills](#install-the-packaged-skills)
+- Want repository skills you can install right now: jump to [Install the repository skills](#install-the-repository-skills)
 - Want ready-made prompt templates without cloning the repo: jump to [Copyable prompts](#2-copyable-prompts)
 - Want to migrate from another renderer with an assistant: start with [Copyable prompts](#2-copyable-prompts) and the rollout pattern below
 - Want to version reusable AI assets inside your own repo: read [Repository assets](#repository-assets)
 
-## Install the packaged skills
+## Install the repository skills
 
 For end users, the recommended command is the shared `skills` installer:
 
@@ -37,39 +37,11 @@ npx skills add https://github.com/Simon-He95/markstream-vue/tree/main/.agents/sk
 npx skills add git@github.com:Simon-He95/markstream-vue.git
 ```
 
-If you specifically want the package CLI, you can still use:
-
-```bash
-npx markstream-vue skills install
-# or
-pnpm dlx markstream-vue skills install
-```
-
-Useful variants:
-
-```bash
-npx markstream-vue skills list
-npx markstream-vue skills install --target codex
-npx markstream-vue skills install --target ./tmp/skills-test --mode copy --force
-```
-
 - `npx skills add Simon-He95/markstream-vue` is the primary recommendation for Codex-compatible skill installation
-- `skills install` defaults to `copy`, which is safer for `npx` and `dlx` usage
-- the default target is `~/.agents/skills`
-- `--target codex` targets `${CODEX_HOME:-~/.codex}/skills`
-- `--target` accepts either `agents`, `codex`, or any custom path
-- `--force` replaces existing installs at the target path
+- `markstream-vue@1.0` does not publish a CLI `bin`
+- repository scripts such as `pnpm skills:list` and `pnpm prompts:list` are maintainer helpers for cloned checkouts, not npm package surface
 
-The prompts stay in the repository under `prompts/`; the packaged installer only handles the skill folders.
-
-The same CLI can also expose bundled prompt templates:
-
-```bash
-npx markstream-vue prompts list
-npx markstream-vue prompts show install-markstream
-```
-
-That is usually the easiest way for npm users to discover the maintained prompt set without cloning the repository.
+The prompts stay in the repository under `prompts/`. Copy them from GitHub or from a cloned checkout; they are not published through the `markstream-vue` npm package.
 
 ## Repository assets
 

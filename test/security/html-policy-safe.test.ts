@@ -200,4 +200,27 @@ describe('htmlPolicy safe security corpus', () => {
     expect(wrapper.html()).not.toMatch(/javascript:/i)
     expect(wrapper.html()).not.toMatch(/\sonclick=/i)
   })
+
+  it.each([
+    '<a href="java',
+    '<a href="javascript:',
+    '<img src=x oner',
+    '<script',
+    '</script',
+    '<thinking><img src=x onerror=alert(1)>',
+  ])('keeps streaming HTML mid-state non-executable: %s', async (content) => {
+    const wrapper = mount(MarkdownRender, {
+      props: {
+        content,
+        final: false,
+        customHtmlTags: ['thinking'],
+        htmlPolicy: 'safe',
+        batchRendering: false,
+      },
+    })
+
+    await flushAll()
+
+    expectNoExecutableMarkup(wrapper.html())
+  })
 })

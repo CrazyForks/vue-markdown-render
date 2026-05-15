@@ -81,7 +81,10 @@
     "./index.css": "./dist/index.css",
     "./index.px.css": "./dist/index.px.css",
     "./index.tailwind.css": "./dist/index.tailwind.css",
-    "./tailwind": "./dist/tailwind.ts",
+    "./tailwind": {
+      "types": "./dist/tailwind.d.ts",
+      "import": "./dist/tailwind.js"
+    },
     "./workers/katexWorkerClient": {
       "types": "./dist/workers/katexWorkerClient.d.ts",
       "import": "./dist/workers/katexWorkerClient.js"
@@ -104,15 +107,8 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": {
-    "markstream-vue": "./bin/markstream-vue.mjs"
-  },
   "files": [
-    ".agents",
-    "bin",
-    "dist",
-    "dist/workers",
-    "prompts"
+    "dist"
   ],
   "scripts": {
     "dev": "pnpm run -C playground dev",
@@ -138,7 +134,8 @@
     "test:update": "vitest -u",
     "typecheck": "vue-tsc --noEmit",
     "check:ssr": "vitest --run test/ssr-import.test.ts test/ssr-render-to-string.test.ts",
-    "prepublishOnly": "npm run build && pnpm run check:core-published",
+    "release:verify": "pnpm lint && pnpm typecheck && pnpm exec vitest --run && pnpm run test:api:strict && MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:pack && MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:pack:optional",
+    "prepublishOnly": "pnpm run build:parser && npm run build && pnpm run check:workspace-deps-published && MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:pack && MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:pack:optional",
     "play": "pnpm run -C playground dev",
     "play:angular": "pnpm run -C playground-angular dev",
     "play:vue2": "pnpm run -C playground-vue2 dev",
@@ -168,7 +165,7 @@
     "preview": "pnpm run -C playground preview",
     "build:parser": "pnpm run -C packages/markdown-parser build",
     "build:core": "pnpm run -C packages/markstream-core build",
-    "build": "pnpm run build:core && vite build --mode npm && vite build --config vite.config.tailwind.ts --mode npm && node scripts/copy-tailwind-css.mjs && node scripts/generate-px-css.mjs && pnpm run build:dts",
+    "build": "pnpm run build:core && vite build --mode npm && node scripts/write-tailwind-types.mjs && vite build --config vite.config.tailwind.ts --mode npm && node scripts/copy-tailwind-css.mjs && node scripts/generate-px-css.mjs && pnpm run build:dts",
     "build:analyze": "ANALYZE=true pnpm build",
     "size:check": "node scripts/check-package-size.mjs",
     "docs:dev": "vitepress dev docs",
@@ -193,8 +190,10 @@
     "build:demo": "vite build",
     "build:view": "vite preview",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0",
-    "release": "pnpm run check:core-published && bumpp --all --commit --no-tag --no-push --execute 'conventional-changelog -p angular -i CHANGELOG.md -s -r 0' && pnpm publish && node scripts/tag-package.mjs --package-json package.json --push",
+    "release": "bumpp --commit --no-tag --no-push --execute 'conventional-changelog -p angular -i CHANGELOG.md -s -r 0' && pnpm run check:workspace-deps-published && pnpm publish && node scripts/tag-package.mjs --package-json package.json --push",
     "release:angular": "pnpm run -C packages/markstream-angular release",
+    "release:parser": "pnpm run -C packages/markdown-parser release",
+    "release:1.0": "pnpm run release:verify && pnpm run release:parser && pnpm run release:core && pnpm run release",
     "tag": "node scripts/tag-package.mjs",
     "tag:vue3": "node scripts/tag-package.mjs --package-json package.json",
     "tag:vue3:push": "node scripts/tag-package.mjs --package-json package.json --push",
@@ -216,9 +215,12 @@
     "tag:prune:v:all": "node scripts/prune-tags.mjs --pattern 'v*' --apply --local --remote-delete",
     "check:peer-deps": "node ./scripts/check-peer-deps.cjs",
     "check:core-published": "node ./scripts/check-core-published.mjs --package-json package.json --core-package-json packages/markstream-core/package.json",
+    "check:workspace-deps-published": "node ./scripts/check-workspace-deps-published.mjs",
     "test:e2e:link-tooltip-streaming": "node scripts/e2e-link-tooltip-streaming.mjs",
     "test:smoke:core": "pnpm run -C packages/markstream-core build && node -e \"import('markstream-core').then((m) => { if (!m.createSmoothMarkdownStream) process.exit(1) })\" && node -e \"const { createRequire } = require('node:module'); const req = createRequire(process.cwd() + '/'); const m = req('markstream-core'); if (!m.createSmoothMarkdownStream) process.exit(1)\"",
     "test:smoke:minimal": "node scripts/smoke-minimal-install.mjs",
+    "test:smoke:pack": "node scripts/smoke-packed-package.mjs",
+    "test:smoke:pack:optional": "MARKSTREAM_SMOKE_WITH_OPTIONAL_PEERS=1 node scripts/smoke-packed-package.mjs",
     "test:smoke:vue2-cjs": "pnpm run -C packages/markstream-core build && pnpm run -C packages/markstream-vue2 build && node -e \"const { createRequire } = require('node:module'); const path = require('node:path'); const req = createRequire(path.resolve('./packages/markstream-vue2/dist/index.cjs')); req('markstream-core')\"",
     "test:e2e:vue2-cli-smoke": "node scripts/e2e-vue2-cli-smoke.mjs",
     "test:e2e:math-streaming-stability": "node scripts/e2e-math-streaming-stability.mjs",
