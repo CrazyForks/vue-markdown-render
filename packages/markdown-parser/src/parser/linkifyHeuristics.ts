@@ -6,6 +6,7 @@ const PATH_SEPARATOR_RE = /[\\/]/u
 const DOMAINISH_TEXT_RE = /^[\p{L}\p{N}./\\-]+$/u
 const DOMAIN_LABEL_RE = /^[A-Za-z0-9-]{1,63}$/u
 const PUNYCODE_TLD_RE = /^xn--[a-z0-9-]{2,59}$/i
+const NUMBERED_FILENAME_SEGMENT_RE = /(?:^|[._-])\d+|\d+[._-]/u
 const AMBIGUOUS_BARE_DOMAIN_EXTENSIONS = new Set([
   'ai',
   'md',
@@ -121,6 +122,10 @@ function hasStrongFilenameSignals(linkText: string) {
     return !hasDomainAuthorityPrefix(linkText)
 
   const extensionless = linkText.replace(FILENAMEISH_EXTENSION_RE, '')
+  const hasNonAscii = Array.from(extensionless).some(char => char.charCodeAt(0) > 0x7F)
+  if (hasNonAscii && NUMBERED_FILENAME_SEGMENT_RE.test(extensionless))
+    return true
+
   const filenameLikeSegments = extensionless.split('.').filter(Boolean)
   return filenameLikeSegments.some(isUppercaseFilenameSegment)
 }
