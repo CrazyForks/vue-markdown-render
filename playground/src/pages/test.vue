@@ -170,7 +170,7 @@ const diffHideUnchangedRegions = {
   enabled: true,
   contextLineCount: 2,
   minimumLineCount: 4,
-  revealLineCount: 5,
+  revealLineCount: 0,
 } as const
 
 function resolveInitialDarkMode() {

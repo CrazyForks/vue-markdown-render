@@ -225,12 +225,16 @@ let runtimeMonacoOptions: MonacoRuntimeOptions | null = null
 const isDiff = computed(() => props.node.diff)
 const diffStats = ref({ removed: 0, added: 0 })
 const diffStatsAriaLabel = computed(() => `-${diffStats.value.removed} +${diffStats.value.added}`)
-const disabledDiffHideUnchangedRegions = Object.freeze({ enabled: false })
 const defaultDiffHideUnchangedRegions = Object.freeze({
   enabled: true,
   contextLineCount: 2,
   minimumLineCount: 4,
   revealLineCount: 5,
+})
+const disabledDiffHideUnchangedRegions = Object.freeze({
+  ...defaultDiffHideUnchangedRegions,
+  enabled: false,
+  revealLineCount: 0,
 })
 function resolveDiffHideUnchangedRegionsOption(value: unknown) {
   if (typeof value === 'boolean')
@@ -2248,15 +2252,14 @@ watch(
                 catch {}
               }
               syncRuntimeMonacoOptions()
-              const pair = resolveDiffRenderPair(
-                String(props.node.originalCode ?? ''),
-                String(props.node.updatedCode ?? ''),
-              )
-              await updateDiffCode(
-                pair.original,
-                pair.updated,
-                monacoLanguage.value,
-              )
+              editorMounted.value = false
+              editorDisplayReady.value = false
+              editorCreated.value = false
+              clearEditorHeightSyncBindings()
+              clearInlineFoldProxies()
+              safeClean()
+              await nextTick()
+              await ensureEditorCreation(codeEditor.value as HTMLElement)
               if (isUnmounted || !isDiff.value)
                 return
               refreshDiffPresentation()
