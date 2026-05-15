@@ -70,6 +70,13 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(nodes, 'README.md')).toBe(true)
   })
 
+  it('keeps numbered cjk filenames in headings as text', () => {
+    const nodes = parseMarkdownToStructure('### ① 主角团（01-主角团.md）', md, { final: true })
+
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, '01-主角团.md')).toBe(true)
+  })
+
   it('keeps file-like paths as text instead of preserving linkify output', () => {
     const nodes = parseMarkdownToStructure('请查看 docs/README.md 和 src/index.ts。', md, { final: true })
 
