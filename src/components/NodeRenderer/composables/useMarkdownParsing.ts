@@ -6,8 +6,11 @@ import type { ComputedRef } from 'vue'
 import type { CustomComponents } from '../../../types'
 import type { NodeRendererProps } from '../../../types/node-renderer-props'
 import {
+  BLOCKED_HTML_TAGS,
+  EXTENDED_STANDARD_HTML_TAGS,
   getMarkdown,
   mergeCustomHtmlTags,
+  normalizeCustomHtmlTagName,
   parseMarkdownToStructure,
   resolveCustomHtmlTags,
 } from 'stream-markdown-parser'
@@ -36,8 +39,17 @@ export interface MarkdownParsingState {
 
 function getAutoCustomHtmlTags(mapping: Partial<CustomComponents>) {
   return Object.entries(mapping)
-    .filter(([key, component]) => component != null && !isReservedNodeComponentKey(key))
-    .map(([key]) => key)
+    .map(([key, component]) => {
+      const normalized = normalizeCustomHtmlTagName(key)
+      return component != null
+        && normalized
+        && !isReservedNodeComponentKey(normalized)
+        && !EXTENDED_STANDARD_HTML_TAGS.has(normalized)
+        && !BLOCKED_HTML_TAGS.has(normalized)
+        ? normalized
+        : ''
+    })
+    .filter(Boolean)
 }
 
 export function useMarkdownParsing(

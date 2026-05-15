@@ -13,8 +13,17 @@ describe('release dependency gates', () => {
     expect(prepublishOnly).toContain('pnpm run build:parser')
     expect(prepublishOnly).toContain('pnpm run check:workspace-deps-published')
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack')
+    expect(prepublishOnly).toContain('pnpm run test:smoke:pack:optional')
     expect(prepublishOnly.indexOf('pnpm run build:parser')).toBeLessThan(prepublishOnly.indexOf('pnpm run check:workspace-deps-published'))
     expect(prepublishOnly.indexOf('pnpm run check:workspace-deps-published')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack'))
+    expect(prepublishOnly.indexOf('pnpm run test:smoke:pack')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional'))
+  })
+
+  it('uses the workspace dependency publish gate in the release script', () => {
+    const release = packageJson.scripts.release
+
+    expect(release).toContain('pnpm run check:workspace-deps-published')
+    expect(release).not.toContain('pnpm run check:core-published')
   })
 
   it('checks both runtime workspace packages for published versions', () => {

@@ -348,6 +348,64 @@ Footnotes are server-rendered.[^1]
     }
   })
 
+  it('does not auto-register standard or hard-blocked html tag component keys', async () => {
+    const SpanOverride = defineComponent({
+      name: 'SsrSpanOverride',
+      setup() {
+        return () => h('strong', { 'data-ssr-span-override': '1' }, 'span override')
+      },
+    })
+    const AnchorOverride = defineComponent({
+      name: 'SsrAnchorOverride',
+      setup() {
+        return () => h('strong', { 'data-ssr-anchor-override': '1' }, 'anchor override')
+      },
+    })
+    const ScriptOverride = defineComponent({
+      name: 'SsrScriptOverride',
+      setup() {
+        return () => h('strong', { 'data-ssr-script-override': '1' }, 'script override')
+      },
+    })
+    const IframeOverride = defineComponent({
+      name: 'SsrIframeOverride',
+      setup() {
+        return () => h('strong', { 'data-ssr-iframe-override': '1' }, 'iframe override')
+      },
+    })
+
+    const app = createSSRApp({
+      render: () => h(MarkdownRender, {
+        content: [
+          '<span>safe span</span>',
+          '<a href="https://example.com">safe anchor</a>',
+          '<script>alert(1)</script>',
+          '<iframe src="https://example.com"></iframe>',
+        ].join('\n'),
+        final: true,
+      }),
+    })
+    app.use(VueRendererMarkdown, {
+      components: {
+        span: SpanOverride,
+        a: AnchorOverride,
+        script: ScriptOverride,
+        iframe: IframeOverride,
+      },
+    })
+
+    const html = await renderToString(app)
+
+    expect(html).not.toContain('data-ssr-span-override')
+    expect(html).not.toContain('data-ssr-anchor-override')
+    expect(html).not.toContain('data-ssr-script-override')
+    expect(html).not.toContain('data-ssr-iframe-override')
+    expect(html).toContain('<span>safe span</span>')
+    expect(html).toContain('href="https://example.com"')
+    expect(html).not.toContain('<script')
+    expect(html).not.toContain('<iframe')
+  })
+
   it('renders structured html wrappers on the server without duplicating nested markdown or keeping safe-policy style attrs', async () => {
     const html = await renderMarkdown(`<span style="font-size: 12px;">
 
