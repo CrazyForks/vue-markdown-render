@@ -10,6 +10,7 @@ import EmphasisNode from '../EmphasisNode/EmphasisNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode'
 import ImageNode from '../ImageNode'
 import InlineCodeNode from '../InlineCodeNode'
+import NodeChildRenderer from '../NodeChildRenderer'
 import StrikethroughNode from '../StrikethroughNode'
 import StrongNode from '../StrongNode'
 import TextNode from '../TextNode'
@@ -49,7 +50,9 @@ const cssVars = computed(() => {
 })
 
 // Available node components for child rendering
-const nodeComponents = {
+const customComponents = useCustomNodeComponents(() => props.customId)
+
+const nodeComponents = computed(() => ({
   text: TextNode,
   strong: StrongNode,
   strikethrough: StrikethroughNode,
@@ -57,18 +60,8 @@ const nodeComponents = {
   image: ImageNode,
   html_inline: HtmlInlineNode,
   inline_code: InlineCodeNode,
-}
-
-const customComponents = useCustomNodeComponents(() => props.customId)
-
-// 获取子节点组件，优先使用用户自定义组件
-function getChildComponent(child: any) {
-  const customComponent = customComponents.value[child.type]
-  if (customComponent)
-    return customComponent
-
-  return nodeComponents[child.type] || null
-}
+  ...customComponents.value,
+}))
 
 // forward any non-prop attributes (e.g. custom-id) to the rendered element
 const attrs = useAttrs()
@@ -188,10 +181,10 @@ const title = computed(() => {
     @mouseenter="(e) => onAnchorEnter(e)"
     @mouseleave="onAnchorLeave"
   >
-    <component
-      :is="getChildComponent(child)"
+    <NodeChildRenderer
       v-for="(child, index) in node.children"
       :key="`${indexKey || 'emphasis'}-${index}`"
+      :components="nodeComponents"
       :node="child"
       :custom-id="props.customId"
       :index-key="`${indexKey || 'link-text'}-${index}`"

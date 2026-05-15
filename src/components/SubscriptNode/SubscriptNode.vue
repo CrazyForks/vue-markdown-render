@@ -9,6 +9,7 @@ import HtmlInlineNode from '../HtmlInlineNode'
 import InlineCodeNode from '../InlineCodeNode'
 import InsertNode from '../InsertNode'
 import LinkNode from '../LinkNode'
+import NodeChildRenderer from '../NodeChildRenderer'
 import { MathInlineNodeAsync } from '../NodeRenderer/asyncComponent'
 import ReferenceNode from '../ReferenceNode'
 import StrikethroughNode from '../StrikethroughNode'
@@ -56,14 +57,13 @@ const nodeComponents = computed(() => ({
 <template>
   <sub class="subscript-node">
     <template v-for="(child, index) in node.children" :key="`${indexKey || 'subscript'}-${index}`">
-      <component
-        :is="nodeComponents[child.type]"
-        v-if="nodeComponents[child.type]"
+      <NodeChildRenderer
+        :components="nodeComponents"
         :node="child"
         :custom-id="props.customId"
         :index-key="`${indexKey || 'subscript'}-${index}`"
+        fallback-to-text
       />
-      <span v-else>{{ (child as any).content || (child as any).raw }}</span>
     </template>
   </sub>
 </template>

@@ -92,6 +92,13 @@ const AnswerBox = defineComponent({
   },
 })
 
+const Mention = defineComponent({
+  name: 'Mention',
+  setup(_, { slots }) {
+    return () => h('span', { class: 'mention' }, slots.default?.())
+  },
+})
+
 afterEach(() => {
   removeCustomComponents(customId)
 })
@@ -258,6 +265,34 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
 
     const link = boxes[1].get('a[href="https://vuejs.org"]')
     expect(link.attributes('title')).toBe('https://vuejs.org')
+  })
+
+  it('renders custom tag slots inside inline container children', async () => {
+    setCustomComponents(customId, {
+      mention: Mention,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        content: [
+          '**<mention>Simon</mention>**',
+          '',
+          '*<mention>Ada</mention>*',
+          '',
+          '# Hi <mention>Lin</mention>',
+        ].join('\n'),
+        final: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.get('strong .mention').text()).toBe('Simon')
+    expect(wrapper.get('em .mention').text()).toBe('Ada')
+    expect(wrapper.get('h1 .mention').text()).toBe('Lin')
   })
 
   it('lets d2lang exact overrides beat d2 fallback while keeping d2 props', async () => {

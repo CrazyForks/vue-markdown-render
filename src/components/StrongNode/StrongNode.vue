@@ -9,6 +9,7 @@ import HtmlInlineNode from '../HtmlInlineNode'
 import InlineCodeNode from '../InlineCodeNode'
 import InsertNode from '../InsertNode'
 import LinkNode from '../LinkNode'
+import NodeChildRenderer from '../NodeChildRenderer'
 import { MathInlineNodeAsync } from '../NodeRenderer/asyncComponent'
 import ReferenceNode from '../ReferenceNode'
 import StrikethroughNode from '../StrikethroughNode'
@@ -56,12 +57,12 @@ const nodeComponents = computed(() => ({
 
 <template>
   <strong class="strong-node">
-    <component
-      :is="nodeComponents[child.type]"
+    <NodeChildRenderer
       v-for="(child, index) in node.children"
       :key="`${indexKey || 'strong'}-${index}`"
-      :index-key="`${indexKey || 'strong'}-${index}`"
+      :components="nodeComponents"
       :node="child"
+      :index-key="`${indexKey || 'strong'}-${index}`"
       :custom-id="props.customId"
     />
   </strong>

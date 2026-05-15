@@ -11,6 +11,7 @@ import ImageNode from '../ImageNode'
 import InlineCodeNode from '../InlineCodeNode'
 import InsertNode from '../InsertNode'
 import LinkNode from '../LinkNode'
+import NodeChildRenderer from '../NodeChildRenderer'
 import { MathInlineNodeAsync } from '../NodeRenderer/asyncComponent'
 import ReferenceNode from '../ReferenceNode'
 import StrikethroughNode from '../StrikethroughNode'
@@ -72,10 +73,10 @@ const nodeComponents = computed(() => ({
     dir="auto"
     v-bind="node.attrs"
   >
-    <component
-      :is="nodeComponents[child.type]"
+    <NodeChildRenderer
       v-for="(child, index) in node.children"
       :key="`${indexKey || 'heading'}-${index}`"
+      :components="nodeComponents"
       :custom-id="props.customId"
       :node="child"
       :index-key="`${indexKey || 'heading'}-${index}`"
