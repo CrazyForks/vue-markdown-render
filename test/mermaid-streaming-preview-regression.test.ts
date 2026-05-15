@@ -398,6 +398,10 @@ describe('mermaid streaming preview regression', () => {
     ;(wrapper.vm as any).mermaidAvailable = true
     ;(wrapper.vm as any).viewportReady = true
     ;(wrapper.vm as any).showSource = false
+    await flushVueUpdates()
+    await vi.advanceTimersByTimeAsync(400)
+    await settleStreamingRender()
+
     wrapper.get('div._mermaid').element.innerHTML = '<svg data-rendered="previous" viewBox="0 0 100 100"><rect width="1" height="1" /></svg>'
     await flushVueUpdates()
 

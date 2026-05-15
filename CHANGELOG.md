@@ -1,4 +1,4 @@
-## Unreleased
+## [1.0.0-rc.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.14-beta.8...markstream-vue@1.0.0-rc.0) (2026-05-15)
 
 ### Behavior Changes
 

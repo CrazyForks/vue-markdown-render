@@ -15,7 +15,7 @@ afterEach(() => {
 })
 
 describe('mermaid static render performance', () => {
-  it('starts completed diagrams in preview mode with a reserved preview height', async () => {
+  it('promotes completed diagrams from SSR fallback to preview with a reserved height', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('IntersectionObserver', undefined as any)
 
@@ -50,7 +50,12 @@ describe('mermaid static render performance', () => {
       },
     })
 
-    expect(wrapper.find('[data-markstream-mermaid="1"]').attributes('data-markstream-mode')).toBe('pending')
+    expect(wrapper.find('[data-markstream-mermaid="1"]').attributes('data-markstream-mode')).toBe('fallback')
+    expect(wrapper.find('.mermaid-source-panel').exists()).toBe(true)
+
+    await flushVueUpdates()
+
+    expect(['pending', 'preview']).toContain(wrapper.find('[data-markstream-mermaid="1"]').attributes('data-markstream-mode'))
     expect(wrapper.find('.mermaid-source-panel').exists()).toBe(false)
     expect((wrapper.get('.mermaid-preview-area').element as HTMLElement).style.height).toBe('500px')
 

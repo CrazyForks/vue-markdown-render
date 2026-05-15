@@ -10,7 +10,7 @@ import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, getMermaidDiag
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
 
-import { getMermaid, isMermaidEnabled } from './mermaid'
+import { getMermaid } from './mermaid'
 import { toSafeSvgElement } from './mermaidSvgSanitizer'
 
 const props = withDefaults(
@@ -54,8 +54,7 @@ const DOMPURIFY_CONFIG = {
   SAFE_FOR_TEMPLATES: true,
 } as const
 
-const mermaidInitiallyEnabled = typeof window !== 'undefined' && isMermaidEnabled()
-const mermaidAvailable = ref(mermaidInitiallyEnabled)
+const mermaidAvailable = ref(false)
 const mermaidSecurityLevel = computed(() => props.isStrict ? 'strict' : 'loose')
 const mermaidInitConfig = computed(() => ({
   startOnLoad: false,
@@ -238,7 +237,7 @@ const translateX = ref(0)
 const translateY = ref(0)
 const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
-const showSource = ref(!mermaidInitiallyEnabled)
+const showSource = ref(true)
 const userToggledShowSource = ref(false)
 const isRendering = ref(false)
 const renderQueue = ref<Promise<boolean> | null>(null)
