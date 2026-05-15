@@ -99,6 +99,23 @@ const Mention = defineComponent({
   },
 })
 
+const InlinePropsProbe = defineComponent({
+  name: 'InlinePropsProbe',
+  props: {
+    node: { type: Object, required: true },
+    loading: Boolean,
+    isDark: Boolean,
+  },
+  setup(props, { slots }) {
+    return () => h('span', {
+      'class': 'inline-props-probe',
+      'data-type': String((props.node as any)?.type ?? ''),
+      'data-loading': String(props.loading),
+      'data-is-dark': String(props.isDark),
+    }, slots.default?.())
+  },
+})
+
 afterEach(() => {
   removeCustomComponents(customId)
 })
@@ -293,6 +310,65 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     expect(wrapper.get('strong .mention').text()).toBe('Simon')
     expect(wrapper.get('em .mention').text()).toBe('Ada')
     expect(wrapper.get('h1 .mention').text()).toBe('Lin')
+  })
+
+  it('forwards loading and isDark to inline custom tag components', async () => {
+    setCustomComponents(customId, {
+      mention: InlinePropsProbe,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        isDark: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+        nodes: [
+          {
+            type: 'paragraph',
+            raw: '',
+            children: [
+              {
+                type: 'mention',
+                tag: 'mention',
+                content: 'Direct',
+                raw: '<mention>Direct</mention>',
+                loading: true,
+              },
+              {
+                type: 'text',
+                content: ' ',
+                raw: ' ',
+              },
+              {
+                type: 'strong',
+                raw: '**<mention>Strong</mention>**',
+                children: [
+                  {
+                    type: 'mention',
+                    tag: 'mention',
+                    content: 'Strong',
+                    raw: '<mention>Strong</mention>',
+                    loading: true,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probes = wrapper.findAll('.inline-props-probe')
+    expect(probes).toHaveLength(2)
+    expect(probes[0].attributes('data-loading')).toBe('true')
+    expect(probes[0].attributes('data-is-dark')).toBe('true')
+    expect(probes[0].text()).toBe('Direct')
+    expect(probes[1].attributes('data-loading')).toBe('true')
+    expect(probes[1].attributes('data-is-dark')).toBe('true')
+    expect(probes[1].text()).toBe('Strong')
   })
 
   it('lets d2lang exact overrides beat d2 fallback while keeping d2 props', async () => {

@@ -59,8 +59,10 @@ const fallbackText = computed(() => String((props.node as any).content ?? props.
     v-if="component && rendersCustomNode"
     v-bind="customAttrs"
     :node="node"
+    :loading="(node as any).loading"
     :index-key="indexKey"
     :custom-id="customId"
+    :is-dark="nestedRendererProps.isDark"
   >
     <StructuredNodeRenderer
       v-if="hasSlotChildren"

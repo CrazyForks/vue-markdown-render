@@ -110,7 +110,13 @@ If the parser or core package stays below 1.0, `markstream-vue` must pin the exa
 
 ## Required package smoke
 
-Run packed-package validation before publishing:
+Run the unified release gate before publishing:
+
+```bash
+pnpm release:verify
+```
+
+That command runs lint, typecheck, the full Vitest suite, strict public API checks, and packed-package validation:
 
 ```bash
 pnpm test:smoke:pack
@@ -153,8 +159,7 @@ Track initial render time, stream update cost, p95 frame cost, max long task, me
 - [ ] Legacy fence renderer escaping covered by tests.
 - [ ] Safe HTML docs and XSS regression tests complete.
 - [ ] App-scoped custom component registry covered by SSR test.
-- [ ] `pnpm test:smoke:pack` passes.
-- [ ] `pnpm test:smoke:pack:optional` passes.
+- [ ] `pnpm release:verify` passes.
 - [ ] CSS, Tailwind, and worker subpath exports smoke-tested.
 - [ ] Unit, SSR, public API, and package export checks are green.
 - [ ] Nuxt SSR smoke or preview deployment is green.

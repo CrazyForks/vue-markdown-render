@@ -221,9 +221,11 @@ const processedChildren = computed(() => renderedChildren.value.map((child, inde
         v-else-if="item.isCustomComponent"
         v-bind="item.customAttrs"
         :node="item.child"
+        :loading="(item.child as any).loading"
         :index-key="item.key"
         :custom-id="props.customId"
         :custom-html-tags="resolvedCustomHtmlTags"
+        :is-dark="nestedRendererProps.isDark"
       >
         <StructuredNodeRenderer
           v-if="item.hasSlotChildren"
