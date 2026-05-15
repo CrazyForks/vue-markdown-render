@@ -202,8 +202,8 @@ importers:
         specifier: ^1.0.6
         version: 1.0.6
       markdown-it-ts:
-        specifier: ^0.0.9
-        version: 0.0.9
+        specifier: ^1.0.0
+        version: 1.0.0
     devDependencies:
       '@types/node':
         specifier: ^22.19.15
@@ -9283,8 +9283,8 @@ packages:
   markdown-it-task-checkbox@1.0.6:
     resolution: {integrity: sha512-7pxkHuvqTOu3iwVGmDPeYjQg+AIS9VQxzyLP9JCg9lBjgPAJXGEkChK6A2iFuj3tS0GV3HG2u5AMNhcQqwxpJw==}
 
-  markdown-it-ts@0.0.9:
-    resolution: {integrity: sha512-krzuXIaUUiXI8SLlyssp1q4FzDlnfP3wrJwb7ulzwa1DLTYnYDtVe9R5NLTi2FZTo59APCD6to5JnFFj5bs0nA==}
+  markdown-it-ts@1.0.0:
+    resolution: {integrity: sha512-hQT/yCYryC3jNs2wJ35R4m1zKcBxNuFaKCGzwpmq2OuMXMNbUK1oTwCxONIjy5lXWWG1UCNbGXe1nbTiWbH/iA==}
     engines: {node: '>=18'}
 
   markdown-it@14.1.1:
@@ -22839,8 +22839,10 @@ snapshots:
 
   markdown-it-task-checkbox@1.0.6: {}
 
-  markdown-it-ts@0.0.9:
+  markdown-it-ts@1.0.0:
     dependencies:
+      '@types/linkify-it': 5.0.0
+      '@types/mdurl': 2.0.0
       entities: 4.5.0
       linkify-it: 5.0.0
       mdurl: 2.0.0

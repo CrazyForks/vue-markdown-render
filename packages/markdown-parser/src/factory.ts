@@ -30,12 +30,23 @@ export interface FactoryOptions extends Record<string, unknown> {
 }
 
 export function factory(opts: FactoryOptions = {}): MarkdownItInstance {
+  const markdownItOptions = opts.markdownItOptions ?? {}
+  const experimental = typeof markdownItOptions.experimental === 'object' && markdownItOptions.experimental !== null
+    ? markdownItOptions.experimental as Record<string, unknown>
+    : {}
+  const stream = Object.prototype.hasOwnProperty.call(markdownItOptions, 'stream')
+    ? Boolean(markdownItOptions.stream)
+    : true
+
   const md = new MarkdownIt({
     html: true,
     linkify: true,
     typographer: true,
-    stream: true,
-    ...(opts.markdownItOptions ?? {}),
+    ...markdownItOptions,
+    experimental: {
+      stream,
+      ...experimental,
+    },
   }) as unknown as MarkdownItInstance
 
   if (opts.enableMath ?? true) {
