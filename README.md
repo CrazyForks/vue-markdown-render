@@ -82,7 +82,7 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 - Interactive test page (shareable links, easy reproduction): https://markstream-vue.simonhe.me/test
 - Docs: https://markstream-vue-docs.simonhe.me/guide/
 - Showcase: https://markstream-vue-docs.simonhe.me/guide/showcase
-- 1.0 benchmark report workflow: `pnpm benchmark:1.0`
+- 1.0 benchmark report: run `pnpm benchmark:1.0`
 - AI/LLM context (project map): https://markstream-vue-docs.simonhe.me/llms
 - AI/LLM context (中文): https://markstream-vue-docs.simonhe.me/llms.zh-CN
 - One-click StackBlitz demo: https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue

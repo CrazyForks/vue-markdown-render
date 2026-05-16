@@ -199,9 +199,35 @@ async function measureAfterComponentUnmount(page) {
   return await readUsedHeapBytes(page)
 }
 
+async function frameBaseline(page, stateName) {
+  return await page.evaluate((key) => {
+    const state = window[key] ?? {}
+    return Array.isArray(state.frameDeltas) ? state.frameDeltas.length : 0
+  }, stateName)
+}
+
+async function frameStatsSince(page, stateName, baseline) {
+  return await page.evaluate(({ key, baseline }) => {
+    const state = window[key] ?? {}
+    const frameDeltas = Array.isArray(state.frameDeltas)
+      ? state.frameDeltas.slice(Number(baseline || 0)).map(Number).filter(Number.isFinite)
+      : []
+    const sortedFrameDeltas = [...frameDeltas].sort((a, b) => a - b)
+    const frameP95Index = sortedFrameDeltas.length
+      ? Math.min(sortedFrameDeltas.length - 1, Math.ceil(sortedFrameDeltas.length * 0.95) - 1)
+      : -1
+    return {
+      frameSampleCount: frameDeltas.length,
+      frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
+      frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
+    }
+  }, { key: stateName, baseline })
+}
+
 async function runScenario(browser, port, mode) {
   const rootSelector = '.preview-surface'
   const sample = process.env.PLAYGROUND_SAMPLE || 'baseline'
+  const benchmarkPath = '/test?benchmark=1'
   const warmupContext = await browser.newContext({
     viewport: { width: 1600, height: 1200 },
     storageState: {
@@ -218,7 +244,7 @@ async function runScenario(browser, port, mode) {
     },
   })
   const warmupPage = await warmupContext.newPage()
-  await warmupPage.goto(`http://${host}:${port}/test`, { waitUntil: 'load' })
+  await warmupPage.goto(`http://${host}:${port}${benchmarkPath}`, { waitUntil: 'load' })
   await warmupPage.locator('.workspace-card--preview').waitFor({ state: 'visible', timeout: 15000 })
   await warmupContext.close()
 
@@ -326,30 +352,20 @@ async function runScenario(browser, port, mode) {
   })
 
   const page = await context.newPage()
-  await page.goto(`http://${host}:${port}/test`, { waitUntil: 'load' })
+  await page.goto(`http://${host}:${port}${benchmarkPath}`, { waitUntil: 'load' })
 
+  const initialFrameBaseline = await frameBaseline(page, '__playgroundPerfState')
   await page.locator('.workspace-card--preview').waitFor({ state: 'visible', timeout: 15000 })
   await waitForVisibleBlocksReady(page, rootSelector)
   await page.waitForTimeout(200)
+  const initialFrameStats = await frameStatsSince(page, '__playgroundPerfState', initialFrameBaseline)
 
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate((frameStats) => {
     const state = window.__playgroundPerfState ?? {}
     const longTasks = Array.isArray(state.longTasks) ? state.longTasks : []
     const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
     const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
     const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
-    const frameDeltas = Array.isArray(state.frameDeltas)
-      ? state.frameDeltas.map(Number).filter(Number.isFinite)
-      : []
-    const sortedFrameDeltas = [...frameDeltas].sort((a, b) => a - b)
-    const frameP95Index = sortedFrameDeltas.length
-      ? Math.min(sortedFrameDeltas.length - 1, Math.ceil(sortedFrameDeltas.length * 0.95) - 1)
-      : -1
-    const frameStats = {
-      frameSampleCount: frameDeltas.length,
-      frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
-      frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
-    }
     const root = document.querySelector('.preview-surface')
     const rootRect = root?.getBoundingClientRect()
     const isVisible = (element) => {
@@ -409,30 +425,20 @@ async function runScenario(browser, port, mode) {
             .slice(0, 5)
         : [],
     }
-  })
+  }, initialFrameStats)
 
+  const scrollFrameBaseline = await frameBaseline(page, '__playgroundPerfState')
   const scrollMetrics = await scrollThroughRoot(page, rootSelector)
   await waitForAllD2Ready(page)
   await page.waitForTimeout(200)
+  const fullScrollFrameStats = await frameStatsSince(page, '__playgroundPerfState', scrollFrameBaseline)
 
-  result.fullScroll = await page.evaluate(() => {
+  result.fullScroll = await page.evaluate((frameStats) => {
     const state = window.__playgroundPerfState ?? {}
     const longTasks = Array.isArray(state.longTasks) ? state.longTasks : []
     const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
     const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
     const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
-    const frameDeltas = Array.isArray(state.frameDeltas)
-      ? state.frameDeltas.map(Number).filter(Number.isFinite)
-      : []
-    const sortedFrameDeltas = [...frameDeltas].sort((a, b) => a - b)
-    const frameP95Index = sortedFrameDeltas.length
-      ? Math.min(sortedFrameDeltas.length - 1, Math.ceil(sortedFrameDeltas.length * 0.95) - 1)
-      : -1
-    const frameStats = {
-      frameSampleCount: frameDeltas.length,
-      frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
-      frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
-    }
     return {
       settleTimeMs: performance.now() - Number(state.startedAt ?? 0),
       ...frameStats,
@@ -448,7 +454,7 @@ async function runScenario(browser, port, mode) {
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
       scrollDriftPx: null,
     }
-  })
+  }, fullScrollFrameStats)
   result.fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
   result.memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
   result.memoryAfterUnmountBytes = await measureAfterComponentUnmount(page)

@@ -150,10 +150,10 @@ Use `htmlPolicy="trusted"` only for content that is fully controlled by the appl
 
 The 1.0 public benchmark covers the shipped playground scenarios:
 
-- Diagnostic Studio baseline, thinking, diff, and stress samples in MarkdownCodeBlock and Monaco modes.
+- Diagnostic Studio baseline, thinking, diff, and stress samples in MarkdownCodeBlock and Monaco modes using `/test?benchmark=1`.
 - Main playground reverse-flex chat initial load, full-scroll pass, and streaming replay.
 
-Track LCP, CLS, settle time, p95 `requestAnimationFrame` interval, max long task, DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC.
+Track LCP, CLS, settle time, frame sample count, phase-local p95 `requestAnimationFrame` interval, max long task, DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC.
 
 Extended synthetic scenarios such as 1 MB documents, 1000 code blocks, 100 Mermaid blocks, and 10k pre-parsed nodes are planned for 1.0.x. Do not use them as 1.0 release evidence until they are implemented in `pnpm benchmark:1.0`.
 

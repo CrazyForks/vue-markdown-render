@@ -22,7 +22,7 @@ const scenarios = [
     title: `Diagnostic Studio / ${sample}`,
     command: ['node', ['scripts/e2e-playground-performance.mjs']],
     env: { PLAYGROUND_SAMPLE: sample },
-    notes: 'Runs /test in MarkdownCodeBlock and Monaco modes, then scrolls the preview surface.',
+    notes: 'Runs /test?benchmark=1 in MarkdownCodeBlock and Monaco modes, then scrolls the preview surface.',
   })),
   {
     id: 'main-playground-chat',
@@ -233,13 +233,13 @@ function renderMarkdownReport(report) {
   lines.push('')
   lines.push('## Results')
   lines.push('')
-  lines.push('| Scenario | Phase | LCP ms | CLS | Settle ms | Frame interval p95 ms | Max long task ms | DOM nodes | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after component unmount + GC |')
-  lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: |')
+  lines.push('| Scenario | Phase | LCP ms | CLS | Settle ms | Frame samples | Frame interval p95 ms | Max long task ms | DOM nodes | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after component unmount + GC |')
+  lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: |')
 
   for (const entry of report.scenarios) {
     for (const item of scenarioRows(entry)) {
       const row = item.row ?? {}
-      lines.push(`| ${item.scenario} | ${item.phase} | ${formatMs(row.lcpMs)} | ${typeof row.cls === 'number' ? row.cls.toFixed(4) : '-'} | ${formatMs(row.settleTimeMs)} | ${formatMs(row.frameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.domNodeCount)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
+      lines.push(`| ${item.scenario} | ${item.phase} | ${formatMs(row.lcpMs)} | ${typeof row.cls === 'number' ? row.cls.toFixed(4) : '-'} | ${formatMs(row.settleTimeMs)} | ${formatNumber(row.frameSampleCount)} | ${formatMs(row.frameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.domNodeCount)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
     }
   }
 
@@ -249,8 +249,23 @@ function renderMarkdownReport(report) {
   for (const entry of report.scenarios)
     lines.push(`- **${entry.title}**: ${entry.notes}`)
   lines.push('')
-  lines.push('This report records measured release evidence from the shipped playgrounds. Frame interval is the p95 `requestAnimationFrame` delta, and heap after component unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
+  lines.push('This report records measured release evidence from the shipped playgrounds. Frame interval is the p95 `requestAnimationFrame` delta from each phase-local sample window, and heap after component unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
   return `${lines.join('\n')}\n`
+}
+
+function writeReportFiles(report, partial = false) {
+  const slug = `${report.versions.markstreamVue}.chrome-${platform()}-${arch()}`
+  const fileSlug = partial ? `${slug}.partial` : slug
+  const jsonPath = path.join(outputDir, `${fileSlug}.json`)
+  const markdownPath = path.join(outputDir, `${fileSlug}.md`)
+  const latestPath = path.join(outputDir, partial ? 'latest-partial-summary.md' : 'latest-summary.md')
+  const markdown = renderMarkdownReport(report)
+
+  writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`)
+  writeFileSync(markdownPath, markdown)
+  writeFileSync(latestPath, markdown)
+
+  return { jsonPath, markdownPath, latestPath }
 }
 
 async function run() {
@@ -275,6 +290,7 @@ async function run() {
     },
     scenarios: [],
   }
+  writeReportFiles(report, true)
 
   if (process.env.MARKSTREAM_BENCHMARK_SKIP_BUILD !== '1') {
     console.error('[benchmark:1.0] Build playground')
@@ -295,17 +311,10 @@ async function run() {
       env: scenario.env,
       result: parseJsonOutput(stdout),
     })
+    writeReportFiles(report, true)
   }
 
-  const slug = `${report.versions.markstreamVue}.chrome-${platform()}-${arch()}`
-  const jsonPath = path.join(outputDir, `${slug}.json`)
-  const markdownPath = path.join(outputDir, `${slug}.md`)
-  const latestPath = path.join(outputDir, 'latest-summary.md')
-  const markdown = renderMarkdownReport(report)
-
-  writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`)
-  writeFileSync(markdownPath, markdown)
-  writeFileSync(latestPath, markdown)
+  const { jsonPath, markdownPath, latestPath } = writeReportFiles(report)
 
   console.log(`Wrote ${path.relative(repoRoot, jsonPath)}`)
   console.log(`Wrote ${path.relative(repoRoot, markdownPath)}`)

@@ -199,31 +199,46 @@ async function measureAfterComponentUnmount(page) {
   return await readUsedHeapBytes(page)
 }
 
-async function collectMetrics(page) {
-  const rootSelector = '.chatbot-messages'
-  await page.goto('/', { waitUntil: 'load' })
-  await page.locator('.playground-root').waitFor({ state: 'visible', timeout: 15000 })
-  await waitForVisibleBlocksReady(page, rootSelector)
-  await page.waitForTimeout(250)
+async function frameBaseline(page, stateName) {
+  return await page.evaluate((key) => {
+    const state = window[key] ?? {}
+    return Array.isArray(state.frameDeltas) ? state.frameDeltas.length : 0
+  }, stateName)
+}
 
-  const initial = await page.evaluate(() => {
-    const state = window.__mainPlaygroundPerf ?? {}
-    const longTasks = Array.isArray(state.longTasks) ? state.longTasks : []
-    const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
-    const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
-    const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
+async function frameStatsSince(page, stateName, baseline) {
+  return await page.evaluate(({ key, baseline }) => {
+    const state = window[key] ?? {}
     const frameDeltas = Array.isArray(state.frameDeltas)
-      ? state.frameDeltas.map(Number).filter(Number.isFinite)
+      ? state.frameDeltas.slice(Number(baseline || 0)).map(Number).filter(Number.isFinite)
       : []
     const sortedFrameDeltas = [...frameDeltas].sort((a, b) => a - b)
     const frameP95Index = sortedFrameDeltas.length
       ? Math.min(sortedFrameDeltas.length - 1, Math.ceil(sortedFrameDeltas.length * 0.95) - 1)
       : -1
-    const frameStats = {
+    return {
       frameSampleCount: frameDeltas.length,
       frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
       frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
     }
+  }, { key: stateName, baseline })
+}
+
+async function collectMetrics(page) {
+  const rootSelector = '.chatbot-messages'
+  await page.goto('/', { waitUntil: 'load' })
+  const initialFrameBaseline = await frameBaseline(page, '__mainPlaygroundPerf')
+  await page.locator('.playground-root').waitFor({ state: 'visible', timeout: 15000 })
+  await waitForVisibleBlocksReady(page, rootSelector)
+  await page.waitForTimeout(250)
+  const initialFrameStats = await frameStatsSince(page, '__mainPlaygroundPerf', initialFrameBaseline)
+
+  const initial = await page.evaluate((frameStats) => {
+    const state = window.__mainPlaygroundPerf ?? {}
+    const longTasks = Array.isArray(state.longTasks) ? state.longTasks : []
+    const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
+    const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
+    const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
     const root = document.querySelector('.chatbot-messages')
     const rootRect = root?.getBoundingClientRect()
     const isVisible = (element) => {
@@ -271,30 +286,20 @@ async function collectMetrics(page) {
             .slice(0, 5)
         : [],
     }
-  })
+  }, initialFrameStats)
 
+  const scrollFrameBaseline = await frameBaseline(page, '__mainPlaygroundPerf')
   const scrollMetrics = await scrollThroughRoot(page, rootSelector)
   await waitForAllD2Ready(page)
   await page.waitForTimeout(250)
+  const fullScrollFrameStats = await frameStatsSince(page, '__mainPlaygroundPerf', scrollFrameBaseline)
 
-  const fullScroll = await page.evaluate(() => {
+  const fullScroll = await page.evaluate((frameStats) => {
     const state = window.__mainPlaygroundPerf ?? {}
     const longTasks = Array.isArray(state.longTasks) ? state.longTasks : []
     const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
     const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
     const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
-    const frameDeltas = Array.isArray(state.frameDeltas)
-      ? state.frameDeltas.map(Number).filter(Number.isFinite)
-      : []
-    const sortedFrameDeltas = [...frameDeltas].sort((a, b) => a - b)
-    const frameP95Index = sortedFrameDeltas.length
-      ? Math.min(sortedFrameDeltas.length - 1, Math.ceil(sortedFrameDeltas.length * 0.95) - 1)
-      : -1
-    const frameStats = {
-      frameSampleCount: frameDeltas.length,
-      frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
-      frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
-    }
     return {
       settleTimeMs: performance.now() - Number(state.startedAt ?? 0),
       ...frameStats,
@@ -311,7 +316,7 @@ async function collectMetrics(page) {
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
       scrollDriftPx: null,
     }
-  })
+  }, fullScrollFrameStats)
   fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
 
   const replayButton = page.locator('button.nav-btn--stream')

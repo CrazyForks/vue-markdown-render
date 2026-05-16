@@ -46,7 +46,7 @@ stream-markdown-parser@1.0.0
 pnpm run release:gate:1.0
 ```
 
-该命令会执行 release verification、docs build、size budget 和 1.0 benchmark report。当前 public benchmark 覆盖已发布 playground 场景：Diagnostic Studio 的 baseline、thinking、diff、stress，以及主 playground reverse-flex chat。benchmark 会生成 `benchmark/*.json`、`benchmark/*.md`、`benchmark/latest-summary.md`，release notes 应优先引用 `1.0 Benchmark` workflow artifact；本地提交的报告只代表文件名和环境信息披露的本机快照。
+该命令会执行 release verification、docs build、size budget 和 1.0 benchmark report。当前 public benchmark 覆盖已发布 playground 场景：Diagnostic Studio 的 baseline、thinking、diff、stress，以及主 playground reverse-flex chat。Diagnostic Studio 场景使用 `/test?benchmark=1`，报告中的 frame p95 使用 phase-local sample window。benchmark 会生成 `benchmark/*.json`、`benchmark/*.md`、`benchmark/latest-summary.md`，release notes 应优先引用 `1.0 Benchmark` workflow artifact；本地生成的报告只代表文件名和环境信息披露的本机快照。
 
 ## Go / No-Go
 
@@ -56,9 +56,9 @@ pnpm run release:gate:1.0
 - [x] Safe HTML 文档与 XSS 回归测试完成。
 - [x] App-scoped custom component registry 有 SSR 测试覆盖。
 - [x] CSS、Tailwind、worker subpath exports 已纳入 smoke test。
-- [x] Unit、SSR、public API、package export checks 纳入 release gate。
-- [x] `pnpm run release:gate:1.0` 已通过。
-- [x] Nuxt SSR smoke 已通过 dev 和 preview 模式。
-- [x] VitePress docs build 纳入 release gate。
+- [ ] Unit、SSR、public API、package export checks 已通过。
+- [ ] `pnpm run release:gate:1.0` 已通过。
+- [ ] Nuxt SSR smoke 已通过 dev 和 preview 模式。
+- [ ] VitePress docs build 已通过。
 - [x] Migration notes 与 changelog 已记录 beta/rc 到 1.0 的变更。
-- [x] 当前 playground benchmark report 可通过 `pnpm benchmark:1.0` 或 workflow artifact 生成。
+- [ ] 当前 playground benchmark report 或最新 workflow artifact 已附到 release notes。
