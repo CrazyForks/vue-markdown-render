@@ -148,14 +148,18 @@ function parseJsonOutput(stdout) {
   return JSON.parse(stdout.slice(start, end + 1))
 }
 
-function heavyBlockSummary(row) {
+function heavyBlockSummary(row, scope = 'all') {
   const parts = []
-  if (typeof row.mermaidCount === 'number')
-    parts.push(`Mermaid ${row.renderedMermaidCount ?? row.visibleRenderedMermaidCount ?? '-'}/${row.mermaidCount}`)
-  if (typeof row.infographicCount === 'number')
-    parts.push(`Infographic ${row.renderedInfographicCount ?? row.visibleRenderedInfographicCount ?? '-'}/${row.infographicCount}`)
-  if (typeof row.d2Count === 'number')
-    parts.push(`D2 ${row.renderedD2Count ?? row.visibleRenderedD2Count ?? '-'}/${row.d2Count}`)
+  const visible = scope === 'visible'
+  const mermaidCount = visible ? row.visibleMermaidCount : row.mermaidCount
+  const infographicCount = visible ? row.visibleInfographicCount : row.infographicCount
+  const d2Count = visible ? row.visibleD2Count : row.d2Count
+  if (typeof mermaidCount === 'number')
+    parts.push(`Mermaid ${(visible ? row.visibleRenderedMermaidCount : row.renderedMermaidCount) ?? '-'}/${mermaidCount}`)
+  if (typeof infographicCount === 'number')
+    parts.push(`Infographic ${(visible ? row.visibleRenderedInfographicCount : row.renderedInfographicCount) ?? '-'}/${infographicCount}`)
+  if (typeof d2Count === 'number')
+    parts.push(`D2 ${(visible ? row.visibleRenderedD2Count : row.renderedD2Count) ?? '-'}/${d2Count}`)
   return parts.length ? parts.join('<br>') : '-'
 }
 
@@ -180,6 +184,7 @@ function scenarioRows(entry) {
         scenario: entry.title,
         phase: `${mode} initial`,
         row,
+        heavyBlockScope: 'visible',
         memoryAfterUnmountBytes: row.memoryAfterUnmountBytes,
       })
       if (row.fullScroll) {
@@ -187,6 +192,7 @@ function scenarioRows(entry) {
           scenario: entry.title,
           phase: `${mode} full scroll`,
           row: row.fullScroll,
+          heavyBlockScope: 'all',
           memoryAfterUnmountBytes: row.memoryAfterUnmountBytes,
         })
       }
@@ -195,9 +201,9 @@ function scenarioRows(entry) {
   }
 
   if (entry.id === 'main-playground-chat') {
-    rows.push({ scenario: entry.title, phase: 'initial', row: result.initial, memoryAfterUnmountBytes: result.memoryAfterUnmountBytes })
-    rows.push({ scenario: entry.title, phase: 'full scroll', row: result.fullScroll, memoryAfterUnmountBytes: result.memoryAfterUnmountBytes })
-    rows.push({ scenario: entry.title, phase: 'stream replay', row: result.replay, memoryAfterUnmountBytes: result.memoryAfterUnmountBytes })
+    rows.push({ scenario: entry.title, phase: 'initial', row: result.initial, heavyBlockScope: 'visible', memoryAfterUnmountBytes: result.memoryAfterUnmountBytes })
+    rows.push({ scenario: entry.title, phase: 'full scroll', row: result.fullScroll, heavyBlockScope: 'all', memoryAfterUnmountBytes: result.memoryAfterUnmountBytes })
+    rows.push({ scenario: entry.title, phase: 'stream replay', row: result.replay, heavyBlockScope: 'all', memoryAfterUnmountBytes: result.memoryAfterUnmountBytes })
   }
 
   return rows
@@ -227,13 +233,13 @@ function renderMarkdownReport(report) {
   lines.push('')
   lines.push('## Results')
   lines.push('')
-  lines.push('| Scenario | Phase | LCP ms | CLS | Settle ms | Frame p95 ms | Max long task ms | DOM nodes | Fallbacks | Heavy blocks | Scroll drift px | Heap after unmount |')
+  lines.push('| Scenario | Phase | LCP ms | CLS | Settle ms | Frame interval p95 ms | Max long task ms | DOM nodes | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after component unmount + GC |')
   lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: |')
 
   for (const entry of report.scenarios) {
     for (const item of scenarioRows(entry)) {
       const row = item.row ?? {}
-      lines.push(`| ${item.scenario} | ${item.phase} | ${formatMs(row.lcpMs)} | ${typeof row.cls === 'number' ? row.cls.toFixed(4) : '-'} | ${formatMs(row.settleTimeMs)} | ${formatMs(row.frameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.domNodeCount)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
+      lines.push(`| ${item.scenario} | ${item.phase} | ${formatMs(row.lcpMs)} | ${typeof row.cls === 'number' ? row.cls.toFixed(4) : '-'} | ${formatMs(row.settleTimeMs)} | ${formatMs(row.frameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.domNodeCount)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
     }
   }
 
@@ -243,7 +249,7 @@ function renderMarkdownReport(report) {
   for (const entry of report.scenarios)
     lines.push(`- **${entry.title}**: ${entry.notes}`)
   lines.push('')
-  lines.push('This report records measured release evidence from the shipped playgrounds. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
+  lines.push('This report records measured release evidence from the shipped playgrounds. Frame interval is the p95 `requestAnimationFrame` delta, and heap after component unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
   return `${lines.join('\n')}\n`
 }
 

@@ -36,9 +36,15 @@ describe('release dependency gates', () => {
     expect(releaseGate).toContain('pnpm run size:check')
     expect(releaseGate).toContain('pnpm run benchmark:1.0')
     expect(release1).toContain('pnpm run release:gate:1.0')
-    expect(release1.indexOf('pnpm run release:gate:1.0')).toBeLessThan(release1.indexOf('pnpm run release:parser'))
-    expect(release1.indexOf('pnpm run release:parser')).toBeLessThan(release1.indexOf('pnpm run release:core'))
-    expect(release1.indexOf('pnpm run release:core')).toBeLessThan(release1.lastIndexOf('pnpm run release'))
+    expect(scripts['publish:parser:current']).toContain('scripts/publish-current-package.mjs')
+    expect(scripts['publish:core:current']).toContain('scripts/publish-current-package.mjs')
+    expect(scripts['publish:vue3:current']).toContain('scripts/publish-current-package.mjs')
+    expect(release1).not.toContain('pnpm run release:parser')
+    expect(release1).not.toContain('pnpm run release:core')
+    expect(release1).not.toMatch(/&& pnpm run release(?:\s|$)/)
+    expect(release1.indexOf('pnpm run release:gate:1.0')).toBeLessThan(release1.indexOf('pnpm run publish:parser:current'))
+    expect(release1.indexOf('pnpm run publish:parser:current')).toBeLessThan(release1.indexOf('pnpm run publish:core:current'))
+    expect(release1.indexOf('pnpm run publish:core:current')).toBeLessThan(release1.indexOf('pnpm run publish:vue3:current'))
   })
 
   it('checks both runtime workspace packages for published versions', () => {

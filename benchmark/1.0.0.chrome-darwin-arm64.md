@@ -1,6 +1,6 @@
 # markstream-vue 1.0 Benchmark Report
 
-Generated at: 2026-05-16T02:10:20.243Z
+Generated at: 2026-05-16T02:33:59.231Z
 
 ## Environment
 
@@ -20,27 +20,27 @@ Generated at: 2026-05-16T02:10:20.243Z
 
 ## Results
 
-| Scenario | Phase | LCP ms | CLS | Settle ms | Frame p95 ms | Max long task ms | DOM nodes | Fallbacks | Heavy blocks | Scroll drift px | Heap after unmount |
+| Scenario | Phase | LCP ms | CLS | Settle ms | Frame interval p95 ms | Max long task ms | DOM nodes | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after component unmount + GC |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: |
-| Diagnostic Studio / baseline | markdown initial | 392.0 | 0.0000 | 794.1 | 66.6 | 247.0 | 833 | 0 visible / 1 total | Mermaid 1/1<br>Infographic 1/1<br>D2 0/1 | - | 1.10 MB |
-| Diagnostic Studio / baseline | markdown full scroll | - | - | 3629.9 | 50.0 | - | 960 | 0 | Mermaid 1/1<br>Infographic 1/1<br>D2 1/1 | 0.0 | 1.10 MB |
-| Diagnostic Studio / baseline | monaco initial | 488.0 | 0.0000 | 993.8 | 75.0 | 273.0 | 651 | 0 visible / 1 total | Mermaid 1/1<br>Infographic 1/1<br>D2 0/1 | - | 1.10 MB |
-| Diagnostic Studio / baseline | monaco full scroll | - | - | 3443.4 | 58.3 | - | 1018 | 0 | Mermaid 1/1<br>Infographic 1/1<br>D2 1/1 | 0.0 | 1.10 MB |
-| Diagnostic Studio / thinking | markdown initial | 404.0 | 0.0000 | 952.3 | 50.1 | 259.0 | 585 | 0 visible / 1 total | Mermaid 1/1<br>Infographic 0/0<br>D2 0/0 | - | 1.06 MB |
-| Diagnostic Studio / thinking | markdown full scroll | - | - | 1351.0 | 50.0 | - | 610 | 0 | Mermaid 1/1<br>Infographic 0/0<br>D2 0/0 | 0.0 | 1.06 MB |
-| Diagnostic Studio / thinking | monaco initial | 384.0 | 0.0000 | 825.1 | 58.6 | 250.0 | 524 | 0 visible / 1 total | Mermaid 1/1<br>Infographic 0/0<br>D2 0/0 | - | 1.09 MB |
-| Diagnostic Studio / thinking | monaco full scroll | - | - | 1484.4 | 33.4 | - | 668 | 0 | Mermaid 1/1<br>Infographic 0/0<br>D2 0/0 | 0.0 | 1.09 MB |
-| Diagnostic Studio / diff | markdown initial | 404.0 | 0.0000 | 1687.4 | 75.0 | 300.0 | 867 | 0 visible / 0 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 1.08 MB |
-| Diagnostic Studio / diff | markdown full scroll | - | - | 2083.0 | 50.0 | - | 867 | 0 | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | 0.0 | 1.08 MB |
-| Diagnostic Studio / diff | monaco initial | 412.0 | 0.0000 | 1468.9 | 82.5 | 263.0 | 808 | 0 visible / 0 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 1.08 MB |
-| Diagnostic Studio / diff | monaco full scroll | - | - | 2055.3 | 41.2 | - | 866 | 0 | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | 0.0 | 1.08 MB |
-| Diagnostic Studio / stress | markdown initial | 432.0 | 0.0000 | 791.5 | 17.6 | 287.0 | 533 | 0 visible / 0 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 1.06 MB |
-| Diagnostic Studio / stress | markdown full scroll | - | - | 1196.6 | 9.3 | - | 533 | 0 | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | 0.0 | 1.06 MB |
-| Diagnostic Studio / stress | monaco initial | 420.0 | 0.0000 | 778.0 | 17.5 | 281.0 | 533 | 0 visible / 0 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 1.06 MB |
-| Diagnostic Studio / stress | monaco full scroll | - | - | 1171.0 | 16.7 | - | 533 | 0 | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | 0.0 | 1.06 MB |
-| Main Playground / reverse-flex chat | initial | 184.0 | 0.0000 | 494.0 | 9.3 | 110.0 | 305 | 0 visible / 0 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 994.8 KB |
-| Main Playground / reverse-flex chat | full scroll | - | - | 754.5 | 9.3 | - | 317 | 0 | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | 0.0 | 994.8 KB |
-| Main Playground / reverse-flex chat | stream replay | - | - | 439.5 | 8.9 | - | 317 | - | - | - | 994.8 KB |
+| Diagnostic Studio / baseline | markdown initial | 372.0 | 0.0000 | 785.2 | 66.6 | 237.0 | 833 | 0 visible / 1 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 73.58 MB |
+| Diagnostic Studio / baseline | markdown full scroll | - | - | 3586.5 | 42.2 | - | 960 | 0 | Mermaid 1/1<br>Infographic 1/1<br>D2 1/1 | 0.0 | 73.58 MB |
+| Diagnostic Studio / baseline | monaco initial | 376.0 | 0.0000 | 855.7 | 66.7 | 238.0 | 758 | 0 visible / 1 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 69.59 MB |
+| Diagnostic Studio / baseline | monaco full scroll | - | - | 3454.8 | 50.5 | - | 1018 | 0 | Mermaid 1/1<br>Infographic 1/1<br>D2 1/1 | 0.0 | 69.59 MB |
+| Diagnostic Studio / thinking | markdown initial | 400.0 | 0.0000 | 956.6 | 57.4 | 260.0 | 585 | 0 visible / 1 total | Mermaid 1/1<br>Infographic 0/0<br>D2 0/0 | - | 38.82 MB |
+| Diagnostic Studio / thinking | markdown full scroll | - | - | 1354.4 | 49.1 | - | 610 | 0 | Mermaid 1/1<br>Infographic 0/0<br>D2 0/0 | 0.0 | 38.82 MB |
+| Diagnostic Studio / thinking | monaco initial | 400.0 | 0.0000 | 864.6 | 58.6 | 264.0 | 524 | 0 visible / 1 total | Mermaid 1/1<br>Infographic 0/0<br>D2 0/0 | - | 40.37 MB |
+| Diagnostic Studio / thinking | monaco full scroll | - | - | 1491.5 | 41.6 | - | 668 | 0 | Mermaid 1/1<br>Infographic 0/0<br>D2 0/0 | 0.0 | 40.37 MB |
+| Diagnostic Studio / diff | markdown initial | 404.0 | 0.0000 | 1370.9 | 58.7 | 261.0 | 867 | 0 visible / 0 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 52.04 MB |
+| Diagnostic Studio / diff | markdown full scroll | - | - | 1766.2 | 74.0 | - | 867 | 0 | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | 0.0 | 52.04 MB |
+| Diagnostic Studio / diff | monaco initial | 408.0 | 0.0000 | 1417.6 | 83.3 | 262.0 | 801 | 0 visible / 0 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 49.06 MB |
+| Diagnostic Studio / diff | monaco full scroll | - | - | 2006.6 | 41.7 | - | 866 | 0 | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | 0.0 | 49.06 MB |
+| Diagnostic Studio / stress | markdown initial | 416.0 | 0.0000 | 766.4 | 16.7 | 273.0 | 533 | 0 visible / 0 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 24.44 MB |
+| Diagnostic Studio / stress | markdown full scroll | - | - | 1159.8 | 16.6 | - | 533 | 0 | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | 0.0 | 24.44 MB |
+| Diagnostic Studio / stress | monaco initial | 416.0 | 0.0000 | 772.5 | 24.4 | 277.0 | 533 | 0 visible / 0 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 24.46 MB |
+| Diagnostic Studio / stress | monaco full scroll | - | - | 1166.9 | 16.6 | - | 533 | 0 | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | 0.0 | 24.46 MB |
+| Main Playground / reverse-flex chat | initial | 200.0 | 0.0000 | 516.3 | 8.9 | 116.0 | 282 | 0 visible / 0 total | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | - | 16.58 MB |
+| Main Playground / reverse-flex chat | full scroll | - | - | 773.9 | 9.3 | - | 317 | 0 | Mermaid 0/0<br>Infographic 0/0<br>D2 0/0 | 0.0 | 16.58 MB |
+| Main Playground / reverse-flex chat | stream replay | - | - | 442.7 | 9.3 | - | 317 | - | - | - | 16.58 MB |
 
 ## Scenario Notes
 
@@ -50,4 +50,4 @@ Generated at: 2026-05-16T02:10:20.243Z
 - **Diagnostic Studio / stress**: Runs /test in MarkdownCodeBlock and Monaco modes, then scrolls the preview surface.
 - **Main Playground / reverse-flex chat**: Runs the main AI chat playground, full-scrolls the reverse-flex viewport, and replays streaming.
 
-This report records measured release evidence from the shipped playgrounds. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.
+This report records measured release evidence from the shipped playgrounds. Frame interval is the p95 `requestAnimationFrame` delta, and heap after component unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.

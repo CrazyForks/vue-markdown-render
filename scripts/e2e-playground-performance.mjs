@@ -185,6 +185,20 @@ async function readUsedHeapBytes(page) {
   })
 }
 
+async function measureAfterComponentUnmount(page) {
+  await page.evaluate(async () => {
+    const unmount = window.__markstreamBenchmarkUnmount
+    if (typeof unmount !== 'function')
+      throw new Error('Benchmark component unmount hook is not available.')
+    unmount()
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  })
+  if (typeof page.requestGC === 'function')
+    await page.requestGC()
+  await page.waitForTimeout(100)
+  return await readUsedHeapBytes(page)
+}
+
 async function runScenario(browser, port, mode) {
   const rootSelector = '.preview-surface'
   const sample = process.env.PLAYGROUND_SAMPLE || 'baseline'
@@ -437,11 +451,7 @@ async function runScenario(browser, port, mode) {
   })
   result.fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
   result.memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
-  await page.goto('about:blank')
-  if (typeof page.requestGC === 'function')
-    await page.requestGC()
-  await page.waitForTimeout(100)
-  result.memoryAfterUnmountBytes = await readUsedHeapBytes(page)
+  result.memoryAfterUnmountBytes = await measureAfterComponentUnmount(page)
 
   await context.close()
   return result
@@ -470,6 +480,10 @@ function assertScenario(result) {
     throw new Error(`[${result.mode}] Max long task should stay within 700ms. Got ${result.longTaskMaxMs}.`)
   if (!(result.longTaskTotalMs <= 1800))
     throw new Error(`[${result.mode}] Total long task time should stay within 1800ms. Got ${result.longTaskTotalMs}.`)
+  if (!(result.frameP95Ms <= 120))
+    throw new Error(`[${result.mode}] Frame interval p95 should stay within 120ms. Got ${result.frameP95Ms}.`)
+  if (!(result.domNodeCount <= 5000))
+    throw new Error(`[${result.mode}] DOM node count budget exceeded. Got ${result.domNodeCount}.`)
   if (result.fullScroll.fallbackCount !== 0)
     throw new Error(`[${result.mode}] Code fallback should be gone after full scroll settle.`)
   if (result.fullScroll.renderedMermaidCount !== result.fullScroll.mermaidCount)
@@ -478,6 +492,12 @@ function assertScenario(result) {
     throw new Error(`[${result.mode}] Infographic blocks should all finish after full scroll settle.`)
   if (result.fullScroll.renderedD2Count !== result.fullScroll.d2Count)
     throw new Error(`[${result.mode}] D2 blocks should all finish after full scroll settle.`)
+  if (!(result.fullScroll.frameP95Ms <= 120))
+    throw new Error(`[${result.mode}] Full-scroll frame interval p95 should stay within 120ms. Got ${result.fullScroll.frameP95Ms}.`)
+  if (!(result.fullScroll.scrollDriftPx <= 2))
+    throw new Error(`[${result.mode}] Scroll drift should stay within 2px. Got ${result.fullScroll.scrollDriftPx}.`)
+  if (!(result.fullScroll.domNodeCount <= 5000))
+    throw new Error(`[${result.mode}] Full-scroll DOM node count budget exceeded. Got ${result.fullScroll.domNodeCount}.`)
 }
 
 async function run() {

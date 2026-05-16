@@ -148,17 +148,14 @@ Use `htmlPolicy="trusted"` only for content that is fully controlled by the appl
 
 ## Performance release gate
 
-The public benchmark set should include:
+The 1.0 public benchmark covers the shipped playground scenarios:
 
-- 10 KB normal docs.
-- 100 KB AI streaming.
-- 1 MB large document.
-- 1000 code blocks.
-- 100 Mermaid blocks.
-- 10k pre-parsed nodes.
-- Reverse-flex chat scroll.
+- Diagnostic Studio baseline, thinking, diff, and stress samples in MarkdownCodeBlock and Monaco modes.
+- Main playground reverse-flex chat initial load, full-scroll pass, and streaming replay.
 
-Track initial render time, stream update cost, p95 frame cost, max long task, memory after unmount, scroll drift, and DOM node count.
+Track LCP, CLS, settle time, p95 `requestAnimationFrame` interval, max long task, DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC.
+
+Extended synthetic scenarios such as 1 MB documents, 1000 code blocks, 100 Mermaid blocks, and 10k pre-parsed nodes are planned for 1.0.x. Do not use them as 1.0 release evidence until they are implemented in `pnpm benchmark:1.0`.
 
 Generate the public report with:
 
@@ -176,7 +173,7 @@ The report writes `benchmark/*.json`, `benchmark/*.md`, and `benchmark/latest-su
 - [x] Safe HTML docs and XSS regression tests complete.
 - [x] App-scoped custom component registry covered by SSR test.
 - [x] `pnpm run release:gate:1.0` passes.
-- [x] `benchmark/latest-summary.md` or the latest workflow artifact is attached to the release notes.
+- [x] Current playground benchmark report or the latest workflow artifact is attached to the release notes.
 - [x] CSS, Tailwind, and worker subpath exports smoke-tested.
 - [x] Unit, SSR, public API, and package export checks are green.
 - [x] Nuxt SSR smoke or preview deployment is green.

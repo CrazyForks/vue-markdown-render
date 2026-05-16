@@ -185,6 +185,20 @@ async function readUsedHeapBytes(page) {
   })
 }
 
+async function measureAfterComponentUnmount(page) {
+  await page.evaluate(async () => {
+    const unmount = window.__markstreamBenchmarkUnmount
+    if (typeof unmount !== 'function')
+      throw new Error('Benchmark component unmount hook is not available.')
+    unmount()
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  })
+  if (typeof page.requestGC === 'function')
+    await page.requestGC()
+  await page.waitForTimeout(100)
+  return await readUsedHeapBytes(page)
+}
+
 async function collectMetrics(page) {
   const rootSelector = '.chatbot-messages'
   await page.goto('/', { waitUntil: 'load' })
@@ -346,11 +360,7 @@ async function collectMetrics(page) {
   })
 
   const memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
-  await page.goto('about:blank')
-  if (typeof page.requestGC === 'function')
-    await page.requestGC()
-  await page.waitForTimeout(100)
-  const memoryAfterUnmountBytes = await readUsedHeapBytes(page)
+  const memoryAfterUnmountBytes = await measureAfterComponentUnmount(page)
 
   return { initial, fullScroll, replay, memoryBeforeUnmountBytes, memoryAfterUnmountBytes }
 }
@@ -374,6 +384,10 @@ function assertScenario(result) {
     throw new Error(`Total long task time should stay within 1400ms. Got ${result.initial.longTaskTotalMs}.`)
   if (!(result.initial.settleTimeMs <= 7000))
     throw new Error(`Initial settle should stay within 7000ms. Got ${result.initial.settleTimeMs}.`)
+  if (!(result.initial.frameP95Ms <= 120))
+    throw new Error(`Initial frame interval p95 should stay within 120ms. Got ${result.initial.frameP95Ms}.`)
+  if (!(result.initial.domNodeCount <= 5000))
+    throw new Error(`Initial DOM node count budget exceeded. Got ${result.initial.domNodeCount}.`)
   if (result.fullScroll.fallbackCount !== 0)
     throw new Error('Code block fallbacks should be gone after full scroll settle.')
   if (result.fullScroll.renderedMermaidCount !== result.fullScroll.mermaidCount)
@@ -382,8 +396,18 @@ function assertScenario(result) {
     throw new Error('All infographic blocks should finish after full scroll settle.')
   if (result.fullScroll.d2Count > 0 && result.fullScroll.renderedD2Count !== result.fullScroll.d2Count)
     throw new Error('All d2 blocks should finish after full scroll settle.')
+  if (!(result.fullScroll.frameP95Ms <= 120))
+    throw new Error(`Full-scroll frame interval p95 should stay within 120ms. Got ${result.fullScroll.frameP95Ms}.`)
+  if (!(result.fullScroll.scrollDriftPx <= 2))
+    throw new Error(`Scroll drift should stay within 2px. Got ${result.fullScroll.scrollDriftPx}.`)
+  if (!(result.fullScroll.domNodeCount <= 5000))
+    throw new Error(`Full-scroll DOM node count budget exceeded. Got ${result.fullScroll.domNodeCount}.`)
   if (!(result.replay.settleTimeMs <= 5000))
     throw new Error(`Replay settle should stay within 5000ms. Got ${result.replay.settleTimeMs}.`)
+  if (!(result.replay.frameP95Ms <= 120))
+    throw new Error(`Replay frame interval p95 should stay within 120ms. Got ${result.replay.frameP95Ms}.`)
+  if (!(result.replay.domNodeCount <= 5000))
+    throw new Error(`Replay DOM node count budget exceeded. Got ${result.replay.domNodeCount}.`)
 }
 
 async function run() {

@@ -12,4 +12,4 @@ description: 生成 markstream-vue 1.0 benchmark 报告，包含环境披露和 
 pnpm benchmark:1.0
 ```
 
-该命令会先构建 playground，再用 `vite preview` 跑 Diagnostic Studio 的 baseline、thinking、diff、stress 样例和主 playground reverse-flex chat 场景，生成 `benchmark/*.json`、`benchmark/*.md` 和 `benchmark/latest-summary.md`，并记录 LCP、CLS、settle time、p95 frame cost、long task、DOM 节点数、fallback、重节点完成数、滚动漂移和 heap after unmount 等指标。调试单个问题时可以用 `MARKSTREAM_BENCHMARK_SAMPLES=baseline,diff` 缩小样例范围。
+该命令会先构建 playground，再用 `vite preview` 跑 Diagnostic Studio 的 baseline、thinking、diff、stress 样例和主 playground reverse-flex chat 场景，生成 `benchmark/*.json`、`benchmark/*.md` 和 `benchmark/latest-summary.md`，并记录 LCP、CLS、settle time、p95 `requestAnimationFrame` interval、long task、DOM 节点数、fallback、重节点 readiness、滚动漂移和 Chrome-only best-effort 的 component unmount + GC 后 heap 等指标。调试单个问题时可以用 `MARKSTREAM_BENCHMARK_SAMPLES=baseline,diff` 缩小样例范围。正式 release notes 优先引用 workflow artifact；本地提交的 `latest-summary.md` 只是本机快照，不代表 CI latest。

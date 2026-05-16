@@ -8,10 +8,18 @@ description: 从 beta 或 rc 版本迁移到 markstream-vue 1.0 的说明。
 
 `markstream-vue@1.0` 的稳定范围是 Vue 3 renderer。发布时请让 `markstream-vue`、`markstream-core`、`stream-markdown-parser` 一起升级到 `1.0.0`。
 
+普通应用升级只需要安装 Vue 包：
+
+```bash
+pnpm add markstream-vue@1.0.0
+```
+
+只有直接 import `markstream-core` 或 `stream-markdown-parser` API 时，才需要显式 pin 这两个包。
+
 发布前运行：
 
 ```bash
 pnpm run release:gate:1.0
 ```
 
-同时把生成的 `benchmark/latest-summary.md` 或 `1.0 Benchmark` workflow artifact 附到 release notes。
+同时把 `1.0 Benchmark` workflow artifact，或带环境披露的本地 benchmark report，附到 release notes。

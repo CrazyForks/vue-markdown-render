@@ -16,11 +16,13 @@ description: Migration notes for moving from beta or rc releases to markstream-v
 
 ## Before upgrading
 
-1. Replace any dependency pins for the rc packages with the final packages:
+1. Replace any dependency pins for the rc packages with the final Vue package:
 
 ```bash
-pnpm add markstream-vue@1.0.0 markstream-core@1.0.0 stream-markdown-parser@1.0.0
+pnpm add markstream-vue@1.0.0
 ```
+
+Only pin `markstream-core` or `stream-markdown-parser` directly if your app imports their APIs.
 
 2. Import one published CSS file:
 
@@ -56,4 +58,4 @@ Run the 1.0 gate before publishing:
 pnpm run release:gate:1.0
 ```
 
-Attach a generated `benchmark/latest-summary.md` or the `1.0 Benchmark` workflow artifact to the release notes.
+Attach the `1.0 Benchmark` workflow artifact, or a generated local benchmark report with its environment disclosure, to the release notes.

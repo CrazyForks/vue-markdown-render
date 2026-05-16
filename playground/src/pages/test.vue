@@ -225,6 +225,7 @@ const issueUrl = ref<string>('')
 const editorTextareaRef = ref<HTMLTextAreaElement | null>(null)
 const previewCardRef = ref<HTMLElement | null>(null)
 const previewStageRef = ref<HTMLElement | null>(null)
+const benchmarkRenderPreview = ref(true)
 const annotationDrawSvgRef = ref<SVGSVGElement | null>(null)
 const annotationTextInputRef = ref<HTMLTextAreaElement | null>(null)
 const streamSettingsDialogRef = ref<HTMLDialogElement | null>(null)
@@ -2454,7 +2455,11 @@ async function initializeTestPage() {
   restoreViewModeFromUrl()
   const restored = restoreFromLocalShare() || await restoreFromUrl()
   if (!restored) {
-    const sample = sampleCards.find(item => item.id === selectedSampleId.value) ?? sampleCards[0]
+    const requestedSample = new URLSearchParams(window.location.search).get('sample')
+    const sample = sampleCards.find(item => item.id === requestedSample)
+      ?? sampleCards.find(item => item.id === selectedSampleId.value)
+      ?? sampleCards[0]
+    selectedSampleId.value = sample.id
     input.value = sample.content
   }
   initialAnnotationSnapshot ||= restoreAnnotationCache()
@@ -2484,10 +2489,16 @@ async function initializeTestPage() {
 }
 
 onMounted(() => {
+  const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
+  benchmarkWindow.__markstreamBenchmarkUnmount = () => {
+    benchmarkRenderPreview.value = false
+  }
   void initializeTestPage()
 })
 
 onBeforeUnmount(() => {
+  const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
+  delete benchmarkWindow.__markstreamBenchmarkUnmount
   document.removeEventListener('fullscreenchange', syncPreviewFullscreenState)
   window.removeEventListener('pointermove', onAnnotationSelectionPointerMove)
   window.removeEventListener('pointerup', onAnnotationSelectionPointerUp)
@@ -3130,6 +3141,7 @@ watch(mermaidEnabled, (enabled) => {
               <div class="preview-stage-frame">
                 <div ref="previewStageRef" class="preview-stage">
                   <MarkdownRender
+                    v-if="benchmarkRenderPreview"
                     :content="previewContent"
                     :custom-html-tags="testPageCustomHtmlTags"
                     :is-dark="isDark"
