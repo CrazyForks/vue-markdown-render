@@ -206,11 +206,11 @@ async function readUsedHeapBytes(page) {
   })
 }
 
-async function measureAfterComponentUnmount(page) {
+async function measureAfterRendererUnmount(page) {
   await page.evaluate(async () => {
     const unmount = window.__markstreamBenchmarkUnmount
     if (typeof unmount !== 'function')
-      throw new Error('Benchmark component unmount hook is not available.')
+      throw new Error('Benchmark renderer unmount hook is not available.')
     unmount()
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   })
@@ -254,7 +254,7 @@ async function frameStatsSince(page, stateName, baseline) {
 
 async function collectMetrics(page) {
   const rootSelector = '.chatbot-messages'
-  await page.goto('/', { waitUntil: 'load' })
+  await page.goto('/?benchmark=1', { waitUntil: 'load' })
   const initialFrameBaseline = await frameBaseline(page, '__mainPlaygroundPerf')
   await page.locator('.playground-root').waitFor({ state: 'visible', timeout: 15000 })
   await waitForVisibleBlocksReady(page, rootSelector)
@@ -405,7 +405,7 @@ async function collectMetrics(page) {
   })
 
   const memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
-  const memoryAfterUnmountBytes = await measureAfterComponentUnmount(page)
+  const memoryAfterUnmountBytes = await measureAfterRendererUnmount(page)
 
   return { initial, fullScroll, replay, memoryBeforeUnmountBytes, memoryAfterUnmountBytes }
 }
@@ -470,7 +470,7 @@ async function run() {
       baseURL: `http://${host}:${port}`,
     })
     const warmupPage = await warmupContext.newPage()
-    await warmupPage.goto('/', { waitUntil: 'load' })
+    await warmupPage.goto('/?benchmark=1', { waitUntil: 'load' })
     await warmupPage.locator('.playground-root').waitFor({ state: 'visible', timeout: 15000 })
     await warmupContext.close()
     const context = await browser.newContext({

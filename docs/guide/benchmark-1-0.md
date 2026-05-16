@@ -13,7 +13,7 @@ pnpm benchmark:1.0
 The command builds the playground, serves it with `vite preview`, then runs the playground checks that are already used for performance regression coverage:
 
 - Diagnostic Studio baseline, thinking, diff, and stress samples in MarkdownCodeBlock and Monaco modes using `/test?benchmark=1`, which disables the version sandbox iframe and annotation layer so frame metrics and renderer DOM metrics track the renderer surface.
-- Main playground reverse-flex chat initial load, full-scroll pass, and streaming replay.
+- Main playground reverse-flex chat initial load, full-scroll pass, and streaming replay using `/?benchmark=1`.
 
 It writes:
 
@@ -27,7 +27,7 @@ benchmark/
   latest-summary.md
 ```
 
-The Markdown summary includes the release package version, git SHA, workspace package versions, Node, OS, CPU, browser, viewport, server mode, LCP, CLS, settle time, frame sample count, frame p95 `requestAnimationFrame` interval, full-scroll heavy-settle frame p95, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC when the browser exposes that value.
+The Markdown summary includes the release package version, git SHA, workspace package versions, Node, OS, CPU, browser, viewport, server mode, LCP, CLS, settle time, frame sample count, frame p95 `requestAnimationFrame` interval, full-scroll heavy-settle frame p95, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after renderer unmount plus GC when the browser exposes that value.
 
 Initial rows report heavy-block readiness only for blocks visible in the phase viewport, and show N/A when that viewport contains no heavy blocks. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to `.preview-surface` or `.chatbot-messages` and are the DOM budget used by the release gate. Frame p95 is recorded for every phase; on full-scroll rows, `scrollFrameP95Ms` covers only the active scroll loop. `heavySettleFrameP95Ms` records post-scroll heavy-block settle separately. Frame p95 values are report metrics for 1.0; the hard release gate stays on fallback counts, heavy-block readiness, DOM budget, CLS, long tasks, and settle time.
 

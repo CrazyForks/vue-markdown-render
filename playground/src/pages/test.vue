@@ -2491,8 +2491,10 @@ async function initializeTestPage() {
 
 onMounted(() => {
   const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
-  benchmarkWindow.__markstreamBenchmarkUnmount = () => {
-    benchmarkRenderPreview.value = false
+  if (isBenchmarkMode) {
+    benchmarkWindow.__markstreamBenchmarkUnmount = () => {
+      benchmarkRenderPreview.value = false
+    }
   }
   void initializeTestPage()
 })

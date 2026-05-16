@@ -206,11 +206,11 @@ async function readUsedHeapBytes(page) {
   })
 }
 
-async function measureAfterComponentUnmount(page) {
+async function measureAfterRendererUnmount(page) {
   await page.evaluate(async () => {
     const unmount = window.__markstreamBenchmarkUnmount
     if (typeof unmount !== 'function')
-      throw new Error('Benchmark component unmount hook is not available.')
+      throw new Error('Benchmark renderer unmount hook is not available.')
     unmount()
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   })
@@ -495,7 +495,7 @@ async function runScenario(browser, port, mode) {
   })
   result.fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
   result.memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
-  result.memoryAfterUnmountBytes = await measureAfterComponentUnmount(page)
+  result.memoryAfterUnmountBytes = await measureAfterRendererUnmount(page)
 
   await context.close()
   return result

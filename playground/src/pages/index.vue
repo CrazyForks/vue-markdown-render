@@ -102,6 +102,7 @@ const selectedStreamPresetId = computed<StreamPresetId>({
 const streamPresetDescription = computed(() => activeStreamPreset.value?.description ?? 'Custom min/max window with your own burst profile.')
 const streamChunkRangeLabel = computed(() => `${normalizedChunkSizeRange.value.min}-${normalizedChunkSizeRange.value.max}`)
 const streamDelayRangeLabel = computed(() => `${normalizedChunkDelayRange.value.min}-${normalizedChunkDelayRange.value.max}ms`)
+const isBenchmarkMode = typeof window !== 'undefined' && new URL(window.location.href).searchParams.get('benchmark') === '1'
 const benchmarkRenderChat = ref(true)
 const {
   content,
@@ -416,15 +417,17 @@ function scheduleCheckMinHeight() {
 
 onMounted(() => {
   const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
-  benchmarkWindow.__markstreamBenchmarkUnmount = () => {
-    stopStreamSimulation()
-    __roContainer?.disconnect()
-    __roContent?.disconnect()
-    __mo?.disconnect()
-    __roContainer = null
-    __roContent = null
-    __mo = null
-    benchmarkRenderChat.value = false
+  if (isBenchmarkMode) {
+    benchmarkWindow.__markstreamBenchmarkUnmount = () => {
+      stopStreamSimulation()
+      __roContainer?.disconnect()
+      __roContent?.disconnect()
+      __mo?.disconnect()
+      __roContainer = null
+      __roContent = null
+      __mo = null
+      benchmarkRenderChat.value = false
+    }
   }
   startStreamSimulation()
   // 初始检查和观察
