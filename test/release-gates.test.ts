@@ -9,6 +9,7 @@ describe('release dependency gates', () => {
     const scripts = packageJson.scripts
     const prepublishOnly = scripts.prepublishOnly
 
+    expect(scripts['check:workspace-deps-local']).toBe('node ./scripts/check-workspace-deps-local.mjs')
     expect(scripts['check:workspace-deps-published']).toBe('node ./scripts/check-workspace-deps-published.mjs')
     expect(prepublishOnly).toContain('pnpm run build:parser')
     expect(prepublishOnly).toContain('pnpm run check:workspace-deps-published')
@@ -40,9 +41,11 @@ describe('release dependency gates', () => {
     expect(scripts['publish:parser:current']).toContain('scripts/publish-current-package.mjs')
     expect(scripts['publish:core:current']).toContain('scripts/publish-current-package.mjs')
     expect(scripts['publish:vue3:current']).toContain('scripts/publish-current-package.mjs')
+    expect(scripts['publish:vue3:current']).toContain('pnpm run check:workspace-deps-published')
     expect(scripts['publish:parser:dry-run']).toContain('--dry-run')
     expect(scripts['publish:core:dry-run']).toContain('--dry-run')
-    expect(scripts['publish:vue3:dry-run']).toContain('pnpm run check:workspace-deps-published')
+    expect(scripts['publish:vue3:dry-run']).toContain('pnpm run check:workspace-deps-local')
+    expect(scripts['publish:vue3:dry-run']).not.toContain('pnpm run check:workspace-deps-published')
     expect(scripts['publish:vue3:dry-run']).toContain('--dry-run')
     expect(release1).not.toContain('pnpm run release:parser')
     expect(release1).not.toContain('pnpm run release:core')
@@ -63,6 +66,15 @@ describe('release dependency gates', () => {
     expect(script).toContain('Refusing to retag an already-published version.')
   })
 
+  it('skips publish lifecycle scripts for dry-run package publishes', () => {
+    const script = readFileSync(resolve(process.cwd(), 'scripts/publish-current-package.mjs'), 'utf8')
+
+    expect(script).toContain('const dryRunPublishArgs = args.dryRun ? [\'--dry-run\', \'--ignore-scripts\'] : []')
+    expect(script).toContain('const pnpmDryRunPublishArgs = args.dryRun ? [...dryRunPublishArgs, \'--no-git-checks\'] : []')
+    expect(script).toContain('[\'publish\', \'--access\', \'public\', ...pnpmDryRunPublishArgs]')
+    expect(script).toContain('[\'publish\', \'--access\', \'public\', ...dryRunPublishArgs]')
+  })
+
   it('checks both runtime workspace packages for published versions', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/check-workspace-deps-published.mjs'), 'utf8')
 
@@ -70,5 +82,15 @@ describe('release dependency gates', () => {
     expect(script).toMatch(/packageJson: 'packages\/markstream-core\/package\.json'/)
     expect(script).toMatch(/name: 'stream-markdown-parser'/)
     expect(script).toMatch(/packageJson: 'packages\/markdown-parser\/package\.json'/)
+  })
+
+  it('keeps dry-run workspace dependency checks local', () => {
+    const script = readFileSync(resolve(process.cwd(), 'scripts/check-workspace-deps-local.mjs'), 'utf8')
+
+    expect(script).toMatch(/name: 'markstream-core'/)
+    expect(script).toMatch(/name: 'stream-markdown-parser'/)
+    expect(script).toContain('dependencyVersion !== \'workspace:*\' && dependencyVersion !== targetVersion')
+    expect(script).not.toContain('execFileSync')
+    expect(script).not.toContain('npmViewVersion')
   })
 })

@@ -83,7 +83,7 @@ for (const dep of workspaceDeps) {
   if (!targetVersion || typeof targetVersion !== 'string')
     throw new Error(`[check-workspace-deps-published] Invalid version in ${dep.packageJson}`)
 
-  if (!String(dependencyVersion).startsWith('workspace:') && dependencyVersion !== targetVersion) {
+  if (dependencyVersion !== 'workspace:*' && dependencyVersion !== targetVersion) {
     throw new Error(
       `[check-workspace-deps-published] ${dep.name} must use workspace:* or exact local version ${targetVersion}, got ${dependencyVersion}.`,
     )

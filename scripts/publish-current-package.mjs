@@ -83,6 +83,8 @@ const args = parseArgs(process.argv.slice(2))
 const packageJsonPath = path.resolve(repoRoot, args.packageJson)
 const packageDir = path.dirname(packageJsonPath)
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+const dryRunPublishArgs = args.dryRun ? ['--dry-run', '--ignore-scripts'] : []
+const pnpmDryRunPublishArgs = args.dryRun ? [...dryRunPublishArgs, '--no-git-checks'] : []
 
 console.log(`[publish-current] ${packageJson.name}@${packageJson.version}`)
 run('pnpm', ['-C', packageDir, 'run', 'build'])
@@ -96,8 +98,8 @@ else {
   if (!args.dryRun)
     run('npm', ['whoami'], packageDir)
   if (packageDir === repoRoot)
-    run('pnpm', ['publish', '--access', 'public', ...(args.dryRun ? ['--dry-run'] : [])], packageDir)
+    run('pnpm', ['publish', '--access', 'public', ...pnpmDryRunPublishArgs], packageDir)
   else
-    run('npm', ['publish', '--access', 'public', ...(args.dryRun ? ['--dry-run'] : [])], packageDir)
+    run('npm', ['publish', '--access', 'public', ...dryRunPublishArgs], packageDir)
   run('node', ['scripts/tag-package.mjs', '--package-json', path.relative(repoRoot, packageJsonPath), ...(args.dryRun ? ['--dry-run', '--allow-dirty'] : ['--push'])])
 }
