@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { arch, cpus, platform, release, totalmem, type } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const outputDir = path.resolve(repoRoot, process.env.MARKSTREAM_BENCHMARK_OUTPUT_DIR || 'benchmark')
+const resultOutputDir = path.join(outputDir, 'results')
 
 const diagnosticSamples = (process.env.MARKSTREAM_BENCHMARK_SAMPLES || 'baseline,thinking,diff,stress')
   .split(',')
@@ -32,6 +33,7 @@ const scenarios = [
     notes: 'Runs the main AI chat playground, full-scrolls the reverse-flex viewport, and replays streaming.',
   },
 ]
+const requiredScenarioIds = scenarios.map(scenario => scenario.id)
 
 function readPackageVersion(packageJsonPath) {
   const packageJson = JSON.parse(readFileSync(path.join(repoRoot, packageJsonPath), 'utf8'))
@@ -58,6 +60,12 @@ function formatNumber(value) {
   return typeof value === 'number' && Number.isFinite(value)
     ? String(Math.round(value))
     : '-'
+}
+
+async function resolveGitSha() {
+  if (process.env.GITHUB_SHA)
+    return process.env.GITHUB_SHA
+  return (await spawnText('git', ['rev-parse', 'HEAD'])).trim()
 }
 
 function phaseFrameSampleCount(row) {
@@ -148,12 +156,26 @@ async function runCommand(command, args, env) {
   })
 }
 
-function parseJsonOutput(stdout) {
-  const start = stdout.indexOf('{')
-  const end = stdout.lastIndexOf('}')
-  if (start < 0 || end < start)
-    throw new Error('Benchmark command did not print a JSON object.')
-  return JSON.parse(stdout.slice(start, end + 1))
+function readJsonFile(filePath) {
+  return JSON.parse(readFileSync(filePath, 'utf8'))
+}
+
+function resultPathForScenario(scenario) {
+  return path.join(resultOutputDir, `${scenario.id}.json`)
+}
+
+function assertReportFresh(report) {
+  const rootPackageVersion = readPackageVersion('package.json')
+  if (report.packageVersion !== rootPackageVersion)
+    throw new Error(`Benchmark report packageVersion ${report.packageVersion} does not match package.json version ${rootPackageVersion}.`)
+  if (process.env.GITHUB_SHA && report.gitSha !== process.env.GITHUB_SHA)
+    throw new Error(`Benchmark report gitSha ${report.gitSha} does not match GITHUB_SHA ${process.env.GITHUB_SHA}.`)
+
+  const scenarioIds = report.scenarios.map(scenario => scenario.id)
+  for (const id of requiredScenarioIds) {
+    if (!scenarioIds.includes(id))
+      throw new Error(`Benchmark report is missing required scenario ${id}.`)
+  }
 }
 
 function heavyBlockSummary(row, scope = 'all') {
@@ -234,6 +256,8 @@ function renderMarkdownReport(report) {
   lines.push('')
   lines.push('| Field | Value |')
   lines.push('| --- | --- |')
+  lines.push(`| Package version | ${report.packageVersion} |`)
+  lines.push(`| Git SHA | ${report.gitSha} |`)
   lines.push(`| markstream-vue | ${report.versions.markstreamVue} |`)
   lines.push(`| markstream-core | ${report.versions.markstreamCore} |`)
   lines.push(`| stream-markdown-parser | ${report.versions.streamMarkdownParser} |`)
@@ -243,7 +267,7 @@ function renderMarkdownReport(report) {
   lines.push(`| Memory | ${formatBytes(report.environment.totalMemoryBytes)} |`)
   lines.push(`| Browser | ${report.environment.browser.version} |`)
   lines.push(`| Browser executable | \`${report.environment.browser.executablePath}\` |`)
-  lines.push('| Viewport | 1600 x 1200 |')
+  lines.push(`| Viewport | ${report.environment.viewport} |`)
   lines.push(`| Server mode | ${report.environment.serverMode}, CI=1 |`)
   lines.push('')
   lines.push('## Results')
@@ -300,13 +324,17 @@ function writeReportFiles(report, partial = false) {
 
 async function run() {
   mkdirSync(outputDir, { recursive: true })
+  mkdirSync(resultOutputDir, { recursive: true })
 
   const browser = await resolveChromeVersion()
   const serverMode = 'Vite production preview after playground build'
+  const rootPackageVersion = readPackageVersion('package.json')
   const report = {
+    packageVersion: rootPackageVersion,
+    gitSha: await resolveGitSha(),
     generatedAt: new Date().toISOString(),
     versions: {
-      markstreamVue: readPackageVersion('package.json'),
+      markstreamVue: rootPackageVersion,
       markstreamCore: readPackageVersion('packages/markstream-core/package.json'),
       streamMarkdownParser: readPackageVersion('packages/markdown-parser/package.json'),
     },
@@ -316,6 +344,7 @@ async function run() {
       cpu: cpus()[0]?.model ?? 'unknown',
       totalMemoryBytes: totalmem(),
       browser,
+      viewport: '1600 x 1200',
       serverMode,
     },
     scenarios: [],
@@ -331,10 +360,13 @@ async function run() {
 
   for (const scenario of scenarios) {
     const [command, args] = scenario.command
+    const resultPath = resultPathForScenario(scenario)
     console.error(`[benchmark:1.0] ${scenario.title}`)
     try {
-      const { stdout } = await runCommand(command, args, {
+      rmSync(resultPath, { force: true })
+      await runCommand(command, args, {
         ...scenario.env,
+        BENCHMARK_JSON_PATH: resultPath,
         PLAYGROUND_PERFORMANCE_SERVER: 'preview',
       })
       report.scenarios.push({
@@ -343,7 +375,7 @@ async function run() {
         notes: scenario.notes,
         env: scenario.env,
         status: 'passed',
-        result: parseJsonOutput(stdout),
+        result: readJsonFile(resultPath),
       })
       writeReportFiles(report, true)
     }
@@ -362,6 +394,7 @@ async function run() {
     }
   }
 
+  assertReportFresh(report)
   const { jsonPath, markdownPath, latestPath } = writeReportFiles(report)
 
   console.log(`Wrote ${path.relative(repoRoot, jsonPath)}`)

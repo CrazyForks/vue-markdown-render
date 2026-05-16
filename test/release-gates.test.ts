@@ -58,6 +58,28 @@ describe('release dependency gates', () => {
     expect(releaseDryRun.indexOf('pnpm run publish:core:dry-run')).toBeLessThan(releaseDryRun.indexOf('pnpm run publish:vue3:dry-run'))
   })
 
+  it('binds the 1.0 benchmark report to the release version and commit', () => {
+    const script = readFileSync(resolve(process.cwd(), 'scripts/benchmark-1-0.mjs'), 'utf8')
+
+    expect(script).toContain('packageVersion: rootPackageVersion')
+    expect(script).toContain('gitSha: await resolveGitSha()')
+    expect(script).toContain('report.packageVersion !== rootPackageVersion')
+    expect(script).toContain('process.env.GITHUB_SHA && report.gitSha !== process.env.GITHUB_SHA')
+    expect(script).toContain('const requiredScenarioIds = scenarios.map(scenario => scenario.id)')
+  })
+
+  it('uses explicit JSON files for child benchmark results', () => {
+    const benchmarkScript = readFileSync(resolve(process.cwd(), 'scripts/benchmark-1-0.mjs'), 'utf8')
+    const diagnosticScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-playground-performance.mjs'), 'utf8')
+    const mainScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-main-playground-performance.mjs'), 'utf8')
+
+    expect(benchmarkScript).toContain('BENCHMARK_JSON_PATH: resultPath')
+    expect(benchmarkScript).toContain('result: readJsonFile(resultPath)')
+    expect(benchmarkScript).not.toContain('parseJsonOutput')
+    expect(diagnosticScript).toContain('process.env.BENCHMARK_JSON_PATH')
+    expect(mainScript).toContain('process.env.BENCHMARK_JSON_PATH')
+  })
+
   it('does not create release tags for package versions already published on npm', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/publish-current-package.mjs'), 'utf8')
 

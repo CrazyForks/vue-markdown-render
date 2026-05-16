@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
 import process from 'node:process'
@@ -89,6 +89,18 @@ function resolveChromeLaunchOptions() {
     channel: 'chrome',
     headless: true,
   }
+}
+
+function writeJsonResult(result) {
+  const json = `${JSON.stringify(result, null, 2)}\n`
+  const outputPath = process.env.BENCHMARK_JSON_PATH
+  if (!outputPath) {
+    process.stdout.write(json)
+    return
+  }
+  const resolvedPath = path.isAbsolute(outputPath) ? outputPath : path.resolve(repoRoot, outputPath)
+  mkdirSync(path.dirname(resolvedPath), { recursive: true })
+  writeFileSync(resolvedPath, json)
 }
 
 function startDevServer(port) {
@@ -556,7 +568,7 @@ async function run() {
     const page = await context.newPage()
     result = await collectMetrics(page)
     assertScenario(result)
-    console.log(JSON.stringify(result, null, 2))
+    writeJsonResult(result)
 
     await context.close()
     await browser.close()
@@ -565,8 +577,12 @@ async function run() {
   catch (error) {
     console.error('[e2e-main-playground-performance] failed')
     console.error(error)
-    if (result)
-      console.error(JSON.stringify(result, null, 2))
+    if (result) {
+      if (process.env.BENCHMARK_JSON_PATH)
+        writeJsonResult(result)
+      else
+        console.error(JSON.stringify(result, null, 2))
+    }
     console.error(server.getLogs())
     process.exitCode = 1
   }

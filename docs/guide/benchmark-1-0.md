@@ -19,12 +19,15 @@ It writes:
 
 ```txt
 benchmark/
+  results/
+    diagnostic-baseline.json
+    ...
   1.0.0.chrome-linux-x64.json
   1.0.0.chrome-linux-x64.md
   latest-summary.md
 ```
 
-The Markdown summary includes package versions, Node, OS, CPU, browser, viewport, server mode, LCP, CLS, settle time, frame sample count, frame p95 `requestAnimationFrame` interval, full-scroll heavy-settle frame p95, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC when the browser exposes that value.
+The Markdown summary includes the release package version, git SHA, workspace package versions, Node, OS, CPU, browser, viewport, server mode, LCP, CLS, settle time, frame sample count, frame p95 `requestAnimationFrame` interval, full-scroll heavy-settle frame p95, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC when the browser exposes that value.
 
 Initial rows report heavy-block readiness only for blocks visible in the phase viewport, and show N/A when that viewport contains no heavy blocks. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to `.preview-surface` or `.chatbot-messages` and are the DOM budget used by the release gate. Frame p95 is recorded for every phase; on full-scroll rows, `scrollFrameP95Ms` covers only the active scroll loop. `heavySettleFrameP95Ms` records post-scroll heavy-block settle separately. Frame p95 values are report metrics for 1.0; the hard release gate stays on fallback counts, heavy-block readiness, DOM budget, CLS, long tasks, and settle time.
 
@@ -36,7 +39,7 @@ For script debugging only, set `MARKSTREAM_BENCHMARK_SKIP_BUILD=1` to reuse an e
 
 The `1.0 Benchmark` GitHub Actions workflow runs on a nightly schedule and can be started manually. It uploads the generated `benchmark/` directory as an artifact.
 
-Use workflow artifacts for release notes. Local generated reports are snapshots for their disclosed OS/CPU/browser environment; `benchmark/latest-summary.md` is a convenience copy of the local report, not the canonical CI latest. Do not claim speedups that are not present in a generated report.
+Use workflow artifacts for release notes. Local generated reports are snapshots for their disclosed OS/CPU/browser environment; `benchmark/latest-summary.md` is a convenience copy of the local report, not the canonical CI latest. These numbers are release regression metrics, not universal performance guarantees. Do not claim speedups that are not present in a generated report.
 
 ## Release gate
 
