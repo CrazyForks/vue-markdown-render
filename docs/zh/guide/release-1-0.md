@@ -48,7 +48,9 @@ pnpm run release:gate:1.0
 
 该命令会执行 release verification、docs build、size budget 和 1.0 benchmark report。当前 public benchmark 覆盖已发布 playground 场景：Diagnostic Studio 的 baseline、thinking、diff、stress，以及主 playground reverse-flex chat。Diagnostic Studio 场景使用 `/test?benchmark=1`，报告中的 frame p95 使用 phase-local sample window。benchmark 会生成 `benchmark/*.json`、`benchmark/*.md`、`benchmark/latest-summary.md`，release notes 应优先引用 `1.0 Benchmark` workflow artifact；本地生成的报告只代表文件名和环境信息披露的本机快照。
 
-## Go / No-Go
+## Release operator checklist
+
+这份 checklist 用于 1.0 正式发布和 release notes 最终确认。未勾选项是发布当天的人工确认项，不代表当前 1.0 readiness 状态。
 
 - [x] 稳定与实验 API 已记录。
 - [x] Parser/core 与 Vue 3 renderer 采用同版本 1.0.0 发布策略。

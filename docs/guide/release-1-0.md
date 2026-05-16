@@ -165,7 +165,9 @@ pnpm benchmark:1.0
 
 The report writes `benchmark/*.json`, `benchmark/*.md`, and `benchmark/latest-summary.md` with environment disclosure. The nightly/manual `1.0 Benchmark` GitHub Actions workflow uploads the same files as artifacts.
 
-## Go / No-Go checklist
+## Release operator checklist
+
+Use this checklist during the final 1.0 publish and release-notes pass. Unchecked items are release-day confirmations, not a live 1.0 readiness status.
 
 - [x] Stable and experimental public API documented.
 - [x] Parser/core release strategy decided.
