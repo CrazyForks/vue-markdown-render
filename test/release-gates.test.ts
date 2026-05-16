@@ -30,6 +30,7 @@ describe('release dependency gates', () => {
     const scripts = packageJson.scripts
     const releaseGate = scripts['release:gate:1.0']
     const release1 = scripts['release:1.0']
+    const releaseDryRun = scripts['release:dry-run:1.0']
 
     expect(releaseGate).toContain('pnpm run release:verify')
     expect(releaseGate).toContain('pnpm run docs:build:ci')
@@ -39,12 +40,27 @@ describe('release dependency gates', () => {
     expect(scripts['publish:parser:current']).toContain('scripts/publish-current-package.mjs')
     expect(scripts['publish:core:current']).toContain('scripts/publish-current-package.mjs')
     expect(scripts['publish:vue3:current']).toContain('scripts/publish-current-package.mjs')
+    expect(scripts['publish:parser:dry-run']).toContain('--dry-run')
+    expect(scripts['publish:core:dry-run']).toContain('--dry-run')
+    expect(scripts['publish:vue3:dry-run']).toContain('pnpm run check:workspace-deps-published')
+    expect(scripts['publish:vue3:dry-run']).toContain('--dry-run')
     expect(release1).not.toContain('pnpm run release:parser')
     expect(release1).not.toContain('pnpm run release:core')
     expect(release1).not.toMatch(/&& pnpm run release(?:\s|$)/)
     expect(release1.indexOf('pnpm run release:gate:1.0')).toBeLessThan(release1.indexOf('pnpm run publish:parser:current'))
     expect(release1.indexOf('pnpm run publish:parser:current')).toBeLessThan(release1.indexOf('pnpm run publish:core:current'))
     expect(release1.indexOf('pnpm run publish:core:current')).toBeLessThan(release1.indexOf('pnpm run publish:vue3:current'))
+    expect(releaseDryRun.indexOf('pnpm run release:gate:1.0')).toBeLessThan(releaseDryRun.indexOf('pnpm run publish:parser:dry-run'))
+    expect(releaseDryRun.indexOf('pnpm run publish:parser:dry-run')).toBeLessThan(releaseDryRun.indexOf('pnpm run publish:core:dry-run'))
+    expect(releaseDryRun.indexOf('pnpm run publish:core:dry-run')).toBeLessThan(releaseDryRun.indexOf('pnpm run publish:vue3:dry-run'))
+  })
+
+  it('does not create release tags for package versions already published on npm', () => {
+    const script = readFileSync(resolve(process.cwd(), 'scripts/publish-current-package.mjs'), 'utf8')
+
+    expect(script).toContain('assertPublishedTagAtHead(packageJson)')
+    expect(script).toContain('Refusing to create a tag for an already-published version.')
+    expect(script).toContain('Refusing to retag an already-published version.')
   })
 
   it('checks both runtime workspace packages for published versions', () => {
