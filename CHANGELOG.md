@@ -1,3 +1,14 @@
+## [1.0.0](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.0-rc.0...markstream-vue@1.0.0) (2026-05-16)
+
+### 1.0 Stable Release
+
+* Released `markstream-vue@1.0.0`, `markstream-core@1.0.0`, and `stream-markdown-parser@1.0.0` together.
+* Stabilized the Vue 3 renderer API: `MarkdownRender`, `VueRendererMarkdown`, `useSmoothMarkdownStream`, raw `content`, pre-parsed `nodes`, safe HTML defaults, optional Mermaid / KaTeX / D2 / Infographic / Monaco integrations, CSS exports, Tailwind export, documented worker client exports, and SSR imports.
+* Kept cross-framework adapters, repository skills/prompts, low-level worker implementation files, and height-estimation experiments outside the 1.x compatibility promise.
+* Added a reproducible 1.0 benchmark report workflow with JSON and Markdown output, environment disclosure, LCP, CLS, settle time, p95 frame cost, max long task, DOM node count, fallback count, heavy-block completion, scroll drift, and heap-after-unmount metrics.
+* Added 1.0 migration and showcase docs for launch material.
+* Tightened the 1.0 release gate to include release verification, docs build, size budget, and benchmark report generation.
+
 ## [1.0.0-rc.0](https://github.com/Simon-He95/markstream-vue/compare/v0.0.14-beta.8...markstream-vue@1.0.0-rc.0) (2026-05-15)
 
 ### Behavior Changes

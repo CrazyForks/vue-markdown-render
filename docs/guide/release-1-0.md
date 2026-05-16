@@ -113,10 +113,26 @@ If the parser or core package stays below 1.0, `markstream-vue` must pin the exa
 Run the unified release gate before publishing:
 
 ```bash
+pnpm run release:gate:1.0
+```
+
+That command builds the parser and core packages, then runs lint, typecheck, the full Vitest suite, strict public API checks, packed-package validation, VitePress docs build, package size budget check, and the 1.0 benchmark report.
+
+Run the full publish-chain dry run before the final publish:
+
+```bash
+pnpm run release:dry-run:1.0
+```
+
+That repeats the release gate, then dry-runs publishing the parser, core, and Vue packages in order.
+
+For package-only validation, run:
+
+```bash
 pnpm release:verify
 ```
 
-That command runs lint, typecheck, the full Vitest suite, strict public API checks, and packed-package validation:
+That command builds the parser and core packages, then runs lint, typecheck, the full Vitest suite, strict public API checks, and packed-package validation:
 
 ```bash
 pnpm test:smoke:pack
@@ -140,28 +156,36 @@ Use `htmlPolicy="trusted"` only for content that is fully controlled by the appl
 
 ## Performance release gate
 
-The public benchmark set should include:
+The 1.0 public benchmark covers the shipped playground scenarios:
 
-- 10 KB normal docs.
-- 100 KB AI streaming.
-- 1 MB large document.
-- 1000 code blocks.
-- 100 Mermaid blocks.
-- 10k pre-parsed nodes.
-- Reverse-flex chat scroll.
+- Diagnostic Studio baseline, thinking, diff, and stress samples in MarkdownCodeBlock and Monaco modes using `/test?benchmark=1`.
+- Main playground reverse-flex chat initial load, full-scroll pass, and streaming replay using `/?benchmark=1`.
 
-Track initial render time, stream update cost, p95 frame cost, max long task, memory after unmount, scroll drift, and DOM node count.
+Track LCP, CLS, settle time, frame sample count, frame p95 `requestAnimationFrame` interval, full-scroll heavy-settle frame p95, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after renderer unmount plus GC. Frame p95 is report evidence for 1.0; the hard release gate stays on fallback counts, heavy-block readiness, DOM budget, CLS, long tasks, and settle time.
 
-## Go / No-Go checklist
+Extended synthetic scenarios such as 1 MB documents, 1000 code blocks, 100 Mermaid blocks, and 10k pre-parsed nodes are planned for 1.0.x. Do not use them as 1.0 release evidence until they are implemented in `pnpm benchmark:1.0`.
 
-- [ ] Stable and experimental public API documented.
-- [ ] Parser/core release strategy decided.
-- [ ] Legacy fence renderer escaping covered by tests.
-- [ ] Safe HTML docs and XSS regression tests complete.
-- [ ] App-scoped custom component registry covered by SSR test.
-- [ ] `pnpm release:verify` passes.
-- [ ] CSS, Tailwind, and worker subpath exports smoke-tested.
+Generate the public report with:
+
+```bash
+pnpm benchmark:1.0
+```
+
+The report writes `benchmark/*.json`, `benchmark/*.md`, and `benchmark/latest-summary.md` with environment disclosure. The nightly/manual `1.0 Benchmark` GitHub Actions workflow uploads the same files as artifacts.
+
+## Release operator checklist
+
+Use this checklist during the final 1.0 publish and release-notes pass. Unchecked items are release-day confirmations, not a live 1.0 readiness status.
+
+- [x] Stable and experimental public API documented.
+- [x] Parser/core release strategy decided.
+- [x] Legacy fence renderer escaping covered by tests.
+- [x] Safe HTML docs and XSS regression tests complete.
+- [x] App-scoped custom component registry covered by SSR test.
+- [ ] `pnpm run release:dry-run:1.0` passes.
+- [ ] Current playground benchmark report or the latest workflow artifact is attached to the release notes.
+- [x] CSS, Tailwind, and worker subpath exports smoke-tested.
 - [ ] Unit, SSR, public API, and package export checks are green.
 - [ ] Nuxt SSR smoke or preview deployment is green.
 - [ ] VitePress docs build is green.
-- [ ] Migration notes and changelog describe beta-to-1.0 breaking changes.
+- [x] Migration notes and changelog describe beta-to-1.0 breaking changes.

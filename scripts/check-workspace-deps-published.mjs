@@ -6,6 +6,8 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
+const npmViewAttempts = 30
+const npmViewDelayMs = 2000
 
 const workspaceDeps = [
   {
@@ -40,6 +42,35 @@ function npmViewVersion(packageName, version) {
   return null
 }
 
+async function waitForPublishedVersion(packageName, version) {
+  let publishedVersion = null
+  let sawNpmViewError = false
+
+  for (let attempt = 1; attempt <= npmViewAttempts; attempt++) {
+    try {
+      publishedVersion = npmViewVersion(packageName, version)
+      if (publishedVersion === version)
+        return publishedVersion
+    }
+    catch {
+      sawNpmViewError = true
+    }
+
+    if (attempt < npmViewAttempts)
+      await new Promise(resolve => setTimeout(resolve, npmViewDelayMs))
+  }
+
+  if (sawNpmViewError && !publishedVersion) {
+    throw new Error(
+      `[check-workspace-deps-published] ${packageName}@${version} is not visible on npm after ${npmViewAttempts} attempts. Publish ${packageName} first.`,
+    )
+  }
+
+  throw new Error(
+    `[check-workspace-deps-published] Expected ${packageName}@${version} on npm, got ${publishedVersion || 'none'} after ${npmViewAttempts} attempts. Publish ${packageName} first.`,
+  )
+}
+
 const rootPackageJson = readJson(resolve(root, 'package.json'))
 
 for (const dep of workspaceDeps) {
@@ -52,27 +83,13 @@ for (const dep of workspaceDeps) {
   if (!targetVersion || typeof targetVersion !== 'string')
     throw new Error(`[check-workspace-deps-published] Invalid version in ${dep.packageJson}`)
 
-  if (!String(dependencyVersion).startsWith('workspace:') && dependencyVersion !== targetVersion) {
+  if (dependencyVersion !== 'workspace:*' && dependencyVersion !== targetVersion) {
     throw new Error(
       `[check-workspace-deps-published] ${dep.name} must use workspace:* or exact local version ${targetVersion}, got ${dependencyVersion}.`,
     )
   }
 
-  let publishedVersion = null
-  try {
-    publishedVersion = npmViewVersion(dep.name, targetVersion)
-  }
-  catch {
-    throw new Error(
-      `[check-workspace-deps-published] ${dep.name}@${targetVersion} is not published yet. Publish ${dep.name} first.`,
-    )
-  }
-
-  if (publishedVersion !== targetVersion) {
-    throw new Error(
-      `[check-workspace-deps-published] Expected ${dep.name}@${targetVersion} on npm, got ${publishedVersion || 'none'}. Publish ${dep.name} first.`,
-    )
-  }
+  await waitForPublishedVersion(dep.name, targetVersion)
 
   console.log(`[check-workspace-deps-published] OK: ${dep.name}@${targetVersion} is published.`)
 }

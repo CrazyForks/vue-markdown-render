@@ -192,6 +192,7 @@ const testPageMonacoOptions = {
 
 const selectedSampleId = useLocalStorage<SampleId>('vmr-test-sample', 'baseline')
 const input = ref<string>(sampleCards[0].content)
+const isBenchmarkMode = typeof window !== 'undefined' && new URL(window.location.href).searchParams.get('benchmark') === '1'
 const streamChunkSizeMin = useLocalStorage<number>('vmr-test-stream-chunk-size-min', 2)
 const streamChunkSizeMax = useLocalStorage<number>('vmr-test-stream-chunk-size-max', 7)
 const streamChunkDelayMin = useLocalStorage<number>('vmr-test-stream-delay-min', 14)
@@ -225,6 +226,7 @@ const issueUrl = ref<string>('')
 const editorTextareaRef = ref<HTMLTextAreaElement | null>(null)
 const previewCardRef = ref<HTMLElement | null>(null)
 const previewStageRef = ref<HTMLElement | null>(null)
+const benchmarkRenderPreview = ref(true)
 const annotationDrawSvgRef = ref<SVGSVGElement | null>(null)
 const annotationTextInputRef = ref<HTMLTextAreaElement | null>(null)
 const streamSettingsDialogRef = ref<HTMLDialogElement | null>(null)
@@ -357,9 +359,9 @@ const previewShareButtonLabel = computed(() => {
   return previewShareUsesLocalStorage.value ? '复制本地预览链接' : '分享预览'
 })
 const labShareButtonLabel = computed(() => labShareUsesLocalStorage.value ? '复制本地实验页链接' : '复制实验页链接')
-const showImmersivePreviewControls = computed(() => isSharePreviewMode.value || isPreviewFullscreen.value)
+const showImmersivePreviewControls = computed(() => !isBenchmarkMode && (isSharePreviewMode.value || isPreviewFullscreen.value))
 const immersiveBackLabel = computed(() => isSharePreviewMode.value ? '打开 Test Page' : '返回编辑')
-const showPreviewAnnotations = computed(() => isSharePreviewMode.value || isPreviewFullscreen.value)
+const showPreviewAnnotations = computed(() => !isBenchmarkMode && (isSharePreviewMode.value || isPreviewFullscreen.value))
 const showAnnotationToolbar = computed(() => showImmersivePreviewControls.value && annotationEnabled.value)
 const annotationCanUndo = computed(() => annotationHistoryIndex.value > 0)
 const annotationCanRedo = computed(() => annotationHistoryIndex.value < annotationHistory.value.length - 1)
@@ -2454,7 +2456,11 @@ async function initializeTestPage() {
   restoreViewModeFromUrl()
   const restored = restoreFromLocalShare() || await restoreFromUrl()
   if (!restored) {
-    const sample = sampleCards.find(item => item.id === selectedSampleId.value) ?? sampleCards[0]
+    const requestedSample = new URLSearchParams(window.location.search).get('sample')
+    const sample = sampleCards.find(item => item.id === requestedSample)
+      ?? sampleCards.find(item => item.id === selectedSampleId.value)
+      ?? sampleCards[0]
+    selectedSampleId.value = sample.id
     input.value = sample.content
   }
   initialAnnotationSnapshot ||= restoreAnnotationCache()
@@ -2484,10 +2490,18 @@ async function initializeTestPage() {
 }
 
 onMounted(() => {
+  const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
+  if (isBenchmarkMode) {
+    benchmarkWindow.__markstreamBenchmarkUnmount = () => {
+      benchmarkRenderPreview.value = false
+    }
+  }
   void initializeTestPage()
 })
 
 onBeforeUnmount(() => {
+  const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
+  delete benchmarkWindow.__markstreamBenchmarkUnmount
   document.removeEventListener('fullscreenchange', syncPreviewFullscreenState)
   window.removeEventListener('pointermove', onAnnotationSelectionPointerMove)
   window.removeEventListener('pointerup', onAnnotationSelectionPointerUp)
@@ -2813,7 +2827,7 @@ watch(mermaidEnabled, (enabled) => {
             </div>
           </section>
 
-          <section class="panel-card panel-card--sandbox">
+          <section v-if="!isBenchmarkMode" class="panel-card panel-card--sandbox">
             <div class="panel-card__head">
               <div>
                 <h2>版本沙箱</h2>
@@ -3126,10 +3140,11 @@ watch(mermaidEnabled, (enabled) => {
             </header>
 
             <div class="preview-surface">
-              <div class="preview-surface__grid" />
+              <div v-if="!isBenchmarkMode" class="preview-surface__grid" />
               <div class="preview-stage-frame">
                 <div ref="previewStageRef" class="preview-stage">
                   <MarkdownRender
+                    v-if="benchmarkRenderPreview"
                     :content="previewContent"
                     :custom-html-tags="testPageCustomHtmlTags"
                     :is-dark="isDark"
@@ -3147,6 +3162,7 @@ watch(mermaidEnabled, (enabled) => {
                   />
 
                   <div
+                    v-if="!isBenchmarkMode"
                     class="preview-annotation-layer"
                     :class="{ 'preview-annotation-layer--visible': annotationOverlayVisible }"
                   >
@@ -3359,7 +3375,7 @@ watch(mermaidEnabled, (enabled) => {
             </div>
           </article>
 
-          <article v-if="!isSharePreviewMode" class="workspace-card workspace-card--full workspace-card--sandbox-preview">
+          <article v-if="!isBenchmarkMode && !isSharePreviewMode" class="workspace-card workspace-card--full workspace-card--sandbox-preview">
             <header class="workspace-card__head">
               <div>
                 <h2>版本沙箱预览</h2>

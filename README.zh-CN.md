@@ -74,6 +74,8 @@
 - Playground（交互演示）： https://markstream-vue.simonhe.me/
 - 交互测试页（可分享链接，便于复现）： https://markstream-vue.simonhe.me/test
 - 文档： https://markstream-vue-docs.simonhe.me/zh/guide/
+- Showcase： https://markstream-vue-docs.simonhe.me/zh/guide/showcase
+- 1.0 benchmark 报告：`pnpm benchmark:1.0`
 - AI/LLM 项目索引（中文）： https://markstream-vue-docs.simonhe.me/llms.zh-CN
 - AI/LLM 项目索引（英文）： https://markstream-vue-docs.simonhe.me/llms
 - 一键 StackBlitz 体验： https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue

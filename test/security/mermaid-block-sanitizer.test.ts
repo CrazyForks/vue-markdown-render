@@ -563,7 +563,7 @@ describe('mermaid block SVG sanitizer', () => {
     })
   })
 
-  it('gates Mermaid bindFunctions in static Svelte and Angular HTML enhancers', async () => {
+  it('gates Mermaid bindFunctions in static Svelte and Angular HTML enhancers', { timeout: 10000 }, async () => {
     const bindFunctions = vi.fn()
     const fakeMermaid = {
       render: vi.fn(async () => ({

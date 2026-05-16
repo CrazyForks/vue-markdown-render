@@ -102,6 +102,8 @@ const selectedStreamPresetId = computed<StreamPresetId>({
 const streamPresetDescription = computed(() => activeStreamPreset.value?.description ?? 'Custom min/max window with your own burst profile.')
 const streamChunkRangeLabel = computed(() => `${normalizedChunkSizeRange.value.min}-${normalizedChunkSizeRange.value.max}`)
 const streamDelayRangeLabel = computed(() => `${normalizedChunkDelayRange.value.min}-${normalizedChunkDelayRange.value.max}ms`)
+const isBenchmarkMode = typeof window !== 'undefined' && new URL(window.location.href).searchParams.get('benchmark') === '1'
+const benchmarkRenderChat = ref(true)
 const {
   content,
   isPaused,
@@ -414,6 +416,19 @@ function scheduleCheckMinHeight() {
 }
 
 onMounted(() => {
+  const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
+  if (isBenchmarkMode) {
+    benchmarkWindow.__markstreamBenchmarkUnmount = () => {
+      stopStreamSimulation()
+      __roContainer?.disconnect()
+      __roContent?.disconnect()
+      __mo?.disconnect()
+      __roContainer = null
+      __roContent = null
+      __mo = null
+      benchmarkRenderChat.value = false
+    }
+  }
   startStreamSimulation()
   // 初始检查和观察
   const container = messagesContainer.value
@@ -449,6 +464,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
+  delete benchmarkWindow.__markstreamBenchmarkUnmount
   stopStreamSimulation()
   __roContainer?.disconnect()
   __roContent?.disconnect()
@@ -787,6 +804,7 @@ onBeforeUnmount(() => {
         <!-- Messages area -->
         <main ref="messagesContainer" class="chat-messages chatbot-messages">
           <MarkdownRender
+            v-if="benchmarkRenderChat"
             :content="content"
             :smooth-streaming="smoothStreaming"
             :fade="!smoothStreaming"

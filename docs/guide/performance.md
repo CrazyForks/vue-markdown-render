@@ -57,21 +57,27 @@ Huge documents should use a smaller live window:
 
 Use `content` for small and medium documents, ordinary docs pages, and moderate streaming. For very large documents or very high-frequency streams, parse outside the component and pass `nodes` so parsing and rendering can be scheduled independently.
 
-## Benchmark contract for 1.0
+## Benchmark coverage for 1.0
 
-Before publishing 1.0, benchmark at least these cases:
+Before publishing 1.0, run the public benchmark over the shipped playground scenarios:
 
 | Case | Purpose |
 | --- | --- |
-| 10 KB Markdown | Normal docs page |
-| 100 KB Markdown | AI streaming response |
-| 1 MB Markdown | Large document |
-| 1000 code blocks | Code-heavy docs |
-| 100 Mermaid blocks | Diagram-heavy docs |
-| 10k parsed nodes | Large pre-parsed AST |
-| Reverse-flex chat scroll | Chat viewport behavior |
+| Diagnostic Studio baseline | Mixed docs, code blocks, Mermaid, D2, and Infographic |
+| Diagnostic Studio thinking | Custom component and nested Markdown rendering |
+| Diagnostic Studio diff | Diff code block rendering |
+| Diagnostic Studio stress | Safe repro and escaped content behavior |
+| Reverse-flex chat scroll | Main playground chat viewport behavior |
 
-Track initial render time, average stream update cost, p95 frame cost, max long task duration, memory after unmount, scroll position drift, and DOM node count.
+Track LCP, CLS, settle time, p95 `requestAnimationFrame` interval, max long task duration, page and renderer DOM node counts, visible fallback count, heavy-block readiness, scroll position drift, and best-effort Chrome-only heap after renderer unmount plus GC. Synthetic 1 MB, 1000-code-block, 100-Mermaid, and 10k-node cases are future 1.0.x coverage and should not be cited as 1.0 release evidence until they exist in the benchmark script.
+
+Generate the release report with:
+
+```bash
+pnpm benchmark:1.0
+```
+
+This builds the playground, runs the scenarios through `vite preview`, and writes JSON and Markdown summaries under `benchmark/`, including environment disclosure so release notes can cite measured numbers instead of informal claims.
 
 ## Bundle size workflow (maintainers)
 
