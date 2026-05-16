@@ -11,6 +11,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const outputDir = path.resolve(repoRoot, process.env.MARKSTREAM_BENCHMARK_OUTPUT_DIR || 'benchmark')
 const resultOutputDir = path.join(outputDir, 'results')
+const isReleaseGate = process.env.MARKSTREAM_RELEASE_GATE === '1'
+
+if (isReleaseGate && process.env.MARKSTREAM_BENCHMARK_SKIP_BUILD === '1') {
+  throw new Error('MARKSTREAM_BENCHMARK_SKIP_BUILD=1 is not allowed in release gate.')
+}
+
+if (isReleaseGate && process.env.MARKSTREAM_BENCHMARK_SAMPLES) {
+  throw new Error('MARKSTREAM_BENCHMARK_SAMPLES is not allowed in release gate.')
+}
 
 const diagnosticSamples = (process.env.MARKSTREAM_BENCHMARK_SAMPLES || 'baseline,thinking,diff,stress')
   .split(',')

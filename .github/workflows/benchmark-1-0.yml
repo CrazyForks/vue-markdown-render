@@ -2,6 +2,19 @@ name: 1.0 Benchmark
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - src/**
+      - packages/markstream-core/**
+      - packages/markdown-parser/**
+      - playground/src/**
+      - playground-shared/**
+      - scripts/benchmark-1-0.mjs
+      - scripts/e2e-*-performance.mjs
+      - package.json
+      - pnpm-lock.yaml
+      - .github/workflows/benchmark-1-0.yml
   pull_request:
     paths:
       - src/**
