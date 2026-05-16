@@ -26,6 +26,8 @@ benchmark/
 
 The Markdown summary includes package versions, Node, OS, CPU, browser, viewport, server mode, LCP, CLS, settle time, frame sample count, phase-local p95 `requestAnimationFrame` interval, max long task, DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC when the browser exposes that value.
 
+Initial rows report heavy-block readiness only for blocks visible in the phase viewport. Full-scroll rows report all heavy blocks after the scroll pass. Frame interval p95 is recorded for every phase; the release gate only enforces the 120 ms budget when the phase has at least 30 frame samples.
+
 For script debugging only, set `MARKSTREAM_BENCHMARK_SKIP_BUILD=1` to reuse an existing playground build. Do not use that shortcut for release evidence unless the build artifact was just produced. Set `MARKSTREAM_BENCHMARK_SAMPLES=baseline,diff` only when narrowing a local investigation.
 
 ## CI workflow

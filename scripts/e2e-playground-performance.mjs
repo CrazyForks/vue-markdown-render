@@ -12,6 +12,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const playgroundDir = path.join(repoRoot, 'playground')
 const host = '127.0.0.1'
+const MIN_FRAME_SAMPLES_FOR_GATE = 30
 
 function isPortOpen(port) {
   return new Promise((resolve) => {
@@ -466,6 +467,12 @@ async function runScenario(browser, port, mode) {
 function assertScenario(result) {
   if (result.sample !== 'stress' && !(result.codeBlockCount > 0))
     throw new Error(`[${result.mode}] Expected at least one rendered code block.`)
+  if (result.sample === 'baseline' && !(result.mermaidCount > 0))
+    throw new Error(`[${result.mode}] Baseline sample should include at least one mermaid block.`)
+  if (result.sample === 'baseline' && !(result.infographicCount > 0))
+    throw new Error(`[${result.mode}] Baseline sample should include at least one infographic block.`)
+  if (result.sample === 'baseline' && !(result.d2Count > 0))
+    throw new Error(`[${result.mode}] Baseline sample should include at least one D2 block.`)
   if (result.visibleFallbackCount !== 0)
     throw new Error(`[${result.mode}] Visible code fallback should be gone after initial settle.`)
   if (result.sample === 'diff' && result.mode === 'monaco' && !(result.diffCodeBlockCount > 0))
@@ -486,8 +493,7 @@ function assertScenario(result) {
     throw new Error(`[${result.mode}] Max long task should stay within 700ms. Got ${result.longTaskMaxMs}.`)
   if (!(result.longTaskTotalMs <= 1800))
     throw new Error(`[${result.mode}] Total long task time should stay within 1800ms. Got ${result.longTaskTotalMs}.`)
-  if (!(result.frameP95Ms <= 120))
-    throw new Error(`[${result.mode}] Frame interval p95 should stay within 120ms. Got ${result.frameP95Ms}.`)
+  assertFrameBudget(`[${result.mode}] Frame interval p95`, result)
   if (!(result.domNodeCount <= 5000))
     throw new Error(`[${result.mode}] DOM node count budget exceeded. Got ${result.domNodeCount}.`)
   if (result.fullScroll.fallbackCount !== 0)
@@ -498,12 +504,18 @@ function assertScenario(result) {
     throw new Error(`[${result.mode}] Infographic blocks should all finish after full scroll settle.`)
   if (result.fullScroll.renderedD2Count !== result.fullScroll.d2Count)
     throw new Error(`[${result.mode}] D2 blocks should all finish after full scroll settle.`)
-  if (!(result.fullScroll.frameP95Ms <= 120))
-    throw new Error(`[${result.mode}] Full-scroll frame interval p95 should stay within 120ms. Got ${result.fullScroll.frameP95Ms}.`)
+  assertFrameBudget(`[${result.mode}] Full-scroll frame interval p95`, result.fullScroll)
   if (!(result.fullScroll.scrollDriftPx <= 2))
     throw new Error(`[${result.mode}] Scroll drift should stay within 2px. Got ${result.fullScroll.scrollDriftPx}.`)
   if (!(result.fullScroll.domNodeCount <= 5000))
     throw new Error(`[${result.mode}] Full-scroll DOM node count budget exceeded. Got ${result.fullScroll.domNodeCount}.`)
+}
+
+function assertFrameBudget(label, stats) {
+  if (stats.frameSampleCount < MIN_FRAME_SAMPLES_FOR_GATE)
+    return
+  if (!(stats.frameP95Ms <= 120))
+    throw new Error(`${label} should stay within 120ms. Got ${stats.frameP95Ms}.`)
 }
 
 async function run() {

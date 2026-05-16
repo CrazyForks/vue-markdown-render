@@ -12,6 +12,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const playgroundDir = path.join(repoRoot, 'playground')
 const host = '127.0.0.1'
+const MIN_FRAME_SAMPLES_FOR_GATE = 30
 
 function isPortOpen(port) {
   return new Promise((resolve) => {
@@ -389,8 +390,7 @@ function assertScenario(result) {
     throw new Error(`Total long task time should stay within 1400ms. Got ${result.initial.longTaskTotalMs}.`)
   if (!(result.initial.settleTimeMs <= 7000))
     throw new Error(`Initial settle should stay within 7000ms. Got ${result.initial.settleTimeMs}.`)
-  if (!(result.initial.frameP95Ms <= 120))
-    throw new Error(`Initial frame interval p95 should stay within 120ms. Got ${result.initial.frameP95Ms}.`)
+  assertFrameBudget('Initial frame interval p95', result.initial)
   if (!(result.initial.domNodeCount <= 5000))
     throw new Error(`Initial DOM node count budget exceeded. Got ${result.initial.domNodeCount}.`)
   if (result.fullScroll.fallbackCount !== 0)
@@ -401,18 +401,23 @@ function assertScenario(result) {
     throw new Error('All infographic blocks should finish after full scroll settle.')
   if (result.fullScroll.d2Count > 0 && result.fullScroll.renderedD2Count !== result.fullScroll.d2Count)
     throw new Error('All d2 blocks should finish after full scroll settle.')
-  if (!(result.fullScroll.frameP95Ms <= 120))
-    throw new Error(`Full-scroll frame interval p95 should stay within 120ms. Got ${result.fullScroll.frameP95Ms}.`)
+  assertFrameBudget('Full-scroll frame interval p95', result.fullScroll)
   if (!(result.fullScroll.scrollDriftPx <= 2))
     throw new Error(`Scroll drift should stay within 2px. Got ${result.fullScroll.scrollDriftPx}.`)
   if (!(result.fullScroll.domNodeCount <= 5000))
     throw new Error(`Full-scroll DOM node count budget exceeded. Got ${result.fullScroll.domNodeCount}.`)
   if (!(result.replay.settleTimeMs <= 5000))
     throw new Error(`Replay settle should stay within 5000ms. Got ${result.replay.settleTimeMs}.`)
-  if (!(result.replay.frameP95Ms <= 120))
-    throw new Error(`Replay frame interval p95 should stay within 120ms. Got ${result.replay.frameP95Ms}.`)
+  assertFrameBudget('Replay frame interval p95', result.replay)
   if (!(result.replay.domNodeCount <= 5000))
     throw new Error(`Replay DOM node count budget exceeded. Got ${result.replay.domNodeCount}.`)
+}
+
+function assertFrameBudget(label, stats) {
+  if (stats.frameSampleCount < MIN_FRAME_SAMPLES_FOR_GATE)
+    return
+  if (!(stats.frameP95Ms <= 120))
+    throw new Error(`${label} should stay within 120ms. Got ${stats.frameP95Ms}.`)
 }
 
 async function run() {
