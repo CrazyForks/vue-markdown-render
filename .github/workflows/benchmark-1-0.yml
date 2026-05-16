@@ -47,6 +47,15 @@ jobs:
       - name: Run 1.0 benchmark
         run: pnpm benchmark:1.0
 
+      - name: Append benchmark summary
+        if: always()
+        run: |
+          if [ -f benchmark/latest-summary.md ]; then
+            cat benchmark/latest-summary.md >> "$GITHUB_STEP_SUMMARY"
+          elif [ -f benchmark/latest-partial-summary.md ]; then
+            cat benchmark/latest-partial-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Upload benchmark report
         if: always()
         uses: actions/upload-artifact@v4
