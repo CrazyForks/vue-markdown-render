@@ -55,7 +55,7 @@ jobs:
         run: nr typecheck
 
       - name: Run tests
-        run: nr test -- --run
+        run: pnpm run build:parser && pnpm run build:core && nr test -- --run
 
       - name: Run SSR check
         run: nr check:ssr

@@ -116,7 +116,7 @@ Run the unified release gate before publishing:
 pnpm run release:gate:1.0
 ```
 
-That command runs lint, typecheck, the full Vitest suite, strict public API checks, packed-package validation, VitePress docs build, package size budget check, and the 1.0 benchmark report.
+That command builds the parser and core packages, then runs lint, typecheck, the full Vitest suite, strict public API checks, packed-package validation, VitePress docs build, package size budget check, and the 1.0 benchmark report.
 
 For package-only validation, run:
 
@@ -124,7 +124,7 @@ For package-only validation, run:
 pnpm release:verify
 ```
 
-That command runs lint, typecheck, the full Vitest suite, strict public API checks, and packed-package validation:
+That command builds the parser and core packages, then runs lint, typecheck, the full Vitest suite, strict public API checks, and packed-package validation:
 
 ```bash
 pnpm test:smoke:pack
@@ -172,10 +172,10 @@ The report writes `benchmark/*.json`, `benchmark/*.md`, and `benchmark/latest-su
 - [x] Legacy fence renderer escaping covered by tests.
 - [x] Safe HTML docs and XSS regression tests complete.
 - [x] App-scoped custom component registry covered by SSR test.
-- [x] `pnpm run release:gate:1.0` passes.
-- [x] Current playground benchmark report or the latest workflow artifact is attached to the release notes.
+- [ ] `pnpm run release:gate:1.0` passes.
+- [ ] Current playground benchmark report or the latest workflow artifact is attached to the release notes.
 - [x] CSS, Tailwind, and worker subpath exports smoke-tested.
-- [x] Unit, SSR, public API, and package export checks are green.
-- [x] Nuxt SSR smoke or preview deployment is green.
-- [x] VitePress docs build is green.
+- [ ] Unit, SSR, public API, and package export checks are green.
+- [ ] Nuxt SSR smoke or preview deployment is green.
+- [ ] VitePress docs build is green.
 - [x] Migration notes and changelog describe beta-to-1.0 breaking changes.

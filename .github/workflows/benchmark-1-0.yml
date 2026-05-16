@@ -2,6 +2,14 @@ name: 1.0 Benchmark
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/benchmark-1-0.mjs
+      - scripts/e2e-*-performance.mjs
+      - playground/**
+      - src/**
+      - packages/markdown-parser/**
+      - packages/markstream-core/**
   schedule:
     - cron: '0 18 * * *'
 

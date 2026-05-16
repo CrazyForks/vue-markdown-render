@@ -12,6 +12,7 @@ const repoRoot = path.resolve(__dirname, '..')
 function parseArgs(argv) {
   const args = {
     packageJson: 'package.json',
+    dryRun: false,
   }
 
   for (let i = 0; i < argv.length; i++) {
@@ -19,8 +20,11 @@ function parseArgs(argv) {
     if (current === '--package-json') {
       args.packageJson = argv[++i]
     }
+    else if (current === '--dry-run') {
+      args.dryRun = true
+    }
     else if (current === '--help' || current === '-h') {
-      console.log('Usage: node scripts/publish-current-package.mjs --package-json <path>')
+      console.log('Usage: node scripts/publish-current-package.mjs --package-json <path> [--dry-run]')
       process.exit(0)
     }
     else {
@@ -49,8 +53,11 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
 
 console.log(`[publish-current] ${packageJson.name}@${packageJson.version}`)
 run('pnpm', ['-C', packageDir, 'run', 'build'])
+run('npm', ['config', 'get', 'registry'], packageDir)
+if (!args.dryRun)
+  run('npm', ['whoami'], packageDir)
 if (packageDir === repoRoot)
-  run('pnpm', ['publish', '--access', 'public'], packageDir)
+  run('pnpm', ['publish', '--access', 'public', ...(args.dryRun ? ['--dry-run'] : [])], packageDir)
 else
-  run('npm', ['publish', '--access', 'public'], packageDir)
-run('node', ['scripts/tag-package.mjs', '--package-json', path.relative(repoRoot, packageJsonPath), '--push'])
+  run('npm', ['publish', '--access', 'public', ...(args.dryRun ? ['--dry-run'] : [])], packageDir)
+run('node', ['scripts/tag-package.mjs', '--package-json', path.relative(repoRoot, packageJsonPath), ...(args.dryRun ? ['--dry-run', '--allow-dirty'] : ['--push'])])
