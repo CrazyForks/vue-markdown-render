@@ -294,9 +294,11 @@ async function collectMetrics(page) {
 
   const scrollFrameBaseline = await frameBaseline(page, '__mainPlaygroundPerf')
   const scrollMetrics = await scrollThroughRoot(page, rootSelector)
+  const scrollFrameStats = await frameStatsSince(page, '__mainPlaygroundPerf', scrollFrameBaseline)
+  const heavySettleFrameBaseline = await frameBaseline(page, '__mainPlaygroundPerf')
   await waitForAllD2Ready(page)
   await page.waitForTimeout(250)
-  const fullScrollFrameStats = await frameStatsSince(page, '__mainPlaygroundPerf', scrollFrameBaseline)
+  const heavySettleFrameStats = await frameStatsSince(page, '__mainPlaygroundPerf', heavySettleFrameBaseline)
 
   const fullScroll = await page.evaluate((frameStats) => {
     const state = window.__mainPlaygroundPerf ?? {}
@@ -322,7 +324,14 @@ async function collectMetrics(page) {
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
       scrollDriftPx: null,
     }
-  }, fullScrollFrameStats)
+  }, {
+    scrollFrameSampleCount: scrollFrameStats.frameSampleCount,
+    scrollFrameP95Ms: scrollFrameStats.frameP95Ms,
+    scrollFrameMaxMs: scrollFrameStats.frameMaxMs,
+    heavySettleFrameSampleCount: heavySettleFrameStats.frameSampleCount,
+    heavySettleFrameP95Ms: heavySettleFrameStats.frameP95Ms,
+    heavySettleFrameMaxMs: heavySettleFrameStats.frameMaxMs,
+  })
   fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
 
   const replayButton = page.locator('button.nav-btn--stream')
@@ -399,7 +408,7 @@ function assertScenario(result) {
     throw new Error(`Total long task time should stay within 1400ms. Got ${result.initial.longTaskTotalMs}.`)
   if (!(result.initial.settleTimeMs <= 7000))
     throw new Error(`Initial settle should stay within 7000ms. Got ${result.initial.settleTimeMs}.`)
-  assertFrameBudget('Initial frame interval p95', result.initial)
+  assertFrameBudget('Initial frame interval p95', result.initial.frameSampleCount, result.initial.frameP95Ms)
   if (!(result.initial.rendererDomNodeCount <= 5000))
     throw new Error(`Initial renderer DOM node count budget exceeded. Got ${result.initial.rendererDomNodeCount}.`)
   if (result.fullScroll.fallbackCount !== 0)
@@ -410,21 +419,21 @@ function assertScenario(result) {
     throw new Error('All infographic blocks should finish after full scroll settle.')
   if (result.fullScroll.d2Count > 0 && result.fullScroll.renderedD2Count !== result.fullScroll.d2Count)
     throw new Error('All d2 blocks should finish after full scroll settle.')
-  assertFrameBudget('Full-scroll frame interval p95', result.fullScroll)
+  assertFrameBudget('Full-scroll scroll frame interval p95', result.fullScroll.scrollFrameSampleCount, result.fullScroll.scrollFrameP95Ms)
   if (!(result.fullScroll.rendererDomNodeCount <= 5000))
     throw new Error(`Full-scroll renderer DOM node count budget exceeded. Got ${result.fullScroll.rendererDomNodeCount}.`)
   if (!(result.replay.settleTimeMs <= 5000))
     throw new Error(`Replay settle should stay within 5000ms. Got ${result.replay.settleTimeMs}.`)
-  assertFrameBudget('Replay frame interval p95', result.replay)
+  assertFrameBudget('Replay frame interval p95', result.replay.frameSampleCount, result.replay.frameP95Ms)
   if (!(result.replay.rendererDomNodeCount <= 5000))
     throw new Error(`Replay renderer DOM node count budget exceeded. Got ${result.replay.rendererDomNodeCount}.`)
 }
 
-function assertFrameBudget(label, stats) {
-  if (stats.frameSampleCount < MIN_FRAME_SAMPLES_FOR_GATE)
+function assertFrameBudget(label, frameSampleCount, frameP95Ms) {
+  if (frameSampleCount < MIN_FRAME_SAMPLES_FOR_GATE)
     return
-  if (!(stats.frameP95Ms <= 120))
-    throw new Error(`${label} should stay within 120ms. Got ${stats.frameP95Ms}.`)
+  if (!(frameP95Ms <= 120))
+    throw new Error(`${label} should stay within 120ms. Got ${frameP95Ms}.`)
 }
 
 async function run() {

@@ -24,9 +24,9 @@ benchmark/
   latest-summary.md
 ```
 
-The Markdown summary includes package versions, Node, OS, CPU, browser, viewport, server mode, LCP, CLS, settle time, frame sample count, phase-local p95 `requestAnimationFrame` interval, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC when the browser exposes that value.
+The Markdown summary includes package versions, Node, OS, CPU, browser, viewport, server mode, LCP, CLS, settle time, gate frame sample count, gate p95 `requestAnimationFrame` interval, full-scroll heavy-settle frame p95, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC when the browser exposes that value.
 
-Initial rows report heavy-block readiness only for blocks visible in the phase viewport. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to `.preview-surface` or `.chatbot-messages` and are the DOM budget used by the release gate. Frame interval p95 is recorded for every phase; the release gate only enforces the 120 ms budget when the phase has at least 30 frame samples.
+Initial rows report heavy-block readiness only for blocks visible in the phase viewport. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to `.preview-surface` or `.chatbot-messages` and are the DOM budget used by the release gate. Gate frame p95 is recorded for every phase; on full-scroll rows, the hard gate uses only `scrollFrameP95Ms` from the active scroll loop. `heavySettleFrameP95Ms` records post-scroll heavy-block settle separately and is not a 1.0 hard frame gate. The release gate only enforces the 120 ms budget when the gate window has at least 30 frame samples.
 
 For script debugging only, set `MARKSTREAM_BENCHMARK_SKIP_BUILD=1` to reuse an existing playground build. Do not use that shortcut for release evidence unless the build artifact was just produced. Set `MARKSTREAM_BENCHMARK_SAMPLES=baseline,diff` only when narrowing a local investigation.
 
