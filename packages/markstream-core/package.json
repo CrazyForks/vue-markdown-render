@@ -1,7 +1,7 @@
 {
   "name": "markstream-core",
   "type": "module",
-  "version": "1.0.0-rc.0",
+  "version": "1.0.0",
   "packageManager": "pnpm@10.33.4",
   "description": "Framework-agnostic smooth streaming controller and streaming text state utilities for Markstream",
   "author": "Simon He",

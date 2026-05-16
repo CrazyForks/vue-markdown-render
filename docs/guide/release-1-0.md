@@ -113,6 +113,14 @@ If the parser or core package stays below 1.0, `markstream-vue` must pin the exa
 Run the unified release gate before publishing:
 
 ```bash
+pnpm run release:gate:1.0
+```
+
+That command runs lint, typecheck, the full Vitest suite, strict public API checks, packed-package validation, VitePress docs build, package size budget check, and the 1.0 benchmark report.
+
+For package-only validation, run:
+
+```bash
 pnpm release:verify
 ```
 
@@ -152,16 +160,25 @@ The public benchmark set should include:
 
 Track initial render time, stream update cost, p95 frame cost, max long task, memory after unmount, scroll drift, and DOM node count.
 
+Generate the public report with:
+
+```bash
+pnpm benchmark:1.0
+```
+
+The report writes `benchmark/*.json`, `benchmark/*.md`, and `benchmark/latest-summary.md` with environment disclosure. The nightly/manual `1.0 Benchmark` GitHub Actions workflow uploads the same files as artifacts.
+
 ## Go / No-Go checklist
 
-- [ ] Stable and experimental public API documented.
-- [ ] Parser/core release strategy decided.
-- [ ] Legacy fence renderer escaping covered by tests.
-- [ ] Safe HTML docs and XSS regression tests complete.
-- [ ] App-scoped custom component registry covered by SSR test.
-- [ ] `pnpm release:verify` passes.
-- [ ] CSS, Tailwind, and worker subpath exports smoke-tested.
-- [ ] Unit, SSR, public API, and package export checks are green.
-- [ ] Nuxt SSR smoke or preview deployment is green.
-- [ ] VitePress docs build is green.
-- [ ] Migration notes and changelog describe beta-to-1.0 breaking changes.
+- [x] Stable and experimental public API documented.
+- [x] Parser/core release strategy decided.
+- [x] Legacy fence renderer escaping covered by tests.
+- [x] Safe HTML docs and XSS regression tests complete.
+- [x] App-scoped custom component registry covered by SSR test.
+- [x] `pnpm run release:gate:1.0` passes.
+- [x] `benchmark/latest-summary.md` or the latest workflow artifact is attached to the release notes.
+- [x] CSS, Tailwind, and worker subpath exports smoke-tested.
+- [x] Unit, SSR, public API, and package export checks are green.
+- [x] Nuxt SSR smoke or preview deployment is green.
+- [x] VitePress docs build is green.
+- [x] Migration notes and changelog describe beta-to-1.0 breaking changes.

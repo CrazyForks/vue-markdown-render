@@ -26,6 +26,21 @@ describe('release dependency gates', () => {
     expect(release).not.toContain('pnpm run check:core-published')
   })
 
+  it('uses the 1.0 release gate before publishing stable packages', () => {
+    const scripts = packageJson.scripts
+    const releaseGate = scripts['release:gate:1.0']
+    const release1 = scripts['release:1.0']
+
+    expect(releaseGate).toContain('pnpm run release:verify')
+    expect(releaseGate).toContain('pnpm run docs:build:ci')
+    expect(releaseGate).toContain('pnpm run size:check')
+    expect(releaseGate).toContain('pnpm run benchmark:1.0')
+    expect(release1).toContain('pnpm run release:gate:1.0')
+    expect(release1.indexOf('pnpm run release:gate:1.0')).toBeLessThan(release1.indexOf('pnpm run release:parser'))
+    expect(release1.indexOf('pnpm run release:parser')).toBeLessThan(release1.indexOf('pnpm run release:core'))
+    expect(release1.indexOf('pnpm run release:core')).toBeLessThan(release1.lastIndexOf('pnpm run release'))
+  })
+
   it('checks both runtime workspace packages for published versions', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/check-workspace-deps-published.mjs'), 'utf8')
 

@@ -28,7 +28,7 @@ Looking for other frameworks?
 
 Experimental surfaces are the cross-framework adapters, repository skills/prompts, low-level worker entrypoints beyond documented clients, and internal performance/debug props such as `indexKey`, `renderAsFragment`, `debugPerformance`, batch budget internals, and height-estimation experiments.
 
-For the full release contract and Go / No-Go checklist, see [1.0 Release Readiness](./docs/guide/release-1-0.md).
+For the full release contract and Go / No-Go checklist, see [1.0 Release Readiness](./docs/guide/release-1-0.md). For reproducible performance evidence, run `pnpm benchmark:1.0` and use the generated [1.0 Benchmark Report](./docs/guide/benchmark-1-0.md).
 
 ## Contents
 
@@ -81,6 +81,8 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 - Playground (interactive demo): https://markstream-vue.simonhe.me/
 - Interactive test page (shareable links, easy reproduction): https://markstream-vue.simonhe.me/test
 - Docs: https://markstream-vue-docs.simonhe.me/guide/
+- Showcase: https://markstream-vue-docs.simonhe.me/guide/showcase
+- 1.0 benchmark report workflow: `pnpm benchmark:1.0`
 - AI/LLM context (project map): https://markstream-vue-docs.simonhe.me/llms
 - AI/LLM context (中文): https://markstream-vue-docs.simonhe.me/llms.zh-CN
 - One-click StackBlitz demo: https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
@@ -438,17 +440,19 @@ Parse hooks example (match server + client):
 
 - Latest: [Releases](https://github.com/Simon-He95/markstream-vue/releases) — see highlights and upgrade notes.
 - Full history: [CHANGELOG.md](./CHANGELOG.md)
-- Recent highlights (0.0.3-beta.1/beta.0):
-  - Parser bumped to `stream-markdown-parser@0.0.36` for parsing fixes.
-  - Monaco upgrades with more languages/themes + diff-friendly code block tweaks.
-  - HTML/SVG preview dialog and AST debug view in the playground.
+- 1.0 launch notes:
+  - Stable Vue 3 renderer API, SSR imports, CSS exports, Tailwind export, worker client exports, and safe HTML defaults.
+  - `markstream-vue@1.0.0`, `markstream-core@1.0.0`, and `stream-markdown-parser@1.0.0` ship together.
+  - Public benchmark report: run `pnpm benchmark:1.0` or use the `1.0 Benchmark` workflow artifact.
+  - Migration guide: [Migrating to 1.0](./docs/guide/migration-1-0.md).
 
 ## 🧭 Showcase & examples
 
 Build something with markstream-vue? Open a PR to add it here (include a link + 1 screenshot/GIF). Ideal fits: AI/chat UIs, streaming docs, diff/code-review panes, or Markdown-driven pages with embedded Vue components.
 
 - **FlowNote** — streaming Markdown note app demo (SSE + virtual window) — https://markstream-vue.simonhe.me/
-- **AI Chat surface** — playground “test” page showing incremental batches + share links — https://markstream-vue.simonhe.me/test
+- **Diagnostic Studio** — shareable repro links, render-mode switching, diff/thinking/stress samples, annotations, PDF export — https://markstream-vue.simonhe.me/test
+- **1.0 Showcase guide** — launch-ready demo matrix for chat, long docs, code review, diagrams, custom components, and safe HTML — https://markstream-vue-docs.simonhe.me/guide/showcase
 
 ## 📺 Introduction Video
 

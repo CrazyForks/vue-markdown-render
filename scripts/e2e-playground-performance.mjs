@@ -49,12 +49,17 @@ function killProcessTree(child) {
   if (!child || child.killed)
     return
   try {
-    child.kill('SIGTERM')
+    if (process.platform !== 'win32' && child.pid)
+      process.kill(-child.pid, 'SIGTERM')
+    else
+      child.kill('SIGTERM')
   }
   catch {}
   setTimeout(() => {
     try {
-      if (!child.killed)
+      if (process.platform !== 'win32' && child.pid)
+        process.kill(-child.pid, 'SIGKILL')
+      else if (!child.killed)
         child.kill('SIGKILL')
     }
     catch {}
@@ -88,11 +93,15 @@ function resolveChromeLaunchOptions() {
 
 function startDevServer(port) {
   const logs = []
+  const serverArgs = process.env.PLAYGROUND_PERFORMANCE_SERVER === 'preview'
+    ? ['-C', playgroundDir, 'exec', 'vite', 'preview', '--host', host, '--port', String(port), '--strictPort']
+    : ['-C', playgroundDir, 'exec', 'vite', '--host', host, '--port', String(port), '--strictPort']
   const child = spawn(
     'pnpm',
-    ['-C', playgroundDir, 'exec', 'vite', '--host', host, '--port', String(port), '--strictPort'],
+    serverArgs,
     {
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
       env: {
         ...process.env,
         CI: '1',
@@ -138,12 +147,13 @@ async function waitForAllD2Ready(page, timeout = 15000) {
 }
 
 async function scrollThroughRoot(page, rootSelector) {
+  let maxScrollDriftPx = 0
   while (true) {
     await waitForVisibleBlocksReady(page, rootSelector)
     const state = await page.evaluate((selector) => {
       const root = document.querySelector(selector)
       if (!root)
-        return { done: true }
+        return { done: true, nextScrollTop: 0 }
       root.style.scrollBehavior = 'auto'
       const maxScrollTop = Math.max(0, root.scrollHeight - root.clientHeight)
       const step = Math.max(320, Math.round(root.clientHeight * 0.85))
@@ -151,13 +161,28 @@ async function scrollThroughRoot(page, rootSelector) {
       const done = nextScrollTop <= root.scrollTop + 1
       if (!done)
         root.scrollTop = nextScrollTop
-      return { done }
+      return { done, nextScrollTop }
     }, rootSelector)
     if (state.done)
       break
     await page.waitForTimeout(180)
+    const driftPx = await page.evaluate(({ selector, expectedScrollTop }) => {
+      const root = document.querySelector(selector)
+      return root ? Math.abs(root.scrollTop - expectedScrollTop) : 0
+    }, { selector: rootSelector, expectedScrollTop: state.nextScrollTop })
+    maxScrollDriftPx = Math.max(maxScrollDriftPx, Number(driftPx || 0))
   }
   await waitForVisibleBlocksReady(page, rootSelector)
+  return { maxScrollDriftPx }
+}
+
+async function readUsedHeapBytes(page) {
+  return await page.evaluate(() => {
+    const memory = performance.memory
+    return memory && typeof memory.usedJSHeapSize === 'number'
+      ? memory.usedJSHeapSize
+      : null
+  })
 }
 
 async function runScenario(browser, port, mode) {
@@ -208,6 +233,8 @@ async function runScenario(browser, port, mode) {
       longTasks: [],
       paints: {},
       layoutShifts: [],
+      frameDeltas: [],
+      lastFrameAt: 0,
     }
 
     window.__playgroundPerfState = state
@@ -270,6 +297,18 @@ async function runScenario(browser, port, mode) {
       }).observe({ type: 'paint', buffered: true })
     }
     catch {}
+
+    try {
+      const sampleFrame = (now) => {
+        if (state.lastFrameAt > 0)
+          state.frameDeltas.push(now - state.lastFrameAt)
+        state.lastFrameAt = now
+        if (state.frameDeltas.length < 2400)
+          requestAnimationFrame(sampleFrame)
+      }
+      requestAnimationFrame(sampleFrame)
+    }
+    catch {}
   })
 
   const page = await context.newPage()
@@ -285,6 +324,18 @@ async function runScenario(browser, port, mode) {
     const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
     const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
     const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
+    const frameDeltas = Array.isArray(state.frameDeltas)
+      ? state.frameDeltas.map(Number).filter(Number.isFinite)
+      : []
+    const sortedFrameDeltas = [...frameDeltas].sort((a, b) => a - b)
+    const frameP95Index = sortedFrameDeltas.length
+      ? Math.min(sortedFrameDeltas.length - 1, Math.ceil(sortedFrameDeltas.length * 0.95) - 1)
+      : -1
+    const frameStats = {
+      frameSampleCount: frameDeltas.length,
+      frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
+      frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
+    }
     const root = document.querySelector('.preview-surface')
     const rootRect = root?.getBoundingClientRect()
     const isVisible = (element) => {
@@ -314,7 +365,10 @@ async function runScenario(browser, port, mode) {
       longTaskCount: longTasks.length,
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
       longTaskMaxMs: longTasks.length ? Math.max(...longTasks) : 0,
+      ...frameStats,
       settleTimeMs: performance.now() - Number(state.startedAt ?? 0),
+      domNodeCount: document.querySelectorAll('*').length,
+      jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
       codeBlockCount: allCodeBlocks.length,
       diffCodeBlockCount: diffCodeBlocks.length,
       fallbackCount: document.querySelectorAll('.code-fallback-plain, .code-pre-fallback').length,
@@ -343,7 +397,7 @@ async function runScenario(browser, port, mode) {
     }
   })
 
-  await scrollThroughRoot(page, rootSelector)
+  const scrollMetrics = await scrollThroughRoot(page, rootSelector)
   await waitForAllD2Ready(page)
   await page.waitForTimeout(200)
 
@@ -353,8 +407,23 @@ async function runScenario(browser, port, mode) {
     const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
     const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
     const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
+    const frameDeltas = Array.isArray(state.frameDeltas)
+      ? state.frameDeltas.map(Number).filter(Number.isFinite)
+      : []
+    const sortedFrameDeltas = [...frameDeltas].sort((a, b) => a - b)
+    const frameP95Index = sortedFrameDeltas.length
+      ? Math.min(sortedFrameDeltas.length - 1, Math.ceil(sortedFrameDeltas.length * 0.95) - 1)
+      : -1
+    const frameStats = {
+      frameSampleCount: frameDeltas.length,
+      frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
+      frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
+    }
     return {
       settleTimeMs: performance.now() - Number(state.startedAt ?? 0),
+      ...frameStats,
+      domNodeCount: document.querySelectorAll('*').length,
+      jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
       fallbackCount: document.querySelectorAll('.code-fallback-plain, .code-pre-fallback').length,
       mermaidCount: mermaids.length,
       renderedMermaidCount: mermaids.filter(element => element.querySelector('svg')).length,
@@ -363,15 +432,23 @@ async function runScenario(browser, port, mode) {
       d2Count: d2Blocks.length,
       renderedD2Count: d2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
+      scrollDriftPx: null,
     }
   })
+  result.fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
+  result.memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
+  await page.goto('about:blank')
+  if (typeof page.requestGC === 'function')
+    await page.requestGC()
+  await page.waitForTimeout(100)
+  result.memoryAfterUnmountBytes = await readUsedHeapBytes(page)
 
   await context.close()
   return result
 }
 
 function assertScenario(result) {
-  if (!(result.codeBlockCount > 0))
+  if (result.sample !== 'stress' && !(result.codeBlockCount > 0))
     throw new Error(`[${result.mode}] Expected at least one rendered code block.`)
   if (result.visibleFallbackCount !== 0)
     throw new Error(`[${result.mode}] Visible code fallback should be gone after initial settle.`)
@@ -407,6 +484,7 @@ async function run() {
   const port = process.env.PORT ? Number(process.env.PORT) : await findFreePort()
   const server = startDevServer(port)
   let results = null
+  let browser = null
   const cleanup = () => killProcessTree(server.child)
   process.on('SIGINT', cleanup)
   process.on('SIGTERM', cleanup)
@@ -414,7 +492,7 @@ async function run() {
 
   try {
     await waitForPort(port)
-    const browser = await chromium.launch(resolveChromeLaunchOptions())
+    browser = await chromium.launch(resolveChromeLaunchOptions())
 
     const markdownResult = await runScenario(browser, port, 'markdown')
     const monacoResult = await runScenario(browser, port, 'monaco')
@@ -429,6 +507,7 @@ async function run() {
     console.log(JSON.stringify(results, null, 2))
 
     await browser.close()
+    browser = null
   }
   catch (error) {
     console.error('[e2e-playground-performance] failed')
@@ -439,6 +518,12 @@ async function run() {
     process.exitCode = 1
   }
   finally {
+    if (browser) {
+      try {
+        await browser.close()
+      }
+      catch {}
+    }
     cleanup()
   }
 }

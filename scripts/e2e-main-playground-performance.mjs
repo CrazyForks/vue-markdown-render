@@ -49,12 +49,17 @@ function killProcessTree(child) {
   if (!child || child.killed)
     return
   try {
-    child.kill('SIGTERM')
+    if (process.platform !== 'win32' && child.pid)
+      process.kill(-child.pid, 'SIGTERM')
+    else
+      child.kill('SIGTERM')
   }
   catch {}
   setTimeout(() => {
     try {
-      if (!child.killed)
+      if (process.platform !== 'win32' && child.pid)
+        process.kill(-child.pid, 'SIGKILL')
+      else if (!child.killed)
         child.kill('SIGKILL')
     }
     catch {}
@@ -88,11 +93,15 @@ function resolveChromeLaunchOptions() {
 
 function startDevServer(port) {
   const logs = []
+  const serverArgs = process.env.PLAYGROUND_PERFORMANCE_SERVER === 'preview'
+    ? ['-C', playgroundDir, 'exec', 'vite', 'preview', '--host', host, '--port', String(port), '--strictPort']
+    : ['-C', playgroundDir, 'exec', 'vite', '--host', host, '--port', String(port), '--strictPort']
   const child = spawn(
     'pnpm',
-    ['-C', playgroundDir, 'exec', 'vite', '--host', host, '--port', String(port), '--strictPort'],
+    serverArgs,
     {
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
       env: {
         ...process.env,
         CI: '1',
@@ -138,12 +147,13 @@ async function waitForAllD2Ready(page, timeout = 15000) {
 }
 
 async function scrollThroughRoot(page, rootSelector) {
+  let maxScrollDriftPx = 0
   while (true) {
     await waitForVisibleBlocksReady(page, rootSelector)
     const state = await page.evaluate((selector) => {
       const root = document.querySelector(selector)
       if (!root)
-        return { done: true }
+        return { done: true, nextScrollTop: 0 }
       root.style.scrollBehavior = 'auto'
       const maxScrollTop = Math.max(0, root.scrollHeight - root.clientHeight)
       const step = Math.max(320, Math.round(root.clientHeight * 0.85))
@@ -151,19 +161,34 @@ async function scrollThroughRoot(page, rootSelector) {
       const done = nextScrollTop <= root.scrollTop + 1
       if (!done)
         root.scrollTop = nextScrollTop
-      return { done }
+      return { done, nextScrollTop }
     }, rootSelector)
     if (state.done)
       break
     await page.waitForTimeout(180)
+    const driftPx = await page.evaluate(({ selector, expectedScrollTop }) => {
+      const root = document.querySelector(selector)
+      return root ? Math.abs(root.scrollTop - expectedScrollTop) : 0
+    }, { selector: rootSelector, expectedScrollTop: state.nextScrollTop })
+    maxScrollDriftPx = Math.max(maxScrollDriftPx, Number(driftPx || 0))
   }
   await waitForVisibleBlocksReady(page, rootSelector)
+  return { maxScrollDriftPx }
+}
+
+async function readUsedHeapBytes(page) {
+  return await page.evaluate(() => {
+    const memory = performance.memory
+    return memory && typeof memory.usedJSHeapSize === 'number'
+      ? memory.usedJSHeapSize
+      : null
+  })
 }
 
 async function collectMetrics(page) {
   const rootSelector = '.chatbot-messages'
   await page.goto('/', { waitUntil: 'load' })
-  await page.locator('.chatbot-container').waitFor({ state: 'visible', timeout: 15000 })
+  await page.locator('.playground-root').waitFor({ state: 'visible', timeout: 15000 })
   await waitForVisibleBlocksReady(page, rootSelector)
   await page.waitForTimeout(250)
 
@@ -173,6 +198,18 @@ async function collectMetrics(page) {
     const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
     const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
     const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
+    const frameDeltas = Array.isArray(state.frameDeltas)
+      ? state.frameDeltas.map(Number).filter(Number.isFinite)
+      : []
+    const sortedFrameDeltas = [...frameDeltas].sort((a, b) => a - b)
+    const frameP95Index = sortedFrameDeltas.length
+      ? Math.min(sortedFrameDeltas.length - 1, Math.ceil(sortedFrameDeltas.length * 0.95) - 1)
+      : -1
+    const frameStats = {
+      frameSampleCount: frameDeltas.length,
+      frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
+      frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
+    }
     const root = document.querySelector('.chatbot-messages')
     const rootRect = root?.getBoundingClientRect()
     const isVisible = (element) => {
@@ -194,7 +231,10 @@ async function collectMetrics(page) {
       longTaskCount: longTasks.length,
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
       longTaskMaxMs: longTasks.length ? Math.max(...longTasks) : 0,
+      ...frameStats,
       settleTimeMs: performance.now() - Number(state.startedAt ?? 0),
+      domNodeCount: document.querySelectorAll('*').length,
+      jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
       codeBlockCount: document.querySelectorAll('.code-block-container').length,
       fallbackCount: document.querySelectorAll('.code-fallback-plain, .code-pre-fallback').length,
       visibleCodeBlockCount: visibleCodeBlocks.length,
@@ -219,7 +259,7 @@ async function collectMetrics(page) {
     }
   })
 
-  await scrollThroughRoot(page, rootSelector)
+  const scrollMetrics = await scrollThroughRoot(page, rootSelector)
   await waitForAllD2Ready(page)
   await page.waitForTimeout(250)
 
@@ -229,8 +269,23 @@ async function collectMetrics(page) {
     const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
     const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
     const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
+    const frameDeltas = Array.isArray(state.frameDeltas)
+      ? state.frameDeltas.map(Number).filter(Number.isFinite)
+      : []
+    const sortedFrameDeltas = [...frameDeltas].sort((a, b) => a - b)
+    const frameP95Index = sortedFrameDeltas.length
+      ? Math.min(sortedFrameDeltas.length - 1, Math.ceil(sortedFrameDeltas.length * 0.95) - 1)
+      : -1
+    const frameStats = {
+      frameSampleCount: frameDeltas.length,
+      frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
+      frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
+    }
     return {
       settleTimeMs: performance.now() - Number(state.startedAt ?? 0),
+      ...frameStats,
+      domNodeCount: document.querySelectorAll('*').length,
+      jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
       codeBlockCount: document.querySelectorAll('.code-block-container').length,
       fallbackCount: document.querySelectorAll('.code-fallback-plain, .code-pre-fallback').length,
       mermaidCount: mermaids.length,
@@ -240,16 +295,18 @@ async function collectMetrics(page) {
       d2Count: d2Blocks.length,
       renderedD2Count: d2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
+      scrollDriftPx: null,
     }
   })
+  fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
 
-  const replayButton = page.locator('button[title="Pause streaming"], button[title="Resume streaming"]')
+  const replayButton = page.locator('button.nav-btn--stream')
   await replayButton.waitFor({ state: 'visible', timeout: 5000 })
-  if ((await replayButton.getAttribute('title')) === 'Pause streaming') {
+  if ((await replayButton.textContent())?.includes('Pause')) {
     await replayButton.click()
     await page.waitForFunction(() => {
-      const button = document.querySelector('button[title="Resume streaming"]')
-      return Boolean(button)
+      const button = document.querySelector('button.nav-btn--stream')
+      return button?.textContent?.includes('Resume')
     }, null, { timeout: 5000 })
   }
   await page.evaluate(() => {
@@ -258,9 +315,10 @@ async function collectMetrics(page) {
       state.replayStartedAt = performance.now()
       state.replayLongTaskCountBaseline = state.longTasks.length
       state.replayLongTaskTotalBaseline = state.longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0)
+      state.replayFrameCountBaseline = Array.isArray(state.frameDeltas) ? state.frameDeltas.length : 0
     }
   })
-  await page.locator('button[title="Resume streaming"]').click()
+  await page.locator('button.nav-btn--stream').click()
   await waitForVisibleBlocksReady(page, rootSelector)
   await page.waitForTimeout(250)
 
@@ -268,14 +326,33 @@ async function collectMetrics(page) {
     const state = window.__mainPlaygroundPerf ?? {}
     const longTasks = Array.isArray(state.longTasks) ? state.longTasks : []
     const totalLongTaskMs = longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0)
+    const frameDeltas = Array.isArray(state.frameDeltas)
+      ? state.frameDeltas.slice(Number(state.replayFrameCountBaseline ?? 0)).map(Number).filter(Number.isFinite)
+      : []
+    const sortedFrameDeltas = [...frameDeltas].sort((a, b) => a - b)
+    const frameP95Index = sortedFrameDeltas.length
+      ? Math.min(sortedFrameDeltas.length - 1, Math.ceil(sortedFrameDeltas.length * 0.95) - 1)
+      : -1
     return {
       settleTimeMs: performance.now() - Number(state.replayStartedAt ?? performance.now()),
       longTaskCount: longTasks.length - Number(state.replayLongTaskCountBaseline ?? 0),
       longTaskTotalMs: totalLongTaskMs - Number(state.replayLongTaskTotalBaseline ?? 0),
+      frameSampleCount: frameDeltas.length,
+      frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
+      frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
+      domNodeCount: document.querySelectorAll('*').length,
+      jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
     }
   })
 
-  return { initial, fullScroll, replay }
+  const memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
+  await page.goto('about:blank')
+  if (typeof page.requestGC === 'function')
+    await page.requestGC()
+  await page.waitForTimeout(100)
+  const memoryAfterUnmountBytes = await readUsedHeapBytes(page)
+
+  return { initial, fullScroll, replay, memoryBeforeUnmountBytes, memoryAfterUnmountBytes }
 }
 
 function assertScenario(result) {
@@ -313,6 +390,7 @@ async function run() {
   const port = process.env.PORT ? Number(process.env.PORT) : await findFreePort()
   const server = startDevServer(port)
   let result = null
+  let browser = null
   const cleanup = () => killProcessTree(server.child)
   process.on('SIGINT', cleanup)
   process.on('SIGTERM', cleanup)
@@ -320,14 +398,14 @@ async function run() {
 
   try {
     await waitForPort(port)
-    const browser = await chromium.launch(resolveChromeLaunchOptions())
+    browser = await chromium.launch(resolveChromeLaunchOptions())
     const warmupContext = await browser.newContext({
       viewport: { width: 1600, height: 1200 },
       baseURL: `http://${host}:${port}`,
     })
     const warmupPage = await warmupContext.newPage()
     await warmupPage.goto('/', { waitUntil: 'load' })
-    await warmupPage.locator('.chatbot-container').waitFor({ state: 'visible', timeout: 15000 })
+    await warmupPage.locator('.playground-root').waitFor({ state: 'visible', timeout: 15000 })
     await warmupContext.close()
     const context = await browser.newContext({
       viewport: { width: 1600, height: 1200 },
@@ -342,6 +420,8 @@ async function run() {
         longTasks: [],
         paints: {},
         layoutShifts: [],
+        frameDeltas: [],
+        lastFrameAt: 0,
         pauseEnabledSeen: false,
       }
 
@@ -405,6 +485,18 @@ async function run() {
         }).observe({ type: 'paint', buffered: true })
       }
       catch {}
+
+      try {
+        const sampleFrame = (now) => {
+          if (state.lastFrameAt > 0)
+            state.frameDeltas.push(now - state.lastFrameAt)
+          state.lastFrameAt = now
+          if (state.frameDeltas.length < 2400)
+            requestAnimationFrame(sampleFrame)
+        }
+        requestAnimationFrame(sampleFrame)
+      }
+      catch {}
     })
 
     const page = await context.newPage()
@@ -414,6 +506,7 @@ async function run() {
 
     await context.close()
     await browser.close()
+    browser = null
   }
   catch (error) {
     console.error('[e2e-main-playground-performance] failed')
@@ -424,6 +517,12 @@ async function run() {
     process.exitCode = 1
   }
   finally {
+    if (browser) {
+      try {
+        await browser.close()
+      }
+      catch {}
+    }
     cleanup()
   }
 }

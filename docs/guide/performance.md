@@ -73,6 +73,14 @@ Before publishing 1.0, benchmark at least these cases:
 
 Track initial render time, average stream update cost, p95 frame cost, max long task duration, memory after unmount, scroll position drift, and DOM node count.
 
+Generate the release report with:
+
+```bash
+pnpm benchmark:1.0
+```
+
+This builds the playground, runs the scenarios through `vite preview`, and writes JSON and Markdown summaries under `benchmark/`, including environment disclosure so release notes can cite measured numbers instead of informal claims.
+
 ## Bundle size workflow (maintainers)
 
 If you are changing code paths that can impact build size (renderers, code blocks, optional peers), run this flow before merging:
