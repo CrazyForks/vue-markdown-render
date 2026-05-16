@@ -12,7 +12,7 @@ pnpm benchmark:1.0
 
 The command builds the playground, serves it with `vite preview`, then runs the playground checks that are already used for performance regression coverage:
 
-- Diagnostic Studio baseline, thinking, diff, and stress samples in MarkdownCodeBlock and Monaco modes using `/test?benchmark=1`, which disables the version sandbox iframe and annotation layer so the frame/DOM metrics track the renderer surface.
+- Diagnostic Studio baseline, thinking, diff, and stress samples in MarkdownCodeBlock and Monaco modes using `/test?benchmark=1`, which disables the version sandbox iframe and annotation layer so frame metrics and renderer DOM metrics track the renderer surface.
 - Main playground reverse-flex chat initial load, full-scroll pass, and streaming replay.
 
 It writes:
@@ -24,9 +24,9 @@ benchmark/
   latest-summary.md
 ```
 
-The Markdown summary includes package versions, Node, OS, CPU, browser, viewport, server mode, LCP, CLS, settle time, frame sample count, phase-local p95 `requestAnimationFrame` interval, max long task, DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC when the browser exposes that value.
+The Markdown summary includes package versions, Node, OS, CPU, browser, viewport, server mode, LCP, CLS, settle time, frame sample count, phase-local p95 `requestAnimationFrame` interval, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC when the browser exposes that value.
 
-Initial rows report heavy-block readiness only for blocks visible in the phase viewport. Full-scroll rows report all heavy blocks after the scroll pass. Frame interval p95 is recorded for every phase; the release gate only enforces the 120 ms budget when the phase has at least 30 frame samples.
+Initial rows report heavy-block readiness only for blocks visible in the phase viewport. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to `.preview-surface` or `.chatbot-messages` and are the DOM budget used by the release gate. Frame interval p95 is recorded for every phase; the release gate only enforces the 120 ms budget when the phase has at least 30 frame samples.
 
 For script debugging only, set `MARKSTREAM_BENCHMARK_SKIP_BUILD=1` to reuse an existing playground build. Do not use that shortcut for release evidence unless the build artifact was just produced. Set `MARKSTREAM_BENCHMARK_SAMPLES=baseline,diff` only when narrowing a local investigation.
 
@@ -45,3 +45,11 @@ pnpm run release:gate:1.0
 ```
 
 That command executes `release:verify`, `docs:build:ci`, `size:check`, and the benchmark report. The release command uses `.tmp/benchmark` for the generated report so publishing does not depend on tracked benchmark artifacts.
+
+Before publishing, run the full package dry run:
+
+```bash
+pnpm run release:dry-run:1.0
+```
+
+That repeats the release gate, then dry-runs the parser, core, and Vue package publish path.

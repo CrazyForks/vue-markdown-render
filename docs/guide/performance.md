@@ -69,7 +69,7 @@ Before publishing 1.0, run the public benchmark over the shipped playground scen
 | Diagnostic Studio stress | Safe repro and escaped content behavior |
 | Reverse-flex chat scroll | Main playground chat viewport behavior |
 
-Track LCP, CLS, settle time, p95 `requestAnimationFrame` interval, max long task duration, DOM node count, visible fallback count, heavy-block readiness, scroll position drift, and best-effort Chrome-only heap after component unmount plus GC. Synthetic 1 MB, 1000-code-block, 100-Mermaid, and 10k-node cases are future 1.0.x coverage and should not be cited as 1.0 release evidence until they exist in the benchmark script.
+Track LCP, CLS, settle time, p95 `requestAnimationFrame` interval, max long task duration, page and renderer DOM node counts, visible fallback count, heavy-block readiness, scroll position drift, and best-effort Chrome-only heap after component unmount plus GC. Synthetic 1 MB, 1000-code-block, 100-Mermaid, and 10k-node cases are future 1.0.x coverage and should not be cited as 1.0 release evidence until they exist in the benchmark script.
 
 Generate the release report with:
 

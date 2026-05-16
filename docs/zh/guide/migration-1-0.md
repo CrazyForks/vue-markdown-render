@@ -52,10 +52,10 @@ app.use(VueRendererMarkdown, {
 
 ## Release validation
 
-发布前运行 1.0 gate：
+发布前运行 1.0 publish dry run：
 
 ```bash
-pnpm run release:gate:1.0
+pnpm run release:dry-run:1.0
 ```
 
 把 `1.0 Benchmark` workflow artifact，或带环境披露的本地 benchmark report，附到 release notes。

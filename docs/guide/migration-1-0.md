@@ -52,10 +52,10 @@ app.use(VueRendererMarkdown, {
 
 ## Release validation
 
-Run the 1.0 gate before publishing:
+Run the 1.0 publish dry run before publishing:
 
 ```bash
-pnpm run release:gate:1.0
+pnpm run release:dry-run:1.0
 ```
 
 Attach the `1.0 Benchmark` workflow artifact, or a generated local benchmark report with its environment disclosure, to the release notes.

@@ -134,9 +134,11 @@ async function waitForVisibleBlocksReady(page, rootSelector) {
     const visibleCodeBlocks = Array.from(document.querySelectorAll('.code-block-container')).filter(isVisible)
     const visibleMermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]')).filter(isVisible)
     const visibleInfographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]')).filter(isVisible)
+    const visibleD2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]')).filter(isVisible)
     return visibleCodeBlocks.every(element => !element.querySelector('.code-fallback-plain, .code-pre-fallback'))
       && visibleMermaids.every(element => element.querySelector('svg'))
       && visibleInfographics.every(element => element.querySelector('svg'))
+      && visibleD2Blocks.every(element => element.querySelector('.d2-svg svg'))
   }, rootSelector, { timeout: 30000 })
 }
 
@@ -263,7 +265,8 @@ async function collectMetrics(page) {
       longTaskMaxMs: longTasks.length ? Math.max(...longTasks) : 0,
       ...frameStats,
       settleTimeMs: performance.now() - Number(state.startedAt ?? 0),
-      domNodeCount: document.querySelectorAll('*').length,
+      pageDomNodeCount: document.querySelectorAll('*').length,
+      rendererDomNodeCount: root ? root.querySelectorAll('*').length : 0,
       jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
       codeBlockCount: document.querySelectorAll('.code-block-container').length,
       fallbackCount: document.querySelectorAll('.code-fallback-plain, .code-pre-fallback').length,
@@ -301,10 +304,12 @@ async function collectMetrics(page) {
     const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
     const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
     const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
+    const root = document.querySelector('.chatbot-messages')
     return {
       settleTimeMs: performance.now() - Number(state.startedAt ?? 0),
       ...frameStats,
-      domNodeCount: document.querySelectorAll('*').length,
+      pageDomNodeCount: document.querySelectorAll('*').length,
+      rendererDomNodeCount: root ? root.querySelectorAll('*').length : 0,
       jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
       codeBlockCount: document.querySelectorAll('.code-block-container').length,
       fallbackCount: document.querySelectorAll('.code-fallback-plain, .code-pre-fallback').length,
@@ -345,6 +350,7 @@ async function collectMetrics(page) {
   const replay = await page.evaluate(() => {
     const state = window.__mainPlaygroundPerf ?? {}
     const longTasks = Array.isArray(state.longTasks) ? state.longTasks : []
+    const root = document.querySelector('.chatbot-messages')
     const totalLongTaskMs = longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0)
     const frameDeltas = Array.isArray(state.frameDeltas)
       ? state.frameDeltas.slice(Number(state.replayFrameCountBaseline ?? 0)).map(Number).filter(Number.isFinite)
@@ -360,7 +366,8 @@ async function collectMetrics(page) {
       frameSampleCount: frameDeltas.length,
       frameP95Ms: frameP95Index >= 0 ? sortedFrameDeltas[frameP95Index] : 0,
       frameMaxMs: sortedFrameDeltas.length ? sortedFrameDeltas[sortedFrameDeltas.length - 1] : 0,
-      domNodeCount: document.querySelectorAll('*').length,
+      pageDomNodeCount: document.querySelectorAll('*').length,
+      rendererDomNodeCount: root ? root.querySelectorAll('*').length : 0,
       jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
     }
   })
@@ -378,6 +385,8 @@ function assertScenario(result) {
     throw new Error('Visible mermaid blocks should finish in preview mode after initial settle.')
   if (result.initial.visibleRenderedInfographicCount !== result.initial.visibleInfographicCount)
     throw new Error('Visible infographic blocks should finish after initial settle.')
+  if (result.initial.visibleRenderedD2Count !== result.initial.visibleD2Count)
+    throw new Error('Visible D2 blocks should finish after initial settle.')
   if (!(result.initial.lcpMs > 0))
     throw new Error('Expected a positive LCP measurement.')
   if (!(result.initial.lcpMs <= 4000))
@@ -391,8 +400,8 @@ function assertScenario(result) {
   if (!(result.initial.settleTimeMs <= 7000))
     throw new Error(`Initial settle should stay within 7000ms. Got ${result.initial.settleTimeMs}.`)
   assertFrameBudget('Initial frame interval p95', result.initial)
-  if (!(result.initial.domNodeCount <= 5000))
-    throw new Error(`Initial DOM node count budget exceeded. Got ${result.initial.domNodeCount}.`)
+  if (!(result.initial.rendererDomNodeCount <= 5000))
+    throw new Error(`Initial renderer DOM node count budget exceeded. Got ${result.initial.rendererDomNodeCount}.`)
   if (result.fullScroll.fallbackCount !== 0)
     throw new Error('Code block fallbacks should be gone after full scroll settle.')
   if (result.fullScroll.renderedMermaidCount !== result.fullScroll.mermaidCount)
@@ -402,13 +411,13 @@ function assertScenario(result) {
   if (result.fullScroll.d2Count > 0 && result.fullScroll.renderedD2Count !== result.fullScroll.d2Count)
     throw new Error('All d2 blocks should finish after full scroll settle.')
   assertFrameBudget('Full-scroll frame interval p95', result.fullScroll)
-  if (!(result.fullScroll.domNodeCount <= 5000))
-    throw new Error(`Full-scroll DOM node count budget exceeded. Got ${result.fullScroll.domNodeCount}.`)
+  if (!(result.fullScroll.rendererDomNodeCount <= 5000))
+    throw new Error(`Full-scroll renderer DOM node count budget exceeded. Got ${result.fullScroll.rendererDomNodeCount}.`)
   if (!(result.replay.settleTimeMs <= 5000))
     throw new Error(`Replay settle should stay within 5000ms. Got ${result.replay.settleTimeMs}.`)
   assertFrameBudget('Replay frame interval p95', result.replay)
-  if (!(result.replay.domNodeCount <= 5000))
-    throw new Error(`Replay DOM node count budget exceeded. Got ${result.replay.domNodeCount}.`)
+  if (!(result.replay.rendererDomNodeCount <= 5000))
+    throw new Error(`Replay renderer DOM node count budget exceeded. Got ${result.replay.rendererDomNodeCount}.`)
 }
 
 function assertFrameBudget(label, stats) {

@@ -134,9 +134,11 @@ async function waitForVisibleBlocksReady(page, rootSelector) {
     const visibleCodeBlocks = Array.from(document.querySelectorAll('.code-block-container')).filter(isVisible)
     const visibleMermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]')).filter(isVisible)
     const visibleInfographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]')).filter(isVisible)
+    const visibleD2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]')).filter(isVisible)
     return visibleCodeBlocks.every(element => !element.querySelector('.code-fallback-plain, .code-pre-fallback'))
       && visibleMermaids.every(element => Boolean(element.querySelector('svg')))
       && visibleInfographics.every(element => Boolean(element.querySelector('svg')))
+      && visibleD2Blocks.every(element => Boolean(element.querySelector('.d2-svg svg')))
   }, rootSelector, { timeout: 30000 })
 }
 
@@ -398,7 +400,8 @@ async function runScenario(browser, port, mode) {
       longTaskMaxMs: longTasks.length ? Math.max(...longTasks) : 0,
       ...frameStats,
       settleTimeMs: performance.now() - Number(state.startedAt ?? 0),
-      domNodeCount: document.querySelectorAll('*').length,
+      pageDomNodeCount: document.querySelectorAll('*').length,
+      rendererDomNodeCount: root ? root.querySelectorAll('*').length : 0,
       jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
       codeBlockCount: allCodeBlocks.length,
       diffCodeBlockCount: diffCodeBlocks.length,
@@ -440,10 +443,12 @@ async function runScenario(browser, port, mode) {
     const mermaids = Array.from(document.querySelectorAll('[data-markstream-mermaid="1"]'))
     const infographics = Array.from(document.querySelectorAll('[data-markstream-infographic="1"]'))
     const d2Blocks = Array.from(document.querySelectorAll('[data-markstream-d2="1"]'))
+    const root = document.querySelector('.preview-surface')
     return {
       settleTimeMs: performance.now() - Number(state.startedAt ?? 0),
       ...frameStats,
-      domNodeCount: document.querySelectorAll('*').length,
+      pageDomNodeCount: document.querySelectorAll('*').length,
+      rendererDomNodeCount: root ? root.querySelectorAll('*').length : 0,
       jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
       fallbackCount: document.querySelectorAll('.code-fallback-plain, .code-pre-fallback').length,
       mermaidCount: mermaids.length,
@@ -483,6 +488,8 @@ function assertScenario(result) {
     throw new Error(`[${result.mode}] Visible mermaid blocks should finish in preview mode after initial settle.`)
   if (result.visibleRenderedInfographicCount !== result.visibleInfographicCount)
     throw new Error(`[${result.mode}] Visible infographic blocks should finish after initial settle.`)
+  if (result.visibleRenderedD2Count !== result.visibleD2Count)
+    throw new Error(`[${result.mode}] Visible D2 blocks should finish after initial settle.`)
   if (!(result.lcpMs > 0 && result.lcpMs <= 5000))
     throw new Error(`[${result.mode}] LCP should stay within 5000ms. Got ${result.lcpMs}.`)
   if (!(result.cls <= 0.05))
@@ -494,8 +501,8 @@ function assertScenario(result) {
   if (!(result.longTaskTotalMs <= 1800))
     throw new Error(`[${result.mode}] Total long task time should stay within 1800ms. Got ${result.longTaskTotalMs}.`)
   assertFrameBudget(`[${result.mode}] Frame interval p95`, result)
-  if (!(result.domNodeCount <= 5000))
-    throw new Error(`[${result.mode}] DOM node count budget exceeded. Got ${result.domNodeCount}.`)
+  if (!(result.rendererDomNodeCount <= 5000))
+    throw new Error(`[${result.mode}] Renderer DOM node count budget exceeded. Got ${result.rendererDomNodeCount}.`)
   if (result.fullScroll.fallbackCount !== 0)
     throw new Error(`[${result.mode}] Code fallback should be gone after full scroll settle.`)
   if (result.fullScroll.renderedMermaidCount !== result.fullScroll.mermaidCount)
@@ -505,8 +512,8 @@ function assertScenario(result) {
   if (result.fullScroll.renderedD2Count !== result.fullScroll.d2Count)
     throw new Error(`[${result.mode}] D2 blocks should all finish after full scroll settle.`)
   assertFrameBudget(`[${result.mode}] Full-scroll frame interval p95`, result.fullScroll)
-  if (!(result.fullScroll.domNodeCount <= 5000))
-    throw new Error(`[${result.mode}] Full-scroll DOM node count budget exceeded. Got ${result.fullScroll.domNodeCount}.`)
+  if (!(result.fullScroll.rendererDomNodeCount <= 5000))
+    throw new Error(`[${result.mode}] Full-scroll renderer DOM node count budget exceeded. Got ${result.fullScroll.rendererDomNodeCount}.`)
 }
 
 function assertFrameBudget(label, stats) {

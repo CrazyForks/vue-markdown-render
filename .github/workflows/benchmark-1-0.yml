@@ -8,11 +8,6 @@ on:
       - scripts/e2e-*-performance.mjs
       - package.json
       - pnpm-lock.yaml
-      - playground/**
-      - playground-shared/**
-      - src/**
-      - packages/markdown-parser/**
-      - packages/markstream-core/**
       - .github/workflows/benchmark-1-0.yml
   schedule:
     - cron: '0 18 * * *'

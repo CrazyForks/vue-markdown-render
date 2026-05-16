@@ -118,6 +118,14 @@ pnpm run release:gate:1.0
 
 That command builds the parser and core packages, then runs lint, typecheck, the full Vitest suite, strict public API checks, packed-package validation, VitePress docs build, package size budget check, and the 1.0 benchmark report.
 
+Run the full publish-chain dry run before the final publish:
+
+```bash
+pnpm run release:dry-run:1.0
+```
+
+That repeats the release gate, then dry-runs publishing the parser, core, and Vue packages in order.
+
 For package-only validation, run:
 
 ```bash
@@ -153,7 +161,7 @@ The 1.0 public benchmark covers the shipped playground scenarios:
 - Diagnostic Studio baseline, thinking, diff, and stress samples in MarkdownCodeBlock and Monaco modes using `/test?benchmark=1`.
 - Main playground reverse-flex chat initial load, full-scroll pass, and streaming replay.
 
-Track LCP, CLS, settle time, frame sample count, phase-local p95 `requestAnimationFrame` interval, max long task, DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC.
+Track LCP, CLS, settle time, frame sample count, phase-local p95 `requestAnimationFrame` interval, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after component unmount plus GC.
 
 Extended synthetic scenarios such as 1 MB documents, 1000 code blocks, 100 Mermaid blocks, and 10k pre-parsed nodes are planned for 1.0.x. Do not use them as 1.0 release evidence until they are implemented in `pnpm benchmark:1.0`.
 
@@ -174,7 +182,7 @@ Use this checklist during the final 1.0 publish and release-notes pass. Unchecke
 - [x] Legacy fence renderer escaping covered by tests.
 - [x] Safe HTML docs and XSS regression tests complete.
 - [x] App-scoped custom component registry covered by SSR test.
-- [ ] `pnpm run release:gate:1.0` passes.
+- [ ] `pnpm run release:dry-run:1.0` passes.
 - [ ] Current playground benchmark report or the latest workflow artifact is attached to the release notes.
 - [x] CSS, Tailwind, and worker subpath exports smoke-tested.
 - [ ] Unit, SSR, public API, and package export checks are green.
