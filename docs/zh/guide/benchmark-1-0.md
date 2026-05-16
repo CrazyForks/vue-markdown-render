@@ -24,9 +24,11 @@ benchmark/
   latest-summary.md
 ```
 
-Markdown 摘要会记录 package 版本、Node、OS、CPU、browser、viewport、server mode、LCP、CLS、settle time、gate frame sample count、gate p95 `requestAnimationFrame` interval、full-scroll heavy-settle frame p95、max long task、page DOM node count、renderer DOM node count、visible fallback count、重节点 readiness、scroll drift，以及浏览器暴露时的 Chrome-only best-effort component unmount + GC 后 heap。
+Markdown 摘要会记录 package 版本、Node、OS、CPU、browser、viewport、server mode、LCP、CLS、settle time、frame sample count、frame p95 `requestAnimationFrame` interval、full-scroll heavy-settle frame p95、max long task、page DOM node count、renderer DOM node count、visible fallback count、重节点 readiness、scroll drift，以及浏览器暴露时的 Chrome-only best-effort component unmount + GC 后 heap。
 
-Initial 行只报告当前 viewport 内可见重节点的 readiness。Full-scroll 行会在滚完整个 surface 后报告所有重节点的 readiness。Page DOM nodes 只用于诊断；renderer DOM nodes 会限定在 `.preview-surface` 或 `.chatbot-messages` 内，也是 release gate 使用的 DOM 预算。每个阶段都会记录 gate frame p95；full-scroll 行的硬门禁只使用 active scroll loop 的 `scrollFrameP95Ms`。`heavySettleFrameP95Ms` 单独记录 post-scroll heavy block settle，不作为 1.0 frame 硬门禁。release gate 只有在 gate window 至少采到 30 个 frame sample 时，才会强制执行 120 ms 预算。
+Initial 行只报告当前 viewport 内可见重节点的 readiness；如果当前 viewport 没有重节点，则显示 N/A。Full-scroll 行会在滚完整个 surface 后报告所有重节点的 readiness。Page DOM nodes 只用于诊断；renderer DOM nodes 会限定在 `.preview-surface` 或 `.chatbot-messages` 内，也是 release gate 使用的 DOM 预算。每个阶段都会记录 frame p95；full-scroll 行的 `scrollFrameP95Ms` 只覆盖 active scroll loop。`heavySettleFrameP95Ms` 单独记录 post-scroll heavy block settle。1.0 中 frame p95 是 report metric；硬门禁保留在 fallback count、重节点 readiness、DOM budget、CLS、long tasks 和 settle time 上。
+
+如果单个场景失败，runner 会继续执行剩余场景，写出包含 passed 和 failed 条目的完整报告，然后以非零状态退出。
 
 仅调试脚本时，可以设置 `MARKSTREAM_BENCHMARK_SKIP_BUILD=1` 复用已有 playground build。除非 build artifact 刚刚生成，否则不要把这个快捷方式生成的结果当作 release evidence。排查单个问题时，可以设置 `MARKSTREAM_BENCHMARK_SAMPLES=baseline,diff` 缩小样例范围。
 

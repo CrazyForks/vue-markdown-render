@@ -60,11 +60,11 @@ function formatNumber(value) {
     : '-'
 }
 
-function gateFrameSampleCount(row) {
+function phaseFrameSampleCount(row) {
   return row.scrollFrameSampleCount ?? row.frameSampleCount
 }
 
-function gateFrameP95Ms(row) {
+function phaseFrameP95Ms(row) {
   return row.scrollFrameP95Ms ?? row.frameP95Ms
 }
 
@@ -162,16 +162,20 @@ function heavyBlockSummary(row, scope = 'all') {
   const mermaidCount = visible ? row.visibleMermaidCount : row.mermaidCount
   const infographicCount = visible ? row.visibleInfographicCount : row.infographicCount
   const d2Count = visible ? row.visibleD2Count : row.d2Count
-  if (typeof mermaidCount === 'number')
+  if (!((mermaidCount ?? 0) + (infographicCount ?? 0) + (d2Count ?? 0)))
+    return 'N/A'
+  if (mermaidCount > 0)
     parts.push(`Mermaid ${(visible ? row.visibleRenderedMermaidCount : row.renderedMermaidCount) ?? '-'}/${mermaidCount}`)
-  if (typeof infographicCount === 'number')
+  if (infographicCount > 0)
     parts.push(`Infographic ${(visible ? row.visibleRenderedInfographicCount : row.renderedInfographicCount) ?? '-'}/${infographicCount}`)
-  if (typeof d2Count === 'number')
+  if (d2Count > 0)
     parts.push(`D2 ${(visible ? row.visibleRenderedD2Count : row.renderedD2Count) ?? '-'}/${d2Count}`)
   return parts.length ? parts.join('<br>') : '-'
 }
 
 function fallbackSummary(row) {
+  if (typeof row.visibleFallbackCount === 'number' && row.visibleCodeBlockCount === 0)
+    return `N/A visible / ${row.fallbackCount ?? 0} total`
   if (typeof row.visibleFallbackCount === 'number')
     return `${row.visibleFallbackCount} visible / ${row.fallbackCount ?? 0} total`
   if (typeof row.fallbackCount === 'number')
@@ -244,13 +248,13 @@ function renderMarkdownReport(report) {
   lines.push('')
   lines.push('## Results')
   lines.push('')
-  lines.push('| Scenario | Phase | LCP ms | CLS | Settle ms | Gate frame samples | Gate frame p95 ms | Heavy settle frame samples | Heavy settle frame p95 ms | Max long task ms | Page DOM nodes | Renderer DOM nodes | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after component unmount + GC |')
+  lines.push('| Scenario | Phase | LCP ms | CLS | Settle ms | Frame samples | Frame p95 ms | Heavy settle frame samples | Heavy settle frame p95 ms | Max long task ms | Page DOM nodes | Renderer DOM nodes | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after component unmount + GC |')
   lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: |')
 
   for (const entry of report.scenarios) {
     for (const item of scenarioRows(entry)) {
       const row = item.row ?? {}
-      lines.push(`| ${item.scenario} | ${item.phase} | ${formatMs(row.lcpMs)} | ${typeof row.cls === 'number' ? row.cls.toFixed(4) : '-'} | ${formatMs(row.settleTimeMs)} | ${formatNumber(gateFrameSampleCount(row))} | ${formatMs(gateFrameP95Ms(row))} | ${formatNumber(row.heavySettleFrameSampleCount)} | ${formatMs(row.heavySettleFrameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.pageDomNodeCount)} | ${formatNumber(row.rendererDomNodeCount)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
+      lines.push(`| ${item.scenario} | ${item.phase} | ${formatMs(row.lcpMs)} | ${typeof row.cls === 'number' ? row.cls.toFixed(4) : '-'} | ${formatMs(row.settleTimeMs)} | ${formatNumber(phaseFrameSampleCount(row))} | ${formatMs(phaseFrameP95Ms(row))} | ${formatNumber(row.heavySettleFrameSampleCount)} | ${formatMs(row.heavySettleFrameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.pageDomNodeCount)} | ${formatNumber(row.rendererDomNodeCount)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
     }
   }
 
@@ -275,7 +279,7 @@ function renderMarkdownReport(report) {
   for (const entry of report.scenarios)
     lines.push(`- **${entry.title}**: ${entry.notes}`)
   lines.push('')
-  lines.push('This report records measured release evidence from the shipped playgrounds. Initial rows report readiness for heavy blocks visible in the phase viewport, while full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to the benchmark surface and are the value used by the release gate. Gate frame p95 is the phase-local p95 `requestAnimationFrame` delta; for full-scroll rows it covers only the active scroll loop. Heavy-settle frame p95 covers post-scroll heavy block readiness and is recorded separately from the hard frame gate. Low-sample frame windows are recorded without acting as a hard release gate. Raw scrollTop drift is recorded for diagnostics but is not a 1.0 release gate. Heap after component unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
+  lines.push('This report records measured release evidence from the shipped playgrounds. Initial rows report readiness for heavy blocks visible in the phase viewport, and show N/A when that viewport contains no heavy blocks. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to the benchmark surface and are the value used by the release gate. Frame p95 is the phase-local p95 `requestAnimationFrame` delta; for full-scroll rows it covers only the active scroll loop. Heavy-settle frame p95 covers post-scroll heavy block readiness separately. Frame p95 values are reported for review, but are not a 1.0 hard release gate. Raw scrollTop drift is recorded for diagnostics but is not a 1.0 release gate. Heap after component unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
   return `${lines.join('\n')}\n`
 }
 
@@ -323,6 +327,8 @@ async function run() {
     await runCommand('pnpm', ['-C', 'playground', 'build'], {})
   }
 
+  const failedScenarios = []
+
   for (const scenario of scenarios) {
     const [command, args] = scenario.command
     console.error(`[benchmark:1.0] ${scenario.title}`)
@@ -342,16 +348,17 @@ async function run() {
       writeReportFiles(report, true)
     }
     catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
       report.scenarios.push({
         id: scenario.id,
         title: scenario.title,
         notes: scenario.notes,
         env: scenario.env,
         status: 'failed',
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
       })
+      failedScenarios.push(scenario.title)
       writeReportFiles(report, true)
-      throw error
     }
   }
 
@@ -360,6 +367,9 @@ async function run() {
   console.log(`Wrote ${path.relative(repoRoot, jsonPath)}`)
   console.log(`Wrote ${path.relative(repoRoot, markdownPath)}`)
   console.log(`Wrote ${path.relative(repoRoot, latestPath)}`)
+
+  if (failedScenarios.length)
+    throw new Error(`Benchmark failed in ${failedScenarios.length} scenario(s): ${failedScenarios.join(', ')}`)
 }
 
 run().catch((error) => {
