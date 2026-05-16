@@ -417,6 +417,13 @@ function scheduleCheckMinHeight() {
 onMounted(() => {
   const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
   benchmarkWindow.__markstreamBenchmarkUnmount = () => {
+    stopStreamSimulation()
+    __roContainer?.disconnect()
+    __roContent?.disconnect()
+    __mo?.disconnect()
+    __roContainer = null
+    __roContent = null
+    __mo = null
     benchmarkRenderChat.value = false
   }
   startStreamSimulation()

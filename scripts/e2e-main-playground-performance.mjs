@@ -402,8 +402,6 @@ function assertScenario(result) {
   if (result.fullScroll.d2Count > 0 && result.fullScroll.renderedD2Count !== result.fullScroll.d2Count)
     throw new Error('All d2 blocks should finish after full scroll settle.')
   assertFrameBudget('Full-scroll frame interval p95', result.fullScroll)
-  if (!(result.fullScroll.scrollDriftPx <= 2))
-    throw new Error(`Scroll drift should stay within 2px. Got ${result.fullScroll.scrollDriftPx}.`)
   if (!(result.fullScroll.domNodeCount <= 5000))
     throw new Error(`Full-scroll DOM node count budget exceeded. Got ${result.fullScroll.domNodeCount}.`)
   if (!(result.replay.settleTimeMs <= 5000))

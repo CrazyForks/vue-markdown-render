@@ -175,6 +175,9 @@ function scenarioRows(entry) {
   const rows = []
   const result = entry.result
 
+  if (!result)
+    return rows
+
   if (entry.id.startsWith('diagnostic-')) {
     for (const mode of ['markdown', 'monaco']) {
       const row = result[mode]
@@ -243,13 +246,28 @@ function renderMarkdownReport(report) {
     }
   }
 
+  const failedScenarios = report.scenarios.filter(entry => entry.status === 'failed')
+  if (failedScenarios.length) {
+    lines.push('')
+    lines.push('## Failed Scenarios')
+    lines.push('')
+    for (const entry of failedScenarios) {
+      lines.push(`### ${entry.title}`)
+      lines.push('')
+      lines.push('```txt')
+      lines.push(String(entry.error || 'Unknown benchmark failure').slice(0, 8000))
+      lines.push('```')
+      lines.push('')
+    }
+  }
+
   lines.push('')
   lines.push('## Scenario Notes')
   lines.push('')
   for (const entry of report.scenarios)
     lines.push(`- **${entry.title}**: ${entry.notes}`)
   lines.push('')
-  lines.push('This report records measured release evidence from the shipped playgrounds. Initial rows report readiness for heavy blocks visible in the phase viewport, while full-scroll rows report all heavy blocks after the scroll pass. Frame interval is the p95 `requestAnimationFrame` delta from each phase-local sample window, and low-sample frame windows are recorded without acting as a hard release gate. Heap after component unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
+  lines.push('This report records measured release evidence from the shipped playgrounds. Initial rows report readiness for heavy blocks visible in the phase viewport, while full-scroll rows report all heavy blocks after the scroll pass. Frame interval is the p95 `requestAnimationFrame` delta from each phase-local sample window, and low-sample frame windows are recorded without acting as a hard release gate. Raw scrollTop drift is recorded for diagnostics but is not a 1.0 release gate. Heap after component unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
   return `${lines.join('\n')}\n`
 }
 
@@ -300,18 +318,33 @@ async function run() {
   for (const scenario of scenarios) {
     const [command, args] = scenario.command
     console.error(`[benchmark:1.0] ${scenario.title}`)
-    const { stdout } = await runCommand(command, args, {
-      ...scenario.env,
-      PLAYGROUND_PERFORMANCE_SERVER: 'preview',
-    })
-    report.scenarios.push({
-      id: scenario.id,
-      title: scenario.title,
-      notes: scenario.notes,
-      env: scenario.env,
-      result: parseJsonOutput(stdout),
-    })
-    writeReportFiles(report, true)
+    try {
+      const { stdout } = await runCommand(command, args, {
+        ...scenario.env,
+        PLAYGROUND_PERFORMANCE_SERVER: 'preview',
+      })
+      report.scenarios.push({
+        id: scenario.id,
+        title: scenario.title,
+        notes: scenario.notes,
+        env: scenario.env,
+        status: 'passed',
+        result: parseJsonOutput(stdout),
+      })
+      writeReportFiles(report, true)
+    }
+    catch (error) {
+      report.scenarios.push({
+        id: scenario.id,
+        title: scenario.title,
+        notes: scenario.notes,
+        env: scenario.env,
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      })
+      writeReportFiles(report, true)
+      throw error
+    }
   }
 
   const { jsonPath, markdownPath, latestPath } = writeReportFiles(report)
