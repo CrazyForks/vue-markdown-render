@@ -350,6 +350,13 @@ const previewD2MaxHeight = computed(() => 'none')
 const charCount = computed(() => input.value.length)
 const lineCount = computed(() => (input.value ? input.value.split('\n').length : 0))
 const isSharePreviewMode = computed(() => testPageViewMode.value === 'preview')
+const previewIsImmersive = computed(() => isPreviewFullscreen.value || isSharePreviewMode.value)
+const previewViewportPriority = computed(() => previewIsImmersive.value ? false : viewportPriority.value)
+const previewMaxLiveNodes = computed(() => previewIsImmersive.value ? 0 : 320)
+const previewLiveNodeBuffer = computed(() => previewIsImmersive.value ? 180 : 60)
+const previewInitialRenderBatchSize = computed(() => previewIsImmersive.value ? 240 : 40)
+const previewRenderBatchSize = computed(() => previewIsImmersive.value ? 180 : 80)
+const previewRenderBatchDelay = computed(() => previewIsImmersive.value ? 0 : 16)
 const labShareUsesLocalStorage = ref(false)
 const previewShareUsesLocalStorage = ref(false)
 let shareModeHintRequestId = 0
@@ -3151,10 +3158,15 @@ watch(mermaidEnabled, (enabled) => {
                     :mermaid-props="previewMermaidProps"
                     :d2-props="previewD2Props"
                     :infographic-props="previewInfographicProps"
-                    :viewport-priority="viewportPriority"
+                    :viewport-priority="previewViewportPriority"
                     :batch-rendering="batchRendering"
                     :typewriter="typewriter"
                     :code-block-stream="codeBlockStream"
+                    :max-live-nodes="previewMaxLiveNodes"
+                    :live-node-buffer="previewLiveNodeBuffer"
+                    :initial-render-batch-size="previewInitialRenderBatchSize"
+                    :render-batch-size="previewRenderBatchSize"
+                    :render-batch-delay="previewRenderBatchDelay"
                     code-block-dark-theme="vitesse-dark"
                     code-block-light-theme="vitesse-light"
                     :code-block-monaco-options="testPageMonacoOptions"
@@ -5238,6 +5250,8 @@ watch(mermaidEnabled, (enabled) => {
 .workspace-card--preview:fullscreen .preview-surface :deep(.markdown-renderer) {
   width: min(100%, 820px);
   margin: 0 auto;
+  content-visibility: visible;
+  contain-intrinsic-size: none;
 }
 
 .workspace-card--share-preview .preview-surface :deep(img),
