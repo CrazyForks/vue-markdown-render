@@ -352,6 +352,7 @@ const lineCount = computed(() => (input.value ? input.value.split('\n').length :
 const isSharePreviewMode = computed(() => testPageViewMode.value === 'preview')
 const previewIsImmersive = computed(() => isPreviewFullscreen.value || isSharePreviewMode.value)
 const previewViewportPriority = computed(() => previewIsImmersive.value ? false : viewportPriority.value)
+const previewBatchRendering = computed(() => previewIsImmersive.value ? true : batchRendering.value)
 const previewMaxLiveNodes = computed(() => previewIsImmersive.value ? 0 : 320)
 const previewLiveNodeBuffer = computed(() => previewIsImmersive.value ? 180 : 60)
 const previewInitialRenderBatchSize = computed(() => previewIsImmersive.value ? 240 : 40)
@@ -3159,7 +3160,7 @@ watch(mermaidEnabled, (enabled) => {
                     :d2-props="previewD2Props"
                     :infographic-props="previewInfographicProps"
                     :viewport-priority="previewViewportPriority"
-                    :batch-rendering="batchRendering"
+                    :batch-rendering="previewBatchRendering"
                     :typewriter="typewriter"
                     :code-block-stream="codeBlockStream"
                     :max-live-nodes="previewMaxLiveNodes"
