@@ -699,7 +699,11 @@ onBeforeUnmount(() => {
         <header class="chat-header">
           <div class="chat-header__brand">
             <div class="chat-header__logo">
-              <Icon icon="carbon:machine-learning-model" class="chat-header__logo-icon" />
+              <img
+                src="/vue-markdown-icon.svg"
+                alt=""
+                class="chat-header__logo-icon"
+              >
             </div>
             <div class="chat-header__info">
               <h1 class="chat-header__title">
@@ -1209,9 +1213,9 @@ onBeforeUnmount(() => {
 }
 
 .chat-header__logo-icon {
-  width: 22px;
-  height: 22px;
-  color: #fff;
+  width: 30px;
+  height: 30px;
+  display: block;
 }
 
 .chat-header__info {
