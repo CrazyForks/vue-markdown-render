@@ -400,11 +400,14 @@ async function main() {
       const root = document.querySelector(selector)
       if (!root)
         return false
-      const vueIconImage = Array.from(root.querySelectorAll('img.image-node__img'))
-        .find(img => img.getAttribute('alt') === 'Vue Markdown Icon')
+      const markstreamLogoImage = Array.from(root.querySelectorAll('img.image-node__img'))
+        .find(img => img.getAttribute('alt') === 'Markstream logo')
       const error = Array.from(root.querySelectorAll('.image-error'))
         .find(node => (node.textContent || '').includes('Image failed to load'))
-      return !vueIconImage && !!error
+      return !!markstreamLogoImage
+        && markstreamLogoImage.complete
+        && markstreamLogoImage.naturalWidth > 0
+        && !error
     }, homeRendererSelector, { timeout: 15000 })
     await page.waitForFunction(() => document.querySelectorAll('.chatbot-messages .thinking-node .markstream-svelte').length > 0, null, { timeout: 30000 })
 

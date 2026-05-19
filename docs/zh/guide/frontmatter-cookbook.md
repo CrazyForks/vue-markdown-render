@@ -42,9 +42,9 @@ export function splitFrontmatter(input: string) {
 ```vue
 <!-- ArticleMarkdown.vue -->
 <script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
 import { computed } from 'vue'
 import { parse } from 'yaml'
-import MarkdownRender from 'markstream-vue'
 import { splitFrontmatter } from './frontmatter'
 
 const props = defineProps<{
@@ -148,8 +148,8 @@ createApp(App)
 
 ```vue
 <script setup lang="ts">
-import { computed } from 'vue'
 import MarkdownRender from 'markstream-vue'
+import { computed } from 'vue'
 import { injectFrontmatterTag } from './frontmatter'
 
 const props = defineProps<{
@@ -171,10 +171,10 @@ const renderContent = computed(() => injectFrontmatterTag(props.content))
 
 ```vue
 <script setup lang="ts">
-import { computed, onBeforeUnmount } from 'vue'
 import MarkdownRender, { removeCustomComponents, setCustomComponents } from 'markstream-vue'
-import FrontMatterNode from './FrontMatterNode.vue'
+import { computed, onBeforeUnmount } from 'vue'
 import { injectFrontmatterTag } from './frontmatter'
+import FrontMatterNode from './FrontMatterNode.vue'
 
 const props = defineProps<{
   content: string
