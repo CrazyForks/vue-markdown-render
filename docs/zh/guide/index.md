@@ -22,6 +22,7 @@ description: 按任务组织的 markstream-vue 指南，帮助你在安装、流
 - [渲染器与节点组件](/zh/guide/components)：导出的渲染器和节点组件参考。
 - [覆盖内置组件](/zh/guide/component-overrides)：替换 `image`、`code_block`、`mermaid`、`link` 等内置节点。
 - [自定义标签与高级组件](/zh/guide/custom-components)：支持 `thinking` 这类可信标签。
+- [YAML Front Matter Cookbook](/zh/guide/frontmatter-cookbook)：提取页面 metadata，或先转换成可信自定义标签再渲染。
 - [高级解析](/zh/guide/advanced) 与 [解析器 API](/zh/guide/parser-api)：需要 token / AST 级改造时再看。
 
 ## 我想接入到现有项目里
@@ -45,6 +46,7 @@ description: 按任务组织的 markstream-vue 指南，帮助你在安装、流
 | [API 参考](/zh/guide/api) | 解析器工具、作用域覆盖和渲染流程入口 |
 | [渲染器与节点组件](/zh/guide/components) | 渲染器和节点组件总览 |
 | [自定义](/zh/guide/component-overrides) | 覆盖内置组件与扩展自定义标签 |
+| [YAML Front Matter](/zh/guide/frontmatter-cookbook) | 提取 metadata，或映射到可信自定义标签 |
 
 ### Vue 2 (markstream-vue2)
 
