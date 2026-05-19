@@ -56,7 +56,7 @@
     "@terrastruct/d2": ">=0.1.33",
     "katex": ">=0.16.22",
     "mermaid": ">=11",
-    "stream-monaco": ">=0.0.40"
+    "stream-monaco": ">=0.0.41"
   },
   "peerDependenciesMeta": {
     "@antv/infographic": {
