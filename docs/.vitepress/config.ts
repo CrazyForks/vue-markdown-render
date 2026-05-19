@@ -225,13 +225,13 @@ const chineseGuideSidebar = [
 ]
 
 const siteHead = [
-  ['link', { rel: 'icon', href: '/logo.svg', type: 'image/svg+xml' }],
+  ['link', { rel: 'icon', href: '/app-icon.svg', type: 'image/svg+xml' }],
   ['meta', { name: 'theme-color', content: '#111827' }],
   ['meta', { name: 'robots', content: 'index,follow' }],
   ['meta', { property: 'og:type', content: 'website' }],
   ['meta', { property: 'og:site_name', content: 'markstream-vue' }],
   ['meta', { property: 'og:image', content: docsOgImageUrl }],
-  ['meta', { property: 'og:image:alt', content: 'markstream-vue documentation and playground previews' }],
+  ['meta', { property: 'og:image:alt', content: 'markstream-vue logo and documentation overview' }],
   ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
   ['meta', { name: 'twitter:image', content: docsOgImageUrl }],
 ]
@@ -594,7 +594,11 @@ export default defineConfig({
     },
   },
   themeConfig: {
-    logo: '/logo.svg',
+    logo: {
+      light: '/logo.svg',
+      dark: '/logo-dark.svg',
+      alt: 'markstream-vue',
+    },
     search: {
       provider: 'local',
     },
