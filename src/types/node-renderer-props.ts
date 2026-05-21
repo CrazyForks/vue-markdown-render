@@ -83,7 +83,7 @@ export interface NodeRendererProps {
   smoothStreaming?: boolean | 'auto'
   /** Options forwarded to the built-in smooth streaming composable. */
   smoothStreamingOptions?: SmoothMarkdownStreamOptions
-  /** Minimum interval in ms between smooth-streaming parse commits. Default: 80. */
+  /** Performance tuning knob for the minimum interval in ms between smooth-streaming parse commits. Default: 80. */
   parseCoalesceMs?: number
   /** Enable/disable non-code-node enter and streamed-text fade animations. Default: true */
   fade?: boolean

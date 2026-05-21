@@ -50,6 +50,18 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect((md as any).stream.peek()).toHaveLength(0)
   })
 
+  it('clears stale non-final stream cache when final auto parse falls back to sync parse', () => {
+    const md = getMarkdown('stream-parser-final-auto-cache-reset')
+    const markdown = buildLargeAppendFriendlyDoc(40)
+
+    parseMarkdownToStructure(markdown, md, { final: false })
+    expect((md as any).stream.peek().length).toBeGreaterThan(0)
+
+    parseMarkdownToStructure(markdown, md, { final: true })
+
+    expect((md as any).stream.peek()).toHaveLength(0)
+  })
+
   it('allows callers to force stream.parse for final parses', () => {
     const md = getMarkdown('stream-parser-final-force')
     ;(md as any).stream.resetStats()
@@ -383,6 +395,45 @@ describe('parseMarkdownToStructure stream parser integration', () => {
 
     expect(seenInstance).toBe(true)
     expect(seenMethod).toBe('cached')
+  })
+
+  it('does not create invalid clones for URL and Error token meta objects', () => {
+    const md = getMarkdown('stream-parser-built-in-meta-clone')
+    const promise = Promise.resolve('cached')
+    ;(md as any).core.ruler.push('test_builtin_meta', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (inline) {
+        inline.meta = {
+          url: new URL('https://example.com/path?q=1'),
+          error: new TypeError('cached error'),
+          promise,
+        }
+      }
+    })
+
+    let seenUrl = ''
+    let seenUrlQuery = ''
+    let seenErrorMessage = ''
+    let seenErrorInstance = false
+    let seenPromise: unknown
+
+    parseMarkdownToStructure(buildLargeAppendFriendlyDoc(40), md, {
+      preTransformTokens(tokens: any[]) {
+        const meta = tokens.find(token => token.type === 'inline')?.meta
+        seenUrl = meta?.url?.toString()
+        seenUrlQuery = meta?.url?.searchParams?.get('q')
+        seenErrorMessage = meta?.error?.message
+        seenErrorInstance = meta?.error instanceof TypeError
+        seenPromise = meta?.promise
+        return tokens
+      },
+    })
+
+    expect(seenUrl).toBe('https://example.com/path?q=1')
+    expect(seenUrlQuery).toBe('1')
+    expect(seenErrorMessage).toBe('cached error')
+    expect(seenErrorInstance).toBe(true)
+    expect(seenPromise).toBe(promise)
   })
 
   it('does not leak mutations to non-structured-cloneable class token meta objects', () => {

@@ -619,15 +619,33 @@ async function run() {
       const originalInfo = console.info.bind(console)
       const streamCounterKeys = ['total', 'cacheHits', 'appendHits', 'tailHits', 'fullParses', 'chunkedParses']
       const parseTimingKeys = ['tokenCloneMs', 'processTokensMs', 'parseMarkdownToStructureTotalMs']
+      const parseCountersByRenderer = new Map()
       console.info = (...args) => {
         try {
           const label = args[0]
           if (label === '[markstream-vue][perf] parse(stream)' || label === '[markstream-vue][perf] parse(sync)') {
             const data = args[1] ?? {}
             const metrics = state.parsePerformance
+            const rendererId = typeof data.rendererId === 'string'
+              ? data.rendererId
+              : '__default__'
+            const previousCounters = parseCountersByRenderer.get(rendererId) ?? {
+              parseCommitCount: 0,
+              parseCoalescedCount: 0,
+            }
+            const parseCommitCount = Number(data.parseCommitCount || 0)
+            const parseCoalescedCount = Number(data.parseCoalescedCount || 0)
 
-            metrics.parseCommitCount = Math.max(metrics.parseCommitCount, Number(data.parseCommitCount || 0))
-            metrics.parseCoalescedCount = Math.max(metrics.parseCoalescedCount, Number(data.parseCoalescedCount || 0))
+            metrics.parseCommitCount += parseCommitCount >= previousCounters.parseCommitCount
+              ? parseCommitCount - previousCounters.parseCommitCount
+              : parseCommitCount
+            metrics.parseCoalescedCount += parseCoalescedCount >= previousCounters.parseCoalescedCount
+              ? parseCoalescedCount - previousCounters.parseCoalescedCount
+              : parseCoalescedCount
+            parseCountersByRenderer.set(rendererId, {
+              parseCommitCount,
+              parseCoalescedCount,
+            })
             for (const key of parseTimingKeys)
               metrics[key] += Number(data[key] || 0)
 

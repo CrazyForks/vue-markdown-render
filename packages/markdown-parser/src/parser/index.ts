@@ -108,6 +108,20 @@ function isPlainObject(value: unknown) {
   return proto === Object.prototype || proto === null
 }
 
+function copyCloneableOwnDataProperties(source: object, target: Record<PropertyKey, unknown>, seen: WeakMap<object, unknown>) {
+  for (const key of Reflect.ownKeys(source)) {
+    const descriptor = Object.getOwnPropertyDescriptor(source, key)
+    if (!descriptor || !('value' in descriptor))
+      continue
+
+    const targetDescriptor = Object.getOwnPropertyDescriptor(target, key)
+    if (targetDescriptor && (!('value' in targetDescriptor) || targetDescriptor.writable === false))
+      continue
+
+    target[key] = safeCloneTokenField(descriptor.value, seen)
+  }
+}
+
 function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>()): T {
   if (!value || typeof value !== 'object')
     return value
@@ -154,15 +168,49 @@ function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>())
     return cloned as T
   }
 
+  if (typeof URL !== 'undefined' && value instanceof URL) {
+    const cloned = new URL(value.href)
+    seen.set(object, cloned)
+    copyCloneableOwnDataProperties(object, cloned as unknown as Record<PropertyKey, unknown>, seen)
+    return cloned as T
+  }
+
+  if (typeof URLSearchParams !== 'undefined' && value instanceof URLSearchParams) {
+    const cloned = new URLSearchParams(value.toString())
+    seen.set(object, cloned)
+    copyCloneableOwnDataProperties(object, cloned as unknown as Record<PropertyKey, unknown>, seen)
+    return cloned as T
+  }
+
+  if (value instanceof Error) {
+    let cloned: Error
+    const ErrorCtor = value.constructor as new (message?: string) => Error
+    try {
+      cloned = new ErrorCtor(value.message)
+    }
+    catch {
+      cloned = new Error(value.message)
+    }
+    Object.setPrototypeOf(cloned, Object.getPrototypeOf(value))
+    seen.set(object, cloned)
+    copyCloneableOwnDataProperties(object, cloned as unknown as Record<PropertyKey, unknown>, seen)
+    return cloned as T
+  }
+
+  if (typeof Promise !== 'undefined' && value instanceof Promise) {
+    seen.set(object, value)
+    return value
+  }
+
+  if (typeof Node !== 'undefined' && value instanceof Node) {
+    seen.set(object, value)
+    return value
+  }
+
   if (!isPlainObject(value)) {
     const cloned = Object.create(Object.getPrototypeOf(value)) as Record<PropertyKey, unknown>
     seen.set(object, cloned)
-    for (const key of Reflect.ownKeys(object)) {
-      const descriptor = Object.getOwnPropertyDescriptor(object, key)
-      if (!descriptor || !('value' in descriptor))
-        continue
-      cloned[key] = safeCloneTokenField(descriptor.value, seen)
-    }
+    copyCloneableOwnDataProperties(object, cloned, seen)
     return cloned as T
   }
 
@@ -211,6 +259,18 @@ function shouldUseTopLevelStreamParse(md: MarkdownIt, options: ParseOptions) {
     && (streamParse === true || (streamParse === 'auto' && options.final !== true))
     && stream?.enabled === true
     && typeof stream.parse === 'function'
+}
+
+function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options: ParseOptions) {
+  const internalOptions = options as InternalParseOptions
+  const streamParse = options.streamParse ?? 'auto'
+  const stream = md.stream
+
+  return options.final === true
+    && streamParse === 'auto'
+    && internalOptions.__disableStreamParse !== true
+    && stream?.enabled === true
+    && typeof stream.reset === 'function'
 }
 
 function parseTopLevelTokens(
@@ -2061,6 +2121,10 @@ export function parseMarkdownToStructure(
   // Ensure markdown is a string — guard against null/undefined inputs from callers
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
   let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
+
+  if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options))
+    md.stream!.reset!()
+
   if (!isFinal) {
     if (safeMarkdown.endsWith('- *')) {
       // 放置markdown 解析 - * 会被处理成多个 ul >li 嵌套列表

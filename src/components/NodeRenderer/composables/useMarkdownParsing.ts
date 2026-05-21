@@ -527,6 +527,7 @@ export function useMarkdownParsing(
         && streamStats.total > (streamStatsBefore?.total ?? 0)
 
       options.logPerf(usedStream ? 'parse(stream)' : 'parse(sync)', {
+        rendererId: options.instanceMsgId,
         ms: Math.round(getNow() - parseStart),
         nodes: parsed.length,
         contentLength: content.length,
