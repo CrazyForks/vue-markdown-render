@@ -6,8 +6,8 @@ const PATH_SEPARATOR_RE = /[\\/]/u
 const DOMAINISH_TEXT_RE = /^[\p{L}\p{N}./\\-]+$/u
 const DOMAIN_LABEL_RE = /^[A-Za-z0-9-]{1,63}$/u
 const PUNYCODE_TLD_RE = /^xn--[a-z0-9-]{2,59}$/i
-const NON_ASCII_FILENAME_SEGMENT_RE = /[-\d]/u
-const MARKET_TICKER_SYMBOL_RE = /^(?:[A-Z]{1,6}|\d{4,8})$/u
+const NON_ASCII_FILENAME_SEGMENT_RE = /[-\d\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\uFF10-\uFF19]/u
+const MARKET_TICKER_SYMBOL_RE = /^(?:[A-Z]{1,6}|\d{1,8})$/u
 const AMBIGUOUS_BARE_DOMAIN_EXTENSIONS = new Set([
   'ai',
   'md',

@@ -35,6 +35,25 @@ const UNICODE_PUNCTUATION_RE = /\p{P}/u
 const AUTOLINK_PROTOCOL_RE = /^(?:https?:\/\/|mailto:|ftp:\/\/)/i
 const AUTOLINK_GENERIC_RE = /:\/\//
 
+function hasNonAsciiText(input: string) {
+  return Array.from(input).some(char => char.charCodeAt(0) > 0x7F)
+}
+
+function getHrefAuthority(href: string) {
+  return href.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/, 1)[0] ?? ''
+}
+
+function hasPunycodeAuthorityLabel(authority: string) {
+  return authority.split('.').some(label => label.toLowerCase().startsWith('xn--'))
+}
+
+function isDecodedFromRawPunycode(linkText: string, href: string, raw?: string) {
+  const authority = getHrefAuthority(href)
+  return hasNonAsciiText(linkText)
+    && hasPunycodeAuthorityLabel(authority)
+    && String(raw ?? '').toLowerCase().includes(authority.toLowerCase())
+}
+
 function countUnescapedAsterisks(str: string): number {
   let count = 0
   let i = 0
@@ -1342,11 +1361,13 @@ export function parseInlineTokens(
     const { node, nextIndex } = parseLinkToken(tokens, i, options)
     i = nextIndex
 
+    const linkText = node.text || node.href || ''
     if (
       token.markup === 'linkify'
-      && shouldDemoteFilenameLikeLinkify(node.text || node.href || '')
+      && !isDecodedFromRawPunycode(linkText, node.href, raw)
+      && shouldDemoteFilenameLikeLinkify(linkText)
     ) {
-      pushText(node.text || node.href || '', node.text || node.href || '')
+      pushText(linkText, linkText)
       return
     }
 

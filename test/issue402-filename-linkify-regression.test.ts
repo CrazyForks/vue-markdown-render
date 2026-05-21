@@ -37,6 +37,23 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(nodes, '西游记后传世界观-热血情感版.md')).toBe(true)
   })
 
+  it('keeps cjk ambiguous-extension filenames without ascii separators as text', () => {
+    const input = `文件：
+**个人简历.md**
+**使用说明.md**
+**世界观设定.md**
+**研究报告.ai**
+**报告２０２６.md**`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, '个人简历.md')).toBe(true)
+    expect(textIncludes(nodes, '使用说明.md')).toBe(true)
+    expect(textIncludes(nodes, '世界观设定.md')).toBe(true)
+    expect(textIncludes(nodes, '研究报告.ai')).toBe(true)
+    expect(textIncludes(nodes, '报告２０２６.md')).toBe(true)
+  })
+
   it('keeps market ticker suffixes as plain text inside markdown tables', () => {
     const input = `### 总结速查表
 
@@ -59,6 +76,19 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(nodes, '.SZ')).toBe(true)
     expect(textIncludes(nodes, '003018.SZ')).toBe(true)
     expect(textIncludes(nodes, 'ASML.AS')).toBe(true)
+  })
+
+  it('keeps short numeric market tickers as plain text', () => {
+    const input = `| 代码 | 市场 |
+| :--- | :--- |
+| 5.HK | 港股 |
+| 66.HK | 港股 |
+| 388.HK | 港股 |`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, '5.HK')).toBe(true)
+    expect(textIncludes(nodes, '388.HK')).toBe(true)
   })
 
   it('still preserves normal bare-domain autolinks', () => {
