@@ -59,6 +59,21 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(getStreamStats(md).total).toBe(1)
   })
 
+  it('does not reuse the streaming env cache when final semantics change', () => {
+    const md = getMarkdown('stream-parser-final-env-reset')
+    ;(md as any).stream.resetStats()
+
+    const markdown = '```ts\nconst a = 1\n'
+
+    parseMarkdownToStructure(markdown, md, { final: false, streamParse: true })
+    const before = getStreamStats(md)
+
+    parseMarkdownToStructure(markdown, md, { final: true, streamParse: true })
+    const after = getStreamStats(md)
+
+    expect(after.fullParses).toBeGreaterThanOrEqual(before.fullParses + 1)
+  })
+
   it('parses shared-md documents correctly while streamParse opt-out avoids stream stats and cache', () => {
     const md = getMarkdown('stream-parser-shared-md-opt-out')
     const first = '# First\n\nAlpha paragraph.'

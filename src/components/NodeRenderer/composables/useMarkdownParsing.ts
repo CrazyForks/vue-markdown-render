@@ -430,8 +430,8 @@ export function useMarkdownParsing(
 
     return {
       ...base,
-      // The renderer keeps final content parses on the stream parser by default
-      // so the same md instance can reuse stream cache across the whole render.
+      // Keep renderer content parses on the stream parser by default; final
+      // transitions still reset cache through the parse semantic key.
       streamParse: base.streamParse ?? true,
       ...(hasFinal ? { final: resolvedFinal } : {}),
       ...(hasCustom ? { customHtmlTags } : {}),
