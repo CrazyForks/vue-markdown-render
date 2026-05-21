@@ -85,16 +85,20 @@ function splitUnifiedDiff(content: string, closed: boolean) {
   if (closed || pendingOrig.length > 0 || pendingUpdated.length > 0)
     flushPendingDiffHunk(orig, updated, pendingOrig, pendingUpdated)
 
+  const originalCode = orig.join('\n')
+  const updatedCode = updated.join('\n')
+
   return {
-    original: orig.join('\n'),
-    updated: updated.join('\n'),
+    original: closed && endsWithNewline && originalCode ? `${originalCode}\n` : originalCode,
+    updated: closed && endsWithNewline && updatedCode ? `${updatedCode}\n` : updatedCode,
   }
 }
 
 export function parseFenceToken(token: MarkdownToken): CodeBlockNode {
   const hasMap = Array.isArray(token.map) && token.map.length === 2
   const tokenMeta = (token.meta ?? {}) as unknown as { closed?: boolean }
-  const closed = typeof tokenMeta.closed === 'boolean' ? tokenMeta.closed : undefined
+  const metaClosed = typeof tokenMeta.closed === 'boolean' ? tokenMeta.closed : undefined
+  const closed = metaClosed === true || (metaClosed !== false && hasMap)
   const info = String(token.info ?? '')
   const diff = info.startsWith('diff')
   const language = diff
@@ -128,7 +132,7 @@ export function parseFenceToken(token: MarkdownToken): CodeBlockNode {
       code: String(updated ?? ''),
       raw: String(content ?? ''),
       diff,
-      loading: closed === true ? false : closed === false ? true : !hasMap,
+      loading: metaClosed === true ? false : metaClosed === false ? true : !hasMap,
       originalCode: original,
       updatedCode: updated,
     }
@@ -140,6 +144,6 @@ export function parseFenceToken(token: MarkdownToken): CodeBlockNode {
     code: String(content ?? ''),
     raw: String(content ?? ''),
     diff,
-    loading: closed === true ? false : closed === false ? true : !hasMap,
+    loading: metaClosed === true ? false : metaClosed === false ? true : !hasMap,
   }
 }
