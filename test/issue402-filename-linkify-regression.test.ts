@@ -168,6 +168,28 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(nodes, '005930.KS')).toBe(true)
   })
 
+  it('documents bare ticker-like text without market context', () => {
+    const input = `- BRK-B.US
+- VOW3.DE
+- 2330.TW
+- 005930.KS`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    const linkNodes = links(nodes)
+
+    expect(linkNodes.map(link => link.text)).toEqual([
+      'BRK-B.US',
+      'VOW3.DE',
+      '2330.TW',
+    ])
+    expect(linkNodes.map(link => link.href)).toEqual([
+      'http://BRK-B.US',
+      'http://VOW3.DE',
+      'http://2330.TW',
+    ])
+    expect(textIncludes(nodes, '005930.KS')).toBe(true)
+  })
+
   it('keeps context-only market ticker suffixes as plain text', () => {
     const input = `| 代码 | 市场 |
 | :--- | :--- |
@@ -214,6 +236,34 @@ describe('issue #402 filename-like linkify regression', () => {
       'http://example.md',
       'http://OpenAI.ai',
     ])
+  })
+
+  it('documents standalone lowercase ambiguous filename-like text without filename context', () => {
+    const input = `readme.md
+release-notes.md
+report.final.md
+setup.py
+script.sh
+archive.zip`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    const linkNodes = links(nodes)
+
+    expect(linkNodes.map(link => link.text)).toEqual([
+      'readme.md',
+      'release-notes.md',
+      'report.final.md',
+      'setup.py',
+      'script.sh',
+    ])
+    expect(linkNodes.map(link => link.href)).toEqual([
+      'http://readme.md',
+      'http://release-notes.md',
+      'http://report.final.md',
+      'http://setup.py',
+      'http://script.sh',
+    ])
+    expect(textIncludes(nodes, 'archive.zip')).toBe(true)
   })
 
   it('preserves adjacent cjk bare domains when they are intended as links', () => {
@@ -276,6 +326,53 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(links(nodes)).toHaveLength(0)
     expect(textIncludes(nodes, 'readme.md')).toBe(true)
     expect(textIncludes(nodes, 'release-notes.md')).toBe(true)
+  })
+
+  it('inherits filename context across sibling list items', () => {
+    const input = `- 文件名：
+- readme.md
+- release-notes.md`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'readme.md')).toBe(true)
+    expect(textIncludes(nodes, 'release-notes.md')).toBe(true)
+  })
+
+  it('inherits filename context from a list item into nested list items', () => {
+    const input = `- 文件名：
+  - readme.md
+  - getting-started.md`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'readme.md')).toBe(true)
+    expect(textIncludes(nodes, 'getting-started.md')).toBe(true)
+  })
+
+  it('inherits filename context across blockquote paragraphs', () => {
+    const input = `> 文件名：
+>
+> **readme.md**
+> **release-notes.md**`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'readme.md')).toBe(true)
+    expect(textIncludes(nodes, 'release-notes.md')).toBe(true)
+  })
+
+  it('inherits ticker context across sibling list items', () => {
+    const input = `- 股票代码：
+- BRK-B.US
+- VOW3.DE
+- 2330.TW`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'BRK-B.US')).toBe(true)
+    expect(textIncludes(nodes, 'VOW3.DE')).toBe(true)
+    expect(textIncludes(nodes, '2330.TW')).toBe(true)
   })
 
   it('keeps ascii markdown filenames under document context', () => {

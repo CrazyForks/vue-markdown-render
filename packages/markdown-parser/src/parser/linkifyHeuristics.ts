@@ -1,3 +1,5 @@
+import type { InternalParseOptions, ParseOptions } from '../types'
+
 const FILENAMEISH_EXTENSION_RE = /\.([a-z0-9]{1,15})$/i
 const FILENAMEISH_SEGMENT_RE = /[_()[\]{}<>]/u
 const URL_PREFIX_HINT_RE = /^(?:https?:\/\/|ftp:\/\/|mailto:|www\.)/i
@@ -126,6 +128,62 @@ const FILENAMEISH_LINK_EXTENSIONS = new Set([
 export interface LinkifyDemotionContext {
   filename?: boolean
   marketTicker?: boolean
+}
+
+function hasLinkifyDemotionContext(context?: LinkifyDemotionContext) {
+  return context?.filename === true || context?.marketTicker === true
+}
+
+function mergeLinkifyDemotionContext(
+  left?: LinkifyDemotionContext,
+  right?: LinkifyDemotionContext,
+) {
+  const merged = {
+    filename: left?.filename || right?.filename,
+    marketTicker: left?.marketTicker || right?.marketTicker,
+  }
+  return hasLinkifyDemotionContext(merged) ? merged : undefined
+}
+
+function withLinkifyDemotionContext(options: ParseOptions | undefined, context?: LinkifyDemotionContext) {
+  if (!hasLinkifyDemotionContext(context))
+    return options
+
+  const inheritedContext = (options as InternalParseOptions | undefined)?.__linkifyDemotionContext
+  return {
+    ...options,
+    __linkifyDemotionContext: {
+      filename: inheritedContext?.filename || context?.filename,
+      marketTicker: inheritedContext?.marketTicker || context?.marketTicker,
+    },
+  } as InternalParseOptions
+}
+
+function inferNextBlockLinkifyContext(raw?: string) {
+  const context = inferLinkifyDemotionContext(raw)
+  return hasLinkifyDemotionContext(context) ? context : undefined
+}
+
+export function createLinkifyDemotionContextTracker(
+  options?: ParseOptions,
+  sticky = false,
+) {
+  let context: LinkifyDemotionContext | undefined
+
+  return {
+    options() {
+      return withLinkifyDemotionContext(options, context)
+    },
+    remember(raw?: string) {
+      const nextContext = inferNextBlockLinkifyContext(raw)
+      context = sticky
+        ? mergeLinkifyDemotionContext(context, nextContext)
+        : nextContext
+    },
+    reset() {
+      context = undefined
+    },
+  }
 }
 
 function isValidDomainLabel(label: string) {
