@@ -95,6 +95,10 @@ const STRUCTURAL_OBJECT_FIELDS = new Set([
   'definition',
 ])
 const TEXT_SIGNATURE_FIELDS = ['raw', 'content', 'code', 'originalCode', 'updatedCode']
+const MAX_SIGNATURE_DEPTH = 6
+const MAX_SIGNATURE_KEYS = 80
+const MAX_SIGNATURE_ARRAY_ITEMS = 200
+const MAX_SIGNATURE_STRING_CHARS = 8192
 const objectIdentityIds = new WeakMap<object, number>()
 const nodeSignatureCache = new WeakMap<object, string>()
 let nextObjectIdentityId = 1
@@ -184,22 +188,54 @@ function signatureString(value: unknown) {
   return `${text.length}:${hashString(text)}`
 }
 
-function stableValueSignature(value: unknown): string {
+function stableStringSignature(value: string) {
+  return value.length <= MAX_SIGNATURE_STRING_CHARS
+    ? signatureString(value)
+    : `${value.length}:${hashString(value.slice(0, MAX_SIGNATURE_STRING_CHARS))}:truncated`
+}
+
+function stableValueSignature(
+  value: unknown,
+  seen = new WeakMap<object, string>(),
+  depth = 0,
+): string {
   if (value == null || typeof value === 'number' || typeof value === 'boolean')
     return String(value)
   if (typeof value === 'string')
-    return `s:${signatureString(value)}`
+    return `s:${stableStringSignature(value)}`
   if (typeof value === 'function')
     return `fn:${getIdentityKey(value)}`
-  if (Array.isArray(value))
-    return `a:${value.length}:${value.map(stableValueSignature).join(',')}`
+  if (typeof value !== 'object')
+    return typeof value
+
+  const object = value as object
+  const existing = seen.get(object)
+  if (existing)
+    return `cycle:${existing}`
+
+  if (depth >= MAX_SIGNATURE_DEPTH)
+    return `object:${getIdentityKey(object)}`
+
+  const id = getIdentityKey(object)
+  seen.set(object, id)
+
+  if (Array.isArray(value)) {
+    const items = value.slice(0, MAX_SIGNATURE_ARRAY_ITEMS)
+    return `a:${value.length}:${items
+      .map(item => stableValueSignature(item, seen, depth + 1))
+      .join(',')}`
+  }
+
   if (typeof value === 'object') {
     const record = value as Record<string, unknown>
-    return `o:${Object.keys(record)
+    const keys = Object.keys(record).sort()
+    const sampledKeys = keys.slice(0, MAX_SIGNATURE_KEYS)
+    return `o:${keys.length}:${sampledKeys
       .sort()
-      .map(key => `${key}:${stableValueSignature(record[key])}`)
+      .map(key => `${key}:${stableValueSignature(record[key], seen, depth + 1)}`)
       .join(';')}`
   }
+
   return typeof value
 }
 
@@ -210,18 +246,27 @@ function isParsedNodeLike(value: unknown): value is ParsedNode {
     && typeof (value as { raw?: unknown }).raw === 'string'
 }
 
-function structuralFieldSignature(value: unknown): string {
+function structuralFieldSignature(
+  value: unknown,
+  seen = new WeakMap<object, string>(),
+  depth = 0,
+): string {
   if (Array.isArray(value)) {
     return `a:${value.length}:${value
-      .map(item => isParsedNodeLike(item) ? getParsedNodeSignature(item) : structuralFieldSignature(item))
+      .slice(0, MAX_SIGNATURE_ARRAY_ITEMS)
+      .map(item => isParsedNodeLike(item) ? getParsedNodeSignature(item, seen, depth + 1) : structuralFieldSignature(item, seen, depth + 1))
       .join(',')}`
   }
   if (isParsedNodeLike(value))
-    return getParsedNodeSignature(value)
-  return stableValueSignature(value)
+    return getParsedNodeSignature(value, seen, depth)
+  return stableValueSignature(value, seen, depth)
 }
 
-function buildPrimitiveFieldSignature(record: Record<string, unknown>) {
+function buildPrimitiveFieldSignature(
+  record: Record<string, unknown>,
+  seen: WeakMap<object, string>,
+  depth: number,
+) {
   return Object.keys(record)
     .sort()
     .filter(key => key !== 'children' && !TEXT_SIGNATURE_FIELDS.includes(key))
@@ -235,7 +280,7 @@ function buildPrimitiveFieldSignature(record: Record<string, unknown>) {
       if (typeof value === 'function')
         return `${key}=fn:${getIdentityKey(value)}`
       if (STRUCTURAL_OBJECT_FIELDS.has(key) && (Array.isArray(value) || typeof value === 'object'))
-        return `${key}=${structuralFieldSignature(value)}`
+        return `${key}=${structuralFieldSignature(value, seen, depth + 1)}`
       if (value && typeof value === 'object')
         return `${key}=object:${getIdentityKey(value)}`
 
@@ -257,31 +302,53 @@ function buildTextFieldSignature(record: Record<string, unknown>) {
     .join(';')
 }
 
-function buildCheapNodeSignature(node: ParsedNode) {
+function buildCheapNodeSignature(
+  node: ParsedNode,
+  seen: WeakMap<object, string>,
+  depth: number,
+) {
   const record = node as Record<string, unknown>
   const children = Array.isArray(record.children)
     ? record.children as ParsedNode[]
     : []
   const childSignature = children.length
-    ? children.map(getParsedNodeSignature).join('|')
+    ? children
+        .slice(0, MAX_SIGNATURE_ARRAY_ITEMS)
+        .map(child => getParsedNodeSignature(child, seen, depth + 1))
+        .join('|')
     : ''
 
   return [
     node.type,
     buildTextFieldSignature(record),
-    buildPrimitiveFieldSignature(record),
+    buildPrimitiveFieldSignature(record, seen, depth),
     children.length,
     childSignature,
   ].join(':')
 }
 
-function getParsedNodeSignature(node: ParsedNode) {
+function getParsedNodeSignature(
+  node: ParsedNode,
+  seen = new WeakMap<object, string>(),
+  depth = 0,
+) {
   const cached = nodeSignatureCache.get(node as object)
   if (cached)
     return cached
 
-  const signature = buildCheapNodeSignature(node)
-  nodeSignatureCache.set(node as object, signature)
+  const object = node as object
+  const existing = seen.get(object)
+  if (existing)
+    return `node-cycle:${existing}`
+
+  if (depth >= MAX_SIGNATURE_DEPTH)
+    return `node:${node.type}:${getIdentityKey(object)}`
+
+  const id = getIdentityKey(object)
+  seen.set(object, id)
+
+  const signature = buildCheapNodeSignature(node, seen, depth)
+  nodeSignatureCache.set(object, signature)
   return signature
 }
 

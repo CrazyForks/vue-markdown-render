@@ -223,7 +223,8 @@ interface GetMarkdownOptions {
 > 注意：默认 `streamParse: 'auto'` 会在 `md.stream.enabled === true` 时为非 final
 > 顶层解析使用 markdown-it-ts 的 stream parser，并在该 `md` 实例上保留最近一次
 > source 与 token cache。final 一次性解析默认走普通 parser；需要强制 stream 时传
-> `{ streamParse: true }`，不希望保留 stream cache 的调用方可以显式关闭：
+> `{ streamParse: true }`。如果复用同一个 `md` 解析互不相关的一次性文档，请传
+> `{ final: true }` 或 `{ streamParse: false }`。不希望保留 stream cache 的调用方可以显式关闭：
 
 ```ts
 const nodes = parseMarkdownToStructure(source, md, { streamParse: false })

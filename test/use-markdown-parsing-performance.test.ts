@@ -553,6 +553,86 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('does not crash on cyclic custom node data', () => {
+    const sharedData: any = { series: [1] }
+    sharedData.self = sharedData
+    const content = ref('chart')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        preTransformTokens(tokens) {
+          for (const token of tokens as any[]) {
+            if (token.type === 'inline') {
+              token.children = [{
+                type: 'chart',
+                content: 'chart',
+                raw: 'chart',
+                data: sharedData,
+              }]
+            }
+          }
+          return tokens
+        },
+      },
+    })
+    const firstParagraph = state.parsedNodes.value[0] as any
+    const firstChart = firstParagraph.children?.[0]
+
+    expect(firstChart?.data?.self).toBe(sharedData)
+
+    sharedData.series = [2]
+    content.value = `${content.value}\n\nAppended paragraph.`
+
+    const secondParagraph = state.parsedNodes.value[0] as any
+    const secondChart = secondParagraph.children?.[0]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(secondChart).not.toBe(firstChart)
+    expect(secondChart?.data?.series).toEqual([2])
+
+    scope.stop()
+  })
+
+  it('bounds structural signatures for large custom payloads', () => {
+    const rows = Array.from({ length: 10000 }, (_, index) => {
+      const row = {}
+      Object.defineProperty(row, 'value', {
+        enumerable: true,
+        get() {
+          if (index >= 250)
+            throw new Error('large payload row should not be traversed')
+          return index
+        },
+      })
+      return row
+    })
+    const content = ref('chart')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        preTransformTokens(tokens) {
+          for (const token of tokens as any[]) {
+            if (token.type === 'inline') {
+              token.children = [{
+                type: 'chart',
+                content: 'chart',
+                raw: 'chart',
+                data: { rows },
+              }]
+            }
+          }
+          return tokens
+        },
+      },
+    })
+
+    expect(state.parsedNodes.value[0]).toBeTruthy()
+
+    content.value = `${content.value}\n\nAppended paragraph.`
+
+    expect(state.parsedNodes.value).toHaveLength(2)
+
+    scope.stop()
+  })
+
   it('does not reuse a custom node when content changes but raw stays stable', () => {
     let dynamicContent = 'first'
     const content = ref('custom')

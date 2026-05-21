@@ -245,6 +245,36 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(second[0]?.children).toHaveLength(1)
   })
 
+  it('does not deep-clone stream tokens without transform hooks', () => {
+    const md = getMarkdown('stream-parser-skip-token-clone')
+    ;(md as any).core.ruler.push('test_large_token_meta', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (!inline)
+        return
+
+      inline.meta = {
+        rows: Array.from({ length: 10000 }, (_, index) => {
+          const row = {}
+          Object.defineProperty(row, 'value', {
+            enumerable: true,
+            get() {
+              if (index >= 250)
+                throw new Error('large token meta should not be cloned')
+              return index
+            },
+          })
+          return row
+        }),
+      }
+    })
+
+    const nodes = parseMarkdownToStructure(buildLargeAppendFriendlyDoc(40), md, {
+      streamParse: true,
+    }) as any[]
+
+    expect(nodes).toHaveLength(40)
+  })
+
   it('deep-clones cached stream token object fields before transform hooks', () => {
     const md = getMarkdown('stream-parser-token-deep-clone')
     ;(md as any).core.ruler.push('test_nested_token_fields', (state: any) => {

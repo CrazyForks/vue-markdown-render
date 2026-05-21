@@ -224,8 +224,9 @@ Parses markdown content into a structured node tree.
 > Warning: The default `streamParse: 'auto'` uses markdown-it-ts' stream parser
 > for non-final top-level parses when `md.stream.enabled === true` and keeps the
 > parser's latest source and token cache on that `md` instance. Final one-shot
-> parses use the regular parser unless you pass `{ streamParse: true }`; callers
-> that do not want stream cache can opt out:
+> parses use the regular parser unless you pass `{ streamParse: true }`; if you
+> reuse one `md` instance for unrelated one-shot documents, pass `{ final: true }`
+> or `{ streamParse: false }`. Callers that do not want stream cache can opt out:
 
 ```ts
 const nodes = parseMarkdownToStructure(source, md, { streamParse: false })

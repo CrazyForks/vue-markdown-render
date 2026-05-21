@@ -6,7 +6,7 @@
 * Stabilized the Vue 3 renderer API: `MarkdownRender`, `VueRendererMarkdown`, `useSmoothMarkdownStream`, raw `content`, pre-parsed `nodes`, safe HTML defaults, optional Mermaid / KaTeX / D2 / Infographic / Monaco integrations, CSS exports, Tailwind export, documented worker client exports, and SSR imports.
 * Kept cross-framework adapters, repository skills/prompts, low-level worker implementation files, and height-estimation experiments outside the 1.x compatibility promise.
 * Added a reproducible 1.0 benchmark report workflow with JSON and Markdown output, environment disclosure, LCP, CLS, settle time, p95 frame cost, max long task, DOM node count, fallback count, heavy-block completion, scroll drift, and heap-after-unmount metrics.
-* `parseMarkdownToStructure` now supports stream parser mode for compatible `md` instances: the default `streamParse: 'auto'` uses it for non-final top-level parses, final one-shot parses stay on the regular parser unless `streamParse: true`, and `{ streamParse: false }` remains the opt-out.
+* `parseMarkdownToStructure` now supports stream parser mode for compatible `md` instances: the default `streamParse: 'auto'` uses it for non-final top-level parses, final one-shot parses stay on the regular parser unless `streamParse: true`, and `{ streamParse: false }` remains the opt-out. When reusing one `md` instance for unrelated one-shot documents, pass `{ final: true }` or `{ streamParse: false }`.
 * Added 1.0 migration and showcase docs for launch material.
 * Tightened the 1.0 release gate to include release verification, docs build, size budget, and benchmark report generation.
 
