@@ -7,6 +7,17 @@ const DIFF_HEADER_PREFIXES = ['diff ', 'index ', '--- ', '+++ ', '@@ ']
 // Newline splitter reused in this module
 const NEWLINE_RE = /\r?\n/
 
+function isPotentialDiffMetadataTail(line: string) {
+  const value = String(line ?? '')
+
+  if (!value)
+    return false
+
+  return DIFF_HEADER_PREFIXES.some(prefix =>
+    prefix.startsWith(value) || value.startsWith(prefix),
+  )
+}
+
 function flushPendingDiffHunk(
   orig: string[],
   updated: string[],
@@ -27,7 +38,7 @@ function splitUnifiedDiff(content: string, closed: boolean) {
   const pendingOrig: string[] = []
   const pendingUpdated: string[] = []
   const lines = content.split(NEWLINE_RE)
-  const stableLineCount = Math.max(0, lines.length - 1)
+  const endsWithNewline = /\r?\n$/.test(content)
   const hasUnifiedDiffHeaders = lines.some(line =>
     line.startsWith('diff ')
     || line.startsWith('--- ')
@@ -57,13 +68,21 @@ function splitUnifiedDiff(content: string, closed: boolean) {
     }
   }
 
-  for (let index = 0; index < stableLineCount; index++)
-    processLine(lines[index] ?? '')
+  const lineCountToProcess = endsWithNewline
+    ? Math.max(0, lines.length - 1)
+    : lines.length
 
-  if (closed && stableLineCount < lines.length)
-    processLine(lines[lines.length - 1] ?? '')
+  for (let index = 0; index < lineCountToProcess; index++) {
+    const line = lines[index] ?? ''
+    const isStreamingTail = !closed && !endsWithNewline && index === lineCountToProcess - 1
 
-  if (closed || (pendingOrig.length > 0 && pendingUpdated.length > 0))
+    if (isStreamingTail && isPotentialDiffMetadataTail(line))
+      continue
+
+    processLine(line)
+  }
+
+  if (closed || pendingOrig.length > 0 || pendingUpdated.length > 0)
     flushPendingDiffHunk(orig, updated, pendingOrig, pendingUpdated)
 
   return {
