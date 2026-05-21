@@ -54,6 +54,36 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(nodes, '报告２０２６.md')).toBe(true)
   })
 
+  it('keeps common lowercase ascii markdown filenames as text when used as filenames', () => {
+    const input = `文件：
+**readme.md**
+**release-notes.md**
+**getting-started.md**
+**2026-plan.md**`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'readme.md')).toBe(true)
+    expect(textIncludes(nodes, 'release-notes.md')).toBe(true)
+    expect(textIncludes(nodes, 'getting-started.md')).toBe(true)
+    expect(textIncludes(nodes, '2026-plan.md')).toBe(true)
+  })
+
+  it('keeps non-cjk unicode filenames with ambiguous extensions as text', () => {
+    const input = `附件：
+**résumé.md**
+**café.md**
+**отчёт.md**
+**ملف.md**`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'résumé.md')).toBe(true)
+    expect(textIncludes(nodes, 'café.md')).toBe(true)
+    expect(textIncludes(nodes, 'отчёт.md')).toBe(true)
+    expect(textIncludes(nodes, 'ملف.md')).toBe(true)
+  })
+
   it('keeps market ticker suffixes as plain text inside markdown tables', () => {
     const input = `### 总结速查表
 
@@ -76,6 +106,29 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(nodes, '.SZ')).toBe(true)
     expect(textIncludes(nodes, '003018.SZ')).toBe(true)
     expect(textIncludes(nodes, 'ASML.AS')).toBe(true)
+  })
+
+  it('keeps alphanumeric and common exchange ticker-like text as plain text', () => {
+    const input = `| 代码 | 市场 |
+| :--- | :--- |
+| VOW3.DE | 德股 |
+| 1COV.DE | 德股 |
+| B4B.DE | 德股 |
+| BRK-B.US | 美股 |
+| aapl.us | 美股 |
+| Asml.as | 荷股 |
+| 2330.TW | 台股 |
+| BHP.AX | 澳股 |
+| SHOP.TO | 加股 |
+| 005930.KS | 韩股 |`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'VOW3.DE')).toBe(true)
+    expect(textIncludes(nodes, 'BRK-B.US')).toBe(true)
+    expect(textIncludes(nodes, 'aapl.us')).toBe(true)
+    expect(textIncludes(nodes, 'SHOP.TO')).toBe(true)
+    expect(textIncludes(nodes, '005930.KS')).toBe(true)
   })
 
   it('keeps short numeric market tickers as plain text', () => {
@@ -128,6 +181,37 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(linkNodes).toHaveLength(1)
     expect(linkNodes[0].href).toBe('http://xn--fsqu00a.ai')
     expect(textIncludes(linkNodes[0], 'xn--fsqu00a.ai')).toBe(true)
+  })
+
+  it('preserves decoded visible text from raw punycode before filename demotion', () => {
+    const punycodeMd = getMarkdown('issue-402-punycode-fixlink', {
+      apply: [
+        (md: any) => {
+          md.core.ruler.before('fix_link_tokens', 'decode_punycode_linkify_text_for_test', (state: any) => {
+            for (const token of state.tokens ?? []) {
+              if (token?.type !== 'inline' || !Array.isArray(token.children))
+                continue
+
+              for (let index = 0; index < token.children.length; index++) {
+                const child = token.children[index]
+                const href = child?.attrs?.find((attr: [string, string]) => attr?.[0] === 'href')?.[1]
+                if (child?.type === 'link_open' && child.markup === 'linkify' && href === 'http://xn--fsqu00a.ai') {
+                  const textToken = token.children[index + 1]
+                  if (textToken?.type === 'text')
+                    textToken.content = '例子.ai'
+                }
+              }
+            }
+          })
+        },
+      ],
+    })
+    const nodes = parseMarkdownToStructure('文件：xn--fsqu00a.ai', punycodeMd, { final: true })
+    const linkNodes = links(nodes)
+
+    expect(linkNodes).toHaveLength(1)
+    expect(linkNodes[0].href).toBe('http://xn--fsqu00a.ai')
+    expect(textIncludes(linkNodes[0], '例子.ai')).toBe(true)
   })
 
   it('keeps standalone uppercase filenames as text', () => {

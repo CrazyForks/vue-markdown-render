@@ -1,6 +1,6 @@
 import type { MarkdownIt } from '../markdown-it-types'
 import type { MarkdownToken } from '../types'
-import { shouldDemoteFilenameLikeLinkify } from '../parser/linkifyHeuristics'
+import { inferLinkifyDemotionContext, isDecodedFromRawPunycode, shouldDemoteFilenameLikeLinkify } from '../parser/linkifyHeuristics'
 
 // We hard-stop FULLWIDTH exclamation mark used as CJK punctuation.
 // ASCII `!` is valid in URLs (path/query/fragment), so do not stop on it.
@@ -139,7 +139,7 @@ export function applyFixLinkTokens(md: MarkdownIt) {
       const t = toks[i]
       if (t && t.type === 'inline' && Array.isArray(t.children)) {
         try {
-          t.children = fixLinkToken(t.children)
+          t.children = fixLinkToken(t.children, typeof t.content === 'string' ? t.content : undefined)
         }
         catch (e) {
           // Swallow errors to avoid breaking parsing; keep original children
@@ -153,7 +153,7 @@ export function applyFixLinkTokens(md: MarkdownIt) {
   })
 }
 
-function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
+function fixLinkToken(tokens: MarkdownToken[], raw?: string): MarkdownToken[] {
   // Need at least `link_open + text + link_close` for linkify/autolink fixes.
   // Keep this low to allow fixing `<https://...！suffix>` cases where inline children length is 3.
   if (tokens.length < 3)
@@ -163,6 +163,7 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
   if (tokens.some(token => token.type === 'code_inline'))
     return tokens
 
+  const linkifyDemotionContext = inferLinkifyDemotionContext(raw)
   for (let i = 0; i <= tokens.length - 1; i++) {
     if (i < 0) {
       i = 0
@@ -182,16 +183,17 @@ function fixLinkToken(tokens: MarkdownToken[]): MarkdownToken[] {
       }
       if (closeIdx !== -1) {
         const linkText = collectLinkifyText(tokens, i, closeIdx)
+        const href = getHrefFromLinkOpen(curToken)
         if (
           curToken.markup === 'linkify'
           && linkText
-          && shouldDemoteFilenameLikeLinkify(linkText)
+          && !isDecodedFromRawPunycode(linkText, href, raw)
+          && shouldDemoteFilenameLikeLinkify(linkText, linkifyDemotionContext)
         ) {
           tokens.splice(i, closeIdx - i + 1, textToken(linkText))
           continue
         }
 
-        const href = getHrefFromLinkOpen(curToken)
         const hrefStop = firstIndexOfAny(href, LINKIFY_HARD_STOP_CHARS)
         // Prefer splitting by the visible text token, but also trim href if it contains stop chars.
         for (let j = i + 1; j < closeIdx; j++) {

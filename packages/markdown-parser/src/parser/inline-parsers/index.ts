@@ -1,5 +1,5 @@
 import type { InternalParseOptions, MarkdownToken, ParsedNode, ParseOptions, TextNode } from '../../types'
-import { shouldDemoteFilenameLikeLinkify } from '../linkifyHeuristics'
+import { inferLinkifyDemotionContext, isDecodedFromRawPunycode, shouldDemoteFilenameLikeLinkify } from '../linkifyHeuristics'
 import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
@@ -34,25 +34,6 @@ const UNICODE_PUNCTUATION_RE = /\p{P}/u
 // detection logic is easy to tweak and test.
 const AUTOLINK_PROTOCOL_RE = /^(?:https?:\/\/|mailto:|ftp:\/\/)/i
 const AUTOLINK_GENERIC_RE = /:\/\//
-
-function hasNonAsciiText(input: string) {
-  return Array.from(input).some(char => char.charCodeAt(0) > 0x7F)
-}
-
-function getHrefAuthority(href: string) {
-  return href.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/, 1)[0] ?? ''
-}
-
-function hasPunycodeAuthorityLabel(authority: string) {
-  return authority.split('.').some(label => label.toLowerCase().startsWith('xn--'))
-}
-
-function isDecodedFromRawPunycode(linkText: string, href: string, raw?: string) {
-  const authority = getHrefAuthority(href)
-  return hasNonAsciiText(linkText)
-    && hasPunycodeAuthorityLabel(authority)
-    && String(raw ?? '').toLowerCase().includes(authority.toLowerCase())
-}
 
 function countUnescapedAsterisks(str: string): number {
   let count = 0
@@ -369,6 +350,19 @@ export function parseInlineTokens(
 ): ParsedNode[] {
   if (!tokens || tokens.length === 0)
     return []
+
+  const inheritedContext = (options as InternalParseOptions | undefined)?.__linkifyDemotionContext
+  const inferredContext = inferLinkifyDemotionContext(raw)
+  const linkifyDemotionContext = {
+    filename: inheritedContext?.filename || inferredContext.filename,
+    marketTicker: inheritedContext?.marketTicker || inferredContext.marketTicker,
+  }
+  if (linkifyDemotionContext.filename || linkifyDemotionContext.marketTicker) {
+    options = {
+      ...options,
+      __linkifyDemotionContext: linkifyDemotionContext,
+    } as InternalParseOptions
+  }
 
   const internalOptions = options as InternalParseOptions | undefined
   const result: ParsedNode[] = []
@@ -1365,7 +1359,7 @@ export function parseInlineTokens(
     if (
       token.markup === 'linkify'
       && !isDecodedFromRawPunycode(linkText, node.href, raw)
-      && shouldDemoteFilenameLikeLinkify(linkText)
+      && shouldDemoteFilenameLikeLinkify(linkText, internalOptions?.__linkifyDemotionContext)
     ) {
       pushText(linkText, linkText)
       return

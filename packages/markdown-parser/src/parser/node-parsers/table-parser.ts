@@ -1,4 +1,5 @@
 import type {
+  InternalParseOptions,
   MarkdownToken,
   ParseOptions,
   TableCellNode,
@@ -6,6 +7,7 @@ import type {
   TableRowNode,
 } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
+import { inferLinkifyDemotionContext } from '../linkifyHeuristics'
 
 // Extract alignment from attrs (e.g. ['style','text-align:left'])
 function extractAlign(attrs: MarkdownToken['attrs']): 'left' | 'right' | 'center' | undefined {
@@ -26,6 +28,22 @@ function extractAlign(attrs: MarkdownToken['attrs']): 'left' | 'right' | 'center
   }
   return 'left'
 }
+
+function parseOptionsForTableCell(options: ParseOptions | undefined, headerRaw?: string) {
+  const headerContext = inferLinkifyDemotionContext(headerRaw)
+  if (!headerContext.filename && !headerContext.marketTicker)
+    return options
+
+  const inheritedContext = (options as InternalParseOptions | undefined)?.__linkifyDemotionContext
+  return {
+    ...options,
+    __linkifyDemotionContext: {
+      filename: inheritedContext?.filename || headerContext.filename,
+      marketTicker: inheritedContext?.marketTicker || headerContext.marketTicker,
+    },
+  } as InternalParseOptions
+}
+
 export function parseTable(
   tokens: MarkdownToken[],
   index: number,
@@ -60,11 +78,13 @@ export function parseTable(
           const contentToken = tokens[k + 1]
           const content = String(contentToken.content ?? '')
           const align = extractAlign(tokens[k].attrs)
+          const cellIndex = cells.length
+          const headerRaw = !isHeaderCell && !isHeader ? headerRow?.cells[cellIndex]?.raw : undefined
 
           cells.push({
             type: 'table_cell',
             header: isHeaderCell || isHeader,
-            children: parseInlineTokens(contentToken.children || [], content, undefined, options),
+            children: parseInlineTokens(contentToken.children || [], content, undefined, parseOptionsForTableCell(options, headerRaw)),
             raw: content,
             align,
           })
