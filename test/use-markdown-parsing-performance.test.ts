@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { NodeRendererProps } from '../src/types/node-renderer-props'
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { computed, effectScope, reactive, ref } from 'vue'
 import { useMarkdownParsing } from '../src/components/NodeRenderer/composables/useMarkdownParsing'
@@ -38,6 +39,25 @@ function buildParagraphs(count: number) {
     { length: count },
     (_, index) => `Paragraph ${index + 1} with enough text to exercise large append parsing.`,
   ).join('\n\n')
+}
+
+function buildTokenHeavyMarkdown(count: number) {
+  const sections = Array.from({ length: count }, (_, index) => {
+    const n = index + 1
+    return [
+      `### Section ${n}`,
+      `Paragraph ${n} with [a link](https://example.com/${n}) and **strong** plus _emphasis_.`,
+      '',
+      `- item ${n}.1 with \`inline code\``,
+      `- item ${n}.2 with [inline reference ${n}](https://example.com/ref-${n})`,
+      '',
+      `| Name | Value |`,
+      `| - | - |`,
+      `| row ${n} | ${n} |`,
+    ].join('\n')
+  }).join('\n\n')
+
+  return `${sections}\n\n`
 }
 
 function setTokenAttr(token: { attrs?: [string, string][] | null }, name: string, value: string) {
@@ -331,6 +351,34 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('renderer default final stream parse equals sync final parse for unfinished constructs', () => {
+    const content = ref([
+      '```ts',
+      'const value = 1',
+      '',
+      '<details>',
+      '<summary>Steps</summary>',
+      '- item',
+      '',
+      '$$',
+      'x + y',
+    ].join('\n'))
+    const { final, scope, state } = createParsingState(content)
+
+    final.value = true
+
+    const rendererFinal = state.parsedNodes.value
+    const syncFinal = parseMarkdownToStructure(
+      content.value,
+      getMarkdown('sync-final'),
+      { final: true, streamParse: false },
+    )
+
+    expect(rendererFinal).toEqual(syncFinal)
+
+    scope.stop()
+  })
+
   it('does not reuse stale ParsedNode references when parseOptions changes', () => {
     const content = ref('**hello')
     const { props, scope, state } = createParsingState(content)
@@ -467,6 +515,44 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('does not reuse a custom node when the same data object mutates in place', () => {
+    const sharedData = { series: [1] }
+    const content = ref('chart')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        preTransformTokens(tokens) {
+          for (const token of tokens as any[]) {
+            if (token.type === 'inline') {
+              token.children = [{
+                type: 'chart',
+                content: 'chart',
+                raw: 'chart',
+                data: sharedData,
+              }]
+            }
+          }
+          return tokens
+        },
+      },
+    })
+    const firstParagraph = state.parsedNodes.value[0] as any
+    const firstChart = firstParagraph.children?.[0]
+
+    expect(firstChart?.data?.series).toEqual([1])
+
+    sharedData.series = [2]
+    content.value = `${content.value}\n\nAppended paragraph.`
+
+    const secondParagraph = state.parsedNodes.value[0] as any
+    const secondChart = secondParagraph.children?.[0]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(secondChart).not.toBe(firstChart)
+    expect(secondChart?.data?.series).toEqual([2])
+
+    scope.stop()
+  })
+
   it('does not reuse a custom node when content changes but raw stays stable', () => {
     let dynamicContent = 'first'
     const content = ref('custom')
@@ -567,5 +653,39 @@ describe('useMarkdownParsing performance behavior', () => {
     expect((streamDelta?.appendHits ?? 0) + (streamDelta?.tailHits ?? 0) + (streamDelta?.cacheHits ?? 0)).toBeGreaterThan(0)
 
     scope.stop()
+  })
+
+  it('keeps synthetic token-heavy append parses on the stream parser budget path', () => {
+    const md = getMarkdown('token-heavy-budget')
+    const content = buildTokenHeavyMarkdown(160)
+    const timing: {
+      tokenCloneMs?: number
+      parseMarkdownToStructureTotalMs?: number
+    } = {}
+
+    parseMarkdownToStructure(content, md, { streamParse: true, __timing: timing } as any)
+    const before = md.stream?.stats?.() as {
+      appendHits?: number
+      tailHits?: number
+      cacheHits?: number
+      fullParses?: number
+    } | undefined
+
+    parseMarkdownToStructure(`${content}Appended paragraph with [tail](https://example.com/tail) and **strong** text.\n\n`, md, {
+      streamParse: true,
+      __timing: timing,
+    } as any)
+
+    const after = md.stream?.stats?.() as typeof before
+    const appendHits = (after?.appendHits ?? 0) - (before?.appendHits ?? 0)
+    const tailHits = (after?.tailHits ?? 0) - (before?.tailHits ?? 0)
+    const cacheHits = (after?.cacheHits ?? 0) - (before?.cacheHits ?? 0)
+    const fullParses = (after?.fullParses ?? 0) - (before?.fullParses ?? 0)
+    const tokenCloneMs = timing.tokenCloneMs ?? 0
+    const totalMs = timing.parseMarkdownToStructureTotalMs ?? 0
+
+    expect(appendHits + tailHits + cacheHits).toBeGreaterThan(0)
+    expect(fullParses).toBeLessThanOrEqual(1)
+    expect(tokenCloneMs).toBeLessThanOrEqual(totalMs * 0.35)
   })
 })

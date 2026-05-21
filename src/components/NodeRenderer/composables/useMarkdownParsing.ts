@@ -84,8 +84,11 @@ const PARSE_TIMING_KEYS: Array<keyof ParserTimingMetrics> = [
 ]
 const STRUCTURAL_OBJECT_FIELDS = new Set([
   'attrs',
+  'data',
   'items',
   'header',
+  'payload',
+  'props',
   'rows',
   'cells',
   'term',
@@ -309,6 +312,11 @@ function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode
   return identical ? previousNodes : stableNodes
 }
 
+function primeParsedNodeSignatures(nodes: ParsedNode[]) {
+  for (const node of nodes)
+    getParsedNodeSignature(node)
+}
+
 function getStreamStatsDelta(current: StreamStatsLike, previous: StreamStatsLike | null) {
   const delta: Record<string, number> = {}
 
@@ -522,6 +530,7 @@ export function useMarkdownParsing(
       ? stabilizeParsedNodes(nextParsed, previousParsedNodes)
       : nextParsed
 
+    primeParsedNodeSignatures(parsed)
     parseCommitCount += 1
     previousContent = content
     previousParseSemanticKey = currentParseSemanticKey
