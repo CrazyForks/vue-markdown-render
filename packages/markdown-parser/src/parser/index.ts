@@ -108,6 +108,21 @@ function isPlainObject(value: unknown) {
   return proto === Object.prototype || proto === null
 }
 
+function tryStructuredCloneTokenField<T>(value: T, seen: WeakMap<object, unknown>): T | undefined {
+  if (typeof globalThis.structuredClone !== 'function')
+    return undefined
+
+  try {
+    const cloned = globalThis.structuredClone(value)
+    if (cloned && typeof cloned === 'object')
+      seen.set(value as object, cloned)
+    return cloned as T
+  }
+  catch {
+    return undefined
+  }
+}
+
 function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>()): T {
   if (!value || typeof value !== 'object')
     return value
@@ -154,8 +169,12 @@ function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>())
     return cloned as T
   }
 
-  if (!isPlainObject(value))
+  if (!isPlainObject(value)) {
+    const structuredCloneValue = tryStructuredCloneTokenField(value, seen)
+    if (structuredCloneValue !== undefined)
+      return structuredCloneValue
     return value
+  }
 
   const cloned: Record<string, unknown> = {}
   seen.set(object, cloned)
@@ -194,23 +213,25 @@ function cloneMarkdownTokens(tokens: Token[]) {
   return tokens.map(cloneMarkdownToken)
 }
 
+function shouldUseTopLevelStreamParse(md: MarkdownIt, options: ParseOptions) {
+  const internalOptions = options as InternalParseOptions
+  const stream = md.stream
+  return internalOptions.__disableStreamParse !== true
+    && options.streamParse !== false
+    && stream?.enabled === true
+    && typeof stream.parse === 'function'
+}
+
 function parseTopLevelTokens(
   md: MarkdownIt,
   source: string,
   env: Record<string, unknown>,
   options: ParseOptions,
 ) {
-  const internalOptions = options as InternalParseOptions
-  const stream = md.stream
-  const shouldUseStreamParse = internalOptions.__disableStreamParse !== true
-    && options.streamParse !== false
-    && stream?.enabled === true
-    && typeof stream.parse === 'function'
-
-  if (!shouldUseStreamParse)
+  if (!shouldUseTopLevelStreamParse(md, options))
     return md.parse(source, env)
 
-  const tokens = stream.parse!(source, getStableStreamEnv(md, env))
+  const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
   const timing = getParseTiming(options)
   if (!timing)
     return cloneMarkdownTokens(tokens)
@@ -2169,7 +2190,7 @@ export function parseMarkdownToStructure(
     // instrumentation, but preserve the full-document html_block shape.
     const preHook = options.preTransformTokens
     const postHook = options.postTransformTokens
-    if (typeof preHook === 'function' || typeof postHook === 'function') {
+    if (shouldUseTopLevelStreamParse(md, options) || typeof preHook === 'function' || typeof postHook === 'function') {
       const rawTokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options) as unknown as MarkdownToken[]
       const hookedTokens = typeof preHook === 'function' ? (preHook(rawTokens) || rawTokens) : rawTokens
       if (typeof postHook === 'function')

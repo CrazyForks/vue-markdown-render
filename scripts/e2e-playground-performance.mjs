@@ -103,6 +103,62 @@ function writeJsonResult(result) {
   writeFileSync(resolvedPath, json)
 }
 
+const parsePerformanceCounterKeys = [
+  'parseCommitCount',
+  'parseCoalescedCount',
+  'streamCommitCount',
+  'syncCommitCount',
+]
+const parsePerformanceTimingKeys = [
+  'tokenCloneMs',
+  'processTokensMs',
+  'parseMarkdownToStructureTotalMs',
+]
+const parsePerformanceStreamCounterKeys = [
+  'total',
+  'cacheHits',
+  'appendHits',
+  'tailHits',
+  'fullParses',
+  'chunkedParses',
+]
+
+function cloneParsePerformance(value) {
+  return value == null ? null : JSON.parse(JSON.stringify(value))
+}
+
+function diffNumber(after, before) {
+  return Number(after || 0) - Number(before || 0)
+}
+
+function diffParsePerformance(after, before) {
+  if (!after)
+    return null
+  if (!before)
+    return cloneParsePerformance(after)
+
+  const out = cloneParsePerformance(after)
+
+  for (const key of parsePerformanceCounterKeys)
+    out[key] = diffNumber(after[key], before[key])
+  for (const key of parsePerformanceTimingKeys)
+    out[key] = diffNumber(after[key], before[key])
+
+  out.stream = {}
+  for (const key of parsePerformanceStreamCounterKeys)
+    out.stream[key] = diffNumber(after.stream?.[key], before.stream?.[key])
+
+  out.streamModes = {}
+  const streamModes = new Set([
+    ...Object.keys(after.streamModes ?? {}),
+    ...Object.keys(before.streamModes ?? {}),
+  ])
+  for (const key of streamModes)
+    out.streamModes[key] = diffNumber(after.streamModes?.[key], before.streamModes?.[key])
+
+  return out
+}
+
 function startDevServer(port) {
   const logs = []
   const serverArgs = process.env.PLAYGROUND_PERFORMANCE_SERVER === 'preview'
@@ -508,6 +564,8 @@ async function runScenario(browser, port, mode) {
         : [],
     }
   }, initialFrameStats)
+  result.parsePerformance = cloneParsePerformance(result.parsePerformance)
+  const fullScrollParsePerformanceBaseline = cloneParsePerformance(result.parsePerformance)
 
   const scrollMetrics = await scrollThroughRoot(page, rootSelector, '__playgroundPerfState')
   const heavySettleFrameBaseline = await frameBaseline(page, '__playgroundPerfState')
@@ -547,6 +605,10 @@ async function runScenario(browser, port, mode) {
     heavySettleFrameP95Ms: heavySettleFrameStats.frameP95Ms,
     heavySettleFrameMaxMs: heavySettleFrameStats.frameMaxMs,
   })
+  result.fullScroll.parsePerformance = diffParsePerformance(
+    result.fullScroll.parsePerformance,
+    fullScrollParsePerformanceBaseline,
+  )
   result.fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
   result.memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
   result.memoryAfterUnmountBytes = await measureAfterRendererUnmount(page)

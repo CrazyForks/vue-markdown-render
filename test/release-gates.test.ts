@@ -91,6 +91,8 @@ describe('release dependency gates', () => {
     expect(diagnosticPlayground).toContain(':debug-performance="isBenchmarkMode"')
     expect(diagnosticScript).toContain('parsePerformance')
     expect(mainScript).toContain('parsePerformance')
+    expect(diagnosticScript).toContain('diffParsePerformance')
+    expect(mainScript).toContain('replayParsePerformanceBaseline')
     expect(mainScript).toContain('Replay stream parser should record append/tail/cache hits')
     expect(benchmarkScript).toContain('parsePerformanceSummary')
     expect(benchmarkScript).toContain('tokenCloneMs')

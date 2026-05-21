@@ -1084,6 +1084,14 @@ function flushPendingHeightMeasurements() {
   }
 }
 
+function clearPendingHeightMeasurements() {
+  if (heightMeasurementRaf != null) {
+    cancelFrame?.(heightMeasurementRaf)
+    heightMeasurementRaf = null
+  }
+  pendingHeightMeasurements.clear()
+}
+
 function bumpNodeContentVersion(index: number) {
   const next = (nodeContentVersions.get(index) ?? 0) + 1
   nodeContentVersions.set(index, next)
@@ -1225,11 +1233,7 @@ watch(
     nodeContentDeferredMeasureTimers.clear()
     nodeContentVersions.clear()
     clearFinalHeightConvergenceTimers()
-    if (heightMeasurementRaf != null) {
-      cancelFrame?.(heightMeasurementRaf)
-      heightMeasurementRaf = null
-    }
-    pendingHeightMeasurements.clear()
+    clearPendingHeightMeasurements()
   },
   { immediate: true },
 )
@@ -1315,6 +1319,7 @@ const {
   hasIdleCallback,
   cleanupNodeVisibility,
   onDatasetKeyChanged: (total) => {
+    clearPendingHeightMeasurements()
     resetHeightMeasurements()
     if (total > 0)
       rebuildHeightTrees(total)
@@ -1526,11 +1531,7 @@ onBeforeUnmount(() => {
   nodeContentDeferredMeasureTimers.clear()
   nodeContentVersions.clear()
   clearFinalHeightConvergenceTimers()
-  if (heightMeasurementRaf != null) {
-    cancelFrame?.(heightMeasurementRaf)
-    heightMeasurementRaf = null
-  }
-  pendingHeightMeasurements.clear()
+  clearPendingHeightMeasurements()
   cleanupExperimentResizeObserver()
   clearRestoreReconcile()
   cleanupScrollListener()

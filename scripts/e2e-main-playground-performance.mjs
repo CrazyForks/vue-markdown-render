@@ -103,6 +103,62 @@ function writeJsonResult(result) {
   writeFileSync(resolvedPath, json)
 }
 
+const parsePerformanceCounterKeys = [
+  'parseCommitCount',
+  'parseCoalescedCount',
+  'streamCommitCount',
+  'syncCommitCount',
+]
+const parsePerformanceTimingKeys = [
+  'tokenCloneMs',
+  'processTokensMs',
+  'parseMarkdownToStructureTotalMs',
+]
+const parsePerformanceStreamCounterKeys = [
+  'total',
+  'cacheHits',
+  'appendHits',
+  'tailHits',
+  'fullParses',
+  'chunkedParses',
+]
+
+function cloneParsePerformance(value) {
+  return value == null ? null : JSON.parse(JSON.stringify(value))
+}
+
+function diffNumber(after, before) {
+  return Number(after || 0) - Number(before || 0)
+}
+
+function diffParsePerformance(after, before) {
+  if (!after)
+    return null
+  if (!before)
+    return cloneParsePerformance(after)
+
+  const out = cloneParsePerformance(after)
+
+  for (const key of parsePerformanceCounterKeys)
+    out[key] = diffNumber(after[key], before[key])
+  for (const key of parsePerformanceTimingKeys)
+    out[key] = diffNumber(after[key], before[key])
+
+  out.stream = {}
+  for (const key of parsePerformanceStreamCounterKeys)
+    out.stream[key] = diffNumber(after.stream?.[key], before.stream?.[key])
+
+  out.streamModes = {}
+  const streamModes = new Set([
+    ...Object.keys(after.streamModes ?? {}),
+    ...Object.keys(before.streamModes ?? {}),
+  ])
+  for (const key of streamModes)
+    out.streamModes[key] = diffNumber(after.streamModes?.[key], before.streamModes?.[key])
+
+  return out
+}
+
 function startDevServer(port) {
   const logs = []
   const serverArgs = process.env.PLAYGROUND_PERFORMANCE_SERVER === 'preview'
@@ -317,6 +373,8 @@ async function collectMetrics(page) {
         : [],
     }
   }, initialFrameStats)
+  initial.parsePerformance = cloneParsePerformance(initial.parsePerformance)
+  const fullScrollParsePerformanceBaseline = cloneParsePerformance(initial.parsePerformance)
 
   const scrollMetrics = await scrollThroughRoot(page, rootSelector, '__mainPlaygroundPerf')
   const heavySettleFrameBaseline = await frameBaseline(page, '__mainPlaygroundPerf')
@@ -357,6 +415,10 @@ async function collectMetrics(page) {
     heavySettleFrameP95Ms: heavySettleFrameStats.frameP95Ms,
     heavySettleFrameMaxMs: heavySettleFrameStats.frameMaxMs,
   })
+  fullScroll.parsePerformance = diffParsePerformance(
+    fullScroll.parsePerformance,
+    fullScrollParsePerformanceBaseline,
+  )
   fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
 
   const replayButton = page.locator('button.nav-btn--stream')
@@ -368,14 +430,19 @@ async function collectMetrics(page) {
       return button?.textContent?.includes('Resume')
     }, null, { timeout: 5000 })
   }
-  await page.evaluate(() => {
+  const replayParsePerformanceBaseline = await page.evaluate(() => {
     const state = window.__mainPlaygroundPerf
-    if (state) {
-      state.replayStartedAt = performance.now()
-      state.replayLongTaskCountBaseline = state.longTasks.length
-      state.replayLongTaskTotalBaseline = state.longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0)
-      state.replayFrameCountBaseline = Array.isArray(state.frameDeltas) ? state.frameDeltas.length : 0
-    }
+    if (!state)
+      return null
+
+    state.replayStartedAt = performance.now()
+    state.replayLongTaskCountBaseline = state.longTasks.length
+    state.replayLongTaskTotalBaseline = state.longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0)
+    state.replayFrameCountBaseline = Array.isArray(state.frameDeltas) ? state.frameDeltas.length : 0
+    state.replayParsePerformanceBaseline = state.parsePerformance == null
+      ? null
+      : JSON.parse(JSON.stringify(state.parsePerformance))
+    return state.replayParsePerformanceBaseline
   })
   await page.locator('button.nav-btn--stream').click()
   await waitForVisibleBlocksReady(page, rootSelector)
@@ -406,6 +473,10 @@ async function collectMetrics(page) {
       parsePerformance: state.parsePerformance ?? null,
     }
   })
+  replay.parsePerformance = diffParsePerformance(
+    replay.parsePerformance,
+    replayParsePerformanceBaseline,
+  )
 
   const memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
   const memoryAfterUnmountBytes = await measureAfterRendererUnmount(page)

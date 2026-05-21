@@ -122,6 +122,27 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(getStreamStats(md).total).toBe(1)
   })
 
+  it('updates the top-level stream cache for standalone html documents', () => {
+    const md = getMarkdown('stream-parser-standalone-html-document')
+    ;(md as any).stream.resetStats()
+
+    const nodes = parseMarkdownToStructure(
+      [
+        '<!doctype html>',
+        '<html>',
+        '<body><p>Cached document</p></body>',
+        '</html>',
+      ].join('\n'),
+      md,
+      { final: true },
+    ) as any[]
+
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.tag).toBe('html')
+    expect(getStreamStats(md).total).toBe(1)
+  })
+
   it('does not let cached stream tokens leak mutations into repeated parses', () => {
     const md = getMarkdown('stream-parser-token-clone')
     const markdown = [
@@ -260,5 +281,41 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(seenSet).toEqual(['cached', 'cached'])
     expect(seenDate).toEqual([123, 123])
     expect(seenRegExpLastIndex).toEqual([2, 2])
+  })
+
+  it('does not leak mutations to structured-cloneable class token meta objects', () => {
+    class MutableMeta {
+      value = 'cached'
+    }
+
+    const md = getMarkdown('stream-parser-class-meta-mutation')
+    ;(md as any).core.ruler.push('test_custom_class_meta', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (inline)
+        inline.meta = { custom: new MutableMeta() }
+    })
+    ;(md as any).stream.resetStats()
+
+    const markdown = buildLargeAppendFriendlyDoc(40)
+    const seen: string[] = []
+    let mutate = true
+
+    const options = {
+      preTransformTokens(tokens: any[]) {
+        const meta = tokens.find(token => token.type === 'inline')?.meta
+        seen.push(meta?.custom?.value)
+        if (mutate)
+          meta.custom.value = 'mutated'
+        return tokens
+      },
+    }
+
+    parseMarkdownToStructure(markdown, md, options)
+    mutate = false
+    parseMarkdownToStructure(markdown, md, options)
+
+    const stats = getStreamStats(md)
+    expect(stats.cacheHits + stats.appendHits + stats.tailHits).toBeGreaterThan(0)
+    expect(seen).toEqual(['cached', 'cached'])
   })
 })
