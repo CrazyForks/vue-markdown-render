@@ -31,6 +31,8 @@ You can jump in at any stage:
 
 Both helpers are framework-agnostic and can run in Node or the browser. For large documents you can reuse the `md` instance between parses to avoid re-initializing plugins.
 
+`parseMarkdownToStructure` uses the stream parser by default when the `md` instance supports it, so the instance retains the latest source/token cache. For one-shot parse helpers or shared singleton `md` instances, pass `{ streamParse: false }`.
+
 ## Custom components & scoping
 
 For SSR, prefer app-scoped registration through `VueRendererMarkdown`:

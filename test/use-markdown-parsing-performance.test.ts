@@ -81,6 +81,44 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('flushes pending coalesced content immediately when final becomes true', () => {
+    vi.useFakeTimers()
+    const initial = 'hello '.repeat(18).trim()
+    const next = `${initial} world`
+    const content = ref(initial)
+    const smooth = ref(true)
+    const { final, scope, state } = createParsingState(content, smooth)
+
+    expect(state.parsedNodes.value[0]?.raw).toBe(initial)
+
+    content.value = next
+    expect(state.parsedNodes.value[0]?.raw).toBe(initial)
+
+    final.value = true
+    expect(state.parsedNodes.value[0]?.raw).toBe(next)
+
+    scope.stop()
+  })
+
+  it('flushes pending coalesced content before applying parse semantic changes', () => {
+    vi.useFakeTimers()
+    const initial = 'hello '.repeat(18).trim()
+    const next = `${initial} world`
+    const content = ref(initial)
+    const smooth = ref(true)
+    const { props, scope, state } = createParsingState(content, smooth)
+
+    expect(state.parsedNodes.value[0]?.raw).toBe(initial)
+
+    content.value = next
+    expect(state.parsedNodes.value[0]?.raw).toBe(initial)
+
+    props.parseOptions = { requireClosingStrong: true }
+    expect(state.parsedNodes.value[0]?.raw).toBe(next)
+
+    scope.stop()
+  })
+
   it('uses parseCoalesceMs to pace smooth streaming parse commits', async () => {
     vi.useFakeTimers()
     const initial = 'hello '.repeat(18).trim()
@@ -276,6 +314,36 @@ describe('useMarkdownParsing performance behavior', () => {
       streamStats: expect.any(Object),
     })
     expect(typeof data?.streamMode === 'string' || data?.streamMode == null).toBe(true)
+
+    scope.stop()
+  })
+
+  it('logs parse coalescing and stream hit counters for append parses', async () => {
+    vi.useFakeTimers()
+    const initial = buildParagraphs(40)
+    const next = `${initial} appended tail`
+    const content = ref(initial)
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(true), {}, ref(true), logPerf)
+
+    expect(state.parsedNodes.value.length).toBe(40)
+
+    content.value = next
+    expect(state.parsedNodes.value.length).toBe(40)
+
+    await vi.advanceTimersByTimeAsync(80)
+    expect(state.parsedNodes.value.at(-1)?.raw).toBe(next.split('\n\n').at(-1))
+
+    const data = logPerf.mock.calls.at(-1)?.[1]
+    const streamDelta = data?.streamDelta as { appendHits?: number, tailHits?: number, cacheHits?: number } | undefined
+
+    expect(data).toMatchObject({
+      parseCommitCount: 2,
+      parseCoalescedCount: expect.any(Number),
+      streamDelta: expect.any(Object),
+    })
+    expect(data?.parseCoalescedCount).toBeGreaterThan(0)
+    expect((streamDelta?.appendHits ?? 0) + (streamDelta?.tailHits ?? 0) + (streamDelta?.cacheHits ?? 0)).toBeGreaterThan(0)
 
     scope.stop()
   })

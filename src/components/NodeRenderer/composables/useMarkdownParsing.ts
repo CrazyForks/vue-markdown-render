@@ -299,6 +299,8 @@ export function useMarkdownParsing(
   let previousParseSemanticKey = ''
   let previousContent = ''
   let parseCoalesceTimer: ReturnType<typeof setTimeout> | undefined
+  let parseCommitCount = 0
+  let parseCoalescedCount = 0
   let lastParseFlushAt = getNow()
 
   function clearParseCoalesceTimer() {
@@ -318,6 +320,8 @@ export function useMarkdownParsing(
   }
 
   function scheduleParseContentFlush() {
+    parseCoalescedCount += 1
+
     if (parseCoalesceTimer)
       return
 
@@ -416,6 +420,20 @@ export function useMarkdownParsing(
     props.customMarkdownIt,
   ))
 
+  watch(
+    parseSemanticKey,
+    (currentParseSemanticKey, previousKey) => {
+      if (!previousKey || currentParseSemanticKey === previousKey)
+        return
+
+      flushParseContent()
+      previousParsedNodes = []
+      previousContent = ''
+      resetStreamParseCache(mdInstance.value)
+    },
+    { flush: 'sync' },
+  )
+
   const parsedNodes = computed<ParsedNode[]>(() => {
     if (props.nodes?.length) {
       previousParsedNodes = []
@@ -459,6 +477,7 @@ export function useMarkdownParsing(
       ? stabilizeParsedNodes(nextParsed, previousParsedNodes)
       : nextParsed
 
+    parseCommitCount += 1
     previousContent = content
     previousParseSemanticKey = currentParseSemanticKey
     previousParsedNodes = parsed
@@ -472,6 +491,8 @@ export function useMarkdownParsing(
         ms: Math.round(getNow() - parseStart),
         nodes: parsed.length,
         contentLength: content.length,
+        parseCommitCount,
+        parseCoalescedCount,
         ...(streamStats
           ? {
               streamMode: streamStats.lastMode,

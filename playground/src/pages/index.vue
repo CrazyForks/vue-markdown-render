@@ -819,6 +819,7 @@ onBeforeUnmount(() => {
             :custom-html-tags="['thinking']"
             :escape-html-tags="['question', 'answer']"
             :is-dark="isDark"
+            :debug-performance="isBenchmarkMode"
             :data-theme="activeBrandTheme || undefined"
             custom-id="playground-demo"
             class="chat-messages__content"

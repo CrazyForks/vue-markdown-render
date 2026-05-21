@@ -80,6 +80,21 @@ describe('release dependency gates', () => {
     expect(mainScript).toContain('process.env.BENCHMARK_JSON_PATH')
   })
 
+  it('captures stream parser metrics in the 1.0 benchmark', () => {
+    const benchmarkScript = readFileSync(resolve(process.cwd(), 'scripts/benchmark-1-0.mjs'), 'utf8')
+    const diagnosticScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-playground-performance.mjs'), 'utf8')
+    const mainScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-main-playground-performance.mjs'), 'utf8')
+    const mainPlayground = readFileSync(resolve(process.cwd(), 'playground/src/pages/index.vue'), 'utf8')
+    const diagnosticPlayground = readFileSync(resolve(process.cwd(), 'playground/src/pages/test.vue'), 'utf8')
+
+    expect(mainPlayground).toContain(':debug-performance="isBenchmarkMode"')
+    expect(diagnosticPlayground).toContain(':debug-performance="isBenchmarkMode"')
+    expect(diagnosticScript).toContain('parsePerformance')
+    expect(mainScript).toContain('parsePerformance')
+    expect(mainScript).toContain('Replay stream parser should record append/tail/cache hits')
+    expect(benchmarkScript).toContain('parsePerformanceSummary')
+  })
+
   it('does not create release tags for package versions already published on npm', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/publish-current-package.mjs'), 'utf8')
 

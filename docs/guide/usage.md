@@ -89,6 +89,8 @@ const nodes = parseMarkdownToStructure('# Title', md)
 - `parseMarkdownToStructure(content, md)` transforms a Markdown string into the AST consumed by the renderer.
 - Combine with `setCustomComponents(id?, mapping)` to swap node renderers for a given `custom-id`.
 
+`parseMarkdownToStructure` uses the stream parser by default when the `md` instance supports it, retaining the latest source/token cache on that instance. For one-shot parse helpers or shared singleton `md` instances, pass `{ streamParse: false }`.
+
 ## Streaming recommendation
 
 For low-frequency updates, passing `content` directly is convenient. For chat-style token streams or long documents, the built-in smooth streaming on `MarkdownRender` paces `content` updates so visible output stays steady even when incoming chunks are bursty. The default `smooth-streaming="auto"` enables pacing automatically when `typewriter` is on or `max-live-nodes <= 0`.

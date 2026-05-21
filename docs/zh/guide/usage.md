@@ -91,6 +91,8 @@ const nodes = parseMarkdownToStructure('# 标题', md)
 - `parseMarkdownToStructure(content, md)` 将 Markdown 字符串转为渲染器使用的 AST。
 - 可搭配 `setCustomComponents(id?, mapping)` 为特定 `custom-id` 替换节点渲染器。
 
+`parseMarkdownToStructure` 默认会在 `md` 支持时使用 stream parser，并在该实例上保留最新的 source/token cache。一次性解析 helper 或共享 singleton `md` 实例可传 `{ streamParse: false }` 避免保留这份缓存。
+
 ## 流式推荐用法
 
 `content` 模式适合低频更新或一次性渲染；如果你在做 AI Chat、SSE、逐 token 输出，`MarkdownRender` 内置的 smooth streaming 可以对 `content` 更新做 pacing，即使 incoming chunk 是突发式的，可见输出也能保持平稳。默认 `smooth-streaming="auto"` 会在 `typewriter` 开启或 `max-live-nodes <= 0` 时自动启用 pacing。
