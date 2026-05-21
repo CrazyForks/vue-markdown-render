@@ -63,6 +63,8 @@ function getAutoCustomHtmlTags(mapping: Partial<CustomComponents>) {
 }
 
 const PARSE_COALESCE_MS = 80
+const objectIdentityIds = new WeakMap<object, number>()
+let nextObjectIdentityId = 1
 
 function getNow() {
   return typeof performance !== 'undefined'
@@ -76,6 +78,37 @@ function readStreamStats(md: MarkdownIt): StreamStatsLike | null {
     return null
 
   return stream.stats() as StreamStatsLike
+}
+
+function getIdentityKey(value: unknown) {
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null)
+    return ''
+
+  const object = value as object
+  let id = objectIdentityIds.get(object)
+  if (!id) {
+    id = nextObjectIdentityId++
+    objectIdentityIds.set(object, id)
+  }
+  return String(id)
+}
+
+function stableParseKey(options: RendererParseOptions, md: MarkdownIt, customMarkdownIt: NodeRendererProps['customMarkdownIt']) {
+  return JSON.stringify({
+    md: getIdentityKey(md),
+    customMarkdownIt: getIdentityKey(customMarkdownIt),
+    final: options.final === true,
+    requireClosingStrong: options.requireClosingStrong === true,
+    customHtmlTags: options.customHtmlTags ?? [],
+    streamParse: options.streamParse ?? 'auto',
+    validateLink: getIdentityKey(options.validateLink),
+    preTransformTokens: getIdentityKey(options.preTransformTokens),
+    postTransformTokens: getIdentityKey(options.postTransformTokens),
+  })
+}
+
+function resetStreamParseCache(md: MarkdownIt) {
+  md.stream?.reset?.()
 }
 
 function shouldFlushParseImmediately(previous: string, next: string) {
@@ -162,6 +195,8 @@ export function useMarkdownParsing(
   const smoothStreamingEnabled = options.smoothStreamingEnabled ?? computed(() => false)
   const contentToParse = ref(options.renderContent.value)
   let previousParsedNodes: ParsedNode[] = []
+  let previousParseSemanticKey = ''
+  let previousContent = ''
   let parseCoalesceTimer: ReturnType<typeof setTimeout> | undefined
   let lastParseFlushAt = getNow()
 
@@ -274,9 +309,16 @@ export function useMarkdownParsing(
     )
   })
 
+  const parseSemanticKey = computed(() => stableParseKey(
+    mergedParseOptions.value,
+    mdInstance.value,
+    props.customMarkdownIt,
+  ))
+
   const parsedNodes = computed<ParsedNode[]>(() => {
     if (props.nodes?.length) {
       previousParsedNodes = []
+      previousContent = ''
       return markRaw((props.nodes as unknown as ParsedNode[]).slice())
     }
 
@@ -284,6 +326,7 @@ export function useMarkdownParsing(
 
     if (!content) {
       previousParsedNodes = []
+      previousContent = ''
       return []
     }
 
@@ -291,15 +334,32 @@ export function useMarkdownParsing(
       ? getNow()
       : 0
     const md = mdInstance.value
+    const currentParseSemanticKey = parseSemanticKey.value
+    const canReuseParsedNodes = previousParsedNodes.length > 0
+      && content.startsWith(previousContent)
+      && currentParseSemanticKey === previousParseSemanticKey
+
+    if (previousParseSemanticKey && currentParseSemanticKey !== previousParseSemanticKey) {
+      previousParsedNodes = []
+      previousContent = ''
+      resetStreamParseCache(md)
+    }
+
     const streamStatsBefore = options.debugPerformanceEnabled.value
       ? readStreamStats(md)
       : null
 
-    const parsed = stabilizeParsedNodes(parseMarkdownToStructure(
+    const nextParsed = parseMarkdownToStructure(
       content,
       md,
       mergedParseOptions.value,
-    ), previousParsedNodes)
+    )
+    const parsed = canReuseParsedNodes
+      ? stabilizeParsedNodes(nextParsed, previousParsedNodes)
+      : nextParsed
+
+    previousContent = content
+    previousParseSemanticKey = currentParseSemanticKey
     previousParsedNodes = parsed
 
     if (options.debugPerformanceEnabled.value) {

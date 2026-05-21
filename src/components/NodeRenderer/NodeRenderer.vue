@@ -390,9 +390,10 @@ const {
   clamp,
 })
 const nodeContentElements = new Map<number, HTMLElement | null>()
+const nodeContentVersions = new Map<number, number>()
 const nodeContentDeferredMeasureTimers = new Map<number, number[]>()
 const finalHeightConvergenceTimers: number[] = []
-const pendingHeightMeasurements = new Map<number, { height: number, allowShrink: boolean }>()
+const pendingHeightMeasurements = new Map<number, { height: number, allowShrink: boolean, version: number, el: HTMLElement }>()
 let heightMeasurementRaf: number | null = null
 const desiredRenderedCount = computed(() => {
   if (!virtualizationEnabled.value)
@@ -1046,24 +1047,44 @@ function flushPendingHeightMeasurements() {
 
   for (const [index, pending] of pendingHeightMeasurements) {
     pendingHeightMeasurements.delete(index)
+    if (nodeContentElements.get(index) !== pending.el)
+      continue
+    if (nodeContentVersions.get(index) !== pending.version)
+      continue
     recordNodeHeight(index, pending.height, { allowShrink: pending.allowShrink })
   }
 }
 
-function queueNodeHeightRecord(index: number, height: number) {
+function bumpNodeContentVersion(index: number) {
+  const next = (nodeContentVersions.get(index) ?? 0) + 1
+  nodeContentVersions.set(index, next)
+  return next
+}
+
+function queueNodeHeightRecord(index: number, el: HTMLElement, height: number) {
   if (!Number.isFinite(height) || height <= 0)
     return
+  if (nodeContentElements.get(index) !== el)
+    return
 
+  const version = nodeContentVersions.get(index)
+  if (version == null)
+    return
   const node = parsedNodes.value[index] as (ParsedNode & { loading?: boolean }) | undefined
   const allowShrink = node?.loading !== true
   const previous = pendingHeightMeasurements.get(index)
-  const nextHeight = previous && !allowShrink
+  const combinedAllowShrink = previous
+    ? previous.allowShrink && allowShrink
+    : allowShrink
+  const nextHeight = previous && !combinedAllowShrink
     ? Math.max(previous.height, height)
     : height
 
   pendingHeightMeasurements.set(index, {
     height: nextHeight,
-    allowShrink: previous ? previous.allowShrink && allowShrink : allowShrink,
+    allowShrink: combinedAllowShrink,
+    version,
+    el,
   })
 
   if (heightMeasurementRaf != null)
@@ -1078,7 +1099,7 @@ function queueNodeHeightRecord(index: number, height: number) {
 }
 
 function measureNodeHeight(index: number, el: HTMLElement) {
-  queueNodeHeightRecord(index, el.offsetHeight)
+  queueNodeHeightRecord(index, el, el.offsetHeight)
 }
 
 function clearFinalHeightConvergenceTimers() {
@@ -1110,6 +1131,8 @@ function scheduleFinalHeightConvergence() {
 }
 
 function setNodeContentRef(index: number, el: HTMLElement | null) {
+  pendingHeightMeasurements.delete(index)
+  bumpNodeContentVersion(index)
   const previousTimers = nodeContentDeferredMeasureTimers.get(index)
   if (previousTimers) {
     for (const id of previousTimers)
@@ -1123,6 +1146,7 @@ function setNodeContentRef(index: number, el: HTMLElement | null) {
   }
   if (!el || !shouldMeasureNodeHeights.value) {
     nodeContentElements.delete(index)
+    nodeContentVersions.delete(index)
     return
   }
   nodeContentElements.set(index, el)
@@ -1160,6 +1184,7 @@ watch(
         window.clearTimeout(id)
     }
     nodeContentDeferredMeasureTimers.clear()
+    nodeContentVersions.clear()
     clearFinalHeightConvergenceTimers()
     if (heightMeasurementRaf != null) {
       cancelFrame?.(heightMeasurementRaf)
@@ -1460,6 +1485,7 @@ onBeforeUnmount(() => {
       window.clearTimeout(id)
   }
   nodeContentDeferredMeasureTimers.clear()
+  nodeContentVersions.clear()
   clearFinalHeightConvergenceTimers()
   if (heightMeasurementRaf != null) {
     cancelFrame?.(heightMeasurementRaf)
