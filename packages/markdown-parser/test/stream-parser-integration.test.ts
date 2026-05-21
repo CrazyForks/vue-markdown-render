@@ -30,6 +30,43 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(stats.lastMode).not.toBe('full')
   })
 
+  it('resolves references in appended content when reference definitions already exist', () => {
+    const md = getMarkdown('stream-parser-reference-append-global-state')
+    ;(md as any).stream.resetStats()
+
+    const first = `[ref]: https://example.com\n\n${buildLargeAppendFriendlyDoc(40)}`
+    const second = `${first}append: [x][ref]\n`
+
+    parseMarkdownToStructure(first, md, { streamParse: true })
+    const streamed = parseMarkdownToStructure(second, md, { streamParse: true }) as any[]
+    const sync = parseMarkdownToStructure(
+      second,
+      getMarkdown('stream-parser-reference-append-global-state-sync'),
+      { streamParse: false },
+    )
+
+    const links: any[] = []
+    const collectLinks = (node: any) => {
+      if (!node)
+        return
+      if (node.type === 'link')
+        links.push(node)
+      for (const key of ['children', 'items']) {
+        if (Array.isArray(node[key])) {
+          for (const child of node[key])
+            collectLinks(child)
+        }
+      }
+    }
+
+    for (const node of streamed)
+      collectLinks(node)
+
+    expect(streamed).toEqual(sync)
+    expect(links.some(link => link.text === 'x' && link.href === 'https://example.com')).toBe(true)
+    expect(getStreamStats(md).total).toBe(2)
+  })
+
   it('allows callers to opt out of stream.parse', () => {
     const md = getMarkdown('stream-parser-opt-out')
     ;(md as any).stream.resetStats()
