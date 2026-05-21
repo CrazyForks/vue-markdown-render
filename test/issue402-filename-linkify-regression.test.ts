@@ -24,6 +24,43 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(nodes, '制度02-XX银行呆账核销管理办法.md')).toBe(true)
   })
 
+  it('keeps cjk markdown filenames without numeric segments as text', () => {
+    const input = `文件名：
+
+**《西游记后传世界观-热血情感版.md》**
+
+如果你要，我下一步可以直接继续补其中一个：
+1. **主角团角色设定**`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, '西游记后传世界观-热血情感版.md')).toBe(true)
+  })
+
+  it('keeps market ticker suffixes as plain text inside markdown tables', () => {
+    const input = `### 总结速查表
+
+| 后缀 | 对应市场/交易所 | 典型例子 |
+| :--- | :--- | :--- |
+| **.SZ** | 深交所 (中国) | 003018.SZ |
+| **.SS / .SH** | 上交所 (中国) | 600519.SS |
+| **.BJ** | 北交所 (中国) | 835185.BJ |
+| **.US** | 美股 (通用) | AAPL.US |
+| **.NY** | 纽交所 (NYSE) | JPM.NY |
+| **.L / .LN** | 伦交所 (LSE) | HSBA.L |
+| **.HK** | 港交所 (HKEX) | 0700.HK |
+| **.T** | 东证 (日本) | 6758.T |
+| **.DE** | 德交所 (德国) | SAP.DE |
+| **.PA** | 泛欧 (巴黎) | TTE.PA |
+| **.AS** | 泛欧 (阿姆斯特丹) | ASML.AS |`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, '.SZ')).toBe(true)
+    expect(textIncludes(nodes, '003018.SZ')).toBe(true)
+    expect(textIncludes(nodes, 'ASML.AS')).toBe(true)
+  })
+
   it('still preserves normal bare-domain autolinks', () => {
     const nodes = parseMarkdownToStructure('访问 example.com 获取更多信息。', md, { final: true })
     const linkNodes = links(nodes)

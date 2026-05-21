@@ -6,7 +6,8 @@ const PATH_SEPARATOR_RE = /[\\/]/u
 const DOMAINISH_TEXT_RE = /^[\p{L}\p{N}./\\-]+$/u
 const DOMAIN_LABEL_RE = /^[A-Za-z0-9-]{1,63}$/u
 const PUNYCODE_TLD_RE = /^xn--[a-z0-9-]{2,59}$/i
-const NUMBERED_FILENAME_SEGMENT_RE = /(?:^|[._-])\d+|\d+[._-]/u
+const NON_ASCII_FILENAME_SEGMENT_RE = /[-\d]/u
+const MARKET_TICKER_SYMBOL_RE = /^(?:[A-Z]{1,6}|\d{4,8})$/u
 const AMBIGUOUS_BARE_DOMAIN_EXTENSIONS = new Set([
   'ai',
   'md',
@@ -14,6 +15,21 @@ const AMBIGUOUS_BARE_DOMAIN_EXTENSIONS = new Set([
   'rs',
   'sh',
   'zip',
+])
+const MARKET_TICKER_SUFFIXES = new Set([
+  'as',
+  'bj',
+  'de',
+  'hk',
+  'l',
+  'ln',
+  'ny',
+  'pa',
+  'sh',
+  'ss',
+  'sz',
+  't',
+  'us',
 ])
 const FILENAMEISH_LINK_EXTENSIONS = new Set([
   '7z',
@@ -123,11 +139,19 @@ function hasStrongFilenameSignals(linkText: string) {
 
   const extensionless = linkText.replace(FILENAMEISH_EXTENSION_RE, '')
   const hasNonAscii = Array.from(extensionless).some(char => char.charCodeAt(0) > 0x7F)
-  if (hasNonAscii && NUMBERED_FILENAME_SEGMENT_RE.test(extensionless))
+  if (hasNonAscii && NON_ASCII_FILENAME_SEGMENT_RE.test(extensionless))
     return true
 
   const filenameLikeSegments = extensionless.split('.').filter(Boolean)
   return filenameLikeSegments.some(isUppercaseFilenameSegment)
+}
+
+function isMarketTickerLikeText(linkText: string, extension: string) {
+  if (!MARKET_TICKER_SUFFIXES.has(extension))
+    return false
+
+  const symbol = linkText.slice(0, -(extension.length + 1))
+  return symbol === '' ? linkText.startsWith('.') : MARKET_TICKER_SYMBOL_RE.test(symbol)
 }
 
 export function shouldDemoteFilenameLikeLinkify(linkText: string) {
@@ -139,6 +163,9 @@ export function shouldDemoteFilenameLikeLinkify(linkText: string) {
     return false
 
   const extension = String(extensionMatch[1] ?? '').toLowerCase()
+  if (isMarketTickerLikeText(linkText, extension))
+    return true
+
   if (!FILENAMEISH_LINK_EXTENSIONS.has(extension))
     return false
 
