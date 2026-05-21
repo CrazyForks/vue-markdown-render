@@ -220,9 +220,9 @@ interface GetMarkdownOptions {
 - `md` (MarkdownItCore): 由 `getMarkdown()` 创建的 markdown-it-ts 实例
 - `options` (ParseOptions, 可选): 带有钩子的解析选项
 
-当 `md` 实例启用了 `md.stream.enabled === true` 时，顶层解析默认会使用
-markdown-it-ts 的 stream parser，并在该 `md` 实例上保留最近一次 source
-与 token cache。一次性解析、不希望保留 stream cache 的调用方可以显式关闭：
+> 注意：当 `md` 实例启用了 `md.stream.enabled === true` 时，顶层解析默认会使用
+> markdown-it-ts 的 stream parser，并在该 `md` 实例上保留最近一次 source
+> 与 token cache。一次性解析、不希望保留 stream cache 的调用方可以显式关闭：
 
 ```ts
 const nodes = parseMarkdownToStructure(source, md, { streamParse: false })

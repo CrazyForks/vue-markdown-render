@@ -318,7 +318,7 @@ const nodes = parseMarkdownToStructure('# Hello\n\nThis is parsed once', md)
 // send `nodes` JSON to the client
 ```
 
-By default, `parseMarkdownToStructure` uses the stream parser on compatible `md` instances and retains the latest source/token cache. For one-shot parse helpers or shared singleton `md` instances, pass `{ streamParse: false }`.
+> Warning: `parseMarkdownToStructure` uses the stream parser on compatible `md` instances by default, so that instance retains the latest source/token cache. For one-shot parse helpers or shared singleton `md` instances, pass `{ streamParse: false }`.
 
 ```vue
 <!-- client -->

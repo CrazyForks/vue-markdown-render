@@ -37,6 +37,49 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     parseMarkdownToStructure(buildLargeAppendFriendlyDoc(40), md, { streamParse: false })
 
     expect(getStreamStats(md).total).toBe(0)
+    expect((md as any).stream.peek()).toHaveLength(0)
+  })
+
+  it('parses shared-md documents correctly while streamParse opt-out avoids stream stats and cache', () => {
+    const md = getMarkdown('stream-parser-shared-md-opt-out')
+    const first = '# First\n\nAlpha paragraph.'
+    const second = '# Second\n\n- beta\n- gamma\n'
+
+    expect(JSON.stringify(parseMarkdownToStructure(first, md))).toContain('First')
+    expect(JSON.stringify(parseMarkdownToStructure(second, md))).toContain('Second')
+
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const optOutFirst = parseMarkdownToStructure(first, md, { streamParse: false }) as any[]
+    const optOutSecond = parseMarkdownToStructure(second, md, { streamParse: false }) as any[]
+
+    expect(optOutFirst[0]?.type).toBe('heading')
+    expect(JSON.stringify(optOutSecond)).toContain('gamma')
+    expect(getStreamStats(md).total).toBe(0)
+    expect((md as any).stream.peek()).toHaveLength(0)
+  })
+
+  it('keeps final-mode stream parses equivalent to sync parses after streaming same source', () => {
+    const md = getMarkdown('stream-parser-final-switch')
+    const markdown = [
+      '```ts',
+      'const value = 1',
+      '',
+      '<div>',
+      '$$',
+      'x + y',
+    ].join('\n')
+
+    parseMarkdownToStructure(markdown, md, { final: false })
+    const streamedFinal = parseMarkdownToStructure(markdown, md, { final: true })
+    const syncFinal = parseMarkdownToStructure(
+      markdown,
+      getMarkdown('stream-parser-final-switch-sync'),
+      { final: true, streamParse: false },
+    )
+
+    expect(streamedFinal).toEqual(syncFinal)
   })
 
   it('does not let details fragment parsing overwrite the top-level stream cache', () => {
@@ -159,5 +202,63 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     })
 
     expect(seen).toBe('v')
+  })
+
+  it('does not leak mutations to non-plain token meta objects', () => {
+    const md = getMarkdown('stream-parser-map-mutation')
+    ;(md as any).core.ruler.push('test_non_plain_meta', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (!inline)
+        return
+
+      const regexp = /cached/g
+      regexp.lastIndex = 2
+      inline.meta = {
+        map: new Map([['k', 'cached']]),
+        set: new Set(['cached']),
+        date: new Date(123),
+        regexp,
+      }
+    })
+    ;(md as any).stream.resetStats()
+
+    const markdown = buildLargeAppendFriendlyDoc(40)
+    const seenMap: unknown[] = []
+    const seenSet: unknown[] = []
+    const seenDate: number[] = []
+    const seenRegExpLastIndex: number[] = []
+    let mutate = true
+
+    const options = {
+      preTransformTokens(tokens: any[]) {
+        const meta = tokens.find(token => token.type === 'inline')?.meta
+        seenMap.push(meta?.map?.get('k'))
+        seenSet.push(Array.from(meta?.set ?? [])[0])
+        seenDate.push(meta?.date?.getTime())
+        seenRegExpLastIndex.push(meta?.regexp?.lastIndex)
+
+        if (mutate) {
+          meta?.map?.set('k', 'mutated')
+          meta?.set?.clear()
+          meta?.set?.add('mutated')
+          meta?.date?.setTime(456)
+          if (meta?.regexp)
+            meta.regexp.lastIndex = 8
+        }
+
+        return tokens
+      },
+    }
+
+    parseMarkdownToStructure(markdown, md, options)
+    mutate = false
+    parseMarkdownToStructure(markdown, md, options)
+
+    const stats = getStreamStats(md)
+    expect(stats.cacheHits + stats.appendHits + stats.tailHits).toBeGreaterThan(0)
+    expect(seenMap).toEqual(['cached', 'cached'])
+    expect(seenSet).toEqual(['cached', 'cached'])
+    expect(seenDate).toEqual([123, 123])
+    expect(seenRegExpLastIndex).toEqual([2, 2])
   })
 })

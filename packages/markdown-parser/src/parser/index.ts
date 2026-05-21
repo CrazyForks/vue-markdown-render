@@ -125,6 +125,35 @@ function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>())
     return cloned as T
   }
 
+  if (value instanceof Map) {
+    const cloned = new Map()
+    seen.set(object, cloned)
+    for (const [key, item] of value)
+      cloned.set(safeCloneTokenField(key, seen), safeCloneTokenField(item, seen))
+    return cloned as T
+  }
+
+  if (value instanceof Set) {
+    const cloned = new Set()
+    seen.set(object, cloned)
+    for (const item of value)
+      cloned.add(safeCloneTokenField(item, seen))
+    return cloned as T
+  }
+
+  if (value instanceof Date) {
+    const cloned = new Date(value.getTime())
+    seen.set(object, cloned)
+    return cloned as T
+  }
+
+  if (value instanceof RegExp) {
+    const cloned = new RegExp(value.source, value.flags)
+    cloned.lastIndex = value.lastIndex
+    seen.set(object, cloned)
+    return cloned as T
+  }
+
   if (!isPlainObject(value))
     return value
 

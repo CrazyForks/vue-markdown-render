@@ -81,13 +81,13 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
-  it('flushes pending coalesced content immediately when final becomes true', () => {
+  it('flushes pending coalesced content immediately when final becomes true', async () => {
     vi.useFakeTimers()
     const initial = 'hello '.repeat(18).trim()
     const next = `${initial} world`
     const content = ref(initial)
     const smooth = ref(true)
-    const { final, scope, state } = createParsingState(content, smooth)
+    const { final, scope, state } = createParsingState(content, smooth, { parseCoalesceMs: 1000 })
 
     expect(state.parsedNodes.value[0]?.raw).toBe(initial)
 
@@ -95,6 +95,9 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(state.parsedNodes.value[0]?.raw).toBe(initial)
 
     final.value = true
+    expect(state.parsedNodes.value[0]?.raw).toBe(next)
+
+    await vi.advanceTimersByTimeAsync(999)
     expect(state.parsedNodes.value[0]?.raw).toBe(next)
 
     scope.stop()
