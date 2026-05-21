@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { flushAll } from './setup/flush-all'
 
 class CountingResizeObserver {
@@ -84,6 +85,12 @@ function installManualMeasurementPlatform() {
 
 function setupState(wrapper: any) {
   return (wrapper.vm as any).$?.setupState as any
+}
+
+async function flushVueOnly() {
+  await nextTick()
+  await Promise.resolve()
+  await Promise.resolve()
 }
 
 describe('node renderer measurement performance', () => {
@@ -280,6 +287,45 @@ describe('node renderer measurement performance', () => {
     platform.flushFrames()
 
     expect(state.getFallbackNodeHeight(0)).toBe(120)
+    wrapper.unmount()
+  })
+
+  it('releases appended content tail height shrink guard after idle', async () => {
+    vi.useFakeTimers()
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: 'Paragraph 1\n\nParagraph 2',
+        maxLiveNodes: 1,
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushVueOnly()
+    platform.flushFrames()
+
+    await wrapper.setProps({ content: 'Paragraph 1\n\nParagraph 2 plus streamed tail' })
+    await flushVueOnly()
+    platform.flushFrames()
+
+    const state = setupState(wrapper)
+    const element = wrapper.get('.node-slot[data-node-index="0"] .node-content').element as HTMLElement
+    const resize = platform.resizeCallbacks.get(element)
+
+    platform.heights.set(element, 120)
+    resize?.([], {} as ResizeObserver)
+    platform.heights.set(element, 80)
+    resize?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    expect(state.getFallbackNodeHeight(0)).toBe(120)
+
+    platform.heights.set(element, 70)
+    await vi.advanceTimersByTimeAsync(1200)
+    platform.flushFrames()
+
+    expect(state.getFallbackNodeHeight(0)).toBe(70)
     wrapper.unmount()
   })
 

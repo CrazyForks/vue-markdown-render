@@ -173,7 +173,13 @@ function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>())
     const structuredCloneValue = tryStructuredCloneTokenField(value, seen)
     if (structuredCloneValue !== undefined)
       return structuredCloneValue
-    return value
+
+    const cloned = Object.create(Object.getPrototypeOf(value)) as Record<string, unknown>
+    seen.set(object, cloned)
+    const record = value as Record<string, unknown>
+    for (const key of Object.keys(record))
+      cloned[key] = safeCloneTokenField(record[key], seen)
+    return cloned as T
   }
 
   const cloned: Record<string, unknown> = {}

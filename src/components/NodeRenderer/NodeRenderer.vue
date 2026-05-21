@@ -114,6 +114,7 @@ const emit = defineEmits<{
 const MAX_DEFERRED_NODE_COUNT = 900
 const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
+const CONTENT_STREAMING_TAIL_IDLE_MS = 1200
 
 const containerRef = ref<HTMLElement>()
 const paragraphProbeWrapperRef = ref<HTMLElement | null>(null)
@@ -172,6 +173,35 @@ provide('markstreamSmoothStreaming', smoothStreamingEnabled)
 const contentStreamingTailActive = ref(false)
 let previousContentStreamValue = ''
 let hasSeenContentStreamValue = false
+let contentStreamingTailIdleTimer: number | null = null
+
+function clearContentStreamingTailIdleTimer() {
+  if (!isClient || contentStreamingTailIdleTimer == null)
+    return
+  window.clearTimeout(contentStreamingTailIdleTimer)
+  contentStreamingTailIdleTimer = null
+}
+
+function markContentStreamingTailActive() {
+  contentStreamingTailActive.value = true
+  if (!isClient)
+    return
+
+  clearContentStreamingTailIdleTimer()
+  contentStreamingTailIdleTimer = window.setTimeout(() => {
+    contentStreamingTailIdleTimer = null
+    if (effectiveFinal.value === true || props.nodes?.length)
+      return
+    clearPendingHeightMeasurements()
+    contentStreamingTailActive.value = false
+    measureTrackedNodeHeights()
+  }, CONTENT_STREAMING_TAIL_IDLE_MS)
+}
+
+function clearContentStreamingTailActive() {
+  contentStreamingTailActive.value = false
+  clearContentStreamingTailIdleTimer()
+}
 
 watch(
   [renderContent, () => props.nodes, effectiveFinal],
@@ -179,7 +209,7 @@ watch(
     const nextContent = content ?? ''
 
     if (nodes?.length || final === true) {
-      contentStreamingTailActive.value = false
+      clearContentStreamingTailActive()
       previousContentStreamValue = nextContent
       hasSeenContentStreamValue = true
       return
@@ -192,10 +222,10 @@ watch(
     }
 
     if (previousContentStreamValue && nextContent.length > previousContentStreamValue.length && nextContent.startsWith(previousContentStreamValue)) {
-      contentStreamingTailActive.value = true
+      markContentStreamingTailActive()
     }
     else if (nextContent.length < previousContentStreamValue.length || !nextContent.startsWith(previousContentStreamValue)) {
-      contentStreamingTailActive.value = false
+      clearContentStreamingTailActive()
     }
 
     previousContentStreamValue = nextContent
@@ -1143,6 +1173,13 @@ function measureNodeHeight(index: number, el: HTMLElement) {
   queueNodeHeightRecord(index, el, el.offsetHeight)
 }
 
+function measureTrackedNodeHeights() {
+  for (const [index, el] of nodeContentElements) {
+    if (el)
+      measureNodeHeight(index, el)
+  }
+}
+
 function clearFinalHeightConvergenceTimers() {
   if (!isClient)
     return
@@ -1521,6 +1558,7 @@ watch(
 onBeforeUnmount(() => {
   cleanupBatchScheduler()
   destroyNodeVisibilityState()
+  clearContentStreamingTailIdleTimer()
   for (const observer of nodeContentResizeObservers.values())
     observer.disconnect()
   nodeContentResizeObservers.clear()

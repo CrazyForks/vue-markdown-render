@@ -337,4 +337,41 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(stats.cacheHits + stats.appendHits + stats.tailHits).toBeGreaterThan(0)
     expect(seen).toEqual(['cached', 'cached'])
   })
+
+  it('does not leak mutations to non-structured-cloneable class token meta objects', () => {
+    class NonStructuredCloneableMeta {
+      value = 'cached'
+      fn = () => 'x'
+    }
+
+    const md = getMarkdown('stream-parser-non-structured-class-meta-mutation')
+    ;(md as any).core.ruler.push('test_non_structured_class_meta', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (inline)
+        inline.meta = { custom: new NonStructuredCloneableMeta() }
+    })
+    ;(md as any).stream.resetStats()
+
+    const markdown = buildLargeAppendFriendlyDoc(40)
+    const seen: string[] = []
+    let mutate = true
+
+    const options = {
+      preTransformTokens(tokens: any[]) {
+        const meta = tokens.find(token => token.type === 'inline')?.meta
+        seen.push(meta?.custom?.value)
+        if (mutate)
+          meta.custom.value = 'mutated'
+        return tokens
+      },
+    }
+
+    parseMarkdownToStructure(markdown, md, options)
+    mutate = false
+    parseMarkdownToStructure(markdown, md, options)
+
+    const stats = getStreamStats(md)
+    expect(stats.cacheHits + stats.appendHits + stats.tailHits).toBeGreaterThan(0)
+    expect(seen).toEqual(['cached', 'cached'])
+  })
 })

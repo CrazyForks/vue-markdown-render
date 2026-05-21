@@ -430,6 +430,8 @@ export function useMarkdownParsing(
 
     return {
       ...base,
+      // The renderer keeps final content parses on the stream parser by default
+      // so the same md instance can reuse stream cache across the whole render.
       streamParse: base.streamParse ?? true,
       ...(hasFinal ? { final: resolvedFinal } : {}),
       ...(hasCustom ? { customHtmlTags } : {}),
