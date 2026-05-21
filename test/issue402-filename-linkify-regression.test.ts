@@ -108,6 +108,28 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(nodes, 'ASML.AS')).toBe(true)
   })
 
+  it('keeps ticker-like text as plain text in whitespace-separated summary blocks', () => {
+    const input = `### 总结速查表
+
+后缀 对应市场/交易所 典型例子
+.SZ 深交所 (中国) 003018.SZ
+.SS / .SH 上交所 (中国) 600519.SS
+.BJ 北交所 (中国) 835185.BJ
+.US 美股 (通用) AAPL.US
+.NY 纽交所 (NYSE) JPM.NY
+.L / .LN 伦交所 (LSE) HSBA.L
+.HK 港交所 (HKEX) 0700.HK
+.T 东证 (日本) 6758.T
+.DE 德交所 (德国) SAP.DE
+.PA 泛欧 (巴黎) TTE.PA
+.AS 泛欧 (阿姆斯特丹) ASML.AS`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, '003018.SZ')).toBe(true)
+    expect(textIncludes(nodes, 'ASML.AS')).toBe(true)
+  })
+
   it('keeps alphanumeric and common exchange ticker-like text as plain text', () => {
     const input = `| 代码 | 市场 |
 | :--- | :--- |
@@ -129,6 +151,35 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(nodes, 'aapl.us')).toBe(true)
     expect(textIncludes(nodes, 'SHOP.TO')).toBe(true)
     expect(textIncludes(nodes, '005930.KS')).toBe(true)
+  })
+
+  it('keeps alphanumeric and hyphenated tickers in lists under ticker context', () => {
+    const input = `股票代码：
+
+- BRK-B.US
+- VOW3.DE
+- aapl.us
+- 2330.TW
+- 005930.KS`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'BRK-B.US')).toBe(true)
+    expect(textIncludes(nodes, '005930.KS')).toBe(true)
+  })
+
+  it('keeps context-only market ticker suffixes as plain text', () => {
+    const input = `| 代码 | 市场 |
+| :--- | :--- |
+| 7203.JP | 日股 |
+| 600000.CN | A股 |
+| ABC.SI | 新股 |
+| XYZ.MX | 墨股 |`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, '7203.JP')).toBe(true)
+    expect(textIncludes(nodes, 'XYZ.MX')).toBe(true)
   })
 
   it('keeps short numeric market tickers as plain text', () => {
@@ -212,6 +263,53 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(linkNodes).toHaveLength(1)
     expect(linkNodes[0].href).toBe('http://xn--fsqu00a.ai')
     expect(textIncludes(linkNodes[0], '例子.ai')).toBe(true)
+  })
+
+  it('keeps ascii markdown filenames in lists under filename context', () => {
+    const input = `文件列表：
+
+- readme.md
+- release-notes.md
+- getting-started.md`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'readme.md')).toBe(true)
+    expect(textIncludes(nodes, 'release-notes.md')).toBe(true)
+  })
+
+  it('keeps ascii markdown filenames under document context', () => {
+    const input = `文档：
+
+**readme.md**
+**release-notes.md**`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'readme.md')).toBe(true)
+    expect(textIncludes(nodes, 'release-notes.md')).toBe(true)
+  })
+
+  it('keeps context-only filename extensions as text only under filename context', () => {
+    const appTldMd = getMarkdown('issue-402-app-tld', {
+      apply: [
+        (md: any) => {
+          md.linkify?.tlds?.(['app'], true)
+        },
+      ],
+    })
+    const nodes = parseMarkdownToStructure(`文件：
+
+- Foo.app
+- installer.app`, appTldMd, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'Foo.app')).toBe(true)
+    expect(textIncludes(nodes, 'installer.app')).toBe(true)
+
+    const domainNodes = parseMarkdownToStructure('访问 example.app 获取更多信息。', appTldMd, { final: true })
+    const linkNodes = links(domainNodes)
+    expect(linkNodes).toHaveLength(1)
+    expect(linkNodes[0].href).toBe('http://example.app')
   })
 
   it('keeps standalone uppercase filenames as text', () => {

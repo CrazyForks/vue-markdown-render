@@ -1,4 +1,4 @@
-const FILENAMEISH_EXTENSION_RE = /\.([a-z0-9]{1,10})$/i
+const FILENAMEISH_EXTENSION_RE = /\.([a-z0-9]{1,15})$/i
 const FILENAMEISH_SEGMENT_RE = /[_()[\]{}<>]/u
 const URL_PREFIX_HINT_RE = /^(?:https?:\/\/|ftp:\/\/|mailto:|www\.)/i
 const URL_QUERY_OR_AUTH_HINT_RE = /[?#@]/u
@@ -8,7 +8,7 @@ const DOMAIN_LABEL_RE = /^[A-Za-z0-9-]{1,63}$/u
 const PUNYCODE_TLD_RE = /^xn--[a-z0-9-]{2,59}$/i
 const MARKET_TICKER_SYMBOL_RE = /^(?:[A-Z]{1,6}|\d{1,8})$/u
 const MARKET_TICKER_CONTEXT_SYMBOL_RE = /^(?=.{1,12}$)[A-Z0-9]+(?:-[A-Z0-9]+)?$/iu
-const FILENAME_CONTEXT_RE = /文件名\s*[:：]?|文件\s*[:：]?|附件\s*[:：]?|档案\s*[:：]?|檔案\s*[:：]?|\bfile\s*name\b\s*[:：]?|\battachments?\b\s*[:：]?|\bfiles?\b\s*[:：]?/iu
+const FILENAME_CONTEXT_RE = /文件名\s*[:：]?|文件\s*[:：]?|附件\s*[:：]?|档案\s*[:：]?|檔案\s*[:：]?|文档\s*[:：]?|文檔\s*[:：]?|资料\s*[:：]?|資料\s*[:：]?|路径\s*[:：]?|路徑\s*[:：]?|\bfile\s*name\b\s*[:：]?|\battachments?\b\s*[:：]?|\bfiles?\b\s*[:：]?|\bdocuments?\b\s*[:：]?|\bdocs?\b\s*[:：]?|\bpaths?\b\s*[:：]?/iu
 const MARKET_TICKER_CONTEXT_RE = /股票代码|股票代碼|证券代码|證券代碼|代码|代碼|交易所|后缀|後綴|市场|市場|\btickers?\b|\bsymbols?\b|\bexchanges?\b/iu
 const AMBIGUOUS_BARE_DOMAIN_EXTENSIONS = new Set([
   'ai',
@@ -36,9 +36,24 @@ const MARKET_TICKER_SUFFIXES = new Set([
 const MARKET_TICKER_CONTEXT_SUFFIXES = new Set([
   ...MARKET_TICKER_SUFFIXES,
   'ax',
+  'cn',
+  'jp',
   'ks',
+  'mx',
+  'si',
   'to',
   'tw',
+])
+const FILENAME_CONTEXT_ONLY_EXTENSIONS = new Set([
+  'app',
+  'apk',
+  'dmg',
+  'exe',
+  'ipa',
+  'lock',
+  'log',
+  'markdown',
+  'webmanifest',
 ])
 const FILENAMEISH_LINK_EXTENSIONS = new Set([
   '7z',
@@ -211,8 +226,11 @@ export function shouldDemoteFilenameLikeLinkify(linkText: string, context: Linki
   if (isMarketTickerLikeText(linkText, extension, context.marketTicker === true))
     return true
 
-  if (!FILENAMEISH_LINK_EXTENSIONS.has(extension))
+  if (!FILENAMEISH_LINK_EXTENSIONS.has(extension)) {
+    if (context.filename && FILENAME_CONTEXT_ONLY_EXTENSIONS.has(extension))
+      return true
     return false
+  }
 
   // Extensions like `.ai` and `.md` can be both real bare-domain TLDs and
   // common filenames. Keep those linkified unless we also see stronger
