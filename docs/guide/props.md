@@ -8,7 +8,7 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 
 ## 1.0 API tiers
 
-Stable props for 1.x: `content`, `nodes`, `final`, `parseOptions`, `customMarkdownIt`, `customHtmlTags`, `htmlPolicy`, `showTooltips`, `isDark`, `customId`, `typewriter`, `smoothStreaming`, `smoothStreamingOptions`, `renderCodeBlocksAsPre`, `codeBlockStream`, `codeBlockProps`, `codeBlockMonacoOptions`, `codeBlockDarkTheme`, `codeBlockLightTheme`, `mermaidProps`, `d2Props`, `infographicProps`, `batchRendering`, `deferNodesUntilVisible`, `maxLiveNodes`, and `liveNodeBuffer`.
+Stable props for 1.x: `content`, `nodes`, `final`, `parseOptions`, `customMarkdownIt`, `customHtmlTags`, `htmlPolicy`, `showTooltips`, `isDark`, `customId`, `typewriter`, `smoothStreaming`, `smoothStreamingOptions`, `parseCoalesceMs`, `renderCodeBlocksAsPre`, `codeBlockStream`, `codeBlockProps`, `codeBlockMonacoOptions`, `codeBlockDarkTheme`, `codeBlockLightTheme`, `mermaidProps`, `d2Props`, `infographicProps`, `batchRendering`, `deferNodesUntilVisible`, `maxLiveNodes`, and `liveNodeBuffer`.
 
 Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, `renderBatchBudgetMs`, `renderBatchIdleTimeoutMs`, and `viewportPriority`. They are available for advanced integrations and internal tests, but are not part of the 1.x compatibility promise yet.
 
@@ -30,6 +30,7 @@ Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`,
 | `typewriter` | `boolean` | `false` | Shows the blinking typewriter cursor while streamed content grows. |
 | `smooth-streaming` | `boolean \| 'auto'` | `'auto'` | Enables built-in pacing for streaming `content` updates. `'auto'` only enables when `typewriter=true` or `max-live-nodes<=0`. Set `true` to force-enable, `false` to render with raw chunk cadence. |
 | `smooth-streaming-options` | `SmoothMarkdownStreamOptions` | – | Options for built-in stream pacing (`minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`). Read when the renderer is created; recreate the renderer with a different `key` if you need to change them dynamically. |
+| `parse-coalesce-ms` | `number` | `80` | Minimum interval between parse commits while smooth streaming coalesces character-only updates. Set `0` to parse every smooth-stream commit. |
 | `fade` | `boolean` | `true` | Enables non-code-node enter fade and appended-text fade. Disable if you need zero animation for SSR snapshots. |
 
 ::: tip SSR and smooth streaming
@@ -74,7 +75,7 @@ Use `smooth-streaming-options` to fine-tune pacing behaviour:
 />
 ```
 
-Available keys: `minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`. These are read once when the renderer is created; change the component `key` to apply new options dynamically.
+Available keys: `minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`. These are read once when the renderer is created; change the component `key` to apply new options dynamically. Use `parse-coalesce-ms` separately when you need to tune the parser's coalescing interval.
 
 ### Security defaults and compatibility opt-outs
 

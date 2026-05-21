@@ -59,6 +59,7 @@ const props: NodeRendererProps = {
   final: true,
   typewriter: true,
   smoothStreaming: 'auto',
+  parseCoalesceMs: 80,
   maxLiveNodes: 320,
 }
 

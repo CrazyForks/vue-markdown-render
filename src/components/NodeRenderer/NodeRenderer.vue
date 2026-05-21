@@ -232,6 +232,7 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   isDark: props.isDark,
   typewriter: props.typewriter,
   smoothStreamingOptions: props.smoothStreamingOptions,
+  parseCoalesceMs: props.parseCoalesceMs,
   fade: props.fade,
 }))
 provide('markstreamNestedRendererProps', nestedRendererProps)
@@ -1071,7 +1072,8 @@ function queueNodeHeightRecord(index: number, el: HTMLElement, height: number) {
   if (version == null)
     return
   const node = parsedNodes.value[index] as (ParsedNode & { loading?: boolean }) | undefined
-  const allowShrink = node?.loading !== true
+  const isStreamingTail = effectiveFinal.value !== true && index >= parsedNodes.value.length - 2
+  const allowShrink = !isStreamingTail && node?.loading !== true
   const previous = pendingHeightMeasurements.get(index)
   const combinedAllowShrink = previous
     ? previous.allowShrink && allowShrink
@@ -1161,13 +1163,19 @@ function setNodeContentRef(index: number, el: HTMLElement | null) {
     observer.observe(el)
     nodeContentResizeObservers.set(index, observer)
   }
-  if (parsedNodes.value[index]?.type === 'code_block' && typeof window !== 'undefined') {
-    nodeContentDeferredMeasureTimers.set(index, [
-      window.setTimeout(measure, 16),
-      window.setTimeout(measure, 80),
-      window.setTimeout(measure, 240),
-      window.setTimeout(measure, 800),
-    ])
+  if (typeof window !== 'undefined') {
+    const deferredMeasureDelays = parsedNodes.value[index]?.type === 'code_block'
+      ? [16, 80, 240, 800]
+      : effectiveFinal.value
+        ? [80]
+        : []
+
+    if (deferredMeasureDelays.length) {
+      nodeContentDeferredMeasureTimers.set(
+        index,
+        deferredMeasureDelays.map(delay => window.setTimeout(measure, delay)),
+      )
+    }
   }
 }
 

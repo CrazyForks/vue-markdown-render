@@ -88,6 +88,7 @@ function setupState(wrapper: any) {
 
 describe('node renderer measurement performance', () => {
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
@@ -187,6 +188,69 @@ describe('node renderer measurement performance', () => {
     platform.flushFrames()
 
     expect(state.getFallbackNodeHeight(0)).toBe(120)
+    wrapper.unmount()
+  })
+
+  it('keeps the largest pending streaming tail height without a loading flag', async () => {
+    const platform = installManualMeasurementPlatform()
+    const firstNode = createParagraph(1)
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [firstNode, createParagraph(2)],
+        maxLiveNodes: 1,
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+    platform.flushFrames()
+
+    const state = setupState(wrapper)
+    const element = wrapper.get('.node-slot[data-node-index="0"] .node-content').element as HTMLElement
+    const resize = platform.resizeCallbacks.get(element)
+
+    platform.heights.set(element, 120)
+    resize?.([], {} as ResizeObserver)
+    platform.heights.set(element, 80)
+    resize?.([], {} as ResizeObserver)
+    platform.flushFrames()
+
+    expect(state.getFallbackNodeHeight(0)).toBe(120)
+    wrapper.unmount()
+  })
+
+  it('remeasures newly mounted final nodes after a short delay', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        maxLiveNodes: 1,
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+    platform.flushFrames()
+
+    const state = setupState(wrapper)
+    const element = wrapper.get('.node-slot[data-node-index="0"] .node-content').element as HTMLElement
+
+    platform.heights.set(element, 40)
+    state.setNodeContentRef(0, element)
+    await Promise.resolve()
+    platform.flushFrames()
+    expect(state.getFallbackNodeHeight(0)).toBe(40)
+
+    platform.heights.set(element, 90)
+    await new Promise(resolve => setTimeout(resolve, 90))
+    platform.flushFrames()
+
+    expect(state.getFallbackNodeHeight(0)).toBe(90)
     wrapper.unmount()
   })
 })

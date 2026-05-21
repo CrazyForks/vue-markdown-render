@@ -62,7 +62,15 @@ function getAutoCustomHtmlTags(mapping: Partial<CustomComponents>) {
     .filter(Boolean)
 }
 
-const PARSE_COALESCE_MS = 80
+const DEFAULT_PARSE_COALESCE_MS = 80
+const STREAM_STAT_COUNTER_KEYS: Array<keyof StreamStatsLike> = [
+  'total',
+  'cacheHits',
+  'appendHits',
+  'tailHits',
+  'fullParses',
+  'chunkedParses',
+]
 const objectIdentityIds = new WeakMap<object, number>()
 let nextObjectIdentityId = 1
 
@@ -130,37 +138,55 @@ function shouldFlushParseImmediately(previous: string, next: string) {
     || /(?:^|\n)(?:#{1,6}\s|[-+*]\s+|\d+[.)]\s+|>\s*|`{3,}|~{3,}|\|)/.test(appended)
 }
 
-function getStableNodePayload(node: ParsedNode) {
-  const record = node as Record<string, unknown>
-  const raw = record.raw
-  if (typeof raw === 'string')
-    return raw
+function resolveParseCoalesceMs(props: Readonly<NodeRendererProps>) {
+  const value = props.parseCoalesceMs
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : DEFAULT_PARSE_COALESCE_MS
+}
 
-  for (const key of ['code', 'content', 'text']) {
-    const value = record[key]
-    if (typeof value === 'string')
-      return value
+function toNodeSignatureValue(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+    return value
+
+  if (typeof value === 'bigint')
+    return `bigint:${value}`
+
+  if (typeof value === 'symbol')
+    return `symbol:${String(value)}`
+
+  if (typeof value === 'function')
+    return `function:${getIdentityKey(value)}`
+
+  if (Array.isArray(value))
+    return value.map(item => toNodeSignatureValue(item, seen))
+
+  if (typeof value === 'object') {
+    const object = value as object
+    if (seen.has(object))
+      return '[Circular]'
+
+    seen.add(object)
+    const normalized: Record<string, unknown> = {}
+    const record = value as Record<string, unknown>
+    for (const key of Object.keys(record).sort()) {
+      const item = record[key]
+      if (item !== undefined)
+        normalized[key] = toNodeSignatureValue(item, seen)
+    }
+    seen.delete(object)
+    return normalized
   }
 
-  return ''
+  return String(value)
+}
+
+function getParsedNodeSignature(node: ParsedNode) {
+  return JSON.stringify(toNodeSignatureValue(node))
 }
 
 function isParsedNodeStable(previous: ParsedNode, next: ParsedNode) {
-  if (previous.type !== next.type)
-    return false
-
-  const previousRecord = previous as Record<string, unknown>
-  const nextRecord = next as Record<string, unknown>
-
-  if (previousRecord.loading !== nextRecord.loading)
-    return false
-  if (previousRecord.diff !== nextRecord.diff)
-    return false
-  if (previousRecord.language !== nextRecord.language)
-    return false
-
-  const previousPayload = getStableNodePayload(previous)
-  return previousPayload !== '' && previousPayload === getStableNodePayload(next)
+  return getParsedNodeSignature(previous) === getParsedNodeSignature(next)
 }
 
 function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode[]) {
@@ -184,6 +210,19 @@ function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode
   }
 
   return identical ? previousNodes : stableNodes
+}
+
+function getStreamStatsDelta(current: StreamStatsLike, previous: StreamStatsLike | null) {
+  const delta: Record<string, number> = {}
+
+  for (const key of STREAM_STAT_COUNTER_KEYS) {
+    const currentValue = current[key]
+    const previousValue = previous?.[key]
+    if (typeof currentValue === 'number')
+      delta[key] = currentValue - (typeof previousValue === 'number' ? previousValue : 0)
+  }
+
+  return delta
 }
 
 export function useMarkdownParsing(
@@ -220,7 +259,7 @@ export function useMarkdownParsing(
     if (parseCoalesceTimer)
       return
 
-    const delay = Math.max(0, PARSE_COALESCE_MS - (getNow() - lastParseFlushAt))
+    const delay = Math.max(0, resolveParseCoalesceMs(props) - (getNow() - lastParseFlushAt))
     if (delay <= 0) {
       flushParseContent()
       return
@@ -371,7 +410,13 @@ export function useMarkdownParsing(
         ms: Math.round(getNow() - parseStart),
         nodes: parsed.length,
         contentLength: content.length,
-        ...(streamStats ? { streamStats } : {}),
+        ...(streamStats
+          ? {
+              streamMode: streamStats.lastMode,
+              streamDelta: getStreamStatsDelta(streamStats, streamStatsBefore),
+              streamStats,
+            }
+          : {}),
       })
     }
 
