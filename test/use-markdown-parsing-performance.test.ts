@@ -283,6 +283,44 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('does not reuse nodes when a custom object field changes', () => {
+    let seriesValue = 1
+    const content = ref('chart')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        preTransformTokens(tokens) {
+          for (const token of tokens as any[]) {
+            if (token.type === 'inline') {
+              token.children = [{
+                type: 'chart',
+                content: 'chart',
+                raw: 'chart',
+                data: { series: [seriesValue] },
+              }]
+            }
+          }
+          return tokens
+        },
+      },
+    })
+    const firstParagraph = state.parsedNodes.value[0] as any
+    const firstChart = firstParagraph.children?.[0]
+
+    expect(firstChart?.data?.series).toEqual([1])
+
+    seriesValue = 2
+    content.value = `${content.value}\n\nAppended paragraph.`
+
+    const secondParagraph = state.parsedNodes.value[0] as any
+    const secondChart = secondParagraph.children?.[0]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(secondChart).not.toBe(firstChart)
+    expect(secondChart?.data?.series).toEqual([2])
+
+    scope.stop()
+  })
+
   it('does not deep-stringify previous ParsedNodes during large append reuse', () => {
     const stringify = vi.spyOn(JSON, 'stringify')
     const content = ref(buildParagraphs(5000))

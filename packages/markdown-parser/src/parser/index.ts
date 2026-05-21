@@ -56,8 +56,35 @@ function getStableStreamEnv(md: MarkdownIt, env: Record<string, unknown>) {
   return stableEnv
 }
 
+function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+  if (!value || typeof value !== 'object')
+    return value
+
+  const object = value as object
+  const existing = seen.get(object)
+  if (existing)
+    return existing as T
+
+  if (Array.isArray(value)) {
+    const cloned: unknown[] = []
+    seen.set(object, cloned)
+    for (const item of value)
+      cloned.push(safeCloneTokenField(item, seen))
+    return cloned as T
+  }
+
+  const cloned = Object.assign(Object.create(Object.getPrototypeOf(value)), value) as Record<string, unknown>
+  seen.set(object, cloned)
+
+  for (const key of Object.keys(cloned))
+    cloned[key] = safeCloneTokenField(cloned[key], seen)
+
+  return cloned as T
+}
+
 function cloneMarkdownToken(token: Token): Token {
   const cloned = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as Token
+  const seen = new WeakMap<object, unknown>()
 
   if (Array.isArray(token.attrs))
     cloned.attrs = token.attrs.map(attr => [...attr] as [string, string])
@@ -65,8 +92,15 @@ function cloneMarkdownToken(token: Token): Token {
     cloned.map = [...token.map] as [number, number]
   if (Array.isArray(token.children))
     cloned.children = token.children.map(cloneMarkdownToken)
-  if (token.meta && typeof token.meta === 'object')
-    cloned.meta = { ...token.meta }
+
+  for (const key of Object.keys(token as unknown as Record<string, unknown>)) {
+    if (key === 'attrs' || key === 'map' || key === 'children')
+      continue
+
+    const value = (token as unknown as Record<string, unknown>)[key]
+    if (value && typeof value === 'object')
+      (cloned as unknown as Record<string, unknown>)[key] = safeCloneTokenField(value, seen)
+  }
 
   return cloned
 }

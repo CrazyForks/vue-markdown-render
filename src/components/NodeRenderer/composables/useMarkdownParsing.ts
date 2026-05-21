@@ -195,16 +195,8 @@ function buildPrimitiveFieldSignature(record: Record<string, unknown>) {
         return `${key}=fn:${getIdentityKey(value)}`
       if (STRUCTURAL_OBJECT_FIELDS.has(key) && (Array.isArray(value) || typeof value === 'object'))
         return `${key}=${stableValueSignature(value)}`
-      if (Array.isArray(value)) {
-        const items = value.map((item) => {
-          if (typeof item === 'string')
-            return `s:${signatureString(item)}`
-          if (typeof item === 'number' || typeof item === 'boolean' || item == null)
-            return String(item)
-          return typeof item
-        })
-        return `${key}=a:${items.length}:${items.join(',')}`
-      }
+      if (value && typeof value === 'object')
+        return `${key}=object:${getIdentityKey(value)}`
 
       return ''
     })

@@ -97,4 +97,46 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(second[0]?.type).toBe('html_block')
     expect(second[0]?.children).toHaveLength(1)
   })
+
+  it('deep-clones cached stream token object fields before transform hooks', () => {
+    const md = getMarkdown('stream-parser-token-deep-clone')
+    ;(md as any).core.ruler.push('test_nested_token_fields', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (!inline)
+        return
+
+      inline.meta = { nested: { value: 'cached' } }
+      inline.custom = { state: { value: 'cached' } }
+    })
+    ;(md as any).stream.resetStats()
+
+    const markdown = buildLargeAppendFriendlyDoc(40)
+    const seenMeta: string[] = []
+    const seenCustom: string[] = []
+    let mutate = true
+
+    const options = {
+      preTransformTokens(tokens: any[]) {
+        const inline = tokens.find(token => token.type === 'inline')
+        seenMeta.push(inline?.meta?.nested?.value)
+        seenCustom.push(inline?.custom?.state?.value)
+
+        if (mutate) {
+          inline.meta.nested.value = 'mutated'
+          inline.custom.state.value = 'mutated'
+        }
+
+        return tokens
+      },
+    }
+
+    parseMarkdownToStructure(markdown, md, options)
+    mutate = false
+    parseMarkdownToStructure(markdown, md, options)
+
+    const stats = getStreamStats(md)
+    expect(stats.cacheHits + stats.appendHits + stats.tailHits).toBeGreaterThan(0)
+    expect(seenMeta).toEqual(['cached', 'cached'])
+    expect(seenCustom).toEqual(['cached', 'cached'])
+  })
 })
