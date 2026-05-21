@@ -329,6 +329,56 @@ describe('node renderer measurement performance', () => {
     wrapper.unmount()
   })
 
+  it('allows streaming tail heights to shrink during final convergence', async () => {
+    vi.useFakeTimers()
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: 'Paragraph 1\n\nParagraph 2',
+        maxLiveNodes: 1,
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushVueOnly()
+    platform.flushFrames()
+
+    await wrapper.setProps({ content: 'Paragraph 1\n\nParagraph 2 plus streamed tail' })
+    await flushVueOnly()
+    platform.flushFrames()
+
+    const state = setupState(wrapper)
+    const element = wrapper.get('.node-slot[data-node-index="0"] .node-content').element as HTMLElement
+    const resize = platform.resizeCallbacks.get(element)
+
+    platform.heights.set(element, 200)
+    resize?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    expect(state.getFallbackNodeHeight(0)).toBe(200)
+
+    platform.heights.set(element, 400)
+    resize?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    expect(state.getFallbackNodeHeight(0)).toBe(400)
+
+    platform.heights.set(element, 300)
+    resize?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    expect(state.getFallbackNodeHeight(0)).toBe(400)
+
+    await wrapper.setProps({ final: true })
+    await flushVueOnly()
+    const finalElement = wrapper.get('.node-slot[data-node-index="0"] .node-content').element as HTMLElement
+    platform.heights.set(finalElement, 300)
+    await vi.advanceTimersByTimeAsync(80)
+    platform.flushFrames()
+
+    expect(state.getFallbackNodeHeight(0)).toBe(300)
+    wrapper.unmount()
+  })
+
   it('remeasures newly mounted final nodes after a short delay', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default

@@ -229,7 +229,8 @@ Parses markdown content into a structured node tree.
 > or `{ streamParse: false }`. Callers that do not want stream cache can opt out:
 
 ```ts
-const nodes = parseMarkdownToStructure(source, md, { streamParse: false })
+const oneShotNodes = parseMarkdownToStructure(source, md, { final: true })
+const optOutNodes = parseMarkdownToStructure(source, md, { streamParse: false })
 ```
 
 **Returns:** `ParsedNode[]` - An array of parsed nodes

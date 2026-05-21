@@ -225,26 +225,50 @@ function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>())
 }
 
 function cloneMarkdownToken(token: Token, cloneObjectFields = true): Token {
-  const cloned = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as Token
+  if (!cloneObjectFields) {
+    const cloned = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as Token
+    if (Array.isArray(token.attrs))
+      cloned.attrs = token.attrs.map(attr => [...attr] as [string, string])
+    if (Array.isArray(token.map))
+      cloned.map = [...token.map] as [number, number]
+    if (Array.isArray(token.children))
+      cloned.children = token.children.map(child => cloneMarkdownToken(child, cloneObjectFields))
+    return cloned
+  }
+
+  const cloned = Object.create(Object.getPrototypeOf(token)) as Token
   const seen = new WeakMap<object, unknown>()
 
-  if (Array.isArray(token.attrs))
-    cloned.attrs = token.attrs.map(attr => [...attr] as [string, string])
-  if (Array.isArray(token.map))
-    cloned.map = [...token.map] as [number, number]
-  if (Array.isArray(token.children))
-    cloned.children = token.children.map(child => cloneMarkdownToken(child, cloneObjectFields))
-
-  if (!cloneObjectFields)
-    return cloned
-
-  for (const key of Object.keys(token as unknown as Record<string, unknown>)) {
-    if (key === 'attrs' || key === 'map' || key === 'children')
+  for (const key of Reflect.ownKeys(token as unknown as object)) {
+    const descriptor = Object.getOwnPropertyDescriptor(token, key)
+    if (!descriptor)
       continue
 
-    const value = (token as unknown as Record<string, unknown>)[key]
-    if (value && typeof value === 'object')
-      (cloned as unknown as Record<string, unknown>)[key] = safeCloneTokenField(value, seen)
+    if (!('value' in descriptor)) {
+      Object.defineProperty(cloned, key, descriptor)
+      continue
+    }
+
+    const value = descriptor.value
+    let clonedValue = value
+
+    if (key === 'attrs' && Array.isArray(value)) {
+      clonedValue = value.map(attr => [...attr] as [string, string])
+    }
+    else if (key === 'map' && Array.isArray(value)) {
+      clonedValue = [...value] as [number, number]
+    }
+    else if (key === 'children' && Array.isArray(value)) {
+      clonedValue = value.map(child => cloneMarkdownToken(child, cloneObjectFields))
+    }
+    else if (cloneObjectFields && value && typeof value === 'object') {
+      clonedValue = safeCloneTokenField(value, seen)
+    }
+
+    Object.defineProperty(cloned, key, {
+      ...descriptor,
+      value: clonedValue,
+    })
   }
 
   return cloned

@@ -33,6 +33,10 @@ Markdown 字符串 → getMarkdown() → markdown-it-ts 实例
 
 > 注意：`parseMarkdownToStructure` 默认是 `streamParse: 'auto'`：兼容的 `md` 实例会在非 final 顶层解析时使用 stream parser，并保留最近一次 source/token cache。final 一次性解析默认走普通 parser；需要强制 stream 时传 `{ streamParse: true }`，需要关闭时传 `{ streamParse: false }`。如果复用同一个 `md` 解析互不相关的一次性文档，请传 `{ final: true }` 或 `{ streamParse: false }`。
 
+```ts
+const oneShotNodes = parseMarkdownToStructure(source, md, { final: true })
+```
+
 ## 自定义组件与作用域
 
 通过 `setCustomComponents(customId?, mapping)` 覆盖任意节点渲染器，再在 `MarkdownRender` 上传入匹配的 `custom-id`，即可限定覆盖范围。

@@ -227,7 +227,8 @@ interface GetMarkdownOptions {
 > `{ final: true }` 或 `{ streamParse: false }`。不希望保留 stream cache 的调用方可以显式关闭：
 
 ```ts
-const nodes = parseMarkdownToStructure(source, md, { streamParse: false })
+const oneShotNodes = parseMarkdownToStructure(source, md, { final: true })
+const optOutNodes = parseMarkdownToStructure(source, md, { streamParse: false })
 ```
 
 **返回值：** `ParsedNode[]` - 解析后的节点数组

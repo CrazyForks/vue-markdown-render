@@ -593,11 +593,17 @@ export function useMarkdownParsing(
       md,
       parseOptionsForCall,
     )
+    const reuseStart = options.debugPerformanceEnabled.value
+      ? getNow()
+      : 0
     const parsed = canReuseParsedNodes
       ? stabilizeParsedNodes(nextParsed, previousParsedNodes)
       : nextParsed
 
     primeParsedNodeSignatures(parsed)
+    const nodeReuseMs = options.debugPerformanceEnabled.value
+      ? getNow() - reuseStart
+      : 0
     parseCommitCount += 1
     previousContent = content
     previousParseSemanticKey = currentParseSemanticKey
@@ -615,6 +621,7 @@ export function useMarkdownParsing(
         contentLength: content.length,
         parseCommitCount,
         parseCoalescedCount,
+        nodeReuseMs,
         ...(parserTiming
           ? Object.fromEntries(PARSE_TIMING_KEYS.map(key => [key, parserTiming[key] ?? 0]))
           : {}),

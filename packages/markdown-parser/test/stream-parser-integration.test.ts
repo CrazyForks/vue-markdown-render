@@ -317,6 +317,57 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(seenCustom).toEqual(['cached', 'cached'])
   })
 
+  it('preserves symbol and non-enumerable token fields before transform hooks', () => {
+    const tokenSymbol = Symbol('token-plugin-state')
+    const md = getMarkdown('stream-parser-token-hidden-fields')
+    ;(md as any).core.ruler.push('test_hidden_token_fields', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (!inline)
+        return
+
+      Object.defineProperty(inline, 'hiddenPluginState', {
+        configurable: true,
+        enumerable: false,
+        writable: true,
+        value: { value: 'cached' },
+      })
+      inline[tokenSymbol] = { value: 'cached' }
+    })
+    ;(md as any).stream.resetStats()
+
+    const markdown = buildLargeAppendFriendlyDoc(40)
+    const seenHidden: unknown[] = []
+    const seenSymbol: unknown[] = []
+    const seenHiddenEnumerable: unknown[] = []
+    let mutate = true
+
+    const options = {
+      preTransformTokens(tokens: any[]) {
+        const inline = tokens.find(token => token.type === 'inline')
+        seenHidden.push(inline?.hiddenPluginState?.value)
+        seenSymbol.push(inline?.[tokenSymbol]?.value)
+        seenHiddenEnumerable.push(Object.getOwnPropertyDescriptor(inline, 'hiddenPluginState')?.enumerable)
+
+        if (mutate) {
+          inline.hiddenPluginState.value = 'mutated'
+          inline[tokenSymbol].value = 'mutated'
+        }
+
+        return tokens
+      },
+    }
+
+    parseMarkdownToStructure(markdown, md, options)
+    mutate = false
+    parseMarkdownToStructure(markdown, md, options)
+
+    const stats = getStreamStats(md)
+    expect(stats.cacheHits + stats.appendHits + stats.tailHits).toBeGreaterThan(0)
+    expect(seenHidden).toEqual(['cached', 'cached'])
+    expect(seenSymbol).toEqual(['cached', 'cached'])
+    expect(seenHiddenEnumerable).toEqual([false, false])
+  })
+
   it('keeps non-plain token meta objects usable when cloning cached stream tokens', () => {
     const md = getMarkdown('stream-parser-map-meta')
     ;(md as any).core.ruler.push('test_map_meta', (state: any) => {

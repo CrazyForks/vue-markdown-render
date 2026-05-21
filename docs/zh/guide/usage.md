@@ -93,6 +93,11 @@ const nodes = parseMarkdownToStructure('# 标题', md)
 
 > 注意：`parseMarkdownToStructure` 默认是 `streamParse: 'auto'`：兼容的 `md` 实例会在非 final 顶层解析时使用 stream parser，并保留最近一次 source/token cache。final 一次性解析默认走普通 parser；需要强制 stream 时传 `{ streamParse: true }`，需要关闭时传 `{ streamParse: false }`。如果复用同一个 `md` 解析互不相关的一次性文档，请传 `{ final: true }` 或 `{ streamParse: false }`。
 
+```ts
+declare const source: string
+const oneShotNodes = parseMarkdownToStructure(source, md, { final: true })
+```
+
 当 `MarkdownRender` 自己解析 `content` 时，会有意把 `parseOptions.streamParse` 默认设为 `true`，让 streaming parse 使用 `md.stream.parse`。当 `final` 变化时，renderer 会使 stream cache 失效，并用 final 语义重新解析，避免 loading 或未闭合 token 状态过期。若希望 final content parse 继续走普通 parser，可传 `:parse-options="{ streamParse: 'auto' }"`；若要完全关闭 stream parser，可传 `false`。
 
 ## 流式推荐用法
