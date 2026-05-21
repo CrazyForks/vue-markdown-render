@@ -436,12 +436,11 @@ export interface ParseOptions {
   validateLink?: (url: string) => boolean
   // When true, log the parsed tree structure for debugging
   debug?: boolean
-  /** @internal */
-  __disableStreamParse?: boolean
 }
 
 export interface InternalParseOptions extends ParseOptions {
   __customHtmlBlockCursor?: number
+  __disableStreamParse?: boolean
   __insideStrong?: boolean
   __markdownIt?: MarkdownIt
   __sourceMarkdown?: string

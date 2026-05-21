@@ -108,21 +108,6 @@ function isPlainObject(value: unknown) {
   return proto === Object.prototype || proto === null
 }
 
-function tryStructuredCloneTokenField<T>(value: T, seen: WeakMap<object, unknown>): T | undefined {
-  if (typeof globalThis.structuredClone !== 'function')
-    return undefined
-
-  try {
-    const cloned = globalThis.structuredClone(value)
-    if (cloned && typeof cloned === 'object')
-      seen.set(value as object, cloned)
-    return cloned as T
-  }
-  catch {
-    return undefined
-  }
-}
-
 function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>()): T {
   if (!value || typeof value !== 'object')
     return value
@@ -170,15 +155,14 @@ function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>())
   }
 
   if (!isPlainObject(value)) {
-    const structuredCloneValue = tryStructuredCloneTokenField(value, seen)
-    if (structuredCloneValue !== undefined)
-      return structuredCloneValue
-
-    const cloned = Object.create(Object.getPrototypeOf(value)) as Record<string, unknown>
+    const cloned = Object.create(Object.getPrototypeOf(value)) as Record<PropertyKey, unknown>
     seen.set(object, cloned)
-    const record = value as Record<string, unknown>
-    for (const key of Object.keys(record))
-      cloned[key] = safeCloneTokenField(record[key], seen)
+    for (const key of Reflect.ownKeys(object)) {
+      const descriptor = Object.getOwnPropertyDescriptor(object, key)
+      if (!descriptor || !('value' in descriptor))
+        continue
+      cloned[key] = safeCloneTokenField(descriptor.value, seen)
+    }
     return cloned as T
   }
 
@@ -561,7 +545,7 @@ function findLastClosingTagStart(raw: string, tag: string) {
   return last
 }
 
-function buildDetailsChildParseOptions(options: ParseOptions, final: boolean): ParseOptions {
+function buildDetailsChildParseOptions(options: ParseOptions, final: boolean): InternalParseOptions {
   return {
     final,
     __disableStreamParse: true,
@@ -670,10 +654,12 @@ function parseDetailsFragmentChildren(
   if (!fragment.trim())
     return []
 
-  return parseMarkdownToStructure(fragment, md, {
-    ...options,
+  const internalOptions: InternalParseOptions = {
+    ...(options as InternalParseOptions),
     __disableStreamParse: true,
-  })
+  }
+
+  return parseMarkdownToStructure(fragment, md, internalOptions)
 }
 
 function parseSummaryChildren(

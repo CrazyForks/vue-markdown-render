@@ -336,11 +336,10 @@ export interface ParseOptions {
      */
     validateLink?: (url: string) => boolean;
     debug?: boolean;
-    /** @internal */
-    __disableStreamParse?: boolean;
 }
 export interface InternalParseOptions extends ParseOptions {
     __customHtmlBlockCursor?: number;
+    __disableStreamParse?: boolean;
     __insideStrong?: boolean;
     __markdownIt?: MarkdownIt;
     __sourceMarkdown?: string;

@@ -353,6 +353,38 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(seen).toEqual(['cached', 'cached'])
   })
 
+  it('preserves custom class token meta prototype when cloning cached stream tokens', () => {
+    class CustomMeta {
+      value = 'cached'
+
+      getValue() {
+        return this.value
+      }
+    }
+
+    const md = getMarkdown('stream-parser-class-prototype')
+    ;(md as any).core.ruler.push('test_class_meta', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (inline)
+        inline.meta = { custom: new CustomMeta() }
+    })
+
+    let seenInstance = false
+    let seenMethod = ''
+
+    parseMarkdownToStructure(buildLargeAppendFriendlyDoc(40), md, {
+      preTransformTokens(tokens: any[]) {
+        const custom = tokens.find(token => token.type === 'inline')?.meta?.custom
+        seenInstance = custom instanceof CustomMeta
+        seenMethod = custom.getValue()
+        return tokens
+      },
+    })
+
+    expect(seenInstance).toBe(true)
+    expect(seenMethod).toBe('cached')
+  })
+
   it('does not leak mutations to non-structured-cloneable class token meta objects', () => {
     class NonStructuredCloneableMeta {
       value = 'cached'

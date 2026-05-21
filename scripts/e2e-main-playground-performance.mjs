@@ -122,6 +122,7 @@ const parsePerformanceStreamCounterKeys = [
   'fullParses',
   'chunkedParses',
 ]
+const tokenCloneTotalBudgetRatio = 0.35
 
 function cloneParsePerformance(value) {
   return value == null ? null : JSON.parse(JSON.stringify(value))
@@ -157,6 +158,19 @@ function diffParsePerformance(after, before) {
     out.streamModes[key] = diffNumber(after.streamModes?.[key], before.streamModes?.[key])
 
   return out
+}
+
+function assertTokenCloneBudget(parsePerformance) {
+  const tokenCloneMs = Number(parsePerformance?.tokenCloneMs ?? 0)
+  const totalMs = Number(parsePerformance?.parseMarkdownToStructureTotalMs ?? 0)
+  if (!(Number.isFinite(tokenCloneMs) && Number.isFinite(totalMs) && totalMs > 0))
+    return
+
+  if (tokenCloneMs > totalMs * tokenCloneTotalBudgetRatio) {
+    throw new Error(
+      `Replay token clone cost too high: ${tokenCloneMs}ms of ${totalMs}ms.`,
+    )
+  }
 }
 
 function startDevServer(port) {
@@ -540,6 +554,7 @@ function assertScenario(result) {
   const streamHitCount = (stream.appendHits ?? 0) + (stream.tailHits ?? 0) + (stream.cacheHits ?? 0)
   if (!(streamHitCount > 0))
     throw new Error(`Replay stream parser should record append/tail/cache hits. Stream stats: ${JSON.stringify(stream)}.`)
+  assertTokenCloneBudget(parsePerformance)
 }
 
 async function run() {
