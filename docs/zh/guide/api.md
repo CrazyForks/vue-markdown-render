@@ -31,7 +31,7 @@ Markdown 字符串 → getMarkdown() → markdown-it-ts 实例
 
 两者均可在 Node/浏览器使用。处理大文档时可复用 `md` 实例避免重复初始化插件。
 
-> 注意：`parseMarkdownToStructure` 默认会在 `md` 支持时使用 stream parser，因此该实例会保留最新的 source/token cache。一次性解析 helper 或共享 singleton `md` 实例可传 `{ streamParse: false }`。
+> 注意：`parseMarkdownToStructure` 默认是 `streamParse: 'auto'`：兼容的 `md` 实例会在非 final 顶层解析时使用 stream parser，并保留最近一次 source/token cache。final 一次性解析默认走普通 parser；需要强制 stream 时传 `{ streamParse: true }`，需要关闭时传 `{ streamParse: false }`。
 
 ## 自定义组件与作用域
 

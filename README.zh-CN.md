@@ -310,6 +310,8 @@ const nodes = parseMarkdownToStructure('# Hello\n\n服务端解析一次', md)
 // 将 nodes JSON 下发到客户端
 ```
 
+> 注意：`parseMarkdownToStructure` 默认是 `streamParse: 'auto'`：兼容的 `md` 实例会在非 final 顶层解析时使用 `md.stream.parse`，并保留最近一次 source/token cache。final 一次性解析默认走普通 parser；需要强制 stream 时传 `{ streamParse: true }`，需要关闭时传 `{ streamParse: false }`。
+
 ```vue
 <!-- client -->
 <MarkdownRender :nodes="nodesFromServer" />

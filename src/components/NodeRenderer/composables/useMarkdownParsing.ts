@@ -82,7 +82,15 @@ const PARSE_TIMING_KEYS: Array<keyof ParserTimingMetrics> = [
   'processTokensMs',
   'parseMarkdownToStructureTotalMs',
 ]
-const STRUCTURAL_OBJECT_FIELDS = new Set(['attrs'])
+const STRUCTURAL_OBJECT_FIELDS = new Set([
+  'attrs',
+  'items',
+  'header',
+  'rows',
+  'cells',
+  'term',
+  'definition',
+])
 const objectIdentityIds = new WeakMap<object, number>()
 const nodeSignatureCache = new WeakMap<object, string>()
 let nextObjectIdentityId = 1
@@ -191,6 +199,24 @@ function stableValueSignature(value: unknown): string {
   return typeof value
 }
 
+function isParsedNodeLike(value: unknown): value is ParsedNode {
+  return typeof value === 'object'
+    && value !== null
+    && typeof (value as { type?: unknown }).type === 'string'
+    && typeof (value as { raw?: unknown }).raw === 'string'
+}
+
+function structuralFieldSignature(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `a:${value.length}:${value
+      .map(item => isParsedNodeLike(item) ? getParsedNodeSignature(item) : structuralFieldSignature(item))
+      .join(',')}`
+  }
+  if (isParsedNodeLike(value))
+    return getParsedNodeSignature(value)
+  return stableValueSignature(value)
+}
+
 function buildPrimitiveFieldSignature(record: Record<string, unknown>) {
   return Object.keys(record)
     .sort()
@@ -205,7 +231,7 @@ function buildPrimitiveFieldSignature(record: Record<string, unknown>) {
       if (typeof value === 'function')
         return `${key}=fn:${getIdentityKey(value)}`
       if (STRUCTURAL_OBJECT_FIELDS.has(key) && (Array.isArray(value) || typeof value === 'object'))
-        return `${key}=${stableValueSignature(value)}`
+        return `${key}=${structuralFieldSignature(value)}`
       if (value && typeof value === 'object')
         return `${key}=object:${getIdentityKey(value)}`
 
@@ -399,11 +425,12 @@ export function useMarkdownParsing(
     const hasFinal = resolvedFinal != null
     const hasCustom = customHtmlTags.length > 0
 
-    if (!hasFinal && !hasCustom)
+    if (!hasFinal && !hasCustom && base.streamParse != null)
       return base
 
     return {
       ...base,
+      streamParse: base.streamParse ?? true,
       ...(hasFinal ? { final: resolvedFinal } : {}),
       ...(hasCustom ? { customHtmlTags } : {}),
     } as RendererParseOptions

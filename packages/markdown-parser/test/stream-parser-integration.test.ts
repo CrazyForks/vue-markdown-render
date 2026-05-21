@@ -40,6 +40,25 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect((md as any).stream.peek()).toHaveLength(0)
   })
 
+  it('keeps final one-shot parses sync by default in auto mode', () => {
+    const md = getMarkdown('stream-parser-final-auto')
+    ;(md as any).stream.resetStats()
+
+    parseMarkdownToStructure(buildLargeAppendFriendlyDoc(40), md, { final: true })
+
+    expect(getStreamStats(md).total).toBe(0)
+    expect((md as any).stream.peek()).toHaveLength(0)
+  })
+
+  it('allows callers to force stream.parse for final parses', () => {
+    const md = getMarkdown('stream-parser-final-force')
+    ;(md as any).stream.resetStats()
+
+    parseMarkdownToStructure(buildLargeAppendFriendlyDoc(40), md, { final: true, streamParse: true })
+
+    expect(getStreamStats(md).total).toBe(1)
+  })
+
   it('parses shared-md documents correctly while streamParse opt-out avoids stream stats and cache', () => {
     const md = getMarkdown('stream-parser-shared-md-opt-out')
     const first = '# First\n\nAlpha paragraph.'
@@ -97,7 +116,7 @@ describe('parseMarkdownToStructure stream parser integration', () => {
         '</details>',
       ].join('\n'),
       md,
-      { final: true },
+      { final: true, streamParse: true },
     )
 
     expect(getStreamStats(md).total).toBe(1)
@@ -115,7 +134,7 @@ describe('parseMarkdownToStructure stream parser integration', () => {
         '</div>',
       ].join('\n'),
       md,
-      { final: true },
+      { final: true, streamParse: true },
     ) as any[]
 
     expect(nodes[0]?.children?.length).toBeGreaterThan(0)
@@ -134,7 +153,7 @@ describe('parseMarkdownToStructure stream parser integration', () => {
         '</html>',
       ].join('\n'),
       md,
-      { final: true },
+      { final: true, streamParse: true },
     ) as any[]
 
     expect(nodes).toHaveLength(1)
@@ -154,8 +173,8 @@ describe('parseMarkdownToStructure stream parser integration', () => {
       '</span>',
     ].join('\n')
 
-    parseMarkdownToStructure(markdown, md, { final: true })
-    const second = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+    parseMarkdownToStructure(markdown, md, { final: true, streamParse: true })
+    const second = parseMarkdownToStructure(markdown, md, { final: true, streamParse: true }) as any[]
 
     expect(second).toHaveLength(1)
     expect(second[0]?.type).toBe('html_block')

@@ -29,7 +29,7 @@ Parameters:
 - `md` (MarkdownItCore): a markdown-it-ts instance created by `getMarkdown()`
 - `options` (ParseOptions, optional): contains transform hooks described below
 
-> Warning: By default this uses `md.stream.parse` when available and retains the latest source/token cache on the `md` instance. For one-shot parse helpers or shared singleton `md` instances, pass `{ streamParse: false }`.
+> Warning: The default `streamParse: 'auto'` uses `md.stream.parse` for non-final top-level parses when available and retains the latest source/token cache on the `md` instance. Final one-shot parses use the regular parser unless you pass `{ streamParse: true }`; pass `{ streamParse: false }` to opt out.
 
 > Tip for custom components: for simple HTML‑like tags such as `<thinking>`, prefer the built‑in `customHtmlTags` / `custom-html-tags` allowlist so the parser emits custom nodes directly. Use `preTransformTokens` only when you need to reshape `content`/`attrs`. See [custom component parsing](/guide/advanced#custom-component-parsing) for details.
 

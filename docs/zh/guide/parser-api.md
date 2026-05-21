@@ -24,7 +24,7 @@ description: 使用解析器 API 在 markstream-vue 渲染节点之前接入 tok
 ### `parseMarkdownToStructure(content, md, options?)`
 将 Markdown 字符串解析为供渲染器使用的节点树（AST）。
 
-> 注意：默认会在 `md` 支持时使用 `md.stream.parse`，并在该实例上保留最新的 source/token cache。一次性解析 helper 或共享 singleton `md` 实例可传 `{ streamParse: false }`。
+> 注意：默认 `streamParse: 'auto'` 会在兼容的 `md` 实例上为非 final 顶层解析使用 `md.stream.parse`，并保留最近一次 source/token cache。final 一次性解析默认走普通 parser；需要强制 stream 时传 `{ streamParse: true }`，需要关闭时传 `{ streamParse: false }`。
 
 > 提示：对于 `<thinking>` 等简单自定义标签，推荐使用内置的 `customHtmlTags` / `custom-html-tags` 白名单让解析器直接输出自定义节点；只有在需要手动重写 `content/attrs` 时再用 `preTransformTokens`。参见 [自定义组件解析示例](/zh/guide/advanced#自定义组件解析示例)。
 

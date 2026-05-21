@@ -532,8 +532,11 @@ function assertScenario(result) {
   if (!(parsePerformance.parseCoalescedCount >= 0))
     throw new Error('Replay should record the smooth-stream parse coalescing counter.')
   const stream = parsePerformance.stream ?? {}
-  if (!(stream.fullParses >= 1))
-    throw new Error(`Replay stream parser should record at least one full parse. Got ${stream.fullParses}.`)
+  const warmFullParses = (result.initial.parsePerformance?.stream?.fullParses ?? 0)
+    + (result.fullScroll.parsePerformance?.stream?.fullParses ?? 0)
+    + (stream.fullParses ?? 0)
+  if (!(warmFullParses >= 1))
+    throw new Error(`Replay stream parser should have a full parse before or during replay. Got ${warmFullParses}.`)
   const streamHitCount = (stream.appendHits ?? 0) + (stream.tailHits ?? 0) + (stream.cacheHits ?? 0)
   if (!(streamHitCount > 0))
     throw new Error(`Replay stream parser should record append/tail/cache hits. Stream stats: ${JSON.stringify(stream)}.`)

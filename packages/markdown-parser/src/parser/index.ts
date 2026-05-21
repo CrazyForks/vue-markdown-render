@@ -216,8 +216,9 @@ function cloneMarkdownTokens(tokens: Token[]) {
 function shouldUseTopLevelStreamParse(md: MarkdownIt, options: ParseOptions) {
   const internalOptions = options as InternalParseOptions
   const stream = md.stream
+  const streamParse = options.streamParse ?? 'auto'
   return internalOptions.__disableStreamParse !== true
-    && options.streamParse !== false
+    && (streamParse === true || (streamParse === 'auto' && options.final !== true))
     && stream?.enabled === true
     && typeof stream.parse === 'function'
 }

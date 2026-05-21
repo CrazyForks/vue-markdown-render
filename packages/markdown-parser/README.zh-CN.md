@@ -220,9 +220,10 @@ interface GetMarkdownOptions {
 - `md` (MarkdownItCore): 由 `getMarkdown()` 创建的 markdown-it-ts 实例
 - `options` (ParseOptions, 可选): 带有钩子的解析选项
 
-> 注意：当 `md` 实例启用了 `md.stream.enabled === true` 时，顶层解析默认会使用
-> markdown-it-ts 的 stream parser，并在该 `md` 实例上保留最近一次 source
-> 与 token cache。一次性解析、不希望保留 stream cache 的调用方可以显式关闭：
+> 注意：默认 `streamParse: 'auto'` 会在 `md.stream.enabled === true` 时为非 final
+> 顶层解析使用 markdown-it-ts 的 stream parser，并在该 `md` 实例上保留最近一次
+> source 与 token cache。final 一次性解析默认走普通 parser；需要强制 stream 时传
+> `{ streamParse: true }`，不希望保留 stream cache 的调用方可以显式关闭：
 
 ```ts
 const nodes = parseMarkdownToStructure(source, md, { streamParse: false })
@@ -269,8 +270,8 @@ interface ParseOptions {
   validateLink?: (url: string) => boolean
   // true 表示输入已结束（end-of-stream）
   final?: boolean
-  // 顶层文档默认使用 markdown-it-ts stream parser；
-  // 一次性解析且不希望 md 保留 stream cache 时设为 false
+  // 'auto' 为非 final 顶层文档使用 stream parser；
+  // final 解析需强制 stream 时设 true，不希望保留 stream cache 时设 false
   streamParse?: boolean | 'auto'
   // 解析 strong 时要求闭合 `**`（默认 false）
   requireClosingStrong?: boolean

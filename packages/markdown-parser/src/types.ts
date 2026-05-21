@@ -406,11 +406,9 @@ export interface ParseOptions {
   preTransformTokens?: TransformTokensHook
   postTransformTokens?: TransformTokensHook
   /**
-   * Defaults to markdown-it-ts' stream parser for the top-level document parse
-   * when available. Fragment parses always use the regular parser to keep the
-   * stream cache tied to the full source document. Set to false for one-shot
-   * parses that should not retain the latest source/token cache on the md
-   * instance.
+   * Defaults to 'auto': use markdown-it-ts' stream parser for non-final
+   * top-level document parses when available. Final parses and fragment parses
+   * use the regular parser unless streamParse is explicitly true.
    */
   streamParse?: boolean | 'auto'
   // When true, require a closing `**` to parse strong; otherwise allow mid-state strong

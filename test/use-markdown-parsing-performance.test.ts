@@ -50,6 +50,41 @@ function setTokenAttr(token: { attrs?: [string, string][] | null }, name: string
   token.attrs = attrs
 }
 
+function findNode(nodes: any[], type: string) {
+  return nodes.find(node => node?.type === type)
+}
+
+function createDefinitionListTokens(definition: string) {
+  return [
+    { type: 'dl_open' },
+    { type: 'dt_open' },
+    { type: 'inline', content: 'Term', children: [{ type: 'text', content: 'Term' }] },
+    { type: 'dt_close' },
+    { type: 'dd_open' },
+    { type: 'paragraph_open' },
+    { type: 'inline', content: definition, children: [{ type: 'text', content: definition }] },
+    { type: 'paragraph_close' },
+    { type: 'dd_close' },
+    { type: 'dl_close' },
+  ] as any[]
+}
+
+function createFootnoteAndAdmonitionTokens(text: string) {
+  const inline = { type: 'inline', content: text, children: [{ type: 'text', content: text }] }
+  return [
+    { type: 'container_note_open', info: 'note Title' },
+    { type: 'paragraph_open' },
+    inline,
+    { type: 'paragraph_close' },
+    { type: 'container_note_close' },
+    { type: 'footnote_open', meta: { label: '1' } },
+    { type: 'paragraph_open' },
+    { type: 'inline', content: text, children: [{ type: 'text', content: text }] },
+    { type: 'paragraph_close' },
+    { type: 'footnote_close' },
+  ] as any[]
+}
+
 describe('useMarkdownParsing performance behavior', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -155,6 +190,114 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(second[0]).toBe(first[0])
     expect(second[1]).toBe(first[1])
     expect(second[2]).not.toBe(first[2])
+
+    scope.stop()
+  })
+
+  it('reuses unchanged list ParsedNode references after append parses', () => {
+    const content = ref('- alpha\n- beta')
+    const { scope, state } = createParsingState(content)
+    const firstList = state.parsedNodes.value[0]
+
+    content.value = `${content.value}\n\nAppended paragraph.`
+    const second = state.parsedNodes.value
+
+    expect(second[0]).toBe(firstList)
+    expect(second[1]).not.toBe(firstList)
+
+    scope.stop()
+  })
+
+  it('reuses unchanged table ParsedNode references after append parses', () => {
+    const content = ref('| A | B |\n| - | - |\n| x | y |')
+    const { scope, state } = createParsingState(content)
+    const firstTable = state.parsedNodes.value[0]
+
+    content.value = `${content.value}\n\nAppended paragraph.`
+    const second = state.parsedNodes.value
+
+    expect(second[0]).toBe(firstTable)
+    expect(second[1]).not.toBe(firstTable)
+
+    scope.stop()
+  })
+
+  it('does not reuse a table when appended references change cell children', () => {
+    const content = ref('| Link |\n| - |\n| [x][ref] |\n\n')
+    const { scope, state } = createParsingState(content)
+    const firstTable = state.parsedNodes.value[0] as any
+
+    expect(firstTable.header?.cells?.[0]?.children?.[0]?.type).toBe('text')
+
+    content.value = `${content.value}[ref]: https://example.com\n`
+    const secondTable = state.parsedNodes.value[0] as any
+
+    expect(secondTable).not.toBe(firstTable)
+    expect(secondTable.rows?.[0]?.cells?.[0]?.children?.[0]?.type).toBe('link')
+
+    scope.stop()
+  })
+
+  it('reuses unchanged definition list ParsedNode references after append parses', () => {
+    const content = ref('definition-list')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        streamParse: false,
+        preTransformTokens: () => createDefinitionListTokens('Definition'),
+      },
+    })
+    const firstList = state.parsedNodes.value[0]
+
+    content.value = `${content.value}\n\nAppended paragraph.`
+    const secondList = state.parsedNodes.value[0]
+
+    expect(secondList).toBe(firstList)
+
+    scope.stop()
+  })
+
+  it('does not reuse a definition list when its definition changes', () => {
+    let definition = 'First definition'
+    const content = ref('definition-list')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        streamParse: false,
+        preTransformTokens: () => createDefinitionListTokens(definition),
+      },
+    })
+    const firstList = state.parsedNodes.value[0] as any
+
+    definition = 'Second definition'
+    content.value = `${content.value}\n\nAppended paragraph.`
+    const secondList = state.parsedNodes.value[0] as any
+
+    expect(secondList).not.toBe(firstList)
+    expect(secondList.items?.[0]?.definition?.[0]?.raw).toBe('Second definition')
+
+    scope.stop()
+  })
+
+  it('does not reuse footnote and admonition nodes when their children change', () => {
+    let nestedText = 'First'
+    const content = ref('nested containers')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        streamParse: false,
+        preTransformTokens: () => createFootnoteAndAdmonitionTokens(nestedText),
+      },
+    })
+    const firstAdmonition = findNode(state.parsedNodes.value, 'admonition')
+    const firstFootnote = findNode(state.parsedNodes.value, 'footnote')
+
+    nestedText = 'Second'
+    content.value = `${content.value}\n\nAppended paragraph.`
+    const secondAdmonition = findNode(state.parsedNodes.value, 'admonition')
+    const secondFootnote = findNode(state.parsedNodes.value, 'footnote')
+
+    expect(secondAdmonition).not.toBe(firstAdmonition)
+    expect(secondFootnote).not.toBe(firstFootnote)
+    expect(secondAdmonition?.children?.[0]?.raw).toBe('Second')
+    expect(secondFootnote?.children?.[0]?.raw).toBe('Second')
 
     scope.stop()
   })
