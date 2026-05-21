@@ -114,6 +114,7 @@ const emit = defineEmits<{
 const MAX_DEFERRED_NODE_COUNT = 900
 const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
+const CONTENT_STREAMING_TAIL_IDLE_MS = 1200
 
 const containerRef = ref<HTMLElement>()
 const paragraphProbeWrapperRef = ref<HTMLElement | null>(null)
@@ -169,6 +170,68 @@ const {
   inheritedSmoothStreaming,
 })
 provide('markstreamSmoothStreaming', smoothStreamingEnabled)
+const contentStreamingTailActive = ref(false)
+let previousContentStreamValue = ''
+let hasSeenContentStreamValue = false
+let contentStreamingTailIdleTimer: number | null = null
+
+function clearContentStreamingTailIdleTimer() {
+  if (!isClient || contentStreamingTailIdleTimer == null)
+    return
+  window.clearTimeout(contentStreamingTailIdleTimer)
+  contentStreamingTailIdleTimer = null
+}
+
+function markContentStreamingTailActive() {
+  contentStreamingTailActive.value = true
+  if (!isClient)
+    return
+
+  clearContentStreamingTailIdleTimer()
+  contentStreamingTailIdleTimer = window.setTimeout(() => {
+    contentStreamingTailIdleTimer = null
+    if (effectiveFinal.value === true || props.nodes?.length)
+      return
+    clearPendingHeightMeasurements()
+    contentStreamingTailActive.value = false
+    measureTrackedNodeHeights()
+  }, CONTENT_STREAMING_TAIL_IDLE_MS)
+}
+
+function clearContentStreamingTailActive() {
+  contentStreamingTailActive.value = false
+  clearContentStreamingTailIdleTimer()
+}
+
+watch(
+  [renderContent, () => props.nodes, effectiveFinal],
+  ([content, nodes, final]) => {
+    const nextContent = content ?? ''
+
+    if (nodes?.length || final === true) {
+      clearContentStreamingTailActive()
+      previousContentStreamValue = nextContent
+      hasSeenContentStreamValue = true
+      return
+    }
+
+    if (!hasSeenContentStreamValue) {
+      previousContentStreamValue = nextContent
+      hasSeenContentStreamValue = true
+      return
+    }
+
+    if (previousContentStreamValue && nextContent.length > previousContentStreamValue.length && nextContent.startsWith(previousContentStreamValue)) {
+      markContentStreamingTailActive()
+    }
+    else if (nextContent.length < previousContentStreamValue.length || !nextContent.startsWith(previousContentStreamValue)) {
+      clearContentStreamingTailActive()
+    }
+
+    previousContentStreamValue = nextContent
+  },
+  { flush: 'sync', immediate: true },
+)
 
 function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)
@@ -181,20 +244,6 @@ const instanceMsgId = props.customId
 const mathBlockMinHeightCache = createMathBlockMinHeightCache(instanceMsgId)
 const mathBlockCacheScope = computed(() => `${instanceMsgId}:${streamRenderVersion.value}`)
 provideMathBlockMinHeightCache(mathBlockMinHeightCache)
-const renderVersionSource = computed(() => {
-  if (props.nodes?.length)
-    return props.nodes
-  return renderContent.value
-})
-
-watch(
-  renderVersionSource,
-  () => {
-    mathBlockMinHeightCache.clear()
-    streamRenderVersion.value += 1
-  },
-  { immediate: true },
-)
 const customComponentsMap = useCustomNodeComponents(() => props.customId)
 const {
   effectiveCustomHtmlTagsSet,
@@ -204,10 +253,20 @@ const {
   instanceMsgId,
   renderContent,
   effectiveFinal,
+  smoothStreamingEnabled,
   debugPerformanceEnabled,
   customComponentsMap,
   logPerf,
 })
+
+watch(
+  parsedNodes,
+  () => {
+    mathBlockMinHeightCache.clear()
+    streamRenderVersion.value += 1
+  },
+  { immediate: true },
+)
 const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   customId: props.customId,
   customHtmlTags: mergedParseOptions.value.customHtmlTags,
@@ -231,6 +290,7 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   isDark: props.isDark,
   typewriter: props.typewriter,
   smoothStreamingOptions: props.smoothStreamingOptions,
+  parseCoalesceMs: props.parseCoalesceMs,
   fade: props.fade,
 }))
 provide('markstreamNestedRendererProps', nestedRendererProps)
@@ -389,7 +449,11 @@ const {
   clamp,
 })
 const nodeContentElements = new Map<number, HTMLElement | null>()
+const nodeContentVersions = new Map<number, number>()
 const nodeContentDeferredMeasureTimers = new Map<number, number[]>()
+const finalHeightConvergenceTimers: number[] = []
+const pendingHeightMeasurements = new Map<number, { height: number, allowShrink: boolean, version: number, el: HTMLElement }>()
+let heightMeasurementRaf: number | null = null
 const desiredRenderedCount = computed(() => {
   if (!virtualizationEnabled.value)
     return parsedNodes.value.length
@@ -1037,7 +1101,116 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
     scheduleFocusSync()
 }
 
+function flushPendingHeightMeasurements() {
+  heightMeasurementRaf = null
+
+  for (const [index, pending] of pendingHeightMeasurements) {
+    pendingHeightMeasurements.delete(index)
+    if (nodeContentElements.get(index) !== pending.el)
+      continue
+    if (nodeContentVersions.get(index) !== pending.version)
+      continue
+    recordNodeHeight(index, pending.height, { allowShrink: pending.allowShrink })
+  }
+}
+
+function clearPendingHeightMeasurements() {
+  if (heightMeasurementRaf != null) {
+    cancelFrame?.(heightMeasurementRaf)
+    heightMeasurementRaf = null
+  }
+  pendingHeightMeasurements.clear()
+}
+
+function bumpNodeContentVersion(index: number) {
+  const next = (nodeContentVersions.get(index) ?? 0) + 1
+  nodeContentVersions.set(index, next)
+  return next
+}
+
+function queueNodeHeightRecord(index: number, el: HTMLElement, height: number) {
+  if (!Number.isFinite(height) || height <= 0)
+    return
+  if (nodeContentElements.get(index) !== el)
+    return
+
+  const version = nodeContentVersions.get(index)
+  if (version == null)
+    return
+  const node = parsedNodes.value[index] as (ParsedNode & { loading?: boolean }) | undefined
+  const isContentStreamingTail = contentStreamingTailActive.value
+    && effectiveFinal.value !== true
+    && !props.nodes?.length
+    && index >= parsedNodes.value.length - 2
+  const allowShrink = !(node?.loading === true || isContentStreamingTail)
+  const previous = pendingHeightMeasurements.get(index)
+  const combinedAllowShrink = previous
+    ? previous.allowShrink && allowShrink
+    : allowShrink
+  const nextHeight = previous && !combinedAllowShrink
+    ? Math.max(previous.height, height)
+    : height
+
+  pendingHeightMeasurements.set(index, {
+    height: nextHeight,
+    allowShrink: combinedAllowShrink,
+    version,
+    el,
+  })
+
+  if (heightMeasurementRaf != null)
+    return
+
+  heightMeasurementRaf = requestFrame
+    ? requestFrame(flushPendingHeightMeasurements)
+    : null
+
+  if (heightMeasurementRaf == null)
+    flushPendingHeightMeasurements()
+}
+
+function measureNodeHeight(index: number, el: HTMLElement) {
+  queueNodeHeightRecord(index, el, el.offsetHeight)
+}
+
+function measureTrackedNodeHeights() {
+  for (const [index, el] of nodeContentElements) {
+    if (el)
+      measureNodeHeight(index, el)
+  }
+}
+
+function clearFinalHeightConvergenceTimers() {
+  if (!isClient)
+    return
+
+  while (finalHeightConvergenceTimers.length) {
+    const timer = finalHeightConvergenceTimers.pop()
+    if (timer != null)
+      window.clearTimeout(timer)
+  }
+}
+
+function scheduleFinalHeightConvergence() {
+  if (!isClient || !effectiveFinal.value || !nodeContentElements.size)
+    return
+
+  clearFinalHeightConvergenceTimers()
+  for (const delay of [80, 240, 640]) {
+    const timer = window.setTimeout(() => {
+      for (const [index, el] of nodeContentElements) {
+        if (el)
+          measureNodeHeight(index, el)
+      }
+    }, delay)
+
+    finalHeightConvergenceTimers.push(timer)
+  }
+}
+
 function setNodeContentRef(index: number, el: HTMLElement | null) {
+  pendingHeightMeasurements.delete(index)
+  bumpNodeContentVersion(index)
   const previousTimers = nodeContentDeferredMeasureTimers.get(index)
   if (previousTimers) {
     for (const id of previousTimers)
@@ -1051,11 +1224,12 @@ function setNodeContentRef(index: number, el: HTMLElement | null) {
   }
   if (!el || !shouldMeasureNodeHeights.value) {
     nodeContentElements.delete(index)
+    nodeContentVersions.delete(index)
     return
   }
   nodeContentElements.set(index, el)
   const measure = () => {
-    recordNodeHeight(index, el.offsetHeight)
+    measureNodeHeight(index, el)
   }
   queueMicrotask(measure)
   if (typeof ResizeObserver !== 'undefined') {
@@ -1065,13 +1239,19 @@ function setNodeContentRef(index: number, el: HTMLElement | null) {
     observer.observe(el)
     nodeContentResizeObservers.set(index, observer)
   }
-  if (parsedNodes.value[index]?.type === 'code_block' && typeof window !== 'undefined') {
-    nodeContentDeferredMeasureTimers.set(index, [
-      window.setTimeout(measure, 16),
-      window.setTimeout(measure, 80),
-      window.setTimeout(measure, 240),
-      window.setTimeout(measure, 800),
-    ])
+  if (typeof window !== 'undefined') {
+    const deferredMeasureDelays = parsedNodes.value[index]?.type === 'code_block'
+      ? [16, 80, 240, 800]
+      : effectiveFinal.value
+        ? [80]
+        : []
+
+    if (deferredMeasureDelays.length) {
+      nodeContentDeferredMeasureTimers.set(
+        index,
+        deferredMeasureDelays.map(delay => window.setTimeout(measure, delay)),
+      )
+    }
   }
 }
 
@@ -1088,8 +1268,19 @@ watch(
         window.clearTimeout(id)
     }
     nodeContentDeferredMeasureTimers.clear()
+    nodeContentVersions.clear()
+    clearFinalHeightConvergenceTimers()
+    clearPendingHeightMeasurements()
   },
   { immediate: true },
+)
+
+watch(
+  effectiveFinal,
+  (final) => {
+    if (final)
+      scheduleFinalHeightConvergence()
+  },
 )
 
 const VIEWPORT_FALLBACK_DELAY = 1800
@@ -1165,6 +1356,7 @@ const {
   hasIdleCallback,
   cleanupNodeVisibility,
   onDatasetKeyChanged: (total) => {
+    clearPendingHeightMeasurements()
     resetHeightMeasurements()
     if (total > 0)
       rebuildHeightTrees(total)
@@ -1366,6 +1558,7 @@ watch(
 onBeforeUnmount(() => {
   cleanupBatchScheduler()
   destroyNodeVisibilityState()
+  clearContentStreamingTailIdleTimer()
   for (const observer of nodeContentResizeObservers.values())
     observer.disconnect()
   nodeContentResizeObservers.clear()
@@ -1374,6 +1567,9 @@ onBeforeUnmount(() => {
       window.clearTimeout(id)
   }
   nodeContentDeferredMeasureTimers.clear()
+  nodeContentVersions.clear()
+  clearFinalHeightConvergenceTimers()
+  clearPendingHeightMeasurements()
   cleanupExperimentResizeObserver()
   clearRestoreReconcile()
   cleanupScrollListener()

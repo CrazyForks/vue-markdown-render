@@ -307,6 +307,12 @@ export type TransformTokensHook = (tokens: MarkdownToken[]) => MarkdownToken[];
 export interface ParseOptions {
     preTransformTokens?: TransformTokensHook;
     postTransformTokens?: TransformTokensHook;
+    /**
+     * Defaults to 'auto': use markdown-it-ts' stream parser for non-final
+     * top-level document parses when available. Final parses and fragment parses
+     * use the regular parser unless streamParse is explicitly true.
+     */
+    streamParse?: boolean | 'auto';
     requireClosingStrong?: boolean;
     /**
      * When true, indicates the input buffer is complete (end-of-stream).
@@ -333,6 +339,7 @@ export interface ParseOptions {
 }
 export interface InternalParseOptions extends ParseOptions {
     __customHtmlBlockCursor?: number;
+    __disableStreamParse?: boolean;
     __insideStrong?: boolean;
     __markdownIt?: MarkdownIt;
     __sourceMarkdown?: string;

@@ -1003,6 +1003,59 @@ After`,
     }
   })
 
+  it('keeps default final stream parsing equivalent to final sync parsing for unfinished constructs', async () => {
+    const examples = [
+      {
+        name: 'unclosed code fence',
+        markdown: '```ts\nconst value = 1',
+      },
+      {
+        name: 'unclosed math block',
+        markdown: '$$\nx + y',
+      },
+      {
+        name: 'custom html tag',
+        markdown: '<thinking>\n- one\n- two',
+        props: { customHtmlTags: ['thinking'] },
+      },
+      {
+        name: 'details children',
+        markdown: [
+          '<details>',
+          '<summary>Steps</summary>',
+          '',
+          '- one',
+          '- two',
+          '',
+          '</details>',
+        ].join('\n'),
+      },
+    ]
+
+    for (const example of examples) {
+      const sharedProps = {
+        final: true,
+        fade: false,
+        renderCodeBlocksAsPre: true,
+        ...example.props,
+      }
+      const streamWrapper = await mountMarkdown(example.markdown, sharedProps)
+      const syncWrapper = await mountMarkdown(example.markdown, {
+        ...sharedProps,
+        parseOptions: { streamParse: false },
+      })
+
+      try {
+        expect(normalizeText(streamWrapper.text()), example.name).toBe(normalizeText(syncWrapper.text()))
+        expect(sanitizeSnapshotHtml(streamWrapper.html(), example.name)).toBe(sanitizeSnapshotHtml(syncWrapper.html(), example.name))
+      }
+      finally {
+        streamWrapper.unmount()
+        syncWrapper.unmount()
+      }
+    }
+  })
+
   it('renders repeated custom components without slot content reuse', async () => {
     const scopeId = 'custom-components-repeat'
     const NewQuestion = defineComponent({

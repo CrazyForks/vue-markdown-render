@@ -126,6 +126,8 @@ For a trusted custom tag, the emitted node typically includes:
 
 The exact `attrs` shape can vary, so treat it as raw attribute data that your component normalizes for its own needs.
 
+Renderer node reuse compares common custom object fields such as `attrs`, `data`, `props`, and `payload` structurally. If a parser hook attaches other object fields to custom nodes, replace those objects when their contents change.
+
 ## 4. Repeated and nested custom tags
 
 This flow is designed to support:

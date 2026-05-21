@@ -89,6 +89,15 @@ const nodes = parseMarkdownToStructure('# Title', md)
 - `parseMarkdownToStructure(content, md)` transforms a Markdown string into the AST consumed by the renderer.
 - Combine with `setCustomComponents(id?, mapping)` to swap node renderers for a given `custom-id`.
 
+> Warning: `parseMarkdownToStructure` defaults to `streamParse: 'auto'`: compatible `md` instances use `md.stream.parse` for non-final top-level parses and retain the latest source/token cache. Final one-shot parses use the regular parser unless you pass `{ streamParse: true }`; pass `{ streamParse: false }` to opt out. If you reuse one `md` instance for unrelated one-shot documents, pass `{ final: true }` or `{ streamParse: false }`.
+
+```ts
+declare const source: string
+const oneShotNodes = parseMarkdownToStructure(source, md, { final: true })
+```
+
+When `MarkdownRender` parses its own `content`, it intentionally defaults `parseOptions.streamParse` to `true` so streaming parses use `md.stream.parse`. When `final` changes, the renderer invalidates the stream cache and reparses with final semantics to avoid stale loading or unclosed-token state. Pass `:parse-options="{ streamParse: 'auto' }"` to keep final content parses on the regular parser, or `false` to opt out entirely.
+
 ## Streaming recommendation
 
 For low-frequency updates, passing `content` directly is convenient. For chat-style token streams or long documents, the built-in smooth streaming on `MarkdownRender` paces `content` updates so visible output stays steady even when incoming chunks are bursty. The default `smooth-streaming="auto"` enables pacing automatically when `typewriter` is on or `max-live-nodes <= 0`.

@@ -3172,6 +3172,7 @@ watch(mermaidEnabled, (enabled) => {
                     code-block-light-theme="vitesse-light"
                     :code-block-monaco-options="testPageMonacoOptions"
                     :parse-options="previewParseOptions"
+                    :debug-performance="isBenchmarkMode"
                   />
 
                   <div

@@ -103,6 +103,62 @@ function writeJsonResult(result) {
   writeFileSync(resolvedPath, json)
 }
 
+const parsePerformanceCounterKeys = [
+  'parseCommitCount',
+  'parseCoalescedCount',
+  'streamCommitCount',
+  'syncCommitCount',
+]
+const parsePerformanceTimingKeys = [
+  'tokenCloneMs',
+  'processTokensMs',
+  'parseMarkdownToStructureTotalMs',
+]
+const parsePerformanceStreamCounterKeys = [
+  'total',
+  'cacheHits',
+  'appendHits',
+  'tailHits',
+  'fullParses',
+  'chunkedParses',
+]
+
+function cloneParsePerformance(value) {
+  return value == null ? null : JSON.parse(JSON.stringify(value))
+}
+
+function diffNumber(after, before) {
+  return Number(after || 0) - Number(before || 0)
+}
+
+function diffParsePerformance(after, before) {
+  if (!after)
+    return null
+  if (!before)
+    return cloneParsePerformance(after)
+
+  const out = cloneParsePerformance(after)
+
+  for (const key of parsePerformanceCounterKeys)
+    out[key] = diffNumber(after[key], before[key])
+  for (const key of parsePerformanceTimingKeys)
+    out[key] = diffNumber(after[key], before[key])
+
+  out.stream = {}
+  for (const key of parsePerformanceStreamCounterKeys)
+    out.stream[key] = diffNumber(after.stream?.[key], before.stream?.[key])
+
+  out.streamModes = {}
+  const streamModes = new Set([
+    ...Object.keys(after.streamModes ?? {}),
+    ...Object.keys(before.streamModes ?? {}),
+  ])
+  for (const key of streamModes)
+    out.streamModes[key] = diffNumber(after.streamModes?.[key], before.streamModes?.[key])
+
+  return out
+}
+
 function startDevServer(port) {
   const logs = []
   const serverArgs = process.env.PLAYGROUND_PERFORMANCE_SERVER === 'preview'
@@ -303,9 +359,61 @@ async function runScenario(browser, port, mode) {
       layoutShifts: [],
       frameDeltas: [],
       lastFrameAt: 0,
+      parsePerformance: {
+        parseCommitCount: 0,
+        parseCoalescedCount: 0,
+        streamCommitCount: 0,
+        syncCommitCount: 0,
+        tokenCloneMs: 0,
+        processTokensMs: 0,
+        parseMarkdownToStructureTotalMs: 0,
+        stream: {
+          total: 0,
+          cacheHits: 0,
+          appendHits: 0,
+          tailHits: 0,
+          fullParses: 0,
+          chunkedParses: 0,
+        },
+        streamModes: {},
+      },
     }
 
     window.__playgroundPerfState = state
+
+    const originalInfo = console.info.bind(console)
+    const streamCounterKeys = ['total', 'cacheHits', 'appendHits', 'tailHits', 'fullParses', 'chunkedParses']
+    const parseTimingKeys = ['tokenCloneMs', 'processTokensMs', 'parseMarkdownToStructureTotalMs']
+    console.info = (...args) => {
+      try {
+        const label = args[0]
+        if (label === '[markstream-vue][perf] parse(stream)' || label === '[markstream-vue][perf] parse(sync)') {
+          const data = args[1] ?? {}
+          const metrics = state.parsePerformance
+
+          metrics.parseCommitCount = Math.max(metrics.parseCommitCount, Number(data.parseCommitCount || 0))
+          metrics.parseCoalescedCount = Math.max(metrics.parseCoalescedCount, Number(data.parseCoalescedCount || 0))
+          for (const key of parseTimingKeys)
+            metrics[key] += Number(data[key] || 0)
+
+          if (label === '[markstream-vue][perf] parse(stream)')
+            metrics.streamCommitCount += 1
+          else
+            metrics.syncCommitCount += 1
+
+          const delta = data.streamDelta
+          if (delta && typeof delta === 'object') {
+            for (const key of streamCounterKeys)
+              metrics.stream[key] += Number(delta[key] || 0)
+          }
+
+          if (typeof data.streamMode === 'string')
+            metrics.streamModes[data.streamMode] = (metrics.streamModes[data.streamMode] ?? 0) + 1
+        }
+      }
+      catch {}
+      originalInfo(...args)
+    }
 
     const describeElement = (element) => {
       if (!element)
@@ -448,6 +556,7 @@ async function runScenario(browser, port, mode) {
       visibleD2Count: visibleD2Blocks.length,
       visibleRenderedD2Count: visibleD2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
       sandboxFrameMounted: Boolean(document.querySelector('.sandbox-frame')),
+      parsePerformance: state.parsePerformance ?? null,
       topLayoutShifts: Array.isArray(state.layoutShifts)
         ? [...state.layoutShifts]
             .sort((a, b) => Number(b?.value || 0) - Number(a?.value || 0))
@@ -455,6 +564,8 @@ async function runScenario(browser, port, mode) {
         : [],
     }
   }, initialFrameStats)
+  result.parsePerformance = cloneParsePerformance(result.parsePerformance)
+  const fullScrollParsePerformanceBaseline = cloneParsePerformance(result.parsePerformance)
 
   const scrollMetrics = await scrollThroughRoot(page, rootSelector, '__playgroundPerfState')
   const heavySettleFrameBaseline = await frameBaseline(page, '__playgroundPerfState')
@@ -483,6 +594,7 @@ async function runScenario(browser, port, mode) {
       d2Count: d2Blocks.length,
       renderedD2Count: d2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
+      parsePerformance: state.parsePerformance ?? null,
       scrollDriftPx: null,
     }
   }, {
@@ -493,6 +605,10 @@ async function runScenario(browser, port, mode) {
     heavySettleFrameP95Ms: heavySettleFrameStats.frameP95Ms,
     heavySettleFrameMaxMs: heavySettleFrameStats.frameMaxMs,
   })
+  result.fullScroll.parsePerformance = diffParsePerformance(
+    result.fullScroll.parsePerformance,
+    fullScrollParsePerformanceBaseline,
+  )
   result.fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
   result.memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
   result.memoryAfterUnmountBytes = await measureAfterRendererUnmount(page)

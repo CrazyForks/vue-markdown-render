@@ -105,11 +105,13 @@ export function parseTable(
     }
   }
 
+  const tokenLoading = tokens[index].loading === true
+
   const tableNode: TableNode = {
     type: 'table',
     header: headerRow,
     rows,
-    loading: tokens[index].loading ?? false,
+    loading: tokenLoading && !options?.final && rows.length === 0,
     raw: [headerRow, ...rows].map(row => row.raw).join('\n'),
   }
 

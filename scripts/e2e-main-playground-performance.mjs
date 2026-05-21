@@ -103,6 +103,76 @@ function writeJsonResult(result) {
   writeFileSync(resolvedPath, json)
 }
 
+const parsePerformanceCounterKeys = [
+  'parseCommitCount',
+  'parseCoalescedCount',
+  'streamCommitCount',
+  'syncCommitCount',
+]
+const parsePerformanceTimingKeys = [
+  'tokenCloneMs',
+  'processTokensMs',
+  'parseMarkdownToStructureTotalMs',
+]
+const parsePerformanceStreamCounterKeys = [
+  'total',
+  'cacheHits',
+  'appendHits',
+  'tailHits',
+  'fullParses',
+  'chunkedParses',
+]
+const tokenCloneTotalBudgetRatio = 0.35
+
+function cloneParsePerformance(value) {
+  return value == null ? null : JSON.parse(JSON.stringify(value))
+}
+
+function diffNumber(after, before) {
+  return Number(after || 0) - Number(before || 0)
+}
+
+function diffParsePerformance(after, before) {
+  if (!after)
+    return null
+  if (!before)
+    return cloneParsePerformance(after)
+
+  const out = cloneParsePerformance(after)
+
+  for (const key of parsePerformanceCounterKeys)
+    out[key] = diffNumber(after[key], before[key])
+  for (const key of parsePerformanceTimingKeys)
+    out[key] = diffNumber(after[key], before[key])
+
+  out.stream = {}
+  for (const key of parsePerformanceStreamCounterKeys)
+    out.stream[key] = diffNumber(after.stream?.[key], before.stream?.[key])
+
+  out.streamModes = {}
+  const streamModes = new Set([
+    ...Object.keys(after.streamModes ?? {}),
+    ...Object.keys(before.streamModes ?? {}),
+  ])
+  for (const key of streamModes)
+    out.streamModes[key] = diffNumber(after.streamModes?.[key], before.streamModes?.[key])
+
+  return out
+}
+
+function assertTokenCloneBudget(parsePerformance) {
+  const tokenCloneMs = Number(parsePerformance?.tokenCloneMs ?? 0)
+  const totalMs = Number(parsePerformance?.parseMarkdownToStructureTotalMs ?? 0)
+  if (!(Number.isFinite(tokenCloneMs) && Number.isFinite(totalMs) && totalMs > 0))
+    return
+
+  if (tokenCloneMs > totalMs * tokenCloneTotalBudgetRatio) {
+    throw new Error(
+      `Replay token clone cost too high: ${tokenCloneMs}ms of ${totalMs}ms.`,
+    )
+  }
+}
+
 function startDevServer(port) {
   const logs = []
   const serverArgs = process.env.PLAYGROUND_PERFORMANCE_SERVER === 'preview'
@@ -309,6 +379,7 @@ async function collectMetrics(page) {
       renderedD2Count: d2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
       visibleD2Count: visibleD2Blocks.length,
       visibleRenderedD2Count: visibleD2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
+      parsePerformance: state.parsePerformance ?? null,
       topLayoutShifts: Array.isArray(state.layoutShifts)
         ? [...state.layoutShifts]
             .sort((a, b) => Number(b?.value || 0) - Number(a?.value || 0))
@@ -316,6 +387,8 @@ async function collectMetrics(page) {
         : [],
     }
   }, initialFrameStats)
+  initial.parsePerformance = cloneParsePerformance(initial.parsePerformance)
+  const fullScrollParsePerformanceBaseline = cloneParsePerformance(initial.parsePerformance)
 
   const scrollMetrics = await scrollThroughRoot(page, rootSelector, '__mainPlaygroundPerf')
   const heavySettleFrameBaseline = await frameBaseline(page, '__mainPlaygroundPerf')
@@ -345,6 +418,7 @@ async function collectMetrics(page) {
       d2Count: d2Blocks.length,
       renderedD2Count: d2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
+      parsePerformance: state.parsePerformance ?? null,
       scrollDriftPx: null,
     }
   }, {
@@ -355,6 +429,10 @@ async function collectMetrics(page) {
     heavySettleFrameP95Ms: heavySettleFrameStats.frameP95Ms,
     heavySettleFrameMaxMs: heavySettleFrameStats.frameMaxMs,
   })
+  fullScroll.parsePerformance = diffParsePerformance(
+    fullScroll.parsePerformance,
+    fullScrollParsePerformanceBaseline,
+  )
   fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
 
   const replayButton = page.locator('button.nav-btn--stream')
@@ -366,14 +444,19 @@ async function collectMetrics(page) {
       return button?.textContent?.includes('Resume')
     }, null, { timeout: 5000 })
   }
-  await page.evaluate(() => {
+  const replayParsePerformanceBaseline = await page.evaluate(() => {
     const state = window.__mainPlaygroundPerf
-    if (state) {
-      state.replayStartedAt = performance.now()
-      state.replayLongTaskCountBaseline = state.longTasks.length
-      state.replayLongTaskTotalBaseline = state.longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0)
-      state.replayFrameCountBaseline = Array.isArray(state.frameDeltas) ? state.frameDeltas.length : 0
-    }
+    if (!state)
+      return null
+
+    state.replayStartedAt = performance.now()
+    state.replayLongTaskCountBaseline = state.longTasks.length
+    state.replayLongTaskTotalBaseline = state.longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0)
+    state.replayFrameCountBaseline = Array.isArray(state.frameDeltas) ? state.frameDeltas.length : 0
+    state.replayParsePerformanceBaseline = state.parsePerformance == null
+      ? null
+      : JSON.parse(JSON.stringify(state.parsePerformance))
+    return state.replayParsePerformanceBaseline
   })
   await page.locator('button.nav-btn--stream').click()
   await waitForVisibleBlocksReady(page, rootSelector)
@@ -401,8 +484,13 @@ async function collectMetrics(page) {
       pageDomNodeCount: document.querySelectorAll('*').length,
       rendererDomNodeCount: root ? root.querySelectorAll('*').length : 0,
       jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
+      parsePerformance: state.parsePerformance ?? null,
     }
   })
+  replay.parsePerformance = diffParsePerformance(
+    replay.parsePerformance,
+    replayParsePerformanceBaseline,
+  )
 
   const memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
   const memoryAfterUnmountBytes = await measureAfterRendererUnmount(page)
@@ -450,6 +538,23 @@ function assertScenario(result) {
     throw new Error(`Replay settle should stay within 5000ms. Got ${result.replay.settleTimeMs}.`)
   if (!(result.replay.rendererDomNodeCount <= 5000))
     throw new Error(`Replay renderer DOM node count budget exceeded. Got ${result.replay.rendererDomNodeCount}.`)
+  const parsePerformance = result.replay.parsePerformance
+  if (!parsePerformance || !(parsePerformance.parseCommitCount > 0))
+    throw new Error('Replay should record Markdown parse commit metrics.')
+  if (!(parsePerformance.streamCommitCount > 0))
+    throw new Error('Replay should use stream parser commits.')
+  if (!(parsePerformance.parseCoalescedCount >= 0))
+    throw new Error('Replay should record the smooth-stream parse coalescing counter.')
+  const stream = parsePerformance.stream ?? {}
+  const warmFullParses = (result.initial.parsePerformance?.stream?.fullParses ?? 0)
+    + (result.fullScroll.parsePerformance?.stream?.fullParses ?? 0)
+    + (stream.fullParses ?? 0)
+  if (!(warmFullParses >= 1))
+    throw new Error(`Replay stream parser should have a full parse before or during replay. Got ${warmFullParses}.`)
+  const streamHitCount = (stream.appendHits ?? 0) + (stream.tailHits ?? 0) + (stream.cacheHits ?? 0)
+  if (!(streamHitCount > 0))
+    throw new Error(`Replay stream parser should record append/tail/cache hits. Stream stats: ${JSON.stringify(stream)}.`)
+  assertTokenCloneBudget(parsePerformance)
 }
 
 async function run() {
@@ -489,9 +594,79 @@ async function run() {
         frameDeltas: [],
         lastFrameAt: 0,
         pauseEnabledSeen: false,
+        parsePerformance: {
+          parseCommitCount: 0,
+          parseCoalescedCount: 0,
+          streamCommitCount: 0,
+          syncCommitCount: 0,
+          tokenCloneMs: 0,
+          processTokensMs: 0,
+          parseMarkdownToStructureTotalMs: 0,
+          stream: {
+            total: 0,
+            cacheHits: 0,
+            appendHits: 0,
+            tailHits: 0,
+            fullParses: 0,
+            chunkedParses: 0,
+          },
+          streamModes: {},
+        },
       }
 
       window.__mainPlaygroundPerf = state
+
+      const originalInfo = console.info.bind(console)
+      const streamCounterKeys = ['total', 'cacheHits', 'appendHits', 'tailHits', 'fullParses', 'chunkedParses']
+      const parseTimingKeys = ['tokenCloneMs', 'processTokensMs', 'parseMarkdownToStructureTotalMs']
+      const parseCountersByRenderer = new Map()
+      console.info = (...args) => {
+        try {
+          const label = args[0]
+          if (label === '[markstream-vue][perf] parse(stream)' || label === '[markstream-vue][perf] parse(sync)') {
+            const data = args[1] ?? {}
+            const metrics = state.parsePerformance
+            const rendererId = typeof data.rendererId === 'string'
+              ? data.rendererId
+              : '__default__'
+            const previousCounters = parseCountersByRenderer.get(rendererId) ?? {
+              parseCommitCount: 0,
+              parseCoalescedCount: 0,
+            }
+            const parseCommitCount = Number(data.parseCommitCount || 0)
+            const parseCoalescedCount = Number(data.parseCoalescedCount || 0)
+
+            metrics.parseCommitCount += parseCommitCount >= previousCounters.parseCommitCount
+              ? parseCommitCount - previousCounters.parseCommitCount
+              : parseCommitCount
+            metrics.parseCoalescedCount += parseCoalescedCount >= previousCounters.parseCoalescedCount
+              ? parseCoalescedCount - previousCounters.parseCoalescedCount
+              : parseCoalescedCount
+            parseCountersByRenderer.set(rendererId, {
+              parseCommitCount,
+              parseCoalescedCount,
+            })
+            for (const key of parseTimingKeys)
+              metrics[key] += Number(data[key] || 0)
+
+            if (label === '[markstream-vue][perf] parse(stream)')
+              metrics.streamCommitCount += 1
+            else
+              metrics.syncCommitCount += 1
+
+            const delta = data.streamDelta
+            if (delta && typeof delta === 'object') {
+              for (const key of streamCounterKeys)
+                metrics.stream[key] += Number(delta[key] || 0)
+            }
+
+            if (typeof data.streamMode === 'string')
+              metrics.streamModes[data.streamMode] = (metrics.streamModes[data.streamMode] ?? 0) + 1
+          }
+        }
+        catch {}
+        originalInfo(...args)
+      }
 
       const describeElement = (element) => {
         if (!element)

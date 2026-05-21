@@ -10,6 +10,8 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 
 Stable props for 1.x: `content`, `nodes`, `final`, `parseOptions`, `customMarkdownIt`, `customHtmlTags`, `htmlPolicy`, `showTooltips`, `isDark`, `customId`, `typewriter`, `smoothStreaming`, `smoothStreamingOptions`, `renderCodeBlocksAsPre`, `codeBlockStream`, `codeBlockProps`, `codeBlockMonacoOptions`, `codeBlockDarkTheme`, `codeBlockLightTheme`, `mermaidProps`, `d2Props`, `infographicProps`, `batchRendering`, `deferNodesUntilVisible`, `maxLiveNodes`, and `liveNodeBuffer`.
 
+Advanced performance tuning prop: `parseCoalesceMs` is available in 1.x, but its scheduling semantics may be refined.
+
 Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, `renderBatchBudgetMs`, `renderBatchIdleTimeoutMs`, and `viewportPriority`. They are available for advanced integrations and internal tests, but are not part of the 1.x compatibility promise yet.
 
 ## Core props on `MarkdownRender`
@@ -26,10 +28,11 @@ Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`,
 | `custom-html-tags` | `string[]` | – | Extra HTML-like tags treated as common during streaming mid‑states and emitted as custom nodes (`type: 'thinking'`, etc.) for `setCustomComponents` mapping (forwarded to `getMarkdown`, e.g. `['thinking']`). |
 | `html-policy` | `'safe' \| 'escape' \| 'trusted'` | `'safe'` | Controls `html_block` / `html_inline` rendering. `safe` blocks active/embed/form tags, `escape` shows literal HTML text, and `trusted` keeps the older broad HTML behavior while still removing scripts and unsafe attrs. |
 | `custom-markdown-it` | `(md: MarkdownIt) => MarkdownIt` | – | Customize the internal MarkdownIt instance (add plugins, tweak options). |
-| `debug-performance` | `boolean` | `false` | Logs parse/render timing and virtualization stats (dev only). |
+| `debug-performance` | `boolean` | `false` | Logs parse/render timing, virtualization stats, and `parse(stream)` details such as `streamMode` / `streamDelta` (dev only). |
 | `typewriter` | `boolean` | `false` | Shows the blinking typewriter cursor while streamed content grows. |
 | `smooth-streaming` | `boolean \| 'auto'` | `'auto'` | Enables built-in pacing for streaming `content` updates. `'auto'` only enables when `typewriter=true` or `max-live-nodes<=0`. Set `true` to force-enable, `false` to render with raw chunk cadence. |
 | `smooth-streaming-options` | `SmoothMarkdownStreamOptions` | – | Options for built-in stream pacing (`minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`). Read when the renderer is created; recreate the renderer with a different `key` if you need to change them dynamically. |
+| `parse-coalesce-ms` | `number` | `80` | Performance tuning knob for the minimum interval between parse commits while built-in smooth streaming coalesces character-only updates. It does not throttle raw `content` prop updates when `smooth-streaming=false` and has no effect in `nodes` mode. Set `0` to parse every smooth-stream commit. Default scheduling may be optimized in future releases. |
 | `fade` | `boolean` | `true` | Enables non-code-node enter fade and appended-text fade. Disable if you need zero animation for SSR snapshots. |
 
 ::: tip SSR and smooth streaming
@@ -74,7 +77,7 @@ Use `smooth-streaming-options` to fine-tune pacing behaviour:
 />
 ```
 
-Available keys: `minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`. These are read once when the renderer is created; change the component `key` to apply new options dynamically.
+Available keys: `minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`. These are read once when the renderer is created; change the component `key` to apply new options dynamically. Use `parse-coalesce-ms` only when built-in smooth streaming is enabled and you need to tune parser coalescing for a measured performance case.
 
 ### Security defaults and compatibility opt-outs
 

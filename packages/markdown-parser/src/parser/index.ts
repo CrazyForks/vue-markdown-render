@@ -18,8 +18,54 @@ type ParsedNodeWithFields = ParsedNode & {
   tag?: unknown
 }
 
+const streamParseEnvCache = new WeakMap<object, Map<string, Record<string, unknown>>>()
+
+interface ParseTimingMetrics {
+  tokenCloneMs?: number
+  processTokensMs?: number
+  parseMarkdownToStructureTotalMs?: number
+}
+
+type TimedParseOptions = ParseOptions & {
+  __timing?: ParseTimingMetrics
+}
+
 function getNodeFields(node: ParsedNode) {
   return node as ParsedNodeWithFields
+}
+
+function getParserNow() {
+  return typeof performance !== 'undefined'
+    ? performance.now()
+    : Date.now()
+}
+
+function addTiming(metrics: ParseTimingMetrics | undefined, key: keyof ParseTimingMetrics, value: number) {
+  if (!metrics)
+    return
+
+  metrics[key] = (metrics[key] ?? 0) + value
+}
+
+function getParseTiming(options: ParseOptions) {
+  return (options as TimedParseOptions).__timing
+}
+
+function finishTimedParse<T extends ParsedNode[]>(result: T, timing: ParseTimingMetrics | undefined, startedAt: number) {
+  if (timing)
+    addTiming(timing, 'parseMarkdownToStructureTotalMs', getParserNow() - startedAt)
+
+  return result
+}
+
+function processTokensWithTiming(tokens: MarkdownToken[], options: ParseOptions | undefined, timing: ParseTimingMetrics | undefined) {
+  if (!timing)
+    return processTokens(tokens, options)
+
+  const startedAt = getParserNow()
+  const result = processTokens(tokens, options)
+  addTiming(timing, 'processTokensMs', getParserNow() - startedAt)
+  return result
 }
 
 function getCustomHtmlTagSet(options?: ParseOptions) {
@@ -29,6 +75,255 @@ function getCustomHtmlTagSet(options?: ParseOptions) {
 
   const normalized = normalizeCustomHtmlTags(custom)
   return normalized.length ? new Set(normalized) : null
+}
+
+function getStableStreamEnv(md: MarkdownIt, env: Record<string, unknown>) {
+  const mdKey = md as unknown as object
+  let byMode = streamParseEnvCache.get(mdKey)
+  if (!byMode) {
+    byMode = new Map()
+    streamParseEnvCache.set(mdKey, byMode)
+  }
+
+  const modeKey = env.__markstreamFinal === true ? 'final' : 'streaming'
+  let stableEnv = byMode.get(modeKey)
+  if (!stableEnv) {
+    stableEnv = {}
+    byMode.set(modeKey, stableEnv)
+  }
+
+  for (const key of Object.keys(stableEnv)) {
+    if (!Object.prototype.hasOwnProperty.call(env, key))
+      delete stableEnv[key]
+  }
+  Object.assign(stableEnv, env)
+  return stableEnv
+}
+
+function isPlainObject(value: unknown) {
+  if (!value || typeof value !== 'object')
+    return false
+
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+function copyCloneableOwnDataProperties(source: object, target: Record<PropertyKey, unknown>, seen: WeakMap<object, unknown>) {
+  for (const key of Reflect.ownKeys(source)) {
+    const descriptor = Object.getOwnPropertyDescriptor(source, key)
+    if (!descriptor || !('value' in descriptor))
+      continue
+
+    const targetDescriptor = Object.getOwnPropertyDescriptor(target, key)
+    if (targetDescriptor && (!('value' in targetDescriptor) || targetDescriptor.writable === false))
+      continue
+
+    target[key] = safeCloneTokenField(descriptor.value, seen)
+  }
+}
+
+function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+  if (!value || typeof value !== 'object')
+    return value
+
+  const object = value as object
+  const existing = seen.get(object)
+  if (existing)
+    return existing as T
+
+  if (Array.isArray(value)) {
+    const cloned: unknown[] = []
+    seen.set(object, cloned)
+    for (const item of value)
+      cloned.push(safeCloneTokenField(item, seen))
+    return cloned as T
+  }
+
+  if (value instanceof Map) {
+    const cloned = new Map()
+    seen.set(object, cloned)
+    for (const [key, item] of value)
+      cloned.set(safeCloneTokenField(key, seen), safeCloneTokenField(item, seen))
+    return cloned as T
+  }
+
+  if (value instanceof Set) {
+    const cloned = new Set()
+    seen.set(object, cloned)
+    for (const item of value)
+      cloned.add(safeCloneTokenField(item, seen))
+    return cloned as T
+  }
+
+  if (value instanceof Date) {
+    const cloned = new Date(value.getTime())
+    seen.set(object, cloned)
+    return cloned as T
+  }
+
+  if (value instanceof RegExp) {
+    const cloned = new RegExp(value.source, value.flags)
+    cloned.lastIndex = value.lastIndex
+    seen.set(object, cloned)
+    return cloned as T
+  }
+
+  if (typeof URL !== 'undefined' && value instanceof URL) {
+    const cloned = new URL(value.href)
+    seen.set(object, cloned)
+    copyCloneableOwnDataProperties(object, cloned as unknown as Record<PropertyKey, unknown>, seen)
+    return cloned as T
+  }
+
+  if (typeof URLSearchParams !== 'undefined' && value instanceof URLSearchParams) {
+    const cloned = new URLSearchParams(value.toString())
+    seen.set(object, cloned)
+    copyCloneableOwnDataProperties(object, cloned as unknown as Record<PropertyKey, unknown>, seen)
+    return cloned as T
+  }
+
+  if (value instanceof Error) {
+    let cloned: Error
+    const ErrorCtor = value.constructor as new (message?: string) => Error
+    try {
+      cloned = new ErrorCtor(value.message)
+    }
+    catch {
+      cloned = new Error(value.message)
+    }
+    Object.setPrototypeOf(cloned, Object.getPrototypeOf(value))
+    seen.set(object, cloned)
+    copyCloneableOwnDataProperties(object, cloned as unknown as Record<PropertyKey, unknown>, seen)
+    return cloned as T
+  }
+
+  if (typeof Promise !== 'undefined' && value instanceof Promise) {
+    seen.set(object, value)
+    return value
+  }
+
+  if (typeof Node !== 'undefined' && value instanceof Node) {
+    seen.set(object, value)
+    return value
+  }
+
+  if (!isPlainObject(value)) {
+    const cloned = Object.create(Object.getPrototypeOf(value)) as Record<PropertyKey, unknown>
+    seen.set(object, cloned)
+    copyCloneableOwnDataProperties(object, cloned, seen)
+    return cloned as T
+  }
+
+  const cloned: Record<string, unknown> = {}
+  seen.set(object, cloned)
+
+  const record = value as Record<string, unknown>
+  for (const key of Object.keys(record))
+    cloned[key] = safeCloneTokenField(record[key], seen)
+
+  return cloned as T
+}
+
+function cloneMarkdownToken(token: Token, cloneObjectFields = true): Token {
+  if (!cloneObjectFields) {
+    const cloned = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as Token
+    if (Array.isArray(token.attrs))
+      cloned.attrs = token.attrs.map(attr => [...attr] as [string, string])
+    if (Array.isArray(token.map))
+      cloned.map = [...token.map] as [number, number]
+    if (Array.isArray(token.children))
+      cloned.children = token.children.map(child => cloneMarkdownToken(child, cloneObjectFields))
+    return cloned
+  }
+
+  const cloned = Object.create(Object.getPrototypeOf(token)) as Token
+  const seen = new WeakMap<object, unknown>()
+
+  for (const key of Reflect.ownKeys(token as unknown as object)) {
+    const descriptor = Object.getOwnPropertyDescriptor(token, key)
+    if (!descriptor)
+      continue
+
+    if (!('value' in descriptor)) {
+      Object.defineProperty(cloned, key, descriptor)
+      continue
+    }
+
+    const value = descriptor.value
+    let clonedValue = value
+
+    if (key === 'attrs' && Array.isArray(value)) {
+      clonedValue = value.map(attr => [...attr] as [string, string])
+    }
+    else if (key === 'map' && Array.isArray(value)) {
+      clonedValue = [...value] as [number, number]
+    }
+    else if (key === 'children' && Array.isArray(value)) {
+      clonedValue = value.map(child => cloneMarkdownToken(child, cloneObjectFields))
+    }
+    else if (cloneObjectFields && value && typeof value === 'object') {
+      clonedValue = safeCloneTokenField(value, seen)
+    }
+
+    Object.defineProperty(cloned, key, {
+      ...descriptor,
+      value: clonedValue,
+    })
+  }
+
+  return cloned
+}
+
+function cloneMarkdownTokens(tokens: Token[], cloneObjectFields = true) {
+  return tokens.map(token => cloneMarkdownToken(token, cloneObjectFields))
+}
+
+function shouldUseTopLevelStreamParse(md: MarkdownIt, options: ParseOptions) {
+  const internalOptions = options as InternalParseOptions
+  const stream = md.stream
+  const streamParse = options.streamParse ?? 'auto'
+  return internalOptions.__disableStreamParse !== true
+    && (streamParse === true || (streamParse === 'auto' && options.final !== true))
+    && stream?.enabled === true
+    && typeof stream.parse === 'function'
+}
+
+function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options: ParseOptions) {
+  const internalOptions = options as InternalParseOptions
+  const streamParse = options.streamParse ?? 'auto'
+  const stream = md.stream
+
+  return options.final === true
+    && streamParse === 'auto'
+    && internalOptions.__disableStreamParse !== true
+    && stream?.enabled === true
+    && typeof stream.reset === 'function'
+}
+
+function shouldCloneTopLevelStreamTokenObjectFields(options: ParseOptions) {
+  return typeof options.preTransformTokens === 'function'
+    || typeof options.postTransformTokens === 'function'
+}
+
+function parseTopLevelTokens(
+  md: MarkdownIt,
+  source: string,
+  env: Record<string, unknown>,
+  options: ParseOptions,
+) {
+  if (!shouldUseTopLevelStreamParse(md, options))
+    return md.parse(source, env)
+
+  const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
+  const cloneObjectFields = shouldCloneTopLevelStreamTokenObjectFields(options)
+  const timing = getParseTiming(options)
+  if (!timing)
+    return cloneMarkdownTokens(tokens, cloneObjectFields)
+
+  const startedAt = getParserNow()
+  const cloned = cloneMarkdownTokens(tokens, cloneObjectFields)
+  addTiming(timing, 'tokenCloneMs', getParserNow() - startedAt)
+  return cloned
 }
 
 export function buildAllowedHtmlTagSet(options?: ParseOptions) {
@@ -343,9 +638,10 @@ function findLastClosingTagStart(raw: string, tag: string) {
   return last
 }
 
-function buildDetailsChildParseOptions(options: ParseOptions, final: boolean): ParseOptions {
+function buildDetailsChildParseOptions(options: ParseOptions, final: boolean): InternalParseOptions {
   return {
     final,
+    __disableStreamParse: true,
     requireClosingStrong: options.requireClosingStrong,
     customHtmlTags: options.customHtmlTags,
     validateLink: options.validateLink,
@@ -451,7 +747,12 @@ function parseDetailsFragmentChildren(
   if (!fragment.trim())
     return []
 
-  return parseMarkdownToStructure(fragment, md, options)
+  const internalOptions: InternalParseOptions = {
+    ...(options as InternalParseOptions),
+    __disableStreamParse: true,
+  }
+
+  return parseMarkdownToStructure(fragment, md, internalOptions)
 }
 
 function parseSummaryChildren(
@@ -1847,10 +2148,16 @@ export function parseMarkdownToStructure(
   md: MarkdownIt,
   options: ParseOptions = {},
 ): ParsedNode[] {
+  const timing = getParseTiming(options)
+  const parseStartedAt = timing ? getParserNow() : 0
   const isFinal = !!options.final
   // Ensure markdown is a string — guard against null/undefined inputs from callers
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
   let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
+
+  if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options))
+    md.stream!.reset!()
+
   if (!isFinal) {
     if (safeMarkdown.endsWith('- *')) {
       // 放置markdown 解析 - * 会被处理成多个 ul >li 嵌套列表
@@ -1973,20 +2280,20 @@ export function parseMarkdownToStructure(
     // instrumentation, but preserve the full-document html_block shape.
     const preHook = options.preTransformTokens
     const postHook = options.postTransformTokens
-    if (typeof preHook === 'function' || typeof postHook === 'function') {
-      const rawTokens = md.parse(safeMarkdown, { __markstreamFinal: isFinal }) as unknown as MarkdownToken[]
+    if (shouldUseTopLevelStreamParse(md, options) || typeof preHook === 'function' || typeof postHook === 'function') {
+      const rawTokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options) as unknown as MarkdownToken[]
       const hookedTokens = typeof preHook === 'function' ? (preHook(rawTokens) || rawTokens) : rawTokens
       if (typeof postHook === 'function')
         postHook(hookedTokens)
     }
-    return standaloneHtmlDocument
+    return finishTimedParse(standaloneHtmlDocument, timing, parseStartedAt)
   }
 
   // Get tokens from markdown-it
-  const tokens = md.parse(safeMarkdown, { __markstreamFinal: isFinal })
+  const tokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options)
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
-    return []
+    return finishTimedParse([], timing, parseStartedAt)
   // Allow consumers to transform tokens before processing
   const pre = options.preTransformTokens
   const post = options.postTransformTokens
@@ -2011,7 +2318,7 @@ export function parseMarkdownToStructure(
     __sourceMarkdown: safeMarkdown,
     __customHtmlBlockCursor: 0,
   }
-  let result = processTokens(transformedTokens, internalOptions)
+  let result = processTokensWithTiming(transformedTokens, internalOptions, timing)
 
   // Backwards compatible token-level post hook: if provided and returns
   // a modified token array, re-process tokens and override node-level result.
@@ -2023,7 +2330,7 @@ export function parseMarkdownToStructure(
       const first = (postResult as unknown[])[0] as unknown
       const firstType = (first as Record<string, unknown>)?.type
       if (first && typeof firstType === 'string') {
-        result = processTokens(postResult as unknown as MarkdownToken[])
+        result = processTokensWithTiming(postResult as unknown as MarkdownToken[], undefined, timing)
       }
       else {
         // Otherwise assume it returned ParsedNode[] and use it as-is
@@ -2065,7 +2372,7 @@ export function parseMarkdownToStructure(
   if (options.debug) {
     console.log('Parsed Markdown Tree Structure:', result)
   }
-  return result
+  return finishTimedParse(result, timing, parseStartedAt)
 }
 
 // Process markdown-it tokens into our structured format

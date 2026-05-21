@@ -214,6 +214,19 @@ function fallbackSummary(row) {
   return '-'
 }
 
+function parsePerformanceSummary(row) {
+  const metrics = row.parsePerformance
+  if (!metrics)
+    return '-'
+
+  const stream = metrics.stream ?? {}
+  return [
+    `commits ${formatNumber(metrics.parseCommitCount)} / coalesced ${formatNumber(metrics.parseCoalescedCount)}`,
+    `stream full ${formatNumber(stream.fullParses)} / append ${formatNumber(stream.appendHits)} / tail ${formatNumber(stream.tailHits)} / cache ${formatNumber(stream.cacheHits)}`,
+    `timing total ${formatMs(metrics.parseMarkdownToStructureTotalMs)} / clone ${formatMs(metrics.tokenCloneMs)} / process ${formatMs(metrics.processTokensMs)}`,
+  ].join('<br>')
+}
+
 function scenarioRows(entry) {
   const rows = []
   const result = entry.result
@@ -281,13 +294,13 @@ function renderMarkdownReport(report) {
   lines.push('')
   lines.push('## Results')
   lines.push('')
-  lines.push('| Scenario | Phase | LCP ms | CLS | Settle ms | Frame samples | Frame p95 ms | Heavy settle frame samples | Heavy settle frame p95 ms | Max long task ms | Page DOM nodes | Renderer DOM nodes | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after renderer unmount + GC |')
-  lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: | ---: |')
+  lines.push('| Scenario | Phase | LCP ms | CLS | Settle ms | Frame samples | Frame p95 ms | Heavy settle frame samples | Heavy settle frame p95 ms | Max long task ms | Page DOM nodes | Renderer DOM nodes | Parse stream | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after renderer unmount + GC |')
+  lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | ---: | ---: |')
 
   for (const entry of report.scenarios) {
     for (const item of scenarioRows(entry)) {
       const row = item.row ?? {}
-      lines.push(`| ${item.scenario} | ${item.phase} | ${formatMs(row.lcpMs)} | ${typeof row.cls === 'number' ? row.cls.toFixed(4) : '-'} | ${formatMs(row.settleTimeMs)} | ${formatNumber(phaseFrameSampleCount(row))} | ${formatMs(phaseFrameP95Ms(row))} | ${formatNumber(row.heavySettleFrameSampleCount)} | ${formatMs(row.heavySettleFrameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.pageDomNodeCount)} | ${formatNumber(row.rendererDomNodeCount)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
+      lines.push(`| ${item.scenario} | ${item.phase} | ${formatMs(row.lcpMs)} | ${typeof row.cls === 'number' ? row.cls.toFixed(4) : '-'} | ${formatMs(row.settleTimeMs)} | ${formatNumber(phaseFrameSampleCount(row))} | ${formatMs(phaseFrameP95Ms(row))} | ${formatNumber(row.heavySettleFrameSampleCount)} | ${formatMs(row.heavySettleFrameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.pageDomNodeCount)} | ${formatNumber(row.rendererDomNodeCount)} | ${parsePerformanceSummary(row)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
     }
   }
 
@@ -312,7 +325,7 @@ function renderMarkdownReport(report) {
   for (const entry of report.scenarios)
     lines.push(`- **${entry.title}**: ${entry.notes}`)
   lines.push('')
-  lines.push('This report records measured release evidence from the shipped playgrounds. Initial rows report readiness for heavy blocks visible in the phase viewport, and show N/A when that viewport contains no heavy blocks. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to the benchmark surface and are the value used by the release gate. Frame p95 is the phase-local p95 `requestAnimationFrame` delta; for full-scroll rows it covers only the active scroll loop. Heavy-settle frame p95 covers post-scroll heavy block readiness separately. Frame p95 values are reported for review, but are not a 1.0 hard release gate. Raw scrollTop drift is recorded for diagnostics but is not a 1.0 release gate. Heap after renderer unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
+  lines.push('This report records measured release evidence from the shipped playgrounds. Initial rows report readiness for heavy blocks visible in the phase viewport, and show N/A when that viewport contains no heavy blocks. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to the benchmark surface and are the value used by the release gate. Parse stream metrics record renderer parse commits, coalesced smooth-stream parse updates, and markdown-it stream parser full/append/tail/cache counters. Frame p95 is the phase-local p95 `requestAnimationFrame` delta; for full-scroll rows it covers only the active scroll loop. Heavy-settle frame p95 covers post-scroll heavy block readiness separately. Frame p95 values are reported for review, but are not a 1.0 hard release gate. Raw scrollTop drift is recorded for diagnostics but is not a 1.0 release gate. Heap after renderer unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
   return `${lines.join('\n')}\n`
 }
 
