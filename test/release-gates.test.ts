@@ -93,6 +93,8 @@ describe('release dependency gates', () => {
     expect(mainScript).toContain('parsePerformance')
     expect(mainScript).toContain('Replay stream parser should record append/tail/cache hits')
     expect(benchmarkScript).toContain('parsePerformanceSummary')
+    expect(benchmarkScript).toContain('tokenCloneMs')
+    expect(benchmarkScript).toContain('processTokensMs')
   })
 
   it('does not create release tags for package versions already published on npm', () => {

@@ -464,8 +464,8 @@ function assertScenario(result) {
   if (!(stream.fullParses >= 1))
     throw new Error(`Replay stream parser should record at least one full parse. Got ${stream.fullParses}.`)
   const streamHitCount = (stream.appendHits ?? 0) + (stream.tailHits ?? 0) + (stream.cacheHits ?? 0)
-  if (streamHitCount === 0 && stream.fullParses === parsePerformance.streamCommitCount)
-    console.warn(`Replay stream parser used full parses for every stream commit. Stream stats: ${JSON.stringify(stream)}.`)
+  if (!(streamHitCount > 0))
+    throw new Error(`Replay stream parser should record append/tail/cache hits. Stream stats: ${JSON.stringify(stream)}.`)
 }
 
 async function run() {
@@ -510,6 +510,9 @@ async function run() {
           parseCoalescedCount: 0,
           streamCommitCount: 0,
           syncCommitCount: 0,
+          tokenCloneMs: 0,
+          processTokensMs: 0,
+          parseMarkdownToStructureTotalMs: 0,
           stream: {
             total: 0,
             cacheHits: 0,
@@ -526,6 +529,7 @@ async function run() {
 
       const originalInfo = console.info.bind(console)
       const streamCounterKeys = ['total', 'cacheHits', 'appendHits', 'tailHits', 'fullParses', 'chunkedParses']
+      const parseTimingKeys = ['tokenCloneMs', 'processTokensMs', 'parseMarkdownToStructureTotalMs']
       console.info = (...args) => {
         try {
           const label = args[0]
@@ -535,6 +539,9 @@ async function run() {
 
             metrics.parseCommitCount = Math.max(metrics.parseCommitCount, Number(data.parseCommitCount || 0))
             metrics.parseCoalescedCount = Math.max(metrics.parseCoalescedCount, Number(data.parseCoalescedCount || 0))
+            for (const key of parseTimingKeys)
+              metrics[key] += Number(data[key] || 0)
+
             if (label === '[markstream-vue][perf] parse(stream)')
               metrics.streamCommitCount += 1
             else

@@ -28,6 +28,12 @@ interface StreamStatsLike {
   lastMode?: string
 }
 
+interface ParserTimingMetrics {
+  tokenCloneMs?: number
+  processTokensMs?: number
+  parseMarkdownToStructureTotalMs?: number
+}
+
 export interface MarkdownParsingOptions {
   instanceMsgId: string
   renderContent: ComputedRef<string>
@@ -70,6 +76,11 @@ const STREAM_STAT_COUNTER_KEYS: Array<keyof StreamStatsLike> = [
   'tailHits',
   'fullParses',
   'chunkedParses',
+]
+const PARSE_TIMING_KEYS: Array<keyof ParserTimingMetrics> = [
+  'tokenCloneMs',
+  'processTokensMs',
+  'parseMarkdownToStructureTotalMs',
 ]
 const STRUCTURAL_OBJECT_FIELDS = new Set(['attrs'])
 const objectIdentityIds = new WeakMap<object, number>()
@@ -460,10 +471,17 @@ export function useMarkdownParsing(
       ? readStreamStats(md)
       : null
 
+    const parserTiming: ParserTimingMetrics | undefined = options.debugPerformanceEnabled.value
+      ? {}
+      : undefined
+    const parseOptionsForCall = parserTiming
+      ? ({ ...mergedParseOptions.value, __timing: parserTiming } as RendererParseOptions & { __timing: ParserTimingMetrics })
+      : mergedParseOptions.value
+
     const nextParsed = parseMarkdownToStructure(
       content,
       md,
-      mergedParseOptions.value,
+      parseOptionsForCall,
     )
     const parsed = canReuseParsedNodes
       ? stabilizeParsedNodes(nextParsed, previousParsedNodes)
@@ -485,6 +503,9 @@ export function useMarkdownParsing(
         contentLength: content.length,
         parseCommitCount,
         parseCoalescedCount,
+        ...(parserTiming
+          ? Object.fromEntries(PARSE_TIMING_KEYS.map(key => [key, parserTiming[key] ?? 0]))
+          : {}),
         ...(streamStats
           ? {
               streamMode: streamStats.lastMode,

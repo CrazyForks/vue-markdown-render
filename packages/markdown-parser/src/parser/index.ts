@@ -20,8 +20,52 @@ type ParsedNodeWithFields = ParsedNode & {
 
 const streamParseEnvCache = new WeakMap<object, Map<string, Record<string, unknown>>>()
 
+interface ParseTimingMetrics {
+  tokenCloneMs?: number
+  processTokensMs?: number
+  parseMarkdownToStructureTotalMs?: number
+}
+
+type TimedParseOptions = ParseOptions & {
+  __timing?: ParseTimingMetrics
+}
+
 function getNodeFields(node: ParsedNode) {
   return node as ParsedNodeWithFields
+}
+
+function getParserNow() {
+  return typeof performance !== 'undefined'
+    ? performance.now()
+    : Date.now()
+}
+
+function addTiming(metrics: ParseTimingMetrics | undefined, key: keyof ParseTimingMetrics, value: number) {
+  if (!metrics)
+    return
+
+  metrics[key] = (metrics[key] ?? 0) + value
+}
+
+function getParseTiming(options: ParseOptions) {
+  return (options as TimedParseOptions).__timing
+}
+
+function finishTimedParse<T extends ParsedNode[]>(result: T, timing: ParseTimingMetrics | undefined, startedAt: number) {
+  if (timing)
+    addTiming(timing, 'parseMarkdownToStructureTotalMs', getParserNow() - startedAt)
+
+  return result
+}
+
+function processTokensWithTiming(tokens: MarkdownToken[], options: ParseOptions | undefined, timing: ParseTimingMetrics | undefined) {
+  if (!timing)
+    return processTokens(tokens, options)
+
+  const startedAt = getParserNow()
+  const result = processTokens(tokens, options)
+  addTiming(timing, 'processTokensMs', getParserNow() - startedAt)
+  return result
 }
 
 function getCustomHtmlTagSet(options?: ParseOptions) {
@@ -56,6 +100,14 @@ function getStableStreamEnv(md: MarkdownIt, env: Record<string, unknown>) {
   return stableEnv
 }
 
+function isPlainObject(value: unknown) {
+  if (!value || typeof value !== 'object')
+    return false
+
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
 function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>()): T {
   if (!value || typeof value !== 'object')
     return value
@@ -73,11 +125,15 @@ function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>())
     return cloned as T
   }
 
-  const cloned = Object.assign(Object.create(Object.getPrototypeOf(value)), value) as Record<string, unknown>
+  if (!isPlainObject(value))
+    return value
+
+  const cloned: Record<string, unknown> = {}
   seen.set(object, cloned)
 
-  for (const key of Object.keys(cloned))
-    cloned[key] = safeCloneTokenField(cloned[key], seen)
+  const record = value as Record<string, unknown>
+  for (const key of Object.keys(record))
+    cloned[key] = safeCloneTokenField(record[key], seen)
 
   return cloned as T
 }
@@ -125,7 +181,15 @@ function parseTopLevelTokens(
   if (!shouldUseStreamParse)
     return md.parse(source, env)
 
-  return cloneMarkdownTokens(stream.parse!(source, getStableStreamEnv(md, env)))
+  const tokens = stream.parse!(source, getStableStreamEnv(md, env))
+  const timing = getParseTiming(options)
+  if (!timing)
+    return cloneMarkdownTokens(tokens)
+
+  const startedAt = getParserNow()
+  const cloned = cloneMarkdownTokens(tokens)
+  addTiming(timing, 'tokenCloneMs', getParserNow() - startedAt)
+  return cloned
 }
 
 export function buildAllowedHtmlTagSet(options?: ParseOptions) {
@@ -1948,6 +2012,8 @@ export function parseMarkdownToStructure(
   md: MarkdownIt,
   options: ParseOptions = {},
 ): ParsedNode[] {
+  const timing = getParseTiming(options)
+  const parseStartedAt = timing ? getParserNow() : 0
   const isFinal = !!options.final
   // Ensure markdown is a string — guard against null/undefined inputs from callers
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
@@ -2080,14 +2146,14 @@ export function parseMarkdownToStructure(
       if (typeof postHook === 'function')
         postHook(hookedTokens)
     }
-    return standaloneHtmlDocument
+    return finishTimedParse(standaloneHtmlDocument, timing, parseStartedAt)
   }
 
   // Get tokens from markdown-it
   const tokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options)
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
-    return []
+    return finishTimedParse([], timing, parseStartedAt)
   // Allow consumers to transform tokens before processing
   const pre = options.preTransformTokens
   const post = options.postTransformTokens
@@ -2112,7 +2178,7 @@ export function parseMarkdownToStructure(
     __sourceMarkdown: safeMarkdown,
     __customHtmlBlockCursor: 0,
   }
-  let result = processTokens(transformedTokens, internalOptions)
+  let result = processTokensWithTiming(transformedTokens, internalOptions, timing)
 
   // Backwards compatible token-level post hook: if provided and returns
   // a modified token array, re-process tokens and override node-level result.
@@ -2124,7 +2190,7 @@ export function parseMarkdownToStructure(
       const first = (postResult as unknown[])[0] as unknown
       const firstType = (first as Record<string, unknown>)?.type
       if (first && typeof firstType === 'string') {
-        result = processTokens(postResult as unknown as MarkdownToken[])
+        result = processTokensWithTiming(postResult as unknown as MarkdownToken[], undefined, timing)
       }
       else {
         // Otherwise assume it returned ParsedNode[] and use it as-is
@@ -2166,7 +2232,7 @@ export function parseMarkdownToStructure(
   if (options.debug) {
     console.log('Parsed Markdown Tree Structure:', result)
   }
-  return result
+  return finishTimedParse(result, timing, parseStartedAt)
 }
 
 // Process markdown-it tokens into our structured format

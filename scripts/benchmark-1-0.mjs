@@ -223,6 +223,7 @@ function parsePerformanceSummary(row) {
   return [
     `commits ${formatNumber(metrics.parseCommitCount)} / coalesced ${formatNumber(metrics.parseCoalescedCount)}`,
     `stream full ${formatNumber(stream.fullParses)} / append ${formatNumber(stream.appendHits)} / tail ${formatNumber(stream.tailHits)} / cache ${formatNumber(stream.cacheHits)}`,
+    `timing total ${formatMs(metrics.parseMarkdownToStructureTotalMs)} / clone ${formatMs(metrics.tokenCloneMs)} / process ${formatMs(metrics.processTokensMs)}`,
   ].join('<br>')
 }
 

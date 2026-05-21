@@ -139,4 +139,25 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(seenMeta).toEqual(['cached', 'cached'])
     expect(seenCustom).toEqual(['cached', 'cached'])
   })
+
+  it('keeps non-plain token meta objects usable when cloning cached stream tokens', () => {
+    const md = getMarkdown('stream-parser-map-meta')
+    ;(md as any).core.ruler.push('test_map_meta', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (inline)
+        inline.meta = { map: new Map([['k', 'v']]) }
+    })
+
+    const markdown = buildLargeAppendFriendlyDoc(40)
+    let seen: unknown
+
+    parseMarkdownToStructure(markdown, md, {
+      preTransformTokens(tokens: any[]) {
+        seen = tokens.find(token => token.type === 'inline')?.meta?.map?.get('k')
+        return tokens
+      },
+    })
+
+    expect(seen).toBe('v')
+  })
 })

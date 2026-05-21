@@ -269,7 +269,7 @@ interface ParseOptions {
   validateLink?: (url: string) => boolean
   // true 表示输入已结束（end-of-stream）
   final?: boolean
-  // 顶层文档是否使用 markdown-it-ts stream parser；
+  // 顶层文档默认使用 markdown-it-ts stream parser；
   // 一次性解析且不希望 md 保留 stream cache 时设为 false
   streamParse?: boolean | 'auto'
   // 解析 strong 时要求闭合 `**`（默认 false）

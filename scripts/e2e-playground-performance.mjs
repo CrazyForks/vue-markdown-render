@@ -308,6 +308,9 @@ async function runScenario(browser, port, mode) {
         parseCoalescedCount: 0,
         streamCommitCount: 0,
         syncCommitCount: 0,
+        tokenCloneMs: 0,
+        processTokensMs: 0,
+        parseMarkdownToStructureTotalMs: 0,
         stream: {
           total: 0,
           cacheHits: 0,
@@ -324,6 +327,7 @@ async function runScenario(browser, port, mode) {
 
     const originalInfo = console.info.bind(console)
     const streamCounterKeys = ['total', 'cacheHits', 'appendHits', 'tailHits', 'fullParses', 'chunkedParses']
+    const parseTimingKeys = ['tokenCloneMs', 'processTokensMs', 'parseMarkdownToStructureTotalMs']
     console.info = (...args) => {
       try {
         const label = args[0]
@@ -333,6 +337,9 @@ async function runScenario(browser, port, mode) {
 
           metrics.parseCommitCount = Math.max(metrics.parseCommitCount, Number(data.parseCommitCount || 0))
           metrics.parseCoalescedCount = Math.max(metrics.parseCoalescedCount, Number(data.parseCoalescedCount || 0))
+          for (const key of parseTimingKeys)
+            metrics[key] += Number(data[key] || 0)
+
           if (label === '[markstream-vue][perf] parse(stream)')
             metrics.streamCommitCount += 1
           else

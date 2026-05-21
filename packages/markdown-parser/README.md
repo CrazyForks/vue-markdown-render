@@ -271,7 +271,7 @@ interface ParseOptions {
   validateLink?: (url: string) => boolean
   // When true, treats the input as complete (end-of-stream)
   final?: boolean
-  // Use markdown-it-ts stream parsing for top-level documents.
+  // Use markdown-it-ts stream parsing for top-level documents by default.
   // Set false for one-shot parses that should not retain stream cache on md.
   streamParse?: boolean | 'auto'
   // Require closing `**` for strong parsing (default: false)
