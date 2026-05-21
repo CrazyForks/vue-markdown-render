@@ -405,6 +405,12 @@ export type TransformTokensHook = (tokens: MarkdownToken[]) => MarkdownToken[]
 export interface ParseOptions {
   preTransformTokens?: TransformTokensHook
   postTransformTokens?: TransformTokensHook
+  /**
+   * Use markdown-it-ts' stream parser for the top-level document parse when
+   * available. Fragment parses always use the regular parser to keep the
+   * stream cache tied to the full source document.
+   */
+  streamParse?: boolean | 'auto'
   // When true, require a closing `**` to parse strong; otherwise allow mid-state strong
   requireClosingStrong?: boolean
   /**
@@ -430,6 +436,8 @@ export interface ParseOptions {
   validateLink?: (url: string) => boolean
   // When true, log the parsed tree structure for debugging
   debug?: boolean
+  /** @internal */
+  __disableStreamParse?: boolean
 }
 
 export interface InternalParseOptions extends ParseOptions {

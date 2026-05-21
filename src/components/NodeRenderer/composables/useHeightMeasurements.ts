@@ -19,7 +19,7 @@ export interface HeightMeasurements {
   resetHeightMeasurements: () => void
   pruneHeightMeasurements: (size: number) => void
   rebuildHeightTrees: (size: number) => void
-  recordNodeHeight: (index: number, height: number) => void
+  recordNodeHeight: (index: number, height: number, options?: { allowShrink?: boolean }) => void
 
   fenwickRangeSum: (tree: number[], start: number, end: number) => number
 }
@@ -126,11 +126,19 @@ export function useHeightMeasurements(
     heightKnownTree.value = countTree
   }
 
-  function recordNodeHeight(index: number, height: number) {
+  function recordNodeHeight(index: number, height: number, recordOptions: { allowShrink?: boolean } = {}) {
     if (!Number.isFinite(height) || height <= 0)
       return
 
     const previous = nodeHeights[index]
+    if (previous) {
+      if (recordOptions.allowShrink === false && height < previous)
+        return
+
+      if (Math.abs(height - previous) <= 1)
+        return
+    }
+
     nodeHeights[index] = height
 
     if (previous) {

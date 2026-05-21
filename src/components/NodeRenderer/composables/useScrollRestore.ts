@@ -59,6 +59,7 @@ export function useScrollRestore(options: ScrollRestoreOptions): ScrollRestore {
   } = options
 
   const activeRestoreAnchor = ref<RestoreAnchor | null>(null)
+  const RESTORE_DRIFT_DEADBAND_PX = 2
 
   let restoreReconcileRaf: number | null = null
   let restoreReconcileTimers: number[] = []
@@ -134,7 +135,13 @@ export function useScrollRestore(options: ScrollRestoreOptions): ScrollRestore {
   }
 
   function applyRestoreAnchor(anchor: RestoreAnchor) {
-    setRelativeScrollTopWithinContainer(resolveAnchorOffset(anchor))
+    const target = resolveAnchorOffset(anchor)
+    const current = getRelativeScrollTopWithinContainer()
+
+    if (current != null && Math.abs(current - target) <= RESTORE_DRIFT_DEADBAND_PX)
+      return
+
+    setRelativeScrollTopWithinContainer(target)
   }
 
   function scheduleRestoreReconcile() {

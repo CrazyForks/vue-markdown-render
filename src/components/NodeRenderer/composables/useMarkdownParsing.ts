@@ -14,15 +14,25 @@ import {
   parseMarkdownToStructure,
   resolveCustomHtmlTags,
 } from 'stream-markdown-parser'
-import { computed, markRaw } from 'vue'
+import { computed, markRaw, onScopeDispose, ref, watch } from 'vue'
 import { isReservedNodeComponentKey } from '../../../utils/nodeComponents'
 
 type RendererParseOptions = NonNullable<NodeRendererProps['parseOptions']>
+interface StreamStatsLike {
+  total?: number
+  cacheHits?: number
+  appendHits?: number
+  tailHits?: number
+  fullParses?: number
+  chunkedParses?: number
+  lastMode?: string
+}
 
 export interface MarkdownParsingOptions {
   instanceMsgId: string
   renderContent: ComputedRef<string>
   effectiveFinal: ComputedRef<boolean | undefined>
+  smoothStreamingEnabled?: ComputedRef<boolean>
   debugPerformanceEnabled: ComputedRef<boolean>
   customComponentsMap?: ComputedRef<Partial<CustomComponents>>
   logPerf: (label: string, data: Record<string, unknown>) => void
@@ -52,12 +62,155 @@ function getAutoCustomHtmlTags(mapping: Partial<CustomComponents>) {
     .filter(Boolean)
 }
 
+const PARSE_COALESCE_MS = 80
+
+function getNow() {
+  return typeof performance !== 'undefined'
+    ? performance.now()
+    : Date.now()
+}
+
+function readStreamStats(md: MarkdownIt): StreamStatsLike | null {
+  const stream = md.stream
+  if (!stream || typeof stream.stats !== 'function')
+    return null
+
+  return stream.stats() as StreamStatsLike
+}
+
+function shouldFlushParseImmediately(previous: string, next: string) {
+  if (!previous && next)
+    return true
+
+  if (next.length <= 80)
+    return true
+
+  if (next.length < previous.length || !next.startsWith(previous))
+    return true
+
+  const appended = next.slice(previous.length)
+  if (!appended)
+    return false
+
+  return appended.endsWith('\n')
+    || appended.includes('\n\n')
+    || /(?:^|\n)(?:#{1,6}\s|[-+*]\s+|\d+[.)]\s+|>\s*|`{3,}|~{3,}|\|)/.test(appended)
+}
+
+function getStableNodePayload(node: ParsedNode) {
+  const record = node as Record<string, unknown>
+  const raw = record.raw
+  if (typeof raw === 'string')
+    return raw
+
+  for (const key of ['code', 'content', 'text']) {
+    const value = record[key]
+    if (typeof value === 'string')
+      return value
+  }
+
+  return ''
+}
+
+function isParsedNodeStable(previous: ParsedNode, next: ParsedNode) {
+  if (previous.type !== next.type)
+    return false
+
+  const previousRecord = previous as Record<string, unknown>
+  const nextRecord = next as Record<string, unknown>
+
+  if (previousRecord.loading !== nextRecord.loading)
+    return false
+  if (previousRecord.diff !== nextRecord.diff)
+    return false
+  if (previousRecord.language !== nextRecord.language)
+    return false
+
+  const previousPayload = getStableNodePayload(previous)
+  return previousPayload !== '' && previousPayload === getStableNodePayload(next)
+}
+
+function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode[]) {
+  if (!previousNodes.length)
+    return nextNodes
+
+  const stableNodes = new Array<ParsedNode>(nextNodes.length)
+  let identical = nextNodes.length === previousNodes.length
+
+  for (let index = 0; index < nextNodes.length; index++) {
+    const previous = previousNodes[index]
+    const next = nextNodes[index]
+
+    if (previous && isParsedNodeStable(previous, next)) {
+      stableNodes[index] = previous
+    }
+    else {
+      stableNodes[index] = next
+      identical = false
+    }
+  }
+
+  return identical ? previousNodes : stableNodes
+}
+
 export function useMarkdownParsing(
   props: Readonly<NodeRendererProps>,
   options: MarkdownParsingOptions,
 ): MarkdownParsingState {
   const defaultMd = getMarkdown(options.instanceMsgId)
   const customTagCache = new Map<string, MarkdownIt>()
+  const smoothStreamingEnabled = options.smoothStreamingEnabled ?? computed(() => false)
+  const contentToParse = ref(options.renderContent.value)
+  let previousParsedNodes: ParsedNode[] = []
+  let parseCoalesceTimer: ReturnType<typeof setTimeout> | undefined
+  let lastParseFlushAt = getNow()
+
+  function clearParseCoalesceTimer() {
+    if (!parseCoalesceTimer)
+      return
+
+    clearTimeout(parseCoalesceTimer)
+    parseCoalesceTimer = undefined
+  }
+
+  function flushParseContent() {
+    clearParseCoalesceTimer()
+    const nextContent = options.renderContent.value
+    if (contentToParse.value !== nextContent)
+      contentToParse.value = nextContent
+    lastParseFlushAt = getNow()
+  }
+
+  function scheduleParseContentFlush() {
+    if (parseCoalesceTimer)
+      return
+
+    const delay = Math.max(0, PARSE_COALESCE_MS - (getNow() - lastParseFlushAt))
+    if (delay <= 0) {
+      flushParseContent()
+      return
+    }
+
+    parseCoalesceTimer = setTimeout(flushParseContent, delay)
+  }
+
+  watch(
+    [options.renderContent, options.effectiveFinal, smoothStreamingEnabled],
+    ([nextContent, final, smoothEnabled]) => {
+      if (contentToParse.value === nextContent)
+        return
+
+      if (!smoothEnabled || final || shouldFlushParseImmediately(contentToParse.value, nextContent)) {
+        flushParseContent()
+        return
+      }
+
+      scheduleParseContentFlush()
+    },
+    { flush: 'sync', immediate: true },
+  )
+
+  onScopeDispose(clearParseCoalesceTimer)
 
   const effectiveCustomHtmlTags = computed(() => {
     return mergeCustomHtmlTags(
@@ -122,29 +275,43 @@ export function useMarkdownParsing(
   })
 
   const parsedNodes = computed<ParsedNode[]>(() => {
-    if (props.nodes?.length)
+    if (props.nodes?.length) {
+      previousParsedNodes = []
       return markRaw((props.nodes as unknown as ParsedNode[]).slice())
+    }
 
-    const contentToParse = options.renderContent.value
+    const content = contentToParse.value
 
-    if (!contentToParse)
+    if (!content) {
+      previousParsedNodes = []
       return []
+    }
 
     const parseStart = options.debugPerformanceEnabled.value
-      ? performance.now()
+      ? getNow()
       : 0
+    const md = mdInstance.value
+    const streamStatsBefore = options.debugPerformanceEnabled.value
+      ? readStreamStats(md)
+      : null
 
-    const parsed = parseMarkdownToStructure(
-      contentToParse,
-      mdInstance.value,
+    const parsed = stabilizeParsedNodes(parseMarkdownToStructure(
+      content,
+      md,
       mergedParseOptions.value,
-    )
+    ), previousParsedNodes)
+    previousParsedNodes = parsed
 
     if (options.debugPerformanceEnabled.value) {
-      options.logPerf('parse(sync)', {
-        ms: Math.round(performance.now() - parseStart),
+      const streamStats = readStreamStats(md)
+      const usedStream = typeof streamStats?.total === 'number'
+        && streamStats.total > (streamStatsBefore?.total ?? 0)
+
+      options.logPerf(usedStream ? 'parse(stream)' : 'parse(sync)', {
+        ms: Math.round(getNow() - parseStart),
         nodes: parsed.length,
-        contentLength: contentToParse.length,
+        contentLength: content.length,
+        ...(streamStats ? { streamStats } : {}),
       })
     }
 

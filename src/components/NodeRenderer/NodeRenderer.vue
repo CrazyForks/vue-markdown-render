@@ -204,6 +204,7 @@ const {
   instanceMsgId,
   renderContent,
   effectiveFinal,
+  smoothStreamingEnabled,
   debugPerformanceEnabled,
   customComponentsMap,
   logPerf,
@@ -390,6 +391,9 @@ const {
 })
 const nodeContentElements = new Map<number, HTMLElement | null>()
 const nodeContentDeferredMeasureTimers = new Map<number, number[]>()
+const finalHeightConvergenceTimers: number[] = []
+const pendingHeightMeasurements = new Map<number, { height: number, allowShrink: boolean }>()
+let heightMeasurementRaf: number | null = null
 const desiredRenderedCount = computed(() => {
   if (!virtualizationEnabled.value)
     return parsedNodes.value.length
@@ -1037,6 +1041,74 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
     scheduleFocusSync()
 }
 
+function flushPendingHeightMeasurements() {
+  heightMeasurementRaf = null
+
+  for (const [index, pending] of pendingHeightMeasurements) {
+    pendingHeightMeasurements.delete(index)
+    recordNodeHeight(index, pending.height, { allowShrink: pending.allowShrink })
+  }
+}
+
+function queueNodeHeightRecord(index: number, height: number) {
+  if (!Number.isFinite(height) || height <= 0)
+    return
+
+  const node = parsedNodes.value[index] as (ParsedNode & { loading?: boolean }) | undefined
+  const allowShrink = node?.loading !== true
+  const previous = pendingHeightMeasurements.get(index)
+  const nextHeight = previous && !allowShrink
+    ? Math.max(previous.height, height)
+    : height
+
+  pendingHeightMeasurements.set(index, {
+    height: nextHeight,
+    allowShrink: previous ? previous.allowShrink && allowShrink : allowShrink,
+  })
+
+  if (heightMeasurementRaf != null)
+    return
+
+  heightMeasurementRaf = requestFrame
+    ? requestFrame(flushPendingHeightMeasurements)
+    : null
+
+  if (heightMeasurementRaf == null)
+    flushPendingHeightMeasurements()
+}
+
+function measureNodeHeight(index: number, el: HTMLElement) {
+  queueNodeHeightRecord(index, el.offsetHeight)
+}
+
+function clearFinalHeightConvergenceTimers() {
+  if (!isClient)
+    return
+
+  while (finalHeightConvergenceTimers.length) {
+    const timer = finalHeightConvergenceTimers.pop()
+    if (timer != null)
+      window.clearTimeout(timer)
+  }
+}
+
+function scheduleFinalHeightConvergence() {
+  if (!isClient || !effectiveFinal.value || !nodeContentElements.size)
+    return
+
+  clearFinalHeightConvergenceTimers()
+  for (const delay of [80, 240, 640]) {
+    const timer = window.setTimeout(() => {
+      for (const [index, el] of nodeContentElements) {
+        if (el)
+          measureNodeHeight(index, el)
+      }
+    }, delay)
+
+    finalHeightConvergenceTimers.push(timer)
+  }
+}
+
 function setNodeContentRef(index: number, el: HTMLElement | null) {
   const previousTimers = nodeContentDeferredMeasureTimers.get(index)
   if (previousTimers) {
@@ -1055,7 +1127,7 @@ function setNodeContentRef(index: number, el: HTMLElement | null) {
   }
   nodeContentElements.set(index, el)
   const measure = () => {
-    recordNodeHeight(index, el.offsetHeight)
+    measureNodeHeight(index, el)
   }
   queueMicrotask(measure)
   if (typeof ResizeObserver !== 'undefined') {
@@ -1088,8 +1160,22 @@ watch(
         window.clearTimeout(id)
     }
     nodeContentDeferredMeasureTimers.clear()
+    clearFinalHeightConvergenceTimers()
+    if (heightMeasurementRaf != null) {
+      cancelFrame?.(heightMeasurementRaf)
+      heightMeasurementRaf = null
+    }
+    pendingHeightMeasurements.clear()
   },
   { immediate: true },
+)
+
+watch(
+  effectiveFinal,
+  (final) => {
+    if (final)
+      scheduleFinalHeightConvergence()
+  },
 )
 
 const VIEWPORT_FALLBACK_DELAY = 1800
@@ -1374,6 +1460,12 @@ onBeforeUnmount(() => {
       window.clearTimeout(id)
   }
   nodeContentDeferredMeasureTimers.clear()
+  clearFinalHeightConvergenceTimers()
+  if (heightMeasurementRaf != null) {
+    cancelFrame?.(heightMeasurementRaf)
+    heightMeasurementRaf = null
+  }
+  pendingHeightMeasurements.clear()
   cleanupExperimentResizeObserver()
   clearRestoreReconcile()
   cleanupScrollListener()

@@ -18,6 +18,8 @@ type ParsedNodeWithFields = ParsedNode & {
   tag?: unknown
 }
 
+const streamParseEnvCache = new WeakMap<object, Map<string, Record<string, unknown>>>()
+
 function getNodeFields(node: ParsedNode) {
   return node as ParsedNodeWithFields
 }
@@ -29,6 +31,67 @@ function getCustomHtmlTagSet(options?: ParseOptions) {
 
   const normalized = normalizeCustomHtmlTags(custom)
   return normalized.length ? new Set(normalized) : null
+}
+
+function getStableStreamEnv(md: MarkdownIt, env: Record<string, unknown>) {
+  const mdKey = md as unknown as object
+  let byMode = streamParseEnvCache.get(mdKey)
+  if (!byMode) {
+    byMode = new Map()
+    streamParseEnvCache.set(mdKey, byMode)
+  }
+
+  const modeKey = env.__markstreamFinal === true ? 'final' : 'streaming'
+  let stableEnv = byMode.get(modeKey)
+  if (!stableEnv) {
+    stableEnv = {}
+    byMode.set(modeKey, stableEnv)
+  }
+
+  for (const key of Object.keys(stableEnv)) {
+    if (!Object.prototype.hasOwnProperty.call(env, key))
+      delete stableEnv[key]
+  }
+  Object.assign(stableEnv, env)
+  return stableEnv
+}
+
+function cloneMarkdownToken(token: Token): Token {
+  const cloned = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as Token
+
+  if (Array.isArray(token.attrs))
+    cloned.attrs = token.attrs.map(attr => [...attr] as [string, string])
+  if (Array.isArray(token.map))
+    cloned.map = [...token.map] as [number, number]
+  if (Array.isArray(token.children))
+    cloned.children = token.children.map(cloneMarkdownToken)
+  if (token.meta && typeof token.meta === 'object')
+    cloned.meta = { ...token.meta }
+
+  return cloned
+}
+
+function cloneMarkdownTokens(tokens: Token[]) {
+  return tokens.map(cloneMarkdownToken)
+}
+
+function parseTopLevelTokens(
+  md: MarkdownIt,
+  source: string,
+  env: Record<string, unknown>,
+  options: ParseOptions,
+) {
+  const internalOptions = options as InternalParseOptions
+  const stream = md.stream
+  const shouldUseStreamParse = internalOptions.__disableStreamParse !== true
+    && options.streamParse !== false
+    && stream?.enabled === true
+    && typeof stream.parse === 'function'
+
+  if (!shouldUseStreamParse)
+    return md.parse(source, env)
+
+  return cloneMarkdownTokens(stream.parse!(source, getStableStreamEnv(md, env)))
 }
 
 export function buildAllowedHtmlTagSet(options?: ParseOptions) {
@@ -346,6 +409,7 @@ function findLastClosingTagStart(raw: string, tag: string) {
 function buildDetailsChildParseOptions(options: ParseOptions, final: boolean): ParseOptions {
   return {
     final,
+    __disableStreamParse: true,
     requireClosingStrong: options.requireClosingStrong,
     customHtmlTags: options.customHtmlTags,
     validateLink: options.validateLink,
@@ -451,7 +515,10 @@ function parseDetailsFragmentChildren(
   if (!fragment.trim())
     return []
 
-  return parseMarkdownToStructure(fragment, md, options)
+  return parseMarkdownToStructure(fragment, md, {
+    ...options,
+    __disableStreamParse: true,
+  })
 }
 
 function parseSummaryChildren(
@@ -1974,7 +2041,7 @@ export function parseMarkdownToStructure(
     const preHook = options.preTransformTokens
     const postHook = options.postTransformTokens
     if (typeof preHook === 'function' || typeof postHook === 'function') {
-      const rawTokens = md.parse(safeMarkdown, { __markstreamFinal: isFinal }) as unknown as MarkdownToken[]
+      const rawTokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options) as unknown as MarkdownToken[]
       const hookedTokens = typeof preHook === 'function' ? (preHook(rawTokens) || rawTokens) : rawTokens
       if (typeof postHook === 'function')
         postHook(hookedTokens)
@@ -1983,7 +2050,7 @@ export function parseMarkdownToStructure(
   }
 
   // Get tokens from markdown-it
-  const tokens = md.parse(safeMarkdown, { __markstreamFinal: isFinal })
+  const tokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options)
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
     return []

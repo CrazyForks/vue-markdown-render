@@ -86,6 +86,14 @@ export interface MarkdownIt {
   disable: (list: string | string[], ignoreInvalid?: boolean) => this
   use: <TParams extends unknown[] = any[]>(plugin: CompatibleMarkdownItPlugin<TParams>, ...params: TParams) => this
   parse: (src: string, env?: Record<string, unknown>) => Token[]
+  stream?: {
+    enabled?: boolean
+    parse?: (src: string, env?: Record<string, unknown>) => Token[]
+    reset?: () => void
+    peek?: () => Token[]
+    stats?: () => unknown
+    resetStats?: () => void
+  }
   parseInline: (src: string, env?: Record<string, unknown>) => Token[]
   render: (src: string, env?: Record<string, unknown>) => string
   renderInline: (src: string, env?: Record<string, unknown>) => string
