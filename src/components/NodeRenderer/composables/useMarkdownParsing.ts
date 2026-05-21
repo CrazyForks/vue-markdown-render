@@ -91,6 +91,7 @@ const STRUCTURAL_OBJECT_FIELDS = new Set([
   'term',
   'definition',
 ])
+const TEXT_SIGNATURE_FIELDS = ['raw', 'content', 'code', 'originalCode', 'updatedCode']
 const objectIdentityIds = new WeakMap<object, number>()
 const nodeSignatureCache = new WeakMap<object, string>()
 let nextObjectIdentityId = 1
@@ -220,7 +221,7 @@ function structuralFieldSignature(value: unknown): string {
 function buildPrimitiveFieldSignature(record: Record<string, unknown>) {
   return Object.keys(record)
     .sort()
-    .filter(key => key !== 'children' && key !== 'raw' && key !== 'content' && key !== 'code')
+    .filter(key => key !== 'children' && !TEXT_SIGNATURE_FIELDS.includes(key))
     .map((key) => {
       const value = record[key]
 
@@ -241,15 +242,20 @@ function buildPrimitiveFieldSignature(record: Record<string, unknown>) {
     .join(';')
 }
 
+function buildTextFieldSignature(record: Record<string, unknown>) {
+  return TEXT_SIGNATURE_FIELDS
+    .map((key) => {
+      const value = record[key]
+      return typeof value === 'string'
+        ? `${key}=s:${signatureString(value)}`
+        : ''
+    })
+    .filter(Boolean)
+    .join(';')
+}
+
 function buildCheapNodeSignature(node: ParsedNode) {
   const record = node as Record<string, unknown>
-  const raw = typeof record.raw === 'string'
-    ? record.raw
-    : typeof record.content === 'string'
-      ? record.content
-      : typeof record.code === 'string'
-        ? record.code
-        : ''
   const children = Array.isArray(record.children)
     ? record.children as ParsedNode[]
     : []
@@ -259,7 +265,7 @@ function buildCheapNodeSignature(node: ParsedNode) {
 
   return [
     node.type,
-    signatureString(raw),
+    buildTextFieldSignature(record),
     buildPrimitiveFieldSignature(record),
     children.length,
     childSignature,

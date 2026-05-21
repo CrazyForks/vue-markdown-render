@@ -467,6 +467,43 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('does not reuse a custom node when content changes but raw stays stable', () => {
+    let dynamicContent = 'first'
+    const content = ref('custom')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        preTransformTokens(tokens) {
+          for (const token of tokens as any[]) {
+            if (token.type === 'inline') {
+              token.children = [{
+                type: 'chart',
+                raw: 'chart',
+                content: dynamicContent,
+              }]
+            }
+          }
+          return tokens
+        },
+      },
+    })
+    const firstParagraph = state.parsedNodes.value[0] as any
+    const firstChart = firstParagraph.children?.[0]
+
+    expect(firstChart?.content).toBe('first')
+
+    dynamicContent = 'second'
+    content.value = `${content.value}\n\nAppended paragraph.`
+
+    const secondParagraph = state.parsedNodes.value[0] as any
+    const secondChart = secondParagraph.children?.[0]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(secondChart).not.toBe(firstChart)
+    expect(secondChart?.content).toBe('second')
+
+    scope.stop()
+  })
+
   it('does not deep-stringify previous ParsedNodes during large append reuse', () => {
     const stringify = vi.spyOn(JSON, 'stringify')
     const content = ref(buildParagraphs(5000))
