@@ -60,6 +60,25 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(getStreamStats(md).total).toBe(1)
   })
 
+  it('does not let generic html fragment parsing overwrite the top-level stream cache', () => {
+    const md = getMarkdown('stream-parser-generic-html-fragments')
+    ;(md as any).stream.resetStats()
+
+    const nodes = parseMarkdownToStructure(
+      [
+        '<div>',
+        '# Title',
+        '- item',
+        '</div>',
+      ].join('\n'),
+      md,
+      { final: true },
+    ) as any[]
+
+    expect(nodes[0]?.children?.length).toBeGreaterThan(0)
+    expect(getStreamStats(md).total).toBe(1)
+  })
+
   it('does not let cached stream tokens leak mutations into repeated parses', () => {
     const md = getMarkdown('stream-parser-token-clone')
     const markdown = [

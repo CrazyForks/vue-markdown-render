@@ -40,6 +40,16 @@ function buildParagraphs(count: number) {
   ).join('\n\n')
 }
 
+function setTokenAttr(token: { attrs?: [string, string][] | null }, name: string, value: string) {
+  const attrs = token.attrs ?? []
+  const existing = attrs.find(attr => attr[0] === name)
+  if (existing)
+    existing[1] = value
+  else
+    attrs.push([name, value])
+  token.attrs = attrs
+}
+
 describe('useMarkdownParsing performance behavior', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -183,6 +193,54 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(second).not.toBe(first)
     expect((second as any).raw).toBe((first as any).raw)
     expect(paragraphChildren(second).some(child => child.type === 'link')).toBe(false)
+
+    scope.stop()
+  })
+
+  it('does not reuse nodes when only attrs change', () => {
+    let attrValue = 'first'
+    const content = ref('# Title\n\n[x](https://example.com)')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: { streamParse: false },
+      customMarkdownIt: (md: any) => {
+        if (md.__testDynamicAttrsInstalled)
+          return md
+
+        md.__testDynamicAttrsInstalled = true
+        md.core.ruler.push('test_dynamic_attrs', (parserState: any) => {
+          for (const token of parserState.tokens ?? []) {
+            if (token.type === 'heading_open')
+              setTokenAttr(token, 'data-state', attrValue)
+
+            if (token.type === 'inline') {
+              for (const child of token.children ?? []) {
+                if (child.type === 'link_open')
+                  setTokenAttr(child, 'data-state', attrValue)
+              }
+            }
+          }
+        })
+        return md
+      },
+    })
+    const firstHeading = state.parsedNodes.value[0] as any
+    const firstParagraph = state.parsedNodes.value[1]
+    const firstLink = paragraphChildren(firstParagraph).find(child => child.type === 'link') as any
+
+    expect(firstHeading.attrs).toMatchObject({ 'data-state': 'first' })
+    expect(firstLink.attrs).toContainEqual(['data-state', 'first'])
+
+    attrValue = 'second'
+    content.value = `${content.value}\n\nAppended paragraph.`
+
+    const secondHeading = state.parsedNodes.value[0] as any
+    const secondParagraph = state.parsedNodes.value[1]
+    const secondLink = paragraphChildren(secondParagraph).find(child => child.type === 'link') as any
+
+    expect(secondHeading).not.toBe(firstHeading)
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(secondHeading.attrs).toMatchObject({ 'data-state': 'second' })
+    expect(secondLink.attrs).toContainEqual(['data-state', 'second'])
 
     scope.stop()
   })

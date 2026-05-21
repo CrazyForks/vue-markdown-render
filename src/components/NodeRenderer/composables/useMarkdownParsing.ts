@@ -71,6 +71,7 @@ const STREAM_STAT_COUNTER_KEYS: Array<keyof StreamStatsLike> = [
   'fullParses',
   'chunkedParses',
 ]
+const STRUCTURAL_OBJECT_FIELDS = new Set(['attrs'])
 const objectIdentityIds = new WeakMap<object, number>()
 const nodeSignatureCache = new WeakMap<object, string>()
 let nextObjectIdentityId = 1
@@ -160,6 +161,25 @@ function signatureString(value: unknown) {
   return `${text.length}:${hashString(text)}`
 }
 
+function stableValueSignature(value: unknown): string {
+  if (value == null || typeof value === 'number' || typeof value === 'boolean')
+    return String(value)
+  if (typeof value === 'string')
+    return `s:${signatureString(value)}`
+  if (typeof value === 'function')
+    return `fn:${getIdentityKey(value)}`
+  if (Array.isArray(value))
+    return `a:${value.length}:${value.map(stableValueSignature).join(',')}`
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return `o:${Object.keys(record)
+      .sort()
+      .map(key => `${key}:${stableValueSignature(record[key])}`)
+      .join(';')}`
+  }
+  return typeof value
+}
+
 function buildPrimitiveFieldSignature(record: Record<string, unknown>) {
   return Object.keys(record)
     .sort()
@@ -173,6 +193,8 @@ function buildPrimitiveFieldSignature(record: Record<string, unknown>) {
         return `${key}=${String(value)}`
       if (typeof value === 'function')
         return `${key}=fn:${getIdentityKey(value)}`
+      if (STRUCTURAL_OBJECT_FIELDS.has(key) && (Array.isArray(value) || typeof value === 'object'))
+        return `${key}=${stableValueSignature(value)}`
       if (Array.isArray(value)) {
         const items = value.map((item) => {
           if (typeof item === 'string')
