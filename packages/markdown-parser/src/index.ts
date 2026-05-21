@@ -161,9 +161,8 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
   md.use(markdownItMark)
   // Safely resolve default export or the module itself for checkbox plugin
   type CheckboxPluginFn = (md: MarkdownIt, opts?: unknown) => void
-  const markdownItCheckboxPlugin = ((markdownItCheckbox as unknown) as {
-    default?: CheckboxPluginFn
-  }).default ?? markdownItCheckbox
+  const checkboxModule = markdownItCheckbox as unknown as { default?: CheckboxPluginFn } & CheckboxPluginFn
+  const markdownItCheckboxPlugin = checkboxModule.default ?? checkboxModule
   md.use(markdownItCheckboxPlugin)
   md.use(markdownItIns)
   md.use(markdownItFootnote)
