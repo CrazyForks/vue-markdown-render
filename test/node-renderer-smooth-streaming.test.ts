@@ -7,6 +7,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import NodeRenderer from '../src/components/NodeRenderer'
 
+function readStreamRenderVersion(wrapper: any) {
+  const version = wrapper.vm.$?.setupState?.streamRenderVersion
+  return typeof version === 'number' ? version : version?.value
+}
+
 describe('node renderer smooth streaming', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -158,6 +163,7 @@ describe('node renderer smooth streaming', () => {
 
     await nextTick()
     queuedFrames.length = 0
+    const initialVersion = readStreamRenderVersion(wrapper)
 
     // Initial append — visible is still empty (rAF not ticked)
     await wrapper.setProps({ content: 'hello' })
@@ -177,6 +183,7 @@ describe('node renderer smooth streaming', () => {
     // Before the fix, each props.content change bumped streamRenderVersion,
     // which could trigger TextNode watchers even though visible was unchanged.
     expect(wrapper.text()).not.toContain('hello world')
+    expect(readStreamRenderVersion(wrapper)).toBe(initialVersion)
     wrapper.unmount()
   })
 

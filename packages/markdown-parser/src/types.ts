@@ -408,7 +408,9 @@ export interface ParseOptions {
   /**
    * Use markdown-it-ts' stream parser for the top-level document parse when
    * available. Fragment parses always use the regular parser to keep the
-   * stream cache tied to the full source document.
+   * stream cache tied to the full source document. Set to false for one-shot
+   * parses that should not retain the latest source/token cache on the md
+   * instance.
    */
   streamParse?: boolean | 'auto'
   // When true, require a closing `**` to parse strong; otherwise allow mid-state strong

@@ -191,7 +191,7 @@ describe('node renderer measurement performance', () => {
     wrapper.unmount()
   })
 
-  it('keeps the largest pending streaming tail height without a loading flag', async () => {
+  it('allows nodes mode without final=true to shrink tail heights', async () => {
     const platform = installManualMeasurementPlatform()
     const firstNode = createParagraph(1)
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -204,6 +204,68 @@ describe('node renderer measurement performance', () => {
       },
     })
 
+    await flushAll()
+    platform.flushFrames()
+
+    const state = setupState(wrapper)
+    const element = wrapper.get('.node-slot[data-node-index="0"] .node-content').element as HTMLElement
+    const resize = platform.resizeCallbacks.get(element)
+
+    platform.heights.set(element, 120)
+    resize?.([], {} as ResizeObserver)
+    platform.heights.set(element, 80)
+    resize?.([], {} as ResizeObserver)
+    platform.flushFrames()
+
+    expect(state.getFallbackNodeHeight(0)).toBe(80)
+    wrapper.unmount()
+  })
+
+  it('allows static content without final=true to shrink tail heights', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: 'Paragraph 1\n\nParagraph 2',
+        maxLiveNodes: 1,
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+    platform.flushFrames()
+
+    const state = setupState(wrapper)
+    const element = wrapper.get('.node-slot[data-node-index="0"] .node-content').element as HTMLElement
+    const resize = platform.resizeCallbacks.get(element)
+
+    platform.heights.set(element, 120)
+    resize?.([], {} as ResizeObserver)
+    platform.heights.set(element, 80)
+    resize?.([], {} as ResizeObserver)
+    platform.flushFrames()
+
+    expect(state.getFallbackNodeHeight(0)).toBe(80)
+    wrapper.unmount()
+  })
+
+  it('keeps the largest pending appended content tail height without a loading flag', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: 'Paragraph 1\n\nParagraph 2',
+        maxLiveNodes: 1,
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+    platform.flushFrames()
+
+    await wrapper.setProps({ content: 'Paragraph 1\n\nParagraph 2 plus streamed tail' })
     await flushAll()
     platform.flushFrames()
 

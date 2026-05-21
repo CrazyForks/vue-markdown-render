@@ -72,6 +72,7 @@ const STREAM_STAT_COUNTER_KEYS: Array<keyof StreamStatsLike> = [
   'chunkedParses',
 ]
 const objectIdentityIds = new WeakMap<object, number>()
+const nodeSignatureCache = new WeakMap<object, string>()
 let nextObjectIdentityId = 1
 
 function getNow() {
@@ -145,44 +146,83 @@ function resolveParseCoalesceMs(props: Readonly<NodeRendererProps>) {
     : DEFAULT_PARSE_COALESCE_MS
 }
 
-function toNodeSignatureValue(value: unknown, seen = new WeakSet<object>()): unknown {
-  if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
-    return value
-
-  if (typeof value === 'bigint')
-    return `bigint:${value}`
-
-  if (typeof value === 'symbol')
-    return `symbol:${String(value)}`
-
-  if (typeof value === 'function')
-    return `function:${getIdentityKey(value)}`
-
-  if (Array.isArray(value))
-    return value.map(item => toNodeSignatureValue(item, seen))
-
-  if (typeof value === 'object') {
-    const object = value as object
-    if (seen.has(object))
-      return '[Circular]'
-
-    seen.add(object)
-    const normalized: Record<string, unknown> = {}
-    const record = value as Record<string, unknown>
-    for (const key of Object.keys(record).sort()) {
-      const item = record[key]
-      if (item !== undefined)
-        normalized[key] = toNodeSignatureValue(item, seen)
-    }
-    seen.delete(object)
-    return normalized
+function hashString(value: string) {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
   }
+  return (hash >>> 0).toString(36)
+}
 
-  return String(value)
+function signatureString(value: unknown) {
+  const text = String(value ?? '')
+  return `${text.length}:${hashString(text)}`
+}
+
+function buildPrimitiveFieldSignature(record: Record<string, unknown>) {
+  return Object.keys(record)
+    .sort()
+    .filter(key => key !== 'children' && key !== 'raw' && key !== 'content' && key !== 'code')
+    .map((key) => {
+      const value = record[key]
+
+      if (typeof value === 'string')
+        return `${key}=s:${signatureString(value)}`
+      if (typeof value === 'number' || typeof value === 'boolean' || value == null)
+        return `${key}=${String(value)}`
+      if (typeof value === 'function')
+        return `${key}=fn:${getIdentityKey(value)}`
+      if (Array.isArray(value)) {
+        const items = value.map((item) => {
+          if (typeof item === 'string')
+            return `s:${signatureString(item)}`
+          if (typeof item === 'number' || typeof item === 'boolean' || item == null)
+            return String(item)
+          return typeof item
+        })
+        return `${key}=a:${items.length}:${items.join(',')}`
+      }
+
+      return ''
+    })
+    .filter(Boolean)
+    .join(';')
+}
+
+function buildCheapNodeSignature(node: ParsedNode) {
+  const record = node as Record<string, unknown>
+  const raw = typeof record.raw === 'string'
+    ? record.raw
+    : typeof record.content === 'string'
+      ? record.content
+      : typeof record.code === 'string'
+        ? record.code
+        : ''
+  const children = Array.isArray(record.children)
+    ? record.children as ParsedNode[]
+    : []
+  const childSignature = children.length
+    ? children.map(getParsedNodeSignature).join('|')
+    : ''
+
+  return [
+    node.type,
+    signatureString(raw),
+    buildPrimitiveFieldSignature(record),
+    children.length,
+    childSignature,
+  ].join(':')
 }
 
 function getParsedNodeSignature(node: ParsedNode) {
-  return JSON.stringify(toNodeSignatureValue(node))
+  const cached = nodeSignatureCache.get(node as object)
+  if (cached)
+    return cached
+
+  const signature = buildCheapNodeSignature(node)
+  nodeSignatureCache.set(node as object, signature)
+  return signature
 }
 
 function isParsedNodeStable(previous: ParsedNode, next: ParsedNode) {

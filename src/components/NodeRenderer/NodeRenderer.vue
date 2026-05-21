@@ -169,6 +169,39 @@ const {
   inheritedSmoothStreaming,
 })
 provide('markstreamSmoothStreaming', smoothStreamingEnabled)
+const contentStreamingTailActive = ref(false)
+let previousContentStreamValue = ''
+let hasSeenContentStreamValue = false
+
+watch(
+  [renderContent, () => props.nodes, effectiveFinal],
+  ([content, nodes, final]) => {
+    const nextContent = content ?? ''
+
+    if (nodes?.length || final === true) {
+      contentStreamingTailActive.value = false
+      previousContentStreamValue = nextContent
+      hasSeenContentStreamValue = true
+      return
+    }
+
+    if (!hasSeenContentStreamValue) {
+      previousContentStreamValue = nextContent
+      hasSeenContentStreamValue = true
+      return
+    }
+
+    if (previousContentStreamValue && nextContent.length > previousContentStreamValue.length && nextContent.startsWith(previousContentStreamValue)) {
+      contentStreamingTailActive.value = true
+    }
+    else if (nextContent.length < previousContentStreamValue.length || !nextContent.startsWith(previousContentStreamValue)) {
+      contentStreamingTailActive.value = false
+    }
+
+    previousContentStreamValue = nextContent
+  },
+  { flush: 'sync', immediate: true },
+)
 
 function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)
@@ -181,20 +214,6 @@ const instanceMsgId = props.customId
 const mathBlockMinHeightCache = createMathBlockMinHeightCache(instanceMsgId)
 const mathBlockCacheScope = computed(() => `${instanceMsgId}:${streamRenderVersion.value}`)
 provideMathBlockMinHeightCache(mathBlockMinHeightCache)
-const renderVersionSource = computed(() => {
-  if (props.nodes?.length)
-    return props.nodes
-  return renderContent.value
-})
-
-watch(
-  renderVersionSource,
-  () => {
-    mathBlockMinHeightCache.clear()
-    streamRenderVersion.value += 1
-  },
-  { immediate: true },
-)
 const customComponentsMap = useCustomNodeComponents(() => props.customId)
 const {
   effectiveCustomHtmlTagsSet,
@@ -209,6 +228,15 @@ const {
   customComponentsMap,
   logPerf,
 })
+
+watch(
+  parsedNodes,
+  () => {
+    mathBlockMinHeightCache.clear()
+    streamRenderVersion.value += 1
+  },
+  { immediate: true },
+)
 const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   customId: props.customId,
   customHtmlTags: mergedParseOptions.value.customHtmlTags,
@@ -1072,8 +1100,11 @@ function queueNodeHeightRecord(index: number, el: HTMLElement, height: number) {
   if (version == null)
     return
   const node = parsedNodes.value[index] as (ParsedNode & { loading?: boolean }) | undefined
-  const isStreamingTail = effectiveFinal.value !== true && index >= parsedNodes.value.length - 2
-  const allowShrink = !isStreamingTail && node?.loading !== true
+  const isContentStreamingTail = contentStreamingTailActive.value
+    && effectiveFinal.value !== true
+    && !props.nodes?.length
+    && index >= parsedNodes.value.length - 2
+  const allowShrink = !(node?.loading === true || isContentStreamingTail)
   const previous = pendingHeightMeasurements.get(index)
   const combinedAllowShrink = previous
     ? previous.allowShrink && allowShrink

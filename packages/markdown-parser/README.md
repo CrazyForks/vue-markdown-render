@@ -221,6 +221,15 @@ Parses markdown content into a structured node tree.
 - `md` (MarkdownItCore): A markdown-it-ts instance created with `getMarkdown()`
 - `options` (ParseOptions, optional): Parsing options with hooks
 
+When the `md` instance has `md.stream.enabled === true`, top-level parses use
+markdown-it-ts' stream parser by default and keep the parser's latest source and
+token cache on that `md` instance. One-shot callers that do not want that cache
+can opt out:
+
+```ts
+const nodes = parseMarkdownToStructure(source, md, { streamParse: false })
+```
+
 **Returns:** `ParsedNode[]` - An array of parsed nodes
 
 #### `processTokens(tokens)`
@@ -262,6 +271,9 @@ interface ParseOptions {
   validateLink?: (url: string) => boolean
   // When true, treats the input as complete (end-of-stream)
   final?: boolean
+  // Use markdown-it-ts stream parsing for top-level documents.
+  // Set false for one-shot parses that should not retain stream cache on md.
+  streamParse?: boolean | 'auto'
   // Require closing `**` for strong parsing (default: false)
   requireClosingStrong?: boolean
 }

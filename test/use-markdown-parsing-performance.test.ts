@@ -33,6 +33,13 @@ function paragraphChildren(node: unknown) {
   return ((node as { children?: unknown[] } | undefined)?.children ?? []) as Array<{ type?: string }>
 }
 
+function buildParagraphs(count: number) {
+  return Array.from(
+    { length: count },
+    (_, index) => `Paragraph ${index + 1} with enough text to exercise large append parsing.`,
+  ).join('\n\n')
+}
+
 describe('useMarkdownParsing performance behavior', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -176,6 +183,22 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(second).not.toBe(first)
     expect((second as any).raw).toBe((first as any).raw)
     expect(paragraphChildren(second).some(child => child.type === 'link')).toBe(false)
+
+    scope.stop()
+  })
+
+  it('does not deep-stringify previous ParsedNodes during large append reuse', () => {
+    const stringify = vi.spyOn(JSON, 'stringify')
+    const content = ref(buildParagraphs(5000))
+    const { scope, state } = createParsingState(content)
+
+    expect(state.parsedNodes.value.length).toBe(5000)
+    stringify.mockClear()
+
+    content.value = `${content.value}\n\nAppended paragraph.`
+    expect(state.parsedNodes.value.length).toBe(5001)
+
+    expect(stringify.mock.calls.length).toBeLessThan(20)
 
     scope.stop()
   })
