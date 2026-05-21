@@ -123,6 +123,35 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(after.fullParses).toBeGreaterThanOrEqual(before.fullParses + 1)
   })
 
+  it('does not keep table loading after rows are appended through stream parse', () => {
+    const md = getMarkdown('stream-table-loading-clear')
+    const first = '| 姓名 | 年龄 | 职业 |\n| --- | --- |'
+    const second = '| 姓名 | 年龄 | 职业 |\n| --- | --- | --- |\n| 张三 | 28 | 工程师 |\n| 李四 | 31 | 设计师 |\n\n'
+
+    const partial = parseMarkdownToStructure(first, md, { final: false, streamParse: true }) as any[]
+    expect(partial[0]?.type).toBe('table')
+    expect(partial[0]?.loading).toBe(true)
+
+    const full = parseMarkdownToStructure(second, md, { final: false, streamParse: true }) as any[]
+    expect(full[0]?.type).toBe('table')
+    expect(full[0]?.rows?.length).toBe(2)
+    expect(full[0]?.loading).toBe(false)
+    expect(full[0]?.rows?.[0]?.cells?.[0]?.children?.[0]?.content).toBe('张三')
+  })
+
+  it('clears table loading on final parse', () => {
+    const md = getMarkdown('stream-table-final-loading-clear')
+    const markdown = '| 姓名 | 年龄 | 职业 |\n| --- | --- | --- |\n'
+
+    const nodes = parseMarkdownToStructure(markdown, md, {
+      final: true,
+      streamParse: true,
+    }) as any[]
+
+    expect(nodes[0]?.type).toBe('table')
+    expect(nodes[0]?.loading).toBe(false)
+  })
+
   it('parses shared-md documents correctly while streamParse opt-out avoids stream stats and cache', () => {
     const md = getMarkdown('stream-parser-shared-md-opt-out')
     const first = '# First\n\nAlpha paragraph.'
