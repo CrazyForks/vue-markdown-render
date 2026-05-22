@@ -1,5 +1,5 @@
 import type { InternalParseOptions, MarkdownToken, ParsedNode, ParseOptions, TextNode } from '../../types'
-import { shouldDemoteFilenameLikeLinkify } from '../linkifyHeuristics'
+import { inferLinkifyDemotionContext, isDecodedFromRawPunycode, shouldDemoteFilenameLikeLinkify } from '../linkifyHeuristics'
 import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
@@ -350,6 +350,20 @@ export function parseInlineTokens(
 ): ParsedNode[] {
   if (!tokens || tokens.length === 0)
     return []
+
+  const inheritedContext = (options as InternalParseOptions | undefined)?.__linkifyDemotionContext
+  const inferredContext = inferLinkifyDemotionContext(raw)
+  const linkifyDemotionContext = {
+    filename: inheritedContext?.filename || inferredContext.filename,
+    explicitFilename: inheritedContext?.explicitFilename || inferredContext.explicitFilename,
+    marketTicker: inheritedContext?.marketTicker || inferredContext.marketTicker,
+  }
+  if (linkifyDemotionContext.filename || linkifyDemotionContext.explicitFilename || linkifyDemotionContext.marketTicker) {
+    options = {
+      ...options,
+      __linkifyDemotionContext: linkifyDemotionContext,
+    } as InternalParseOptions
+  }
 
   const internalOptions = options as InternalParseOptions | undefined
   const result: ParsedNode[] = []
@@ -1342,11 +1356,13 @@ export function parseInlineTokens(
     const { node, nextIndex } = parseLinkToken(tokens, i, options)
     i = nextIndex
 
+    const linkText = node.text || node.href || ''
     if (
       token.markup === 'linkify'
-      && shouldDemoteFilenameLikeLinkify(node.text || node.href || '')
+      && !isDecodedFromRawPunycode(linkText, node.href, raw)
+      && shouldDemoteFilenameLikeLinkify(linkText, internalOptions?.__linkifyDemotionContext)
     ) {
-      pushText(node.text || node.href || '', node.text || node.href || '')
+      pushText(linkText, linkText)
       return
     }
 

@@ -4,6 +4,7 @@ import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
 import { parseInlineTokens } from './inline-parsers'
+import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
 import { parseBlockquote } from './node-parsers/blockquote-parser'
 import { containerTokenHandlers } from './node-parsers/container-token-handlers'
@@ -2382,6 +2383,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
     return []
 
   const result: ParsedNode[] = []
+  const linkifyContext = createLinkifyDemotionContextTracker(options)
   let i = 0
   // Note: table token normalization is applied during markdown-it parsing
   // via the `applyFixTableTokens` plugin (core.ruler.after('block')).
@@ -2389,9 +2391,10 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
   // their respective plugins. That keeps parsing-time fixes centralized
   // and avoids ad-hoc post-processing here.
   while (i < tokens.length) {
-    const handled = parseCommonBlockToken(tokens, i, options, containerTokenHandlers)
+    const handled = parseCommonBlockToken(tokens, i, linkifyContext.options(), containerTokenHandlers)
     if (handled) {
       result.push(handled[0])
+      linkifyContext.remember(handled[0].raw)
       i = handled[1]
       continue
     }
@@ -2400,27 +2403,31 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
     switch (token.type) {
       case 'paragraph_open':
       {
-        const paragraphNode = parseParagraph(tokens, i, options) as ParsedNode
+        const paragraphRaw = String(tokens[i + 1]?.content ?? '')
+        const paragraphNode = parseParagraph(tokens, i, linkifyContext.options(paragraphRaw)) as ParsedNode
         const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
         if (promoted)
           result.push(...promoted)
         else
           result.push(paragraphNode)
+        linkifyContext.remember(paragraphNode.raw)
         i += 3 // Skip paragraph_open, inline, paragraph_close
         break
       }
 
       case 'bullet_list_open':
       case 'ordered_list_open': {
-        const [listNode, newIndex] = parseList(tokens, i, options)
+        const [listNode, newIndex] = parseList(tokens, i, linkifyContext.options())
         result.push(listNode)
+        linkifyContext.remember(listNode.raw)
         i = newIndex
         break
       }
 
       case 'blockquote_open': {
-        const [blockquoteNode, newIndex] = parseBlockquote(tokens, i, options)
+        const [blockquoteNode, newIndex] = parseBlockquote(tokens, i, linkifyContext.options())
         result.push(blockquoteNode)
+        linkifyContext.remember(blockquoteNode.raw)
         i = newIndex
         break
       }
@@ -2433,6 +2440,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
           id,
           raw: String(token.content ?? ''),
         } as ParsedNode)
+        linkifyContext.remember(String(token.content ?? ''))
 
         i++
         break
@@ -2440,6 +2448,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
 
       case 'hardbreak':
         result.push(parseHardBreak())
+        linkifyContext.reset()
         i++
         break
 
@@ -2455,6 +2464,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
             ? [{ type: 'text', content, raw: content } as ParsedNode]
             : [],
         } as ParsedNode)
+        linkifyContext.remember(content)
         i++
         break
       }
@@ -2471,7 +2481,8 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         //   historical behavior and emit them as top-level blocks (not wrapped in
         //   a paragraph), since they represent block-like HTML structures.
         {
-          const parsed = parseInlineTokens(token.children || [], String(token.content ?? ''), undefined, options)
+          const raw = String(token.content ?? '')
+          const parsed = parseInlineTokens(token.children || [], raw, undefined, linkifyContext.options(raw))
           if (parsed.length === 0) {
             // no-op (matches previous behavior)
           }
@@ -2481,7 +2492,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
           else {
             const paragraphNode = {
               type: 'paragraph',
-              raw: String(token.content ?? ''),
+              raw,
               children: parsed,
             } as ParsedNode
             const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
@@ -2490,6 +2501,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
             else
               result.push(paragraphNode)
           }
+          linkifyContext.remember(raw)
         }
         i += 1
         break

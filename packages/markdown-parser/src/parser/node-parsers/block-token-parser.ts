@@ -4,6 +4,7 @@ import { normalizeCustomTag } from '../customHtmlTags'
 import { buildAllowedHtmlTagSet } from '../index'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseFenceToken } from '../inline-parsers/fence-parser'
+import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
 import { parseBlockquote } from './blockquote-parser'
 import { parseCodeBlock } from './code-block-parser'
 import { parseDefinitionList } from './definition-list-parser'
@@ -90,6 +91,7 @@ function parseVmrContainer(
   }
 
   const children: ParsedNode[] = []
+  const linkifyContext = createLinkifyDemotionContextTracker(options, true)
   let j = index + 1
 
   // Parse children until we find the closing token
@@ -99,11 +101,13 @@ function parseVmrContainer(
       const contentToken = tokens[j + 1]
       if (contentToken) {
         const childrenArr = (contentToken.children as MarkdownToken[]) || []
-        children.push({
+        const paragraphNode = {
           type: 'paragraph',
-          children: parseInlineTokens(childrenArr || [], undefined, undefined, options),
+          children: parseInlineTokens(childrenArr || [], undefined, undefined, linkifyContext.options()),
           raw: String(contentToken.content ?? ''),
-        })
+        } as ParsedNode
+        children.push(paragraphNode)
+        linkifyContext.remember(paragraphNode.raw)
       }
       j += 3 // Skip paragraph_open, inline, paragraph_close
     }
@@ -112,21 +116,24 @@ function parseVmrContainer(
       || tokens[j].type === 'ordered_list_open'
     ) {
       // Handle list tokens
-      const [listNode, newIndex] = parseList(tokens, j, options)
+      const [listNode, newIndex] = parseList(tokens, j, linkifyContext.options())
       children.push(listNode)
+      linkifyContext.remember(listNode.raw)
       j = newIndex
     }
     else if (tokens[j].type === 'blockquote_open') {
       // Handle blockquote tokens
-      const [blockquoteNode, newIndex] = parseBlockquote(tokens, j, options)
+      const [blockquoteNode, newIndex] = parseBlockquote(tokens, j, linkifyContext.options())
       children.push(blockquoteNode)
+      linkifyContext.remember(blockquoteNode.raw)
       j = newIndex
     }
     else {
       // Handle other basic block tokens (heading, code_block, fence, etc.)
-      const handled = parseBasicBlockToken(tokens, j, options)
+      const handled = parseBasicBlockToken(tokens, j, linkifyContext.options())
       if (handled) {
         children.push(handled[0])
+        linkifyContext.remember(handled[0].raw)
         j = handled[1]
       }
       else {

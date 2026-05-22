@@ -1,5 +1,6 @@
 import type { FootnoteNode, MarkdownToken, ParsedNode, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
+import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
 
 export function parseFootnote(
   tokens: MarkdownToken[],
@@ -10,6 +11,7 @@ export function parseFootnote(
   const meta = (token.meta ?? {}) as unknown as { label?: number | string }
   const id = String(meta?.label ?? '0')
   const footnoteChildren: ParsedNode[] = []
+  const linkifyContext = createLinkifyDemotionContextTracker(options, true)
   let j = index + 1
 
   while (j < tokens.length && tokens[j].type !== 'footnote_close') {
@@ -19,11 +21,13 @@ export function parseFootnote(
       if (tokens[j + 2].type === 'footnote_anchor') {
         children.push(tokens[j + 2])
       }
-      footnoteChildren.push({
+      const paragraphNode = {
         type: 'paragraph',
-        children: parseInlineTokens(children, String(contentToken.content ?? ''), undefined, options),
+        children: parseInlineTokens(children, String(contentToken.content ?? ''), undefined, linkifyContext.options()),
         raw: String(contentToken.content ?? ''),
-      })
+      } as ParsedNode
+      footnoteChildren.push(paragraphNode)
+      linkifyContext.remember(paragraphNode.raw)
 
       j += 3 // Skip paragraph_open, inline, paragraph_close
     }
