@@ -21,10 +21,17 @@ describe('release dependency gates', () => {
   })
 
   it('uses the workspace dependency publish gate in the release script', () => {
-    const release = packageJson.scripts.release
+    const scripts = packageJson.scripts
+    const release = scripts.release
 
     expect(release).toContain('pnpm run check:workspace-deps-published')
     expect(release).not.toContain('pnpm run check:core-published')
+    expect(scripts.changelog).toContain('--tag-prefix markstream-vue@')
+    expect(scripts.changelog).toContain('-r 1')
+    expect(scripts.changelog).not.toContain('-r 0')
+    expect(release).toContain('--tag-prefix markstream-vue@')
+    expect(release).toContain('-r 1')
+    expect(release).not.toContain('-r 0')
   })
 
   it('uses the 1.0 release gate before publishing stable packages', () => {
