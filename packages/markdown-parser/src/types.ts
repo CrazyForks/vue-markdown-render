@@ -444,6 +444,7 @@ export interface InternalParseOptions extends ParseOptions {
   __insideStrong?: boolean
   __linkifyDemotionContext?: {
     filename?: boolean
+    explicitFilename?: boolean
     marketTicker?: boolean
   }
   __markdownIt?: MarkdownIt

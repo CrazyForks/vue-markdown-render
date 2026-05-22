@@ -204,6 +204,23 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(textIncludes(nodes, 'XYZ.MX')).toBe(true)
   })
 
+  it('keeps additional exchange ticker suffixes as plain text under market context', () => {
+    const input = `| 代码 | 市场 |
+| :--- | :--- |
+| MAERSK-B.CO | 丹麦 |
+| FPH.NZ | 新西兰 |
+| ITUB.SA | 巴西 |
+| TEF.MC | 西班牙 |
+| PKO.PL | 波兰 |
+| EBS.AT | 奥地利 |
+| ENEL.IT | 意大利 |`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'MAERSK-B.CO')).toBe(true)
+    expect(textIncludes(nodes, 'ENEL.IT')).toBe(true)
+  })
+
   it('keeps short numeric market tickers as plain text', () => {
     const input = `| 代码 | 市场 |
 | :--- | :--- |
@@ -224,6 +241,14 @@ describe('issue #402 filename-like linkify regression', () => {
     expect(linkNodes).toHaveLength(1)
     expect(linkNodes[0].href).toBe('http://example.com')
     expect(textIncludes(linkNodes[0], 'example.com')).toBe(true)
+  })
+
+  it('preserves real bare domains in broad market prose', () => {
+    const nodes = parseMarkdownToStructure('市场说明：请访问 example.us 获取更多信息。', md, { final: true })
+    const linkNodes = links(nodes)
+
+    expect(linkNodes).toHaveLength(1)
+    expect(linkNodes[0].href).toBe('http://example.us')
   })
 
   it('preserves bare domains whose TLDs overlap with file extensions', () => {
@@ -328,6 +353,22 @@ archive.zip`
     expect(textIncludes(nodes, 'release-notes.md')).toBe(true)
   })
 
+  it('inherits filename context across multiple top-level filename paragraphs', () => {
+    const input = `文件名：
+
+readme.md
+
+release-notes.md
+
+getting-started.md`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'readme.md')).toBe(true)
+    expect(textIncludes(nodes, 'release-notes.md')).toBe(true)
+    expect(textIncludes(nodes, 'getting-started.md')).toBe(true)
+  })
+
   it('inherits filename context across sibling list items', () => {
     const input = `- 文件名：
 - readme.md
@@ -375,6 +416,51 @@ archive.zip`
     expect(textIncludes(nodes, '2330.TW')).toBe(true)
   })
 
+  it('inherits ticker context across multiple top-level ticker paragraphs', () => {
+    const input = `股票代码：
+
+BRK-B.US
+
+VOW3.DE
+
+aapl.us`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'BRK-B.US')).toBe(true)
+    expect(textIncludes(nodes, 'VOW3.DE')).toBe(true)
+    expect(textIncludes(nodes, 'aapl.us')).toBe(true)
+  })
+
+  it('keeps dot-class US tickers under ticker context', () => {
+    const input = `股票代码：
+
+BRK.B.US
+
+BRK.A.US
+
+BF.B.US`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'BRK.B.US')).toBe(true)
+    expect(textIncludes(nodes, 'BF.B.US')).toBe(true)
+  })
+
+  it('inherits filename and ticker context from row label cells', () => {
+    const input = `| 字段 | 值 |
+| :--- | :--- |
+| 文件名 | readme.md |
+| 股票代码 | BRK-B.US |
+| 证券代码 | VOW3.DE |`
+
+    const nodes = parseMarkdownToStructure(input, md, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'readme.md')).toBe(true)
+    expect(textIncludes(nodes, 'BRK-B.US')).toBe(true)
+    expect(textIncludes(nodes, 'VOW3.DE')).toBe(true)
+  })
+
   it('keeps ascii markdown filenames under document context', () => {
     const input = `文档：
 
@@ -407,6 +493,35 @@ archive.zip`
     const linkNodes = links(domainNodes)
     expect(linkNodes).toHaveLength(1)
     expect(linkNodes[0].href).toBe('http://example.app')
+  })
+
+  it('keeps explicit filename-context TLD files as text without demoting generic file domains', () => {
+    const filenameTldMd = getMarkdown('issue-402-filename-tlds', {
+      apply: [
+        (md: any) => {
+          md.linkify?.tlds?.(['com', 'dev', 'io', 'page', 'site'], true)
+        },
+      ],
+    })
+    const nodes = parseMarkdownToStructure(`文件名：
+
+server.dev
+
+notes.io
+
+homepage.site
+
+release.page
+
+command.com`, filenameTldMd, { final: true })
+    expect(links(nodes)).toHaveLength(0)
+    expect(textIncludes(nodes, 'server.dev')).toBe(true)
+    expect(textIncludes(nodes, 'command.com')).toBe(true)
+
+    const domainNodes = parseMarkdownToStructure('文件：example.com', filenameTldMd, { final: true })
+    const linkNodes = links(domainNodes)
+    expect(linkNodes).toHaveLength(1)
+    expect(linkNodes[0].href).toBe('http://example.com')
   })
 
   it('keeps standalone uppercase filenames as text', () => {

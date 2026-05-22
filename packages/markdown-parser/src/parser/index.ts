@@ -2403,7 +2403,8 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
     switch (token.type) {
       case 'paragraph_open':
       {
-        const paragraphNode = parseParagraph(tokens, i, linkifyContext.options()) as ParsedNode
+        const paragraphRaw = String(tokens[i + 1]?.content ?? '')
+        const paragraphNode = parseParagraph(tokens, i, linkifyContext.options(paragraphRaw)) as ParsedNode
         const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
         if (promoted)
           result.push(...promoted)
@@ -2481,7 +2482,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         //   a paragraph), since they represent block-like HTML structures.
         {
           const raw = String(token.content ?? '')
-          const parsed = parseInlineTokens(token.children || [], raw, undefined, linkifyContext.options())
+          const parsed = parseInlineTokens(token.children || [], raw, undefined, linkifyContext.options(raw))
           if (parsed.length === 0) {
             // no-op (matches previous behavior)
           }

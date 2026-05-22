@@ -9,9 +9,10 @@ const DOMAINISH_TEXT_RE = /^[\p{L}\p{N}./\\-]+$/u
 const DOMAIN_LABEL_RE = /^[A-Za-z0-9-]{1,63}$/u
 const PUNYCODE_TLD_RE = /^xn--[a-z0-9-]{2,59}$/i
 const MARKET_TICKER_SYMBOL_RE = /^(?:[A-Z]{1,6}|\d{1,8})$/u
-const MARKET_TICKER_CONTEXT_SYMBOL_RE = /^(?=.{1,12}$)[A-Z0-9]+(?:-[A-Z0-9]+)?$/iu
+const MARKET_TICKER_CONTEXT_SYMBOL_RE = /^(?=.{1,12}$)[A-Z0-9]+(?:[-.][A-Z0-9]+)*$/iu
+const EXPLICIT_FILENAME_CONTEXT_RE = /文件名\s*[:：]?|附件\s*[:：]?|路径\s*[:：]?|路徑\s*[:：]?|文件列表\s*[:：]?|文档列表\s*[:：]?|文檔列表\s*[:：]?|\bfile\s*names?\b\s*[:：]?|\battachments?\b\s*[:：]?|\bpaths?\b\s*[:：]?|\bfile\s+lists?\b\s*[:：]?|\bdocument\s+lists?\b\s*[:：]?/iu
 const FILENAME_CONTEXT_RE = /文件名\s*[:：]?|文件\s*[:：]?|附件\s*[:：]?|档案\s*[:：]?|檔案\s*[:：]?|文档\s*[:：]?|文檔\s*[:：]?|资料\s*[:：]?|資料\s*[:：]?|路径\s*[:：]?|路徑\s*[:：]?|\bfile\s*name\b\s*[:：]?|\battachments?\b\s*[:：]?|\bfiles?\b\s*[:：]?|\bdocuments?\b\s*[:：]?|\bdocs?\b\s*[:：]?|\bpaths?\b\s*[:：]?/iu
-const MARKET_TICKER_CONTEXT_RE = /股票代码|股票代碼|证券代码|證券代碼|代码|代碼|交易所|后缀|後綴|市场|市場|\btickers?\b|\bsymbols?\b|\bexchanges?\b/iu
+const MARKET_TICKER_CONTEXT_RE = /股票代码|股票代碼|证券代码|證券代碼|(?:代码|代碼|交易所|后缀|後綴|市场|市場)(?=$|[\s:：/|,，、()（）])|\btickers?\b|\bsymbols?\b|\bexchanges?\b/iu
 const AMBIGUOUS_BARE_DOMAIN_EXTENSIONS = new Set([
   'ai',
   'md',
@@ -37,14 +38,28 @@ const MARKET_TICKER_SUFFIXES = new Set([
 ])
 const MARKET_TICKER_CONTEXT_SUFFIXES = new Set([
   ...MARKET_TICKER_SUFFIXES,
+  'at',
   'ax',
   'cn',
+  'co',
+  'it',
   'jp',
   'ks',
+  'mc',
   'mx',
+  'nz',
+  'pl',
+  'sa',
   'si',
   'to',
   'tw',
+])
+const EXPLICIT_FILENAME_CONTEXT_ONLY_EXTENSIONS = new Set([
+  'com',
+  'dev',
+  'io',
+  'page',
+  'site',
 ])
 const FILENAME_CONTEXT_ONLY_EXTENSIONS = new Set([
   'app',
@@ -127,11 +142,12 @@ const FILENAMEISH_LINK_EXTENSIONS = new Set([
 
 export interface LinkifyDemotionContext {
   filename?: boolean
+  explicitFilename?: boolean
   marketTicker?: boolean
 }
 
 function hasLinkifyDemotionContext(context?: LinkifyDemotionContext) {
-  return context?.filename === true || context?.marketTicker === true
+  return context?.filename === true || context?.explicitFilename === true || context?.marketTicker === true
 }
 
 function mergeLinkifyDemotionContext(
@@ -140,6 +156,7 @@ function mergeLinkifyDemotionContext(
 ) {
   const merged = {
     filename: left?.filename || right?.filename,
+    explicitFilename: left?.explicitFilename || right?.explicitFilename,
     marketTicker: left?.marketTicker || right?.marketTicker,
   }
   return hasLinkifyDemotionContext(merged) ? merged : undefined
@@ -154,6 +171,7 @@ function withLinkifyDemotionContext(options: ParseOptions | undefined, context?:
     ...options,
     __linkifyDemotionContext: {
       filename: inheritedContext?.filename || context?.filename,
+      explicitFilename: inheritedContext?.explicitFilename || context?.explicitFilename,
       marketTicker: inheritedContext?.marketTicker || context?.marketTicker,
     },
   } as InternalParseOptions
@@ -164,6 +182,35 @@ function inferNextBlockLinkifyContext(raw?: string) {
   return hasLinkifyDemotionContext(context) ? context : undefined
 }
 
+function normalizeStandaloneContinuationText(text: string) {
+  return text
+    .replace(/^[\s>*_`[\]（(【《"'“‘]+/u, '')
+    .replace(/[\s<*_`\]）)】》"'.。；;，,、:：!?！？]+$/u, '')
+}
+
+function inferContinuationLinkifyContext(raw?: string, inherited?: LinkifyDemotionContext) {
+  if (!hasLinkifyDemotionContext(inherited))
+    return undefined
+
+  const text = String(raw ?? '').trim()
+  const parts = text
+    .split(/\s+/u)
+    .map(normalizeStandaloneContinuationText)
+    .filter(Boolean)
+  if (parts.length === 0)
+    return undefined
+
+  const continuation: LinkifyDemotionContext = {}
+  if (inherited?.filename && parts.every(part => shouldDemoteFilenameLikeLinkify(part, { filename: true, explicitFilename: inherited.explicitFilename })))
+    continuation.filename = true
+  if (inherited?.explicitFilename && continuation.filename)
+    continuation.explicitFilename = true
+  if (inherited?.marketTicker && parts.every(part => shouldDemoteFilenameLikeLinkify(part, { marketTicker: true })))
+    continuation.marketTicker = true
+
+  return hasLinkifyDemotionContext(continuation) ? continuation : undefined
+}
+
 export function createLinkifyDemotionContextTracker(
   options?: ParseOptions,
   sticky = false,
@@ -171,14 +218,22 @@ export function createLinkifyDemotionContextTracker(
   let context: LinkifyDemotionContext | undefined
 
   return {
-    options() {
-      return withLinkifyDemotionContext(options, context)
+    options(raw?: string) {
+      if (sticky || raw == null)
+        return withLinkifyDemotionContext(options, context)
+      return withLinkifyDemotionContext(
+        options,
+        mergeLinkifyDemotionContext(
+          inferNextBlockLinkifyContext(raw),
+          inferContinuationLinkifyContext(raw, context),
+        ),
+      )
     },
     remember(raw?: string) {
       const nextContext = inferNextBlockLinkifyContext(raw)
       context = sticky
         ? mergeLinkifyDemotionContext(context, nextContext)
-        : nextContext
+        : mergeLinkifyDemotionContext(nextContext, inferContinuationLinkifyContext(raw, context))
     },
     reset() {
       context = undefined
@@ -225,7 +280,9 @@ export function isDecodedFromRawPunycode(linkText: string, href: string, raw?: s
 
 export function inferLinkifyDemotionContext(contextText?: string): LinkifyDemotionContext {
   const text = String(contextText ?? '')
+  const explicitFilename = EXPLICIT_FILENAME_CONTEXT_RE.test(text)
   return {
+    explicitFilename,
     filename: FILENAME_CONTEXT_RE.test(text),
     marketTicker: MARKET_TICKER_CONTEXT_RE.test(text),
   }
@@ -285,6 +342,8 @@ export function shouldDemoteFilenameLikeLinkify(linkText: string, context: Linki
     return true
 
   if (!FILENAMEISH_LINK_EXTENSIONS.has(extension)) {
+    if (context.explicitFilename && EXPLICIT_FILENAME_CONTEXT_ONLY_EXTENSIONS.has(extension))
+      return true
     if (context.filename && FILENAME_CONTEXT_ONLY_EXTENSIONS.has(extension))
       return true
     return false

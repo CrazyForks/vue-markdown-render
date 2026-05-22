@@ -355,9 +355,10 @@ export function parseInlineTokens(
   const inferredContext = inferLinkifyDemotionContext(raw)
   const linkifyDemotionContext = {
     filename: inheritedContext?.filename || inferredContext.filename,
+    explicitFilename: inheritedContext?.explicitFilename || inferredContext.explicitFilename,
     marketTicker: inheritedContext?.marketTicker || inferredContext.marketTicker,
   }
-  if (linkifyDemotionContext.filename || linkifyDemotionContext.marketTicker) {
+  if (linkifyDemotionContext.filename || linkifyDemotionContext.explicitFilename || linkifyDemotionContext.marketTicker) {
     options = {
       ...options,
       __linkifyDemotionContext: linkifyDemotionContext,

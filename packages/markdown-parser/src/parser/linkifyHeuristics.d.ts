@@ -1,10 +1,11 @@
 import type { ParseOptions } from '../types';
 export interface LinkifyDemotionContext {
     filename?: boolean;
+    explicitFilename?: boolean;
     marketTicker?: boolean;
 }
 export declare function createLinkifyDemotionContextTracker(options?: ParseOptions, sticky?: boolean): {
-    options(): ParseOptions | undefined;
+    options(raw?: string): ParseOptions | undefined;
     remember(raw?: string): void;
     reset(): void;
 };
