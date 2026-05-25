@@ -131,7 +131,7 @@ function onHeightChange(metrics: MarkstreamVirtualMetrics) {
       :virtual-scroll="{
         enabled: true,
         sessionKey: `thread-1:message-1:${revision}`,
-        scrollRoot: () => scrollRoot,
+        scrollRoot: () => scrollRoot.value,
         restoreState: savedState,
         heightCache: savedState?.heightCache,
         settleMode: 'manual',

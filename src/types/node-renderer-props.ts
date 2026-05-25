@@ -1,4 +1,5 @@
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
+import type { Ref } from 'vue'
 import type { SmoothMarkdownStreamOptions } from '../composables/useSmoothMarkdownStream'
 import type {
   CodeBlockMonacoOptions,
@@ -88,9 +89,13 @@ export interface MarkstreamVirtualState {
   heightCache?: MarkstreamHeightCache
 }
 
+export type MarkstreamScrollRoot = HTMLElement | null
+export type MarkstreamScrollRootLike = MarkstreamScrollRoot | Ref<MarkstreamScrollRoot>
+export type MarkstreamScrollRootResolver = () => MarkstreamScrollRootLike
+
 export interface MarkstreamVirtualScrollOptions {
   enabled?: boolean
-  scrollRoot?: HTMLElement | null | (() => HTMLElement | null)
+  scrollRoot?: MarkstreamScrollRootLike | MarkstreamScrollRootResolver
   sessionKey: string
   threadKey?: string
   restoreState?: MarkstreamVirtualState | null

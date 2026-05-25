@@ -151,7 +151,31 @@ const experimentContainerWidth = ref(0)
 const simpleTextProbeProfile = ref(createEmptySimpleTextProbeProfile())
 function resolveVirtualScrollRoot() {
   const root = props.virtualScroll?.scrollRoot
-  return typeof root === 'function' ? root() : root ?? null
+  const resolved = typeof root === 'function' ? root() : root
+  return unwrapVirtualScrollRoot(resolved)
+}
+
+function unwrapVirtualScrollRoot(value: unknown): HTMLElement | null {
+  if (!value)
+    return null
+
+  if (typeof Element !== 'undefined' && value instanceof Element)
+    return value as HTMLElement
+
+  const candidate = value as Partial<HTMLElement>
+  if (
+    typeof candidate === 'object'
+    && candidate != null
+    && typeof candidate.nodeType === 'number'
+    && typeof candidate.getBoundingClientRect === 'function'
+  ) {
+    return candidate as HTMLElement
+  }
+
+  if (typeof value === 'object' && 'value' in value)
+    return unwrapVirtualScrollRoot((value as { value: unknown }).value)
+
+  return null
 }
 
 const {
@@ -344,8 +368,15 @@ const virtualScrollEnabled = computed(() => Boolean(
   && !renderAsFragment.value
   && props.virtualScroll?.enabled,
 ))
-const textEstimationEnabled = computed(() => heightExperimentEnabled.value && heightExperimentConfig.value?.textEstimation !== false)
-const codeBlockEstimationEnabled = computed(() => heightExperimentEnabled.value && heightExperimentConfig.value?.codeBlockEstimation !== false)
+const heightEstimationActive = computed(() => heightExperimentEnabled.value || virtualScrollEnabled.value)
+const textEstimationEnabled = computed(() => {
+  return heightEstimationActive.value
+    && heightExperimentConfig.value?.textEstimation !== false
+})
+const codeBlockEstimationEnabled = computed(() => {
+  return heightEstimationActive.value
+    && heightExperimentConfig.value?.codeBlockEstimation !== false
+})
 const experimentProbeWidth = computed(() => Math.max(320, experimentContainerWidth.value || containerRef.value?.clientWidth || 640))
 const maxLiveNodesResolved = computed(() => Math.max(1, props.maxLiveNodes ?? 320))
 const virtualizationEnabled = computed(() => {
@@ -701,7 +732,7 @@ function setHeadingProbeWrapper(level: number, el: HTMLElement | null) {
 }
 
 function readSimpleTextProbeProfile() {
-  if (!heightExperimentEnabled.value || typeof window === 'undefined') {
+  if (!heightEstimationActive.value || typeof window === 'undefined') {
     simpleTextProbeProfile.value = createEmptySimpleTextProbeProfile()
     return
   }
@@ -729,7 +760,7 @@ function readSimpleTextProbeProfile() {
 }
 
 function updateExperimentContainerWidth() {
-  if (!heightExperimentEnabled.value && !virtualScrollEnabled.value) {
+  if (!heightEstimationActive.value) {
     experimentContainerWidth.value = 0
     return
   }
@@ -746,7 +777,7 @@ function cleanupExperimentResizeObserver() {
 
 function setupExperimentResizeObserver() {
   cleanupExperimentResizeObserver()
-  if ((!heightExperimentEnabled.value && !virtualScrollEnabled.value) || !containerRef.value || typeof ResizeObserver === 'undefined')
+  if (!heightEstimationActive.value || !containerRef.value || typeof ResizeObserver === 'undefined')
     return
   experimentResizeObserver = new ResizeObserver(() => {
     updateExperimentContainerWidth()
@@ -794,7 +825,7 @@ function resolveCodeBlockShowHeader() {
 
 const estimatedNodeHeights = computed(() => {
   const nodes = parsedNodes.value
-  if (!nodes.length || !heightExperimentEnabled.value)
+  if (!nodes.length || !heightEstimationActive.value)
     return nodes.map(() => null)
 
   const width = experimentContainerWidth.value || containerRef.value?.clientWidth || 0
@@ -848,7 +879,7 @@ watch(
 function estimateHeightRange(start: number, end: number) {
   if (start >= end)
     return 0
-  if (heightExperimentEnabled.value) {
+  if (heightEstimationActive.value) {
     let total = 0
     for (let i = start; i < end; i++)
       total += getFallbackNodeHeight(i)
@@ -962,6 +993,23 @@ function resolveLifecycleNodeIndex(indexKey: string | number) {
 
 function bumpAsyncNodeVersion() {
   pendingAsyncNodeVersion.value += 1
+}
+
+function clearPendingAsyncNodeKeysForIndex(index: number) {
+  const nodeKey = `${getCurrentIndexPrefix()}-${index}`
+  let changed = false
+
+  for (const key of Array.from(pendingAsyncNodeKeys)) {
+    if (key === nodeKey || key.startsWith(`${nodeKey}-`)) {
+      pendingAsyncNodeKeys.delete(key)
+      changed = true
+    }
+  }
+
+  if (changed) {
+    bumpAsyncNodeVersion()
+    scheduleVirtualMetricsEmit('async-node')
+  }
 }
 
 const nodeLifecycle: MarkstreamNodeLifecycle = {
@@ -1226,9 +1274,61 @@ function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
     && canReuseHeightCacheForWidth(state.width || state.metrics.width)
 }
 
-function restoreVirtualState(state: MarkstreamVirtualState) {
+let lastImportedVirtualHeightCacheSignature: string | null = null
+let lastAppliedVirtualRestoreState: MarkstreamVirtualState | null = null
+
+function getHeightCacheSignature(cache: MarkstreamHeightCache) {
+  let checksum = 0
+  for (const entry of cache) {
+    checksum += (entry.index + 1) * 31
+    checksum += Math.round(entry.height * 10)
+  }
+
+  const widthBucket = Math.round(getCurrentVirtualWidth() / HEIGHT_CACHE_WIDTH_BUCKET_PX)
+
+  return [
+    getVirtualSessionKey(),
+    parsedNodes.value.length,
+    widthBucket,
+    cache.length,
+    checksum,
+  ].join(':')
+}
+
+function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
+  if (!virtualScrollEnabled.value || !cache?.length)
+    return false
+
+  if (parsedNodes.value.length <= 0)
+    return false
+
+  const restoreState = props.virtualScroll?.restoreState
+  if (restoreState && !canRestoreVirtualStateCache(restoreState))
+    return false
+
+  const boundedCache = getBoundedHeightCache(cache)
+  if (!boundedCache.length)
+    return false
+
+  const signature = getHeightCacheSignature(boundedCache)
+  if (signature === lastImportedVirtualHeightCacheSignature)
+    return true
+
+  importHeightCache(boundedCache, { mode: 'merge' })
+  lastImportedVirtualHeightCacheSignature = signature
+  scheduleVirtualMetricsEmit('restore')
+  return true
+}
+
+function applyVirtualRestoreState(state: MarkstreamVirtualState | null | undefined) {
+  if (!virtualScrollEnabled.value || !state)
+    return false
+
   if (state.sessionKey !== getVirtualSessionKey())
-    return
+    return false
+
+  if (parsedNodes.value.length <= 0)
+    return false
 
   if (state.heightCache?.length && canRestoreVirtualStateCache(state)) {
     const boundedCache = getBoundedHeightCache(state.heightCache)
@@ -1236,8 +1336,17 @@ function restoreVirtualState(state: MarkstreamVirtualState) {
       importHeightCache(boundedCache, { mode: 'merge' })
   }
 
+  if (lastAppliedVirtualRestoreState === state)
+    return true
+
+  lastAppliedVirtualRestoreState = state
   restoreVirtualAnchor(state.anchor)
   scheduleVirtualMetricsEmit('restore')
+  return true
+}
+
+function restoreVirtualState(state: MarkstreamVirtualState) {
+  applyVirtualRestoreState(state)
 }
 
 function forceFlushPendingHeightMeasurements() {
@@ -1454,7 +1563,7 @@ function estimateIndexForOffset(offsetPx: number) {
   if (offsetPx <= 0)
     return 0
   const nodes = parsedNodes.value
-  if (heightExperimentEnabled.value) {
+  if (heightEstimationActive.value) {
     let remaining = offsetPx
     for (let i = 0; i < nodes.length; i++) {
       const height = getFallbackNodeHeight(i)
@@ -1507,7 +1616,7 @@ function estimateIndexForOffsetFromEnd(offsetPx: number) {
     return 0
   if (offsetPx <= 0)
     return Math.max(0, nodes.length - 1)
-  if (heightExperimentEnabled.value) {
+  if (heightEstimationActive.value) {
     let remaining = offsetPx
     for (let i = nodes.length - 1; i >= 0; i--) {
       const height = getFallbackNodeHeight(i)
@@ -1760,6 +1869,9 @@ function scheduleFinalHeightConvergence() {
 }
 
 function setNodeContentRef(index: number, el: HTMLElement | null) {
+  if (!el)
+    clearPendingAsyncNodeKeysForIndex(index)
+
   pendingHeightMeasurements.delete(index)
   bumpNodeContentVersion(index)
   const previousTimers = nodeContentDeferredMeasureTimers.get(index)
@@ -1974,7 +2086,7 @@ watch(
 )
 
 watch(
-  heightExperimentEnabled,
+  heightEstimationActive,
   (enabled) => {
     if (!enabled)
       return
@@ -1984,9 +2096,9 @@ watch(
 )
 
 watch(
-  [() => containerRef.value, heightExperimentEnabled, virtualScrollEnabled],
+  [() => containerRef.value, heightEstimationActive],
   () => {
-    if (!heightExperimentEnabled.value && !virtualScrollEnabled.value) {
+    if (!heightEstimationActive.value) {
       cleanupExperimentResizeObserver()
       experimentContainerWidth.value = 0
       return
@@ -1998,9 +2110,9 @@ watch(
 )
 
 watch(
-  [heightExperimentEnabled, experimentProbeWidth],
+  [heightEstimationActive, experimentProbeWidth],
   async () => {
-    if (!heightExperimentEnabled.value) {
+    if (!heightEstimationActive.value) {
       simpleTextProbeProfile.value = createEmptySimpleTextProbeProfile()
       return
     }
@@ -2019,7 +2131,7 @@ watch(
 )
 
 watch(
-  [heightExperimentEnabled, virtualScrollEnabled, experimentContainerWidth],
+  [heightEstimationActive, experimentContainerWidth],
   () => {
     if (virtualizationEnabled.value)
       scheduleFocusSync({ immediate: true })
@@ -2076,43 +2188,72 @@ watch(
 )
 
 let autoSettledVirtualSessionKey: string | null = null
+let manualSettleInFlight = false
+let lastManualSettleSignature: string | null = null
+
+function resetVirtualSessionMeasurements() {
+  clearPendingHeightMeasurements()
+  resetHeightMeasurements()
+
+  const total = parsedNodes.value.length
+  if (total > 0)
+    rebuildHeightTrees(total)
+}
+
+function resetVirtualSessionRuntimeState() {
+  autoSettledVirtualSessionKey = null
+  lastEmittedVirtualMetrics = null
+  lastSettledVirtualSignature = null
+  lastFinalVirtualSignature = null
+  lastImportedVirtualHeightCacheSignature = null
+  lastAppliedVirtualRestoreState = null
+  lastManualSettleSignature = null
+  manualSettleInFlight = false
+
+  pendingAsyncNodeKeys.clear()
+  bumpAsyncNodeVersion()
+
+  clearRestoreReconcile()
+  clearVirtualBottomRestoreTimers()
+}
 
 watch(
   () => getVirtualSessionKey(),
   () => {
-    autoSettledVirtualSessionKey = null
-    lastEmittedVirtualMetrics = null
-    lastSettledVirtualSignature = null
-    lastFinalVirtualSignature = null
-    pendingAsyncNodeKeys.clear()
-    bumpAsyncNodeVersion()
+    resetVirtualSessionRuntimeState()
+    resetVirtualSessionMeasurements()
     scheduleVirtualMetricsEmit('content')
   },
 )
 
 watch(
-  () => props.virtualScroll?.heightCache,
-  (cache) => {
-    if (!virtualScrollEnabled.value || !cache?.length)
-      return
-    const restoreState = props.virtualScroll?.restoreState
-    if (restoreState && !canRestoreVirtualStateCache(restoreState))
-      return
-    const boundedCache = getBoundedHeightCache(cache)
-    if (boundedCache.length)
-      importHeightCache(boundedCache, { mode: 'merge' })
-    scheduleVirtualMetricsEmit('restore')
+  [
+    virtualScrollEnabled,
+    () => props.virtualScroll?.heightCache,
+    () => props.virtualScroll?.restoreState,
+    () => parsedNodes.value.length,
+    () => getVirtualSessionKey(),
+    experimentContainerWidth,
+  ],
+  () => {
+    tryImportVirtualHeightCache()
   },
-  { immediate: true },
+  { flush: 'post', immediate: true },
 )
 
 watch(
-  () => props.virtualScroll?.restoreState,
-  async (state) => {
-    if (!virtualScrollEnabled.value || !state)
+  [
+    virtualScrollEnabled,
+    () => props.virtualScroll?.restoreState,
+    () => parsedNodes.value.length,
+    () => getVirtualSessionKey(),
+  ],
+  async ([enabled, state]) => {
+    if (!enabled || !state)
       return
+
     await nextTick()
-    restoreVirtualState(state)
+    applyVirtualRestoreState(state)
   },
   { flush: 'post', immediate: true },
 )
@@ -2145,12 +2286,68 @@ watch(
   { flush: 'post', immediate: true },
 )
 
+function hasManualSettleSignal(token: unknown) {
+  return token !== false && token != null
+}
+
+function getManualSettleSignature(token: unknown) {
+  return [
+    getVirtualSessionKey(),
+    String(token),
+    parsedNodes.value.length,
+    Math.round(estimateHeightRange(0, parsedNodes.value.length)),
+    Math.round(getCurrentVirtualWidth()),
+    heightStats.count,
+    Math.round(heightStats.total),
+  ].join(':')
+}
+
+async function runManualSettleIfReady() {
+  const token = props.virtualScroll?.settledToken
+
+  if (!virtualScrollEnabled.value)
+    return
+  if (props.virtualScroll?.settleMode !== 'manual')
+    return
+  if (!hasManualSettleSignal(token))
+    return
+
+  if (!isLayoutSettled()) {
+    scheduleVirtualMetricsEmit('manual')
+    return
+  }
+
+  const signature = getManualSettleSignature(token)
+  if (signature === lastManualSettleSignature || manualSettleInFlight)
+    return
+
+  manualSettleInFlight = true
+  try {
+    const metrics = await settle({ reason: 'manual' })
+    if (metrics.stable && metrics.phase === 'final')
+      lastManualSettleSignature = signature
+  }
+  finally {
+    manualSettleInFlight = false
+  }
+}
+
 watch(
-  () => props.virtualScroll?.settledToken,
-  (token) => {
-    if (!virtualScrollEnabled.value || props.virtualScroll?.settleMode !== 'manual' || !token)
-      return
-    void settle({ reason: 'manual' })
+  [
+    virtualScrollEnabled,
+    effectiveFinal,
+    () => props.virtualScroll?.settleMode,
+    () => props.virtualScroll?.settledToken,
+    () => getVirtualSessionKey(),
+    pendingAsyncNodeCount,
+    () => renderedCount.value,
+    desiredRenderedCount,
+    () => parsedNodes.value.length,
+    () => heightStats.count,
+    () => heightStats.total,
+  ],
+  () => {
+    void runManualSettleIfReady()
   },
   { flush: 'post', immediate: true },
 )
@@ -2866,9 +3063,9 @@ onBeforeUnmount(() => {
     @mouseover="handleContainerMouseover"
     @mouseout="handleContainerMouseout"
   >
-    <template v-if="heightExperimentEnabled || virtualizationEnabled">
+    <template v-if="heightEstimationActive || virtualizationEnabled">
       <div
-        v-if="heightExperimentEnabled"
+        v-if="heightEstimationActive"
         class="height-estimation-probes"
         :style="{ width: `${experimentProbeWidth}px` }"
         aria-hidden="true"

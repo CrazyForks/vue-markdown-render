@@ -128,6 +128,9 @@ MermaidLoader
 MarkstreamHeightCache
 MarkstreamNodeLifecycle
 MarkstreamRendererHandle
+MarkstreamScrollRoot
+MarkstreamScrollRootLike
+MarkstreamScrollRootResolver
 MarkstreamVirtualAnchor
 MarkstreamVirtualConfidence
 MarkstreamVirtualMetrics
