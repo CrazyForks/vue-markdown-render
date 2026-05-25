@@ -270,6 +270,137 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('keeps virtual metrics unsettled until overlapping async work for the same node settles', async () => {
+    let settleOnce: (() => void) | null = null
+    let settleAgain: (() => void) | null = null
+    const AsyncNode = defineComponent({
+      props: {
+        node: { type: Object, required: true },
+        indexKey: { type: [String, Number], required: true },
+      },
+      setup(props) {
+        const lifecycle = inject<MarkstreamNodeLifecycle>('markstreamNodeLifecycle')
+        onMounted(() => {
+          lifecycle?.markPending(props.indexKey)
+          lifecycle?.markPending(props.indexKey)
+        })
+        settleOnce = () => {
+          lifecycle?.markSettled(props.indexKey)
+        }
+        settleAgain = () => {
+          lifecycle?.markSettled(props.indexKey)
+        }
+        return () => h('div', 'overlapping async')
+      },
+    })
+
+    setCustomComponents('virtual-lifecycle-test', {
+      async_node: AsyncNode as any,
+    })
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-lifecycle-test',
+        nodes: [{ type: 'async_node', raw: '<async-node />', content: '' }],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'thread-a:overlapping-async-node:1',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    expect(handle.getVirtualMetrics().stable).toBe(false)
+
+    settleOnce?.()
+    await flushAll()
+    expect((await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })).stable).toBe(false)
+
+    settleAgain?.()
+    await new Promise(resolve => setTimeout(resolve, 90))
+    await flushAll()
+    expect((await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })).stable).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('forwards nested fragment async lifecycle to the parent virtual renderer', async () => {
+    let finish: (() => void) | null = null
+
+    const NestedAsyncNode = defineComponent({
+      props: {
+        node: { type: Object, required: true },
+        indexKey: { type: [String, Number], required: true },
+      },
+      setup(props) {
+        const lifecycle = inject<MarkstreamNodeLifecycle>('markstreamNodeLifecycle')
+        onMounted(() => {
+          lifecycle?.markPending(props.indexKey)
+        })
+        finish = () => {
+          lifecycle?.markSettled(props.indexKey)
+        }
+        return () => h('div', 'nested async')
+      },
+    })
+
+    setCustomComponents('virtual-lifecycle-test', {
+      nested_async: NestedAsyncNode as any,
+    })
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-lifecycle-test',
+        nodes: [
+          {
+            type: 'html_block',
+            tag: 'x-host',
+            content: '<nested_async></nested_async>',
+            children: [
+              {
+                type: 'nested_async',
+                raw: '<nested_async />',
+                content: '',
+              },
+            ],
+            raw: '<x-host><nested_async /></x-host>',
+          },
+        ],
+        customHtmlTags: ['x-host', 'nested_async'],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'nested-fragment-lifecycle',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    expect(handle.getVirtualMetrics().stable).toBe(false)
+
+    finish?.()
+    await new Promise(resolve => setTimeout(resolve, 90))
+    await flushAll()
+
+    expect((await handle.settle({ frames: 0, timeoutMs: 0 })).stable).toBe(true)
+
+    wrapper.unmount()
+  })
+
   it('emits auto final after pending async nodes settle', async () => {
     let finishAsyncNode: ((height: number) => void) | null = null
     const AsyncNode = defineComponent({
@@ -613,6 +744,46 @@ describe('node renderer virtual-scroll coordination', () => {
 
     const handle = wrapper.vm as any
     expect((await handle.forceMeasure('manual')).totalHeight).not.toBe(800)
+
+    wrapper.unmount()
+  })
+
+  it('imports standalone height cache when entries carry compatibility metadata', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'current-session',
+          settleMode: 'manual',
+          heightCache: [
+            {
+              index: 0,
+              height: 400,
+              nodeType: 'paragraph',
+              signature: 'paragraph\u0000\u00000\u0000Paragraph 1',
+            },
+            {
+              index: 1,
+              height: 400,
+              nodeType: 'paragraph',
+              signature: 'paragraph\u0000\u00000\u0000Paragraph 2',
+            },
+          ],
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    expect((await handle.forceMeasure('manual')).totalHeight).toBe(800)
 
     wrapper.unmount()
   })

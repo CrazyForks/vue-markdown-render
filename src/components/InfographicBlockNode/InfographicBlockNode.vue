@@ -486,7 +486,6 @@ async function renderInfographic(force = false) {
   }
   finally {
     renderInFlight = false
-    void markLifecycleSettled()
     if (rerenderQueued) {
       const forceNext = rerenderForce
       rerenderQueued = false
@@ -494,6 +493,9 @@ async function renderInfographic(force = false) {
       nextTick(() => {
         void renderInfographic(forceNext)
       })
+    }
+    else {
+      void markLifecycleSettled()
     }
   }
 }

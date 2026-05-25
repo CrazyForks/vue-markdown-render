@@ -13,7 +13,7 @@ import type {
   MarkstreamVirtualState,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
-import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -525,11 +525,11 @@ const pendingHeightSettlingTaskCount = computed(() => {
   void heightSettlingTimerVersion.value
   return activeHeightSettlingTimers.size
 })
-const pendingAsyncNodeKeys = new Set<string>()
+const pendingAsyncNodeCounts = new Map<string, number>()
 const pendingAsyncNodeVersion = ref(0)
 const pendingAsyncNodeCount = computed(() => {
   void pendingAsyncNodeVersion.value
-  return pendingAsyncNodeKeys.size
+  return pendingAsyncNodeCounts.size
 })
 let heightMeasurementRaf: number | null = null
 const desiredRenderedCount = computed(() => {
@@ -915,6 +915,67 @@ function getFallbackNodeHeight(index: number) {
   return nodeHeights[index] ?? estimatedNodeHeights.value[index]?.height ?? averageNodeHeight.value
 }
 
+const fallbackHeightPrefix = computed(() => {
+  const total = parsedNodes.value.length
+  const prefix = new Array<number>(total + 1)
+  prefix[0] = 0
+
+  if (!heightEstimationActive.value) {
+    for (let i = 0; i < total; i++)
+      prefix[i + 1] = prefix[i] + (nodeHeights[i] ?? averageNodeHeight.value)
+    return prefix
+  }
+
+  for (let i = 0; i < total; i++)
+    prefix[i + 1] = prefix[i] + getFallbackNodeHeight(i)
+
+  return prefix
+})
+
+function estimateHeightRangeFromPrefix(start: number, end: number) {
+  const total = parsedNodes.value.length
+  const boundedStart = clamp(Math.trunc(start), 0, total)
+  const boundedEnd = clamp(Math.trunc(end), boundedStart, total)
+  if (boundedStart >= boundedEnd)
+    return 0
+
+  const prefix = fallbackHeightPrefix.value
+  return (prefix[boundedEnd] ?? 0) - (prefix[boundedStart] ?? 0)
+}
+
+function estimateIndexForOffsetFromPrefix(offsetPx: number) {
+  const nodes = parsedNodes.value
+  const total = nodes.length
+  if (total <= 0)
+    return 0
+  if (offsetPx <= 0)
+    return 0
+
+  const prefix = fallbackHeightPrefix.value
+  const totalHeight = prefix[total] ?? 0
+  if (offsetPx >= totalHeight)
+    return total - 1
+
+  let low = 0
+  let high = total - 1
+  let answer = total - 1
+
+  while (low <= high) {
+    const mid = (low + high) >> 1
+    const midEnd = prefix[mid + 1] ?? 0
+
+    if (midEnd >= offsetPx) {
+      answer = mid
+      high = mid - 1
+    }
+    else {
+      low = mid + 1
+    }
+  }
+
+  return answer
+}
+
 watch(
   () => parsedNodes.value.length,
   (length) => {
@@ -934,10 +995,7 @@ function estimateHeightRange(start: number, end: number) {
   if (start >= end)
     return 0
   if (heightEstimationActive.value) {
-    let total = 0
-    for (let i = start; i < end; i++)
-      total += getFallbackNodeHeight(i)
-    return total
+    return estimateHeightRangeFromPrefix(start, end)
   }
   if (heightTreeSize.value !== parsedNodes.value.length) {
     let total = 0
@@ -1083,13 +1141,41 @@ function bumpAsyncNodeVersion() {
   pendingAsyncNodeVersion.value += 1
 }
 
+function incrementPendingAsyncNodeKey(key: string) {
+  const previous = pendingAsyncNodeCounts.get(key) ?? 0
+  pendingAsyncNodeCounts.set(key, previous + 1)
+
+  if (previous === 0) {
+    bumpAsyncNodeVersion()
+    scheduleVirtualMetricsEmit('async-node')
+  }
+}
+
+function decrementPendingAsyncNodeKey(key: string) {
+  const previous = pendingAsyncNodeCounts.get(key) ?? 0
+  if (previous <= 0)
+    return false
+
+  if (previous <= 1)
+    pendingAsyncNodeCounts.delete(key)
+  else
+    pendingAsyncNodeCounts.set(key, previous - 1)
+
+  if (previous === 1) {
+    bumpAsyncNodeVersion()
+    scheduleVirtualMetricsEmit('async-node')
+  }
+
+  return true
+}
+
 function clearPendingAsyncNodeKeysForIndex(index: number) {
   const nodeKey = `${getCurrentIndexPrefix()}-${index}`
   let changed = false
 
-  for (const key of Array.from(pendingAsyncNodeKeys)) {
+  for (const key of Array.from(pendingAsyncNodeCounts.keys())) {
     if (key === nodeKey || key.startsWith(`${nodeKey}-`)) {
-      pendingAsyncNodeKeys.delete(key)
+      pendingAsyncNodeCounts.delete(key)
       changed = true
     }
   }
@@ -1100,40 +1186,60 @@ function clearPendingAsyncNodeKeysForIndex(index: number) {
   }
 }
 
-const nodeLifecycle: MarkstreamNodeLifecycle = {
+const parentNodeLifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+
+const localNodeLifecycle: MarkstreamNodeLifecycle = {
   reportHeight(indexKey, height) {
+    if (!virtualScrollEnabled.value)
+      return
+
     const index = resolveLifecycleNodeIndex(indexKey)
     if (index == null)
       return
     recordNodeHeight(index, height)
   },
   markPending(indexKey) {
+    if (!virtualScrollEnabled.value)
+      return
+
     const index = resolveLifecycleNodeIndex(indexKey)
     if (index == null)
       return
 
     const key = String(indexKey)
-    if (pendingAsyncNodeKeys.has(key))
-      return
-    pendingAsyncNodeKeys.add(key)
-    bumpAsyncNodeVersion()
-    scheduleVirtualMetricsEmit('async-node')
+    incrementPendingAsyncNodeKey(key)
   },
   markSettled(indexKey) {
+    if (!virtualScrollEnabled.value)
+      return
+
     const index = resolveLifecycleNodeIndex(indexKey)
     if (index == null)
       return
 
     const key = String(indexKey)
-    if (!pendingAsyncNodeKeys.delete(key))
+    if (!decrementPendingAsyncNodeKey(key))
       return
-    bumpAsyncNodeVersion()
+
     measureTrackedNodeHeights()
-    scheduleVirtualMetricsEmit('async-node')
   },
 }
 
-provide('markstreamNodeLifecycle', nodeLifecycle)
+const providedNodeLifecycle: MarkstreamNodeLifecycle = {
+  reportHeight(indexKey, height) {
+    localNodeLifecycle.reportHeight(indexKey, height)
+  },
+  markPending(indexKey) {
+    localNodeLifecycle.markPending(indexKey)
+    parentNodeLifecycle?.markPending(indexKey)
+  },
+  markSettled(indexKey) {
+    localNodeLifecycle.markSettled(indexKey)
+    parentNodeLifecycle?.markSettled(indexKey)
+  },
+}
+
+provide('markstreamNodeLifecycle', providedNodeLifecycle)
 
 function getVirtualSessionKey() {
   return props.virtualScroll?.sessionKey
@@ -1439,7 +1545,10 @@ function restoreVirtualAnchor(anchor: MarkstreamVirtualAnchor) {
   }
 }
 
-function getBoundedHeightCache(cache: MarkstreamHeightCache) {
+function getBoundedHeightCache(
+  cache: MarkstreamHeightCache,
+  options: { requireCompatibilityMetadata?: boolean } = {},
+) {
   const length = parsedNodes.value.length
   if (length <= 0)
     return []
@@ -1448,6 +1557,9 @@ function getBoundedHeightCache(cache: MarkstreamHeightCache) {
       return false
 
     if (!Number.isFinite(entry.height) || entry.height <= 0)
+      return false
+
+    if (options.requireCompatibilityMetadata && !entry.nodeType && !entry.signature)
       return false
 
     return isHeightCacheEntryCompatible(entry)
@@ -1512,13 +1624,12 @@ function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
     return false
 
   const restoreState = props.virtualScroll?.restoreState
-  if (!restoreState)
+  if (restoreState && !canRestoreVirtualStateCache(restoreState))
     return false
 
-  if (!canRestoreVirtualStateCache(restoreState))
-    return false
-
-  const boundedCache = getBoundedHeightCache(cache)
+  const boundedCache = getBoundedHeightCache(cache, {
+    requireCompatibilityMetadata: !restoreState,
+  })
   if (!boundedCache.length)
     return false
 
@@ -1785,14 +1896,7 @@ function estimateIndexForOffset(offsetPx: number) {
     return 0
   const nodes = parsedNodes.value
   if (heightEstimationActive.value) {
-    let remaining = offsetPx
-    for (let i = 0; i < nodes.length; i++) {
-      const height = getFallbackNodeHeight(i)
-      if (remaining <= height)
-        return i
-      remaining -= height
-    }
-    return Math.max(0, nodes.length - 1)
+    return estimateIndexForOffsetFromPrefix(offsetPx)
   }
   if (heightTreeSize.value === nodes.length && heightSumTree.value.length && heightKnownTree.value.length) {
     const avg = averageNodeHeight.value
@@ -1838,14 +1942,9 @@ function estimateIndexForOffsetFromEnd(offsetPx: number) {
   if (offsetPx <= 0)
     return Math.max(0, nodes.length - 1)
   if (heightEstimationActive.value) {
-    let remaining = offsetPx
-    for (let i = nodes.length - 1; i >= 0; i--) {
-      const height = getFallbackNodeHeight(i)
-      if (remaining <= height)
-        return i
-      remaining -= height
-    }
-    return 0
+    const prefix = fallbackHeightPrefix.value
+    const totalHeight = prefix[nodes.length] ?? 0
+    return estimateIndexForOffsetFromPrefix(Math.max(0, totalHeight - offsetPx))
   }
   if (heightTreeSize.value === nodes.length) {
     const totalHeight = estimateHeightRange(0, nodes.length)
@@ -2431,7 +2530,7 @@ function resetVirtualSessionRuntimeState() {
   pendingImperativeVirtualRestoreState = null
   manualSettleInFlight = false
 
-  pendingAsyncNodeKeys.clear()
+  pendingAsyncNodeCounts.clear()
   bumpAsyncNodeVersion()
 
   clearRestoreReconcile()

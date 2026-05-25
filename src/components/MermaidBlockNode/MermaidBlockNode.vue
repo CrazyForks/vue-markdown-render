@@ -177,6 +177,8 @@ const viewportReady = ref(typeof window === 'undefined')
 const attrs = useAttrs()
 const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
 let lifecyclePendingIndexKey = ''
+let lifecyclePendingCount = 0
+let lifecycleSettleGeneration = 0
 const lifecycleIndexKey = computed(() => {
   const raw = attrs['index-key'] ?? attrs.indexKey
   return raw == null || raw === '' ? '' : String(raw)
@@ -193,14 +195,17 @@ function markLifecyclePending() {
   if (!indexKey)
     return
 
-  if (lifecyclePendingIndexKey === indexKey)
-    return
-
-  if (lifecyclePendingIndexKey)
+  if (lifecyclePendingIndexKey && lifecyclePendingIndexKey !== indexKey) {
     lifecycle?.markSettled(lifecyclePendingIndexKey)
+    lifecyclePendingCount = 0
+  }
 
   lifecyclePendingIndexKey = indexKey
-  lifecycle?.markPending(indexKey)
+  lifecyclePendingCount += 1
+  lifecycleSettleGeneration += 1
+
+  if (lifecyclePendingCount === 1)
+    lifecycle?.markPending(indexKey)
 }
 
 async function markLifecycleSettled() {
@@ -208,8 +213,16 @@ async function markLifecycleSettled() {
   if (!indexKey)
     return
 
+  lifecyclePendingCount = Math.max(0, lifecyclePendingCount - 1)
+  if (lifecyclePendingCount > 0)
+    return
+
   lifecyclePendingIndexKey = ''
+  const generation = ++lifecycleSettleGeneration
   await nextTick()
+  if (generation !== lifecycleSettleGeneration)
+    return
+
   reportLifecycleHeight(indexKey)
   lifecycle?.markSettled(indexKey)
 }
@@ -220,6 +233,8 @@ function clearLifecyclePending() {
     return
 
   lifecyclePendingIndexKey = ''
+  lifecyclePendingCount = 0
+  lifecycleSettleGeneration += 1
   lifecycle?.markSettled(indexKey)
 }
 // Mode container used to animate height between Source and Preview
@@ -1441,76 +1456,85 @@ async function renderPartial(code: string) {
 async function progressiveRender() {
   const scheduledAt = Date.now()
   const token = ++renderToken.value
-  // cancel any previous ongoing progressive work
-  if (currentWorkController) {
-    currentWorkController.abort()
-  }
-  currentWorkController = new AbortController()
-  const signal = currentWorkController.signal
-  const theme = props.isDark ? 'dark' : 'light'
-  const base = baseFixedCode.value
-  // 新增：去除所有空白字符后做比较
-  const normalizedBase = base.replace(/\s+/g, '')
-  if (!base.trim()) {
-    if (shouldKeepPreviewForEmptyStreamingSource())
-      return
-    if (mermaidContent.value)
-      clearElement(mermaidContent.value)
-    lastSvgSnapshot.value = null
-    lastRenderedCode.value = ''
-    hasRenderError.value = false
-    return
-  }
-  // 如果和上一次渲染的 code（去除空白）一致，则跳过渲染
-  if (normalizedBase === lastRenderedCode.value) {
-    return
-  }
-  try {
-    const res = await canParseOrPrefix(base, theme, { signal, timeoutMs: timeouts.value.worker })
-    if (res.fullOk) {
-      const rendered = await initMermaid()
-      if (!rendered)
-        return
-      // Guard against race: if a newer render started, skip flag changes
-      if (renderToken.value === token) {
-        lastSvgSnapshot.value = mermaidContent.value?.innerHTML ?? null
-        // 记录本次渲染的 code（去除空白）
-        lastRenderedCode.value = normalizedBase
-        hasRenderError.value = false
-      }
-      return
-    }
-    // If stopPreviewPolling just happened after this work was queued, avoid partials
-    const justStopped = lastPreviewStopAt && scheduledAt <= lastPreviewStopAt
-    if (res.prefixOk && res.prefix && canApplyPartialPreview() && !justStopped) {
-      // render a best-effort partial preview
-      await renderPartial(res.prefix)
-      return
-    }
-  }
-  catch (e: any) {
-    // aborted -> do nothing
-    if (e?.name === 'AbortError')
-      return
-    // fallthrough to restore last success
-  }
 
-  // Worker/main parse failed -> restore last successful full SVG (if any), do not render prefix
-  if (renderToken.value !== token)
-    return
-  // 若当前处于错误显示状态，避免用缓存覆盖错误，直到下一次成功渲染
-  if (hasRenderError.value)
-    return
-  // If we cannot apply partial and also shouldn't restore cached (e.g., error state), bail
-  const cached = svgCache.value[theme]
-  if (cached && mermaidContent.value) {
-    const rendered = renderSvgToTarget(mermaidContent.value, cached.svg)
-    if (rendered) {
-      lastMermaidBindFunctions = cached.bindFunctions ?? null
-      bindMermaidInteractions(rendered.bindTarget)
+  markLifecyclePending()
+
+  try {
+    // cancel any previous ongoing progressive work
+    if (currentWorkController) {
+      currentWorkController.abort()
     }
+    currentWorkController = new AbortController()
+    const signal = currentWorkController.signal
+    const theme = props.isDark ? 'dark' : 'light'
+    const base = baseFixedCode.value
+    // 新增：去除所有空白字符后做比较
+    const normalizedBase = base.replace(/\s+/g, '')
+    if (!base.trim()) {
+      if (shouldKeepPreviewForEmptyStreamingSource())
+        return
+      if (mermaidContent.value)
+        clearElement(mermaidContent.value)
+      lastSvgSnapshot.value = null
+      lastRenderedCode.value = ''
+      hasRenderError.value = false
+      return
+    }
+    // 如果和上一次渲染的 code（去除空白）一致，则跳过渲染
+    if (normalizedBase === lastRenderedCode.value) {
+      return
+    }
+
+    try {
+      const res = await canParseOrPrefix(base, theme, { signal, timeoutMs: timeouts.value.worker })
+      if (res.fullOk) {
+        const rendered = await initMermaid()
+        if (!rendered)
+          return
+        // Guard against race: if a newer render started, skip flag changes
+        if (renderToken.value === token) {
+          lastSvgSnapshot.value = mermaidContent.value?.innerHTML ?? null
+          // 记录本次渲染的 code（去除空白）
+          lastRenderedCode.value = normalizedBase
+          hasRenderError.value = false
+        }
+        return
+      }
+      // If stopPreviewPolling just happened after this work was queued, avoid partials
+      const justStopped = lastPreviewStopAt && scheduledAt <= lastPreviewStopAt
+      if (res.prefixOk && res.prefix && canApplyPartialPreview() && !justStopped) {
+        // render a best-effort partial preview
+        await renderPartial(res.prefix)
+        return
+      }
+    }
+    catch (e: any) {
+      // aborted -> do nothing
+      if (e?.name === 'AbortError')
+        return
+      // fallthrough to restore last success
+    }
+
+    // Worker/main parse failed -> restore last successful full SVG (if any), do not render prefix
+    if (renderToken.value !== token)
+      return
+    // 若当前处于错误显示状态，避免用缓存覆盖错误，直到下一次成功渲染
+    if (hasRenderError.value)
+      return
+    // If we cannot apply partial and also shouldn't restore cached (e.g., error state), bail
+    const cached = svgCache.value[theme]
+    if (cached && mermaidContent.value) {
+      const rendered = renderSvgToTarget(mermaidContent.value, cached.svg)
+      if (rendered) {
+        lastMermaidBindFunctions = cached.bindFunctions ?? null
+        bindMermaidInteractions(rendered.bindTarget)
+      }
+    }
+    // else: keep current DOM (could be empty on very first run)
   }
-  // else: keep current DOM (could be empty on very first run)
+  finally {
+    void markLifecycleSettled()
+  }
 }
 
 function stopPreviewPolling() {

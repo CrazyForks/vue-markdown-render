@@ -62,4 +62,68 @@ describe('infographicBlockNode streaming errors', () => {
 
     wrapper.unmount()
   })
+
+  it('keeps lifecycle pending across a queued rerender', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    let resolveLoader: ((value: unknown) => void) | null = null
+    const loaderPromise = new Promise<unknown>((resolve) => {
+      resolveLoader = resolve
+    })
+
+    class AsyncInfographic {
+      container: HTMLElement
+
+      constructor(options: { container: HTMLElement }) {
+        this.container = options.container
+      }
+
+      render(source: string) {
+        this.container.innerHTML = `<svg data-source="${source}"></svg>`
+      }
+
+      destroy() {}
+    }
+
+    setInfographicLoader(() => loaderPromise)
+
+    const markPending = vi.fn()
+    const reportHeight = vi.fn()
+    const markSettled = vi.fn()
+
+    const wrapper = mount(InfographicBlockNode as any, {
+      props: {
+        node: createNode('first'),
+        loading: true,
+      },
+      attrs: {
+        'index-key': 'markdown-renderer-0',
+      },
+      global: {
+        provide: {
+          markstreamNodeLifecycle: {
+            markPending,
+            reportHeight,
+            markSettled,
+          },
+        },
+      },
+    })
+
+    await flushAll()
+    expect(markPending).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      node: createNode('second'),
+    })
+    await flushAll()
+
+    resolveLoader?.(AsyncInfographic)
+    await flushAll()
+
+    expect(markPending).toHaveBeenCalledTimes(1)
+    expect(markSettled).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
 })
