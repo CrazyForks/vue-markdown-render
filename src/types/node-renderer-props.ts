@@ -96,7 +96,7 @@ export type MarkstreamScrollRootResolver = () => MarkstreamScrollRootLike
 export interface MarkstreamVirtualScrollOptions {
   enabled?: boolean
   scrollRoot?: MarkstreamScrollRootLike | MarkstreamScrollRootResolver
-  sessionKey: string
+  sessionKey?: string
   threadKey?: string
   restoreState?: MarkstreamVirtualState | null
   heightCache?: MarkstreamHeightCache | null

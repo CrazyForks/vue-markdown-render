@@ -517,6 +517,13 @@ const nodeContentVersions = new Map<number, number>()
 const nodeContentDeferredMeasureTimers = new Map<number, number[]>()
 const finalHeightConvergenceTimers: number[] = []
 const pendingHeightMeasurements = new Map<number, { height: number, allowShrink: boolean, version: number, el: HTMLElement }>()
+const activeHeightSettlingTimers = new Set<number>()
+const heightSettlingTimerVersion = ref(0)
+let heightSettlingTimerVersionQueued = false
+const pendingHeightSettlingTaskCount = computed(() => {
+  void heightSettlingTimerVersion.value
+  return activeHeightSettlingTimers.size
+})
 const pendingAsyncNodeKeys = new Set<string>()
 const pendingAsyncNodeVersion = ref(0)
 const pendingAsyncNodeCount = computed(() => {
@@ -532,6 +539,52 @@ const desiredRenderedCount = computed(() => {
   const target = Math.min(parsedNodes.value.length, windowEnd)
   return Math.max(renderedCount.value, target)
 })
+
+function bumpHeightSettlingTimerVersion() {
+  if (heightSettlingTimerVersionQueued)
+    return
+
+  heightSettlingTimerVersionQueued = true
+  queueMicrotask(() => {
+    heightSettlingTimerVersionQueued = false
+    heightSettlingTimerVersion.value += 1
+  })
+}
+
+function scheduleHeightSettlingTimer(
+  delay: number,
+  task: () => void,
+  reason: MarkstreamVirtualReason = 'node-resize',
+) {
+  if (!isClient || typeof window === 'undefined')
+    return null
+
+  const timer = window.setTimeout(() => {
+    if (activeHeightSettlingTimers.delete(timer))
+      bumpHeightSettlingTimerVersion()
+
+    try {
+      task()
+    }
+    finally {
+      scheduleVirtualMetricsEmit(reason)
+    }
+  }, Math.max(0, delay))
+
+  activeHeightSettlingTimers.add(timer)
+  bumpHeightSettlingTimerVersion()
+  return timer
+}
+
+function clearHeightSettlingTimer(timer: number | null | undefined) {
+  if (!isClient || timer == null)
+    return
+
+  if (activeHeightSettlingTimers.delete(timer))
+    bumpHeightSettlingTimerVersion()
+
+  window.clearTimeout(timer)
+}
 
 function ensureExperimentProbeNodes() {
   if (paragraphProbeNode.value && listItemProbeNode.value && listProbeNode.value && headingProbeNodes.value?.[1])
@@ -939,17 +992,51 @@ const bottomSpacerHeight = computed(() => {
   return estimateHeightRange(end, total)
 })
 
-function buildExperimentReport() {
-  const nodes = parsedNodes.value
+interface VirtualHeightSummary {
+  totalNodes: number
+  measuredCount: number
+  estimatedCount: number
+  averageNodeHeight: number
+  topSpacerHeight: number
+  bottomSpacerHeight: number
+  estimatedTotalHeight: number
+  width: number
+}
+
+function getEstimatedNodeHeightCount() {
+  if (!heightEstimationActive.value)
+    return 0
+
+  let count = 0
+  const estimates = estimatedNodeHeights.value
+  for (let i = 0; i < estimates.length; i++) {
+    if (estimates[i])
+      count++
+  }
+  return count
+}
+
+function buildVirtualHeightSummary(): VirtualHeightSummary {
+  const totalNodes = parsedNodes.value.length
+
   return {
-    totalNodes: nodes.length,
+    totalNodes,
     measuredCount: heightStats.count,
-    estimatedCount: estimatedNodeHeights.value.filter(Boolean).length,
+    estimatedCount: getEstimatedNodeHeightCount(),
     averageNodeHeight: averageNodeHeight.value,
     topSpacerHeight: topSpacerHeight.value,
     bottomSpacerHeight: bottomSpacerHeight.value,
-    estimatedTotalHeight: estimateHeightRange(0, nodes.length),
-    width: experimentContainerWidth.value || containerRef.value?.clientWidth || 0,
+    estimatedTotalHeight: estimateHeightRange(0, totalNodes),
+    width: getCurrentVirtualWidth(),
+  }
+}
+
+function buildExperimentReport() {
+  const nodes = parsedNodes.value
+  const summary = buildVirtualHeightSummary()
+
+  return {
+    ...summary,
     probe: {
       paragraphReady: Boolean(simpleTextProbeProfile.value.paragraph),
       listItemReady: Boolean(simpleTextProbeProfile.value.listItem),
@@ -1059,6 +1146,7 @@ function isLayoutSettled() {
   return effectiveFinal.value === true
     && !contentStreamingTailActive.value
     && pendingAsyncNodeCount.value === 0
+    && activeHeightSettlingTimers.size === 0
     && pendingHeightMeasurements.size === 0
     && heightMeasurementRaf == null
     && renderedCount.value >= desiredRenderedCount.value
@@ -1074,13 +1162,19 @@ function resolveVirtualPhase(phase?: MarkstreamVirtualPhase): MarkstreamVirtualP
   return isLayoutSettled() ? 'settled' : 'settling'
 }
 
-function resolveVirtualConfidence(phase: MarkstreamVirtualPhase, report: ReturnType<typeof buildExperimentReport>) {
-  if (phase === 'final')
-    return 'final'
-  if (report.totalNodes > 0 && report.measuredCount >= report.totalNodes)
-    return 'measured'
+function resolveVirtualConfidence(
+  phase: MarkstreamVirtualPhase,
+  report: Pick<VirtualHeightSummary, 'totalNodes' | 'measuredCount' | 'estimatedCount'>,
+) {
+  if (report.totalNodes <= 0)
+    return phase === 'final' ? 'final' : 'estimate'
+
+  if (report.measuredCount >= report.totalNodes)
+    return phase === 'final' ? 'final' : 'measured'
+
   if (report.measuredCount > 0 || report.estimatedCount > 0)
     return 'mixed'
+
   return 'estimate'
 }
 
@@ -1088,26 +1182,26 @@ function getVirtualMetrics(
   reason: MarkstreamVirtualReason = 'manual',
   phase?: MarkstreamVirtualPhase,
 ): MarkstreamVirtualMetrics {
-  const report = buildExperimentReport()
+  const summary = buildVirtualHeightSummary()
   const resolvedPhase = resolveVirtualPhase(phase)
 
   return {
     sessionKey: getVirtualSessionKey(),
     phase: resolvedPhase,
-    nodeCount: report.totalNodes,
+    nodeCount: summary.totalNodes,
     liveRange: { start: liveRange.start, end: liveRange.end },
     renderedCount: renderedCount.value,
-    measuredCount: report.measuredCount,
-    estimatedCount: report.estimatedCount,
-    averageNodeHeight: report.averageNodeHeight,
-    topSpacerHeight: report.topSpacerHeight,
-    bottomSpacerHeight: report.bottomSpacerHeight,
+    measuredCount: summary.measuredCount,
+    estimatedCount: summary.estimatedCount,
+    averageNodeHeight: summary.averageNodeHeight,
+    topSpacerHeight: summary.topSpacerHeight,
+    bottomSpacerHeight: summary.bottomSpacerHeight,
     visibleDomHeight: getVisibleDomHeight(),
-    totalHeight: report.estimatedTotalHeight,
-    width: report.width,
+    totalHeight: summary.estimatedTotalHeight,
+    width: summary.width,
     final: effectiveFinal.value === true,
     stable: isLayoutSettled(),
-    confidence: resolveVirtualConfidence(resolvedPhase, report),
+    confidence: resolveVirtualConfidence(resolvedPhase, summary),
     reason,
   }
 }
@@ -1263,19 +1357,27 @@ function getBoundedHeightCache(cache: MarkstreamHeightCache) {
 
 function canReuseHeightCacheForWidth(savedWidth: number | null | undefined) {
   const currentWidth = getCurrentVirtualWidth()
-  if (!savedWidth || !currentWidth)
+  if (!savedWidth)
     return true
+
+  if (!currentWidth)
+    return false
 
   return Math.abs(currentWidth - savedWidth) <= HEIGHT_CACHE_WIDTH_BUCKET_PX
 }
 
+function getVirtualStateSavedWidth(state: MarkstreamVirtualState | null | undefined) {
+  return state?.width || state?.metrics.width || null
+}
+
 function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
   return state.sessionKey === getVirtualSessionKey()
-    && canReuseHeightCacheForWidth(state.width || state.metrics.width)
+    && canReuseHeightCacheForWidth(getVirtualStateSavedWidth(state))
 }
 
 let lastImportedVirtualHeightCacheSignature: string | null = null
 let lastAppliedVirtualRestoreState: MarkstreamVirtualState | null = null
+let pendingImperativeVirtualRestoreState: MarkstreamVirtualState | null = null
 
 function getHeightCacheSignature(cache: MarkstreamHeightCache) {
   let checksum = 0
@@ -1303,7 +1405,11 @@ function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
     return false
 
   const restoreState = props.virtualScroll?.restoreState
+  const savedWidth = getVirtualStateSavedWidth(restoreState)
+
   if (restoreState && !canRestoreVirtualStateCache(restoreState))
+    return false
+  if (!restoreState && savedWidth && !canReuseHeightCacheForWidth(savedWidth))
     return false
 
   const boundedCache = getBoundedHeightCache(cache)
@@ -1332,8 +1438,10 @@ function applyVirtualRestoreState(state: MarkstreamVirtualState | null | undefin
 
   if (state.heightCache?.length && canRestoreVirtualStateCache(state)) {
     const boundedCache = getBoundedHeightCache(state.heightCache)
-    if (boundedCache.length)
+    if (boundedCache.length) {
       importHeightCache(boundedCache, { mode: 'merge' })
+      lastImportedVirtualHeightCacheSignature = getHeightCacheSignature(boundedCache)
+    }
   }
 
   if (lastAppliedVirtualRestoreState === state)
@@ -1345,8 +1453,15 @@ function applyVirtualRestoreState(state: MarkstreamVirtualState | null | undefin
   return true
 }
 
+function shouldKeepPendingVirtualRestoreState(state: MarkstreamVirtualState) {
+  return Boolean(state.heightCache?.length && getVirtualStateSavedWidth(state) && !getCurrentVirtualWidth())
+}
+
 function restoreVirtualState(state: MarkstreamVirtualState) {
-  applyVirtualRestoreState(state)
+  pendingImperativeVirtualRestoreState = state
+
+  if (applyVirtualRestoreState(state) && !shouldKeepPendingVirtualRestoreState(state))
+    pendingImperativeVirtualRestoreState = null
 }
 
 function forceFlushPendingHeightMeasurements() {
@@ -1841,13 +1956,9 @@ function measureTrackedNodeHeights() {
 }
 
 function clearFinalHeightConvergenceTimers() {
-  if (!isClient)
-    return
-
   while (finalHeightConvergenceTimers.length) {
     const timer = finalHeightConvergenceTimers.pop()
-    if (timer != null)
-      window.clearTimeout(timer)
+    clearHeightSettlingTimer(timer)
   }
 }
 
@@ -1857,14 +1968,15 @@ function scheduleFinalHeightConvergence() {
 
   clearFinalHeightConvergenceTimers()
   for (const delay of [80, 240, 640]) {
-    const timer = window.setTimeout(() => {
+    const timer = scheduleHeightSettlingTimer(delay, () => {
       for (const [index, el] of nodeContentElements) {
         if (el)
           measureNodeHeight(index, el)
       }
-    }, delay)
+    }, 'final')
 
-    finalHeightConvergenceTimers.push(timer)
+    if (timer != null)
+      finalHeightConvergenceTimers.push(timer)
   }
 }
 
@@ -1877,7 +1989,7 @@ function setNodeContentRef(index: number, el: HTMLElement | null) {
   const previousTimers = nodeContentDeferredMeasureTimers.get(index)
   if (previousTimers) {
     for (const id of previousTimers)
-      window.clearTimeout(id)
+      clearHeightSettlingTimer(id)
     nodeContentDeferredMeasureTimers.delete(index)
   }
   const previousObserver = nodeContentResizeObservers.get(index)
@@ -1910,10 +2022,12 @@ function setNodeContentRef(index: number, el: HTMLElement | null) {
         : []
 
     if (deferredMeasureDelays.length) {
-      nodeContentDeferredMeasureTimers.set(
-        index,
-        deferredMeasureDelays.map(delay => window.setTimeout(measure, delay)),
-      )
+      const timers = deferredMeasureDelays
+        .map(delay => scheduleHeightSettlingTimer(delay, measure, 'node-resize'))
+        .filter((timer): timer is number => timer != null)
+
+      if (timers.length)
+        nodeContentDeferredMeasureTimers.set(index, timers)
     }
   }
 }
@@ -1928,7 +2042,7 @@ watch(
     nodeContentResizeObservers.clear()
     for (const timers of nodeContentDeferredMeasureTimers.values()) {
       for (const id of timers)
-        window.clearTimeout(id)
+        clearHeightSettlingTimer(id)
     }
     nodeContentDeferredMeasureTimers.clear()
     nodeContentVersions.clear()
@@ -2208,6 +2322,7 @@ function resetVirtualSessionRuntimeState() {
   lastImportedVirtualHeightCacheSignature = null
   lastAppliedVirtualRestoreState = null
   lastManualSettleSignature = null
+  pendingImperativeVirtualRestoreState = null
   manualSettleInFlight = false
 
   pendingAsyncNodeKeys.clear()
@@ -2247,6 +2362,7 @@ watch(
     () => props.virtualScroll?.restoreState,
     () => parsedNodes.value.length,
     () => getVirtualSessionKey(),
+    experimentContainerWidth,
   ],
   async ([enabled, state]) => {
     if (!enabled || !state)
@@ -2259,12 +2375,57 @@ watch(
 )
 
 watch(
+  [virtualScrollEnabled, experimentContainerWidth, () => props.virtualScroll?.restoreState],
+  ([enabled]) => {
+    if (!enabled)
+      return
+
+    const state = props.virtualScroll?.restoreState
+    if (!state || !lastImportedVirtualHeightCacheSignature)
+      return
+
+    if (canRestoreVirtualStateCache(state))
+      return
+
+    resetVirtualSessionMeasurements()
+    lastImportedVirtualHeightCacheSignature = null
+    scheduleVirtualMetricsEmit('resize')
+  },
+  { flush: 'post' },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    () => parsedNodes.value.length,
+    () => getVirtualSessionKey(),
+    experimentContainerWidth,
+  ],
+  async ([enabled]) => {
+    if (!enabled || !pendingImperativeVirtualRestoreState)
+      return
+
+    await nextTick()
+
+    if (
+      pendingImperativeVirtualRestoreState
+      && applyVirtualRestoreState(pendingImperativeVirtualRestoreState)
+      && !shouldKeepPendingVirtualRestoreState(pendingImperativeVirtualRestoreState)
+    ) {
+      pendingImperativeVirtualRestoreState = null
+    }
+  },
+  { flush: 'post', immediate: true },
+)
+
+watch(
   [
     virtualScrollEnabled,
     effectiveFinal,
     () => props.virtualScroll?.settleMode,
     () => getVirtualSessionKey(),
     pendingAsyncNodeCount,
+    pendingHeightSettlingTaskCount,
     () => renderedCount.value,
     desiredRenderedCount,
     () => heightStats.count,
@@ -2340,6 +2501,7 @@ watch(
     () => props.virtualScroll?.settledToken,
     () => getVirtualSessionKey(),
     pendingAsyncNodeCount,
+    pendingHeightSettlingTaskCount,
     () => renderedCount.value,
     desiredRenderedCount,
     () => parsedNodes.value.length,
@@ -2410,7 +2572,7 @@ onBeforeUnmount(() => {
   nodeContentResizeObservers.clear()
   for (const timers of nodeContentDeferredMeasureTimers.values()) {
     for (const id of timers)
-      window.clearTimeout(id)
+      clearHeightSettlingTimer(id)
   }
   nodeContentDeferredMeasureTimers.clear()
   nodeContentVersions.clear()

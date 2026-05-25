@@ -123,6 +123,9 @@ const virtualScrollOptions: MarkstreamVirtualScrollOptions = {
   enabled: true,
   sessionKey: 'public-api-session',
 }
+const virtualScrollOptionsWithoutSessionKey: MarkstreamVirtualScrollOptions = {
+  enabled: false,
+}
 const virtualMetrics: MarkstreamVirtualMetrics | null = null
 const virtualState: MarkstreamVirtualState | null = null
 const rendererHandle: MarkstreamRendererHandle | null = null
@@ -190,6 +193,7 @@ void linkProps
 void d2Props
 void infographicProps
 void virtualScrollOptions
+void virtualScrollOptionsWithoutSessionKey
 void virtualMetrics
 void virtualState
 void rendererHandle
