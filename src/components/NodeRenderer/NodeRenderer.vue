@@ -455,6 +455,7 @@ const {
   resolveScrollContainer: () => scrollRootElement.value || resolveScrollContainer(),
   getNormalizedScrollTop,
   getOffsetTopWithinRoot,
+  isReverseFlexScrollRoot,
 
   estimateIndexForOffset,
   estimateHeightRange,
@@ -1067,11 +1068,11 @@ function resolveLifecycleNodeIndex(indexKey: string | number) {
   if (!key.startsWith(prefix))
     return null
 
-  const match = key.slice(prefix.length).match(/^\d+/)
+  const match = key.slice(prefix.length).match(/^(\d+)(?:$|-)/)
   if (!match)
     return null
 
-  const index = Number(match[0])
+  const index = Number(match[1])
   if (!Number.isInteger(index) || index < 0 || index >= parsedNodes.value.length)
     return null
 
@@ -1107,6 +1108,10 @@ const nodeLifecycle: MarkstreamNodeLifecycle = {
     recordNodeHeight(index, height)
   },
   markPending(indexKey) {
+    const index = resolveLifecycleNodeIndex(indexKey)
+    if (index == null)
+      return
+
     const key = String(indexKey)
     if (pendingAsyncNodeKeys.has(key))
       return
@@ -1115,6 +1120,10 @@ const nodeLifecycle: MarkstreamNodeLifecycle = {
     scheduleVirtualMetricsEmit('async-node')
   },
   markSettled(indexKey) {
+    const index = resolveLifecycleNodeIndex(indexKey)
+    if (index == null)
+      return
+
     const key = String(indexKey)
     if (!pendingAsyncNodeKeys.delete(key))
       return
@@ -1274,24 +1283,103 @@ function captureVirtualAnchor(): MarkstreamVirtualAnchor | null {
   }
 }
 
+function getNodeHeightCacheSignature(index: number) {
+  const node = parsedNodes.value[index] as any
+  if (!node)
+    return ''
+
+  const type = String(node.type ?? '')
+  const raw = String(node.raw ?? '')
+  const content = String(node.content ?? node.code ?? '')
+  const language = String(node.language ?? '')
+  const loading = node.loading === true ? '1' : '0'
+
+  return [
+    type,
+    language,
+    loading,
+    raw || content,
+  ].join('\u0000')
+}
+
+function getVirtualContentHash() {
+  let hash = 2166136261
+
+  for (let i = 0; i < parsedNodes.value.length; i++) {
+    const signature = getNodeHeightCacheSignature(i)
+    for (let j = 0; j < signature.length; j++) {
+      hash ^= signature.charCodeAt(j)
+      hash = Math.imul(hash, 16777619)
+    }
+  }
+
+  return String(hash >>> 0)
+}
+
+function exportVirtualHeightCache(): MarkstreamHeightCache {
+  return exportHeightCache()
+    .map((entry): MarkstreamHeightCache[number] | null => {
+      const node = parsedNodes.value[entry.index] as any
+      if (!node)
+        return null
+
+      return {
+        ...entry,
+        nodeType: String(node.type ?? ''),
+        signature: getNodeHeightCacheSignature(entry.index),
+      }
+    })
+    .filter((entry): entry is MarkstreamHeightCache[number] => Boolean(entry))
+}
+
+function isHeightCacheEntryCompatible(entry: MarkstreamHeightCache[number]) {
+  const node = parsedNodes.value[entry.index] as any
+  if (!node)
+    return false
+
+  if (entry.nodeType && entry.nodeType !== String(node.type ?? ''))
+    return false
+
+  if (entry.signature && entry.signature !== getNodeHeightCacheSignature(entry.index))
+    return false
+
+  return true
+}
+
 function captureVirtualStateFromMetrics(metrics: MarkstreamVirtualMetrics): MarkstreamVirtualState | null {
   const anchor = captureVirtualAnchor()
   if (!anchor)
     return null
 
-  const heightCache = exportHeightCache()
+  const heightCache = exportVirtualHeightCache()
 
   return {
     sessionKey: metrics.sessionKey,
     anchor,
     metrics,
     width: metrics.width,
+    contentHash: getVirtualContentHash(),
     heightCache: heightCache.length ? heightCache : undefined,
   }
 }
 
 function captureVirtualState() {
   return captureVirtualStateFromMetrics(getVirtualMetrics('manual'))
+}
+
+function setReverseFlexDistanceFromBottom(root: HTMLElement, distanceFromBottomPx: number) {
+  const distance = Math.max(0, distanceFromBottomPx)
+  const doc = root.ownerDocument || document
+  const max = Math.max(0, (root.scrollHeight ?? 0) - (root.clientHeight ?? 0))
+  const targetNormalized = Math.max(0, max - distance)
+
+  root.scrollTop = -distance
+
+  const afterNegative = getNormalizedScrollTop(root, doc, false)
+  if (Math.abs(afterNegative - targetNormalized) <= 2)
+    return
+
+  root.scrollTop = distance
 }
 
 function applyBottomVirtualAnchor(anchor: Extract<MarkstreamVirtualAnchor, { type: 'bottom' }>) {
@@ -1307,9 +1395,12 @@ function applyBottomVirtualAnchor(anchor: Extract<MarkstreamVirtualAnchor, { typ
     return
   }
 
-  box.root.scrollTop = isReverseFlexScrollRoot(box.root)
-    ? Math.max(0, anchor.distanceFromBottomPx)
-    : target
+  if (isReverseFlexScrollRoot(box.root)) {
+    setReverseFlexDistanceFromBottom(box.root, anchor.distanceFromBottomPx)
+    return
+  }
+
+  box.root.scrollTop = target
 }
 
 const virtualBottomRestoreTimers: number[] = []
@@ -1352,7 +1443,15 @@ function getBoundedHeightCache(cache: MarkstreamHeightCache) {
   const length = parsedNodes.value.length
   if (length <= 0)
     return []
-  return cache.filter(entry => entry.index >= 0 && entry.index < length)
+  return cache.filter((entry) => {
+    if (!Number.isInteger(entry.index) || entry.index < 0 || entry.index >= length)
+      return false
+
+    if (!Number.isFinite(entry.height) || entry.height <= 0)
+      return false
+
+    return isHeightCacheEntryCompatible(entry)
+  })
 }
 
 function canReuseHeightCacheForWidth(savedWidth: number | null | undefined) {
@@ -1371,8 +1470,16 @@ function getVirtualStateSavedWidth(state: MarkstreamVirtualState | null | undefi
 }
 
 function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
-  return state.sessionKey === getVirtualSessionKey()
-    && canReuseHeightCacheForWidth(getVirtualStateSavedWidth(state))
+  if (state.sessionKey !== getVirtualSessionKey())
+    return false
+
+  if (!canReuseHeightCacheForWidth(getVirtualStateSavedWidth(state)))
+    return false
+
+  if (state.contentHash && state.contentHash !== getVirtualContentHash())
+    return false
+
+  return true
 }
 
 let lastImportedVirtualHeightCacheSignature: string | null = null
@@ -1405,11 +1512,10 @@ function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
     return false
 
   const restoreState = props.virtualScroll?.restoreState
-  const savedWidth = getVirtualStateSavedWidth(restoreState)
-
-  if (restoreState && !canRestoreVirtualStateCache(restoreState))
+  if (!restoreState)
     return false
-  if (!restoreState && savedWidth && !canReuseHeightCacheForWidth(savedWidth))
+
+  if (!canRestoreVirtualStateCache(restoreState))
     return false
 
   const boundedCache = getBoundedHeightCache(cache)

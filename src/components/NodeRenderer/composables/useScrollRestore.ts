@@ -22,6 +22,7 @@ export interface ScrollRestoreOptions {
     isViewportRoot: boolean,
   ) => number
   getOffsetTopWithinRoot: (node: HTMLElement, root: HTMLElement) => number
+  isReverseFlexScrollRoot?: (root: HTMLElement) => boolean
 
   estimateIndexForOffset: (offsetPx: number) => number
   estimateHeightRange: (start: number, end: number) => number
@@ -52,6 +53,7 @@ export function useScrollRestore(options: ScrollRestoreOptions): ScrollRestore {
     resolveScrollContainer,
     getNormalizedScrollTop,
     getOffsetTopWithinRoot,
+    isReverseFlexScrollRoot,
     estimateIndexForOffset,
     estimateHeightRange,
     getFallbackNodeHeight,
@@ -109,7 +111,31 @@ export function useScrollRestore(options: ScrollRestoreOptions): ScrollRestore {
       return
     }
 
-    root.scrollTop = getOffsetTopWithinRoot(container, root) + next
+    const absoluteTarget = getOffsetTopWithinRoot(container, root) + next
+
+    if (isReverseFlexScrollRoot?.(root)) {
+      setReverseFlexNormalizedScrollTop(root, doc, absoluteTarget)
+      return
+    }
+
+    root.scrollTop = absoluteTarget
+  }
+
+  function setReverseFlexNormalizedScrollTop(
+    root: HTMLElement,
+    doc: Document,
+    targetNormalized: number,
+  ) {
+    const max = Math.max(0, (root.scrollHeight ?? 0) - (root.clientHeight ?? 0))
+    const distanceFromBottom = Math.max(0, max - Math.max(0, targetNormalized))
+
+    root.scrollTop = -distanceFromBottom
+
+    const afterNegative = getNormalizedScrollTop(root, doc, false)
+    if (Math.abs(afterNegative - targetNormalized) <= 2)
+      return
+
+    root.scrollTop = distanceFromBottom
   }
 
   function resolveAnchorOffset(anchor: RestoreAnchor) {

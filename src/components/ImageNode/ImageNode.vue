@@ -20,7 +20,7 @@ const imageStage = ref<'primary' | 'fallback' | 'failed'>('primary')
 const rootRef = ref<HTMLElement | null>(null)
 const attrs = useAttrs()
 const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
-let lifecyclePending = false
+let lifecyclePendingIndexKey = ''
 
 const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))
 const safeFallbackSrc = computed(() => sanitizeImageSrc(props.fallbackSrc))
@@ -37,26 +37,45 @@ const lifecycleIndexKey = computed(() => {
   return raw == null || raw === '' ? '' : String(raw)
 })
 
-function reportLifecycleHeight() {
-  if (!lifecycleIndexKey.value || !rootRef.value)
+function reportLifecycleHeight(indexKey = lifecycleIndexKey.value) {
+  if (!indexKey || !rootRef.value)
     return
-  lifecycle?.reportHeight(lifecycleIndexKey.value, rootRef.value.offsetHeight)
+  lifecycle?.reportHeight(indexKey, rootRef.value.offsetHeight)
 }
 
 function markLifecyclePending() {
-  if (!lifecycleIndexKey.value || lifecyclePending)
+  const indexKey = lifecycleIndexKey.value
+  if (!indexKey)
     return
-  lifecyclePending = true
-  lifecycle?.markPending(lifecycleIndexKey.value)
+
+  if (lifecyclePendingIndexKey === indexKey)
+    return
+
+  if (lifecyclePendingIndexKey)
+    lifecycle?.markSettled(lifecyclePendingIndexKey)
+
+  lifecyclePendingIndexKey = indexKey
+  lifecycle?.markPending(indexKey)
 }
 
 async function markLifecycleSettled() {
-  if (!lifecycleIndexKey.value || !lifecyclePending)
+  const indexKey = lifecyclePendingIndexKey
+  if (!indexKey)
     return
+
+  lifecyclePendingIndexKey = ''
   await nextTick()
-  reportLifecycleHeight()
-  lifecycle?.markSettled(lifecycleIndexKey.value)
-  lifecyclePending = false
+  reportLifecycleHeight(indexKey)
+  lifecycle?.markSettled(indexKey)
+}
+
+function clearLifecyclePending() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!indexKey)
+    return
+
+  lifecyclePendingIndexKey = ''
+  lifecycle?.markSettled(indexKey)
 }
 
 function handleImageError() {
@@ -132,8 +151,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  if (lifecyclePending && lifecycleIndexKey.value)
-    lifecycle?.markSettled(lifecycleIndexKey.value)
+  clearLifecyclePending()
 })
 </script>
 

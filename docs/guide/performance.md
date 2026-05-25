@@ -194,7 +194,6 @@ function onHeightChange(metrics: MarkstreamVirtualMetrics) {
         sessionKey: `thread-1:message-1:${revision}`,
         scrollRoot: () => scrollRoot.value,
         restoreState: savedState,
-        heightCache: savedState?.heightCache,
         settleMode: 'manual',
         settledToken: sourceDone && !pendingTools,
       }"

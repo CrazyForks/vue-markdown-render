@@ -587,6 +587,108 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not import standalone height cache without restore state', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'current-session',
+          settleMode: 'manual',
+          heightCache: [
+            { index: 0, height: 400 },
+            { index: 1, height: 400 },
+          ],
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    expect((await handle.forceMeasure('manual')).totalHeight).not.toBe(800)
+
+    wrapper.unmount()
+  })
+
+  it('rejects height cache entries whose node signature no longer matches', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'same-session',
+          settleMode: 'manual',
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    const state = {
+      sessionKey: 'same-session',
+      anchor: { type: 'node', nodeIndex: 0, offsetWithinNodePx: 0 },
+      metrics: {
+        ...handle.getVirtualMetrics(),
+        sessionKey: 'same-session',
+        width: 400,
+        totalHeight: 800,
+      },
+      width: 400,
+      contentHash: 'stale-content',
+      heightCache: [
+        {
+          index: 0,
+          height: 400,
+          nodeType: 'paragraph',
+          signature: 'stale-signature',
+        },
+        {
+          index: 1,
+          height: 400,
+          nodeType: 'paragraph',
+          signature: 'stale-signature',
+        },
+      ],
+    }
+
+    await wrapper.setProps({
+      nodes: [
+        {
+          type: 'paragraph',
+          raw: 'Different paragraph',
+          children: [{ type: 'text', content: 'Different paragraph', raw: 'Different paragraph' }],
+        },
+        createParagraph(2),
+      ],
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'same-session',
+        settleMode: 'manual',
+        restoreState: state,
+      },
+    })
+
+    await flushAll()
+
+    expect((await handle.forceMeasure('manual')).totalHeight).not.toBe(800)
+
+    wrapper.unmount()
+  })
+
   it('retries imperative restoreVirtualState after parsed nodes become available', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
@@ -678,6 +780,58 @@ describe('node renderer virtual-scroll coordination', () => {
 
     expect(scrollRoot.value).toBeInstanceOf(HTMLElement)
     expect(wrapper.find('.markstream-vue').exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('settles the original lifecycle key when indexKey changes while image is pending', async () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(72)
+
+    const markPending = vi.fn()
+    const reportHeight = vi.fn()
+    const markSettled = vi.fn()
+    const indexKey = ref('markdown-renderer-0')
+    const ImageNode = (await import('../src/components/ImageNode')).default
+    const node = {
+      type: 'image',
+      src: 'https://example.com/hero.png',
+      alt: 'Hero',
+      title: 'Hero',
+      raw: '![Hero](https://example.com/hero.png)',
+    } as any
+
+    const Host = defineComponent({
+      setup() {
+        return () => h(ImageNode, {
+          node,
+          'index-key': indexKey.value,
+        })
+      },
+    })
+
+    const wrapper = mount(Host, {
+      global: {
+        provide: {
+          markstreamNodeLifecycle: {
+            markPending,
+            reportHeight,
+            markSettled,
+          },
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(markPending).toHaveBeenCalledWith('markdown-renderer-0')
+
+    indexKey.value = 'markdown-renderer-1'
+    await nextTick()
+
+    await wrapper.get('img').trigger('load')
+    await flushAll()
+
+    expect(markSettled).toHaveBeenCalledWith('markdown-renderer-0')
 
     wrapper.unmount()
   })

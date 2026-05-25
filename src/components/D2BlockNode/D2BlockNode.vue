@@ -79,8 +79,14 @@ let lifecyclePendingIndexKey = ''
 
 function markLifecyclePending() {
   const indexKey = lifecycleIndexKey.value
-  if (!lifecycle || !indexKey || lifecyclePendingIndexKey)
+  if (!lifecycle || !indexKey)
     return
+
+  if (lifecyclePendingIndexKey === indexKey)
+    return
+
+  if (lifecyclePendingIndexKey)
+    lifecycle.markSettled(lifecyclePendingIndexKey)
 
   lifecyclePendingIndexKey = indexKey
   lifecycle.markPending(indexKey)

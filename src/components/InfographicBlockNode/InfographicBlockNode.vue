@@ -43,39 +43,51 @@ const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
 const attrs = useAttrs()
 const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
-let lifecyclePending = false
+let lifecyclePendingIndexKey = ''
 const lifecycleIndexKey = computed(() => {
   const raw = attrs['index-key'] ?? attrs.indexKey
   return raw == null || raw === '' ? '' : String(raw)
 })
 
-function reportLifecycleHeight() {
-  if (!lifecycleIndexKey.value || !viewportTarget.value)
+function reportLifecycleHeight(indexKey = lifecycleIndexKey.value) {
+  if (!indexKey || !viewportTarget.value)
     return
-  lifecycle?.reportHeight(lifecycleIndexKey.value, viewportTarget.value.offsetHeight)
+  lifecycle?.reportHeight(indexKey, viewportTarget.value.offsetHeight)
 }
 
 function markLifecyclePending() {
-  if (!lifecycleIndexKey.value || lifecyclePending)
+  const indexKey = lifecycleIndexKey.value
+  if (!indexKey)
     return
-  lifecyclePending = true
-  lifecycle?.markPending(lifecycleIndexKey.value)
+
+  if (lifecyclePendingIndexKey === indexKey)
+    return
+
+  if (lifecyclePendingIndexKey)
+    lifecycle?.markSettled(lifecyclePendingIndexKey)
+
+  lifecyclePendingIndexKey = indexKey
+  lifecycle?.markPending(indexKey)
 }
 
 async function markLifecycleSettled() {
-  if (!lifecycleIndexKey.value || !lifecyclePending)
+  const indexKey = lifecyclePendingIndexKey
+  if (!indexKey)
     return
+
+  lifecyclePendingIndexKey = ''
   await nextTick()
-  reportLifecycleHeight()
-  lifecycle?.markSettled(lifecycleIndexKey.value)
-  lifecyclePending = false
+  reportLifecycleHeight(indexKey)
+  lifecycle?.markSettled(indexKey)
 }
 
 function clearLifecyclePending() {
-  if (!lifecycleIndexKey.value || !lifecyclePending)
+  const indexKey = lifecyclePendingIndexKey
+  if (!indexKey)
     return
-  lifecycle?.markSettled(lifecycleIndexKey.value)
-  lifecyclePending = false
+
+  lifecyclePendingIndexKey = ''
+  lifecycle?.markSettled(indexKey)
 }
 
 if (typeof window !== 'undefined') {
