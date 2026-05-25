@@ -11,6 +11,118 @@ import type {
 
 export type NodeRendererCodeBlockProps = Partial<Omit<CodeBlockNodeProps, 'node'>> & Record<string, unknown>
 
+export type MarkstreamVirtualPhase
+  = | 'estimating'
+    | 'streaming'
+    | 'measuring'
+    | 'settling'
+    | 'settled'
+    | 'final'
+
+export type MarkstreamVirtualConfidence
+  = | 'estimate'
+    | 'mixed'
+    | 'measured'
+    | 'final'
+
+export type MarkstreamVirtualReason
+  = | 'content'
+    | 'parse'
+    | 'batch'
+    | 'resize'
+    | 'node-resize'
+    | 'async-node'
+    | 'font'
+    | 'theme'
+    | 'final'
+    | 'restore'
+    | 'manual'
+
+export type MarkstreamVirtualAnchor
+  = | {
+    type: 'node'
+    nodeIndex: number
+    offsetWithinNodePx: number
+  }
+  | {
+    type: 'bottom'
+    distanceFromBottomPx: number
+  }
+
+export type MarkstreamHeightCache = Array<{
+  index: number
+  height: number
+  nodeType?: string
+  signature?: string
+}>
+
+export interface MarkstreamVirtualMetrics {
+  sessionKey: string
+  phase: MarkstreamVirtualPhase
+  nodeCount: number
+  liveRange: {
+    start: number
+    end: number
+  }
+  renderedCount: number
+  measuredCount: number
+  estimatedCount: number
+  averageNodeHeight: number
+  topSpacerHeight: number
+  bottomSpacerHeight: number
+  visibleDomHeight: number
+  totalHeight: number
+  width: number
+  final: boolean
+  stable: boolean
+  confidence: MarkstreamVirtualConfidence
+  reason: MarkstreamVirtualReason
+}
+
+export interface MarkstreamVirtualState {
+  sessionKey: string
+  anchor: MarkstreamVirtualAnchor
+  metrics: MarkstreamVirtualMetrics
+  width: number
+  contentHash?: string
+  heightCache?: MarkstreamHeightCache
+}
+
+export interface MarkstreamVirtualScrollOptions {
+  enabled?: boolean
+  scrollRoot?: HTMLElement | null | (() => HTMLElement | null)
+  sessionKey: string
+  threadKey?: string
+  restoreState?: MarkstreamVirtualState | null
+  heightCache?: MarkstreamHeightCache | null
+  settleMode?: 'auto' | 'manual'
+  settledToken?: string | number | boolean
+  emitIntervalMs?: number
+  heightDiffThresholdPx?: number
+}
+
+export interface MarkstreamRendererHandle {
+  getVirtualMetrics: () => MarkstreamVirtualMetrics
+  captureVirtualState: () => MarkstreamVirtualState | null
+  restoreVirtualState: (state: MarkstreamVirtualState) => void
+  forceMeasure: (reason?: MarkstreamVirtualReason) => Promise<MarkstreamVirtualMetrics>
+  settle: (options?: {
+    frames?: number
+    timeoutMs?: number
+    reason?: MarkstreamVirtualReason
+  }) => Promise<MarkstreamVirtualMetrics>
+  scrollToNode: (
+    index: number,
+    align?: 'start' | 'center' | 'end' | 'nearest',
+  ) => void
+}
+
+export interface MarkstreamNodeLifecycle {
+  reportHeight: (indexKey: string | number, height: number) => void
+  markPending: (indexKey: string | number) => void
+  markSettled: (indexKey: string | number) => void
+}
+
 export interface NodeRendererProps {
   /** Raw Markdown input. Omit this when you pass pre-parsed nodes instead. */
   content?: string
@@ -105,6 +217,8 @@ export interface NodeRendererProps {
   maxLiveNodes?: number
   /** Number of nodes to keep before/after focus. Default: 60 */
   liveNodeBuffer?: number
+  /** Report logical height and restore state to an outer virtual scroller. */
+  virtualScroll?: MarkstreamVirtualScrollOptions
   /** Internal: render nodes as a fragment without container wrappers */
   renderAsFragment?: boolean
 }

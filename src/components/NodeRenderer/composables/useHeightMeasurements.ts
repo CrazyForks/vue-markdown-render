@@ -1,4 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
+import type { MarkstreamHeightCache } from '../../../types/node-renderer-props'
 import { computed, reactive, ref } from 'vue'
 
 export interface HeightMeasurementsOptions {
@@ -20,6 +21,8 @@ export interface HeightMeasurements {
   pruneHeightMeasurements: (size: number) => void
   rebuildHeightTrees: (size: number) => void
   recordNodeHeight: (index: number, height: number, options?: { allowShrink?: boolean }) => void
+  exportHeightCache: () => MarkstreamHeightCache
+  importHeightCache: (cache: MarkstreamHeightCache, options?: { mode?: 'replace' | 'merge' }) => void
 
   fenwickRangeSum: (tree: number[], start: number, end: number) => number
 }
@@ -170,6 +173,35 @@ export function useHeightMeasurements(
     options.onHeightRecorded?.()
   }
 
+  function exportHeightCache(): MarkstreamHeightCache {
+    return Object.entries(nodeHeights)
+      .map(([rawIndex, rawHeight]) => ({
+        index: Number(rawIndex),
+        height: Number(rawHeight),
+      }))
+      .filter(entry => Number.isFinite(entry.index) && entry.index >= 0 && Number.isFinite(entry.height) && entry.height > 0)
+      .sort((a, b) => a.index - b.index)
+  }
+
+  function importHeightCache(cache: MarkstreamHeightCache, importOptions: { mode?: 'replace' | 'merge' } = {}) {
+    if (!Array.isArray(cache))
+      return
+
+    const previousTreeSize = heightTreeSize.value
+    if (importOptions.mode !== 'merge') {
+      resetHeightMeasurements()
+      if (previousTreeSize > 0)
+        rebuildHeightTrees(previousTreeSize)
+    }
+
+    for (const entry of cache) {
+      const index = Number(entry.index)
+      if (!Number.isInteger(index) || index < 0)
+        continue
+      recordNodeHeight(index, entry.height)
+    }
+  }
+
   const averageNodeHeight = computed(() => {
     return heightStats.count > 0
       ? Math.max(12, heightStats.total / heightStats.count)
@@ -188,6 +220,8 @@ export function useHeightMeasurements(
     pruneHeightMeasurements,
     rebuildHeightTrees,
     recordNodeHeight,
+    exportHeightCache,
+    importHeightCache,
 
     fenwickRangeSum,
   }

@@ -108,7 +108,19 @@ export type {
   MermaidBlockNodeProps,
   PreCodeNodeProps,
 } from './types/component-props'
-export type { NodeRendererProps } from './types/node-renderer-props'
+export type {
+  MarkstreamHeightCache,
+  MarkstreamNodeLifecycle,
+  MarkstreamRendererHandle,
+  MarkstreamVirtualAnchor,
+  MarkstreamVirtualConfidence,
+  MarkstreamVirtualMetrics,
+  MarkstreamVirtualPhase,
+  MarkstreamVirtualReason,
+  MarkstreamVirtualScrollOptions,
+  MarkstreamVirtualState,
+  NodeRendererProps,
+} from './types/node-renderer-props'
 // Export centralized props interfaces so they appear in package d.ts
 export * from './utils'
 export * from './workers/katexCdnWorker'

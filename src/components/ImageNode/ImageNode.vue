@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { ImageNodeProps } from '../../types/component-props'
+import type { MarkstreamNodeLifecycle } from '../../types/node-renderer-props'
 import { sanitizeImageSrc } from 'stream-markdown-parser'
-import { computed, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 
 const props = withDefaults(defineProps<ImageNodeProps>(), {
@@ -16,6 +17,10 @@ const imageLoaded = ref(false)
 const hasError = ref(false)
 const activeSrc = ref('')
 const imageStage = ref<'primary' | 'fallback' | 'failed'>('primary')
+const rootRef = ref<HTMLElement | null>(null)
+const attrs = useAttrs()
+const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+let lifecyclePending = false
 
 const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))
 const safeFallbackSrc = computed(() => sanitizeImageSrc(props.fallbackSrc))
@@ -27,6 +32,32 @@ const showError = computed(() => imageStage.value === 'failed')
 
 // Shimmer overlay only for lazy images while a renderable image is downloading.
 const showShimmer = computed(() => !useEagerImagePath.value && !imageLoaded.value && !hasError.value && imageStage.value !== 'failed' && activeSrc.value.length > 0)
+const lifecycleIndexKey = computed(() => {
+  const raw = attrs['index-key'] ?? attrs.indexKey
+  return raw == null || raw === '' ? '' : String(raw)
+})
+
+function reportLifecycleHeight() {
+  if (!lifecycleIndexKey.value || !rootRef.value)
+    return
+  lifecycle?.reportHeight(lifecycleIndexKey.value, rootRef.value.offsetHeight)
+}
+
+function markLifecyclePending() {
+  if (!lifecycleIndexKey.value || lifecyclePending)
+    return
+  lifecyclePending = true
+  lifecycle?.markPending(lifecycleIndexKey.value)
+}
+
+async function markLifecycleSettled() {
+  if (!lifecycleIndexKey.value || !lifecyclePending)
+    return
+  await nextTick()
+  reportLifecycleHeight()
+  lifecycle?.markSettled(lifecycleIndexKey.value)
+  lifecyclePending = false
+}
 
 function handleImageError() {
   if (imageStage.value === 'primary' && safeFallbackSrc.value && safeFallbackSrc.value !== activeSrc.value) {
@@ -87,10 +118,27 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  [showImage, imageLoaded, hasError, displaySrc],
+  ([visible, loaded, error]) => {
+    if (visible && !loaded && !error) {
+      markLifecyclePending()
+      return
+    }
+    void markLifecycleSettled()
+  },
+  { flush: 'post', immediate: true },
+)
+
+onBeforeUnmount(() => {
+  if (lifecyclePending && lifecycleIndexKey.value)
+    lifecycle?.markSettled(lifecycleIndexKey.value)
+})
 </script>
 
 <template>
-  <span class="image-node-container">
+  <span ref="rootRef" class="image-node-container">
     <img
       v-if="showImage"
       :src="displaySrc"

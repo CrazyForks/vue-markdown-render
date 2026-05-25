@@ -4,6 +4,7 @@ const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 
 export interface ViewportRootOptions {
   isClient: boolean
+  scrollRoot?: () => HTMLElement | null
 }
 
 export interface ViewportRootController {
@@ -40,9 +41,17 @@ export function useViewportRoot(
   containerRef: Ref<HTMLElement | undefined>,
   options: ViewportRootOptions,
 ): ViewportRootController {
+  function resolveExplicitScrollRoot() {
+    return options.scrollRoot?.() ?? null
+  }
+
   function resolveViewportRoot(node?: HTMLElement | null) {
     if (typeof window === 'undefined')
       return null
+
+    const explicitRoot = resolveExplicitScrollRoot()
+    if (explicitRoot)
+      return explicitRoot
 
     const base = node ?? containerRef.value
 
@@ -70,6 +79,10 @@ export function useViewportRoot(
   }
 
   function resolveScrollContainer(node?: HTMLElement | null) {
+    const explicitRoot = resolveExplicitScrollRoot()
+    if (explicitRoot)
+      return explicitRoot
+
     const resolved = resolveViewportRoot(node ?? containerRef.value ?? null)
 
     if (resolved)

@@ -193,4 +193,26 @@ describe('useHeightMeasurements', () => {
     expect(h.heightKnownTree.value).toEqual([])
     expect(h.averageNodeHeight.value).toBe(32)
   })
+
+  it('exports and imports measured height caches', () => {
+    const h = useHeightMeasurements()
+
+    h.recordNodeHeight(1, 40)
+    h.recordNodeHeight(0, 20)
+
+    expect(h.exportHeightCache()).toEqual([
+      { index: 0, height: 20 },
+      { index: 1, height: 40 },
+    ])
+
+    const restored = useHeightMeasurements()
+    restored.rebuildHeightTrees(3)
+    restored.importHeightCache(h.exportHeightCache())
+
+    expect(restored.nodeHeights[0]).toBe(20)
+    expect(restored.nodeHeights[1]).toBe(40)
+    expect(restored.heightStats.total).toBe(60)
+    expect(restored.heightStats.count).toBe(2)
+    expect(restored.fenwickRangeSum(restored.heightSumTree.value, 0, 3)).toBe(60)
+  })
 })

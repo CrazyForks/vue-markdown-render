@@ -7,6 +7,11 @@ import type {
   LinkNodeProps,
   MarkdownIt,
   MarkdownPluginRegistration,
+  MarkstreamNodeLifecycle,
+  MarkstreamRendererHandle,
+  MarkstreamVirtualMetrics,
+  MarkstreamVirtualScrollOptions,
+  MarkstreamVirtualState,
   MarkstreamVuePluginOptions,
   MathBlockNodeProps,
   MathInlineNodeProps,
@@ -61,6 +66,10 @@ const props: NodeRendererProps = {
   smoothStreaming: 'auto',
   parseCoalesceMs: 80,
   maxLiveNodes: 320,
+  virtualScroll: {
+    enabled: true,
+    sessionKey: 'public-api-session',
+  },
 }
 
 const options: SmoothMarkdownStreamOptions = {}
@@ -110,6 +119,14 @@ const imageProps: Partial<ImageNodeProps> = {}
 const linkProps: Partial<LinkNodeProps> = {}
 const d2Props: Partial<D2BlockNodeProps> = {}
 const infographicProps: Partial<InfographicBlockNodeProps> = {}
+const virtualScrollOptions: MarkstreamVirtualScrollOptions = {
+  enabled: true,
+  sessionKey: 'public-api-session',
+}
+const virtualMetrics: MarkstreamVirtualMetrics | null = null
+const virtualState: MarkstreamVirtualState | null = null
+const rendererHandle: MarkstreamRendererHandle | null = null
+const nodeLifecycle: MarkstreamNodeLifecycle | null = null
 
 // Verify named async components retain their concrete types
 // (not erased to generic Component)
@@ -172,6 +189,11 @@ void imageProps
 void linkProps
 void d2Props
 void infographicProps
+void virtualScrollOptions
+void virtualMetrics
+void virtualState
+void rendererHandle
+void nodeLifecycle
 void CodeBlockNode
 void D2BlockNode
 void MathBlockNode

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { InfographicBlockNodeProps } from '../../types/component-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { MarkstreamNodeLifecycle } from '../../types/node-renderer-props'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
@@ -40,6 +41,42 @@ const modalCloneWrapper = ref<HTMLElement | null>(null)
 const hasPreview = ref(false)
 const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
+const attrs = useAttrs()
+const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+let lifecyclePending = false
+const lifecycleIndexKey = computed(() => {
+  const raw = attrs['index-key'] ?? attrs.indexKey
+  return raw == null || raw === '' ? '' : String(raw)
+})
+
+function reportLifecycleHeight() {
+  if (!lifecycleIndexKey.value || !viewportTarget.value)
+    return
+  lifecycle?.reportHeight(lifecycleIndexKey.value, viewportTarget.value.offsetHeight)
+}
+
+function markLifecyclePending() {
+  if (!lifecycleIndexKey.value || lifecyclePending)
+    return
+  lifecyclePending = true
+  lifecycle?.markPending(lifecycleIndexKey.value)
+}
+
+async function markLifecycleSettled() {
+  if (!lifecycleIndexKey.value || !lifecyclePending)
+    return
+  await nextTick()
+  reportLifecycleHeight()
+  lifecycle?.markSettled(lifecycleIndexKey.value)
+  lifecyclePending = false
+}
+
+function clearLifecyclePending() {
+  if (!lifecycleIndexKey.value || !lifecyclePending)
+    return
+  lifecycle?.markSettled(lifecycleIndexKey.value)
+  lifecyclePending = false
+}
 
 if (typeof window !== 'undefined') {
   watch(
@@ -361,6 +398,7 @@ async function renderInfographic(force = false) {
     return
 
   renderInFlight = true
+  markLifecyclePending()
   const previousHtml = infographicContainer.value.innerHTML
   const previousHasPreview = hasPreview.value
 
@@ -436,6 +474,7 @@ async function renderInfographic(force = false) {
   }
   finally {
     renderInFlight = false
+    void markLifecycleSettled()
     if (rerenderQueued) {
       const forceNext = rerenderForce
       rerenderQueued = false
@@ -524,6 +563,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   viewportHandle.value?.destroy()
   viewportHandle.value = null
+  clearLifecyclePending()
   if (infographicInstance) {
     infographicInstance.destroy?.()
     infographicInstance = null

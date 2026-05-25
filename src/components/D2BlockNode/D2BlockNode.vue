@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { D2BlockNodeProps } from '../../types/component-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { MarkstreamNodeLifecycle } from '../../types/node-renderer-props'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
@@ -21,6 +22,8 @@ const props = withDefaults(
   },
 )
 
+const attrs = useAttrs()
+const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
 const { t } = useSafeI18n()
 const copyText = ref(false)
 const isCollapsed = ref(false)
@@ -38,6 +41,10 @@ const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
 
 const baseCode = computed(() => props.node.code ?? '')
+const lifecycleIndexKey = computed(() => {
+  const indexKey = attrs['index-key'] ?? attrs.indexKey
+  return indexKey == null ? '' : String(indexKey)
+})
 const renderSignature = computed(() => `${props.isDark ? 'dark' : 'light'}:${baseCode.value}`)
 const showSourceFallback = computed(() => {
   return showSource.value || !d2Available.value || !svgMarkup.value
@@ -68,6 +75,41 @@ let throttleTimer: number | null = null
 let pendingRender = false
 let bodyObserver: ResizeObserver | null = null
 let lastCompletedRenderSignature = ''
+let lifecyclePendingIndexKey = ''
+
+function markLifecyclePending() {
+  const indexKey = lifecycleIndexKey.value
+  if (!lifecycle || !indexKey || lifecyclePendingIndexKey)
+    return
+
+  lifecyclePendingIndexKey = indexKey
+  lifecycle.markPending(indexKey)
+}
+
+function markLifecycleSettled() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!lifecycle || !indexKey)
+    return
+
+  lifecyclePendingIndexKey = ''
+  nextTick(() => {
+    if (!unmounted) {
+      const height = viewportTarget.value?.offsetHeight ?? 0
+      if (height > 0)
+        lifecycle.reportHeight(indexKey, height)
+    }
+    lifecycle.markSettled(indexKey)
+  })
+}
+
+function clearLifecyclePending() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!lifecycle || !indexKey)
+    return
+
+  lifecyclePendingIndexKey = ''
+  lifecycle.markSettled(indexKey)
+}
 
 if (typeof window !== 'undefined') {
   watch(
@@ -304,6 +346,7 @@ async function renderDiagram() {
   const token = ++renderToken.value
   isRendering.value = true
   renderError.value = null
+  markLifecyclePending()
 
   try {
     const instance = await ensureD2Instance()
@@ -374,6 +417,9 @@ async function renderDiagram() {
       if (pendingRender) {
         pendingRender = false
         scheduleRender()
+      }
+      else {
+        markLifecycleSettled()
       }
     }
   }
@@ -496,6 +542,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unmounted = true
+  clearLifecyclePending()
   lastCompletedRenderSignature = ''
   viewportHandle.value?.destroy()
   viewportHandle.value = null

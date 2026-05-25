@@ -125,6 +125,16 @@ MathOptions
 MermaidBlockEvent
 MermaidBlockNodeProps
 MermaidLoader
+MarkstreamHeightCache
+MarkstreamNodeLifecycle
+MarkstreamRendererHandle
+MarkstreamVirtualAnchor
+MarkstreamVirtualConfidence
+MarkstreamVirtualMetrics
+MarkstreamVirtualPhase
+MarkstreamVirtualReason
+MarkstreamVirtualScrollOptions
+MarkstreamVirtualState
 NodeRendererProps
 PreCodeNodeProps
 SmoothMarkdownStreamController

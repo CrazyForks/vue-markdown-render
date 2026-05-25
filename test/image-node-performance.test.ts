@@ -1,8 +1,13 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import ImageNode from '../src/components/ImageNode/ImageNode.vue'
 
 describe('image node performance defaults', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('does not force lazy loading by default', () => {
     const wrapper = mount(ImageNode, {
       props: {
@@ -41,5 +46,45 @@ describe('image node performance defaults', () => {
     expect(wrapper.get('img').attributes('fetchpriority')).toBeUndefined()
     expect(wrapper.get('img').attributes('decoding')).toBe('async')
     expect(wrapper.get('img').classes()).toContain('is-loading')
+  })
+
+  it('reports image load lifecycle for virtual-scroll settling', async () => {
+    const markPending = vi.fn()
+    const reportHeight = vi.fn()
+    const markSettled = vi.fn()
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(72)
+
+    const wrapper = mount(ImageNode, {
+      attrs: {
+        'index-key': 'markdown-renderer-0',
+      },
+      global: {
+        provide: {
+          markstreamNodeLifecycle: {
+            markPending,
+            reportHeight,
+            markSettled,
+          },
+        },
+      },
+      props: {
+        node: {
+          type: 'image',
+          src: 'https://example.com/hero.png',
+          alt: 'Hero',
+          title: 'Hero',
+          raw: '![Hero](https://example.com/hero.png)',
+        },
+      },
+    })
+
+    await nextTick()
+    expect(markPending).toHaveBeenCalledWith('markdown-renderer-0')
+
+    await wrapper.get('img').trigger('load')
+    await nextTick()
+
+    expect(reportHeight).toHaveBeenCalledWith('markdown-renderer-0', 72)
+    expect(markSettled).toHaveBeenCalledWith('markdown-renderer-0')
   })
 })

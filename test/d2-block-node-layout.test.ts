@@ -64,4 +64,43 @@ describe('d2 block layout', () => {
 
     wrapper.unmount()
   })
+
+  it('reports async render lifecycle height when preview settles', async () => {
+    const heightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(96)
+    const lifecycle = {
+      reportHeight: vi.fn(),
+      markPending: vi.fn(),
+      markSettled: vi.fn(),
+    }
+    const wrapper = mount(D2BlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'd2',
+          code: 'a -> b',
+          raw: '```d2\na -> b\n```',
+        },
+        loading: false,
+      },
+      attrs: {
+        'index-key': 'd2-1',
+      },
+      global: {
+        provide: {
+          markstreamNodeLifecycle: lifecycle,
+        },
+      },
+      attachTo: document.body,
+    })
+
+    await waitForPreview(wrapper)
+    await nextTick()
+
+    expect(lifecycle.markPending).toHaveBeenCalledWith('d2-1')
+    expect(lifecycle.reportHeight).toHaveBeenCalledWith('d2-1', 96)
+    expect(lifecycle.markSettled).toHaveBeenCalledWith('d2-1')
+
+    wrapper.unmount()
+    heightSpy.mockRestore()
+  })
 })

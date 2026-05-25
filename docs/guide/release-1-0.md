@@ -11,6 +11,7 @@ description: Define the markstream-vue 1.0 stable scope, API tiers, package vali
 - `MarkdownRender` for Vue 3.
 - Raw `content` rendering and pre-parsed `nodes` rendering.
 - Streaming mid-state rendering with `final`, `typewriter`, `smoothStreaming`, and `useSmoothMarkdownStream`.
+- Host virtual-scroll coordination through `virtualScroll`, `MarkstreamVirtualMetrics`, `MarkstreamVirtualState`, and `MarkstreamRendererHandle`.
 - Safe HTML rendering with `htmlPolicy="safe"` as the default.
 - Optional Mermaid, KaTeX, D2, Infographic, and Monaco integrations.
 - SSR import and render-to-string support for Vue / Vite / Nuxt / VitePress.
@@ -87,7 +88,7 @@ Root exports are tiered for 1.x compatibility:
 | Export | 1.x status |
 | --- | --- |
 | `MarkdownRender`, `VueRendererMarkdown`, `useSmoothMarkdownStream` | Stable renderer API. |
-| `CustomComponents`, `MarkstreamVuePluginOptions`, `NodeRendererProps`, component prop types | Stable TypeScript surface. |
+| `CustomComponents`, `MarkstreamVuePluginOptions`, `NodeRendererProps`, `MarkstreamVirtual*` types, component prop types | Stable TypeScript surface. |
 | `setCustomComponents`, `removeCustomComponents`, `clearGlobalCustomComponents` | Stable legacy/global custom component registry. Prefer app-scoped `components` for SSR and multi-tenant apps. |
 | `getCustomNodeComponents` | Legacy registry inspection only. It reads global/customId mappings and does not include app-scoped `components`, because those are provided through Vue injection. |
 | `enableKatex` / `disableKatex` / `isKatexEnabled` / `setKatexLoader`, `enableMermaid` / `disableMermaid` / `isMermaidEnabled` / `setMermaidLoader`, `enableD2` / `disableD2` / `isD2Enabled` / `setD2Loader` | Stable optional integration controls. |

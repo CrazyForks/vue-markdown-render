@@ -147,4 +147,62 @@ const md = '# Virtualized transcript'
 </template>
 ```
 
+### Coordinating with an outer virtualizer
+
+If a chat or thread list already virtualizes messages, keep that outer virtualizer in charge of which messages are mounted. Enable `virtual-scroll` only on large Markdown messages so `MarkdownRender` can report the message's logical height while it virtualizes nodes internally.
+
+The important value is `metrics.totalHeight`. It represents the full Markdown document height, including virtual spacers; do not use the renderer element's current `offsetHeight` as the item size because only the live node window may be mounted.
+
+```vue
+<script setup lang="ts">
+import type {
+  MarkstreamRendererHandle,
+  MarkstreamVirtualMetrics,
+  MarkstreamVirtualState,
+} from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
+import { ref, shallowRef } from 'vue'
+
+const scrollRoot = ref<HTMLElement | null>(null)
+const renderer = shallowRef<MarkstreamRendererHandle | null>(null)
+const savedState = shallowRef<MarkstreamVirtualState | null>(null)
+const content = ref('')
+const sourceDone = ref(false)
+const revision = ref(0)
+const pendingTools = ref(false)
+
+function setMessageHeight(messageId: string, height: number) {
+  // Forward this to your outer virtualizer, for example:
+  // virtualizer.setItemSize(messageId, height)
+}
+
+function onHeightChange(metrics: MarkstreamVirtualMetrics) {
+  setMessageHeight('message-1', metrics.totalHeight)
+}
+</script>
+
+<template>
+  <div ref="scrollRoot" class="thread-scroller">
+    <MarkdownRender
+      ref="renderer"
+      :content="content"
+      :final="sourceDone"
+      :max-live-nodes="240"
+      :live-node-buffer="50"
+      :virtual-scroll="{
+        enabled: true,
+        sessionKey: `thread-1:message-1:${revision}`,
+        scrollRoot: () => scrollRoot,
+        restoreState: savedState,
+        heightCache: savedState?.heightCache,
+        settleMode: 'manual',
+        settledToken: sourceDone && !pendingTools,
+      }"
+      @height-change="onHeightChange"
+      @virtual-state-change="savedState = $event"
+    />
+  </div>
+</template>
+```
+
 With these knobs you can keep large AI transcripts or docs under a predictable CPU budget while still presenting consistent scroll behaviour.

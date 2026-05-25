@@ -86,4 +86,62 @@ const md = '# Virtualized transcript'
 </template>
 ```
 
+### 与外层 virtualizer 协作
+
+如果聊天列表或 thread 列表本身已经按 message 做 virtual-scroll，外层 virtualizer 仍然负责决定哪些 message mount。只在超大的 Markdown message 上开启 `virtual-scroll`，让 `MarkdownRender` 在内部裁剪节点 DOM 的同时，把该 message 的逻辑高度报告给外层。
+
+关键值是 `metrics.totalHeight`。它表示包含 virtual spacer 在内的完整 Markdown 逻辑高度；不要把 renderer 元素当前的 `offsetHeight` 当成 item size，因为当前 DOM 可能只挂载了 live window 内的节点。
+
+```vue
+<script setup lang="ts">
+import type {
+  MarkstreamRendererHandle,
+  MarkstreamVirtualMetrics,
+  MarkstreamVirtualState,
+} from 'markstream-vue'
+import MarkdownRender from 'markstream-vue'
+import { ref, shallowRef } from 'vue'
+
+const scrollRoot = ref<HTMLElement | null>(null)
+const renderer = shallowRef<MarkstreamRendererHandle | null>(null)
+const savedState = shallowRef<MarkstreamVirtualState | null>(null)
+const content = ref('')
+const sourceDone = ref(false)
+const revision = ref(0)
+const pendingTools = ref(false)
+
+function setMessageHeight(messageId: string, height: number) {
+  // 传给你的外层 virtualizer，例如：
+  // virtualizer.setItemSize(messageId, height)
+}
+
+function onHeightChange(metrics: MarkstreamVirtualMetrics) {
+  setMessageHeight('message-1', metrics.totalHeight)
+}
+</script>
+
+<template>
+  <div ref="scrollRoot" class="thread-scroller">
+    <MarkdownRender
+      ref="renderer"
+      :content="content"
+      :final="sourceDone"
+      :max-live-nodes="240"
+      :live-node-buffer="50"
+      :virtual-scroll="{
+        enabled: true,
+        sessionKey: `thread-1:message-1:${revision}`,
+        scrollRoot: () => scrollRoot,
+        restoreState: savedState,
+        heightCache: savedState?.heightCache,
+        settleMode: 'manual',
+        settledToken: sourceDone && !pendingTools,
+      }"
+      @height-change="onHeightChange"
+      @virtual-state-change="savedState = $event"
+    />
+  </div>
+</template>
+```
+
 利用这些旋钮，可以把超长 AI 对话或技术文档维持在一个稳定的 CPU / 内存预算中，同时保持滚动与输入的流畅体验。

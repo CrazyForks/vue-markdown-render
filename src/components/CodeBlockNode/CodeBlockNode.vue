@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload } from '../../types/component-props'
+import type { MarkstreamNodeLifecycle } from '../../types/node-renderer-props'
 import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLike, MonacoNamespaceLike, MonacoRuntimeOptions } from './monaco'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
-import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onUnmounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onUnmounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
@@ -48,6 +49,13 @@ const emits = defineEmits<{
   (e: 'previewCode', payload: CodeBlockPreviewPayload): void
   (e: 'copy', code: string): void
 }>()
+
+const attrs = useAttrs()
+const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+const lifecycleIndexKey = computed(() => {
+  const indexKey = attrs['index-key'] ?? attrs.indexKey
+  return indexKey == null ? '' : String(indexKey)
+})
 
 // Chrome warns when Monaco registers non-passive touchstart listeners.
 // Scope the workaround to editor boot so the host page prototype is restored.
@@ -170,6 +178,7 @@ const monacoReady = ref(false)
 let isUnmounted = false
 let expandRafId: number | null = null
 let deferredHeightSyncRafId: number | null = null
+let lifecyclePendingIndexKey = ''
 const heightBeforeCollapse = ref<number | null>(null)
 const lastStableCollapsedDiffHeight = ref<number | null>(null)
 let collapsedDiffSettleGuardUntil = 0
@@ -197,8 +206,43 @@ if (typeof window !== 'undefined') {
     { immediate: true },
   )
 }
+function markLifecyclePending() {
+  const indexKey = lifecycleIndexKey.value
+  if (!lifecycle || !indexKey || lifecyclePendingIndexKey)
+    return
+
+  lifecyclePendingIndexKey = indexKey
+  lifecycle.markPending(indexKey)
+}
+
+function markLifecycleSettled() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!lifecycle || !indexKey)
+    return
+
+  lifecyclePendingIndexKey = ''
+  nextTick(() => {
+    if (!isUnmounted) {
+      const height = container.value?.offsetHeight ?? 0
+      if (height > 0)
+        lifecycle.reportHeight(indexKey, height)
+    }
+    lifecycle.markSettled(indexKey)
+  })
+}
+
+function clearLifecyclePending() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!lifecycle || !indexKey)
+    return
+
+  lifecyclePendingIndexKey = ''
+  lifecycle.markSettled(indexKey)
+}
+
 onBeforeUnmount(() => {
   isUnmounted = true
+  clearLifecyclePending()
   viewportHandle.value?.destroy()
   viewportHandle.value = null
 })
@@ -1854,6 +1898,7 @@ function ensureEditorCreation(el: HTMLElement) {
     return Promise.resolve()
 
   editorCreated.value = true
+  markLifecyclePending()
   const pending = (async () => {
     await withMonacoPassiveTouchListeners(() => runEditorCreation(el))
   })()
@@ -1861,6 +1906,7 @@ function ensureEditorCreation(el: HTMLElement) {
   const currentPromise = pending.finally(() => {
     if (createEditorPromise === currentPromise)
       createEditorPromise = null
+    markLifecycleSettled()
   })
   createEditorPromise = currentPromise
   return currentPromise

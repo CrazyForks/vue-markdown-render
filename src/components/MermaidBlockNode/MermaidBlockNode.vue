@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Exported props interface for MermaidBlockNode
 import type { MermaidBlockEvent, MermaidBlockNodeProps } from '../../types/component-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+import type { MarkstreamNodeLifecycle } from '../../types/node-renderer-props'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
@@ -165,6 +166,7 @@ async function resolveMermaidInstance() {
 
 const copyText = ref(false)
 const isCollapsed = ref(false)
+const blockContainer = ref<HTMLElement>()
 const mermaidContainer = ref<HTMLElement>()
 const mermaidContent = ref<HTMLElement>()
 const modalContent = ref<HTMLElement>()
@@ -172,6 +174,42 @@ const modalCloneWrapper = ref<HTMLElement | null>(null)
 const registerViewport = useViewportPriority()
 const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
+const attrs = useAttrs()
+const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+let lifecyclePending = false
+const lifecycleIndexKey = computed(() => {
+  const raw = attrs['index-key'] ?? attrs.indexKey
+  return raw == null || raw === '' ? '' : String(raw)
+})
+
+function reportLifecycleHeight() {
+  if (!lifecycleIndexKey.value || !blockContainer.value)
+    return
+  lifecycle?.reportHeight(lifecycleIndexKey.value, blockContainer.value.offsetHeight)
+}
+
+function markLifecyclePending() {
+  if (!lifecycleIndexKey.value || lifecyclePending)
+    return
+  lifecyclePending = true
+  lifecycle?.markPending(lifecycleIndexKey.value)
+}
+
+async function markLifecycleSettled() {
+  if (!lifecycleIndexKey.value || !lifecyclePending)
+    return
+  await nextTick()
+  reportLifecycleHeight()
+  lifecycle?.markSettled(lifecycleIndexKey.value)
+  lifecyclePending = false
+}
+
+function clearLifecyclePending() {
+  if (!lifecycleIndexKey.value || !lifecyclePending)
+    return
+  lifecycle?.markSettled(lifecycleIndexKey.value)
+  lifecyclePending = false
+}
 // Mode container used to animate height between Source and Preview
 const modeContainerRef = ref<HTMLElement>()
 const baseFixedCode = computed(() => {
@@ -378,6 +416,7 @@ if (typeof window !== 'undefined') {
 onBeforeUnmount(() => {
   viewportHandle.value?.destroy()
   viewportHandle.value = null
+  clearLifecyclePending()
   clearProgressiveRenderDebounceTimer()
 })
 
@@ -1206,6 +1245,7 @@ async function initMermaid() {
   }
 
   isRendering.value = true
+  markLifecyclePending()
 
   renderQueue.value = (async () => {
     try {
@@ -1290,6 +1330,7 @@ async function initMermaid() {
     finally {
       isRendering.value = false
       renderQueue.value = null
+      void markLifecycleSettled()
     }
   })()
 
@@ -1348,6 +1389,7 @@ async function renderPartial(code: string) {
     return
 
   isRendering.value = true
+  markLifecyclePending()
   try {
     const mermaidInstance = await resolveMermaidInstance()
     if (!mermaidInstance)
@@ -1378,6 +1420,7 @@ async function renderPartial(code: string) {
   }
   finally {
     isRendering.value = false
+    void markLifecycleSettled()
   }
 }
 
@@ -1887,6 +1930,7 @@ onUnmounted(() => {
   terminateMermaidWorker()
   stopPreviewPolling()
   clearRenderRetryTimer()
+  clearLifecyclePending()
 })
 
 watch(
@@ -1918,6 +1962,7 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
 
 <template>
   <div
+    ref="blockContainer"
     class="mermaid-block-container rounded-lg border overflow-hidden"
     data-markstream-mermaid="1"
     :data-markstream-mode="showSource ? 'fallback' : hasRenderedOnce ? 'preview' : 'pending'"
