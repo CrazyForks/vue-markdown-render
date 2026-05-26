@@ -36,8 +36,10 @@ interface VirtualScrollLabSnapshot {
   maxDomNodeCount: number
   maxMarkdownSlotCount: number
   expectedMarkdownSlotCeiling: number
+  maxExpectedMarkdownSlotCeiling: number
   blankFrameCount: number
   clippedMessageCount: number
+  heightDriftMessageCount: number
   maxItemHeightDriftPx: number
   visibleCoverageOk: boolean
   settledEvents: number
@@ -58,6 +60,7 @@ declare global {
         switchThread: (threadId: ThreadId) => Promise<void>
         toggleDensity: () => void
         toggleFontScale: () => void
+        toggleSmallMessageCoordination: () => void
         resetHeights: () => void
       }
     }
@@ -90,11 +93,13 @@ const markdownSlotCount = ref(0)
 const markdownContentCount = ref(0)
 const blankFrameCount = ref(0)
 const clippedMessageCount = ref(0)
+const heightDriftMessageCount = ref(0)
 const maxItemHeightDriftPx = ref(0)
 const worstHeightDriftMessageId = ref('')
 const visibleCoverageOk = ref(true)
 const maxDomNodeCount = ref(0)
 const maxMarkdownSlotCount = ref(0)
+const maxExpectedMarkdownSlotCeiling = ref(0)
 const lastHeightEvent = ref<MarkstreamVirtualMetrics | null>(null)
 const settledEvents = ref(0)
 const scrollCompensationCount = ref(0)
@@ -230,7 +235,9 @@ function setMarkdownHostEl(message: Message, el: Element | null) {
 }
 
 function getEstimatedMessageHeight(message: Message) {
-  return message.huge ? 2700 : 230
+  return message.huge
+    ? Math.max(2700, Math.ceil(message.content.length * 0.62))
+    : 230
 }
 
 function getItemHeight(message: Message) {
@@ -316,6 +323,7 @@ const blankFrameOk = computed(() => blankFrameCount.value === 0)
 
 const layoutIntegrityOk = computed(() => {
   return clippedMessageCount.value === 0
+    && heightDriftMessageCount.value === 0
     && maxItemHeightDriftPx.value <= 2
     && visibleCoverageOk.value
 })
@@ -516,6 +524,12 @@ function scheduleStats() {
   })
 }
 
+function isProbeCoveredByRenderedContent(probe: Element | null) {
+  return Boolean(
+    probe?.closest?.('.message-card, .markdown-renderer, .node-content'),
+  )
+}
+
 function collectStats() {
   const root = scrollRoot.value
   if (!root)
@@ -532,8 +546,12 @@ function collectStats() {
   markdownContentCount.value = contentCount
   maxDomNodeCount.value = Math.max(maxDomNodeCount.value, domCount)
   maxMarkdownSlotCount.value = Math.max(maxMarkdownSlotCount.value, slotCount)
+  maxExpectedMarkdownSlotCeiling.value = Math.max(
+    maxExpectedMarkdownSlotCeiling.value,
+    expectedMarkdownSlotCeiling.value,
+  )
 
-  let clipped = 0
+  let drifted = 0
   let maxDrift = 0
   let worstId = ''
   let heightChanged = false
@@ -546,22 +564,24 @@ function collectStats() {
     const actual = getMeasuredMessageContentHeight(key)
     const expected = getItemHeight(item.message)
     const drift = actual - expected
+    const absDrift = Math.abs(drift)
 
-    if (actual > 0 && Math.abs(actual - expected) > 1) {
+    if (actual > 0 && absDrift > 1) {
       itemHeights.set(key, Math.ceil(actual))
       heightChanged = true
     }
 
-    if (drift > 2) {
-      clipped += 1
-      if (drift > maxDrift) {
-        maxDrift = drift
+    if (actual > 0 && absDrift > 2) {
+      drifted += 1
+      if (absDrift > maxDrift) {
+        maxDrift = absDrift
         worstId = item.message.id
       }
     }
   }
 
-  clippedMessageCount.value = clipped
+  clippedMessageCount.value = drifted
+  heightDriftMessageCount.value = drifted
   maxItemHeightDriftPx.value = maxDrift
   worstHeightDriftMessageId.value = worstId
 
@@ -583,7 +603,7 @@ function collectStats() {
       rootRect.top + rootRect.height * yRatio,
     )
 
-    if (!probe?.closest?.('.virtual-message') && totalHeight.value > viewportHeight.value) {
+    if (!isProbeCoveredByRenderedContent(probe) && totalHeight.value > viewportHeight.value) {
       covered = false
       break
     }
@@ -742,11 +762,13 @@ function resetHeights() {
   streamBottomPinned = false
   blankFrameCount.value = 0
   clippedMessageCount.value = 0
+  heightDriftMessageCount.value = 0
   maxItemHeightDriftPx.value = 0
   worstHeightDriftMessageId.value = ''
   visibleCoverageOk.value = true
   maxDomNodeCount.value = 0
   maxMarkdownSlotCount.value = 0
+  maxExpectedMarkdownSlotCeiling.value = 0
   scrollCompensationCount.value = 0
   scheduleStats()
 }
@@ -773,8 +795,10 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
     maxDomNodeCount: maxDomNodeCount.value,
     maxMarkdownSlotCount: maxMarkdownSlotCount.value,
     expectedMarkdownSlotCeiling: expectedMarkdownSlotCeiling.value,
+    maxExpectedMarkdownSlotCeiling: maxExpectedMarkdownSlotCeiling.value || expectedMarkdownSlotCeiling.value,
     blankFrameCount: blankFrameCount.value,
     clippedMessageCount: clippedMessageCount.value,
+    heightDriftMessageCount: heightDriftMessageCount.value,
     maxItemHeightDriftPx: maxItemHeightDriftPx.value,
     visibleCoverageOk: visibleCoverageOk.value,
     settledEvents: settledEvents.value,
@@ -798,6 +822,7 @@ function exposeLabApi() {
       switchThread,
       toggleDensity,
       toggleFontScale,
+      toggleSmallMessageCoordination,
       resetHeights,
     },
   }
@@ -932,7 +957,9 @@ onBeforeUnmount(() => {
       <span>maxLiveNodes: {{ maxLiveNodes }}</span>
       <span>settled events: {{ settledEvents }}</span>
       <span data-testid="slot-ceiling">slot ceiling: {{ expectedMarkdownSlotCeiling }}</span>
+      <span>max slot ceiling: {{ maxExpectedMarkdownSlotCeiling }}</span>
       <span>clipped: {{ clippedMessageCount }}</span>
+      <span>height drift items: {{ heightDriftMessageCount }}</span>
       <span data-testid="max-drift">max drift: {{ Math.round(maxItemHeightDriftPx) }}px</span>
       <span v-if="worstHeightDriftMessageId">
         worst drift: {{ worstHeightDriftMessageId }}

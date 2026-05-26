@@ -1041,7 +1041,7 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('does not emit renderSettled in manual mode before settledToken is provided', async () => {
+  it.each([false, ''])('does not emit renderSettled in manual mode before settledToken is provided: %j', async (settledToken) => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
 
@@ -1053,9 +1053,9 @@ describe('node renderer virtual-scroll coordination', () => {
         viewportPriority: false,
         virtualScroll: {
           enabled: true,
-          sessionKey: 'manual-gated-settled',
+          sessionKey: `manual-gated-settled:${String(settledToken)}`,
           settleMode: 'manual',
-          settledToken: false,
+          settledToken,
           emitIntervalMs: 0,
         },
       },

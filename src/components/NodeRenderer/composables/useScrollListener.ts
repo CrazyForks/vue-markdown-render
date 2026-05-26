@@ -44,12 +44,22 @@ export function useScrollListener(
   }
 
   function setupScrollListener() {
-    if (!isClient || !isListenerEnabled())
+    if (!isClient)
       return
+
+    if (!isListenerEnabled()) {
+      cleanupScrollListener()
+      return
+    }
 
     const root = resolveScrollContainer()
 
-    if (!root || scrollRootElement.value === root)
+    if (!root) {
+      cleanupScrollListener()
+      return
+    }
+
+    if (scrollRootElement.value === root && detachScrollHandler)
       return
 
     cleanupScrollListener()

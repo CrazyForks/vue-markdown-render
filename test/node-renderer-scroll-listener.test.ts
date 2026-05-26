@@ -110,6 +110,47 @@ describe('useScrollListener', () => {
     expect(h.scrollRootElement.value).toBeNull()
   })
 
+  it('detaches the old listener when the scroll root disappears', () => {
+    const oldRoot = createRoot()
+    const h = createHarness({
+      root: oldRoot,
+    })
+    const removeEventListener = vi.spyOn(oldRoot, 'removeEventListener')
+
+    h.listener.setupScrollListener()
+    expect(h.scrollRootElement.value).toBe(oldRoot)
+
+    h.root.value = null
+    h.listener.setupScrollListener()
+
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+    expect(h.scrollRootElement.value).toBeNull()
+
+    oldRoot.dispatchEvent(new Event('scroll'))
+    expect(h.scheduleFocusSync).not.toHaveBeenCalled()
+  })
+
+  it('detaches the old listener when listenerEnabled becomes false', () => {
+    const root = createRoot()
+    const h = createHarness({
+      root,
+      listenerEnabled: true,
+    })
+    const removeEventListener = vi.spyOn(root, 'removeEventListener')
+
+    h.listener.setupScrollListener()
+    expect(h.scrollRootElement.value).toBe(root)
+
+    h.listenerEnabled!.value = false
+    h.listener.setupScrollListener()
+
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+    expect(h.scrollRootElement.value).toBeNull()
+
+    root.dispatchEvent(new Event('scroll'))
+    expect(h.scheduleFocusSync).not.toHaveBeenCalled()
+  })
+
   it('attaches a passive scroll listener and stores the scroll root', () => {
     const h = createHarness()
     const addEventListener = vi.spyOn(h.root.value!, 'addEventListener')

@@ -1400,7 +1400,7 @@ let imperativeVirtualSettleSessionKey: string | null = null
 let imperativeVirtualSettleThreadKey: string | undefined
 
 function hasManualSettleSignal(token: unknown) {
-  return token !== false && token != null
+  return token !== false && token != null && token !== ''
 }
 
 function isInternalLayoutSettled() {

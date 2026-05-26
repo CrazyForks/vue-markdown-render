@@ -173,7 +173,11 @@ async function waitForHealthy(page, label, timeoutMs = 30000) {
     return snapshot.blankFrameCount === 0
       && snapshot.visibleCoverageOk
       && snapshot.clippedMessageCount === 0
+      && snapshot.heightDriftMessageCount === 0
+      && snapshot.maxItemHeightDriftPx <= 2
       && snapshot.markdownSlotCount <= snapshot.expectedMarkdownSlotCeiling
+      && snapshot.maxMarkdownSlotCount <= (snapshot.maxExpectedMarkdownSlotCeiling ?? snapshot.expectedMarkdownSlotCeiling)
+      && snapshot.messageDomCount <= 24
       && snapshot.labStatus === 'ok'
   }, null, { timeout: timeoutMs }).catch(async (error) => {
     const snapshot = await readSnapshot(page).catch(() => null)
@@ -227,6 +231,16 @@ async function run() {
     assert(
       afterStress.markdownSlotCount <= afterStress.expectedMarkdownSlotCeiling,
       'DOM-size exceeded markdown slot ceiling',
+      afterStress,
+    )
+    assert(
+      afterStress.maxMarkdownSlotCount <= (afterStress.maxExpectedMarkdownSlotCeiling ?? afterStress.expectedMarkdownSlotCeiling),
+      'DOM-size exceeded markdown slot ceiling during stress scroll',
+      afterStress,
+    )
+    assert(
+      afterStress.maxItemHeightDriftPx <= 2,
+      'item height drift is too large after stress scroll',
       afterStress,
     )
 
