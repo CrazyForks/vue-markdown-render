@@ -154,6 +154,8 @@ const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
 const CONTENT_STREAMING_TAIL_IDLE_MS = 1200
 const HEIGHT_CACHE_WIDTH_BUCKET_PX = 32
+const BOTTOM_ANCHOR_CAPTURE_MAX_DISTANCE_PX = 160
+const BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX = 32
 
 const containerRef = ref<HTMLElement>()
 const paragraphProbeWrapperRef = ref<HTMLElement | null>(null)
@@ -1201,7 +1203,13 @@ function buildExperimentReport() {
 }
 
 function getCurrentIndexPrefix() {
-  return props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'
+  if (props.indexKey != null)
+    return String(props.indexKey)
+
+  if (virtualScrollEnabled.value)
+    return `virtual-${getVirtualSessionKey()}`
+
+  return 'markdown-renderer'
 }
 
 function resolveLifecycleNodeIndex(indexKey: string | number) {
@@ -1492,27 +1500,62 @@ function getScrollBox() {
   }
 }
 
+function getRendererLogicalHeight() {
+  const total = parsedNodes.value.length
+  return Math.max(
+    0,
+    containerRef.value?.scrollHeight ?? 0,
+    containerRef.value?.offsetHeight ?? 0,
+    estimateHeightRange(0, total),
+  )
+}
+
+function getViewportBottomInRoot(box: NonNullable<ReturnType<typeof getScrollBox>>) {
+  return box.isViewportRoot
+    ? box.clientHeight
+    : box.root.getBoundingClientRect().bottom
+}
+
+function getRendererBottomDistanceFromViewport(
+  box: NonNullable<ReturnType<typeof getScrollBox>>,
+) {
+  const container = containerRef.value
+  if (!container)
+    return null
+
+  const containerRect = container.getBoundingClientRect()
+  const viewportBottom = getViewportBottomInRoot(box)
+
+  return viewportBottom - containerRect.bottom
+}
+
 function captureBottomVirtualAnchor(): MarkstreamVirtualAnchor | null {
   const box = getScrollBox()
   const container = containerRef.value
   if (!box || !container)
     return null
 
-  const distanceFromBottomPx = Math.max(0, box.scrollHeight - box.scrollTop - box.clientHeight)
-  if (distanceFromBottomPx > 8)
+  const rendererBottomDistance = getRendererBottomDistanceFromViewport(box)
+  if (rendererBottomDistance == null)
     return null
 
-  const containerRect = container.getBoundingClientRect()
-  const rootBottom = box.isViewportRoot
-    ? box.clientHeight
-    : box.root.getBoundingClientRect().bottom
+  const scrollRootDistanceFromBottom = Math.max(
+    0,
+    box.scrollHeight - box.scrollTop - box.clientHeight,
+  )
 
-  if (Math.abs(containerRect.bottom - rootBottom) > 8)
+  const rendererBottomIsNearViewportBottom
+    = rendererBottomDistance >= -8
+      && rendererBottomDistance <= BOTTOM_ANCHOR_CAPTURE_MAX_DISTANCE_PX
+
+  const scrollRootIsPinnedToBottom = scrollRootDistanceFromBottom <= 8
+
+  if (!rendererBottomIsNearViewportBottom && !scrollRootIsPinnedToBottom)
     return null
 
   return {
     type: 'bottom',
-    distanceFromBottomPx,
+    distanceFromBottomPx: Math.max(0, rendererBottomDistance),
   }
 }
 
@@ -1630,40 +1673,47 @@ function captureVirtualState() {
   })
 }
 
-function setReverseFlexDistanceFromBottom(root: HTMLElement, distanceFromBottomPx: number) {
-  const distance = Math.max(0, distanceFromBottomPx)
-  const doc = root.ownerDocument || document
-  const max = Math.max(0, (root.scrollHeight ?? 0) - (root.clientHeight ?? 0))
-  const targetNormalized = Math.max(0, max - distance)
+function setNormalizedScrollTop(root: HTMLElement, doc: Document, targetNormalized: number) {
+  const target = Math.max(0, targetNormalized)
 
-  root.scrollTop = -distance
+  if (!isReverseFlexScrollRoot(root)) {
+    root.scrollTop = target
+    return
+  }
+
+  const max = Math.max(0, (root.scrollHeight ?? 0) - (root.clientHeight ?? 0))
+  const distanceFromBottom = Math.max(0, max - target)
+
+  root.scrollTop = -distanceFromBottom
 
   const afterNegative = getNormalizedScrollTop(root, doc, false)
-  if (Math.abs(afterNegative - targetNormalized) <= 2)
+  if (Math.abs(afterNegative - target) <= 2)
     return
 
-  root.scrollTop = distance
+  root.scrollTop = distanceFromBottom
 }
 
 function applyBottomVirtualAnchor(anchor: Extract<MarkstreamVirtualAnchor, { type: 'bottom' }>) {
   const box = getScrollBox()
-  if (!box)
+  const container = containerRef.value
+  if (!box || !container)
     return
 
-  const target = Math.max(0, box.scrollHeight - box.clientHeight - Math.max(0, anchor.distanceFromBottomPx))
-  const view = box.doc.defaultView || (typeof window !== 'undefined' ? window : null)
+  const rendererTop = getOffsetTopWithinRoot(container, box.root)
+  const rendererHeight = getRendererLogicalHeight()
+  const distance = Math.max(0, anchor.distanceFromBottomPx)
+
+  const target = Math.max(
+    0,
+    rendererTop + rendererHeight - box.clientHeight + distance,
+  )
 
   if (box.isViewportRoot) {
-    view?.scrollTo?.(0, target)
+    box.doc.defaultView?.scrollTo?.(0, target)
     return
   }
 
-  if (isReverseFlexScrollRoot(box.root)) {
-    setReverseFlexDistanceFromBottom(box.root, anchor.distanceFromBottomPx)
-    return
-  }
-
-  box.root.scrollTop = target
+  setNormalizedScrollTop(box.root, box.doc, target)
 }
 
 const virtualBottomRestoreTimers: number[] = []
@@ -1721,13 +1771,22 @@ function handleVirtualScrollRootScroll() {
   if (!box)
     return
 
-  const distanceFromBottomPx = Math.max(
-    0,
-    box.scrollHeight - box.scrollTop - box.clientHeight,
-  )
-
-  if (Math.abs(distanceFromBottomPx - anchor.distanceFromBottomPx) > 32)
+  const rendererBottomDistance = getRendererBottomDistanceFromViewport(box)
+  if (rendererBottomDistance == null) {
     clearActiveVirtualBottomAnchor()
+    return
+  }
+
+  if (
+    rendererBottomDistance < -BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX
+    || (
+      Math.abs(
+        Math.max(0, rendererBottomDistance) - Math.max(0, anchor.distanceFromBottomPx),
+      ) > BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX
+    )
+  ) {
+    clearActiveVirtualBottomAnchor()
+  }
 }
 
 function restoreVirtualAnchor(anchor: MarkstreamVirtualAnchor) {
@@ -1783,13 +1842,14 @@ function getBoundedHeightCache(
 
 function canReuseHeightCacheForWidth(savedWidth: number | null | undefined) {
   const currentWidth = getCurrentVirtualWidth()
-  if (!savedWidth)
-    return true
 
-  if (!currentWidth)
+  if (!Number.isFinite(currentWidth) || currentWidth <= 0)
     return false
 
-  return Math.abs(currentWidth - savedWidth) <= HEIGHT_CACHE_WIDTH_BUCKET_PX
+  if (!Number.isFinite(savedWidth) || Number(savedWidth) <= 0)
+    return false
+
+  return Math.abs(currentWidth - Number(savedWidth)) <= HEIGHT_CACHE_WIDTH_BUCKET_PX
 }
 
 function getVirtualStateSavedWidth(state: MarkstreamVirtualState | null | undefined) {
@@ -1818,8 +1878,6 @@ function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
 
 function canReuseStandaloneHeightCache() {
   const cacheWidth = props.virtualScroll?.heightCacheWidth
-  if (!cacheWidth)
-    return false
   return canReuseHeightCacheForWidth(cacheWidth)
 }
 
@@ -1910,7 +1968,10 @@ function applyVirtualRestoreState(state: MarkstreamVirtualState | null | undefin
 }
 
 function shouldKeepPendingVirtualRestoreState(state: MarkstreamVirtualState) {
-  return Boolean(state.heightCache?.length && getVirtualStateSavedWidth(state) && !getCurrentVirtualWidth())
+  return Boolean(
+    state.heightCache?.length
+    && !canReuseHeightCacheForWidth(getVirtualStateSavedWidth(state)),
+  )
 }
 
 function restoreVirtualState(state: MarkstreamVirtualState) {

@@ -1,7 +1,7 @@
 import type { MarkstreamNodeLifecycle } from '../src/types/node-renderer-props'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, inject, nextTick, onMounted, ref } from 'vue'
+import { defineComponent, h, inject, nextTick, onMounted, ref, watch } from 'vue'
 import { removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
 
@@ -66,6 +66,40 @@ function getRootNodeContentElements(root: Element) {
     .filter((el): el is HTMLElement => Boolean(el))
 }
 
+function makeDomRect(top: number, height: number, width = 400) {
+  return {
+    x: 0,
+    y: top,
+    top,
+    bottom: top + height,
+    left: 0,
+    right: width,
+    width,
+    height,
+    toJSON: () => ({}),
+  } as DOMRect
+}
+
+function installRendererBottomGeometry(
+  wrapper: ReturnType<typeof mount>,
+  scrollRoot: HTMLElement,
+  getRendererHeight: () => number,
+) {
+  Object.defineProperty(wrapper.element, 'scrollHeight', {
+    configurable: true,
+    get: getRendererHeight,
+  })
+
+  vi.spyOn(scrollRoot, 'getBoundingClientRect').mockImplementation(() => {
+    return makeDomRect(0, scrollRoot.clientHeight)
+  })
+
+  vi.spyOn(wrapper.element, 'getBoundingClientRect').mockImplementation(() => {
+    const height = getRendererHeight()
+    return makeDomRect(-scrollRoot.scrollTop, height)
+  })
+}
+
 describe('node renderer virtual-scroll coordination', () => {
   beforeEach(() => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
@@ -75,6 +109,7 @@ describe('node renderer virtual-scroll coordination', () => {
   afterEach(() => {
     try {
       removeCustomComponents('virtual-lifecycle-test')
+      removeCustomComponents('virtual-prefix-test')
     }
     catch {}
     vi.unstubAllGlobals()
@@ -1193,6 +1228,59 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not import restore height cache when saved width is missing', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'missing-saved-width',
+          settleMode: 'manual',
+          restoreState: {
+            sessionKey: 'missing-saved-width',
+            anchor: { type: 'node', nodeIndex: 0, offsetWithinNodePx: 0 },
+            metrics: {
+              sessionKey: 'missing-saved-width',
+              phase: 'final',
+              nodeCount: 2,
+              liveRange: { start: 0, end: 2 },
+              renderedCount: 2,
+              measuredCount: 2,
+              estimatedCount: 0,
+              averageNodeHeight: 400,
+              topSpacerHeight: 0,
+              bottomSpacerHeight: 0,
+              visibleDomHeight: 800,
+              totalHeight: 800,
+              width: 0,
+              final: true,
+              stable: true,
+              confidence: 'final',
+              reason: 'manual',
+            },
+            width: 0,
+            heightCache: [
+              { index: 0, height: 400 },
+              { index: 1, height: 400 },
+            ],
+          },
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).not.toBe(800)
+
+    wrapper.unmount()
+  })
+
   it('does not import standalone height cache without restore state', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
@@ -1471,6 +1559,134 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('uses virtual sessionKey as the default node index prefix when indexKey is omitted', async () => {
+    const seenIndexKeys: string[] = []
+
+    const ProbeNode = defineComponent({
+      props: {
+        node: { type: Object, required: true },
+        indexKey: { type: [String, Number], required: true },
+      },
+      setup(props) {
+        watch(
+          () => props.indexKey,
+          value => seenIndexKeys.push(String(value)),
+          { immediate: true },
+        )
+
+        return () => h('div', 'probe')
+      },
+    })
+
+    setCustomComponents('virtual-prefix-test', {
+      probe: ProbeNode as any,
+    })
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-prefix-test',
+        nodes: [{ type: 'probe', raw: '<probe />', content: '' }],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'session-a',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'session-b',
+        settleMode: 'manual',
+        emitIntervalMs: 0,
+      },
+    })
+
+    await flushAll()
+
+    expect(seenIndexKeys).toContain('virtual-session-a-0')
+    expect(seenIndexKeys).toContain('virtual-session-b-0')
+
+    wrapper.unmount()
+  })
+
+  it('captures renderer-bottom anchor even when message chrome exists below the renderer', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const scrollRoot = document.createElement('div')
+    document.body.appendChild(scrollRoot)
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => 1000,
+    })
+
+    scrollRoot.scrollTop = 800
+
+    vi.spyOn(scrollRoot, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      bottom: 200,
+      left: 0,
+      right: 400,
+      width: 400,
+      height: 200,
+      toJSON: () => ({}),
+    } as DOMRect)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'renderer-bottom-with-chrome',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    vi.spyOn(wrapper.element, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 80,
+      top: 80,
+      bottom: 160,
+      left: 0,
+      right: 400,
+      width: 400,
+      height: 80,
+      toJSON: () => ({}),
+    } as DOMRect)
+
+    const state = (wrapper.vm as any).captureVirtualState()
+
+    expect(state?.anchor).toMatchObject({
+      type: 'bottom',
+      distanceFromBottomPx: 40,
+    })
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
   it('keeps a restored bottom anchor active after late height changes', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -1505,6 +1721,7 @@ describe('node renderer virtual-scroll coordination', () => {
     })
 
     await flushAll()
+    installRendererBottomGeometry(wrapper, scrollRoot, () => scrollHeight)
 
     const handle = wrapper.vm as any
     handle.restoreVirtualState({
@@ -1564,6 +1781,7 @@ describe('node renderer virtual-scroll coordination', () => {
     })
 
     await flushAll()
+    installRendererBottomGeometry(wrapper, scrollRoot, () => scrollHeight)
 
     const handle = wrapper.vm as any
     handle.restoreVirtualState({
@@ -1620,6 +1838,7 @@ describe('node renderer virtual-scroll coordination', () => {
     })
 
     await flushAll()
+    installRendererBottomGeometry(wrapper, scrollRoot, () => scrollHeight)
 
     const handle = wrapper.vm as any
     handle.restoreVirtualState({
@@ -1682,6 +1901,7 @@ describe('node renderer virtual-scroll coordination', () => {
     })
 
     await flushAll()
+    installRendererBottomGeometry(wrapper, scrollRoot, () => scrollHeight)
 
     const handle = wrapper.vm as any
     handle.restoreVirtualState({

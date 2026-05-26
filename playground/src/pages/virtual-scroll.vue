@@ -40,6 +40,10 @@ const messageDomCount = ref(0)
 const markdownSlotCount = ref(0)
 const markdownContentCount = ref(0)
 const blankFrameCount = ref(0)
+const clippedMessageCount = ref(0)
+const maxItemHeightDriftPx = ref(0)
+const worstHeightDriftMessageId = ref('')
+const visibleCoverageOk = ref(true)
 const maxDomNodeCount = ref(0)
 const maxMarkdownSlotCount = ref(0)
 const lastHeightEvent = ref<MarkstreamVirtualMetrics | null>(null)
@@ -251,9 +255,17 @@ const domSizeOk = computed(() => {
 
 const blankFrameOk = computed(() => blankFrameCount.value === 0)
 
+const layoutIntegrityOk = computed(() => {
+  return clippedMessageCount.value === 0
+    && maxItemHeightDriftPx.value <= 2
+    && visibleCoverageOk.value
+})
+
 const labStatus = computed(() => {
   if (!blankFrameOk.value)
     return 'blank-frame-risk'
+  if (!layoutIntegrityOk.value)
+    return 'layout-drift-risk'
   if (!domSizeOk.value)
     return 'dom-size-risk'
   return 'ok'
@@ -283,9 +295,11 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
 function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   const key = messageKey(message)
   const outerAnchor = captureOuterAnchor()
+  const measuredArticleHeight = messageEls.get(key)?.scrollHeight ?? 0
   const nextHeight = Math.max(
     1,
     Math.ceil(metrics.totalHeight + getMessageChromeHeight(key)),
+    measuredArticleHeight,
   )
   const previous = itemHeights.get(key)
 
@@ -418,13 +432,57 @@ function collectStats() {
   maxDomNodeCount.value = Math.max(maxDomNodeCount.value, domCount)
   maxMarkdownSlotCount.value = Math.max(maxMarkdownSlotCount.value, slotCount)
 
-  const rect = root.getBoundingClientRect()
-  const probe = document.elementFromPoint(
-    rect.left + rect.width / 2,
-    rect.top + rect.height / 2,
-  )
+  let clipped = 0
+  let maxDrift = 0
+  let worstId = ''
 
-  if (!probe?.closest?.('.virtual-message') && totalHeight.value > viewportHeight.value)
+  for (const item of visibleItems.value) {
+    const key = messageKey(item.message)
+    const article = messageEls.get(key)
+    if (!article)
+      continue
+
+    const actual = article.scrollHeight
+    const expected = getItemHeight(item.message)
+    const drift = actual - expected
+
+    if (drift > 2) {
+      clipped += 1
+      if (drift > maxDrift) {
+        maxDrift = drift
+        worstId = item.message.id
+      }
+    }
+  }
+
+  clippedMessageCount.value = clipped
+  maxItemHeightDriftPx.value = maxDrift
+  worstHeightDriftMessageId.value = worstId
+
+  const rootRect = root.getBoundingClientRect()
+  const probePoints = [
+    [0.5, 0.25],
+    [0.5, 0.5],
+    [0.5, 0.75],
+  ] as const
+
+  let covered = true
+
+  for (const [xRatio, yRatio] of probePoints) {
+    const probe = document.elementFromPoint(
+      rootRect.left + rootRect.width * xRatio,
+      rootRect.top + rootRect.height * yRatio,
+    )
+
+    if (!probe?.closest?.('.virtual-message') && totalHeight.value > viewportHeight.value) {
+      covered = false
+      break
+    }
+  }
+
+  visibleCoverageOk.value = covered
+
+  if (!covered)
     blankFrameCount.value += 1
 }
 
@@ -550,6 +608,10 @@ function resetHeights() {
   messageEls.clear()
   markdownHostEls.clear()
   blankFrameCount.value = 0
+  clippedMessageCount.value = 0
+  maxItemHeightDriftPx.value = 0
+  worstHeightDriftMessageId.value = ''
+  visibleCoverageOk.value = true
   maxDomNodeCount.value = 0
   maxMarkdownSlotCount.value = 0
   scrollCompensationCount.value = 0
@@ -651,6 +713,17 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
+    <section class="checklist">
+      <strong>验收步骤</strong>
+      <ol>
+        <li>点击 Bottom，然后点击 Stream last huge message，观察 scrollTop 是否保持 pinned，不应向上跳。</li>
+        <li>点击 Stress scroll，连续 10 秒，blank probes 必须保持 0，coverage 必须为 ok。</li>
+        <li>切换 Thread A / Thread B，再切回来，scrollTop 和 visible range 应恢复。</li>
+        <li>切换 Density / Font，max drift 应回落到 0 或接近 0，不能长期 clipped。</li>
+        <li>markdown slots 应接近 renderedHugeMessageCount × maxLiveNodes，而不是随全文节点数线性增长。</li>
+      </ol>
+    </section>
+
     <section class="metrics">
       <span class="status-chip" :class="labStatus">
         status: {{ labStatus }}
@@ -661,6 +734,12 @@ onBeforeUnmount(() => {
       <span>maxLiveNodes: {{ maxLiveNodes }}</span>
       <span>settled events: {{ settledEvents }}</span>
       <span>slot ceiling: {{ expectedMarkdownSlotCeiling }}</span>
+      <span>clipped: {{ clippedMessageCount }}</span>
+      <span>max drift: {{ Math.round(maxItemHeightDriftPx) }}px</span>
+      <span v-if="worstHeightDriftMessageId">
+        worst drift: {{ worstHeightDriftMessageId }}
+      </span>
+      <span>coverage: {{ visibleCoverageOk ? 'ok' : 'risk' }}</span>
       <span v-if="lastHeightEvent">
         last markdown: {{ Math.round(lastHeightEvent.totalHeight) }}px /
         {{ lastHeightEvent.phase }} /
@@ -749,6 +828,19 @@ onBeforeUnmount(() => {
   background: var(--lab-panel);
 }
 
+.checklist {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--lab-border);
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 12px;
+}
+
+.checklist ol {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+
 .toolbar-main,
 .toolbar-actions,
 .metrics {
@@ -790,6 +882,11 @@ button:hover {
 .status-chip.ok {
   background: #dcfce7;
   color: #166534;
+}
+
+.status-chip.layout-drift-risk {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .status-chip.blank-frame-risk,
