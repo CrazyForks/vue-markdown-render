@@ -120,41 +120,31 @@ const emit = defineEmits<{
   (e: 'click', event: MouseEvent): void
   (e: 'mouseover', event: MouseEvent): void
   (e: 'mouseout', event: MouseEvent): void
-  (e: 'virtualStateChange', payload: MarkstreamVirtualState): void
   (e: 'virtual-state-change', payload: MarkstreamVirtualState): void
-  (e: 'heightChange', payload: MarkstreamVirtualMetrics): void
   (e: 'height-change', payload: MarkstreamVirtualMetrics): void
-  (e: 'renderSettled', payload: MarkstreamVirtualMetrics): void
   (e: 'render-settled', payload: MarkstreamVirtualMetrics): void
-  (e: 'renderFinal', payload: MarkstreamVirtualMetrics): void
   (e: 'render-final', payload: MarkstreamVirtualMetrics): void
-  (e: 'anchorChange', payload: MarkstreamVirtualAnchor): void
   (e: 'anchor-change', payload: MarkstreamVirtualAnchor): void
 }>()
 
-/* eslint-disable vue/custom-event-name-casing -- Public virtualScroll API also emits documented kebab-case events. */
+/* eslint-disable vue/custom-event-name-casing -- Public virtualScroll events are kebab-case. */
 function emitHeightChange(metrics: MarkstreamVirtualMetrics) {
-  emit('heightChange', metrics)
   emit('height-change', metrics)
 }
 
 function emitVirtualStateChange(state: MarkstreamVirtualState) {
-  emit('virtualStateChange', state)
   emit('virtual-state-change', state)
 }
 
 function emitAnchorChange(anchor: MarkstreamVirtualAnchor) {
-  emit('anchorChange', anchor)
   emit('anchor-change', anchor)
 }
 
 function emitRenderSettled(metrics: MarkstreamVirtualMetrics) {
-  emit('renderSettled', metrics)
   emit('render-settled', metrics)
 }
 
 function emitRenderFinal(metrics: MarkstreamVirtualMetrics) {
-  emit('renderFinal', metrics)
   emit('render-final', metrics)
 }
 /* eslint-enable vue/custom-event-name-casing */
@@ -513,6 +503,7 @@ const {
   fenwickRangeSum,
 } = useHeightMeasurements({
   onHeightRecorded: () => {
+    markFallbackHeightPrefixDirty()
     if (activeRestoreAnchor.value)
       scheduleRestoreReconcile()
     if (activeVirtualBottomAnchor.value)
@@ -570,6 +561,14 @@ const pendingAsyncNodeCount = computed(() => {
   return pendingAsyncNodeCounts.size
 })
 let heightMeasurementRaf: number | null = null
+let fallbackHeightPrefixDirty = true
+let fallbackHeightPrefixCache: number[] = [0]
+let fallbackHeightPrefixCacheKey = ''
+
+function markFallbackHeightPrefixDirty() {
+  fallbackHeightPrefixDirty = true
+}
+
 const desiredRenderedCount = computed(() => {
   if (!virtualizationEnabled.value)
     return parsedNodes.value.length
@@ -843,6 +842,7 @@ function setHeadingProbeWrapper(level: number, el: HTMLElement | null) {
 function readSimpleTextProbeProfile() {
   if (!heightEstimationActive.value || typeof window === 'undefined') {
     simpleTextProbeProfile.value = createEmptySimpleTextProbeProfile()
+    markFallbackHeightPrefixDirty()
     return
   }
 
@@ -866,6 +866,7 @@ function readSimpleTextProbeProfile() {
   }
 
   simpleTextProbeProfile.value = nextProfile
+  markFallbackHeightPrefixDirty()
 }
 
 function updateExperimentContainerWidth() {
@@ -972,22 +973,47 @@ function getFallbackNodeHeight(index: number) {
   return nodeHeights[index] ?? estimatedNodeHeights.value[index]?.height ?? averageNodeHeight.value
 }
 
-const fallbackHeightPrefix = computed(() => {
+function getFallbackHeightPrefix() {
   const total = parsedNodes.value.length
+  const width = experimentContainerWidth.value || containerRef.value?.clientWidth || 0
+  const widthBucket = Number.isFinite(width) && width > 0
+    ? Math.round(width / HEIGHT_CACHE_WIDTH_BUCKET_PX)
+    : 0
+  const measurementKey = props.virtualScroll?.measurementKey == null
+    ? ''
+    : String(props.virtualScroll.measurementKey)
+  const key = [
+    total,
+    heightStats.count,
+    Math.round(heightStats.total),
+    Math.round(averageNodeHeight.value * 100),
+    measurementKey,
+    widthBucket,
+    heightEstimationActive.value ? 1 : 0,
+    heightEstimationExperimentRevision.value,
+    streamRenderVersion.value,
+  ].join(':')
+
+  if (!fallbackHeightPrefixDirty && fallbackHeightPrefixCacheKey === key)
+    return fallbackHeightPrefixCache
+
   const prefix = new Array<number>(total + 1)
   prefix[0] = 0
 
-  if (!heightEstimationActive.value) {
-    for (let i = 0; i < total; i++)
-      prefix[i + 1] = prefix[i] + (nodeHeights[i] ?? averageNodeHeight.value)
-    return prefix
+  for (let i = 0; i < total; i++) {
+    prefix[i + 1] = prefix[i] + (
+      heightEstimationActive.value
+        ? getFallbackNodeHeight(i)
+        : (nodeHeights[i] ?? averageNodeHeight.value)
+    )
   }
 
-  for (let i = 0; i < total; i++)
-    prefix[i + 1] = prefix[i] + getFallbackNodeHeight(i)
+  fallbackHeightPrefixCache = prefix
+  fallbackHeightPrefixCacheKey = key
+  fallbackHeightPrefixDirty = false
 
   return prefix
-})
+}
 
 function estimateHeightRangeFromPrefix(start: number, end: number) {
   const total = parsedNodes.value.length
@@ -996,7 +1022,7 @@ function estimateHeightRangeFromPrefix(start: number, end: number) {
   if (boundedStart >= boundedEnd)
     return 0
 
-  const prefix = fallbackHeightPrefix.value
+  const prefix = getFallbackHeightPrefix()
   return (prefix[boundedEnd] ?? 0) - (prefix[boundedStart] ?? 0)
 }
 
@@ -1008,7 +1034,7 @@ function estimateIndexForOffsetFromPrefix(offsetPx: number) {
   if (offsetPx <= 0)
     return 0
 
-  const prefix = fallbackHeightPrefix.value
+  const prefix = getFallbackHeightPrefix()
   const totalHeight = prefix[total] ?? 0
   if (offsetPx >= totalHeight)
     return total - 1
@@ -1036,6 +1062,7 @@ function estimateIndexForOffsetFromPrefix(offsetPx: number) {
 watch(
   () => parsedNodes.value.length,
   (length) => {
+    markFallbackHeightPrefixDirty()
     if (length <= 0) {
       resetHeightMeasurements()
       return
@@ -1845,6 +1872,7 @@ function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
     return true
 
   importHeightCache(boundedCache, { mode: 'merge' })
+  markFallbackHeightPrefixDirty()
   lastImportedVirtualHeightCacheSignature = signature
   scheduleVirtualMetricsEmit('restore')
   return true
@@ -1867,6 +1895,7 @@ function applyVirtualRestoreState(state: MarkstreamVirtualState | null | undefin
     const boundedCache = getBoundedHeightCache(state.heightCache)
     if (boundedCache.length) {
       importHeightCache(boundedCache, { mode: 'merge' })
+      markFallbackHeightPrefixDirty()
       lastImportedVirtualHeightCacheSignature = getHeightCacheSignature(boundedCache)
     }
   }
@@ -2209,7 +2238,7 @@ function estimateIndexForOffsetFromEnd(offsetPx: number) {
   if (offsetPx <= 0)
     return Math.max(0, nodes.length - 1)
   if (heightEstimationActive.value) {
-    const prefix = fallbackHeightPrefix.value
+    const prefix = getFallbackHeightPrefix()
     const totalHeight = prefix[nodes.length] ?? 0
     return estimateIndexForOffsetFromPrefix(Math.max(0, totalHeight - offsetPx))
   }
@@ -2627,6 +2656,7 @@ const {
   onDatasetKeyChanged: (total) => {
     clearPendingHeightMeasurements()
     resetHeightMeasurements()
+    markFallbackHeightPrefixDirty()
     if (total > 0)
       rebuildHeightTrees(total)
   },
@@ -2703,6 +2733,7 @@ watch(
   async () => {
     if (!heightEstimationActive.value) {
       simpleTextProbeProfile.value = createEmptySimpleTextProbeProfile()
+      markFallbackHeightPrefixDirty()
       return
     }
     await nextTick()
@@ -2722,6 +2753,7 @@ watch(
 watch(
   [heightEstimationActive, experimentContainerWidth],
   () => {
+    markFallbackHeightPrefixDirty()
     if (virtualizationEnabled.value)
       scheduleFocusSync({ immediate: true })
     if (activeRestoreAnchor.value)
@@ -2787,6 +2819,7 @@ let lastVirtualLayoutEpochKey: string | null = null
 function resetVirtualSessionMeasurements() {
   clearPendingHeightMeasurements()
   resetHeightMeasurements()
+  markFallbackHeightPrefixDirty()
 
   const total = parsedNodes.value.length
   if (total > 0)
@@ -2819,6 +2852,7 @@ function resetVirtualSessionRuntimeState() {
 function resetVirtualLayoutMeasurements(reason: MarkstreamVirtualReason = 'resize') {
   clearPendingHeightMeasurements()
   resetHeightMeasurements()
+  markFallbackHeightPrefixDirty()
 
   const total = parsedNodes.value.length
   if (total > 0)

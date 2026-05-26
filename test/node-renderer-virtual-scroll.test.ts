@@ -118,14 +118,14 @@ describe('node renderer virtual-scroll coordination', () => {
     expect(metrics.threadKey).toBe('thread-a')
     expect(metrics.totalHeight).toBe(120)
     expect(metrics.measuredCount).toBe(2)
-    expect(wrapper.emitted('heightChange')?.at(-1)?.[0]).toMatchObject({
+    expect(wrapper.emitted('height-change')?.at(-1)?.[0]).toMatchObject({
       sessionKey: 'thread-a:message-1:1',
       threadKey: 'thread-a',
       totalHeight: 120,
     })
-    expect(wrapper.emitted('height-change')?.at(-1)?.[0]).toBe(wrapper.emitted('heightChange')?.at(-1)?.[0])
-    expect(wrapper.emitted('virtual-state-change')?.at(-1)?.[0]).toBe(wrapper.emitted('virtualStateChange')?.at(-1)?.[0])
-    expect(wrapper.emitted('anchor-change')?.at(-1)?.[0]).toBe(wrapper.emitted('anchorChange')?.at(-1)?.[0])
+    expect(wrapper.emitted('heightChange')).toBeUndefined()
+    expect(wrapper.emitted('virtualStateChange')).toBeUndefined()
+    expect(wrapper.emitted('anchorChange')).toBeUndefined()
 
     const state = handle.captureVirtualState()
     expect(state).toMatchObject({
@@ -144,16 +144,16 @@ describe('node renderer virtual-scroll coordination', () => {
     const settled = await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })
     expect(settled.phase).toBe('final')
     expect(settled.stable).toBe(true)
-    expect(wrapper.emitted('renderSettled')?.at(-1)?.[0]).toMatchObject({
+    expect(wrapper.emitted('render-settled')?.at(-1)?.[0]).toMatchObject({
       totalHeight: 120,
       stable: true,
     })
-    expect(wrapper.emitted('render-settled')?.at(-1)?.[0]).toBe(wrapper.emitted('renderSettled')?.at(-1)?.[0])
-    expect(wrapper.emitted('renderFinal')?.at(-1)?.[0]).toMatchObject({
+    expect(wrapper.emitted('renderSettled')).toBeUndefined()
+    expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toMatchObject({
       phase: 'final',
       totalHeight: 120,
     })
-    expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toBe(wrapper.emitted('renderFinal')?.at(-1)?.[0])
+    expect(wrapper.emitted('renderFinal')).toBeUndefined()
 
     wrapper.unmount()
   })
@@ -220,7 +220,7 @@ describe('node renderer virtual-scroll coordination', () => {
       stable: true,
       totalHeight: 64,
     })
-    expect(wrapper.emitted('renderSettled')?.at(-1)?.[0]).toMatchObject({
+    expect(wrapper.emitted('render-settled')?.at(-1)?.[0]).toMatchObject({
       sessionKey: 'lazy-image-settled',
       stable: true,
     })
@@ -273,7 +273,6 @@ describe('node renderer virtual-scroll coordination', () => {
         stable: false,
       })
       expect(metrics.phase).not.toBe('final')
-      expect(wrapper.emitted('renderFinal')).toBeUndefined()
       expect(wrapper.emitted('render-final')).toBeUndefined()
     }
     finally {
@@ -333,7 +332,6 @@ describe('node renderer virtual-scroll coordination', () => {
         stable: false,
       })
       expect(metrics.phase).not.toBe('final')
-      expect(wrapper.emitted('renderFinal')).toBeUndefined()
       expect(wrapper.emitted('render-final')).toBeUndefined()
     }
     finally {
@@ -505,7 +503,7 @@ describe('node renderer virtual-scroll coordination', () => {
     const metrics = await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })
     expect(metrics.totalHeight).toBe(96)
     expect(metrics.stable).toBe(true)
-    expect(wrapper.emitted('renderSettled')?.at(-1)?.[0]).toMatchObject({
+    expect(wrapper.emitted('render-settled')?.at(-1)?.[0]).toMatchObject({
       totalHeight: 96,
       stable: true,
     })
@@ -760,14 +758,14 @@ describe('node renderer virtual-scroll coordination', () => {
     })
 
     await flushAll()
-    expect(wrapper.emitted('renderFinal')).toBeUndefined()
+    expect(wrapper.emitted('render-final')).toBeUndefined()
 
     expect(finishAsyncNode).toBeTypeOf('function')
     finishAsyncNode?.(88)
     await new Promise(resolve => setTimeout(resolve, 160))
     await flushAll()
 
-    expect(wrapper.emitted('renderFinal')?.at(-1)?.[0]).toMatchObject({
+    expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toMatchObject({
       phase: 'final',
       totalHeight: 88,
       stable: true,
@@ -820,13 +818,13 @@ describe('node renderer virtual-scroll coordination', () => {
     })
 
     await flushAll()
-    expect(wrapper.emitted('renderFinal')).toBeUndefined()
+    expect(wrapper.emitted('render-final')).toBeUndefined()
 
     finishAsyncNode?.(123)
     await new Promise(resolve => setTimeout(resolve, 160))
     await flushAll()
 
-    expect(wrapper.emitted('renderFinal')?.at(-1)?.[0]).toMatchObject({
+    expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toMatchObject({
       phase: 'final',
       totalHeight: 123,
       stable: true,
@@ -867,8 +865,8 @@ describe('node renderer virtual-scroll coordination', () => {
     platform.flushFrames()
     await flushAll()
 
-    expect(wrapper.emitted('renderSettled')).toBeUndefined()
-    expect(wrapper.emitted('renderFinal')).toBeUndefined()
+    expect(wrapper.emitted('render-settled')).toBeUndefined()
+    expect(wrapper.emitted('render-final')).toBeUndefined()
     expect((wrapper.vm as any).getVirtualMetrics()).toMatchObject({
       stable: false,
       totalHeight: 40,
@@ -905,7 +903,7 @@ describe('node renderer virtual-scroll coordination', () => {
     platform.flushFrames()
     await flushAll()
 
-    const state = wrapper.emitted('virtualStateChange')?.at(-1)?.[0] as any
+    const state = wrapper.emitted('virtual-state-change')?.at(-1)?.[0] as any
     expect(state).toMatchObject({
       sessionKey: 'streaming-light-state',
       metrics: {
@@ -958,7 +956,7 @@ describe('node renderer virtual-scroll coordination', () => {
       platform.flushFrames()
       await nextTick()
 
-      expect(wrapper.emitted('renderFinal')).toBeUndefined()
+      expect(wrapper.emitted('render-final')).toBeUndefined()
 
       await vi.advanceTimersByTimeAsync(90)
       platform.flushFrames()
@@ -970,7 +968,7 @@ describe('node renderer virtual-scroll coordination', () => {
         stable: true,
         totalHeight: 40,
       })
-      expect(wrapper.emitted('renderFinal')?.at(-1)?.[0]).toMatchObject({
+      expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toMatchObject({
         phase: 'final',
         stable: true,
         totalHeight: 40,

@@ -32,6 +32,8 @@ const stressRunning = ref(false)
 const itemHeights = reactive(new Map<string, number>())
 const virtualStates = reactive(new Map<string, MarkstreamVirtualState>())
 const threadScrollTops = reactive(new Map<string, number>())
+const messageEls = new Map<string, HTMLElement>()
+const markdownHostEls = new Map<string, HTMLElement>()
 
 const domNodeCount = ref(0)
 const messageDomCount = ref(0)
@@ -42,6 +44,7 @@ const maxDomNodeCount = ref(0)
 const maxMarkdownSlotCount = ref(0)
 const lastHeightEvent = ref<MarkstreamVirtualMetrics | null>(null)
 const settledEvents = ref(0)
+const scrollCompensationCount = ref(0)
 
 let statsRaf = 0
 let stressRaf = 0
@@ -147,8 +150,24 @@ function messageKey(message: Message) {
   return `${activeThreadId.value}:${message.id}:${message.revision}`
 }
 
+function setMessageEl(message: Message, el: Element | null) {
+  const key = messageKey(message)
+  if (el instanceof HTMLElement)
+    messageEls.set(key, el)
+  else
+    messageEls.delete(key)
+}
+
+function setMarkdownHostEl(message: Message, el: Element | null) {
+  const key = messageKey(message)
+  if (el instanceof HTMLElement)
+    markdownHostEls.set(key, el)
+  else
+    markdownHostEls.delete(key)
+}
+
 function getEstimatedMessageHeight(message: Message) {
-  return message.huge ? 2600 : 190
+  return message.huge ? 2700 : 230
 }
 
 function getItemHeight(message: Message) {
@@ -218,6 +237,28 @@ const visibleItems = computed(() => {
   })
 })
 
+const renderedHugeMessageCount = computed(() => {
+  return visibleItems.value.filter(item => item.message.huge).length
+})
+
+const expectedMarkdownSlotCeiling = computed(() => {
+  return renderedHugeMessageCount.value * (maxLiveNodes.value + 96) + 600
+})
+
+const domSizeOk = computed(() => {
+  return markdownSlotCount.value <= expectedMarkdownSlotCeiling.value
+})
+
+const blankFrameOk = computed(() => blankFrameCount.value === 0)
+
+const labStatus = computed(() => {
+  if (!blankFrameOk.value)
+    return 'blank-frame-risk'
+  if (!domSizeOk.value)
+    return 'dom-size-risk'
+  return 'ok'
+})
+
 function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOptions {
   const key = messageKey(message)
   const state = virtualStates.get(key)
@@ -241,15 +282,95 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
 
 function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   const key = messageKey(message)
-  const nextHeight = Math.max(1, Math.ceil(metrics.totalHeight))
+  const outerAnchor = captureOuterAnchor()
+  const nextHeight = Math.max(
+    1,
+    Math.ceil(metrics.totalHeight + getMessageChromeHeight(key)),
+  )
   const previous = itemHeights.get(key)
 
   lastHeightEvent.value = metrics
 
-  if (previous == null || Math.abs(previous - nextHeight) > 1)
+  if (previous == null || Math.abs(previous - nextHeight) > 1) {
     itemHeights.set(key, nextHeight)
+    restoreOuterAnchor(outerAnchor)
+  }
 
   scheduleStats()
+}
+
+interface OuterAnchor {
+  type: 'item' | 'bottom'
+  index?: number
+  offsetPx?: number
+  distanceFromBottomPx?: number
+}
+
+function captureOuterAnchor(): OuterAnchor | null {
+  const root = scrollRoot.value
+  if (!root)
+    return null
+
+  const distanceFromBottomPx = Math.max(
+    0,
+    totalHeight.value - root.scrollTop - root.clientHeight,
+  )
+
+  if (distanceFromBottomPx <= 8) {
+    return {
+      type: 'bottom',
+      distanceFromBottomPx,
+    }
+  }
+
+  const index = lowerBoundOffset(root.scrollTop + 1)
+  return {
+    type: 'item',
+    index,
+    offsetPx: root.scrollTop - (prefixTops.value[index] ?? 0),
+  }
+}
+
+function restoreOuterAnchor(anchor: OuterAnchor | null) {
+  if (!anchor)
+    return
+
+  void nextTick(() => {
+    const root = scrollRoot.value
+    if (!root)
+      return
+
+    if (anchor.type === 'bottom') {
+      root.scrollTop = Math.max(
+        0,
+        totalHeight.value - root.clientHeight - Math.max(0, anchor.distanceFromBottomPx ?? 0),
+      )
+    }
+    else {
+      const index = Math.min(
+        Math.max(0, anchor.index ?? 0),
+        Math.max(0, messages.value.length - 1),
+      )
+      root.scrollTop = Math.max(
+        0,
+        (prefixTops.value[index] ?? 0) + Math.max(0, anchor.offsetPx ?? 0),
+      )
+    }
+
+    scrollTop.value = root.scrollTop
+    scrollCompensationCount.value += 1
+    scheduleStats()
+  })
+}
+
+function getMessageChromeHeight(key: string) {
+  const article = messageEls.get(key)
+  const markdownHost = markdownHostEls.get(key)
+
+  if (!article || !markdownHost)
+    return 72
+
+  return Math.max(0, article.scrollHeight - markdownHost.offsetHeight)
 }
 
 function onVirtualStateChange(message: Message, state: MarkstreamVirtualState) {
@@ -426,9 +547,12 @@ function startStreamingLastMessage() {
 function resetHeights() {
   itemHeights.clear()
   virtualStates.clear()
+  messageEls.clear()
+  markdownHostEls.clear()
   blankFrameCount.value = 0
   maxDomNodeCount.value = 0
   maxMarkdownSlotCount.value = 0
+  scrollCompensationCount.value = 0
   scheduleStats()
 }
 
@@ -487,6 +611,7 @@ onBeforeUnmount(() => {
         <span>dom nodes: {{ domNodeCount }}</span>
         <span>max dom: {{ maxDomNodeCount }}</span>
         <span>blank probes: {{ blankFrameCount }}</span>
+        <span>scroll compensations: {{ scrollCompensationCount }}</span>
       </div>
 
       <div class="toolbar-actions">
@@ -527,11 +652,15 @@ onBeforeUnmount(() => {
     </header>
 
     <section class="metrics">
+      <span class="status-chip" :class="labStatus">
+        status: {{ labStatus }}
+      </span>
       <span>totalHeight: {{ Math.round(totalHeight) }}px</span>
       <span>scrollTop: {{ Math.round(scrollTop) }}px</span>
       <span>visible range: {{ visibleRange.start }} - {{ visibleRange.end }}</span>
       <span>maxLiveNodes: {{ maxLiveNodes }}</span>
       <span>settled events: {{ settledEvents }}</span>
+      <span>slot ceiling: {{ expectedMarkdownSlotCeiling }}</span>
       <span v-if="lastHeightEvent">
         last markdown: {{ Math.round(lastHeightEvent.totalHeight) }}px /
         {{ lastHeightEvent.phase }} /
@@ -548,6 +677,7 @@ onBeforeUnmount(() => {
         <article
           v-for="{ message, top, height } in visibleItems"
           :key="messageKey(message)"
+          :ref="el => setMessageEl(message, el as Element | null)"
           class="virtual-message"
           :class="[message.role, { huge: message.huge }]"
           :style="{
@@ -564,23 +694,28 @@ onBeforeUnmount(() => {
               <span>estimated item height: {{ Math.round(height) }}px</span>
             </div>
 
-            <MarkdownRender
-              :content="message.content"
-              :final="message.final"
-              :custom-id="message.id"
-              :index-key="messageKey(message)"
-              :max-live-nodes="message.huge ? maxLiveNodes : 0"
-              :live-node-buffer="48"
-              :batch-rendering="true"
-              :initial-render-batch-size="40"
-              :render-batch-size="80"
-              :render-code-blocks-as-pre="true"
-              :fade="false"
-              :virtual-scroll="makeVirtualScrollOptions(message)"
-              @height-change="onHeightChange(message, $event)"
-              @virtual-state-change="onVirtualStateChange(message, $event)"
-              @render-settled="onRenderSettled"
-            />
+            <div
+              :ref="el => setMarkdownHostEl(message, el as Element | null)"
+              class="markdown-host"
+            >
+              <MarkdownRender
+                :content="message.content"
+                :final="message.final"
+                :custom-id="message.id"
+                :index-key="messageKey(message)"
+                :max-live-nodes="message.huge ? maxLiveNodes : 0"
+                :live-node-buffer="48"
+                :batch-rendering="true"
+                :initial-render-batch-size="40"
+                :render-batch-size="80"
+                :render-code-blocks-as-pre="true"
+                :fade="false"
+                :virtual-scroll="makeVirtualScrollOptions(message)"
+                @height-change="onHeightChange(message, $event)"
+                @virtual-state-change="onVirtualStateChange(message, $event)"
+                @render-settled="onRenderSettled"
+              />
+            </div>
           </div>
         </article>
       </div>
@@ -652,6 +787,17 @@ button:hover {
   background: color-mix(in srgb, var(--lab-panel) 92%, var(--lab-bg));
 }
 
+.status-chip.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-chip.blank-frame-risk,
+.status-chip.dom-size-risk {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .scroller {
   flex: 1 1 auto;
   overflow: auto;
@@ -677,13 +823,16 @@ button:hover {
 }
 
 .message-card {
-  min-height: 100%;
   box-sizing: border-box;
   border: 1px solid var(--lab-border);
   border-radius: 0.5rem;
   background: var(--lab-panel);
   padding: 0.85rem;
   overflow: hidden;
+}
+
+.markdown-host {
+  min-width: 0;
 }
 
 .virtual-message.user .message-card {
