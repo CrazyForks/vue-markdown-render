@@ -132,6 +132,7 @@ export function useHeightMeasurements(
   function recomputeHeightStats() {
     let total = 0
     let count = 0
+    const boundedSize = heightTreeSize.value
 
     for (const [rawIndex, rawHeight] of Object.entries(nodeHeights)) {
       const index = Number(rawIndex)
@@ -140,6 +141,7 @@ export function useHeightMeasurements(
       if (
         !Number.isFinite(index)
         || index < 0
+        || (boundedSize > 0 && index >= boundedSize)
         || !Number.isFinite(height)
         || height <= 0
       ) {
@@ -244,6 +246,9 @@ export function useHeightMeasurements(
       const height = Number(entry.height)
 
       if (!Number.isInteger(index) || index < 0)
+        continue
+
+      if (targetTreeSize > 0 && index >= targetTreeSize)
         continue
 
       if (!Number.isFinite(height) || height <= 0)

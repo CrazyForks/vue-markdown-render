@@ -59,6 +59,7 @@ export type MarkstreamHeightCache = Array<{
 
 export interface MarkstreamVirtualMetrics {
   sessionKey: string
+  threadKey?: string
   phase: MarkstreamVirtualPhase
   nodeCount: number
   liveRange: {
@@ -82,6 +83,7 @@ export interface MarkstreamVirtualMetrics {
 
 export interface MarkstreamVirtualState {
   sessionKey: string
+  threadKey?: string
   anchor: MarkstreamVirtualAnchor
   metrics: MarkstreamVirtualMetrics
   width: number

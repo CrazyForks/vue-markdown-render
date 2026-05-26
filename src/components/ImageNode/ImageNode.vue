@@ -43,6 +43,15 @@ function reportLifecycleHeight(indexKey = lifecycleIndexKey.value) {
   lifecycle?.reportHeight(indexKey, rootRef.value.offsetHeight)
 }
 
+function scheduleLifecycleHeightReport(indexKey = lifecycleIndexKey.value) {
+  if (!indexKey)
+    return
+
+  void nextTick(() => {
+    reportLifecycleHeight(indexKey)
+  })
+}
+
 function markLifecyclePending() {
   const indexKey = lifecycleIndexKey.value
   if (!indexKey)
@@ -84,18 +93,21 @@ function handleImageError() {
     activeSrc.value = safeFallbackSrc.value
     imageLoaded.value = false
     hasError.value = false
+    scheduleLifecycleHeightReport()
     return
   }
 
   imageStage.value = 'failed'
   hasError.value = true
   emit('error', activeSrc.value)
+  scheduleLifecycleHeightReport()
 }
 
 function handleImageLoad() {
   imageLoaded.value = true
   hasError.value = false
   emit('load', displaySrc.value)
+  scheduleLifecycleHeightReport()
 }
 
 function handleClick(e: Event) {
@@ -139,13 +151,28 @@ watch(
 )
 
 watch(
-  [showImage, imageLoaded, hasError, displaySrc],
-  ([visible, loaded, error]) => {
-    if (visible && !loaded && !error) {
-      markLifecyclePending()
+  [showImage, imageLoaded, hasError, displaySrc, () => props.lazy],
+  ([visible, loaded, error, src, lazy]) => {
+    if (!visible || !src || error) {
+      void markLifecycleSettled()
+      scheduleLifecycleHeightReport()
       return
     }
-    void markLifecycleSettled()
+
+    if (loaded) {
+      void markLifecycleSettled()
+      scheduleLifecycleHeightReport()
+      return
+    }
+
+    if (lazy) {
+      clearLifecyclePending()
+      scheduleLifecycleHeightReport()
+      return
+    }
+
+    if (!loaded && !error)
+      markLifecyclePending()
   },
   { flush: 'post', immediate: true },
 )

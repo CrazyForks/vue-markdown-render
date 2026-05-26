@@ -625,6 +625,21 @@ function clearHeightSettlingTimer(timer: number | null | undefined) {
   window.clearTimeout(timer)
 }
 
+function clearAllHeightSettlingTimers() {
+  if (isClient && typeof window !== 'undefined') {
+    for (const timer of activeHeightSettlingTimers)
+      window.clearTimeout(timer)
+  }
+
+  if (activeHeightSettlingTimers.size) {
+    activeHeightSettlingTimers.clear()
+    bumpHeightSettlingTimerVersion()
+  }
+
+  finalHeightConvergenceTimers.length = 0
+  nodeContentDeferredMeasureTimers.clear()
+}
+
 function ensureExperimentProbeNodes() {
   if (paragraphProbeNode.value && listItemProbeNode.value && listProbeNode.value && headingProbeNodes.value?.[1])
     return
@@ -877,6 +892,8 @@ function setupExperimentResizeObserver() {
     updateExperimentContainerWidth()
     if (activeRestoreAnchor.value)
       scheduleRestoreReconcile()
+    if (activeVirtualBottomAnchor.value)
+      scheduleVirtualBottomRestoreReconcile()
     scheduleVirtualMetricsEmit('resize')
   })
   experimentResizeObserver.observe(containerRef.value)
@@ -1298,6 +1315,11 @@ function getVirtualSessionKey() {
     ?? String(props.indexKey ?? props.customId ?? instanceMsgId)
 }
 
+function getVirtualThreadKey() {
+  const key = props.virtualScroll?.threadKey
+  return key == null || key === '' ? undefined : String(key)
+}
+
 function getVirtualMeasurementKey() {
   const key = props.virtualScroll?.measurementKey
   return key == null ? '' : String(key)
@@ -1315,6 +1337,7 @@ function getVisibleDomHeight() {
 }
 
 let imperativeVirtualSettleSessionKey: string | null = null
+let imperativeVirtualSettleThreadKey: string | undefined
 
 function hasManualSettleSignal(token: unknown) {
   return token !== false && token != null
@@ -1338,6 +1361,7 @@ function isHostSettleConfirmed() {
     return true
 
   return imperativeVirtualSettleSessionKey === getVirtualSessionKey()
+    && imperativeVirtualSettleThreadKey === getVirtualThreadKey()
 }
 
 function isLayoutSettled() {
@@ -1379,6 +1403,7 @@ function getVirtualMetrics(
 
   return {
     sessionKey: getVirtualSessionKey(),
+    threadKey: getVirtualThreadKey(),
     phase: resolvedPhase,
     nodeCount: summary.totalNodes,
     liveRange: { start: liveRange.start, end: liveRange.end },
@@ -1548,6 +1573,7 @@ function captureVirtualStateFromMetrics(
 
   return {
     sessionKey: metrics.sessionKey,
+    threadKey: metrics.threadKey,
     anchor,
     metrics,
     width: metrics.width,
@@ -1733,6 +1759,10 @@ function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
   if (state.sessionKey !== getVirtualSessionKey())
     return false
 
+  const currentThreadKey = getVirtualThreadKey() ?? ''
+  if (state.threadKey && state.threadKey !== currentThreadKey)
+    return false
+
   if ((state.measurementKey ?? '') !== getVirtualMeasurementKey())
     return false
 
@@ -1766,6 +1796,7 @@ function getHeightCacheSignature(cache: MarkstreamHeightCache) {
   const widthBucket = Math.round(getCurrentVirtualWidth() / HEIGHT_CACHE_WIDTH_BUCKET_PX)
 
   return [
+    getVirtualThreadKey() ?? '',
     getVirtualSessionKey(),
     getVirtualMeasurementKey(),
     parsedNodes.value.length,
@@ -1810,6 +1841,9 @@ function applyVirtualRestoreState(state: MarkstreamVirtualState | null | undefin
     return false
 
   if (state.sessionKey !== getVirtualSessionKey())
+    return false
+
+  if (state.threadKey && state.threadKey !== (getVirtualThreadKey() ?? ''))
     return false
 
   if (parsedNodes.value.length <= 0)
@@ -1879,30 +1913,51 @@ async function forceMeasure(reason: MarkstreamVirtualReason = 'manual') {
   return metrics
 }
 
+function isSameVirtualSession(sessionKey: string, threadKey = getVirtualThreadKey()) {
+  return getVirtualSessionKey() === sessionKey && getVirtualThreadKey() === threadKey
+}
+
 async function settle(options: {
   frames?: number
   timeoutMs?: number
   reason?: MarkstreamVirtualReason
 } = {}) {
+  const sessionKeyAtStart = getVirtualSessionKey()
+  const threadKeyAtStart = getVirtualThreadKey()
   const frames = options.frames ?? 2
   const timeoutMs = options.timeoutMs ?? 120
   const reason = options.reason ?? 'manual'
 
   for (let i = 0; i < frames; i++) {
     await nextTick()
+    if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart))
+      return getVirtualMetrics(reason)
+
     await waitForVirtualFrame()
+    if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart))
+      return getVirtualMetrics(reason)
+
     measureTrackedNodeHeights()
     forceFlushPendingHeightMeasurements()
   }
 
   await waitForVirtualTimeout(timeoutMs)
+  if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart))
+    return getVirtualMetrics(reason)
+
   measureTrackedNodeHeights()
   forceFlushPendingHeightMeasurements()
 
-  if (isInternalLayoutSettled())
-    imperativeVirtualSettleSessionKey = getVirtualSessionKey()
+  if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart))
+    return getVirtualMetrics(reason)
 
-  const metrics = getVirtualMetrics(reason, isLayoutSettled() ? 'final' : undefined)
+  if (isInternalLayoutSettled()) {
+    imperativeVirtualSettleSessionKey = sessionKeyAtStart
+    imperativeVirtualSettleThreadKey = threadKeyAtStart
+  }
+
+  const finalPhase = isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart) && isLayoutSettled()
+  const metrics = getVirtualMetrics(reason, finalPhase ? 'final' : undefined)
   emitVirtualMetricsNow(metrics, true)
   return metrics
 }
@@ -1966,6 +2021,7 @@ function shouldEmitVirtualMetrics(metrics: MarkstreamVirtualMetrics) {
     || metrics.phase !== previous.phase
     || metrics.stable !== previous.stable
     || metrics.final !== previous.final
+    || metrics.threadKey !== previous.threadKey
     || metrics.nodeCount !== previous.nodeCount
     || metrics.measuredCount !== previous.measuredCount
     || metrics.width !== previous.width
@@ -1992,7 +2048,7 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
     }
   }
 
-  const settledSignature = `${metrics.sessionKey}:${metrics.nodeCount}:${Math.round(metrics.totalHeight)}:${Math.round(metrics.width)}`
+  const settledSignature = `${metrics.threadKey ?? ''}:${metrics.sessionKey}:${metrics.nodeCount}:${Math.round(metrics.totalHeight)}:${Math.round(metrics.width)}`
   if (metrics.stable && lastSettledVirtualSignature !== settledSignature) {
     const settledState = captureVirtualStateFromMetrics(metrics, {
       includeHeightCache: true,
@@ -2641,6 +2697,8 @@ watch(
       scheduleFocusSync({ immediate: true })
     if (activeRestoreAnchor.value)
       scheduleRestoreReconcile()
+    if (activeVirtualBottomAnchor.value)
+      scheduleVirtualBottomRestoreReconcile()
     scheduleVirtualMetricsEmit('resize')
   },
   { immediate: false },
@@ -2692,6 +2750,7 @@ watch(
 )
 
 let autoSettledVirtualSessionKey: string | null = null
+let autoSettledVirtualSessionThreadKey: string | undefined
 let manualSettleInFlight = false
 let lastManualSettleSignature: string | null = null
 
@@ -2705,8 +2764,12 @@ function resetVirtualSessionMeasurements() {
 }
 
 function resetVirtualSessionRuntimeState() {
+  clearVirtualMetricsSchedule()
+  clearAllHeightSettlingTimers()
   autoSettledVirtualSessionKey = null
+  autoSettledVirtualSessionThreadKey = undefined
   imperativeVirtualSettleSessionKey = null
+  imperativeVirtualSettleThreadKey = undefined
   lastEmittedVirtualMetrics = null
   lastSettledVirtualSignature = null
   lastFinalVirtualSignature = null
@@ -2724,7 +2787,7 @@ function resetVirtualSessionRuntimeState() {
 }
 
 watch(
-  () => getVirtualSessionKey(),
+  [() => getVirtualSessionKey(), () => getVirtualThreadKey()],
   () => {
     resetVirtualSessionRuntimeState()
     resetVirtualSessionMeasurements()
@@ -2818,6 +2881,7 @@ watch(
     effectiveFinal,
     () => props.virtualScroll?.settleMode,
     () => getVirtualSessionKey(),
+    () => getVirtualThreadKey(),
     pendingAsyncNodeCount,
     pendingHeightSettlingTaskCount,
     () => renderedCount.value,
@@ -2825,17 +2889,24 @@ watch(
     () => heightStats.count,
     () => heightStats.total,
   ],
-  ([enabled, final, settleMode, sessionKey]) => {
+  ([enabled, final, settleMode, sessionKey, threadKey]) => {
     if (!enabled || final !== true || settleMode === 'manual')
       return
-    if (autoSettledVirtualSessionKey === sessionKey)
+    if (autoSettledVirtualSessionKey === sessionKey && autoSettledVirtualSessionThreadKey === threadKey)
       return
     if (!isLayoutSettled())
       return
     autoSettledVirtualSessionKey = sessionKey
+    autoSettledVirtualSessionThreadKey = threadKey
     void settle({ reason: 'final' }).then((metrics) => {
-      if (!metrics.stable && autoSettledVirtualSessionKey === sessionKey)
+      if (
+        !metrics.stable
+        && autoSettledVirtualSessionKey === sessionKey
+        && autoSettledVirtualSessionThreadKey === threadKey
+      ) {
         autoSettledVirtualSessionKey = null
+        autoSettledVirtualSessionThreadKey = undefined
+      }
     })
   },
   { flush: 'post', immediate: true },
@@ -2843,6 +2914,7 @@ watch(
 
 function getManualSettleSignature(token: unknown) {
   return [
+    getVirtualThreadKey() ?? '',
     getVirtualSessionKey(),
     String(token),
     parsedNodes.value.length,
@@ -2855,6 +2927,8 @@ function getManualSettleSignature(token: unknown) {
 
 async function runManualSettleIfReady() {
   const token = props.virtualScroll?.settledToken
+  const sessionKeyAtStart = getVirtualSessionKey()
+  const threadKeyAtStart = getVirtualThreadKey()
 
   if (!virtualScrollEnabled.value)
     return
@@ -2875,11 +2949,25 @@ async function runManualSettleIfReady() {
   manualSettleInFlight = true
   try {
     const metrics = await settle({ reason: 'manual' })
-    if (metrics.stable && metrics.phase === 'final')
+    if (
+      metrics.sessionKey === sessionKeyAtStart
+      && metrics.threadKey === threadKeyAtStart
+      && metrics.stable
+      && metrics.phase === 'final'
+    ) {
       lastManualSettleSignature = signature
+    }
   }
   finally {
     manualSettleInFlight = false
+
+    await nextTick()
+    if (
+      isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart)
+      && lastManualSettleSignature !== signature
+    ) {
+      void runManualSettleIfReady()
+    }
   }
 }
 

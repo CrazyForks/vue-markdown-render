@@ -232,4 +232,20 @@ describe('useHeightMeasurements', () => {
     expect(h.fenwickRangeSum(h.heightSumTree.value, 0, 4)).toBe(120)
     expect(onHeightRecorded).toHaveBeenCalledTimes(1)
   })
+
+  it('ignores out-of-range imported height cache entries', () => {
+    const h = useHeightMeasurements()
+
+    h.rebuildHeightTrees(2)
+    h.importHeightCache([
+      { index: 0, height: 20 },
+      { index: 99, height: 100 },
+    ])
+
+    expect(h.nodeHeights[0]).toBe(20)
+    expect(h.nodeHeights[99]).toBeUndefined()
+    expect(h.heightStats.total).toBe(20)
+    expect(h.heightStats.count).toBe(1)
+    expect(h.fenwickRangeSum(h.heightSumTree.value, 0, 2)).toBe(20)
+  })
 })

@@ -92,6 +92,7 @@ describe('node renderer virtual-scroll coordination', () => {
         viewportPriority: false,
         virtualScroll: {
           enabled: true,
+          threadKey: 'thread-a',
           sessionKey: 'thread-a:message-1:1',
           settleMode: 'manual',
           emitIntervalMs: 0,
@@ -114,10 +115,12 @@ describe('node renderer virtual-scroll coordination', () => {
     const metrics = await handle.forceMeasure('manual')
 
     expect(metrics.sessionKey).toBe('thread-a:message-1:1')
+    expect(metrics.threadKey).toBe('thread-a')
     expect(metrics.totalHeight).toBe(120)
     expect(metrics.measuredCount).toBe(2)
     expect(wrapper.emitted('heightChange')?.at(-1)?.[0]).toMatchObject({
       sessionKey: 'thread-a:message-1:1',
+      threadKey: 'thread-a',
       totalHeight: 120,
     })
     expect(wrapper.emitted('height-change')?.at(-1)?.[0]).toBe(wrapper.emitted('heightChange')?.at(-1)?.[0])
@@ -127,6 +130,7 @@ describe('node renderer virtual-scroll coordination', () => {
     const state = handle.captureVirtualState()
     expect(state).toMatchObject({
       sessionKey: 'thread-a:message-1:1',
+      threadKey: 'thread-a',
       heightCache: [
         { index: 0, height: 40 },
         { index: 1, height: 80 },
@@ -152,6 +156,130 @@ describe('node renderer virtual-scroll coordination', () => {
     expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toBe(wrapper.emitted('renderFinal')?.at(-1)?.[0])
 
     wrapper.unmount()
+  })
+
+  it('does not block render-settled on unloaded lazy images', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const ImageNode = (await import('../src/components/ImageNode')).default
+    const LazyImageNode = defineComponent({
+      props: {
+        node: { type: Object, required: true },
+        indexKey: { type: [String, Number], required: true },
+      },
+      setup(props) {
+        return () => h(ImageNode, {
+          'node': props.node as any,
+          'lazy': true,
+          'index-key': props.indexKey,
+        })
+      },
+    })
+
+    setCustomComponents('virtual-lifecycle-test', {
+      image: LazyImageNode as any,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-lifecycle-test',
+        nodes: [
+          {
+            type: 'image',
+            src: 'https://example.com/lazy.png',
+            alt: 'Lazy',
+            title: null,
+            raw: '![Lazy](https://example.com/lazy.png)',
+          },
+        ],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'lazy-image-settled',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const contentEl = getRootNodeContentElements(wrapper.element)[0]!
+    platform.heights.set(contentEl, 64)
+    platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+    await new Promise(resolve => setTimeout(resolve, 90))
+
+    const settled = await (wrapper.vm as any).settle({ frames: 0, timeoutMs: 0, reason: 'manual' })
+
+    expect(settled).toMatchObject({
+      phase: 'final',
+      stable: true,
+      totalHeight: 64,
+    })
+    expect(wrapper.emitted('renderSettled')?.at(-1)?.[0]).toMatchObject({
+      sessionKey: 'lazy-image-settled',
+      stable: true,
+    })
+
+    wrapper.unmount()
+  })
+
+  it('does not emit stale final metrics after virtual session changes during settle', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | null = null
+
+    try {
+      const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+      wrapper = mount(NodeRenderer, {
+        props: {
+          nodes: [createParagraph(1)],
+          final: true,
+          fade: false,
+          viewportPriority: false,
+          virtualScroll: {
+            enabled: true,
+            sessionKey: 'session-a',
+            settleMode: 'manual',
+            emitIntervalMs: 0,
+          },
+        },
+      })
+
+      await nextTick()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const settlePromise = (wrapper.vm as any).settle({ frames: 0, timeoutMs: 120, reason: 'manual' })
+
+      await wrapper.setProps({
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'session-b',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      })
+
+      await vi.advanceTimersByTimeAsync(120)
+      const metrics = await settlePromise
+
+      expect(metrics).toMatchObject({
+        sessionKey: 'session-b',
+        stable: false,
+      })
+      expect(metrics.phase).not.toBe('final')
+      expect(wrapper.emitted('renderFinal')).toBeUndefined()
+      expect(wrapper.emitted('render-final')).toBeUndefined()
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
   })
 
   it('resets measured heights when virtual session changes', async () => {
@@ -1289,6 +1417,62 @@ describe('node renderer virtual-scroll coordination', () => {
     await nextTick()
 
     expect(scrollRoot.scrollTop).toBe(1100)
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
+  it('reconciles a restored bottom anchor when container width changes', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const scrollRoot = document.createElement('div')
+    let scrollHeight = 1000
+
+    document.body.appendChild(scrollRoot)
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => scrollHeight,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2), createParagraph(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        maxLiveNodes: 1,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'bottom-anchor-resize',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    handle.restoreVirtualState({
+      sessionKey: 'bottom-anchor-resize',
+      anchor: { type: 'bottom', distanceFromBottomPx: 0 },
+      metrics: handle.getVirtualMetrics(),
+      width: 0,
+    })
+
+    expect(scrollRoot.scrollTop).toBe(800)
+
+    scrollHeight = 1400
+    platform.resizeCallbacks.get(wrapper.element)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+
+    expect(scrollRoot.scrollTop).toBe(1200)
 
     wrapper.unmount()
     scrollRoot.remove()
