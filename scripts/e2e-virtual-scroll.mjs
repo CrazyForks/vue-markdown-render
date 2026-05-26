@@ -327,6 +327,10 @@ async function run() {
       api.toggleDensity()
       api.toggleFontScale()
       const relayoutAfter = await waitHealthy(45)
+
+      api.toggleNarrowMode()
+      const narrowAfter = await waitHealthy(60)
+
       await waitForSettledEvent()
       const finalAfter = await waitHealthy(45)
 
@@ -338,6 +342,7 @@ async function run() {
         stressAfter,
         streamAfter,
         relayoutAfter,
+        narrowAfter,
         final: finalAfter,
       }
     })
@@ -350,6 +355,7 @@ async function run() {
       stressAfter,
       streamAfter,
       relayoutAfter,
+      narrowAfter,
       final,
     } = result
 
@@ -486,6 +492,26 @@ async function run() {
       relayoutAfter.health.maxObservedHeightDriftPx < 24,
       'density/font relayout did not converge',
       relayoutAfter.health,
+    )
+
+    assert(
+      narrowAfter.layoutWidth > 0 && narrowAfter.layoutWidth < 320,
+      'narrow virtual-scroll lab did not enter sub-320px layout',
+      narrowAfter,
+    )
+
+    assert(
+      narrowAfter.health.maxObservedHeightDriftPx < 24,
+      'sub-320px virtual-scroll layout did not converge',
+      narrowAfter.health,
+    )
+
+    assert(
+      narrowAfter.health.maxObservedBlankProbes === 0
+      && narrowAfter.blankFrameCount === 0
+      && narrowAfter.visibleCoverageOk === true,
+      'blank frame or coverage regression observed in narrow layout',
+      narrowAfter,
     )
 
     process.stdout.write(`${JSON.stringify({

@@ -153,7 +153,7 @@ If a chat or thread list already virtualizes messages, keep that outer virtualiz
 
 The important value is `metrics.totalHeight`. It represents the full Markdown document height, including virtual spacers; do not use the renderer element's current `offsetHeight` as the item size because only the live node window may be mounted.
 
-When `virtualScroll.enabled=true`, pass a stable `sessionKey` that survives remounts and thread restores, such as `threadId:messageId:revision`. Do not rely on the renderer's fallback id for persisted restore state.
+When `virtualScroll.enabled=true`, pass a stable `sessionKey` that survives remounts and thread restores, such as `threadId:messageId:revision`. Bind `threadKey` to the message's own thread id, for example `threadKey: message.threadId`, rather than global active-thread state. Do not rely on the renderer's fallback id for persisted restore state.
 
 When passing standalone `heightCache`, also pass `heightCacheWidth`; otherwise the cache is ignored to avoid reusing stale measurements after width changes.
 
@@ -173,6 +173,7 @@ import { computed, ref, shallowRef } from 'vue'
 const scrollRoot = ref<HTMLElement | null>(null)
 const renderer = shallowRef<MarkstreamRendererHandle | null>(null)
 const savedState = shallowRef<MarkstreamVirtualState | null>(null)
+const message = { threadId: 'thread-1', id: 'message-1' }
 const content = ref('')
 const sourceDone = ref(false)
 const revision = ref(0)
@@ -184,7 +185,8 @@ const codeBlockLineHeight = ref(20)
 
 const virtualScroll = computed<MarkstreamVirtualScrollOptions>(() => ({
   enabled: true,
-  sessionKey: `thread-1:message-1:${revision.value}`,
+  sessionKey: `${message.threadId}:${message.id}:${revision.value}`,
+  threadKey: message.threadId,
   scrollRoot: () => scrollRoot.value,
   restoreState: savedState.value,
   measurementKey: `${theme.value}:${density.value}:${fontScale.value}:${codeBlockLineHeight.value}`,
@@ -199,7 +201,7 @@ function setMessageHeight(messageId: string, height: number) {
 }
 
 function onHeightChange(metrics: MarkstreamVirtualMetrics) {
-  setMessageHeight('message-1', metrics.totalHeight)
+  setMessageHeight(message.id, metrics.totalHeight)
 }
 
 function mergeVirtualState(

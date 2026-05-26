@@ -92,7 +92,7 @@ const md = '# Virtualized transcript'
 
 关键值是 `metrics.totalHeight`。它表示包含 virtual spacer 在内的完整 Markdown 逻辑高度；不要把 renderer 元素当前的 `offsetHeight` 当成 item size，因为当前 DOM 可能只挂载了 live window 内的节点。
 
-当 `virtualScroll.enabled=true` 时，请传入可跨 remount 和 thread restore 保持稳定的 `sessionKey`，例如 `threadId:messageId:revision`。不要依赖 renderer fallback id 来持久化恢复状态。
+当 `virtualScroll.enabled=true` 时，请传入可跨 remount 和 thread restore 保持稳定的 `sessionKey`，例如 `threadId:messageId:revision`。`threadKey` 应该绑定到 message 自身的 thread id，例如 `threadKey: message.threadId`，而不是全局 active thread 状态。不要依赖 renderer fallback id 来持久化恢复状态。
 
 单独传 `heightCache` 时必须同时传 `heightCacheWidth`；否则组件会忽略该缓存，以避免容器宽度变化后复用过期高度。
 
@@ -112,6 +112,7 @@ import { computed, ref, shallowRef } from 'vue'
 const scrollRoot = ref<HTMLElement | null>(null)
 const renderer = shallowRef<MarkstreamRendererHandle | null>(null)
 const savedState = shallowRef<MarkstreamVirtualState | null>(null)
+const message = { threadId: 'thread-1', id: 'message-1' }
 const content = ref('')
 const sourceDone = ref(false)
 const revision = ref(0)
@@ -123,7 +124,8 @@ const codeBlockLineHeight = ref(20)
 
 const virtualScroll = computed<MarkstreamVirtualScrollOptions>(() => ({
   enabled: true,
-  sessionKey: `thread-1:message-1:${revision.value}`,
+  sessionKey: `${message.threadId}:${message.id}:${revision.value}`,
+  threadKey: message.threadId,
   scrollRoot: () => scrollRoot.value,
   restoreState: savedState.value,
   measurementKey: `${theme.value}:${density.value}:${fontScale.value}:${codeBlockLineHeight.value}`,
@@ -138,7 +140,7 @@ function setMessageHeight(messageId: string, height: number) {
 }
 
 function onHeightChange(metrics: MarkstreamVirtualMetrics) {
-  setMessageHeight('message-1', metrics.totalHeight)
+  setMessageHeight(message.id, metrics.totalHeight)
 }
 
 function mergeVirtualState(

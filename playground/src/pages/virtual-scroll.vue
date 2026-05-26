@@ -54,6 +54,7 @@ interface LabHealth extends LabStats {
 interface VirtualScrollLabSnapshot {
   ready: boolean
   threadId: ThreadId
+  layoutWidth: number
   range: { start: number, end: number }
   firstVisibleMessageId: string
   outerAnchor: OuterAnchor | null
@@ -125,6 +126,7 @@ declare global {
       toggleDensity: () => void
       toggleFontScale: () => void
       toggleSmallMessageCoordination: () => void
+      toggleNarrowMode: () => void
       nextFrame: () => Promise<void>
       clearEvents: () => void
     }
@@ -141,6 +143,7 @@ declare global {
         toggleDensity: () => void
         toggleFontScale: () => void
         toggleSmallMessageCoordination: () => void
+        toggleNarrowMode: () => void
         resetHeights: () => void
       }
     }
@@ -158,6 +161,7 @@ const maxLiveNodes = ref(220)
 const overscanPx = ref(1400)
 const stressRunning = ref(false)
 const coordinateSmallMessages = ref(false)
+const narrowMode = ref(false)
 const SCROLL_JITTER_BUDGET_PX = 32
 
 const itemHeights = reactive(new Map<string, number>())
@@ -470,7 +474,7 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
   const options = {
     enabled,
     sessionKey: key,
-    threadKey: activeThreadId.value,
+    threadKey: message.threadId,
     scrollRoot: () => scrollRoot.value,
     restoreState: state ?? null,
     restoreAnchor: restoreTarget?.messageKey === key
@@ -1150,6 +1154,11 @@ function toggleSmallMessageCoordination() {
   scheduleStats()
 }
 
+function toggleNarrowMode() {
+  narrowMode.value = !narrowMode.value
+  scheduleStats()
+}
+
 function startStressScroll() {
   if (stressRunning.value)
     return
@@ -1302,6 +1311,7 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
   return {
     ready: labReady.value,
     threadId: activeThreadId.value,
+    layoutWidth: layoutWidth.value,
     range: { ...visibleRange.value },
     firstVisibleMessageId,
     outerAnchor,
@@ -1383,6 +1393,7 @@ function exposeLabApi() {
     toggleDensity,
     toggleFontScale,
     toggleSmallMessageCoordination,
+    toggleNarrowMode,
     nextFrame: waitFrame,
     clearEvents: clearLabEvents,
   }
@@ -1400,6 +1411,7 @@ function exposeLabApi() {
       toggleDensity,
       toggleFontScale,
       toggleSmallMessageCoordination,
+      toggleNarrowMode,
       resetHeights,
     },
   }
@@ -1461,6 +1473,7 @@ onBeforeUnmount(() => {
     :class="[
       `density-${density}`,
       { 'font-large': fontScale > 1 },
+      { narrow: narrowMode },
     ]"
   >
     <header class="toolbar">
@@ -1501,6 +1514,9 @@ onBeforeUnmount(() => {
         </button>
         <button @click="toggleSmallMessageCoordination">
           Small coordination: {{ coordinateSmallMessages ? 'on' : 'off' }}
+        </button>
+        <button @click="toggleNarrowMode">
+          Width: {{ narrowMode ? 'narrow' : 'normal' }}
         </button>
         <button @click="startStreamingLastMessage">
           Stream last huge message
@@ -1803,6 +1819,12 @@ button:hover {
   overflow: auto;
   contain: strict;
   position: relative;
+}
+
+.virtual-scroll-page.narrow .scroller {
+  width: min(100%, 300px);
+  align-self: center;
+  border-inline: 1px solid var(--lab-border);
 }
 
 .virtual-canvas {

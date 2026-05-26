@@ -189,20 +189,30 @@ function unwrapVirtualScrollRoot(value: unknown): HTMLElement | null {
   if (typeof Element !== 'undefined' && value instanceof Element)
     return value as HTMLElement
 
-  const candidate = value as Partial<HTMLElement>
-  if (
-    typeof candidate === 'object'
-    && candidate != null
-    && typeof candidate.nodeType === 'number'
-    && typeof candidate.getBoundingClientRect === 'function'
-  ) {
-    return candidate as HTMLElement
-  }
-
   if (typeof value === 'object' && 'value' in value)
     return unwrapVirtualScrollRoot((value as { value: unknown }).value)
 
+  if (typeof value === 'object' && '$el' in value)
+    return unwrapVirtualScrollRoot((value as { $el: unknown }).$el)
+
+  if (isScrollRootElementLike(value))
+    return value as HTMLElement
+
   return null
+}
+
+function isScrollRootElementLike(value: unknown): value is HTMLElement {
+  if (!value || typeof value !== 'object')
+    return false
+
+  const candidate = value as Partial<HTMLElement>
+
+  return typeof candidate.getBoundingClientRect === 'function'
+    && typeof candidate.addEventListener === 'function'
+    && typeof candidate.removeEventListener === 'function'
+    && 'scrollTop' in candidate
+    && 'scrollHeight' in candidate
+    && 'clientHeight' in candidate
 }
 
 const {
@@ -417,7 +427,15 @@ const codeBlockEstimationEnabled = computed(() => {
   return heightEstimationActive.value
     && heightExperimentConfig.value?.codeBlockEstimation !== false
 })
-const experimentProbeWidth = computed(() => Math.max(320, experimentContainerWidth.value || containerRef.value?.clientWidth || 640))
+function getMeasuredContainerWidth() {
+  const width = experimentContainerWidth.value || containerRef.value?.clientWidth || 0
+  return Number.isFinite(width) && width > 0 ? width : 0
+}
+
+const experimentProbeWidth = computed(() => {
+  const measured = getMeasuredContainerWidth()
+  return measured > 0 ? Math.max(1, Math.round(measured)) : 640
+})
 const maxLiveNodesResolved = computed(() => Math.max(1, props.maxLiveNodes ?? 320))
 const virtualizationEnabled = computed(() => {
   if (renderAsFragment.value)
@@ -1462,7 +1480,7 @@ function getVirtualMeasurementKey() {
 }
 
 function getCurrentVirtualWidth() {
-  return experimentContainerWidth.value || containerRef.value?.clientWidth || 0
+  return getMeasuredContainerWidth()
 }
 
 const virtualLayoutWidthBucket = computed(() => {
@@ -1686,6 +1704,22 @@ function hashVirtualString(input: string) {
   return (hash >>> 0).toString(36)
 }
 
+function hashVirtualParts(parts: Iterable<string>) {
+  let hash = 2166136261
+
+  for (const part of parts) {
+    for (let i = 0; i < part.length; i++) {
+      hash ^= part.charCodeAt(i)
+      hash = Math.imul(hash, 16777619)
+    }
+
+    hash ^= 0x1F
+    hash = Math.imul(hash, 16777619)
+  }
+
+  return (hash >>> 0).toString(36)
+}
+
 const HEIGHT_CACHE_SIGNATURE_MAX_DEPTH = 6
 const HEIGHT_CACHE_SIGNATURE_MAX_ARRAY_ITEMS = 160
 const HEIGHT_CACHE_SIGNATURE_MAX_STRING_CHARS = 8192
@@ -1735,10 +1769,18 @@ function stableHeightSignatureValue(
   seen.add(value)
 
   if (Array.isArray(value)) {
-    return `a:${value.length}:${value
-      .slice(0, HEIGHT_CACHE_SIGNATURE_MAX_ARRAY_ITEMS)
-      .map(item => stableHeightSignatureValue(item, seen, depth + 1))
-      .join(',')}`
+    const signatures = value.map(item =>
+      stableHeightSignatureValue(item, seen, depth + 1),
+    )
+
+    if (value.length <= HEIGHT_CACHE_SIGNATURE_MAX_ARRAY_ITEMS)
+      return `a:${value.length}:${signatures.join(',')}`
+
+    const head = signatures.slice(0, 32).join(',')
+    const tail = signatures.slice(-32).join(',')
+    const aggregate = hashVirtualParts(signatures)
+
+    return `a:${value.length}:h=${head}:t=${tail}:all=${aggregate}`
   }
 
   const record = value as Record<string, unknown>
@@ -3702,7 +3744,8 @@ async function runManualSettleIfReady() {
   try {
     const metrics = await settle({ reason: 'manual' })
     if (
-      metrics.sessionKey === sessionKeyAtStart
+      isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart)
+      && metrics.sessionKey === sessionKeyAtStart
       && metrics.threadKey === threadKeyAtStart
       && metrics.stable
       && metrics.phase === 'final'

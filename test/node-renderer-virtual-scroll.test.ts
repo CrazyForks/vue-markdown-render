@@ -19,6 +19,39 @@ function createParagraph(index: number) {
   } as any
 }
 
+function createLongListNode(mutated = false) {
+  const items = Array.from({ length: 220 }, (_, index) => {
+    const content = mutated && index === 190
+      ? `Changed late item ${index}. ${'This should invalidate cached height. '.repeat(20)}`
+      : `Item ${index}`
+
+    return {
+      type: 'list_item',
+      raw: `- ${content}`,
+      children: [
+        {
+          type: 'paragraph',
+          raw: content,
+          children: [
+            {
+              type: 'text',
+              content,
+              raw: content,
+            },
+          ],
+        },
+      ],
+    }
+  })
+
+  return {
+    type: 'list',
+    ordered: false,
+    raw: items.map(item => item.raw).join('\n'),
+    items,
+  } as any
+}
+
 function installManualMeasurementPlatform() {
   const frames: FrameRequestCallback[] = []
   const heights = new WeakMap<HTMLElement, number>()
@@ -154,6 +187,41 @@ describe('node renderer virtual-scroll coordination', () => {
     catch {}
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+  })
+
+  it('uses actual sub-320px container width for virtual-scroll height probes', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      if (el.classList?.contains('markdown-renderer'))
+        return 280
+      return 280
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'sub-320-probe-width',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const probe = wrapper.element.querySelector('.height-estimation-probes') as HTMLElement | null
+    expect(probe).toBeTruthy()
+    expect(probe?.style.width).toBe('280px')
+
+    wrapper.unmount()
   })
 
   it('exposes logical height metrics and settled events for outer virtualizers', async () => {
@@ -2074,6 +2142,71 @@ describe('node renderer virtual-scroll coordination', () => {
     expect((await handle.forceMeasure('manual')).totalHeight).not.toBe(800)
 
     wrapper.unmount()
+  })
+
+  it('invalidates height cache when late entries in long structural arrays change', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(640)
+
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    const seed = mount(NodeRenderer, {
+      props: {
+        nodes: [createLongListNode(false)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'long-array-cache',
+          measurementKey: 'same-layout',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const seedContent = getRootNodeContentElements(seed.element)[0]!
+    platform.heights.set(seedContent, 500)
+    platform.resizeCallbacks.get(seedContent)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+    await (seed.vm as any).forceMeasure('manual')
+
+    const restoreState = (seed.vm as any).captureVirtualState()
+    expect(restoreState?.heightCache?.length).toBeGreaterThan(0)
+
+    seed.unmount()
+
+    const restored = mount(NodeRenderer, {
+      props: {
+        nodes: [createLongListNode(true)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'long-array-cache',
+          measurementKey: 'same-layout',
+          restoreState,
+          restoreAnchor: false,
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+    platform.flushFrames()
+    await nextTick()
+
+    const metrics = (restored.vm as any).getVirtualMetrics()
+
+    expect(metrics.measuredCount).toBe(0)
+
+    restored.unmount()
   })
 
   it('reuses compatible per-node height cache entries when contentHash changes', async () => {
