@@ -608,6 +608,11 @@ function recordNodeHeight(
     nodeHeightSignatures.delete(index)
 }
 
+function getNodeLayoutHeight(index: number, contentEl: HTMLElement) {
+  const slotHeight = nodeSlotElements.get(index)?.offsetHeight ?? 0
+  return slotHeight > 0 ? slotHeight : contentEl.offsetHeight
+}
+
 function removeNodeHeights(
   indices: Iterable<number>,
   options: { notify?: boolean } = {},
@@ -1518,7 +1523,7 @@ const localNodeLifecycle: MarkstreamNodeLifecycle = {
       return
 
     const measuredHeight = Number(height)
-    const wrapperHeight = currentEl.offsetHeight
+    const wrapperHeight = getNodeLayoutHeight(index, currentEl)
     const nextHeight = Number.isFinite(measuredHeight) && measuredHeight > 0
       ? Math.max(measuredHeight, wrapperHeight || 0)
       : wrapperHeight
@@ -1694,12 +1699,22 @@ function getScrollBox() {
 
 function getRendererLogicalHeight() {
   const total = parsedNodes.value.length
-  return Math.max(
+  const estimatedHeight = Math.max(0, estimateHeightRange(0, total))
+  const domHeight = Math.max(
     0,
     containerRef.value?.scrollHeight ?? 0,
     containerRef.value?.offsetHeight ?? 0,
-    estimateHeightRange(0, total),
   )
+
+  if (virtualizationEnabled.value)
+    return estimatedHeight
+
+  if (virtualScrollEnabled.value) {
+    const hasModelHeight = heightStats.count > 0 || getEstimatedNodeHeightCount() > 0
+    return hasModelHeight ? estimatedHeight : Math.max(domHeight, estimatedHeight)
+  }
+
+  return Math.max(domHeight, estimatedHeight)
 }
 
 function getViewportBottomInRoot(box: NonNullable<ReturnType<typeof getScrollBox>>) {
@@ -2584,6 +2599,7 @@ async function settle(options: {
   frames?: number
   timeoutMs?: number
   reason?: MarkstreamVirtualReason
+  expectedSettledTokenKey?: string
 } = {}) {
   const sessionKeyAtStart = getVirtualSessionKey()
   const threadKeyAtStart = getVirtualThreadKey()
@@ -2591,6 +2607,7 @@ async function settle(options: {
   const frames = options.frames ?? 2
   const timeoutMs = options.timeoutMs ?? 120
   const reason = options.reason ?? 'manual'
+  const expectedSettledTokenKey = options.expectedSettledTokenKey
   const staleBaseMetrics = getVirtualMetrics(reason)
   const staleMetrics = (): MarkstreamVirtualMetrics => ({
     ...staleBaseMetrics,
@@ -2601,14 +2618,21 @@ async function settle(options: {
       : staleBaseMetrics.confidence,
     reason,
   })
+  const isSameSettleContext = () => {
+    return isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart)
+      && (
+        expectedSettledTokenKey == null
+        || getManualSettleTokenKey() === expectedSettledTokenKey
+      )
+  }
 
   for (let i = 0; i < frames; i++) {
     await nextTick()
-    if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
+    if (!isSameSettleContext())
       return staleMetrics()
 
     await waitForVirtualFrame()
-    if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
+    if (!isSameSettleContext())
       return staleMetrics()
 
     measureTrackedNodeHeights()
@@ -2616,13 +2640,13 @@ async function settle(options: {
   }
 
   await waitForVirtualTimeout(timeoutMs)
-  if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
+  if (!isSameSettleContext())
     return staleMetrics()
 
   measureTrackedNodeHeights()
   forceFlushPendingHeightMeasurements()
 
-  if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
+  if (!isSameSettleContext())
     return staleMetrics()
 
   if (isInternalLayoutSettled()) {
@@ -2630,7 +2654,7 @@ async function settle(options: {
     imperativeVirtualSettleThreadKey = threadKeyAtStart
   }
 
-  const finalPhase = isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart) && isLayoutSettled()
+  const finalPhase = isSameSettleContext() && isLayoutSettled()
   const metrics = getVirtualMetrics(reason, finalPhase ? 'final' : undefined)
   emitVirtualMetricsNow(metrics, true)
   return metrics
@@ -2739,6 +2763,10 @@ function stringifyVirtualToken(value: unknown) {
   catch {
     return String(value)
   }
+}
+
+function getManualSettleTokenKey(token: unknown = props.virtualScroll?.settledToken) {
+  return stringifyVirtualToken(token)
 }
 
 function getVirtualMetricsEventKey(
@@ -3146,7 +3174,7 @@ function queueNodeHeightRecord(index: number, el: HTMLElement, height: number) {
 }
 
 function measureNodeHeight(index: number, el: HTMLElement) {
-  queueNodeHeightRecord(index, el, el.offsetHeight)
+  queueNodeHeightRecord(index, el, getNodeLayoutHeight(index, el))
 }
 
 function measureTrackedNodeHeights() {
@@ -3836,7 +3864,7 @@ function getManualSettleSignature(token: unknown) {
     getVirtualSessionKey(),
     getVirtualMeasurementKey(),
     virtualLayoutWidthBucket.value,
-    String(token),
+    getManualSettleTokenKey(token),
     parsedNodes.value.length,
     Math.round(estimateHeightRange(0, parsedNodes.value.length)),
     Math.round(getCurrentVirtualWidth()),
@@ -3847,6 +3875,7 @@ function getManualSettleSignature(token: unknown) {
 
 async function runManualSettleIfReady() {
   const token = props.virtualScroll?.settledToken
+  const tokenKeyAtStart = getManualSettleTokenKey(token)
   const sessionKeyAtStart = getVirtualSessionKey()
   const threadKeyAtStart = getVirtualThreadKey()
   const layoutEpochKeyAtStart = virtualLayoutEpochKey.value
@@ -3869,11 +3898,17 @@ async function runManualSettleIfReady() {
 
   manualSettleInFlight = true
   try {
-    const metrics = await settle({ reason: 'manual' })
+    const metrics = await settle({
+      reason: 'manual',
+      expectedSettledTokenKey: tokenKeyAtStart,
+    })
+    const tokenStillCurrent = getManualSettleTokenKey() === tokenKeyAtStart
+
     if (
       isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart)
       && metrics.sessionKey === sessionKeyAtStart
       && metrics.threadKey === threadKeyAtStart
+      && tokenStillCurrent
       && metrics.stable
       && metrics.phase === 'final'
     ) {
@@ -3884,9 +3919,15 @@ async function runManualSettleIfReady() {
     manualSettleInFlight = false
 
     await nextTick()
+    const currentToken = props.virtualScroll?.settledToken
+    const currentSignature = hasManualSettleSignal(currentToken)
+      ? getManualSettleSignature(currentToken)
+      : ''
+
     if (
       isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart)
-      && lastManualSettleSignature !== signature
+      && currentSignature
+      && lastManualSettleSignature !== currentSignature
     ) {
       void runManualSettleIfReady()
     }

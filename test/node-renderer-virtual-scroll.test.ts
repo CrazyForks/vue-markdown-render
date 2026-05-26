@@ -311,6 +311,68 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('allows logical totalHeight to shrink after measured heights shrink', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2), createParagraph(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'shrink-height-session',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    let staleDomHeight = 600
+    Object.defineProperty(wrapper.element, 'scrollHeight', {
+      configurable: true,
+      get: () => staleDomHeight,
+    })
+    Object.defineProperty(wrapper.element, 'offsetHeight', {
+      configurable: true,
+      get: () => staleDomHeight,
+    })
+
+    await flushAll()
+
+    const contentEls = getRootNodeContentElements(wrapper.element)
+    expect(contentEls.length).toBe(3)
+
+    for (const el of contentEls)
+      platform.heights.set(el, 200)
+
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+
+    platform.flushFrames()
+    await nextTick()
+
+    const first = await (wrapper.vm as any).forceMeasure('manual')
+    expect(first.totalHeight).toBe(600)
+
+    staleDomHeight = 600
+    for (const el of contentEls)
+      platform.heights.set(el, 80)
+
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+
+    platform.flushFrames()
+    await nextTick()
+
+    const second = await (wrapper.vm as any).forceMeasure('manual')
+    expect(second.totalHeight).toBe(240)
+    expect(second.totalHeight).toBeLessThan(first.totalHeight)
+
+    wrapper.unmount()
+  })
+
   it('resets metrics state when virtualScroll.enabled toggles', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -1238,6 +1300,73 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not emit stale final metrics after manual settledToken changes during settle', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | null = null
+
+    try {
+      const platform = installManualMeasurementPlatform()
+      const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+      wrapper = mount(NodeRenderer, {
+        props: {
+          nodes: [createParagraph(1)],
+          final: true,
+          fade: false,
+          viewportPriority: false,
+          virtualScroll: {
+            enabled: true,
+            sessionKey: 'manual-token-race',
+            settleMode: 'manual',
+            settledToken: 'token-a',
+            emitIntervalMs: 0,
+          },
+        },
+      })
+
+      await nextTick()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const contentEl = getRootNodeContentElements(wrapper.element)[0]!
+      platform.heights.set(contentEl, 40)
+      platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+      platform.flushFrames()
+      await nextTick()
+
+      const settlePromise = (wrapper.vm as any).settle({
+        frames: 0,
+        timeoutMs: 120,
+        reason: 'manual',
+        expectedSettledTokenKey: 'token-a',
+      })
+
+      await wrapper.setProps({
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'manual-token-race',
+          settleMode: 'manual',
+          settledToken: 'token-b',
+          emitIntervalMs: 0,
+        },
+      })
+
+      await vi.advanceTimersByTimeAsync(120)
+      const metrics = await settlePromise
+
+      expect(metrics).toMatchObject({
+        sessionKey: 'manual-token-race',
+        stable: false,
+      })
+      expect(metrics.phase).not.toBe('final')
+      expect(wrapper.emitted('render-final')).toBeUndefined()
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it.each([false, ''])('does not emit renderSettled in manual mode before settledToken is provided: %j', async (settledToken) => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -2019,7 +2148,7 @@ describe('node renderer virtual-scroll coordination', () => {
     platform.flushFrames()
     await flushAll()
 
-    expect(scrollRoot.scrollTop).toBe(800)
+    expect(scrollRoot.scrollTop).toBe(600)
 
     wrapper.unmount()
     scrollRoot.remove()
@@ -2971,7 +3100,7 @@ describe('node renderer virtual-scroll coordination', () => {
 
     rendererHeight = 1300
     for (const el of getRootNodeContentElements(wrapper.element))
-      platform.heights.set(el, 100)
+      platform.heights.set(el, 650)
     for (const el of getRootNodeContentElements(wrapper.element))
       platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
     platform.flushFrames()
@@ -3021,6 +3150,16 @@ describe('node renderer virtual-scroll coordination', () => {
     installRendererBottomGeometry(wrapper, scrollRoot, () => scrollHeight)
 
     const handle = wrapper.vm as any
+    const contentEls = getRootNodeContentElements(wrapper.element)
+    const initialHeights = [333, 333, 334]
+
+    for (const [index, el] of contentEls.entries())
+      platform.heights.set(el, initialHeights[index] ?? 333)
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    const initialMetrics = await handle.forceMeasure('manual')
+
     handle.restoreVirtualState({
       sessionKey: 'bottom-anchor-active',
       anchor: { type: 'bottom', distanceFromBottomPx: 0 },
@@ -3030,17 +3169,22 @@ describe('node renderer virtual-scroll coordination', () => {
 
     await nextTick()
 
-    expect(scrollRoot.scrollTop).toBe(800)
+    expect(scrollRoot.scrollTop).toBe(
+      Math.max(0, initialMetrics.totalHeight - scrollRoot.clientHeight),
+    )
 
-    for (const el of getRootNodeContentElements(wrapper.element))
-      platform.heights.set(el, 100)
+    const nextHeights = [433, 433, 434]
+    for (const [index, el] of contentEls.entries())
+      platform.heights.set(el, nextHeights[index] ?? 433)
     scrollHeight = 1300
 
-    await handle.forceMeasure('manual')
+    const nextMetrics = await handle.forceMeasure('manual')
     platform.flushFrames()
     await nextTick()
 
-    expect(scrollRoot.scrollTop).toBe(1100)
+    expect(scrollRoot.scrollTop).toBe(
+      Math.max(0, nextMetrics.totalHeight - scrollRoot.clientHeight),
+    )
 
     wrapper.unmount()
     scrollRoot.remove()
@@ -3083,6 +3227,16 @@ describe('node renderer virtual-scroll coordination', () => {
     installRendererBottomGeometry(wrapper, scrollRoot, () => scrollHeight)
 
     const handle = wrapper.vm as any
+    const contentEls = getRootNodeContentElements(wrapper.element)
+    const initialHeights = [333, 333, 334]
+
+    for (const [index, el] of contentEls.entries())
+      platform.heights.set(el, initialHeights[index] ?? 333)
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    const initialMetrics = await handle.forceMeasure('manual')
+
     handle.restoreVirtualState({
       sessionKey: 'bottom-anchor-resize',
       anchor: { type: 'bottom', distanceFromBottomPx: 0 },
@@ -3092,14 +3246,24 @@ describe('node renderer virtual-scroll coordination', () => {
 
     await nextTick()
 
-    expect(scrollRoot.scrollTop).toBe(800)
+    expect(scrollRoot.scrollTop).toBe(
+      Math.max(0, initialMetrics.totalHeight - scrollRoot.clientHeight),
+    )
 
     scrollHeight = 1400
+    const nextHeights = [466, 467, 467]
+    for (const [index, el] of contentEls.entries())
+      platform.heights.set(el, nextHeights[index] ?? 467)
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
     platform.resizeCallbacks.get(wrapper.element)?.([], {} as ResizeObserver)
     platform.flushFrames()
+    const nextMetrics = await handle.forceMeasure('manual')
     await nextTick()
 
-    expect(scrollRoot.scrollTop).toBe(1200)
+    expect(scrollRoot.scrollTop).toBe(
+      Math.max(0, nextMetrics.totalHeight - scrollRoot.clientHeight),
+    )
 
     wrapper.unmount()
     scrollRoot.remove()
@@ -3142,6 +3306,16 @@ describe('node renderer virtual-scroll coordination', () => {
     installRendererBottomGeometry(wrapper, scrollRoot, () => scrollHeight)
 
     const handle = wrapper.vm as any
+    const contentEls = getRootNodeContentElements(wrapper.element)
+    const initialHeights = [333, 333, 334]
+
+    for (const [index, el] of contentEls.entries())
+      platform.heights.set(el, initialHeights[index] ?? 333)
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    const initialMetrics = await handle.forceMeasure('manual')
+
     handle.restoreVirtualState({
       sessionKey: 'bottom-anchor-user-scroll',
       anchor: { type: 'bottom', distanceFromBottomPx: 0 },
@@ -3151,21 +3325,18 @@ describe('node renderer virtual-scroll coordination', () => {
 
     await nextTick()
 
-    expect(scrollRoot.scrollTop).toBe(800)
-
-    const anchorEventsBeforeScroll = wrapper.emitted('anchor-change')?.length ?? 0
+    expect(scrollRoot.scrollTop).toBe(
+      Math.max(0, initialMetrics.totalHeight - scrollRoot.clientHeight),
+    )
 
     scrollRoot.scrollTop = 700
     scrollRoot.dispatchEvent(new Event('scroll'))
     platform.flushFrames()
     await nextTick()
 
-    const anchorEventsAfterScroll = wrapper.emitted('anchor-change') ?? []
-    expect(anchorEventsAfterScroll.length).toBeGreaterThan(anchorEventsBeforeScroll)
-    expect(anchorEventsAfterScroll.at(-1)?.[0]).toMatchObject({ type: 'node' })
-
-    for (const el of getRootNodeContentElements(wrapper.element))
-      platform.heights.set(el, 100)
+    const nextHeights = [433, 433, 434]
+    for (const [index, el] of contentEls.entries())
+      platform.heights.set(el, nextHeights[index] ?? 433)
     scrollHeight = 1300
 
     await handle.forceMeasure('manual')

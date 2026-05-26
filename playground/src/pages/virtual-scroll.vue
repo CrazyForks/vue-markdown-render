@@ -427,8 +427,12 @@ function captureVisibleVirtualStates() {
     const key = messageKey(item.message)
     const renderer = rendererRefs.get(key)
     const state = renderer?.captureVirtualState()
-    if (state)
+    if (state) {
       virtualStates.set(key, mergeVirtualState(virtualStates.get(key), state))
+
+      if (state.metrics.totalHeight > 0)
+        itemHeights.set(key, getLogicalMessageHeight(key, state.metrics.totalHeight))
+    }
   }
 }
 
@@ -499,7 +503,7 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
     return {
       ...options,
       heightCache,
-      heightCacheWidth: state.width,
+      heightCacheWidth: state.width || layoutWidth.value,
     }
   }
 
@@ -516,10 +520,7 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
     : captureOuterAnchor()
 
   const measuredContentHeight = getMeasuredMessageContentHeight(key)
-  const logicalContentHeight = Math.max(
-    1,
-    Math.ceil(metrics.totalHeight + getMessageChromeHeight(key)),
-  )
+  const logicalContentHeight = getLogicalMessageHeight(key, metrics.totalHeight)
   const coordinated = isCoordinatedMessage(message)
   const nextHeight = coordinated
     ? logicalContentHeight
@@ -754,18 +755,58 @@ function getMeasuredMessageContentHeight(key: string) {
 }
 
 function getMessageChromeHeight(key: string) {
-  const measured = getMeasuredMessageContentHeight(key)
+  const article = messageEls.get(key)
+  const card = messageCardEls.get(key)
   const markdownHost = markdownHostEls.get(key)
+  const meta = card?.querySelector<HTMLElement>(':scope > .message-meta')
 
-  if (!measured || !markdownHost)
+  if (!article || !card || !markdownHost || !meta)
     return 72
 
-  const markdownHeight = Math.max(
-    markdownHost.scrollHeight,
-    markdownHost.offsetHeight,
+  const articleStyle = window.getComputedStyle(article)
+  const cardStyle = window.getComputedStyle(card)
+  const metaStyle = window.getComputedStyle(meta)
+  const articlePadding = readPx(articleStyle.paddingTop) + readPx(articleStyle.paddingBottom)
+  const cardPadding = readPx(cardStyle.paddingTop) + readPx(cardStyle.paddingBottom)
+  const cardBorder = readPx(cardStyle.borderTopWidth) + readPx(cardStyle.borderBottomWidth)
+  const metaHeight = Math.max(
+    meta.getBoundingClientRect().height,
+    meta.offsetHeight,
+  )
+  const metaMargin = readPx(metaStyle.marginTop) + readPx(metaStyle.marginBottom)
+
+  return Math.max(
+    0,
+    Math.ceil(articlePadding + cardPadding + cardBorder + metaHeight + metaMargin),
+  )
+}
+
+function getMarkdownRendererDomHeight(key: string) {
+  const markdownHost = markdownHostEls.get(key)
+  const renderer = markdownHost?.querySelector<HTMLElement>(
+    ':scope > .markstream-vue.markdown-renderer',
   )
 
-  return Math.max(0, measured - markdownHeight)
+  if (!renderer)
+    return 0
+
+  return Math.ceil(Math.max(
+    renderer.scrollHeight,
+    renderer.offsetHeight,
+    renderer.getBoundingClientRect().height,
+  ))
+}
+
+function getLogicalMessageHeight(key: string, rendererHeight: number) {
+  const rendererDomHeight = getMarkdownRendererDomHeight(key)
+  const rendererBoxDelta = rendererDomHeight > 0
+    ? Math.max(0, rendererDomHeight - rendererHeight)
+    : 0
+
+  return Math.max(
+    1,
+    Math.ceil(rendererHeight + getMessageChromeHeight(key) + rendererBoxDelta),
+  )
 }
 
 function onVirtualStateChange(message: Message, state: MarkstreamVirtualState) {
@@ -1161,6 +1202,15 @@ async function switchThread(threadId: ThreadId) {
   const previousScrollTop = scrollTop.value
 
   activeThreadId.value = threadId
+
+  for (const message of threads[threadId]) {
+    const key = messageKey(message)
+    const state = virtualStates.get(key)
+    const height = state?.metrics?.totalHeight
+    if (height && height > 0 && !itemHeights.has(key)) {
+      itemHeights.set(key, getLogicalMessageHeight(key, height))
+    }
+  }
 
   const savedAnchor = threadAnchors.get(threadId)
   const savedScrollTop = threadScrollTops.get(threadId) ?? 0

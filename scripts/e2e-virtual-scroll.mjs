@@ -258,16 +258,6 @@ async function run() {
         }
         return latest
       }
-      const waitForSettledEvent = async (frames = 120) => {
-        let latest = api.read()
-        for (let i = 0; i < frames; i++) {
-          if (latest.settledEvents > 0)
-            return latest
-          await api.nextFrame()
-          latest = api.read()
-        }
-        return latest
-      }
       const waitUntil = async (predicate, frames = 180) => {
         let latest = api.read()
         for (let i = 0; i < frames; i++) {
@@ -356,7 +346,26 @@ async function run() {
       api.toggleNarrowMode()
       const narrowAfter = await waitHealthy(60)
 
-      await waitForSettledEvent()
+      api.clearEvents()
+      const relayoutThreadBefore = api.read()
+      const settledEventsBeforeRelayoutRestore = relayoutThreadBefore.settledEvents
+      const relayoutOtherThread
+        = relayoutThreadBefore.threadId === 'thread-a' ? 'thread-b' : 'thread-a'
+
+      await api.switchThread(relayoutOtherThread)
+      await waitCurrentHealthy()
+      await api.switchThread(relayoutThreadBefore.threadId)
+      let relayoutThreadAfter = await waitCurrentHealthy()
+      await waitUntil(
+        snapshot => snapshot.settledEvents > settledEventsBeforeRelayoutRestore,
+        180,
+      )
+      for (let i = 0; i < 8; i++)
+        await api.nextFrame()
+      relayoutThreadAfter = api.read()
+      api.clearEvents()
+      await api.nextFrame()
+
       const finalAfter = await waitHealthy(45)
 
       return {
@@ -369,6 +378,8 @@ async function run() {
         streamAfter,
         relayoutAfter,
         narrowAfter,
+        relayoutThreadBefore,
+        relayoutThreadAfter,
         final: finalAfter,
       }
     })
@@ -383,11 +394,14 @@ async function run() {
       streamAfter,
       relayoutAfter,
       narrowAfter,
+      relayoutThreadBefore,
+      relayoutThreadAfter,
       final,
     } = result
 
     assertThreadRestore('thread-a', threadABefore, threadAAfter)
     assertThreadRestore('thread-b', threadBBefore, threadBAfter)
+    assertThreadRestore('relayout thread restore', relayoutThreadBefore, relayoutThreadAfter)
 
     assert(
       switchAfter.health.maxObservedBlankProbes === 0
@@ -481,6 +495,26 @@ async function run() {
       {
         health: final.health,
         events: final.events.filter(event => !event.expectedJump && (event.scrollJumpPx ?? 0) > 32),
+      },
+    )
+
+    assert(
+      relayoutAfter.health.maxObservedScrollJumpPx <= 32
+      && narrowAfter.health.maxObservedScrollJumpPx <= 32,
+      'layout changes caused unexpected scroll jump',
+      {
+        relayout: relayoutAfter.health,
+        narrow: narrowAfter.health,
+      },
+    )
+
+    assert(
+      relayoutAfter.maxItemHeightDriftPx < 24
+      && narrowAfter.maxItemHeightDriftPx < 24,
+      'height model did not converge after layout change',
+      {
+        relayout: relayoutAfter,
+        narrow: narrowAfter,
       },
     )
 
