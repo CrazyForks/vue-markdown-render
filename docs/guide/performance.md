@@ -153,6 +153,8 @@ If a chat or thread list already virtualizes messages, keep that outer virtualiz
 
 The important value is `metrics.totalHeight`. It represents the full Markdown document height, including virtual spacers; do not use the renderer element's current `offsetHeight` as the item size because only the live node window may be mounted.
 
+When `virtualScroll.enabled=true`, pass a stable `sessionKey` that survives remounts and thread restores, such as `threadId:messageId:revision`. Do not rely on the renderer's fallback id for persisted restore state.
+
 ```vue
 <script setup lang="ts">
 import type {

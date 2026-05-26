@@ -70,4 +70,30 @@ describe('playground /virtual-scroll shell smoke', () => {
 
     wrapper.unmount()
   })
+
+  it('keeps the lab status visible after core actions', async () => {
+    const wrapper = mount(VirtualScrollPage, {
+      attachTo: document.body,
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const buttons = wrapper.findAll('button')
+    await buttons.find(button => button.text() === 'Bottom')?.trigger('click')
+    await flushAll()
+
+    await buttons.find(button => button.text().startsWith('Density:'))?.trigger('click')
+    await flushAll()
+
+    await buttons.find(button => button.text().startsWith('Font:'))?.trigger('click')
+    await flushAll()
+
+    expect(wrapper.get('[data-testid="lab-status"]').text()).toContain('status: ok')
+    expect(wrapper.get('[data-testid="blank-probes"]').text()).toContain('blank probes: 0')
+    expect(wrapper.get('[data-testid="markdown-slots"]').text()).toContain('markdown slots:')
+    expect(wrapper.get('[data-testid="max-drift"]').text()).toContain('max drift:')
+
+    wrapper.unmount()
+  })
 })

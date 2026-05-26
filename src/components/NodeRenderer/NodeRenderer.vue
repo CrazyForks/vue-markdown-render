@@ -389,10 +389,13 @@ const heightExperimentEnabled = computed(() => Boolean(
   && !isNestedListItemRenderer
   && heightExperimentConfig.value?.enabled,
 ))
+const virtualScrollRequested = computed(() => Boolean(
+  !renderAsFragment.value
+  && props.virtualScroll?.enabled,
+))
 const virtualScrollEnabled = computed(() => Boolean(
   isClient
-  && !renderAsFragment.value
-  && props.virtualScroll?.enabled,
+  && virtualScrollRequested.value,
 ))
 const heightEstimationActive = computed(() => heightExperimentEnabled.value || virtualScrollEnabled.value)
 const textEstimationEnabled = computed(() => {
@@ -1207,7 +1210,7 @@ function getCurrentIndexPrefix() {
   if (props.indexKey != null)
     return String(props.indexKey)
 
-  if (virtualScrollEnabled.value)
+  if (virtualScrollRequested.value)
     return `virtual-${getVirtualSessionKey()}`
 
   return 'markdown-renderer'
@@ -1347,8 +1350,11 @@ const providedNodeLifecycle: MarkstreamNodeLifecycle = {
 provide(MARKSTREAM_NODE_LIFECYCLE_KEY, providedNodeLifecycle)
 
 function getVirtualSessionKey() {
-  return props.virtualScroll?.sessionKey
-    ?? String(props.indexKey ?? props.customId ?? instanceMsgId)
+  const explicit = props.virtualScroll?.sessionKey
+  if (explicit != null && explicit !== '')
+    return String(explicit)
+
+  return String(props.indexKey ?? props.customId ?? instanceMsgId)
 }
 
 function getVirtualThreadKey() {
@@ -1573,22 +1579,33 @@ function captureVirtualAnchor(): MarkstreamVirtualAnchor | null {
   }
 }
 
+function hashVirtualString(input: string) {
+  let hash = 2166136261
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+
+  return (hash >>> 0).toString(36)
+}
+
 function getNodeHeightCacheSignature(index: number) {
   const node = parsedNodes.value[index] as any
   if (!node)
     return ''
 
   const type = String(node.type ?? '')
-  const raw = String(node.raw ?? '')
-  const content = String(node.content ?? node.code ?? '')
   const language = String(node.language ?? '')
   const loading = node.loading === true ? '1' : '0'
+  const raw = String(node.raw ?? '')
+  const content = String(node.content ?? node.code ?? '')
+  const payloadHash = hashVirtualString(raw || content)
 
   return [
     type,
     language,
     loading,
-    raw || content,
+    payloadHash,
   ].join('\u0000')
 }
 
@@ -1603,7 +1620,7 @@ function getVirtualContentHash() {
     }
   }
 
-  return String(hash >>> 0)
+  return (hash >>> 0).toString(36)
 }
 
 function exportVirtualHeightCache(): MarkstreamHeightCache {
@@ -1910,30 +1927,26 @@ function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
   if (parsedNodes.value.length <= 0)
     return false
 
-  const restoreState = props.virtualScroll?.restoreState
-  const canUseRestoreState = Boolean(restoreState && canRestoreVirtualStateCache(restoreState))
-  const canUseStandaloneCache = canReuseStandaloneHeightCache()
-
-  if (!canUseRestoreState && !canUseStandaloneCache)
+  if (!canReuseStandaloneHeightCache())
     return false
 
   const boundedCache = getBoundedHeightCache(cache, {
-    requireCompatibilityMetadata: !canUseRestoreState,
+    requireCompatibilityMetadata: true,
   })
+
   if (!boundedCache.length)
     return false
 
-  const cacheSource = canUseRestoreState ? 'restore' : 'standalone'
   const signature = getHeightCacheSignature(boundedCache)
   if (signature === lastImportedVirtualHeightCacheSignature) {
-    lastImportedVirtualHeightCacheSource = cacheSource
+    lastImportedVirtualHeightCacheSource = 'standalone'
     return true
   }
 
   importHeightCache(boundedCache, { mode: 'merge' })
   markFallbackHeightPrefixDirty()
   lastImportedVirtualHeightCacheSignature = signature
-  lastImportedVirtualHeightCacheSource = cacheSource
+  lastImportedVirtualHeightCacheSource = 'standalone'
   scheduleVirtualMetricsEmit('restore')
   return true
 }
@@ -2949,6 +2962,26 @@ function resetVirtualLayoutMeasurements(reason: MarkstreamVirtualReason = 'resiz
     scheduleVirtualMetricsEmit(reason)
   })
 }
+
+watch(
+  virtualScrollEnabled,
+  (enabled, previous) => {
+    if (enabled === previous)
+      return
+
+    if (!enabled) {
+      resetVirtualSessionRuntimeState()
+      clearVirtualMetricsSchedule()
+      return
+    }
+
+    resetVirtualSessionRuntimeState()
+    resetVirtualSessionMeasurements()
+    lastVirtualLayoutEpochKey = virtualLayoutEpochKey.value
+    scheduleVirtualMetricsEmit('content')
+  },
+  { flush: 'post' },
+)
 
 watch(
   [virtualScrollEnabled, virtualLayoutEpochKey],

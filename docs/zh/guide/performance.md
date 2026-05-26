@@ -92,6 +92,8 @@ const md = '# Virtualized transcript'
 
 关键值是 `metrics.totalHeight`。它表示包含 virtual spacer 在内的完整 Markdown 逻辑高度；不要把 renderer 元素当前的 `offsetHeight` 当成 item size，因为当前 DOM 可能只挂载了 live window 内的节点。
 
+当 `virtualScroll.enabled=true` 时，请传入可跨 remount 和 thread restore 保持稳定的 `sessionKey`，例如 `threadId:messageId:revision`。不要依赖 renderer fallback id 来持久化恢复状态。
+
 ```vue
 <script setup lang="ts">
 import type {

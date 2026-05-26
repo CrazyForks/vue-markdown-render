@@ -34,7 +34,7 @@ Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`,
 | `smooth-streaming-options` | `SmoothMarkdownStreamOptions` | – | Options for built-in stream pacing (`minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`). Read when the renderer is created; recreate the renderer with a different `key` if you need to change them dynamically. |
 | `parse-coalesce-ms` | `number` | `80` | Performance tuning knob for the minimum interval between parse commits while built-in smooth streaming coalesces character-only updates. It does not throttle raw `content` prop updates when `smooth-streaming=false` and has no effect in `nodes` mode. Set `0` to parse every smooth-stream commit. Default scheduling may be optimized in future releases. |
 | `fade` | `boolean` | `true` | Enables non-code-node enter fade and appended-text fade. Disable if you need zero animation for SSR snapshots. |
-| `virtual-scroll` | `MarkstreamVirtualScrollOptions` | – | Enables host virtual-scroll coordination. Use this when an outer message/thread virtualizer needs logical `totalHeight`, restore state, and settle/final events instead of reading the current DOM height. |
+| `virtual-scroll` | `MarkstreamVirtualScrollOptions` | – | Enables host virtual-scroll coordination. Use this when an outer message/thread virtualizer needs logical `totalHeight`, restore state, and settle/final events instead of reading the current DOM height. When `enabled=true`, pass a stable `sessionKey`. |
 
 ::: tip SSR and smooth streaming
 For SSR with static initial content, prefer `smooth-streaming="auto"` (the default). The `auto` mode includes a mounted gate that prevents pacing initial content from blank on the first client render. Use `smooth-streaming=true` only when you explicitly want to pace the first client-side content as well — this can cause a hydration mismatch or a first-paint flash of empty content in SSR setups.
@@ -138,7 +138,7 @@ Use `html-policy="escape"` when you want literal HTML text to stay visible inste
 | `render-batch-delay` | `16` | Extra delay (ms) before each batch after rAF. |
 | `render-batch-budget-ms` | `6` | Time budget (ms) before adaptive batch sizes shrink. |
 | `render-batch-idle-timeout-ms` | `120` | Timeout (ms) for `requestIdleCallback` slices (when available). |
-| `virtual-scroll` | – | Reports logical height and restore state to an outer virtualizer. Listen to `height-change` and use `metrics.totalHeight` as the message/item size. |
+| `virtual-scroll` | – | Reports logical height and restore state to an outer virtualizer. Listen to `height-change` and use `metrics.totalHeight` as the message/item size. When `enabled=true`, pass a stable `sessionKey`. |
 
 ## Global code block options (forwarded from `MarkdownRender`)
 

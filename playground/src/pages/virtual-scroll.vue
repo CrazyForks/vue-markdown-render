@@ -31,12 +31,14 @@ const fontScale = ref(1)
 const maxLiveNodes = ref(220)
 const overscanPx = ref(1400)
 const stressRunning = ref(false)
+const coordinateSmallMessages = ref(false)
 
 const itemHeights = reactive(new Map<string, number>())
 const virtualStates = reactive(new Map<string, MarkstreamVirtualState>())
 const threadScrollTops = reactive(new Map<ThreadId, number>())
 const threadAnchors = reactive(new Map<ThreadId, OuterAnchor>())
 const messageEls = new Map<string, HTMLElement>()
+const messageCardEls = new Map<string, HTMLElement>()
 const markdownHostEls = new Map<string, HTMLElement>()
 
 const domNodeCount = ref(0)
@@ -167,6 +169,14 @@ function setMessageEl(message: Message, el: Element | null) {
     messageEls.delete(key)
 }
 
+function setMessageCardEl(message: Message, el: Element | null) {
+  const key = messageKey(message)
+  if (el instanceof HTMLElement)
+    messageCardEls.set(key, el)
+  else
+    messageCardEls.delete(key)
+}
+
 function setMarkdownHostEl(message: Message, el: Element | null) {
   const key = messageKey(message)
   if (el instanceof HTMLElement)
@@ -246,12 +256,12 @@ const visibleItems = computed(() => {
   })
 })
 
-const renderedHugeMessageCount = computed(() => {
-  return visibleItems.value.filter(item => item.message.huge).length
+const renderedCoordinatedMessageCount = computed(() => {
+  return visibleItems.value.filter(item => item.message.huge || coordinateSmallMessages.value).length
 })
 
 const expectedMarkdownSlotCeiling = computed(() => {
-  return renderedHugeMessageCount.value * (maxLiveNodes.value + 96) + 600
+  return renderedCoordinatedMessageCount.value * (maxLiveNodes.value + 96) + 600
 })
 
 const domSizeOk = computed(() => {
@@ -280,9 +290,10 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
   const key = messageKey(message)
   const state = virtualStates.get(key)
   const heightCache = state?.heightCache as MarkstreamHeightCache | undefined
+  const enabled = message.huge || coordinateSmallMessages.value
 
   return {
-    enabled: true,
+    enabled,
     sessionKey: key,
     threadKey: activeThreadId.value,
     scrollRoot: () => scrollRoot.value,
@@ -300,11 +311,11 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
 function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   const key = messageKey(message)
   const outerAnchor = captureOuterAnchor()
-  const measuredArticleHeight = messageEls.get(key)?.scrollHeight ?? 0
+  const measuredContentHeight = getMeasuredMessageContentHeight(key)
   const nextHeight = Math.max(
     1,
     Math.ceil(metrics.totalHeight + getMessageChromeHeight(key)),
-    measuredArticleHeight,
+    measuredContentHeight,
   )
   const previous = itemHeights.get(key)
 
@@ -382,14 +393,41 @@ function restoreOuterAnchor(anchor: OuterAnchor | null) {
   })
 }
 
-function getMessageChromeHeight(key: string) {
+function readPx(value: string | null | undefined) {
+  const parsed = Number.parseFloat(String(value ?? ''))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function getArticleVerticalPadding(key: string) {
   const article = messageEls.get(key)
+  if (!article)
+    return 0
+
+  const style = window.getComputedStyle(article)
+  return readPx(style.paddingTop) + readPx(style.paddingBottom)
+}
+
+function getMeasuredMessageContentHeight(key: string) {
+  const card = messageCardEls.get(key)
+  if (!card)
+    return 0
+
+  return Math.ceil(card.scrollHeight + getArticleVerticalPadding(key))
+}
+
+function getMessageChromeHeight(key: string) {
+  const measured = getMeasuredMessageContentHeight(key)
   const markdownHost = markdownHostEls.get(key)
 
-  if (!article || !markdownHost)
+  if (!measured || !markdownHost)
     return 72
 
-  return Math.max(0, article.scrollHeight - markdownHost.offsetHeight)
+  const markdownHeight = Math.max(
+    markdownHost.scrollHeight,
+    markdownHost.offsetHeight,
+  )
+
+  return Math.max(0, measured - markdownHeight)
 }
 
 function onVirtualStateChange(message: Message, state: MarkstreamVirtualState) {
@@ -443,11 +481,7 @@ function collectStats() {
 
   for (const item of visibleItems.value) {
     const key = messageKey(item.message)
-    const article = messageEls.get(key)
-    if (!article)
-      continue
-
-    const actual = article.scrollHeight
+    const actual = getMeasuredMessageContentHeight(key)
     const expected = getItemHeight(item.message)
     const drift = actual - expected
 
@@ -558,6 +592,11 @@ function toggleFontScale() {
   scheduleStats()
 }
 
+function toggleSmallMessageCoordination() {
+  coordinateSmallMessages.value = !coordinateSmallMessages.value
+  scheduleStats()
+}
+
 function startStressScroll() {
   if (stressRunning.value)
     return
@@ -657,6 +696,10 @@ onBeforeUnmount(() => {
   saveThreadScroll()
   stopStressScroll()
 
+  messageEls.clear()
+  messageCardEls.clear()
+  markdownHostEls.clear()
+
   if (streamTimer)
     window.clearInterval(streamTimer)
 
@@ -681,11 +724,11 @@ onBeforeUnmount(() => {
         <span>thread: {{ activeThreadId }}</span>
         <span>messages: {{ messages.length }}</span>
         <span>outer rendered: {{ messageDomCount }}</span>
-        <span>markdown slots: {{ markdownSlotCount }}</span>
+        <span data-testid="markdown-slots">markdown slots: {{ markdownSlotCount }}</span>
         <span>markdown content: {{ markdownContentCount }}</span>
         <span>dom nodes: {{ domNodeCount }}</span>
         <span>max dom: {{ maxDomNodeCount }}</span>
-        <span>blank probes: {{ blankFrameCount }}</span>
+        <span data-testid="blank-probes">blank probes: {{ blankFrameCount }}</span>
         <span>scroll compensations: {{ scrollCompensationCount }}</span>
       </div>
 
@@ -711,6 +754,9 @@ onBeforeUnmount(() => {
         <button @click="toggleFontScale">
           Font: {{ fontScale }}
         </button>
+        <button @click="toggleSmallMessageCoordination">
+          Small coordination: {{ coordinateSmallMessages ? 'on' : 'off' }}
+        </button>
         <button @click="startStreamingLastMessage">
           Stream last huge message
         </button>
@@ -733,12 +779,12 @@ onBeforeUnmount(() => {
         <li>点击 Stress scroll，连续 10 秒，blank probes 必须保持 0，coverage 必须为 ok。</li>
         <li>切换 Thread A / Thread B，再切回来，scrollTop 和 visible range 应恢复。</li>
         <li>切换 Density / Font，max drift 应回落到 0 或接近 0，不能长期 clipped。</li>
-        <li>markdown slots 应接近 renderedHugeMessageCount × maxLiveNodes，而不是随全文节点数线性增长。</li>
+        <li>markdown slots 应接近 coordinated message count × maxLiveNodes，而不是随全文节点数线性增长。</li>
       </ol>
     </section>
 
     <section class="metrics">
-      <span class="status-chip" :class="labStatus">
+      <span data-testid="lab-status" class="status-chip" :class="labStatus">
         status: {{ labStatus }}
       </span>
       <span>totalHeight: {{ Math.round(totalHeight) }}px</span>
@@ -748,7 +794,7 @@ onBeforeUnmount(() => {
       <span>settled events: {{ settledEvents }}</span>
       <span>slot ceiling: {{ expectedMarkdownSlotCeiling }}</span>
       <span>clipped: {{ clippedMessageCount }}</span>
-      <span>max drift: {{ Math.round(maxItemHeightDriftPx) }}px</span>
+      <span data-testid="max-drift">max drift: {{ Math.round(maxItemHeightDriftPx) }}px</span>
       <span v-if="worstHeightDriftMessageId">
         worst drift: {{ worstHeightDriftMessageId }}
       </span>
@@ -777,7 +823,10 @@ onBeforeUnmount(() => {
             height: `${height}px`,
           }"
         >
-          <div class="message-card">
+          <div
+            :ref="el => setMessageCardEl(message, el as Element | null)"
+            class="message-card"
+          >
             <div class="message-meta">
               <strong>{{ message.role }}</strong>
               <span>{{ message.id }}</span>

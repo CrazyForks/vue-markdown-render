@@ -96,10 +96,8 @@ export type MarkstreamScrollRoot = HTMLElement | null
 export type MarkstreamScrollRootLike = MarkstreamScrollRoot | Ref<MarkstreamScrollRoot>
 export type MarkstreamScrollRootResolver = () => MarkstreamScrollRootLike
 
-export interface MarkstreamVirtualScrollOptions {
-  enabled?: boolean
+interface MarkstreamVirtualScrollSharedOptions {
   scrollRoot?: MarkstreamScrollRootLike | MarkstreamScrollRootResolver
-  sessionKey?: string
   threadKey?: string
   restoreState?: MarkstreamVirtualState | null
   heightCache?: MarkstreamHeightCache | null
@@ -114,6 +112,20 @@ export interface MarkstreamVirtualScrollOptions {
   emitIntervalMs?: number
   heightDiffThresholdPx?: number
 }
+
+export type MarkstreamVirtualScrollOptions
+  = | (MarkstreamVirtualScrollSharedOptions & {
+    enabled: true
+    sessionKey: string
+  })
+  | (MarkstreamVirtualScrollSharedOptions & {
+    enabled: boolean
+    sessionKey: string
+  })
+  | (MarkstreamVirtualScrollSharedOptions & {
+    enabled?: false
+    sessionKey?: string
+  })
 
 export interface MarkstreamRendererHandle {
   getVirtualMetrics: () => MarkstreamVirtualMetrics

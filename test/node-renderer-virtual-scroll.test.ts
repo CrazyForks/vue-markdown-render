@@ -59,6 +59,46 @@ function installManualMeasurementPlatform() {
   }
 }
 
+async function captureSeedHeightCache(
+  NodeRenderer: any,
+  heights: number[] = [400, 400],
+) {
+  const platform = installManualMeasurementPlatform()
+  const wrapper = mount(NodeRenderer, {
+    props: {
+      nodes: heights.map((_, index) => createParagraph(index + 1)),
+      final: true,
+      fade: false,
+      viewportPriority: false,
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'seed-cache',
+        settleMode: 'manual',
+        emitIntervalMs: 0,
+      },
+    },
+  })
+
+  await flushAll()
+
+  const contentEls = getRootNodeContentElements(wrapper.element)
+  for (const [index, height] of heights.entries()) {
+    const el = contentEls[index]
+    if (!el)
+      continue
+
+    platform.heights.set(el, height)
+    platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+  }
+  platform.flushFrames()
+  await nextTick()
+  await (wrapper.vm as any).forceMeasure('manual')
+
+  const heightCache = (wrapper.vm as any).captureVirtualState()?.heightCache ?? []
+  wrapper.unmount()
+  return heightCache
+}
+
 function getRootNodeContentElements(root: Element) {
   return Array.from(root.children)
     .filter((el): el is HTMLElement => el instanceof HTMLElement && el.classList.contains('node-slot'))
@@ -189,6 +229,62 @@ describe('node renderer virtual-scroll coordination', () => {
       totalHeight: 120,
     })
     expect(wrapper.emitted('renderFinal')).toBeUndefined()
+
+    wrapper.unmount()
+  })
+
+  it('resets metrics state when virtualScroll.enabled toggles', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'toggle-session',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const contentEl = getRootNodeContentElements(wrapper.element)[0]!
+    platform.heights.set(contentEl, 40)
+    platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+    await (wrapper.vm as any).forceMeasure('manual')
+
+    const emittedBeforeToggle = wrapper.emitted('height-change')?.length ?? 0
+
+    await wrapper.setProps({
+      virtualScroll: {
+        enabled: false,
+        sessionKey: 'toggle-session',
+        settleMode: 'manual',
+        emitIntervalMs: 0,
+      },
+    })
+    await flushAll()
+
+    await wrapper.setProps({
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'toggle-session',
+        settleMode: 'manual',
+        emitIntervalMs: 0,
+      },
+    })
+    await flushAll()
+    platform.flushFrames()
+    await nextTick()
+
+    expect(wrapper.emitted('height-change')?.length ?? 0).toBeGreaterThan(emittedBeforeToggle)
 
     wrapper.unmount()
   })
@@ -947,14 +1043,16 @@ describe('node renderer virtual-scroll coordination', () => {
     })
     expect(state.heightCache).toBeUndefined()
     expect(state.contentHash).toBeUndefined()
-    expect((wrapper.vm as any).captureVirtualState()?.heightCache).toEqual([
+    const heightCache = (wrapper.vm as any).captureVirtualState()?.heightCache ?? []
+    expect(heightCache).toMatchObject([
       {
         index: 0,
         height: 40,
         nodeType: 'paragraph',
-        signature: 'paragraph\u0000\u00000\u0000Paragraph 1',
       },
     ])
+    expect(heightCache[0]?.signature).toBeTruthy()
+    expect(heightCache[0]?.signature).not.toContain('Paragraph')
 
     wrapper.unmount()
   })
@@ -1367,10 +1465,30 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('imports standalone height cache when entries carry compatibility metadata', async () => {
+  it('requires standalone height cache compatibility metadata even when restore state is valid', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const metrics = {
+      sessionKey: 'current-session',
+      phase: 'final',
+      nodeCount: 2,
+      liveRange: { start: 0, end: 2 },
+      renderedCount: 2,
+      measuredCount: 2,
+      estimatedCount: 0,
+      averageNodeHeight: 400,
+      topSpacerHeight: 0,
+      bottomSpacerHeight: 0,
+      visibleDomHeight: 800,
+      totalHeight: 800,
+      width: 400,
+      final: true,
+      stable: true,
+      confidence: 'final',
+      reason: 'manual',
+    } as const
+
     const wrapper = mount(NodeRenderer, {
       props: {
         nodes: [createParagraph(1), createParagraph(2)],
@@ -1383,19 +1501,45 @@ describe('node renderer virtual-scroll coordination', () => {
           settleMode: 'manual',
           heightCacheWidth: 400,
           heightCache: [
-            {
-              index: 0,
-              height: 400,
-              nodeType: 'paragraph',
-              signature: 'paragraph\u0000\u00000\u0000Paragraph 1',
-            },
-            {
-              index: 1,
-              height: 400,
-              nodeType: 'paragraph',
-              signature: 'paragraph\u0000\u00000\u0000Paragraph 2',
-            },
+            { index: 0, height: 400 },
+            { index: 1, height: 400 },
           ],
+          restoreState: {
+            sessionKey: 'current-session',
+            anchor: { type: 'node', nodeIndex: 0, offsetWithinNodePx: 0 },
+            metrics,
+            width: 400,
+          },
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).not.toBe(800)
+
+    wrapper.unmount()
+  })
+
+  it('imports standalone height cache when entries carry compatibility metadata', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const seedCache = await captureSeedHeightCache(NodeRenderer)
+    expect(seedCache.every((entry: any) => entry.signature && !entry.signature.includes('Paragraph'))).toBe(true)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'current-session',
+          settleMode: 'manual',
+          heightCacheWidth: 400,
+          heightCache: seedCache,
         },
       },
     })
@@ -1412,6 +1556,7 @@ describe('node renderer virtual-scroll coordination', () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const seedCache = await captureSeedHeightCache(NodeRenderer)
     const metrics = {
       sessionKey: 'shared-session',
       threadKey: 'thread-b',
@@ -1445,20 +1590,7 @@ describe('node renderer virtual-scroll coordination', () => {
           sessionKey: 'shared-session',
           settleMode: 'manual',
           heightCacheWidth: 400,
-          heightCache: [
-            {
-              index: 0,
-              height: 400,
-              nodeType: 'paragraph',
-              signature: 'paragraph\u0000\u00000\u0000Paragraph 1',
-            },
-            {
-              index: 1,
-              height: 400,
-              nodeType: 'paragraph',
-              signature: 'paragraph\u0000\u00000\u0000Paragraph 2',
-            },
-          ],
+          heightCache: seedCache,
           restoreState: {
             sessionKey: 'shared-session',
             threadKey: 'thread-b',
@@ -1481,6 +1613,7 @@ describe('node renderer virtual-scroll coordination', () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const seedCache = await captureSeedHeightCache(NodeRenderer)
     const wrapper = mount(NodeRenderer, {
       props: {
         nodes: [createParagraph(1), createParagraph(2)],
@@ -1491,20 +1624,7 @@ describe('node renderer virtual-scroll coordination', () => {
           enabled: true,
           sessionKey: 'standalone-cache-no-width',
           settleMode: 'manual',
-          heightCache: [
-            {
-              index: 0,
-              height: 400,
-              nodeType: 'paragraph',
-              signature: 'paragraph\u0000\u00000\u0000Paragraph 1',
-            },
-            {
-              index: 1,
-              height: 400,
-              nodeType: 'paragraph',
-              signature: 'paragraph\u0000\u00000\u0000Paragraph 2',
-            },
-          ],
+          heightCache: seedCache,
         },
       },
     })
