@@ -155,6 +155,7 @@ const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
 const CONTENT_STREAMING_TAIL_IDLE_MS = 1200
 const HEIGHT_CACHE_WIDTH_BUCKET_PX = 32
+const UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET = -1
 const BOTTOM_ANCHOR_CAPTURE_MAX_DISTANCE_PX = 160
 const BOTTOM_ANCHOR_SCROLL_ROOT_MAX_DISTANCE_PX = 64
 const BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX = 32
@@ -875,8 +876,10 @@ function syncFocusToScroll(force = false) {
     const offsetFromBottom = Math.max(0, distanceFromBottom) + Math.max(0, viewportHeight) * 0.5
     const estimated = estimateIndexForOffsetFromEnd(offsetFromBottom)
     const next = clamp(estimated, 0, Math.max(0, total - 1))
-    if (force || Math.abs(next - focusIndex.value) > 1)
+    if (force || Math.abs(next - focusIndex.value) > 1) {
       focusIndex.value = next
+      updateLiveRange()
+    }
     return
   }
 
@@ -923,12 +926,14 @@ function syncFocusToScroll(force = false) {
     const targetOffset = relativeScrollTop + Math.max(0, viewportHeight) * 0.5
     const estimated = estimateIndexForOffset(targetOffset)
     focusIndex.value = clamp(estimated, 0, Math.max(0, parsedNodes.value.length - 1))
+    updateLiveRange()
     return
   }
   const midpoint = Math.round((firstVisible + lastVisible) / 2)
   if (!force && Math.abs(midpoint - focusIndex.value) <= 1)
     return
   focusIndex.value = clamp(midpoint, 0, Math.max(0, parsedNodes.value.length - 1))
+  updateLiveRange()
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -1087,12 +1092,18 @@ function getFallbackNodeHeight(index: number) {
   return nodeHeights[index] ?? estimatedNodeHeights.value[index]?.height ?? averageNodeHeight.value
 }
 
+function getHeightCacheWidthBucket(width: unknown) {
+  const numeric = Number(width)
+  if (!Number.isFinite(numeric) || numeric <= 0)
+    return UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET
+
+  return Math.floor(numeric / HEIGHT_CACHE_WIDTH_BUCKET_PX)
+}
+
 function getFallbackHeightPrefix() {
   const total = parsedNodes.value.length
   const width = experimentContainerWidth.value || containerRef.value?.clientWidth || 0
-  const widthBucket = Number.isFinite(width) && width > 0
-    ? Math.round(width / HEIGHT_CACHE_WIDTH_BUCKET_PX)
-    : 0
+  const widthBucket = getHeightCacheWidthBucket(width)
   const measurementKey = props.virtualScroll?.measurementKey == null
     ? ''
     : String(props.virtualScroll.measurementKey)
@@ -1484,10 +1495,7 @@ function getCurrentVirtualWidth() {
 }
 
 const virtualLayoutWidthBucket = computed(() => {
-  const width = getCurrentVirtualWidth()
-  if (!Number.isFinite(width) || width <= 0)
-    return 0
-  return Math.round(width / HEIGHT_CACHE_WIDTH_BUCKET_PX)
+  return getHeightCacheWidthBucket(getCurrentVirtualWidth())
 })
 
 const virtualLayoutEpochKey = computed(() => {
@@ -2123,14 +2131,16 @@ function getBoundedHeightCache(
 
 function canReuseHeightCacheForWidth(savedWidth: number | null | undefined) {
   const currentWidth = getCurrentVirtualWidth()
+  const currentBucket = getHeightCacheWidthBucket(currentWidth)
+  const savedBucket = getHeightCacheWidthBucket(savedWidth)
 
-  if (!Number.isFinite(currentWidth) || currentWidth <= 0)
+  if (currentBucket === UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET)
     return false
 
-  if (!Number.isFinite(savedWidth) || Number(savedWidth) <= 0)
+  if (savedBucket === UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET)
     return false
 
-  return Math.abs(currentWidth - Number(savedWidth)) <= HEIGHT_CACHE_WIDTH_BUCKET_PX
+  return currentBucket === savedBucket
 }
 
 function getVirtualStateSavedWidth(state: MarkstreamVirtualState | null | undefined) {
@@ -2201,7 +2211,7 @@ function getHeightCacheSignature(cache: MarkstreamHeightCache) {
     })
     .join('\u0001')
 
-  const widthBucket = Math.round(getCurrentVirtualWidth() / HEIGHT_CACHE_WIDTH_BUCKET_PX)
+  const widthBucket = getHeightCacheWidthBucket(getCurrentVirtualWidth())
 
   return [
     getVirtualThreadKey() ?? '',
@@ -2567,6 +2577,10 @@ function scrollToNode(
 
     setRelativeScrollTopWithinContainer(Math.max(0, target))
     scheduleFocusSync({ immediate: true })
+    if (virtualizationEnabled.value) {
+      focusIndex.value = boundedIndex
+      updateLiveRange()
+    }
   }
 
   if (virtualizationEnabled.value) {

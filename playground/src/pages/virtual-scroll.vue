@@ -27,6 +27,8 @@ interface LabStats {
   markdownRendererCount: number
   markdownSlotCount: number
   markdownContentCount: number
+  maxHugeMessageSlotCount: number
+  hugeMessageDomCount: number
   blankProbeCount: number
   heightDriftPx: number
   maxItemHeightDriftPx: number
@@ -47,6 +49,8 @@ interface LabHealth extends LabStats {
   maxObservedScrollJumpPx: number
   scrollJitterOk: boolean
   virtualDomWithinLimit: boolean
+  hugeRendererDomWithinLimit: boolean
+  hugeRendererSlotBudget: number
   domSlotBudget: number
   layoutIntegrityOk: boolean
 }
@@ -72,6 +76,8 @@ interface VirtualScrollLabSnapshot {
   domNodeCount: number
   markdownSlotCount: number
   markdownContentCount: number
+  maxHugeMessageSlotCount: number
+  hugeRendererSlotBudget: number
   maxDomNodeCount: number
   maxMarkdownSlotCount: number
   expectedMarkdownSlotCeiling: number
@@ -507,10 +513,9 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
     ? { type: 'bottom', distanceFromBottomPx: 0 }
     : captureOuterAnchor()
   const measuredContentHeight = getMeasuredMessageContentHeight(key)
-  const nextHeight = Math.max(
+  const nextHeight = measuredContentHeight || Math.max(
     1,
     Math.ceil(metrics.totalHeight + getMessageChromeHeight(key)),
-    measuredContentHeight,
   )
   const previous = itemHeights.get(key)
 
@@ -530,6 +535,7 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
 
 interface OuterAnchor {
   type: 'item' | 'bottom'
+  messageKey?: string
   index?: number
   offsetPx?: number
   distanceFromBottomPx?: number
@@ -553,8 +559,10 @@ function captureOuterAnchor(): OuterAnchor | null {
   }
 
   const index = lowerBoundOffset(root.scrollTop + 1)
+  const message = messages.value[index]
   return {
     type: 'item',
+    messageKey: message ? messageKey(message) : undefined,
     index,
     offsetPx: root.scrollTop - (prefixTops.value[index] ?? 0),
   }
@@ -567,6 +575,9 @@ function resolveThreadAnchorMessageKey(threadId: ThreadId, anchor: OuterAnchor |
   const list = threads[threadId]
 
   if (anchor.type === 'item') {
+    if (anchor.messageKey)
+      return anchor.messageKey
+
     const index = Math.min(
       Math.max(0, anchor.index ?? 0),
       Math.max(0, list.length - 1),
@@ -577,6 +588,22 @@ function resolveThreadAnchorMessageKey(threadId: ThreadId, anchor: OuterAnchor |
 
   const message = list[list.length - 1]
   return message ? messageKey(message) : ''
+}
+
+function resolveOuterAnchorIndex(anchor: OuterAnchor) {
+  if (anchor.type !== 'item')
+    return 0
+
+  if (anchor.messageKey) {
+    const byKey = messages.value.findIndex(message => messageKey(message) === anchor.messageKey)
+    if (byKey >= 0)
+      return byKey
+  }
+
+  return Math.min(
+    Math.max(0, anchor.index ?? 0),
+    Math.max(0, messages.value.length - 1),
+  )
 }
 
 function markThreadRestoreTarget(threadId: ThreadId, anchor: OuterAnchor | null) {
@@ -620,10 +647,7 @@ function resolveOuterAnchorScrollTop(anchor: OuterAnchor) {
     )
   }
 
-  const index = Math.min(
-    Math.max(0, anchor.index ?? 0),
-    Math.max(0, messages.value.length - 1),
-  )
+  const index = resolveOuterAnchorIndex(anchor)
 
   return clampOuterScrollTop(
     (prefixTops.value[index] ?? 0) + Math.max(0, anchor.offsetPx ?? 0),
@@ -810,6 +834,10 @@ function isProbeCoveredByRenderedContent(probe: Element | null) {
   if (element.closest('.node-content, .node-placeholder'))
     return true
 
+  const slot = element.closest('.node-slot')
+  if (slot?.querySelector(':scope > .node-content, :scope > .node-placeholder'))
+    return true
+
   if (element.closest('.markdown-renderer'))
     return false
 
@@ -820,12 +848,38 @@ function isProbeCoveredByRenderedContent(probe: Element | null) {
   return Boolean(card)
 }
 
+function countBlankProbePoints(root: HTMLElement) {
+  const rootRect = root.getBoundingClientRect()
+  if (rootRect.width <= 0 || rootRect.height <= 0)
+    return 0
+
+  const xRatios = [0.2, 0.5, 0.8]
+  const yRatios = [0.08, 0.25, 0.5, 0.75, 0.92]
+  let blank = 0
+
+  for (const xRatio of xRatios) {
+    for (const yRatio of yRatios) {
+      const probe = document.elementFromPoint(
+        rootRect.left + rootRect.width * xRatio,
+        rootRect.top + rootRect.height * yRatio,
+      )
+
+      if (!isProbeCoveredByRenderedContent(probe))
+        blank++
+    }
+  }
+
+  return blank
+}
+
 function createEmptyLabStats(): LabStats {
   return {
     visibleItemCount: 0,
     markdownRendererCount: 0,
     markdownSlotCount: 0,
     markdownContentCount: 0,
+    maxHugeMessageSlotCount: 0,
+    hugeMessageDomCount: 0,
     blankProbeCount: 0,
     heightDriftPx: 0,
     maxItemHeightDriftPx: 0,
@@ -860,8 +914,9 @@ function applyLabStats(stats: LabStats) {
   worstHeightDriftMessageId.value = stats.worstHeightDriftMessageId
   visibleCoverageOk.value = stats.visibleCoverageOk
 
-  if (stats.blankProbeCount > 0)
-    blankFrameCount.value += 1
+  blankFrameCount.value = stats.blankProbeCount > 0
+    ? blankFrameCount.value + 1
+    : 0
 }
 
 function measureViewportCoverageGaps(root: HTMLElement) {
@@ -909,6 +964,13 @@ function collectStats(options: CollectStatsOptions = {}) {
   const messageCount = root.querySelectorAll('.virtual-message').length
   const slotCount = root.querySelectorAll('.node-slot').length
   const contentCount = root.querySelectorAll('.node-content').length
+  const hugeMessages = Array.from(root.querySelectorAll<HTMLElement>('.virtual-message.huge'))
+  const maxHugeMessageSlotCount = hugeMessages.reduce((max, el) => {
+    const renderer = el.querySelector<HTMLElement>(
+      ':scope > .message-card > .markdown-host > .markstream-vue.markdown-renderer',
+    )
+    return Math.max(max, renderer?.querySelectorAll(':scope > .node-slot').length ?? 0)
+  }, 0)
 
   let drifted = 0
   let maxDrift = 0
@@ -965,28 +1027,11 @@ function collectStats(options: CollectStatsOptions = {}) {
   if (heightChanged)
     void restoreOuterAnchor(outerAnchor, { immediate: true })
 
-  const rootRect = root.getBoundingClientRect()
-  const probePoints = [
-    [0.5, 0.25],
-    [0.5, 0.5],
-    [0.5, 0.75],
-    [0.25, 0.5],
-    [0.75, 0.5],
-  ] as const
-
-  let covered = true
-
-  for (const [xRatio, yRatio] of probePoints) {
-    const probe = document.elementFromPoint(
-      rootRect.left + rootRect.width * xRatio,
-      rootRect.top + rootRect.height * yRatio,
-    )
-
-    if (!isProbeCoveredByRenderedContent(probe) && totalHeight.value > currentViewportHeight) {
-      covered = false
-      break
-    }
-  }
+  const gridBlankProbeCount = totalHeight.value > currentViewportHeight
+    ? countBlankProbePoints(root)
+    : 0
+  blankProbeCount += gridBlankProbeCount
+  const covered = gridBlankProbeCount === 0
 
   if (messageCount === 0 && totalHeight.value > currentViewportHeight)
     blankProbeCount++
@@ -999,6 +1044,8 @@ function collectStats(options: CollectStatsOptions = {}) {
     markdownRendererCount: root.querySelectorAll('.markstream-vue').length,
     markdownSlotCount: slotCount,
     markdownContentCount: contentCount,
+    maxHugeMessageSlotCount,
+    hugeMessageDomCount: hugeMessages.length,
     blankProbeCount,
     heightDriftPx,
     maxItemHeightDriftPx: maxDrift,
@@ -1106,6 +1153,9 @@ async function switchThread(threadId: ThreadId) {
   root.scrollTop = scrollTop.value
 
   applyLabStats(collectStats({ reconcile: true }))
+  if (savedAnchor)
+    await restoreOuterAnchor(savedAnchor, { immediate: true, expectedJump: true })
+
   await waitFrame()
 
   pushLabEvent('thread-switch', {
@@ -1173,8 +1223,11 @@ function startStressScroll() {
     const maxScroll = Math.max(0, totalHeight.value - viewportHeight.value)
     const t = performance.now() - startedAt
     const ratio = (Math.sin(t / 600) + 1) / 2
+    const target = maxScroll * ratio
+    const maxStep = Math.max(600, viewportHeight.value * 1.5)
+    const delta = Math.max(-maxStep, Math.min(maxStep, target - scrollRoot.value.scrollTop))
 
-    scrollRoot.value.scrollTop = maxScroll * ratio
+    scrollRoot.value.scrollTop += delta
     onScroll()
 
     stressRaf = requestAnimationFrame(step)
@@ -1202,7 +1255,6 @@ function startStreamingLastMessage(options: StreamLastMessageOptions = {}) {
   let cursor = Math.max(0, options.initialChars ?? 1200)
   streamBottomPinned = getCurrentDistanceFromBottom() <= 32
 
-  target.revision += 1
   target.content = full.slice(0, cursor)
   target.final = false
 
@@ -1219,6 +1271,9 @@ function startStreamingLastMessage(options: StreamLastMessageOptions = {}) {
     if (cursor >= full.length) {
       target.content = full
       target.final = true
+      void nextTick(() => {
+        void rendererRefs.get(messageKey(target))?.settle({ reason: 'manual' })
+      })
 
       if (streamBottomPinned)
         void restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
@@ -1262,11 +1317,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     0,
     ...labEvents.map(event => event.markdownSlotCount ?? 0),
   )
-  const maxObservedHeightDriftPx = Math.max(
-    stats.maxItemHeightDriftPx,
-    0,
-    ...labEvents.map(event => event.maxItemHeightDriftPx ?? 0),
-  )
+  const maxObservedHeightDriftPx = stats.maxItemHeightDriftPx
   const maxObservedScrollJumpPx = Math.max(
     0,
     ...labEvents
@@ -1275,6 +1326,8 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
   )
   const domSlotBudget = Math.max(1, stats.markdownRendererCount) * 280
   const virtualDomWithinLimit = stats.markdownSlotCount <= domSlotBudget
+  const hugeRendererSlotBudget = maxLiveNodes.value + 16
+  const hugeRendererDomWithinLimit = stats.maxHugeMessageSlotCount <= hugeRendererSlotBudget
   const scrollJitterOk = maxObservedScrollJumpPx <= SCROLL_JITTER_BUDGET_PX
 
   return {
@@ -1286,6 +1339,8 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     maxObservedScrollJumpPx,
     scrollJitterOk,
     virtualDomWithinLimit,
+    hugeRendererDomWithinLimit,
+    hugeRendererSlotBudget,
     domSlotBudget,
     layoutIntegrityOk:
       stats.blankProbeCount === 0
@@ -1293,6 +1348,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
       && stats.visibleCoverageOk
       && maxObservedBlankProbes === 0
       && virtualDomWithinLimit
+      && hugeRendererDomWithinLimit
       && scrollJitterOk
       && maxObservedHeightDriftPx < 24,
   }
@@ -1329,6 +1385,8 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
     domNodeCount: stats.domNodeCount,
     markdownSlotCount: stats.markdownSlotCount,
     markdownContentCount: stats.markdownContentCount,
+    maxHugeMessageSlotCount: stats.maxHugeMessageSlotCount,
+    hugeRendererSlotBudget: health.hugeRendererSlotBudget,
     maxDomNodeCount: maxDomNodeCount.value,
     maxMarkdownSlotCount: maxMarkdownSlotCount.value,
     expectedMarkdownSlotCeiling: expectedMarkdownSlotCeiling.value,
@@ -1374,6 +1432,7 @@ async function rapidSwitchThreads(threadIds: ThreadId[], count = 9) {
 
 function clearLabEvents() {
   labEvents.splice(0)
+  blankFrameCount.value = 0
   lastObservedScrollTop = scrollTop.value
   expectedScrollTop = scrollTop.value
 }
@@ -1483,6 +1542,9 @@ onBeforeUnmount(() => {
         <span>messages: {{ messages.length }}</span>
         <span>outer rendered: {{ messageDomCount }}</span>
         <span data-testid="markdown-slots">markdown slots: {{ markdownSlotCount }}</span>
+        <span data-testid="huge-max-slots">
+          max huge slots: {{ labSnapshot.maxHugeMessageSlotCount }} / {{ labSnapshot.hugeRendererSlotBudget }}
+        </span>
         <span>markdown content: {{ markdownContentCount }}</span>
         <span data-testid="dom-nodes">dom nodes: {{ domNodeCount }}</span>
         <span>max dom: {{ maxDomNodeCount }}</span>
@@ -1584,6 +1646,13 @@ onBeforeUnmount(() => {
       <div>
         <strong>node-slot count</strong>
         <span>{{ labSnapshot.stats.markdownSlotCount }} / {{ labSnapshot.health.domSlotBudget }}</span>
+      </div>
+
+      <div>
+        <strong>huge slots</strong>
+        <span :class="{ ok: labSnapshot.health.hugeRendererDomWithinLimit, bad: !labSnapshot.health.hugeRendererDomWithinLimit }">
+          {{ labSnapshot.stats.maxHugeMessageSlotCount }} / {{ labSnapshot.health.hugeRendererSlotBudget }}
+        </span>
       </div>
 
       <div>

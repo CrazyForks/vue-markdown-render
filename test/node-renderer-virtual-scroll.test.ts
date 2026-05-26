@@ -1987,6 +1987,44 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('rejects standalone height cache when container width crosses cache bucket', async () => {
+    let width = 400
+
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const heightCache = await captureSeedHeightCache(NodeRenderer, [400, 400])
+
+    width = 432
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'seed-cache',
+          heightCache,
+          heightCacheWidth: 400,
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const metrics = (wrapper.vm as any).getVirtualMetrics()
+
+    expect(metrics.measuredCount).toBe(0)
+    expect(metrics.totalHeight).not.toBe(800)
+
+    wrapper.unmount()
+  })
+
   it('imports compatible standalone height cache when restore state is for another thread', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 

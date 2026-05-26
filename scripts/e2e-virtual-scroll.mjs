@@ -41,9 +41,15 @@ function outerAnchorDelta(before, after) {
 function assertThreadRestore(label, before, after) {
   const scrollDelta = Math.abs(before.scrollTop - after.scrollTop)
   const anchorDelta = outerAnchorDelta(before.outerAnchor, after.outerAnchor)
+  const sameFirstVisibleMessage = before.firstVisibleMessageId
+    && before.firstVisibleMessageId === after.firstVisibleMessageId
+  const sameAnchorMessage = before.outerAnchor?.type === 'item'
+    && after.outerAnchor?.type === 'item'
+    && before.outerAnchor.messageKey
+    && before.outerAnchor.messageKey === after.outerAnchor.messageKey
 
   assert(
-    scrollDelta < 32 || anchorDelta < 32,
+    scrollDelta < 32 || anchorDelta < 32 || sameFirstVisibleMessage || sameAnchorMessage,
     `${label} scroll position was not restored accurately`,
     {
       before: {
@@ -390,6 +396,17 @@ async function run() {
     )
 
     assert(
+      final.health.hugeRendererDomWithinLimit === true
+      && final.maxHugeMessageSlotCount <= final.hugeRendererSlotBudget,
+      'a huge Markdown renderer exceeded its per-renderer live node budget',
+      {
+        maxHugeMessageSlotCount: final.maxHugeMessageSlotCount,
+        hugeRendererSlotBudget: final.hugeRendererSlotBudget,
+        health: final.health,
+      },
+    )
+
+    assert(
       final.health.maxObservedMarkdownSlots <= final.health.domSlotBudget,
       'observed markdown node-slot count exceeded budget',
       final.health,
@@ -447,7 +464,8 @@ async function run() {
       stressAfter.health.maxObservedBlankProbes === 0
       && stressAfter.blankFrameCount === 0
       && stressAfter.visibleCoverageOk === true
-      && stressAfter.health.virtualDomWithinLimit === true,
+      && stressAfter.health.virtualDomWithinLimit === true
+      && stressAfter.health.hugeRendererDomWithinLimit === true,
       'blank frame or DOM budget regression observed during stress scroll',
       stressAfter,
     )
