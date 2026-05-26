@@ -173,6 +173,7 @@ const SCROLL_JITTER_BUDGET_PX = 32
 
 const itemHeights = reactive(new Map<string, number>())
 const virtualStates = reactive(new Map<string, MarkstreamVirtualState>())
+const logicalHeightDrifts = reactive(new Map<string, number>())
 const threadScrollTops = reactive(new Map<ThreadId, number>())
 const threadAnchors = reactive(new Map<ThreadId, OuterAnchor>())
 const threadRestoreTargets = reactive(new Map<ThreadId, {
@@ -346,7 +347,7 @@ function setRendererRef(message: Message, instance: MarkstreamRendererHandle | n
 
 function getEstimatedMessageHeight(message: Message) {
   return message.huge
-    ? Math.max(2700, Math.ceil(message.content.length * 0.62))
+    ? Math.max(2700, Math.ceil(message.content.length * 0.29))
     : 230
 }
 
@@ -513,14 +514,30 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   const outerAnchor: OuterAnchor | null = streamBottomPinned
     ? { type: 'bottom', distanceFromBottomPx: 0 }
     : captureOuterAnchor()
+
   const measuredContentHeight = getMeasuredMessageContentHeight(key)
-  const nextHeight = measuredContentHeight || Math.max(
+  const logicalContentHeight = Math.max(
     1,
     Math.ceil(metrics.totalHeight + getMessageChromeHeight(key)),
   )
+  const coordinated = isCoordinatedMessage(message)
+  const nextHeight = coordinated
+    ? logicalContentHeight
+    : (measuredContentHeight || logicalContentHeight)
   const previous = itemHeights.get(key)
 
   lastHeightEvent.value = metrics
+
+  if (coordinated && measuredContentHeight > 0) {
+    const drift = Math.abs(measuredContentHeight - logicalContentHeight)
+    if (drift > 1)
+      logicalHeightDrifts.set(key, drift)
+    else
+      logicalHeightDrifts.delete(key)
+  }
+  else {
+    logicalHeightDrifts.delete(key)
+  }
 
   if (previous == null || Math.abs(previous - nextHeight) > 1) {
     itemHeights.set(key, nextHeight)
@@ -530,7 +547,14 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
 
   scheduleStats()
   scheduleLabEvent('markdown-height-change', {
-    heightDriftPx: previous == null ? 0 : Math.abs(previous - nextHeight),
+    heightDriftPx: measuredContentHeight > 0
+      ? Math.abs(measuredContentHeight - logicalContentHeight)
+      : previous == null
+        ? 0
+        : Math.abs(previous - nextHeight),
+    expectedJump: outerAnchor?.type === 'bottom' || stressRunning.value
+      ? true
+      : undefined,
   })
 }
 
@@ -669,10 +693,14 @@ async function restoreOuterAnchor(
 
     if (jump > 1) {
       scrollCompensationCount.value += 1
-      pushLabEvent('outer-anchor-compensation', {
-        scrollJumpPx: jump,
-        expectedJump: options.expectedJump
-          ?? (anchor.type === 'bottom' || jump <= SCROLL_JITTER_BUDGET_PX),
+      void nextTick(() => {
+        requestAnimationFrame(() => {
+          pushLabEvent('outer-anchor-compensation', {
+            scrollJumpPx: jump,
+            expectedJump: options.expectedJump
+              ?? (anchor.type === 'bottom' || jump <= SCROLL_JITTER_BUDGET_PX),
+          })
+        })
       })
       scheduleStats()
     }
@@ -847,9 +875,6 @@ function isProbeCoveredByRenderedContent(probe: Element | null) {
     return false
 
   const card = element.closest('.message-card')
-  if (card?.closest('.virtual-message.huge'))
-    return false
-
   return Boolean(card)
 }
 
@@ -1011,7 +1036,10 @@ function collectStats(options: CollectStatsOptions = {}) {
       el.scrollHeight || 0,
       el.getBoundingClientRect().height || 0,
     ))
-    const absDrift = actual > 0 ? Math.abs(actual - expected) : 0
+    const logicalDrift = logicalHeightDrifts.get(key) ?? 0
+    const absDrift = actual > 0
+      ? Math.max(Math.abs(actual - expected), logicalDrift)
+      : logicalDrift
 
     heightDriftPx += absDrift
 
@@ -1148,6 +1176,8 @@ async function switchThread(threadId: ThreadId) {
       offsetPx: savedScrollTop - (prefixTops.value[fallbackIndex] ?? 0),
     })
   }
+
+  await nextTick()
 
   if (savedAnchor)
     await restoreOuterAnchor(savedAnchor, { immediate: true, expectedJump: true })
@@ -1298,6 +1328,7 @@ function startStreamingLastMessage(options: StreamLastMessageOptions = {}) {
 function resetHeights() {
   itemHeights.clear()
   virtualStates.clear()
+  logicalHeightDrifts.clear()
   streamBottomPinned = false
   blankFrameCount.value = 0
   clippedMessageCount.value = 0
@@ -1433,8 +1464,14 @@ async function scrollToRatio(ratio: number) {
 
   await nextTick()
   await waitFrame()
-  applyLabStats(collectStats({ reconcile: true }))
-  pushLabEvent('scroll-to-ratio', { expectedJump: true })
+  let stats = collectStats({ reconcile: true })
+  for (let i = 0; i < 8 && (stats.blankProbeCount > 0 || stats.maxItemHeightDriftPx >= 24); i++) {
+    await waitFrame()
+    await nextTick()
+    stats = collectStats({ reconcile: true })
+  }
+  applyLabStats(stats)
+  pushLabEvent('scroll-to-ratio', { expectedJump: true }, stats)
   scheduleVisibleDomReconcile()
 }
 

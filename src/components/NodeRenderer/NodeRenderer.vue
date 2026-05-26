@@ -1655,7 +1655,7 @@ function getVirtualMetrics(
     topSpacerHeight: summary.topSpacerHeight,
     bottomSpacerHeight: summary.bottomSpacerHeight,
     visibleDomHeight: getVisibleDomHeight(),
-    totalHeight: summary.estimatedTotalHeight,
+    totalHeight: getRendererLogicalHeight(),
     width: summary.width,
     final: effectiveFinal.value === true,
     stable: isLayoutSettled(),
@@ -2591,15 +2591,25 @@ async function settle(options: {
   const frames = options.frames ?? 2
   const timeoutMs = options.timeoutMs ?? 120
   const reason = options.reason ?? 'manual'
+  const staleBaseMetrics = getVirtualMetrics(reason)
+  const staleMetrics = (): MarkstreamVirtualMetrics => ({
+    ...staleBaseMetrics,
+    phase: staleBaseMetrics.final ? 'settling' : staleBaseMetrics.phase,
+    stable: false,
+    confidence: staleBaseMetrics.confidence === 'final'
+      ? 'mixed'
+      : staleBaseMetrics.confidence,
+    reason,
+  })
 
   for (let i = 0; i < frames; i++) {
     await nextTick()
     if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
-      return getVirtualMetrics(reason)
+      return staleMetrics()
 
     await waitForVirtualFrame()
     if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
-      return getVirtualMetrics(reason)
+      return staleMetrics()
 
     measureTrackedNodeHeights()
     forceFlushPendingHeightMeasurements()
@@ -2607,13 +2617,13 @@ async function settle(options: {
 
   await waitForVirtualTimeout(timeoutMs)
   if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
-    return getVirtualMetrics(reason)
+    return staleMetrics()
 
   measureTrackedNodeHeights()
   forceFlushPendingHeightMeasurements()
 
   if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
-    return getVirtualMetrics(reason)
+    return staleMetrics()
 
   if (isInternalLayoutSettled()) {
     imperativeVirtualSettleSessionKey = sessionKeyAtStart
@@ -2752,8 +2762,16 @@ function resetVirtualMetricsEventDedupes() {
   lastFinalVirtualEventKey = null
 }
 
+function shouldDelayVirtualMetricsUntilDom(force = false) {
+  return !force
+    && virtualScrollRequested.value
+    && !virtualScrollDomEnabled.value
+}
+
 function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false) {
   if (!virtualScrollEnabled.value)
+    return
+  if (shouldDelayVirtualMetricsUntilDom(force))
     return
 
   const shouldEmit = force || shouldEmitVirtualMetrics(metrics)
@@ -2805,6 +2823,15 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
     }
   }
 }
+
+watch(
+  virtualScrollDomEnabled,
+  (enabled) => {
+    if (enabled)
+      scheduleVirtualMetricsEmit('content')
+  },
+  { flush: 'post' },
+)
 
 function clearVirtualMetricsSchedule() {
   if (virtualMetricsEmitRaf != null) {

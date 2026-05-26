@@ -7,6 +7,8 @@ import type {
   LinkNodeProps,
   MarkdownIt,
   MarkdownPluginRegistration,
+  MarkstreamHeightCacheEntry,
+  MarkstreamMeasuredHeightCacheEntry,
   MarkstreamNodeLifecycle,
   MarkstreamRendererHandle,
   MarkstreamVirtualMetrics,
@@ -128,8 +130,18 @@ const virtualScrollOptions: MarkstreamVirtualScrollOptions = {
   sessionKey: 'public-api-session',
 }
 const virtualScrollHeightCacheOptions: MarkstreamVirtualScrollHeightCacheOptions = {
-  heightCache: [{ index: 0, height: 120 }],
+  heightCache: [{ index: 0, height: 120, nodeType: 'paragraph', signature: 'public-api-signature' }],
   heightCacheWidth: 600,
+}
+const heightCacheEntry: MarkstreamHeightCacheEntry = {
+  index: 0,
+  height: 120,
+  nodeType: 'paragraph',
+  signature: 'public-api-signature',
+}
+const measuredHeightCacheEntry: MarkstreamMeasuredHeightCacheEntry = {
+  index: 0,
+  height: 120,
 }
 const virtualScrollSharedOptions: MarkstreamVirtualScrollSharedOptions = {
   measurementKey: 'public-api-measurement',
@@ -208,6 +220,8 @@ void d2Props
 void infographicProps
 void virtualScrollOptions
 void virtualScrollHeightCacheOptions
+void heightCacheEntry
+void measuredHeightCacheEntry
 void virtualScrollSharedOptions
 void virtualScrollOptionsWithoutSessionKey
 void virtualMetrics

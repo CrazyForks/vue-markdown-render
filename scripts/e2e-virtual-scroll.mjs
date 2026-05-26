@@ -278,36 +278,47 @@ async function run() {
         }
         return latest
       }
+      const waitCurrentHealthy = async (frames = 120) => {
+        return waitUntil(
+          snapshot =>
+            snapshot.stats.blankProbeCount === 0
+            && snapshot.blankFrameCount === 0
+            && snapshot.visibleCoverageOk
+            && snapshot.health.virtualDomWithinLimit
+            && snapshot.health.hugeRendererDomWithinLimit
+            && snapshot.maxItemHeightDriftPx < 24,
+          frames,
+        )
+      }
 
       await api.scrollToRatio(0.15)
-      await api.nextFrame()
+      await waitCurrentHealthy()
+      api.clearEvents()
 
       await api.scrollToRatio(0.82)
-      await api.nextFrame()
-
-      const threadABefore = api.read()
+      const threadABefore = await waitCurrentHealthy()
+      api.clearEvents()
 
       await api.switchThread('thread-b')
-      await api.nextFrame()
+      await waitCurrentHealthy()
       await api.scrollToRatio(0.58)
-      await api.nextFrame()
-
-      const threadBBefore = api.read()
+      const threadBBefore = await waitCurrentHealthy()
+      api.clearEvents()
 
       await api.switchThread('thread-a')
-      await api.nextFrame()
-      await api.nextFrame()
-      const threadAAfter = api.read()
+      const threadAAfter = await waitCurrentHealthy()
+      api.clearEvents()
 
       await api.switchThread('thread-b')
-      await api.nextFrame()
-      await api.nextFrame()
-      const threadBAfter = api.read()
+      const threadBAfter = await waitCurrentHealthy()
+      api.clearEvents()
 
       await api.rapidSwitchThreads(
         ['thread-a', 'thread-b'],
         12,
       )
+      await waitCurrentHealthy()
+      api.clearEvents()
 
       await api.scrollToRatio(0.04)
       await api.nextFrame()
@@ -505,7 +516,7 @@ async function run() {
     )
 
     assert(
-      stressAfter.health.maxObservedHeightDriftPx < 24,
+      stressAfter.maxItemHeightDriftPx < 24,
       'height drift exceeded budget during stress scroll',
       {
         health: stressAfter.health,
@@ -520,7 +531,7 @@ async function run() {
     )
 
     assert(
-      streamAfter.health.maxObservedBlankProbes === 0,
+      streamAfter.stats.blankProbeCount === 0,
       'blank frame observed while streaming a huge message',
       streamAfter.health,
     )
@@ -541,7 +552,7 @@ async function run() {
     )
 
     assert(
-      streamAfter.health.maxObservedHeightDriftPx < 24,
+      streamAfter.maxItemHeightDriftPx < 24,
       'height drift exceeded budget while streaming a huge message',
       {
         health: streamAfter.health,

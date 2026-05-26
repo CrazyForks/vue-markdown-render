@@ -1,5 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
-import type { MarkstreamHeightCache } from '../../../types/node-renderer-props'
+import type { MarkstreamInternalHeightCache } from '../../../types/node-renderer-props'
 import { computed, reactive, ref } from 'vue'
 
 export interface HeightMeasurementsOptions {
@@ -23,8 +23,8 @@ export interface HeightMeasurements {
   recordNodeHeight: (index: number, height: number, options?: { allowShrink?: boolean }) => void
   removeNodeHeight: (index: number, options?: { notify?: boolean }) => boolean
   removeNodeHeights: (indices: Iterable<number>, options?: { notify?: boolean }) => number
-  exportHeightCache: () => MarkstreamHeightCache
-  importHeightCache: (cache: MarkstreamHeightCache, options?: { mode?: 'replace' | 'merge' }) => void
+  exportHeightCache: () => MarkstreamInternalHeightCache
+  importHeightCache: (cache: MarkstreamInternalHeightCache, options?: { mode?: 'replace' | 'merge' }) => void
 
   fenwickRangeSum: (tree: number[], start: number, end: number) => number
 }
@@ -267,7 +267,7 @@ export function useHeightMeasurements(
     return removed
   }
 
-  function exportHeightCache(): MarkstreamHeightCache {
+  function exportHeightCache(): MarkstreamInternalHeightCache {
     return Object.entries(nodeHeights)
       .map(([rawIndex, rawHeight]) => ({
         index: Number(rawIndex),
@@ -277,7 +277,7 @@ export function useHeightMeasurements(
       .sort((a, b) => a.index - b.index)
   }
 
-  function importHeightCache(cache: MarkstreamHeightCache, importOptions: { mode?: 'replace' | 'merge' } = {}) {
+  function importHeightCache(cache: MarkstreamInternalHeightCache, importOptions: { mode?: 'replace' | 'merge' } = {}) {
     if (!Array.isArray(cache))
       return
 

@@ -110,6 +110,8 @@ export type {
 } from './types/component-props'
 export type {
   MarkstreamHeightCache,
+  MarkstreamHeightCacheEntry,
+  MarkstreamMeasuredHeightCacheEntry,
   MarkstreamNodeLifecycle,
   MarkstreamRendererHandle,
   MarkstreamScrollRoot,

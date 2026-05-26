@@ -50,12 +50,18 @@ export type MarkstreamVirtualAnchor
     distanceFromBottomPx: number
   }
 
-export type MarkstreamHeightCache = Array<{
+export interface MarkstreamMeasuredHeightCacheEntry {
   index: number
   height: number
-  nodeType?: string
-  signature?: string
-}>
+}
+
+export interface MarkstreamHeightCacheEntry extends MarkstreamMeasuredHeightCacheEntry {
+  nodeType: string
+  signature: string
+}
+
+export type MarkstreamHeightCache = MarkstreamHeightCacheEntry[]
+export type MarkstreamInternalHeightCache = MarkstreamMeasuredHeightCacheEntry[]
 
 export interface MarkstreamVirtualMetrics {
   sessionKey: string

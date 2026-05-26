@@ -478,7 +478,7 @@ describe('node renderer virtual-scroll coordination', () => {
       const metrics = await settlePromise
 
       expect(metrics).toMatchObject({
-        sessionKey: 'session-b',
+        sessionKey: 'session-a',
         stable: false,
       })
       expect(metrics.phase).not.toBe('final')
