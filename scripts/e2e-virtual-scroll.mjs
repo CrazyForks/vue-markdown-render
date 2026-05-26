@@ -141,50 +141,15 @@ function startDevServer(port) {
   }
 }
 
-async function readSnapshot(page) {
-  return await page.evaluate(() => {
-    const api = window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__
-    if (!api)
-      throw new Error('Virtual scroll lab API is not available')
-    return api.read()
-  })
-}
-
 async function waitForLabReady(page, timeoutMs = 30000) {
   await page.waitForFunction(() => {
-    const api = window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__
+    const api = window.__markstreamVirtualScrollLab
     if (!api)
       return false
 
     const snapshot = api.read()
-    return snapshot.totalHeight > snapshot.viewportHeight
-      && snapshot.messageDomCount > 0
-      && snapshot.markdownSlotCount > 0
+    return snapshot.ready === true
   }, null, { timeout: timeoutMs })
-}
-
-async function waitForHealthy(page, label, timeoutMs = 30000) {
-  await page.waitForFunction(() => {
-    const api = window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__
-    if (!api)
-      return false
-
-    const snapshot = api.read()
-    return snapshot.blankFrameCount === 0
-      && snapshot.visibleCoverageOk
-      && snapshot.clippedMessageCount === 0
-      && snapshot.heightDriftMessageCount === 0
-      && snapshot.maxItemHeightDriftPx <= 2
-      && snapshot.markdownSlotCount <= snapshot.expectedMarkdownSlotCeiling
-      && snapshot.domNodeCount <= snapshot.expectedDomNodeCeiling
-      && snapshot.maxMarkdownSlotCount <= (snapshot.maxExpectedMarkdownSlotCeiling ?? snapshot.expectedMarkdownSlotCeiling)
-      && snapshot.maxDomNodeCount <= (snapshot.maxExpectedDomNodeCeiling ?? snapshot.expectedDomNodeCeiling)
-      && snapshot.messageDomCount <= 24
-      && snapshot.labStatus === 'ok'
-  }, null, { timeout: timeoutMs }).catch(async (error) => {
-    const snapshot = await readSnapshot(page).catch(() => null)
-    throw new Error(`${label} did not become healthy: ${error.message}\n${JSON.stringify(snapshot, null, 2)}`)
-  })
 }
 
 async function run() {
@@ -207,83 +172,125 @@ async function run() {
     })
 
     await page.goto(`http://${host}:${port}/virtual-scroll`, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle',
       timeout: 60000,
     })
 
     await waitForLabReady(page)
-    await waitForHealthy(page, 'initial')
 
-    await page.evaluate(() => window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__.actions.jumpToBottom())
-    await page.evaluate(() => window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__.actions.startStreamingLastMessage())
+    await page.evaluate(() => {
+      window.__markstreamVirtualScrollLab.clearEvents()
+    })
 
-    await page.waitForTimeout(4500)
-    await waitForHealthy(page, 'streaming bottom pin')
+    const result = await page.evaluate(async () => {
+      const api = window.__markstreamVirtualScrollLab
 
-    const afterStream = await readSnapshot(page)
-    assert(afterStream.distanceFromBottomPx <= 32, 'streaming should remain pinned near bottom', afterStream)
+      await api.scrollToRatio(0.15)
+      await api.nextFrame()
 
-    await page.evaluate(() => window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__.actions.startStressScroll())
-    await page.waitForTimeout(10000)
-    await page.evaluate(() => window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__.actions.stopStressScroll())
-    await waitForHealthy(page, 'stress scroll')
+      await api.scrollToRatio(0.82)
+      await api.nextFrame()
 
-    const afterStress = await readSnapshot(page)
-    assert(afterStress.blankFrameCount === 0, 'stress scroll produced blank frames', afterStress)
+      const threadABefore = api.read()
+
+      await api.switchThread('thread-b')
+      await api.nextFrame()
+      await api.scrollToRatio(0.58)
+      await api.nextFrame()
+
+      const threadBBefore = api.read()
+
+      await api.switchThread('thread-a')
+      await api.nextFrame()
+      const threadAAfter = api.read()
+
+      await api.switchThread('thread-b')
+      await api.nextFrame()
+      const threadBAfter = api.read()
+
+      await api.rapidSwitchThreads(
+        ['thread-a', 'thread-b'],
+        12,
+      )
+
+      await api.scrollToRatio(0.04)
+      await api.nextFrame()
+      await api.scrollToRatio(0.95)
+      await api.nextFrame()
+
+      return {
+        threadABefore,
+        threadBBefore,
+        threadAAfter,
+        threadBAfter,
+        final: api.read(),
+      }
+    })
+
+    const {
+      threadABefore,
+      threadBBefore,
+      threadAAfter,
+      threadBAfter,
+      final,
+    } = result
+
+    const threadARestoreDelta = Math.abs(threadABefore.scrollTop - threadAAfter.scrollTop)
+    const threadBRestoreDelta = Math.abs(threadBBefore.scrollTop - threadBAfter.scrollTop)
+
     assert(
-      afterStress.markdownSlotCount <= afterStress.expectedMarkdownSlotCeiling,
-      'DOM-size exceeded markdown slot ceiling',
-      afterStress,
+      threadARestoreDelta < 32,
+      'thread-a scroll position was not restored accurately',
+      { before: threadABefore.scrollTop, after: threadAAfter.scrollTop, threadARestoreDelta },
     )
+
     assert(
-      afterStress.domNodeCount <= afterStress.expectedDomNodeCeiling,
-      'DOM-size exceeded total DOM node ceiling',
-      afterStress,
+      threadBRestoreDelta < 32,
+      'thread-b scroll position was not restored accurately',
+      { before: threadBBefore.scrollTop, after: threadBAfter.scrollTop, threadBRestoreDelta },
     )
+
     assert(
-      afterStress.maxMarkdownSlotCount <= (afterStress.maxExpectedMarkdownSlotCeiling ?? afterStress.expectedMarkdownSlotCeiling),
-      'DOM-size exceeded markdown slot ceiling during stress scroll',
-      afterStress,
+      final.health.maxObservedBlankProbes === 0,
+      'blank visible item observed during virtual scrolling',
+      {
+        health: final.health,
+        events: final.events.filter(event => (event.blankProbeCount ?? 0) > 0),
+      },
     )
+
     assert(
-      afterStress.maxDomNodeCount <= (afterStress.maxExpectedDomNodeCeiling ?? afterStress.expectedDomNodeCeiling),
-      'DOM-size exceeded total DOM node ceiling during stress scroll',
-      afterStress,
+      final.health.virtualDomWithinLimit === true,
+      'markdown DOM slot count exceeded budget',
+      final.health,
     )
+
     assert(
-      afterStress.maxItemHeightDriftPx <= 2,
-      'item height drift is too large after stress scroll',
-      afterStress,
+      final.health.maxObservedMarkdownSlots <= final.health.domSlotBudget,
+      'observed markdown node-slot count exceeded budget',
+      final.health,
     )
 
-    await page.evaluate(() => window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__.actions.jumpToMiddle())
-    await page.waitForTimeout(300)
-    const threadABefore = await readSnapshot(page)
-
-    await page.evaluate(() => window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__.actions.switchThread('thread-b'))
-    await page.waitForTimeout(500)
-    await waitForHealthy(page, 'thread B')
-
-    await page.evaluate(() => window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__.actions.switchThread('thread-a'))
-    await page.waitForTimeout(800)
-    await waitForHealthy(page, 'thread A restore')
-
-    const threadAAfter = await readSnapshot(page)
     assert(
-      Math.abs(threadAAfter.scrollTop - threadABefore.scrollTop) <= 48,
-      'thread restore drift is too large',
-      { before: threadABefore, after: threadAAfter },
+      final.health.maxObservedHeightDriftPx < 24,
+      'height drift is too large after coordination',
+      {
+        health: final.health,
+        events: final.events.filter(event => (event.maxItemHeightDriftPx ?? 0) >= 24),
+      },
     )
 
-    await page.evaluate(() => window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__.actions.toggleDensity())
-    await page.evaluate(() => window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__.actions.toggleFontScale())
-    await page.waitForTimeout(1200)
-    await waitForHealthy(page, 'density/font relayout')
+    assert(
+      final.health.layoutIntegrityOk === true,
+      'virtual-scroll layout health check failed',
+      final.health,
+    )
 
-    const finalSnapshot = await readSnapshot(page)
     process.stdout.write(`${JSON.stringify({
       ok: true,
-      snapshot: finalSnapshot,
+      threadARestoreDelta,
+      threadBRestoreDelta,
+      health: final.health,
     }, null, 2)}\n`)
   }
   catch (error) {

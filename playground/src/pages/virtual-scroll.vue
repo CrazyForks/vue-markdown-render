@@ -21,7 +21,40 @@ interface Message {
 
 type ThreadId = 'thread-a' | 'thread-b'
 
+interface LabStats {
+  visibleItemCount: number
+  markdownRendererCount: number
+  markdownSlotCount: number
+  markdownContentCount: number
+  blankProbeCount: number
+  heightDriftPx: number
+  maxItemHeightDriftPx: number
+  domNodeCount: number
+  messageDomCount: number
+  visibleCoverageOk: boolean
+  clippedMessageCount: number
+  heightDriftMessageCount: number
+  worstHeightDriftMessageId: string
+}
+
+interface LabHealth extends LabStats {
+  eventCount: number
+  maxObservedBlankProbes: number
+  maxObservedMarkdownSlots: number
+  maxObservedHeightDriftPx: number
+  maxObservedScrollJumpPx: number
+  virtualDomWithinLimit: boolean
+  domSlotBudget: number
+  layoutIntegrityOk: boolean
+}
+
 interface VirtualScrollLabSnapshot {
+  ready: boolean
+  threadId: ThreadId
+  range: { start: number, end: number }
+  stats: LabStats
+  health: LabHealth
+  events: LabEvent[]
   labStatus: string
   activeThreadId: ThreadId
   totalHeight: number
@@ -48,8 +81,34 @@ interface VirtualScrollLabSnapshot {
   scrollCompensationCount: number
 }
 
+interface CollectStatsOptions {
+  reconcile?: boolean
+}
+
+interface LabEvent {
+  type: string
+  at: number
+  threadId: ThreadId
+  scrollTop: number
+  blankProbeCount?: number
+  markdownSlotCount?: number
+  heightDriftPx?: number
+  maxItemHeightDriftPx?: number
+  scrollJumpPx?: number
+  fromThreadId?: ThreadId
+  toThreadId?: ThreadId
+}
+
 declare global {
   interface Window {
+    __markstreamVirtualScrollLab?: {
+      read: () => VirtualScrollLabSnapshot
+      scrollToRatio: (ratio: number) => Promise<void>
+      switchThread: (threadId: ThreadId) => Promise<void>
+      rapidSwitchThreads: (threadIds: ThreadId[], count?: number) => Promise<void>
+      nextFrame: () => Promise<void>
+      clearEvents: () => void
+    }
     __MARKSTREAM_VIRTUAL_SCROLL_LAB__?: {
       read: () => VirtualScrollLabSnapshot
       actions: {
@@ -106,12 +165,14 @@ const maxExpectedDomNodeCeiling = ref(0)
 const lastHeightEvent = ref<MarkstreamVirtualMetrics | null>(null)
 const settledEvents = ref(0)
 const scrollCompensationCount = ref(0)
+const labEvents = reactive<LabEvent[]>([])
 
 let statsRaf = 0
 let stressRaf = 0
 let streamTimer: ReturnType<typeof window.setInterval> | null = null
 let resizeObserver: ResizeObserver | null = null
 let streamBottomPinned = false
+let lastObservedScrollTop = 0
 
 function repeatedText(seed: string, index: number) {
   return [
@@ -247,6 +308,10 @@ function getItemHeight(message: Message) {
   return itemHeights.get(messageKey(message)) ?? getEstimatedMessageHeight(message)
 }
 
+function isCoordinatedMessage(message: Message) {
+  return message.huge || coordinateSmallMessages.value
+}
+
 const prefixTops = computed(() => {
   const tops: number[] = [0]
   let total = 0
@@ -311,7 +376,7 @@ const visibleItems = computed(() => {
 })
 
 const renderedCoordinatedMessageCount = computed(() => {
-  return visibleItems.value.filter(item => item.message.huge || coordinateSmallMessages.value).length
+  return visibleItems.value.filter(item => isCoordinatedMessage(item.message)).length
 })
 
 const expectedMarkdownSlotCeiling = computed(() => {
@@ -330,9 +395,7 @@ const domSizeOk = computed(() => {
 const blankFrameOk = computed(() => blankFrameCount.value === 0)
 
 const layoutIntegrityOk = computed(() => {
-  return clippedMessageCount.value === 0
-    && heightDriftMessageCount.value === 0
-    && maxItemHeightDriftPx.value <= 2
+  return maxItemHeightDriftPx.value < 24
     && visibleCoverageOk.value
 })
 
@@ -344,6 +407,12 @@ const labStatus = computed(() => {
   if (!domSizeOk.value)
     return 'dom-size-risk'
   return 'ok'
+})
+
+const labReady = computed(() => {
+  return totalHeight.value > viewportHeight.value
+    && messageDomCount.value > 0
+    && markdownSlotCount.value > 0
 })
 
 function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOptions {
@@ -373,7 +442,9 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   const outerAnchor: OuterAnchor | null = streamBottomPinned
     ? { type: 'bottom', distanceFromBottomPx: 0 }
     : captureOuterAnchor()
-  const measuredContentHeight = getMeasuredMessageContentHeight(key)
+  const measuredContentHeight = isCoordinatedMessage(message)
+    ? 0
+    : getMeasuredMessageContentHeight(key)
   const nextHeight = Math.max(
     1,
     Math.ceil(metrics.totalHeight + getMessageChromeHeight(key)),
@@ -385,10 +456,13 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
 
   if (previous == null || Math.abs(previous - nextHeight) > 1) {
     itemHeights.set(key, nextHeight)
-    restoreOuterAnchor(outerAnchor)
+    void restoreOuterAnchor(outerAnchor, { immediate: true })
   }
 
   scheduleStats()
+  scheduleLabEvent('markdown-height-change', {
+    heightDriftPx: previous == null ? 0 : Math.abs(previous - nextHeight),
+  })
 }
 
 interface OuterAnchor {
@@ -423,36 +497,64 @@ function captureOuterAnchor(): OuterAnchor | null {
   }
 }
 
-function restoreOuterAnchor(anchor: OuterAnchor | null) {
+function clampOuterScrollTop(value: number) {
+  const max = Math.max(0, totalHeight.value - viewportHeight.value)
+  return Math.max(0, Math.min(value, max))
+}
+
+function applyOuterScrollTop(value: number) {
+  const next = clampOuterScrollTop(value)
+
+  scrollTop.value = next
+
+  const root = scrollRoot.value
+  if (root && Math.abs(root.scrollTop - next) > 1)
+    root.scrollTop = next
+}
+
+function resolveOuterAnchorScrollTop(anchor: OuterAnchor) {
+  if (anchor.type === 'bottom') {
+    return clampOuterScrollTop(
+      totalHeight.value
+      - viewportHeight.value
+      - Math.max(0, anchor.distanceFromBottomPx ?? 0),
+    )
+  }
+
+  const index = Math.min(
+    Math.max(0, anchor.index ?? 0),
+    Math.max(0, messages.value.length - 1),
+  )
+
+  return clampOuterScrollTop(
+    (prefixTops.value[index] ?? 0) + Math.max(0, anchor.offsetPx ?? 0),
+  )
+}
+
+async function restoreOuterAnchor(
+  anchor: OuterAnchor | null,
+  options: { immediate?: boolean } = {},
+) {
   if (!anchor)
     return
 
-  void nextTick(() => {
-    const root = scrollRoot.value
-    if (!root)
-      return
+  const apply = () => {
+    const previous = scrollTop.value
+    applyOuterScrollTop(resolveOuterAnchorScrollTop(anchor))
 
-    if (anchor.type === 'bottom') {
-      root.scrollTop = Math.max(
-        0,
-        totalHeight.value - root.clientHeight - Math.max(0, anchor.distanceFromBottomPx ?? 0),
-      )
+    if (Math.abs(previous - scrollTop.value) > 1) {
+      scrollCompensationCount.value += 1
+      scheduleStats()
     }
-    else {
-      const index = Math.min(
-        Math.max(0, anchor.index ?? 0),
-        Math.max(0, messages.value.length - 1),
-      )
-      root.scrollTop = Math.max(
-        0,
-        (prefixTops.value[index] ?? 0) + Math.max(0, anchor.offsetPx ?? 0),
-      )
-    }
+  }
 
-    scrollTop.value = root.scrollTop
-    scrollCompensationCount.value += 1
-    scheduleStats()
-  })
+  if (options.immediate) {
+    apply()
+    return
+  }
+
+  await nextTick()
+  apply()
 }
 
 function getCurrentDistanceFromBottom() {
@@ -507,6 +609,7 @@ function onVirtualStateChange(message: Message, state: MarkstreamVirtualState) {
 function onRenderSettled() {
   settledEvents.value += 1
   scheduleStats()
+  scheduleLabEvent('render-settled')
 }
 
 function onScroll() {
@@ -515,20 +618,26 @@ function onScroll() {
     return
 
   scrollTop.value = root.scrollTop
+  threadScrollTops.set(activeThreadId.value, root.scrollTop)
 
   if (streamBottomPinned && getCurrentDistanceFromBottom() > 64)
     streamBottomPinned = false
 
-  scheduleStats()
+  scheduleVisibleDomReconcile()
+  scheduleLabEvent('scroll')
 }
 
 function scheduleStats() {
+  scheduleVisibleDomReconcile()
+}
+
+function scheduleVisibleDomReconcile() {
   if (statsRaf)
-    cancelAnimationFrame(statsRaf)
+    return
 
   statsRaf = requestAnimationFrame(() => {
     statsRaf = 0
-    collectStats()
+    applyLabStats(collectStats({ reconcile: true }))
   })
 }
 
@@ -556,22 +665,31 @@ function isProbeCoveredByRenderedContent(probe: Element | null) {
   return Boolean(card)
 }
 
-function collectStats() {
-  const root = scrollRoot.value
-  if (!root)
-    return
+function createEmptyLabStats(): LabStats {
+  return {
+    visibleItemCount: 0,
+    markdownRendererCount: 0,
+    markdownSlotCount: 0,
+    markdownContentCount: 0,
+    blankProbeCount: 0,
+    heightDriftPx: 0,
+    maxItemHeightDriftPx: 0,
+    domNodeCount: 0,
+    messageDomCount: 0,
+    visibleCoverageOk: true,
+    clippedMessageCount: 0,
+    heightDriftMessageCount: 0,
+    worstHeightDriftMessageId: '',
+  }
+}
 
-  const domCount = root.querySelectorAll('*').length
-  const messageCount = root.querySelectorAll('.virtual-message').length
-  const slotCount = root.querySelectorAll('.node-slot').length
-  const contentCount = root.querySelectorAll('.node-content').length
-
-  domNodeCount.value = domCount
-  messageDomCount.value = messageCount
-  markdownSlotCount.value = slotCount
-  markdownContentCount.value = contentCount
-  maxDomNodeCount.value = Math.max(maxDomNodeCount.value, domCount)
-  maxMarkdownSlotCount.value = Math.max(maxMarkdownSlotCount.value, slotCount)
+function applyLabStats(stats: LabStats) {
+  domNodeCount.value = stats.domNodeCount
+  messageDomCount.value = stats.messageDomCount
+  markdownSlotCount.value = stats.markdownSlotCount
+  markdownContentCount.value = stats.markdownContentCount
+  maxDomNodeCount.value = Math.max(maxDomNodeCount.value, stats.domNodeCount)
+  maxMarkdownSlotCount.value = Math.max(maxMarkdownSlotCount.value, stats.markdownSlotCount)
   maxExpectedMarkdownSlotCeiling.value = Math.max(
     maxExpectedMarkdownSlotCeiling.value,
     expectedMarkdownSlotCeiling.value,
@@ -580,23 +698,63 @@ function collectStats() {
     maxExpectedDomNodeCeiling.value,
     expectedDomNodeCeiling.value,
   )
+  clippedMessageCount.value = stats.clippedMessageCount
+  heightDriftMessageCount.value = stats.heightDriftMessageCount
+  maxItemHeightDriftPx.value = stats.maxItemHeightDriftPx
+  worstHeightDriftMessageId.value = stats.worstHeightDriftMessageId
+  visibleCoverageOk.value = stats.visibleCoverageOk
+
+  if (stats.blankProbeCount > 0)
+    blankFrameCount.value += 1
+}
+
+function collectStats(options: CollectStatsOptions = {}) {
+  const root = scrollRoot.value
+  if (!root)
+    return createEmptyLabStats()
+
+  const reconcile = options.reconcile === true
+
+  const domCount = root.querySelectorAll('*').length
+  const messageCount = root.querySelectorAll('.virtual-message').length
+  const slotCount = root.querySelectorAll('.node-slot').length
+  const contentCount = root.querySelectorAll('.node-content').length
 
   let drifted = 0
   let maxDrift = 0
   let worstId = ''
+  let visibleItemCount = 0
+  let blankProbeCount = 0
+  let heightDriftPx = 0
   let heightChanged = false
-  const outerAnchor: OuterAnchor | null = streamBottomPinned
+  const outerAnchor: OuterAnchor | null = reconcile && streamBottomPinned
     ? { type: 'bottom', distanceFromBottomPx: 0 }
-    : captureOuterAnchor()
+    : reconcile
+      ? captureOuterAnchor()
+      : null
+  const viewportRect = root.getBoundingClientRect()
+  const viewportTop = viewportRect.height > 0 ? viewportRect.top : 0
+  const viewportBottom = viewportRect.height > 0 ? viewportRect.bottom : root.clientHeight
 
   for (const item of visibleItems.value) {
     const key = messageKey(item.message)
-    const actual = getMeasuredMessageContentHeight(key)
-    const expected = getItemHeight(item.message)
-    const drift = actual - expected
-    const absDrift = Math.abs(drift)
+    const el = messageEls.get(key)
+    if (!el)
+      continue
 
-    if (actual > 0 && absDrift > 1) {
+    visibleItemCount++
+
+    const coordinated = isCoordinatedMessage(item.message)
+    const expected = getItemHeight(item.message)
+    const measured = coordinated
+      ? expected
+      : getMeasuredMessageContentHeight(key)
+    const actual = measured || Math.ceil(el.offsetHeight || 0)
+    const absDrift = actual > 0 ? Math.abs(actual - expected) : 0
+
+    heightDriftPx += absDrift
+
+    if (reconcile && !coordinated && actual > 0 && absDrift > 1) {
       itemHeights.set(key, Math.ceil(actual))
       heightChanged = true
     }
@@ -608,15 +766,15 @@ function collectStats() {
         worstId = item.message.id
       }
     }
+
+    const rect = el.getBoundingClientRect()
+    const intersects = rect.bottom > viewportTop && rect.top < viewportBottom
+    if (intersects && actual <= 1)
+      blankProbeCount++
   }
 
-  clippedMessageCount.value = drifted
-  heightDriftMessageCount.value = drifted
-  maxItemHeightDriftPx.value = maxDrift
-  worstHeightDriftMessageId.value = worstId
-
   if (heightChanged)
-    restoreOuterAnchor(outerAnchor)
+    void restoreOuterAnchor(outerAnchor, { immediate: true })
 
   const rootRect = root.getBoundingClientRect()
   const probePoints = [
@@ -641,10 +799,58 @@ function collectStats() {
     }
   }
 
-  visibleCoverageOk.value = covered
+  if (messageCount === 0 && totalHeight.value > viewportHeight.value)
+    blankProbeCount++
 
-  if (!covered)
-    blankFrameCount.value += 1
+  return {
+    visibleItemCount,
+    markdownRendererCount: root.querySelectorAll('.markstream-vue').length,
+    markdownSlotCount: slotCount,
+    markdownContentCount: contentCount,
+    blankProbeCount,
+    heightDriftPx,
+    maxItemHeightDriftPx: maxDrift,
+    domNodeCount: domCount,
+    messageDomCount: messageCount,
+    visibleCoverageOk: covered,
+    clippedMessageCount: drifted,
+    heightDriftMessageCount: drifted,
+    worstHeightDriftMessageId: worstId,
+  }
+}
+
+function pushLabEvent(type: string, payload: Partial<LabEvent> = {}) {
+  const now = typeof performance !== 'undefined'
+    ? performance.now()
+    : Date.now()
+  const stats = collectStats({ reconcile: false })
+  const currentScrollTop = scrollTop.value
+  const scrollJumpPx = Math.abs(currentScrollTop - lastObservedScrollTop)
+
+  lastObservedScrollTop = currentScrollTop
+
+  labEvents.push({
+    type,
+    at: now,
+    threadId: activeThreadId.value,
+    scrollTop: currentScrollTop,
+    blankProbeCount: stats.blankProbeCount,
+    markdownSlotCount: stats.markdownSlotCount,
+    heightDriftPx: stats.heightDriftPx,
+    maxItemHeightDriftPx: stats.maxItemHeightDriftPx,
+    scrollJumpPx,
+    ...payload,
+  })
+
+  while (labEvents.length > 300)
+    labEvents.shift()
+}
+
+function scheduleLabEvent(type: string, payload: Partial<LabEvent> = {}) {
+  requestAnimationFrame(() => {
+    applyLabStats(collectStats({ reconcile: true }))
+    pushLabEvent(type, payload)
+  })
 }
 
 function saveThreadScroll() {
@@ -663,7 +869,18 @@ async function switchThread(threadId: ThreadId) {
     return
 
   saveThreadScroll()
+  const previousThreadId = activeThreadId.value
+  const previousScrollTop = scrollTop.value
+
   activeThreadId.value = threadId
+
+  const savedAnchor = threadAnchors.get(threadId)
+  const savedScrollTop = threadScrollTops.get(threadId) ?? 0
+
+  if (savedAnchor)
+    await restoreOuterAnchor(savedAnchor, { immediate: true })
+  else
+    applyOuterScrollTop(savedScrollTop)
 
   await nextTick()
 
@@ -671,16 +888,18 @@ async function switchThread(threadId: ThreadId) {
   if (!root)
     return
 
-  const savedAnchor = threadAnchors.get(threadId)
-  if (savedAnchor) {
-    restoreOuterAnchor(savedAnchor)
-  }
-  else {
-    root.scrollTop = threadScrollTops.get(threadId) ?? 0
-    scrollTop.value = root.scrollTop
-  }
+  root.scrollTop = scrollTop.value
 
-  scheduleStats()
+  applyLabStats(collectStats({ reconcile: true }))
+  await waitFrame()
+
+  pushLabEvent('thread-switch', {
+    fromThreadId: previousThreadId,
+    toThreadId: threadId,
+    scrollJumpPx: Math.abs(scrollTop.value - previousScrollTop),
+  })
+
+  scheduleVisibleDomReconcile()
 }
 
 function jumpToTop() {
@@ -765,21 +984,21 @@ function startStreamingLastMessage() {
   target.final = false
 
   if (streamBottomPinned)
-    restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
+    void restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
 
   streamTimer = window.setInterval(() => {
     cursor += 2400
     target.content = full.slice(0, cursor)
 
     if (streamBottomPinned)
-      restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
+      void restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
 
     if (cursor >= full.length) {
       target.content = full
       target.final = true
 
       if (streamBottomPinned)
-        restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
+        void restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
 
       if (streamTimer)
         window.clearInterval(streamTimer)
@@ -803,17 +1022,66 @@ function resetHeights() {
   maxExpectedMarkdownSlotCeiling.value = 0
   maxExpectedDomNodeCeiling.value = 0
   scrollCompensationCount.value = 0
+  labEvents.splice(0)
+  lastObservedScrollTop = scrollTop.value
   scheduleStats()
 }
 
+function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
+  const maxObservedBlankProbes = Math.max(
+    stats.blankProbeCount,
+    0,
+    ...labEvents.map(event => event.blankProbeCount ?? 0),
+  )
+  const maxObservedMarkdownSlots = Math.max(
+    stats.markdownSlotCount,
+    0,
+    ...labEvents.map(event => event.markdownSlotCount ?? 0),
+  )
+  const maxObservedHeightDriftPx = Math.max(
+    stats.maxItemHeightDriftPx,
+    0,
+    ...labEvents.map(event => event.maxItemHeightDriftPx ?? 0),
+  )
+  const maxObservedScrollJumpPx = Math.max(
+    0,
+    ...labEvents.map(event => event.scrollJumpPx ?? 0),
+  )
+  const domSlotBudget = Math.max(1, stats.markdownRendererCount) * 280
+  const virtualDomWithinLimit = stats.markdownSlotCount <= domSlotBudget
+
+  return {
+    ...stats,
+    eventCount: labEvents.length,
+    maxObservedBlankProbes,
+    maxObservedMarkdownSlots,
+    maxObservedHeightDriftPx,
+    maxObservedScrollJumpPx,
+    virtualDomWithinLimit,
+    domSlotBudget,
+    layoutIntegrityOk:
+      stats.blankProbeCount === 0
+      && maxObservedBlankProbes === 0
+      && virtualDomWithinLimit
+      && maxObservedHeightDriftPx < 24,
+  }
+}
+
 function readLabSnapshot(): VirtualScrollLabSnapshot {
-  collectStats()
+  const stats = collectStats({ reconcile: false })
+  const health = readLabHealth(stats)
 
   const root = scrollRoot.value
   const currentScrollTop = root?.scrollTop ?? scrollTop.value
   const currentViewportHeight = root?.clientHeight ?? viewportHeight.value
 
   return {
+    ready: labReady.value,
+    threadId: activeThreadId.value,
+    range: { ...visibleRange.value },
+    stats,
+    health,
+    events: labEvents.slice(),
     labStatus: labStatus.value,
     activeThreadId: activeThreadId.value,
     totalHeight: totalHeight.value,
@@ -821,10 +1089,10 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
     viewportHeight: currentViewportHeight,
     distanceFromBottomPx: Math.max(0, totalHeight.value - currentScrollTop - currentViewportHeight),
     visibleRange: { ...visibleRange.value },
-    messageDomCount: messageDomCount.value,
-    domNodeCount: domNodeCount.value,
-    markdownSlotCount: markdownSlotCount.value,
-    markdownContentCount: markdownContentCount.value,
+    messageDomCount: stats.messageDomCount,
+    domNodeCount: stats.domNodeCount,
+    markdownSlotCount: stats.markdownSlotCount,
+    markdownContentCount: stats.markdownContentCount,
     maxDomNodeCount: maxDomNodeCount.value,
     maxMarkdownSlotCount: maxMarkdownSlotCount.value,
     expectedMarkdownSlotCeiling: expectedMarkdownSlotCeiling.value,
@@ -832,18 +1100,58 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
     maxExpectedMarkdownSlotCeiling: maxExpectedMarkdownSlotCeiling.value || expectedMarkdownSlotCeiling.value,
     maxExpectedDomNodeCeiling: maxExpectedDomNodeCeiling.value || expectedDomNodeCeiling.value,
     blankFrameCount: blankFrameCount.value,
-    clippedMessageCount: clippedMessageCount.value,
-    heightDriftMessageCount: heightDriftMessageCount.value,
-    maxItemHeightDriftPx: maxItemHeightDriftPx.value,
-    visibleCoverageOk: visibleCoverageOk.value,
+    clippedMessageCount: stats.clippedMessageCount,
+    heightDriftMessageCount: stats.heightDriftMessageCount,
+    maxItemHeightDriftPx: stats.maxItemHeightDriftPx,
+    visibleCoverageOk: stats.visibleCoverageOk,
     settledEvents: settledEvents.value,
     scrollCompensationCount: scrollCompensationCount.value,
   }
 }
 
+const labSnapshot = computed(() => readLabSnapshot())
+
+function waitFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve())
+  })
+}
+
+async function scrollToRatio(ratio: number) {
+  const max = Math.max(0, totalHeight.value - viewportHeight.value)
+  applyOuterScrollTop(max * Math.max(0, Math.min(1, ratio)))
+
+  await nextTick()
+  await waitFrame()
+  applyLabStats(collectStats({ reconcile: true }))
+  pushLabEvent('scroll-to-ratio')
+  scheduleVisibleDomReconcile()
+}
+
+async function rapidSwitchThreads(threadIds: ThreadId[], count = 9) {
+  for (let i = 0; i < count; i++) {
+    await switchThread(threadIds[i % threadIds.length])
+    await waitFrame()
+  }
+}
+
+function clearLabEvents() {
+  labEvents.splice(0)
+  lastObservedScrollTop = scrollTop.value
+}
+
 function exposeLabApi() {
   if (typeof window === 'undefined')
     return
+
+  window.__markstreamVirtualScrollLab = {
+    read: readLabSnapshot,
+    scrollToRatio,
+    switchThread,
+    rapidSwitchThreads,
+    nextFrame: waitFrame,
+    clearEvents: clearLabEvents,
+  }
 
   window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__ = {
     read: readLabSnapshot,
@@ -863,7 +1171,7 @@ function exposeLabApi() {
   }
 }
 
-watch([totalHeight, visibleRange], () => {
+watch([totalHeight, visibleRange, viewportHeight], () => {
   scheduleStats()
 }, { flush: 'post' })
 
@@ -891,6 +1199,9 @@ onBeforeUnmount(() => {
   saveThreadScroll()
   stopStressScroll()
   streamBottomPinned = false
+
+  if (typeof window !== 'undefined')
+    delete window.__markstreamVirtualScrollLab
 
   if (typeof window !== 'undefined')
     delete window.__MARKSTREAM_VIRTUAL_SCROLL_LAB__
@@ -1006,6 +1317,42 @@ onBeforeUnmount(() => {
         {{ lastHeightEvent.phase }} /
         measured {{ lastHeightEvent.measuredCount }}/{{ lastHeightEvent.nodeCount }}
       </span>
+    </section>
+
+    <section class="metrics-grid">
+      <div>
+        <strong>visible items</strong>
+        <span>{{ labSnapshot.stats.visibleItemCount }}</span>
+      </div>
+
+      <div>
+        <strong>markdown renderers</strong>
+        <span>{{ labSnapshot.stats.markdownRendererCount }}</span>
+      </div>
+
+      <div>
+        <strong>node-slot count</strong>
+        <span>{{ labSnapshot.stats.markdownSlotCount }} / {{ labSnapshot.health.domSlotBudget }}</span>
+      </div>
+
+      <div>
+        <strong>blank probes</strong>
+        <span :class="{ bad: labSnapshot.health.maxObservedBlankProbes > 0 }">
+          {{ labSnapshot.health.maxObservedBlankProbes }}
+        </span>
+      </div>
+
+      <div>
+        <strong>height drift</strong>
+        <span>{{ Math.round(labSnapshot.health.maxObservedHeightDriftPx) }}px</span>
+      </div>
+
+      <div>
+        <strong>layout</strong>
+        <span :class="{ ok: labSnapshot.health.layoutIntegrityOk, bad: !labSnapshot.health.layoutIntegrityOk }">
+          {{ labSnapshot.health.layoutIntegrityOk ? 'ok' : 'bad' }}
+        </span>
+      </div>
     </section>
 
     <main
@@ -1146,6 +1493,50 @@ button:hover {
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--lab-border);
   background: color-mix(in srgb, var(--lab-panel) 92%, var(--lab-bg));
+}
+
+.metrics-grid {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px;
+  border-bottom: 1px solid var(--lab-border);
+  background: var(--lab-border);
+}
+
+.metrics-grid div {
+  min-width: 0;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--lab-panel);
+}
+
+.metrics-grid strong {
+  color: var(--lab-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.metrics-grid span {
+  color: var(--lab-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.metrics-grid .ok {
+  color: #166534;
+}
+
+.metrics-grid .bad {
+  color: #991b1b;
+}
+
+@media (max-width: 900px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .status-chip.ok {

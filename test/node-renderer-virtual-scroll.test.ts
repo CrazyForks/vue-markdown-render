@@ -229,6 +229,16 @@ describe('node renderer virtual-scroll coordination', () => {
       totalHeight: 120,
     })
     expect(wrapper.emitted('renderFinal')).toBeUndefined()
+    expect(wrapper.emitted('render-final')?.length ?? 0).toBe(1)
+
+    await handle.forceMeasure('manual')
+    platform.flushFrames()
+    await nextTick()
+
+    expect(wrapper.emitted('render-final')?.length ?? 0).toBe(1)
+
+    await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })
+    expect(wrapper.emitted('render-final')?.length ?? 0).toBe(1)
 
     wrapper.unmount()
   })

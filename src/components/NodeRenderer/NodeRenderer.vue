@@ -1982,6 +1982,7 @@ function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
   markFallbackHeightPrefixDirty()
   lastImportedVirtualHeightCacheSignature = signature
   lastImportedVirtualHeightCacheSource = 'standalone'
+  resetVirtualMetricsEventDedupes()
   scheduleVirtualMetricsEmit('restore')
   return true
 }
@@ -2045,6 +2046,7 @@ function applyVirtualRestoreState(
       markFallbackHeightPrefixDirty()
       lastImportedVirtualHeightCacheSignature = getHeightCacheSignature(boundedCache)
       lastImportedVirtualHeightCacheSource = 'restore'
+      resetVirtualMetricsEventDedupes()
       importedCache = true
     }
   }
@@ -2184,6 +2186,9 @@ function scrollToNode(
   index: number,
   align: 'start' | 'center' | 'end' | 'nearest' = 'start',
 ) {
+  clearActiveVirtualBottomAnchor()
+  clearRestoreReconcile()
+
   const total = parsedNodes.value.length
   if (total <= 0)
     return
@@ -2232,8 +2237,8 @@ let virtualMetricsEmitRaf: number | null = null
 let virtualMetricsEmitTimer: number | null = null
 let lastVirtualEmitAt = 0
 let lastEmittedVirtualMetrics: MarkstreamVirtualMetrics | null = null
-let lastSettledVirtualSignature: string | null = null
-let lastFinalVirtualSignature: string | null = null
+let lastSettledVirtualEventKey: string | null = null
+let lastFinalVirtualEventKey: string | null = null
 
 function getVirtualNow() {
   return typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -2258,6 +2263,47 @@ function shouldEmitVirtualMetrics(metrics: MarkstreamVirtualMetrics) {
     || metrics.width !== previous.width
 }
 
+function stringifyVirtualToken(value: unknown) {
+  if (value == null)
+    return ''
+
+  if (
+    typeof value === 'string'
+    || typeof value === 'number'
+    || typeof value === 'boolean'
+  ) {
+    return String(value)
+  }
+
+  try {
+    return JSON.stringify(value)
+  }
+  catch {
+    return String(value)
+  }
+}
+
+function getVirtualMetricsEventKey(
+  phase: 'settled' | 'final',
+  metrics: MarkstreamVirtualMetrics,
+) {
+  return [
+    phase,
+    metrics.sessionKey,
+    metrics.threadKey ?? '',
+    getVirtualMeasurementKey(),
+    getVirtualContentHash(),
+    stringifyVirtualToken(props.virtualScroll?.settledToken),
+    Math.round(metrics.totalHeight),
+    Math.round(metrics.width),
+  ].join('\u0000')
+}
+
+function resetVirtualMetricsEventDedupes() {
+  lastSettledVirtualEventKey = null
+  lastFinalVirtualEventKey = null
+}
+
 function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false) {
   if (!virtualScrollEnabled.value)
     return
@@ -2279,38 +2325,36 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
     }
   }
 
-  const settledSignature = [
-    metrics.threadKey ?? '',
-    metrics.sessionKey,
-    getVirtualMeasurementKey(),
-    virtualLayoutWidthBucket.value,
-    metrics.nodeCount,
-    Math.round(metrics.totalHeight),
-    Math.round(metrics.width),
-  ].join(':')
-  if (metrics.stable && lastSettledVirtualSignature !== settledSignature) {
-    const settledState = captureVirtualStateFromMetrics(metrics, {
-      includeHeightCache: true,
-    })
-    if (settledState)
-      emitVirtualStateChange(settledState)
+  if (metrics.stable) {
+    const eventKey = getVirtualMetricsEventKey('settled', metrics)
 
-    emitRenderSettled(metrics)
-    lastSettledVirtualSignature = settledSignature
-  }
-  else if (!metrics.stable) {
-    lastSettledVirtualSignature = null
+    if (eventKey !== lastSettledVirtualEventKey) {
+      lastSettledVirtualEventKey = eventKey
+
+      const settledState = captureVirtualStateFromMetrics(metrics, {
+        includeHeightCache: true,
+      })
+      if (settledState)
+        emitVirtualStateChange(settledState)
+
+      emitRenderSettled(metrics)
+    }
   }
 
-  if (metrics.phase === 'final' && lastFinalVirtualSignature !== settledSignature) {
-    const finalState = captureVirtualStateFromMetrics(metrics, {
-      includeHeightCache: true,
-    })
-    if (finalState)
-      emitVirtualStateChange(finalState)
+  if (metrics.phase === 'final') {
+    const eventKey = getVirtualMetricsEventKey('final', metrics)
 
-    emitRenderFinal(metrics)
-    lastFinalVirtualSignature = settledSignature
+    if (eventKey !== lastFinalVirtualEventKey) {
+      lastFinalVirtualEventKey = eventKey
+
+      const finalState = captureVirtualStateFromMetrics(metrics, {
+        includeHeightCache: true,
+      })
+      if (finalState)
+        emitVirtualStateChange(finalState)
+
+      emitRenderFinal(metrics)
+    }
   }
 }
 
@@ -2838,6 +2882,7 @@ const {
     clearPendingHeightMeasurements()
     resetHeightMeasurements()
     markFallbackHeightPrefixDirty()
+    resetVirtualMetricsEventDedupes()
     if (total > 0)
       rebuildHeightTrees(total)
   },
@@ -3029,8 +3074,7 @@ function resetVirtualSessionRuntimeState() {
   imperativeVirtualSettleSessionKey = null
   imperativeVirtualSettleThreadKey = undefined
   lastEmittedVirtualMetrics = null
-  lastSettledVirtualSignature = null
-  lastFinalVirtualSignature = null
+  resetVirtualMetricsEventDedupes()
   lastImportedVirtualHeightCacheSignature = null
   lastImportedVirtualHeightCacheSource = null
   lastAppliedVirtualRestoreSignature = null
@@ -3058,8 +3102,7 @@ function resetVirtualLayoutMeasurements(reason: MarkstreamVirtualReason = 'resiz
   lastImportedVirtualHeightCacheSource = null
   lastAppliedVirtualRestoreSignature = null
   lastEmittedVirtualMetrics = null
-  lastSettledVirtualSignature = null
-  lastFinalVirtualSignature = null
+  resetVirtualMetricsEventDedupes()
   lastManualSettleSignature = null
   autoSettledVirtualSignature = null
   imperativeVirtualSettleSessionKey = null
@@ -3131,6 +3174,20 @@ watch(
     resetVirtualSessionRuntimeState()
     resetVirtualSessionMeasurements()
     scheduleVirtualMetricsEmit('content')
+  },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    () => props.virtualScroll?.sessionKey,
+    () => props.virtualScroll?.measurementKey,
+    () => props.indexKey,
+    () => getVirtualContentHash(),
+  ],
+  ([enabled]) => {
+    if (enabled)
+      resetVirtualMetricsEventDedupes()
   },
 )
 

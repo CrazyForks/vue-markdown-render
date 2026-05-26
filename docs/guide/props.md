@@ -40,6 +40,14 @@ Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`,
 For SSR with static initial content, prefer `smooth-streaming="auto"` (the default). The `auto` mode includes a mounted gate that prevents pacing initial content from blank on the first client render. Use `smooth-streaming=true` only when you explicitly want to pace the first client-side content as well — this can cause a hydration mismatch or a first-paint flash of empty content in SSR setups.
 :::
 
+### Virtual scroll coordination
+
+When `virtual-scroll.enabled` is true, `MarkdownRender` reports the logical height of the full Markdown document through `height-change`.
+
+Use `metrics.totalHeight` as the outer virtualizer item size. Do not use the current DOM `offsetHeight`, because the renderer may internally virtualize Markdown nodes and keep only a live window in the DOM.
+
+`final` means the source stream has completed. It does not guarantee that the layout has settled. Code blocks, diagrams, images, fonts, and custom components may still change height. Use `render-final` or `rendererRef.settle()` before persisting a final height cache.
+
 ### smooth-streaming and fade — pick one, not both
 
 `smooth-streaming` and `fade` both produce a "text appears gradually" effect, but at different layers:
