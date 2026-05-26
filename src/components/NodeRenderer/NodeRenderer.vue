@@ -1257,7 +1257,13 @@ function getVisibleDomHeight() {
   return total || containerRef.value?.offsetHeight || 0
 }
 
-function isLayoutSettled() {
+let imperativeVirtualSettleSessionKey: string | null = null
+
+function hasManualSettleSignal(token: unknown) {
+  return token !== false && token != null
+}
+
+function isInternalLayoutSettled() {
   return effectiveFinal.value === true
     && !contentStreamingTailActive.value
     && pendingAsyncNodeCount.value === 0
@@ -1265,6 +1271,20 @@ function isLayoutSettled() {
     && pendingHeightMeasurements.size === 0
     && heightMeasurementRaf == null
     && renderedCount.value >= desiredRenderedCount.value
+}
+
+function isHostSettleConfirmed() {
+  if (props.virtualScroll?.settleMode !== 'manual')
+    return true
+
+  if (hasManualSettleSignal(props.virtualScroll?.settledToken))
+    return true
+
+  return imperativeVirtualSettleSessionKey === getVirtualSessionKey()
+}
+
+function isLayoutSettled() {
+  return isInternalLayoutSettled() && isHostSettleConfirmed()
 }
 
 function resolveVirtualPhase(phase?: MarkstreamVirtualPhase): MarkstreamVirtualPhase {
@@ -1452,12 +1472,17 @@ function isHeightCacheEntryCompatible(entry: MarkstreamHeightCache[number]) {
   return true
 }
 
-function captureVirtualStateFromMetrics(metrics: MarkstreamVirtualMetrics): MarkstreamVirtualState | null {
+function captureVirtualStateFromMetrics(
+  metrics: MarkstreamVirtualMetrics,
+  options: { includeHeightCache?: boolean } = {},
+): MarkstreamVirtualState | null {
   const anchor = captureVirtualAnchor()
   if (!anchor)
     return null
 
-  const heightCache = exportVirtualHeightCache()
+  const heightCache = options.includeHeightCache
+    ? exportVirtualHeightCache()
+    : []
 
   return {
     sessionKey: metrics.sessionKey,
@@ -1470,7 +1495,9 @@ function captureVirtualStateFromMetrics(metrics: MarkstreamVirtualMetrics): Mark
 }
 
 function captureVirtualState() {
-  return captureVirtualStateFromMetrics(getVirtualMetrics('manual'))
+  return captureVirtualStateFromMetrics(getVirtualMetrics('manual'), {
+    includeHeightCache: true,
+  })
 }
 
 function setReverseFlexDistanceFromBottom(root: HTMLElement, distanceFromBottomPx: number) {
@@ -1594,6 +1621,13 @@ function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
   return true
 }
 
+function canReuseStandaloneHeightCache() {
+  const cacheWidth = props.virtualScroll?.heightCacheWidth
+  if (!cacheWidth)
+    return false
+  return canReuseHeightCacheForWidth(cacheWidth)
+}
+
 let lastImportedVirtualHeightCacheSignature: string | null = null
 let lastAppliedVirtualRestoreState: MarkstreamVirtualState | null = null
 let pendingImperativeVirtualRestoreState: MarkstreamVirtualState | null = null
@@ -1625,6 +1659,9 @@ function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
 
   const restoreState = props.virtualScroll?.restoreState
   if (restoreState && !canRestoreVirtualStateCache(restoreState))
+    return false
+
+  if (!restoreState && !canReuseStandaloneHeightCache())
     return false
 
   const boundedCache = getBoundedHeightCache(cache, {
@@ -1737,6 +1774,9 @@ async function settle(options: {
   measureTrackedNodeHeights()
   forceFlushPendingHeightMeasurements()
 
+  if (isInternalLayoutSettled())
+    imperativeVirtualSettleSessionKey = getVirtualSessionKey()
+
   const metrics = getVirtualMetrics(reason, isLayoutSettled() ? 'final' : undefined)
   emitVirtualMetricsNow(metrics, true)
   return metrics
@@ -1810,12 +1850,17 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
   if (!virtualScrollEnabled.value)
     return
 
-  if (force || shouldEmitVirtualMetrics(metrics)) {
+  const shouldEmit = force || shouldEmitVirtualMetrics(metrics)
+  const shouldIncludeHeightCache = force || metrics.stable || metrics.phase === 'final'
+
+  if (shouldEmit) {
     emit('heightChange', metrics)
     lastEmittedVirtualMetrics = metrics
     lastVirtualEmitAt = getVirtualNow()
 
-    const state = captureVirtualStateFromMetrics(metrics)
+    const state = captureVirtualStateFromMetrics(metrics, {
+      includeHeightCache: shouldIncludeHeightCache,
+    })
     if (state) {
       emit('virtualStateChange', state)
       emit('anchorChange', state.anchor)
@@ -1824,6 +1869,12 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
 
   const settledSignature = `${metrics.sessionKey}:${metrics.nodeCount}:${Math.round(metrics.totalHeight)}:${Math.round(metrics.width)}`
   if (metrics.stable && lastSettledVirtualSignature !== settledSignature) {
+    const settledState = captureVirtualStateFromMetrics(metrics, {
+      includeHeightCache: true,
+    })
+    if (settledState)
+      emit('virtualStateChange', settledState)
+
     emit('renderSettled', metrics)
     lastSettledVirtualSignature = settledSignature
   }
@@ -1832,6 +1883,12 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
   }
 
   if (metrics.phase === 'final' && lastFinalVirtualSignature !== settledSignature) {
+    const finalState = captureVirtualStateFromMetrics(metrics, {
+      includeHeightCache: true,
+    })
+    if (finalState)
+      emit('virtualStateChange', finalState)
+
     emit('renderFinal', metrics)
     lastFinalVirtualSignature = settledSignature
   }
@@ -2521,6 +2578,7 @@ function resetVirtualSessionMeasurements() {
 
 function resetVirtualSessionRuntimeState() {
   autoSettledVirtualSessionKey = null
+  imperativeVirtualSettleSessionKey = null
   lastEmittedVirtualMetrics = null
   lastSettledVirtualSignature = null
   lastFinalVirtualSignature = null
@@ -2550,6 +2608,7 @@ watch(
   [
     virtualScrollEnabled,
     () => props.virtualScroll?.heightCache,
+    () => props.virtualScroll?.heightCacheWidth,
     () => props.virtualScroll?.restoreState,
     () => parsedNodes.value.length,
     () => getVirtualSessionKey(),
@@ -2652,10 +2711,6 @@ watch(
   { flush: 'post', immediate: true },
 )
 
-function hasManualSettleSignal(token: unknown) {
-  return token !== false && token != null
-}
-
 function getManualSettleSignature(token: unknown) {
   return [
     getVirtualSessionKey(),
@@ -2678,7 +2733,7 @@ async function runManualSettleIfReady() {
   if (!hasManualSettleSignal(token))
     return
 
-  if (!isLayoutSettled()) {
+  if (!isInternalLayoutSettled()) {
     scheduleVirtualMetricsEmit('manual')
     return
   }

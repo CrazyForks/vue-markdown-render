@@ -523,6 +523,96 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not emit renderSettled in manual mode before settledToken is provided', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'manual-gated-settled',
+          settleMode: 'manual',
+          settledToken: false,
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const contentEl = getRootNodeContentElements(wrapper.element)[0]!
+    platform.heights.set(contentEl, 40)
+    platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+
+    await new Promise(resolve => setTimeout(resolve, 700))
+    platform.flushFrames()
+    await flushAll()
+
+    expect(wrapper.emitted('renderSettled')).toBeUndefined()
+    expect(wrapper.emitted('renderFinal')).toBeUndefined()
+    expect((wrapper.vm as any).getVirtualMetrics()).toMatchObject({
+      stable: false,
+      totalHeight: 40,
+    })
+
+    wrapper.unmount()
+  })
+
+  it('omits height cache from non-final virtualStateChange emissions', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1)],
+        final: false,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'streaming-light-state',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const contentEl = getRootNodeContentElements(wrapper.element)[0]!
+    platform.heights.set(contentEl, 40)
+    platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+    platform.flushFrames()
+    await flushAll()
+
+    const state = wrapper.emitted('virtualStateChange')?.at(-1)?.[0] as any
+    expect(state).toMatchObject({
+      sessionKey: 'streaming-light-state',
+      metrics: {
+        totalHeight: 40,
+      },
+    })
+    expect(state.heightCache).toBeUndefined()
+    expect((wrapper.vm as any).captureVirtualState()?.heightCache).toEqual([
+      {
+        index: 0,
+        height: 40,
+        nodeType: 'paragraph',
+        signature: 'paragraph\u0000\u00000\u0000Paragraph 1',
+      },
+    ])
+
+    wrapper.unmount()
+  })
+
   it('does not emit final before deferred height settling timers finish', async () => {
     vi.useFakeTimers()
     let wrapper: ReturnType<typeof mount> | null = null
@@ -762,6 +852,7 @@ describe('node renderer virtual-scroll coordination', () => {
           enabled: true,
           sessionKey: 'current-session',
           settleMode: 'manual',
+          heightCacheWidth: 400,
           heightCache: [
             {
               index: 0,
@@ -784,6 +875,46 @@ describe('node renderer virtual-scroll coordination', () => {
 
     const handle = wrapper.vm as any
     expect((await handle.forceMeasure('manual')).totalHeight).toBe(800)
+
+    wrapper.unmount()
+  })
+
+  it('rejects standalone height cache when measured width is missing', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'standalone-cache-no-width',
+          settleMode: 'manual',
+          heightCache: [
+            {
+              index: 0,
+              height: 400,
+              nodeType: 'paragraph',
+              signature: 'paragraph\u0000\u00000\u0000Paragraph 1',
+            },
+            {
+              index: 1,
+              height: 400,
+              nodeType: 'paragraph',
+              signature: 'paragraph\u0000\u00000\u0000Paragraph 2',
+            },
+          ],
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    expect((await handle.forceMeasure('manual')).totalHeight).not.toBe(800)
 
     wrapper.unmount()
   })
@@ -953,6 +1084,32 @@ describe('node renderer virtual-scroll coordination', () => {
     expect(wrapper.find('.markstream-vue').exists()).toBe(true)
 
     wrapper.unmount()
+  })
+
+  it('computes scrollRoot-relative offsets from bounding rects', async () => {
+    const { useViewportRoot } = await import('../src/components/NodeRenderer/composables/useViewportRoot')
+    const containerRef = ref<HTMLElement>()
+    const root = document.createElement('div')
+    const node = document.createElement('div')
+    const rect = (top: number, height = 20) => ({
+      x: 0,
+      y: top,
+      top,
+      bottom: top + height,
+      left: 0,
+      right: 100,
+      width: 100,
+      height,
+      toJSON: () => ({}),
+    }) as DOMRect
+
+    root.scrollTop = 300
+    vi.spyOn(root, 'getBoundingClientRect').mockReturnValue(rect(100))
+    vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(rect(450))
+
+    const viewport = useViewportRoot(containerRef, { isClient: true })
+
+    expect(viewport.getOffsetTopWithinRoot(node, root)).toBe(650)
   })
 
   it('settles the original lifecycle key when indexKey changes while image is pending', async () => {

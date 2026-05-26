@@ -100,6 +100,7 @@ export interface MarkstreamVirtualScrollOptions {
   threadKey?: string
   restoreState?: MarkstreamVirtualState | null
   heightCache?: MarkstreamHeightCache | null
+  heightCacheWidth?: number
   settleMode?: 'auto' | 'manual'
   settledToken?: string | number | boolean
   emitIntervalMs?: number

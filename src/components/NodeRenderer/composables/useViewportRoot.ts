@@ -139,17 +139,30 @@ export function useViewportRoot(
     return max - distanceFromBottom
   }
 
+  function isDocumentScrollRoot(root: HTMLElement, doc: Document) {
+    return root === doc.documentElement
+      || root === doc.body
+      || root === doc.scrollingElement
+  }
+
+  function getDocumentScrollTop(doc: Document) {
+    return doc.scrollingElement?.scrollTop
+      ?? doc.documentElement?.scrollTop
+      ?? doc.body?.scrollTop
+      ?? 0
+  }
+
   function getOffsetTopWithinRoot(node: HTMLElement, root: HTMLElement) {
-    let current: HTMLElement | null = node
-    let total = 0
-    let guard = 0
+    const doc = root.ownerDocument || node.ownerDocument || document
 
-    while (current && current !== root && guard++ < 64) {
-      total += current.offsetTop || 0
-      current = current.offsetParent as HTMLElement | null
-    }
+    if (isDocumentScrollRoot(root, doc))
+      return node.getBoundingClientRect().top + getDocumentScrollTop(doc)
 
-    return total
+    const rootRect = root.getBoundingClientRect()
+    const nodeRect = node.getBoundingClientRect()
+    const normalizedScrollTop = getNormalizedScrollTop(root, doc, false)
+
+    return nodeRect.top - rootRect.top + normalizedScrollTop
   }
 
   return {

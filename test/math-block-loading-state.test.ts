@@ -82,4 +82,47 @@ describe('mathBlockNode loading state', () => {
     wrapper.unmount()
     heightSpy.mockRestore()
   })
+
+  it('settles pending lifecycle when content becomes empty before KaTeX resolves', async () => {
+    const lifecycle = {
+      reportHeight: vi.fn(),
+      markPending: vi.fn(),
+      markSettled: vi.fn(),
+    }
+
+    const wrapper = mount(MathBlockNode as any, {
+      props: {
+        indexKey: 'math-pending',
+        node: {
+          type: 'math_block',
+          content: 'x',
+          raw: '\\[x\\]',
+          loading: true,
+        },
+      },
+      global: {
+        provide: {
+          markstreamNodeLifecycle: lifecycle,
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(lifecycle.markPending).toHaveBeenCalledWith('math-pending')
+
+    await wrapper.setProps({
+      node: {
+        type: 'math_block',
+        content: '',
+        raw: '\\[\\]',
+        loading: false,
+      },
+    })
+    await flushAll()
+
+    expect(lifecycle.markSettled).toHaveBeenCalledWith('math-pending')
+
+    wrapper.unmount()
+  })
 })

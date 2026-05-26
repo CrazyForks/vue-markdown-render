@@ -152,9 +152,13 @@ function clearLifecyclePending() {
 
 // Function to render math using KaTeX
 async function renderMath() {
-  if (isUnmounted)
+  if (isUnmounted) {
+    clearLifecyclePending()
     return
+  }
+
   if (!props.node.content) {
+    clearLifecyclePending()
     renderingLoading.value = false
     renderedHtml.value = ''
     renderedText.value = props.node.raw
@@ -277,6 +281,7 @@ watch(
   () => {
     renderMath()
   },
+  { flush: 'post' },
 )
 
 watch(

@@ -97,10 +97,11 @@ const md = '# Virtualized transcript'
 import type {
   MarkstreamRendererHandle,
   MarkstreamVirtualMetrics,
+  MarkstreamVirtualScrollOptions,
   MarkstreamVirtualState,
 } from 'markstream-vue'
 import MarkdownRender from 'markstream-vue'
-import { ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 
 const scrollRoot = ref<HTMLElement | null>(null)
 const renderer = shallowRef<MarkstreamRendererHandle | null>(null)
@@ -109,6 +110,16 @@ const content = ref('')
 const sourceDone = ref(false)
 const revision = ref(0)
 const pendingTools = ref(false)
+
+const virtualScroll = computed<MarkstreamVirtualScrollOptions>(() => ({
+  enabled: true,
+  sessionKey: `thread-1:message-1:${revision.value}`,
+  scrollRoot: () => scrollRoot.value,
+  restoreState: savedState.value,
+  settleMode: 'manual',
+  settledToken: sourceDone.value && !pendingTools.value,
+  emitIntervalMs: 32,
+}))
 
 function setMessageHeight(messageId: string, height: number) {
   // 传给你的外层 virtualizer，例如：
@@ -128,14 +139,7 @@ function onHeightChange(metrics: MarkstreamVirtualMetrics) {
       :final="sourceDone"
       :max-live-nodes="240"
       :live-node-buffer="50"
-      :virtual-scroll="{
-        enabled: true,
-        sessionKey: `thread-1:message-1:${revision}`,
-        scrollRoot: () => scrollRoot.value,
-        restoreState: savedState,
-        settleMode: 'manual',
-        settledToken: sourceDone && !pendingTools,
-      }"
+      :virtual-scroll="virtualScroll"
       @height-change="onHeightChange"
       @virtual-state-change="savedState = $event"
     />
