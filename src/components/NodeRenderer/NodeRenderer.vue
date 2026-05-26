@@ -1097,7 +1097,7 @@ function getHeightCacheWidthBucket(width: unknown) {
   if (!Number.isFinite(numeric) || numeric <= 0)
     return UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET
 
-  return Math.floor(numeric / HEIGHT_CACHE_WIDTH_BUCKET_PX)
+  return Math.round(numeric / HEIGHT_CACHE_WIDTH_BUCKET_PX)
 }
 
 function getFallbackHeightPrefix() {
@@ -1986,11 +1986,15 @@ function clearVirtualBottomRestoreTimers() {
   }
 }
 
-function clearActiveVirtualBottomAnchor() {
+function clearActiveVirtualBottomAnchor(reason?: MarkstreamVirtualReason) {
+  const hadAnchor = Boolean(activeVirtualBottomAnchor.value)
   activeVirtualBottomAnchor.value = null
   virtualBottomRestoreScrollGuardUntil = 0
   virtualBottomRestoreScrollGuardTarget = null
   clearVirtualBottomRestoreTimers()
+
+  if (hadAnchor && reason)
+    scheduleVirtualMetricsEmit(reason)
 }
 
 function scheduleVirtualBottomRestoreReconcile() {
@@ -2030,7 +2034,7 @@ function handleVirtualScrollRootScroll() {
 
   const rendererBottomDistance = getRendererBottomDistanceFromViewport(box)
   if (rendererBottomDistance == null) {
-    clearActiveVirtualBottomAnchor()
+    clearActiveVirtualBottomAnchor('restore')
     return
   }
 
@@ -2042,7 +2046,7 @@ function handleVirtualScrollRootScroll() {
       ) > BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX
     )
   ) {
-    clearActiveVirtualBottomAnchor()
+    clearActiveVirtualBottomAnchor('restore')
   }
 }
 
@@ -2323,12 +2327,12 @@ function applyVirtualRestoreState(
     }
   }
 
+  if (waitingForCacheWidth)
+    return false
+
   if (!options.restoreAnchor) {
     if (importedCache)
       scheduleVirtualMetricsEmit('restore')
-
-    if (waitingForCacheWidth)
-      return false
 
     return true
   }
@@ -2340,13 +2344,13 @@ function applyVirtualRestoreState(
     if (importedCache)
       scheduleVirtualMetricsEmit('restore')
 
-    return !waitingForCacheWidth
+    return true
   }
 
   lastAppliedVirtualRestoreSignature = signature
   restoreVirtualAnchor(state.anchor)
   scheduleVirtualMetricsEmit('restore')
-  return !waitingForCacheWidth
+  return true
 }
 
 function hasKnownVirtualWidth() {

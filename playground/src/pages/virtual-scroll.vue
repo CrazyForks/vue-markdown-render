@@ -58,6 +58,7 @@ interface LabHealth extends LabStats {
 interface VirtualScrollLabSnapshot {
   ready: boolean
   threadId: ThreadId
+  streamingActive: boolean
   layoutWidth: number
   range: { start: number, end: number }
   firstVisibleMessageId: string
@@ -1317,7 +1318,11 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     0,
     ...labEvents.map(event => event.markdownSlotCount ?? 0),
   )
-  const maxObservedHeightDriftPx = stats.maxItemHeightDriftPx
+  const maxObservedHeightDriftPx = Math.max(
+    stats.maxItemHeightDriftPx,
+    0,
+    ...labEvents.map(event => event.maxItemHeightDriftPx ?? 0),
+  )
   const maxObservedScrollJumpPx = Math.max(
     0,
     ...labEvents
@@ -1325,7 +1330,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
       .map(event => event.scrollJumpPx ?? 0),
   )
   const domSlotBudget = Math.max(1, stats.markdownRendererCount) * 280
-  const virtualDomWithinLimit = stats.markdownSlotCount <= domSlotBudget
+  const virtualDomWithinLimit = maxObservedMarkdownSlots <= domSlotBudget
   const hugeRendererSlotBudget = maxLiveNodes.value + 16
   const hugeRendererDomWithinLimit = stats.maxHugeMessageSlotCount <= hugeRendererSlotBudget
   const scrollJitterOk = maxObservedScrollJumpPx <= SCROLL_JITTER_BUDGET_PX
@@ -1367,6 +1372,7 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
   return {
     ready: labReady.value,
     threadId: activeThreadId.value,
+    streamingActive: streamTimer != null,
     layoutWidth: layoutWidth.value,
     range: { ...visibleRange.value },
     firstVisibleMessageId,

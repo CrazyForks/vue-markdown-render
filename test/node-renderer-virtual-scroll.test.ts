@@ -1443,6 +1443,59 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('reuses restore height cache across 1px width jitter in the same bucket', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(319)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const seedCache = await captureSeedHeightCache(NodeRenderer)
+    const metrics = {
+      sessionKey: 'width-jitter-session',
+      phase: 'final',
+      nodeCount: 2,
+      liveRange: { start: 0, end: 2 },
+      renderedCount: 2,
+      measuredCount: 2,
+      estimatedCount: 0,
+      averageNodeHeight: 400,
+      topSpacerHeight: 0,
+      bottomSpacerHeight: 0,
+      visibleDomHeight: 800,
+      totalHeight: 800,
+      width: 320,
+      final: true,
+      stable: true,
+      confidence: 'final',
+      reason: 'manual',
+    } as const
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'width-jitter-session',
+          settleMode: 'manual',
+          restoreState: {
+            sessionKey: 'width-jitter-session',
+            anchor: { type: 'node', nodeIndex: 0, offsetWithinNodePx: 0 },
+            metrics,
+            width: 320,
+            heightCache: seedCache,
+          },
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).toBe(800)
+
+    wrapper.unmount()
+  })
+
   it('does not import unscoped restore height cache into a scoped thread', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
@@ -1815,6 +1868,87 @@ describe('node renderer virtual-scroll coordination', () => {
     expect((await handle.forceMeasure('manual')).totalHeight).not.toBe(800)
 
     wrapper.unmount()
+  })
+
+  it('does not apply cached restore anchor before current width is known', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const seedCache = await captureSeedHeightCache(NodeRenderer)
+    const platform = installManualMeasurementPlatform()
+    const scrollRoot = document.createElement('div')
+    let width = 0
+    const scrollHeight = 1000
+
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width)
+    document.body.appendChild(scrollRoot)
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => scrollHeight,
+    })
+
+    scrollRoot.scrollTop = 120
+
+    const restoreState = {
+      sessionKey: 'pending-prop-width-restore',
+      anchor: { type: 'bottom', distanceFromBottomPx: 0 },
+      metrics: {
+        sessionKey: 'pending-prop-width-restore',
+        phase: 'final',
+        nodeCount: 2,
+        liveRange: { start: 0, end: 2 },
+        renderedCount: 2,
+        measuredCount: 2,
+        estimatedCount: 0,
+        averageNodeHeight: 400,
+        topSpacerHeight: 0,
+        bottomSpacerHeight: 0,
+        visibleDomHeight: 800,
+        totalHeight: 800,
+        width: 400,
+        final: true,
+        stable: true,
+        confidence: 'final',
+        reason: 'manual',
+      },
+      width: 400,
+      heightCache: seedCache,
+    } as any
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'pending-prop-width-restore',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          restoreAnchor: 'thread-restore',
+          restoreState,
+        },
+      },
+    })
+
+    installRendererBottomGeometry(wrapper, scrollRoot, () => scrollHeight)
+    await flushAll()
+
+    expect(scrollRoot.scrollTop).toBe(120)
+
+    width = 400
+    platform.resizeCallbacks.get(wrapper.element)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await flushAll()
+
+    expect(scrollRoot.scrollTop).toBe(800)
+
+    wrapper.unmount()
+    scrollRoot.remove()
   })
 
   it('does not import restore height cache when saved width is missing', async () => {
@@ -2945,8 +3079,16 @@ describe('node renderer virtual-scroll coordination', () => {
 
     expect(scrollRoot.scrollTop).toBe(800)
 
+    const anchorEventsBeforeScroll = wrapper.emitted('anchor-change')?.length ?? 0
+
     scrollRoot.scrollTop = 700
     scrollRoot.dispatchEvent(new Event('scroll'))
+    platform.flushFrames()
+    await nextTick()
+
+    const anchorEventsAfterScroll = wrapper.emitted('anchor-change') ?? []
+    expect(anchorEventsAfterScroll.length).toBeGreaterThan(anchorEventsBeforeScroll)
+    expect(anchorEventsAfterScroll.at(-1)?.[0]).toMatchObject({ type: 'node' })
 
     for (const el of getRootNodeContentElements(wrapper.element))
       platform.heights.set(el, 100)

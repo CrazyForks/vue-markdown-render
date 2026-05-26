@@ -41,15 +41,9 @@ function outerAnchorDelta(before, after) {
 function assertThreadRestore(label, before, after) {
   const scrollDelta = Math.abs(before.scrollTop - after.scrollTop)
   const anchorDelta = outerAnchorDelta(before.outerAnchor, after.outerAnchor)
-  const sameFirstVisibleMessage = before.firstVisibleMessageId
-    && before.firstVisibleMessageId === after.firstVisibleMessageId
-  const sameAnchorMessage = before.outerAnchor?.type === 'item'
-    && after.outerAnchor?.type === 'item'
-    && before.outerAnchor.messageKey
-    && before.outerAnchor.messageKey === after.outerAnchor.messageKey
 
   assert(
-    scrollDelta < 32 || anchorDelta < 32 || sameFirstVisibleMessage || sameAnchorMessage,
+    scrollDelta < 32 || anchorDelta < 32,
     `${label} scroll position was not restored accurately`,
     {
       before: {
@@ -274,6 +268,16 @@ async function run() {
         }
         return latest
       }
+      const waitUntil = async (predicate, frames = 180) => {
+        let latest = api.read()
+        for (let i = 0; i < frames; i++) {
+          if (predicate(latest))
+            return latest
+          await api.nextFrame()
+          latest = api.read()
+        }
+        return latest
+      }
 
       await api.scrollToRatio(0.15)
       await api.nextFrame()
@@ -309,6 +313,7 @@ async function run() {
       await api.nextFrame()
       await api.scrollToRatio(0.95)
       await api.nextFrame()
+      const switchAfter = await waitHealthy(60, { clearEvents: false })
 
       api.clearEvents()
       api.startStressScroll()
@@ -320,13 +325,16 @@ async function run() {
       await api.nextFrame()
 
       await scrollToSettledBottom()
+      const settledEventsBeforeStream = api.read().settledEvents
       api.startStreamingLastMessage({
         blocks: 160,
         initialChars: 800,
         chunkSize: 6400,
         intervalMs: 16,
       })
-      const streamAfter = await waitHealthy(90, { clearEvents: false })
+      await waitUntil(snapshot => snapshot.streamingActive === false, 360)
+      await waitUntil(snapshot => snapshot.settledEvents > settledEventsBeforeStream, 180)
+      const streamAfter = await waitHealthy(120, { clearEvents: false })
       api.clearEvents()
       await api.nextFrame()
 
@@ -345,6 +353,7 @@ async function run() {
         threadBBefore,
         threadAAfter,
         threadBAfter,
+        switchAfter,
         stressAfter,
         streamAfter,
         relayoutAfter,
@@ -358,6 +367,7 @@ async function run() {
       threadBBefore,
       threadAAfter,
       threadBAfter,
+      switchAfter,
       stressAfter,
       streamAfter,
       relayoutAfter,
@@ -367,6 +377,21 @@ async function run() {
 
     assertThreadRestore('thread-a', threadABefore, threadAAfter)
     assertThreadRestore('thread-b', threadBBefore, threadBAfter)
+
+    assert(
+      switchAfter.health.maxObservedBlankProbes === 0
+      && switchAfter.blankFrameCount === 0
+      && switchAfter.visibleCoverageOk === true
+      && switchAfter.health.maxObservedScrollJumpPx <= 32,
+      'blank frame or unexpected scroll jump observed during thread switching',
+      {
+        health: switchAfter.health,
+        events: switchAfter.events.filter(event =>
+          (event.blankProbeCount ?? 0) > 0
+          || (!event.expectedJump && (event.scrollJumpPx ?? 0) > 32),
+        ),
+      },
+    )
 
     assert(
       final.health.maxObservedBlankProbes === 0,
