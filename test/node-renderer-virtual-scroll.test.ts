@@ -1,8 +1,8 @@
-import type { MarkstreamNodeLifecycle } from '../src/types/node-renderer-props'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, inject, nextTick, onMounted, ref, watch } from 'vue'
 import { removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../src/utils/nodeLifecycle'
 import { flushAll } from './setup/flush-all'
 
 function createParagraph(index: number) {
@@ -486,7 +486,7 @@ describe('node renderer virtual-scroll coordination', () => {
         indexKey: { type: [String, Number], required: true },
       },
       setup(props) {
-        const lifecycle = inject<MarkstreamNodeLifecycle>('markstreamNodeLifecycle')
+        const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY)
         onMounted(() => {
           lifecycle?.markPending(props.indexKey)
         })
@@ -555,7 +555,7 @@ describe('node renderer virtual-scroll coordination', () => {
         indexKey: { type: [String, Number], required: true },
       },
       setup(props) {
-        const lifecycle = inject<MarkstreamNodeLifecycle>('markstreamNodeLifecycle')
+        const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY)
         onMounted(() => {
           lifecycle?.markPending(props.indexKey)
           lifecycle?.markPending(props.indexKey)
@@ -617,7 +617,7 @@ describe('node renderer virtual-scroll coordination', () => {
         indexKey: { type: [String, Number], required: true },
       },
       setup(props) {
-        const lifecycle = inject<MarkstreamNodeLifecycle>('markstreamNodeLifecycle')
+        const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY)
         onMounted(() => {
           lifecycle?.markPending(props.indexKey)
         })
@@ -686,7 +686,7 @@ describe('node renderer virtual-scroll coordination', () => {
         indexKey: { type: [String, Number], required: true },
       },
       setup(props) {
-        const lifecycle = inject<MarkstreamNodeLifecycle>('markstreamNodeLifecycle')
+        const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY)
         report = (height: number) => {
           lifecycle?.reportHeight(props.indexKey, height)
         }
@@ -754,7 +754,7 @@ describe('node renderer virtual-scroll coordination', () => {
         indexKey: { type: [String, Number], required: true },
       },
       setup(props) {
-        const lifecycle = inject<MarkstreamNodeLifecycle>('markstreamNodeLifecycle')
+        const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY)
         onMounted(() => {
           lifecycle?.markPending(props.indexKey)
         })
@@ -818,7 +818,7 @@ describe('node renderer virtual-scroll coordination', () => {
         indexKey: { type: [String, Number], required: true },
       },
       setup(props) {
-        const lifecycle = inject<MarkstreamNodeLifecycle>('markstreamNodeLifecycle')
+        const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY)
         onMounted(() => {
           lifecycle?.markPending(props.indexKey)
         })
@@ -1091,6 +1091,62 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not import unscoped restore height cache into a scoped thread', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const metrics = {
+      sessionKey: 'shared-session',
+      phase: 'final',
+      nodeCount: 2,
+      liveRange: { start: 0, end: 2 },
+      renderedCount: 2,
+      measuredCount: 2,
+      estimatedCount: 0,
+      averageNodeHeight: 400,
+      topSpacerHeight: 0,
+      bottomSpacerHeight: 0,
+      visibleDomHeight: 800,
+      totalHeight: 800,
+      width: 400,
+      final: true,
+      stable: true,
+      confidence: 'final',
+      reason: 'manual',
+    } as const
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          threadKey: 'thread-a',
+          sessionKey: 'shared-session',
+          settleMode: 'manual',
+          restoreState: {
+            sessionKey: 'shared-session',
+            anchor: { type: 'node', nodeIndex: 0, offsetWithinNodePx: 0 },
+            metrics,
+            width: 400,
+            heightCache: [
+              { index: 0, height: 400 },
+              { index: 1, height: 400 },
+            ],
+          },
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).not.toBe(800)
+
+    wrapper.unmount()
+  })
+
   it('does not reuse restore height cache when measurementKey changes', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
@@ -1348,6 +1404,75 @@ describe('node renderer virtual-scroll coordination', () => {
 
     const handle = wrapper.vm as any
     expect((await handle.forceMeasure('manual')).totalHeight).toBe(800)
+
+    wrapper.unmount()
+  })
+
+  it('imports compatible standalone height cache when restore state is for another thread', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const metrics = {
+      sessionKey: 'shared-session',
+      threadKey: 'thread-b',
+      phase: 'final',
+      nodeCount: 2,
+      liveRange: { start: 0, end: 2 },
+      renderedCount: 2,
+      measuredCount: 2,
+      estimatedCount: 0,
+      averageNodeHeight: 400,
+      topSpacerHeight: 0,
+      bottomSpacerHeight: 0,
+      visibleDomHeight: 800,
+      totalHeight: 800,
+      width: 400,
+      final: true,
+      stable: true,
+      confidence: 'final',
+      reason: 'manual',
+    } as const
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          threadKey: 'thread-a',
+          sessionKey: 'shared-session',
+          settleMode: 'manual',
+          heightCacheWidth: 400,
+          heightCache: [
+            {
+              index: 0,
+              height: 400,
+              nodeType: 'paragraph',
+              signature: 'paragraph\u0000\u00000\u0000Paragraph 1',
+            },
+            {
+              index: 1,
+              height: 400,
+              nodeType: 'paragraph',
+              signature: 'paragraph\u0000\u00000\u0000Paragraph 2',
+            },
+          ],
+          restoreState: {
+            sessionKey: 'shared-session',
+            threadKey: 'thread-b',
+            anchor: { type: 'node', nodeIndex: 0, offsetWithinNodePx: 0 },
+            metrics,
+            width: 400,
+          },
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).toBe(800)
 
     wrapper.unmount()
   })
@@ -1687,6 +1812,70 @@ describe('node renderer virtual-scroll coordination', () => {
     scrollRoot.remove()
   })
 
+  it('does not capture a bottom anchor for a renderer far above the viewport bottom', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const scrollRoot = document.createElement('div')
+    document.body.appendChild(scrollRoot)
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => 1000,
+    })
+
+    scrollRoot.scrollTop = 800
+
+    vi.spyOn(scrollRoot, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      bottom: 200,
+      left: 0,
+      right: 400,
+      width: 400,
+      height: 200,
+      toJSON: () => ({}),
+    } as DOMRect)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'renderer-bottom-overscan',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    vi.spyOn(wrapper.element, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: -420,
+      top: -420,
+      bottom: -260,
+      left: 0,
+      right: 400,
+      width: 400,
+      height: 160,
+      toJSON: () => ({}),
+    } as DOMRect)
+
+    expect((wrapper.vm as any).captureVirtualState()?.anchor.type).not.toBe('bottom')
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
   it('keeps a restored bottom anchor active after late height changes', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -1984,7 +2173,7 @@ describe('node renderer virtual-scroll coordination', () => {
     const wrapper = mount(Host, {
       global: {
         provide: {
-          markstreamNodeLifecycle: {
+          [MARKSTREAM_NODE_LIFECYCLE_KEY]: {
             markPending,
             reportHeight,
             markSettled,

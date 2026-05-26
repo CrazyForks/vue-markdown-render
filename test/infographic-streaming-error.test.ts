@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setInfographicLoader } from '../src/components/InfographicBlockNode/infographic'
 import InfographicBlockNode from '../src/components/InfographicBlockNode/InfographicBlockNode.vue'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../src/utils/nodeLifecycle'
 import { flushAll } from './setup/flush-all'
 
 const defaultInfographicLoader = () => import('@antv/infographic')
@@ -101,7 +102,7 @@ describe('infographicBlockNode streaming errors', () => {
       },
       global: {
         provide: {
-          markstreamNodeLifecycle: {
+          [MARKSTREAM_NODE_LIFECYCLE_KEY]: {
             markPending,
             reportHeight,
             markSettled,

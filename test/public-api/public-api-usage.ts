@@ -38,6 +38,7 @@ import MarkdownRender, {
   isD2Enabled,
   isKatexEnabled,
   isMermaidEnabled,
+  MARKSTREAM_NODE_LIFECYCLE_KEY,
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
@@ -52,6 +53,7 @@ import MarkdownRender, {
   setMermaidLoader,
   toSafeMermaidSvgMarkup,
   toSafeSvgElement,
+  useMarkstreamNodeLifecycle,
   useSmoothMarkdownStream,
   VueRendererMarkdown,
 } from 'markstream-vue'
@@ -130,6 +132,8 @@ const virtualMetrics: MarkstreamVirtualMetrics | null = null
 const virtualState: MarkstreamVirtualState | null = null
 const rendererHandle: MarkstreamRendererHandle | null = null
 const nodeLifecycle: MarkstreamNodeLifecycle | null = null
+void MARKSTREAM_NODE_LIFECYCLE_KEY
+void useMarkstreamNodeLifecycle
 
 // Verify named async components retain their concrete types
 // (not erased to generic Component)

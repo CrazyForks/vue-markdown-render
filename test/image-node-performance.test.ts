@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import ImageNode from '../src/components/ImageNode/ImageNode.vue'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../src/utils/nodeLifecycle'
 
 describe('image node performance defaults', () => {
   afterEach(() => {
@@ -60,7 +61,7 @@ describe('image node performance defaults', () => {
       },
       global: {
         provide: {
-          markstreamNodeLifecycle: {
+          [MARKSTREAM_NODE_LIFECYCLE_KEY]: {
             markPending,
             reportHeight,
             markSettled,

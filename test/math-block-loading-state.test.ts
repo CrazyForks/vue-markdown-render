@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MathBlockNode from '../src/components/MathBlockNode/MathBlockNode.vue'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../src/utils/nodeLifecycle'
 import { flushAll } from './setup/flush-all'
 
 const mocks = vi.hoisted(() => ({
@@ -68,7 +69,7 @@ describe('mathBlockNode loading state', () => {
       },
       global: {
         provide: {
-          markstreamNodeLifecycle: lifecycle,
+          [MARKSTREAM_NODE_LIFECYCLE_KEY]: lifecycle,
         },
       },
     })
@@ -102,7 +103,7 @@ describe('mathBlockNode loading state', () => {
       },
       global: {
         provide: {
-          markstreamNodeLifecycle: lifecycle,
+          [MARKSTREAM_NODE_LIFECYCLE_KEY]: lifecycle,
         },
       },
     })

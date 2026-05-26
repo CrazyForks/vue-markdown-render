@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { InfographicBlockNodeProps } from '../../types/component-props'
-import type { MarkstreamNodeLifecycle } from '../../types/node-renderer-props'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import infographicIcon from '../../icon/infographic.svg?raw'
 import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { getInfographic, isInfographicEnabled } from './infographic'
 
 const props = withDefaults(
@@ -42,7 +42,7 @@ const hasPreview = ref(false)
 const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
 const attrs = useAttrs()
-const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 let lifecyclePendingIndexKey = ''
 const lifecycleIndexKey = computed(() => {
   const raw = attrs['index-key'] ?? attrs.indexKey

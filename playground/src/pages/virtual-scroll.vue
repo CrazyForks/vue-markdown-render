@@ -10,6 +10,7 @@ import MarkdownRender from '../../../src/components/NodeRenderer'
 import '../../../src/index.css'
 
 interface Message {
+  threadId: ThreadId
   id: string
   role: 'user' | 'assistant'
   content: string
@@ -18,8 +19,10 @@ interface Message {
   revision: number
 }
 
+type ThreadId = 'thread-a' | 'thread-b'
+
 const scrollRoot = ref<HTMLElement | null>(null)
-const activeThreadId = ref<'thread-a' | 'thread-b'>('thread-a')
+const activeThreadId = ref<ThreadId>('thread-a')
 const viewportHeight = ref(720)
 const scrollTop = ref(0)
 const layoutWidth = ref(0)
@@ -31,7 +34,8 @@ const stressRunning = ref(false)
 
 const itemHeights = reactive(new Map<string, number>())
 const virtualStates = reactive(new Map<string, MarkstreamVirtualState>())
-const threadScrollTops = reactive(new Map<string, number>())
+const threadScrollTops = reactive(new Map<ThreadId, number>())
+const threadAnchors = reactive(new Map<ThreadId, OuterAnchor>())
 const messageEls = new Map<string, HTMLElement>()
 const markdownHostEls = new Map<string, HTMLElement>()
 
@@ -112,7 +116,7 @@ function makeMarkdown(seed: string, blocks: number) {
   return parts.join('\n\n')
 }
 
-function makeMessages(threadId: 'thread-a' | 'thread-b'): Message[] {
+function makeMessages(threadId: ThreadId): Message[] {
   const prefix = threadId === 'thread-a' ? 'A' : 'B'
 
   return Array.from({ length: 80 }, (_, index) => {
@@ -120,6 +124,7 @@ function makeMessages(threadId: 'thread-a' | 'thread-b'): Message[] {
     const blocks = huge ? (index === 79 ? 900 : 360) : 6 + (index % 5)
 
     return {
+      threadId,
       id: `${threadId}-msg-${index}`,
       role: index % 3 === 0 ? 'user' : 'assistant',
       huge,
@@ -151,7 +156,7 @@ const measurementKey = computed(() => [
 ].join(':'))
 
 function messageKey(message: Message) {
-  return `${activeThreadId.value}:${message.id}:${message.revision}`
+  return `${message.threadId}:${message.id}:${message.revision}`
 }
 
 function setMessageEl(message: Message, el: Element | null) {
@@ -492,9 +497,12 @@ function saveThreadScroll() {
     return
 
   threadScrollTops.set(activeThreadId.value, root.scrollTop)
+  const anchor = captureOuterAnchor()
+  if (anchor)
+    threadAnchors.set(activeThreadId.value, anchor)
 }
 
-async function switchThread(threadId: 'thread-a' | 'thread-b') {
+async function switchThread(threadId: ThreadId) {
   if (threadId === activeThreadId.value)
     return
 
@@ -504,7 +512,14 @@ async function switchThread(threadId: 'thread-a' | 'thread-b') {
   await nextTick()
 
   const root = scrollRoot.value
-  if (root) {
+  if (!root)
+    return
+
+  const savedAnchor = threadAnchors.get(threadId)
+  if (savedAnchor) {
+    restoreOuterAnchor(savedAnchor)
+  }
+  else {
     root.scrollTop = threadScrollTops.get(threadId) ?? 0
     scrollTop.value = root.scrollTop
   }
@@ -605,8 +620,6 @@ function startStreamingLastMessage() {
 function resetHeights() {
   itemHeights.clear()
   virtualStates.clear()
-  messageEls.clear()
-  markdownHostEls.clear()
   blankFrameCount.value = 0
   clippedMessageCount.value = 0
   maxItemHeightDriftPx.value = 0

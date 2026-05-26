@@ -56,6 +56,7 @@ import {
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { isReservedNodeComponentKey, useCustomNodeComponents } from '../../utils/nodeComponents'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import MarkdownCodeBlockNode from '../MarkdownCodeBlockNode'
@@ -1278,7 +1279,7 @@ function clearPendingAsyncNodeKeysForIndex(index: number) {
   }
 }
 
-const parentNodeLifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+const parentNodeLifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 
 const localNodeLifecycle: MarkstreamNodeLifecycle = {
   reportHeight(indexKey, height) {
@@ -1343,7 +1344,7 @@ const providedNodeLifecycle: MarkstreamNodeLifecycle = {
   },
 }
 
-provide('markstreamNodeLifecycle', providedNodeLifecycle)
+provide(MARKSTREAM_NODE_LIFECYCLE_KEY, providedNodeLifecycle)
 
 function getVirtualSessionKey() {
   return props.virtualScroll?.sessionKey
@@ -1353,6 +1354,10 @@ function getVirtualSessionKey() {
 function getVirtualThreadKey() {
   const key = props.virtualScroll?.threadKey
   return key == null || key === '' ? undefined : String(key)
+}
+
+function isSameVirtualThreadKey(threadKey: string | undefined) {
+  return (threadKey ?? '') === (getVirtualThreadKey() ?? '')
 }
 
 function getVirtualMeasurementKey() {
@@ -1539,18 +1544,11 @@ function captureBottomVirtualAnchor(): MarkstreamVirtualAnchor | null {
   if (rendererBottomDistance == null)
     return null
 
-  const scrollRootDistanceFromBottom = Math.max(
-    0,
-    box.scrollHeight - box.scrollTop - box.clientHeight,
-  )
-
   const rendererBottomIsNearViewportBottom
     = rendererBottomDistance >= -8
       && rendererBottomDistance <= BOTTOM_ANCHOR_CAPTURE_MAX_DISTANCE_PX
 
-  const scrollRootIsPinnedToBottom = scrollRootDistanceFromBottom <= 8
-
-  if (!rendererBottomIsNearViewportBottom && !scrollRootIsPinnedToBottom)
+  if (!rendererBottomIsNearViewportBottom)
     return null
 
   return {
@@ -1860,8 +1858,7 @@ function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
   if (state.sessionKey !== getVirtualSessionKey())
     return false
 
-  const currentThreadKey = getVirtualThreadKey() ?? ''
-  if (state.threadKey && state.threadKey !== currentThreadKey)
+  if (!isSameVirtualThreadKey(state.threadKey))
     return false
 
   if ((state.measurementKey ?? '') !== getVirtualMeasurementKey())
@@ -1882,6 +1879,7 @@ function canReuseStandaloneHeightCache() {
 }
 
 let lastImportedVirtualHeightCacheSignature: string | null = null
+let lastImportedVirtualHeightCacheSource: 'restore' | 'standalone' | null = null
 let lastAppliedVirtualRestoreState: MarkstreamVirtualState | null = null
 let pendingImperativeVirtualRestoreState: MarkstreamVirtualState | null = null
 
@@ -1913,25 +1911,29 @@ function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
     return false
 
   const restoreState = props.virtualScroll?.restoreState
-  if (restoreState && !canRestoreVirtualStateCache(restoreState))
-    return false
+  const canUseRestoreState = Boolean(restoreState && canRestoreVirtualStateCache(restoreState))
+  const canUseStandaloneCache = canReuseStandaloneHeightCache()
 
-  if (!restoreState && !canReuseStandaloneHeightCache())
+  if (!canUseRestoreState && !canUseStandaloneCache)
     return false
 
   const boundedCache = getBoundedHeightCache(cache, {
-    requireCompatibilityMetadata: !restoreState,
+    requireCompatibilityMetadata: !canUseRestoreState,
   })
   if (!boundedCache.length)
     return false
 
+  const cacheSource = canUseRestoreState ? 'restore' : 'standalone'
   const signature = getHeightCacheSignature(boundedCache)
-  if (signature === lastImportedVirtualHeightCacheSignature)
+  if (signature === lastImportedVirtualHeightCacheSignature) {
+    lastImportedVirtualHeightCacheSource = cacheSource
     return true
+  }
 
   importHeightCache(boundedCache, { mode: 'merge' })
   markFallbackHeightPrefixDirty()
   lastImportedVirtualHeightCacheSignature = signature
+  lastImportedVirtualHeightCacheSource = cacheSource
   scheduleVirtualMetricsEmit('restore')
   return true
 }
@@ -1943,7 +1945,7 @@ function applyVirtualRestoreState(state: MarkstreamVirtualState | null | undefin
   if (state.sessionKey !== getVirtualSessionKey())
     return false
 
-  if (state.threadKey && state.threadKey !== (getVirtualThreadKey() ?? ''))
+  if (!isSameVirtualThreadKey(state.threadKey))
     return false
 
   if (parsedNodes.value.length <= 0)
@@ -1955,6 +1957,7 @@ function applyVirtualRestoreState(state: MarkstreamVirtualState | null | undefin
       importHeightCache(boundedCache, { mode: 'merge' })
       markFallbackHeightPrefixDirty()
       lastImportedVirtualHeightCacheSignature = getHeightCacheSignature(boundedCache)
+      lastImportedVirtualHeightCacheSource = 'restore'
     }
   }
 
@@ -2898,6 +2901,7 @@ function resetVirtualSessionRuntimeState() {
   lastSettledVirtualSignature = null
   lastFinalVirtualSignature = null
   lastImportedVirtualHeightCacheSignature = null
+  lastImportedVirtualHeightCacheSource = null
   lastAppliedVirtualRestoreState = null
   lastManualSettleSignature = null
   pendingImperativeVirtualRestoreState = null
@@ -2920,6 +2924,7 @@ function resetVirtualLayoutMeasurements(reason: MarkstreamVirtualReason = 'resiz
     rebuildHeightTrees(total)
 
   lastImportedVirtualHeightCacheSignature = null
+  lastImportedVirtualHeightCacheSource = null
   lastAppliedVirtualRestoreState = null
   lastEmittedVirtualMetrics = null
   lastSettledVirtualSignature = null
@@ -3022,11 +3027,15 @@ watch(
     if (!state || !lastImportedVirtualHeightCacheSignature)
       return
 
+    if (lastImportedVirtualHeightCacheSource !== 'restore')
+      return
+
     if (canRestoreVirtualStateCache(state))
       return
 
     resetVirtualSessionMeasurements()
     lastImportedVirtualHeightCacheSignature = null
+    lastImportedVirtualHeightCacheSource = null
     scheduleVirtualMetricsEmit('resize')
   },
   { flush: 'post' },

@@ -126,6 +126,7 @@ export type {
 } from './types/node-renderer-props'
 // Export centralized props interfaces so they appear in package d.ts
 export * from './utils'
+export { MARKSTREAM_NODE_LIFECYCLE_KEY, useMarkstreamNodeLifecycle } from './utils/nodeLifecycle'
 export * from './workers/katexCdnWorker'
 export * from './workers/katexWorkerClient'
 export * from './workers/mermaidCdnWorker'

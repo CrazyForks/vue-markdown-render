@@ -127,6 +127,8 @@ MermaidBlockNodeProps
 MermaidLoader
 MarkstreamHeightCache
 MarkstreamNodeLifecycle
+MARKSTREAM_NODE_LIFECYCLE_KEY
+useMarkstreamNodeLifecycle
 MarkstreamRendererHandle
 MarkstreamScrollRoot
 MarkstreamScrollRootLike

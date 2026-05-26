@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { ImageNodeProps } from '../../types/component-props'
-import type { MarkstreamNodeLifecycle } from '../../types/node-renderer-props'
 import { sanitizeImageSrc } from 'stream-markdown-parser'
 import { computed, inject, nextTick, onBeforeUnmount, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 
 const props = withDefaults(defineProps<ImageNodeProps>(), {
   fallbackSrc: '',
@@ -19,7 +19,7 @@ const activeSrc = ref('')
 const imageStage = ref<'primary' | 'fallback' | 'failed'>('primary')
 const rootRef = ref<HTMLElement | null>(null)
 const attrs = useAttrs()
-const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 let lifecyclePendingIndexKey = ''
 
 const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))

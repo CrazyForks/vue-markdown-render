@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import D2BlockNode from '../src/components/D2BlockNode/D2BlockNode.vue'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../src/utils/nodeLifecycle'
 
 vi.mock('../src/components/D2BlockNode/d2', () => ({
   getD2: vi.fn(async () => class FakeD2 {
@@ -87,7 +88,7 @@ describe('d2 block layout', () => {
       },
       global: {
         provide: {
-          markstreamNodeLifecycle: lifecycle,
+          [MARKSTREAM_NODE_LIFECYCLE_KEY]: lifecycle,
         },
       },
       attachTo: document.body,

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload } from '../../types/component-props'
-import type { MarkstreamNodeLifecycle } from '../../types/node-renderer-props'
 import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLike, MonacoNamespaceLike, MonacoRuntimeOptions } from './monaco'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
@@ -10,6 +9,7 @@ import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
 import CodeBlockShell from './CodeBlockShell.vue'
@@ -51,7 +51,7 @@ const emits = defineEmits<{
 }>()
 
 const attrs = useAttrs()
-const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 const lifecycleIndexKey = computed(() => {
   const indexKey = attrs['index-key'] ?? attrs.indexKey
   return indexKey == null ? '' : String(indexKey)

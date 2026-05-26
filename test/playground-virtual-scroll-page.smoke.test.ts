@@ -4,7 +4,7 @@ import { nextTick } from 'vue'
 import VirtualScrollPage from '../playground/src/pages/virtual-scroll.vue'
 import { flushAll } from './setup/flush-all'
 
-describe('playground /virtual-scroll smoke', () => {
+describe('playground /virtual-scroll shell smoke', () => {
   let originalElementFromPoint: typeof document.elementFromPoint | undefined
 
   beforeEach(() => {
@@ -46,7 +46,7 @@ describe('playground /virtual-scroll smoke', () => {
     }
   })
 
-  it('renders the virtual scroll lab shell and exposes validation metrics', async () => {
+  it('renders lab shell', async () => {
     const wrapper = mount(VirtualScrollPage, {
       attachTo: document.body,
     })
@@ -59,11 +59,14 @@ describe('playground /virtual-scroll smoke', () => {
     expect(wrapper.text()).toContain('markdown slots:')
     expect(wrapper.text()).toContain('blank probes:')
     expect(wrapper.text()).toContain('status:')
-
-    await wrapper.get('button:nth-of-type(5)').trigger('click')
-    await flushAll()
-
     expect(wrapper.text()).toContain('visible range:')
+    expect(wrapper.findAll('button').map(button => button.text())).toEqual(expect.arrayContaining([
+      'Thread A',
+      'Thread B',
+      'Bottom',
+      'Stress scroll',
+      'Reset caches',
+    ]))
 
     wrapper.unmount()
   })

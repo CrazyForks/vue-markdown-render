@@ -1,13 +1,13 @@
 <script setup lang="ts">
 // Exported props interface for MermaidBlockNode
 import type { MermaidBlockEvent, MermaidBlockNodeProps } from '../../types/component-props'
-import type { MarkstreamNodeLifecycle } from '../../types/node-renderer-props'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import mermaidIcon from '../../icon/mermaid.svg?raw'
 import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, getMermaidDiagramKind, parsePositiveNumber } from '../../utils/diagramHeight'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
 
@@ -175,7 +175,7 @@ const registerViewport = useViewportPriority()
 const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
 const attrs = useAttrs()
-const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 let lifecyclePendingIndexKey = ''
 let lifecyclePendingCount = 0
 let lifecycleSettleGeneration = 0

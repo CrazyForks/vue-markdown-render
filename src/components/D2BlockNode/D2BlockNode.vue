@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { D2BlockNodeProps } from '../../types/component-props'
-import type { MarkstreamNodeLifecycle } from '../../types/node-renderer-props'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { getD2 } from './d2'
 
 const props = withDefaults(
@@ -23,7 +23,7 @@ const props = withDefaults(
 )
 
 const attrs = useAttrs()
-const lifecycle = inject<MarkstreamNodeLifecycle | null>('markstreamNodeLifecycle', null)
+const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 const { t } = useSafeI18n()
 const copyText = ref(false)
 const isCollapsed = ref(false)

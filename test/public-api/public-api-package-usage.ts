@@ -1,12 +1,14 @@
 import {
   getLanguageIcon,
   isBrokenMermaidSvg,
+  MARKSTREAM_NODE_LIFECYCLE_KEY,
   normalizeLanguageIdentifier,
   parseMarkdownToStructure,
   safeRaf,
   sanitizeMermaidSvg,
   toSafeMermaidSvgMarkup,
   toSafeSvgElement,
+  useMarkstreamNodeLifecycle,
 } from 'markstream-vue/utils'
 import {
   recommendWorkerThreshold,
@@ -41,6 +43,8 @@ void sanitizeMermaidSvg
 void toSafeMermaidSvgMarkup
 void toSafeSvgElement
 void isBrokenMermaidSvg
+void MARKSTREAM_NODE_LIFECYCLE_KEY
+void useMarkstreamNodeLifecycle
 void safeRaf
 void recommendWorkerThreshold
 void enablePerfMonitoring
