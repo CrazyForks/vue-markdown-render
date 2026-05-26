@@ -15,6 +15,7 @@ function createRoot() {
 function createHarness(options: {
   isClient?: boolean
   virtualized?: boolean
+  listenerEnabled?: boolean
   root?: HTMLElement | null
   onScroll?: () => void
 } = {}) {
@@ -22,6 +23,9 @@ function createHarness(options: {
     options.root === undefined ? createRoot() : options.root,
   )
   const virtualized = ref(options.virtualized ?? true)
+  const listenerEnabled = options.listenerEnabled == null
+    ? null
+    : ref(options.listenerEnabled)
   const scrollRootElement = ref<HTMLElement | null>(null)
   const resolveScrollContainer = vi.fn(() => root.value)
   const scheduleFocusSync = vi.fn()
@@ -29,6 +33,9 @@ function createHarness(options: {
   const listener = useScrollListener({
     isClient: options.isClient ?? true,
     virtualizationEnabled: computed(() => virtualized.value),
+    listenerEnabled: listenerEnabled
+      ? computed(() => listenerEnabled.value)
+      : undefined,
     scrollRootElement,
     resolveScrollContainer,
     scheduleFocusSync,
@@ -38,6 +45,7 @@ function createHarness(options: {
   return {
     root,
     virtualized,
+    listenerEnabled,
     scrollRootElement,
     resolveScrollContainer,
     scheduleFocusSync,
@@ -71,6 +79,24 @@ describe('useScrollListener', () => {
 
     expect(h.resolveScrollContainer).not.toHaveBeenCalled()
     expect(h.scrollRootElement.value).toBeNull()
+  })
+
+  it('can attach a virtual-scroll-only listener without scheduling focus sync', () => {
+    const onScroll = vi.fn()
+    const h = createHarness({
+      virtualized: false,
+      listenerEnabled: true,
+      onScroll,
+    })
+
+    h.listener.setupScrollListener()
+
+    expect(h.scrollRootElement.value).toBe(h.root.value)
+
+    h.root.value!.dispatchEvent(new Event('scroll'))
+
+    expect(onScroll).toHaveBeenCalledTimes(1)
+    expect(h.scheduleFocusSync).not.toHaveBeenCalled()
   })
 
   it('does nothing when no scroll root is resolved', () => {

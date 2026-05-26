@@ -3,6 +3,7 @@ import type { ComputedRef, Ref } from 'vue'
 export interface ScrollListenerOptions {
   isClient: boolean
   virtualizationEnabled: ComputedRef<boolean>
+  listenerEnabled?: ComputedRef<boolean>
   scrollRootElement: Ref<HTMLElement | null>
   resolveScrollContainer: (node?: HTMLElement | null) => HTMLElement | null
   scheduleFocusSync: (options?: { immediate?: boolean }) => void
@@ -20,6 +21,7 @@ export function useScrollListener(
   const {
     isClient,
     virtualizationEnabled,
+    listenerEnabled,
     scrollRootElement,
     resolveScrollContainer,
     scheduleFocusSync,
@@ -37,8 +39,12 @@ export function useScrollListener(
     scrollRootElement.value = null
   }
 
+  function isListenerEnabled() {
+    return listenerEnabled?.value ?? virtualizationEnabled.value
+  }
+
   function setupScrollListener() {
-    if (!isClient || !virtualizationEnabled.value)
+    if (!isClient || !isListenerEnabled())
       return
 
     const root = resolveScrollContainer()
@@ -50,7 +56,8 @@ export function useScrollListener(
 
     const handler = () => {
       onScroll?.()
-      scheduleFocusSync()
+      if (virtualizationEnabled.value)
+        scheduleFocusSync()
     }
 
     root.addEventListener('scroll', handler, { passive: true })

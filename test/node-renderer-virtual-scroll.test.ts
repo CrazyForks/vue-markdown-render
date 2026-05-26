@@ -120,6 +120,9 @@ describe('node renderer virtual-scroll coordination', () => {
       sessionKey: 'thread-a:message-1:1',
       totalHeight: 120,
     })
+    expect(wrapper.emitted('height-change')?.at(-1)?.[0]).toBe(wrapper.emitted('heightChange')?.at(-1)?.[0])
+    expect(wrapper.emitted('virtual-state-change')?.at(-1)?.[0]).toBe(wrapper.emitted('virtualStateChange')?.at(-1)?.[0])
+    expect(wrapper.emitted('anchor-change')?.at(-1)?.[0]).toBe(wrapper.emitted('anchorChange')?.at(-1)?.[0])
 
     const state = handle.captureVirtualState()
     expect(state).toMatchObject({
@@ -141,10 +144,12 @@ describe('node renderer virtual-scroll coordination', () => {
       totalHeight: 120,
       stable: true,
     })
+    expect(wrapper.emitted('render-settled')?.at(-1)?.[0]).toBe(wrapper.emitted('renderSettled')?.at(-1)?.[0])
     expect(wrapper.emitted('renderFinal')?.at(-1)?.[0]).toMatchObject({
       phase: 'final',
       totalHeight: 120,
     })
+    expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toBe(wrapper.emitted('renderFinal')?.at(-1)?.[0])
 
     wrapper.unmount()
   })
@@ -425,7 +430,7 @@ describe('node renderer virtual-scroll coordination', () => {
 
     setCustomComponents('virtual-lifecycle-test', {
       'x-host': HostNode as any,
-      nested_reporter: NestedReporter as any,
+      'nested_reporter': NestedReporter as any,
     })
 
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -670,6 +675,7 @@ describe('node renderer virtual-scroll coordination', () => {
       },
     })
     expect(state.heightCache).toBeUndefined()
+    expect(state.contentHash).toBeUndefined()
     expect((wrapper.vm as any).captureVirtualState()?.heightCache).toEqual([
       {
         index: 0,
@@ -1326,6 +1332,68 @@ describe('node renderer virtual-scroll coordination', () => {
     const handle = wrapper.vm as any
     handle.restoreVirtualState({
       sessionKey: 'bottom-anchor-user-scroll',
+      anchor: { type: 'bottom', distanceFromBottomPx: 0 },
+      metrics: handle.getVirtualMetrics(),
+      width: 0,
+    })
+
+    expect(scrollRoot.scrollTop).toBe(800)
+
+    scrollRoot.scrollTop = 700
+    scrollRoot.dispatchEvent(new Event('scroll'))
+
+    for (const el of getRootNodeContentElements(wrapper.element))
+      platform.heights.set(el, 100)
+    scrollHeight = 1300
+
+    await handle.forceMeasure('manual')
+    platform.flushFrames()
+    await nextTick()
+
+    expect(scrollRoot.scrollTop).toBe(700)
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
+  it('stops restoring a bottom anchor after the user scrolls away when node virtualization is disabled', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const scrollRoot = document.createElement('div')
+    let scrollHeight = 1000
+
+    document.body.appendChild(scrollRoot)
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => scrollHeight,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2), createParagraph(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        maxLiveNodes: 0,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'bottom-anchor-user-scroll-no-node-virtualization',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    handle.restoreVirtualState({
+      sessionKey: 'bottom-anchor-user-scroll-no-node-virtualization',
       anchor: { type: 'bottom', distanceFromBottomPx: 0 },
       metrics: handle.getVirtualMetrics(),
       width: 0,

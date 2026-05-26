@@ -121,11 +121,44 @@ const emit = defineEmits<{
   (e: 'mouseover', event: MouseEvent): void
   (e: 'mouseout', event: MouseEvent): void
   (e: 'virtualStateChange', payload: MarkstreamVirtualState): void
+  (e: 'virtual-state-change', payload: MarkstreamVirtualState): void
   (e: 'heightChange', payload: MarkstreamVirtualMetrics): void
+  (e: 'height-change', payload: MarkstreamVirtualMetrics): void
   (e: 'renderSettled', payload: MarkstreamVirtualMetrics): void
+  (e: 'render-settled', payload: MarkstreamVirtualMetrics): void
   (e: 'renderFinal', payload: MarkstreamVirtualMetrics): void
+  (e: 'render-final', payload: MarkstreamVirtualMetrics): void
   (e: 'anchorChange', payload: MarkstreamVirtualAnchor): void
+  (e: 'anchor-change', payload: MarkstreamVirtualAnchor): void
 }>()
+
+/* eslint-disable vue/custom-event-name-casing -- Public virtualScroll API also emits documented kebab-case events. */
+function emitHeightChange(metrics: MarkstreamVirtualMetrics) {
+  emit('heightChange', metrics)
+  emit('height-change', metrics)
+}
+
+function emitVirtualStateChange(state: MarkstreamVirtualState) {
+  emit('virtualStateChange', state)
+  emit('virtual-state-change', state)
+}
+
+function emitAnchorChange(anchor: MarkstreamVirtualAnchor) {
+  emit('anchorChange', anchor)
+  emit('anchor-change', anchor)
+}
+
+function emitRenderSettled(metrics: MarkstreamVirtualMetrics) {
+  emit('renderSettled', metrics)
+  emit('render-settled', metrics)
+}
+
+function emitRenderFinal(metrics: MarkstreamVirtualMetrics) {
+  emit('renderFinal', metrics)
+  emit('render-final', metrics)
+}
+/* eslint-enable vue/custom-event-name-casing */
+
 const MAX_DEFERRED_NODE_COUNT = 900
 const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
@@ -506,6 +539,7 @@ const deferNodes = computed(() => {
   return viewportPriorityEnabled.value
 })
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
+const scrollListenerEnabled = computed(() => virtualizationEnabled.value || virtualScrollEnabled.value)
 const {
   liveNodeBufferResolved,
   focusIndex,
@@ -682,6 +716,7 @@ const {
 } = useScrollListener({
   isClient,
   virtualizationEnabled,
+  listenerEnabled: scrollListenerEnabled,
   scrollRootElement,
   resolveScrollContainer,
   scheduleFocusSync,
@@ -1496,13 +1531,18 @@ function isHeightCacheEntryCompatible(entry: MarkstreamHeightCache[number]) {
 
 function captureVirtualStateFromMetrics(
   metrics: MarkstreamVirtualMetrics,
-  options: { includeHeightCache?: boolean } = {},
+  options: {
+    includeHeightCache?: boolean
+    includeContentHash?: boolean
+  } = {},
 ): MarkstreamVirtualState | null {
   const anchor = captureVirtualAnchor()
   if (!anchor)
     return null
 
-  const heightCache = options.includeHeightCache
+  const includeHeightCache = options.includeHeightCache === true
+  const includeContentHash = options.includeContentHash ?? includeHeightCache
+  const heightCache = includeHeightCache
     ? exportVirtualHeightCache()
     : []
 
@@ -1511,7 +1551,7 @@ function captureVirtualStateFromMetrics(
     anchor,
     metrics,
     width: metrics.width,
-    contentHash: getVirtualContentHash(),
+    contentHash: includeContentHash ? getVirtualContentHash() : undefined,
     measurementKey: getVirtualMeasurementKey() || undefined,
     heightCache: heightCache.length ? heightCache : undefined,
   }
@@ -1939,7 +1979,7 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
   const shouldIncludeHeightCache = force || metrics.stable || metrics.phase === 'final'
 
   if (shouldEmit) {
-    emit('heightChange', metrics)
+    emitHeightChange(metrics)
     lastEmittedVirtualMetrics = metrics
     lastVirtualEmitAt = getVirtualNow()
 
@@ -1947,8 +1987,8 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
       includeHeightCache: shouldIncludeHeightCache,
     })
     if (state) {
-      emit('virtualStateChange', state)
-      emit('anchorChange', state.anchor)
+      emitVirtualStateChange(state)
+      emitAnchorChange(state.anchor)
     }
   }
 
@@ -1958,9 +1998,9 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
       includeHeightCache: true,
     })
     if (settledState)
-      emit('virtualStateChange', settledState)
+      emitVirtualStateChange(settledState)
 
-    emit('renderSettled', metrics)
+    emitRenderSettled(metrics)
     lastSettledVirtualSignature = settledSignature
   }
   else if (!metrics.stable) {
@@ -1972,9 +2012,9 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
       includeHeightCache: true,
     })
     if (finalState)
-      emit('virtualStateChange', finalState)
+      emitVirtualStateChange(finalState)
 
-    emit('renderFinal', metrics)
+    emitRenderFinal(metrics)
     lastFinalVirtualSignature = settledSignature
   }
 }
@@ -2512,17 +2552,27 @@ const {
 })
 
 watch(
-  () => virtualizationEnabled.value,
-  (enabled) => {
-    if (!enabled) {
+  [
+    scrollListenerEnabled,
+    virtualizationEnabled,
+    () => containerRef.value,
+    () => resolveVirtualScrollRoot(),
+  ],
+  ([listenerEnabled, virtualized]) => {
+    if (!listenerEnabled) {
       cleanupScrollListener()
       cancelScheduledFocusSync()
       return
     }
+
     setupScrollListener()
-    scheduleFocusSync({ immediate: true })
+
+    if (virtualized)
+      scheduleFocusSync({ immediate: true })
+    else
+      cancelScheduledFocusSync()
   },
-  { immediate: true },
+  { flush: 'post', immediate: true },
 )
 
 // Some scroll containers (e.g. `flex-direction: column-reverse` chat lists)
@@ -2537,16 +2587,6 @@ watch(
     scheduleFocusSync({ immediate: true })
   },
   { flush: 'post' },
-)
-
-watch(
-  () => containerRef.value,
-  () => {
-    if (!virtualizationEnabled.value)
-      return
-    setupScrollListener()
-    scheduleFocusSync({ immediate: true })
-  },
 )
 
 watch(
