@@ -92,7 +92,34 @@ export interface MarkstreamVirtualState {
   heightCache?: MarkstreamHeightCache
 }
 
-export type MarkstreamScrollRoot = HTMLElement | null
+export interface MarkstreamRectLike {
+  top: number
+  bottom: number
+  left: number
+  right: number
+  width: number
+  height: number
+}
+
+export interface MarkstreamScrollRootElementLike {
+  scrollTop: number
+  readonly scrollHeight: number
+  readonly clientHeight: number
+  readonly ownerDocument?: unknown
+  getBoundingClientRect: () => MarkstreamRectLike
+  addEventListener: (
+    type: string,
+    listener: (...args: any[]) => void,
+    options?: unknown,
+  ) => void
+  removeEventListener: (
+    type: string,
+    listener: (...args: any[]) => void,
+    options?: unknown,
+  ) => void
+}
+
+export type MarkstreamScrollRoot = MarkstreamScrollRootElementLike | null
 export type MarkstreamScrollRootLike = MarkstreamScrollRoot | Ref<MarkstreamScrollRoot>
 export type MarkstreamScrollRootResolver = () => MarkstreamScrollRootLike
 

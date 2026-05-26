@@ -13,7 +13,7 @@ import type {
   MarkstreamVirtualState,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
-import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -394,11 +394,21 @@ const virtualScrollRequested = computed(() => Boolean(
   !renderAsFragment.value
   && props.virtualScroll?.enabled,
 ))
+const virtualScrollMounted = ref(false)
+onMounted(() => {
+  virtualScrollMounted.value = true
+})
+
 const virtualScrollEnabled = computed(() => Boolean(
   isClient
   && virtualScrollRequested.value,
 ))
+const virtualScrollDomEnabled = computed(() => Boolean(
+  virtualScrollMounted.value
+  && virtualScrollEnabled.value,
+))
 const heightEstimationActive = computed(() => heightExperimentEnabled.value || virtualScrollEnabled.value)
+const heightEstimationDomActive = computed(() => heightExperimentEnabled.value || virtualScrollDomEnabled.value)
 const textEstimationEnabled = computed(() => {
   return heightEstimationActive.value
     && heightExperimentConfig.value?.textEstimation !== false
@@ -457,6 +467,7 @@ const {
 const nodeSlotElements = new Map<number, HTMLElement | null>()
 const nodeContentResizeObservers = new Map<number, ResizeObserver>()
 const codeBlockRenderCache = new WeakMap<object, { signature: string, node: ParsedNode }>()
+const nodeHeightSignatures = new Map<number, string>()
 const nodeSlotVersion = ref(0)
 const sortedNodeSlots = computed(() => {
   // Track a manual version so we only rebuild when slots change.
@@ -466,6 +477,30 @@ const sortedNodeSlots = computed(() => {
 const scrollRootElement = ref<HTMLElement | null>(null)
 const activeVirtualBottomAnchor = ref<Extract<MarkstreamVirtualAnchor, { type: 'bottom' }> | null>(null)
 let virtualBottomRestoreRaf: number | null = null
+let virtualBottomRestoreScrollGuardUntil = 0
+let virtualBottomRestoreScrollGuardTarget: number | null = null
+
+function guardVirtualBottomProgrammaticScroll(target: number) {
+  virtualBottomRestoreScrollGuardUntil = getVirtualNow() + 120
+  virtualBottomRestoreScrollGuardTarget = target
+}
+
+function consumeVirtualBottomProgrammaticScrollGuard(box: { scrollTop: number }) {
+  if (getVirtualNow() >= virtualBottomRestoreScrollGuardUntil) {
+    virtualBottomRestoreScrollGuardTarget = null
+    return false
+  }
+
+  const guardedTarget = virtualBottomRestoreScrollGuardTarget
+  if (guardedTarget == null)
+    return true
+
+  const guarded = Math.abs(box.scrollTop - guardedTarget) <= 2
+  if (!guarded)
+    virtualBottomRestoreScrollGuardTarget = null
+
+  return guarded
+}
 const {
   activeRestoreAnchor,
   getRelativeScrollTopWithinContainer,
@@ -501,13 +536,13 @@ const {
   heightSumTree,
   heightKnownTree,
   averageNodeHeight,
-  resetHeightMeasurements,
+  resetHeightMeasurements: resetMeasuredHeightMeasurements,
   pruneHeightMeasurements,
   rebuildHeightTrees,
-  recordNodeHeight,
-  removeNodeHeights,
+  recordNodeHeight: recordMeasuredNodeHeight,
+  removeNodeHeights: removeMeasuredNodeHeights,
   exportHeightCache,
-  importHeightCache,
+  importHeightCache: importMeasuredHeightCache,
   fenwickRangeSum,
 } = useHeightMeasurements({
   onHeightRecorded: () => {
@@ -521,6 +556,57 @@ const {
     scheduleVirtualMetricsEmit('node-resize')
   },
 })
+
+function resetHeightMeasurements() {
+  resetMeasuredHeightMeasurements()
+  nodeHeightSignatures.clear()
+}
+
+function rememberNodeHeightSignature(index: number) {
+  if (!Number.isInteger(index) || index < 0 || index >= parsedNodes.value.length)
+    return
+
+  nodeHeightSignatures.set(index, getNodeHeightCacheSignature(index))
+}
+
+function forgetNodeHeightSignatures(indices: Iterable<number>) {
+  for (const index of indices)
+    nodeHeightSignatures.delete(index)
+}
+
+function recordNodeHeight(
+  index: number,
+  height: number,
+  options: { allowShrink?: boolean } = {},
+) {
+  const before = nodeHeights[index]
+  recordMeasuredNodeHeight(index, height, options)
+  const after = nodeHeights[index]
+
+  if (after && after > 0)
+    rememberNodeHeightSignature(index)
+  else if (before)
+    nodeHeightSignatures.delete(index)
+}
+
+function removeNodeHeights(
+  indices: Iterable<number>,
+  options: { notify?: boolean } = {},
+) {
+  const list = Array.from(indices, Number)
+  const removed = removeMeasuredNodeHeights(list, options)
+  if (removed > 0)
+    forgetNodeHeightSignatures(list)
+  return removed
+}
+
+function importHeightCache(
+  cache: MarkstreamHeightCache,
+  options: { mode?: 'replace' | 'merge' } = {},
+) {
+  importMeasuredHeightCache(cache, options)
+  seedCurrentNodeHeightSignatures()
+}
 const deferNodes = computed(() => {
   if (renderAsFragment.value)
     return false
@@ -554,7 +640,6 @@ const {
 })
 const nodeContentElements = new Map<number, HTMLElement | null>()
 const nodeContentVersions = new Map<number, number>()
-const nodeHeightSignatures = new Map<number, string>()
 const nodeContentDeferredMeasureTimers = new Map<number, number[]>()
 const finalHeightConvergenceTimers: number[] = []
 const pendingHeightMeasurements = new Map<number, { height: number, allowShrink: boolean, version: number, el: HTMLElement }>()
@@ -1601,6 +1686,9 @@ function hashVirtualString(input: string) {
   return (hash >>> 0).toString(36)
 }
 
+let virtualContentHashRevision = -1
+let virtualContentHashCache = ''
+
 function getNodeHeightCacheSignature(index: number) {
   const node = parsedNodes.value[index] as any
   if (!node)
@@ -1622,6 +1710,10 @@ function getNodeHeightCacheSignature(index: number) {
 }
 
 function getVirtualContentHash() {
+  const revision = streamRenderVersion.value
+  if (virtualContentHashRevision === revision)
+    return virtualContentHashCache
+
   let hash = 2166136261
 
   for (let i = 0; i < parsedNodes.value.length; i++) {
@@ -1632,7 +1724,9 @@ function getVirtualContentHash() {
     }
   }
 
-  return (hash >>> 0).toString(36)
+  virtualContentHashCache = (hash >>> 0).toString(36)
+  virtualContentHashRevision = revision
+  return virtualContentHashCache
 }
 
 function exportVirtualHeightCache(): MarkstreamHeightCache {
@@ -1736,6 +1830,8 @@ function applyBottomVirtualAnchor(anchor: Extract<MarkstreamVirtualAnchor, { typ
     rendererTop + rendererHeight - box.clientHeight - distance,
   )
 
+  guardVirtualBottomProgrammaticScroll(target)
+
   if (box.isViewportRoot) {
     box.doc.defaultView?.scrollTo?.(0, target)
     return
@@ -1764,6 +1860,8 @@ function clearVirtualBottomRestoreTimers() {
 
 function clearActiveVirtualBottomAnchor() {
   activeVirtualBottomAnchor.value = null
+  virtualBottomRestoreScrollGuardUntil = 0
+  virtualBottomRestoreScrollGuardTarget = null
   clearVirtualBottomRestoreTimers()
 }
 
@@ -1797,6 +1895,9 @@ function handleVirtualScrollRootScroll() {
 
   const box = getScrollBox()
   if (!box)
+    return
+
+  if (consumeVirtualBottomProgrammaticScrollGuard(box))
     return
 
   const rendererBottomDistance = getRendererBottomDistanceFromViewport(box)
@@ -2152,8 +2253,11 @@ function restoreVirtualState(
 
 function seedCurrentNodeHeightSignatures() {
   nodeHeightSignatures.clear()
-  for (let i = 0; i < parsedNodes.value.length; i++)
-    nodeHeightSignatures.set(i, getNodeHeightCacheSignature(i))
+  for (const rawIndex of Object.keys(nodeHeights)) {
+    const index = Number(rawIndex)
+    if (Number.isInteger(index) && index >= 0 && index < parsedNodes.value.length)
+      rememberNodeHeightSignature(index)
+  }
 }
 
 function invalidateChangedNodeHeights(reason: MarkstreamVirtualReason = 'content') {
@@ -2163,7 +2267,12 @@ function invalidateChangedNodeHeights(reason: MarkstreamVirtualReason = 'content
   const staleIndices: number[] = []
   const total = parsedNodes.value.length
 
-  for (let index = 0; index < total; index++) {
+  for (const index of Array.from(nodeHeightSignatures.keys())) {
+    if (index >= total) {
+      staleIndices.push(index)
+      continue
+    }
+
     const signature = getNodeHeightCacheSignature(index)
     const previousSignature = nodeHeightSignatures.get(index)
 
@@ -3297,7 +3406,7 @@ watch(
     () => props.virtualScroll?.sessionKey,
     () => props.virtualScroll?.measurementKey,
     () => props.indexKey,
-    () => getVirtualContentHash(),
+    () => streamRenderVersion.value,
   ],
   ([enabled]) => {
     if (enabled) {
@@ -4248,16 +4357,16 @@ onBeforeUnmount(() => {
     :class="[
       { dark: props.isDark },
       { virtualized: virtualizationEnabled },
-      { 'virtual-scroll-coordinated': virtualScrollEnabled },
+      { 'virtual-scroll-coordinated': virtualScrollDomEnabled },
     ]"
     :data-custom-id="props.customId"
     @click="handleContainerClick"
     @mouseover="handleContainerMouseover"
     @mouseout="handleContainerMouseout"
   >
-    <template v-if="heightEstimationActive || virtualizationEnabled">
+    <template v-if="heightEstimationDomActive || virtualizationEnabled">
       <div
-        v-if="heightEstimationActive"
+        v-if="heightEstimationDomActive"
         class="height-estimation-probes"
         :style="{ width: `${experimentProbeWidth}px` }"
         aria-hidden="true"

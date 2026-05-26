@@ -29,6 +29,7 @@ export function useScrollListener(
   } = options
 
   let detachScrollHandler: (() => void) | null = null
+  let lastObservedScrollTop: number | null = null
 
   function cleanupScrollListener() {
     if (detachScrollHandler) {
@@ -36,6 +37,7 @@ export function useScrollListener(
       detachScrollHandler = null
     }
 
+    lastObservedScrollTop = null
     scrollRootElement.value = null
   }
 
@@ -66,8 +68,13 @@ export function useScrollListener(
 
     const handler = () => {
       onScroll?.()
-      if (virtualizationEnabled.value)
-        scheduleFocusSync()
+      if (virtualizationEnabled.value) {
+        const options = resolveFocusSyncScheduleOptions(root)
+        if (options)
+          scheduleFocusSync(options)
+        else
+          scheduleFocusSync()
+      }
     }
 
     root.addEventListener('scroll', handler, { passive: true })
@@ -76,6 +83,22 @@ export function useScrollListener(
     detachScrollHandler = () => {
       root.removeEventListener('scroll', handler)
     }
+  }
+
+  function resolveFocusSyncScheduleOptions(root: HTMLElement) {
+    const current = Math.abs(root.scrollTop || 0)
+    const previous = lastObservedScrollTop
+    lastObservedScrollTop = current
+
+    if (previous == null)
+      return undefined
+
+    const jump = Math.abs(current - previous)
+    const immediateThreshold = Math.max(480, (root.clientHeight || 0) * 0.75)
+
+    return jump > immediateThreshold
+      ? { immediate: true }
+      : undefined
   }
 
   return {

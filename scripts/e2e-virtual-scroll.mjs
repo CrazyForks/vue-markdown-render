@@ -302,6 +302,13 @@ async function run() {
       await api.scrollToRatio(0.95)
       await api.nextFrame()
 
+      api.clearEvents()
+      api.startStressScroll()
+      for (let i = 0; i < 180; i++)
+        await api.nextFrame()
+      api.stopStressScroll()
+      const stressAfter = await waitHealthy(45)
+
       await scrollToSettledBottom()
       api.startStreamingLastMessage({
         blocks: 160,
@@ -315,15 +322,17 @@ async function run() {
       api.toggleFontScale()
       const relayoutAfter = await waitHealthy(45)
       await waitForSettledEvent()
+      const finalAfter = await waitHealthy(45)
 
       return {
         threadABefore,
         threadBBefore,
         threadAAfter,
         threadBAfter,
+        stressAfter,
         streamAfter,
         relayoutAfter,
-        final: api.read(),
+        final: finalAfter,
       }
     })
 
@@ -332,6 +341,7 @@ async function run() {
       threadBBefore,
       threadAAfter,
       threadBAfter,
+      stressAfter,
       streamAfter,
       relayoutAfter,
       final,
@@ -410,6 +420,15 @@ async function run() {
       final.settledEvents > 0,
       'no render-settled events were observed in the virtual-scroll lab',
       final,
+    )
+
+    assert(
+      stressAfter.health.maxObservedBlankProbes === 0
+      && stressAfter.blankFrameCount === 0
+      && stressAfter.visibleCoverageOk === true
+      && stressAfter.health.virtualDomWithinLimit === true,
+      'blank frame or DOM budget regression observed during stress scroll',
+      stressAfter,
     )
 
     assert(

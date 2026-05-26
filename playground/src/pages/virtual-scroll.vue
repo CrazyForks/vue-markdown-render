@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   MarkstreamHeightCache,
+  MarkstreamRendererHandle,
   MarkstreamVirtualMetrics,
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualState,
@@ -116,6 +117,8 @@ declare global {
       scrollToRatio: (ratio: number) => Promise<void>
       switchThread: (threadId: ThreadId) => Promise<void>
       rapidSwitchThreads: (threadIds: ThreadId[], count?: number) => Promise<void>
+      startStressScroll: () => void
+      stopStressScroll: () => void
       startStreamingLastMessage: (options?: StreamLastMessageOptions) => void
       toggleDensity: () => void
       toggleFontScale: () => void
@@ -161,6 +164,7 @@ const threadAnchors = reactive(new Map<ThreadId, OuterAnchor>())
 const messageEls = new Map<string, HTMLElement>()
 const messageCardEls = new Map<string, HTMLElement>()
 const markdownHostEls = new Map<string, HTMLElement>()
+const rendererRefs = new Map<string, MarkstreamRendererHandle>()
 
 const domNodeCount = ref(0)
 const messageDomCount = ref(0)
@@ -312,6 +316,14 @@ function setMarkdownHostEl(message: Message, el: Element | null) {
     markdownHostEls.delete(key)
 }
 
+function setRendererRef(message: Message, instance: MarkstreamRendererHandle | null) {
+  const key = messageKey(message)
+  if (instance)
+    rendererRefs.set(key, instance)
+  else
+    rendererRefs.delete(key)
+}
+
 function getEstimatedMessageHeight(message: Message) {
   return message.huge
     ? Math.max(2700, Math.ceil(message.content.length * 0.62))
@@ -388,6 +400,16 @@ const visibleItems = computed(() => {
     }
   })
 })
+
+function captureVisibleVirtualStates() {
+  for (const item of visibleItems.value) {
+    const key = messageKey(item.message)
+    const renderer = rendererRefs.get(key)
+    const state = renderer?.captureVirtualState()
+    if (state)
+      virtualStates.set(key, mergeVirtualState(virtualStates.get(key), state))
+  }
+}
 
 const renderedCoordinatedMessageCount = computed(() => {
   return visibleItems.value.filter(item => isCoordinatedMessage(item.message)).length
@@ -917,6 +939,7 @@ function saveThreadScroll() {
   if (!root)
     return
 
+  captureVisibleVirtualStates()
   threadScrollTops.set(activeThreadId.value, root.scrollTop)
   const anchor = captureOuterAnchor()
   if (anchor)
@@ -1219,6 +1242,8 @@ function exposeLabApi() {
     scrollToRatio,
     switchThread,
     rapidSwitchThreads,
+    startStressScroll,
+    stopStressScroll,
     startStreamingLastMessage,
     toggleDensity,
     toggleFontScale,
@@ -1283,6 +1308,7 @@ onBeforeUnmount(() => {
   messageEls.clear()
   messageCardEls.clear()
   markdownHostEls.clear()
+  rendererRefs.clear()
 
   if (streamTimer)
     window.clearInterval(streamTimer)
@@ -1468,6 +1494,7 @@ onBeforeUnmount(() => {
               class="markdown-host"
             >
               <MarkdownRender
+                :ref="instance => setRendererRef(message, instance as MarkstreamRendererHandle | null)"
                 :content="message.content"
                 :final="message.final"
                 :custom-id="message.id"
