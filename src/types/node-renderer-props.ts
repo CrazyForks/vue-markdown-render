@@ -100,6 +100,14 @@ interface MarkstreamVirtualScrollSharedOptions {
   scrollRoot?: MarkstreamScrollRootLike | MarkstreamScrollRootResolver
   threadKey?: string
   restoreState?: MarkstreamVirtualState | null
+  /**
+   * Apply `restoreState.anchor` to the shared scroll root.
+   *
+   * By default `restoreState` imports compatible height cache only, so several
+   * MarkdownRender instances can mount with persisted state without fighting
+   * over the same outer scroll root.
+   */
+  restoreAnchor?: boolean | string | number
   heightCache?: MarkstreamHeightCache | null
   heightCacheWidth?: number
   /**

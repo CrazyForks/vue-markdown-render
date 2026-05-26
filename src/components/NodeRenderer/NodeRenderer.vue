@@ -1884,10 +1884,20 @@ function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
   if (!canReuseHeightCacheForWidth(getVirtualStateSavedWidth(state)))
     return false
 
-  if (state.contentHash && state.contentHash !== getVirtualContentHash())
+  if (!hasRestoreCacheCompatibilityMetadata(state))
     return false
 
   return true
+}
+
+function hasRestoreCacheCompatibilityMetadata(state: MarkstreamVirtualState) {
+  if (!state.heightCache?.length)
+    return false
+
+  if (state.contentHash)
+    return state.contentHash === getVirtualContentHash()
+
+  return state.heightCache.every(entry => Boolean(entry.nodeType || entry.signature))
 }
 
 function canReuseStandaloneHeightCache() {
@@ -1897,7 +1907,7 @@ function canReuseStandaloneHeightCache() {
 
 let lastImportedVirtualHeightCacheSignature: string | null = null
 let lastImportedVirtualHeightCacheSource: 'restore' | 'standalone' | null = null
-let lastAppliedVirtualRestoreState: MarkstreamVirtualState | null = null
+let lastAppliedVirtualRestoreSignature: string | null = null
 let pendingImperativeVirtualRestoreState: MarkstreamVirtualState | null = null
 
 function getHeightCacheSignature(cache: MarkstreamHeightCache) {
@@ -1951,7 +1961,41 @@ function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
   return true
 }
 
-function applyVirtualRestoreState(state: MarkstreamVirtualState | null | undefined) {
+function getVirtualRestoreAnchorToken() {
+  const token = props.virtualScroll?.restoreAnchor
+
+  if (token == null || token === false)
+    return null
+
+  return token === true ? 'true' : String(token)
+}
+
+function getVirtualAnchorRestoreSignature(
+  state: MarkstreamVirtualState,
+  token: string,
+) {
+  const anchor = state.anchor
+  const anchorKey = anchor.type === 'bottom'
+    ? `bottom:${Math.round(anchor.distanceFromBottomPx)}`
+    : `node:${anchor.nodeIndex}:${Math.round(anchor.offsetWithinNodePx)}`
+
+  return [
+    getVirtualThreadKey() ?? '',
+    getVirtualSessionKey(),
+    getVirtualMeasurementKey(),
+    virtualLayoutWidthBucket.value,
+    token,
+    anchorKey,
+  ].join(':')
+}
+
+function applyVirtualRestoreState(
+  state: MarkstreamVirtualState | null | undefined,
+  options: {
+    restoreAnchor?: boolean
+    restoreToken?: string
+  } = {},
+) {
   if (!virtualScrollEnabled.value || !state)
     return false
 
@@ -1964,20 +2008,35 @@ function applyVirtualRestoreState(state: MarkstreamVirtualState | null | undefin
   if (parsedNodes.value.length <= 0)
     return false
 
+  let importedCache = false
+
   if (state.heightCache?.length && canRestoreVirtualStateCache(state)) {
-    const boundedCache = getBoundedHeightCache(state.heightCache)
+    const boundedCache = getBoundedHeightCache(state.heightCache, {
+      requireCompatibilityMetadata: !state.contentHash,
+    })
+
     if (boundedCache.length) {
       importHeightCache(boundedCache, { mode: 'merge' })
       markFallbackHeightPrefixDirty()
       lastImportedVirtualHeightCacheSignature = getHeightCacheSignature(boundedCache)
       lastImportedVirtualHeightCacheSource = 'restore'
+      importedCache = true
     }
   }
 
-  if (lastAppliedVirtualRestoreState === state)
+  if (!options.restoreAnchor) {
+    if (importedCache)
+      scheduleVirtualMetricsEmit('restore')
+    return true
+  }
+
+  const restoreToken = options.restoreToken ?? 'imperative'
+  const signature = getVirtualAnchorRestoreSignature(state, restoreToken)
+
+  if (lastAppliedVirtualRestoreSignature === signature)
     return true
 
-  lastAppliedVirtualRestoreState = state
+  lastAppliedVirtualRestoreSignature = signature
   restoreVirtualAnchor(state.anchor)
   scheduleVirtualMetricsEmit('restore')
   return true
@@ -1993,8 +2052,15 @@ function shouldKeepPendingVirtualRestoreState(state: MarkstreamVirtualState) {
 function restoreVirtualState(state: MarkstreamVirtualState) {
   pendingImperativeVirtualRestoreState = state
 
-  if (applyVirtualRestoreState(state) && !shouldKeepPendingVirtualRestoreState(state))
+  if (
+    applyVirtualRestoreState(state, {
+      restoreAnchor: true,
+      restoreToken: 'imperative',
+    })
+    && !shouldKeepPendingVirtualRestoreState(state)
+  ) {
     pendingImperativeVirtualRestoreState = null
+  }
 }
 
 function forceFlushPendingHeightMeasurements() {
@@ -2887,11 +2953,26 @@ watch(
   { immediate: true },
 )
 
-let autoSettledVirtualSessionKey: string | null = null
-let autoSettledVirtualSessionThreadKey: string | undefined
+let autoSettledVirtualSignature: string | null = null
 let manualSettleInFlight = false
 let lastManualSettleSignature: string | null = null
 let lastVirtualLayoutEpochKey: string | null = null
+
+function getAutoVirtualSettleSignature() {
+  const total = parsedNodes.value.length
+
+  return [
+    getVirtualThreadKey() ?? '',
+    getVirtualSessionKey(),
+    getVirtualMeasurementKey(),
+    virtualLayoutWidthBucket.value,
+    total,
+    Math.round(estimateHeightRange(0, total)),
+    Math.round(getCurrentVirtualWidth()),
+    heightStats.count,
+    Math.round(heightStats.total),
+  ].join(':')
+}
 
 function resetVirtualSessionMeasurements() {
   clearPendingHeightMeasurements()
@@ -2906,8 +2987,7 @@ function resetVirtualSessionMeasurements() {
 function resetVirtualSessionRuntimeState() {
   clearVirtualMetricsSchedule()
   clearAllHeightSettlingTimers()
-  autoSettledVirtualSessionKey = null
-  autoSettledVirtualSessionThreadKey = undefined
+  autoSettledVirtualSignature = null
   imperativeVirtualSettleSessionKey = null
   imperativeVirtualSettleThreadKey = undefined
   lastEmittedVirtualMetrics = null
@@ -2915,7 +2995,7 @@ function resetVirtualSessionRuntimeState() {
   lastFinalVirtualSignature = null
   lastImportedVirtualHeightCacheSignature = null
   lastImportedVirtualHeightCacheSource = null
-  lastAppliedVirtualRestoreState = null
+  lastAppliedVirtualRestoreSignature = null
   lastManualSettleSignature = null
   pendingImperativeVirtualRestoreState = null
   manualSettleInFlight = false
@@ -2938,13 +3018,12 @@ function resetVirtualLayoutMeasurements(reason: MarkstreamVirtualReason = 'resiz
 
   lastImportedVirtualHeightCacheSignature = null
   lastImportedVirtualHeightCacheSource = null
-  lastAppliedVirtualRestoreState = null
+  lastAppliedVirtualRestoreSignature = null
   lastEmittedVirtualMetrics = null
   lastSettledVirtualSignature = null
   lastFinalVirtualSignature = null
   lastManualSettleSignature = null
-  autoSettledVirtualSessionKey = null
-  autoSettledVirtualSessionThreadKey = undefined
+  autoSettledVirtualSignature = null
   imperativeVirtualSettleSessionKey = null
   imperativeVirtualSettleThreadKey = undefined
   manualSettleInFlight = false
@@ -3035,6 +3114,7 @@ watch(
   [
     virtualScrollEnabled,
     () => props.virtualScroll?.restoreState,
+    () => props.virtualScroll?.restoreAnchor,
     () => props.virtualScroll?.measurementKey,
     () => parsedNodes.value.length,
     () => getVirtualSessionKey(),
@@ -3045,7 +3125,12 @@ watch(
       return
 
     await nextTick()
-    applyVirtualRestoreState(state)
+
+    const restoreToken = getVirtualRestoreAnchorToken()
+    applyVirtualRestoreState(state, {
+      restoreAnchor: restoreToken != null,
+      restoreToken: restoreToken ?? undefined,
+    })
   },
   { flush: 'post', immediate: true },
 )
@@ -3089,7 +3174,10 @@ watch(
 
     if (
       pendingImperativeVirtualRestoreState
-      && applyVirtualRestoreState(pendingImperativeVirtualRestoreState)
+      && applyVirtualRestoreState(pendingImperativeVirtualRestoreState, {
+        restoreAnchor: true,
+        restoreToken: 'imperative',
+      })
       && !shouldKeepPendingVirtualRestoreState(pendingImperativeVirtualRestoreState)
     ) {
       pendingImperativeVirtualRestoreState = null
@@ -3113,24 +3201,22 @@ watch(
     () => heightStats.count,
     () => heightStats.total,
   ],
-  ([enabled, final, settleMode, sessionKey, threadKey]) => {
+  ([enabled, final, settleMode]) => {
     if (!enabled || final !== true || settleMode === 'manual')
-      return
-    if (autoSettledVirtualSessionKey === sessionKey && autoSettledVirtualSessionThreadKey === threadKey)
       return
     if (!isLayoutSettled())
       return
-    autoSettledVirtualSessionKey = sessionKey
-    autoSettledVirtualSessionThreadKey = threadKey
+
+    const signature = getAutoVirtualSettleSignature()
+
+    if (autoSettledVirtualSignature === signature)
+      return
+
+    autoSettledVirtualSignature = signature
+
     void settle({ reason: 'final' }).then((metrics) => {
-      if (
-        !metrics.stable
-        && autoSettledVirtualSessionKey === sessionKey
-        && autoSettledVirtualSessionThreadKey === threadKey
-      ) {
-        autoSettledVirtualSessionKey = null
-        autoSettledVirtualSessionThreadKey = undefined
-      }
+      if (!metrics.stable && autoSettledVirtualSignature === signature)
+        autoSettledVirtualSignature = null
     })
   },
   { flush: 'post', immediate: true },

@@ -905,6 +905,83 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('emits auto final again when settled heights change', async () => {
+    let finishAsyncNode: ((height: number) => void) | null = null
+    let reportAsyncHeight: ((height: number) => void) | null = null
+    const AsyncNode = defineComponent({
+      props: {
+        node: { type: Object, required: true },
+        indexKey: { type: [String, Number], required: true },
+      },
+      setup(props) {
+        const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY)
+        onMounted(() => {
+          lifecycle?.markPending(props.indexKey)
+        })
+        reportAsyncHeight = (height: number) => {
+          lifecycle?.reportHeight(props.indexKey, height)
+        }
+        finishAsyncNode = (height: number) => {
+          lifecycle?.reportHeight(props.indexKey, height)
+          lifecycle?.markSettled(props.indexKey)
+        }
+        return () => h('div', { class: 'async-custom-node' }, 'async custom node')
+      },
+    })
+
+    setCustomComponents('virtual-lifecycle-test', {
+      async_node: AsyncNode as any,
+    })
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-lifecycle-test',
+        nodes: [
+          {
+            type: 'async_node',
+            raw: '<async-node />',
+            content: '',
+          },
+        ],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'thread-a:auto-height-change:1',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    finishAsyncNode?.(88)
+    await new Promise(resolve => setTimeout(resolve, 160))
+    await flushAll()
+
+    const firstFinalCount = wrapper.emitted('render-final')?.length ?? 0
+    expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toMatchObject({
+      phase: 'final',
+      totalHeight: 88,
+      stable: true,
+    })
+
+    reportAsyncHeight?.(120)
+    await new Promise(resolve => setTimeout(resolve, 160))
+    await flushAll()
+
+    expect(wrapper.emitted('render-final')?.length).toBeGreaterThan(firstFinalCount)
+    expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toMatchObject({
+      phase: 'final',
+      totalHeight: 120,
+      stable: true,
+    })
+
+    wrapper.unmount()
+  })
+
   it('manual settledToken retries final after async nodes settle', async () => {
     let finishAsyncNode: ((height: number) => void) | null = null
 
@@ -1275,8 +1352,8 @@ describe('node renderer virtual-scroll coordination', () => {
       width: 400,
       measurementKey: 'light:16',
       heightCache: [
-        { index: 0, height: 400 },
-        { index: 1, height: 400 },
+        { index: 0, height: 400, nodeType: 'paragraph' },
+        { index: 1, height: 400, nodeType: 'paragraph' },
       ],
     } as any
 
@@ -1317,6 +1394,191 @@ describe('node renderer virtual-scroll coordination', () => {
     expect(handle.captureVirtualState()?.measurementKey).toBe('light:16')
 
     wrapper.unmount()
+  })
+
+  it('treats prop restoreState as cache-only unless restoreAnchor is provided', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const scrollRoot = document.createElement('div')
+    document.body.appendChild(scrollRoot)
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => 1000,
+    })
+
+    scrollRoot.scrollTop = 120
+
+    const metrics = {
+      sessionKey: 'cache-only-session',
+      phase: 'final',
+      nodeCount: 2,
+      liveRange: { start: 0, end: 2 },
+      renderedCount: 2,
+      measuredCount: 2,
+      estimatedCount: 0,
+      averageNodeHeight: 400,
+      topSpacerHeight: 0,
+      bottomSpacerHeight: 0,
+      visibleDomHeight: 800,
+      totalHeight: 800,
+      width: 400,
+      final: true,
+      stable: true,
+      confidence: 'final',
+      reason: 'manual',
+    } as const
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'cache-only-session',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          restoreState: {
+            sessionKey: 'cache-only-session',
+            anchor: { type: 'bottom', distanceFromBottomPx: 0 },
+            metrics,
+            width: 400,
+            heightCache: [
+              { index: 0, height: 400, nodeType: 'paragraph' },
+              { index: 1, height: 400, nodeType: 'paragraph' },
+            ],
+          },
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(scrollRoot.scrollTop).toBe(120)
+    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).toBe(800)
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
+  it('applies prop restoreState anchor only when restoreAnchor token is provided', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const scrollRoot = document.createElement('div')
+    document.body.appendChild(scrollRoot)
+
+    let scrollHeight = 1000
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => scrollHeight,
+    })
+
+    scrollRoot.scrollTop = 120
+
+    const restoreState = {
+      sessionKey: 'explicit-anchor-session',
+      anchor: { type: 'bottom', distanceFromBottomPx: 0 },
+      metrics: {
+        sessionKey: 'explicit-anchor-session',
+        phase: 'final',
+        nodeCount: 2,
+        liveRange: { start: 0, end: 2 },
+        renderedCount: 2,
+        measuredCount: 2,
+        estimatedCount: 0,
+        averageNodeHeight: 100,
+        topSpacerHeight: 0,
+        bottomSpacerHeight: 0,
+        visibleDomHeight: 200,
+        totalHeight: 200,
+        width: 400,
+        final: true,
+        stable: true,
+        confidence: 'final',
+        reason: 'manual',
+      },
+      width: 400,
+    } as any
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'explicit-anchor-session',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          restoreState,
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(scrollRoot.scrollTop).toBe(120)
+    installRendererBottomGeometry(wrapper, scrollRoot, () => scrollHeight)
+
+    await wrapper.setProps({
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'explicit-anchor-session',
+        scrollRoot: () => scrollRoot,
+        settleMode: 'manual',
+        restoreAnchor: 'thread-restore-1',
+        restoreState,
+      },
+    })
+
+    await flushAll()
+    expect(scrollRoot.scrollTop).toBe(800)
+
+    scrollRoot.scrollTop = 300
+    scrollHeight = 1000
+
+    await wrapper.setProps({
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'explicit-anchor-session',
+        scrollRoot: () => scrollRoot,
+        settleMode: 'manual',
+        restoreAnchor: 'thread-restore-1',
+        restoreState,
+      },
+    })
+
+    await flushAll()
+    expect(scrollRoot.scrollTop).toBe(300)
+
+    await wrapper.setProps({
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'explicit-anchor-session',
+        scrollRoot: () => scrollRoot,
+        settleMode: 'manual',
+        restoreAnchor: 'thread-restore-2',
+        restoreState,
+      },
+    })
+
+    await flushAll()
+    expect(scrollRoot.scrollTop).toBe(800)
+
+    wrapper.unmount()
+    scrollRoot.remove()
   })
 
   it('does not import restore height cache before current width is known', async () => {
@@ -1737,8 +1999,8 @@ describe('node renderer virtual-scroll coordination', () => {
       },
       width: 400,
       heightCache: [
-        { index: 0, height: 50 },
-        { index: 1, height: 50 },
+        { index: 0, height: 50, nodeType: 'paragraph' },
+        { index: 1, height: 50, nodeType: 'paragraph' },
       ],
     } as any
 
