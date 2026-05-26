@@ -41,11 +41,9 @@ function outerAnchorDelta(before, after) {
 function assertThreadRestore(label, before, after) {
   const scrollDelta = Math.abs(before.scrollTop - after.scrollTop)
   const anchorDelta = outerAnchorDelta(before.outerAnchor, after.outerAnchor)
-  const sameFirstVisible = Boolean(before.firstVisibleMessageId)
-    && before.firstVisibleMessageId === after.firstVisibleMessageId
 
   assert(
-    scrollDelta < 32 || anchorDelta < 32 || sameFirstVisible,
+    scrollDelta < 32 || anchorDelta < 32,
     `${label} scroll position was not restored accurately`,
     {
       before: {
@@ -60,7 +58,6 @@ function assertThreadRestore(label, before, after) {
       },
       scrollDelta,
       anchorDelta,
-      sameFirstVisible,
     },
   )
 }
@@ -289,9 +286,11 @@ async function run() {
 
       await api.switchThread('thread-a')
       await api.nextFrame()
+      await api.nextFrame()
       const threadAAfter = api.read()
 
       await api.switchThread('thread-b')
+      await api.nextFrame()
       await api.nextFrame()
       const threadBAfter = api.read()
 

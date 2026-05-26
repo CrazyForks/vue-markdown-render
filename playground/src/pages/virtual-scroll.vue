@@ -164,6 +164,10 @@ const itemHeights = reactive(new Map<string, number>())
 const virtualStates = reactive(new Map<string, MarkstreamVirtualState>())
 const threadScrollTops = reactive(new Map<ThreadId, number>())
 const threadAnchors = reactive(new Map<ThreadId, OuterAnchor>())
+const threadRestoreTargets = reactive(new Map<ThreadId, {
+  messageKey: string
+  token: number
+}>())
 const messageEls = new Map<string, HTMLElement>()
 const messageCardEls = new Map<string, HTMLElement>()
 const markdownHostEls = new Map<string, HTMLElement>()
@@ -195,6 +199,7 @@ let resizeObserver: ResizeObserver | null = null
 let streamBottomPinned = false
 let lastObservedScrollTop = 0
 let expectedScrollTop: number | null = null
+let restoreAnchorTokenSeq = 0
 
 function repeatedText(seed: string, index: number) {
   return [
@@ -460,6 +465,7 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
   const state = virtualStates.get(key)
   const heightCache = state?.heightCache as MarkstreamHeightCache | undefined
   const enabled = message.huge || coordinateSmallMessages.value
+  const restoreTarget = threadRestoreTargets.get(message.threadId)
 
   const options = {
     enabled,
@@ -467,6 +473,9 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
     threadKey: activeThreadId.value,
     scrollRoot: () => scrollRoot.value,
     restoreState: state ?? null,
+    restoreAnchor: restoreTarget?.messageKey === key
+      ? restoreTarget.token
+      : false,
     measurementKey: measurementKey.value,
     settleMode: 'manual',
     settledToken: message.final,
@@ -547,6 +556,36 @@ function captureOuterAnchor(): OuterAnchor | null {
   }
 }
 
+function resolveThreadAnchorMessageKey(threadId: ThreadId, anchor: OuterAnchor | null) {
+  if (!anchor)
+    return ''
+
+  const list = threads[threadId]
+
+  if (anchor.type === 'item') {
+    const index = Math.min(
+      Math.max(0, anchor.index ?? 0),
+      Math.max(0, list.length - 1),
+    )
+    const message = list[index]
+    return message ? messageKey(message) : ''
+  }
+
+  const message = list[list.length - 1]
+  return message ? messageKey(message) : ''
+}
+
+function markThreadRestoreTarget(threadId: ThreadId, anchor: OuterAnchor | null) {
+  const key = resolveThreadAnchorMessageKey(threadId, anchor)
+  if (!key)
+    return
+
+  threadRestoreTargets.set(threadId, {
+    messageKey: key,
+    token: ++restoreAnchorTokenSeq,
+  })
+}
+
 function getCurrentViewportHeight() {
   return scrollRoot.value?.clientHeight || viewportHeight.value
 }
@@ -589,7 +628,7 @@ function resolveOuterAnchorScrollTop(anchor: OuterAnchor) {
 
 async function restoreOuterAnchor(
   anchor: OuterAnchor | null,
-  options: { immediate?: boolean } = {},
+  options: { immediate?: boolean, expectedJump?: boolean } = {},
 ) {
   if (!anchor)
     return
@@ -603,7 +642,8 @@ async function restoreOuterAnchor(
       scrollCompensationCount.value += 1
       pushLabEvent('outer-anchor-compensation', {
         scrollJumpPx: jump,
-        expectedJump: anchor.type === 'bottom' || jump <= SCROLL_JITTER_BUDGET_PX,
+        expectedJump: options.expectedJump
+          ?? (anchor.type === 'bottom' || jump <= SCROLL_JITTER_BUDGET_PX),
       })
       scheduleStats()
     }
@@ -613,6 +653,7 @@ async function restoreOuterAnchor(
     apply()
     void nextTick(() => {
       apply()
+      void waitFrame().then(apply)
     })
     return
   }
@@ -1016,8 +1057,10 @@ function saveThreadScroll() {
   captureVisibleVirtualStates()
   threadScrollTops.set(activeThreadId.value, root.scrollTop)
   const anchor = captureOuterAnchor()
-  if (anchor)
+  if (anchor) {
     threadAnchors.set(activeThreadId.value, anchor)
+    markThreadRestoreTarget(activeThreadId.value, anchor)
+  }
 }
 
 async function switchThread(threadId: ThreadId) {
@@ -1033,8 +1076,20 @@ async function switchThread(threadId: ThreadId) {
   const savedAnchor = threadAnchors.get(threadId)
   const savedScrollTop = threadScrollTops.get(threadId) ?? 0
 
+  if (savedAnchor) {
+    markThreadRestoreTarget(threadId, savedAnchor)
+  }
+  else {
+    const fallbackIndex = lowerBoundOffset(savedScrollTop + 1)
+    markThreadRestoreTarget(threadId, {
+      type: 'item',
+      index: fallbackIndex,
+      offsetPx: savedScrollTop - (prefixTops.value[fallbackIndex] ?? 0),
+    })
+  }
+
   if (savedAnchor)
-    await restoreOuterAnchor(savedAnchor, { immediate: true })
+    await restoreOuterAnchor(savedAnchor, { immediate: true, expectedJump: true })
   else
     applyOuterScrollTop(savedScrollTop)
 

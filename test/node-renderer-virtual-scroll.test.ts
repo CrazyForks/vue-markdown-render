@@ -1832,7 +1832,7 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('requires standalone height cache compatibility metadata even when restore state is valid', async () => {
+  it('rejects standalone height cache entries without signatures', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -1868,8 +1868,8 @@ describe('node renderer virtual-scroll coordination', () => {
           settleMode: 'manual',
           heightCacheWidth: 400,
           heightCache: [
-            { index: 0, height: 400 },
-            { index: 1, height: 400 },
+            { index: 0, height: 400, nodeType: 'paragraph' },
+            { index: 1, height: 400, nodeType: 'paragraph' },
           ],
           restoreState: {
             sessionKey: 'current-session',
@@ -1888,7 +1888,7 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('imports standalone height cache when entries carry compatibility metadata', async () => {
+  it('imports standalone height cache when entries carry signatures', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -2191,6 +2191,55 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     expect(handle.getVirtualMetrics().totalHeight).toBe(100)
+
+    wrapper.unmount()
+  })
+
+  it('keeps imperative restoreState pending until width is known', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const seedCache = await captureSeedHeightCache(NodeRenderer, [320, 360])
+    const platform = installManualMeasurementPlatform()
+    let width = 0
+
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'pending-width-restore',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    const state = {
+      sessionKey: 'pending-width-restore',
+      anchor: { type: 'node', nodeIndex: 0, offsetWithinNodePx: 0 },
+      metrics: handle.getVirtualMetrics(),
+      width: 960,
+      heightCache: seedCache,
+    } as any
+
+    handle.restoreVirtualState(state, { restoreAnchor: false })
+    await flushAll()
+
+    expect((await handle.forceMeasure('manual')).totalHeight).not.toBe(680)
+
+    width = 960
+    platform.resizeCallbacks.get(wrapper.element)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await flushAll()
+
+    expect((await handle.forceMeasure('manual')).totalHeight).toBe(680)
 
     wrapper.unmount()
   })
