@@ -1329,6 +1329,20 @@ function getCurrentVirtualWidth() {
   return experimentContainerWidth.value || containerRef.value?.clientWidth || 0
 }
 
+const virtualLayoutWidthBucket = computed(() => {
+  const width = getCurrentVirtualWidth()
+  if (!Number.isFinite(width) || width <= 0)
+    return 0
+  return Math.round(width / HEIGHT_CACHE_WIDTH_BUCKET_PX)
+})
+
+const virtualLayoutEpochKey = computed(() => {
+  return [
+    getVirtualMeasurementKey(),
+    virtualLayoutWidthBucket.value,
+  ].join('\u0000')
+})
+
 function getVisibleDomHeight() {
   let total = 0
   for (const el of nodeContentElements.values())
@@ -1913,8 +1927,14 @@ async function forceMeasure(reason: MarkstreamVirtualReason = 'manual') {
   return metrics
 }
 
-function isSameVirtualSession(sessionKey: string, threadKey = getVirtualThreadKey()) {
-  return getVirtualSessionKey() === sessionKey && getVirtualThreadKey() === threadKey
+function isSameVirtualSession(
+  sessionKey: string,
+  threadKey = getVirtualThreadKey(),
+  layoutEpochKey = virtualLayoutEpochKey.value,
+) {
+  return getVirtualSessionKey() === sessionKey
+    && getVirtualThreadKey() === threadKey
+    && virtualLayoutEpochKey.value === layoutEpochKey
 }
 
 async function settle(options: {
@@ -1924,17 +1944,18 @@ async function settle(options: {
 } = {}) {
   const sessionKeyAtStart = getVirtualSessionKey()
   const threadKeyAtStart = getVirtualThreadKey()
+  const layoutEpochKeyAtStart = virtualLayoutEpochKey.value
   const frames = options.frames ?? 2
   const timeoutMs = options.timeoutMs ?? 120
   const reason = options.reason ?? 'manual'
 
   for (let i = 0; i < frames; i++) {
     await nextTick()
-    if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart))
+    if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
       return getVirtualMetrics(reason)
 
     await waitForVirtualFrame()
-    if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart))
+    if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
       return getVirtualMetrics(reason)
 
     measureTrackedNodeHeights()
@@ -1942,13 +1963,13 @@ async function settle(options: {
   }
 
   await waitForVirtualTimeout(timeoutMs)
-  if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart))
+  if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
     return getVirtualMetrics(reason)
 
   measureTrackedNodeHeights()
   forceFlushPendingHeightMeasurements()
 
-  if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart))
+  if (!isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart))
     return getVirtualMetrics(reason)
 
   if (isInternalLayoutSettled()) {
@@ -1956,7 +1977,7 @@ async function settle(options: {
     imperativeVirtualSettleThreadKey = threadKeyAtStart
   }
 
-  const finalPhase = isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart) && isLayoutSettled()
+  const finalPhase = isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart) && isLayoutSettled()
   const metrics = getVirtualMetrics(reason, finalPhase ? 'final' : undefined)
   emitVirtualMetricsNow(metrics, true)
   return metrics
@@ -2048,7 +2069,15 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
     }
   }
 
-  const settledSignature = `${metrics.threadKey ?? ''}:${metrics.sessionKey}:${metrics.nodeCount}:${Math.round(metrics.totalHeight)}:${Math.round(metrics.width)}`
+  const settledSignature = [
+    metrics.threadKey ?? '',
+    metrics.sessionKey,
+    getVirtualMeasurementKey(),
+    virtualLayoutWidthBucket.value,
+    metrics.nodeCount,
+    Math.round(metrics.totalHeight),
+    Math.round(metrics.width),
+  ].join(':')
   if (metrics.stable && lastSettledVirtualSignature !== settledSignature) {
     const settledState = captureVirtualStateFromMetrics(metrics, {
       includeHeightCache: true,
@@ -2753,6 +2782,7 @@ let autoSettledVirtualSessionKey: string | null = null
 let autoSettledVirtualSessionThreadKey: string | undefined
 let manualSettleInFlight = false
 let lastManualSettleSignature: string | null = null
+let lastVirtualLayoutEpochKey: string | null = null
 
 function resetVirtualSessionMeasurements() {
   clearPendingHeightMeasurements()
@@ -2785,6 +2815,62 @@ function resetVirtualSessionRuntimeState() {
   clearRestoreReconcile()
   clearActiveVirtualBottomAnchor()
 }
+
+function resetVirtualLayoutMeasurements(reason: MarkstreamVirtualReason = 'resize') {
+  clearPendingHeightMeasurements()
+  resetHeightMeasurements()
+
+  const total = parsedNodes.value.length
+  if (total > 0)
+    rebuildHeightTrees(total)
+
+  lastImportedVirtualHeightCacheSignature = null
+  lastAppliedVirtualRestoreState = null
+  lastEmittedVirtualMetrics = null
+  lastSettledVirtualSignature = null
+  lastFinalVirtualSignature = null
+  lastManualSettleSignature = null
+  autoSettledVirtualSessionKey = null
+  autoSettledVirtualSessionThreadKey = undefined
+  imperativeVirtualSettleSessionKey = null
+  imperativeVirtualSettleThreadKey = undefined
+  manualSettleInFlight = false
+
+  tryImportVirtualHeightCache()
+
+  void nextTick(() => {
+    measureTrackedNodeHeights()
+
+    if (activeRestoreAnchor.value)
+      scheduleRestoreReconcile()
+    if (activeVirtualBottomAnchor.value)
+      scheduleVirtualBottomRestoreReconcile()
+
+    scheduleVirtualMetricsEmit(reason)
+  })
+}
+
+watch(
+  [virtualScrollEnabled, virtualLayoutEpochKey],
+  ([enabled, epochKey]) => {
+    if (!enabled) {
+      lastVirtualLayoutEpochKey = null
+      return
+    }
+
+    if (lastVirtualLayoutEpochKey == null) {
+      lastVirtualLayoutEpochKey = epochKey
+      return
+    }
+
+    if (lastVirtualLayoutEpochKey === epochKey)
+      return
+
+    lastVirtualLayoutEpochKey = epochKey
+    resetVirtualLayoutMeasurements('resize')
+  },
+  { flush: 'post', immediate: true },
+)
 
 watch(
   [() => getVirtualSessionKey(), () => getVirtualThreadKey()],
@@ -2882,6 +2968,7 @@ watch(
     () => props.virtualScroll?.settleMode,
     () => getVirtualSessionKey(),
     () => getVirtualThreadKey(),
+    virtualLayoutEpochKey,
     pendingAsyncNodeCount,
     pendingHeightSettlingTaskCount,
     () => renderedCount.value,
@@ -2916,6 +3003,8 @@ function getManualSettleSignature(token: unknown) {
   return [
     getVirtualThreadKey() ?? '',
     getVirtualSessionKey(),
+    getVirtualMeasurementKey(),
+    virtualLayoutWidthBucket.value,
     String(token),
     parsedNodes.value.length,
     Math.round(estimateHeightRange(0, parsedNodes.value.length)),
@@ -2929,6 +3018,7 @@ async function runManualSettleIfReady() {
   const token = props.virtualScroll?.settledToken
   const sessionKeyAtStart = getVirtualSessionKey()
   const threadKeyAtStart = getVirtualThreadKey()
+  const layoutEpochKeyAtStart = virtualLayoutEpochKey.value
 
   if (!virtualScrollEnabled.value)
     return
@@ -2963,7 +3053,7 @@ async function runManualSettleIfReady() {
 
     await nextTick()
     if (
-      isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart)
+      isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart)
       && lastManualSettleSignature !== signature
     ) {
       void runManualSettleIfReady()
@@ -2978,6 +3068,7 @@ watch(
     () => props.virtualScroll?.settleMode,
     () => props.virtualScroll?.settledToken,
     () => getVirtualSessionKey(),
+    virtualLayoutEpochKey,
     pendingAsyncNodeCount,
     pendingHeightSettlingTaskCount,
     () => renderedCount.value,
@@ -3697,7 +3788,11 @@ onBeforeUnmount(() => {
     v-else
     ref="containerRef"
     class="markstream-vue markdown-renderer"
-    :class="[{ dark: props.isDark }, { virtualized: virtualizationEnabled }]"
+    :class="[
+      { dark: props.isDark },
+      { virtualized: virtualizationEnabled },
+      { 'virtual-scroll-coordinated': virtualScrollEnabled },
+    ]"
     :data-custom-id="props.customId"
     @click="handleContainerClick"
     @mouseover="handleContainerMouseover"
@@ -3893,7 +3988,8 @@ onBeforeUnmount(() => {
   contain-intrinsic-size: 800px 600px;
 }
 
-.markdown-renderer.virtualized {
+.markdown-renderer.virtualized,
+.markdown-renderer.virtual-scroll-coordinated {
   /* When virtualization is active, `content-visibility: auto` can keep the
      whole subtree unpainted until the scroll container dispatches a scroll
      event in some layouts (e.g. complex chat shells). The virtual window
@@ -3913,10 +4009,12 @@ onBeforeUnmount(() => {
 }
 
 .node-slot {
+  display: flow-root;
   width: 100%;
 }
 
 .node-content {
+  display: flow-root;
   width: 100%;
 }
 

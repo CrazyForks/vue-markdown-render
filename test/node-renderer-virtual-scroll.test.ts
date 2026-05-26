@@ -282,6 +282,66 @@ describe('node renderer virtual-scroll coordination', () => {
     }
   })
 
+  it('does not emit stale final metrics after measurementKey changes during settle', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | null = null
+
+    try {
+      const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+      wrapper = mount(NodeRenderer, {
+        props: {
+          nodes: [createParagraph(1)],
+          final: true,
+          fade: false,
+          viewportPriority: false,
+          virtualScroll: {
+            enabled: true,
+            sessionKey: 'same-session-layout-a',
+            measurementKey: 'theme-a',
+            settleMode: 'manual',
+            emitIntervalMs: 0,
+          },
+        },
+      })
+
+      await nextTick()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const settlePromise = (wrapper.vm as any).settle({
+        frames: 0,
+        timeoutMs: 120,
+        reason: 'manual',
+      })
+
+      await wrapper.setProps({
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'same-session-layout-a',
+          measurementKey: 'theme-b',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      })
+
+      await vi.advanceTimersByTimeAsync(120)
+      const metrics = await settlePromise
+
+      expect(metrics).toMatchObject({
+        sessionKey: 'same-session-layout-a',
+        stable: false,
+      })
+      expect(metrics.phase).not.toBe('final')
+      expect(wrapper.emitted('renderFinal')).toBeUndefined()
+      expect(wrapper.emitted('render-final')).toBeUndefined()
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('resets measured heights when virtual session changes', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -331,6 +391,56 @@ describe('node renderer virtual-scroll coordination', () => {
     await nextTick()
 
     expect((await handle.forceMeasure('manual')).totalHeight).toBe(120)
+
+    wrapper.unmount()
+  })
+
+  it('resets measured heights when measurementKey changes', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'same-session-layout-cache',
+          measurementKey: 'theme-a',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const contentEl = getRootNodeContentElements(wrapper.element)[0]!
+    platform.heights.set(contentEl, 500)
+    platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+
+    const handle = wrapper.vm as any
+    expect(handle.getVirtualMetrics().totalHeight).toBe(500)
+
+    platform.heights.set(contentEl, 120)
+    await wrapper.setProps({
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'same-session-layout-cache',
+        measurementKey: 'theme-b',
+        settleMode: 'manual',
+        emitIntervalMs: 0,
+      },
+    })
+    await flushAll()
+    platform.flushFrames()
+    await nextTick()
+
+    expect(handle.getVirtualMetrics().totalHeight).toBe(120)
 
     wrapper.unmount()
   })
