@@ -52,6 +52,8 @@ interface VirtualScrollLabSnapshot {
   ready: boolean
   threadId: ThreadId
   range: { start: number, end: number }
+  firstVisibleMessageId: string
+  outerAnchor: OuterAnchor | null
   stats: LabStats
   health: LabHealth
   events: LabEvent[]
@@ -615,7 +617,52 @@ function getMessageChromeHeight(key: string) {
 }
 
 function onVirtualStateChange(message: Message, state: MarkstreamVirtualState) {
-  virtualStates.set(messageKey(message), state)
+  const key = messageKey(message)
+  const previous = virtualStates.get(key)
+  virtualStates.set(key, mergeVirtualState(previous, state))
+}
+
+function canCarryHeightCache(
+  previous: MarkstreamVirtualState | undefined,
+  next: MarkstreamVirtualState,
+) {
+  if (!previous?.heightCache?.length)
+    return false
+
+  if (previous.sessionKey !== next.sessionKey)
+    return false
+
+  if ((previous.threadKey ?? '') !== (next.threadKey ?? ''))
+    return false
+
+  if ((previous.measurementKey ?? '') !== (next.measurementKey ?? ''))
+    return false
+
+  if (previous.contentHash && next.contentHash && previous.contentHash !== next.contentHash)
+    return false
+
+  return true
+}
+
+function mergeVirtualState(
+  previous: MarkstreamVirtualState | undefined,
+  next: MarkstreamVirtualState,
+): MarkstreamVirtualState {
+  if (next.heightCache?.length)
+    return next
+
+  if (!previous || !canCarryHeightCache(previous, next))
+    return next
+
+  const heightCache = previous.heightCache
+
+  return {
+    ...next,
+    heightCache,
+    width: previous.width || next.width,
+    contentHash: previous.contentHash ?? next.contentHash,
+    measurementKey: previous.measurementKey ?? next.measurementKey,
+  }
 }
 
 function onRenderSettled() {
@@ -1073,6 +1120,8 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     domSlotBudget,
     layoutIntegrityOk:
       stats.blankProbeCount === 0
+      && blankFrameCount.value === 0
+      && stats.visibleCoverageOk
       && maxObservedBlankProbes === 0
       && virtualDomWithinLimit
       && maxObservedHeightDriftPx < 24,
@@ -1082,6 +1131,8 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
 function readLabSnapshot(): VirtualScrollLabSnapshot {
   const stats = collectStats({ reconcile: false })
   const health = readLabHealth(stats)
+  const firstVisibleMessageId = visibleItems.value[0]?.message.id ?? ''
+  const outerAnchor = captureOuterAnchor()
 
   const root = scrollRoot.value
   const currentScrollTop = root?.scrollTop ?? scrollTop.value
@@ -1091,6 +1142,8 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
     ready: labReady.value,
     threadId: activeThreadId.value,
     range: { ...visibleRange.value },
+    firstVisibleMessageId,
+    outerAnchor,
     stats,
     health,
     events: labEvents.slice(),

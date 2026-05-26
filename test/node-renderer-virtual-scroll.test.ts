@@ -1138,6 +1138,60 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('invalidates imperative manual settle confirmation when height changes in the same session', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'manual-settle-height-change',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const contentEl = getRootNodeContentElements(wrapper.element)[0]!
+    platform.heights.set(contentEl, 40)
+    platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+
+    const handle = wrapper.vm as any
+    expect(await handle.forceMeasure('manual')).toMatchObject({
+      totalHeight: 40,
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 90))
+    platform.flushFrames()
+    await nextTick()
+
+    expect(await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })).toMatchObject({
+      stable: true,
+      totalHeight: 40,
+    })
+
+    platform.heights.set(contentEl, 80)
+    platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+
+    expect(handle.getVirtualMetrics()).toMatchObject({
+      stable: false,
+      totalHeight: 80,
+    })
+
+    wrapper.unmount()
+  })
+
   it('omits height cache from non-final virtualStateChange emissions', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default

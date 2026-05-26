@@ -136,6 +136,36 @@ function setMessageHeight(messageId: string, height: number) {
 function onHeightChange(metrics: MarkstreamVirtualMetrics) {
   setMessageHeight('message-1', metrics.totalHeight)
 }
+
+function mergeVirtualState(
+  previous: MarkstreamVirtualState | null,
+  next: MarkstreamVirtualState,
+): MarkstreamVirtualState {
+  if (next.heightCache?.length)
+    return next
+
+  if (
+    previous?.heightCache?.length
+    && previous.sessionKey === next.sessionKey
+    && (previous.threadKey ?? '') === (next.threadKey ?? '')
+    && (previous.measurementKey ?? '') === (next.measurementKey ?? '')
+    && (!previous.contentHash || !next.contentHash || previous.contentHash === next.contentHash)
+  ) {
+    return {
+      ...next,
+      heightCache: previous.heightCache,
+      width: previous.width || next.width,
+      contentHash: previous.contentHash ?? next.contentHash,
+      measurementKey: previous.measurementKey ?? next.measurementKey,
+    }
+  }
+
+  return next
+}
+
+function onVirtualStateChange(state: MarkstreamVirtualState) {
+  savedState.value = mergeVirtualState(savedState.value, state)
+}
 </script>
 
 <template>
@@ -148,7 +178,7 @@ function onHeightChange(metrics: MarkstreamVirtualMetrics) {
       :live-node-buffer="50"
       :virtual-scroll="virtualScroll"
       @height-change="onHeightChange"
-      @virtual-state-change="savedState = $event"
+      @virtual-state-change="onVirtualStateChange"
     />
   </div>
 </template>

@@ -512,6 +512,8 @@ const {
 } = useHeightMeasurements({
   onHeightRecorded: () => {
     markFallbackHeightPrefixDirty()
+    if (virtualScrollEnabled.value)
+      resetVirtualSettleConfirmation()
     if (activeRestoreAnchor.value)
       scheduleRestoreReconcile()
     if (activeVirtualBottomAnchor.value)
@@ -2140,7 +2142,7 @@ function invalidateChangedNodeHeights(reason: MarkstreamVirtualReason = 'content
 
   removeNodeHeights(staleIndices, { notify: false })
   markFallbackHeightPrefixDirty()
-  resetVirtualMetricsEventDedupes()
+  resetVirtualSettleConfirmation()
 
   if (activeRestoreAnchor.value)
     scheduleRestoreReconcile()
@@ -3106,6 +3108,14 @@ let manualSettleInFlight = false
 let lastManualSettleSignature: string | null = null
 let lastVirtualLayoutEpochKey: string | null = null
 
+function resetVirtualSettleConfirmation() {
+  autoSettledVirtualSignature = null
+  imperativeVirtualSettleSessionKey = null
+  imperativeVirtualSettleThreadKey = undefined
+  lastManualSettleSignature = null
+  resetVirtualMetricsEventDedupes()
+}
+
 function getAutoVirtualSettleSignature() {
   const total = parsedNodes.value.length
 
@@ -3138,17 +3148,13 @@ function resetVirtualSessionMeasurements() {
 function resetVirtualSessionRuntimeState() {
   clearVirtualMetricsSchedule()
   clearAllHeightSettlingTimers()
-  autoSettledVirtualSignature = null
-  imperativeVirtualSettleSessionKey = null
-  imperativeVirtualSettleThreadKey = undefined
   lastEmittedVirtualMetrics = null
-  resetVirtualMetricsEventDedupes()
   lastImportedVirtualHeightCacheSignature = null
   lastImportedVirtualHeightCacheSource = null
   lastAppliedVirtualRestoreSignature = null
-  lastManualSettleSignature = null
   pendingImperativeVirtualRestoreState = null
   manualSettleInFlight = false
+  resetVirtualSettleConfirmation()
 
   pendingAsyncNodeCounts.clear()
   bumpAsyncNodeVersion()
@@ -3173,12 +3179,8 @@ function resetVirtualLayoutMeasurements(reason: MarkstreamVirtualReason = 'resiz
   lastImportedVirtualHeightCacheSource = null
   lastAppliedVirtualRestoreSignature = null
   lastEmittedVirtualMetrics = null
-  resetVirtualMetricsEventDedupes()
-  lastManualSettleSignature = null
-  autoSettledVirtualSignature = null
-  imperativeVirtualSettleSessionKey = null
-  imperativeVirtualSettleThreadKey = undefined
   manualSettleInFlight = false
+  resetVirtualSettleConfirmation()
 
   tryImportVirtualHeightCache()
 
@@ -3263,6 +3265,26 @@ watch(
     }
   },
   { flush: 'post', immediate: true },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    () => parsedNodes.value.length,
+    () => getVirtualSessionKey(),
+    () => getVirtualThreadKey(),
+  ],
+  ([enabled, length, sessionKey, threadKey], [previousEnabled, previousLength, previousSessionKey, previousThreadKey]) => {
+    if (!enabled || !previousEnabled)
+      return
+
+    if (sessionKey !== previousSessionKey || threadKey !== previousThreadKey)
+      return
+
+    if (length !== previousLength)
+      resetVirtualSettleConfirmation()
+  },
+  { flush: 'post' },
 )
 
 watch(

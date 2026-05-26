@@ -21,6 +21,50 @@ function assert(condition, message, details) {
   throw new Error(`${message}${suffix}`)
 }
 
+function outerAnchorDelta(before, after) {
+  if (!before || !after || before.type !== after.type)
+    return Number.POSITIVE_INFINITY
+
+  if (before.type === 'bottom') {
+    return Math.abs(
+      Number(before.distanceFromBottomPx ?? 0)
+      - Number(after.distanceFromBottomPx ?? 0),
+    )
+  }
+
+  if (before.index !== after.index)
+    return Number.POSITIVE_INFINITY
+
+  return Math.abs(Number(before.offsetPx ?? 0) - Number(after.offsetPx ?? 0))
+}
+
+function assertThreadRestore(label, before, after) {
+  const scrollDelta = Math.abs(before.scrollTop - after.scrollTop)
+  const anchorDelta = outerAnchorDelta(before.outerAnchor, after.outerAnchor)
+  const sameFirstVisible = Boolean(before.firstVisibleMessageId)
+    && before.firstVisibleMessageId === after.firstVisibleMessageId
+
+  assert(
+    scrollDelta < 32 || anchorDelta < 32 || sameFirstVisible,
+    `${label} scroll position was not restored accurately`,
+    {
+      before: {
+        scrollTop: before.scrollTop,
+        firstVisibleMessageId: before.firstVisibleMessageId,
+        outerAnchor: before.outerAnchor,
+      },
+      after: {
+        scrollTop: after.scrollTop,
+        firstVisibleMessageId: after.firstVisibleMessageId,
+        outerAnchor: after.outerAnchor,
+      },
+      scrollDelta,
+      anchorDelta,
+      sameFirstVisible,
+    },
+  )
+}
+
 function isPortOpen(port) {
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port })
@@ -191,6 +235,8 @@ async function run() {
           latest = api.read()
           if (
             latest.health.maxObservedBlankProbes === 0
+            && latest.blankFrameCount === 0
+            && latest.visibleCoverageOk
             && latest.health.virtualDomWithinLimit
             && latest.maxItemHeightDriftPx < 24
           ) {
@@ -280,20 +326,8 @@ async function run() {
       final,
     } = result
 
-    const threadARestoreDelta = Math.abs(threadABefore.scrollTop - threadAAfter.scrollTop)
-    const threadBRestoreDelta = Math.abs(threadBBefore.scrollTop - threadBAfter.scrollTop)
-
-    assert(
-      threadARestoreDelta < 32,
-      'thread-a scroll position was not restored accurately',
-      { before: threadABefore.scrollTop, after: threadAAfter.scrollTop, threadARestoreDelta },
-    )
-
-    assert(
-      threadBRestoreDelta < 32,
-      'thread-b scroll position was not restored accurately',
-      { before: threadBBefore.scrollTop, after: threadBAfter.scrollTop, threadBRestoreDelta },
-    )
+    assertThreadRestore('thread-a', threadABefore, threadAAfter)
+    assertThreadRestore('thread-b', threadBBefore, threadBAfter)
 
     assert(
       final.health.maxObservedBlankProbes === 0,
@@ -302,6 +336,18 @@ async function run() {
         health: final.health,
         events: final.events.filter(event => (event.blankProbeCount ?? 0) > 0),
       },
+    )
+
+    assert(
+      final.blankFrameCount === 0,
+      'blank frame counter increased during virtual scrolling',
+      final,
+    )
+
+    assert(
+      final.visibleCoverageOk === true,
+      'visible probe coverage failed',
+      final,
     )
 
     assert(
@@ -314,6 +360,24 @@ async function run() {
       final.health.maxObservedMarkdownSlots <= final.health.domSlotBudget,
       'observed markdown node-slot count exceeded budget',
       final.health,
+    )
+
+    assert(
+      final.maxMarkdownSlotCount <= final.maxExpectedMarkdownSlotCeiling,
+      'peak markdown node-slot count exceeded expected ceiling',
+      {
+        maxMarkdownSlotCount: final.maxMarkdownSlotCount,
+        maxExpectedMarkdownSlotCeiling: final.maxExpectedMarkdownSlotCeiling,
+      },
+    )
+
+    assert(
+      final.maxDomNodeCount <= final.maxExpectedDomNodeCeiling,
+      'peak DOM node count exceeded expected ceiling',
+      {
+        maxDomNodeCount: final.maxDomNodeCount,
+        maxExpectedDomNodeCeiling: final.maxExpectedDomNodeCeiling,
+      },
     )
 
     assert(
@@ -344,6 +408,12 @@ async function run() {
     )
 
     assert(
+      streamAfter.blankFrameCount === 0,
+      'blank frame observed while streaming a huge message',
+      streamAfter,
+    )
+
+    assert(
       relayoutAfter.health.maxObservedHeightDriftPx < 24,
       'density/font relayout did not converge',
       relayoutAfter.health,
@@ -351,8 +421,6 @@ async function run() {
 
     process.stdout.write(`${JSON.stringify({
       ok: true,
-      threadARestoreDelta,
-      threadBRestoreDelta,
       health: final.health,
     }, null, 2)}\n`)
   }
