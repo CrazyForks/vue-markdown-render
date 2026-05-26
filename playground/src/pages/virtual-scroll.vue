@@ -97,6 +97,7 @@ interface LabEvent {
   heightDriftPx?: number
   maxItemHeightDriftPx?: number
   scrollJumpPx?: number
+  expectedJump?: boolean
   fromThreadId?: ThreadId
   toThreadId?: ThreadId
 }
@@ -896,6 +897,7 @@ function pushLabEvent(type: string, payload: Partial<LabEvent> = {}) {
     heightDriftPx: stats.heightDriftPx,
     maxItemHeightDriftPx: stats.maxItemHeightDriftPx,
     scrollJumpPx,
+    expectedJump: payload.expectedJump ?? false,
     ...payload,
   })
 
@@ -953,6 +955,7 @@ async function switchThread(threadId: ThreadId) {
   pushLabEvent('thread-switch', {
     fromThreadId: previousThreadId,
     toThreadId: threadId,
+    expectedJump: true,
     scrollJumpPx: Math.abs(scrollTop.value - previousScrollTop),
   })
 
@@ -1104,7 +1107,9 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
   )
   const maxObservedScrollJumpPx = Math.max(
     0,
-    ...labEvents.map(event => event.scrollJumpPx ?? 0),
+    ...labEvents
+      .filter(event => !event.expectedJump)
+      .map(event => event.scrollJumpPx ?? 0),
   )
   const domSlotBudget = Math.max(1, stats.markdownRendererCount) * 280
   const virtualDomWithinLimit = stats.markdownSlotCount <= domSlotBudget
@@ -1189,7 +1194,7 @@ async function scrollToRatio(ratio: number) {
   await nextTick()
   await waitFrame()
   applyLabStats(collectStats({ reconcile: true }))
-  pushLabEvent('scroll-to-ratio')
+  pushLabEvent('scroll-to-ratio', { expectedJump: true })
   scheduleVisibleDomReconcile()
 }
 

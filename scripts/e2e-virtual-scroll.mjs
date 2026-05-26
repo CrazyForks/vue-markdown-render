@@ -258,6 +258,16 @@ async function run() {
         }
         return latest
       }
+      const waitForSettledEvent = async (frames = 120) => {
+        let latest = api.read()
+        for (let i = 0; i < frames; i++) {
+          if (latest.settledEvents > 0)
+            return latest
+          await api.nextFrame()
+          latest = api.read()
+        }
+        return latest
+      }
 
       await api.scrollToRatio(0.15)
       await api.nextFrame()
@@ -304,6 +314,7 @@ async function run() {
       api.toggleDensity()
       api.toggleFontScale()
       const relayoutAfter = await waitHealthy(45)
+      await waitForSettledEvent()
 
       return {
         threadABefore,
@@ -393,6 +404,12 @@ async function run() {
       final.health.layoutIntegrityOk === true,
       'virtual-scroll layout health check failed',
       final.health,
+    )
+
+    assert(
+      final.settledEvents > 0,
+      'no render-settled events were observed in the virtual-scroll lab',
+      final,
     )
 
     assert(

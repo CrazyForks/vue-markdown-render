@@ -1730,9 +1730,10 @@ function applyBottomVirtualAnchor(anchor: Extract<MarkstreamVirtualAnchor, { typ
   const rendererHeight = getRendererLogicalHeight()
   const distance = Math.max(0, anchor.distanceFromBottomPx)
 
+  // Keep renderer bottom `distance` px above viewport bottom.
   const target = Math.max(
     0,
-    rendererTop + rendererHeight - box.clientHeight + distance,
+    rendererTop + rendererHeight - box.clientHeight - distance,
   )
 
   if (box.isViewportRoot) {
@@ -1873,16 +1874,23 @@ function primeVirtualWindowForAnchor(anchor: MarkstreamVirtualAnchor) {
 
 function getBoundedHeightCache(
   cache: MarkstreamHeightCache,
-  options: { requireCompatibilityMetadata?: boolean } = {},
+  options: {
+    requireCompatibilityMetadata?: boolean
+    requireSignature?: boolean
+  } = {},
 ) {
   const length = parsedNodes.value.length
   if (length <= 0)
     return []
+
   return cache.filter((entry) => {
     if (!Number.isInteger(entry.index) || entry.index < 0 || entry.index >= length)
       return false
 
     if (!Number.isFinite(entry.height) || entry.height <= 0)
+      return false
+
+    if (options.requireSignature && !entry.signature)
       return false
 
     if (options.requireCompatibilityMetadata && !entry.nodeType && !entry.signature)
@@ -1927,14 +1935,29 @@ function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
   return true
 }
 
+function getRestoreContentHashMatch(state: MarkstreamVirtualState) {
+  return Boolean(
+    state.contentHash
+    && state.contentHash === getVirtualContentHash(),
+  )
+}
+
+function shouldRequireRestoreEntrySignature(state: MarkstreamVirtualState) {
+  return Boolean(
+    state.contentHash
+    && state.contentHash !== getVirtualContentHash(),
+  )
+}
+
 function hasRestoreCacheCompatibilityMetadata(state: MarkstreamVirtualState) {
-  if (!state.heightCache?.length)
+  const cache = state.heightCache
+  if (!cache?.length)
     return false
 
-  if (state.contentHash)
-    return state.contentHash === getVirtualContentHash()
+  if (getRestoreContentHashMatch(state))
+    return cache.some(entry => Boolean(entry.nodeType || entry.signature))
 
-  return state.heightCache.every(entry => Boolean(entry.nodeType || entry.signature))
+  return cache.some(entry => Boolean(entry.signature))
 }
 
 function canReuseStandaloneHeightCache() {
@@ -1948,11 +1971,16 @@ let lastAppliedVirtualRestoreSignature: string | null = null
 let pendingImperativeVirtualRestoreState: MarkstreamVirtualState | null = null
 
 function getHeightCacheSignature(cache: MarkstreamHeightCache) {
-  let checksum = 0
-  for (const entry of cache) {
-    checksum += (entry.index + 1) * 31
-    checksum += Math.round(entry.height * 10)
-  }
+  const payload = cache
+    .map((entry) => {
+      return [
+        entry.index,
+        Math.round(entry.height * 10),
+        entry.nodeType ?? '',
+        entry.signature ?? '',
+      ].join('\u0002')
+    })
+    .join('\u0001')
 
   const widthBucket = Math.round(getCurrentVirtualWidth() / HEIGHT_CACHE_WIDTH_BUCKET_PX)
 
@@ -1963,7 +1991,7 @@ function getHeightCacheSignature(cache: MarkstreamHeightCache) {
     parsedNodes.value.length,
     widthBucket,
     cache.length,
-    checksum,
+    hashVirtualString(payload),
   ].join(':')
 }
 
@@ -2051,6 +2079,7 @@ function applyVirtualRestoreState(
   if (state.heightCache?.length && canRestoreVirtualStateCache(state)) {
     const boundedCache = getBoundedHeightCache(state.heightCache, {
       requireCompatibilityMetadata: !state.contentHash,
+      requireSignature: shouldRequireRestoreEntrySignature(state),
     })
 
     if (boundedCache.length) {
@@ -2081,11 +2110,25 @@ function applyVirtualRestoreState(
   return true
 }
 
+function hasKnownVirtualWidth() {
+  const width = getCurrentVirtualWidth()
+  return Number.isFinite(width) && width > 0
+}
+
 function shouldKeepPendingVirtualRestoreState(state: MarkstreamVirtualState) {
-  return Boolean(
-    state.heightCache?.length
-    && !canReuseHeightCacheForWidth(getVirtualStateSavedWidth(state)),
-  )
+  if (state.sessionKey !== getVirtualSessionKey())
+    return false
+
+  if (!isSameVirtualThreadKey(state.threadKey))
+    return false
+
+  if (parsedNodes.value.length <= 0)
+    return true
+
+  if (state.heightCache?.length && !hasKnownVirtualWidth())
+    return true
+
+  return false
 }
 
 function restoreVirtualState(
@@ -2098,15 +2141,13 @@ function restoreVirtualState(
     ? 'imperative'
     : String(options.restoreToken)
 
-  if (
-    applyVirtualRestoreState(state, {
-      restoreAnchor: restoreAnchorOption,
-      restoreToken,
-    })
-    && !shouldKeepPendingVirtualRestoreState(state)
-  ) {
+  const applied = applyVirtualRestoreState(state, {
+    restoreAnchor: restoreAnchorOption,
+    restoreToken,
+  })
+
+  if (applied || !shouldKeepPendingVirtualRestoreState(state))
     pendingImperativeVirtualRestoreState = null
-  }
 }
 
 function seedCurrentNodeHeightSignatures() {
@@ -3361,21 +3402,19 @@ watch(
     experimentContainerWidth,
   ],
   async ([enabled]) => {
-    if (!enabled || !pendingImperativeVirtualRestoreState)
+    const state = pendingImperativeVirtualRestoreState
+    if (!enabled || !state)
       return
 
     await nextTick()
 
-    if (
-      pendingImperativeVirtualRestoreState
-      && applyVirtualRestoreState(pendingImperativeVirtualRestoreState, {
-        restoreAnchor: true,
-        restoreToken: 'imperative',
-      })
-      && !shouldKeepPendingVirtualRestoreState(pendingImperativeVirtualRestoreState)
-    ) {
+    const applied = applyVirtualRestoreState(state, {
+      restoreAnchor: true,
+      restoreToken: 'imperative',
+    })
+
+    if (applied || !shouldKeepPendingVirtualRestoreState(state))
       pendingImperativeVirtualRestoreState = null
-    }
   },
   { flush: 'post', immediate: true },
 )
