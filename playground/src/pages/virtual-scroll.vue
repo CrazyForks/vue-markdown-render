@@ -30,6 +30,7 @@ interface LabStats {
   blankProbeCount: number
   heightDriftPx: number
   maxItemHeightDriftPx: number
+  maxCoverageGapPx: number
   domNodeCount: number
   messageDomCount: number
   visibleCoverageOk: boolean
@@ -44,6 +45,7 @@ interface LabHealth extends LabStats {
   maxObservedMarkdownSlots: number
   maxObservedHeightDriftPx: number
   maxObservedScrollJumpPx: number
+  scrollJitterOk: boolean
   virtualDomWithinLimit: boolean
   domSlotBudget: number
   layoutIntegrityOk: boolean
@@ -156,6 +158,7 @@ const maxLiveNodes = ref(220)
 const overscanPx = ref(1400)
 const stressRunning = ref(false)
 const coordinateSmallMessages = ref(false)
+const SCROLL_JITTER_BUDGET_PX = 32
 
 const itemHeights = reactive(new Map<string, number>())
 const virtualStates = reactive(new Map<string, MarkstreamVirtualState>())
@@ -191,6 +194,7 @@ let streamTimer: ReturnType<typeof window.setInterval> | null = null
 let resizeObserver: ResizeObserver | null = null
 let streamBottomPinned = false
 let lastObservedScrollTop = 0
+let expectedScrollTop: number | null = null
 
 function repeatedText(seed: string, index: number) {
   return [
@@ -457,19 +461,30 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
   const heightCache = state?.heightCache as MarkstreamHeightCache | undefined
   const enabled = message.huge || coordinateSmallMessages.value
 
-  return {
+  const options = {
     enabled,
     sessionKey: key,
     threadKey: activeThreadId.value,
     scrollRoot: () => scrollRoot.value,
     restoreState: state ?? null,
-    heightCache: heightCache ?? null,
-    heightCacheWidth: state?.width,
     measurementKey: measurementKey.value,
     settleMode: 'manual',
     settledToken: message.final,
     emitIntervalMs: 32,
     heightDiffThresholdPx: 1,
+  } satisfies MarkstreamVirtualScrollOptions
+
+  if (heightCache && state) {
+    return {
+      ...options,
+      heightCache,
+      heightCacheWidth: state.width,
+    }
+  }
+
+  return {
+    ...options,
+    heightCache: null,
   }
 }
 
@@ -490,7 +505,8 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
 
   if (previous == null || Math.abs(previous - nextHeight) > 1) {
     itemHeights.set(key, nextHeight)
-    void restoreOuterAnchor(outerAnchor, { immediate: true })
+    if (!stressRunning.value)
+      void restoreOuterAnchor(outerAnchor, { immediate: true })
   }
 
   scheduleStats()
@@ -531,8 +547,12 @@ function captureOuterAnchor(): OuterAnchor | null {
   }
 }
 
+function getCurrentViewportHeight() {
+  return scrollRoot.value?.clientHeight || viewportHeight.value
+}
+
 function clampOuterScrollTop(value: number) {
-  const max = Math.max(0, totalHeight.value - viewportHeight.value)
+  const max = Math.max(0, totalHeight.value - getCurrentViewportHeight())
   return Math.max(0, Math.min(value, max))
 }
 
@@ -547,10 +567,12 @@ function applyOuterScrollTop(value: number) {
 }
 
 function resolveOuterAnchorScrollTop(anchor: OuterAnchor) {
+  const currentViewportHeight = getCurrentViewportHeight()
+
   if (anchor.type === 'bottom') {
     return clampOuterScrollTop(
       totalHeight.value
-      - viewportHeight.value
+      - currentViewportHeight
       - Math.max(0, anchor.distanceFromBottomPx ?? 0),
     )
   }
@@ -575,9 +597,14 @@ async function restoreOuterAnchor(
   const apply = () => {
     const previous = scrollTop.value
     applyOuterScrollTop(resolveOuterAnchorScrollTop(anchor))
+    const jump = Math.abs(previous - scrollTop.value)
 
-    if (Math.abs(previous - scrollTop.value) > 1) {
+    if (jump > 1) {
       scrollCompensationCount.value += 1
+      pushLabEvent('outer-anchor-compensation', {
+        scrollJumpPx: jump,
+        expectedJump: anchor.type === 'bottom' || jump <= SCROLL_JITTER_BUDGET_PX,
+      })
       scheduleStats()
     }
   }
@@ -701,12 +728,13 @@ function onScroll() {
 
   scrollTop.value = root.scrollTop
   threadScrollTops.set(activeThreadId.value, root.scrollTop)
+  expectedScrollTop = root.scrollTop
 
   if (streamBottomPinned && !streamTimer && getCurrentDistanceFromBottom() > 64)
     streamBottomPinned = false
 
   scheduleVisibleDomReconcile()
-  scheduleLabEvent('scroll')
+  scheduleLabEvent('scroll', { expectedJump: true })
 }
 
 function scheduleStats() {
@@ -756,6 +784,7 @@ function createEmptyLabStats(): LabStats {
     blankProbeCount: 0,
     heightDriftPx: 0,
     maxItemHeightDriftPx: 0,
+    maxCoverageGapPx: 0,
     domNodeCount: 0,
     messageDomCount: 0,
     visibleCoverageOk: true,
@@ -790,6 +819,40 @@ function applyLabStats(stats: LabStats) {
     blankFrameCount.value += 1
 }
 
+function measureViewportCoverageGaps(root: HTMLElement) {
+  const viewport = root.getBoundingClientRect()
+  const segments: Array<{ top: number, bottom: number }> = []
+
+  for (const el of root.querySelectorAll('.virtual-message')) {
+    if (!(el instanceof HTMLElement))
+      continue
+
+    const rect = el.getBoundingClientRect()
+    const top = Math.max(viewport.top, rect.top)
+    const bottom = Math.min(viewport.bottom, rect.bottom)
+
+    if (bottom > top)
+      segments.push({ top, bottom })
+  }
+
+  segments.sort((a, b) => a.top - b.top)
+
+  let cursor = viewport.top
+  let maxGap = 0
+
+  for (const segment of segments) {
+    if (segment.top > cursor)
+      maxGap = Math.max(maxGap, segment.top - cursor)
+
+    cursor = Math.max(cursor, segment.bottom)
+  }
+
+  if (cursor < viewport.bottom)
+    maxGap = Math.max(maxGap, viewport.bottom - cursor)
+
+  return maxGap
+}
+
 function collectStats(options: CollectStatsOptions = {}) {
   const root = scrollRoot.value
   if (!root)
@@ -811,12 +874,13 @@ function collectStats(options: CollectStatsOptions = {}) {
   let heightChanged = false
   const outerAnchor: OuterAnchor | null = reconcile && streamBottomPinned
     ? { type: 'bottom', distanceFromBottomPx: 0 }
-    : reconcile
+    : reconcile && !stressRunning.value
       ? captureOuterAnchor()
       : null
   const viewportRect = root.getBoundingClientRect()
   const viewportTop = viewportRect.height > 0 ? viewportRect.top : 0
   const viewportBottom = viewportRect.height > 0 ? viewportRect.bottom : root.clientHeight
+  const currentViewportHeight = getCurrentViewportHeight()
 
   for (const item of visibleItems.value) {
     const key = messageKey(item.message)
@@ -873,14 +937,17 @@ function collectStats(options: CollectStatsOptions = {}) {
       rootRect.top + rootRect.height * yRatio,
     )
 
-    if (!isProbeCoveredByRenderedContent(probe) && totalHeight.value > viewportHeight.value) {
+    if (!isProbeCoveredByRenderedContent(probe) && totalHeight.value > currentViewportHeight) {
       covered = false
       break
     }
   }
 
-  if (messageCount === 0 && totalHeight.value > viewportHeight.value)
+  if (messageCount === 0 && totalHeight.value > currentViewportHeight)
     blankProbeCount++
+
+  const maxCoverageGapPx = measureViewportCoverageGaps(root)
+  const coverageGapOk = maxCoverageGapPx <= 24
 
   return {
     visibleItemCount,
@@ -890,22 +957,28 @@ function collectStats(options: CollectStatsOptions = {}) {
     blankProbeCount,
     heightDriftPx,
     maxItemHeightDriftPx: maxDrift,
+    maxCoverageGapPx,
     domNodeCount: domCount,
     messageDomCount: messageCount,
-    visibleCoverageOk: covered,
+    visibleCoverageOk: covered && coverageGapOk,
     clippedMessageCount: drifted,
     heightDriftMessageCount: drifted,
     worstHeightDriftMessageId: worstId,
   }
 }
 
-function pushLabEvent(type: string, payload: Partial<LabEvent> = {}) {
+function pushLabEvent(
+  type: string,
+  payload: Partial<LabEvent> = {},
+  stats: LabStats = collectStats({ reconcile: false }),
+) {
   const now = typeof performance !== 'undefined'
     ? performance.now()
     : Date.now()
-  const stats = collectStats({ reconcile: false })
   const currentScrollTop = scrollTop.value
   const scrollJumpPx = Math.abs(currentScrollTop - lastObservedScrollTop)
+  const expectedActiveScrollJump = expectedScrollTop != null
+    && Math.abs(currentScrollTop - expectedScrollTop) <= 1
 
   lastObservedScrollTop = currentScrollTop
 
@@ -919,7 +992,7 @@ function pushLabEvent(type: string, payload: Partial<LabEvent> = {}) {
     heightDriftPx: stats.heightDriftPx,
     maxItemHeightDriftPx: stats.maxItemHeightDriftPx,
     scrollJumpPx,
-    expectedJump: payload.expectedJump ?? false,
+    expectedJump: payload.expectedJump ?? expectedActiveScrollJump,
     ...payload,
   })
 
@@ -929,8 +1002,9 @@ function pushLabEvent(type: string, payload: Partial<LabEvent> = {}) {
 
 function scheduleLabEvent(type: string, payload: Partial<LabEvent> = {}) {
   requestAnimationFrame(() => {
+    const beforeReconcile = collectStats({ reconcile: false })
+    pushLabEvent(type, payload, beforeReconcile)
     applyLabStats(collectStats({ reconcile: true }))
-    pushLabEvent(type, payload)
   })
 }
 
@@ -1109,6 +1183,7 @@ function resetHeights() {
   scrollCompensationCount.value = 0
   labEvents.splice(0)
   lastObservedScrollTop = scrollTop.value
+  expectedScrollTop = scrollTop.value
   scheduleStats()
 }
 
@@ -1136,6 +1211,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
   )
   const domSlotBudget = Math.max(1, stats.markdownRendererCount) * 280
   const virtualDomWithinLimit = stats.markdownSlotCount <= domSlotBudget
+  const scrollJitterOk = maxObservedScrollJumpPx <= SCROLL_JITTER_BUDGET_PX
 
   return {
     ...stats,
@@ -1144,6 +1220,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     maxObservedMarkdownSlots,
     maxObservedHeightDriftPx,
     maxObservedScrollJumpPx,
+    scrollJitterOk,
     virtualDomWithinLimit,
     domSlotBudget,
     layoutIntegrityOk:
@@ -1152,6 +1229,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
       && stats.visibleCoverageOk
       && maxObservedBlankProbes === 0
       && virtualDomWithinLimit
+      && scrollJitterOk
       && maxObservedHeightDriftPx < 24,
   }
 }
@@ -1213,6 +1291,7 @@ function waitFrame() {
 async function scrollToRatio(ratio: number) {
   const max = Math.max(0, totalHeight.value - viewportHeight.value)
   applyOuterScrollTop(max * Math.max(0, Math.min(1, ratio)))
+  expectedScrollTop = scrollTop.value
 
   await nextTick()
   await waitFrame()
@@ -1231,6 +1310,7 @@ async function rapidSwitchThreads(threadIds: ThreadId[], count = 9) {
 function clearLabEvents() {
   labEvents.splice(0)
   lastObservedScrollTop = scrollTop.value
+  expectedScrollTop = scrollTop.value
 }
 
 function exposeLabApi() {
@@ -1448,6 +1528,13 @@ onBeforeUnmount(() => {
       </div>
 
       <div>
+        <strong>scroll jitter</strong>
+        <span :class="{ ok: labSnapshot.health.scrollJitterOk, bad: !labSnapshot.health.scrollJitterOk }">
+          {{ Math.round(labSnapshot.health.maxObservedScrollJumpPx) }}px
+        </span>
+      </div>
+
+      <div>
         <strong>layout</strong>
         <span :class="{ ok: labSnapshot.health.layoutIntegrityOk, bad: !labSnapshot.health.layoutIntegrityOk }">
           {{ labSnapshot.health.layoutIntegrityOk ? 'ok' : 'bad' }}
@@ -1599,7 +1686,7 @@ button:hover {
 .metrics-grid {
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
   border-bottom: 1px solid var(--lab-border);
   background: var(--lab-border);

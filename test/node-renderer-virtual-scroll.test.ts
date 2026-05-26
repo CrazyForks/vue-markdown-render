@@ -1992,7 +1992,7 @@ describe('node renderer virtual-scroll coordination', () => {
           sessionKey: 'standalone-cache-no-width',
           settleMode: 'manual',
           heightCache: seedCache,
-        },
+        } as any,
       },
     })
 

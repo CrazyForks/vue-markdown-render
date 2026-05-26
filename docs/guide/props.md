@@ -46,7 +46,9 @@ When `virtual-scroll.enabled` is true, `MarkdownRender` reports the logical heig
 
 Use `metrics.totalHeight` as the outer virtualizer item size. Do not use the current DOM `offsetHeight`, because the renderer may internally virtualize Markdown nodes and keep only a live window in the DOM.
 
-`final` means the source stream has completed. It does not guarantee that the layout has settled. Code blocks, diagrams, images, fonts, and custom components may still change height. Use `render-final` or `rendererRef.settle()` before persisting a final height cache.
+When passing standalone `heightCache`, also pass `heightCacheWidth`; otherwise the cache is ignored to avoid reusing stale measurements after width changes.
+
+`final` means the source stream has completed. It does not guarantee that the layout has settled. Code blocks, diagrams, images, fonts, and custom components may still change height. `render-final` means this render session has passed the selected settle policy. For virtualized or offscreen nodes, `metrics.confidence` may still be `mixed`. Persist the height cache as authoritative only when `metrics.confidence` is `measured` or `final`, or when you persist the returned per-node `heightCache` together with `width`, `measurementKey`, and `contentHash`.
 
 ### smooth-streaming and fade — pick one, not both
 

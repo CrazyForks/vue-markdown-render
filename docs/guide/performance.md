@@ -155,6 +155,10 @@ The important value is `metrics.totalHeight`. It represents the full Markdown do
 
 When `virtualScroll.enabled=true`, pass a stable `sessionKey` that survives remounts and thread restores, such as `threadId:messageId:revision`. Do not rely on the renderer's fallback id for persisted restore state.
 
+When passing standalone `heightCache`, also pass `heightCacheWidth`; otherwise the cache is ignored to avoid reusing stale measurements after width changes.
+
+`render-final` means this render session has passed the selected settle policy. For virtualized or offscreen nodes, `metrics.confidence` may still be `mixed`. Persist the height cache as authoritative only when `metrics.confidence` is `measured` or `final`, or when you persist the returned per-node `heightCache` together with `width`, `measurementKey`, and `contentHash`.
+
 ```vue
 <script setup lang="ts">
 import type {

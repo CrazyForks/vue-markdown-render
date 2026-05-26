@@ -10,7 +10,9 @@ import type {
   MarkstreamNodeLifecycle,
   MarkstreamRendererHandle,
   MarkstreamVirtualMetrics,
+  MarkstreamVirtualScrollHeightCacheOptions,
   MarkstreamVirtualScrollOptions,
+  MarkstreamVirtualScrollSharedOptions,
   MarkstreamVirtualState,
   MarkstreamVuePluginOptions,
   MathBlockNodeProps,
@@ -125,6 +127,14 @@ const virtualScrollOptions: MarkstreamVirtualScrollOptions = {
   enabled: true,
   sessionKey: 'public-api-session',
 }
+const virtualScrollHeightCacheOptions: MarkstreamVirtualScrollHeightCacheOptions = {
+  heightCache: [{ index: 0, height: 120 }],
+  heightCacheWidth: 600,
+}
+const virtualScrollSharedOptions: MarkstreamVirtualScrollSharedOptions = {
+  measurementKey: 'public-api-measurement',
+  heightCache: null,
+}
 const virtualScrollOptionsWithoutSessionKey: MarkstreamVirtualScrollOptions = {
   enabled: false,
 }
@@ -197,6 +207,8 @@ void linkProps
 void d2Props
 void infographicProps
 void virtualScrollOptions
+void virtualScrollHeightCacheOptions
+void virtualScrollSharedOptions
 void virtualScrollOptionsWithoutSessionKey
 void virtualMetrics
 void virtualState

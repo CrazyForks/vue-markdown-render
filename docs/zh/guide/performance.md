@@ -94,6 +94,10 @@ const md = '# Virtualized transcript'
 
 当 `virtualScroll.enabled=true` 时，请传入可跨 remount 和 thread restore 保持稳定的 `sessionKey`，例如 `threadId:messageId:revision`。不要依赖 renderer fallback id 来持久化恢复状态。
 
+单独传 `heightCache` 时必须同时传 `heightCacheWidth`；否则组件会忽略该缓存，以避免容器宽度变化后复用过期高度。
+
+`render-final` 表示当前 render session 已通过 settle 策略，不等于所有离屏虚拟节点都已经真实测量。虚拟化或离屏节点存在时，`metrics.confidence` 可能仍是 `mixed`。只有在 `metrics.confidence` 为 `measured` / `final`，或同时持久化返回的 per-node `heightCache`、`width`、`measurementKey`、`contentHash` 时，才建议把该高度缓存作为权威缓存。
+
 ```vue
 <script setup lang="ts">
 import type {

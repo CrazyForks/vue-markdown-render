@@ -228,7 +228,7 @@ async function run() {
 
     const result = await page.evaluate(async () => {
       const api = window.__markstreamVirtualScrollLab
-      const waitHealthy = async (frames = 30) => {
+      const waitHealthy = async (frames = 30, options = {}) => {
         let latest = api.read()
         for (let i = 0; i < frames; i++) {
           await api.nextFrame()
@@ -238,11 +238,14 @@ async function run() {
             && latest.blankFrameCount === 0
             && latest.visibleCoverageOk
             && latest.health.virtualDomWithinLimit
+            && latest.health.scrollJitterOk
             && latest.maxItemHeightDriftPx < 24
           ) {
-            api.clearEvents()
-            await api.nextFrame()
-            latest = api.read()
+            if (options.clearEvents !== false) {
+              api.clearEvents()
+              await api.nextFrame()
+              latest = api.read()
+            }
             return latest
           }
         }
@@ -307,7 +310,9 @@ async function run() {
       for (let i = 0; i < 180; i++)
         await api.nextFrame()
       api.stopStressScroll()
-      const stressAfter = await waitHealthy(45)
+      const stressAfter = await waitHealthy(45, { clearEvents: false })
+      api.clearEvents()
+      await api.nextFrame()
 
       await scrollToSettledBottom()
       api.startStreamingLastMessage({
@@ -316,7 +321,9 @@ async function run() {
         chunkSize: 6400,
         intervalMs: 16,
       })
-      const streamAfter = await waitHealthy(90)
+      const streamAfter = await waitHealthy(90, { clearEvents: false })
+      api.clearEvents()
+      await api.nextFrame()
 
       api.toggleDensity()
       api.toggleFontScale()
@@ -411,6 +418,15 @@ async function run() {
     )
 
     assert(
+      final.health.maxObservedScrollJumpPx <= 32,
+      'unexpected scroll jump observed during virtual-scroll coordination',
+      {
+        health: final.health,
+        events: final.events.filter(event => !event.expectedJump && (event.scrollJumpPx ?? 0) > 32),
+      },
+    )
+
+    assert(
       final.health.layoutIntegrityOk === true,
       'virtual-scroll layout health check failed',
       final.health,
@@ -432,6 +448,15 @@ async function run() {
     )
 
     assert(
+      stressAfter.health.maxObservedScrollJumpPx <= 32,
+      'unexpected scroll jump observed during stress scroll',
+      {
+        health: stressAfter.health,
+        events: stressAfter.events.filter(event => !event.expectedJump && (event.scrollJumpPx ?? 0) > 32),
+      },
+    )
+
+    assert(
       streamAfter.distanceFromBottomPx < 96,
       'streaming while pinned to bottom caused scroll drift',
       streamAfter,
@@ -447,6 +472,15 @@ async function run() {
       streamAfter.blankFrameCount === 0,
       'blank frame observed while streaming a huge message',
       streamAfter,
+    )
+
+    assert(
+      streamAfter.health.maxObservedScrollJumpPx <= 32,
+      'unexpected scroll jump observed while streaming a huge message',
+      {
+        health: streamAfter.health,
+        events: streamAfter.events.filter(event => !event.expectedJump && (event.scrollJumpPx ?? 0) > 32),
+      },
     )
 
     assert(

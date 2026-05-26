@@ -120,7 +120,9 @@ export type {
   MarkstreamVirtualMetrics,
   MarkstreamVirtualPhase,
   MarkstreamVirtualReason,
+  MarkstreamVirtualScrollHeightCacheOptions,
   MarkstreamVirtualScrollOptions,
+  MarkstreamVirtualScrollSharedOptions,
   MarkstreamVirtualState,
   NodeRendererProps,
 } from './types/node-renderer-props'

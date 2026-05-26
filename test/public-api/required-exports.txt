@@ -138,7 +138,9 @@ MarkstreamVirtualConfidence
 MarkstreamVirtualMetrics
 MarkstreamVirtualPhase
 MarkstreamVirtualReason
+MarkstreamVirtualScrollHeightCacheOptions
 MarkstreamVirtualScrollOptions
+MarkstreamVirtualScrollSharedOptions
 MarkstreamVirtualState
 NodeRendererProps
 PreCodeNodeProps

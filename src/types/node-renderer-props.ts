@@ -123,7 +123,23 @@ export type MarkstreamScrollRoot = MarkstreamScrollRootElementLike | null
 export type MarkstreamScrollRootLike = MarkstreamScrollRoot | Ref<MarkstreamScrollRoot>
 export type MarkstreamScrollRootResolver = () => MarkstreamScrollRootLike
 
-interface MarkstreamVirtualScrollSharedOptions {
+export type MarkstreamVirtualScrollHeightCacheOptions
+  = | {
+    heightCache?: null | undefined
+    heightCacheWidth?: number
+  }
+  | {
+    /**
+     * Cached measured node heights.
+     *
+     * When this is supplied outside restoreState, heightCacheWidth is required
+     * so the renderer can reject stale layout caches after width changes.
+     */
+    heightCache: MarkstreamHeightCache
+    heightCacheWidth: number
+  }
+
+interface MarkstreamVirtualScrollSharedBaseOptions {
   scrollRoot?: MarkstreamScrollRootLike | MarkstreamScrollRootResolver
   threadKey?: string
   restoreState?: MarkstreamVirtualState | null
@@ -135,8 +151,6 @@ interface MarkstreamVirtualScrollSharedOptions {
    * over the same outer scroll root.
    */
   restoreAnchor?: boolean | string | number
-  heightCache?: MarkstreamHeightCache | null
-  heightCacheWidth?: number
   /**
    * Extra cache invalidation key for layout-affecting host state:
    * theme, font, density, custom component style revision, Monaco line height, etc.
@@ -147,6 +161,9 @@ interface MarkstreamVirtualScrollSharedOptions {
   emitIntervalMs?: number
   heightDiffThresholdPx?: number
 }
+
+export type MarkstreamVirtualScrollSharedOptions
+  = MarkstreamVirtualScrollSharedBaseOptions & MarkstreamVirtualScrollHeightCacheOptions
 
 export type MarkstreamVirtualScrollOptions
   = | (MarkstreamVirtualScrollSharedOptions & {
