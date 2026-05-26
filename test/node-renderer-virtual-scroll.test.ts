@@ -827,6 +827,80 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not keep render unsettled when an async node settles with a stale indexKey', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | null = null
+    let settleCapturedKey: (() => void) | null = null
+
+    try {
+      const AsyncNode = defineComponent({
+        props: {
+          node: { type: Object, required: true },
+          indexKey: { type: [String, Number], required: true },
+        },
+        setup(props) {
+          const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY)
+          onMounted(() => {
+            const capturedKey = props.indexKey
+            lifecycle?.markPending(capturedKey)
+            settleCapturedKey = () => {
+              lifecycle?.markSettled(capturedKey)
+            }
+          })
+          return () => h('div', 'async stale lifecycle')
+        },
+      })
+
+      setCustomComponents('virtual-lifecycle-test', {
+        async_node: AsyncNode as any,
+      })
+
+      const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+      wrapper = mount(NodeRenderer, {
+        props: {
+          customId: 'virtual-lifecycle-test',
+          indexKey: 'message-a',
+          nodes: [{ type: 'async_node', raw: '<async-node />', content: '' }],
+          final: true,
+          fade: false,
+          viewportPriority: false,
+          virtualScroll: {
+            enabled: true,
+            sessionKey: 'stable-session',
+            threadKey: 'thread-a',
+            settleMode: 'manual',
+            emitIntervalMs: 0,
+          },
+        },
+      })
+
+      await nextTick()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const handle = wrapper.vm as any
+      expect(handle.getVirtualMetrics().stable).toBe(false)
+
+      await wrapper.setProps({ indexKey: 'message-a-rerendered' })
+      await nextTick()
+
+      expect(settleCapturedKey).toBeTypeOf('function')
+      settleCapturedKey?.()
+
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+      await Promise.resolve()
+
+      const metrics = await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })
+      expect(metrics.stable).toBe(true)
+      expect(metrics.phase === 'settled' || metrics.phase === 'final').toBe(true)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('forwards nested fragment async lifecycle to the parent virtual renderer', async () => {
     let finish: (() => void) | null = null
 

@@ -669,7 +669,16 @@ const pendingHeightSettlingTaskCount = computed(() => {
   void heightSettlingTimerVersion.value
   return activeHeightSettlingTimers.size
 })
+
+interface PendingAsyncNodeRecord {
+  index: number
+  sessionKey: string
+  threadKey?: string
+  layoutEpochKey: string
+}
+
 const pendingAsyncNodeCounts = new Map<string, number>()
+const pendingAsyncNodeRecords = new Map<string, PendingAsyncNodeRecord>()
 const pendingAsyncNodeVersion = ref(0)
 const pendingAsyncNodeCount = computed(() => {
   void pendingAsyncNodeVersion.value
@@ -1352,122 +1361,6 @@ function resolveLifecycleNodeIndex(indexKey: string | number) {
   return index
 }
 
-function bumpAsyncNodeVersion() {
-  pendingAsyncNodeVersion.value += 1
-}
-
-function incrementPendingAsyncNodeKey(key: string) {
-  const previous = pendingAsyncNodeCounts.get(key) ?? 0
-  pendingAsyncNodeCounts.set(key, previous + 1)
-
-  if (previous === 0) {
-    bumpAsyncNodeVersion()
-    scheduleVirtualMetricsEmit('async-node')
-  }
-}
-
-function decrementPendingAsyncNodeKey(key: string) {
-  const previous = pendingAsyncNodeCounts.get(key) ?? 0
-  if (previous <= 0)
-    return false
-
-  if (previous <= 1)
-    pendingAsyncNodeCounts.delete(key)
-  else
-    pendingAsyncNodeCounts.set(key, previous - 1)
-
-  if (previous === 1) {
-    bumpAsyncNodeVersion()
-    scheduleVirtualMetricsEmit('async-node')
-  }
-
-  return true
-}
-
-function clearPendingAsyncNodeKeysForIndex(index: number) {
-  const nodeKey = `${getCurrentIndexPrefix()}-${index}`
-  let changed = false
-
-  for (const key of Array.from(pendingAsyncNodeCounts.keys())) {
-    if (key === nodeKey || key.startsWith(`${nodeKey}-`)) {
-      pendingAsyncNodeCounts.delete(key)
-      changed = true
-    }
-  }
-
-  if (changed) {
-    bumpAsyncNodeVersion()
-    scheduleVirtualMetricsEmit('async-node')
-  }
-}
-
-const parentNodeLifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
-
-const localNodeLifecycle: MarkstreamNodeLifecycle = {
-  reportHeight(indexKey, height) {
-    if (!virtualScrollEnabled.value)
-      return
-
-    const index = resolveLifecycleNodeIndex(indexKey)
-    if (index == null)
-      return
-
-    const currentEl = nodeContentElements.get(index)
-    if (!currentEl)
-      return
-
-    const measuredHeight = Number(height)
-    const wrapperHeight = currentEl.offsetHeight
-    const nextHeight = Number.isFinite(measuredHeight) && measuredHeight > 0
-      ? Math.max(measuredHeight, wrapperHeight || 0)
-      : wrapperHeight
-
-    recordNodeHeight(index, nextHeight)
-  },
-  markPending(indexKey) {
-    if (!virtualScrollEnabled.value)
-      return
-
-    const index = resolveLifecycleNodeIndex(indexKey)
-    if (index == null)
-      return
-
-    const key = String(indexKey)
-    incrementPendingAsyncNodeKey(key)
-  },
-  markSettled(indexKey) {
-    if (!virtualScrollEnabled.value)
-      return
-
-    const index = resolveLifecycleNodeIndex(indexKey)
-    if (index == null)
-      return
-
-    const key = String(indexKey)
-    if (!decrementPendingAsyncNodeKey(key))
-      return
-
-    measureTrackedNodeHeights()
-  },
-}
-
-const providedNodeLifecycle: MarkstreamNodeLifecycle = {
-  reportHeight(indexKey, height) {
-    localNodeLifecycle.reportHeight(indexKey, height)
-    parentNodeLifecycle?.reportHeight(indexKey, height)
-  },
-  markPending(indexKey) {
-    localNodeLifecycle.markPending(indexKey)
-    parentNodeLifecycle?.markPending(indexKey)
-  },
-  markSettled(indexKey) {
-    localNodeLifecycle.markSettled(indexKey)
-    parentNodeLifecycle?.markSettled(indexKey)
-  },
-}
-
-provide(MARKSTREAM_NODE_LIFECYCLE_KEY, providedNodeLifecycle)
-
 function getVirtualSessionKey() {
   const explicit = props.virtualScroll?.sessionKey
   if (explicit != null && explicit !== '')
@@ -1504,6 +1397,178 @@ const virtualLayoutEpochKey = computed(() => {
     virtualLayoutWidthBucket.value,
   ].join('\u0000')
 })
+
+function bumpAsyncNodeVersion() {
+  pendingAsyncNodeVersion.value += 1
+}
+
+function getPendingAsyncNodeRecord(index: number): PendingAsyncNodeRecord {
+  return {
+    index,
+    sessionKey: getVirtualSessionKey(),
+    threadKey: getVirtualThreadKey(),
+    layoutEpochKey: virtualLayoutEpochKey.value,
+  }
+}
+
+function isUsablePendingAsyncNodeRecord(record: PendingAsyncNodeRecord | undefined) {
+  if (!record)
+    return false
+
+  if (!Number.isInteger(record.index) || record.index < 0 || record.index >= parsedNodes.value.length)
+    return false
+
+  return record.sessionKey === getVirtualSessionKey()
+    && record.threadKey === getVirtualThreadKey()
+    && record.layoutEpochKey === virtualLayoutEpochKey.value
+}
+
+function resolveLifecycleNodeIndexForPendingKey(indexKey: string | number) {
+  const key = String(indexKey)
+  const record = pendingAsyncNodeRecords.get(key)
+
+  if (record)
+    return isUsablePendingAsyncNodeRecord(record) ? record.index : null
+
+  return resolveLifecycleNodeIndex(key)
+}
+
+function hasPendingAsyncNodeKey(indexKey: string | number) {
+  return pendingAsyncNodeCounts.has(String(indexKey))
+}
+
+function incrementPendingAsyncNodeKey(key: string, index: number) {
+  const previous = pendingAsyncNodeCounts.get(key) ?? 0
+  pendingAsyncNodeCounts.set(key, previous + 1)
+  pendingAsyncNodeRecords.set(key, getPendingAsyncNodeRecord(index))
+
+  if (previous === 0) {
+    bumpAsyncNodeVersion()
+    scheduleVirtualMetricsEmit('async-node')
+  }
+}
+
+function decrementPendingAsyncNodeKey(key: string) {
+  const previous = pendingAsyncNodeCounts.get(key) ?? 0
+  if (previous <= 0)
+    return false
+
+  if (previous <= 1) {
+    pendingAsyncNodeCounts.delete(key)
+    pendingAsyncNodeRecords.delete(key)
+  }
+  else {
+    pendingAsyncNodeCounts.set(key, previous - 1)
+  }
+
+  if (previous === 1) {
+    bumpAsyncNodeVersion()
+    scheduleVirtualMetricsEmit('async-node')
+  }
+
+  return true
+}
+
+function clearPendingAsyncNodeKeysForIndex(index: number) {
+  const nodeKey = `${getCurrentIndexPrefix()}-${index}`
+  let changed = false
+
+  for (const key of Array.from(pendingAsyncNodeCounts.keys())) {
+    const record = pendingAsyncNodeRecords.get(key)
+    const belongsToIndex = record?.index === index
+      || key === nodeKey
+      || key.startsWith(`${nodeKey}-`)
+
+    if (belongsToIndex) {
+      pendingAsyncNodeCounts.delete(key)
+      pendingAsyncNodeRecords.delete(key)
+      changed = true
+    }
+  }
+
+  if (changed) {
+    bumpAsyncNodeVersion()
+    scheduleVirtualMetricsEmit('async-node')
+  }
+}
+
+function clearAllPendingAsyncNodeKeys(reason: MarkstreamVirtualReason = 'async-node') {
+  if (!pendingAsyncNodeCounts.size && !pendingAsyncNodeRecords.size)
+    return
+
+  pendingAsyncNodeCounts.clear()
+  pendingAsyncNodeRecords.clear()
+  bumpAsyncNodeVersion()
+  scheduleVirtualMetricsEmit(reason)
+}
+
+const parentNodeLifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
+
+const localNodeLifecycle: MarkstreamNodeLifecycle = {
+  reportHeight(indexKey, height) {
+    if (!virtualScrollEnabled.value)
+      return
+
+    const index = resolveLifecycleNodeIndexForPendingKey(indexKey)
+    if (index == null)
+      return
+
+    const currentEl = nodeContentElements.get(index)
+    if (!currentEl)
+      return
+
+    const measuredHeight = Number(height)
+    const wrapperHeight = currentEl.offsetHeight
+    const nextHeight = Number.isFinite(measuredHeight) && measuredHeight > 0
+      ? Math.max(measuredHeight, wrapperHeight || 0)
+      : wrapperHeight
+
+    recordNodeHeight(index, nextHeight)
+  },
+  markPending(indexKey) {
+    if (!virtualScrollEnabled.value)
+      return
+
+    const index = resolveLifecycleNodeIndex(indexKey)
+    if (index == null)
+      return
+
+    const key = String(indexKey)
+    incrementPendingAsyncNodeKey(key, index)
+  },
+  markSettled(indexKey) {
+    if (!virtualScrollEnabled.value)
+      return
+
+    const key = String(indexKey)
+    const index = resolveLifecycleNodeIndexForPendingKey(indexKey)
+    if (index == null && !hasPendingAsyncNodeKey(key))
+      return
+
+    if (!decrementPendingAsyncNodeKey(key))
+      return
+
+    if (index != null)
+      measureTrackedNodeHeights()
+  },
+}
+
+const providedNodeLifecycle: MarkstreamNodeLifecycle = {
+  reportHeight(indexKey, height) {
+    localNodeLifecycle.reportHeight(indexKey, height)
+    parentNodeLifecycle?.reportHeight(indexKey, height)
+  },
+  markPending(indexKey) {
+    localNodeLifecycle.markPending(indexKey)
+    parentNodeLifecycle?.markPending(indexKey)
+  },
+  markSettled(indexKey) {
+    localNodeLifecycle.markSettled(indexKey)
+    parentNodeLifecycle?.markSettled(indexKey)
+  },
+}
+
+provide(MARKSTREAM_NODE_LIFECYCLE_KEY, providedNodeLifecycle)
 
 function getVisibleDomHeight() {
   let total = 0
@@ -1712,20 +1777,16 @@ function hashVirtualString(input: string) {
   return (hash >>> 0).toString(36)
 }
 
-function hashVirtualParts(parts: Iterable<string>) {
-  let hash = 2166136261
-
-  for (const part of parts) {
-    for (let i = 0; i < part.length; i++) {
-      hash ^= part.charCodeAt(i)
-      hash = Math.imul(hash, 16777619)
-    }
-
-    hash ^= 0x1F
+function hashVirtualPartInto(seed: number, part: string) {
+  let hash = seed
+  for (let i = 0; i < part.length; i++) {
+    hash ^= part.charCodeAt(i)
     hash = Math.imul(hash, 16777619)
   }
 
-  return (hash >>> 0).toString(36)
+  hash ^= 0x1F
+  hash = Math.imul(hash, 16777619)
+  return hash
 }
 
 const HEIGHT_CACHE_SIGNATURE_MAX_DEPTH = 6
@@ -1776,45 +1837,67 @@ function stableHeightSignatureValue(
 
   seen.add(value)
 
-  if (Array.isArray(value)) {
-    const signatures = value.map(item =>
-      stableHeightSignatureValue(item, seen, depth + 1),
-    )
+  try {
+    if (Array.isArray(value)) {
+      if (value.length <= HEIGHT_CACHE_SIGNATURE_MAX_ARRAY_ITEMS) {
+        const signatures: string[] = []
+        for (let i = 0; i < value.length; i++)
+          signatures.push(stableHeightSignatureValue(value[i], seen, depth + 1))
 
-    if (value.length <= HEIGHT_CACHE_SIGNATURE_MAX_ARRAY_ITEMS)
-      return `a:${value.length}:${signatures.join(',')}`
-
-    const head = signatures.slice(0, 32).join(',')
-    const tail = signatures.slice(-32).join(',')
-    const aggregate = hashVirtualParts(signatures)
-
-    return `a:${value.length}:h=${head}:t=${tail}:all=${aggregate}`
-  }
-
-  const record = value as Record<string, unknown>
-  const keys = Object.keys(record)
-    .filter((key) => {
-      const field = record[key]
-
-      if (key === 'parent' || key === 'el' || key === 'component')
-        return false
-
-      if (
-        field == null
-        || typeof field === 'string'
-        || typeof field === 'number'
-        || typeof field === 'boolean'
-      ) {
-        return true
+        return `a:${value.length}:${signatures.join(',')}`
       }
 
-      return HEIGHT_CACHE_STRUCTURAL_KEYS.has(key)
-    })
-    .sort()
+      const headParts: string[] = []
+      const tailParts: string[] = []
+      const tailStart = Math.max(0, value.length - 32)
+      let aggregateHash = 2166136261
 
-  return `o:${keys.length}:${keys
-    .map(key => `${key}=${stableHeightSignatureValue(record[key], seen, depth + 1)}`)
-    .join(';')}`
+      for (let i = 0; i < value.length; i++) {
+        const signature = stableHeightSignatureValue(value[i], seen, depth + 1)
+        aggregateHash = hashVirtualPartInto(aggregateHash, signature)
+
+        if (i < 32)
+          headParts.push(signature)
+        if (i >= tailStart)
+          tailParts.push(signature)
+      }
+
+      return [
+        `a:${value.length}`,
+        `h=${headParts.join(',')}`,
+        `t=${tailParts.join(',')}`,
+        `all=${(aggregateHash >>> 0).toString(36)}`,
+      ].join(':')
+    }
+
+    const record = value as Record<string, unknown>
+    const keys = Object.keys(record)
+      .filter((key) => {
+        const field = record[key]
+
+        if (key === 'parent' || key === 'el' || key === 'component')
+          return false
+
+        if (
+          field == null
+          || typeof field === 'string'
+          || typeof field === 'number'
+          || typeof field === 'boolean'
+        ) {
+          return true
+        }
+
+        return HEIGHT_CACHE_STRUCTURAL_KEYS.has(key)
+      })
+      .sort()
+
+    return `o:${keys.length}:${keys
+      .map(key => `${key}=${stableHeightSignatureValue(record[key], seen, depth + 1)}`)
+      .join(';')}`
+  }
+  finally {
+    seen.delete(value)
+  }
 }
 
 let virtualContentHashRevision = -1
@@ -3460,8 +3543,7 @@ function resetVirtualSessionRuntimeState() {
   manualSettleInFlight = false
   resetVirtualSettleConfirmation()
 
-  pendingAsyncNodeCounts.clear()
-  bumpAsyncNodeVersion()
+  clearAllPendingAsyncNodeKeys('restore')
 
   clearRestoreReconcile()
   clearActiveVirtualBottomAnchor()

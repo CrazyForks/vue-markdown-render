@@ -505,6 +505,15 @@ async function run() {
     )
 
     assert(
+      stressAfter.health.maxObservedHeightDriftPx < 24,
+      'height drift exceeded budget during stress scroll',
+      {
+        health: stressAfter.health,
+        events: stressAfter.events.filter(event => (event.maxItemHeightDriftPx ?? 0) >= 24),
+      },
+    )
+
+    assert(
       streamAfter.distanceFromBottomPx < 96,
       'streaming while pinned to bottom caused scroll drift',
       streamAfter,
@@ -528,6 +537,15 @@ async function run() {
       {
         health: streamAfter.health,
         events: streamAfter.events.filter(event => !event.expectedJump && (event.scrollJumpPx ?? 0) > 32),
+      },
+    )
+
+    assert(
+      streamAfter.health.maxObservedHeightDriftPx < 24,
+      'height drift exceeded budget while streaming a huge message',
+      {
+        health: streamAfter.health,
+        events: streamAfter.events.filter(event => (event.maxItemHeightDriftPx ?? 0) >= 24),
       },
     )
 

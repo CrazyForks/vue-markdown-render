@@ -704,21 +704,25 @@ function readPx(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-function getArticleVerticalPadding(key: string) {
-  const article = messageEls.get(key)
-  if (!article)
-    return 0
-
-  const style = window.getComputedStyle(article)
-  return readPx(style.paddingTop) + readPx(style.paddingBottom)
-}
-
 function getMeasuredMessageContentHeight(key: string) {
+  const article = messageEls.get(key)
   const card = messageCardEls.get(key)
-  if (!card)
+  if (!article || !card)
     return 0
 
-  return Math.ceil(card.scrollHeight + getArticleVerticalPadding(key))
+  const articleStyle = window.getComputedStyle(article)
+  const cardStyle = window.getComputedStyle(card)
+  const articlePadding = readPx(articleStyle.paddingTop) + readPx(articleStyle.paddingBottom)
+  const cardBorder = readPx(cardStyle.borderTopWidth) + readPx(cardStyle.borderBottomWidth)
+
+  const cardRectHeight = card.getBoundingClientRect().height
+  const cardOffsetHeight = card.offsetHeight
+  const cardScrollHeight = card.scrollHeight + cardBorder
+
+  return Math.ceil(
+    Math.max(cardRectHeight, cardOffsetHeight, cardScrollHeight)
+    + articlePadding,
+  )
 }
 
 function getMessageChromeHeight(key: string) {
@@ -1001,7 +1005,12 @@ function collectStats(options: CollectStatsOptions = {}) {
     const expected = getItemHeight(item.message)
     const coordinated = isCoordinatedMessage(item.message)
     const measured = getMeasuredMessageContentHeight(key)
-    const actual = measured || Math.ceil(el.offsetHeight || 0)
+    const actual = Math.ceil(Math.max(
+      measured,
+      el.offsetHeight || 0,
+      el.scrollHeight || 0,
+      el.getBoundingClientRect().height || 0,
+    ))
     const absDrift = actual > 0 ? Math.abs(actual - expected) : 0
 
     heightDriftPx += absDrift
@@ -1916,7 +1925,8 @@ button:hover {
   box-sizing: border-box;
   padding: 0.75rem 1rem;
   will-change: transform;
-  overflow: hidden;
+  overflow: visible;
+  contain: layout style;
 }
 
 .message-card {
@@ -1925,7 +1935,7 @@ button:hover {
   border-radius: 0.5rem;
   background: var(--lab-panel);
   padding: 0.85rem;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .markdown-host {
