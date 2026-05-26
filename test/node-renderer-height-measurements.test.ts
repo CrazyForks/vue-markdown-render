@@ -162,6 +162,32 @@ describe('useHeightMeasurements', () => {
     expect(h.fenwickRangeSum(h.heightKnownTree.value, 0, 4)).toBe(3)
   })
 
+  it('removes measured heights from stats and Fenwick trees', () => {
+    const onHeightRecorded = vi.fn()
+    const h = useHeightMeasurements({ onHeightRecorded })
+
+    h.recordNodeHeight(0, 10)
+    h.recordNodeHeight(1, 20)
+    h.recordNodeHeight(2, 30)
+    h.rebuildHeightTrees(3)
+
+    expect(h.removeNodeHeight(1)).toBe(true)
+
+    expect(h.nodeHeights[1]).toBeUndefined()
+    expect(h.heightStats.total).toBe(40)
+    expect(h.heightStats.count).toBe(2)
+    expect(h.fenwickRangeSum(h.heightSumTree.value, 0, 3)).toBe(40)
+    expect(h.fenwickRangeSum(h.heightKnownTree.value, 0, 3)).toBe(2)
+    expect(onHeightRecorded).toHaveBeenCalledTimes(4)
+
+    expect(h.removeNodeHeights([0, 2], { notify: false })).toBe(2)
+    expect(h.heightStats.total).toBe(0)
+    expect(h.heightStats.count).toBe(0)
+    expect(h.fenwickRangeSum(h.heightSumTree.value, 0, 3)).toBe(0)
+    expect(h.fenwickRangeSum(h.heightKnownTree.value, 0, 3)).toBe(0)
+    expect(onHeightRecorded).toHaveBeenCalledTimes(4)
+  })
+
   it('ignores Fenwick updates for indexes outside the current tree size', () => {
     const h = useHeightMeasurements()
 

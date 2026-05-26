@@ -138,7 +138,13 @@ export type MarkstreamVirtualScrollOptions
 export interface MarkstreamRendererHandle {
   getVirtualMetrics: () => MarkstreamVirtualMetrics
   captureVirtualState: () => MarkstreamVirtualState | null
-  restoreVirtualState: (state: MarkstreamVirtualState) => void
+  restoreVirtualState: (
+    state: MarkstreamVirtualState,
+    options?: {
+      restoreAnchor?: boolean
+      restoreToken?: string | number | boolean
+    },
+  ) => void
   forceMeasure: (reason?: MarkstreamVirtualReason) => Promise<MarkstreamVirtualMetrics>
   settle: (options?: {
     frames?: number

@@ -156,6 +156,7 @@ const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
 const CONTENT_STREAMING_TAIL_IDLE_MS = 1200
 const HEIGHT_CACHE_WIDTH_BUCKET_PX = 32
 const BOTTOM_ANCHOR_CAPTURE_MAX_DISTANCE_PX = 160
+const BOTTOM_ANCHOR_SCROLL_ROOT_MAX_DISTANCE_PX = 64
 const BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX = 32
 
 const containerRef = ref<HTMLElement>()
@@ -504,6 +505,7 @@ const {
   pruneHeightMeasurements,
   rebuildHeightTrees,
   recordNodeHeight,
+  removeNodeHeights,
   exportHeightCache,
   importHeightCache,
   fenwickRangeSum,
@@ -550,6 +552,7 @@ const {
 })
 const nodeContentElements = new Map<number, HTMLElement | null>()
 const nodeContentVersions = new Map<number, number>()
+const nodeHeightSignatures = new Map<number, string>()
 const nodeContentDeferredMeasureTimers = new Map<number, number[]>()
 const finalHeightConvergenceTimers: number[] = []
 const pendingHeightMeasurements = new Map<number, { height: number, allowShrink: boolean, version: number, el: HTMLElement }>()
@@ -1546,6 +1549,13 @@ function captureBottomVirtualAnchor(): MarkstreamVirtualAnchor | null {
   if (!box || !container)
     return null
 
+  const scrollRootDistanceFromBottom = Math.max(
+    0,
+    box.scrollHeight - box.scrollTop - box.clientHeight,
+  )
+  if (scrollRootDistanceFromBottom > BOTTOM_ANCHOR_SCROLL_ROOT_MAX_DISTANCE_PX)
+    return null
+
   const rendererBottomDistance = getRendererBottomDistanceFromViewport(box)
   if (rendererBottomDistance == null)
     return null
@@ -2076,18 +2086,68 @@ function shouldKeepPendingVirtualRestoreState(state: MarkstreamVirtualState) {
   )
 }
 
-function restoreVirtualState(state: MarkstreamVirtualState) {
+function restoreVirtualState(
+  state: MarkstreamVirtualState,
+  options: { restoreAnchor?: boolean, restoreToken?: string | number | boolean } = {},
+) {
   pendingImperativeVirtualRestoreState = state
+  const restoreAnchorOption = options.restoreAnchor !== false
+  const restoreToken = options.restoreToken == null
+    ? 'imperative'
+    : String(options.restoreToken)
 
   if (
     applyVirtualRestoreState(state, {
-      restoreAnchor: true,
-      restoreToken: 'imperative',
+      restoreAnchor: restoreAnchorOption,
+      restoreToken,
     })
     && !shouldKeepPendingVirtualRestoreState(state)
   ) {
     pendingImperativeVirtualRestoreState = null
   }
+}
+
+function seedCurrentNodeHeightSignatures() {
+  nodeHeightSignatures.clear()
+  for (let i = 0; i < parsedNodes.value.length; i++)
+    nodeHeightSignatures.set(i, getNodeHeightCacheSignature(i))
+}
+
+function invalidateChangedNodeHeights(reason: MarkstreamVirtualReason = 'content') {
+  if (!virtualScrollEnabled.value)
+    return
+
+  const staleIndices: number[] = []
+  const total = parsedNodes.value.length
+
+  for (let index = 0; index < total; index++) {
+    const signature = getNodeHeightCacheSignature(index)
+    const previousSignature = nodeHeightSignatures.get(index)
+
+    if (previousSignature != null && previousSignature !== signature)
+      staleIndices.push(index)
+
+    nodeHeightSignatures.set(index, signature)
+  }
+
+  for (const index of Array.from(nodeHeightSignatures.keys())) {
+    if (index >= total)
+      nodeHeightSignatures.delete(index)
+  }
+
+  if (!staleIndices.length)
+    return
+
+  removeNodeHeights(staleIndices, { notify: false })
+  markFallbackHeightPrefixDirty()
+  resetVirtualMetricsEventDedupes()
+
+  if (activeRestoreAnchor.value)
+    scheduleRestoreReconcile()
+  if (activeVirtualBottomAnchor.value)
+    scheduleVirtualBottomRestoreReconcile()
+
+  scheduleVirtualMetricsEmit(reason)
 }
 
 function forceFlushPendingHeightMeasurements() {
@@ -2955,7 +3015,12 @@ watch(
 )
 
 watch(
-  [heightEstimationActive, experimentProbeWidth],
+  [
+    heightEstimationActive,
+    experimentProbeWidth,
+    () => props.virtualScroll?.measurementKey,
+    () => props.isDark,
+  ],
   async () => {
     if (!heightEstimationActive.value) {
       simpleTextProbeProfile.value = createEmptySimpleTextProbeProfile()
@@ -3061,10 +3126,13 @@ function resetVirtualSessionMeasurements() {
   clearPendingHeightMeasurements()
   resetHeightMeasurements()
   markFallbackHeightPrefixDirty()
+  nodeHeightSignatures.clear()
 
   const total = parsedNodes.value.length
   if (total > 0)
     rebuildHeightTrees(total)
+
+  seedCurrentNodeHeightSignatures()
 }
 
 function resetVirtualSessionRuntimeState() {
@@ -3093,10 +3161,13 @@ function resetVirtualLayoutMeasurements(reason: MarkstreamVirtualReason = 'resiz
   clearPendingHeightMeasurements()
   resetHeightMeasurements()
   markFallbackHeightPrefixDirty()
+  nodeHeightSignatures.clear()
 
   const total = parsedNodes.value.length
   if (total > 0)
     rebuildHeightTrees(total)
+
+  seedCurrentNodeHeightSignatures()
 
   lastImportedVirtualHeightCacheSignature = null
   lastImportedVirtualHeightCacheSource = null
@@ -3186,9 +3257,12 @@ watch(
     () => getVirtualContentHash(),
   ],
   ([enabled]) => {
-    if (enabled)
+    if (enabled) {
       resetVirtualMetricsEventDedupes()
+      invalidateChangedNodeHeights('content')
+    }
   },
+  { flush: 'post', immediate: true },
 )
 
 watch(
@@ -3466,6 +3540,7 @@ onBeforeUnmount(() => {
   }
   nodeContentDeferredMeasureTimers.clear()
   nodeContentVersions.clear()
+  nodeHeightSignatures.clear()
   clearFinalHeightConvergenceTimers()
   clearPendingHeightMeasurements()
   cleanupExperimentResizeObserver()

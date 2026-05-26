@@ -184,6 +184,34 @@ async function run() {
 
     const result = await page.evaluate(async () => {
       const api = window.__markstreamVirtualScrollLab
+      const waitHealthy = async (frames = 30) => {
+        let latest = api.read()
+        for (let i = 0; i < frames; i++) {
+          await api.nextFrame()
+          latest = api.read()
+          if (
+            latest.health.maxObservedBlankProbes === 0
+            && latest.health.virtualDomWithinLimit
+            && latest.maxItemHeightDriftPx < 24
+          ) {
+            api.clearEvents()
+            await api.nextFrame()
+            latest = api.read()
+            return latest
+          }
+        }
+        return latest
+      }
+      const scrollToSettledBottom = async () => {
+        let latest = api.read()
+        for (let i = 0; i < 4; i++) {
+          await api.scrollToRatio(1)
+          latest = await waitHealthy(45)
+          if (latest.distanceFromBottomPx < 32)
+            return latest
+        }
+        return latest
+      }
 
       await api.scrollToRatio(0.15)
       await api.nextFrame()
@@ -218,11 +246,26 @@ async function run() {
       await api.scrollToRatio(0.95)
       await api.nextFrame()
 
+      await scrollToSettledBottom()
+      api.startStreamingLastMessage({
+        blocks: 160,
+        initialChars: 800,
+        chunkSize: 6400,
+        intervalMs: 16,
+      })
+      const streamAfter = await waitHealthy(90)
+
+      api.toggleDensity()
+      api.toggleFontScale()
+      const relayoutAfter = await waitHealthy(45)
+
       return {
         threadABefore,
         threadBBefore,
         threadAAfter,
         threadBAfter,
+        streamAfter,
+        relayoutAfter,
         final: api.read(),
       }
     })
@@ -232,6 +275,8 @@ async function run() {
       threadBBefore,
       threadAAfter,
       threadBAfter,
+      streamAfter,
+      relayoutAfter,
       final,
     } = result
 
@@ -284,6 +329,24 @@ async function run() {
       final.health.layoutIntegrityOk === true,
       'virtual-scroll layout health check failed',
       final.health,
+    )
+
+    assert(
+      streamAfter.distanceFromBottomPx < 96,
+      'streaming while pinned to bottom caused scroll drift',
+      streamAfter,
+    )
+
+    assert(
+      streamAfter.health.maxObservedBlankProbes === 0,
+      'blank frame observed while streaming a huge message',
+      streamAfter.health,
+    )
+
+    assert(
+      relayoutAfter.health.maxObservedHeightDriftPx < 24,
+      'density/font relayout did not converge',
+      relayoutAfter.health,
     )
 
     process.stdout.write(`${JSON.stringify({

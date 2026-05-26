@@ -99,6 +99,13 @@ interface LabEvent {
   toThreadId?: ThreadId
 }
 
+interface StreamLastMessageOptions {
+  blocks?: number
+  initialChars?: number
+  chunkSize?: number
+  intervalMs?: number
+}
+
 declare global {
   interface Window {
     __markstreamVirtualScrollLab?: {
@@ -106,6 +113,10 @@ declare global {
       scrollToRatio: (ratio: number) => Promise<void>
       switchThread: (threadId: ThreadId) => Promise<void>
       rapidSwitchThreads: (threadIds: ThreadId[], count?: number) => Promise<void>
+      startStreamingLastMessage: (options?: StreamLastMessageOptions) => void
+      toggleDensity: () => void
+      toggleFontScale: () => void
+      toggleSmallMessageCoordination: () => void
       nextFrame: () => Promise<void>
       clearEvents: () => void
     }
@@ -442,9 +453,7 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   const outerAnchor: OuterAnchor | null = streamBottomPinned
     ? { type: 'bottom', distanceFromBottomPx: 0 }
     : captureOuterAnchor()
-  const measuredContentHeight = isCoordinatedMessage(message)
-    ? 0
-    : getMeasuredMessageContentHeight(key)
+  const measuredContentHeight = getMeasuredMessageContentHeight(key)
   const nextHeight = Math.max(
     1,
     Math.ceil(metrics.totalHeight + getMessageChromeHeight(key)),
@@ -550,6 +559,9 @@ async function restoreOuterAnchor(
 
   if (options.immediate) {
     apply()
+    void nextTick(() => {
+      apply()
+    })
     return
   }
 
@@ -620,7 +632,7 @@ function onScroll() {
   scrollTop.value = root.scrollTop
   threadScrollTops.set(activeThreadId.value, root.scrollTop)
 
-  if (streamBottomPinned && getCurrentDistanceFromBottom() > 64)
+  if (streamBottomPinned && !streamTimer && getCurrentDistanceFromBottom() > 64)
     streamBottomPinned = false
 
   scheduleVisibleDomReconcile()
@@ -744,11 +756,9 @@ function collectStats(options: CollectStatsOptions = {}) {
 
     visibleItemCount++
 
-    const coordinated = isCoordinatedMessage(item.message)
     const expected = getItemHeight(item.message)
-    const measured = coordinated
-      ? expected
-      : getMeasuredMessageContentHeight(key)
+    const coordinated = isCoordinatedMessage(item.message)
+    const measured = getMeasuredMessageContentHeight(key)
     const actual = measured || Math.ceil(el.offsetHeight || 0)
     const absDrift = actual > 0 ? Math.abs(actual - expected) : 0
 
@@ -970,13 +980,15 @@ function stopStressScroll() {
   }
 }
 
-function startStreamingLastMessage() {
+function startStreamingLastMessage(options: StreamLastMessageOptions = {}) {
   if (streamTimer)
     window.clearInterval(streamTimer)
 
   const target = messages.value[messages.value.length - 1]
-  const full = makeMarkdown(`${activeThreadId.value}-streaming`, 1100)
-  let cursor = 1200
+  const full = makeMarkdown(`${activeThreadId.value}-streaming`, options.blocks ?? 1100)
+  const chunkSize = Math.max(1, options.chunkSize ?? 2400)
+  const intervalMs = Math.max(0, options.intervalMs ?? 80)
+  let cursor = Math.max(0, options.initialChars ?? 1200)
   streamBottomPinned = getCurrentDistanceFromBottom() <= 32
 
   target.revision += 1
@@ -987,7 +999,7 @@ function startStreamingLastMessage() {
     void restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
 
   streamTimer = window.setInterval(() => {
-    cursor += 2400
+    cursor += chunkSize
     target.content = full.slice(0, cursor)
 
     if (streamBottomPinned)
@@ -1004,7 +1016,7 @@ function startStreamingLastMessage() {
         window.clearInterval(streamTimer)
       streamTimer = null
     }
-  }, 80)
+  }, intervalMs)
 }
 
 function resetHeights() {
@@ -1149,6 +1161,10 @@ function exposeLabApi() {
     scrollToRatio,
     switchThread,
     rapidSwitchThreads,
+    startStreamingLastMessage,
+    toggleDensity,
+    toggleFontScale,
+    toggleSmallMessageCoordination,
     nextFrame: waitFrame,
     clearEvents: clearLabEvents,
   }

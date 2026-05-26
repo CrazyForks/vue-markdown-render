@@ -534,6 +534,51 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('invalidates measured heights when node content changes in the same session', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'same-session-content-cache',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const contentEl = getRootNodeContentElements(wrapper.element)[0]!
+    platform.heights.set(contentEl, 500)
+    platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+
+    const handle = wrapper.vm as any
+    expect((await handle.forceMeasure('manual')).totalHeight).toBe(500)
+
+    const changedNode = createParagraph(1)
+    changedNode.raw = 'Paragraph 1 updated with more content'
+    changedNode.children[0].raw = changedNode.raw
+    changedNode.children[0].content = changedNode.raw
+
+    await wrapper.setProps({
+      nodes: [changedNode],
+    })
+    await flushAll()
+
+    expect(handle.getVirtualMetrics().totalHeight).not.toBe(500)
+
+    wrapper.unmount()
+  })
+
   it('resets measured heights when measurementKey changes', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default

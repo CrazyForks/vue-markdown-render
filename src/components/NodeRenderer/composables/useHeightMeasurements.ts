@@ -21,6 +21,8 @@ export interface HeightMeasurements {
   pruneHeightMeasurements: (size: number) => void
   rebuildHeightTrees: (size: number) => void
   recordNodeHeight: (index: number, height: number, options?: { allowShrink?: boolean }) => void
+  removeNodeHeight: (index: number, options?: { notify?: boolean }) => boolean
+  removeNodeHeights: (indices: Iterable<number>, options?: { notify?: boolean }) => number
   exportHeightCache: () => MarkstreamHeightCache
   importHeightCache: (cache: MarkstreamHeightCache, options?: { mode?: 'replace' | 'merge' }) => void
 
@@ -218,6 +220,53 @@ export function useHeightMeasurements(
     })
   }
 
+  function removeNodeHeightInternal(index: number) {
+    if (!Number.isInteger(index) || index < 0)
+      return false
+
+    const previous = nodeHeights[index]
+    if (!Number.isFinite(previous) || previous <= 0)
+      return false
+
+    delete nodeHeights[index]
+    heightStats.total = Math.max(0, heightStats.total - previous)
+    heightStats.count = Math.max(0, heightStats.count - 1)
+
+    if (heightTreeSize.value > index) {
+      const sumTree = heightSumTree.value
+      const countTree = heightKnownTree.value
+
+      if (sumTree.length && countTree.length) {
+        fenwickUpdate(sumTree, index, -previous)
+        fenwickUpdate(countTree, index, -1)
+      }
+    }
+
+    return true
+  }
+
+  function removeNodeHeight(index: number, removeOptions: { notify?: boolean } = {}) {
+    const changed = removeNodeHeightInternal(index)
+    if (changed && removeOptions.notify !== false)
+      options.onHeightRecorded?.()
+    return changed
+  }
+
+  function removeNodeHeights(indices: Iterable<number>, removeOptions: { notify?: boolean } = {}) {
+    let removed = 0
+
+    for (const rawIndex of indices) {
+      const index = Number(rawIndex)
+      if (removeNodeHeightInternal(index))
+        removed++
+    }
+
+    if (removed > 0 && removeOptions.notify !== false)
+      options.onHeightRecorded?.()
+
+    return removed
+  }
+
   function exportHeightCache(): MarkstreamHeightCache {
     return Object.entries(nodeHeights)
       .map(([rawIndex, rawHeight]) => ({
@@ -291,6 +340,8 @@ export function useHeightMeasurements(
     pruneHeightMeasurements,
     rebuildHeightTrees,
     recordNodeHeight,
+    removeNodeHeight,
+    removeNodeHeights,
     exportHeightCache,
     importHeightCache,
 
