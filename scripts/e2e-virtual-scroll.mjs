@@ -176,7 +176,9 @@ async function waitForHealthy(page, label, timeoutMs = 30000) {
       && snapshot.heightDriftMessageCount === 0
       && snapshot.maxItemHeightDriftPx <= 2
       && snapshot.markdownSlotCount <= snapshot.expectedMarkdownSlotCeiling
+      && snapshot.domNodeCount <= snapshot.expectedDomNodeCeiling
       && snapshot.maxMarkdownSlotCount <= (snapshot.maxExpectedMarkdownSlotCeiling ?? snapshot.expectedMarkdownSlotCeiling)
+      && snapshot.maxDomNodeCount <= (snapshot.maxExpectedDomNodeCeiling ?? snapshot.expectedDomNodeCeiling)
       && snapshot.messageDomCount <= 24
       && snapshot.labStatus === 'ok'
   }, null, { timeout: timeoutMs }).catch(async (error) => {
@@ -205,7 +207,7 @@ async function run() {
     })
 
     await page.goto(`http://${host}:${port}/virtual-scroll`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: 60000,
     })
 
@@ -234,8 +236,18 @@ async function run() {
       afterStress,
     )
     assert(
+      afterStress.domNodeCount <= afterStress.expectedDomNodeCeiling,
+      'DOM-size exceeded total DOM node ceiling',
+      afterStress,
+    )
+    assert(
       afterStress.maxMarkdownSlotCount <= (afterStress.maxExpectedMarkdownSlotCeiling ?? afterStress.expectedMarkdownSlotCeiling),
       'DOM-size exceeded markdown slot ceiling during stress scroll',
+      afterStress,
+    )
+    assert(
+      afterStress.maxDomNodeCount <= (afterStress.maxExpectedDomNodeCeiling ?? afterStress.expectedDomNodeCeiling),
+      'DOM-size exceeded total DOM node ceiling during stress scroll',
       afterStress,
     )
     assert(

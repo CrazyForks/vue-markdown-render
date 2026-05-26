@@ -65,6 +65,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: pnpm run build:parser && pnpm build
 
+      - name: Virtual scroll playground e2e (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm run test:e2e:virtual-scroll
+
       - name: Minimal install smoke (Ubuntu only)
         if: matrix.os == 'ubuntu-latest'
         run: MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm test:smoke:minimal

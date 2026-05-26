@@ -1805,33 +1805,58 @@ function handleVirtualScrollRootScroll() {
 }
 
 function restoreVirtualAnchor(anchor: MarkstreamVirtualAnchor) {
-  if (anchor.type === 'node') {
-    clearActiveVirtualBottomAnchor()
+  const apply = () => {
+    if (anchor.type === 'node') {
+      clearActiveVirtualBottomAnchor()
 
-    restoreAnchor({
-      nodeIndex: anchor.nodeIndex,
-      offsetWithinNodePx: anchor.offsetWithinNodePx,
-    })
+      restoreAnchor({
+        nodeIndex: anchor.nodeIndex,
+        offsetWithinNodePx: anchor.offsetWithinNodePx,
+      })
+      return
+    }
+
+    clearRestoreReconcile()
+    activeRestoreAnchor.value = null
+    activeVirtualBottomAnchor.value = anchor
+    clearVirtualBottomRestoreTimers()
+
+    applyBottomVirtualAnchor(anchor)
+
+    if (!isClient)
+      return
+
+    for (const delay of [0, 120, 280, 480]) {
+      virtualBottomRestoreTimers.push(window.setTimeout(() => {
+        const activeAnchor = activeVirtualBottomAnchor.value
+        if (activeAnchor)
+          applyBottomVirtualAnchor(activeAnchor)
+      }, delay))
+    }
+  }
+
+  if (primeVirtualWindowForAnchor(anchor)) {
+    void nextTick(apply)
     return
   }
 
-  clearRestoreReconcile()
-  activeRestoreAnchor.value = null
-  activeVirtualBottomAnchor.value = anchor
-  clearVirtualBottomRestoreTimers()
+  apply()
+}
 
-  applyBottomVirtualAnchor(anchor)
+function primeVirtualWindowForAnchor(anchor: MarkstreamVirtualAnchor) {
+  if (!virtualizationEnabled.value)
+    return false
 
-  if (!isClient)
-    return
+  const total = parsedNodes.value.length
+  if (total <= 0)
+    return false
 
-  for (const delay of [0, 120, 280, 480]) {
-    virtualBottomRestoreTimers.push(window.setTimeout(() => {
-      const activeAnchor = activeVirtualBottomAnchor.value
-      if (activeAnchor)
-        applyBottomVirtualAnchor(activeAnchor)
-    }, delay))
-  }
+  focusIndex.value = anchor.type === 'node'
+    ? clamp(anchor.nodeIndex, 0, total - 1)
+    : total - 1
+
+  updateLiveRange()
+  return true
 }
 
 function getBoundedHeightCache(
@@ -2164,29 +2189,42 @@ function scrollToNode(
     return
 
   const boundedIndex = clamp(index, 0, total - 1)
-  const nodeTop = resolveAnchorOffset({
-    nodeIndex: boundedIndex,
-    offsetWithinNodePx: 0,
-  })
-  const nodeHeight = getFallbackNodeHeight(boundedIndex)
-  const box = getScrollBox()
-  const viewportHeight = box?.clientHeight ?? 0
-  const current = getRelativeScrollTopWithinContainer()
 
-  let target = nodeTop
-  if (align === 'center') {
-    target = nodeTop - viewportHeight / 2 + nodeHeight / 2
-  }
-  else if (align === 'end') {
-    target = nodeTop - viewportHeight + nodeHeight
-  }
-  else if (align === 'nearest' && current != null) {
-    if (nodeTop >= current && nodeTop + nodeHeight <= current + viewportHeight)
-      return
-    target = nodeTop < current ? nodeTop : nodeTop - viewportHeight + nodeHeight
+  const apply = () => {
+    const nodeTop = resolveAnchorOffset({
+      nodeIndex: boundedIndex,
+      offsetWithinNodePx: 0,
+    })
+    const nodeHeight = getFallbackNodeHeight(boundedIndex)
+    const box = getScrollBox()
+    const viewportHeight = box?.clientHeight ?? 0
+    const current = getRelativeScrollTopWithinContainer()
+
+    let target = nodeTop
+    if (align === 'center') {
+      target = nodeTop - viewportHeight / 2 + nodeHeight / 2
+    }
+    else if (align === 'end') {
+      target = nodeTop - viewportHeight + nodeHeight
+    }
+    else if (align === 'nearest' && current != null) {
+      if (nodeTop >= current && nodeTop + nodeHeight <= current + viewportHeight)
+        return
+      target = nodeTop < current ? nodeTop : nodeTop - viewportHeight + nodeHeight
+    }
+
+    setRelativeScrollTopWithinContainer(Math.max(0, target))
+    scheduleFocusSync({ immediate: true })
   }
 
-  setRelativeScrollTopWithinContainer(Math.max(0, target))
+  if (virtualizationEnabled.value) {
+    focusIndex.value = boundedIndex
+    updateLiveRange()
+    void nextTick(apply)
+    return
+  }
+
+  apply()
 }
 
 let pendingVirtualMetricsReason: MarkstreamVirtualReason = 'content'
@@ -3085,8 +3123,11 @@ watch(
 )
 
 watch(
-  [() => getVirtualSessionKey(), () => getVirtualThreadKey()],
-  () => {
+  [virtualScrollEnabled, () => getVirtualSessionKey(), () => getVirtualThreadKey()],
+  ([enabled]) => {
+    if (!enabled)
+      return
+
     resetVirtualSessionRuntimeState()
     resetVirtualSessionMeasurements()
     scheduleVirtualMetricsEmit('content')

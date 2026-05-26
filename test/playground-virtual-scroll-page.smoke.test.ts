@@ -15,7 +15,7 @@ describe('playground /virtual-scroll shell smoke', () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(960)
     Object.defineProperty(document, 'elementFromPoint', {
       configurable: true,
-      value: vi.fn(() => document.querySelector('.message-card')),
+      value: vi.fn(() => document.querySelector('.node-content') ?? document.querySelector('.node-placeholder')),
     })
 
     vi.stubGlobal('ResizeObserver', class {

@@ -36,7 +36,9 @@ interface VirtualScrollLabSnapshot {
   maxDomNodeCount: number
   maxMarkdownSlotCount: number
   expectedMarkdownSlotCeiling: number
+  expectedDomNodeCeiling: number
   maxExpectedMarkdownSlotCeiling: number
+  maxExpectedDomNodeCeiling: number
   blankFrameCount: number
   clippedMessageCount: number
   heightDriftMessageCount: number
@@ -100,6 +102,7 @@ const visibleCoverageOk = ref(true)
 const maxDomNodeCount = ref(0)
 const maxMarkdownSlotCount = ref(0)
 const maxExpectedMarkdownSlotCeiling = ref(0)
+const maxExpectedDomNodeCeiling = ref(0)
 const lastHeightEvent = ref<MarkstreamVirtualMetrics | null>(null)
 const settledEvents = ref(0)
 const scrollCompensationCount = ref(0)
@@ -315,8 +318,13 @@ const expectedMarkdownSlotCeiling = computed(() => {
   return renderedCoordinatedMessageCount.value * (maxLiveNodes.value + 96) + 600
 })
 
+const expectedDomNodeCeiling = computed(() => {
+  return 1600 + messageDomCount.value * 80 + expectedMarkdownSlotCeiling.value * 8
+})
+
 const domSizeOk = computed(() => {
   return markdownSlotCount.value <= expectedMarkdownSlotCeiling.value
+    && domNodeCount.value <= expectedDomNodeCeiling.value
 })
 
 const blankFrameOk = computed(() => blankFrameCount.value === 0)
@@ -525,9 +533,27 @@ function scheduleStats() {
 }
 
 function isProbeCoveredByRenderedContent(probe: Element | null) {
-  return Boolean(
-    probe?.closest?.('.message-card, .markdown-renderer, .node-content'),
-  )
+  if (!probe)
+    return false
+
+  const element = probe instanceof Element ? probe : probe.parentElement
+  if (!element)
+    return false
+
+  if (element.closest('.message-meta'))
+    return true
+
+  if (element.closest('.node-content, .node-placeholder'))
+    return true
+
+  if (element.closest('.markdown-renderer'))
+    return false
+
+  const card = element.closest('.message-card')
+  if (card?.closest('.virtual-message.huge'))
+    return false
+
+  return Boolean(card)
 }
 
 function collectStats() {
@@ -549,6 +575,10 @@ function collectStats() {
   maxExpectedMarkdownSlotCeiling.value = Math.max(
     maxExpectedMarkdownSlotCeiling.value,
     expectedMarkdownSlotCeiling.value,
+  )
+  maxExpectedDomNodeCeiling.value = Math.max(
+    maxExpectedDomNodeCeiling.value,
+    expectedDomNodeCeiling.value,
   )
 
   let drifted = 0
@@ -593,6 +623,8 @@ function collectStats() {
     [0.5, 0.25],
     [0.5, 0.5],
     [0.5, 0.75],
+    [0.25, 0.5],
+    [0.75, 0.5],
   ] as const
 
   let covered = true
@@ -769,6 +801,7 @@ function resetHeights() {
   maxDomNodeCount.value = 0
   maxMarkdownSlotCount.value = 0
   maxExpectedMarkdownSlotCeiling.value = 0
+  maxExpectedDomNodeCeiling.value = 0
   scrollCompensationCount.value = 0
   scheduleStats()
 }
@@ -795,7 +828,9 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
     maxDomNodeCount: maxDomNodeCount.value,
     maxMarkdownSlotCount: maxMarkdownSlotCount.value,
     expectedMarkdownSlotCeiling: expectedMarkdownSlotCeiling.value,
+    expectedDomNodeCeiling: expectedDomNodeCeiling.value,
     maxExpectedMarkdownSlotCeiling: maxExpectedMarkdownSlotCeiling.value || expectedMarkdownSlotCeiling.value,
+    maxExpectedDomNodeCeiling: maxExpectedDomNodeCeiling.value || expectedDomNodeCeiling.value,
     blankFrameCount: blankFrameCount.value,
     clippedMessageCount: clippedMessageCount.value,
     heightDriftMessageCount: heightDriftMessageCount.value,
@@ -957,6 +992,7 @@ onBeforeUnmount(() => {
       <span>maxLiveNodes: {{ maxLiveNodes }}</span>
       <span>settled events: {{ settledEvents }}</span>
       <span data-testid="slot-ceiling">slot ceiling: {{ expectedMarkdownSlotCeiling }}</span>
+      <span data-testid="dom-ceiling">dom ceiling: {{ expectedDomNodeCeiling }}</span>
       <span>max slot ceiling: {{ maxExpectedMarkdownSlotCeiling }}</span>
       <span>clipped: {{ clippedMessageCount }}</span>
       <span>height drift items: {{ heightDriftMessageCount }}</span>

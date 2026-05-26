@@ -2125,6 +2125,77 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('primes the virtual window before scrollToNode to avoid spacer-only blank frames', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    const nodes = Array.from({ length: 20 }, (_, index) => createParagraph(index + 1))
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes,
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        maxLiveNodes: 4,
+        liveNodeBuffer: 1,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'scroll-to-node-prime',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    handle.scrollToNode(18)
+    await nextTick()
+
+    const metrics = handle.getVirtualMetrics()
+    expect(metrics.liveRange.start).toBeLessThanOrEqual(18)
+    expect(metrics.liveRange.end).toBeGreaterThan(18)
+
+    wrapper.unmount()
+  })
+
+  it('primes the virtual window before restoring a node anchor', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: Array.from({ length: 20 }, (_, index) => createParagraph(index + 1)),
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        maxLiveNodes: 4,
+        liveNodeBuffer: 1,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'restore-anchor-prime',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    handle.restoreVirtualState({
+      sessionKey: 'restore-anchor-prime',
+      anchor: { type: 'node', nodeIndex: 17, offsetWithinNodePx: 0 },
+      metrics: handle.getVirtualMetrics(),
+      width: 400,
+    })
+
+    await nextTick()
+
+    const metrics = handle.getVirtualMetrics()
+    expect(metrics.liveRange.start).toBeLessThanOrEqual(17)
+    expect(metrics.liveRange.end).toBeGreaterThan(17)
+
+    wrapper.unmount()
+  })
+
   it('captures renderer-bottom anchor even when message chrome exists below the renderer', async () => {
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
     const scrollRoot = document.createElement('div')
@@ -2302,6 +2373,8 @@ describe('node renderer virtual-scroll coordination', () => {
       width: 0,
     })
 
+    await nextTick()
+
     expect(scrollRoot.scrollTop).toBe(800)
 
     for (const el of getRootNodeContentElements(wrapper.element))
@@ -2362,6 +2435,8 @@ describe('node renderer virtual-scroll coordination', () => {
       width: 0,
     })
 
+    await nextTick()
+
     expect(scrollRoot.scrollTop).toBe(800)
 
     scrollHeight = 1400
@@ -2418,6 +2493,8 @@ describe('node renderer virtual-scroll coordination', () => {
       metrics: handle.getVirtualMetrics(),
       width: 0,
     })
+
+    await nextTick()
 
     expect(scrollRoot.scrollTop).toBe(800)
 
