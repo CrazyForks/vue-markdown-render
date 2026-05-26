@@ -6,6 +6,7 @@ export interface ScrollListenerOptions {
   scrollRootElement: Ref<HTMLElement | null>
   resolveScrollContainer: (node?: HTMLElement | null) => HTMLElement | null
   scheduleFocusSync: (options?: { immediate?: boolean }) => void
+  onScroll?: () => void
 }
 
 export interface ScrollListener {
@@ -22,6 +23,7 @@ export function useScrollListener(
     scrollRootElement,
     resolveScrollContainer,
     scheduleFocusSync,
+    onScroll,
   } = options
 
   let detachScrollHandler: (() => void) | null = null
@@ -46,7 +48,10 @@ export function useScrollListener(
 
     cleanupScrollListener()
 
-    const handler = () => scheduleFocusSync()
+    const handler = () => {
+      onScroll?.()
+      scheduleFocusSync()
+    }
 
     root.addEventListener('scroll', handler, { passive: true })
     scrollRootElement.value = root

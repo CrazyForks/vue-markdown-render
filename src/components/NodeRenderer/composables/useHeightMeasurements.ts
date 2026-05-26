@@ -129,17 +129,50 @@ export function useHeightMeasurements(
     heightKnownTree.value = countTree
   }
 
-  function recordNodeHeight(index: number, height: number, recordOptions: { allowShrink?: boolean } = {}) {
+  function recomputeHeightStats() {
+    let total = 0
+    let count = 0
+
+    for (const [rawIndex, rawHeight] of Object.entries(nodeHeights)) {
+      const index = Number(rawIndex)
+      const height = Number(rawHeight)
+
+      if (
+        !Number.isFinite(index)
+        || index < 0
+        || !Number.isFinite(height)
+        || height <= 0
+      ) {
+        delete nodeHeights[index]
+        continue
+      }
+
+      total += height
+      count++
+    }
+
+    heightStats.total = total
+    heightStats.count = count
+  }
+
+  function recordNodeHeightInternal(
+    index: number,
+    height: number,
+    recordOptions: {
+      allowShrink?: boolean
+      notify?: boolean
+    } = {},
+  ) {
     if (!Number.isFinite(height) || height <= 0)
-      return
+      return false
 
     const previous = nodeHeights[index]
     if (previous) {
       if (recordOptions.allowShrink === false && height < previous)
-        return
+        return false
 
       if (Math.abs(height - previous) <= 1)
-        return
+        return false
     }
 
     nodeHeights[index] = height
@@ -170,7 +203,17 @@ export function useHeightMeasurements(
       }
     }
 
-    options.onHeightRecorded?.()
+    if (recordOptions.notify !== false)
+      options.onHeightRecorded?.()
+
+    return true
+  }
+
+  function recordNodeHeight(index: number, height: number, recordOptions: { allowShrink?: boolean } = {}) {
+    recordNodeHeightInternal(index, height, {
+      ...recordOptions,
+      notify: true,
+    })
   }
 
   function exportHeightCache(): MarkstreamHeightCache {
@@ -187,19 +230,42 @@ export function useHeightMeasurements(
     if (!Array.isArray(cache))
       return
 
-    const previousTreeSize = heightTreeSize.value
+    const targetTreeSize = heightTreeSize.value
+    let changed = false
+
     if (importOptions.mode !== 'merge') {
-      resetHeightMeasurements()
-      if (previousTreeSize > 0)
-        rebuildHeightTrees(previousTreeSize)
+      for (const key of Object.keys(nodeHeights))
+        delete nodeHeights[Number(key)]
+      changed = true
     }
 
     for (const entry of cache) {
       const index = Number(entry.index)
+      const height = Number(entry.height)
+
       if (!Number.isInteger(index) || index < 0)
         continue
-      recordNodeHeight(index, entry.height)
+
+      if (!Number.isFinite(height) || height <= 0)
+        continue
+
+      const previous = nodeHeights[index]
+      if (previous && Math.abs(previous - height) <= 1)
+        continue
+
+      nodeHeights[index] = height
+      changed = true
     }
+
+    if (!changed)
+      return
+
+    recomputeHeightStats()
+
+    if (targetTreeSize > 0)
+      rebuildHeightTrees(targetTreeSize)
+
+    options.onHeightRecorded?.()
   }
 
   const averageNodeHeight = computed(() => {

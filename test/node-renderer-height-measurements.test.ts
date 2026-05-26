@@ -215,4 +215,21 @@ describe('useHeightMeasurements', () => {
     expect(restored.heightStats.count).toBe(2)
     expect(restored.fenwickRangeSum(restored.heightSumTree.value, 0, 3)).toBe(60)
   })
+
+  it('imports height cache in one notification batch', () => {
+    const onHeightRecorded = vi.fn()
+    const h = useHeightMeasurements({ onHeightRecorded })
+
+    h.rebuildHeightTrees(4)
+    h.importHeightCache([
+      { index: 0, height: 20 },
+      { index: 1, height: 40 },
+      { index: 2, height: 60 },
+    ])
+
+    expect(h.heightStats.total).toBe(120)
+    expect(h.heightStats.count).toBe(3)
+    expect(h.fenwickRangeSum(h.heightSumTree.value, 0, 4)).toBe(120)
+    expect(onHeightRecorded).toHaveBeenCalledTimes(1)
+  })
 })

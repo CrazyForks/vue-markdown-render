@@ -110,12 +110,17 @@ const content = ref('')
 const sourceDone = ref(false)
 const revision = ref(0)
 const pendingTools = ref(false)
+const theme = ref('light')
+const density = ref('comfortable')
+const fontScale = ref(1)
+const codeBlockLineHeight = ref(20)
 
 const virtualScroll = computed<MarkstreamVirtualScrollOptions>(() => ({
   enabled: true,
   sessionKey: `thread-1:message-1:${revision.value}`,
   scrollRoot: () => scrollRoot.value,
   restoreState: savedState.value,
+  measurementKey: `${theme.value}:${density.value}:${fontScale.value}:${codeBlockLineHeight.value}`,
   settleMode: 'manual',
   settledToken: sourceDone.value && !pendingTools.value,
   emitIntervalMs: 32,

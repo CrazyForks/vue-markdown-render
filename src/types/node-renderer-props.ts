@@ -86,6 +86,7 @@ export interface MarkstreamVirtualState {
   metrics: MarkstreamVirtualMetrics
   width: number
   contentHash?: string
+  measurementKey?: string
   heightCache?: MarkstreamHeightCache
 }
 
@@ -101,6 +102,11 @@ export interface MarkstreamVirtualScrollOptions {
   restoreState?: MarkstreamVirtualState | null
   heightCache?: MarkstreamHeightCache | null
   heightCacheWidth?: number
+  /**
+   * Extra cache invalidation key for layout-affecting host state:
+   * theme, font, density, custom component style revision, Monaco line height, etc.
+   */
+  measurementKey?: string | number
   settleMode?: 'auto' | 'manual'
   settledToken?: string | number | boolean
   emitIntervalMs?: number

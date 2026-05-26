@@ -16,6 +16,7 @@ function createHarness(options: {
   isClient?: boolean
   virtualized?: boolean
   root?: HTMLElement | null
+  onScroll?: () => void
 } = {}) {
   const root = ref<HTMLElement | null>(
     options.root === undefined ? createRoot() : options.root,
@@ -31,6 +32,7 @@ function createHarness(options: {
     scrollRootElement,
     resolveScrollContainer,
     scheduleFocusSync,
+    onScroll: options.onScroll,
   })
 
   return {
@@ -100,6 +102,21 @@ describe('useScrollListener', () => {
 
     expect(h.scheduleFocusSync).toHaveBeenCalledTimes(1)
     expect(h.scheduleFocusSync).toHaveBeenCalledWith()
+  })
+
+  it('runs the external scroll hook before scheduling focus sync', () => {
+    const calls: string[] = []
+    const h = createHarness({
+      onScroll: () => calls.push('hook'),
+    })
+    h.scheduleFocusSync.mockImplementation(() => {
+      calls.push('focus')
+    })
+
+    h.listener.setupScrollListener()
+    h.root.value!.dispatchEvent(new Event('scroll'))
+
+    expect(calls).toEqual(['hook', 'focus'])
   })
 
   it('does not attach a duplicate listener for the same root', () => {

@@ -434,6 +434,8 @@ const sortedNodeSlots = computed(() => {
   return Array.from(nodeSlotElements.entries()).sort((a, b) => a[0] - b[0])
 })
 const scrollRootElement = ref<HTMLElement | null>(null)
+const activeVirtualBottomAnchor = ref<Extract<MarkstreamVirtualAnchor, { type: 'bottom' }> | null>(null)
+let virtualBottomRestoreRaf: number | null = null
 const {
   activeRestoreAnchor,
   getRelativeScrollTopWithinContainer,
@@ -480,6 +482,8 @@ const {
   onHeightRecorded: () => {
     if (activeRestoreAnchor.value)
       scheduleRestoreReconcile()
+    if (activeVirtualBottomAnchor.value)
+      scheduleVirtualBottomRestoreReconcile()
     scheduleVirtualMetricsEmit('node-resize')
   },
 })
@@ -681,6 +685,7 @@ const {
   scrollRootElement,
   resolveScrollContainer,
   scheduleFocusSync,
+  onScroll: handleVirtualScrollRootScroll,
 })
 
 function syncFocusToScroll(force = false) {
@@ -1196,7 +1201,18 @@ const localNodeLifecycle: MarkstreamNodeLifecycle = {
     const index = resolveLifecycleNodeIndex(indexKey)
     if (index == null)
       return
-    recordNodeHeight(index, height)
+
+    const currentEl = nodeContentElements.get(index)
+    if (!currentEl)
+      return
+
+    const measuredHeight = Number(height)
+    const wrapperHeight = currentEl.offsetHeight
+    const nextHeight = Number.isFinite(measuredHeight) && measuredHeight > 0
+      ? Math.max(measuredHeight, wrapperHeight || 0)
+      : wrapperHeight
+
+    recordNodeHeight(index, nextHeight)
   },
   markPending(indexKey) {
     if (!virtualScrollEnabled.value)
@@ -1228,6 +1244,7 @@ const localNodeLifecycle: MarkstreamNodeLifecycle = {
 const providedNodeLifecycle: MarkstreamNodeLifecycle = {
   reportHeight(indexKey, height) {
     localNodeLifecycle.reportHeight(indexKey, height)
+    parentNodeLifecycle?.reportHeight(indexKey, height)
   },
   markPending(indexKey) {
     localNodeLifecycle.markPending(indexKey)
@@ -1244,6 +1261,11 @@ provide('markstreamNodeLifecycle', providedNodeLifecycle)
 function getVirtualSessionKey() {
   return props.virtualScroll?.sessionKey
     ?? String(props.indexKey ?? props.customId ?? instanceMsgId)
+}
+
+function getVirtualMeasurementKey() {
+  const key = props.virtualScroll?.measurementKey
+  return key == null ? '' : String(key)
 }
 
 function getCurrentVirtualWidth() {
@@ -1490,6 +1512,7 @@ function captureVirtualStateFromMetrics(
     metrics,
     width: metrics.width,
     contentHash: getVirtualContentHash(),
+    measurementKey: getVirtualMeasurementKey() || undefined,
     heightCache: heightCache.length ? heightCache : undefined,
   }
 }
@@ -1541,6 +1564,12 @@ const virtualBottomRestoreTimers: number[] = []
 function clearVirtualBottomRestoreTimers() {
   if (!isClient)
     return
+
+  if (virtualBottomRestoreRaf != null) {
+    cancelFrame?.(virtualBottomRestoreRaf)
+    virtualBottomRestoreRaf = null
+  }
+
   while (virtualBottomRestoreTimers.length) {
     const timer = virtualBottomRestoreTimers.pop()
     if (timer != null)
@@ -1548,8 +1577,56 @@ function clearVirtualBottomRestoreTimers() {
   }
 }
 
+function clearActiveVirtualBottomAnchor() {
+  activeVirtualBottomAnchor.value = null
+  clearVirtualBottomRestoreTimers()
+}
+
+function scheduleVirtualBottomRestoreReconcile() {
+  if (!activeVirtualBottomAnchor.value || !isClient)
+    return
+
+  if (virtualBottomRestoreRaf != null)
+    return
+
+  const run = () => {
+    virtualBottomRestoreRaf = null
+
+    const anchor = activeVirtualBottomAnchor.value
+    if (anchor)
+      applyBottomVirtualAnchor(anchor)
+  }
+
+  virtualBottomRestoreRaf = requestFrame
+    ? requestFrame(run)
+    : null
+
+  if (virtualBottomRestoreRaf == null)
+    run()
+}
+
+function handleVirtualScrollRootScroll() {
+  const anchor = activeVirtualBottomAnchor.value
+  if (!anchor)
+    return
+
+  const box = getScrollBox()
+  if (!box)
+    return
+
+  const distanceFromBottomPx = Math.max(
+    0,
+    box.scrollHeight - box.scrollTop - box.clientHeight,
+  )
+
+  if (Math.abs(distanceFromBottomPx - anchor.distanceFromBottomPx) > 32)
+    clearActiveVirtualBottomAnchor()
+}
+
 function restoreVirtualAnchor(anchor: MarkstreamVirtualAnchor) {
   if (anchor.type === 'node') {
+    clearActiveVirtualBottomAnchor()
+
     restoreAnchor({
       nodeIndex: anchor.nodeIndex,
       offsetWithinNodePx: anchor.offsetWithinNodePx,
@@ -1559,7 +1636,9 @@ function restoreVirtualAnchor(anchor: MarkstreamVirtualAnchor) {
 
   clearRestoreReconcile()
   activeRestoreAnchor.value = null
+  activeVirtualBottomAnchor.value = anchor
   clearVirtualBottomRestoreTimers()
+
   applyBottomVirtualAnchor(anchor)
 
   if (!isClient)
@@ -1567,7 +1646,9 @@ function restoreVirtualAnchor(anchor: MarkstreamVirtualAnchor) {
 
   for (const delay of [0, 120, 280, 480]) {
     virtualBottomRestoreTimers.push(window.setTimeout(() => {
-      applyBottomVirtualAnchor(anchor)
+      const activeAnchor = activeVirtualBottomAnchor.value
+      if (activeAnchor)
+        applyBottomVirtualAnchor(activeAnchor)
     }, delay))
   }
 }
@@ -1612,6 +1693,9 @@ function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
   if (state.sessionKey !== getVirtualSessionKey())
     return false
 
+  if ((state.measurementKey ?? '') !== getVirtualMeasurementKey())
+    return false
+
   if (!canReuseHeightCacheForWidth(getVirtualStateSavedWidth(state)))
     return false
 
@@ -1643,6 +1727,7 @@ function getHeightCacheSignature(cache: MarkstreamHeightCache) {
 
   return [
     getVirtualSessionKey(),
+    getVirtualMeasurementKey(),
     parsedNodes.value.length,
     widthBucket,
     cache.length,
@@ -2326,6 +2411,9 @@ watch(
 watch(
   [() => parsedNodes.value.length, () => renderedCount.value],
   () => {
+    if (activeVirtualBottomAnchor.value)
+      scheduleVirtualBottomRestoreReconcile()
+
     scheduleVirtualMetricsEmit('content')
   },
   { flush: 'post', immediate: true },
@@ -2592,7 +2680,7 @@ function resetVirtualSessionRuntimeState() {
   bumpAsyncNodeVersion()
 
   clearRestoreReconcile()
-  clearVirtualBottomRestoreTimers()
+  clearActiveVirtualBottomAnchor()
 }
 
 watch(
@@ -2610,6 +2698,7 @@ watch(
     () => props.virtualScroll?.heightCache,
     () => props.virtualScroll?.heightCacheWidth,
     () => props.virtualScroll?.restoreState,
+    () => props.virtualScroll?.measurementKey,
     () => parsedNodes.value.length,
     () => getVirtualSessionKey(),
     experimentContainerWidth,
@@ -2624,6 +2713,7 @@ watch(
   [
     virtualScrollEnabled,
     () => props.virtualScroll?.restoreState,
+    () => props.virtualScroll?.measurementKey,
     () => parsedNodes.value.length,
     () => getVirtualSessionKey(),
     experimentContainerWidth,
@@ -2639,7 +2729,7 @@ watch(
 )
 
 watch(
-  [virtualScrollEnabled, experimentContainerWidth, () => props.virtualScroll?.restoreState],
+  [virtualScrollEnabled, experimentContainerWidth, () => props.virtualScroll?.restoreState, () => props.virtualScroll?.measurementKey],
   ([enabled]) => {
     if (!enabled)
       return
@@ -2840,7 +2930,7 @@ onBeforeUnmount(() => {
   clearPendingHeightMeasurements()
   cleanupExperimentResizeObserver()
   clearRestoreReconcile()
-  clearVirtualBottomRestoreTimers()
+  clearActiveVirtualBottomAnchor()
   clearVirtualMetricsSchedule()
   cleanupScrollListener()
   cancelScheduledFocusSync()
