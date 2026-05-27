@@ -22,6 +22,8 @@ interface Message {
 
 type ThreadId = 'thread-a' | 'thread-b'
 
+type LabProfile = 'smoke' | 'stress'
+
 type ProbeKind = 'content' | 'placeholder' | 'chrome' | 'empty-card' | 'blank'
 
 interface ProbeCounts {
@@ -164,6 +166,7 @@ declare global {
       toggleFontScale: () => void
       toggleSmallMessageCoordination: () => void
       toggleNarrowMode: () => void
+      toggleReverseFlexMode: () => void
       settleVisibleRenderers: () => Promise<MarkstreamVirtualMetrics[]>
       nextFrame: () => Promise<void>
       clearEvents: () => void
@@ -182,6 +185,7 @@ declare global {
         toggleFontScale: () => void
         toggleSmallMessageCoordination: () => void
         toggleNarrowMode: () => void
+        toggleReverseFlexMode: () => void
         settleVisibleRenderers: () => Promise<MarkstreamVirtualMetrics[]>
         resetHeights: () => void
       }
@@ -201,7 +205,37 @@ const overscanPx = ref(1400)
 const stressRunning = ref(false)
 const coordinateSmallMessages = ref(false)
 const narrowMode = ref(false)
+const reverseFlexMode = ref(false)
 const SCROLL_JITTER_BUDGET_PX = 32
+const USER_SCROLL_COMPENSATION_GUARD_MS = 180
+const PROGRAMMATIC_SCROLL_GUARD_MS = 160
+const RESTORE_TARGET_RELEASE_DELAY_MS = 1200
+
+function readLabProfile(): LabProfile {
+  if (typeof window === 'undefined')
+    return 'stress'
+
+  const raw = new URLSearchParams(window.location.search).get('profile')
+  return raw === 'smoke' ? 'smoke' : 'stress'
+}
+
+const labProfile = readLabProfile()
+
+const fixtureConfig = labProfile === 'smoke'
+  ? {
+      messageCount: 42,
+      hugeModulo: 9,
+      hugeOffset: 4,
+      hugeBlocks: 180,
+      lastHugeBlocks: 420,
+    }
+  : {
+      messageCount: 80,
+      hugeModulo: 9,
+      hugeOffset: 4,
+      hugeBlocks: 360,
+      lastHugeBlocks: 900,
+    }
 
 const itemHeights = reactive(new Map<string, ItemHeightRecord>())
 const virtualStates = reactive(new Map<string, MarkstreamVirtualState>())
@@ -216,6 +250,10 @@ const messageEls = new Map<string, HTMLElement>()
 const messageCardEls = new Map<string, HTMLElement>()
 const markdownHostEls = new Map<string, HTMLElement>()
 const rendererRefs = new Map<string, MarkstreamRendererHandle>()
+const threadRestoreTargetClearTimers = new Map<
+  ThreadId,
+  ReturnType<typeof setTimeout>
+>()
 
 const domNodeCount = ref(0)
 const messageDomCount = ref(0)
@@ -247,23 +285,89 @@ let streamingHeightChangeExpectedUntil = 0
 let lastObservedScrollTop = 0
 let expectedScrollTop: number | null = null
 let restoreAnchorTokenSeq = 0
+let lastUserScrollAt = 0
+let programmaticScrollGuardUntil = 0
+
+function nowMs() {
+  return typeof performance !== 'undefined'
+    ? performance.now()
+    : Date.now()
+}
+
+function markProgrammaticScroll(durationMs = PROGRAMMATIC_SCROLL_GUARD_MS) {
+  programmaticScrollGuardUntil = Math.max(
+    programmaticScrollGuardUntil,
+    nowMs() + durationMs,
+  )
+}
+
+function isProgrammaticScroll() {
+  return nowMs() <= programmaticScrollGuardUntil
+}
+
+function clearThreadRestoreTargetTimer(threadId: ThreadId) {
+  const timer = threadRestoreTargetClearTimers.get(threadId)
+  if (!timer)
+    return
+
+  clearTimeout(timer)
+  threadRestoreTargetClearTimers.delete(threadId)
+}
+
+function deferClearThreadRestoreTarget(
+  threadId: ThreadId,
+  delayMs = RESTORE_TARGET_RELEASE_DELAY_MS,
+) {
+  clearThreadRestoreTargetTimer(threadId)
+
+  const timer = setTimeout(() => {
+    threadRestoreTargetClearTimers.delete(threadId)
+    threadRestoreTargets.delete(threadId)
+  }, delayMs)
+
+  threadRestoreTargetClearTimers.set(threadId, timer)
+}
+
+function shouldRestoreOuterAnchorAfterHeightChange(anchor: OuterAnchor | null) {
+  if (!anchor)
+    return false
+
+  if (anchor.type === 'bottom')
+    return true
+
+  if (streamBottomPinned || streamTimer != null || isStreamingHeightChangeExpected())
+    return true
+
+  if (stressRunning.value)
+    return false
+
+  return nowMs() - lastUserScrollAt > USER_SCROLL_COMPENSATION_GUARD_MS
+}
+
+function markThreadRestoreConsumedIfNeeded(
+  message: Message,
+  metrics: MarkstreamVirtualMetrics,
+) {
+  const key = messageKey(message)
+  const target = threadRestoreTargets.get(message.threadId)
+
+  if (!target || target.messageKey !== key)
+    return
+
+  if (metrics.reason === 'restore' || metrics.stable || metrics.phase === 'final')
+    deferClearThreadRestoreTarget(message.threadId)
+}
 
 function readRootScrollTop() {
   return scrollRoot.value?.scrollTop ?? scrollTop.value
 }
 
 function markStreamingHeightChangeExpected(durationMs = 8000) {
-  const now = typeof performance !== 'undefined'
-    ? performance.now()
-    : Date.now()
-  streamingHeightChangeExpectedUntil = Math.max(streamingHeightChangeExpectedUntil, now + durationMs)
+  streamingHeightChangeExpectedUntil = Math.max(streamingHeightChangeExpectedUntil, nowMs() + durationMs)
 }
 
 function isStreamingHeightChangeExpected() {
-  const now = typeof performance !== 'undefined'
-    ? performance.now()
-    : Date.now()
-  return now <= streamingHeightChangeExpectedUntil
+  return nowMs() <= streamingHeightChangeExpectedUntil
 }
 
 function syncScrollStateFromRoot(
@@ -341,10 +445,14 @@ function makeMarkdown(seed: string, blocks: number) {
 
 function makeMessages(threadId: ThreadId): Message[] {
   const prefix = threadId === 'thread-a' ? 'A' : 'B'
+  const lastIndex = fixtureConfig.messageCount - 1
 
-  return Array.from({ length: 80 }, (_, index) => {
-    const huge = index % 9 === 4 || index === 79
-    const blocks = huge ? (index === 79 ? 900 : 360) : 6 + (index % 5)
+  return Array.from({ length: fixtureConfig.messageCount }, (_, index) => {
+    const huge = index % fixtureConfig.hugeModulo === fixtureConfig.hugeOffset
+      || index === lastIndex
+    const blocks = huge
+      ? (index === lastIndex ? fixtureConfig.lastHugeBlocks : fixtureConfig.hugeBlocks)
+      : 6 + (index % 5)
 
     return {
       threadId,
@@ -632,6 +740,7 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   const previous = getCachedItemHeight(key)
 
   lastHeightEvent.value = metrics
+  markThreadRestoreConsumedIfNeeded(message, metrics)
 
   if (coordinated && measuredContentHeight > 0) {
     const drift = Math.abs(measuredContentHeight - logicalContentHeight)
@@ -646,8 +755,15 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
 
   if (previous == null || Math.abs(previous - nextHeight) > 1) {
     setItemHeight(key, nextHeight)
-    if (!stressRunning.value)
-      void restoreOuterAnchor(outerAnchor, { immediate: true })
+
+    if (shouldRestoreOuterAnchorAfterHeightChange(outerAnchor)) {
+      void restoreOuterAnchor(outerAnchor, {
+        immediate: true,
+        expectedJump: outerAnchor?.type === 'bottom'
+          || streamTimer != null
+          || isStreamingHeightChangeExpected(),
+      })
+    }
   }
 
   scheduleStats()
@@ -657,7 +773,9 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
       : previous == null
         ? 0
         : Math.abs(previous - nextHeight),
-    expectedJump: outerAnchor?.type === 'bottom' || stressRunning.value || streamTimer != null || isStreamingHeightChangeExpected()
+    expectedJump: outerAnchor?.type === 'bottom'
+      || streamTimer != null
+      || isStreamingHeightChangeExpected()
       ? true
       : undefined,
   })
@@ -741,6 +859,8 @@ function markThreadRestoreTarget(threadId: ThreadId, anchor: OuterAnchor | null)
   if (!key)
     return
 
+  clearThreadRestoreTargetTimer(threadId)
+
   threadRestoreTargets.set(threadId, {
     messageKey: key,
     token: ++restoreAnchorTokenSeq,
@@ -760,11 +880,14 @@ function applyOuterScrollTop(value: number) {
   const next = clampOuterScrollTop(value)
 
   scrollTop.value = next
+  markProgrammaticScroll()
 
   const root = scrollRoot.value
   if (root) {
-    if (Math.abs(root.scrollTop - next) > 1)
+    if (Math.abs(root.scrollTop - next) > 1) {
+      markProgrammaticScroll()
       root.scrollTop = next
+    }
 
     scrollTop.value = root.scrollTop
   }
@@ -1028,7 +1151,12 @@ function onScroll() {
   if (!scrollRoot.value)
     return
 
+  const programmatic = isProgrammaticScroll()
+
   syncScrollStateFromRoot({ updateExpected: true })
+
+  if (!programmatic)
+    lastUserScrollAt = nowMs()
 
   if (streamBottomPinned && !streamTimer && getCurrentDistanceFromBottom() > 64)
     streamBottomPinned = false
@@ -1341,7 +1469,7 @@ function collectStats(options: CollectStatsOptions = {}) {
       blankProbeCount++
   }
 
-  if (heightChanged)
+  if (heightChanged && shouldRestoreOuterAnchorAfterHeightChange(outerAnchor))
     void restoreOuterAnchor(outerAnchor, { immediate: true })
 
   const probeCounts = totalHeight.value > currentViewportHeight
@@ -1516,6 +1644,7 @@ async function switchThread(threadId: ThreadId) {
     if (!root)
       return
 
+    markProgrammaticScroll()
     root.scrollTop = scrollTop.value
     await stabilizeThreadRestore(targetAnchor, savedScrollTop)
 
@@ -1539,13 +1668,14 @@ async function switchThread(threadId: ThreadId) {
     scheduleVisibleDomReconcile()
   }
   finally {
-    threadRestoreTargets.delete(threadId)
+    deferClearThreadRestoreTarget(threadId)
   }
 }
 
 function jumpToTop() {
   if (!scrollRoot.value)
     return
+  markProgrammaticScroll()
   scrollRoot.value.scrollTop = 0
   onScroll()
 }
@@ -1553,6 +1683,7 @@ function jumpToTop() {
 function jumpToMiddle() {
   if (!scrollRoot.value)
     return
+  markProgrammaticScroll()
   scrollRoot.value.scrollTop = Math.max(0, totalHeight.value / 2 - viewportHeight.value / 2)
   onScroll()
 }
@@ -1560,6 +1691,7 @@ function jumpToMiddle() {
 function jumpToBottom() {
   if (!scrollRoot.value)
     return
+  markProgrammaticScroll()
   scrollRoot.value.scrollTop = Math.max(0, totalHeight.value - viewportHeight.value)
   onScroll()
 }
@@ -1602,6 +1734,12 @@ function toggleNarrowMode() {
   })
 }
 
+function toggleReverseFlexMode() {
+  void mutateLayoutWithAnchor(() => {
+    reverseFlexMode.value = !reverseFlexMode.value
+  })
+}
+
 function startStressScroll() {
   if (stressRunning.value)
     return
@@ -1620,6 +1758,7 @@ function startStressScroll() {
     const maxStep = Math.max(600, viewportHeight.value * 1.5)
     const delta = Math.max(-maxStep, Math.min(maxStep, target - scrollRoot.value.scrollTop))
 
+    markProgrammaticScroll()
     scrollRoot.value.scrollTop += delta
     onScroll()
 
@@ -1926,6 +2065,7 @@ function exposeLabApi() {
     toggleFontScale,
     toggleSmallMessageCoordination,
     toggleNarrowMode,
+    toggleReverseFlexMode,
     settleVisibleRenderers,
     nextFrame: waitFrame,
     clearEvents: clearLabEvents,
@@ -1945,6 +2085,7 @@ function exposeLabApi() {
       toggleFontScale,
       toggleSmallMessageCoordination,
       toggleNarrowMode,
+      toggleReverseFlexMode,
       settleVisibleRenderers,
       resetHeights,
     },
@@ -1979,6 +2120,10 @@ onBeforeUnmount(() => {
   saveThreadScroll()
   stopStressScroll()
   streamBottomPinned = false
+
+  for (const timer of threadRestoreTargetClearTimers.values())
+    clearTimeout(timer)
+  threadRestoreTargetClearTimers.clear()
 
   if (typeof window !== 'undefined')
     delete window.__markstreamVirtualScrollLab
@@ -2171,6 +2316,7 @@ onBeforeUnmount(() => {
       ref="scrollRoot"
       data-testid="virtual-scroll-root"
       class="scroller"
+      :class="{ 'reverse-flex-mode': reverseFlexMode }"
       @scroll.passive="onScroll"
     >
       <div
@@ -2374,6 +2520,15 @@ button:hover {
   overflow: auto;
   contain: strict;
   position: relative;
+}
+
+.scroller.reverse-flex-mode {
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.scroller.reverse-flex-mode .virtual-canvas {
+  flex: 0 0 auto;
 }
 
 .virtual-scroll-page.narrow .scroller {

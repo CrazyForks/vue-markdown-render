@@ -255,7 +255,9 @@ async function run() {
       process.stderr.write(`[browser:pageerror] ${error.stack || error.message}\n`)
     })
 
-    await page.goto(`http://${host}:${port}/virtual-scroll`, {
+    const profile = stressMode ? 'stress' : 'smoke'
+
+    await page.goto(`http://${host}:${port}/virtual-scroll?profile=${profile}`, {
       waitUntil: 'networkidle',
       timeout: 60000,
     })
@@ -332,10 +334,41 @@ async function run() {
         await api.settleVisibleRenderers()
         const final = await waitHealthy()
 
-        return { before, restored, final }
+        api.clearEvents()
+        api.toggleReverseFlexMode()
+        await api.nextFrame()
+        await api.scrollToRatio(1)
+
+        const reverseBefore = api.read()
+
+        await api.switchThread(reverseBefore.threadId === 'thread-a' ? 'thread-b' : 'thread-a')
+        await api.nextFrame()
+        await api.switchThread(reverseBefore.threadId)
+
+        for (let i = 0; i < 60; i++)
+          await api.nextFrame()
+
+        const reverseAfter = api.read()
+        api.toggleReverseFlexMode()
+        await api.nextFrame()
+
+        return {
+          before,
+          restored,
+          final,
+          reverseFlexProbe: {
+            before: reverseBefore,
+            after: reverseAfter,
+          },
+        }
       })
 
       assertThreadRestore('smoke thread restore', smoke.before, smoke.restored)
+      assertThreadRestore(
+        'reverse flex thread restore',
+        smoke.reverseFlexProbe.before,
+        smoke.reverseFlexProbe.after,
+      )
 
       assert(
         smoke.final.health.layoutIntegrityOk
