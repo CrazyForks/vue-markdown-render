@@ -1615,6 +1615,82 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('emits cache-only virtual state for offscreen renderers without anchor-change', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const scrollRoot = document.createElement('div')
+    document.body.appendChild(scrollRoot)
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => 1800,
+    })
+
+    scrollRoot.scrollTop = 800
+
+    vi.spyOn(scrollRoot, 'getBoundingClientRect').mockReturnValue(makeDomRect(0, 200))
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'offscreen-cache-only-state',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    vi.spyOn(wrapper.element, 'getBoundingClientRect').mockReturnValue(makeDomRect(1200, 160))
+
+    await flushAll()
+
+    const anchorChangeCount = wrapper.emitted('anchor-change')?.length ?? 0
+    const contentEls = getRootNodeContentElements(wrapper.element)
+    platform.heights.set(contentEls[0]!, 70)
+    platform.heights.set(contentEls[1]!, 90)
+
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+
+    await (wrapper.vm as any).forceMeasure('manual')
+    platform.flushFrames()
+    await nextTick()
+
+    const state = wrapper.emitted('virtual-state-change')?.at(-1)?.[0] as any
+    expect(state).toMatchObject({
+      sessionKey: 'offscreen-cache-only-state',
+      anchorCaptured: false,
+      heightCache: [
+        { index: 0, height: 70 },
+        { index: 1, height: 90 },
+      ],
+    })
+    expect(state.anchor).toBeUndefined()
+    expect(wrapper.emitted('anchor-change')?.length ?? 0).toBe(anchorChangeCount)
+    expect((wrapper.vm as any).captureVirtualState()).toMatchObject({
+      anchorCaptured: false,
+      heightCache: [
+        { index: 0, height: 70 },
+        { index: 1, height: 90 },
+      ],
+    })
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
   it('does not emit final before deferred height settling timers finish', async () => {
     vi.useFakeTimers()
     let wrapper: ReturnType<typeof mount> | null = null
@@ -1981,6 +2057,76 @@ describe('node renderer virtual-scroll coordination', () => {
           restoreState: {
             sessionKey: 'cache-only-session',
             anchor: { type: 'bottom', distanceFromBottomPx: 0 },
+            metrics,
+            width: 400,
+            heightCache: seedCache,
+          },
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(scrollRoot.scrollTop).toBe(120)
+    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).toBe(800)
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
+  it('imports cache-only restoreState even when restoreAnchor is requested', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const seedCache = await captureSeedHeightCache(NodeRenderer)
+    const scrollRoot = document.createElement('div')
+    document.body.appendChild(scrollRoot)
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => 1000,
+    })
+
+    scrollRoot.scrollTop = 120
+
+    const metrics = {
+      sessionKey: 'cache-only-anchor-request',
+      phase: 'final',
+      nodeCount: 2,
+      liveRange: { start: 0, end: 2 },
+      renderedCount: 2,
+      measuredCount: 2,
+      estimatedCount: 0,
+      averageNodeHeight: 400,
+      topSpacerHeight: 0,
+      bottomSpacerHeight: 0,
+      visibleDomHeight: 800,
+      totalHeight: 800,
+      width: 400,
+      final: true,
+      stable: true,
+      confidence: 'final',
+      reason: 'manual',
+    } as const
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'cache-only-anchor-request',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          restoreAnchor: true,
+          restoreState: {
+            sessionKey: 'cache-only-anchor-request',
             metrics,
             width: 400,
             heightCache: seedCache,
@@ -3206,7 +3352,7 @@ describe('node renderer virtual-scroll coordination', () => {
       toJSON: () => ({}),
     } as DOMRect)
 
-    expect((wrapper.vm as any).captureVirtualState()?.anchor.type).not.toBe('bottom')
+    expect((wrapper.vm as any).captureVirtualState()?.anchor?.type).not.toBe('bottom')
 
     wrapper.unmount()
     scrollRoot.remove()

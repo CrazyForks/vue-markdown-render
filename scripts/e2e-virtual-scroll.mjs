@@ -124,6 +124,10 @@ function killProcessTree(child) {
 function resolveChromeLaunchOptions() {
   const candidates = [
     process.env.PLAYWRIGHT_CHROME_PATH,
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+    typeof chromium.executablePath === 'function'
+      ? chromium.executablePath()
+      : '',
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     '/Applications/Chromium.app/Contents/MacOS/Chromium',
     '/usr/bin/google-chrome',
@@ -136,6 +140,10 @@ function resolveChromeLaunchOptions() {
       return {
         executablePath: candidate,
         headless: true,
+        args: [
+          '--disable-dev-shm-usage',
+          '--no-sandbox',
+        ],
       }
     }
   }
@@ -143,6 +151,10 @@ function resolveChromeLaunchOptions() {
   return {
     channel: 'chrome',
     headless: true,
+    args: [
+      '--disable-dev-shm-usage',
+      '--no-sandbox',
+    ],
   }
 }
 
@@ -784,6 +796,42 @@ async function run() {
       && smallCoordinationAfter.health.maxObservedScrollJumpPx <= 32,
       'small-message virtual-scroll coordination caused blank frame, DOM budget, or jitter regression',
       smallCoordinationAfter,
+    )
+
+    const anchorPollutionProbe = await page.evaluate(async () => {
+      const api = window.__markstreamVirtualScrollLab
+
+      await api.scrollToRatio(0.73)
+      await api.nextFrame()
+      const before = api.read()
+
+      api.toggleDensity()
+      for (let i = 0; i < 30; i++)
+        await api.nextFrame()
+
+      const afterRelayout = api.read()
+
+      await api.switchThread(before.threadId === 'thread-a' ? 'thread-b' : 'thread-a')
+      for (let i = 0; i < 12; i++)
+        await api.nextFrame()
+
+      await api.switchThread(before.threadId)
+      for (let i = 0; i < 30; i++)
+        await api.nextFrame()
+
+      const restored = api.read()
+
+      return {
+        before,
+        afterRelayout,
+        restored,
+      }
+    })
+
+    assertThreadRestore(
+      'anchor pollution probe',
+      anchorPollutionProbe.before,
+      anchorPollutionProbe.restored,
     )
 
     process.stdout.write(`${JSON.stringify({

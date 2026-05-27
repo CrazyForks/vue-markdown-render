@@ -926,47 +926,78 @@ function onVirtualStateChange(message: Message, state: MarkstreamVirtualState) {
   virtualStates.set(key, mergeVirtualState(previous, state))
 }
 
+function canCarryStateIdentity(
+  previous: MarkstreamVirtualState | undefined,
+  next: MarkstreamVirtualState,
+) {
+  if (!previous)
+    return false
+
+  return previous.sessionKey === next.sessionKey
+    && (previous.threadKey ?? '') === (next.threadKey ?? '')
+    && (previous.measurementKey ?? '') === (next.measurementKey ?? '')
+    && (!previous.contentHash || !next.contentHash || previous.contentHash === next.contentHash)
+}
+
 function canCarryHeightCache(
   previous: MarkstreamVirtualState | undefined,
   next: MarkstreamVirtualState,
 ) {
-  if (!previous?.heightCache?.length)
-    return false
-
-  if (previous.sessionKey !== next.sessionKey)
-    return false
-
-  if ((previous.threadKey ?? '') !== (next.threadKey ?? ''))
-    return false
-
-  if ((previous.measurementKey ?? '') !== (next.measurementKey ?? ''))
-    return false
-
-  if (previous.contentHash && next.contentHash && previous.contentHash !== next.contentHash)
-    return false
-
-  return true
+  return Boolean(
+    previous?.heightCache?.length
+    && canCarryStateIdentity(previous, next),
+  )
 }
 
 function mergeVirtualState(
   previous: MarkstreamVirtualState | undefined,
   next: MarkstreamVirtualState,
 ): MarkstreamVirtualState {
-  if (next.heightCache?.length)
-    return next
-
-  if (!previous || !canCarryHeightCache(previous, next))
-    return next
-
-  const heightCache = previous.heightCache
+  const heightCache = next.heightCache?.length
+    ? next.heightCache
+    : canCarryHeightCache(previous, next)
+      ? previous!.heightCache
+      : undefined
+  const anchor = next.anchor
+    ?? (canCarryStateIdentity(previous, next) ? previous?.anchor : undefined)
 
   return {
     ...next,
-    heightCache,
-    width: previous.width || next.width,
-    contentHash: previous.contentHash ?? next.contentHash,
-    measurementKey: previous.measurementKey ?? next.measurementKey,
+    ...(anchor ? { anchor } : {}),
+    anchorCaptured: Boolean(next.anchor),
+    ...(heightCache?.length ? { heightCache } : {}),
+    width: next.width || previous?.width || 0,
+    contentHash: next.contentHash ?? previous?.contentHash,
+    measurementKey: next.measurementKey ?? previous?.measurementKey,
   }
+}
+
+function isCurrentOuterAnchorOwner(message: Message) {
+  const anchor = captureOuterAnchor()
+  if (!anchor)
+    return false
+
+  return resolveThreadAnchorMessageKey(message.threadId, anchor) === messageKey(message)
+}
+
+function onAnchorChange(message: Message, anchor: MarkstreamVirtualState['anchor']) {
+  if (!anchor)
+    return
+
+  const key = messageKey(message)
+
+  if (!isCurrentOuterAnchorOwner(message))
+    return
+
+  const previous = virtualStates.get(key)
+  if (!previous)
+    return
+
+  virtualStates.set(key, {
+    ...previous,
+    anchor,
+    anchorCaptured: true,
+  })
 }
 
 function onRenderSettled() {
@@ -2043,8 +2074,8 @@ onBeforeUnmount(() => {
                 :final="message.final"
                 :custom-id="message.id"
                 :index-key="messageKey(message)"
-                :max-live-nodes="message.huge ? maxLiveNodes : 0"
-                :live-node-buffer="48"
+                :max-live-nodes="isCoordinatedMessage(message) ? maxLiveNodes : 0"
+                :live-node-buffer="60"
                 :batch-rendering="true"
                 :initial-render-batch-size="40"
                 :render-batch-size="80"
@@ -2053,6 +2084,7 @@ onBeforeUnmount(() => {
                 :virtual-scroll="makeVirtualScrollOptions(message)"
                 @height-change="onHeightChange(message, $event)"
                 @virtual-state-change="onVirtualStateChange(message, $event)"
+                @anchor-change="onAnchorChange(message, $event)"
                 @render-settled="onRenderSettled"
               />
             </div>

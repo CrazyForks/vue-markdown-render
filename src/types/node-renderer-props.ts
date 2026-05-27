@@ -90,7 +90,17 @@ export interface MarkstreamVirtualMetrics {
 export interface MarkstreamVirtualState {
   sessionKey: string
   threadKey?: string
-  anchor: MarkstreamVirtualAnchor
+  /**
+   * Present only when this renderer is close enough to the scrollRoot viewport
+   * to own a restore anchor. Automatic height/cache state may omit it.
+   */
+  anchor?: MarkstreamVirtualAnchor
+  /**
+   * true means `anchor` was captured from this renderer's current visible or
+   * near-visible viewport area. false/undefined means the state is primarily
+   * for metrics and height cache.
+   */
+  anchorCaptured?: boolean
   metrics: MarkstreamVirtualMetrics
   width: number
   contentHash?: string
@@ -194,9 +204,8 @@ export interface MarkstreamRendererHandle {
       /**
        * Default: false.
        *
-       * Import compatible height cache by default. Set true only for the one
-       * renderer that owns the current outer-scroll anchor, otherwise multiple
-       * mounted MarkdownRender instances can fight over the same scroll root.
+       * Only works when state.anchor exists. Cache import still works without
+       * anchor.
        */
       restoreAnchor?: boolean
       restoreToken?: string | number | boolean

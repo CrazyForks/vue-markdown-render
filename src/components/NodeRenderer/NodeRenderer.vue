@@ -1742,6 +1742,21 @@ function getViewportBottomInRoot(box: NonNullable<ReturnType<typeof getScrollBox
     : box.root.getBoundingClientRect().bottom
 }
 
+function getVirtualViewportRect(box: NonNullable<ReturnType<typeof getScrollBox>>) {
+  if (box.isViewportRoot) {
+    return {
+      top: 0,
+      bottom: box.clientHeight,
+    }
+  }
+
+  const rect = box.root.getBoundingClientRect()
+  return {
+    top: rect.top,
+    bottom: rect.bottom,
+  }
+}
+
 function getRendererBottomDistanceFromViewport(
   box: NonNullable<ReturnType<typeof getScrollBox>>,
 ) {
@@ -1785,20 +1800,60 @@ function captureBottomVirtualAnchor(): MarkstreamVirtualAnchor | null {
   }
 }
 
-function captureVirtualAnchor(): MarkstreamVirtualAnchor | null {
+function isRendererNearVirtualViewport(extraMarginPx = 64) {
+  const box = getScrollBox()
+  const container = containerRef.value
+
+  if (!box || !container)
+    return false
+
+  const viewport = getVirtualViewportRect(box)
+  const rect = container.getBoundingClientRect()
+
+  return rect.bottom >= viewport.top - extraMarginPx
+    && rect.top <= viewport.bottom + extraMarginPx
+}
+
+function createFallbackNodeAnchor(): MarkstreamVirtualAnchor | null {
+  const total = parsedNodes.value.length
+
+  if (total <= 0)
+    return null
+
+  return {
+    type: 'node',
+    nodeIndex: clamp(focusIndex.value, 0, Math.max(0, total - 1)),
+    offsetWithinNodePx: 0,
+  }
+}
+
+function captureVirtualAnchor(
+  options: {
+    allowFallback?: boolean
+    requireViewport?: boolean
+  } = {},
+): MarkstreamVirtualAnchor | null {
+  const requireViewport = options.requireViewport !== false
+
+  if (requireViewport && !isRendererNearVirtualViewport())
+    return null
+
   const bottomAnchor = captureBottomVirtualAnchor()
   if (bottomAnchor)
     return bottomAnchor
 
   const anchor = captureRestoreAnchor()
-  if (!anchor)
-    return null
-
-  return {
-    type: 'node',
-    nodeIndex: anchor.nodeIndex,
-    offsetWithinNodePx: anchor.offsetWithinNodePx,
+  if (anchor) {
+    return {
+      type: 'node',
+      nodeIndex: anchor.nodeIndex,
+      offsetWithinNodePx: anchor.offsetWithinNodePx,
+    }
   }
+
+  return options.allowFallback === true
+    ? createFallbackNodeAnchor()
+    : null
 }
 
 function hashVirtualString(input: string) {
@@ -2000,31 +2055,34 @@ function captureVirtualStateFromMetrics(
   options: {
     includeHeightCache?: boolean
     includeContentHash?: boolean
+    allowAnchorFallback?: boolean
+    includeEmptyState?: boolean
   } = {},
 ): MarkstreamVirtualState | null {
-  let anchor = captureVirtualAnchor()
-
-  if (!anchor && parsedNodes.value.length > 0) {
-    anchor = {
-      type: 'node',
-      nodeIndex: clamp(focusIndex.value, 0, Math.max(0, parsedNodes.value.length - 1)),
-      offsetWithinNodePx: 0,
-    }
-  }
-
-  if (!anchor)
-    return null
-
   const includeHeightCache = options.includeHeightCache === true
   const includeContentHash = options.includeContentHash ?? includeHeightCache
   const heightCache = includeHeightCache
     ? exportVirtualHeightCache()
     : []
+  const anchor = captureVirtualAnchor({
+    allowFallback: options.allowAnchorFallback === true,
+    requireViewport: true,
+  })
+
+  if (!anchor && !heightCache.length && options.includeEmptyState !== true)
+    return null
 
   return {
     sessionKey: metrics.sessionKey,
     threadKey: metrics.threadKey,
-    anchor,
+    ...(anchor
+      ? {
+          anchor,
+          anchorCaptured: true,
+        }
+      : {
+          anchorCaptured: false,
+        }),
     metrics,
     width: metrics.width,
     contentHash: includeContentHash ? getVirtualContentHash() : undefined,
@@ -2036,6 +2094,9 @@ function captureVirtualStateFromMetrics(
 function captureVirtualState() {
   return captureVirtualStateFromMetrics(getVirtualMetrics('manual'), {
     includeHeightCache: true,
+    includeContentHash: true,
+    allowAnchorFallback: true,
+    includeEmptyState: true,
   })
 }
 
@@ -2391,9 +2452,11 @@ function getVirtualAnchorRestoreSignature(
   token: string,
 ) {
   const anchor = state.anchor
-  const anchorKey = anchor.type === 'bottom'
-    ? `bottom:${Math.round(anchor.distanceFromBottomPx)}`
-    : `node:${anchor.nodeIndex}:${Math.round(anchor.offsetWithinNodePx)}`
+  const anchorKey = !anchor
+    ? 'none'
+    : anchor.type === 'bottom'
+      ? `bottom:${Math.round(anchor.distanceFromBottomPx)}`
+      : `node:${anchor.nodeIndex}:${Math.round(anchor.offsetWithinNodePx)}`
 
   return [
     getVirtualThreadKey() ?? '',
@@ -2448,6 +2511,13 @@ function applyVirtualRestoreState(
     return false
 
   if (!options.restoreAnchor) {
+    if (importedCache)
+      scheduleVirtualMetricsEmit('restore')
+
+    return true
+  }
+
+  if (!state.anchor) {
     if (importedCache)
       scheduleVirtualMetricsEmit('restore')
 
@@ -2825,12 +2895,16 @@ function getVirtualAnchorEventKey(anchor: MarkstreamVirtualAnchor) {
 
 function getVirtualStateEventKey(state: MarkstreamVirtualState) {
   const metrics = state.metrics
+  const anchorKey = state.anchor
+    ? getVirtualAnchorEventKey(state.anchor)
+    : 'none'
 
   return [
     state.sessionKey,
     state.threadKey ?? '',
     getVirtualMeasurementKey(),
-    getVirtualAnchorEventKey(state.anchor),
+    anchorKey,
+    state.anchorCaptured ? 1 : 0,
     metrics.liveRange.start,
     metrics.liveRange.end,
     metrics.renderedCount,
@@ -2876,7 +2950,8 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
 
   if (state && (shouldEmitHeight || shouldEmitVirtualState(state, force))) {
     emitVirtualStateChange(state)
-    emitAnchorChange(state.anchor)
+    if (state.anchor)
+      emitAnchorChange(state.anchor)
     lastEmittedVirtualStateKey = getVirtualStateEventKey(state)
   }
 
