@@ -311,7 +311,7 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('does not under-report non-virtualized coordinated height before all nodes are measured', async () => {
+  it('does not under-report non-virtualized coordinated height against mounted DOM', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
     const wrapper = mount(NodeRenderer, {
@@ -365,7 +365,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await nextTick()
 
     const metrics = await (wrapper.vm as any).forceMeasure('manual')
-    expect(metrics.totalHeight).toBe(240)
+    expect(metrics.totalHeight).toBe(600)
 
     wrapper.unmount()
   })
@@ -415,7 +415,7 @@ describe('node renderer virtual-scroll coordination', () => {
     const first = await (wrapper.vm as any).forceMeasure('manual')
     expect(first.totalHeight).toBe(600)
 
-    staleDomHeight = 600
+    staleDomHeight = 240
     for (const el of contentEls)
       platform.heights.set(el, 80)
 
@@ -1683,6 +1683,44 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('caps exported virtual height cache payloads', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: Array.from({ length: 6 }, (_, index) => createParagraph(index + 1)),
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'height-cache-limit',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+          heightCacheLimit: 3,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const contentEls = getRootNodeContentElements(wrapper.element)
+    for (const [index, el] of contentEls.entries()) {
+      platform.heights.set(el, 40 + index)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+    }
+
+    platform.flushFrames()
+    await nextTick()
+    await (wrapper.vm as any).forceMeasure('manual')
+
+    const heightCache = (wrapper.vm as any).captureVirtualState()?.heightCache ?? []
+    expect(heightCache).toHaveLength(3)
+    expect(heightCache.every((entry: any) => entry.signature)).toBe(true)
+
+    wrapper.unmount()
+  })
+
   it('emits cache-only virtual state for offscreen renderers without anchor-change', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -2596,7 +2634,7 @@ describe('node renderer virtual-scroll coordination', () => {
     platform.flushFrames()
     await flushAll()
 
-    expect(scrollRoot.scrollTop).toBe(600)
+    expect(scrollRoot.scrollTop).toBe(800)
 
     wrapper.unmount()
     scrollRoot.remove()

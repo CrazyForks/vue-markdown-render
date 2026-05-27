@@ -1611,7 +1611,15 @@ function getVisibleDomHeight() {
   let total = 0
   for (const el of nodeContentElements.values())
     total += el?.offsetHeight ?? 0
-  return total || containerRef.value?.offsetHeight || 0
+
+  const spacerHeight = virtualizationEnabled.value
+    ? topSpacerHeight.value + bottomSpacerHeight.value
+    : 0
+
+  return Math.ceil(Math.max(
+    total + spacerHeight,
+    containerRef.value?.offsetHeight ?? 0,
+  ))
 }
 
 let imperativeVirtualSettleSessionKey: string | null = null
@@ -1768,10 +1776,10 @@ function getRendererLogicalHeight() {
   )
 
   if (total <= 0)
-    return domHeight
+    return Math.ceil(domHeight)
 
   if (virtualizationEnabled.value)
-    return estimatedHeight
+    return Math.max(1, Math.ceil(estimatedHeight))
 
   if (virtualScrollEnabled.value) {
     const hasModelHeight = estimatedHeight > 0
@@ -1779,19 +1787,25 @@ function getRendererLogicalHeight() {
       || getEstimatedNodeHeightCount() > 0
 
     if (!hasModelHeight)
-      return domHeight
+      return Math.ceil(domHeight)
 
     if (incrementalRenderingActive.value && renderedCount.value < total)
-      return estimatedHeight
+      return Math.max(1, Math.ceil(estimatedHeight))
 
-    const allNodesMeasured = total <= 0 || heightStats.count >= total
-    if (allNodesMeasured || isLayoutSettled())
-      return estimatedHeight
-
-    return Math.max(domHeight, estimatedHeight)
+    // In non-internal-virtualized mode the full renderer DOM is mounted, so
+    // outer virtualizers must never receive less than the actual DOM height.
+    return Math.max(
+      1,
+      Math.ceil(domHeight),
+      Math.ceil(estimatedHeight),
+    )
   }
 
-  return Math.max(domHeight, estimatedHeight)
+  return Math.max(
+    1,
+    Math.ceil(domHeight),
+    Math.ceil(estimatedHeight),
+  )
 }
 
 function getViewportBottomInRoot(box: NonNullable<ReturnType<typeof getScrollBox>>) {
@@ -2079,7 +2093,7 @@ function getVirtualContentHash() {
 }
 
 function exportVirtualHeightCache(): MarkstreamHeightCache {
-  return exportHeightCache()
+  const cache = exportHeightCache()
     .map((entry): MarkstreamHeightCache[number] | null => {
       const node = parsedNodes.value[entry.index] as any
       if (!node)
@@ -2092,6 +2106,60 @@ function exportVirtualHeightCache(): MarkstreamHeightCache {
       }
     })
     .filter((entry): entry is MarkstreamHeightCache[number] => Boolean(entry))
+
+  return limitVirtualHeightCache(cache)
+}
+
+function getVirtualHeightCacheLimit() {
+  const raw = Number(props.virtualScroll?.heightCacheLimit ?? 5000)
+
+  if (!Number.isFinite(raw) || raw <= 0)
+    return Number.POSITIVE_INFINITY
+
+  return Math.max(1, Math.trunc(raw))
+}
+
+function limitVirtualHeightCache(cache: MarkstreamHeightCache): MarkstreamHeightCache {
+  const limit = getVirtualHeightCacheLimit()
+
+  if (!Number.isFinite(limit) || cache.length <= limit)
+    return cache
+
+  const keep = new Map<number, MarkstreamHeightCache[number]>()
+  const add = (entry: MarkstreamHeightCache[number] | undefined) => {
+    if (!entry || keep.size >= limit)
+      return
+
+    keep.set(entry.index, entry)
+  }
+
+  const total = parsedNodes.value.length
+  const aroundStart = clamp(
+    liveRange.start - liveNodeBufferResolved.value * 2,
+    0,
+    total,
+  )
+  const aroundEnd = clamp(
+    liveRange.end + liveNodeBufferResolved.value * 2,
+    aroundStart,
+    total,
+  )
+
+  for (const entry of cache) {
+    if (entry.index >= aroundStart && entry.index < aroundEnd)
+      add(entry)
+  }
+
+  const step = Math.max(1, Math.ceil(cache.length / limit))
+  for (let i = 0; i < cache.length && keep.size < limit; i += step)
+    add(cache[i])
+
+  for (let i = cache.length - 1; i >= 0 && keep.size < limit; i -= step)
+    add(cache[i])
+
+  return Array.from(keep.values())
+    .sort((a, b) => a.index - b.index)
+    .slice(0, limit)
 }
 
 function isHeightCacheEntryCompatible(entry: MarkstreamHeightCache[number]) {

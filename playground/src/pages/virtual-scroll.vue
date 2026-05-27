@@ -145,6 +145,11 @@ interface ItemHeightRecord {
   measurementKey: string
 }
 
+interface ChromeHeightRecord {
+  height: number
+  measurementKey: string
+}
+
 interface StreamLastMessageOptions {
   blocks?: number
   initialChars?: number
@@ -202,6 +207,7 @@ const density = ref<'comfortable' | 'compact'>('comfortable')
 const fontScale = ref(1)
 const maxLiveNodes = ref(220)
 const overscanPx = ref(1400)
+const scrollVelocityPxPerFrame = ref(0)
 const stressRunning = ref(false)
 const coordinateSmallMessages = ref(false)
 const narrowMode = ref(false)
@@ -238,6 +244,7 @@ const fixtureConfig = labProfile === 'smoke'
     }
 
 const itemHeights = reactive(new Map<string, ItemHeightRecord>())
+const chromeHeights = reactive(new Map<string, ChromeHeightRecord>())
 const virtualStates = reactive(new Map<string, MarkstreamVirtualState>())
 const logicalHeightDrifts = reactive(new Map<string, number>())
 const threadScrollTops = reactive(new Map<ThreadId, number>())
@@ -287,12 +294,35 @@ let expectedScrollTop: number | null = null
 let restoreAnchorTokenSeq = 0
 let lastUserScrollAt = 0
 let programmaticScrollGuardUntil = 0
+let lastVelocitySampleTop = 0
+let lastVelocitySampleAt = 0
 
 function nowMs() {
   return typeof performance !== 'undefined'
     ? performance.now()
     : Date.now()
 }
+
+function updateScrollVelocity(currentTop: number) {
+  const at = nowMs()
+
+  if (lastVelocitySampleAt > 0) {
+    const dt = Math.max(16, at - lastVelocitySampleAt)
+    const pxPerFrame = Math.abs(currentTop - lastVelocitySampleTop) / dt * 16
+    scrollVelocityPxPerFrame.value = Math.min(4000, pxPerFrame)
+  }
+
+  lastVelocitySampleTop = currentTop
+  lastVelocitySampleAt = at
+}
+
+const dynamicOverscanPx = computed(() => {
+  return Math.ceil(Math.max(
+    overscanPx.value,
+    viewportHeight.value * 2.5,
+    Math.min(8000, scrollVelocityPxPerFrame.value * 2.5),
+  ))
+})
 
 function markProgrammaticScroll(durationMs = PROGRAMMATIC_SCROLL_GUARD_MS) {
   programmaticScrollGuardUntil = Math.max(
@@ -378,6 +408,7 @@ function syncScrollStateFromRoot(
   const current = readRootScrollTop()
 
   scrollTop.value = current
+  updateScrollVelocity(current)
   threadScrollTops.set(activeThreadId.value, current)
 
   if (options.updateExpected)
@@ -539,6 +570,17 @@ function getCachedItemHeight(key: string) {
   return record.height
 }
 
+function getCachedChromeHeight(key: string) {
+  const record = chromeHeights.get(key)
+  if (!record)
+    return null
+
+  if (record.measurementKey !== measurementKey.value)
+    return null
+
+  return record.height
+}
+
 function setItemHeight(key: string, height: number) {
   if (!Number.isFinite(height) || height <= 0)
     return
@@ -549,10 +591,25 @@ function setItemHeight(key: string, height: number) {
   })
 }
 
+function setChromeHeight(key: string, height: number) {
+  if (!Number.isFinite(height) || height <= 0)
+    return
+
+  chromeHeights.set(key, {
+    height: Math.ceil(height),
+    measurementKey: measurementKey.value,
+  })
+}
+
 function pruneStaleItemHeights() {
   for (const [key, record] of itemHeights) {
     if (record.measurementKey !== measurementKey.value)
       itemHeights.delete(key)
+  }
+
+  for (const [key, record] of chromeHeights) {
+    if (record.measurementKey !== measurementKey.value)
+      chromeHeights.delete(key)
   }
 }
 
@@ -669,10 +726,11 @@ function lowerBoundOffset(offset: number) {
 }
 
 const visibleRange = computed(() => {
-  const startOffset = Math.max(0, scrollTop.value - overscanPx.value)
+  const overscan = dynamicOverscanPx.value
+  const startOffset = Math.max(0, scrollTop.value - overscan)
   const endOffset = Math.min(
     totalHeight.value,
-    scrollTop.value + viewportHeight.value + overscanPx.value,
+    scrollTop.value + viewportHeight.value + overscan,
   )
 
   const start = lowerBoundOffset(startOffset)
@@ -1068,7 +1126,7 @@ function getMessageChromeHeight(key: string) {
   const meta = card?.querySelector<HTMLElement>(':scope > .message-meta')
 
   if (!article || !card || !markdownHost || !meta)
-    return 72
+    return getCachedChromeHeight(key) ?? 72
 
   const articleStyle = window.getComputedStyle(article)
   const cardStyle = window.getComputedStyle(card)
@@ -1082,10 +1140,13 @@ function getMessageChromeHeight(key: string) {
   )
   const metaMargin = readPx(metaStyle.marginTop) + readPx(metaStyle.marginBottom)
 
-  return Math.max(
+  const chromeHeight = Math.max(
     0,
     Math.ceil(articlePadding + cardPadding + cardBorder + metaHeight + metaMargin),
   )
+
+  setChromeHeight(key, chromeHeight)
+  return chromeHeight
 }
 
 function getMarkdownRendererDomHeight(key: string) {
@@ -1202,11 +1263,15 @@ function onAnchorChange(message: Message, anchor: MarkstreamVirtualState['anchor
     return
 
   const previous = virtualStates.get(key)
-  if (!previous)
+  const base = previous
+    ?? rendererRefs.get(key)?.captureVirtualState()
+    ?? null
+
+  if (!base)
     return
 
   virtualStates.set(key, {
-    ...previous,
+    ...base,
     anchor,
     anchorCaptured: true,
   })
@@ -1903,6 +1968,7 @@ function startStreamingLastMessage(options: StreamLastMessageOptions = {}) {
 
 function resetHeights() {
   itemHeights.clear()
+  chromeHeights.clear()
   virtualStates.clear()
   logicalHeightDrifts.clear()
   streamBottomPinned = false

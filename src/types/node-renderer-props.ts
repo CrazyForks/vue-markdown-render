@@ -182,6 +182,13 @@ interface MarkstreamVirtualScrollSharedBaseOptions {
   settledToken?: string | number | boolean
   emitIntervalMs?: number
   heightDiffThresholdPx?: number
+  /**
+   * Maximum number of measured node-height records emitted in heightCache.
+   *
+   * Default: 5000. Set <= 0 to export all compatible measured heights.
+   * Large values improve restore precision but increase event/state payload size.
+   */
+  heightCacheLimit?: number
 }
 
 export type MarkstreamVirtualScrollSharedOptions
