@@ -2214,6 +2214,7 @@ describe('node renderer virtual-scroll coordination', () => {
 
   it('applies prop restoreState anchor only when restoreAnchor token is provided', async () => {
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
     const scrollRoot = document.createElement('div')
     document.body.appendChild(scrollRoot)
 
@@ -2327,6 +2328,7 @@ describe('node renderer virtual-scroll coordination', () => {
 
   it('does not imperatively restore anchor unless restoreAnchor is true', async () => {
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
     const scrollRoot = document.createElement('div')
     document.body.appendChild(scrollRoot)
 
@@ -2379,6 +2381,75 @@ describe('node renderer virtual-scroll coordination', () => {
       restoreAnchor: true,
       restoreToken: 'target-renderer',
     })
+    await flushAll()
+
+    expect(scrollRoot.scrollTop).toBe(800)
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
+  it('does not imperatively restore anchor before current width is known', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const platform = installManualMeasurementPlatform()
+    const scrollRoot = document.createElement('div')
+    let width = 0
+
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width)
+    document.body.appendChild(scrollRoot)
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => 1000,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      attachTo: document.body,
+      props: {
+        nodes: [createParagraph(1), createParagraph(2), createParagraph(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'imperative-restore-width-pending',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+    installRendererBottomGeometry(wrapper, scrollRoot, () => 1000)
+
+    const handle = wrapper.vm as any
+    handle.restoreVirtualState({
+      sessionKey: 'imperative-restore-width-pending',
+      anchor: {
+        type: 'bottom',
+        distanceFromBottomPx: 0,
+      },
+      metrics: {
+        ...handle.getVirtualMetrics(),
+        width: 400,
+      },
+      width: 400,
+    }, {
+      restoreAnchor: true,
+      restoreToken: 'target-renderer',
+    })
+    await nextTick()
+
+    expect(scrollRoot.scrollTop).toBe(0)
+
+    width = 400
+    platform.resizeCallbacks.get(wrapper.element)?.([], {} as ResizeObserver)
+    platform.flushFrames()
     await flushAll()
 
     expect(scrollRoot.scrollTop).toBe(800)
@@ -3257,6 +3328,7 @@ describe('node renderer virtual-scroll coordination', () => {
 
   it('primes the virtual window before restoring a node anchor', async () => {
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
     const wrapper = mount(NodeRenderer, {
       props: {

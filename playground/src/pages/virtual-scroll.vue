@@ -1155,8 +1155,9 @@ function mergeVirtualState(
       ? previous!.heightCache
       : undefined
 
+  const nextExplicitlyCapturedNoAnchor = next.anchorCaptured === false
   const shouldCarryPreviousAnchor = next.anchor == null
-    && next.anchorCaptured !== false
+    && !nextExplicitlyCapturedNoAnchor
     && canCarryStateIdentity(previous, next)
 
   const anchor = next.anchor
@@ -1164,7 +1165,11 @@ function mergeVirtualState(
 
   const merged: MarkstreamVirtualState = {
     ...next,
-    anchorCaptured: Boolean(next.anchor),
+    anchorCaptured: next.anchor
+      ? true
+      : nextExplicitlyCapturedNoAnchor
+        ? false
+        : previous?.anchorCaptured,
     ...(heightCache?.length ? { heightCache } : {}),
     width: next.width || previous?.width || 0,
     contentHash: next.contentHash ?? previous?.contentHash,
@@ -2181,16 +2186,30 @@ function exposeLabApi() {
   }
 }
 
+// Expose the API before mount so failing CI runs can still report route/module state.
+exposeLabApi()
+
 watch([totalHeight, visibleRange, viewportHeight], () => {
   scheduleStats()
 }, { flush: 'post' })
 
-onMounted(() => {
-  const root = scrollRoot.value
-  if (!root)
+let mountedRootInitialized = false
+let mountedRootSetupActive = false
+
+function setupMountedRoot() {
+  if (!mountedRootSetupActive)
     return
 
-  exposeLabApi()
+  if (mountedRootInitialized)
+    return
+
+  const root = scrollRoot.value
+  if (!root) {
+    requestAnimationFrame(setupMountedRoot)
+    return
+  }
+
+  mountedRootInitialized = true
 
   viewportHeight.value = root.clientHeight
   layoutWidth.value = root.clientWidth
@@ -2203,12 +2222,20 @@ onMounted(() => {
   resizeObserver.observe(root)
 
   scheduleStats()
+}
+
+onMounted(() => {
+  mountedRootSetupActive = true
+  exposeLabApi()
+  setupMountedRoot()
 })
 
 onBeforeUnmount(() => {
   saveThreadScroll()
   stopStressScroll()
   streamBottomPinned = false
+  mountedRootSetupActive = false
+  mountedRootInitialized = false
 
   for (const timer of threadRestoreTargetClearTimers.values())
     clearTimeout(timer)

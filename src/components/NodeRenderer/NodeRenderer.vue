@@ -2556,6 +2556,10 @@ function applyVirtualRestoreState(
 
   const wantsCacheImport = Boolean(state.heightCache?.length)
   const waitingForCacheWidth = wantsCacheImport && !hasKnownVirtualWidth()
+  const wantsAnchorRestore = options.restoreAnchor === true && Boolean(state.anchor)
+  const waitingForAnchorWidth = wantsAnchorRestore
+    && !hasKnownVirtualWidth()
+    && Number(getVirtualStateSavedWidth(state)) > 0
   let importedCache = false
 
   if (state.heightCache?.length && canRestoreVirtualStateCache(state)) {
@@ -2574,7 +2578,7 @@ function applyVirtualRestoreState(
     }
   }
 
-  if (waitingForCacheWidth)
+  if (waitingForCacheWidth || waitingForAnchorWidth)
     return false
 
   if (!options.restoreAnchor) {
@@ -2623,6 +2627,9 @@ function shouldKeepPendingVirtualRestoreState(state: MarkstreamVirtualState) {
     return true
 
   if (state.heightCache?.length && !hasKnownVirtualWidth())
+    return true
+
+  if (state.anchor && Number(getVirtualStateSavedWidth(state)) > 0 && !hasKnownVirtualWidth())
     return true
 
   return false

@@ -212,7 +212,46 @@ function startDevServer(port) {
   }
 }
 
-async function waitForLabReady(page, timeoutMs = 30000) {
+async function collectPageDebugState(page) {
+  if (!page)
+    return null
+
+  return page.evaluate(() => {
+    const app = document.querySelector('#app')
+    const root = document.querySelector('[data-testid="virtual-scroll-root"]')
+    const api = window.__markstreamVirtualScrollLab
+
+    let snapshot = null
+    try {
+      snapshot = api?.read?.() ?? null
+    }
+    catch {}
+
+    return {
+      href: window.location.href,
+      readyState: document.readyState,
+      title: document.title,
+      hasLabApi: Boolean(api),
+      hasApp: Boolean(app),
+      appHtmlLength: app?.innerHTML?.length ?? 0,
+      appText: app?.textContent?.slice(0, 1000) ?? '',
+      hasScrollRoot: Boolean(root),
+      bodyText: document.body?.textContent?.slice(0, 1000) ?? '',
+      scriptCount: document.scripts.length,
+      snapshot,
+    }
+  }).catch(() => null)
+}
+
+async function waitForLabReady(page, timeoutMs = 120000) {
+  const startedAt = Date.now()
+
+  await page.waitForFunction(() => {
+    return Boolean(window.__markstreamVirtualScrollLab?.read)
+  }, null, { timeout: Math.min(timeoutMs, 90000) })
+
+  const remaining = Math.max(1000, timeoutMs - (Date.now() - startedAt))
+
   await page.waitForFunction(() => {
     const api = window.__markstreamVirtualScrollLab
     if (!api)
@@ -220,7 +259,7 @@ async function waitForLabReady(page, timeoutMs = 30000) {
 
     const snapshot = api.read()
     return snapshot.ready === true
-  }, null, { timeout: timeoutMs })
+  }, null, { timeout: remaining })
 }
 
 async function run() {
@@ -230,6 +269,8 @@ async function run() {
   let browser
   let page
   const pageErrors = []
+  const consoleMessages = []
+  const requestFailures = []
 
   try {
     await waitForPort(port)
@@ -251,6 +292,13 @@ async function run() {
     })
 
     page.on('console', (msg) => {
+      const entry = {
+        type: msg.type(),
+        text: msg.text(),
+        location: msg.location?.(),
+      }
+      consoleMessages.push(entry)
+
       if (msg.type() === 'error')
         process.stderr.write(`[browser:${msg.type()}] ${msg.text()}\n`)
     })
@@ -258,6 +306,14 @@ async function run() {
     page.on('pageerror', (error) => {
       pageErrors.push(error.stack || error.message || String(error))
       process.stderr.write(`[browser:pageerror] ${error.stack || error.message}\n`)
+    })
+
+    page.on('requestfailed', (request) => {
+      requestFailures.push({
+        url: request.url(),
+        method: request.method(),
+        failure: request.failure()?.errorText ?? '',
+      })
     })
 
     function assertNoPageErrors(label) {
@@ -271,7 +327,7 @@ async function run() {
     const profile = stressMode ? 'stress' : 'smoke'
 
     await page.goto(`http://${host}:${port}/virtual-scroll?profile=${profile}`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: 60000,
     })
 
@@ -1031,14 +1087,8 @@ async function run() {
   }
   catch (error) {
     if (page) {
-      const snapshot = await page.evaluate(() => {
-        try {
-          return window.__markstreamVirtualScrollLab?.read?.() ?? null
-        }
-        catch {
-          return null
-        }
-      }).catch(() => null)
+      const pageDebugState = await collectPageDebugState(page)
+      const snapshot = pageDebugState?.snapshot ?? null
 
       if (snapshot)
         process.stderr.write(`[virtual-scroll:snapshot]\n${JSON.stringify(snapshot, null, 2)}\n`)
@@ -1049,7 +1099,14 @@ async function run() {
         JSON.stringify(
           {
             snapshot,
+            pageDebugState,
             pageErrors,
+            consoleMessages,
+            requestFailures,
+            error: {
+              message: error?.message || String(error),
+              stack: error?.stack || '',
+            },
           },
           null,
           2,
