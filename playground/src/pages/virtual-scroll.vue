@@ -1154,18 +1154,29 @@ function mergeVirtualState(
     : canCarryHeightCache(previous, next)
       ? previous!.heightCache
       : undefined
-  const anchor = next.anchor
-    ?? (canCarryStateIdentity(previous, next) ? previous?.anchor : undefined)
 
-  return {
+  const shouldCarryPreviousAnchor = next.anchor == null
+    && next.anchorCaptured !== false
+    && canCarryStateIdentity(previous, next)
+
+  const anchor = next.anchor
+    ?? (shouldCarryPreviousAnchor ? previous?.anchor : undefined)
+
+  const merged: MarkstreamVirtualState = {
     ...next,
-    ...(anchor ? { anchor } : {}),
     anchorCaptured: Boolean(next.anchor),
     ...(heightCache?.length ? { heightCache } : {}),
     width: next.width || previous?.width || 0,
     contentHash: next.contentHash ?? previous?.contentHash,
     measurementKey: next.measurementKey ?? previous?.measurementKey,
   }
+
+  if (anchor)
+    merged.anchor = anchor
+  else
+    delete merged.anchor
+
+  return merged
 }
 
 function isCurrentOuterAnchorOwner(message: Message) {

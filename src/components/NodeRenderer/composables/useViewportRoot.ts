@@ -123,7 +123,7 @@ export function useViewportRoot(
     isViewportRoot: boolean,
   ) {
     if (isViewportRoot)
-      return doc.documentElement?.scrollTop ?? doc.body?.scrollTop ?? 0
+      return getDocumentScrollTop(doc)
 
     const raw = root.scrollTop
 
@@ -146,10 +146,16 @@ export function useViewportRoot(
   }
 
   function getDocumentScrollTop(doc: Document) {
-    return doc.scrollingElement?.scrollTop
-      ?? doc.documentElement?.scrollTop
-      ?? doc.body?.scrollTop
-      ?? 0
+    const scrollingTop = Number((doc.scrollingElement as HTMLElement | null)?.scrollTop)
+    const documentTop = Number(doc.documentElement?.scrollTop ?? 0)
+    const bodyTop = Number(doc.body?.scrollTop ?? 0)
+
+    return Math.max(
+      0,
+      Number.isFinite(scrollingTop) ? scrollingTop : 0,
+      Number.isFinite(documentTop) ? documentTop : 0,
+      Number.isFinite(bodyTop) ? bodyTop : 0,
+    )
   }
 
   function getOffsetTopWithinRoot(node: HTMLElement, root: HTMLElement) {

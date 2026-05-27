@@ -1454,14 +1454,34 @@ function hasPendingAsyncNodeKey(indexKey: string | number) {
 }
 
 function incrementPendingAsyncNodeKey(key: string, index: number) {
-  const previous = pendingAsyncNodeCounts.get(key) ?? 0
-  pendingAsyncNodeCounts.set(key, previous + 1)
+  const previousRecord = pendingAsyncNodeRecords.get(key)
+  if (previousRecord && isUsablePendingAsyncNodeRecord(previousRecord))
+    return
+
+  pendingAsyncNodeCounts.set(key, 1)
   pendingAsyncNodeRecords.set(key, getPendingAsyncNodeRecord(index))
   bumpAsyncNodeVersion()
 
-  if (previous === 0) {
-    scheduleVirtualMetricsEmit('async-node')
+  scheduleVirtualMetricsEmit('async-node')
+}
+
+function pruneStalePendingAsyncNodeKeys(reason: MarkstreamVirtualReason = 'async-node') {
+  let changed = false
+
+  for (const [key, record] of Array.from(pendingAsyncNodeRecords.entries())) {
+    if (isUsablePendingAsyncNodeRecord(record))
+      continue
+
+    pendingAsyncNodeRecords.delete(key)
+    pendingAsyncNodeCounts.delete(key)
+    changed = true
   }
+
+  if (!changed)
+    return
+
+  bumpAsyncNodeVersion()
+  scheduleVirtualMetricsEmit(reason)
 }
 
 function decrementPendingAsyncNodeKey(key: string) {
@@ -3909,8 +3929,24 @@ watch(
 
     resetVirtualSessionRuntimeState()
     resetVirtualSessionMeasurements()
+    clearAllPendingAsyncNodeKeys('content')
     scheduleVirtualMetricsEmit('content')
   },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    () => getVirtualSessionKey(),
+    () => getVirtualThreadKey(),
+    virtualLayoutEpochKey,
+    () => parsedNodes.value.length,
+  ],
+  ([enabled]) => {
+    if (enabled)
+      pruneStalePendingAsyncNodeKeys('async-node')
+  },
+  { flush: 'post' },
 )
 
 watch(

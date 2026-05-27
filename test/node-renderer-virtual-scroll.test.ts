@@ -928,7 +928,7 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('keeps virtual metrics unsettled until overlapping async work for the same node settles', async () => {
+  it('treats duplicate async pending marks for the same node as idempotent', async () => {
     let settleOnce: (() => void) | null = null
     let settleAgain: (() => void) | null = null
     const AsyncNode = defineComponent({
@@ -979,12 +979,72 @@ describe('node renderer virtual-scroll coordination', () => {
     expect(handle.getVirtualMetrics().stable).toBe(false)
 
     settleOnce?.()
+    await new Promise(resolve => setTimeout(resolve, 90))
     await flushAll()
-    expect((await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })).stable).toBe(false)
+    expect((await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })).stable).toBe(true)
 
     settleAgain?.()
     await new Promise(resolve => setTimeout(resolve, 90))
     await flushAll()
+    expect((await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })).stable).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('clears stale async pending keys when the virtual layout epoch changes', async () => {
+    const AsyncNode = defineComponent({
+      props: {
+        node: { type: Object, required: true },
+        indexKey: { type: [String, Number], required: true },
+      },
+      setup(props) {
+        const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY)
+        onMounted(() => {
+          lifecycle?.markPending(props.indexKey)
+        })
+        return () => h('div', 'stale pending async')
+      },
+    })
+
+    setCustomComponents('virtual-lifecycle-test', {
+      async_node: AsyncNode as any,
+    })
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-lifecycle-test',
+        nodes: [{ type: 'async_node', raw: '<async-node />', content: '' }],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'thread-a:stale-layout-pending:1',
+          measurementKey: 'theme-a',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    expect(handle.getVirtualMetrics().stable).toBe(false)
+
+    await wrapper.setProps({
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'thread-a:stale-layout-pending:1',
+        measurementKey: 'theme-b',
+        settleMode: 'manual',
+        emitIntervalMs: 0,
+      },
+    })
+    await new Promise(resolve => setTimeout(resolve, 90))
+    await flushAll()
+
     expect((await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })).stable).toBe(true)
 
     wrapper.unmount()
@@ -3753,6 +3813,19 @@ describe('node renderer virtual-scroll coordination', () => {
     const viewport = useViewportRoot(containerRef, { isClient: true })
 
     expect(viewport.getOffsetTopWithinRoot(node, root)).toBe(650)
+  })
+
+  it('reads body scrollTop for viewport roots when documentElement scrollTop is zero', async () => {
+    const { useViewportRoot } = await import('../src/components/NodeRenderer/composables/useViewportRoot')
+    const containerRef = ref<HTMLElement>()
+    const viewport = useViewportRoot(containerRef, { isClient: true })
+
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 320
+
+    expect(viewport.getNormalizedScrollTop(document.documentElement, document, true)).toBe(320)
+
+    document.body.scrollTop = 0
   })
 
   it('settles the original lifecycle key when indexKey changes while image is pending', async () => {
