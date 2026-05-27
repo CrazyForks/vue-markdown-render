@@ -93,6 +93,7 @@ describe('playground /virtual-scroll shell smoke', () => {
     expect(wrapper.get('[data-testid="blank-probes"]').text()).toMatch(/^blank probes:/)
     expect(wrapper.get('[data-testid="markdown-slots"]').text()).toContain('markdown slots:')
     expect(wrapper.get('[data-testid="max-drift"]').text()).toContain('max drift:')
+    expect(wrapper.get('[data-testid="item-overflow"]').text()).toContain('item overflow:')
 
     wrapper.unmount()
   })

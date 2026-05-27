@@ -1778,8 +1778,15 @@ function getRendererLogicalHeight() {
   if (total <= 0)
     return Math.ceil(domHeight)
 
-  if (virtualizationEnabled.value)
-    return Math.max(1, Math.ceil(estimatedHeight))
+  if (virtualizationEnabled.value) {
+    return virtualScrollEnabled.value
+      ? Math.max(
+          1,
+          Math.ceil(estimatedHeight),
+          Math.ceil(domHeight),
+        )
+      : Math.max(1, Math.ceil(estimatedHeight))
+  }
 
   if (virtualScrollEnabled.value) {
     const hasModelHeight = estimatedHeight > 0
@@ -2439,7 +2446,15 @@ function canReuseHeightCacheForWidth(savedWidth: number | null | undefined) {
 }
 
 function getVirtualStateSavedWidth(state: MarkstreamVirtualState | null | undefined) {
-  return state?.width || state?.metrics.width || null
+  const explicitWidth = Number(state?.width)
+  if (Number.isFinite(explicitWidth) && explicitWidth > 0)
+    return explicitWidth
+
+  const metricsWidth = Number(state?.metrics?.width)
+  if (Number.isFinite(metricsWidth) && metricsWidth > 0)
+    return metricsWidth
+
+  return null
 }
 
 function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {

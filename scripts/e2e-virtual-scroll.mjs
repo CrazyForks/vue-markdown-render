@@ -460,7 +460,7 @@ async function run() {
 
     const profile = stressMode ? 'stress' : 'smoke'
 
-    await page.goto(`http://${host}:${port}/virtual-scroll?profile=${profile}`, {
+    await page.goto(`http://${host}:${port}/virtual-scroll?profile=${profile}&strict=1`, {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
     })
@@ -485,6 +485,7 @@ async function run() {
       wheelProbe.stats.blankProbeCount === 0
       && wheelProbe.blankFrameCount === 0
       && wheelProbe.visibleCoverageOk === true
+      && wheelProbe.health.strictClippingOk === true
       && wheelProbe.health.virtualDomWithinLimit === true
       && wheelProbe.health.hugeRendererDomWithinLimit === true,
       'blank frame, coverage, or DOM budget regression observed during real wheel scrolling',
@@ -508,6 +509,7 @@ async function run() {
               && latest.health.virtualDomWithinLimit
               && latest.health.hugeRendererDomWithinLimit
               && latest.health.threadRestoreOk
+              && latest.health.strictClippingOk
               && latest.maxItemHeightDriftPx < 24
             ) {
               api.clearEvents()
@@ -697,6 +699,7 @@ async function run() {
             && latest.visibleCoverageOk
             && latest.health.virtualDomWithinLimit
             && latest.health.scrollJitterOk
+            && latest.health.strictClippingOk
             && latest.maxItemHeightDriftPx < 24
           ) {
             if (options.clearEvents !== false) {
@@ -753,6 +756,7 @@ async function run() {
         && snapshot.blankFrameCount === 0
         && snapshot.visibleCoverageOk
         && snapshot.health.maxObservedCoverageGapPx <= 24
+        && snapshot.health.strictClippingOk
         && snapshot.health.virtualDomWithinLimit
         && snapshot.health.hugeRendererDomWithinLimit
         && snapshot.maxItemHeightDriftPx < 24

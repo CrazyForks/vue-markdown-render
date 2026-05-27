@@ -48,6 +48,7 @@ interface LabStats {
   heightDriftPx: number
   maxItemHeightDriftPx: number
   maxCoverageGapPx: number
+  maxItemOverflowPx: number
   domNodeCount: number
   messageDomCount: number
   visibleCoverageOk: boolean
@@ -64,8 +65,10 @@ interface LabHealth extends LabStats {
   maxObservedMarkdownSlots: number
   maxObservedHeightDriftPx: number
   maxObservedCoverageGapPx: number
+  maxObservedItemOverflowPx: number
   maxObservedScrollJumpPx: number
   scrollJitterOk: boolean
+  strictClippingOk: boolean
   virtualDomWithinLimit: boolean
   hugeRendererDomWithinLimit: boolean
   hugeRendererSlotBudget: number
@@ -110,6 +113,7 @@ interface VirtualScrollLabSnapshot {
   clippedMessageCount: number
   heightDriftMessageCount: number
   maxItemHeightDriftPx: number
+  maxItemOverflowPx: number
   visibleCoverageOk: boolean
   settledEvents: number
   heightCacheStateCount: number
@@ -135,6 +139,7 @@ interface LabEvent {
   heightDriftPx?: number
   maxItemHeightDriftPx?: number
   maxCoverageGapPx?: number
+  maxItemOverflowPx?: number
   scrollJumpPx?: number
   expectedJump?: boolean
   fromThreadId?: ThreadId
@@ -830,11 +835,18 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
     heightDiffThresholdPx: 1,
   } satisfies MarkstreamVirtualScrollOptions
 
-  if (heightCache && state) {
+  const stateWidth = Number(state?.width)
+  const canPassStandaloneHeightCache = Boolean(
+    heightCache?.length
+    && Number.isFinite(stateWidth)
+    && stateWidth > 0,
+  )
+
+  if (canPassStandaloneHeightCache) {
     return {
       ...options,
       heightCache,
-      heightCacheWidth: state.width || layoutWidth.value,
+      heightCacheWidth: stateWidth,
     }
   }
 
@@ -847,10 +859,13 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
 function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   const key = messageKey(message)
   const isActiveThreadMessage = message.threadId === activeThreadId.value
+  const restoreTargetAnchor = threadRestoreTargets.has(message.threadId)
+    ? threadAnchors.get(message.threadId) ?? null
+    : null
   const outerAnchor: OuterAnchor | null = isActiveThreadMessage
     ? streamBottomPinned
       ? { type: 'bottom', distanceFromBottomPx: 0 }
-      : captureOuterAnchor()
+      : restoreTargetAnchor ?? captureOuterAnchor()
     : null
 
   const measuredContentHeight = getMeasuredMessageContentHeight(key)
@@ -1467,6 +1482,7 @@ function createEmptyLabStats(): LabStats {
     heightDriftPx: 0,
     maxItemHeightDriftPx: 0,
     maxCoverageGapPx: 0,
+    maxItemOverflowPx: 0,
     domNodeCount: 0,
     messageDomCount: 0,
     visibleCoverageOk: true,
@@ -1538,6 +1554,17 @@ function measureViewportCoverageGaps(root: HTMLElement) {
   return maxGap
 }
 
+function measureItemOverflowPx(article: HTMLElement, card: HTMLElement) {
+  const articleRect = article.getBoundingClientRect()
+  const cardRect = card.getBoundingClientRect()
+
+  return Math.max(
+    0,
+    cardRect.bottom - articleRect.bottom,
+    articleRect.top - cardRect.top,
+  )
+}
+
 function collectStats(options: CollectStatsOptions = {}) {
   const root = scrollRoot.value
   if (!root)
@@ -1566,6 +1593,7 @@ function collectStats(options: CollectStatsOptions = {}) {
   let emptyCardProbeCount = 0
   let chromeOnlyProbeCount = 0
   let heightDriftPx = 0
+  let maxItemOverflowPx = 0
   let heightChanged = false
   const outerAnchor: OuterAnchor | null = reconcile && streamBottomPinned
     ? { type: 'bottom', distanceFromBottomPx: 0 }
@@ -1618,6 +1646,14 @@ function collectStats(options: CollectStatsOptions = {}) {
     const intersects = rect.bottom > viewportTop && rect.top < viewportBottom
     if (intersects && actual <= 1)
       blankProbeCount++
+
+    const card = messageCardEls.get(key)
+    if (card) {
+      maxItemOverflowPx = Math.max(
+        maxItemOverflowPx,
+        measureItemOverflowPx(el, card),
+      )
+    }
   }
 
   if (heightChanged && shouldRestoreOuterAnchorAfterHeightChange(outerAnchor))
@@ -1658,6 +1694,7 @@ function collectStats(options: CollectStatsOptions = {}) {
     heightDriftPx,
     maxItemHeightDriftPx: maxDrift,
     maxCoverageGapPx,
+    maxItemOverflowPx,
     domNodeCount: domCount,
     messageDomCount: messageCount,
     visibleCoverageOk: covered && coverageGapOk,
@@ -1695,6 +1732,7 @@ function pushLabEvent(
     heightDriftPx: stats.heightDriftPx,
     maxItemHeightDriftPx: stats.maxItemHeightDriftPx,
     maxCoverageGapPx: stats.maxCoverageGapPx,
+    maxItemOverflowPx: stats.maxItemOverflowPx,
     scrollJumpPx,
     expectedJump: payload.expectedJump ?? expectedActiveScrollJump,
     ...payload,
@@ -1852,17 +1890,31 @@ function jumpToBottom() {
 }
 
 async function mutateLayoutWithAnchor(mutator: () => void) {
+  const threadId = activeThreadId.value
   const anchor = captureOuterAnchor()
+
+  if (anchor) {
+    threadAnchors.set(threadId, anchor)
+    markThreadRestoreTarget(threadId, anchor)
+  }
 
   mutator()
   pruneStaleItemHeights()
 
-  await nextTick()
+  for (let i = 0; i < 4; i++) {
+    await nextTick()
 
-  if (anchor)
-    await restoreOuterAnchor(anchor, { immediate: true, expectedJump: true })
+    if (anchor)
+      await restoreOuterAnchor(anchor, { immediate: true, expectedJump: true })
+
+    await waitFrame()
+    applyLabStats(collectStats({ reconcile: true }))
+  }
 
   scheduleStats()
+
+  if (anchor)
+    deferClearThreadRestoreTarget(threadId)
 }
 
 function toggleDensity() {
@@ -2034,6 +2086,11 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     0,
     ...labEvents.map(event => event.maxCoverageGapPx ?? 0),
   )
+  const maxObservedItemOverflowPx = Math.max(
+    stats.maxItemOverflowPx,
+    0,
+    ...labEvents.map(event => event.maxItemOverflowPx ?? 0),
+  )
   const maxObservedScrollJumpPx = Math.max(
     0,
     ...labEvents
@@ -2049,6 +2106,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
   const hugeRendererSlotBudget = maxLiveNodes.value + 16
   const hugeRendererDomWithinLimit = stats.maxHugeMessageSlotCount <= hugeRendererSlotBudget
   const scrollJitterOk = maxObservedScrollJumpPx <= SCROLL_JITTER_BUDGET_PX
+  const strictClippingOk = stats.maxItemOverflowPx <= 2
   const threadRestoreOk = lastThreadRestoreDeltaPx.value <= SCROLL_JITTER_BUDGET_PX
     || lastThreadRestoreAnchorDeltaPx.value <= SCROLL_JITTER_BUDGET_PX
 
@@ -2061,8 +2119,10 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     maxObservedMarkdownSlots,
     maxObservedHeightDriftPx,
     maxObservedCoverageGapPx,
+    maxObservedItemOverflowPx,
     maxObservedScrollJumpPx,
     scrollJitterOk,
+    strictClippingOk,
     virtualDomWithinLimit,
     hugeRendererDomWithinLimit,
     hugeRendererSlotBudget,
@@ -2076,6 +2136,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
       && stats.emptyCardProbeCount === 0
       && blankFrameCount.value === 0
       && stats.visibleCoverageOk
+      && strictClippingOk
       && maxObservedBlankProbes === 0
       && maxObservedPlaceholderProbes === 0
       && maxObservedEmptyCardProbes === 0
@@ -2120,6 +2181,9 @@ function assertVirtualScrollHealth(snapshot: VirtualScrollLabSnapshot) {
 
   if (snapshot.health.maxObservedCoverageGapPx > 24)
     failures.push(`observed coverage gap=${snapshot.health.maxObservedCoverageGapPx}px`)
+
+  if (snapshot.stats.maxItemOverflowPx > 2)
+    failures.push(`item overflow=${snapshot.stats.maxItemOverflowPx}px`)
 
   if (!snapshot.health.virtualDomWithinLimit)
     failures.push(`markdown slots exceeded: ${snapshot.markdownSlotCount}/${snapshot.health.domSlotBudget}`)
@@ -2188,6 +2252,7 @@ function buildLabSnapshot(stats: LabStats): VirtualScrollLabSnapshot {
     clippedMessageCount: stats.clippedMessageCount,
     heightDriftMessageCount: stats.heightDriftMessageCount,
     maxItemHeightDriftPx: stats.maxItemHeightDriftPx,
+    maxItemOverflowPx: stats.maxItemOverflowPx,
     visibleCoverageOk: stats.visibleCoverageOk,
     settledEvents: settledEvents.value,
     heightCacheStateCount: Array
@@ -2241,8 +2306,11 @@ const verificationGroups = computed(() => ({
   },
   heightCorrectness: {
     ok: labSnapshot.value.maxItemHeightDriftPx < 24
-      && labSnapshot.value.visibleCoverageOk,
+      && labSnapshot.value.visibleCoverageOk
+      && labSnapshot.value.health.strictClippingOk,
     maxItemHeightDriftPx: labSnapshot.value.maxItemHeightDriftPx,
+    maxItemOverflowPx: labSnapshot.value.maxItemOverflowPx,
+    maxObservedItemOverflowPx: labSnapshot.value.health.maxObservedItemOverflowPx,
     heightDriftMessageCount: labSnapshot.value.heightDriftMessageCount,
     clippedMessageCount: labSnapshot.value.clippedMessageCount,
   },
@@ -2573,6 +2641,7 @@ onBeforeUnmount(() => {
       <span>clipped: {{ clippedMessageCount }}</span>
       <span>height drift items: {{ heightDriftMessageCount }}</span>
       <span data-testid="max-drift">max drift: {{ Math.round(maxItemHeightDriftPx) }}px</span>
+      <span data-testid="item-overflow">item overflow: {{ Math.round(labSnapshot.maxItemOverflowPx) }}px</span>
       <span v-if="worstHeightDriftMessageId">
         worst drift: {{ worstHeightDriftMessageId }}
       </span>
@@ -2617,6 +2686,14 @@ onBeforeUnmount(() => {
       <div>
         <strong>height drift</strong>
         <span>{{ Math.round(labSnapshot.health.maxObservedHeightDriftPx) }}px</span>
+      </div>
+
+      <div>
+        <strong>item overflow</strong>
+        <span :class="{ ok: labSnapshot.health.strictClippingOk, bad: !labSnapshot.health.strictClippingOk }">
+          {{ Math.round(labSnapshot.maxItemOverflowPx) }}px /
+          {{ Math.round(labSnapshot.health.maxObservedItemOverflowPx) }}px
+        </span>
       </div>
 
       <div>
@@ -2703,6 +2780,8 @@ onBeforeUnmount(() => {
           :ref="el => setMessageEl(message, el as Element | null)"
           class="virtual-message"
           :class="[message.role, { huge: message.huge }]"
+          :data-message-id="message.id"
+          :data-expected-height="Math.round(height)"
           :style="{
             transform: `translateY(${top}px)`,
             height: `${height}px`,
@@ -3005,8 +3084,8 @@ button:hover {
   box-sizing: border-box;
   padding: 0.75rem 1rem;
   will-change: transform;
-  overflow: visible;
-  contain: layout style;
+  overflow: hidden;
+  contain: layout paint style;
 }
 
 .message-card {
@@ -3015,7 +3094,7 @@ button:hover {
   border-radius: 0.5rem;
   background: var(--lab-panel);
   padding: 0.85rem;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .markdown-host {

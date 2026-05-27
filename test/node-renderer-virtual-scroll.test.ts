@@ -502,6 +502,45 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not under-report internally virtualized coordinated height against mounted DOM', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [
+          createParagraph(1),
+          createParagraph(2),
+          createParagraph(3),
+        ],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        maxLiveNodes: 1,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'virtualized-dom-floor',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    Object.defineProperty(wrapper.element, 'scrollHeight', {
+      configurable: true,
+      get: () => 600,
+    })
+    Object.defineProperty(wrapper.element, 'offsetHeight', {
+      configurable: true,
+      get: () => 600,
+    })
+
+    await flushAll()
+
+    expect((wrapper.vm as any).getVirtualMetrics().totalHeight).toBe(600)
+    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).toBe(600)
+
+    wrapper.unmount()
+  })
+
   it('allows logical totalHeight to shrink after measured heights shrink', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
