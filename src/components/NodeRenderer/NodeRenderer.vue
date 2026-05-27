@@ -190,7 +190,7 @@ function unwrapVirtualScrollRoot(value: unknown): HTMLElement | null {
   if (!value)
     return null
 
-  if (typeof Element !== 'undefined' && value instanceof Element)
+  if (typeof HTMLElement !== 'undefined' && value instanceof HTMLElement)
     return value as HTMLElement
 
   if (typeof value === 'object' && 'value' in value)
@@ -201,6 +201,9 @@ function unwrapVirtualScrollRoot(value: unknown): HTMLElement | null {
 
   if (isScrollRootElementLike(value))
     return value as HTMLElement
+
+  if (typeof Element !== 'undefined' && value instanceof Element)
+    return null
 
   return null
 }
@@ -2689,6 +2692,7 @@ async function settle(options: {
   timeoutMs?: number
   reason?: MarkstreamVirtualReason
   expectedSettledTokenKey?: string
+  flushPendingTimers?: boolean
 } = {}) {
   const sessionKeyAtStart = getVirtualSessionKey()
   const threadKeyAtStart = getVirtualThreadKey()
@@ -2697,7 +2701,7 @@ async function settle(options: {
   const timeoutMs = options.timeoutMs ?? 120
   const reason = options.reason ?? 'manual'
   const expectedSettledTokenKey = options.expectedSettledTokenKey
-  const shouldFinalizeSettlingTimers = options.timeoutMs != null
+  const shouldFinalizeSettlingTimers = options.flushPendingTimers === true
   const staleBaseMetrics = getVirtualMetrics(reason)
   const staleMetrics = (): MarkstreamVirtualMetrics => ({
     ...staleBaseMetrics,

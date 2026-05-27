@@ -56,8 +56,16 @@ export interface MarkstreamMeasuredHeightCacheEntry {
 }
 
 export interface MarkstreamHeightCacheEntry extends MarkstreamMeasuredHeightCacheEntry {
-  nodeType: string
-  signature: string
+  /**
+   * Optional compatibility metadata.
+   *
+   * MarkdownRender exports these fields for newly captured caches, and
+   * standalone virtualScroll.heightCache imports require signature at runtime.
+   * They remain optional so persisted restoreState and host-merged caches can
+   * be represented without casts.
+   */
+  nodeType?: string
+  signature?: string
 }
 
 export type MarkstreamHeightCache = MarkstreamHeightCacheEntry[]
@@ -216,6 +224,11 @@ export interface MarkstreamRendererHandle {
     frames?: number
     timeoutMs?: number
     reason?: MarkstreamVirtualReason
+    /**
+     * Force-clear pending delayed height-settling timers before returning.
+     * Default: false. Use only when the host knows async layout work is done.
+     */
+    flushPendingTimers?: boolean
   }) => Promise<MarkstreamVirtualMetrics>
   scrollToNode: (
     index: number,

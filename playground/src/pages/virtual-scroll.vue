@@ -5,9 +5,9 @@ import type {
   MarkstreamVirtualMetrics,
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualState,
-} from '../../../src/types/node-renderer-props'
+} from '../../../src/exports'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import MarkdownRender from '../../../src/components/NodeRenderer'
+import MarkdownRender from '../../../src/exports'
 import '../../../src/index.css'
 
 interface Message {
@@ -22,6 +22,16 @@ interface Message {
 
 type ThreadId = 'thread-a' | 'thread-b'
 
+type ProbeKind = 'content' | 'placeholder' | 'chrome' | 'empty-card' | 'blank'
+
+interface ProbeCounts {
+  content: number
+  placeholder: number
+  chrome: number
+  emptyCard: number
+  blank: number
+}
+
 interface LabStats {
   visibleItemCount: number
   markdownRendererCount: number
@@ -30,6 +40,9 @@ interface LabStats {
   maxHugeMessageSlotCount: number
   hugeMessageDomCount: number
   blankProbeCount: number
+  placeholderProbeCount: number
+  emptyCardProbeCount: number
+  chromeOnlyProbeCount: number
   heightDriftPx: number
   maxItemHeightDriftPx: number
   maxCoverageGapPx: number
@@ -44,6 +57,8 @@ interface LabStats {
 interface LabHealth extends LabStats {
   eventCount: number
   maxObservedBlankProbes: number
+  maxObservedPlaceholderProbes: number
+  maxObservedEmptyCardProbes: number
   maxObservedMarkdownSlots: number
   maxObservedHeightDriftPx: number
   maxObservedCoverageGapPx: number
@@ -110,6 +125,9 @@ interface LabEvent {
   threadId: ThreadId
   scrollTop: number
   blankProbeCount?: number
+  placeholderProbeCount?: number
+  emptyCardProbeCount?: number
+  chromeOnlyProbeCount?: number
   markdownSlotCount?: number
   heightDriftPx?: number
   maxItemHeightDriftPx?: number
@@ -1034,39 +1052,113 @@ function scheduleVisibleDomReconcile() {
   })
 }
 
-function isProbeCoveredByRenderedContent(probe: Element | null) {
-  if (!probe)
+function createEmptyProbeCounts(): ProbeCounts {
+  return {
+    content: 0,
+    placeholder: 0,
+    chrome: 0,
+    emptyCard: 0,
+    blank: 0,
+  }
+}
+
+function hasVisibleRect(el: Element | null) {
+  if (
+    !(el instanceof HTMLElement)
+    && !(typeof SVGElement !== 'undefined' && el instanceof SVGElement)
+  ) {
     return false
+  }
+
+  const rect = el.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 1
+}
+
+function hasRenderableMarkdownContent(el: Element | null) {
+  if (!el)
+    return false
+
+  const contentSelector = [
+    'p',
+    'pre',
+    'code',
+    'table',
+    'blockquote',
+    'ul',
+    'ol',
+    'li',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'img',
+    'svg',
+    'canvas',
+    '.paragraph-node',
+    '.code-block-shell',
+    '.math-block-node',
+    '.mermaid-block',
+    '.d2-block',
+    '.infographic-block',
+  ].join(',')
+
+  const candidate = el.matches?.(contentSelector)
+    ? el
+    : el.querySelector(contentSelector)
+
+  if (candidate && hasVisibleRect(candidate))
+    return true
+
+  return (el.textContent?.trim().length ?? 0) > 0 && hasVisibleRect(el)
+}
+
+function classifyProbePoint(probe: Element | null): ProbeKind {
+  if (!probe)
+    return 'blank'
 
   const element = probe instanceof Element ? probe : probe.parentElement
   if (!element)
-    return false
+    return 'blank'
 
-  if (element.closest('.message-meta'))
-    return true
+  if (element.closest('.node-placeholder'))
+    return 'placeholder'
 
-  if (element.closest('.node-content, .node-placeholder'))
-    return true
+  const content = element.closest('.node-content')
+  if (content)
+    return hasRenderableMarkdownContent(content) ? 'content' : 'blank'
 
   const slot = element.closest('.node-slot')
-  if (slot?.querySelector(':scope > .node-content, :scope > .node-placeholder'))
-    return true
+  if (slot) {
+    if (slot.querySelector(':scope > .node-placeholder'))
+      return 'placeholder'
 
-  if (element.closest('.markdown-renderer'))
-    return false
+    const slotContent = slot.querySelector(':scope > .node-content')
+    return hasRenderableMarkdownContent(slotContent) ? 'content' : 'blank'
+  }
+
+  if (element.closest('.message-meta'))
+    return 'chrome'
 
   const card = element.closest('.message-card')
-  return Boolean(card)
+  if (card) {
+    const markdownHost = card.querySelector('.markdown-host')
+    return hasRenderableMarkdownContent(markdownHost) ? 'content' : 'empty-card'
+  }
+
+  return 'blank'
 }
 
-function countBlankProbePoints(root: HTMLElement) {
+function countProbePoints(root: HTMLElement) {
   const rootRect = root.getBoundingClientRect()
+  const counts = createEmptyProbeCounts()
+
   if (rootRect.width <= 0 || rootRect.height <= 0)
-    return 0
+    return counts
 
   const xRatios = [0.2, 0.5, 0.8]
   const yRatios = [0.08, 0.25, 0.5, 0.75, 0.92]
-  let blank = 0
 
   for (const xRatio of xRatios) {
     for (const yRatio of yRatios) {
@@ -1075,12 +1167,12 @@ function countBlankProbePoints(root: HTMLElement) {
         rootRect.top + rootRect.height * yRatio,
       )
 
-      if (!isProbeCoveredByRenderedContent(probe))
-        blank++
+      const kind = classifyProbePoint(probe)
+      counts[kind] += 1
     }
   }
 
-  return blank
+  return counts
 }
 
 function createEmptyLabStats(): LabStats {
@@ -1092,6 +1184,9 @@ function createEmptyLabStats(): LabStats {
     maxHugeMessageSlotCount: 0,
     hugeMessageDomCount: 0,
     blankProbeCount: 0,
+    placeholderProbeCount: 0,
+    emptyCardProbeCount: 0,
+    chromeOnlyProbeCount: 0,
     heightDriftPx: 0,
     maxItemHeightDriftPx: 0,
     maxCoverageGapPx: 0,
@@ -1188,6 +1283,9 @@ function collectStats(options: CollectStatsOptions = {}) {
   let worstId = ''
   let visibleItemCount = 0
   let blankProbeCount = 0
+  let placeholderProbeCount = 0
+  let emptyCardProbeCount = 0
+  let chromeOnlyProbeCount = 0
   let heightDriftPx = 0
   let heightChanged = false
   const outerAnchor: OuterAnchor | null = reconcile && streamBottomPinned
@@ -1246,11 +1344,20 @@ function collectStats(options: CollectStatsOptions = {}) {
   if (heightChanged)
     void restoreOuterAnchor(outerAnchor, { immediate: true })
 
-  const gridBlankProbeCount = totalHeight.value > currentViewportHeight
-    ? countBlankProbePoints(root)
-    : 0
-  blankProbeCount += gridBlankProbeCount
-  const covered = gridBlankProbeCount === 0
+  const probeCounts = totalHeight.value > currentViewportHeight
+    ? countProbePoints(root)
+    : createEmptyProbeCounts()
+
+  blankProbeCount += probeCounts.blank
+    + probeCounts.placeholder
+    + probeCounts.emptyCard
+  placeholderProbeCount += probeCounts.placeholder
+  emptyCardProbeCount += probeCounts.emptyCard
+  chromeOnlyProbeCount += probeCounts.chrome
+
+  const covered = probeCounts.blank === 0
+    && probeCounts.placeholder === 0
+    && probeCounts.emptyCard === 0
 
   if (messageCount === 0 && totalHeight.value > currentViewportHeight)
     blankProbeCount++
@@ -1266,6 +1373,9 @@ function collectStats(options: CollectStatsOptions = {}) {
     maxHugeMessageSlotCount,
     hugeMessageDomCount: hugeMessages.length,
     blankProbeCount,
+    placeholderProbeCount,
+    emptyCardProbeCount,
+    chromeOnlyProbeCount,
     heightDriftPx,
     maxItemHeightDriftPx: maxDrift,
     maxCoverageGapPx,
@@ -1299,6 +1409,9 @@ function pushLabEvent(
     threadId: activeThreadId.value,
     scrollTop: currentScrollTop,
     blankProbeCount: stats.blankProbeCount,
+    placeholderProbeCount: stats.placeholderProbeCount,
+    emptyCardProbeCount: stats.emptyCardProbeCount,
+    chromeOnlyProbeCount: stats.chromeOnlyProbeCount,
     markdownSlotCount: stats.markdownSlotCount,
     heightDriftPx: stats.heightDriftPx,
     maxItemHeightDriftPx: stats.maxItemHeightDriftPx,
@@ -1333,6 +1446,23 @@ function saveThreadScroll() {
   if (anchor) {
     threadAnchors.set(activeThreadId.value, anchor)
     markThreadRestoreTarget(activeThreadId.value, anchor)
+  }
+}
+
+async function stabilizeThreadRestore(
+  anchor: OuterAnchor | null,
+  fallbackScrollTop: number,
+) {
+  for (let i = 0; i < 4; i++) {
+    if (anchor)
+      await restoreOuterAnchor(anchor, { immediate: true, expectedJump: true })
+    else
+      applyOuterScrollTop(fallbackScrollTop)
+
+    await nextTick()
+    await waitFrame()
+
+    applyLabStats(collectStats({ reconcile: true }))
   }
 }
 
@@ -1380,24 +1510,14 @@ async function switchThread(threadId: ThreadId) {
 
     await nextTick()
 
-    if (savedAnchor)
-      await restoreOuterAnchor(savedAnchor, { immediate: true, expectedJump: true })
-    else
-      applyOuterScrollTop(savedScrollTop)
-
-    await nextTick()
+    await stabilizeThreadRestore(targetAnchor, savedScrollTop)
 
     const root = scrollRoot.value
     if (!root)
       return
 
     root.scrollTop = scrollTop.value
-
-    applyLabStats(collectStats({ reconcile: true }))
-    if (savedAnchor)
-      await restoreOuterAnchor(savedAnchor, { immediate: true, expectedJump: true })
-
-    await waitFrame()
+    await stabilizeThreadRestore(targetAnchor, savedScrollTop)
 
     const currentRootScrollTop = scrollRoot.value?.scrollTop ?? scrollTop.value
     const expectedThreadScrollTop = targetAnchor
@@ -1593,6 +1713,16 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     0,
     ...labEvents.map(event => event.blankProbeCount ?? 0),
   )
+  const maxObservedPlaceholderProbes = Math.max(
+    stats.placeholderProbeCount,
+    0,
+    ...labEvents.map(event => event.placeholderProbeCount ?? 0),
+  )
+  const maxObservedEmptyCardProbes = Math.max(
+    stats.emptyCardProbeCount,
+    0,
+    ...labEvents.map(event => event.emptyCardProbeCount ?? 0),
+  )
   const maxObservedMarkdownSlots = Math.max(
     stats.markdownSlotCount,
     0,
@@ -1626,6 +1756,8 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     ...stats,
     eventCount: labEvents.length,
     maxObservedBlankProbes,
+    maxObservedPlaceholderProbes,
+    maxObservedEmptyCardProbes,
     maxObservedMarkdownSlots,
     maxObservedHeightDriftPx,
     maxObservedCoverageGapPx,
@@ -1640,9 +1772,13 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     threadRestoreOk,
     layoutIntegrityOk:
       stats.blankProbeCount === 0
+      && stats.placeholderProbeCount === 0
+      && stats.emptyCardProbeCount === 0
       && blankFrameCount.value === 0
       && stats.visibleCoverageOk
       && maxObservedBlankProbes === 0
+      && maxObservedPlaceholderProbes === 0
+      && maxObservedEmptyCardProbes === 0
       && maxObservedCoverageGapPx <= 24
       && virtualDomWithinLimit
       && hugeRendererDomWithinLimit
@@ -1749,6 +1885,7 @@ async function settleVisibleRenderers() {
         reason: 'manual',
         frames: 8,
         timeoutMs: 1400,
+        flushPendingTimers: true,
       }),
     ))
 

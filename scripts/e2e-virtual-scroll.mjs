@@ -13,6 +13,21 @@ const repoRoot = path.resolve(__dirname, '..')
 const playgroundDir = path.join(repoRoot, 'playground')
 const host = '127.0.0.1'
 
+function readMode() {
+  const arg = process.argv.find(value => value.startsWith('--mode='))
+  const raw = arg
+    ? arg.slice('--mode='.length)
+    : process.env.MARKSTREAM_E2E_VIRTUAL_SCROLL_MODE || 'smoke'
+
+  if (raw !== 'smoke' && raw !== 'stress')
+    throw new Error(`Invalid virtual-scroll e2e mode: ${raw}`)
+
+  return raw
+}
+
+const mode = readMode()
+const stressMode = mode === 'stress'
+
 function assert(condition, message, details) {
   if (condition)
     return
@@ -215,7 +230,18 @@ async function run() {
   try {
     await waitForPort(port)
 
-    browser = await chromium.launch(resolveChromeLaunchOptions())
+    try {
+      browser = await chromium.launch(resolveChromeLaunchOptions())
+    }
+    catch (error) {
+      throw new Error(
+        [
+          'Unable to launch Chromium for virtual-scroll e2e.',
+          'Install Chrome/Chromium in CI or set PLAYWRIGHT_CHROME_PATH / PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH.',
+          `Original error: ${error?.message || String(error)}`,
+        ].join('\n'),
+      )
+    }
     page = await browser.newPage({
       viewport: { width: 1280, height: 900 },
     })
@@ -260,6 +286,74 @@ async function run() {
       'blank frame, coverage, or DOM budget regression observed during real wheel scrolling',
       wheelProbe,
     )
+
+    if (!stressMode) {
+      const smoke = await page.evaluate(async () => {
+        const api = window.__markstreamVirtualScrollLab
+
+        const waitHealthy = async (frames = 90) => {
+          let latest = api.read()
+          for (let i = 0; i < frames; i++) {
+            await api.nextFrame()
+            latest = api.read()
+
+            if (
+              latest.stats.blankProbeCount === 0
+              && latest.health.maxObservedBlankProbes === 0
+              && latest.health.maxObservedPlaceholderProbes === 0
+              && latest.health.maxObservedEmptyCardProbes === 0
+              && latest.blankFrameCount === 0
+              && latest.visibleCoverageOk
+              && latest.health.virtualDomWithinLimit
+              && latest.health.hugeRendererDomWithinLimit
+              && latest.health.threadRestoreOk
+              && latest.maxItemHeightDriftPx < 24
+            ) {
+              api.clearEvents()
+              await api.nextFrame()
+              latest = api.read()
+              return latest
+            }
+          }
+
+          return latest
+        }
+
+        await api.clearEvents()
+        await api.scrollToRatio(0.82)
+        const before = await waitHealthy()
+
+        await api.switchThread('thread-b')
+        await waitHealthy()
+
+        await api.switchThread(before.threadId)
+        const restored = await waitHealthy()
+
+        await api.settleVisibleRenderers()
+        const final = await waitHealthy()
+
+        return { before, restored, final }
+      })
+
+      assertThreadRestore('smoke thread restore', smoke.before, smoke.restored)
+
+      assert(
+        smoke.final.health.layoutIntegrityOk
+        && smoke.final.health.virtualDomWithinLimit
+        && smoke.final.health.hugeRendererDomWithinLimit
+        && smoke.final.health.maxObservedBlankProbes === 0,
+        'virtual-scroll smoke health check failed',
+        smoke.final,
+      )
+
+      process.stdout.write(`${JSON.stringify({
+        ok: true,
+        mode,
+        health: smoke.final.health,
+      }, null, 2)}\n`)
+
+      return
+    }
 
     await page.evaluate(() => {
       window.__markstreamVirtualScrollLab.clearEvents()
@@ -836,6 +930,7 @@ async function run() {
 
     process.stdout.write(`${JSON.stringify({
       ok: true,
+      mode,
       health: final.health,
     }, null, 2)}\n`)
   }
