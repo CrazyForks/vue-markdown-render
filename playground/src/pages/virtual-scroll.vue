@@ -179,6 +179,7 @@ declare global {
       toggleNarrowMode: () => Promise<void>
       toggleReverseFlexMode: () => Promise<void>
       forceUnmountVisibleHugeMessage: () => Promise<void>
+      replaceVisibleHugeMessageSameShape: () => Promise<void>
       settleVisibleRenderers: () => Promise<MarkstreamVirtualMetrics[]>
       nextFrame: () => Promise<void>
       clearEvents: () => void
@@ -199,6 +200,7 @@ declare global {
         toggleNarrowMode: () => Promise<void>
         toggleReverseFlexMode: () => Promise<void>
         forceUnmountVisibleHugeMessage: () => Promise<void>
+        replaceVisibleHugeMessageSameShape: () => Promise<void>
         settleVisibleRenderers: () => Promise<MarkstreamVirtualMetrics[]>
         resetHeights: () => void
       }
@@ -2331,6 +2333,29 @@ const labSnapshot = shallowRef<VirtualScrollLabSnapshot>(
 
 const labStatusClass = computed(() => labSnapshot.value.labStatus === 'ok' ? 'ok' : 'failed')
 
+const debugSummary = computed(() => ({
+  thread: activeThreadId.value,
+  scrollTop: Math.round(scrollTop.value),
+  totalHeight: Math.round(totalHeight.value),
+  visibleRange: visibleRange.value,
+  domNodeCount: domNodeCount.value,
+  messageDomCount: messageDomCount.value,
+  markdownSlotCount: markdownSlotCount.value,
+  markdownContentCount: markdownContentCount.value,
+  maxHugeMessageSlotCount: labSnapshot.value.maxHugeMessageSlotCount,
+  blankFrameCount: blankFrameCount.value,
+  visibleCoverageOk: visibleCoverageOk.value,
+  clippedMessageCount: clippedMessageCount.value,
+  heightDriftMessageCount: heightDriftMessageCount.value,
+  maxItemHeightDriftPx: maxItemHeightDriftPx.value,
+  lastThreadRestoreDeltaPx: lastThreadRestoreDeltaPx.value,
+  lastThreadRestoreAnchorDeltaPx: lastThreadRestoreAnchorDeltaPx.value,
+  virtualDomWithinLimit: labSnapshot.value.health.virtualDomWithinLimit,
+  hugeRendererDomWithinLimit: labSnapshot.value.health.hugeRendererDomWithinLimit,
+  threadRestoreOk: labSnapshot.value.health.threadRestoreOk,
+  layoutIntegrityOk: labSnapshot.value.health.layoutIntegrityOk,
+}))
+
 function refreshLabSnapshot(stats: LabStats = collectStats({ reconcile: false })) {
   labSnapshot.value = buildLabSnapshot(stats)
 }
@@ -2408,6 +2433,63 @@ async function forceUnmountVisibleHugeMessage() {
 
   await nextTick()
   scheduleStats()
+}
+
+async function replaceVisibleHugeMessageSameShape() {
+  const item = visibleItems.value.find(item => item.message.huge)
+  if (!item)
+    return
+
+  const anchor = captureOuterAnchor()
+  const threadId = activeThreadId.value
+  const message = item.message
+
+  if (anchor) {
+    threadAnchors.set(threadId, anchor)
+    markThreadRestoreTarget(threadId, anchor)
+  }
+
+  const previousContent = message.content
+  const approximateBlocks = Math.max(
+    80,
+    previousContent.split('\n## ').length,
+  )
+
+  message.content = makeMarkdown(
+    `${message.id}-same-shape-replacement-${message.revision + 1}`,
+    approximateBlocks,
+  )
+  message.revision += 1
+  message.final = true
+
+  await nextTick()
+
+  if (anchor) {
+    await restoreOuterAnchor(anchor, {
+      immediate: true,
+      expectedJump: true,
+    })
+  }
+
+  for (let i = 0; i < 8; i++) {
+    await nextTick()
+    await waitFrame()
+
+    if (anchor) {
+      await restoreOuterAnchor(anchor, {
+        immediate: true,
+        expectedJump: true,
+      })
+    }
+
+    applyLabStats(collectStats({ reconcile: true }))
+  }
+
+  scheduleLabEvent('same-shape-session-replace', {
+    expectedJump: true,
+  })
+
+  deferClearThreadRestoreTarget(threadId)
 }
 
 async function scrollToRatio(ratio: number) {
@@ -2490,6 +2572,7 @@ function exposeLabApi() {
     toggleNarrowMode,
     toggleReverseFlexMode,
     forceUnmountVisibleHugeMessage,
+    replaceVisibleHugeMessageSameShape,
     settleVisibleRenderers,
     nextFrame: waitFrame,
     clearEvents: clearLabEvents,
@@ -2511,6 +2594,7 @@ function exposeLabApi() {
       toggleNarrowMode,
       toggleReverseFlexMode,
       forceUnmountVisibleHugeMessage,
+      replaceVisibleHugeMessageSameShape,
       settleVisibleRenderers,
       resetHeights,
     },
@@ -2810,73 +2894,130 @@ onBeforeUnmount(() => {
       </p>
     </section>
 
-    <main
-      ref="scrollRoot"
-      data-testid="virtual-scroll-root"
-      class="scroller"
-      :class="{ 'reverse-flex-mode': reverseFlexMode }"
-      @scroll.passive="onScroll"
-    >
-      <div
-        data-testid="virtual-canvas"
-        class="virtual-canvas"
-        :style="{ height: `${totalHeight}px` }"
-      >
-        <article
-          v-for="{ message, top, height } in visibleItems"
-          :key="messageRenderKey(message)"
-          :ref="el => setMessageEl(message, el as Element | null)"
-          class="virtual-message"
-          :class="[message.role, { huge: message.huge }]"
-          :data-message-id="message.id"
-          :data-expected-height="Math.round(height)"
-          :style="{
-            transform: `translateY(${top}px)`,
-            height: `${height}px`,
-          }"
-        >
-          <div
-            :ref="el => setMessageCardEl(message, el as Element | null)"
-            class="message-card"
-          >
-            <div class="message-meta">
-              <strong>{{ message.role }}</strong>
-              <span>{{ message.id }}</span>
-              <span v-if="message.huge">huge</span>
-              <span>{{ message.final ? 'final' : 'streaming' }}</span>
-              <span>estimated item height: {{ Math.round(height) }}px</span>
-            </div>
+    <div class="virtual-workspace">
+      <aside class="virtual-debug-panel" aria-label="Virtual Scroll Health">
+        <h2>Virtual Scroll Health</h2>
 
-            <div
-              :ref="el => setMarkdownHostEl(message, el as Element | null)"
-              class="markdown-host"
-            >
-              <MarkdownRender
-                v-if="!isForceHidden(message)"
-                :key="messageRenderKey(message)"
-                :ref="instance => setRendererRef(message, instance as MarkstreamRendererHandle | null)"
-                :content="message.content"
-                :final="message.final"
-                :custom-id="message.id"
-                :index-key="messageKey(message)"
-                :max-live-nodes="isCoordinatedMessage(message) ? maxLiveNodes : 0"
-                :live-node-buffer="60"
-                :batch-rendering="true"
-                :initial-render-batch-size="40"
-                :render-batch-size="80"
-                :render-code-blocks-as-pre="true"
-                :fade="false"
-                :virtual-scroll="makeVirtualScrollOptions(message)"
-                @height-change="onHeightChange(message, $event)"
-                @virtual-state-change="onVirtualStateChange(message, $event)"
-                @anchor-change="onAnchorChange(message, $event)"
-                @render-settled="onRenderSettled"
-              />
-            </div>
+        <dl>
+          <div>
+            <dt>Thread</dt>
+            <dd>{{ debugSummary.thread }}</dd>
           </div>
-        </article>
-      </div>
-    </main>
+          <div>
+            <dt>ScrollTop</dt>
+            <dd>{{ debugSummary.scrollTop }}</dd>
+          </div>
+          <div>
+            <dt>Total height</dt>
+            <dd>{{ debugSummary.totalHeight }}</dd>
+          </div>
+          <div>
+            <dt>Visible range</dt>
+            <dd>{{ debugSummary.visibleRange.start }} - {{ debugSummary.visibleRange.end }}</dd>
+          </div>
+          <div>
+            <dt>DOM nodes</dt>
+            <dd>{{ debugSummary.domNodeCount }}</dd>
+          </div>
+          <div>
+            <dt>Markdown slots</dt>
+            <dd>{{ debugSummary.markdownSlotCount }}</dd>
+          </div>
+          <div>
+            <dt>Max huge slots</dt>
+            <dd>{{ debugSummary.maxHugeMessageSlotCount }}</dd>
+          </div>
+          <div>
+            <dt>Blank frames</dt>
+            <dd>{{ debugSummary.blankFrameCount }}</dd>
+          </div>
+          <div>
+            <dt>Thread restore delta</dt>
+            <dd>{{ debugSummary.lastThreadRestoreDeltaPx }}px</dd>
+          </div>
+          <div>
+            <dt>Anchor delta</dt>
+            <dd>{{ debugSummary.lastThreadRestoreAnchorDeltaPx }}px</dd>
+          </div>
+        </dl>
+
+        <div class="virtual-health-flags">
+          <span :data-ok="debugSummary.virtualDomWithinLimit">DOM budget</span>
+          <span :data-ok="debugSummary.hugeRendererDomWithinLimit">Huge DOM budget</span>
+          <span :data-ok="debugSummary.threadRestoreOk">Thread restore</span>
+          <span :data-ok="debugSummary.layoutIntegrityOk">Layout integrity</span>
+          <span :data-ok="debugSummary.visibleCoverageOk">No blank viewport</span>
+        </div>
+      </aside>
+
+      <main
+        ref="scrollRoot"
+        data-testid="virtual-scroll-root"
+        class="scroller"
+        :class="{ 'reverse-flex-mode': reverseFlexMode }"
+        @scroll.passive="onScroll"
+      >
+        <div
+          data-testid="virtual-canvas"
+          class="virtual-canvas"
+          :style="{ height: `${totalHeight}px` }"
+        >
+          <article
+            v-for="{ message, top, height } in visibleItems"
+            :key="messageRenderKey(message)"
+            :ref="el => setMessageEl(message, el as Element | null)"
+            class="virtual-message"
+            :class="[message.role, { huge: message.huge }]"
+            :data-message-id="message.id"
+            :data-expected-height="Math.round(height)"
+            :style="{
+              transform: `translateY(${top}px)`,
+              height: `${height}px`,
+            }"
+          >
+            <div
+              :ref="el => setMessageCardEl(message, el as Element | null)"
+              class="message-card"
+            >
+              <div class="message-meta">
+                <strong>{{ message.role }}</strong>
+                <span>{{ message.id }}</span>
+                <span v-if="message.huge">huge</span>
+                <span>{{ message.final ? 'final' : 'streaming' }}</span>
+                <span>estimated item height: {{ Math.round(height) }}px</span>
+              </div>
+
+              <div
+                :ref="el => setMarkdownHostEl(message, el as Element | null)"
+                class="markdown-host"
+              >
+                <MarkdownRender
+                  v-if="!isForceHidden(message)"
+                  :key="messageRenderKey(message)"
+                  :ref="instance => setRendererRef(message, instance as MarkstreamRendererHandle | null)"
+                  :content="message.content"
+                  :final="message.final"
+                  :custom-id="message.id"
+                  :index-key="messageKey(message)"
+                  :max-live-nodes="isCoordinatedMessage(message) ? maxLiveNodes : 0"
+                  :live-node-buffer="60"
+                  :batch-rendering="true"
+                  :initial-render-batch-size="40"
+                  :render-batch-size="80"
+                  :render-code-blocks-as-pre="true"
+                  :fade="false"
+                  :virtual-scroll="makeVirtualScrollOptions(message)"
+                  @height-change="onHeightChange(message, $event)"
+                  @virtual-state-change="onVirtualStateChange(message, $event)"
+                  @anchor-change="onAnchorChange(message, $event)"
+                  @render-settled="onRenderSettled"
+                />
+              </div>
+            </div>
+          </article>
+        </div>
+      </main>
+    </div>
   </div>
 </template>
 
@@ -3074,9 +3215,83 @@ button:hover {
   color: #991b1b;
 }
 
+.virtual-workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.virtual-debug-panel {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 20;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(420px, calc(100vh - 24px));
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(120, 120, 120, 0.25);
+  border-radius: 12px;
+  background: color-mix(in srgb, Canvas 94%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.virtual-debug-panel h2 {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.virtual-debug-panel dl {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.virtual-debug-panel dl > div {
+  display: contents;
+}
+
+.virtual-debug-panel dt {
+  color: #64748b;
+}
+
+.virtual-debug-panel dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.virtual-health-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.virtual-health-flags span {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.virtual-health-flags span[data-ok='true'] {
+  background: #dcfce7;
+  color: #166534;
+}
+
 @media (max-width: 900px) {
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .virtual-debug-panel {
+    display: none;
   }
 }
 
@@ -3098,7 +3313,9 @@ button:hover {
 }
 
 .scroller {
-  flex: 1 1 auto;
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 0;
   overflow: auto;
   contain: strict;
   position: relative;
@@ -3115,7 +3332,8 @@ button:hover {
 
 .virtual-scroll-page.narrow .scroller {
   width: min(100%, 300px);
-  align-self: center;
+  align-self: stretch;
+  justify-self: center;
   border-inline: 1px solid var(--lab-border);
 }
 

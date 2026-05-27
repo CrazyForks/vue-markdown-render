@@ -36,6 +36,7 @@ function createHarness(options: {
   const parsedNodesIdentity = computed(() => parsedNodes.value)
   const parsedNodeCount = computed(() => parsedNodes.value.length)
   const desiredRenderedCount = computed(() => parsedNodeCount.value)
+  const datasetKey = computed(() => props.indexKey)
 
   const batchingEnabled = computed(() => true)
   const incremental = ref(options.incremental ?? true)
@@ -48,7 +49,7 @@ function createHarness(options: {
   const adaptiveBatchSize = ref(Math.max(1, resolvedBatchSize.value || 1))
 
   const previousRenderContext = ref<{
-    key: NodeRendererProps['indexKey']
+    key: unknown
     total: number
   }>({
     key: props.indexKey,
@@ -78,6 +79,7 @@ function createHarness(options: {
       parsedNodesIdentity,
       parsedNodeCount,
       desiredRenderedCount,
+      datasetKey,
 
       batchingEnabled,
       incrementalRenderingActive,
@@ -217,5 +219,73 @@ describe('useBatchRenderingScheduler', () => {
 
     expect(h.renderedCount.value).toBe(6)
     expect(h.cleanupNodeVisibility).toHaveBeenLastCalledWith(6)
+  })
+
+  it('resets batch state when an explicit dataset key changes with stable indexKey and length', async () => {
+    const props = reactive<SchedulerProps>({
+      indexKey: 'stable-message-key',
+      renderBatchDelay: 10,
+      renderBatchIdleTimeoutMs: 120,
+      renderBatchBudgetMs: 6,
+    })
+    const parsedNodes = ref(makeNodes(8))
+    const datasetKeySource = ref<unknown>('thread-a:message-1:rev-1')
+    const renderedCount = ref(0)
+    const cleanupNodeVisibility = vi.fn()
+    const onDatasetKeyChanged = vi.fn()
+    const onDatasetChanged = vi.fn()
+    const scope = effectScope()
+    let scheduler: ReturnType<typeof useBatchRenderingScheduler> | undefined
+
+    scope.run(() => {
+      scheduler = useBatchRenderingScheduler({
+        props: props as Readonly<NodeRendererProps>,
+        isClient: true,
+        isTestEnv: false,
+        parsedNodesIdentity: computed(() => parsedNodes.value),
+        parsedNodeCount: computed(() => parsedNodes.value.length),
+        desiredRenderedCount: computed(() => parsedNodes.value.length),
+        datasetKey: computed(() => datasetKeySource.value),
+        batchingEnabled: computed(() => true),
+        incrementalRenderingActive: computed(() => true),
+        resolvedBatchSize: computed(() => 2),
+        resolvedInitialBatch: computed(() => 2),
+        renderedCount,
+        adaptiveBatchSize: ref(2),
+        previousRenderContext: ref({
+          key: datasetKeySource.value,
+          total: 0,
+        }),
+        previousBatchConfig: ref({
+          batchSize: 2,
+          initial: 2,
+          delay: 10,
+          enabled: true,
+        }),
+        requestFrame: null,
+        cancelFrame: null,
+        hasIdleCallback: false,
+        cleanupNodeVisibility,
+        onDatasetKeyChanged,
+        onDatasetChanged,
+      })
+    })
+
+    cleanupFns.push(() => {
+      scheduler?.cleanupBatchScheduler()
+      scope.stop()
+    })
+
+    vi.advanceTimersByTime(10)
+    await nextTick()
+    expect(renderedCount.value).toBe(4)
+
+    datasetKeySource.value = 'thread-b:message-1:rev-1'
+    await nextTick()
+
+    expect(props.indexKey).toBe('stable-message-key')
+    expect(onDatasetKeyChanged).toHaveBeenCalledWith(8)
+    expect(onDatasetChanged).toHaveBeenCalled()
+    expect(renderedCount.value).toBe(2)
   })
 })

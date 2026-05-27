@@ -1506,9 +1506,43 @@ function isSameVirtualThreadKey(threadKey: string | undefined) {
   return (threadKey ?? '') === (getVirtualThreadKey() ?? '')
 }
 
-function getVirtualMeasurementKey() {
+function getHostVirtualMeasurementKey() {
   const key = props.virtualScroll?.measurementKey
   return key == null ? '' : String(key)
+}
+
+function getVirtualRendererLayoutKey() {
+  const monaco = props.codeBlockMonacoOptions
+  const codeProps = props.codeBlockProps
+
+  return [
+    props.isDark ? 'dark' : 'light',
+    props.renderCodeBlocksAsPre ? 'code-pre' : 'code-rich',
+    props.codeBlockStream === false ? 'code-static' : 'code-stream',
+    stringifyVirtualToken(props.codeBlockMinWidth),
+    stringifyVirtualToken(props.codeBlockMaxWidth),
+    stringifyVirtualToken(monaco?.fontSize),
+    stringifyVirtualToken(monaco?.lineHeight),
+    stringifyVirtualToken(monaco?.fontFamily),
+    stringifyVirtualToken(monaco?.tabSize),
+    stringifyVirtualToken(monaco?.MAX_HEIGHT),
+    stringifyVirtualToken(monaco?.wordWrap),
+    stringifyVirtualToken(monaco?.wrappingIndent),
+    stringifyVirtualToken(monaco?.padding),
+    stringifyVirtualToken(codeProps?.showHeader),
+    stringifyVirtualToken(codeProps?.showCopyButton),
+    stringifyVirtualToken(codeProps?.showExpandButton),
+    stringifyVirtualToken(codeProps?.showPreviewButton),
+    stringifyVirtualToken(codeProps?.showCollapseButton),
+    stringifyVirtualToken(codeProps?.showFontSizeButtons),
+  ].join('\u0000')
+}
+
+function getVirtualMeasurementKey() {
+  return [
+    getHostVirtualMeasurementKey(),
+    getVirtualRendererLayoutKey(),
+  ].join('\u0000')
 }
 
 function getCurrentVirtualWidth() {
@@ -1524,6 +1558,19 @@ const virtualLayoutEpochKey = computed(() => {
     getVirtualMeasurementKey(),
     virtualLayoutWidthBucket.value,
   ].join('\u0000')
+})
+
+const batchDatasetKey = computed(() => {
+  if (virtualScrollRequested.value) {
+    return [
+      'virtual',
+      getVirtualThreadKey() ?? '',
+      getVirtualSessionKey(),
+      virtualLayoutEpochKey.value,
+    ].join('\u0000')
+  }
+
+  return props.indexKey
 })
 
 function bumpAsyncNodeVersion() {
@@ -1898,8 +1945,13 @@ function getRendererLogicalHeight() {
     if (!hasModelHeight)
       return Math.ceil(domHeight)
 
-    if (incrementalRenderingActive.value && renderedCount.value < total)
-      return Math.max(1, Math.ceil(modelHeight))
+    if (incrementalRenderingActive.value && renderedCount.value < total) {
+      return Math.max(
+        1,
+        Math.ceil(domHeight),
+        Math.ceil(modelHeight),
+      )
+    }
 
     // Non-internal-virtualized mode mounts the full renderer DOM, so the outer
     // virtualizer must not receive less than the actual DOM box.
@@ -3857,6 +3909,7 @@ const {
   parsedNodesIdentity,
   parsedNodeCount,
   desiredRenderedCount,
+  datasetKey: batchDatasetKey,
   batchingEnabled,
   incrementalRenderingActive,
   resolvedBatchSize,
@@ -3949,8 +4002,7 @@ watch(
   [
     heightEstimationActive,
     experimentProbeWidth,
-    () => props.virtualScroll?.measurementKey,
-    () => props.isDark,
+    virtualLayoutEpochKey,
   ],
   async () => {
     if (!heightEstimationActive.value) {

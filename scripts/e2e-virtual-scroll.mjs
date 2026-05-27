@@ -587,6 +587,25 @@ async function run() {
 
         const unmountAfter = api.read()
 
+        api.clearEvents()
+        await api.scrollToRatio(0.72)
+        for (let i = 0; i < 20; i++)
+          await api.nextFrame()
+
+        api.clearEvents()
+        await api.nextFrame()
+        const sameShapeBefore = api.read()
+
+        if (typeof api.replaceVisibleHugeMessageSameShape !== 'function')
+          throw new Error('replaceVisibleHugeMessageSameShape lab action is missing')
+
+        await api.replaceVisibleHugeMessageSameShape()
+
+        for (let i = 0; i < 90; i++)
+          await api.nextFrame()
+
+        const sameShapeAfter = api.read()
+
         return {
           before,
           restored,
@@ -598,6 +617,10 @@ async function run() {
           unmountProbe: {
             before: unmountBefore,
             after: unmountAfter,
+          },
+          sameShapeProbe: {
+            before: sameShapeBefore,
+            after: sameShapeAfter,
           },
         }
       })
@@ -633,6 +656,17 @@ async function run() {
         && smoke.unmountProbe.after.health.hugeRendererDomWithinLimit,
         'forced renderer unmount caused lost virtual state, blank frame, or scroll jump',
         smoke.unmountProbe,
+      )
+
+      assert(
+        smoke.sameShapeProbe.after.stats.blankProbeCount === 0
+        && smoke.sameShapeProbe.after.blankFrameCount === 0
+        && smoke.sameShapeProbe.after.visibleCoverageOk
+        && smoke.sameShapeProbe.after.health.virtualDomWithinLimit
+        && smoke.sameShapeProbe.after.health.hugeRendererDomWithinLimit
+        && smoke.sameShapeProbe.after.health.maxObservedScrollJumpPx <= 32,
+        'same-shape virtual session replacement caused blank frame, DOM budget regression, or scroll jump',
+        smoke.sameShapeProbe,
       )
 
       assertNoPageErrors('virtual-scroll smoke e2e')

@@ -15,7 +15,7 @@ export interface BatchRenderingState {
   incrementalRenderingActive: ComputedRef<boolean>
   renderedCount: ReturnType<typeof ref<number>>
   previousRenderContext: ReturnType<typeof ref<{
-    key: NodeRendererProps['indexKey']
+    key: unknown
     total: number
   }>>
   adaptiveBatchSize: ReturnType<typeof ref<number>>
@@ -58,7 +58,7 @@ export function useBatchRenderingState(
   const renderedCount = ref(0)
 
   const previousRenderContext = ref<{
-    key: NodeRendererProps['indexKey']
+    key: unknown
     total: number
   }>({
     key: props.indexKey,

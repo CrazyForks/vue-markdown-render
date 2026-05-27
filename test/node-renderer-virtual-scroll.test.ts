@@ -66,6 +66,40 @@ function createCodeBlock(lineCount = 120) {
   } as any
 }
 
+function makeSameShapeContent(seed: string) {
+  return Array.from({ length: 120 }, (_, index) => {
+    return [
+      `## ${seed} heading ${index}`,
+      `${seed} paragraph ${index} `.repeat(8),
+    ].join('\n\n')
+  }).join('\n\n')
+}
+
+function makeDefaultVirtualMeasurementKey(host = '') {
+  return [
+    host,
+    [
+      'light',
+      'code-rich',
+      'code-stream',
+      ...Array.from({ length: 16 }, () => ''),
+    ].join('\u0000'),
+  ].join('\u0000')
+}
+
+async function flushQueuedAnimationFrames(
+  frames: FrameRequestCallback[],
+  count = 4,
+) {
+  for (let i = 0; i < count; i++) {
+    await nextTick()
+    const pending = frames.splice(0)
+    for (const callback of pending)
+      callback(performance.now())
+  }
+  await nextTick()
+}
+
 function installManualMeasurementPlatform() {
   const frames: FrameRequestCallback[] = []
   const heights = new WeakMap<HTMLElement, number>()
@@ -1014,6 +1048,73 @@ describe('node renderer virtual-scroll coordination', () => {
     expect((await handle.forceMeasure('manual')).totalHeight).toBe(120)
 
     wrapper.unmount()
+  })
+
+  it('resets incremental batch state when virtualScroll.sessionKey changes with stable indexKey and same node count', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    const frames: FrameRequestCallback[] = []
+    let wrapper: ReturnType<typeof mount> | null = null
+
+    process.env.NODE_ENV = 'development'
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    try {
+      const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+      wrapper = mount(NodeRenderer, {
+        attachTo: document.body,
+        props: {
+          indexKey: 'stable-message-key',
+          customId: 'same-length-session-test',
+          content: makeSameShapeContent('a'),
+          final: true,
+          batchRendering: true,
+          maxLiveNodes: 0,
+          initialRenderBatchSize: 8,
+          renderBatchSize: 8,
+          renderBatchDelay: 0,
+          fade: false,
+          viewportPriority: false,
+          virtualScroll: {
+            enabled: true,
+            sessionKey: 'thread-a:message-1:rev-1',
+            threadKey: 'thread-a',
+            settleMode: 'manual',
+            settledToken: true,
+          },
+        },
+      })
+
+      await flushAll()
+      await flushQueuedAnimationFrames(frames, 12)
+
+      const renderedBeforeSwitch = getRootNodeContentElements(wrapper.element).length
+      expect(renderedBeforeSwitch).toBeGreaterThan(8)
+
+      await wrapper.setProps({
+        content: makeSameShapeContent('b'),
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'thread-b:message-1:rev-1',
+          threadKey: 'thread-b',
+          settleMode: 'manual',
+          settledToken: true,
+        },
+      })
+
+      await nextTick()
+
+      const renderedImmediatelyAfterSwitch = getRootNodeContentElements(wrapper.element).length
+      expect(renderedImmediatelyAfterSwitch).toBeLessThanOrEqual(8)
+    }
+    finally {
+      wrapper?.unmount()
+      process.env.NODE_ENV = originalNodeEnv
+    }
   })
 
   it('invalidates measured heights when node content changes in the same session', async () => {
@@ -2224,6 +2325,7 @@ describe('node renderer virtual-scroll coordination', () => {
             anchor: { type: 'node', nodeIndex: 0, offsetWithinNodePx: 0 },
             metrics,
             width: 320,
+            measurementKey: makeDefaultVirtualMeasurementKey(),
             heightCache: seedCache,
           },
         },
@@ -2322,7 +2424,7 @@ describe('node renderer virtual-scroll coordination', () => {
       anchor: { type: 'node', nodeIndex: 0, offsetWithinNodePx: 0 },
       metrics,
       width: 400,
-      measurementKey: 'light:16',
+      measurementKey: makeDefaultVirtualMeasurementKey('light:16'),
       heightCache: seedCache,
     } as any
 
@@ -2360,7 +2462,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     expect((await handle.forceMeasure('manual')).totalHeight).toBe(800)
-    expect(handle.captureVirtualState()?.measurementKey).toBe('light:16')
+    expect(handle.captureVirtualState()?.measurementKey).toBe(makeDefaultVirtualMeasurementKey('light:16'))
 
     wrapper.unmount()
   })
@@ -2420,6 +2522,7 @@ describe('node renderer virtual-scroll coordination', () => {
             anchor: { type: 'bottom', distanceFromBottomPx: 0 },
             metrics,
             width: 400,
+            measurementKey: makeDefaultVirtualMeasurementKey(),
             heightCache: seedCache,
           },
         },
@@ -2490,6 +2593,7 @@ describe('node renderer virtual-scroll coordination', () => {
             sessionKey: 'cache-only-anchor-request',
             metrics,
             width: 400,
+            measurementKey: makeDefaultVirtualMeasurementKey(),
             heightCache: seedCache,
           },
         },
@@ -3372,6 +3476,7 @@ describe('node renderer virtual-scroll coordination', () => {
             metrics,
             width: 400,
             contentHash: 'stale-content-hash',
+            measurementKey: makeDefaultVirtualMeasurementKey(),
             heightCache: seedCache,
           },
         },
@@ -3413,6 +3518,7 @@ describe('node renderer virtual-scroll coordination', () => {
         reason: 'manual',
       },
       width: 400,
+      measurementKey: makeDefaultVirtualMeasurementKey(),
       heightCache: seedCache,
     } as any
 
@@ -3475,6 +3581,7 @@ describe('node renderer virtual-scroll coordination', () => {
       anchor: { type: 'node', nodeIndex: 0, offsetWithinNodePx: 0 },
       metrics: handle.getVirtualMetrics(),
       width: 960,
+      measurementKey: makeDefaultVirtualMeasurementKey(),
       heightCache: seedCache,
     } as any
 
