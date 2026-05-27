@@ -370,9 +370,8 @@ async function run() {
 
             if (
               latest.stats.blankProbeCount === 0
-              && latest.health.maxObservedBlankProbes === 0
-              && latest.health.maxObservedPlaceholderProbes === 0
-              && latest.health.maxObservedEmptyCardProbes === 0
+              && latest.stats.placeholderProbeCount === 0
+              && latest.stats.emptyCardProbeCount === 0
               && latest.blankFrameCount === 0
               && latest.visibleCoverageOk
               && latest.health.virtualDomWithinLimit
@@ -438,7 +437,22 @@ async function run() {
         }
 
         api.toggleReverseFlexMode()
-        await api.nextFrame()
+        await waitHealthy()
+
+        api.clearEvents()
+        await api.scrollToRatio(0.82)
+        for (let i = 0; i < 20; i++)
+          await api.nextFrame()
+
+        const unmountBefore = api.read()
+
+        api.clearEvents()
+        await api.forceUnmountVisibleHugeMessage()
+
+        for (let i = 0; i < 60; i++)
+          await api.nextFrame()
+
+        const unmountAfter = api.read()
 
         return {
           before,
@@ -447,6 +461,10 @@ async function run() {
           reverseFlexProbe: {
             before: reverseBefore,
             after: reverseAfter,
+          },
+          unmountProbe: {
+            before: unmountBefore,
+            after: unmountAfter,
           },
         }
       })
@@ -465,6 +483,16 @@ async function run() {
         && smoke.final.health.maxObservedBlankProbes === 0,
         'virtual-scroll smoke health check failed',
         smoke.final,
+      )
+
+      assert(
+        smoke.unmountProbe.after.health.threadRestoreOk
+        && smoke.unmountProbe.after.health.maxObservedBlankProbes === 0
+        && smoke.unmountProbe.after.blankFrameCount === 0
+        && smoke.unmountProbe.after.health.maxObservedScrollJumpPx <= 32
+        && smoke.unmountProbe.after.health.hugeRendererDomWithinLimit,
+        'forced renderer unmount caused lost virtual state, blank frame, or scroll jump',
+        smoke.unmountProbe,
       )
 
       assertNoPageErrors('virtual-scroll smoke e2e')

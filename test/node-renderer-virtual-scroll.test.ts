@@ -311,6 +311,65 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('flushes latest virtual state before unmount', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'thread-a:unmount-flush',
+          threadKey: 'thread-a',
+          settleMode: 'manual',
+          emitIntervalMs: 1000,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const contentEls = getRootNodeContentElements(wrapper.element)
+    expect(contentEls.length).toBe(2)
+
+    platform.heights.set(contentEls[0]!, 48)
+    platform.heights.set(contentEls[1]!, 96)
+
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+
+    wrapper.unmount()
+
+    const heightEvents = wrapper.emitted('height-change') ?? []
+    expect(heightEvents.at(-1)?.[0]).toMatchObject({
+      sessionKey: 'thread-a:unmount-flush',
+      threadKey: 'thread-a',
+      totalHeight: 144,
+    })
+
+    const stateEvents = wrapper.emitted('virtual-state-change') ?? []
+    const lastState = stateEvents.at(-1)?.[0] as any
+
+    expect(lastState).toMatchObject({
+      sessionKey: 'thread-a:unmount-flush',
+      threadKey: 'thread-a',
+      metrics: {
+        totalHeight: 144,
+      },
+    })
+
+    expect(lastState.heightCache).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ index: 0, height: 48 }),
+        expect.objectContaining({ index: 1, height: 96 }),
+      ]),
+    )
+  })
+
   it('does not under-report non-virtualized coordinated height against mounted DOM', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default

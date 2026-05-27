@@ -172,6 +172,7 @@ declare global {
       toggleSmallMessageCoordination: () => void
       toggleNarrowMode: () => void
       toggleReverseFlexMode: () => void
+      forceUnmountVisibleHugeMessage: () => Promise<void>
       settleVisibleRenderers: () => Promise<MarkstreamVirtualMetrics[]>
       nextFrame: () => Promise<void>
       clearEvents: () => void
@@ -191,6 +192,7 @@ declare global {
         toggleSmallMessageCoordination: () => void
         toggleNarrowMode: () => void
         toggleReverseFlexMode: () => void
+        forceUnmountVisibleHugeMessage: () => Promise<void>
         settleVisibleRenderers: () => Promise<MarkstreamVirtualMetrics[]>
         resetHeights: () => void
       }
@@ -257,6 +259,7 @@ const messageEls = new Map<string, HTMLElement>()
 const messageCardEls = new Map<string, HTMLElement>()
 const markdownHostEls = new Map<string, HTMLElement>()
 const rendererRefs = new Map<string, MarkstreamRendererHandle>()
+const forceHiddenMessageKeys = reactive(new Set<string>())
 const threadRestoreTargetClearTimers = new Map<
   ThreadId,
   ReturnType<typeof setTimeout>
@@ -517,12 +520,20 @@ const measurementKey = computed(() => [
   maxLiveNodes.value,
 ].join(':'))
 
-function messageKey(message: Message) {
+function messageStateKey(message: Message) {
+  return `${message.threadId}:${message.id}`
+}
+
+function messageRenderKey(message: Message) {
   return `${message.threadId}:${message.id}:${message.revision}`
 }
 
+function messageKey(message: Message) {
+  return messageStateKey(message)
+}
+
 function setMessageEl(message: Message, el: Element | null) {
-  const key = messageKey(message)
+  const key = messageStateKey(message)
   if (el instanceof HTMLElement)
     messageEls.set(key, el)
   else
@@ -530,7 +541,7 @@ function setMessageEl(message: Message, el: Element | null) {
 }
 
 function setMessageCardEl(message: Message, el: Element | null) {
-  const key = messageKey(message)
+  const key = messageStateKey(message)
   if (el instanceof HTMLElement)
     messageCardEls.set(key, el)
   else
@@ -538,7 +549,7 @@ function setMessageCardEl(message: Message, el: Element | null) {
 }
 
 function setMarkdownHostEl(message: Message, el: Element | null) {
-  const key = messageKey(message)
+  const key = messageStateKey(message)
   if (el instanceof HTMLElement)
     markdownHostEls.set(key, el)
   else
@@ -546,11 +557,15 @@ function setMarkdownHostEl(message: Message, el: Element | null) {
 }
 
 function setRendererRef(message: Message, instance: MarkstreamRendererHandle | null) {
-  const key = messageKey(message)
+  const key = messageStateKey(message)
   if (instance)
     rendererRefs.set(key, instance)
   else
     rendererRefs.delete(key)
+}
+
+function isForceHidden(message: Message) {
+  return forceHiddenMessageKeys.has(messageStateKey(message))
 }
 
 function getEstimatedMessageHeight(message: Message) {
@@ -810,7 +825,7 @@ const labReady = computed(() => {
 })
 
 function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOptions {
-  const key = messageKey(message)
+  const key = messageStateKey(message)
   const state = virtualStates.get(key)
   const heightCache = state?.heightCache as MarkstreamHeightCache | undefined
   const enabled = message.huge || coordinateSmallMessages.value
@@ -848,9 +863,12 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
 
 function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   const key = messageKey(message)
-  const outerAnchor: OuterAnchor | null = streamBottomPinned
-    ? { type: 'bottom', distanceFromBottomPx: 0 }
-    : captureOuterAnchor()
+  const isActiveThreadMessage = message.threadId === activeThreadId.value
+  const outerAnchor: OuterAnchor | null = isActiveThreadMessage
+    ? streamBottomPinned
+      ? { type: 'bottom', distanceFromBottomPx: 0 }
+      : captureOuterAnchor()
+    : null
 
   const measuredContentHeight = getMeasuredMessageContentHeight(key)
   const logicalContentHeight = getLogicalMessageHeight(key, metrics.totalHeight)
@@ -860,8 +878,10 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
     : (measuredContentHeight || logicalContentHeight)
   const previous = getCachedItemHeight(key)
 
-  lastHeightEvent.value = metrics
-  markThreadRestoreConsumedIfNeeded(message, metrics)
+  if (isActiveThreadMessage) {
+    lastHeightEvent.value = metrics
+    markThreadRestoreConsumedIfNeeded(message, metrics)
+  }
 
   if (coordinated && measuredContentHeight > 0) {
     const drift = Math.abs(measuredContentHeight - logicalContentHeight)
@@ -877,7 +897,7 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   if (previous == null || Math.abs(previous - nextHeight) > 1) {
     setItemHeight(key, nextHeight)
 
-    if (shouldRestoreOuterAnchorAfterHeightChange(outerAnchor)) {
+    if (isActiveThreadMessage && shouldRestoreOuterAnchorAfterHeightChange(outerAnchor)) {
       void restoreOuterAnchor(outerAnchor, {
         immediate: true,
         expectedJump: outerAnchor?.type === 'bottom'
@@ -887,20 +907,22 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
     }
   }
 
-  scheduleStats()
-  scheduleLabEvent('markdown-height-change', {
-    heightDriftPx: measuredContentHeight > 0
-      ? Math.abs(measuredContentHeight - logicalContentHeight)
-      : previous == null
-        ? 0
-        : Math.abs(previous - nextHeight),
-    expectedJump: outerAnchor?.type === 'bottom'
-      || streamTimer != null
-      || isStreamingHeightChangeExpected()
-      || stressRunning.value
-      ? true
-      : undefined,
-  })
+  if (isActiveThreadMessage) {
+    scheduleStats()
+    scheduleLabEvent('markdown-height-change', {
+      heightDriftPx: measuredContentHeight > 0
+        ? Math.abs(measuredContentHeight - logicalContentHeight)
+        : previous == null
+          ? 0
+          : Math.abs(previous - nextHeight),
+      expectedJump: outerAnchor?.type === 'bottom'
+        || streamTimer != null
+        || isStreamingHeightChangeExpected()
+        || stressRunning.value
+        ? true
+        : undefined,
+    })
+  }
 }
 
 interface OuterAnchor {
@@ -1255,6 +1277,9 @@ function isCurrentOuterAnchorOwner(message: Message) {
 
 function onAnchorChange(message: Message, anchor: MarkstreamVirtualState['anchor']) {
   if (!anchor)
+    return
+
+  if (message.threadId !== activeThreadId.value)
     return
 
   const key = messageKey(message)
@@ -2147,6 +2172,27 @@ function waitFrame() {
   })
 }
 
+async function forceUnmountVisibleHugeMessage() {
+  const target = visibleItems.value.find(item => item.message.huge)
+  if (!target)
+    return
+
+  captureVisibleVirtualStates()
+
+  const key = messageStateKey(target.message)
+  forceHiddenMessageKeys.add(key)
+
+  await nextTick()
+  scheduleStats()
+
+  await waitFrame()
+
+  forceHiddenMessageKeys.delete(key)
+
+  await nextTick()
+  scheduleStats()
+}
+
 async function scrollToRatio(ratio: number) {
   const max = Math.max(0, totalHeight.value - viewportHeight.value)
   applyOuterScrollTop(max * Math.max(0, Math.min(1, ratio)))
@@ -2226,6 +2272,7 @@ function exposeLabApi() {
     toggleSmallMessageCoordination,
     toggleNarrowMode,
     toggleReverseFlexMode,
+    forceUnmountVisibleHugeMessage,
     settleVisibleRenderers,
     nextFrame: waitFrame,
     clearEvents: clearLabEvents,
@@ -2246,6 +2293,7 @@ function exposeLabApi() {
       toggleSmallMessageCoordination,
       toggleNarrowMode,
       toggleReverseFlexMode,
+      forceUnmountVisibleHugeMessage,
       settleVisibleRenderers,
       resetHeights,
     },
@@ -2494,6 +2542,34 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
+    <section class="dom-budget">
+      <h3>DOM budget</h3>
+      <p>
+        Markdown slots:
+        <strong :class="{ danger: markdownSlotCount > expectedMarkdownSlotCeiling }">
+          {{ markdownSlotCount }}
+        </strong>
+        /
+        {{ expectedMarkdownSlotCeiling }}
+      </p>
+      <p>
+        Huge renderer max slots:
+        <strong :class="{ danger: labSnapshot.maxHugeMessageSlotCount > maxLiveNodes + 96 }">
+          {{ labSnapshot.maxHugeMessageSlotCount }}
+        </strong>
+        /
+        {{ maxLiveNodes + 96 }}
+      </p>
+      <p>
+        Total DOM nodes:
+        <strong :class="{ danger: domNodeCount > expectedDomNodeCeiling }">
+          {{ domNodeCount }}
+        </strong>
+        /
+        {{ expectedDomNodeCeiling }}
+      </p>
+    </section>
+
     <main
       ref="scrollRoot"
       data-testid="virtual-scroll-root"
@@ -2508,7 +2584,7 @@ onBeforeUnmount(() => {
       >
         <article
           v-for="{ message, top, height } in visibleItems"
-          :key="messageKey(message)"
+          :key="messageRenderKey(message)"
           :ref="el => setMessageEl(message, el as Element | null)"
           class="virtual-message"
           :class="[message.role, { huge: message.huge }]"
@@ -2534,6 +2610,7 @@ onBeforeUnmount(() => {
               class="markdown-host"
             >
               <MarkdownRender
+                v-if="!isForceHidden(message)"
                 :ref="instance => setRendererRef(message, instance as MarkstreamRendererHandle | null)"
                 :content="message.content"
                 :final="message.final"
@@ -2672,6 +2749,36 @@ button:hover {
 }
 
 .metrics-grid .bad {
+  color: #991b1b;
+}
+
+.dom-budget {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--lab-border);
+  background: var(--lab-panel);
+}
+
+.dom-budget h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.dom-budget p {
+  margin: 0;
+  color: var(--lab-muted);
+  font-size: 12px;
+}
+
+.dom-budget strong {
+  color: var(--lab-text);
+}
+
+.dom-budget .danger {
   color: #991b1b;
 }
 

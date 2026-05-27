@@ -3157,6 +3157,42 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
   }
 }
 
+function flushVirtualStateBeforeUnmount() {
+  if (!virtualScrollEnabled.value)
+    return
+
+  try {
+    forceFlushPendingHeightMeasurements()
+
+    const metrics = getVirtualMetrics('manual')
+
+    if (shouldEmitVirtualMetrics(metrics)) {
+      emitHeightChange(metrics)
+      lastEmittedVirtualMetrics = metrics
+      lastVirtualEmitAt = getVirtualNow()
+    }
+
+    const state = captureVirtualStateFromMetrics(metrics, {
+      includeHeightCache: true,
+      includeContentHash: true,
+      allowAnchorFallback: true,
+      includeEmptyState: true,
+    })
+
+    if (state) {
+      emitVirtualStateChange(state)
+
+      if (state.anchor)
+        emitAnchorChange(state.anchor)
+
+      lastEmittedVirtualStateKey = getVirtualStateEventKey(state)
+    }
+  }
+  catch {
+    // Unmount cleanup must never throw.
+  }
+}
+
 watch(
   virtualScrollDomEnabled,
   (enabled) => {
@@ -4327,6 +4363,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  flushVirtualStateBeforeUnmount()
   cleanupBatchScheduler()
   destroyNodeVisibilityState()
   clearContentStreamingTailIdleTimer()
