@@ -146,6 +146,90 @@ function tokenToRaw(token: MarkdownToken) {
   return String(shape.raw ?? shape.content ?? shape.markup ?? '')
 }
 
+function getMutableMeta(token: MarkdownToken) {
+  const target = token as MarkdownToken & { meta?: Record<string, unknown> | null }
+  if (!target.meta)
+    target.meta = {}
+  return target.meta as Record<string, unknown>
+}
+
+function setCustomHtmlSourceMeta(token: MarkdownToken, raw: string, inner: string) {
+  const meta = getMutableMeta(token)
+  meta.markstreamCustomHtmlRaw = raw
+  meta.markstreamCustomHtmlInner = inner
+}
+
+function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<string>) {
+  if (!customTagSet.size)
+    return
+
+  const stack: Array<{ tag: string, token: MarkdownToken, raw: string, inner: string }> = []
+
+  const appendToOpenFrames = (raw: string) => {
+    if (!raw || !stack.length)
+      return
+    for (const frame of stack) {
+      frame.raw += raw
+      frame.inner += raw
+    }
+  }
+
+  const handleToken = (child: MarkdownToken) => {
+    const raw = tokenToRaw(child)
+    const tag = child.type === 'html_inline'
+      ? getHtmlInlineTagName(raw)
+      : ''
+    const isCustomTag = tag && customTagSet.has(tag)
+
+    if (!isCustomTag) {
+      appendToOpenFrames(raw)
+      return
+    }
+
+    const closing = isHtmlInlineClosingTag(raw)
+    const selfClosing = !closing && isSelfClosingHtmlInline(raw, tag)
+
+    if (closing) {
+      if (!stack.length || stack[stack.length - 1].tag !== tag) {
+        appendToOpenFrames(raw)
+        return
+      }
+
+      for (let i = 0; i < stack.length; i++) {
+        stack[i].raw += raw
+        if (i < stack.length - 1)
+          stack[i].inner += raw
+      }
+
+      const frame = stack.pop()!
+      setCustomHtmlSourceMeta(frame.token, frame.raw, frame.inner)
+      return
+    }
+
+    appendToOpenFrames(raw)
+    if (selfClosing) {
+      setCustomHtmlSourceMeta(child, raw, '')
+      return
+    }
+
+    stack.push({ tag, token: child, raw, inner: '' })
+  }
+
+  for (const token of tokens) {
+    if (token.type === 'inline' && Array.isArray(token.children)) {
+      for (const child of token.children)
+        handleToken(child)
+      continue
+    }
+
+    if (stack.length && typeof token.content === 'string')
+      appendToOpenFrames(token.content)
+  }
+
+  for (const frame of stack)
+    setCustomHtmlSourceMeta(frame.token, frame.raw, frame.inner)
+}
+
 function isNonElementHtmlBlock(content: string) {
   return /^\s*<\s*[!?]/.test(content)
 }
@@ -476,6 +560,8 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
         console.error('[applyFixHtmlInlineTokens] failed to fix streaming html inline', e)
       }
     }
+
+    attachCustomHtmlSourceMeta(toks, customTagSet)
   })
 
   // Fix certain single-token inline HTML cases by expanding into [openTag, text, closeTag]

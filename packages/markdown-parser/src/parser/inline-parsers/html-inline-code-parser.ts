@@ -68,6 +68,15 @@ function tokenToRaw(token: MarkdownToken) {
   return String(raw ?? '')
 }
 
+function getCustomHtmlSourceMeta(token: MarkdownToken) {
+  const meta = (token as MarkdownToken & { meta?: Record<string, unknown> | null }).meta
+  const raw = meta?.markstreamCustomHtmlRaw
+  const inner = meta?.markstreamCustomHtmlInner
+  return typeof raw === 'string' && typeof inner === 'string'
+    ? { raw, inner }
+    : null
+}
+
 type AttrTuple = [string, string]
 
 function getAttrValue(attrs: AttrTuple[], name: string): string | undefined {
@@ -355,9 +364,10 @@ export function parseHtmlInlineCodeToken(
     attrs.push([attrName, attrValue])
   }
   if (customTagSet?.has(tag)) {
-    const _content = fragment.innerTokens.length
-      ? stringifyTokens(fragment.innerTokens)
-      : ''
+    const sourceMeta = getCustomHtmlSourceMeta(token)
+    const _content = sourceMeta
+      ? sourceMeta.inner
+      : (fragment.innerTokens.length ? stringifyTokens(fragment.innerTokens) : '')
 
     const customChildren = fragment.innerTokens.length
       ? parseInlineTokens(fragment.innerTokens, raw, pPreToken, options)
@@ -369,7 +379,7 @@ export function parseHtmlInlineCodeToken(
         attrs,
         content: _content,
         children: customChildren,
-        raw: content,
+        raw: sourceMeta?.raw ?? content,
         loading: token.loading || loading,
         autoClosed,
       } as ParsedNode,
