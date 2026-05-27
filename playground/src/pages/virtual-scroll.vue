@@ -813,19 +813,23 @@ const labReady = computed(() => {
 })
 
 function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOptions {
-  const key = messageStateKey(message)
-  const state = virtualStates.get(key)
+  const stateKey = messageStateKey(message)
+  const sessionKey = messageRenderKey(message)
+  const previousState = virtualStates.get(stateKey)
+  const state = previousState?.sessionKey === sessionKey
+    ? previousState
+    : undefined
   const heightCache = state?.heightCache as MarkstreamHeightCache | undefined
   const enabled = message.huge || coordinateSmallMessages.value
   const restoreTarget = threadRestoreTargets.get(message.threadId)
 
   const options = {
     enabled,
-    sessionKey: key,
+    sessionKey,
     threadKey: message.threadId,
     scrollRoot: () => scrollRoot.value,
     restoreState: state ?? null,
-    restoreAnchor: restoreTarget?.messageKey === key
+    restoreAnchor: restoreTarget?.messageKey === stateKey
       ? restoreTarget.token
       : false,
     measurementKey: measurementKey.value,
@@ -1799,7 +1803,14 @@ async function switchThread(threadId: ThreadId) {
     for (const message of threads[threadId]) {
       const key = messageKey(message)
       const state = virtualStates.get(key)
-      const height = state?.metrics?.totalHeight
+
+      if (!state)
+        continue
+
+      if (state.sessionKey !== messageRenderKey(message))
+        continue
+
+      const height = state.metrics?.totalHeight
       if (
         height
         && height > 0
@@ -2805,6 +2816,7 @@ onBeforeUnmount(() => {
             >
               <MarkdownRender
                 v-if="!isForceHidden(message)"
+                :key="messageRenderKey(message)"
                 :ref="instance => setRendererRef(message, instance as MarkstreamRendererHandle | null)"
                 :content="message.content"
                 :final="message.final"

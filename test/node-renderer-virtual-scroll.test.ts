@@ -52,6 +52,20 @@ function createLongListNode(mutated = false) {
   } as any
 }
 
+function createCodeBlock(lineCount = 120) {
+  const code = Array.from({ length: lineCount }, (_, index) => {
+    return `console.log("line ${index + 1}")`
+  }).join('\n')
+
+  return {
+    type: 'code_block',
+    language: 'ts',
+    code,
+    raw: `\`\`\`ts\n${code}\n\`\`\``,
+    loading: false,
+  } as any
+}
+
 function installManualMeasurementPlatform() {
   const frames: FrameRequestCallback[] = []
   const heights = new WeakMap<HTMLElement, number>()
@@ -502,22 +516,23 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('does not under-report internally virtualized coordinated height against mounted DOM', async () => {
+  it('does not pin virtualized logical height to stale container scrollHeight', async () => {
+    const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => 640)
+
     const wrapper = mount(NodeRenderer, {
       props: {
-        nodes: [
-          createParagraph(1),
-          createParagraph(2),
-          createParagraph(3),
-        ],
+        nodes: Array.from({ length: 8 }, (_, index) => createParagraph(index + 1)),
         final: true,
         fade: false,
         viewportPriority: false,
-        maxLiveNodes: 1,
+        maxLiveNodes: 4,
+        liveNodeBuffer: 0,
         virtualScroll: {
           enabled: true,
-          sessionKey: 'virtualized-dom-floor',
+          sessionKey: 'virtualized-shrink',
           settleMode: 'manual',
           emitIntervalMs: 0,
         },
@@ -526,17 +541,66 @@ describe('node renderer virtual-scroll coordination', () => {
 
     Object.defineProperty(wrapper.element, 'scrollHeight', {
       configurable: true,
-      get: () => 600,
+      get: () => 1000,
     })
     Object.defineProperty(wrapper.element, 'offsetHeight', {
       configurable: true,
-      get: () => 600,
+      get: () => 1000,
     })
 
     await flushAll()
+    await nextTick()
 
-    expect((wrapper.vm as any).getVirtualMetrics().totalHeight).toBe(600)
-    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).toBe(600)
+    const contentEls = getRootNodeContentElements(wrapper.element)
+    expect(contentEls.length).toBeGreaterThan(0)
+    expect(contentEls.length).toBeLessThanOrEqual(4)
+
+    for (const el of contentEls) {
+      platform.heights.set(el, 40)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+    }
+
+    platform.flushFrames()
+    await nextTick()
+
+    const metrics = await (wrapper.vm as any).forceMeasure('manual')
+
+    expect(metrics.nodeCount).toBe(8)
+    expect(metrics.totalHeight).toBe(320)
+    expect(metrics.totalHeight).toBeLessThan(1000)
+
+    wrapper.unmount()
+  })
+
+  it('estimates pre-rendered code block height for virtual-scroll coordination', async () => {
+    installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => 640)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createCodeBlock(120)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        renderCodeBlocksAsPre: true,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'pre-code-estimation',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const metrics = await (wrapper.vm as any).forceMeasure('manual')
+
+    expect(metrics.estimatedCount).toBe(1)
+    expect(metrics.totalHeight).toBeGreaterThan(1000)
 
     wrapper.unmount()
   })

@@ -1101,7 +1101,7 @@ const estimatedNodeHeights = computed(() => {
 
     if (codeBlockEstimationEnabled.value && node.type === 'code_block') {
       const rendererKind = resolveCodeBlockRendererKind(node)
-      if (rendererKind === 'monaco' || rendererKind === 'markdown') {
+      if (rendererKind === 'monaco' || rendererKind === 'markdown' || rendererKind === 'pre') {
         return estimateCodeBlockHeight(node, {
           rendererKind,
           monacoOptions: props.codeBlockMonacoOptions,
@@ -1609,17 +1609,11 @@ provide(MARKSTREAM_NODE_LIFECYCLE_KEY, providedNodeLifecycle)
 
 function getVisibleDomHeight() {
   let total = 0
+
   for (const el of nodeContentElements.values())
     total += el?.offsetHeight ?? 0
 
-  const spacerHeight = virtualizationEnabled.value
-    ? topSpacerHeight.value + bottomSpacerHeight.value
-    : 0
-
-  return Math.ceil(Math.max(
-    total + spacerHeight,
-    containerRef.value?.offsetHeight ?? 0,
-  ))
+  return Math.ceil(Math.max(0, total))
 }
 
 let imperativeVirtualSettleSessionKey: string | null = null
@@ -1768,7 +1762,7 @@ function getScrollBox() {
 
 function getRendererLogicalHeight() {
   const total = parsedNodes.value.length
-  const estimatedHeight = Math.max(0, estimateHeightRange(0, total))
+  const modelHeight = Math.max(0, estimateHeightRange(0, total))
   const domHeight = Math.max(
     0,
     containerRef.value?.scrollHeight ?? 0,
@@ -1779,17 +1773,14 @@ function getRendererLogicalHeight() {
     return Math.ceil(domHeight)
 
   if (virtualizationEnabled.value) {
-    return virtualScrollEnabled.value
-      ? Math.max(
-          1,
-          Math.ceil(estimatedHeight),
-          Math.ceil(domHeight),
-        )
-      : Math.max(1, Math.ceil(estimatedHeight))
+    if (modelHeight > 0)
+      return Math.max(1, Math.ceil(modelHeight))
+
+    return Math.max(1, Math.ceil(domHeight))
   }
 
   if (virtualScrollEnabled.value) {
-    const hasModelHeight = estimatedHeight > 0
+    const hasModelHeight = modelHeight > 0
       || heightStats.count > 0
       || getEstimatedNodeHeightCount() > 0
 
@@ -1797,21 +1788,21 @@ function getRendererLogicalHeight() {
       return Math.ceil(domHeight)
 
     if (incrementalRenderingActive.value && renderedCount.value < total)
-      return Math.max(1, Math.ceil(estimatedHeight))
+      return Math.max(1, Math.ceil(modelHeight))
 
-    // In non-internal-virtualized mode the full renderer DOM is mounted, so
-    // outer virtualizers must never receive less than the actual DOM height.
+    // Non-internal-virtualized mode mounts the full renderer DOM, so the outer
+    // virtualizer must not receive less than the actual DOM box.
     return Math.max(
       1,
       Math.ceil(domHeight),
-      Math.ceil(estimatedHeight),
+      Math.ceil(modelHeight),
     )
   }
 
   return Math.max(
     1,
     Math.ceil(domHeight),
-    Math.ceil(estimatedHeight),
+    Math.ceil(modelHeight),
   )
 }
 

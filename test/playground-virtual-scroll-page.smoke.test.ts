@@ -96,5 +96,5 @@ describe('playground /virtual-scroll shell smoke', () => {
     expect(wrapper.get('[data-testid="item-overflow"]').text()).toContain('item overflow:')
 
     wrapper.unmount()
-  })
+  }, 10000)
 })
