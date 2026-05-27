@@ -340,18 +340,37 @@ async function run() {
         api.clearEvents()
         api.toggleReverseFlexMode()
         await api.nextFrame()
-        await api.scrollToRatio(1)
+        await api.scrollToRatio(0.62)
 
         const reverseBefore = api.read()
+        const reverseOtherThread = reverseBefore.threadId === 'thread-a' ? 'thread-b' : 'thread-a'
 
-        await api.switchThread(reverseBefore.threadId === 'thread-a' ? 'thread-b' : 'thread-a')
-        await api.nextFrame()
+        await api.switchThread(reverseOtherThread)
+        await api.scrollToRatio(0.28)
         await api.switchThread(reverseBefore.threadId)
 
         for (let i = 0; i < 60; i++)
           await api.nextFrame()
+        api.clearEvents()
+        await api.nextFrame()
 
         const reverseAfter = api.read()
+
+        if (!reverseAfter.health.threadRestoreOk) {
+          throw new Error(
+            `reverse-flex thread restore failed: delta=${reverseAfter.lastThreadRestoreDeltaPx}, anchorDelta=${reverseAfter.lastThreadRestoreAnchorDeltaPx}`,
+          )
+        }
+
+        if (!reverseAfter.health.layoutIntegrityOk)
+          throw new Error(`reverse-flex layout integrity failed: ${reverseAfter.labStatus}`)
+
+        if (Math.abs(reverseAfter.scrollTop - reverseBefore.scrollTop) > 48 && !reverseAfter.health.threadRestoreOk) {
+          throw new Error(
+            `reverse-flex scrollTop drift too large: before=${reverseBefore.scrollTop}, after=${reverseAfter.scrollTop}`,
+          )
+        }
+
         api.toggleReverseFlexMode()
         await api.nextFrame()
 
@@ -585,16 +604,42 @@ async function run() {
       await api.nextFrame()
 
       await scrollToSettledBottom()
+      api.clearEvents()
+      await api.nextFrame()
       const settledEventsBeforeStream = api.read().settledEvents
       api.startStreamingLastMessage({
         blocks: 160,
-        initialChars: 800,
-        chunkSize: 6400,
-        intervalMs: 16,
+        chunkSize: 2600,
+        intervalMs: 32,
       })
-      await waitUntil(snapshot => snapshot.streamingActive === false, 360)
+
+      for (let i = 0; i < 80; i++) {
+        await api.nextFrame()
+        const snapshot = api.read()
+
+        if (snapshot.health.maxObservedBlankProbes > 0)
+          throw new Error(`blank frame during streaming: ${snapshot.health.maxObservedBlankProbes}`)
+
+        if (!snapshot.health.hugeRendererDomWithinLimit) {
+          throw new Error(
+            `DOM budget exceeded during streaming: slots=${snapshot.maxHugeMessageSlotCount}, budget=${snapshot.hugeRendererSlotBudget}`,
+          )
+        }
+
+        if (!snapshot.health.scrollJitterOk)
+          throw new Error(`unexpected scroll jitter during streaming: ${snapshot.health.maxObservedScrollJumpPx}px`)
+      }
+
+      await waitUntil(snapshot => snapshot.streamingActive === false, 720)
       await waitUntil(snapshot => snapshot.settledEvents > settledEventsBeforeStream, 180)
+      await api.settleVisibleRenderers()
+      api.clearEvents()
+      await api.nextFrame()
       const streamAfter = await waitHealthy(120, { clearEvents: false })
+
+      if (!streamAfter.health.layoutIntegrityOk)
+        throw new Error(`streaming final layout failed: ${streamAfter.labStatus}`)
+
       api.clearEvents()
       await api.nextFrame()
 

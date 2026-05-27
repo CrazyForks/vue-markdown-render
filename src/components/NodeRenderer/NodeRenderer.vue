@@ -2417,6 +2417,24 @@ let lastImportedVirtualHeightCacheSource: 'restore' | 'standalone' | null = null
 let lastAppliedVirtualRestoreSignature: string | null = null
 let pendingImperativeVirtualRestoreState: MarkstreamVirtualState | null = null
 let pendingImperativeVirtualRestoreOptions: { restoreAnchor: boolean, restoreToken: string } | null = null
+let warnedStandaloneHeightCacheWithoutSignature = false
+
+function warnStandaloneHeightCacheIgnored(reason: string) {
+  if (
+    warnedStandaloneHeightCacheWithoutSignature
+    || typeof console === 'undefined'
+    || !(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV)
+  ) {
+    return
+  }
+
+  warnedStandaloneHeightCacheWithoutSignature = true
+  console.warn(
+    `[markstream-vue] virtualScroll.heightCache ignored: ${reason}. `
+    + 'Use heightCache exported from virtual-state-change/render-settled, '
+    + 'and pass heightCacheWidth from the same state.',
+  )
+}
 
 function getHeightCacheSignature(cache: MarkstreamHeightCache) {
   const payload = cache
@@ -2457,8 +2475,12 @@ function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
     requireSignature: true,
   })
 
-  if (!boundedCache.length)
+  if (!boundedCache.length) {
+    warnStandaloneHeightCacheIgnored(
+      'standalone heightCache entries must include compatible signature metadata',
+    )
     return false
+  }
 
   const signature = getHeightCacheSignature(boundedCache)
   if (signature === lastImportedVirtualHeightCacheSignature) {

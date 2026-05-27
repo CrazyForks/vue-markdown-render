@@ -57,15 +57,13 @@ export interface MarkstreamMeasuredHeightCacheEntry {
 
 export interface MarkstreamHeightCacheEntry extends MarkstreamMeasuredHeightCacheEntry {
   /**
-   * Optional compatibility metadata.
+   * Compatibility metadata.
    *
    * MarkdownRender exports these fields for newly captured caches, and
    * standalone virtualScroll.heightCache imports require signature at runtime.
-   * They remain optional so persisted restoreState and host-merged caches can
-   * be represented without casts.
    */
   nodeType?: string
-  signature?: string
+  signature: string
 }
 
 export type MarkstreamHeightCache = MarkstreamHeightCacheEntry[]

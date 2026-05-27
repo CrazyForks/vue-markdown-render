@@ -6,7 +6,7 @@ import type {
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualState,
 } from '../../../src/exports'
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import MarkdownRender from '../../../src/exports'
 import '../../../src/index.css'
 
@@ -359,7 +359,7 @@ function markThreadRestoreConsumedIfNeeded(
 }
 
 function readRootScrollTop() {
-  return scrollRoot.value?.scrollTop ?? scrollTop.value
+  return getNormalizedOuterScrollTop()
 }
 
 function markStreamingHeightChangeExpected(durationMs = 8000) {
@@ -585,6 +585,69 @@ const prefixTops = computed(() => {
 
 const totalHeight = computed(() => prefixTops.value[prefixTops.value.length - 1] ?? 0)
 
+function isOuterReverseFlexRoot(root: HTMLElement | null = scrollRoot.value) {
+  if (!root || typeof window === 'undefined')
+    return false
+
+  try {
+    const style = window.getComputedStyle(root)
+    const display = (style.display || '').toLowerCase()
+    const direction = (style.flexDirection || '').toLowerCase()
+    return display.includes('flex') && direction.endsWith('reverse')
+  }
+  catch {
+    return false
+  }
+}
+
+function getOuterScrollMax(root: HTMLElement | null = scrollRoot.value) {
+  const viewport = root?.clientHeight || viewportHeight.value
+  return Math.max(
+    0,
+    totalHeight.value - viewport,
+    root ? (root.scrollHeight || 0) - (root.clientHeight || 0) : 0,
+  )
+}
+
+function getNormalizedOuterScrollTop(root: HTMLElement | null = scrollRoot.value) {
+  if (!root)
+    return scrollTop.value
+
+  if (!isOuterReverseFlexRoot(root))
+    return Math.max(0, root.scrollTop || 0)
+
+  const raw = root.scrollTop || 0
+  const distanceFromBottom = raw < 0 ? -raw : raw
+  return Math.max(0, getOuterScrollMax(root) - distanceFromBottom)
+}
+
+function setNormalizedOuterScrollTop(
+  value: number,
+  root: HTMLElement | null = scrollRoot.value,
+) {
+  const target = clampOuterScrollTop(value)
+  scrollTop.value = target
+  markProgrammaticScroll()
+
+  if (!root)
+    return
+
+  if (!isOuterReverseFlexRoot(root)) {
+    if (Math.abs((root.scrollTop || 0) - target) > 1)
+      root.scrollTop = target
+    scrollTop.value = getNormalizedOuterScrollTop(root)
+    return
+  }
+
+  const distanceFromBottom = Math.max(0, getOuterScrollMax(root) - target)
+
+  root.scrollTop = -distanceFromBottom
+  if (Math.abs(getNormalizedOuterScrollTop(root) - target) > 2)
+    root.scrollTop = distanceFromBottom
+
+  scrollTop.value = getNormalizedOuterScrollTop(root)
+}
+
 function lowerBoundOffset(offset: number) {
   const tops = prefixTops.value
   let low = 0
@@ -795,9 +858,10 @@ function captureOuterAnchor(): OuterAnchor | null {
   if (!root)
     return null
 
+  const currentScrollTop = getNormalizedOuterScrollTop(root)
   const distanceFromBottomPx = Math.max(
     0,
-    totalHeight.value - root.scrollTop - root.clientHeight,
+    totalHeight.value - currentScrollTop - root.clientHeight,
   )
 
   if (distanceFromBottomPx <= 8) {
@@ -807,13 +871,13 @@ function captureOuterAnchor(): OuterAnchor | null {
     }
   }
 
-  const index = lowerBoundOffset(root.scrollTop + 1)
+  const index = lowerBoundOffset(currentScrollTop + 1)
   const message = messages.value[index]
   return {
     type: 'item',
     messageKey: message ? messageKey(message) : undefined,
     index,
-    offsetPx: root.scrollTop - (prefixTops.value[index] ?? 0),
+    offsetPx: currentScrollTop - (prefixTops.value[index] ?? 0),
   }
 }
 
@@ -878,20 +942,7 @@ function clampOuterScrollTop(value: number) {
 }
 
 function applyOuterScrollTop(value: number) {
-  const next = clampOuterScrollTop(value)
-
-  scrollTop.value = next
-  markProgrammaticScroll()
-
-  const root = scrollRoot.value
-  if (root) {
-    if (Math.abs(root.scrollTop - next) > 1) {
-      markProgrammaticScroll()
-      root.scrollTop = next
-    }
-
-    scrollTop.value = root.scrollTop
-  }
+  setNormalizedOuterScrollTop(value)
 }
 
 function resolveOuterAnchorScrollTop(anchor: OuterAnchor) {
@@ -978,7 +1029,10 @@ function getCurrentDistanceFromBottom() {
   if (!root)
     return 0
 
-  return Math.max(0, totalHeight.value - root.scrollTop - root.clientHeight)
+  return Math.max(
+    0,
+    totalHeight.value - getNormalizedOuterScrollTop(root) - root.clientHeight,
+  )
 }
 
 function readPx(value: string | null | undefined) {
@@ -1355,6 +1409,8 @@ function applyLabStats(stats: LabStats) {
   blankFrameCount.value = stats.blankProbeCount > 0
     ? blankFrameCount.value + 1
     : 0
+
+  refreshLabSnapshot(stats)
 }
 
 function measureViewportCoverageGaps(root: HTMLElement) {
@@ -1555,6 +1611,8 @@ function pushLabEvent(
 
   while (labEvents.length > 300)
     labEvents.shift()
+
+  refreshLabSnapshot(stats)
 }
 
 function scheduleLabEvent(type: string, payload: Partial<LabEvent> = {}) {
@@ -1571,7 +1629,7 @@ function saveThreadScroll() {
   if (!root)
     return
 
-  const currentScrollTop = root.scrollTop
+  const currentScrollTop = getNormalizedOuterScrollTop(root)
   const anchor = captureOuterAnchor()
   captureVisibleVirtualStates()
   threadScrollTops.set(activeThreadId.value, currentScrollTop)
@@ -1648,11 +1706,10 @@ async function switchThread(threadId: ThreadId) {
     if (!root)
       return
 
-    markProgrammaticScroll()
-    root.scrollTop = scrollTop.value
+    setNormalizedOuterScrollTop(scrollTop.value, root)
     await stabilizeThreadRestore(targetAnchor, savedScrollTop)
 
-    const currentRootScrollTop = scrollRoot.value?.scrollTop ?? scrollTop.value
+    const currentRootScrollTop = readRootScrollTop()
     const expectedThreadScrollTop = targetAnchor
       ? resolveOuterAnchorScrollTop(targetAnchor)
       : savedScrollTop
@@ -1679,24 +1736,27 @@ async function switchThread(threadId: ThreadId) {
 function jumpToTop() {
   if (!scrollRoot.value)
     return
-  markProgrammaticScroll()
-  scrollRoot.value.scrollTop = 0
+  applyOuterScrollTop(0)
   onScroll()
 }
 
 function jumpToMiddle() {
   if (!scrollRoot.value)
     return
-  markProgrammaticScroll()
-  scrollRoot.value.scrollTop = Math.max(0, totalHeight.value / 2 - viewportHeight.value / 2)
+  applyOuterScrollTop(Math.max(
+    0,
+    totalHeight.value / 2 - getCurrentViewportHeight() / 2,
+  ))
   onScroll()
 }
 
 function jumpToBottom() {
   if (!scrollRoot.value)
     return
-  markProgrammaticScroll()
-  scrollRoot.value.scrollTop = Math.max(0, totalHeight.value - viewportHeight.value)
+  applyOuterScrollTop(Math.max(
+    0,
+    totalHeight.value - getCurrentViewportHeight(),
+  ))
   onScroll()
 }
 
@@ -1755,15 +1815,16 @@ function startStressScroll() {
     if (!stressRunning.value || !scrollRoot.value)
       return
 
-    const maxScroll = Math.max(0, totalHeight.value - viewportHeight.value)
+    const currentViewportHeight = getCurrentViewportHeight()
+    const maxScroll = Math.max(0, totalHeight.value - currentViewportHeight)
     const t = performance.now() - startedAt
     const ratio = (Math.sin(t / 600) + 1) / 2
     const target = maxScroll * ratio
-    const maxStep = Math.max(600, viewportHeight.value * 1.5)
-    const delta = Math.max(-maxStep, Math.min(maxStep, target - scrollRoot.value.scrollTop))
+    const maxStep = Math.max(600, currentViewportHeight * 1.5)
+    const current = getNormalizedOuterScrollTop(scrollRoot.value)
+    const delta = Math.max(-maxStep, Math.min(maxStep, target - current))
 
-    markProgrammaticScroll()
-    scrollRoot.value.scrollTop += delta
+    applyOuterScrollTop(current + delta)
     onScroll()
 
     stressRaf = requestAnimationFrame(step)
@@ -1935,14 +1996,13 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
   }
 }
 
-function readLabSnapshot(): VirtualScrollLabSnapshot {
-  const stats = collectStats({ reconcile: false })
+function buildLabSnapshot(stats: LabStats): VirtualScrollLabSnapshot {
   const health = readLabHealth(stats)
   const firstVisibleMessageId = visibleItems.value[0]?.message.id ?? ''
   const outerAnchor = captureOuterAnchor()
 
   const root = scrollRoot.value
-  const currentScrollTop = root?.scrollTop ?? scrollTop.value
+  const currentScrollTop = readRootScrollTop()
   const currentViewportHeight = root?.clientHeight ?? viewportHeight.value
 
   return {
@@ -1987,7 +2047,17 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
   }
 }
 
-const labSnapshot = computed(() => readLabSnapshot())
+function readLabSnapshot(): VirtualScrollLabSnapshot {
+  return buildLabSnapshot(collectStats({ reconcile: false }))
+}
+
+const labSnapshot = shallowRef<VirtualScrollLabSnapshot>(
+  buildLabSnapshot(createEmptyLabStats()),
+)
+
+function refreshLabSnapshot(stats: LabStats = collectStats({ reconcile: false })) {
+  labSnapshot.value = buildLabSnapshot(stats)
+}
 
 function waitFrame() {
   return new Promise<void>((resolve) => {

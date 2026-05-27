@@ -1564,7 +1564,7 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('omits height cache from non-final virtualStateChange emissions', async () => {
+  it('emits signed height cache from non-final virtualStateChange cache updates', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
 
@@ -1599,8 +1599,16 @@ describe('node renderer virtual-scroll coordination', () => {
         totalHeight: 40,
       },
     })
-    expect(state.heightCache).toBeUndefined()
-    expect(state.contentHash).toBeUndefined()
+    expect(state.heightCache).toMatchObject([
+      {
+        index: 0,
+        height: 40,
+        nodeType: 'paragraph',
+      },
+    ])
+    expect(state.heightCache[0]?.signature).toBeTruthy()
+    expect(state.heightCache[0]?.signature).not.toContain('Paragraph')
+    expect(state.contentHash).toBeTruthy()
     const heightCache = (wrapper.vm as any).captureVirtualState()?.heightCache ?? []
     expect(heightCache).toMatchObject([
       {
