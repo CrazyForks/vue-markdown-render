@@ -662,7 +662,7 @@ describe('node renderer virtual-scroll coordination', () => {
     scrollRoot.remove()
   })
 
-  it('does not block render-settled on unloaded lazy images', async () => {
+  it('waits for lazy images to load before final settle', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
     const ImageNode = (await import('../src/components/ImageNode')).default
@@ -715,7 +715,20 @@ describe('node renderer virtual-scroll coordination', () => {
     platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
     platform.flushFrames()
     await nextTick()
+
+    const pending = await (wrapper.vm as any).settle({ frames: 0, timeoutMs: 0, reason: 'manual' })
+
+    expect(pending).toMatchObject({
+      phase: 'settling',
+      stable: false,
+      totalHeight: 64,
+    })
+
+    const imageEl = contentEl.querySelector('img')
+    expect(imageEl).toBeTruthy()
+    imageEl?.dispatchEvent(new Event('load'))
     await new Promise(resolve => setTimeout(resolve, 90))
+    await flushAll()
 
     const settled = await (wrapper.vm as any).settle({ frames: 0, timeoutMs: 0, reason: 'manual' })
 

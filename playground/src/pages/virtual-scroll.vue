@@ -168,11 +168,11 @@ declare global {
       startStressScroll: () => void
       stopStressScroll: () => void
       startStreamingLastMessage: (options?: StreamLastMessageOptions) => void
-      toggleDensity: () => void
-      toggleFontScale: () => void
-      toggleSmallMessageCoordination: () => void
-      toggleNarrowMode: () => void
-      toggleReverseFlexMode: () => void
+      toggleDensity: () => Promise<void>
+      toggleFontScale: () => Promise<void>
+      toggleSmallMessageCoordination: () => Promise<void>
+      toggleNarrowMode: () => Promise<void>
+      toggleReverseFlexMode: () => Promise<void>
       forceUnmountVisibleHugeMessage: () => Promise<void>
       settleVisibleRenderers: () => Promise<MarkstreamVirtualMetrics[]>
       nextFrame: () => Promise<void>
@@ -188,11 +188,11 @@ declare global {
         stopStressScroll: () => void
         startStreamingLastMessage: () => void
         switchThread: (threadId: ThreadId) => Promise<void>
-        toggleDensity: () => void
-        toggleFontScale: () => void
-        toggleSmallMessageCoordination: () => void
-        toggleNarrowMode: () => void
-        toggleReverseFlexMode: () => void
+        toggleDensity: () => Promise<void>
+        toggleFontScale: () => Promise<void>
+        toggleSmallMessageCoordination: () => Promise<void>
+        toggleNarrowMode: () => Promise<void>
+        toggleReverseFlexMode: () => Promise<void>
         forceUnmountVisibleHugeMessage: () => Promise<void>
         settleVisibleRenderers: () => Promise<MarkstreamVirtualMetrics[]>
         resetHeights: () => void
@@ -801,28 +801,6 @@ const expectedDomNodeCeiling = computed(() => {
   return 1600 + messageDomCount.value * 80 + expectedMarkdownSlotCeiling.value * 8
 })
 
-const domSizeOk = computed(() => {
-  return markdownSlotCount.value <= expectedMarkdownSlotCeiling.value
-    && domNodeCount.value <= expectedDomNodeCeiling.value
-})
-
-const blankFrameOk = computed(() => blankFrameCount.value === 0)
-
-const layoutIntegrityOk = computed(() => {
-  return maxItemHeightDriftPx.value < 24
-    && visibleCoverageOk.value
-})
-
-const labStatus = computed(() => {
-  if (!blankFrameOk.value)
-    return 'blank-frame-risk'
-  if (!layoutIntegrityOk.value)
-    return 'layout-drift-risk'
-  if (!domSizeOk.value)
-    return 'dom-size-risk'
-  return 'ok'
-})
-
 const labReady = computed(() => {
   return totalHeight.value > viewportHeight.value
     && messageDomCount.value > 0
@@ -907,7 +885,8 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
         immediate: true,
         expectedJump: outerAnchor?.type === 'bottom'
           || streamTimer != null
-          || isStreamingHeightChangeExpected(),
+          || isStreamingHeightChangeExpected()
+          || threadRestoreTargets.has(activeThreadId.value),
       })
     }
   }
@@ -923,6 +902,7 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
       expectedJump: outerAnchor?.type === 'bottom'
         || streamTimer != null
         || isStreamingHeightChangeExpected()
+        || threadRestoreTargets.has(activeThreadId.value)
         || stressRunning.value
         ? true
         : undefined,
@@ -1886,31 +1866,31 @@ async function mutateLayoutWithAnchor(mutator: () => void) {
 }
 
 function toggleDensity() {
-  void mutateLayoutWithAnchor(() => {
+  return mutateLayoutWithAnchor(() => {
     density.value = density.value === 'comfortable' ? 'compact' : 'comfortable'
   })
 }
 
 function toggleFontScale() {
-  void mutateLayoutWithAnchor(() => {
+  return mutateLayoutWithAnchor(() => {
     fontScale.value = fontScale.value === 1 ? 1.12 : 1
   })
 }
 
 function toggleSmallMessageCoordination() {
-  void mutateLayoutWithAnchor(() => {
+  return mutateLayoutWithAnchor(() => {
     coordinateSmallMessages.value = !coordinateSmallMessages.value
   })
 }
 
 function toggleNarrowMode() {
-  void mutateLayoutWithAnchor(() => {
+  return mutateLayoutWithAnchor(() => {
     narrowMode.value = !narrowMode.value
   })
 }
 
 function toggleReverseFlexMode() {
-  void mutateLayoutWithAnchor(() => {
+  return mutateLayoutWithAnchor(() => {
     reverseFlexMode.value = !reverseFlexMode.value
   })
 }
@@ -2108,6 +2088,63 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
   }
 }
 
+function assertVirtualScrollHealth(snapshot: VirtualScrollLabSnapshot) {
+  const failures: string[] = []
+
+  if (!snapshot.ready)
+    failures.push('lab not ready')
+
+  if (snapshot.stats.blankProbeCount !== 0)
+    failures.push(`blank probes=${snapshot.stats.blankProbeCount}`)
+
+  if (snapshot.blankFrameCount !== 0)
+    failures.push(`blank frames=${snapshot.blankFrameCount}`)
+
+  if (snapshot.health.maxObservedBlankProbes !== 0)
+    failures.push(`observed blank probes=${snapshot.health.maxObservedBlankProbes}`)
+
+  if (snapshot.stats.placeholderProbeCount !== 0)
+    failures.push(`placeholder probes=${snapshot.stats.placeholderProbeCount}`)
+
+  if (snapshot.health.maxObservedPlaceholderProbes !== 0)
+    failures.push(`observed placeholder probes=${snapshot.health.maxObservedPlaceholderProbes}`)
+
+  if (snapshot.stats.emptyCardProbeCount !== 0)
+    failures.push(`empty card probes=${snapshot.stats.emptyCardProbeCount}`)
+
+  if (snapshot.health.maxObservedEmptyCardProbes !== 0)
+    failures.push(`observed empty card probes=${snapshot.health.maxObservedEmptyCardProbes}`)
+
+  if (!snapshot.visibleCoverageOk)
+    failures.push(`coverage gap=${snapshot.stats.maxCoverageGapPx}px`)
+
+  if (snapshot.health.maxObservedCoverageGapPx > 24)
+    failures.push(`observed coverage gap=${snapshot.health.maxObservedCoverageGapPx}px`)
+
+  if (!snapshot.health.virtualDomWithinLimit)
+    failures.push(`markdown slots exceeded: ${snapshot.markdownSlotCount}/${snapshot.health.domSlotBudget}`)
+
+  if (!snapshot.health.hugeRendererDomWithinLimit)
+    failures.push(`huge renderer slots exceeded: ${snapshot.maxHugeMessageSlotCount}/${snapshot.hugeRendererSlotBudget}`)
+
+  if (!snapshot.health.threadRestoreOk)
+    failures.push(`thread restore failed: scrollDelta=${snapshot.lastThreadRestoreDeltaPx}, anchorDelta=${snapshot.lastThreadRestoreAnchorDeltaPx}`)
+
+  if (!snapshot.health.scrollJitterOk)
+    failures.push(`scroll jitter=${snapshot.health.maxObservedScrollJumpPx}px`)
+
+  if (snapshot.maxItemHeightDriftPx >= 24)
+    failures.push(`height drift=${snapshot.maxItemHeightDriftPx}px`)
+
+  if (snapshot.health.maxObservedHeightDriftPx >= 24)
+    failures.push(`observed height drift=${snapshot.health.maxObservedHeightDriftPx}px`)
+
+  return {
+    ok: failures.length === 0,
+    failures,
+  }
+}
+
 function buildLabSnapshot(stats: LabStats): VirtualScrollLabSnapshot {
   const health = readLabHealth(stats)
   const firstVisibleMessageId = visibleItems.value[0]?.message.id ?? ''
@@ -2117,7 +2154,7 @@ function buildLabSnapshot(stats: LabStats): VirtualScrollLabSnapshot {
   const currentScrollTop = readRootScrollTop()
   const currentViewportHeight = root?.clientHeight ?? viewportHeight.value
 
-  return {
+  const snapshot: VirtualScrollLabSnapshot = {
     ready: labReady.value,
     threadId: activeThreadId.value,
     streamingActive: streamTimer != null,
@@ -2128,7 +2165,7 @@ function buildLabSnapshot(stats: LabStats): VirtualScrollLabSnapshot {
     stats,
     health,
     events: labEvents.slice(),
-    labStatus: labStatus.value,
+    labStatus: 'ok',
     activeThreadId: activeThreadId.value,
     totalHeight: totalHeight.value,
     scrollTop: currentScrollTop,
@@ -2161,6 +2198,14 @@ function buildLabSnapshot(stats: LabStats): VirtualScrollLabSnapshot {
     lastThreadRestoreDeltaPx: lastThreadRestoreDeltaPx.value,
     lastThreadRestoreAnchorDeltaPx: lastThreadRestoreAnchorDeltaPx.value,
   }
+  const healthCheck = assertVirtualScrollHealth(snapshot)
+
+  return {
+    ...snapshot,
+    labStatus: healthCheck.ok
+      ? 'ok'
+      : `failed: ${healthCheck.failures.join('; ')}`,
+  }
 }
 
 function readLabSnapshot(): VirtualScrollLabSnapshot {
@@ -2170,6 +2215,8 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
 const labSnapshot = shallowRef<VirtualScrollLabSnapshot>(
   buildLabSnapshot(createEmptyLabStats()),
 )
+
+const labStatusClass = computed(() => labSnapshot.value.labStatus === 'ok' ? 'ok' : 'failed')
 
 function refreshLabSnapshot(stats: LabStats = collectStats({ reconcile: false })) {
   labSnapshot.value = buildLabSnapshot(stats)
@@ -2511,8 +2558,8 @@ onBeforeUnmount(() => {
     </section>
 
     <section class="metrics">
-      <span data-testid="lab-status" class="status-chip" :class="labStatus">
-        status: {{ labStatus }}
+      <span data-testid="lab-status" class="status-chip" :class="labStatusClass">
+        status: {{ labSnapshot.labStatus }}
       </span>
       <span>totalHeight: {{ Math.round(totalHeight) }}px</span>
       <span>scrollTop: {{ Math.round(scrollTop) }}px</span>
@@ -2916,7 +2963,8 @@ button:hover {
 }
 
 .status-chip.blank-frame-risk,
-.status-chip.dom-size-risk {
+.status-chip.dom-size-risk,
+.status-chip.failed {
   background: #fee2e2;
   color: #991b1b;
 }

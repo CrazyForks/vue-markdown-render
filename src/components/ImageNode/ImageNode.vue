@@ -13,6 +13,8 @@ const props = withDefaults(defineProps<ImageNodeProps>(), {
 
 const emit = defineEmits<{ (e: 'load', src: string): void, (e: 'error', src: string): void, (e: 'click', payload: [Event, string]): void }>()
 
+const IMAGE_LIFECYCLE_PENDING_TIMEOUT_MS = 8000
+
 const imageLoaded = ref(false)
 const hasError = ref(false)
 const activeSrc = ref('')
@@ -21,6 +23,7 @@ const rootRef = ref<HTMLElement | null>(null)
 const attrs = useAttrs()
 const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 let lifecyclePendingIndexKey = ''
+let lifecyclePendingTimer: ReturnType<typeof setTimeout> | null = null
 
 const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))
 const safeFallbackSrc = computed(() => sanitizeImageSrc(props.fallbackSrc))
@@ -52,6 +55,14 @@ function scheduleLifecycleHeightReport(indexKey = lifecycleIndexKey.value) {
   })
 }
 
+function clearLifecyclePendingTimer() {
+  if (!lifecyclePendingTimer)
+    return
+
+  clearTimeout(lifecyclePendingTimer)
+  lifecyclePendingTimer = null
+}
+
 function markLifecyclePending() {
   const indexKey = lifecycleIndexKey.value
   if (!indexKey)
@@ -63,14 +74,28 @@ function markLifecyclePending() {
   if (lifecyclePendingIndexKey)
     lifecycle?.markSettled(lifecyclePendingIndexKey)
 
+  clearLifecyclePendingTimer()
+
   lifecyclePendingIndexKey = indexKey
   lifecycle?.markPending(indexKey)
+
+  if (typeof window !== 'undefined') {
+    lifecyclePendingTimer = window.setTimeout(() => {
+      if (lifecyclePendingIndexKey !== indexKey)
+        return
+
+      scheduleLifecycleHeightReport(indexKey)
+      void markLifecycleSettled()
+    }, IMAGE_LIFECYCLE_PENDING_TIMEOUT_MS)
+  }
 }
 
 async function markLifecycleSettled() {
   const indexKey = lifecyclePendingIndexKey
   if (!indexKey)
     return
+
+  clearLifecyclePendingTimer()
 
   lifecyclePendingIndexKey = ''
   await nextTick()
@@ -82,6 +107,8 @@ function clearLifecyclePending() {
   const indexKey = lifecyclePendingIndexKey
   if (!indexKey)
     return
+
+  clearLifecyclePendingTimer()
 
   lifecyclePendingIndexKey = ''
   lifecycle?.markSettled(indexKey)
@@ -166,7 +193,7 @@ watch(
     }
 
     if (lazy) {
-      clearLifecyclePending()
+      markLifecyclePending()
       scheduleLifecycleHeightReport()
       return
     }

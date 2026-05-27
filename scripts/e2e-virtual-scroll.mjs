@@ -12,6 +12,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const playgroundDir = path.join(repoRoot, 'playground')
 const host = '127.0.0.1'
+const virtualScrollDistDir = '.tmp/virtual-scroll-e2e-dist'
 
 function readMode() {
   const arg = process.argv.find(value => value.startsWith('--mode='))
@@ -176,6 +177,94 @@ function resolveChromeLaunchOptions() {
   }
 }
 
+function runCommand(command, args, options = {}) {
+  const logs = []
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
+      env: {
+        ...process.env,
+        CI: '1',
+      },
+      ...options,
+    })
+
+    child.stdout.on('data', chunk => logs.push(String(chunk)))
+    child.stderr.on('data', chunk => logs.push(String(chunk)))
+
+    child.on('error', reject)
+    child.on('exit', (code, signal) => {
+      if (code === 0) {
+        resolve({ logs: logs.join('') })
+        return
+      }
+
+      reject(new Error([
+        `${command} ${args.join(' ')} failed`,
+        `exitCode=${code}`,
+        `signal=${signal || ''}`,
+        logs.join(''),
+      ].join('\n')))
+    })
+  })
+}
+
+async function buildPlaygroundForE2E() {
+  await runCommand('pnpm', [
+    '-C',
+    playgroundDir,
+    'exec',
+    'vite',
+    'build',
+    '--outDir',
+    virtualScrollDistDir,
+    '--emptyOutDir',
+  ], {
+    cwd: repoRoot,
+  })
+}
+
+function startPreviewServer(port) {
+  const logs = []
+  const child = spawn(
+    'pnpm',
+    [
+      '-C',
+      playgroundDir,
+      'exec',
+      'vite',
+      'preview',
+      '--host',
+      host,
+      '--port',
+      String(port),
+      '--strictPort',
+      '--outDir',
+      virtualScrollDistDir,
+    ],
+    {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
+      env: {
+        ...process.env,
+        CI: '1',
+      },
+    },
+  )
+
+  child.stdout.on('data', chunk => logs.push(String(chunk)))
+  child.stderr.on('data', chunk => logs.push(String(chunk)))
+
+  return {
+    child,
+    getLogs() {
+      return logs.join('')
+    },
+  }
+}
+
 function startDevServer(port) {
   const logs = []
   const child = spawn(
@@ -185,6 +274,7 @@ function startDevServer(port) {
       playgroundDir,
       'exec',
       'vite',
+      '--force',
       '--host',
       host,
       '--port',
@@ -245,26 +335,70 @@ async function collectPageDebugState(page) {
 
 async function waitForLabReady(page, timeoutMs = 120000) {
   const startedAt = Date.now()
+  let lastDebugState = null
 
-  await page.waitForFunction(() => {
-    return Boolean(window.__markstreamVirtualScrollLab?.read)
-  }, null, { timeout: Math.min(timeoutMs, 90000) })
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {})
 
-  const remaining = Math.max(1000, timeoutMs - (Date.now() - startedAt))
+      const stable = await page.evaluate(async () => {
+        const api = window.__markstreamVirtualScrollLab
+        const root = document.querySelector('[data-testid="virtual-scroll-root"]')
 
-  await page.waitForFunction(() => {
+        if (!api || typeof api.read !== 'function' || typeof api.nextFrame !== 'function')
+          return false
+
+        if (!root)
+          return false
+
+        for (let i = 0; i < 3; i++)
+          await api.nextFrame()
+
+        const snapshot = api.read()
+        return Boolean(
+          snapshot
+          && snapshot.ready === true
+          && snapshot.health
+          && document.querySelector('[data-testid="virtual-scroll-root"]'),
+        )
+      }).catch(() => false)
+
+      if (stable)
+        return
+    }
+    catch {}
+
+    lastDebugState = await collectPageDebugState(page)
+    await page.waitForTimeout(150)
+  }
+
+  throw new Error(`Timed out waiting for virtual-scroll lab readiness\n${JSON.stringify(lastDebugState, null, 2)}`)
+}
+
+async function evaluateWithLab(page, task, arg) {
+  await waitForLabReady(page)
+
+  return page.evaluate(async ([fnSource, payload]) => {
     const api = window.__markstreamVirtualScrollLab
-    if (!api)
-      return false
 
-    const snapshot = api.read()
-    return snapshot.ready === true
-  }, null, { timeout: remaining })
+    if (!api || typeof api.read !== 'function' || typeof api.nextFrame !== 'function')
+      throw new Error('virtual-scroll lab API disappeared before evaluation')
+
+    const fn = eval(`(${fnSource})`)
+    return fn(api, payload)
+  }, [String(task), arg])
 }
 
 async function run() {
   const port = await findFreePort()
-  const server = startDevServer(port)
+  const useDevServer = process.env.MARKSTREAM_E2E_VIRTUAL_SCROLL_DEV === '1'
+
+  if (!useDevServer)
+    await buildPlaygroundForE2E()
+
+  const server = useDevServer
+    ? startDevServer(port)
+    : startPreviewServer(port)
 
   let browser
   let page
@@ -341,8 +475,7 @@ async function run() {
       await page.waitForTimeout(16)
     }
 
-    const wheelProbe = await page.evaluate(async () => {
-      const api = window.__markstreamVirtualScrollLab
+    const wheelProbe = await evaluateWithLab(page, async (api) => {
       for (let i = 0; i < 20; i++)
         await api.nextFrame()
       return api.read()
@@ -359,9 +492,7 @@ async function run() {
     )
 
     if (!stressMode) {
-      const smoke = await page.evaluate(async () => {
-        const api = window.__markstreamVirtualScrollLab
-
+      const smoke = await evaluateWithLab(page, async (api) => {
         const waitHealthy = async (frames = 90) => {
           let latest = api.read()
           for (let i = 0; i < frames; i++) {
@@ -403,7 +534,7 @@ async function run() {
         const final = await waitHealthy()
 
         api.clearEvents()
-        api.toggleReverseFlexMode()
+        await api.toggleReverseFlexMode()
         await api.nextFrame()
         await api.scrollToRatio(0.62)
 
@@ -436,7 +567,7 @@ async function run() {
           )
         }
 
-        api.toggleReverseFlexMode()
+        await api.toggleReverseFlexMode()
         await waitHealthy()
 
         api.clearEvents()
@@ -513,12 +644,11 @@ async function run() {
       return
     }
 
-    await page.evaluate(() => {
-      window.__markstreamVirtualScrollLab.clearEvents()
+    await evaluateWithLab(page, async (api) => {
+      api.clearEvents()
     })
 
-    await page.evaluate(async () => {
-      const api = window.__markstreamVirtualScrollLab
+    await evaluateWithLab(page, async (api) => {
       for (let i = 0; i < 8; i++)
         await api.nextFrame()
       await api.scrollToRatio(0)
@@ -529,9 +659,9 @@ async function run() {
       await api.nextFrame()
     })
 
-    const rootScrollSync = await page.evaluate(() => {
+    const rootScrollSync = await evaluateWithLab(page, async (api) => {
       const root = document.querySelector('[data-testid="virtual-scroll-root"]')
-      const snapshot = window.__markstreamVirtualScrollLab.read()
+      const snapshot = api.read()
 
       return {
         domScrollTop: root?.scrollTop ?? null,
@@ -548,12 +678,11 @@ async function run() {
       rootScrollSync,
     )
 
-    await page.evaluate(() => {
-      window.__markstreamVirtualScrollLab.clearEvents()
+    await evaluateWithLab(page, async (api) => {
+      api.clearEvents()
     })
 
-    const result = await page.evaluate(async () => {
-      const api = window.__markstreamVirtualScrollLab
+    const result = await evaluateWithLab(page, async (api) => {
       const waitHealthy = async (frames = 30, options = {}) => {
         let latest = api.read()
         for (let i = 0; i < frames; i++) {
@@ -661,6 +790,15 @@ async function run() {
 
         return latest
       }
+      const waitCurrentHealthyAndClear = async (frames = 120) => {
+        const latest = await waitCurrentHealthy(frames)
+        if (!isCurrentHealthy(latest))
+          return latest
+
+        api.clearEvents()
+        await api.nextFrame()
+        return api.read()
+      }
 
       await api.scrollToRatio(0.15)
       await waitCurrentHealthy()
@@ -746,15 +884,19 @@ async function run() {
       api.clearEvents()
       await api.nextFrame()
 
-      api.toggleDensity()
-      api.toggleFontScale()
-      const relayoutAfter = await waitHealthy(45)
+      await api.toggleDensity()
+      await api.toggleFontScale()
+      await api.settleVisibleRenderers()
+      const relayoutAfter = await waitCurrentHealthyAndClear(120)
 
-      api.toggleNarrowMode()
-      const narrowAfter = await waitHealthy(60)
+      await api.toggleNarrowMode()
+      await api.settleVisibleRenderers()
+      await api.scrollToRatio(0.62)
+      const narrowAfter = await waitCurrentHealthyAndClear(180)
 
-      api.toggleSmallMessageCoordination()
-      const smallCoordinationAfter = await waitHealthy(90)
+      await api.toggleSmallMessageCoordination()
+      await api.settleVisibleRenderers()
+      const smallCoordinationAfter = await waitCurrentHealthyAndClear(180)
 
       await api.scrollToRatio(0.62)
       await waitCurrentHealthy()
@@ -1082,14 +1224,12 @@ async function run() {
       smallCoordinationAfter,
     )
 
-    const anchorPollutionProbe = await page.evaluate(async () => {
-      const api = window.__markstreamVirtualScrollLab
-
+    const anchorPollutionProbe = await evaluateWithLab(page, async (api) => {
       await api.scrollToRatio(0.73)
       await api.nextFrame()
       const before = api.read()
 
-      api.toggleDensity()
+      await api.toggleDensity()
       for (let i = 0; i < 30; i++)
         await api.nextFrame()
 

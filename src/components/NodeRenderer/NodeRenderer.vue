@@ -2789,15 +2789,27 @@ function forceFlushPendingHeightMeasurements() {
 }
 
 function waitForVirtualFrame() {
-  if (!isClient)
+  if (!isClient || isTestEnv)
     return Promise.resolve()
 
   return new Promise<void>((resolve) => {
+    let settled = false
+    let timeout: ReturnType<typeof setTimeout> | null = null
+    const finish = () => {
+      if (settled)
+        return
+      settled = true
+      if (timeout != null)
+        window.clearTimeout(timeout)
+      resolve()
+    }
+
     if (requestFrame) {
-      requestFrame(() => resolve())
+      requestFrame(finish)
+      timeout = window.setTimeout(finish, 50)
       return
     }
-    window.setTimeout(resolve, 0)
+    timeout = window.setTimeout(finish, 0)
   })
 }
 
@@ -2809,8 +2821,13 @@ function waitForVirtualTimeout(timeoutMs: number) {
 
 async function forceMeasure(reason: MarkstreamVirtualReason = 'manual') {
   await nextTick()
+  await waitForVirtualFrame()
+
   measureTrackedNodeHeights()
   forceFlushPendingHeightMeasurements()
+
+  await nextTick()
+
   const metrics = getVirtualMetrics(reason)
   emitVirtualMetricsNow(metrics, true)
   return metrics
