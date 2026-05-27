@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
 import process from 'node:process'
@@ -229,6 +229,7 @@ async function run() {
 
   let browser
   let page
+  const pageErrors = []
 
   try {
     await waitForPort(port)
@@ -255,8 +256,17 @@ async function run() {
     })
 
     page.on('pageerror', (error) => {
+      pageErrors.push(error.stack || error.message || String(error))
       process.stderr.write(`[browser:pageerror] ${error.stack || error.message}\n`)
     })
+
+    function assertNoPageErrors(label) {
+      assert(
+        pageErrors.length === 0,
+        `${label} produced browser page errors`,
+        { pageErrors },
+      )
+    }
 
     const profile = stressMode ? 'stress' : 'smoke'
 
@@ -400,6 +410,8 @@ async function run() {
         'virtual-scroll smoke health check failed',
         smoke.final,
       )
+
+      assertNoPageErrors('virtual-scroll smoke e2e')
 
       process.stdout.write(`${JSON.stringify({
         ok: true,
@@ -1009,6 +1021,8 @@ async function run() {
       anchorPollutionProbe.restored,
     )
 
+    assertNoPageErrors('virtual-scroll stress e2e')
+
     process.stdout.write(`${JSON.stringify({
       ok: true,
       mode,
@@ -1028,6 +1042,20 @@ async function run() {
 
       if (snapshot)
         process.stderr.write(`[virtual-scroll:snapshot]\n${JSON.stringify(snapshot, null, 2)}\n`)
+
+      const snapshotPath = path.join(repoRoot, 'virtual-scroll-failure.json')
+      writeFileSync(
+        snapshotPath,
+        JSON.stringify(
+          {
+            snapshot,
+            pageErrors,
+          },
+          null,
+          2,
+        ),
+      )
+      process.stderr.write(`[virtual-scroll:snapshot-file] ${snapshotPath}\n`)
 
       const screenshotPath = path.join(repoRoot, 'virtual-scroll-failure.png')
       await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {})

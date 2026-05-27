@@ -69,6 +69,16 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: pnpm run test:e2e:virtual-scroll:ci
 
+      - name: Upload virtual scroll e2e diagnostics
+        if: failure() && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: virtual-scroll-e2e-diagnostics-${{ matrix.os }}
+          path: |
+            virtual-scroll-failure.png
+            virtual-scroll-failure.json
+          if-no-files-found: ignore
+
       - name: Minimal install smoke (Ubuntu only)
         if: matrix.os == 'ubuntu-latest'
         run: MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm test:smoke:minimal

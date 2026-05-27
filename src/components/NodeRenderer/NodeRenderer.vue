@@ -57,6 +57,7 @@ import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfog
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { isReservedNodeComponentKey, useCustomNodeComponents } from '../../utils/nodeComponents'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
+import { setNormalizedElementScrollTop } from '../../utils/normalizedScroll'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import MarkdownCodeBlockNode from '../MarkdownCodeBlockNode'
@@ -2158,23 +2159,10 @@ function captureVirtualState() {
 }
 
 function setNormalizedScrollTop(root: HTMLElement, doc: Document, targetNormalized: number) {
-  const target = Math.max(0, targetNormalized)
-
-  if (!isReverseFlexScrollRoot(root)) {
-    root.scrollTop = target
-    return
-  }
-
-  const max = Math.max(0, (root.scrollHeight ?? 0) - (root.clientHeight ?? 0))
-  const distanceFromBottom = Math.max(0, max - target)
-
-  root.scrollTop = -distanceFromBottom
-
-  const afterNegative = getNormalizedScrollTop(root, doc, false)
-  if (Math.abs(afterNegative - target) <= 2)
-    return
-
-  root.scrollTop = distanceFromBottom
+  setNormalizedElementScrollTop(root, doc, targetNormalized, {
+    isReverseFlexScrollRoot,
+    getNormalizedScrollTop,
+  })
 }
 
 function applyBottomVirtualAnchor(anchor: Extract<MarkstreamVirtualAnchor, { type: 'bottom' }>) {
