@@ -226,6 +226,11 @@ const SCROLL_JITTER_BUDGET_PX = 32
 const USER_SCROLL_COMPENSATION_GUARD_MS = 180
 const PROGRAMMATIC_SCROLL_GUARD_MS = 160
 const RESTORE_TARGET_RELEASE_DELAY_MS = 1200
+const COORDINATED_RENDERER_SLOT_EXTRA = 24
+const SMALL_RENDERER_SLOT_BUDGET = 140
+const PAGE_CHROME_DOM_BUDGET = 2200
+const MESSAGE_DOM_BUDGET = 96
+const MARKDOWN_SLOT_DOM_MULTIPLIER = 5
 
 function readLabProfile(): LabProfile {
   if (typeof window === 'undefined')
@@ -640,13 +645,6 @@ function pruneStaleItemHeights() {
   }
 }
 
-function canReuseStateForCurrentMeasurement(state: MarkstreamVirtualState | undefined | null) {
-  if (!state)
-    return false
-
-  return (state.measurementKey ?? '') === measurementKey.value
-}
-
 function getItemHeight(message: Message) {
   return getCachedItemHeight(messageKey(message)) ?? getEstimatedMessageHeight(message)
 }
@@ -798,7 +796,7 @@ async function captureVisibleVirtualStates(options: { forceMeasure?: boolean } =
       }
     }
 
-    const state = renderer.captureVirtualState()
+    const state = renderer.captureVirtualState({ requireViewport: false })
     if (state) {
       virtualStates.set(key, mergeVirtualState(virtualStates.get(key), state))
 
@@ -813,11 +811,17 @@ const renderedCoordinatedMessageCount = computed(() => {
 })
 
 const expectedMarkdownSlotCeiling = computed(() => {
-  return renderedCoordinatedMessageCount.value * (maxLiveNodes.value + 96) + 600
+  const coordinatedCount = renderedCoordinatedMessageCount.value
+  const uncoordinatedCount = Math.max(0, visibleItems.value.length - coordinatedCount)
+
+  return coordinatedCount * (maxLiveNodes.value + COORDINATED_RENDERER_SLOT_EXTRA)
+    + uncoordinatedCount * SMALL_RENDERER_SLOT_BUDGET
 })
 
 const expectedDomNodeCeiling = computed(() => {
-  return 1600 + messageDomCount.value * 80 + expectedMarkdownSlotCeiling.value * 8
+  return PAGE_CHROME_DOM_BUDGET
+    + messageDomCount.value * MESSAGE_DOM_BUDGET
+    + expectedMarkdownSlotCeiling.value * MARKDOWN_SLOT_DOM_MULTIPLIER
 })
 
 const labReady = computed(() => {
@@ -902,8 +906,8 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
     markThreadRestoreConsumedIfNeeded(message, metrics)
   }
 
-  if (coordinated && measuredContentHeight > 0) {
-    const drift = Math.abs(measuredContentHeight - logicalContentHeight)
+  if (coordinated) {
+    const drift = getRendererMetricDrift(key, metrics.totalHeight)
     if (drift > 1)
       logicalHeightDrifts.set(key, drift)
     else
@@ -927,22 +931,29 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
     }
   }
 
-  if (isActiveThreadMessage) {
+  if (isActiveThreadMessage && !isForceHidden(message)) {
     scheduleStats()
-    scheduleLabEvent('markdown-height-change', {
-      heightDriftPx: measuredContentHeight > 0
-        ? Math.abs(measuredContentHeight - logicalContentHeight)
-        : previous == null
-          ? 0
-          : Math.abs(previous - nextHeight),
-      expectedJump: outerAnchor?.type === 'bottom'
-        || streamTimer != null
-        || isStreamingHeightChangeExpected()
-        || threadRestoreTargets.has(activeThreadId.value)
-        || stressRunning.value
-        ? true
-        : undefined,
-    })
+    scheduleLabEvent(
+      'markdown-height-change',
+      {
+        heightDriftPx: coordinated
+          ? getRendererMetricDrift(key, metrics.totalHeight)
+          : previous == null
+            ? 0
+            : Math.abs(previous - nextHeight),
+        expectedJump: outerAnchor?.type === 'bottom'
+          || streamTimer != null
+          || isStreamingHeightChangeExpected()
+          || threadRestoreTargets.has(activeThreadId.value)
+          || stressRunning.value
+          ? true
+          : undefined,
+      },
+      {
+        reconcileBeforeRecord: true,
+        shouldRecord: () => !isForceHidden(message),
+      },
+    )
   }
 }
 
@@ -1209,15 +1220,22 @@ function getMarkdownRendererDomHeight(key: string) {
 }
 
 function getLogicalMessageHeight(key: string, rendererHeight: number) {
-  const rendererDomHeight = getMarkdownRendererDomHeight(key)
-  const rendererBoxDelta = rendererDomHeight > 0
-    ? Math.max(0, rendererDomHeight - rendererHeight)
-    : 0
-
   return Math.max(
     1,
-    Math.ceil(rendererHeight + getMessageChromeHeight(key) + rendererBoxDelta),
+    Math.ceil(rendererHeight + getMessageChromeHeight(key)),
   )
+}
+
+function getRendererMetricDrift(key: string, rendererHeight: number) {
+  const rendererDomHeight = getMarkdownRendererDomHeight(key)
+
+  if (!Number.isFinite(rendererDomHeight) || rendererDomHeight <= 0)
+    return 0
+
+  if (!Number.isFinite(rendererHeight) || rendererHeight <= 0)
+    return rendererDomHeight
+
+  return Math.abs(rendererDomHeight - rendererHeight)
 }
 
 function onVirtualStateChange(message: Message, state: MarkstreamVirtualState) {
@@ -1768,129 +1786,103 @@ function pushLabEvent(
   refreshLabSnapshot(stats)
 }
 
-function scheduleLabEvent(type: string, payload: Partial<LabEvent> = {}) {
+function scheduleLabEvent(
+  type: string,
+  payload: Partial<LabEvent> = {},
+  options: { reconcileBeforeRecord?: boolean, shouldRecord?: () => boolean } = {},
+) {
   requestAnimationFrame(() => {
+    if (options.shouldRecord && !options.shouldRecord())
+      return
+
     syncScrollStateFromRoot()
-    const beforeReconcile = collectStats({ reconcile: false })
-    pushLabEvent(type, payload, beforeReconcile)
-    applyLabStats(collectStats({ reconcile: true }))
+    if (options.reconcileBeforeRecord)
+      applyLabStats(collectStats({ reconcile: true }))
+
+    const stats = collectStats({ reconcile: false })
+    pushLabEvent(type, payload, stats)
+
+    if (!options.reconcileBeforeRecord)
+      applyLabStats(collectStats({ reconcile: true }))
   })
 }
 
-async function saveThreadScroll() {
-  const root = scrollRoot.value
-  if (!root)
-    return
-
-  const currentScrollTop = getNormalizedOuterScrollTop(root)
+async function saveActiveThreadViewport(options: { forceMeasure?: boolean } = {}) {
+  const threadId = activeThreadId.value
   const anchor = captureOuterAnchor()
-  await captureVisibleVirtualStates({ forceMeasure: true })
-  threadScrollTops.set(activeThreadId.value, currentScrollTop)
+  const top = syncScrollStateFromRoot()
+
+  threadScrollTops.set(threadId, top)
+
   if (anchor) {
-    threadAnchors.set(activeThreadId.value, anchor)
-    markThreadRestoreTarget(activeThreadId.value, anchor)
+    threadAnchors.set(threadId, anchor)
+    markThreadRestoreTarget(threadId, anchor)
   }
-}
 
-async function stabilizeThreadRestore(
-  anchor: OuterAnchor | null,
-  fallbackScrollTop: number,
-) {
-  for (let i = 0; i < 4; i++) {
-    if (anchor)
-      await restoreOuterAnchor(anchor, { immediate: true, expectedJump: true })
-    else
-      applyOuterScrollTop(fallbackScrollTop)
-
-    await nextTick()
-    await waitFrame()
-
-    applyLabStats(collectStats({ reconcile: true }))
-  }
+  await captureVisibleVirtualStates({
+    forceMeasure: options.forceMeasure === true,
+  })
 }
 
 async function switchThread(threadId: ThreadId) {
   if (threadId === activeThreadId.value)
     return
 
-  await saveThreadScroll()
   const previousThreadId = activeThreadId.value
   const previousScrollTop = scrollTop.value
 
+  await saveActiveThreadViewport({ forceMeasure: true })
+
   activeThreadId.value = threadId
+  forceHiddenMessageKeys.clear()
 
-  try {
-    for (const message of threads[threadId]) {
-      const key = messageKey(message)
-      const state = virtualStates.get(key)
+  await nextTick()
 
-      if (!state)
-        continue
+  const anchor = threadAnchors.get(threadId) ?? null
+  const savedTop = threadScrollTops.get(threadId) ?? 0
 
-      if (state.sessionKey !== messageRenderKey(message))
-        continue
-
-      const height = state.metrics?.totalHeight
-      if (
-        height
-        && height > 0
-        && getCachedItemHeight(key) == null
-        && canReuseStateForCurrentMeasurement(state)
-      ) {
-        setItemHeight(key, getLogicalMessageHeight(key, height))
-      }
-    }
-
-    const savedAnchor = threadAnchors.get(threadId)
-    const savedScrollTop = threadScrollTops.get(threadId) ?? 0
-    let targetAnchor: OuterAnchor | null = savedAnchor ?? null
-
-    if (savedAnchor) {
-      markThreadRestoreTarget(threadId, savedAnchor)
-    }
-    else {
-      const fallbackIndex = lowerBoundOffset(savedScrollTop + 1)
-      targetAnchor = {
-        type: 'item',
-        index: fallbackIndex,
-        offsetPx: savedScrollTop - (prefixTops.value[fallbackIndex] ?? 0),
-      }
-      markThreadRestoreTarget(threadId, targetAnchor)
-    }
-
-    await nextTick()
-
-    await stabilizeThreadRestore(targetAnchor, savedScrollTop)
-
-    const root = scrollRoot.value
-    if (!root)
-      return
-
-    setNormalizedOuterScrollTop(scrollTop.value, root)
-    await stabilizeThreadRestore(targetAnchor, savedScrollTop)
-
-    const currentRootScrollTop = readRootScrollTop()
-    const expectedThreadScrollTop = targetAnchor
-      ? resolveOuterAnchorScrollTop(targetAnchor)
-      : savedScrollTop
-    const restoredAnchor = captureOuterAnchor()
-
-    lastThreadRestoreDeltaPx.value = Math.abs(currentRootScrollTop - expectedThreadScrollTop)
-    lastThreadRestoreAnchorDeltaPx.value = getOuterAnchorDelta(targetAnchor, restoredAnchor)
-
-    pushLabEvent('thread-switch', {
-      fromThreadId: previousThreadId,
-      toThreadId: threadId,
+  if (anchor) {
+    markThreadRestoreTarget(threadId, anchor)
+    await restoreOuterAnchor(anchor, {
+      immediate: true,
       expectedJump: true,
-      scrollJumpPx: Math.abs(scrollTop.value - previousScrollTop),
-      heightDriftPx: lastThreadRestoreDeltaPx.value,
     })
+  }
+  else {
+    applyOuterScrollTop(savedTop)
+  }
 
-    scheduleVisibleDomReconcile()
+  for (let i = 0; i < 4; i++) {
+    await nextTick()
+    await waitFrame()
+
+    if (anchor) {
+      await restoreOuterAnchor(anchor, {
+        immediate: true,
+        expectedJump: true,
+      })
+    }
   }
-  finally {
+
+  const restored = getNormalizedOuterScrollTop()
+  lastThreadRestoreDeltaPx.value = Math.abs(restored - savedTop)
+  lastThreadRestoreAnchorDeltaPx.value = getOuterAnchorDelta(
+    anchor,
+    captureOuterAnchor(),
+  )
+
+  pushLabEvent('thread-switch', {
+    fromThreadId: previousThreadId,
+    toThreadId: threadId,
+    expectedJump: true,
+    scrollJumpPx: Math.abs(restored - previousScrollTop),
+    heightDriftPx: lastThreadRestoreDeltaPx.value,
+  })
+
+  scheduleVisibleDomReconcile()
+
+  if (anchor)
     deferClearThreadRestoreTarget(threadId)
-  }
 }
 
 function jumpToTop() {
@@ -2150,10 +2142,9 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
   const domSlotBudget = Math.max(
     expectedMarkdownSlotCeiling.value,
     maxExpectedMarkdownSlotCeiling.value || 0,
-    Math.max(1, stats.markdownRendererCount) * 280,
   )
   const virtualDomWithinLimit = maxObservedMarkdownSlots <= domSlotBudget
-  const hugeRendererSlotBudget = maxLiveNodes.value + 16
+  const hugeRendererSlotBudget = maxLiveNodes.value + COORDINATED_RENDERER_SLOT_EXTRA
   const hugeRendererDomWithinLimit = stats.maxHugeMessageSlotCount <= hugeRendererSlotBudget
   const scrollJitterOk = maxObservedScrollJumpPx <= SCROLL_JITTER_BUDGET_PX
   const strictClippingOk = stats.maxItemOverflowPx <= 2
@@ -2419,7 +2410,7 @@ async function forceUnmountVisibleHugeMessage() {
   if (!target)
     return
 
-  await captureVisibleVirtualStates()
+  await captureVisibleVirtualStates({ forceMeasure: true })
 
   const key = messageStateKey(target.message)
   forceHiddenMessageKeys.add(key)
@@ -2646,7 +2637,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  void saveThreadScroll()
+  void saveActiveThreadViewport({ forceMeasure: true })
   stopStressScroll()
   streamBottomPinned = false
   mountedRootSetupActive = false
@@ -2878,11 +2869,11 @@ onBeforeUnmount(() => {
       </p>
       <p>
         Huge renderer max slots:
-        <strong :class="{ danger: labSnapshot.maxHugeMessageSlotCount > maxLiveNodes + 96 }">
+        <strong :class="{ danger: labSnapshot.maxHugeMessageSlotCount > labSnapshot.hugeRendererSlotBudget }">
           {{ labSnapshot.maxHugeMessageSlotCount }}
         </strong>
         /
-        {{ maxLiveNodes + 96 }}
+        {{ labSnapshot.hugeRendererSlotBudget }}
       </p>
       <p>
         Total DOM nodes:

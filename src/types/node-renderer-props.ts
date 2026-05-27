@@ -208,9 +208,26 @@ export type MarkstreamVirtualScrollOptions
     sessionKey?: string
   })
 
+export interface MarkstreamCaptureVirtualStateOptions {
+  /**
+   * Default: false for imperative capture.
+   *
+   * Event-driven state emission still uses viewport-gated capture internally,
+   * but a host virtualizer calling captureVirtualState() during thread switch
+   * should be able to persist a fallback anchor for the renderer it owns.
+   */
+  requireViewport?: boolean
+  /**
+   * Default: true.
+   */
+  includeEmptyState?: boolean
+}
+
 export interface MarkstreamRendererHandle {
   getVirtualMetrics: () => MarkstreamVirtualMetrics
-  captureVirtualState: () => MarkstreamVirtualState | null
+  captureVirtualState: (
+    options?: MarkstreamCaptureVirtualStateOptions
+  ) => MarkstreamVirtualState | null
   restoreVirtualState: (
     state: MarkstreamVirtualState,
     options?: {

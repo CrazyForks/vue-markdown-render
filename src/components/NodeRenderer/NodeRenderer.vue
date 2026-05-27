@@ -3,6 +3,7 @@ import type { ParsedNode } from 'stream-markdown-parser'
 import type { CustomComponents } from '../../types'
 import type { CodeBlockPreviewPayload } from '../../types/component-props'
 import type {
+  MarkstreamCaptureVirtualStateOptions,
   MarkstreamHeightCache,
   MarkstreamNodeLifecycle,
   MarkstreamRendererHandle,
@@ -1774,6 +1775,34 @@ function getVisibleDomHeight() {
   return Math.ceil(Math.max(0, total))
 }
 
+function getVirtualizedDomLogicalHeight() {
+  let total = topSpacerHeight.value + bottomSpacerHeight.value
+
+  for (const el of nodeSlotElements.values()) {
+    if (!el)
+      continue
+
+    total += Math.max(
+      0,
+      el.offsetHeight || 0,
+      el.getBoundingClientRect?.().height || 0,
+    )
+  }
+
+  return Math.ceil(Math.max(0, total))
+}
+
+function getPlausibleVirtualizedContainerHeight(modelHeight: number, domHeight: number) {
+  if (modelHeight <= 0 || domHeight <= 0)
+    return 0
+
+  // Accept small real DOM drift, but reject stale container scrollHeight.
+  const driftBudget = Math.max(512, modelHeight * 0.05)
+  return domHeight <= modelHeight + driftBudget
+    ? Math.ceil(domHeight)
+    : 0
+}
+
 let imperativeVirtualSettleSessionKey: string | null = null
 let imperativeVirtualSettleThreadKey: string | undefined
 
@@ -1931,8 +1960,14 @@ function getRendererLogicalHeight() {
     return Math.ceil(domHeight)
 
   if (virtualizationEnabled.value) {
-    if (modelHeight > 0)
-      return Math.max(1, Math.ceil(modelHeight))
+    if (modelHeight > 0) {
+      return Math.max(
+        1,
+        Math.ceil(modelHeight),
+        getVirtualizedDomLogicalHeight(),
+        getPlausibleVirtualizedContainerHeight(modelHeight, domHeight),
+      )
+    }
 
     return Math.max(1, Math.ceil(domHeight))
   }
@@ -2343,6 +2378,7 @@ function captureVirtualStateFromMetrics(
     includeHeightCache?: boolean
     includeContentHash?: boolean
     allowAnchorFallback?: boolean
+    requireViewport?: boolean
     includeEmptyState?: boolean
   } = {},
 ): MarkstreamVirtualState | null {
@@ -2353,7 +2389,7 @@ function captureVirtualStateFromMetrics(
     : []
   const anchor = captureVirtualAnchor({
     allowFallback: options.allowAnchorFallback === true,
-    requireViewport: true,
+    requireViewport: options.requireViewport,
   })
 
   if (!anchor && !heightCache.length && options.includeEmptyState !== true)
@@ -2378,12 +2414,13 @@ function captureVirtualStateFromMetrics(
   }
 }
 
-function captureVirtualState() {
+function captureVirtualState(options: MarkstreamCaptureVirtualStateOptions = {}) {
   return captureVirtualStateFromMetrics(getVirtualMetrics('manual'), {
     includeHeightCache: true,
     includeContentHash: true,
     allowAnchorFallback: true,
-    includeEmptyState: true,
+    requireViewport: options.requireViewport === true,
+    includeEmptyState: options.includeEmptyState ?? true,
   })
 }
 
@@ -2394,20 +2431,40 @@ function setNormalizedScrollTop(root: HTMLElement, doc: Document, targetNormaliz
   })
 }
 
-function applyBottomVirtualAnchor(anchor: Extract<MarkstreamVirtualAnchor, { type: 'bottom' }>) {
-  const box = getScrollBox()
+function getRendererBottomOffsetWithinRoot(
+  box: NonNullable<ReturnType<typeof getScrollBox>>,
+) {
   const container = containerRef.value
-  if (!box || !container)
-    return
+  if (!container)
+    return null
 
   const rendererTop = getOffsetTopWithinRoot(container, box.root)
-  const rendererHeight = getRendererLogicalHeight()
+  const domHeight = Math.max(
+    0,
+    container.offsetHeight || 0,
+    container.scrollHeight || 0,
+    container.getBoundingClientRect?.().height || 0,
+  )
+  const logicalHeight = getRendererLogicalHeight()
+
+  return rendererTop + Math.max(domHeight, logicalHeight)
+}
+
+function applyBottomVirtualAnchor(anchor: Extract<MarkstreamVirtualAnchor, { type: 'bottom' }>) {
+  const box = getScrollBox()
+  if (!box)
+    return
+
+  const rendererBottom = getRendererBottomOffsetWithinRoot(box)
+  if (rendererBottom == null)
+    return
+
   const distance = Math.max(0, anchor.distanceFromBottomPx)
 
   // Keep renderer bottom `distance` px above viewport bottom.
   const target = Math.max(
     0,
-    rendererTop + rendererHeight - box.clientHeight - distance,
+    rendererBottom - box.clientHeight - distance,
   )
 
   guardVirtualBottomProgrammaticScroll(target)
@@ -3375,6 +3432,7 @@ function flushVirtualStateBeforeUnmount() {
       includeHeightCache: true,
       includeContentHash: true,
       allowAnchorFallback: true,
+      requireViewport: false,
       includeEmptyState: true,
     })
 
@@ -3415,6 +3473,8 @@ function clearVirtualMetricsSchedule() {
 function flushVirtualMetricsEmit() {
   virtualMetricsEmitRaf = null
   virtualMetricsEmitTimer = null
+  measureTrackedNodeHeights()
+  forceFlushPendingHeightMeasurements()
   emitVirtualMetricsNow(getVirtualMetrics(pendingVirtualMetricsReason))
 }
 

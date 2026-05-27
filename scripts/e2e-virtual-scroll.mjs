@@ -606,6 +606,41 @@ async function run() {
 
         const sameShapeAfter = api.read()
 
+        api.clearEvents()
+        await api.scrollToRatio(1)
+        for (let i = 0; i < 20; i++)
+          await api.nextFrame()
+
+        const streamingBefore = api.read()
+
+        await api.startStreamingLastMessage({
+          blocks: 520,
+          initialChars: 1200,
+          chunkSize: 3000,
+          intervalMs: 16,
+        })
+
+        let streamingAfter = api.read()
+        for (let i = 0; i < 240; i++) {
+          await api.nextFrame()
+          streamingAfter = api.read()
+          if (!streamingAfter.streamingActive && streamingAfter.settledEvents > 0)
+            break
+        }
+
+        await api.settleVisibleRenderers()
+        for (let i = 0; i < 60; i++)
+          await api.nextFrame()
+
+        const streamingFinal = api.read()
+
+        api.clearEvents()
+        await api.rapidSwitchThreads(['thread-a', 'thread-b'], 8)
+        for (let i = 0; i < 80; i++)
+          await api.nextFrame()
+
+        const rapidSwitchAfter = api.read()
+
         return {
           before,
           restored,
@@ -622,6 +657,12 @@ async function run() {
             before: sameShapeBefore,
             after: sameShapeAfter,
           },
+          streamingProbe: {
+            before: streamingBefore,
+            after: streamingAfter,
+            final: streamingFinal,
+          },
+          rapidSwitchProbe: rapidSwitchAfter,
         }
       })
 
@@ -667,6 +708,28 @@ async function run() {
         && smoke.sameShapeProbe.after.health.maxObservedScrollJumpPx <= 32,
         'same-shape virtual session replacement caused blank frame, DOM budget regression, or scroll jump',
         smoke.sameShapeProbe,
+      )
+
+      assert(
+        smoke.streamingProbe.final.distanceFromBottomPx < 48
+        && smoke.streamingProbe.final.stats.blankProbeCount === 0
+        && smoke.streamingProbe.final.blankFrameCount === 0
+        && smoke.streamingProbe.final.visibleCoverageOk
+        && smoke.streamingProbe.final.health.virtualDomWithinLimit
+        && smoke.streamingProbe.final.health.hugeRendererDomWithinLimit
+        && smoke.streamingProbe.final.health.maxObservedScrollJumpPx <= 32,
+        'streaming bottom-pinned render caused scroll drift, blank frame, or DOM budget regression',
+        smoke.streamingProbe,
+      )
+
+      assert(
+        smoke.rapidSwitchProbe.health.threadRestoreOk
+        && smoke.rapidSwitchProbe.stats.blankProbeCount === 0
+        && smoke.rapidSwitchProbe.blankFrameCount === 0
+        && smoke.rapidSwitchProbe.health.virtualDomWithinLimit
+        && smoke.rapidSwitchProbe.health.hugeRendererDomWithinLimit,
+        'rapid thread switching lost scroll state or created blank/DOM regression',
+        smoke.rapidSwitchProbe,
       )
 
       assertNoPageErrors('virtual-scroll smoke e2e')

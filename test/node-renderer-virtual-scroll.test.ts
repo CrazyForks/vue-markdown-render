@@ -2141,7 +2141,7 @@ describe('node renderer virtual-scroll coordination', () => {
     })
     expect(state.anchor).toBeUndefined()
     expect(wrapper.emitted('anchor-change')?.length ?? 0).toBe(anchorChangeCount)
-    expect((wrapper.vm as any).captureVirtualState()).toMatchObject({
+    expect((wrapper.vm as any).captureVirtualState({ requireViewport: true })).toMatchObject({
       anchorCaptured: false,
       heightCache: [
         { index: 0, height: 70 },
@@ -4019,7 +4019,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await nextTick()
 
     expect(scrollRoot.scrollTop).toBe(
-      Math.max(0, initialMetrics.totalHeight - scrollRoot.clientHeight),
+      Math.max(0, Math.max(scrollHeight, initialMetrics.totalHeight) - scrollRoot.clientHeight),
     )
 
     const nextHeights = [433, 433, 434]
@@ -4032,7 +4032,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await nextTick()
 
     expect(scrollRoot.scrollTop).toBe(
-      Math.max(0, nextMetrics.totalHeight - scrollRoot.clientHeight),
+      Math.max(0, Math.max(scrollHeight, nextMetrics.totalHeight) - scrollRoot.clientHeight),
     )
 
     wrapper.unmount()
@@ -4096,7 +4096,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await nextTick()
 
     expect(scrollRoot.scrollTop).toBe(
-      Math.max(0, initialMetrics.totalHeight - scrollRoot.clientHeight),
+      Math.max(0, Math.max(scrollHeight, initialMetrics.totalHeight) - scrollRoot.clientHeight),
     )
 
     scrollHeight = 1400
@@ -4111,7 +4111,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await nextTick()
 
     expect(scrollRoot.scrollTop).toBe(
-      Math.max(0, nextMetrics.totalHeight - scrollRoot.clientHeight),
+      Math.max(0, Math.max(scrollHeight, nextMetrics.totalHeight) - scrollRoot.clientHeight),
     )
 
     wrapper.unmount()
@@ -4175,7 +4175,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await nextTick()
 
     expect(scrollRoot.scrollTop).toBe(
-      Math.max(0, initialMetrics.totalHeight - scrollRoot.clientHeight),
+      Math.max(0, Math.max(scrollHeight, initialMetrics.totalHeight) - scrollRoot.clientHeight),
     )
 
     scrollRoot.scrollTop = 700

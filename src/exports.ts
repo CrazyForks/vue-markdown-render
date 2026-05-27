@@ -109,6 +109,7 @@ export type {
   PreCodeNodeProps,
 } from './types/component-props'
 export type {
+  MarkstreamCaptureVirtualStateOptions,
   MarkstreamHeightCache,
   MarkstreamHeightCacheEntry,
   MarkstreamMeasuredHeightCacheEntry,
