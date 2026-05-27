@@ -171,6 +171,25 @@ describe('useScrollListener', () => {
     expect(h.scheduleFocusSync).toHaveBeenCalledWith()
   })
 
+  it('schedules immediate focus sync for the first large scroll jump', () => {
+    const root = createRoot()
+    Object.defineProperty(root, 'clientHeight', {
+      configurable: true,
+      value: 600,
+    })
+
+    root.scrollTop = 0
+
+    const h = createHarness({ root })
+
+    h.listener.setupScrollListener()
+
+    root.scrollTop = 3000
+    root.dispatchEvent(new Event('scroll'))
+
+    expect(h.scheduleFocusSync).toHaveBeenCalledWith({ immediate: true })
+  })
+
   it('runs the external scroll hook before scheduling focus sync', () => {
     const calls: string[] = []
     const h = createHarness({

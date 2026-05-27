@@ -213,6 +213,26 @@ let lastObservedScrollTop = 0
 let expectedScrollTop: number | null = null
 let restoreAnchorTokenSeq = 0
 
+function readRootScrollTop() {
+  return scrollRoot.value?.scrollTop ?? scrollTop.value
+}
+
+function syncScrollStateFromRoot(
+  options: {
+    updateExpected?: boolean
+  } = {},
+) {
+  const current = readRootScrollTop()
+
+  scrollTop.value = current
+  threadScrollTops.set(activeThreadId.value, current)
+
+  if (options.updateExpected)
+    expectedScrollTop = current
+
+  return current
+}
+
 function repeatedText(seed: string, index: number) {
   return [
     `This is paragraph ${index} in a long virtual scroll transcript.`,
@@ -658,8 +678,12 @@ function applyOuterScrollTop(value: number) {
   scrollTop.value = next
 
   const root = scrollRoot.value
-  if (root && Math.abs(root.scrollTop - next) > 1)
-    root.scrollTop = next
+  if (root) {
+    if (Math.abs(root.scrollTop - next) > 1)
+      root.scrollTop = next
+
+    scrollTop.value = root.scrollTop
+  }
 }
 
 function resolveOuterAnchorScrollTop(anchor: OuterAnchor) {
@@ -865,13 +889,10 @@ function onRenderSettled() {
 }
 
 function onScroll() {
-  const root = scrollRoot.value
-  if (!root)
+  if (!scrollRoot.value)
     return
 
-  scrollTop.value = root.scrollTop
-  threadScrollTops.set(activeThreadId.value, root.scrollTop)
-  expectedScrollTop = root.scrollTop
+  syncScrollStateFromRoot({ updateExpected: true })
 
   if (streamBottomPinned && !streamTimer && getCurrentDistanceFromBottom() > 64)
     streamBottomPinned = false
@@ -890,6 +911,7 @@ function scheduleVisibleDomReconcile() {
 
   statsRaf = requestAnimationFrame(() => {
     statsRaf = 0
+    syncScrollStateFromRoot()
     applyLabStats(collectStats({ reconcile: true }))
   })
 }
@@ -1146,7 +1168,7 @@ function pushLabEvent(
   const now = typeof performance !== 'undefined'
     ? performance.now()
     : Date.now()
-  const currentScrollTop = scrollTop.value
+  const currentScrollTop = syncScrollStateFromRoot()
   const scrollJumpPx = Math.abs(currentScrollTop - lastObservedScrollTop)
   const expectedActiveScrollJump = expectedScrollTop != null
     && Math.abs(currentScrollTop - expectedScrollTop) <= 1
@@ -1173,6 +1195,7 @@ function pushLabEvent(
 
 function scheduleLabEvent(type: string, payload: Partial<LabEvent> = {}) {
   requestAnimationFrame(() => {
+    syncScrollStateFromRoot()
     const beforeReconcile = collectStats({ reconcile: false })
     pushLabEvent(type, payload, beforeReconcile)
     applyLabStats(collectStats({ reconcile: true }))
@@ -1392,8 +1415,9 @@ function resetHeights() {
   maxExpectedDomNodeCeiling.value = 0
   scrollCompensationCount.value = 0
   labEvents.splice(0)
-  lastObservedScrollTop = scrollTop.value
-  expectedScrollTop = scrollTop.value
+  const currentScrollTop = syncScrollStateFromRoot()
+  lastObservedScrollTop = currentScrollTop
+  expectedScrollTop = currentScrollTop
   scheduleStats()
 }
 
@@ -1535,8 +1559,9 @@ async function rapidSwitchThreads(threadIds: ThreadId[], count = 9) {
 function clearLabEvents() {
   labEvents.splice(0)
   blankFrameCount.value = 0
-  lastObservedScrollTop = scrollTop.value
-  expectedScrollTop = scrollTop.value
+  const currentScrollTop = syncScrollStateFromRoot()
+  lastObservedScrollTop = currentScrollTop
+  expectedScrollTop = currentScrollTop
 }
 
 function exposeLabApi() {

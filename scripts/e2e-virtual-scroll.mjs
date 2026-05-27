@@ -198,12 +198,13 @@ async function run() {
   const server = startDevServer(port)
 
   let browser
+  let page
 
   try {
     await waitForPort(port)
 
     browser = await chromium.launch(resolveChromeLaunchOptions())
-    const page = await browser.newPage({
+    page = await browser.newPage({
       viewport: { width: 1280, height: 900 },
     })
 
@@ -212,12 +213,47 @@ async function run() {
         process.stderr.write(`[browser:${msg.type()}] ${msg.text()}\n`)
     })
 
+    page.on('pageerror', (error) => {
+      process.stderr.write(`[browser:pageerror] ${error.stack || error.message}\n`)
+    })
+
     await page.goto(`http://${host}:${port}/virtual-scroll`, {
       waitUntil: 'networkidle',
       timeout: 60000,
     })
 
     await waitForLabReady(page)
+
+    await page.evaluate(async () => {
+      const api = window.__markstreamVirtualScrollLab
+      for (let i = 0; i < 8; i++)
+        await api.nextFrame()
+      await api.scrollToRatio(0)
+      await api.nextFrame()
+      await api.scrollToRatio(0.5)
+      await api.nextFrame()
+      await api.scrollToRatio(0)
+      await api.nextFrame()
+    })
+
+    const rootScrollSync = await page.evaluate(() => {
+      const root = document.querySelector('[data-testid="virtual-scroll-root"]')
+      const snapshot = window.__markstreamVirtualScrollLab.read()
+
+      return {
+        domScrollTop: root?.scrollTop ?? null,
+        snapshotScrollTop: snapshot.scrollTop,
+        delta: root
+          ? Math.abs(root.scrollTop - snapshot.scrollTop)
+          : Number.POSITIVE_INFINITY,
+      }
+    })
+
+    assert(
+      rootScrollSync.delta <= 1,
+      'virtual-scroll lab snapshot scrollTop is out of sync with DOM scrollTop',
+      rootScrollSync,
+    )
 
     await page.evaluate(() => {
       window.__markstreamVirtualScrollLab.clearEvents()
@@ -626,6 +662,24 @@ async function run() {
     }, null, 2)}\n`)
   }
   catch (error) {
+    if (page) {
+      const snapshot = await page.evaluate(() => {
+        try {
+          return window.__markstreamVirtualScrollLab?.read?.() ?? null
+        }
+        catch {
+          return null
+        }
+      }).catch(() => null)
+
+      if (snapshot)
+        process.stderr.write(`[virtual-scroll:snapshot]\n${JSON.stringify(snapshot, null, 2)}\n`)
+
+      const screenshotPath = path.join(repoRoot, 'virtual-scroll-failure.png')
+      await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {})
+      process.stderr.write(`[virtual-scroll:screenshot] ${screenshotPath}\n`)
+    }
+
     process.stderr.write(`${server.getLogs()}\n`)
     throw error
   }

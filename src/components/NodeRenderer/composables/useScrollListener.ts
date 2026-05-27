@@ -66,6 +66,8 @@ export function useScrollListener(
 
     cleanupScrollListener()
 
+    lastObservedScrollTop = Math.abs(root.scrollTop || 0)
+
     const handler = () => {
       onScroll?.()
       if (virtualizationEnabled.value) {
@@ -90,11 +92,14 @@ export function useScrollListener(
     const previous = lastObservedScrollTop
     lastObservedScrollTop = current
 
-    if (previous == null)
-      return undefined
-
     const jump = Math.abs(current - previous)
     const immediateThreshold = Math.max(480, (root.clientHeight || 0) * 0.75)
+
+    if (previous == null) {
+      return current > immediateThreshold
+        ? { immediate: true }
+        : undefined
+    }
 
     return jump > immediateThreshold
       ? { immediate: true }
