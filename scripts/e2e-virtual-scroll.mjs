@@ -486,6 +486,13 @@ async function run() {
       )
 
       assert(
+        smoke.final.settledEvents > 0
+        && smoke.final.heightCacheStateCount > 0,
+        'settled virtual-scroll renderers did not persist heightCache state',
+        smoke.final,
+      )
+
+      assert(
         smoke.unmountProbe.after.health.threadRestoreOk
         && smoke.unmountProbe.after.health.maxObservedBlankProbes === 0
         && smoke.unmountProbe.after.blankFrameCount === 0
@@ -960,6 +967,12 @@ async function run() {
         final,
         finalSettleResults,
       },
+    )
+
+    assert(
+      final.heightCacheStateCount > 0,
+      'no persisted heightCache state was captured for virtual-scroll renderers',
+      final,
     )
 
     assert(

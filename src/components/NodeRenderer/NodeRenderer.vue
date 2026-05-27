@@ -2960,6 +2960,11 @@ let lastSettledVirtualEventKey: string | null = null
 let lastFinalVirtualEventKey: string | null = null
 let lastEmittedVirtualHeightCacheSignature: string | null = null
 
+interface VirtualStateEmitCandidate {
+  state: MarkstreamVirtualState | null
+  heightCacheSignature?: string | null
+}
+
 function getVirtualNow() {
   return typeof performance !== 'undefined' && typeof performance.now === 'function'
     ? performance.now()
@@ -3038,6 +3043,23 @@ function getVirtualAnchorEventKey(anchor: MarkstreamVirtualAnchor) {
   return `node:${anchor.nodeIndex}:${Math.round(anchor.offsetWithinNodePx)}`
 }
 
+function getVirtualStateHeightCacheSignature(state: MarkstreamVirtualState) {
+  const cache = state.heightCache
+  if (!cache?.length)
+    return ''
+
+  return getHeightCacheSignature(cache)
+}
+
+function rememberEmittedVirtualHeightCache(
+  state: MarkstreamVirtualState,
+  explicitSignature?: string | null,
+) {
+  const signature = explicitSignature || getVirtualStateHeightCacheSignature(state)
+  if (signature)
+    lastEmittedVirtualHeightCacheSignature = signature
+}
+
 function getVirtualStateEventKey(state: MarkstreamVirtualState) {
   const metrics = state.metrics
   const anchorKey = state.anchor
@@ -3047,7 +3069,9 @@ function getVirtualStateEventKey(state: MarkstreamVirtualState) {
   return [
     state.sessionKey,
     state.threadKey ?? '',
-    getVirtualMeasurementKey(),
+    state.measurementKey ?? getVirtualMeasurementKey(),
+    state.contentHash ?? '',
+    getVirtualStateHeightCacheSignature(state),
     anchorKey,
     state.anchorCaptured ? 1 : 0,
     metrics.liveRange.start,
@@ -3069,31 +3093,51 @@ function shouldEmitVirtualState(state: MarkstreamVirtualState, force = false) {
   return key !== lastEmittedVirtualStateKey
 }
 
-function getVirtualStateForEmit(metrics: MarkstreamVirtualMetrics, force = false) {
+function getVirtualStateForEmit(
+  metrics: MarkstreamVirtualMetrics,
+  force = false,
+): VirtualStateEmitCandidate {
   if (force || metrics.stable || metrics.phase === 'final') {
-    return captureVirtualStateFromMetrics(metrics, {
+    const state = captureVirtualStateFromMetrics(metrics, {
       includeHeightCache: true,
     })
+
+    return {
+      state,
+      heightCacheSignature: state
+        ? getVirtualStateHeightCacheSignature(state)
+        : null,
+    }
   }
 
   const lightState = captureVirtualStateFromMetrics(metrics)
 
-  if (heightStats.count <= 0)
-    return lightState
+  if (heightStats.count <= 0) {
+    return {
+      state: lightState,
+    }
+  }
 
   const cache = exportVirtualHeightCache()
-  if (!cache.length)
-    return lightState
+  if (!cache.length) {
+    return {
+      state: lightState,
+    }
+  }
 
   const signature = getHeightCacheSignature(cache)
-  if (signature === lastEmittedVirtualHeightCacheSignature)
-    return lightState
+  if (signature === lastEmittedVirtualHeightCacheSignature) {
+    return {
+      state: lightState,
+    }
+  }
 
-  lastEmittedVirtualHeightCacheSignature = signature
-
-  return captureVirtualStateFromMetrics(metrics, {
-    includeHeightCache: true,
-  })
+  return {
+    state: captureVirtualStateFromMetrics(metrics, {
+      includeHeightCache: true,
+    }),
+    heightCacheSignature: signature,
+  }
 }
 
 function shouldDelayVirtualMetricsUntilDom(force = false) {
@@ -3109,7 +3153,11 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
     return
 
   const shouldEmitHeight = force || shouldEmitVirtualMetrics(metrics)
-  const state = getVirtualStateForEmit(metrics, force)
+  const candidate = getVirtualStateForEmit(metrics, force)
+  const state = candidate.state
+  const shouldEmitState = Boolean(
+    state && (shouldEmitHeight || shouldEmitVirtualState(state, force)),
+  )
 
   if (shouldEmitHeight) {
     emitHeightChange(metrics)
@@ -3117,11 +3165,12 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
     lastVirtualEmitAt = getVirtualNow()
   }
 
-  if (state && (shouldEmitHeight || shouldEmitVirtualState(state, force))) {
+  if (state && shouldEmitState) {
     emitVirtualStateChange(state)
     if (state.anchor)
       emitAnchorChange(state.anchor)
     lastEmittedVirtualStateKey = getVirtualStateEventKey(state)
+    rememberEmittedVirtualHeightCache(state, candidate.heightCacheSignature)
   }
 
   if (metrics.stable) {
@@ -3133,8 +3182,11 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
       const settledState = captureVirtualStateFromMetrics(metrics, {
         includeHeightCache: true,
       })
-      if (settledState)
+      if (settledState) {
         emitVirtualStateChange(settledState)
+        lastEmittedVirtualStateKey = getVirtualStateEventKey(settledState)
+        rememberEmittedVirtualHeightCache(settledState)
+      }
 
       emitRenderSettled(metrics)
     }
@@ -3149,8 +3201,11 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
       const finalState = captureVirtualStateFromMetrics(metrics, {
         includeHeightCache: true,
       })
-      if (finalState)
+      if (finalState) {
         emitVirtualStateChange(finalState)
+        lastEmittedVirtualStateKey = getVirtualStateEventKey(finalState)
+        rememberEmittedVirtualHeightCache(finalState)
+      }
 
       emitRenderFinal(metrics)
     }

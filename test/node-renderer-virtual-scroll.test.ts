@@ -311,6 +311,79 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('emits updated height cache when cache signature changes without total height change', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createParagraph(1), createParagraph(2)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'balanced-cache-update',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const contentEls = getRootNodeContentElements(wrapper.element)
+    expect(contentEls.length).toBe(2)
+
+    platform.heights.set(contentEls[0]!, 40)
+    platform.heights.set(contentEls[1]!, 80)
+
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+
+    platform.flushFrames()
+    await nextTick()
+
+    await (wrapper.vm as any).forceMeasure('manual')
+
+    const beforeEvents = wrapper.emitted('virtual-state-change') ?? []
+    const beforeState = beforeEvents.at(-1)?.[0] as any
+
+    expect(beforeState.heightCache).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ index: 0, height: 40 }),
+        expect.objectContaining({ index: 1, height: 80 }),
+      ]),
+    )
+
+    const beforeEventCount = beforeEvents.length
+
+    platform.heights.set(contentEls[0]!, 60)
+    platform.heights.set(contentEls[1]!, 60)
+
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+
+    platform.flushFrames()
+    await nextTick()
+    platform.flushFrames()
+    await nextTick()
+
+    const afterEvents = wrapper.emitted('virtual-state-change') ?? []
+    expect(afterEvents.length).toBeGreaterThan(beforeEventCount)
+
+    const afterState = afterEvents.at(-1)?.[0] as any
+    expect(afterState.metrics.totalHeight).toBe(120)
+    expect(afterState.heightCache).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ index: 0, height: 60 }),
+        expect.objectContaining({ index: 1, height: 60 }),
+      ]),
+    )
+
+    wrapper.unmount()
+  })
+
   it('flushes latest virtual state before unmount', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default

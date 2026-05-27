@@ -112,6 +112,7 @@ interface VirtualScrollLabSnapshot {
   maxItemHeightDriftPx: number
   visibleCoverageOk: boolean
   settledEvents: number
+  heightCacheStateCount: number
   scrollCompensationCount: number
   lastThreadRestoreDeltaPx: number
   lastThreadRestoreAnchorDeltaPx: number
@@ -517,7 +518,11 @@ const measurementKey = computed(() => [
   density.value,
   fontScale.value,
   Math.round(layoutWidth.value / 32) * 32,
+].join(':'))
+
+const domBudgetKey = computed(() => [
   maxLiveNodes.value,
+  dynamicOverscanPx.value,
 ].join(':'))
 
 function messageStateKey(message: Message) {
@@ -2148,6 +2153,10 @@ function buildLabSnapshot(stats: LabStats): VirtualScrollLabSnapshot {
     maxItemHeightDriftPx: stats.maxItemHeightDriftPx,
     visibleCoverageOk: stats.visibleCoverageOk,
     settledEvents: settledEvents.value,
+    heightCacheStateCount: Array
+      .from(virtualStates.values())
+      .filter(state => state.heightCache?.length)
+      .length,
     scrollCompensationCount: scrollCompensationCount.value,
     lastThreadRestoreDeltaPx: lastThreadRestoreDeltaPx.value,
     lastThreadRestoreAnchorDeltaPx: lastThreadRestoreAnchorDeltaPx.value,
@@ -2165,6 +2174,51 @@ const labSnapshot = shallowRef<VirtualScrollLabSnapshot>(
 function refreshLabSnapshot(stats: LabStats = collectStats({ reconcile: false })) {
   labSnapshot.value = buildLabSnapshot(stats)
 }
+
+const verificationGroups = computed(() => ({
+  domSize: {
+    ok: labSnapshot.value.health.virtualDomWithinLimit
+      && labSnapshot.value.health.hugeRendererDomWithinLimit,
+    domNodeCount: labSnapshot.value.domNodeCount,
+    markdownSlotCount: labSnapshot.value.markdownSlotCount,
+    maxHugeMessageSlotCount: labSnapshot.value.maxHugeMessageSlotCount,
+    expectedDomNodeCeiling: labSnapshot.value.expectedDomNodeCeiling,
+    expectedMarkdownSlotCeiling: labSnapshot.value.expectedMarkdownSlotCeiling,
+  },
+  blankFrame: {
+    ok: labSnapshot.value.blankFrameCount === 0
+      && labSnapshot.value.health.maxObservedBlankProbes === 0,
+    blankFrameCount: labSnapshot.value.blankFrameCount,
+    maxObservedBlankProbes: labSnapshot.value.health.maxObservedBlankProbes,
+    maxCoverageGapPx: labSnapshot.value.health.maxObservedCoverageGapPx,
+  },
+  heightCorrectness: {
+    ok: labSnapshot.value.maxItemHeightDriftPx < 24
+      && labSnapshot.value.visibleCoverageOk,
+    maxItemHeightDriftPx: labSnapshot.value.maxItemHeightDriftPx,
+    heightDriftMessageCount: labSnapshot.value.heightDriftMessageCount,
+    clippedMessageCount: labSnapshot.value.clippedMessageCount,
+  },
+  threadRestore: {
+    ok: labSnapshot.value.health.threadRestoreOk,
+    lastThreadRestoreDeltaPx: labSnapshot.value.lastThreadRestoreDeltaPx,
+    lastThreadRestoreAnchorDeltaPx: labSnapshot.value.lastThreadRestoreAnchorDeltaPx,
+    firstVisibleMessageId: labSnapshot.value.firstVisibleMessageId,
+    outerAnchor: labSnapshot.value.outerAnchor,
+  },
+  scrollJitter: {
+    ok: labSnapshot.value.health.scrollJitterOk,
+    maxObservedScrollJumpPx: labSnapshot.value.health.maxObservedScrollJumpPx,
+    scrollCompensationCount: labSnapshot.value.scrollCompensationCount,
+  },
+  renderSettlement: {
+    ok: labSnapshot.value.settledEvents > 0
+      && labSnapshot.value.heightCacheStateCount > 0,
+    settledEvents: labSnapshot.value.settledEvents,
+    heightCacheStateCount: labSnapshot.value.heightCacheStateCount,
+    streamingActive: labSnapshot.value.streamingActive,
+  },
+}))
 
 function waitFrame() {
   return new Promise<void>((resolve) => {
@@ -2464,6 +2518,7 @@ onBeforeUnmount(() => {
       <span>scrollTop: {{ Math.round(scrollTop) }}px</span>
       <span>visible range: {{ visibleRange.start }} - {{ visibleRange.end }}</span>
       <span>maxLiveNodes: {{ maxLiveNodes }}</span>
+      <span>dom budget key: {{ domBudgetKey }}</span>
       <span>settled events: {{ settledEvents }}</span>
       <span data-testid="slot-ceiling">slot ceiling: {{ expectedMarkdownSlotCeiling }}</span>
       <span data-testid="dom-ceiling">dom ceiling: {{ expectedDomNodeCeiling }}</span>
@@ -2540,6 +2595,19 @@ onBeforeUnmount(() => {
           {{ labSnapshot.health.layoutIntegrityOk ? 'ok' : 'bad' }}
         </span>
       </div>
+    </section>
+
+    <section class="verification-grid">
+      <article
+        v-for="(group, name) in verificationGroups"
+        :key="name"
+        class="verification-card"
+        :class="{ ok: group.ok, bad: !group.ok }"
+      >
+        <h3>{{ name }}</h3>
+        <strong>{{ group.ok ? 'PASS' : 'CHECK' }}</strong>
+        <pre>{{ JSON.stringify(group, null, 2) }}</pre>
+      </article>
     </section>
 
     <section class="dom-budget">
@@ -2750,6 +2818,55 @@ button:hover {
 
 .metrics-grid .bad {
   color: #991b1b;
+}
+
+.verification-grid {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  max-height: 112px;
+  overflow: auto;
+  border-bottom: 1px solid var(--lab-border);
+  background: var(--lab-bg);
+}
+
+.verification-card {
+  min-width: 0;
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--lab-border);
+  border-radius: 0.5rem;
+  background: var(--lab-panel);
+}
+
+.verification-card.ok {
+  border-color: #16a34a;
+}
+
+.verification-card.bad {
+  border-color: #dc2626;
+  background: #fff7f7;
+}
+
+.verification-card h3 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.verification-card strong {
+  color: var(--lab-muted);
+  font-size: 11px;
+}
+
+.verification-card pre {
+  max-height: 36px;
+  margin: 0;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
 }
 
 .dom-budget {
