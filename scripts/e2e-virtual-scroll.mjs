@@ -224,6 +224,35 @@ async function run() {
 
     await waitForLabReady(page)
 
+    const rootLocator = page.locator('[data-testid="virtual-scroll-root"]')
+    await rootLocator.hover()
+
+    for (let i = 0; i < 24; i++) {
+      await page.mouse.wheel(0, 900)
+      await page.waitForTimeout(16)
+    }
+
+    const wheelProbe = await page.evaluate(async () => {
+      const api = window.__markstreamVirtualScrollLab
+      for (let i = 0; i < 20; i++)
+        await api.nextFrame()
+      return api.read()
+    })
+
+    assert(
+      wheelProbe.stats.blankProbeCount === 0
+      && wheelProbe.blankFrameCount === 0
+      && wheelProbe.visibleCoverageOk === true
+      && wheelProbe.health.virtualDomWithinLimit === true
+      && wheelProbe.health.hugeRendererDomWithinLimit === true,
+      'blank frame, coverage, or DOM budget regression observed during real wheel scrolling',
+      wheelProbe,
+    )
+
+    await page.evaluate(() => {
+      window.__markstreamVirtualScrollLab.clearEvents()
+    })
+
     await page.evaluate(async () => {
       const api = window.__markstreamVirtualScrollLab
       for (let i = 0; i < 8; i++)
@@ -266,8 +295,11 @@ async function run() {
         for (let i = 0; i < frames; i++) {
           await api.nextFrame()
           latest = api.read()
+          const blankProbeOk = options.clearEvents === false
+            ? latest.health.maxObservedBlankProbes === 0
+            : latest.stats.blankProbeCount === 0
           if (
-            latest.health.maxObservedBlankProbes === 0
+            blankProbeOk
             && latest.blankFrameCount === 0
             && latest.visibleCoverageOk
             && latest.health.virtualDomWithinLimit
@@ -304,17 +336,65 @@ async function run() {
         }
         return latest
       }
+      const getOuterAnchorDelta = (before, after) => {
+        if (!before || !after || before.type !== after.type)
+          return Number.POSITIVE_INFINITY
+
+        if (before.type === 'bottom') {
+          return Math.abs(
+            Number(before.distanceFromBottomPx ?? 0)
+            - Number(after.distanceFromBottomPx ?? 0),
+          )
+        }
+
+        if (before.messageKey && after.messageKey && before.messageKey !== after.messageKey)
+          return Number.POSITIVE_INFINITY
+
+        if (before.messageKey == null && after.messageKey == null && before.index !== after.index)
+          return Number.POSITIVE_INFINITY
+
+        return Math.abs(Number(before.offsetPx ?? 0) - Number(after.offsetPx ?? 0))
+      }
+      const isCurrentHealthy = snapshot => (
+        snapshot.stats.blankProbeCount === 0
+        && snapshot.blankFrameCount === 0
+        && snapshot.visibleCoverageOk
+        && snapshot.health.virtualDomWithinLimit
+        && snapshot.health.hugeRendererDomWithinLimit
+        && snapshot.maxItemHeightDriftPx < 24
+      )
+      const isStableSnapshot = (previous, next) => (
+        Math.abs(previous.scrollTop - next.scrollTop) <= 1
+        && Math.abs(previous.totalHeight - next.totalHeight) <= 1
+        && getOuterAnchorDelta(previous.outerAnchor, next.outerAnchor) <= 1
+      )
       const waitCurrentHealthy = async (frames = 120) => {
-        return waitUntil(
-          snapshot =>
-            snapshot.stats.blankProbeCount === 0
-            && snapshot.blankFrameCount === 0
-            && snapshot.visibleCoverageOk
-            && snapshot.health.virtualDomWithinLimit
-            && snapshot.health.hugeRendererDomWithinLimit
-            && snapshot.maxItemHeightDriftPx < 24,
-          frames,
-        )
+        let latest = api.read()
+        let previousHealthy = null
+        let stableFrames = 0
+
+        for (let i = 0; i < frames; i++) {
+          await api.nextFrame()
+          latest = api.read()
+
+          if (!isCurrentHealthy(latest)) {
+            previousHealthy = null
+            stableFrames = 0
+            continue
+          }
+
+          if (previousHealthy && isStableSnapshot(previousHealthy, latest))
+            stableFrames += 1
+          else
+            stableFrames = 0
+
+          previousHealthy = latest
+
+          if (stableFrames >= 2)
+            return latest
+        }
+
+        return latest
       }
 
       await api.scrollToRatio(0.15)
@@ -382,8 +462,13 @@ async function run() {
       api.toggleNarrowMode()
       const narrowAfter = await waitHealthy(60)
 
+      api.toggleSmallMessageCoordination()
+      const smallCoordinationAfter = await waitHealthy(90)
+
+      await api.scrollToRatio(0.62)
+      await waitCurrentHealthy()
       api.clearEvents()
-      const relayoutThreadBefore = api.read()
+      const relayoutThreadBefore = await waitCurrentHealthy()
       const settledEventsBeforeRelayoutRestore = relayoutThreadBefore.settledEvents
       const relayoutOtherThread
         = relayoutThreadBefore.threadId === 'thread-a' ? 'thread-b' : 'thread-a'
@@ -402,6 +487,7 @@ async function run() {
       api.clearEvents()
       await api.nextFrame()
 
+      const finalSettleResults = await api.settleVisibleRenderers()
       const finalAfter = await waitHealthy(45)
 
       return {
@@ -414,8 +500,10 @@ async function run() {
         streamAfter,
         relayoutAfter,
         narrowAfter,
+        smallCoordinationAfter,
         relayoutThreadBefore,
         relayoutThreadAfter,
+        finalSettleResults,
         final: finalAfter,
       }
     })
@@ -430,8 +518,10 @@ async function run() {
       streamAfter,
       relayoutAfter,
       narrowAfter,
+      smallCoordinationAfter,
       relayoutThreadBefore,
       relayoutThreadAfter,
+      finalSettleResults,
       final,
     } = result
 
@@ -573,7 +663,10 @@ async function run() {
     assert(
       final.settledEvents > 0,
       'no render-settled events were observed in the virtual-scroll lab',
-      final,
+      {
+        final,
+        finalSettleResults,
+      },
     )
 
     assert(
@@ -664,6 +757,16 @@ async function run() {
       && narrowAfter.visibleCoverageOk === true,
       'blank frame or coverage regression observed in narrow layout',
       narrowAfter,
+    )
+
+    assert(
+      smallCoordinationAfter.health.maxObservedBlankProbes === 0
+      && smallCoordinationAfter.blankFrameCount === 0
+      && smallCoordinationAfter.visibleCoverageOk === true
+      && smallCoordinationAfter.health.virtualDomWithinLimit === true
+      && smallCoordinationAfter.health.maxObservedScrollJumpPx <= 32,
+      'small-message virtual-scroll coordination caused blank frame, DOM budget, or jitter regression',
+      smallCoordinationAfter,
     )
 
     process.stdout.write(`${JSON.stringify({

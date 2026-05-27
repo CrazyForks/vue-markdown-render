@@ -687,7 +687,12 @@ const pendingAsyncNodeRecords = new Map<string, PendingAsyncNodeRecord>()
 const pendingAsyncNodeVersion = ref(0)
 const pendingAsyncNodeCount = computed(() => {
   void pendingAsyncNodeVersion.value
-  return pendingAsyncNodeCounts.size
+
+  let total = 0
+  for (const count of pendingAsyncNodeCounts.values())
+    total += Math.max(0, count)
+
+  return total
 })
 let heightMeasurementRaf: number | null = null
 let fallbackHeightPrefixDirty = true
@@ -1446,9 +1451,9 @@ function incrementPendingAsyncNodeKey(key: string, index: number) {
   const previous = pendingAsyncNodeCounts.get(key) ?? 0
   pendingAsyncNodeCounts.set(key, previous + 1)
   pendingAsyncNodeRecords.set(key, getPendingAsyncNodeRecord(index))
+  bumpAsyncNodeVersion()
 
   if (previous === 0) {
-    bumpAsyncNodeVersion()
     scheduleVirtualMetricsEmit('async-node')
   }
 }
@@ -1465,9 +1470,9 @@ function decrementPendingAsyncNodeKey(key: string) {
   else {
     pendingAsyncNodeCounts.set(key, previous - 1)
   }
+  bumpAsyncNodeVersion()
 
   if (previous === 1) {
-    bumpAsyncNodeVersion()
     scheduleVirtualMetricsEmit('async-node')
   }
 
@@ -1589,6 +1594,10 @@ function hasManualSettleSignal(token: unknown) {
   return token !== false && token != null && token !== ''
 }
 
+function hasRenderedDesiredNodes() {
+  return virtualizationEnabled.value || renderedCount.value >= desiredRenderedCount.value
+}
+
 function isInternalLayoutSettled() {
   return effectiveFinal.value === true
     && !contentStreamingTailActive.value
@@ -1596,7 +1605,7 @@ function isInternalLayoutSettled() {
     && activeHeightSettlingTimers.size === 0
     && pendingHeightMeasurements.size === 0
     && heightMeasurementRaf == null
-    && renderedCount.value >= desiredRenderedCount.value
+    && hasRenderedDesiredNodes()
 }
 
 function isHostSettleConfirmed() {
@@ -1619,7 +1628,7 @@ function resolveVirtualPhase(phase?: MarkstreamVirtualPhase): MarkstreamVirtualP
     return phase
   if (effectiveFinal.value !== true)
     return parsedNodes.value.length > 0 ? 'streaming' : 'estimating'
-  if (renderedCount.value < desiredRenderedCount.value || pendingHeightMeasurements.size > 0 || heightMeasurementRaf != null)
+  if (!hasRenderedDesiredNodes() || pendingHeightMeasurements.size > 0 || heightMeasurementRaf != null)
     return 'measuring'
   return isLayoutSettled() ? 'settled' : 'settling'
 }
@@ -2615,6 +2624,7 @@ async function settle(options: {
   const timeoutMs = options.timeoutMs ?? 120
   const reason = options.reason ?? 'manual'
   const expectedSettledTokenKey = options.expectedSettledTokenKey
+  const shouldFinalizeSettlingTimers = options.timeoutMs != null
   const staleBaseMetrics = getVirtualMetrics(reason)
   const staleMetrics = (): MarkstreamVirtualMetrics => ({
     ...staleBaseMetrics,
@@ -2649,6 +2659,9 @@ async function settle(options: {
   await waitForVirtualTimeout(timeoutMs)
   if (!isSameSettleContext())
     return staleMetrics()
+
+  if (shouldFinalizeSettlingTimers)
+    clearAllHeightSettlingTimers()
 
   measureTrackedNodeHeights()
   forceFlushPendingHeightMeasurements()
@@ -2726,6 +2739,7 @@ let virtualMetricsEmitRaf: number | null = null
 let virtualMetricsEmitTimer: number | null = null
 let lastVirtualEmitAt = 0
 let lastEmittedVirtualMetrics: MarkstreamVirtualMetrics | null = null
+let lastEmittedVirtualStateKey: string | null = null
 let lastSettledVirtualEventKey: string | null = null
 let lastFinalVirtualEventKey: string | null = null
 
@@ -2795,6 +2809,41 @@ function getVirtualMetricsEventKey(
 function resetVirtualMetricsEventDedupes() {
   lastSettledVirtualEventKey = null
   lastFinalVirtualEventKey = null
+  lastEmittedVirtualStateKey = null
+}
+
+function getVirtualAnchorEventKey(anchor: MarkstreamVirtualAnchor) {
+  if (anchor.type === 'bottom')
+    return `bottom:${Math.round(anchor.distanceFromBottomPx)}`
+
+  return `node:${anchor.nodeIndex}:${Math.round(anchor.offsetWithinNodePx)}`
+}
+
+function getVirtualStateEventKey(state: MarkstreamVirtualState) {
+  const metrics = state.metrics
+
+  return [
+    state.sessionKey,
+    state.threadKey ?? '',
+    getVirtualMeasurementKey(),
+    getVirtualAnchorEventKey(state.anchor),
+    metrics.liveRange.start,
+    metrics.liveRange.end,
+    metrics.renderedCount,
+    metrics.nodeCount,
+    Math.round(metrics.totalHeight),
+    Math.round(metrics.width),
+    metrics.phase,
+    metrics.stable ? 1 : 0,
+  ].join('\u0000')
+}
+
+function shouldEmitVirtualState(state: MarkstreamVirtualState, force = false) {
+  if (force)
+    return true
+
+  const key = getVirtualStateEventKey(state)
+  return key !== lastEmittedVirtualStateKey
 }
 
 function shouldDelayVirtualMetricsUntilDom(force = false) {
@@ -2809,21 +2858,22 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
   if (shouldDelayVirtualMetricsUntilDom(force))
     return
 
-  const shouldEmit = force || shouldEmitVirtualMetrics(metrics)
+  const shouldEmitHeight = force || shouldEmitVirtualMetrics(metrics)
   const shouldIncludeHeightCache = force || metrics.stable || metrics.phase === 'final'
+  const state = captureVirtualStateFromMetrics(metrics, {
+    includeHeightCache: shouldIncludeHeightCache,
+  })
 
-  if (shouldEmit) {
+  if (shouldEmitHeight) {
     emitHeightChange(metrics)
     lastEmittedVirtualMetrics = metrics
     lastVirtualEmitAt = getVirtualNow()
+  }
 
-    const state = captureVirtualStateFromMetrics(metrics, {
-      includeHeightCache: shouldIncludeHeightCache,
-    })
-    if (state) {
-      emitVirtualStateChange(state)
-      emitAnchorChange(state.anchor)
-    }
+  if (state && (shouldEmitHeight || shouldEmitVirtualState(state, force))) {
+    emitVirtualStateChange(state)
+    emitAnchorChange(state.anchor)
+    lastEmittedVirtualStateKey = getVirtualStateEventKey(state)
   }
 
   if (metrics.stable) {

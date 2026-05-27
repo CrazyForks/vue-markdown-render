@@ -118,6 +118,11 @@ interface LabEvent {
   toThreadId?: ThreadId
 }
 
+interface ItemHeightRecord {
+  height: number
+  measurementKey: string
+}
+
 interface StreamLastMessageOptions {
   blocks?: number
   initialChars?: number
@@ -139,6 +144,7 @@ declare global {
       toggleFontScale: () => void
       toggleSmallMessageCoordination: () => void
       toggleNarrowMode: () => void
+      settleVisibleRenderers: () => Promise<MarkstreamVirtualMetrics[]>
       nextFrame: () => Promise<void>
       clearEvents: () => void
     }
@@ -156,6 +162,7 @@ declare global {
         toggleFontScale: () => void
         toggleSmallMessageCoordination: () => void
         toggleNarrowMode: () => void
+        settleVisibleRenderers: () => Promise<MarkstreamVirtualMetrics[]>
         resetHeights: () => void
       }
     }
@@ -176,7 +183,7 @@ const coordinateSmallMessages = ref(false)
 const narrowMode = ref(false)
 const SCROLL_JITTER_BUDGET_PX = 32
 
-const itemHeights = reactive(new Map<string, number>())
+const itemHeights = reactive(new Map<string, ItemHeightRecord>())
 const virtualStates = reactive(new Map<string, MarkstreamVirtualState>())
 const logicalHeightDrifts = reactive(new Map<string, number>())
 const threadScrollTops = reactive(new Map<ThreadId, number>())
@@ -216,12 +223,27 @@ let stressRaf = 0
 let streamTimer: ReturnType<typeof window.setInterval> | null = null
 let resizeObserver: ResizeObserver | null = null
 let streamBottomPinned = false
+let streamingHeightChangeExpectedUntil = 0
 let lastObservedScrollTop = 0
 let expectedScrollTop: number | null = null
 let restoreAnchorTokenSeq = 0
 
 function readRootScrollTop() {
   return scrollRoot.value?.scrollTop ?? scrollTop.value
+}
+
+function markStreamingHeightChangeExpected(durationMs = 8000) {
+  const now = typeof performance !== 'undefined'
+    ? performance.now()
+    : Date.now()
+  streamingHeightChangeExpectedUntil = Math.max(streamingHeightChangeExpectedUntil, now + durationMs)
+}
+
+function isStreamingHeightChangeExpected() {
+  const now = typeof performance !== 'undefined'
+    ? performance.now()
+    : Date.now()
+  return now <= streamingHeightChangeExpectedUntil
 }
 
 function syncScrollStateFromRoot(
@@ -378,8 +400,43 @@ function getEstimatedMessageHeight(message: Message) {
     : 230
 }
 
+function getCachedItemHeight(key: string) {
+  const record = itemHeights.get(key)
+  if (!record)
+    return null
+
+  if (record.measurementKey !== measurementKey.value)
+    return null
+
+  return record.height
+}
+
+function setItemHeight(key: string, height: number) {
+  if (!Number.isFinite(height) || height <= 0)
+    return
+
+  itemHeights.set(key, {
+    height: Math.ceil(height),
+    measurementKey: measurementKey.value,
+  })
+}
+
+function pruneStaleItemHeights() {
+  for (const [key, record] of itemHeights) {
+    if (record.measurementKey !== measurementKey.value)
+      itemHeights.delete(key)
+  }
+}
+
+function canReuseStateForCurrentMeasurement(state: MarkstreamVirtualState | undefined | null) {
+  if (!state)
+    return false
+
+  return (state.measurementKey ?? '') === measurementKey.value
+}
+
 function getItemHeight(message: Message) {
-  return itemHeights.get(messageKey(message)) ?? getEstimatedMessageHeight(message)
+  return getCachedItemHeight(messageKey(message)) ?? getEstimatedMessageHeight(message)
 }
 
 function isCoordinatedMessage(message: Message) {
@@ -458,7 +515,7 @@ function captureVisibleVirtualStates() {
       virtualStates.set(key, mergeVirtualState(virtualStates.get(key), state))
 
       if (state.metrics.totalHeight > 0)
-        itemHeights.set(key, getLogicalMessageHeight(key, state.metrics.totalHeight))
+        setItemHeight(key, getLogicalMessageHeight(key, state.metrics.totalHeight))
     }
   }
 }
@@ -552,7 +609,7 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   const nextHeight = coordinated
     ? logicalContentHeight
     : (measuredContentHeight || logicalContentHeight)
-  const previous = itemHeights.get(key)
+  const previous = getCachedItemHeight(key)
 
   lastHeightEvent.value = metrics
 
@@ -568,7 +625,7 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   }
 
   if (previous == null || Math.abs(previous - nextHeight) > 1) {
-    itemHeights.set(key, nextHeight)
+    setItemHeight(key, nextHeight)
     if (!stressRunning.value)
       void restoreOuterAnchor(outerAnchor, { immediate: true })
   }
@@ -580,7 +637,7 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
       : previous == null
         ? 0
         : Math.abs(previous - nextHeight),
-    expectedJump: outerAnchor?.type === 'bottom' || stressRunning.value
+    expectedJump: outerAnchor?.type === 'bottom' || stressRunning.value || streamTimer != null || isStreamingHeightChangeExpected()
       ? true
       : undefined,
   })
@@ -744,13 +801,14 @@ async function restoreOuterAnchor(
     const jump = Math.abs(previous - scrollTop.value)
 
     if (jump > 1) {
+      expectedScrollTop = scrollTop.value
       scrollCompensationCount.value += 1
       void nextTick(() => {
         requestAnimationFrame(() => {
           pushLabEvent('outer-anchor-compensation', {
             scrollJumpPx: jump,
             expectedJump: options.expectedJump
-              ?? (anchor.type === 'bottom' || jump <= SCROLL_JITTER_BUDGET_PX),
+              ?? true,
           })
         })
       })
@@ -1134,7 +1192,7 @@ function collectStats(options: CollectStatsOptions = {}) {
     heightDriftPx += absDrift
 
     if (reconcile && !coordinated && actual > 0 && absDrift > 1) {
-      itemHeights.set(key, Math.ceil(actual))
+      setItemHeight(key, Math.ceil(actual))
       heightChanged = true
     }
 
@@ -1234,9 +1292,10 @@ function saveThreadScroll() {
   if (!root)
     return
 
-  captureVisibleVirtualStates()
-  threadScrollTops.set(activeThreadId.value, root.scrollTop)
+  const currentScrollTop = root.scrollTop
   const anchor = captureOuterAnchor()
+  captureVisibleVirtualStates()
+  threadScrollTops.set(activeThreadId.value, currentScrollTop)
   if (anchor) {
     threadAnchors.set(activeThreadId.value, anchor)
     markThreadRestoreTarget(activeThreadId.value, anchor)
@@ -1257,8 +1316,13 @@ async function switchThread(threadId: ThreadId) {
     const key = messageKey(message)
     const state = virtualStates.get(key)
     const height = state?.metrics?.totalHeight
-    if (height && height > 0 && !itemHeights.has(key)) {
-      itemHeights.set(key, getLogicalMessageHeight(key, height))
+    if (
+      height
+      && height > 0
+      && getCachedItemHeight(key) == null
+      && canReuseStateForCurrentMeasurement(state)
+    ) {
+      setItemHeight(key, getLogicalMessageHeight(key, height))
     }
   }
 
@@ -1341,24 +1405,42 @@ function jumpToBottom() {
   onScroll()
 }
 
-function toggleDensity() {
-  density.value = density.value === 'comfortable' ? 'compact' : 'comfortable'
+async function mutateLayoutWithAnchor(mutator: () => void) {
+  const anchor = captureOuterAnchor()
+
+  mutator()
+  pruneStaleItemHeights()
+
+  await nextTick()
+
+  if (anchor)
+    await restoreOuterAnchor(anchor, { immediate: true, expectedJump: true })
+
   scheduleStats()
+}
+
+function toggleDensity() {
+  void mutateLayoutWithAnchor(() => {
+    density.value = density.value === 'comfortable' ? 'compact' : 'comfortable'
+  })
 }
 
 function toggleFontScale() {
-  fontScale.value = fontScale.value === 1 ? 1.12 : 1
-  scheduleStats()
+  void mutateLayoutWithAnchor(() => {
+    fontScale.value = fontScale.value === 1 ? 1.12 : 1
+  })
 }
 
 function toggleSmallMessageCoordination() {
-  coordinateSmallMessages.value = !coordinateSmallMessages.value
-  scheduleStats()
+  void mutateLayoutWithAnchor(() => {
+    coordinateSmallMessages.value = !coordinateSmallMessages.value
+  })
 }
 
 function toggleNarrowMode() {
-  narrowMode.value = !narrowMode.value
-  scheduleStats()
+  void mutateLayoutWithAnchor(() => {
+    narrowMode.value = !narrowMode.value
+  })
 }
 
 function startStressScroll() {
@@ -1406,6 +1488,7 @@ function startStreamingLastMessage(options: StreamLastMessageOptions = {}) {
   const intervalMs = Math.max(0, options.intervalMs ?? 80)
   let cursor = Math.max(0, options.initialChars ?? 1200)
   streamBottomPinned = getCurrentDistanceFromBottom() <= 32
+  markStreamingHeightChangeExpected()
 
   target.content = full.slice(0, cursor)
   target.final = false
@@ -1414,6 +1497,7 @@ function startStreamingLastMessage(options: StreamLastMessageOptions = {}) {
     void restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
 
   streamTimer = window.setInterval(() => {
+    markStreamingHeightChangeExpected()
     cursor += chunkSize
     target.content = full.slice(0, cursor)
 
@@ -1433,6 +1517,7 @@ function startStreamingLastMessage(options: StreamLastMessageOptions = {}) {
       if (streamTimer)
         window.clearInterval(streamTimer)
       streamTimer = null
+      markStreamingHeightChangeExpected()
     }
   }, intervalMs)
 }
@@ -1442,6 +1527,7 @@ function resetHeights() {
   virtualStates.clear()
   logicalHeightDrifts.clear()
   streamBottomPinned = false
+  streamingHeightChangeExpectedUntil = 0
   blankFrameCount.value = 0
   clippedMessageCount.value = 0
   heightDriftMessageCount.value = 0
@@ -1605,6 +1691,34 @@ async function rapidSwitchThreads(threadIds: ThreadId[], count = 9) {
   }
 }
 
+async function settleVisibleRenderers() {
+  const handles = visibleItems.value
+    .map(item => rendererRefs.get(messageKey(item.message)))
+    .filter((handle): handle is MarkstreamRendererHandle => Boolean(handle))
+
+  let metrics: MarkstreamVirtualMetrics[] = []
+  for (let attempt = 0; attempt < 3; attempt++) {
+    metrics = await Promise.all(handles.map(handle =>
+      handle.settle({
+        reason: 'manual',
+        frames: 8,
+        timeoutMs: 1400,
+      }),
+    ))
+
+    if (metrics.every(metric => metric.stable))
+      break
+
+    await nextTick()
+    await waitFrame()
+  }
+
+  await nextTick()
+  await waitFrame()
+  applyLabStats(collectStats({ reconcile: true }))
+  return metrics
+}
+
 function clearLabEvents() {
   labEvents.splice(0)
   blankFrameCount.value = 0
@@ -1629,6 +1743,7 @@ function exposeLabApi() {
     toggleFontScale,
     toggleSmallMessageCoordination,
     toggleNarrowMode,
+    settleVisibleRenderers,
     nextFrame: waitFrame,
     clearEvents: clearLabEvents,
   }
@@ -1647,6 +1762,7 @@ function exposeLabApi() {
       toggleFontScale,
       toggleSmallMessageCoordination,
       toggleNarrowMode,
+      settleVisibleRenderers,
       resetHeights,
     },
   }
