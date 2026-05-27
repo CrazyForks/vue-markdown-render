@@ -191,6 +191,13 @@ export interface MarkstreamRendererHandle {
   restoreVirtualState: (
     state: MarkstreamVirtualState,
     options?: {
+      /**
+       * Default: false.
+       *
+       * Import compatible height cache by default. Set true only for the one
+       * renderer that owns the current outer-scroll anchor, otherwise multiple
+       * mounted MarkdownRender instances can fight over the same scroll root.
+       */
       restoreAnchor?: boolean
       restoreToken?: string | number | boolean
     },

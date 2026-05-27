@@ -52,6 +52,9 @@ interface LabHealth extends LabStats {
   hugeRendererDomWithinLimit: boolean
   hugeRendererSlotBudget: number
   domSlotBudget: number
+  lastThreadRestoreDeltaPx: number
+  lastThreadRestoreAnchorDeltaPx: number
+  threadRestoreOk: boolean
   layoutIntegrityOk: boolean
 }
 
@@ -92,6 +95,8 @@ interface VirtualScrollLabSnapshot {
   visibleCoverageOk: boolean
   settledEvents: number
   scrollCompensationCount: number
+  lastThreadRestoreDeltaPx: number
+  lastThreadRestoreAnchorDeltaPx: number
 }
 
 interface CollectStatsOptions {
@@ -202,6 +207,8 @@ const maxExpectedDomNodeCeiling = ref(0)
 const lastHeightEvent = ref<MarkstreamVirtualMetrics | null>(null)
 const settledEvents = ref(0)
 const scrollCompensationCount = ref(0)
+const lastThreadRestoreDeltaPx = ref(0)
+const lastThreadRestoreAnchorDeltaPx = ref(0)
 const labEvents = reactive<LabEvent[]>([])
 
 let statsRaf = 0
@@ -702,6 +709,26 @@ function resolveOuterAnchorScrollTop(anchor: OuterAnchor) {
   return clampOuterScrollTop(
     (prefixTops.value[index] ?? 0) + Math.max(0, anchor.offsetPx ?? 0),
   )
+}
+
+function getOuterAnchorDelta(before: OuterAnchor | null, after: OuterAnchor | null) {
+  if (!before || !after || before.type !== after.type)
+    return Number.POSITIVE_INFINITY
+
+  if (before.type === 'bottom') {
+    return Math.abs(
+      Number(before.distanceFromBottomPx ?? 0)
+      - Number(after.distanceFromBottomPx ?? 0),
+    )
+  }
+
+  if (before.messageKey && after.messageKey && before.messageKey !== after.messageKey)
+    return Number.POSITIVE_INFINITY
+
+  if (before.messageKey == null && after.messageKey == null && before.index !== after.index)
+    return Number.POSITIVE_INFINITY
+
+  return Math.abs(Number(before.offsetPx ?? 0) - Number(after.offsetPx ?? 0))
 }
 
 async function restoreOuterAnchor(
@@ -1237,17 +1264,19 @@ async function switchThread(threadId: ThreadId) {
 
   const savedAnchor = threadAnchors.get(threadId)
   const savedScrollTop = threadScrollTops.get(threadId) ?? 0
+  let targetAnchor: OuterAnchor | null = savedAnchor ?? null
 
   if (savedAnchor) {
     markThreadRestoreTarget(threadId, savedAnchor)
   }
   else {
     const fallbackIndex = lowerBoundOffset(savedScrollTop + 1)
-    markThreadRestoreTarget(threadId, {
+    targetAnchor = {
       type: 'item',
       index: fallbackIndex,
       offsetPx: savedScrollTop - (prefixTops.value[fallbackIndex] ?? 0),
-    })
+    }
+    markThreadRestoreTarget(threadId, targetAnchor)
   }
 
   await nextTick()
@@ -1271,11 +1300,21 @@ async function switchThread(threadId: ThreadId) {
 
   await waitFrame()
 
+  const currentRootScrollTop = scrollRoot.value?.scrollTop ?? scrollTop.value
+  const expectedThreadScrollTop = targetAnchor
+    ? resolveOuterAnchorScrollTop(targetAnchor)
+    : savedScrollTop
+  const restoredAnchor = captureOuterAnchor()
+
+  lastThreadRestoreDeltaPx.value = Math.abs(currentRootScrollTop - expectedThreadScrollTop)
+  lastThreadRestoreAnchorDeltaPx.value = getOuterAnchorDelta(targetAnchor, restoredAnchor)
+
   pushLabEvent('thread-switch', {
     fromThreadId: previousThreadId,
     toThreadId: threadId,
     expectedJump: true,
     scrollJumpPx: Math.abs(scrollTop.value - previousScrollTop),
+    heightDriftPx: lastThreadRestoreDeltaPx.value,
   })
 
   scheduleVisibleDomReconcile()
@@ -1414,6 +1453,8 @@ function resetHeights() {
   maxExpectedMarkdownSlotCeiling.value = 0
   maxExpectedDomNodeCeiling.value = 0
   scrollCompensationCount.value = 0
+  lastThreadRestoreDeltaPx.value = 0
+  lastThreadRestoreAnchorDeltaPx.value = 0
   labEvents.splice(0)
   const currentScrollTop = syncScrollStateFromRoot()
   lastObservedScrollTop = currentScrollTop
@@ -1448,6 +1489,8 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
   const hugeRendererSlotBudget = maxLiveNodes.value + 16
   const hugeRendererDomWithinLimit = stats.maxHugeMessageSlotCount <= hugeRendererSlotBudget
   const scrollJitterOk = maxObservedScrollJumpPx <= SCROLL_JITTER_BUDGET_PX
+  const threadRestoreOk = lastThreadRestoreDeltaPx.value <= SCROLL_JITTER_BUDGET_PX
+    || lastThreadRestoreAnchorDeltaPx.value <= SCROLL_JITTER_BUDGET_PX
 
   return {
     ...stats,
@@ -1461,6 +1504,9 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     hugeRendererDomWithinLimit,
     hugeRendererSlotBudget,
     domSlotBudget,
+    lastThreadRestoreDeltaPx: lastThreadRestoreDeltaPx.value,
+    lastThreadRestoreAnchorDeltaPx: lastThreadRestoreAnchorDeltaPx.value,
+    threadRestoreOk,
     layoutIntegrityOk:
       stats.blankProbeCount === 0
       && blankFrameCount.value === 0
@@ -1469,6 +1515,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
       && virtualDomWithinLimit
       && hugeRendererDomWithinLimit
       && scrollJitterOk
+      && threadRestoreOk
       && maxObservedHeightDriftPx < 24,
   }
 }
@@ -1520,6 +1567,8 @@ function readLabSnapshot(): VirtualScrollLabSnapshot {
     visibleCoverageOk: stats.visibleCoverageOk,
     settledEvents: settledEvents.value,
     scrollCompensationCount: scrollCompensationCount.value,
+    lastThreadRestoreDeltaPx: lastThreadRestoreDeltaPx.value,
+    lastThreadRestoreAnchorDeltaPx: lastThreadRestoreAnchorDeltaPx.value,
   }
 }
 
@@ -1798,6 +1847,16 @@ onBeforeUnmount(() => {
         <strong>scroll jitter</strong>
         <span :class="{ ok: labSnapshot.health.scrollJitterOk, bad: !labSnapshot.health.scrollJitterOk }">
           {{ Math.round(labSnapshot.health.maxObservedScrollJumpPx) }}px
+        </span>
+      </div>
+
+      <div>
+        <strong>thread restore</strong>
+        <span :class="{ ok: labSnapshot.health.threadRestoreOk, bad: !labSnapshot.health.threadRestoreOk }">
+          {{ Math.round(labSnapshot.health.lastThreadRestoreDeltaPx) }}px /
+          {{ Number.isFinite(labSnapshot.health.lastThreadRestoreAnchorDeltaPx)
+            ? Math.round(labSnapshot.health.lastThreadRestoreAnchorDeltaPx)
+            : '∞' }}px
         </span>
       </div>
 

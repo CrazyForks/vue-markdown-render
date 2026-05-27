@@ -311,6 +311,65 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not under-report non-virtualized coordinated height before all nodes are measured', async () => {
+    const platform = installManualMeasurementPlatform()
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [
+          createParagraph(1),
+          createParagraph(2),
+          createParagraph(3),
+        ],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        maxLiveNodes: 0,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'non-virtualized-dom-floor',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    Object.defineProperty(wrapper.element, 'scrollHeight', {
+      configurable: true,
+      get: () => 600,
+    })
+    Object.defineProperty(wrapper.element, 'offsetHeight', {
+      configurable: true,
+      get: () => 600,
+    })
+
+    await flushAll()
+
+    const contentEls = getRootNodeContentElements(wrapper.element)
+    expect(contentEls.length).toBe(3)
+
+    platform.heights.set(contentEls[0]!, 40)
+    platform.resizeCallbacks.get(contentEls[0]!)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+
+    expect((wrapper.vm as any).getVirtualMetrics().totalHeight).toBe(600)
+
+    for (const el of contentEls)
+      platform.heights.set(el, 80)
+
+    for (const el of contentEls)
+      platform.resizeCallbacks.get(el)?.([], {} as ResizeObserver)
+
+    platform.flushFrames()
+    await nextTick()
+
+    const metrics = await (wrapper.vm as any).forceMeasure('manual')
+    expect(metrics.totalHeight).toBe(240)
+
+    wrapper.unmount()
+  })
+
   it('allows logical totalHeight to shrink after measured heights shrink', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
@@ -2010,6 +2069,68 @@ describe('node renderer virtual-scroll coordination', () => {
     scrollRoot.remove()
   })
 
+  it('does not imperatively restore anchor unless restoreAnchor is true', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const scrollRoot = document.createElement('div')
+    document.body.appendChild(scrollRoot)
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => 1000,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      attachTo: document.body,
+      props: {
+        nodes: [createParagraph(1), createParagraph(2), createParagraph(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'imperative-restore-default',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+    installRendererBottomGeometry(wrapper, scrollRoot, () => 1000)
+
+    const state = {
+      sessionKey: 'imperative-restore-default',
+      anchor: {
+        type: 'bottom',
+        distanceFromBottomPx: 0,
+      },
+      metrics: (wrapper.vm as any).getVirtualMetrics(),
+      width: 400,
+    }
+
+    scrollRoot.scrollTop = 0
+    ;(wrapper.vm as any).restoreVirtualState(state)
+    await nextTick()
+
+    expect(scrollRoot.scrollTop).toBe(0)
+
+    ;(wrapper.vm as any).restoreVirtualState(state, {
+      restoreAnchor: true,
+      restoreToken: 'target-renderer',
+    })
+    await flushAll()
+
+    expect(scrollRoot.scrollTop).toBe(800)
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
   it('does not import restore height cache before current width is known', async () => {
     let width = 0
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width)
@@ -2905,7 +3026,7 @@ describe('node renderer virtual-scroll coordination', () => {
       anchor: { type: 'node', nodeIndex: 17, offsetWithinNodePx: 0 },
       metrics: handle.getVirtualMetrics(),
       width: 400,
-    })
+    }, { restoreAnchor: true })
 
     await nextTick()
 
@@ -3092,7 +3213,7 @@ describe('node renderer virtual-scroll coordination', () => {
       anchor: { type: 'bottom', distanceFromBottomPx: 40 },
       metrics: handle.getVirtualMetrics(),
       width: 0,
-    })
+    }, { restoreAnchor: true })
 
     await nextTick()
 
@@ -3165,7 +3286,7 @@ describe('node renderer virtual-scroll coordination', () => {
       anchor: { type: 'bottom', distanceFromBottomPx: 0 },
       metrics: handle.getVirtualMetrics(),
       width: 0,
-    })
+    }, { restoreAnchor: true })
 
     await nextTick()
 
@@ -3242,7 +3363,7 @@ describe('node renderer virtual-scroll coordination', () => {
       anchor: { type: 'bottom', distanceFromBottomPx: 0 },
       metrics: handle.getVirtualMetrics(),
       width: 0,
-    })
+    }, { restoreAnchor: true })
 
     await nextTick()
 
@@ -3321,7 +3442,7 @@ describe('node renderer virtual-scroll coordination', () => {
       anchor: { type: 'bottom', distanceFromBottomPx: 0 },
       metrics: handle.getVirtualMetrics(),
       width: 0,
-    })
+    }, { restoreAnchor: true })
 
     await nextTick()
 
@@ -3391,7 +3512,7 @@ describe('node renderer virtual-scroll coordination', () => {
       anchor: { type: 'bottom', distanceFromBottomPx: 0 },
       metrics: handle.getVirtualMetrics(),
       width: 0,
-    })
+    }, { restoreAnchor: true })
 
     expect(scrollRoot.scrollTop).toBe(800)
 

@@ -561,6 +561,16 @@ async function run() {
     )
 
     assert(
+      final.health.threadRestoreOk === true,
+      'thread restore delta exceeded budget',
+      {
+        lastThreadRestoreDeltaPx: final.health.lastThreadRestoreDeltaPx,
+        lastThreadRestoreAnchorDeltaPx: final.health.lastThreadRestoreAnchorDeltaPx,
+        health: final.health,
+      },
+    )
+
+    assert(
       final.settledEvents > 0,
       'no render-settled events were observed in the virtual-scroll lab',
       final,

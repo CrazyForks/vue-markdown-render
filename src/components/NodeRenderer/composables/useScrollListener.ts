@@ -92,7 +92,6 @@ export function useScrollListener(
     const previous = lastObservedScrollTop
     lastObservedScrollTop = current
 
-    const jump = Math.abs(current - previous)
     const immediateThreshold = Math.max(480, (root.clientHeight || 0) * 0.75)
 
     if (previous == null) {
@@ -100,6 +99,8 @@ export function useScrollListener(
         ? { immediate: true }
         : undefined
     }
+
+    const jump = Math.abs(current - previous)
 
     return jump > immediateThreshold
       ? { immediate: true }

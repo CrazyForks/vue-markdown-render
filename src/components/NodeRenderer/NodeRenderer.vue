@@ -1711,7 +1711,14 @@ function getRendererLogicalHeight() {
 
   if (virtualScrollEnabled.value) {
     const hasModelHeight = heightStats.count > 0 || getEstimatedNodeHeightCount() > 0
-    return hasModelHeight ? estimatedHeight : Math.max(domHeight, estimatedHeight)
+    if (!hasModelHeight)
+      return Math.max(domHeight, estimatedHeight)
+
+    const allNodesMeasured = total <= 0 || heightStats.count >= total
+    if (allNodesMeasured || isLayoutSettled())
+      return estimatedHeight
+
+    return Math.max(domHeight, estimatedHeight)
   }
 
   return Math.max(domHeight, estimatedHeight)
@@ -2476,7 +2483,7 @@ function restoreVirtualState(
   state: MarkstreamVirtualState,
   options: { restoreAnchor?: boolean, restoreToken?: string | number | boolean } = {},
 ) {
-  const restoreAnchorOption = options.restoreAnchor !== false
+  const restoreAnchorOption = options.restoreAnchor === true
   const restoreToken = options.restoreToken == null
     ? 'imperative'
     : String(options.restoreToken)
@@ -3810,7 +3817,7 @@ watch(
     await nextTick()
 
     const applied = applyVirtualRestoreState(state, {
-      restoreAnchor: options?.restoreAnchor ?? true,
+      restoreAnchor: options?.restoreAnchor === true,
       restoreToken: options?.restoreToken ?? 'imperative',
     })
 
