@@ -780,11 +780,23 @@ const visibleItems = computed(() => {
   })
 })
 
-function captureVisibleVirtualStates() {
+async function captureVisibleVirtualStates(options: { forceMeasure?: boolean } = {}) {
   for (const item of visibleItems.value) {
     const key = messageKey(item.message)
     const renderer = rendererRefs.get(key)
-    const state = renderer?.captureVirtualState()
+    if (!renderer)
+      continue
+
+    if (options.forceMeasure) {
+      try {
+        await renderer.forceMeasure('manual')
+      }
+      catch {
+        // The lab should still capture the best available state.
+      }
+    }
+
+    const state = renderer.captureVirtualState()
     if (state) {
       virtualStates.set(key, mergeVirtualState(virtualStates.get(key), state))
 
@@ -861,6 +873,9 @@ function makeVirtualScrollOptions(message: Message): MarkstreamVirtualScrollOpti
 }
 
 function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
+  if (metrics.sessionKey !== messageRenderKey(message))
+    return
+
   const key = messageKey(message)
   const isActiveThreadMessage = message.threadId === activeThreadId.value
   const restoreTargetAnchor = threadRestoreTargets.has(message.threadId)
@@ -1204,6 +1219,9 @@ function getLogicalMessageHeight(key: string, rendererHeight: number) {
 }
 
 function onVirtualStateChange(message: Message, state: MarkstreamVirtualState) {
+  if (state.sessionKey !== messageRenderKey(message))
+    return
+
   const key = messageKey(message)
   const previous = virtualStates.get(key)
   virtualStates.set(key, mergeVirtualState(previous, state))
@@ -1757,14 +1775,14 @@ function scheduleLabEvent(type: string, payload: Partial<LabEvent> = {}) {
   })
 }
 
-function saveThreadScroll() {
+async function saveThreadScroll() {
   const root = scrollRoot.value
   if (!root)
     return
 
   const currentScrollTop = getNormalizedOuterScrollTop(root)
   const anchor = captureOuterAnchor()
-  captureVisibleVirtualStates()
+  await captureVisibleVirtualStates({ forceMeasure: true })
   threadScrollTops.set(activeThreadId.value, currentScrollTop)
   if (anchor) {
     threadAnchors.set(activeThreadId.value, anchor)
@@ -1793,7 +1811,7 @@ async function switchThread(threadId: ThreadId) {
   if (threadId === activeThreadId.value)
     return
 
-  saveThreadScroll()
+  await saveThreadScroll()
   const previousThreadId = activeThreadId.value
   const previousScrollTop = scrollTop.value
 
@@ -2004,22 +2022,37 @@ function startStreamingLastMessage(options: StreamLastMessageOptions = {}) {
   const chunkSize = Math.max(1, options.chunkSize ?? 2400)
   const intervalMs = Math.max(0, options.intervalMs ?? 80)
   let cursor = Math.max(0, options.initialChars ?? 1200)
+  const key = messageKey(target)
+
+  target.revision += 1
+  virtualStates.delete(key)
+  itemHeights.delete(key)
+  logicalHeightDrifts.delete(key)
+
   streamBottomPinned = getCurrentDistanceFromBottom() <= 32
   markStreamingHeightChangeExpected()
 
   target.content = full.slice(0, cursor)
   target.final = false
 
-  if (streamBottomPinned)
-    void restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
+  if (streamBottomPinned) {
+    void restoreOuterAnchor(
+      { type: 'bottom', distanceFromBottomPx: 0 },
+      { immediate: true, expectedJump: true },
+    )
+  }
 
   streamTimer = window.setInterval(() => {
     markStreamingHeightChangeExpected()
     cursor += chunkSize
     target.content = full.slice(0, cursor)
 
-    if (streamBottomPinned)
-      void restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
+    if (streamBottomPinned) {
+      void restoreOuterAnchor(
+        { type: 'bottom', distanceFromBottomPx: 0 },
+        { immediate: true, expectedJump: true },
+      )
+    }
 
     if (cursor >= full.length) {
       target.content = full
@@ -2028,8 +2061,12 @@ function startStreamingLastMessage(options: StreamLastMessageOptions = {}) {
         void rendererRefs.get(messageKey(target))?.settle({ reason: 'manual' })
       })
 
-      if (streamBottomPinned)
-        void restoreOuterAnchor({ type: 'bottom', distanceFromBottomPx: 0 })
+      if (streamBottomPinned) {
+        void restoreOuterAnchor(
+          { type: 'bottom', distanceFromBottomPx: 0 },
+          { immediate: true, expectedJump: true },
+        )
+      }
 
       if (streamTimer)
         window.clearInterval(streamTimer)
@@ -2357,7 +2394,7 @@ async function forceUnmountVisibleHugeMessage() {
   if (!target)
     return
 
-  captureVisibleVirtualStates()
+  await captureVisibleVirtualStates()
 
   const key = messageStateKey(target.message)
   forceHiddenMessageKeys.add(key)
@@ -2525,7 +2562,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  saveThreadScroll()
+  void saveThreadScroll()
   stopStressScroll()
   streamBottomPinned = false
   mountedRootSetupActive = false

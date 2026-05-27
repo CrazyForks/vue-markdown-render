@@ -1115,7 +1115,118 @@ const estimatedNodeHeights = computed(() => {
 })
 
 function getFallbackNodeHeight(index: number) {
-  return nodeHeights[index] ?? estimatedNodeHeights.value[index]?.height ?? averageNodeHeight.value
+  const measured = nodeHeights[index]
+  if (Number.isFinite(measured) && measured > 0)
+    return measured
+
+  const estimated = estimatedNodeHeights.value[index]?.height
+  if (Number.isFinite(estimated) && estimated > 0)
+    return estimated
+
+  return Math.max(
+    averageNodeHeight.value,
+    getStaticNodeHeightFallback(index),
+  )
+}
+
+function getStaticNodeHeightFallback(index: number) {
+  const node = parsedNodes.value[index] as any
+  if (!node || typeof node !== 'object')
+    return 32
+
+  const type = String(node.type ?? '')
+  const width = getMeasuredContainerWidth() || 640
+
+  switch (type) {
+    case 'heading':
+      return 44
+
+    case 'paragraph':
+      return estimateTextFallbackHeight(
+        String(node.raw ?? node.content ?? ''),
+        width,
+        34,
+      )
+
+    case 'list': {
+      const items = Array.isArray(node.items) ? node.items.length : 1
+      return Math.max(48, items * 30 + 12)
+    }
+
+    case 'list_item':
+      return estimateTextFallbackHeight(
+        String(node.raw ?? node.content ?? ''),
+        width,
+        34,
+      )
+
+    case 'blockquote':
+      return estimateTextFallbackHeight(
+        String(node.raw ?? node.content ?? ''),
+        width,
+        56,
+      )
+
+    case 'table': {
+      const rowCount = Array.isArray(node.rows)
+        ? node.rows.length
+        : Array.isArray(node.children)
+          ? node.children.length
+          : 3
+      return Math.max(120, rowCount * 38 + 48)
+    }
+
+    case 'code_block':
+      return estimateTextFallbackHeight(
+        String(node.code ?? node.raw ?? ''),
+        width,
+        96,
+        20,
+      )
+
+    case 'math_block':
+      return 72
+
+    case 'image':
+      return 220
+
+    case 'admonition':
+    case 'vmr_container':
+    case 'html_block':
+      return estimateTextFallbackHeight(
+        String(node.raw ?? node.content ?? ''),
+        width,
+        96,
+      )
+
+    case 'thematic_break':
+      return 24
+
+    default:
+      return estimateTextFallbackHeight(
+        String(node.raw ?? node.content ?? ''),
+        width,
+        40,
+      )
+  }
+}
+
+function estimateTextFallbackHeight(
+  text: string,
+  width: number,
+  minHeight: number,
+  lineHeight = 22,
+) {
+  const source = String(text ?? '')
+  if (!source)
+    return minHeight
+
+  const charsPerLine = Math.max(18, Math.floor(Math.max(320, width) / 8))
+  const hardLines = source.split(/\r?\n/).length
+  const softLines = Math.ceil(source.length / charsPerLine)
+  const lines = Math.max(1, hardLines, softLines)
+
+  return Math.max(minHeight, Math.ceil(lines * lineHeight + 12))
 }
 
 function getHeightCacheWidthBucket(width: unknown) {
@@ -2981,11 +3092,9 @@ let lastEmittedVirtualMetrics: MarkstreamVirtualMetrics | null = null
 let lastEmittedVirtualStateKey: string | null = null
 let lastSettledVirtualEventKey: string | null = null
 let lastFinalVirtualEventKey: string | null = null
-let lastEmittedVirtualHeightCacheSignature: string | null = null
 
 interface VirtualStateEmitCandidate {
   state: MarkstreamVirtualState | null
-  heightCacheSignature?: string | null
 }
 
 function getVirtualNow() {
@@ -3056,7 +3165,6 @@ function resetVirtualMetricsEventDedupes() {
   lastSettledVirtualEventKey = null
   lastFinalVirtualEventKey = null
   lastEmittedVirtualStateKey = null
-  lastEmittedVirtualHeightCacheSignature = null
 }
 
 function getVirtualAnchorEventKey(anchor: MarkstreamVirtualAnchor) {
@@ -3072,15 +3180,6 @@ function getVirtualStateHeightCacheSignature(state: MarkstreamVirtualState) {
     return ''
 
   return getHeightCacheSignature(cache)
-}
-
-function rememberEmittedVirtualHeightCache(
-  state: MarkstreamVirtualState,
-  explicitSignature?: string | null,
-) {
-  const signature = explicitSignature || getVirtualStateHeightCacheSignature(state)
-  if (signature)
-    lastEmittedVirtualHeightCacheSignature = signature
 }
 
 function getVirtualStateEventKey(state: MarkstreamVirtualState) {
@@ -3127,39 +3226,11 @@ function getVirtualStateForEmit(
 
     return {
       state,
-      heightCacheSignature: state
-        ? getVirtualStateHeightCacheSignature(state)
-        : null,
-    }
-  }
-
-  const lightState = captureVirtualStateFromMetrics(metrics)
-
-  if (heightStats.count <= 0) {
-    return {
-      state: lightState,
-    }
-  }
-
-  const cache = exportVirtualHeightCache()
-  if (!cache.length) {
-    return {
-      state: lightState,
-    }
-  }
-
-  const signature = getHeightCacheSignature(cache)
-  if (signature === lastEmittedVirtualHeightCacheSignature) {
-    return {
-      state: lightState,
     }
   }
 
   return {
-    state: captureVirtualStateFromMetrics(metrics, {
-      includeHeightCache: true,
-    }),
-    heightCacheSignature: signature,
+    state: captureVirtualStateFromMetrics(metrics),
   }
 }
 
@@ -3193,7 +3264,6 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
     if (state.anchor)
       emitAnchorChange(state.anchor)
     lastEmittedVirtualStateKey = getVirtualStateEventKey(state)
-    rememberEmittedVirtualHeightCache(state, candidate.heightCacheSignature)
   }
 
   if (metrics.stable) {
@@ -3208,7 +3278,6 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
       if (settledState) {
         emitVirtualStateChange(settledState)
         lastEmittedVirtualStateKey = getVirtualStateEventKey(settledState)
-        rememberEmittedVirtualHeightCache(settledState)
       }
 
       emitRenderSettled(metrics)
@@ -3227,7 +3296,6 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
       if (finalState) {
         emitVirtualStateChange(finalState)
         lastEmittedVirtualStateKey = getVirtualStateEventKey(finalState)
-        rememberEmittedVirtualHeightCache(finalState)
       }
 
       emitRenderFinal(metrics)
@@ -3240,6 +3308,7 @@ function flushVirtualStateBeforeUnmount() {
     return
 
   try {
+    measureTrackedNodeHeights()
     forceFlushPendingHeightMeasurements()
 
     const metrics = getVirtualMetrics('manual')
@@ -5319,13 +5388,18 @@ onBeforeUnmount(() => {
 }
 
 .node-slot {
-  display: flow-root;
   width: 100%;
 }
 
 .node-content {
-  display: flow-root;
   width: 100%;
+}
+
+.markdown-renderer.virtualized .node-slot,
+.markdown-renderer.virtualized .node-content,
+.markdown-renderer.virtual-scroll-coordinated .node-slot,
+.markdown-renderer.virtual-scroll-coordinated .node-content {
+  display: flow-root;
 }
 
 .node-placeholder {

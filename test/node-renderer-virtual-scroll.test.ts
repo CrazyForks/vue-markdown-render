@@ -325,7 +325,7 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('emits updated height cache when cache signature changes without total height change', async () => {
+  it('emits light state when cache signature changes without total height change', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
 
@@ -388,7 +388,10 @@ describe('node renderer virtual-scroll coordination', () => {
 
     const afterState = afterEvents.at(-1)?.[0] as any
     expect(afterState.metrics.totalHeight).toBe(120)
-    expect(afterState.heightCache).toEqual(
+    expect(afterState.heightCache).toBeUndefined()
+
+    const capturedState = (wrapper.vm as any).captureVirtualState()
+    expect(capturedState.heightCache).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ index: 0, height: 60 }),
         expect.objectContaining({ index: 1, height: 60 }),
@@ -1872,7 +1875,7 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('emits signed height cache from non-final virtualStateChange cache updates', async () => {
+  it('omits height cache from non-final virtualStateChange cache updates', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
 
@@ -1907,16 +1910,20 @@ describe('node renderer virtual-scroll coordination', () => {
         totalHeight: 40,
       },
     })
-    expect(state.heightCache).toMatchObject([
+    expect(state.heightCache).toBeUndefined()
+
+    await (wrapper.vm as any).forceMeasure('manual')
+    const forcedState = wrapper.emitted('virtual-state-change')?.at(-1)?.[0] as any
+    expect(forcedState.heightCache).toMatchObject([
       {
         index: 0,
         height: 40,
         nodeType: 'paragraph',
       },
     ])
-    expect(state.heightCache[0]?.signature).toBeTruthy()
-    expect(state.heightCache[0]?.signature).not.toContain('Paragraph')
-    expect(state.contentHash).toBeTruthy()
+    expect(forcedState.heightCache[0]?.signature).toBeTruthy()
+    expect(forcedState.heightCache[0]?.signature).not.toContain('Paragraph')
+
     const heightCache = (wrapper.vm as any).captureVirtualState()?.heightCache ?? []
     expect(heightCache).toMatchObject([
       {
