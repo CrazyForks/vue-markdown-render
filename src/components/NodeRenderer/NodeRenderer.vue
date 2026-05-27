@@ -178,6 +178,9 @@ const streamRenderVersion = ref(0)
 const experimentContainerWidth = ref(0)
 const simpleTextProbeProfile = ref(createEmptySimpleTextProbeProfile())
 function resolveVirtualScrollRoot() {
+  if (props.virtualScroll?.enabled !== true)
+    return null
+
   const root = props.virtualScroll?.scrollRoot
   const resolved = typeof root === 'function' ? root() : root
   return unwrapVirtualScrollRoot(resolved)
@@ -2757,6 +2760,7 @@ function shouldEmitVirtualMetrics(metrics: MarkstreamVirtualMetrics) {
   const threshold = props.virtualScroll?.heightDiffThresholdPx ?? 1
 
   return Math.abs(metrics.totalHeight - previous.totalHeight) > threshold
+    || metrics.sessionKey !== previous.sessionKey
     || metrics.phase !== previous.phase
     || metrics.stable !== previous.stable
     || metrics.final !== previous.final

@@ -488,6 +488,48 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not use virtualScroll.scrollRoot while virtualScroll is disabled', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const scrollRoot = document.createElement('div')
+    document.body.appendChild(scrollRoot)
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      value: 120,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      value: 2000,
+    })
+
+    scrollRoot.scrollTop = 33
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: Array.from({ length: 8 }, (_, index) => createParagraph(index + 1)),
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: false,
+          sessionKey: 'disabled-root',
+          scrollRoot: () => scrollRoot,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const handle = wrapper.vm as any
+    handle.scrollToNode(4)
+    await nextTick()
+
+    expect(scrollRoot.scrollTop).toBe(33)
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
   it('does not block render-settled on unloaded lazy images', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default

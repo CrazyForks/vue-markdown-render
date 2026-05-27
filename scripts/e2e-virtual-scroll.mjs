@@ -359,6 +359,7 @@ async function run() {
         snapshot.stats.blankProbeCount === 0
         && snapshot.blankFrameCount === 0
         && snapshot.visibleCoverageOk
+        && snapshot.health.maxObservedCoverageGapPx <= 24
         && snapshot.health.virtualDomWithinLimit
         && snapshot.health.hugeRendererDomWithinLimit
         && snapshot.maxItemHeightDriftPx < 24
@@ -566,6 +567,15 @@ async function run() {
     )
 
     assert(
+      final.health.maxObservedCoverageGapPx <= 24,
+      'transient viewport coverage gap exceeded budget during virtual scrolling',
+      {
+        health: final.health,
+        events: final.events.filter(event => (event.maxCoverageGapPx ?? 0) > 24),
+      },
+    )
+
+    assert(
       final.health.virtualDomWithinLimit === true,
       'markdown DOM slot count exceeded budget',
       final.health,
@@ -673,6 +683,7 @@ async function run() {
       stressAfter.health.maxObservedBlankProbes === 0
       && stressAfter.blankFrameCount === 0
       && stressAfter.visibleCoverageOk === true
+      && stressAfter.health.maxObservedCoverageGapPx <= 24
       && stressAfter.health.virtualDomWithinLimit === true
       && stressAfter.health.hugeRendererDomWithinLimit === true,
       'blank frame or DOM budget regression observed during stress scroll',
@@ -757,6 +768,12 @@ async function run() {
       && narrowAfter.visibleCoverageOk === true,
       'blank frame or coverage regression observed in narrow layout',
       narrowAfter,
+    )
+
+    assert(
+      narrowAfter.health.maxObservedCoverageGapPx <= 24,
+      'transient viewport coverage gap exceeded budget in narrow layout',
+      narrowAfter.health,
     )
 
     assert(

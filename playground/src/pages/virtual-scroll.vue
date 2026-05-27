@@ -46,6 +46,7 @@ interface LabHealth extends LabStats {
   maxObservedBlankProbes: number
   maxObservedMarkdownSlots: number
   maxObservedHeightDriftPx: number
+  maxObservedCoverageGapPx: number
   maxObservedScrollJumpPx: number
   scrollJitterOk: boolean
   virtualDomWithinLimit: boolean
@@ -112,6 +113,7 @@ interface LabEvent {
   markdownSlotCount?: number
   heightDriftPx?: number
   maxItemHeightDriftPx?: number
+  maxCoverageGapPx?: number
   scrollJumpPx?: number
   expectedJump?: boolean
   fromThreadId?: ThreadId
@@ -1269,6 +1271,7 @@ function pushLabEvent(
     markdownSlotCount: stats.markdownSlotCount,
     heightDriftPx: stats.heightDriftPx,
     maxItemHeightDriftPx: stats.maxItemHeightDriftPx,
+    maxCoverageGapPx: stats.maxCoverageGapPx,
     scrollJumpPx,
     expectedJump: payload.expectedJump ?? expectedActiveScrollJump,
     ...payload,
@@ -1312,76 +1315,81 @@ async function switchThread(threadId: ThreadId) {
 
   activeThreadId.value = threadId
 
-  for (const message of threads[threadId]) {
-    const key = messageKey(message)
-    const state = virtualStates.get(key)
-    const height = state?.metrics?.totalHeight
-    if (
-      height
-      && height > 0
-      && getCachedItemHeight(key) == null
-      && canReuseStateForCurrentMeasurement(state)
-    ) {
-      setItemHeight(key, getLogicalMessageHeight(key, height))
+  try {
+    for (const message of threads[threadId]) {
+      const key = messageKey(message)
+      const state = virtualStates.get(key)
+      const height = state?.metrics?.totalHeight
+      if (
+        height
+        && height > 0
+        && getCachedItemHeight(key) == null
+        && canReuseStateForCurrentMeasurement(state)
+      ) {
+        setItemHeight(key, getLogicalMessageHeight(key, height))
+      }
     }
-  }
 
-  const savedAnchor = threadAnchors.get(threadId)
-  const savedScrollTop = threadScrollTops.get(threadId) ?? 0
-  let targetAnchor: OuterAnchor | null = savedAnchor ?? null
+    const savedAnchor = threadAnchors.get(threadId)
+    const savedScrollTop = threadScrollTops.get(threadId) ?? 0
+    let targetAnchor: OuterAnchor | null = savedAnchor ?? null
 
-  if (savedAnchor) {
-    markThreadRestoreTarget(threadId, savedAnchor)
-  }
-  else {
-    const fallbackIndex = lowerBoundOffset(savedScrollTop + 1)
-    targetAnchor = {
-      type: 'item',
-      index: fallbackIndex,
-      offsetPx: savedScrollTop - (prefixTops.value[fallbackIndex] ?? 0),
+    if (savedAnchor) {
+      markThreadRestoreTarget(threadId, savedAnchor)
     }
-    markThreadRestoreTarget(threadId, targetAnchor)
+    else {
+      const fallbackIndex = lowerBoundOffset(savedScrollTop + 1)
+      targetAnchor = {
+        type: 'item',
+        index: fallbackIndex,
+        offsetPx: savedScrollTop - (prefixTops.value[fallbackIndex] ?? 0),
+      }
+      markThreadRestoreTarget(threadId, targetAnchor)
+    }
+
+    await nextTick()
+
+    if (savedAnchor)
+      await restoreOuterAnchor(savedAnchor, { immediate: true, expectedJump: true })
+    else
+      applyOuterScrollTop(savedScrollTop)
+
+    await nextTick()
+
+    const root = scrollRoot.value
+    if (!root)
+      return
+
+    root.scrollTop = scrollTop.value
+
+    applyLabStats(collectStats({ reconcile: true }))
+    if (savedAnchor)
+      await restoreOuterAnchor(savedAnchor, { immediate: true, expectedJump: true })
+
+    await waitFrame()
+
+    const currentRootScrollTop = scrollRoot.value?.scrollTop ?? scrollTop.value
+    const expectedThreadScrollTop = targetAnchor
+      ? resolveOuterAnchorScrollTop(targetAnchor)
+      : savedScrollTop
+    const restoredAnchor = captureOuterAnchor()
+
+    lastThreadRestoreDeltaPx.value = Math.abs(currentRootScrollTop - expectedThreadScrollTop)
+    lastThreadRestoreAnchorDeltaPx.value = getOuterAnchorDelta(targetAnchor, restoredAnchor)
+
+    pushLabEvent('thread-switch', {
+      fromThreadId: previousThreadId,
+      toThreadId: threadId,
+      expectedJump: true,
+      scrollJumpPx: Math.abs(scrollTop.value - previousScrollTop),
+      heightDriftPx: lastThreadRestoreDeltaPx.value,
+    })
+
+    scheduleVisibleDomReconcile()
   }
-
-  await nextTick()
-
-  if (savedAnchor)
-    await restoreOuterAnchor(savedAnchor, { immediate: true, expectedJump: true })
-  else
-    applyOuterScrollTop(savedScrollTop)
-
-  await nextTick()
-
-  const root = scrollRoot.value
-  if (!root)
-    return
-
-  root.scrollTop = scrollTop.value
-
-  applyLabStats(collectStats({ reconcile: true }))
-  if (savedAnchor)
-    await restoreOuterAnchor(savedAnchor, { immediate: true, expectedJump: true })
-
-  await waitFrame()
-
-  const currentRootScrollTop = scrollRoot.value?.scrollTop ?? scrollTop.value
-  const expectedThreadScrollTop = targetAnchor
-    ? resolveOuterAnchorScrollTop(targetAnchor)
-    : savedScrollTop
-  const restoredAnchor = captureOuterAnchor()
-
-  lastThreadRestoreDeltaPx.value = Math.abs(currentRootScrollTop - expectedThreadScrollTop)
-  lastThreadRestoreAnchorDeltaPx.value = getOuterAnchorDelta(targetAnchor, restoredAnchor)
-
-  pushLabEvent('thread-switch', {
-    fromThreadId: previousThreadId,
-    toThreadId: threadId,
-    expectedJump: true,
-    scrollJumpPx: Math.abs(scrollTop.value - previousScrollTop),
-    heightDriftPx: lastThreadRestoreDeltaPx.value,
-  })
-
-  scheduleVisibleDomReconcile()
+  finally {
+    threadRestoreTargets.delete(threadId)
+  }
 }
 
 function jumpToTop() {
@@ -1564,6 +1572,11 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     0,
     ...labEvents.map(event => event.maxItemHeightDriftPx ?? 0),
   )
+  const maxObservedCoverageGapPx = Math.max(
+    stats.maxCoverageGapPx,
+    0,
+    ...labEvents.map(event => event.maxCoverageGapPx ?? 0),
+  )
   const maxObservedScrollJumpPx = Math.max(
     0,
     ...labEvents
@@ -1584,6 +1597,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     maxObservedBlankProbes,
     maxObservedMarkdownSlots,
     maxObservedHeightDriftPx,
+    maxObservedCoverageGapPx,
     maxObservedScrollJumpPx,
     scrollJitterOk,
     virtualDomWithinLimit,
@@ -1598,6 +1612,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
       && blankFrameCount.value === 0
       && stats.visibleCoverageOk
       && maxObservedBlankProbes === 0
+      && maxObservedCoverageGapPx <= 24
       && virtualDomWithinLimit
       && hugeRendererDomWithinLimit
       && scrollJitterOk
