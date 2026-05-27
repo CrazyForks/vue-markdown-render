@@ -776,6 +776,7 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
     expectedJump: outerAnchor?.type === 'bottom'
       || streamTimer != null
       || isStreamingHeightChangeExpected()
+      || stressRunning.value
       ? true
       : undefined,
   })
@@ -1254,8 +1255,11 @@ function classifyProbePoint(probe: Element | null): ProbeKind {
     return 'placeholder'
 
   const content = element.closest('.node-content')
-  if (content)
-    return hasRenderableMarkdownContent(content) ? 'content' : 'blank'
+  if (content) {
+    return hasRenderableMarkdownContent(content) || hasRenderableMarkdownContent(element)
+      ? 'content'
+      : 'blank'
+  }
 
   const slot = element.closest('.node-slot')
   if (slot) {
@@ -1883,7 +1887,11 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
       .filter(event => !event.expectedJump)
       .map(event => event.scrollJumpPx ?? 0),
   )
-  const domSlotBudget = Math.max(1, stats.markdownRendererCount) * 280
+  const domSlotBudget = Math.max(
+    expectedMarkdownSlotCeiling.value,
+    maxExpectedMarkdownSlotCeiling.value || 0,
+    Math.max(1, stats.markdownRendererCount) * 280,
+  )
   const virtualDomWithinLimit = maxObservedMarkdownSlots <= domSlotBudget
   const hugeRendererSlotBudget = maxLiveNodes.value + 16
   const hugeRendererDomWithinLimit = stats.maxHugeMessageSlotCount <= hugeRendererSlotBudget

@@ -1600,8 +1600,33 @@ function hasManualSettleSignal(token: unknown) {
   return token !== false && token != null && token !== ''
 }
 
+function hasMountedVirtualWindowContent() {
+  if (!virtualizationEnabled.value)
+    return true
+
+  const total = parsedNodes.value.length
+  const start = clamp(liveRange.start, 0, total)
+  const end = clamp(liveRange.end, start, total)
+
+  if (start >= end)
+    return true
+
+  for (let index = start; index < end; index++) {
+    if (!nodeSlotElements.has(index))
+      return false
+
+    if (shouldRenderNode(index) && !nodeContentElements.has(index))
+      return false
+  }
+
+  return true
+}
+
 function hasRenderedDesiredNodes() {
-  return virtualizationEnabled.value || renderedCount.value >= desiredRenderedCount.value
+  if (virtualizationEnabled.value)
+    return hasMountedVirtualWindowContent()
+
+  return renderedCount.value >= desiredRenderedCount.value
 }
 
 function isInternalLayoutSettled() {
@@ -1721,13 +1746,22 @@ function getRendererLogicalHeight() {
     containerRef.value?.offsetHeight ?? 0,
   )
 
+  if (total <= 0)
+    return domHeight
+
   if (virtualizationEnabled.value)
     return estimatedHeight
 
   if (virtualScrollEnabled.value) {
-    const hasModelHeight = heightStats.count > 0 || getEstimatedNodeHeightCount() > 0
+    const hasModelHeight = estimatedHeight > 0
+      || heightStats.count > 0
+      || getEstimatedNodeHeightCount() > 0
+
     if (!hasModelHeight)
-      return Math.max(domHeight, estimatedHeight)
+      return domHeight
+
+    if (incrementalRenderingActive.value && renderedCount.value < total)
+      return estimatedHeight
 
     const allNodesMeasured = total <= 0 || heightStats.count >= total
     if (allNodesMeasured || isLayoutSettled())
@@ -2819,6 +2853,7 @@ let lastEmittedVirtualMetrics: MarkstreamVirtualMetrics | null = null
 let lastEmittedVirtualStateKey: string | null = null
 let lastSettledVirtualEventKey: string | null = null
 let lastFinalVirtualEventKey: string | null = null
+let lastEmittedVirtualHeightCacheSignature: string | null = null
 
 function getVirtualNow() {
   return typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -2888,6 +2923,7 @@ function resetVirtualMetricsEventDedupes() {
   lastSettledVirtualEventKey = null
   lastFinalVirtualEventKey = null
   lastEmittedVirtualStateKey = null
+  lastEmittedVirtualHeightCacheSignature = null
 }
 
 function getVirtualAnchorEventKey(anchor: MarkstreamVirtualAnchor) {
@@ -2928,6 +2964,33 @@ function shouldEmitVirtualState(state: MarkstreamVirtualState, force = false) {
   return key !== lastEmittedVirtualStateKey
 }
 
+function getVirtualStateForEmit(metrics: MarkstreamVirtualMetrics, force = false) {
+  if (force || metrics.stable || metrics.phase === 'final') {
+    return captureVirtualStateFromMetrics(metrics, {
+      includeHeightCache: true,
+    })
+  }
+
+  const lightState = captureVirtualStateFromMetrics(metrics)
+
+  if (heightStats.count <= 0)
+    return lightState
+
+  const cache = exportVirtualHeightCache()
+  if (!cache.length)
+    return lightState
+
+  const signature = getHeightCacheSignature(cache)
+  if (signature === lastEmittedVirtualHeightCacheSignature)
+    return lightState
+
+  lastEmittedVirtualHeightCacheSignature = signature
+
+  return captureVirtualStateFromMetrics(metrics, {
+    includeHeightCache: true,
+  })
+}
+
 function shouldDelayVirtualMetricsUntilDom(force = false) {
   return !force
     && virtualScrollRequested.value
@@ -2941,10 +3004,7 @@ function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false)
     return
 
   const shouldEmitHeight = force || shouldEmitVirtualMetrics(metrics)
-  const shouldIncludeHeightCache = force || metrics.stable || metrics.phase === 'final'
-  const state = captureVirtualStateFromMetrics(metrics, {
-    includeHeightCache: shouldIncludeHeightCache,
-  })
+  const state = getVirtualStateForEmit(metrics, force)
 
   if (shouldEmitHeight) {
     emitHeightChange(metrics)

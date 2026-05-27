@@ -47,7 +47,10 @@ function outerAnchorDelta(before, after) {
     )
   }
 
-  if (before.index !== after.index)
+  if (before.messageKey && after.messageKey && before.messageKey !== after.messageKey)
+    return Number.POSITIVE_INFINITY
+
+  if (before.messageKey == null && after.messageKey == null && before.index !== after.index)
     return Number.POSITIVE_INFINITY
 
   return Math.abs(Number(before.offsetPx ?? 0) - Number(after.offsetPx ?? 0))
