@@ -8,18 +8,16 @@ export interface InfographicConstructor {
   new (options: { container: HTMLElement, width?: string | number, height?: string | number }): InfographicInstance
 }
 
-export type InfographicLoader = () => Promise<object> | object
+export type InfographicLoader = () => Promise<unknown> | unknown
 
-let cachedInfographic: any = null
+let cachedInfographic: InfographicConstructor | null = null
 let infographicLoader: InfographicLoader | null = null
-
-function resetCachedInfographic() {
-  cachedInfographic = null
-}
+let loaderVersion = 0
 
 export function setInfographicLoader(loader?: InfographicLoader | null) {
   infographicLoader = loader ?? null
-  resetCachedInfographic()
+  cachedInfographic = null
+  loaderVersion++
 }
 
 export function enableInfographic(loader: InfographicLoader) {
@@ -41,9 +39,12 @@ export async function getInfographic(): Promise<InfographicConstructor | null> {
     return cachedInfographic
 
   const loader = infographicLoader
+  const version = loaderVersion
   if (!loader)
     return null
   const mod: any = await loader()
+  if (version !== loaderVersion || loader !== infographicLoader)
+    return null
   if (!mod)
     return null
 
@@ -51,21 +52,12 @@ export async function getInfographic(): Promise<InfographicConstructor | null> {
   // Handle ESM default export or named export
   const defaultExport = (mod && (mod as any).default) ? (mod as any).default : mod
 
-  // If default export is the class itself
-  if (typeof defaultExport === 'function' && defaultExport.prototype && defaultExport.prototype.render) {
-    cachedInfographic = defaultExport
-  }
-  // If it's a named export { Infographic }
-  else if (mod.Infographic) {
-    cachedInfographic = mod.Infographic
-  }
-  else if (defaultExport && defaultExport.Infographic) {
-    cachedInfographic = defaultExport.Infographic
-  }
-  else {
-    // Fallback
-    cachedInfographic = defaultExport
-  }
+  const resolved = typeof defaultExport === 'function' && defaultExport.prototype?.render
+    ? defaultExport
+    : (mod.Infographic ?? defaultExport?.Infographic ?? defaultExport)
+  if (version !== loaderVersion || loader !== infographicLoader)
+    return null
 
-  return cachedInfographic as InfographicConstructor
+  cachedInfographic = resolved
+  return cachedInfographic
 }

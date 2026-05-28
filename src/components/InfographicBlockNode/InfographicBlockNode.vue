@@ -163,6 +163,8 @@ async function copy() {
 }
 
 function handleSwitchMode(mode: 'preview' | 'source') {
+  if (mode === 'preview' && !isInfographicEnabled())
+    return
   userToggledShowSource.value = true
   showSource.value = mode === 'source'
 }
@@ -539,6 +541,7 @@ onBeforeUnmount(() => {
 
 const computedButtonStyle = 'infographic-action-btn p-[var(--ms-action-btn-padding)] rounded'
 
+const isPreviewDisabled = computed(() => !isInfographicEnabled())
 const isFullscreenDisabled = computed(() => showSource.value || isCollapsed.value)
 const renderMode = computed(() => {
   if (showSource.value)
@@ -592,7 +595,8 @@ watch(
       <div v-else-if="props.showModeToggle" class="infographic-mode-toggle flex items-center gap-0.5">
         <button
           class="infographic-mode-btn px-2 py-0.5 rounded transition-colors"
-          :class="[!showSource ? 'is-active' : '']"
+          :class="[!showSource ? 'is-active' : '', isPreviewDisabled ? 'opacity-50 cursor-not-allowed' : '']"
+          :disabled="isPreviewDisabled"
           @click="() => handleSwitchMode('preview')"
           @mouseenter="onBtnHover($event, t('common.preview') || 'Preview')"
           @focus="onBtnHover($event, t('common.preview') || 'Preview')"

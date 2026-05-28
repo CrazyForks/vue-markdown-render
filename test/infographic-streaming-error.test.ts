@@ -35,6 +35,25 @@ afterEach(() => {
 })
 
 describe('infographicBlockNode streaming errors', () => {
+  it('disables preview mode when infographic loading is not configured', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const wrapper = mount(InfographicBlockNode as any, {
+      props: {
+        node: createNode('infographic list-row-simple-horizontal-arrow'),
+        loading: true,
+      },
+    })
+
+    await flushAll()
+
+    const previewButton = wrapper.findAll('button').find(button => button.text().includes('Preview'))
+    expect(previewButton?.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('infographic list-row-simple-horizontal-arrow')
+
+    wrapper.unmount()
+  })
+
   it('only reports render errors after streaming completes', async () => {
     vi.stubGlobal('IntersectionObserver', undefined as any)
     setInfographicLoader(() => ErrorInfographic)

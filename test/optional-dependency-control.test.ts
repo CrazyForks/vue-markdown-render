@@ -96,6 +96,28 @@ describe('optional dependency controllers', () => {
       await expect(getInfographic()).resolves.toBeNull()
     })
 
+    it('does not cache an in-flight loader result after disabling', async () => {
+      class CustomInfographic {
+        render() {}
+      }
+
+      let resolve!: (value: object) => void
+      const loader = vi.fn(() =>
+        new Promise<object>((r) => {
+          resolve = r
+        }),
+      )
+
+      setInfographicLoader(loader)
+      const pending = getInfographic()
+
+      disableInfographic()
+      resolve({ Infographic: CustomInfographic })
+
+      await expect(pending).resolves.toBeNull()
+      await expect(getInfographic()).resolves.toBeNull()
+    })
+
     it('requires an explicit loader when enabling infographic', () => {
       expect(() => enableInfographic(undefined as any)).toThrow('enableInfographic requires a loader')
     })
