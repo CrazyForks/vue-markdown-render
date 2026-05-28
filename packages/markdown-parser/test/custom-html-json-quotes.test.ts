@@ -107,6 +107,23 @@ describe('custom HTML JSON content', () => {
     expect(() => JSON.parse(customData.content)).not.toThrow()
   })
 
+  it('does not include a top-level html_block closing tag in custom JSON content', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-html-block-close', { customHtmlTags: tags })
+    const markdown = [
+      '- prefix <custom-data>{"a":"b"}',
+      '',
+      '</custom-data>',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe('{"a":"b"}')
+    expect(String(customData?.raw ?? '')).toContain('</custom-data>')
+    expect(() => JSON.parse(customData.content)).not.toThrow()
+  })
+
   it('keeps typographer enabled for normal markdown text', () => {
     const md = getMarkdown('custom-html-json-quotes-normal-text')
     const nodes = parseMarkdownToStructure('He said "ok".', md, { final: true }) as any[]

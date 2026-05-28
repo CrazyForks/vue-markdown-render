@@ -194,6 +194,25 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
     appendToOpenFrames(gap.includes('\n') ? '\n' : gap)
   }
 
+  const closeTopFrameWithRaw = (raw: string) => {
+    for (let i = 0; i < stack.length; i++) {
+      stack[i].raw += raw
+      if (i < stack.length - 1)
+        stack[i].inner += raw
+    }
+
+    const frame = stack.pop()!
+    setCustomHtmlSourceMeta(frame.token, frame.raw, frame.inner)
+  }
+
+  const isCloseOnlyTopFrame = (raw: string) => {
+    const tag = stack[stack.length - 1]?.tag
+    if (!tag)
+      return false
+    const closeOnlyRe = new RegExp(String.raw`^\s*<\s*\/\s*${escapeTagForRegExp(tag)}\s*>\s*$`, 'i')
+    return closeOnlyRe.test(raw)
+  }
+
   const handleToken = (child: MarkdownToken, raw: string, knownTag?: string) => {
     const tag = knownTag ?? (child.type === 'html_inline'
       ? getHtmlInlineTagName(raw)
@@ -214,14 +233,7 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
         return
       }
 
-      for (let i = 0; i < stack.length; i++) {
-        stack[i].raw += raw
-        if (i < stack.length - 1)
-          stack[i].inner += raw
-      }
-
-      const frame = stack.pop()!
-      setCustomHtmlSourceMeta(frame.token, frame.raw, frame.inner)
+      closeTopFrameWithRaw(raw)
       return
     }
 
@@ -269,7 +281,7 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
         handleToken(child, raw, tag)
       }
 
-      if (sourceReliable && source && cursor < source.length)
+      if (sourceReliable && source && cursor < source.length && !stack.length)
         appendSourceGap(source.slice(cursor))
 
       needsTopLevelSeparator = stack.length > 0
@@ -277,6 +289,15 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
     }
 
     if (stack.length && typeof token.content === 'string') {
+      const raw = tokenToRaw(token)
+      if (token.type === 'html_block' && isCloseOnlyTopFrame(raw)) {
+        closeTopFrameWithRaw(`${needsTopLevelSeparator ? '\n' : ''}${raw}`)
+        needsTopLevelSeparator = stack.length > 0
+        continue
+      }
+      if (!token.content)
+        continue
+
       appendTopLevelSeparator()
       appendToOpenFrames(token.content)
       needsTopLevelSeparator = true
