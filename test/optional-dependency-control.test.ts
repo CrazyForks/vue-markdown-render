@@ -61,6 +61,25 @@ describe('optional dependency controllers', () => {
       await expect(getInfographic()).resolves.toBeNull()
     })
 
+    it('sets and clears the infographic loader through the setter', async () => {
+      class CustomInfographic {
+        render() {}
+      }
+
+      const loader = vi.fn().mockResolvedValue({ Infographic: CustomInfographic })
+
+      setInfographicLoader(loader)
+
+      expect(isInfographicEnabled()).toBe(true)
+      await expect(getInfographic()).resolves.toBe(CustomInfographic)
+      expect(loader).toHaveBeenCalledTimes(1)
+
+      setInfographicLoader()
+
+      expect(isInfographicEnabled()).toBe(false)
+      await expect(getInfographic()).resolves.toBeNull()
+    })
+
     it('allows overriding and disabling the infographic loader', async () => {
       class CustomInfographic {
         render() {}

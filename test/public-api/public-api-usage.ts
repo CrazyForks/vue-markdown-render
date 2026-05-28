@@ -99,6 +99,7 @@ setD2Loader(async () => ({}))
 
 const infographicLoader: InfographicLoader = async () => ({})
 setInfographicLoader(infographicLoader)
+setInfographicLoader()
 enableInfographic(infographicLoader)
 disableInfographic()
 const infographicEnabled = isInfographicEnabled()

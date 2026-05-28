@@ -8,7 +8,7 @@ export interface InfographicConstructor {
   new (options: { container: HTMLElement, width?: string | number, height?: string | number }): InfographicInstance
 }
 
-export type InfographicLoader = () => Promise<unknown> | unknown
+export type InfographicLoader = () => Promise<object> | object
 
 let cachedInfographic: any = null
 let infographicLoader: InfographicLoader | null = null
@@ -17,8 +17,8 @@ function resetCachedInfographic() {
   cachedInfographic = null
 }
 
-export function setInfographicLoader(loader: InfographicLoader | null) {
-  infographicLoader = loader
+export function setInfographicLoader(loader?: InfographicLoader | null) {
+  infographicLoader = loader ?? null
   resetCachedInfographic()
 }
 
@@ -29,7 +29,7 @@ export function enableInfographic(loader: InfographicLoader) {
 }
 
 export function disableInfographic() {
-  setInfographicLoader(null)
+  setInfographicLoader()
 }
 
 export function isInfographicEnabled() {
