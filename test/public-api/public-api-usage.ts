@@ -10,15 +10,19 @@ import type {
   MarkstreamHeightCacheEntry,
   MarkstreamMeasuredHeightCacheEntry,
   MarkstreamNodeLifecycle,
+  MarkstreamOuterVirtualizerAdapter,
   MarkstreamRendererHandle,
   MarkstreamScrollRootLike,
   MarkstreamScrollRootRef,
   MarkstreamScrollRootResolver,
+  MarkstreamThreadVirtualState,
+  MarkstreamTimelineItem,
   MarkstreamVirtualMetrics,
   MarkstreamVirtualScrollHeightCacheOptions,
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualScrollSharedOptions,
   MarkstreamVirtualState,
+  MarkstreamVirtualTimelineProps,
   MarkstreamVuePluginOptions,
   MathBlockNodeProps,
   MathInlineNodeProps,
@@ -46,6 +50,7 @@ import MarkdownRender, {
   isKatexEnabled,
   isMermaidEnabled,
   MARKSTREAM_NODE_LIFECYCLE_KEY,
+  MarkstreamVirtualTimeline,
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
@@ -61,6 +66,7 @@ import MarkdownRender, {
   toSafeMermaidSvgMarkup,
   toSafeSvgElement,
   useMarkstreamNodeLifecycle,
+  useMarkstreamVirtualAdapter,
   useSmoothMarkdownStream,
   VueRendererMarkdown,
 } from 'markstream-vue'
@@ -76,6 +82,7 @@ const props: NodeRendererProps = {
   smoothStreaming: 'auto',
   parseCoalesceMs: 80,
   maxLiveNodes: 320,
+  nodeVirtual: 'auto',
   virtualScroll: {
     enabled: true,
     sessionKey: 'public-api-session',
@@ -158,6 +165,16 @@ const virtualMetrics: MarkstreamVirtualMetrics | null = null
 const virtualState: MarkstreamVirtualState | null = null
 const rendererHandle: MarkstreamRendererHandle | null = null
 const nodeLifecycle: MarkstreamNodeLifecycle | null = null
+const timelineItem: MarkstreamTimelineItem = {
+  id: 'a1',
+  kind: 'assistant-markdown',
+  content: '# Public API',
+  final: true,
+}
+const virtualTimelineProps: MarkstreamVirtualTimelineProps = {
+  items: [timelineItem],
+  threadKey: 'public-api-thread',
+}
 const virtualScrollRootRef = ref<HTMLElement | null>(null) satisfies MarkstreamScrollRootRef
 const virtualScrollRootLike: MarkstreamScrollRootLike = virtualScrollRootRef
 const virtualScrollRootResolver: MarkstreamScrollRootResolver = () => virtualScrollRootRef
@@ -167,6 +184,28 @@ const logicalHeights = new Map<string, number>()
 const outerVirtualizer = {
   resizeItem(_messageId: string, _height: number) {},
 }
+const outerVirtualizerAdapter: MarkstreamOuterVirtualizerAdapter = {
+  getScrollElement: () => virtualScrollRootRef.value,
+  getScrollTop: () => virtualScrollRootRef.value?.scrollTop ?? 0,
+  setScrollTop: (top) => {
+    if (virtualScrollRootRef.value)
+      virtualScrollRootRef.value.scrollTop = top
+  },
+  getViewportHeight: () => virtualScrollRootRef.value?.clientHeight ?? 0,
+  getTotalHeight: () => 0,
+  getItemOffset: () => 0,
+  getItemSize: () => 0,
+  setItemSize: (_key, _height) => {},
+  getVisibleRange: () => ({ start: 0, end: 1 }),
+  scrollToOffset: (_offset) => {},
+  scrollToIndex: (_index, _align) => {},
+}
+const virtualAdapter = useMarkstreamVirtualAdapter({
+  items: [timelineItem],
+  threadKey: 'public-api-thread',
+  virtualizer: outerVirtualizerAdapter,
+})
+const threadVirtualState: MarkstreamThreadVirtualState = virtualAdapter.captureThreadState()
 
 function onVirtualHeightChange(messageId: string, metrics: MarkstreamVirtualMetrics) {
   logicalHeights.set(messageId, metrics.totalHeight)
@@ -203,6 +242,8 @@ function restoreVirtualStateAfterThreadSwitch(messageId: string, restoreToken: n
 }
 void MARKSTREAM_NODE_LIFECYCLE_KEY
 void useMarkstreamNodeLifecycle
+void MarkstreamVirtualTimeline
+void useMarkstreamVirtualAdapter
 
 // Verify named async components retain their concrete types
 // (not erased to generic Component)
@@ -275,6 +316,8 @@ void virtualMetrics
 void virtualState
 void rendererHandle
 void nodeLifecycle
+void timelineItem
+void virtualTimelineProps
 void virtualScrollRootRef
 void virtualScrollRootLike
 void virtualScrollRootResolver
@@ -282,6 +325,9 @@ void rendererRefs
 void savedVirtualStates
 void logicalHeights
 void outerVirtualizer
+void outerVirtualizerAdapter
+void virtualAdapter
+void threadVirtualState
 void onVirtualHeightChange
 void onVirtualStateChange
 void captureVirtualStatesBeforeThreadSwitch

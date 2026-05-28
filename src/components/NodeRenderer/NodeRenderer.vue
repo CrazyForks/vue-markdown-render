@@ -115,6 +115,7 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
   deferNodesUntilVisible: true,
   maxLiveNodes: 320,
   liveNodeBuffer: 60,
+  nodeVirtual: 'auto',
 })
 
 const emit = defineEmits<{
@@ -429,8 +430,12 @@ const maxLiveNodesResolved = computed(() => Math.max(1, props.maxLiveNodes ?? 32
 const virtualizationEnabled = computed(() => {
   if (renderAsFragment.value)
     return false
+  if (props.nodeVirtual === false)
+    return false
   if ((props.maxLiveNodes ?? 0) <= 0)
     return false
+  if (props.nodeVirtual === true)
+    return parsedNodes.value.length > 0
   return parsedNodes.value.length > maxLiveNodesResolved.value
 })
 const shouldMeasureNodeHeights = computed(() => virtualizationEnabled.value || heightExperimentEnabled.value || virtualScrollEnabled.value)

@@ -35,6 +35,7 @@ import LinkNode from './components/LinkNode'
 import ListItemNode from './components/ListItemNode'
 import ListNode from './components/ListNode'
 import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
+import MarkstreamVirtualTimeline from './components/MarkstreamVirtualTimeline'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
 import MarkdownRender from './components/NodeRenderer'
@@ -50,6 +51,7 @@ import TextNode from './components/TextNode'
 import ThematicBreakNode from './components/ThematicBreakNode'
 import Tooltip from './components/Tooltip'
 import VmrContainerNode from './components/VmrContainerNode'
+import { useMarkstreamVirtualAdapter } from './composables/useMarkstreamVirtualAdapter'
 import { setDefaultI18nMap } from './composables/useSafeI18n'
 import { useSmoothMarkdownStream } from './composables/useSmoothMarkdownStream'
 import { setIconTheme } from './icon-themes'
@@ -77,6 +79,20 @@ export type { D2Loader } from './components/D2BlockNode/d2'
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
+export type {
+  MarkstreamBottomAnchor,
+  MarkstreamOuterAnchor,
+  MarkstreamOuterVirtualizerAdapter,
+  MarkstreamThreadAnchor,
+  MarkstreamThreadVirtualState,
+  MarkstreamTimelineItem,
+  MarkstreamTimelineItemKey,
+  MarkstreamVirtualAdapterController,
+  MarkstreamVirtualMarkdownProps,
+  MarkstreamVirtualTimelineProps,
+  MarkstreamVisibleRange,
+  UseMarkstreamVirtualAdapterOptions,
+} from './composables/useMarkstreamVirtualAdapter'
 export type {
   SmoothMarkdownStreamController,
   SmoothMarkdownStreamOptions,
@@ -186,6 +202,7 @@ export {
   ListNode,
   MarkdownCodeBlockNode,
   MarkdownRender,
+  MarkstreamVirtualTimeline,
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
@@ -206,6 +223,7 @@ export {
   TextNode,
   ThematicBreakNode,
   Tooltip,
+  useMarkstreamVirtualAdapter,
   useSmoothMarkdownStream,
   VmrContainerNode,
 }
@@ -251,6 +269,7 @@ const componentMap: Record<string, Component> = {
   VmrContainerNode,
   ReferenceNode,
   MarkdownCodeBlockNode,
+  MarkstreamVirtualTimeline,
 }
 
 export const VueRendererMarkdown: Plugin = {

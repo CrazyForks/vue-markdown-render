@@ -88,6 +88,17 @@ const md = '# Virtualized transcript'
 
 ### 与外层 virtualizer 协作
 
+混合 AI conversation surface 优先使用 0 配置 timeline 入口：
+
+```vue
+<MarkstreamVirtualTimeline
+  :items="timelineItems"
+  :thread-key="activeThreadId"
+/>
+```
+
+如果业务已经有自己的外层 virtualizer，使用 `useMarkstreamVirtualAdapter()`，并把 `markdownProps(item, index)` 绑定到 Markdown item。底层 `virtualScroll` prop 继续作为高级 adapter/debug 协议保留。
+
 如果聊天列表或 thread 列表本身已经按 message 做 virtual-scroll，外层 virtualizer 仍然负责决定哪些 message mount。只在超大的 Markdown message 上开启 `virtual-scroll`，让 `MarkdownRender` 在内部裁剪节点 DOM 的同时，把该 message 的逻辑高度报告给外层。
 
 关键值是 `metrics.totalHeight`。它表示包含 virtual spacer 在内的完整 Markdown 逻辑高度；不要把 renderer 元素当前的 `offsetHeight` 当成 item size，因为当前 DOM 可能只挂载了 live window 内的节点。

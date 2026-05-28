@@ -153,6 +153,12 @@ function goToVirtualScrollLab() {
   })
 }
 
+function goToVirtualTimelineZero() {
+  router.push('/virtual-timeline-zero').catch(() => {
+    window.location.href = '/virtual-timeline-zero'
+  })
+}
+
 // Keep persisted values within reasonable bounds on hydration.
 watchEffect(() => {
   if (streamChunkDelayMin.value !== normalizedChunkDelayRange.value.min)
@@ -756,6 +762,11 @@ onBeforeUnmount(() => {
             <button class="nav-btn nav-btn--virtual" @click="goToVirtualScrollLab">
               <Icon icon="carbon:list" class="nav-btn__icon" />
               <span class="nav-btn__text">Virtual scroll lab</span>
+            </button>
+
+            <button class="nav-btn nav-btn--virtual" @click="goToVirtualTimelineZero">
+              <Icon icon="carbon:flow" class="nav-btn__icon" />
+              <span class="nav-btn__text">Virtual timeline</span>
             </button>
 
             <button

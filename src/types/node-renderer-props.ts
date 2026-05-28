@@ -352,7 +352,14 @@ export interface NodeRendererProps {
   maxLiveNodes?: number
   /** Number of nodes to keep before/after focus. Default: 60 */
   liveNodeBuffer?: number
-  /** Report logical height and restore state to an outer virtual scroller. */
+  /**
+   * Controls node-level virtualization inside this Markdown document only.
+   *
+   * It does not virtualize a chat/timeline list. Use MarkstreamVirtualTimeline
+   * or useMarkstreamVirtualAdapter for the outer conversation surface.
+   */
+  nodeVirtual?: boolean | 'auto'
+  /** Advanced: report logical height and restore state to an outer virtual scroller. */
   virtualScroll?: MarkstreamVirtualScrollOptions
   /** Internal: render nodes as a fragment without container wrappers */
   renderAsFragment?: boolean

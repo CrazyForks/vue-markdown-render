@@ -149,6 +149,17 @@ const md = '# Virtualized transcript'
 
 ### Coordinating with an outer virtualizer
 
+For a mixed AI conversation surface, prefer the zero-config timeline entry:
+
+```vue
+<MarkstreamVirtualTimeline
+  :items="timelineItems"
+  :thread-key="activeThreadId"
+/>
+```
+
+If your app already owns the outer virtualizer, use `useMarkstreamVirtualAdapter()` and bind its `markdownProps(item, index)` to each Markdown item. The raw `virtualScroll` prop remains available as the advanced protocol for custom adapters and debugging.
+
 If a chat or thread list already virtualizes messages, keep that outer virtualizer in charge of which messages are mounted. Enable `virtual-scroll` only on large Markdown messages so `MarkdownRender` can report the message's logical height while it virtualizes nodes internally.
 
 The important value is `metrics.totalHeight`. It represents the full Markdown document height, including virtual spacers; do not use the renderer element's current `offsetHeight` as the item size because only the live node window may be mounted.
