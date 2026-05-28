@@ -163,8 +163,16 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
   if (!customTagSet.size)
     return
 
+  const customTagOpenNeedles = Array.from(customTagSet, tag => `<${tag}`)
   const stack: Array<{ tag: string, token: MarkdownToken, raw: string, inner: string }> = []
   let needsTopLevelSeparator = false
+
+  const mayOpenCustomTag = (source: string) => {
+    if (!source)
+      return false
+    const lower = source.toLowerCase()
+    return customTagOpenNeedles.some(needle => lower.includes(needle))
+  }
 
   const appendToOpenFrames = (raw: string) => {
     if (!raw || !stack.length)
@@ -186,10 +194,10 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
     appendToOpenFrames(gap.includes('\n') ? '\n' : gap)
   }
 
-  const handleToken = (child: MarkdownToken, raw: string) => {
-    const tag = child.type === 'html_inline'
+  const handleToken = (child: MarkdownToken, raw: string, knownTag?: string) => {
+    const tag = knownTag ?? (child.type === 'html_inline'
       ? getHtmlInlineTagName(raw)
-      : ''
+      : '')
     const isCustomTag = tag && customTagSet.has(tag)
 
     if (!isCustomTag) {
@@ -231,13 +239,22 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
       appendTopLevelSeparator()
 
       const source = String(token.content ?? '')
+      if (!stack.length && !mayOpenCustomTag(source)) {
+        needsTopLevelSeparator = false
+        continue
+      }
+
       let cursor = 0
       let sourceReliable = true
       for (const child of token.children) {
         const childRaw = tokenToRaw(child)
+        const tag = child.type === 'html_inline'
+          ? getHtmlInlineTagName(childRaw)
+          : ''
+        const isCustomTag = tag && customTagSet.has(tag)
         let raw = childRaw
 
-        if (sourceReliable && source && childRaw) {
+        if (sourceReliable && source && childRaw && (stack.length || isCustomTag)) {
           const index = source.indexOf(childRaw, cursor)
           if (index !== -1) {
             appendSourceGap(source.slice(cursor, index))
@@ -249,7 +266,7 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
           }
         }
 
-        handleToken(child, raw)
+        handleToken(child, raw, tag)
       }
 
       if (sourceReliable && source && cursor < source.length)
