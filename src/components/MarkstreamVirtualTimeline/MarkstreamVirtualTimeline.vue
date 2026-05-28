@@ -1069,6 +1069,7 @@ defineExpose({
     ref="scrollRoot"
     class="markstream-virtual-timeline"
     :class="{ 'is-restoring-thread': !restorePaintReady }"
+    data-markstream-virtual-timeline="1"
     data-testid="markstream-virtual-timeline"
     @scroll="updateScrollMetrics()"
   >

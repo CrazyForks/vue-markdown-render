@@ -181,9 +181,22 @@ const ariaLabel = computed(() => {
 .markstream-vue pre.markstream-pre--diff-preview {
   padding-left: 0;
   padding-right: 0;
+
   --markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 3px);
   --markstream-pre-diff-gutter-gap: var(--stream-monaco-gutter-gap, 8px);
   --markstream-pre-diff-line-number-width: var(--stream-monaco-line-number-width, 28px);
+  --markstream-pre-diff-line-number-left: var(
+    --stream-monaco-line-number-left,
+    calc(var(--markstream-pre-diff-gutter-marker-width) + var(--markstream-pre-diff-gutter-gap))
+  );
+  --markstream-pre-diff-scrollable-left: var(
+    --stream-monaco-original-scrollable-left,
+    calc(
+      var(--markstream-pre-diff-gutter-marker-width)
+      + (var(--markstream-pre-diff-gutter-gap) * 2)
+      + var(--markstream-pre-diff-line-number-width)
+    )
+  );
   --markstream-pre-diff-line-number-align: var(--stream-monaco-line-number-align, right);
 }
 
@@ -200,48 +213,57 @@ const ariaLabel = computed(() => {
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-pane--modified {
+  --markstream-pre-diff-scrollable-left: var(
+    --stream-monaco-modified-scrollable-left,
+    var(--stream-monaco-original-scrollable-left)
+  );
   box-shadow: inset 1px 0 var(--markstream-diff-pane-divider, hsl(var(--ms-border)));
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line {
   position: relative;
-  display: grid;
-  grid-template-columns:
-    var(--markstream-pre-diff-gutter-marker-width, 3px)
-    var(--markstream-pre-diff-gutter-gap, 8px)
-    var(--markstream-pre-diff-line-number-width, 28px)
-    var(--markstream-pre-diff-gutter-gap, 8px)
-    minmax(0, 1fr);
+  display: block;
+  box-sizing: border-box;
   min-height: var(--markstream-pre-diff-line-height, 30px);
-  align-items: start;
+  padding-left: var(--markstream-pre-diff-scrollable-left);
+  line-height: inherit;
 }
 
-.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-pane--modified .markstream-pre__diff-line {
-  grid-template-columns:
-    var(--markstream-pre-diff-gutter-marker-width, 3px)
-    var(--markstream-pre-diff-gutter-gap, 8px)
-    var(--markstream-pre-diff-line-number-width, 28px)
-    var(--markstream-pre-diff-gutter-gap, 8px)
-    minmax(0, 1fr);
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: transparent;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-rail {
-  grid-column: 1;
-  align-self: stretch;
+  position: absolute;
+  z-index: 2;
+  inset-block: 0;
+  left: 0;
   width: var(--markstream-pre-diff-gutter-marker-width, 3px);
   min-width: var(--markstream-pre-diff-gutter-marker-width, 3px);
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-number {
-  grid-column: 3;
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: var(--markstream-pre-diff-line-number-left);
+  width: var(--markstream-pre-diff-line-number-width);
   color: var(--code-line-number);
   font-variant-numeric: tabular-nums;
+  line-height: inherit;
   text-align: var(--markstream-pre-diff-line-number-align, right);
   user-select: none;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-content {
-  grid-column: 5;
+  position: relative;
+  z-index: 1;
+  display: block;
   min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -263,7 +285,18 @@ const ariaLabel = computed(() => {
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--hunk {
   color: var(--stream-monaco-unchanged-fg, var(--code-line-number));
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--hunk::before {
   background: var(--stream-monaco-unchanged-bg, transparent);
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added:not(.markstream-pre__diff-line--empty)::before {
+  background: var(--stream-monaco-added-line-fill, transparent);
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty)::before {
+  background: var(--stream-monaco-removed-line-fill, transparent);
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added:not(.markstream-pre__diff-line--empty) > .markstream-pre__diff-rail {
@@ -272,14 +305,6 @@ const ariaLabel = computed(() => {
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty) > .markstream-pre__diff-rail {
   background: var(--stream-monaco-removed-gutter, currentColor);
-}
-
-.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added:not(.markstream-pre__diff-line--empty) .markstream-pre__diff-content-inner {
-  background: var(--stream-monaco-added-line-fill, transparent);
-}
-
-.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty) .markstream-pre__diff-content-inner {
-  background: var(--stream-monaco-removed-line-fill, transparent);
 }
 
 /* Keyboard accessibility: visible focus when scroll container is focused */

@@ -36,6 +36,11 @@ declare global {
         state: unknown
         visibleText: string
         restoring: boolean
+        codeBlockProbe: {
+          blocks: number
+          enhanced: number
+          fallback: number
+        }
       }
       nextFrame: () => Promise<void>
       scrollTo: (offset: number) => Promise<unknown>
@@ -265,6 +270,11 @@ function readSnapshot() {
     state: timelineRef.value?.captureThreadState?.() ?? null,
     visibleText: root?.textContent ?? '',
     restoring: root?.classList.contains('is-restoring-thread') ?? false,
+    codeBlockProbe: {
+      blocks: root?.querySelectorAll('[data-markstream-code-block="1"]').length ?? 0,
+      enhanced: root?.querySelectorAll('[data-markstream-code-block="1"][data-markstream-enhanced="true"]').length ?? 0,
+      fallback: root?.querySelectorAll('pre.code-pre-fallback').length ?? 0,
+    },
   }
 }
 

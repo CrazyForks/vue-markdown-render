@@ -53,6 +53,7 @@ const emits = defineEmits<{
 
 const attrs = useAttrs()
 const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
+const hostScrollManaged = inject<{ value: boolean } | null>('markstreamHostScrollManaged', null)
 const lifecycleIndexKey = computed(() => {
   return resolveLifecycleIndexKey(props, attrs)
 })
@@ -1172,15 +1173,38 @@ function resolveScrollRootElement(node?: HTMLElement | null) {
   return scrollRoot
 }
 
+function isExternallyManagedScroll(container: HTMLElement) {
+  if (hostScrollManaged?.value === true)
+    return true
+
+  // Built-in zero-config timeline.
+  if (container.closest('[data-markstream-virtual-timeline="1"], .markstream-virtual-timeline'))
+    return true
+
+  // Common external virtualizer wrapper. In this case the virtualizer owns
+  // scroll reconciliation and CodeBlockNode must not apply local scrollTop
+  // compensation.
+  if (container.closest('.vue-recycle-scroller, [data-virtualizer], [data-virtual-scroll-root]'))
+    return true
+
+  return false
+}
+
 function adjustScrollAfterHeightChange(container: HTMLElement, previousHeight: number, nextHeight: number) {
   if (typeof window === 'undefined')
     return
   if (isDiff.value)
     return
+  if (isExternallyManagedScroll(container))
+    return
+
   const roundedPrev = Math.ceil(previousHeight)
   const roundedNext = Math.ceil(nextHeight)
   const delta = roundedNext - roundedPrev
-  if (!delta)
+
+  // 1px is usually Monaco/pre/browser rounding noise. Never mutate scrollTop
+  // for it, even outside a virtualizer.
+  if (Math.abs(delta) <= 1)
     return
 
   const root = resolveScrollRootElement(container)

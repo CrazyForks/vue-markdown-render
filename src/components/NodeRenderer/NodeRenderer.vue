@@ -403,6 +403,10 @@ const virtualScrollEnabled = computed(() => Boolean(
   isClient
   && virtualScrollRequested.value,
 ))
+
+// Children such as CodeBlockNode must not mutate the outer scrollTop when the
+// host virtualizer / Markdown virtual-scroll contract already owns anchoring.
+provide('markstreamHostScrollManaged', virtualScrollEnabled)
 const virtualScrollDomEnabled = computed(() => Boolean(
   virtualScrollMounted.value
   && virtualScrollEnabled.value,

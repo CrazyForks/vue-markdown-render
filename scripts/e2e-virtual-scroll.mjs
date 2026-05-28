@@ -495,7 +495,7 @@ async function runVirtualTimelineZeroReloadProbe(page, port) {
     summarizeVirtualTimelineZeroSample(beforeReload),
   )
 
-  await page.addInitScript(({ storageKey, storagePayload }) => {
+  await page.evaluate(({ storageKey, storagePayload }) => {
     window.sessionStorage.setItem(storageKey, storagePayload)
   }, {
     storageKey: virtualTimelineZeroStorageKey,
@@ -585,6 +585,155 @@ async function runVirtualTimelineZeroReloadProbe(page, port) {
       afterThreadBSettled: summarizeVirtualTimelineZeroSample(threadSwitch.afterThreadBSettled),
       afterThreadARestored: summarizeVirtualTimelineZeroSample(threadSwitch.afterThreadARestored),
     },
+  }
+}
+
+async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
+  await page.goto(`http://${host}:${port}/virtual-timeline-zero`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  })
+  await waitForVirtualTimelineZeroReady(page)
+
+  await page.evaluate((storageKey) => {
+    window.sessionStorage.removeItem(storageKey)
+  }, virtualTimelineZeroStorageKey)
+
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await waitForVirtualTimelineZeroReady(page)
+
+  const beforeReload = await page.evaluate(async (storageKey) => {
+    const api = window.__markstreamVirtualTimelineZero
+
+    let snapshot = api.read()
+    for (let i = 0; i < 160; i++) {
+      await api.nextFrame()
+      snapshot = api.read()
+
+      if (
+        snapshot.state?.itemHeights?.['a-md-1'] > 4000
+        && snapshot.state?.markdownStates?.['a-md-1']
+      ) {
+        break
+      }
+    }
+
+    let found = null
+    const total = Math.max(1, snapshot.totalHeight || snapshot.scrollHeight || 1)
+
+    // Locate the region around "PR analysis section 13", which is below the
+    // section-6 area and keeps normal ts CodeBlockNode instances above it.
+    for (let offset = 0; offset < total; offset += 420) {
+      snapshot = await api.scrollTo(offset)
+
+      for (let frame = 0; frame < 8; frame++)
+        await api.nextFrame()
+
+      snapshot = api.read()
+
+      if (
+        snapshot.visibleText.includes('PR analysis section 13')
+        || snapshot.visibleText.includes('section13')
+      ) {
+        found = snapshot
+        break
+      }
+    }
+
+    if (!found)
+      throw new Error(`Could not locate PR analysis section 13. Last visible text: ${snapshot.visibleText.slice(0, 400)}`)
+
+    // Put the anchor just below the sensitive region.
+    snapshot = await api.scrollTo(Math.max(0, found.scrollTop + 120))
+
+    for (let frame = 0; frame < 30; frame++)
+      await api.nextFrame()
+
+    snapshot = api.read()
+
+    const storagePayload = JSON.stringify({
+      [snapshot.state.threadKey]: snapshot.state,
+    })
+    window.sessionStorage.setItem(storageKey, storagePayload)
+
+    return {
+      ...snapshot,
+      storagePayload,
+    }
+  }, virtualTimelineZeroStorageKey)
+
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await waitForVirtualTimelineZeroReady(page)
+
+  const probe = await page.evaluate(async () => {
+    const api = window.__markstreamVirtualTimelineZero
+    const samples = []
+    const visibleSamples = []
+
+    for (let i = 0; i < 120; i++) {
+      const sample = api.read()
+      samples.push(sample)
+
+      if (!sample.restoring)
+        visibleSamples.push(sample)
+
+      await api.nextFrame()
+    }
+
+    const stableWindow = visibleSamples.slice(3)
+    const scrollTops = stableWindow.map(sample => Number(sample.scrollTop || 0))
+    const itemHeights = stableWindow.map(sample => Number(sample.state?.itemHeights?.['a-md-1'] || 0))
+
+    const scrollTopMin = Math.min(...scrollTops)
+    const scrollTopMax = Math.max(...scrollTops)
+    const itemHeightMin = Math.min(...itemHeights)
+    const itemHeightMax = Math.max(...itemHeights)
+
+    return {
+      visibleSamples,
+      firstVisible: visibleSamples[0] ?? null,
+      lastVisible: visibleSamples[visibleSamples.length - 1] ?? null,
+      scrollTopRangePx: scrollTopMax - scrollTopMin,
+      itemHeightRangePx: itemHeightMax - itemHeightMin,
+      samples: samples.map(sample => ({
+        scrollTop: sample.scrollTop,
+        totalHeight: sample.totalHeight,
+        restoring: sample.restoring,
+        codeBlockProbe: sample.codeBlockProbe,
+        itemHeight: sample.state?.itemHeights?.['a-md-1'],
+        visibleText: String(sample.visibleText || '').slice(0, 240),
+      })),
+    }
+  })
+
+  assert(
+    probe.visibleSamples.length > 0,
+    'code block jitter probe did not observe visible restored frames',
+    {
+      beforeReload: summarizeVirtualTimelineZeroSample(beforeReload),
+      probe,
+    },
+  )
+
+  assert(
+    probe.scrollTopRangePx <= 0.5 && probe.itemHeightRangePx <= 0.5,
+    'CodeBlockNode caused visible reload jitter around PR analysis section 6/13',
+    {
+      beforeReload: summarizeVirtualTimelineZeroSample(beforeReload),
+      scrollTopRangePx: probe.scrollTopRangePx,
+      itemHeightRangePx: probe.itemHeightRangePx,
+      firstVisible: summarizeVirtualTimelineZeroSample(probe.firstVisible),
+      lastVisible: summarizeVirtualTimelineZeroSample(probe.lastVisible),
+      samples: probe.samples,
+    },
+  )
+
+  return {
+    beforeReload: summarizeVirtualTimelineZeroSample(beforeReload),
+    firstVisible: summarizeVirtualTimelineZeroSample(probe.firstVisible),
+    lastVisible: summarizeVirtualTimelineZeroSample(probe.lastVisible),
+    scrollTopRangePx: probe.scrollTopRangePx,
+    itemHeightRangePx: probe.itemHeightRangePx,
   }
 }
 
@@ -1006,6 +1155,7 @@ async function run() {
       assertNoPageErrors('virtual-scroll smoke e2e')
 
       const virtualTimelineReload = await runVirtualTimelineZeroReloadProbe(page, port)
+      const virtualTimelineCodeBlockJitter = await runVirtualTimelineZeroCodeBlockJitterProbe(page, port)
 
       assertNoPageErrors('virtual-timeline-zero reload e2e')
 
@@ -1014,6 +1164,7 @@ async function run() {
         mode,
         health: smoke.final.health,
         virtualTimelineReload,
+        virtualTimelineCodeBlockJitter,
       }, null, 2)}\n`)
 
       return
