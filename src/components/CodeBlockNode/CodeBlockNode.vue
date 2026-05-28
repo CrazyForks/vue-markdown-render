@@ -2984,8 +2984,10 @@ onUnmounted(() => {
     var(--stream-monaco-gutter-marker-width) + var(--stream-monaco-gutter-gap)
   );
   --stream-monaco-line-number-width: 28px;
-  --markstream-diff-line-number-align: var(--markstream-code-line-number-align, right);
-  --stream-monaco-line-number-align: var(--markstream-diff-line-number-align);
+  --stream-monaco-line-number-align: var(
+    --markstream-diff-line-number-align,
+    var(--markstream-code-line-number-align, right)
+  );
   --stream-monaco-original-margin-width: calc(
     var(--stream-monaco-gutter-marker-width) +
       (var(--stream-monaco-gutter-gap) * 2) +
@@ -3033,7 +3035,10 @@ onUnmounted(() => {
   ) !important;
   width: var(--stream-monaco-line-number-width) !important;
   padding: 0 !important;
-  text-align: var(--markstream-diff-line-number-align, right) !important;
+  text-align: var(
+    --markstream-diff-line-number-align,
+    var(--markstream-code-line-number-align, right)
+  ) !important;
   font-variant-numeric: tabular-nums;
 }
 
@@ -3045,8 +3050,30 @@ onUnmounted(() => {
   ) !important;
   width: var(--stream-monaco-line-number-width) !important;
   padding: 0 !important;
-  text-align: var(--markstream-diff-line-number-align, right) !important;
+  text-align: var(
+    --markstream-diff-line-number-align,
+    var(--markstream-code-line-number-align, right)
+  ) !important;
   font-variant-numeric: tabular-nums;
+}
+
+.code-block-container.is-diff :deep(.monaco-diff-editor .margin-view-overlays .line-numbers),
+.code-block-container.is-diff :deep(.monaco-diff-editor .margin-view-overlays .line-numbers *) {
+  text-align: var(
+    --markstream-diff-line-number-align,
+    var(--markstream-code-line-number-align, right)
+  ) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.code-block-container.is-diff :deep(.monaco-diff-editor),
+.code-block-container.is-diff :deep(.monaco-diff-editor .monaco-editor),
+.code-block-container.is-diff :deep(.monaco-diff-editor .margin),
+.code-block-container.is-diff :deep(.monaco-diff-editor .margin-view-overlays) {
+  --stream-monaco-line-number-align: var(
+    --markstream-diff-line-number-align,
+    var(--markstream-code-line-number-align, right)
+  ) !important;
 }
 
 .code-editor-container.is-hidden {

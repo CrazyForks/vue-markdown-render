@@ -185,6 +185,7 @@
   --code-header-bg:             hsl(var(--ms-secondary));
   --code-selection-bg:          hsl(var(--ms-accent) / 0.3);
   --code-line-number:           hsl(var(--ms-muted-foreground));
+  --markstream-code-line-number-align: right;
 
   /* ── Code block actions ── */
   --code-action-fg:             hsl(var(--ms-muted-foreground));
