@@ -377,6 +377,7 @@ Pick one mode per surface: virtualization for best scrollback and steady memory 
 - `parse-options`: reuse parser hooks (e.g., `preTransformTokens`, `requireClosingStrong`) on the component.
 - `final`: marks end-of-stream; disables mid-state loading parsing and forces unfinished constructs to settle.
 - `custom-html-tags`: extend streaming HTML allowlist for custom tags and emit them as custom nodes for `setCustomComponents` (e.g., `['thinking']`).
+  Declared custom nodes keep `content`/`raw` close to the original tag payload, while `children` remains the Markdown-rendered form for rich text.
 - `setCustomComponents(customId?, mapping)`: register inline Vue components for custom tags/markers (scoped by `custom-id` when provided).
 
 Example: map Markdown placeholders to Vue components (scoped)

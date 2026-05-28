@@ -120,9 +120,12 @@ const props = defineProps<{
 - `type`：标签名本身，例如 `thinking`
 - `tag`：原始标签名
 - `content`：标签内部的 Markdown / 文本内容
+- `raw`：可用时为原始标签片段
 - `attrs`：提取出来的标签属性
 - `loading`：当前是否仍处在流式中间态
 - `autoClosed`：流式阶段是否发生过临时自动补闭合
+
+对于声明过的自定义标签，如果标签内部是 JSON、YAML 或工具调用数据，优先使用 `content`/`raw` 作为源码 payload。若希望标签内部继续按 Markdown 渲染，则使用 `children` 或内层渲染器；这些子节点仍会走常规 inline 解析流程。
 
 `attrs` 的具体形状可能会因来源而不同，所以更好的做法是把它当成“原始属性容器”，在你的组件里按需归一化。
 
