@@ -190,7 +190,7 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
   }
 
   const appendSourceGap = (gap: string) => {
-    appendToOpenFrames(gap.includes('\n') ? '\n' : gap)
+    appendToOpenFrames(gap)
   }
 
   const closeTopFrameWithRaw = (raw: string) => {
@@ -204,12 +204,16 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
     setCustomHtmlSourceMeta(frame.token, frame.raw, frame.inner)
   }
 
-  const isCloseOnlyTopFrame = (raw: string) => {
+  const getTopFrameClosePrefix = (raw: string) => {
     const tag = stack[stack.length - 1]?.tag
     if (!tag)
-      return false
-    const closeOnlyRe = new RegExp(String.raw`^\s*<\s*\/\s*${escapeTagForRegExp(tag)}\s*>\s*$`, 'i')
-    return closeOnlyRe.test(raw)
+      return null
+    const closePrefixRe = new RegExp(String.raw`^\s*<\s*\/\s*${escapeTagForRegExp(tag)}\s*>`, 'i')
+    return raw.match(closePrefixRe)?.[0] ?? null
+  }
+
+  const startsWithTopFrameClose = (source: string) => {
+    return !!getTopFrameClosePrefix(source)
   }
 
   const handleToken = (child: MarkdownToken, raw: string, knownTag?: string) => {
@@ -247,9 +251,12 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
 
   for (const token of tokens) {
     if (token.type === 'inline' && Array.isArray(token.children)) {
-      appendTopLevelSeparator()
-
       const source = String(token.content ?? '')
+      if (startsWithTopFrameClose(source))
+        needsTopLevelSeparator = false
+      else
+        appendTopLevelSeparator()
+
       if (!stack.length && !mayOpenCustomTag(source)) {
         needsTopLevelSeparator = false
         continue
@@ -273,6 +280,8 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
             cursor = index + childRaw.length
           }
           else {
+            if (stack.length && !isCustomTag)
+              continue
             sourceReliable = false
           }
         }
@@ -280,7 +289,7 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
         handleToken(child, raw, tag)
       }
 
-      if (sourceReliable && source && cursor < source.length && !stack.length)
+      if (sourceReliable && source && cursor < source.length && stack.length)
         appendSourceGap(source.slice(cursor))
 
       needsTopLevelSeparator = stack.length > 0
@@ -289,8 +298,9 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
 
     if (stack.length && typeof token.content === 'string') {
       const raw = tokenToRaw(token)
-      if (token.type === 'html_block' && isCloseOnlyTopFrame(raw)) {
-        closeTopFrameWithRaw(`${needsTopLevelSeparator ? '\n' : ''}${raw}`)
+      const closePrefix = token.type === 'html_block' ? getTopFrameClosePrefix(raw) : null
+      if (closePrefix) {
+        closeTopFrameWithRaw(`${needsTopLevelSeparator ? '\n' : ''}${closePrefix}`)
         needsTopLevelSeparator = stack.length > 0
         continue
       }

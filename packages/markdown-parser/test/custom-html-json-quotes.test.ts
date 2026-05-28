@@ -107,6 +107,32 @@ describe('custom HTML JSON content', () => {
     expect(() => JSON.parse(customData.content)).not.toThrow()
   })
 
+  it('preserves HTML entities in source payload content', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-entities', { customHtmlTags: tags })
+    const payload = '{"text":"a&amp;b","quote":"&quot;","numeric":"&#34;"}'
+    const markdown = `<custom-data>${payload}</custom-data>`
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe(payload)
+    expect(customData?.raw).toBe(markdown)
+    expect(() => JSON.parse(customData.content)).not.toThrow()
+  })
+
+  it('preserves trailing source while a streamed custom tag is still open', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-open-trailing-source', { customHtmlTags: tags })
+    const payload = '{"text":"a&amp;b"}   '
+    const markdown = `<custom-data>${payload}`
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: false }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe(payload)
+  })
+
   it('keeps source payload separate from markdown-rendered children', () => {
     const tags = ['custom-data']
     const md = getMarkdown('custom-html-json-quotes-markdown-children', { customHtmlTags: tags })
@@ -146,6 +172,23 @@ describe('custom HTML JSON content', () => {
 
     expect(customData?.content).toBe('{"a":"b"}')
     expect(String(customData?.raw ?? '')).toContain('</custom-data>')
+    expect(() => JSON.parse(customData.content)).not.toThrow()
+  })
+
+  it('does not include top-level html_block closing tag trailing content in custom JSON content', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-html-block-close-trailing', { customHtmlTags: tags })
+    const markdown = [
+      '- prefix <custom-data>{"a":"b"}',
+      '',
+      '</custom-data> trailing',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe('{"a":"b"}')
+    expect(String(customData?.content ?? '')).not.toContain('trailing')
     expect(() => JSON.parse(customData.content)).not.toThrow()
   })
 
