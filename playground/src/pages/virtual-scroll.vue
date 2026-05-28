@@ -796,7 +796,10 @@ async function captureVisibleVirtualStates(options: { forceMeasure?: boolean } =
       }
     }
 
-    const state = renderer.captureVirtualState({ requireViewport: false })
+    const state = renderer.captureVirtualState({
+      requireViewport: true,
+      includeEmptyState: true,
+    })
     if (state) {
       virtualStates.set(key, mergeVirtualState(virtualStates.get(key), state))
 
@@ -1291,7 +1294,7 @@ function mergeVirtualState(
   const merged: MarkstreamVirtualState = {
     ...next,
     anchorCaptured: next.anchor
-      ? true
+      ? next.anchorCaptured !== false
       : nextExplicitlyCapturedNoAnchor
         ? false
         : previous?.anchorCaptured,

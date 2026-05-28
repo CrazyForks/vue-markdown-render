@@ -1280,7 +1280,8 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('treats duplicate async pending marks for the same node as idempotent', async () => {
+  it('keeps layout unsettled until duplicate async lifecycle pending records settle', async () => {
+    const platform = installManualMeasurementPlatform()
     let settleOnce: (() => void) | null = null
     let settleAgain: (() => void) | null = null
     const AsyncNode = defineComponent({
@@ -1300,19 +1301,19 @@ describe('node renderer virtual-scroll coordination', () => {
         settleAgain = () => {
           lifecycle?.markSettled(props.indexKey)
         }
-        return () => h('div', 'overlapping async')
+        return () => h('p', { class: 'multi-pending-node' }, 'overlapping async')
       },
     })
 
     setCustomComponents('virtual-lifecycle-test', {
-      async_node: AsyncNode as any,
+      paragraph: AsyncNode as any,
     })
 
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
     const wrapper = mount(NodeRenderer, {
       props: {
         customId: 'virtual-lifecycle-test',
-        nodes: [{ type: 'async_node', raw: '<async-node />', content: '' }],
+        nodes: [createParagraph(1)],
         final: true,
         fade: false,
         viewportPriority: false,
@@ -1328,17 +1329,56 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     const handle = wrapper.vm as any
-    expect(handle.getVirtualMetrics().stable).toBe(false)
+    const contentEl = getRootNodeContentElements(wrapper.element)[0]!
+    platform.heights.set(contentEl, 72)
+    platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+    platform.flushFrames()
+    await nextTick()
+
+    expect(await handle.settle({
+      frames: 0,
+      timeoutMs: 0,
+      reason: 'manual',
+      flushPendingTimers: true,
+    })).toMatchObject({
+      phase: 'settling',
+      stable: false,
+      totalHeight: 72,
+    })
 
     settleOnce?.()
-    await new Promise(resolve => setTimeout(resolve, 90))
     await flushAll()
-    expect((await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })).stable).toBe(true)
+
+    expect(await handle.settle({
+      frames: 0,
+      timeoutMs: 0,
+      reason: 'manual',
+      flushPendingTimers: true,
+    })).toMatchObject({
+      phase: 'settling',
+      stable: false,
+      totalHeight: 72,
+    })
 
     settleAgain?.()
-    await new Promise(resolve => setTimeout(resolve, 90))
     await flushAll()
-    expect((await handle.settle({ frames: 0, timeoutMs: 0, reason: 'manual' })).stable).toBe(true)
+
+    expect(await handle.settle({
+      frames: 0,
+      timeoutMs: 0,
+      reason: 'manual',
+      flushPendingTimers: true,
+    })).toMatchObject({
+      phase: 'final',
+      stable: true,
+      totalHeight: 72,
+    })
+
+    expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toMatchObject({
+      sessionKey: 'thread-a:overlapping-async-node:1',
+      stable: true,
+      totalHeight: 72,
+    })
 
     wrapper.unmount()
   })
@@ -2777,6 +2817,93 @@ describe('node renderer virtual-scroll coordination', () => {
     ;(wrapper.vm as any).restoreVirtualState(state, {
       restoreAnchor: true,
       restoreToken: 'target-renderer',
+    })
+    await flushAll()
+
+    expect(scrollRoot.scrollTop).toBe(800)
+
+    wrapper.unmount()
+    scrollRoot.remove()
+  })
+
+  it('skips uncaptured restore anchors unless explicitly allowed', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+    const scrollRoot = document.createElement('div')
+    document.body.appendChild(scrollRoot)
+
+    Object.defineProperty(scrollRoot, 'clientHeight', {
+      configurable: true,
+      get: () => 200,
+    })
+    Object.defineProperty(scrollRoot, 'scrollHeight', {
+      configurable: true,
+      get: () => 1000,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      attachTo: document.body,
+      props: {
+        nodes: [createParagraph(1), createParagraph(2), createParagraph(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'uncaptured-anchor-restore',
+          scrollRoot: () => scrollRoot,
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+    installRendererBottomGeometry(wrapper, scrollRoot, () => 1000)
+
+    const state = {
+      sessionKey: 'uncaptured-anchor-restore',
+      anchor: {
+        type: 'bottom',
+        distanceFromBottomPx: 0,
+      },
+      anchorCaptured: false,
+      metrics: {
+        ...(wrapper.vm as any).getVirtualMetrics(),
+        width: 400,
+      },
+      width: 400,
+    }
+
+    scrollRoot.scrollTop = 120
+
+    await wrapper.setProps({
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'uncaptured-anchor-restore',
+        scrollRoot: () => scrollRoot,
+        settleMode: 'manual',
+        emitIntervalMs: 0,
+        restoreAnchor: 'thread-restore',
+        restoreState: state,
+      },
+    })
+    await flushAll()
+
+    expect(scrollRoot.scrollTop).toBe(120)
+
+    ;(wrapper.vm as any).restoreVirtualState(state, {
+      restoreAnchor: true,
+      restoreToken: 'uncaptured-default',
+    })
+    await flushAll()
+
+    expect(scrollRoot.scrollTop).toBe(120)
+
+    ;(wrapper.vm as any).restoreVirtualState(state, {
+      restoreAnchor: true,
+      restoreToken: 'uncaptured-opt-in',
+      allowUncapturedAnchor: true,
     })
     await flushAll()
 

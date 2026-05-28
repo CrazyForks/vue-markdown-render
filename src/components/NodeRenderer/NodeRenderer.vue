@@ -1615,8 +1615,15 @@ function hasPendingAsyncNodeKey(indexKey: string | number) {
 
 function incrementPendingAsyncNodeKey(key: string, index: number) {
   const previousRecord = pendingAsyncNodeRecords.get(key)
-  if (previousRecord && isUsablePendingAsyncNodeRecord(previousRecord))
+  if (previousRecord && isUsablePendingAsyncNodeRecord(previousRecord)) {
+    pendingAsyncNodeCounts.set(
+      key,
+      Math.max(0, pendingAsyncNodeCounts.get(key) ?? 0) + 1,
+    )
+    bumpAsyncNodeVersion()
+    scheduleVirtualMetricsEmit('async-node')
     return
+  }
 
   pendingAsyncNodeCounts.set(key, 1)
   pendingAsyncNodeRecords.set(key, getPendingAsyncNodeRecord(index))
@@ -2095,33 +2102,54 @@ function createFallbackNodeAnchor(): MarkstreamVirtualAnchor | null {
   }
 }
 
+interface CapturedVirtualAnchorResult {
+  anchor: MarkstreamVirtualAnchor
+  captured: boolean
+}
+
 function captureVirtualAnchor(
   options: {
     allowFallback?: boolean
     requireViewport?: boolean
   } = {},
-): MarkstreamVirtualAnchor | null {
+): CapturedVirtualAnchorResult | null {
   const requireViewport = options.requireViewport !== false
+  const nearViewport = isRendererNearVirtualViewport()
 
-  if (requireViewport && !isRendererNearVirtualViewport())
+  if (requireViewport && !nearViewport)
     return null
 
   const bottomAnchor = captureBottomVirtualAnchor()
-  if (bottomAnchor)
-    return bottomAnchor
+  if (bottomAnchor) {
+    return {
+      anchor: bottomAnchor,
+      captured: true,
+    }
+  }
 
   const anchor = captureRestoreAnchor()
   if (anchor) {
     return {
-      type: 'node',
-      nodeIndex: anchor.nodeIndex,
-      offsetWithinNodePx: anchor.offsetWithinNodePx,
+      anchor: {
+        type: 'node',
+        nodeIndex: anchor.nodeIndex,
+        offsetWithinNodePx: anchor.offsetWithinNodePx,
+      },
+      captured: nearViewport,
     }
   }
 
-  return options.allowFallback === true
-    ? createFallbackNodeAnchor()
-    : null
+  if (options.allowFallback === true) {
+    const fallback = createFallbackNodeAnchor()
+    return fallback
+      ? {
+          anchor: fallback,
+          captured: false,
+        }
+      : null
+  }
+
+  return null
 }
 
 function hashVirtualString(input: string) {
@@ -2387,21 +2415,21 @@ function captureVirtualStateFromMetrics(
   const heightCache = includeHeightCache
     ? exportVirtualHeightCache()
     : []
-  const anchor = captureVirtualAnchor({
+  const capturedAnchor = captureVirtualAnchor({
     allowFallback: options.allowAnchorFallback === true,
     requireViewport: options.requireViewport,
   })
 
-  if (!anchor && !heightCache.length && options.includeEmptyState !== true)
+  if (!capturedAnchor && !heightCache.length && options.includeEmptyState !== true)
     return null
 
   return {
     sessionKey: metrics.sessionKey,
     threadKey: metrics.threadKey,
-    ...(anchor
+    ...(capturedAnchor
       ? {
-          anchor,
-          anchorCaptured: true,
+          anchor: capturedAnchor.anchor,
+          anchorCaptured: capturedAnchor.captured,
         }
       : {
           anchorCaptured: false,
@@ -2418,7 +2446,7 @@ function captureVirtualState(options: MarkstreamCaptureVirtualStateOptions = {})
   return captureVirtualStateFromMetrics(getVirtualMetrics('manual'), {
     includeHeightCache: true,
     includeContentHash: true,
-    allowAnchorFallback: true,
+    allowAnchorFallback: options.allowFallbackAnchor === true,
     requireViewport: options.requireViewport === true,
     includeEmptyState: options.includeEmptyState ?? true,
   })
@@ -2718,7 +2746,8 @@ let lastImportedVirtualHeightCacheSignature: string | null = null
 let lastImportedVirtualHeightCacheSource: 'restore' | 'standalone' | null = null
 let lastAppliedVirtualRestoreSignature: string | null = null
 let pendingImperativeVirtualRestoreState: MarkstreamVirtualState | null = null
-let pendingImperativeVirtualRestoreOptions: { restoreAnchor: boolean, restoreToken: string } | null = null
+let pendingImperativeVirtualRestoreOptions:
+  { restoreAnchor: boolean, restoreToken: string, allowUncapturedAnchor: boolean } | null = null
 let warnedStandaloneHeightCacheWithoutSignature = false
 
 function warnStandaloneHeightCacheIgnored(reason: string) {
@@ -2834,6 +2863,7 @@ function applyVirtualRestoreState(
   options: {
     restoreAnchor?: boolean
     restoreToken?: string
+    allowUncapturedAnchor?: boolean
   } = {},
 ) {
   if (!virtualScrollEnabled.value || !state)
@@ -2850,7 +2880,13 @@ function applyVirtualRestoreState(
 
   const wantsCacheImport = Boolean(state.heightCache?.length)
   const waitingForCacheWidth = wantsCacheImport && !hasKnownVirtualWidth()
-  const wantsAnchorRestore = options.restoreAnchor === true && Boolean(state.anchor)
+  const restorableAnchor = state.anchor && (
+    state.anchorCaptured !== false
+    || options.allowUncapturedAnchor === true
+  )
+    ? state.anchor
+    : null
+  const wantsAnchorRestore = options.restoreAnchor === true && Boolean(restorableAnchor)
   const waitingForAnchorWidth = wantsAnchorRestore
     && !hasKnownVirtualWidth()
     && Number(getVirtualStateSavedWidth(state)) > 0
@@ -2882,7 +2918,7 @@ function applyVirtualRestoreState(
     return true
   }
 
-  if (!state.anchor) {
+  if (!restorableAnchor) {
     if (importedCache)
       scheduleVirtualMetricsEmit('restore')
 
@@ -2900,7 +2936,7 @@ function applyVirtualRestoreState(
   }
 
   lastAppliedVirtualRestoreSignature = signature
-  restoreVirtualAnchor(state.anchor)
+  restoreVirtualAnchor(restorableAnchor)
   scheduleVirtualMetricsEmit('restore')
   return true
 }
@@ -2931,7 +2967,11 @@ function shouldKeepPendingVirtualRestoreState(state: MarkstreamVirtualState) {
 
 function restoreVirtualState(
   state: MarkstreamVirtualState,
-  options: { restoreAnchor?: boolean, restoreToken?: string | number | boolean } = {},
+  options: {
+    restoreAnchor?: boolean
+    restoreToken?: string | number | boolean
+    allowUncapturedAnchor?: boolean
+  } = {},
 ) {
   const restoreAnchorOption = options.restoreAnchor === true
   const restoreToken = options.restoreToken == null
@@ -2942,11 +2982,13 @@ function restoreVirtualState(
   pendingImperativeVirtualRestoreOptions = {
     restoreAnchor: restoreAnchorOption,
     restoreToken,
+    allowUncapturedAnchor: options.allowUncapturedAnchor === true,
   }
 
   const applied = applyVirtualRestoreState(state, {
     restoreAnchor: restoreAnchorOption,
     restoreToken,
+    allowUncapturedAnchor: options.allowUncapturedAnchor === true,
   })
 
   if (applied || !shouldKeepPendingVirtualRestoreState(state)) {
@@ -3431,8 +3473,8 @@ function flushVirtualStateBeforeUnmount() {
     const state = captureVirtualStateFromMetrics(metrics, {
       includeHeightCache: true,
       includeContentHash: true,
-      allowAnchorFallback: true,
-      requireViewport: false,
+      allowAnchorFallback: false,
+      requireViewport: true,
       includeEmptyState: true,
     })
 
@@ -4428,6 +4470,7 @@ watch(
     const applied = applyVirtualRestoreState(state, {
       restoreAnchor: options?.restoreAnchor === true,
       restoreToken: options?.restoreToken ?? 'imperative',
+      allowUncapturedAnchor: options?.allowUncapturedAnchor === true,
     })
 
     if (applied || !shouldKeepPendingVirtualRestoreState(state)) {

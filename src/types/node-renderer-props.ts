@@ -213,10 +213,18 @@ export interface MarkstreamCaptureVirtualStateOptions {
    * Default: false for imperative capture.
    *
    * Event-driven state emission still uses viewport-gated capture internally,
-   * but a host virtualizer calling captureVirtualState() during thread switch
-   * should be able to persist a fallback anchor for the renderer it owns.
+   * but a host virtualizer can opt into viewport-gated imperative capture
+   * during thread switch.
    */
   requireViewport?: boolean
+  /**
+   * Default: false.
+   *
+   * When true, captureVirtualState() may include a best-effort node anchor even
+   * if the renderer is not near the viewport. Such anchors are emitted with
+   * anchorCaptured=false and are not auto-restored unless explicitly opted in.
+   */
+  allowFallbackAnchor?: boolean
   /**
    * Default: true.
    */
@@ -226,7 +234,7 @@ export interface MarkstreamCaptureVirtualStateOptions {
 export interface MarkstreamRendererHandle {
   getVirtualMetrics: () => MarkstreamVirtualMetrics
   captureVirtualState: (
-    options?: MarkstreamCaptureVirtualStateOptions
+    options?: MarkstreamCaptureVirtualStateOptions,
   ) => MarkstreamVirtualState | null
   restoreVirtualState: (
     state: MarkstreamVirtualState,
@@ -239,6 +247,13 @@ export interface MarkstreamRendererHandle {
        */
       restoreAnchor?: boolean
       restoreToken?: string | number | boolean
+      /**
+       * Default: false.
+       *
+       * Set true only when the caller knows an anchor with
+       * anchorCaptured=false still belongs to the active viewport context.
+       */
+      allowUncapturedAnchor?: boolean
     },
   ) => void
   forceMeasure: (reason?: MarkstreamVirtualReason) => Promise<MarkstreamVirtualMetrics>
