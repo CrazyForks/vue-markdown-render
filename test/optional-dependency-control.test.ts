@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { disableInfographic, enableInfographic, getInfographic, isInfographicEnabled, setInfographicLoader } from '../src/components/InfographicBlockNode/infographic'
 import { disableKatex, enableKatex, getKatex, isKatexEnabled, setKatexLoader } from '../src/components/MathInlineNode/katex'
 import { disableMermaid, enableMermaid, getMermaid, isMermaidEnabled, setMermaidLoader } from '../src/components/MermaidBlockNode/mermaid'
 import { renderKaTeXWithBackpressure } from '../src/workers/katexWorkerClient'
@@ -47,6 +48,37 @@ describe('optional dependency controllers', () => {
       const disabled = await getMermaid()
       expect(disabled).toBeNull()
       await expect(canParseOffthread('graph TD;A-->B', 'light')).rejects.toMatchObject({ code: 'MERMAID_DISABLED' })
+    })
+  })
+
+  describe('infographic loader control', () => {
+    afterEach(() => {
+      disableInfographic()
+    })
+
+    it('keeps infographic disabled by default to avoid bundling optional peer stubs', async () => {
+      expect(isInfographicEnabled()).toBe(false)
+      await expect(getInfographic()).resolves.toBeNull()
+    })
+
+    it('allows overriding and disabling the infographic loader', async () => {
+      class CustomInfographic {
+        render() {}
+      }
+
+      setInfographicLoader(async () => ({ Infographic: CustomInfographic }))
+
+      const resolved = await getInfographic()
+      expect(resolved).toBe(CustomInfographic)
+      expect(isInfographicEnabled()).toBe(true)
+
+      disableInfographic()
+      expect(isInfographicEnabled()).toBe(false)
+      await expect(getInfographic()).resolves.toBeNull()
+    })
+
+    it('requires an explicit loader when enabling infographic', () => {
+      expect(() => enableInfographic(undefined as any)).toThrow('enableInfographic requires a loader')
     })
   })
 })

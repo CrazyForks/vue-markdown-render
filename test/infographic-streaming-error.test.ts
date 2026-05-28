@@ -1,10 +1,8 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { setInfographicLoader } from '../src/components/InfographicBlockNode/infographic'
+import { disableInfographic, setInfographicLoader } from '../src/components/InfographicBlockNode/infographic'
 import InfographicBlockNode from '../src/components/InfographicBlockNode/InfographicBlockNode.vue'
 import { flushAll } from './setup/flush-all'
-
-const defaultInfographicLoader = () => import('@antv/infographic')
 
 function createNode(code: string) {
   return {
@@ -33,7 +31,7 @@ class ErrorInfographic {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
-  setInfographicLoader(defaultInfographicLoader)
+  disableInfographic()
 })
 
 describe('infographicBlockNode streaming errors', () => {

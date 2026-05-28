@@ -10,6 +10,14 @@
 npm install @antv/infographic
 ```
 
+渲染 infographic 代码块前配置可选 loader：
+
+```ts
+import { setInfographicLoader } from 'markstream-vue'
+
+setInfographicLoader(() => import('@antv/infographic'))
+```
+
 ## 2. 示例
 
 在 Markdown 中使用 `infographic` 代码块即可渲染图表：

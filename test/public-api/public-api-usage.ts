@@ -4,6 +4,7 @@ import type {
   D2BlockNodeProps,
   ImageNodeProps,
   InfographicBlockNodeProps,
+  InfographicLoader,
   LinkNodeProps,
   MarkdownIt,
   MarkdownPluginRegistration,
@@ -21,9 +22,11 @@ import MarkdownRender, {
   CodeBlockNode,
   D2BlockNode,
   disableD2,
+  disableInfographic,
   disableKatex,
   disableMermaid,
   enableD2,
+  enableInfographic,
   enableKatex,
   enableMermaid,
   getCustomNodeComponents,
@@ -31,6 +34,7 @@ import MarkdownRender, {
   InfographicBlockNode,
   isBrokenMermaidSvg,
   isD2Enabled,
+  isInfographicEnabled,
   isKatexEnabled,
   isMermaidEnabled,
   MathBlockNode,
@@ -43,6 +47,7 @@ import MarkdownRender, {
   setCustomComponents,
   setD2Loader,
   setDefaultMathOptions,
+  setInfographicLoader,
   setKatexLoader,
   setMermaidLoader,
   toSafeMermaidSvgMarkup,
@@ -91,6 +96,12 @@ enableD2()
 disableD2()
 const d2Enabled = isD2Enabled()
 setD2Loader(async () => ({}))
+
+const infographicLoader: InfographicLoader = async () => ({})
+setInfographicLoader(infographicLoader)
+enableInfographic(infographicLoader)
+disableInfographic()
+const infographicEnabled = isInfographicEnabled()
 
 setDefaultMathOptions({})
 
@@ -158,6 +169,7 @@ void scopedComponents
 void katexEnabled
 void mermaidEnabled
 void d2Enabled
+void infographicEnabled
 void nodes
 void controller
 void safeMermaidSvg
@@ -172,6 +184,7 @@ void imageProps
 void linkProps
 void d2Props
 void infographicProps
+void infographicLoader
 void CodeBlockNode
 void D2BlockNode
 void MathBlockNode

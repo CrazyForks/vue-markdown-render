@@ -10,6 +10,14 @@ This feature depends on the `@antv/infographic` library.
 npm install @antv/infographic
 ```
 
+Configure the optional loader before rendering infographic blocks:
+
+```ts
+import { setInfographicLoader } from 'markstream-vue'
+
+setInfographicLoader(() => import('@antv/infographic'))
+```
+
 ## 2. Example
 
 Use the `infographic` code block in Markdown to render charts:

@@ -10,10 +10,8 @@ export interface InfographicConstructor {
 
 export type InfographicLoader = () => Promise<unknown> | unknown
 
-const defaultInfographicLoader: InfographicLoader = () => import('@antv/infographic')
-
 let cachedInfographic: any = null
-let infographicLoader: InfographicLoader | null = defaultInfographicLoader
+let infographicLoader: InfographicLoader | null = null
 
 function resetCachedInfographic() {
   cachedInfographic = null
@@ -24,8 +22,18 @@ export function setInfographicLoader(loader: InfographicLoader | null) {
   resetCachedInfographic()
 }
 
+export function enableInfographic(loader: InfographicLoader) {
+  if (typeof loader !== 'function')
+    throw new TypeError('enableInfographic requires a loader function for @antv/infographic')
+  setInfographicLoader(loader)
+}
+
+export function disableInfographic() {
+  setInfographicLoader(null)
+}
+
 export function isInfographicEnabled() {
-  return infographicLoader !== null
+  return typeof infographicLoader === 'function'
 }
 
 export async function getInfographic(): Promise<InfographicConstructor | null> {
@@ -35,16 +43,7 @@ export async function getInfographic(): Promise<InfographicConstructor | null> {
   const loader = infographicLoader
   if (!loader)
     return null
-  let mod: any
-  try {
-    mod = await loader()
-  }
-  catch (err) {
-    if (loader === defaultInfographicLoader) {
-      throw new Error('Optional dependency "@antv/infographic" is not installed. Please install it to enable infographic diagrams.')
-    }
-    throw err
-  }
+  const mod: any = await loader()
   if (!mod)
     return null
 

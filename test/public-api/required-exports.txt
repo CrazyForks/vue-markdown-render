@@ -53,14 +53,17 @@ VueRendererMarkdown
 clearGlobalCustomComponents
 clearRegisteredMarkdownPlugins
 disableD2
+disableInfographic
 disableKatex
 disableMermaid
 enableD2
+enableInfographic
 enableKatex
 enableMermaid
 getCustomNodeComponents
 getMarkdown
 isD2Enabled
+isInfographicEnabled
 isKatexEnabled
 isMermaidEnabled
 removeCustomComponents
@@ -68,6 +71,7 @@ setCustomComponents
 setD2Loader
 setDefaultI18nMap
 setDefaultMathOptions
+setInfographicLoader
 setKatexLoader
 setMermaidLoader
 useSmoothMarkdownStream
@@ -115,6 +119,7 @@ HtmlPolicy
 IconTheme
 ImageNodeProps
 InfographicBlockNodeProps
+InfographicLoader
 KatexLoader
 LinkNodeProps
 MarkdownCodeBlockPreviewPayload
