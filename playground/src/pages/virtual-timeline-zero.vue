@@ -132,11 +132,16 @@ function switchThread(threadId: ThreadId) {
           {{ item.label }}
         </article>
 
-        <MarkdownRender
+        <article
           v-else-if="item.kind === 'assistant-markdown'"
-          v-bind="markdownProps"
-          class="assistant-markdown"
-        />
+          :ref="measureRef"
+          class="assistant-markdown-bubble"
+        >
+          <MarkdownRender
+            v-bind="markdownProps"
+            class="assistant-markdown"
+          />
+        </article>
 
         <component
           :is="item.component"
@@ -244,9 +249,17 @@ function switchThread(threadId: ThreadId) {
   color: #14532d;
 }
 
-.assistant-markdown {
+.assistant-markdown-bubble {
   max-width: 860px;
   margin: 10px 0;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.assistant-markdown {
+  margin: 0;
 }
 
 .status-row {
@@ -309,7 +322,7 @@ function switchThread(threadId: ThreadId) {
   .bubble,
   .status-row,
   .custom-panel,
-  .assistant-markdown {
+  .assistant-markdown-bubble {
     max-width: 100%;
   }
 }

@@ -147,4 +147,117 @@ describe('virtual timeline API', () => {
 
     scope.stop()
   })
+
+  it('does not under-report markdown item height when the measured wrapper includes chrome', () => {
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '# Hello', final: true },
+    ]
+    const sizes = new Map<string, number>()
+    const root = document.createElement('div')
+    const adapter = {
+      getScrollElement: () => root,
+      getScrollTop: () => 0,
+      setScrollTop: vi.fn(),
+      getViewportHeight: () => 400,
+      getTotalHeight: () => sizes.get('a1') ?? 0,
+      getItemOffset: () => 0,
+      getItemSize: (key: string) => sizes.get(key) ?? 0,
+      setItemSize: (key: string, size: number) => {
+        sizes.set(key, size)
+      },
+      getVisibleRange: () => ({ start: 0, end: 1 }),
+      scrollToOffset: vi.fn(),
+      scrollToIndex: vi.fn(),
+      measureElement: vi.fn(),
+    }
+
+    const scope = effectScope()
+    const controller = scope.run(() => useMarkstreamVirtualAdapter({
+      items,
+      threadKey: 'thread-a',
+      virtualizer: adapter,
+    }))!
+
+    const wrapperEl = document.createElement('article')
+    Object.defineProperty(wrapperEl, 'offsetHeight', {
+      configurable: true,
+      value: 720,
+    })
+    Object.defineProperty(wrapperEl, 'scrollHeight', {
+      configurable: true,
+      value: 720,
+    })
+
+    controller.measureItem(items[0], 0, wrapperEl)
+
+    const markdownProps = controller.markdownProps(items[0], 0)
+    markdownProps.onHeightChange(
+      createMetrics(640, markdownProps.virtualScroll!.sessionKey!),
+    )
+
+    expect(sizes.get('a1')).toBe(720)
+
+    scope.stop()
+  })
+
+  it('keeps markdown item height as max(wrapper height, markdown logical height)', () => {
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '# Hello', final: true },
+    ]
+    const sizes = new Map<string, number>()
+    const root = document.createElement('div')
+    let wrapperHeight = 500
+    const adapter = {
+      getScrollElement: () => root,
+      getScrollTop: () => 0,
+      setScrollTop: vi.fn(),
+      getViewportHeight: () => 400,
+      getTotalHeight: () => sizes.get('a1') ?? 0,
+      getItemOffset: () => 0,
+      getItemSize: (key: string) => sizes.get(key) ?? 0,
+      setItemSize: (key: string, size: number) => {
+        sizes.set(key, size)
+      },
+      getVisibleRange: () => ({ start: 0, end: 1 }),
+      scrollToOffset: vi.fn(),
+      scrollToIndex: vi.fn(),
+      measureElement: vi.fn(),
+    }
+
+    const scope = effectScope()
+    const controller = scope.run(() => useMarkstreamVirtualAdapter({
+      items,
+      threadKey: 'thread-a',
+      virtualizer: adapter,
+    }))!
+
+    const wrapperEl = document.createElement('article')
+    Object.defineProperty(wrapperEl, 'offsetHeight', {
+      configurable: true,
+      get: () => wrapperHeight,
+    })
+    Object.defineProperty(wrapperEl, 'scrollHeight', {
+      configurable: true,
+      get: () => wrapperHeight,
+    })
+
+    controller.measureItem(items[0], 0, wrapperEl)
+
+    const markdownProps = controller.markdownProps(items[0], 0)
+    markdownProps.onHeightChange(
+      createMetrics(640, markdownProps.virtualScroll!.sessionKey!),
+    )
+
+    expect(sizes.get('a1')).toBe(640)
+
+    wrapperHeight = 720
+    controller.measureItem(items[0], 0, wrapperEl)
+    markdownProps.onHeightChange(
+      createMetrics(640, markdownProps.virtualScroll!.sessionKey!),
+    )
+
+    expect(sizes.get('a1')).toBe(720)
+
+    scope.stop()
+  })
 })

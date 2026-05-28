@@ -26,6 +26,7 @@ defineOptions({ name: 'MarkstreamVirtualTimeline' })
 
 const props = withDefaults(defineProps<MarkstreamVirtualTimelineProps<any>>(), {
   overscan: 4,
+  overscanPx: 1200,
   stickToBottom: 'auto',
 })
 
@@ -49,9 +50,11 @@ interface TimelineRecord {
 const scrollRoot = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const viewportHeight = ref(0)
+const layoutWidthBucket = ref(0)
 const bottomPinned = ref(true)
 const itemSizes = reactive(new Map<string, number>()) as Map<string, number>
 const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
+const markdownLogicalHeights = reactive(new Map<string, number>()) as Map<string, number>
 const measuredElements = new Map<string, HTMLElement>()
 const resizeObservers = new Map<string, ResizeObserver>()
 const threadStates = new Map<string, MarkstreamThreadVirtualState>()
@@ -60,6 +63,12 @@ const markdownRestoreToken = ref(0)
 let rootResizeObserver: ResizeObserver | null = null
 
 const normalizedThreadKey = computed(() => props.threadKey == null ? undefined : String(props.threadKey))
+const timelineMeasurementKey = computed(() => {
+  return [
+    props.measurementKey == null ? '' : String(props.measurementKey),
+    layoutWidthBucket.value,
+  ].join(':')
+})
 
 const layout = computed(() => {
   const records: TimelineRecord[] = []
@@ -90,6 +99,27 @@ const layout = computed(() => {
   }
 })
 
+function lowerBoundRecordByOffset(records: TimelineRecord[], offset: number) {
+  let low = 0
+  let high = Math.max(0, records.length - 1)
+  let answer = records.length
+
+  while (low <= high) {
+    const mid = (low + high) >> 1
+    const record = records[mid]!
+
+    if (record.offset + record.size >= offset) {
+      answer = mid
+      high = mid - 1
+    }
+    else {
+      low = mid + 1
+    }
+  }
+
+  return Math.min(Math.max(0, answer), Math.max(0, records.length - 1))
+}
+
 const visibleWindow = computed(() => {
   const records = layout.value.records
   if (records.length === 0) {
@@ -102,22 +132,22 @@ const visibleWindow = computed(() => {
     }
   }
 
-  const viewportEnd = scrollTop.value + Math.max(1, viewportHeight.value)
-  let start = 0
-  while (
-    start < records.length
-    && records[start]!.offset + records[start]!.size < scrollTop.value
-  ) {
-    start += 1
-  }
+  const overscanItems = Math.max(0, props.overscan ?? 4)
+  const overscanPx = Math.max(0, props.overscanPx ?? 1200)
+  const viewportStart = Math.max(0, scrollTop.value)
+  const viewportEnd = viewportStart + Math.max(1, viewportHeight.value)
 
-  let end = start
-  while (end < records.length && records[end]!.offset <= viewportEnd)
-    end += 1
+  let start = lowerBoundRecordByOffset(
+    records,
+    Math.max(0, viewportStart - overscanPx),
+  )
+  let end = lowerBoundRecordByOffset(
+    records,
+    Math.min(layout.value.totalHeight, viewportEnd + overscanPx),
+  ) + 1
 
-  const overscan = Math.max(0, props.overscan ?? 4)
-  start = Math.max(0, start - overscan)
-  end = Math.min(records.length, Math.max(end + overscan, start + 1))
+  start = Math.max(0, start - overscanItems)
+  end = Math.min(records.length, Math.max(end + overscanItems, start + 1))
 
   const visibleRecords = records.slice(start, end)
   const first = visibleRecords[0]
@@ -172,10 +202,18 @@ function updateBottomPinned() {
   bottomPinned.value = distanceFromBottom() <= 48
 }
 
+function updateLayoutWidthBucket() {
+  const width = scrollRoot.value?.clientWidth ?? 0
+  layoutWidthBucket.value = Number.isFinite(width) && width > 0
+    ? Math.round(width / 32) * 32
+    : 0
+}
+
 function updateScrollMetrics() {
   const root = scrollRoot.value
   scrollTop.value = root?.scrollTop ?? 0
   viewportHeight.value = root?.clientHeight ?? 0
+  updateLayoutWidthBucket()
   updateBottomPinned()
   rememberThreadState()
 }
@@ -231,33 +269,59 @@ function resolveElement(el: Element | { $el?: Element | null } | null | undefine
   return value instanceof HTMLElement ? value : null
 }
 
+function readElementHeight(element: HTMLElement | null | undefined) {
+  if (!element)
+    return 0
+
+  return Math.ceil(Math.max(
+    0,
+    element.offsetHeight || 0,
+    element.scrollHeight || 0,
+    element.getBoundingClientRect?.().height || 0,
+  ))
+}
+
 function cleanupMeasuredElement(key: string) {
   resizeObservers.get(key)?.disconnect()
   resizeObservers.delete(key)
   measuredElements.delete(key)
 }
 
+function reconcileRecordSize(record: TimelineRecord) {
+  const measured = readElementHeight(measuredElements.get(record.key))
+  const markdown = record.markdown
+    ? (markdownLogicalHeights.get(record.key) ?? 0)
+    : 0
+  const next = Math.max(measured, markdown)
+
+  if (next > 0)
+    setItemSize(record.key, next)
+}
+
 function setMeasuredItemElement(record: TimelineRecord, el: Element | { $el?: Element | null } | null | undefined) {
   const element = resolveElement(el)
   const previous = measuredElements.get(record.key)
 
-  if (!element || record.markdown) {
+  if (!element) {
     cleanupMeasuredElement(record.key)
+    reconcileRecordSize(record)
     return
   }
 
-  if (previous === element)
+  if (previous === element) {
+    reconcileRecordSize(record)
     return
+  }
 
   cleanupMeasuredElement(record.key)
   measuredElements.set(record.key, element)
-  setItemSize(record.key, element.offsetHeight)
+  reconcileRecordSize(record)
 
   if (typeof ResizeObserver === 'undefined')
     return
 
   const observer = new ResizeObserver(() => {
-    setItemSize(record.key, element.offsetHeight)
+    reconcileRecordSize(record)
   })
   observer.observe(element)
   resizeObservers.set(record.key, observer)
@@ -278,7 +342,7 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
     scrollRoot: () => scrollRoot.value,
     restoreState: markdownStates.get(record.key) ?? null,
     restoreAnchor: markdownRestoreItemKey.value === record.key ? markdownRestoreToken.value : false,
-    measurementKey: getMarkstreamTimelineItemRevision(record.item, record.index, props),
+    measurementKey: timelineMeasurementKey.value,
     settleMode: 'manual',
     settledToken: final,
     emitIntervalMs: 32,
@@ -292,7 +356,13 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
     indexKey: getSessionKey(record),
     virtualScroll,
     onHeightChange(metrics: MarkstreamVirtualMetrics) {
-      setItemSize(record.key, metrics.totalHeight)
+      markdownLogicalHeights.set(record.key, metrics.totalHeight)
+      reconcileRecordSize(record)
+
+      void nextTick(() => {
+        reconcileRecordSize(record)
+      })
+
       emit('heightChange', { itemKey: record.key, metrics })
     },
     onVirtualStateChange(state: MarkstreamVirtualState) {
@@ -401,6 +471,7 @@ function restoreOuterAnchor(anchor: MarkstreamThreadAnchor | undefined) {
 function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
   itemSizes.clear()
   markdownStates.clear()
+  markdownLogicalHeights.clear()
 
   for (const [key, size] of Object.entries(state?.itemHeights ?? {}))
     itemSizes.set(key, size)
@@ -425,6 +496,7 @@ function cleanupObservers() {
     observer.disconnect()
   resizeObservers.clear()
   measuredElements.clear()
+  markdownLogicalHeights.clear()
   rootResizeObserver?.disconnect()
   rootResizeObserver = null
 }
@@ -563,6 +635,7 @@ defineExpose({
 }
 
 .markstream-virtual-timeline__item {
+  display: flow-root;
   flex: 0 0 auto;
 }
 

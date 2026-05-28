@@ -99,6 +99,205 @@ const md = '# Virtualized transcript'
 
 如果业务已经有自己的外层 virtualizer，使用 `useMarkstreamVirtualAdapter()`，并把 `markdownProps(item, index)` 绑定到 Markdown item。底层 `virtualScroll` prop 继续作为高级 adapter/debug 协议保留。
 
+#### `vue-virtual-scroller` 示例
+
+playground 里有一个真实可运行的完整页面：`playground/src/pages/virtual-scroller-markstream.vue`（路由 `/virtual-scroller-markstream`）。它使用 `vue-virtual-scroller@3` 的 `DynamicScroller` / `DynamicScrollerItem`，并覆盖完整 Markdown 语法、Mermaid、KaTeX、富代码块、表格、HTML block、图片和脚注，不是简化伪代码。
+
+安装依赖：
+
+```bash
+pnpm add vue-virtual-scroller markstream-vue mermaid katex stream-monaco
+```
+
+入口导入：
+
+```ts
+import type {
+  MarkstreamOuterVirtualizerAdapter,
+  MarkstreamThreadVirtualState,
+} from 'markstream-vue'
+import type { CacheSnapshot, ScrollToOptions } from 'vue-virtual-scroller'
+import MarkdownRender, { useMarkstreamVirtualAdapter } from 'markstream-vue'
+import KatexWorker from 'markstream-vue/workers/katexRenderer.worker?worker&inline'
+import { setKaTeXWorker } from 'markstream-vue/workers/katexWorkerClient'
+import MermaidWorker from 'markstream-vue/workers/mermaidParser.worker?worker&inline'
+import { setMermaidWorker } from 'markstream-vue/workers/mermaidWorkerClient'
+import { computed, nextTick, reactive, ref } from 'vue'
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
+import 'markstream-vue/index.css'
+import 'katex/dist/katex.min.css'
+import 'vue-virtual-scroller/index.css'
+
+setKaTeXWorker(() => new KatexWorker())
+setMermaidWorker(() => new MermaidWorker())
+```
+
+外层 scroller adapter 的关键部分：
+
+```ts
+const scrollerRef = ref<ScrollerHandle | null>(null)
+const itemHeights = reactive(new Map<string, number>()) as Map<string, number>
+const itemOffsets = reactive(new Map<string, number>()) as Map<string, number>
+const savedThreadStates = new Map<ThreadId, SavedThreadState>()
+const visibleRange = ref({ start: 0, end: 0 })
+const widthBucket = ref(0)
+
+const items = computed(() => threadItems[activeThreadId.value])
+const measurementKey = computed(() => [
+  'vue-virtual-scroller-demo',
+  widthBucket.value,
+].join(':'))
+
+function getScrollElement() {
+  const element = scrollerRef.value?.$el
+  return element instanceof HTMLElement ? element : null
+}
+
+function rebuildOffsets() {
+  let offset = 0
+  itemOffsets.clear()
+
+  for (const item of items.value) {
+    itemOffsets.set(item.key, offset)
+    offset += itemHeights.get(item.key) ?? estimateItemHeight(item)
+  }
+}
+
+const virtualizer: MarkstreamOuterVirtualizerAdapter = {
+  getScrollElement,
+  getScrollTop: () => getScrollElement()?.scrollTop ?? 0,
+  setScrollTop: value => scrollerRef.value?.scrollToPosition?.(value),
+  getViewportHeight: () => getScrollElement()?.clientHeight ?? 0,
+  getTotalHeight: () => getScrollElement()?.scrollHeight ?? 0,
+  getItemOffset: key => itemOffsets.get(key) ?? 0,
+  getItemSize: key => itemHeights.get(key) ?? 0,
+  setItemSize(key, size) {
+    const previous = itemHeights.get(key)
+    if (previous != null && Math.abs(previous - size) < 0.5)
+      return
+
+    itemHeights.set(key, size)
+    rebuildOffsets()
+
+    void nextTick(() => {
+      scrollerRef.value?.forceUpdate?.(false)
+    })
+  },
+  getVisibleRange: () => visibleRange.value,
+  scrollToOffset: offset => scrollerRef.value?.scrollToPosition?.(offset),
+  scrollToIndex: (index, align = 'start') => scrollerRef.value?.scrollToItem?.(index, { align }),
+  measureElement: () => {},
+}
+
+const adapter = useMarkstreamVirtualAdapter<TimelineItem>({
+  items,
+  threadKey: activeThreadId,
+  getKey: item => item.key,
+  getKind: item => item.kind,
+  getContent: item => item.kind === 'assistant-markdown' ? item.content : '',
+  getFinal: item => item.kind !== 'assistant-markdown' || item.final,
+  getRevision: item => item.kind === 'assistant-markdown' ? item.revision : undefined,
+  estimateItemHeight,
+  measurementKey,
+  virtualizer,
+})
+```
+
+模板核心：
+
+```vue
+<DynamicScroller
+  ref="scrollerRef"
+  class="message-scroller"
+  :items="items"
+  key-field="key"
+  :min-item-size="72"
+  :buffer="1800"
+>
+  <template #default="{ item, index, active }">
+    <DynamicScrollerItem
+      :item="item"
+      :active="active"
+      :index="index"
+      tag="section"
+    >
+      <article
+        :ref="el => adapter.measureItem(item, index, el)"
+        class="timeline-row"
+        :style="getRowStyle(item)"
+      >
+        <div v-if="item.kind === 'assistant-markdown'" class="assistant-bubble">
+          <MarkdownRender
+            v-bind="adapter.markdownProps(item, index)"
+            :max-live-nodes="280"
+            :live-node-buffer="80"
+            :batch-rendering="true"
+            :code-block-props="{
+              showHeader: true,
+              showCopyButton: true,
+              showCollapseButton: true,
+              showExpandButton: true,
+            }"
+          />
+        </div>
+
+        <div v-else class="message-bubble">
+          {{ item.text ?? item.label ?? item.message }}
+        </div>
+      </article>
+    </DynamicScrollerItem>
+  </template>
+</DynamicScroller>
+```
+
+切换 thread 时同时保存 markstream 状态和 `vue-virtual-scroller` 的 cache：
+
+```ts
+function readCacheSnapshot() {
+  const snapshot = scrollerRef.value?.cacheSnapshot
+  if (!snapshot)
+    return null
+  return 'value' in snapshot ? snapshot.value : snapshot
+}
+
+function rememberThreadState(threadId: ThreadId = activeThreadId.value) {
+  savedThreadStates.set(threadId, {
+    markstreamState: adapter.captureThreadState(),
+    scrollerCache: readCacheSnapshot(),
+  })
+}
+
+async function switchThread(threadId: ThreadId) {
+  if (threadId === activeThreadId.value)
+    return
+
+  rememberThreadState()
+  activeThreadId.value = threadId
+
+  await nextTick()
+  rebuildOffsets()
+
+  const saved = savedThreadStates.get(threadId)
+  if (saved) {
+    scrollerRef.value?.restoreCache?.(saved.scrollerCache)
+    adapter.restoreThreadState(saved.markstreamState)
+  }
+  else {
+    adapter.restoreThreadState(null)
+    scrollerRef.value?.scrollToPosition?.(0)
+  }
+}
+```
+
+这个组合里几个值不要删：
+
+- `:buffer="1800"` 是 px overscan，快速拖滚动条时减少长时间空窗。
+- `:min-item-size="72"` 给 `DynamicScroller` 初始测量前的下限，避免第一屏滚动数学太离谱。
+- `measureItem()` 必须挂在 timeline row 外层，assistant bubble 的 padding、border、header、footer actions 才会计入高度。
+- `getRowStyle(item)` 使用 adapter 记录的高度作为 `minHeight`，避免 Markdown node virtual 期间外层 item size 被低估。
+- `sessionKey = thread:item:revision` 仍然由 adapter 生成；`measurementKey` 只放布局相关状态，例如宽度 bucket、字体、主题、密度。
+- 切 thread 前保存 `captureThreadState()` 和 `cacheSnapshot`，切换后先恢复 scroller cache，再恢复 markstream anchor，滚动条位置和界面都更稳。
+
 如果聊天列表或 thread 列表本身已经按 message 做 virtual-scroll，外层 virtualizer 仍然负责决定哪些 message mount。只在超大的 Markdown message 上开启 `virtual-scroll`，让 `MarkdownRender` 在内部裁剪节点 DOM 的同时，把该 message 的逻辑高度报告给外层。
 
 关键值是 `metrics.totalHeight`。它表示包含 virtual spacer 在内的完整 Markdown 逻辑高度；不要把 renderer 元素当前的 `offsetHeight` 当成 item size，因为当前 DOM 可能只挂载了 live window 内的节点。

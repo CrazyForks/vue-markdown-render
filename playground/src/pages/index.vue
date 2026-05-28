@@ -159,6 +159,12 @@ function goToVirtualTimelineZero() {
   })
 }
 
+function goToVirtualScrollerMarkstream() {
+  router.push('/virtual-scroller-markstream').catch(() => {
+    window.location.href = '/virtual-scroller-markstream'
+  })
+}
+
 // Keep persisted values within reasonable bounds on hydration.
 watchEffect(() => {
   if (streamChunkDelayMin.value !== normalizedChunkDelayRange.value.min)
@@ -767,6 +773,11 @@ onBeforeUnmount(() => {
             <button class="nav-btn nav-btn--virtual" @click="goToVirtualTimelineZero">
               <Icon icon="carbon:flow" class="nav-btn__icon" />
               <span class="nav-btn__text">Virtual timeline</span>
+            </button>
+
+            <button class="nav-btn nav-btn--virtual" @click="goToVirtualScrollerMarkstream">
+              <Icon icon="carbon:data-vis-1" class="nav-btn__icon" />
+              <span class="nav-btn__text">Vue scroller</span>
             </button>
 
             <button

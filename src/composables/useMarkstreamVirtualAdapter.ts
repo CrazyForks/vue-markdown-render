@@ -35,7 +35,9 @@ export interface MarkstreamVirtualTimelineProps<T = MarkstreamTimelineItem> {
   estimateItemHeight?: (item: T, index: number) => number
 
   overscan?: number
+  overscanPx?: number
   stickToBottom?: boolean | 'auto'
+  measurementKey?: string | number
   debug?: boolean
 }
 
@@ -208,6 +210,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
 ): MarkstreamVirtualAdapterController<T> {
   const itemHeights = reactive(new Map<string, number>()) as Map<string, number>
   const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
+  const markdownLogicalHeights = reactive(new Map<string, number>()) as Map<string, number>
   const measuredElements = new Map<string, HTMLElement>()
   const resizeObservers = new Map<string, ResizeObserver>()
   const markdownRestoreItemKey = ref<string | null>(null)
@@ -259,10 +262,31 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     return value instanceof HTMLElement ? value : null
   }
 
+  function readElementHeight(element: HTMLElement | null | undefined) {
+    if (!element)
+      return 0
+
+    return Math.ceil(Math.max(
+      0,
+      element.offsetHeight || 0,
+      element.scrollHeight || 0,
+      element.getBoundingClientRect?.().height || 0,
+    ))
+  }
+
   function cleanupMeasuredElement(key: string) {
     resizeObservers.get(key)?.disconnect()
     resizeObservers.delete(key)
     measuredElements.delete(key)
+  }
+
+  function reconcileItemSize(key: string) {
+    const measured = readElementHeight(measuredElements.get(key))
+    const markdown = markdownLogicalHeights.get(key) ?? 0
+    const next = Math.max(measured, markdown)
+
+    if (next > 0)
+      setItemSize(key, next)
   }
 
   function measureItem(item: T, index: number, el: Element | { $el?: Element | null } | null | undefined) {
@@ -272,27 +296,27 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
 
     if (!element) {
       cleanupMeasuredElement(key)
+      reconcileItemSize(key)
       return
     }
 
-    if (previous === element)
+    if (previous === element) {
+      reconcileItemSize(key)
       return
+    }
 
     cleanupMeasuredElement(key)
 
-    if (isMarkdownItem(item, index))
-      return
-
     measuredElements.set(key, element)
     options.virtualizer.measureElement?.(key, element)
-    setItemSize(key, element.offsetHeight)
+    reconcileItemSize(key)
 
     if (typeof ResizeObserver === 'undefined')
       return
 
     const observer = new ResizeObserver(() => {
       options.virtualizer.measureElement?.(key, element)
-      setItemSize(key, element.offsetHeight)
+      reconcileItemSize(key)
     })
     observer.observe(element)
     resizeObservers.set(key, observer)
@@ -323,7 +347,12 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       indexKey: getSessionKey(item, index),
       virtualScroll,
       onHeightChange(metrics) {
-        setItemSize(itemKey, metrics.totalHeight)
+        markdownLogicalHeights.set(itemKey, metrics.totalHeight)
+        reconcileItemSize(itemKey)
+
+        void nextTick(() => {
+          reconcileItemSize(itemKey)
+        })
       },
       onVirtualStateChange(state) {
         markdownStates.set(itemKey, state)
@@ -436,6 +465,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   }
 
   function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
+    markdownLogicalHeights.clear()
     importItemHeights(state?.itemHeights ?? {})
     importMarkdownStates(state?.markdownStates ?? {})
 
@@ -454,6 +484,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       observer.disconnect()
     resizeObservers.clear()
     measuredElements.clear()
+    markdownLogicalHeights.clear()
   }
 
   if (getCurrentScope())
