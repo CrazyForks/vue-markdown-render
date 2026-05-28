@@ -8,6 +8,7 @@ export interface ScrollListenerOptions {
   resolveScrollContainer: (node?: HTMLElement | null) => HTMLElement | null
   scheduleFocusSync: (options?: { immediate?: boolean }) => void
   onScroll?: () => void
+  getScrollTop?: (root: HTMLElement) => number
 }
 
 export interface ScrollListener {
@@ -66,7 +67,7 @@ export function useScrollListener(
 
     cleanupScrollListener()
 
-    lastObservedScrollTop = Math.abs(root.scrollTop || 0)
+    lastObservedScrollTop = readObservedScrollTop(root)
 
     const handler = () => {
       onScroll?.()
@@ -88,7 +89,7 @@ export function useScrollListener(
   }
 
   function resolveFocusSyncScheduleOptions(root: HTMLElement) {
-    const current = Math.abs(root.scrollTop || 0)
+    const current = readObservedScrollTop(root)
     const previous = lastObservedScrollTop
     lastObservedScrollTop = current
 
@@ -105,6 +106,14 @@ export function useScrollListener(
     return jump > immediateThreshold
       ? { immediate: true }
       : undefined
+  }
+
+  function readObservedScrollTop(root: HTMLElement) {
+    const raw = options.getScrollTop
+      ? options.getScrollTop(root)
+      : root.scrollTop
+
+    return Math.max(0, Number.isFinite(raw) ? Math.abs(raw) : 0)
   }
 
   return {

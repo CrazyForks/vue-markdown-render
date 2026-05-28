@@ -2,6 +2,7 @@
 import type { MathBlockNodeProps } from '../../types/component-props'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
+import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
@@ -14,7 +15,7 @@ const containerEl = ref<HTMLElement | null>(null)
 const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 const mathContent = computed(() => normalizeKaTeXRenderInput(props.node.content))
 const lifecycleIndexKey = computed(() => {
-  return props.indexKey == null ? '' : String(props.indexKey)
+  return resolveLifecycleIndexKey(props, {})
 })
 
 function resolveInitialState() {

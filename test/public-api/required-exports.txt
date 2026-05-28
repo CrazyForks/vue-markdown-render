@@ -132,6 +132,7 @@ useMarkstreamNodeLifecycle
 MarkstreamRendererHandle
 MarkstreamScrollRoot
 MarkstreamScrollRootLike
+MarkstreamScrollRootRef
 MarkstreamScrollRootResolver
 MarkstreamVirtualAnchor
 MarkstreamVirtualConfidence

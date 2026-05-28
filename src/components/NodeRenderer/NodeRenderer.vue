@@ -193,7 +193,7 @@ function unwrapVirtualScrollRoot(value: unknown): HTMLElement | null {
     return null
 
   if (typeof HTMLElement !== 'undefined' && value instanceof HTMLElement)
-    return value as HTMLElement
+    return value
 
   if (typeof value === 'object' && 'value' in value)
     return unwrapVirtualScrollRoot((value as { value: unknown }).value)
@@ -201,27 +201,7 @@ function unwrapVirtualScrollRoot(value: unknown): HTMLElement | null {
   if (typeof value === 'object' && '$el' in value)
     return unwrapVirtualScrollRoot((value as { $el: unknown }).$el)
 
-  if (isScrollRootElementLike(value))
-    return value as HTMLElement
-
-  if (typeof Element !== 'undefined' && value instanceof Element)
-    return null
-
   return null
-}
-
-function isScrollRootElementLike(value: unknown): value is HTMLElement {
-  if (!value || typeof value !== 'object')
-    return false
-
-  const candidate = value as Partial<HTMLElement>
-
-  return typeof candidate.getBoundingClientRect === 'function'
-    && typeof candidate.addEventListener === 'function'
-    && typeof candidate.removeEventListener === 'function'
-    && 'scrollTop' in candidate
-    && 'scrollHeight' in candidate
-    && 'clientHeight' in candidate
 }
 
 const {
@@ -877,6 +857,14 @@ const {
   resolveScrollContainer,
   scheduleFocusSync,
   onScroll: handleVirtualScrollRootScroll,
+  getScrollTop: (root) => {
+    const doc = root.ownerDocument || containerRef.value?.ownerDocument || document
+    const isViewportRoot = root === doc.documentElement
+      || root === doc.body
+      || root === doc.scrollingElement
+
+    return getNormalizedScrollTop(root, doc, isViewportRoot)
+  },
 })
 
 function syncFocusToScroll(force = false) {
@@ -3538,9 +3526,31 @@ function clearVirtualMetricsSchedule() {
 function flushVirtualMetricsEmit() {
   virtualMetricsEmitRaf = null
   virtualMetricsEmitTimer = null
-  measureTrackedNodeHeights()
-  forceFlushPendingHeightMeasurements()
+  if (shouldForceMeasureBeforeVirtualMetrics(pendingVirtualMetricsReason)) {
+    measureTrackedNodeHeights()
+    forceFlushPendingHeightMeasurements()
+  }
   emitVirtualMetricsNow(getVirtualMetrics(pendingVirtualMetricsReason))
+}
+
+function shouldForceMeasureBeforeVirtualMetrics(reason: MarkstreamVirtualReason) {
+  if (pendingHeightMeasurements.size > 0 || heightMeasurementRaf != null)
+    return true
+
+  switch (reason) {
+    case 'node-resize':
+    case 'async-node':
+    case 'resize':
+    case 'restore':
+    case 'final':
+    case 'manual':
+      return true
+
+    case 'batch':
+    case 'content':
+    default:
+      return false
+  }
 }
 
 function scheduleVirtualMetricsEmit(reason: MarkstreamVirtualReason) {

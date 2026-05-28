@@ -11,6 +11,9 @@ import type {
   MarkstreamMeasuredHeightCacheEntry,
   MarkstreamNodeLifecycle,
   MarkstreamRendererHandle,
+  MarkstreamScrollRootLike,
+  MarkstreamScrollRootRef,
+  MarkstreamScrollRootResolver,
   MarkstreamVirtualMetrics,
   MarkstreamVirtualScrollHeightCacheOptions,
   MarkstreamVirtualScrollOptions,
@@ -61,6 +64,7 @@ import MarkdownRender, {
   useSmoothMarkdownStream,
   VueRendererMarkdown,
 } from 'markstream-vue'
+import { ref } from 'vue'
 
 const component = MarkdownRender
 const plugin = VueRendererMarkdown
@@ -154,6 +158,49 @@ const virtualMetrics: MarkstreamVirtualMetrics | null = null
 const virtualState: MarkstreamVirtualState | null = null
 const rendererHandle: MarkstreamRendererHandle | null = null
 const nodeLifecycle: MarkstreamNodeLifecycle | null = null
+const virtualScrollRootRef = ref<HTMLElement | null>(null) satisfies MarkstreamScrollRootRef
+const virtualScrollRootLike: MarkstreamScrollRootLike = virtualScrollRootRef
+const virtualScrollRootResolver: MarkstreamScrollRootResolver = () => virtualScrollRootRef
+const rendererRefs = new Map<string, MarkstreamRendererHandle>()
+const savedVirtualStates = new Map<string, MarkstreamVirtualState>()
+const logicalHeights = new Map<string, number>()
+const outerVirtualizer = {
+  resizeItem(_messageId: string, _height: number) {},
+}
+
+function onVirtualHeightChange(messageId: string, metrics: MarkstreamVirtualMetrics) {
+  logicalHeights.set(messageId, metrics.totalHeight)
+  outerVirtualizer.resizeItem(messageId, metrics.totalHeight)
+}
+
+function onVirtualStateChange(messageId: string, state: MarkstreamVirtualState) {
+  savedVirtualStates.set(messageId, state)
+}
+
+function captureVirtualStatesBeforeThreadSwitch() {
+  for (const [messageId, renderer] of rendererRefs) {
+    const state = renderer.captureVirtualState({
+      requireViewport: true,
+      includeEmptyState: true,
+    })
+
+    if (state)
+      savedVirtualStates.set(messageId, state)
+  }
+}
+
+function restoreVirtualStateAfterThreadSwitch(messageId: string, restoreToken: number) {
+  const renderer = rendererRefs.get(messageId)
+  const state = savedVirtualStates.get(messageId)
+
+  if (!renderer || !state)
+    return
+
+  renderer.restoreVirtualState(state, {
+    restoreAnchor: true,
+    restoreToken,
+  })
+}
 void MARKSTREAM_NODE_LIFECYCLE_KEY
 void useMarkstreamNodeLifecycle
 
@@ -228,6 +275,17 @@ void virtualMetrics
 void virtualState
 void rendererHandle
 void nodeLifecycle
+void virtualScrollRootRef
+void virtualScrollRootLike
+void virtualScrollRootResolver
+void rendererRefs
+void savedVirtualStates
+void logicalHeights
+void outerVirtualizer
+void onVirtualHeightChange
+void onVirtualStateChange
+void captureVirtualStatesBeforeThreadSwitch
+void restoreVirtualStateAfterThreadSwitch
 void CodeBlockNode
 void D2BlockNode
 void MathBlockNode

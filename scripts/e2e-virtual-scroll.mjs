@@ -527,6 +527,50 @@ async function run() {
     )
 
     if (!stressMode) {
+      const directJumpProbe = await evaluateWithLab(page, async (api) => {
+        api.clearEvents()
+
+        const ratios = [0.03, 0.96, 0.18, 0.74, 0.42, 1, 0]
+        const samples = []
+
+        for (const ratio of ratios) {
+          await api.scrollToRatio(ratio)
+
+          for (let i = 0; i < 8; i++)
+            await api.nextFrame()
+
+          samples.push(api.read())
+        }
+
+        return {
+          final: api.read(),
+          badSample: samples.find(sample => (
+            sample.stats.blankProbeCount > 0
+            || sample.blankFrameCount > 0
+            || sample.visibleCoverageOk !== true
+            || sample.health.strictClippingOk !== true
+            || sample.health.virtualDomWithinLimit !== true
+            || sample.health.hugeRendererDomWithinLimit !== true
+            || sample.health.maxObservedCoverageGapPx > 24
+          )) ?? null,
+          samples,
+        }
+      })
+
+      assert(
+        !directJumpProbe.badSample,
+        'direct scrollTop jumps caused blank frame, coverage gap, clipping, or DOM budget regression',
+        directJumpProbe,
+      )
+
+      assert(
+        directJumpProbe.final.maxHugeMessageSlotCount <= directJumpProbe.final.hugeRendererSlotBudget
+        && directJumpProbe.final.domNodeCount <= directJumpProbe.final.expectedDomNodeCeiling
+        && directJumpProbe.final.markdownSlotCount <= directJumpProbe.final.expectedMarkdownSlotCeiling,
+        'virtual-scroll DOM-size budget was exceeded after direct jumps',
+        directJumpProbe.final,
+      )
+
       const smoke = await evaluateWithLab(page, async (api) => {
         const waitHealthy = async (frames = 90) => {
           let latest = api.read()

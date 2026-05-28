@@ -3,6 +3,7 @@ import type { ImageNodeProps } from '../../types/component-props'
 import { sanitizeImageSrc } from 'stream-markdown-parser'
 import { computed, inject, nextTick, onBeforeUnmount, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
+import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 
 const props = withDefaults(defineProps<ImageNodeProps>(), {
@@ -36,8 +37,7 @@ const showError = computed(() => imageStage.value === 'failed')
 // Shimmer overlay only for lazy images while a renderable image is downloading.
 const showShimmer = computed(() => !useEagerImagePath.value && !imageLoaded.value && !hasError.value && imageStage.value !== 'failed' && activeSrc.value.length > 0)
 const lifecycleIndexKey = computed(() => {
-  const raw = attrs['index-key'] ?? attrs.indexKey
-  return raw == null || raw === '' ? '' : String(raw)
+  return resolveLifecycleIndexKey(props, attrs)
 })
 
 function reportLifecycleHeight(indexKey = lifecycleIndexKey.value) {

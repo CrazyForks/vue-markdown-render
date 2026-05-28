@@ -18,6 +18,7 @@ function createHarness(options: {
   listenerEnabled?: boolean
   root?: HTMLElement | null
   onScroll?: () => void
+  getScrollTop?: (root: HTMLElement) => number
 } = {}) {
   const root = ref<HTMLElement | null>(
     options.root === undefined ? createRoot() : options.root,
@@ -40,6 +41,7 @@ function createHarness(options: {
     resolveScrollContainer,
     scheduleFocusSync,
     onScroll: options.onScroll,
+    getScrollTop: options.getScrollTop,
   })
 
   return {
@@ -187,6 +189,32 @@ describe('useScrollListener', () => {
     root.scrollTop = 3000
     root.dispatchEvent(new Event('scroll'))
 
+    expect(h.scheduleFocusSync).toHaveBeenCalledWith({ immediate: true })
+  })
+
+  it('uses normalized scrollTop values for large jump detection', () => {
+    const root = createRoot()
+    Object.defineProperty(root, 'clientHeight', {
+      configurable: true,
+      value: 600,
+    })
+    Object.defineProperty(root, 'scrollTop', {
+      configurable: true,
+      value: 0,
+      writable: true,
+    })
+
+    const getScrollTop = vi.fn(() => {
+      return root.scrollTop === 0 ? 3000 : 1000
+    })
+    const h = createHarness({ root, getScrollTop })
+
+    h.listener.setupScrollListener()
+
+    root.scrollTop = -120
+    root.dispatchEvent(new Event('scroll'))
+
+    expect(getScrollTop).toHaveBeenCalledWith(root)
     expect(h.scheduleFocusSync).toHaveBeenCalledWith({ immediate: true })
   })
 

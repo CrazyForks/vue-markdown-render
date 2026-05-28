@@ -6,6 +6,7 @@ import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingleto
 import { useViewportPriority } from '../../composables/viewportPriority'
 import infographicIcon from '../../icon/infographic.svg?raw'
 import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
+import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { getInfographic, isInfographicEnabled } from './infographic'
 
@@ -45,8 +46,7 @@ const attrs = useAttrs()
 const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 let lifecyclePendingIndexKey = ''
 const lifecycleIndexKey = computed(() => {
-  const raw = attrs['index-key'] ?? attrs.indexKey
-  return raw == null || raw === '' ? '' : String(raw)
+  return resolveLifecycleIndexKey(props, attrs)
 })
 
 function reportLifecycleHeight(indexKey = lifecycleIndexKey.value) {

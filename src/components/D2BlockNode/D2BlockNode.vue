@@ -4,6 +4,7 @@ import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, 
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
+import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { getD2 } from './d2'
 
@@ -42,8 +43,7 @@ const viewportReady = ref(typeof window === 'undefined')
 
 const baseCode = computed(() => props.node.code ?? '')
 const lifecycleIndexKey = computed(() => {
-  const indexKey = attrs['index-key'] ?? attrs.indexKey
-  return indexKey == null ? '' : String(indexKey)
+  return resolveLifecycleIndexKey(props, attrs)
 })
 const renderSignature = computed(() => `${props.isDark ? 'dark' : 'light'}:${baseCode.value}`)
 const showSourceFallback = computed(() => {

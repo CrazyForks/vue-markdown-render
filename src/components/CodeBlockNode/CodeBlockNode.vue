@@ -9,6 +9,7 @@ import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils'
+import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
@@ -53,8 +54,7 @@ const emits = defineEmits<{
 const attrs = useAttrs()
 const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 const lifecycleIndexKey = computed(() => {
-  const indexKey = attrs['index-key'] ?? attrs.indexKey
-  return indexKey == null ? '' : String(indexKey)
+  return resolveLifecycleIndexKey(props, attrs)
 })
 
 // Chrome warns when Monaco registers non-passive touchstart listeners.

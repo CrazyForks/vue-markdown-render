@@ -117,6 +117,7 @@ export type {
   MarkstreamRendererHandle,
   MarkstreamScrollRoot,
   MarkstreamScrollRootLike,
+  MarkstreamScrollRootRef,
   MarkstreamScrollRootResolver,
   MarkstreamVirtualAnchor,
   MarkstreamVirtualConfidence,

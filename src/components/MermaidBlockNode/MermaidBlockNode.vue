@@ -7,6 +7,7 @@ import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingleto
 import { useViewportPriority } from '../../composables/viewportPriority'
 import mermaidIcon from '../../icon/mermaid.svg?raw'
 import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, getMermaidDiagramKind, parsePositiveNumber } from '../../utils/diagramHeight'
+import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
@@ -180,8 +181,7 @@ let lifecyclePendingIndexKey = ''
 let lifecyclePendingCount = 0
 let lifecycleSettleGeneration = 0
 const lifecycleIndexKey = computed(() => {
-  const raw = attrs['index-key'] ?? attrs.indexKey
-  return raw == null || raw === '' ? '' : String(raw)
+  return resolveLifecycleIndexKey(props, attrs)
 })
 
 function reportLifecycleHeight(indexKey = lifecycleIndexKey.value) {
