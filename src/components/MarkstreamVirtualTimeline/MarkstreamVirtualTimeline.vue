@@ -31,10 +31,24 @@ const props = withDefaults(defineProps<MarkstreamVirtualTimelineProps<any>>(), {
 })
 
 const emit = defineEmits<{
-  (e: 'heightChange', payload: { itemKey: string, metrics: MarkstreamVirtualMetrics }): void
-  (e: 'virtualStateChange', payload: { itemKey: string, state: MarkstreamVirtualState }): void
-  (e: 'rangeChange', payload: { start: number, end: number }): void
+  (e: 'height-change', payload: { itemKey: string, metrics: MarkstreamVirtualMetrics }): void
+  (e: 'virtual-state-change', payload: { itemKey: string, state: MarkstreamVirtualState }): void
+  (e: 'range-change', payload: { start: number, end: number }): void
 }>()
+
+/* eslint-disable vue/custom-event-name-casing -- Public timeline events are kebab-case. */
+function emitHeightChange(payload: { itemKey: string, metrics: MarkstreamVirtualMetrics }) {
+  emit('height-change', payload)
+}
+
+function emitVirtualStateChange(payload: { itemKey: string, state: MarkstreamVirtualState }) {
+  emit('virtual-state-change', payload)
+}
+
+function emitRangeChange(payload: { start: number, end: number }) {
+  emit('range-change', payload)
+}
+/* eslint-enable vue/custom-event-name-casing */
 
 interface TimelineRecord {
   item: any
@@ -250,18 +264,39 @@ function setItemSize(key: string, size: number) {
     return
 
   const previous = itemSizes.get(key)
-  if (previous != null && Math.abs(previous - size) < 0.5)
+  const next = Math.ceil(size)
+
+  if (previous != null && Math.abs(previous - next) < 0.5)
     return
 
+  const anchorBeforeChange = captureOuterAnchor()
   const shouldPin = shouldStickToBottom()
-  itemSizes.set(key, size)
+
+  itemSizes.set(key, next)
   rememberThreadState()
 
-  if (shouldPin) {
-    void nextTick(() => {
+  scheduleScrollReconcileAfterSizeChange(anchorBeforeChange, shouldPin)
+}
+
+function scheduleScrollReconcileAfterSizeChange(anchor: MarkstreamThreadAnchor | undefined, shouldPin: boolean) {
+  const apply = () => {
+    if (shouldPin)
       scrollToBottom()
-    })
+    else if (anchor)
+      restoreOuterAnchor(anchor)
+
+    updateScrollMetrics()
   }
+
+  void nextTick(() => {
+    apply()
+
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        apply()
+      })
+    }
+  })
 }
 
 function resolveElement(el: Element | { $el?: Element | null } | null | undefined) {
@@ -363,12 +398,12 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
         reconcileRecordSize(record)
       })
 
-      emit('heightChange', { itemKey: record.key, metrics })
+      emitHeightChange({ itemKey: record.key, metrics })
     },
     onVirtualStateChange(state: MarkstreamVirtualState) {
       markdownStates.set(record.key, state)
       rememberThreadState()
-      emit('virtualStateChange', { itemKey: record.key, state })
+      emitVirtualStateChange({ itemKey: record.key, state })
     },
   }
 }
@@ -469,6 +504,8 @@ function restoreOuterAnchor(anchor: MarkstreamThreadAnchor | undefined) {
 }
 
 function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
+  cleanupMeasuredElements()
+
   itemSizes.clear()
   markdownStates.clear()
   markdownLogicalHeights.clear()
@@ -484,18 +521,28 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
   markdownRestoreToken.value += 1
 
   void nextTick(() => {
-    restoreOuterAnchor(state?.outerAnchor)
-    if (!state && props.stickToBottom === true)
+    if (state?.outerAnchor) {
+      restoreOuterAnchor(state.outerAnchor)
+    }
+    else if (props.stickToBottom !== false) {
+      bottomPinned.value = true
       scrollToBottom()
+    }
+
     updateScrollMetrics()
   })
 }
 
-function cleanupObservers() {
+function cleanupMeasuredElements() {
   for (const observer of resizeObservers.values())
     observer.disconnect()
+
   resizeObservers.clear()
   measuredElements.clear()
+}
+
+function cleanupObservers() {
+  cleanupMeasuredElements()
   markdownLogicalHeights.clear()
   rootResizeObserver?.disconnect()
   rootResizeObserver = null
@@ -511,7 +558,7 @@ watch(
 watch(
   () => visibleWindow.value.records.map(record => record.key).join('\u0000'),
   () => {
-    emit('rangeChange', {
+    emitRangeChange({
       start: visibleWindow.value.start,
       end: visibleWindow.value.end,
     })
@@ -541,9 +588,12 @@ onMounted(() => {
     rootResizeObserver.observe(scrollRoot.value)
   }
 
-  if (props.stickToBottom === true) {
+  if (props.stickToBottom !== false) {
+    bottomPinned.value = true
+
     void nextTick(() => {
       scrollToBottom()
+      updateScrollMetrics()
     })
   }
 })

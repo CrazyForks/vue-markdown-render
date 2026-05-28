@@ -105,6 +105,23 @@ export interface UseMarkstreamVirtualAdapterOptions<T = MarkstreamTimelineItem> 
   estimateItemHeight?: (item: T, index: number) => number
   measurementKey?: MaybeRefOrGetter<string | number | undefined>
 
+  /**
+   * Preserve the outer scroll anchor when markdown logical height or measured
+   * item height changes.
+   *
+   * Set false if the host virtualizer already performs equivalent scroll
+   * anchoring.
+   *
+   * Default: 'auto'
+   */
+  preserveScrollAnchor?: boolean | 'auto'
+
+  /**
+   * Used when preserveScrollAnchor is enabled.
+   * Default: 48
+   */
+  bottomThresholdPx?: number
+
   virtualizer: MarkstreamOuterVirtualizerAdapter
 }
 
@@ -244,6 +261,39 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     return Number.isFinite(size) && size > 0 ? size : null
   }
 
+  function getBottomThresholdPx() {
+    const value = Number(options.bottomThresholdPx ?? 48)
+    return Number.isFinite(value) ? Math.max(0, value) : 48
+  }
+
+  function getDistanceFromBottom() {
+    return Math.max(
+      0,
+      options.virtualizer.getTotalHeight()
+      - options.virtualizer.getViewportHeight()
+      - options.virtualizer.getScrollTop(),
+    )
+  }
+
+  function shouldPreserveScrollAnchor() {
+    return options.preserveScrollAnchor !== false
+  }
+
+  function scheduleOuterAnchorRestore(anchor: MarkstreamThreadAnchor | undefined) {
+    if (!anchor)
+      return
+
+    void nextTick(() => {
+      restoreOuterAnchor(anchor)
+
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {
+          restoreOuterAnchor(anchor)
+        })
+      }
+    })
+  }
+
   function setItemSize(key: string, size: number) {
     const normalized = normalizeHeight(size)
     if (normalized == null)
@@ -253,8 +303,28 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     if (previous != null && Math.abs(previous - normalized) < 0.5)
       return
 
+    const shouldPreserve = shouldPreserveScrollAnchor()
+    const anchorBeforeChange = shouldPreserve
+      ? captureOuterAnchor()
+      : undefined
+    const wasPinnedToBottom = shouldPreserve
+      && getDistanceFromBottom() <= getBottomThresholdPx()
+
     itemHeights.set(key, normalized)
     options.virtualizer.setItemSize(key, normalized)
+
+    if (!shouldPreserve)
+      return
+
+    if (wasPinnedToBottom) {
+      scheduleOuterAnchorRestore({
+        type: 'bottom',
+        distanceFromBottomPx: 0,
+      })
+      return
+    }
+
+    scheduleOuterAnchorRestore(anchorBeforeChange)
   }
 
   function resolveElement(el: Element | { $el?: Element | null } | null | undefined) {
@@ -432,8 +502,14 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
 
   function importItemHeights(heights: Record<string, number>) {
     itemHeights.clear()
-    for (const [key, size] of Object.entries(heights))
-      setItemSize(key, size)
+    for (const [key, size] of Object.entries(heights)) {
+      const normalized = normalizeHeight(size)
+      if (normalized == null)
+        continue
+
+      itemHeights.set(key, normalized)
+      options.virtualizer.setItemSize(key, normalized)
+    }
   }
 
   function importMarkdownStates(states: Record<string, MarkstreamVirtualState>) {

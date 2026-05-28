@@ -28,6 +28,19 @@ function createMetrics(totalHeight: number, sessionKey = 'thread:a1:'): Markstre
   }
 }
 
+async function flushAnimationFrame() {
+  await new Promise((resolve) => {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        resolve(undefined)
+      })
+      return
+    }
+
+    setTimeout(resolve, 0)
+  })
+}
+
 describe('virtual timeline API', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -257,6 +270,196 @@ describe('virtual timeline API', () => {
     )
 
     expect(sizes.get('a1')).toBe(720)
+
+    scope.stop()
+  })
+
+  it('starts pinned to bottom by default in auto stick mode', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const items = Array.from({ length: 5 }, (_, index) => ({
+      kind: 'user-message',
+      id: `u${index}`,
+      text: `Message ${index}`,
+    }))
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    const expectedScrollTop = (wrapper.vm as any).getTotalHeight() - 300
+    const anchor = (wrapper.vm as any).captureThreadState().outerAnchor
+
+    expect(root.scrollTop).toBe(expectedScrollTop)
+    expect(anchor?.type).toBe('bottom')
+
+    wrapper.unmount()
+  })
+
+  it('preserves the outer anchor when an item above the viewport changes height', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const slotProps: any[] = []
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '# First', final: true },
+      { kind: 'user-message', id: 'u1', text: 'Middle anchor item' },
+      { kind: 'assistant-markdown', id: 'a2', content: '# Second', final: true },
+    ]
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+        overscan: 10,
+        stickToBottom: false,
+      },
+      slots: {
+        default(props: any) {
+          slotProps.push(props)
+
+          return h('div', {
+            'ref': props.measureRef,
+            'data-kind': props.kind,
+          }, props.markdownProps?.content ?? props.item.text ?? '')
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+
+    ;(wrapper.vm as any).scrollToOffset(380)
+    await nextTick()
+
+    const before = (wrapper.vm as any).captureThreadState().outerAnchor
+    expect(before?.type).toBe('item')
+
+    const firstMarkdown = slotProps.find(props => props.itemKey === 'a1')
+    expect(firstMarkdown).toBeTruthy()
+
+    firstMarkdown.markdownProps.onHeightChange(
+      createMetrics(900, firstMarkdown.markdownProps.virtualScroll.sessionKey),
+    )
+
+    await nextTick()
+    await flushAnimationFrame()
+
+    const after = (wrapper.vm as any).captureThreadState().outerAnchor
+
+    expect(root.scrollTop).toBeGreaterThan(380)
+    expect(after?.type).toBe(before?.type)
+    expect(wrapper.emitted('height-change')).toBeTruthy()
+    expect(wrapper.emitted('heightChange')).toBeUndefined()
+
+    if (before?.type === 'item' && after?.type === 'item') {
+      expect(after.itemKey).toBe(before.itemKey)
+      expect(Math.abs(after.offsetWithinItemPx - before.offsetWithinItemPx)).toBeLessThanOrEqual(2)
+    }
+
+    wrapper.unmount()
+  })
+
+  it('adapter preserves the outer anchor when a markdown item above the viewport changes height', async () => {
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '# First', final: true },
+      { kind: 'user-message', id: 'u1', text: 'Middle anchor item' },
+      { kind: 'assistant-markdown', id: 'a2', content: '# Second', final: true },
+    ]
+
+    const sizes = new Map<string, number>([
+      ['a1', 360],
+      ['u1', 88],
+      ['a2', 360],
+    ])
+
+    let scrollTop = 380
+
+    function offsetOf(key: string) {
+      let offset = 0
+
+      for (const item of items) {
+        if (item.id === key)
+          return offset
+
+        offset += sizes.get(item.id) ?? 0
+      }
+
+      return 0
+    }
+
+    const root = document.createElement('div')
+    const adapter = {
+      getScrollElement: () => root,
+      getScrollTop: () => scrollTop,
+      setScrollTop: (value: number) => {
+        scrollTop = value
+      },
+      getViewportHeight: () => 300,
+      getTotalHeight: () => Array.from(sizes.values()).reduce((a, b) => a + b, 0),
+      getItemOffset: (key: string) => offsetOf(key),
+      getItemSize: (key: string) => sizes.get(key) ?? 0,
+      setItemSize: (key: string, size: number) => {
+        sizes.set(key, size)
+      },
+      getVisibleRange: () => ({ start: 0, end: 3 }),
+      scrollToOffset: (offset: number) => {
+        scrollTop = offset
+      },
+      scrollToIndex: vi.fn(),
+    }
+
+    const scope = effectScope()
+    const controller = scope.run(() => useMarkstreamVirtualAdapter({
+      items,
+      threadKey: 'thread-a',
+      virtualizer: adapter,
+    }))!
+
+    const before = controller.captureThreadState().outerAnchor
+    expect(before?.type).toBe('item')
+
+    const markdownProps = controller.markdownProps(items[0], 0)
+    markdownProps.onHeightChange(
+      createMetrics(900, markdownProps.virtualScroll!.sessionKey!),
+    )
+
+    await nextTick()
+    await flushAnimationFrame()
+
+    const after = controller.captureThreadState().outerAnchor
+
+    expect(scrollTop).toBeGreaterThan(380)
+    expect(after?.type).toBe(before?.type)
+
+    if (before?.type === 'item' && after?.type === 'item') {
+      expect(after.itemKey).toBe(before.itemKey)
+      expect(Math.abs(after.offsetWithinItemPx - before.offsetWithinItemPx)).toBeLessThanOrEqual(2)
+    }
 
     scope.stop()
   })
