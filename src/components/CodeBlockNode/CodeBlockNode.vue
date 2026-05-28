@@ -386,6 +386,13 @@ const showPreWhileMonacoLoads = computed(() => {
     return false
   if (editorCreationFailed.value)
     return true
+  // Diff editor has a visible intermediate phase: Monaco root is mounted, but
+  // line changes / diff decorations / theme presentation are not ready yet.
+  // Keep the pre fallback over it until the diff surface is visually ready,
+  // otherwise users see a third "plain editor" state between fallback and final.
+  if (isDiff.value)
+    return !editorDisplayReady.value
+
   // Cold starts keep the fallback until Monaco settles; warm/preloaded mounts skip it.
   return !isCodeBlockRuntimeReady() && !editorDisplayReady.value
 })
@@ -453,6 +460,7 @@ const codeFontMax = 36
 const codeFontStep = 1
 const defaultPreFallbackFontSize = 12
 const defaultPreFallbackLineHeight = 18
+const defaultDiffPreFallbackLineHeight = 30
 const defaultCodeFontSize = ref<number>(
   typeof props.monacoOptions?.fontSize === 'number' ? props.monacoOptions!.fontSize : Number.NaN,
 )
@@ -478,6 +486,29 @@ const preFallbackLineHeight = computed(() => {
   if (preFallbackFontSize.value === defaultPreFallbackFontSize)
     return defaultPreFallbackLineHeight
   return Math.max(12, Math.round(preFallbackFontSize.value * 1.5))
+})
+// Effective line height for diff fallback: honours monacoOptions.lineHeight, else 30px.
+const preFallbackEffectiveLineHeight = computed(() => {
+  if (isDiff.value) {
+    const fromOptions = props.monacoOptions?.lineHeight
+    return typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0
+      ? fromOptions
+      : defaultDiffPreFallbackLineHeight
+  }
+  return preFallbackLineHeight.value
+})
+// Max line count across both diff panes.
+const diffPreFallbackLineCount = computed(() => {
+  const countLines = (source: unknown) => {
+    const value = String(source ?? '')
+    if (!value)
+      return 1
+    return Math.max(1, value.split(/\r\n|\n|\r/).length)
+  }
+  return Math.max(
+    countLines(props.node.originalCode),
+    countLines(props.node.updatedCode),
+  )
 })
 const preFallbackTabSize = computed(() => {
   const fromOptions = props.monacoOptions?.tabSize
@@ -519,11 +550,7 @@ const preFallbackLocalMinHeight = computed(() => {
   }
 
   if (isDiff.value) {
-    const lineCount = Math.max(
-      countLines(props.node.originalCode),
-      countLines(props.node.updatedCode),
-    )
-    return Math.round(lineCount * 30 + 32)
+    return Math.ceil(diffPreFallbackLineCount.value * preFallbackEffectiveLineHeight.value)
   }
 
   return Math.ceil(
@@ -571,23 +598,31 @@ const preFallbackStyle = computed(() => {
   const fontFamily = props.monacoOptions?.fontFamily
   const style = {
     fontSize: `${preFallbackFontSize.value}px`,
-    lineHeight: `${preFallbackLineHeight.value}px`,
+    lineHeight: `${preFallbackEffectiveLineHeight.value}px`,
     tabSize: preFallbackTabSize.value,
     boxSizing: 'border-box',
     maxHeight: `${getMaxHeightValue()}px`,
     overflow: 'auto',
     paddingTop: `${preFallbackVerticalPadding.value.top}px`,
     paddingBottom: `${preFallbackVerticalPadding.value.bottom}px`,
-    ...(estimatedVisibleContentHeight.value != null
-      ? {
-          height: `${estimatedVisibleContentHeight.value}px`,
-          minHeight: `${estimatedVisibleContentHeight.value}px`,
-        }
-      : preFallbackLocalMinHeight.value != null
+    // Diff fallback height is purely line-count-based; skip the external
+    // estimatedContentHeightPx which may carry vertical-padding offsets.
+    ...(isDiff.value
+      ? (preFallbackLocalMinHeight.value != null
+          ? {
+              minHeight: `${preFallbackLocalMinHeight.value}px`,
+            }
+          : {})
+      : estimatedVisibleContentHeight.value != null
         ? {
-            minHeight: `${preFallbackLocalMinHeight.value}px`,
+            height: `${estimatedVisibleContentHeight.value}px`,
+            minHeight: `${estimatedVisibleContentHeight.value}px`,
           }
-        : {}),
+        : preFallbackLocalMinHeight.value != null
+          ? {
+              minHeight: `${preFallbackLocalMinHeight.value}px`,
+            }
+          : {}),
     ...(typeof fontFamily === 'string' && fontFamily.trim()
       ? { '--markstream-code-font-family': fontFamily.trim() }
       : {}),
@@ -600,7 +635,7 @@ const preFallbackStyle = computed(() => {
 
   if (isDiff.value) {
     // Keep the pre diff fallback visually close to stream-monaco's diff line box.
-    style['--markstream-pre-diff-line-height'] = '30px'
+    style['--markstream-pre-diff-line-height'] = `${preFallbackEffectiveLineHeight.value}px`
   }
 
   return style
@@ -1583,6 +1618,72 @@ async function settleInitialEditorDisplay() {
   syncEditorHostHeight(false)
 }
 
+// Waits until the diff editor has computed line changes and rendered at least
+// one view-line, then does a final presentation pass. This prevents the
+// "plain Monaco editor" intermediate frame (the third state between the pre
+// fallback and the fully decorated diff surface).
+async function waitForDiffEditorVisualReady() {
+  if (!isDiff.value)
+    return
+
+  for (let i = 0; i < 8; i++) {
+    if (isUnmounted)
+      return
+
+    const root = codeEditor.value
+    const diffEditor = getDiffEditorView()
+
+    let lineChangesReady = false
+    try {
+      const changes = diffEditor?.getLineChanges?.()
+      lineChangesReady = Array.isArray(changes)
+    }
+    catch {
+      lineChangesReady = false
+    }
+
+    const hasDiffRoot = Boolean(root?.querySelector('.monaco-diff-editor'))
+    const hasRenderedLines = Boolean(
+      root?.querySelector('.monaco-diff-editor .view-lines .view-line'),
+    )
+
+    if (hasDiffRoot && hasRenderedLines && lineChangesReady) {
+      await nextTick()
+      await waitForAnimationFrame()
+      if (isUnmounted)
+        return
+      try {
+        refreshDiffPresentation()
+        syncInlineFoldProxies()
+        refreshDiffStats()
+        scheduleEditorHeightSync()
+      }
+      catch {}
+      return
+    }
+
+    // If there is no Monaco diff root at all yet after the first two passes,
+    // give up — we are likely running in a test or unsupported environment
+    // where Monaco never injects DOM elements.
+    if (i >= 1 && !hasDiffRoot)
+      return
+
+    await nextTick()
+    await waitForAnimationFrame()
+  }
+
+  // Fallback: even if getLineChanges() is slow/null, do one final pass.
+  if (isUnmounted)
+    return
+  try {
+    refreshDiffPresentation()
+    syncInlineFoldProxies()
+    refreshDiffStats()
+    scheduleEditorHeightSync()
+  }
+  catch {}
+}
+
 function getMaxHeightValue(): number {
   const maxH = props.monacoOptions?.MAX_HEIGHT ?? 500
   if (typeof maxH === 'number')
@@ -1982,6 +2083,7 @@ async function runEditorCreation(el: HTMLElement) {
   refreshDiffStats()
   scheduleEditorHeightSync()
   await settleInitialEditorDisplay()
+  await waitForDiffEditorVisualReady()
   if (isUnmounted)
     return
   editorDisplayReady.value = true

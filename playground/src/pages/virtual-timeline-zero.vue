@@ -258,6 +258,15 @@ function getTimelineRoot() {
   return document.querySelector<HTMLElement>('[data-testid="markstream-virtual-timeline"]')
 }
 
+function readDiffCodeBlockProbe(root: HTMLElement | null) {
+  const blocks = Array.from(root?.querySelectorAll<HTMLElement>('[data-markstream-code-block="1"].is-diff') ?? [])
+  return blocks.map(block => ({
+    enhanced: block.dataset.markstreamEnhanced === 'true',
+    fallbackVisible: Boolean(block.querySelector('pre.code-pre-fallback')),
+    hiddenEditor: Boolean(block.querySelector('.code-editor-container.is-hidden')),
+  }))
+}
+
 function readSnapshot() {
   const root = getTimelineRoot()
 
@@ -275,6 +284,7 @@ function readSnapshot() {
       enhanced: root?.querySelectorAll('[data-markstream-code-block="1"][data-markstream-enhanced="true"]').length ?? 0,
       fallback: root?.querySelectorAll('pre.code-pre-fallback').length ?? 0,
     },
+    diffCodeBlockProbe: readDiffCodeBlockProbe(root ?? null),
   }
 }
 

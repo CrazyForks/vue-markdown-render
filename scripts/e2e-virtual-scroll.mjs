@@ -737,6 +737,56 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
   }
 }
 
+async function runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port) {
+  await page.goto(`http://${host}:${port}/virtual-timeline-zero`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  })
+  await waitForVirtualTimelineZeroReady(page)
+
+  const result = await page.evaluate(async () => {
+    const api = window.__markstreamVirtualTimelineZero
+    const samples = []
+    const total = Math.max(api.read().totalHeight, 1)
+
+    // Scroll through the entire timeline collecting diff block probe data.
+    for (let offset = 0; offset < total; offset += 360) {
+      await api.scrollTo(offset)
+      for (let i = 0; i < 8; i++)
+        await api.nextFrame()
+
+      for (let i = 0; i < 8; i++) {
+        const sample = api.read()
+        samples.push({
+          scrollTop: sample.scrollTop,
+          probes: sample.diffCodeBlockProbe ?? [],
+          visibleText: String(sample.visibleText || '').slice(0, 240),
+        })
+        await api.nextFrame()
+      }
+    }
+
+    const bad = samples.find(sample =>
+      sample.probes.some(probe =>
+        // Forbidden third state: editor visible, fallback gone, not yet enhanced.
+        !probe.enhanced && !probe.fallbackVisible && !probe.hiddenEditor,
+      ),
+    )
+
+    return { bad, sampleCount: samples.length }
+  })
+
+  assert(
+    !result.bad,
+    'diff CodeBlockNode exposed an intermediate plain Monaco state between pre fallback and highlighted editor',
+    result,
+  )
+
+  return {
+    sampleCount: result.sampleCount,
+  }
+}
+
 async function run() {
   const port = await findFreePort()
   const useDevServer = process.env.MARKSTREAM_E2E_VIRTUAL_SCROLL_DEV === '1'
@@ -1156,6 +1206,7 @@ async function run() {
 
       const virtualTimelineReload = await runVirtualTimelineZeroReloadProbe(page, port)
       const virtualTimelineCodeBlockJitter = await runVirtualTimelineZeroCodeBlockJitterProbe(page, port)
+      const virtualTimelineDiffCodeBlockState = await runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port)
 
       assertNoPageErrors('virtual-timeline-zero reload e2e')
 
@@ -1165,6 +1216,7 @@ async function run() {
         health: smoke.final.health,
         virtualTimelineReload,
         virtualTimelineCodeBlockJitter,
+        virtualTimelineDiffCodeBlockState,
       }, null, 2)}\n`)
 
       return
