@@ -278,6 +278,10 @@ function resolveEstimatedPreviewHeight() {
   )
 }
 
+function hasExternalPreviewHeightEstimate() {
+  return parsePositiveNumber(props.estimatedPreviewHeightPx) != null
+}
+
 function resolveInitialContainerHeight() {
   return `${resolveEstimatedPreviewHeight()}px`
 }
@@ -871,7 +875,7 @@ function updateContainerHeight(newContainerWidth?: number, options?: { force?: b
     const resolvedHeight = maxHeight == null ? newHeight : Math.min(newHeight, maxHeight)
     const previewHeight = Math.max(resolvedHeight, resolveEstimatedPreviewHeight())
     contentHeight.value = `${Math.max(newHeight, previewHeight)}px`
-    if (!freezePreviewHeight)
+    if (!freezePreviewHeight && !hasExternalPreviewHeightEstimate())
       containerHeight.value = `${previewHeight}px`
   }
 }

@@ -265,8 +265,6 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   const markdownLogicalHeightSources = new Map<string, MarkdownLogicalHeightSource>()
   const measuredElements = new Map<string, HTMLElement>()
   const resizeObservers = new Map<string, ResizeObserver>()
-  const markdownRestoreItemKey = ref<string | null>(null)
-  const markdownRestoreToken = ref(0)
   const restoringThread = ref(false)
   const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
   let restoreThreadSeq = 0
@@ -537,7 +535,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     if (markdown > 0) {
       let next = Math.max(measured, markdown + chrome)
 
-      if (!reconcileOptions.allowMarkdownShrink && cached > 0)
+      if ((!reconcileOptions.allowMarkdownShrink || restoringThread.value) && cached > 0)
         next = Math.max(next, cached)
 
       if (next > 0)
@@ -599,7 +597,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       threadKey,
       scrollRoot: () => options.virtualizer.getScrollElement(),
       restoreState: markdownStates.get(itemKey) ?? null,
-      restoreAnchor: markdownRestoreItemKey.value === itemKey ? markdownRestoreToken.value : false,
+      restoreAnchor: false,
       measurementKey: toValue(options.measurementKey),
       settleMode: 'manual',
       settledToken: final,
@@ -826,11 +824,6 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     activeRestoreAnchor = anchor
 
     preloadThreadState(state)
-
-    markdownRestoreItemKey.value = anchor?.type === 'item'
-      ? anchor.itemKey
-      : null
-    markdownRestoreToken.value += 1
 
     if (!anchor) {
       restoringThread.value = false

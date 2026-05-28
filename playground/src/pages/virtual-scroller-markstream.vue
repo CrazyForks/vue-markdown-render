@@ -18,8 +18,8 @@ import 'vue-virtual-scroller/index.css'
 
 type ThreadId = 'thread-a' | 'thread-b'
 
-setKaTeXWorker(() => new KatexWorker())
-setMermaidWorker(() => new MermaidWorker())
+setKaTeXWorker(new KatexWorker())
+setMermaidWorker(new MermaidWorker())
 getUseMonaco()
 
 interface BaseTimelineItem {
@@ -232,6 +232,18 @@ function makeDiagramMathMarkdown(label: string, step: number) {
     '  E --> F',
     '```',
     '',
+    '```infographic',
+    'infographic list-row-simple-horizontal-arrow',
+    'data',
+    '  items',
+    '    - label: Cache snapshot',
+    '      desc: Restored before paint',
+    '    - label: Markdown state',
+    '      desc: Preloaded into adapter',
+    '    - label: Diagram height',
+    '      desc: Locked to estimated preview height',
+    '```',
+    '',
     '| Formula | Meaning |',
     '| --- | --- |',
     '| `$H = max(H_{wrapper}, H_{markdown})$` | timeline item size |',
@@ -334,6 +346,28 @@ const totalHeight = ref(0)
 const widthBucket = ref(0)
 const isRestoringThread = ref(false)
 let rootResizeObserver: ResizeObserver | null = null
+
+const VIRTUAL_SCROLLER_STORAGE_KEY = 'markstream-vue:virtual-scroller-markstream:thread-states:v1'
+
+type PersistedScrollerThreadStates = Partial<Record<ThreadId, SavedThreadState>>
+
+function readPersistedScrollerStates(): PersistedScrollerThreadStates {
+  if (typeof window === 'undefined')
+    return {}
+
+  try {
+    const raw = window.sessionStorage.getItem(VIRTUAL_SCROLLER_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  }
+  catch {
+    return {}
+  }
+}
+
+const persistedScrollerStates = readPersistedScrollerStates()
+
+for (const [threadId, state] of Object.entries(persistedScrollerStates) as Array<[ThreadId, SavedThreadState]>)
+  savedThreadStates.set(threadId, state)
 
 const threadItems: Record<ThreadId, TimelineItem[]> = {
   'thread-a': makeThread('thread-a', 'Thread A', 12),
@@ -495,6 +529,11 @@ const adapter = useMarkstreamVirtualAdapter<TimelineItem>({
   virtualizer,
 })
 
+const initialSavedState = savedThreadStates.get(activeThreadId.value)
+
+if (initialSavedState)
+  adapter.preloadThreadState(initialSavedState.markstreamState)
+
 function getRowStyle(item: TimelineItem) {
   const height = itemHeights.get(item.key)
   return height ? { minHeight: `${height}px` } : undefined
@@ -513,6 +552,23 @@ function rememberThreadState(threadId: ThreadId = activeThreadId.value) {
     markstreamState: adapter.captureThreadState(),
     scrollerCache: readCacheSnapshot(),
   })
+
+  writePersistedScrollerStates()
+}
+
+function writePersistedScrollerStates() {
+  if (typeof window === 'undefined')
+    return
+
+  const payload = Object.fromEntries(savedThreadStates.entries())
+
+  try {
+    window.sessionStorage.setItem(
+      VIRTUAL_SCROLLER_STORAGE_KEY,
+      JSON.stringify(payload),
+    )
+  }
+  catch {}
 }
 
 async function switchThread(threadId: ThreadId) {
@@ -572,8 +628,20 @@ function onScroll() {
   rememberThreadState()
 }
 
-onMounted(() => {
+onMounted(async () => {
   rebuildOffsets()
+
+  const initialSaved = savedThreadStates.get(activeThreadId.value)
+  if (initialSaved) {
+    isRestoringThread.value = true
+
+    await nextTick()
+
+    scrollerRef.value?.restoreCache?.(initialSaved.scrollerCache)
+    adapter.restoreThreadState(initialSaved.markstreamState)
+    scrollerRef.value?.forceUpdate?.(false)
+  }
+
   updateScrollMetrics()
 
   const root = getScrollElement()
@@ -584,6 +652,18 @@ onMounted(() => {
       updateScrollMetrics()
     })
     rootResizeObserver.observe(root)
+  }
+
+  if (initialSaved) {
+    await nextTick()
+
+    if (typeof requestAnimationFrame === 'function') {
+      await new Promise<void>(resolve => requestAnimationFrame(() => {
+        resolve()
+      }))
+    }
+
+    isRestoringThread.value = false
   }
 })
 

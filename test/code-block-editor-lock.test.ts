@@ -118,6 +118,8 @@ describe('codeBlockNode editor creation locking', () => {
     await waitForCreateEditorCalls(1, helpers)
 
     expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
+    expect(wrapper.find('pre.code-pre-fallback').classes()).toContain('markstream-pre--line-numbers')
+    expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1'])
     expect(wrapper.find('.code-editor-container').classes()).toContain('is-hidden')
 
     const finish = resolveCreate
@@ -165,12 +167,18 @@ describe('codeBlockNode editor creation locking', () => {
       await waitForCreateEditorCalls(1, helpers)
 
       const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
-      expect(fallback.style.fontSize).toBe('14px')
-      expect(fallback.style.lineHeight).toBe('19px')
+      expect(fallback.style.fontSize).toBe('12px')
+      expect(fallback.style.lineHeight).toBe('18px')
       expect(fallback.style.tabSize).toBe('4')
       expect(fallback.style.paddingTop).toBe('0px')
       expect(fallback.style.paddingBottom).toBe('0px')
+      expect(fallback.style.getPropertyValue('--markstream-pre-line-number-top')).toBe('0px')
+      expect(fallback.style.getPropertyValue('--markstream-code-padding-left')).toBe('62px')
+      expect(fallback.style.getPropertyValue('--markstream-pre-line-number-width')).toBe('36px')
+      expect(fallback.style.getPropertyValue('--markstream-pre-line-number-gap')).toBe('0px')
       expect(fallback.style.maxHeight).toBe('320px')
+      expect(fallback.style.height).toBe('')
+      expect(fallback.style.minHeight).toBe('21px')
       expect(fallback.style.overflow).toBe('auto')
     }
     finally {
@@ -219,6 +227,63 @@ describe('codeBlockNode editor creation locking', () => {
       expect(fallback.style.tabSize).toBe('2')
       expect(fallback.style.paddingTop).toBe('3px')
       expect(fallback.style.paddingBottom).toBe('5px')
+      expect(fallback.style.getPropertyValue('--markstream-pre-line-number-top')).toBe('3px')
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('renders a side-by-side diff fallback while Monaco is mounting', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createDiffEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '-const oldValue = 1\n+const newValue = 2\n const stable = true',
+          diff: true,
+          originalCode: 'const oldValue = 1\nconst stable = true',
+          updatedCode: 'const newValue = 2\nconst stable = true',
+          raw: '```diff\n-const oldValue = 1\n+const newValue = 2\n const stable = true\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateDiffEditorCalls(1, helpers)
+
+      const fallback = wrapper.get('pre.code-pre-fallback')
+      const fallbackEl = fallback.element as HTMLElement
+      expect(fallback.classes()).toContain('markstream-pre--diff-preview')
+      expect(fallbackEl.style.height).toBe('')
+      expect(fallbackEl.style.minHeight).toBe('92px')
+      expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(2)
+      expect(wrapper.findAll('.markstream-pre__diff-pane--original .markstream-pre__diff-content').map(node => node.text())).toEqual([
+        'const oldValue = 1',
+        'const stable = true',
+      ])
+      expect(wrapper.findAll('.markstream-pre__diff-pane--modified .markstream-pre__diff-content').map(node => node.text())).toEqual([
+        'const newValue = 2',
+        'const stable = true',
+      ])
+      expect(wrapper.findAll('.markstream-pre__diff-pane--original .markstream-pre__diff-number').map(node => node.text())).toEqual(['1', '2'])
+      expect(wrapper.findAll('.markstream-pre__diff-pane--modified .markstream-pre__diff-number').map(node => node.text())).toEqual(['1', '2'])
+      expect(wrapper.findAll('.markstream-pre__diff-line--removed')).toHaveLength(1)
+      expect(wrapper.findAll('.markstream-pre__diff-line--added')).toHaveLength(1)
     }
     finally {
       resolveCreate?.()

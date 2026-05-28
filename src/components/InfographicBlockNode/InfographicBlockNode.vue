@@ -147,9 +147,12 @@ const estimatedPreviewHeight = computed(() =>
   ),
 )
 const containerHeight = ref<string>(`${estimatedPreviewHeight.value}px`)
+const hasExternalPreviewHeightEstimate = computed(() => parsePositiveNumber(props.estimatedPreviewHeightPx) != null)
 
 function updateContainerHeight() {
   if (!infographicContainer.value)
+    return
+  if (hasExternalPreviewHeightEstimate.value)
     return
 
   const actualHeight = infographicContainer.value.scrollHeight

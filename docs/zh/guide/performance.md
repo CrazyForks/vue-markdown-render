@@ -128,8 +128,8 @@ import 'markstream-vue/index.css'
 import 'katex/dist/katex.min.css'
 import 'vue-virtual-scroller/index.css'
 
-setKaTeXWorker(() => new KatexWorker())
-setMermaidWorker(() => new MermaidWorker())
+setKaTeXWorker(new KatexWorker())
+setMermaidWorker(new MermaidWorker())
 ```
 
 外层 scroller adapter 的关键部分：

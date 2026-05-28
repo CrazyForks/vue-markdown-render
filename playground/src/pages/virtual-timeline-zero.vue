@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import type { MarkstreamThreadVirtualState } from '../../../src/exports'
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import MarkdownRender, { MarkstreamVirtualTimeline } from '../../../src/exports'
+import KatexWorker from '../../../src/workers/katexRenderer.worker?worker&inline'
+import { setKaTeXWorker } from '../../../src/workers/katexWorkerClient'
+import MermaidWorker from '../../../src/workers/mermaidParser.worker?worker&inline'
+import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
 import '../../../src/index.css'
+import 'katex/dist/katex.min.css'
 
 type ThreadId = 'thread-a' | 'thread-b'
+
+setKaTeXWorker(new KatexWorker())
+setMermaidWorker(new MermaidWorker())
 
 type TimelineItem
   = | { kind: 'system-divider', id: string, text: string }
@@ -25,7 +34,10 @@ declare global {
         clientHeight: number
         totalHeight: number
         state: unknown
+        visibleText: string
+        restoring: boolean
       }
+      nextFrame: () => Promise<void>
       scrollTo: (offset: number) => Promise<unknown>
       switchThread: (threadId: ThreadId) => Promise<unknown>
     }
@@ -35,7 +47,7 @@ declare global {
 const activeThreadId = ref<ThreadId>('thread-a')
 const timelineRef = ref<{
   scrollToOffset: (offset: number) => void
-  captureThreadState: () => unknown
+  captureThreadState: () => MarkstreamThreadVirtualState
   getTotalHeight: () => number
 } | null>(null)
 
@@ -52,13 +64,63 @@ const InspectionPanel = defineComponent({
 function makeLargeMarkdown(label: string, count: number) {
   return Array.from({ length: count }, (_, index) => {
     const step = index + 1
+    let syntaxBlock: string[]
+
+    if (step % 5 === 1) {
+      syntaxBlock = [
+        `Inline KaTeX checkpoint: $H_${step} = O_${step} + M_${step}$.`,
+        '',
+        '$$',
+        `\\Delta h_${step} = \\sum_{i=1}^{${step}} \\left(h_i - \\hat{h}_i\\right)`,
+        '$$',
+      ]
+    }
+    else if (step % 5 === 2) {
+      syntaxBlock = [
+        '```mermaid',
+        'flowchart TD',
+        `  A["${label} section ${step}"] --> B["Measure item height"]`,
+        '  B --> C["Import Markdown cache"]',
+        '  C --> D["Restore outer anchor"]',
+        '```',
+      ]
+    }
+    else if (step % 5 === 3) {
+      syntaxBlock = [
+        '```diff ts:restore-anchor.ts',
+        `-const section${step} = ${JSON.stringify({ step, label: 'estimated' })}`,
+        `+const section${step} = ${JSON.stringify({ step, label, restored: true })}`,
+        '```',
+      ]
+    }
+    else if (step % 5 === 4) {
+      syntaxBlock = [
+        '```infographic',
+        'infographic list-row-simple-horizontal-arrow',
+        'data',
+        '  items',
+        `    - label: Section ${step}`,
+        '      desc: Persisted state loaded',
+        '    - label: Height cache',
+        '      desc: Ready before paint',
+        '    - label: Anchor',
+        '      desc: No visible jump',
+        '```',
+      ]
+    }
+    else {
+      syntaxBlock = [
+        '```ts',
+        `const section${step} = ${JSON.stringify({ step, label })}`,
+        '```',
+      ]
+    }
+
     return [
       `## ${label} section ${step}`,
       `This block is part of a long assistant answer. It is intentionally repeated so MarkdownRender can virtualize block nodes while the timeline virtualizer owns the outer item height.`,
       '',
-      '```ts',
-      `const section${step} = ${JSON.stringify({ step, label })}`,
-      '```',
+      ...syntaxBlock,
     ].join('\n')
   }).join('\n\n')
 }
@@ -85,7 +147,105 @@ const threadItems: Record<ThreadId, TimelineItem[]> = {
 
 const timelineItems = computed(() => threadItems[activeThreadId.value])
 
+const THREAD_STATE_STORAGE_KEY = 'markstream-vue:virtual-timeline-zero:thread-states:v1'
+
+type PersistedThreadStates = Partial<Record<ThreadId, MarkstreamThreadVirtualState>>
+
+function readPersistedThreadStates(): PersistedThreadStates {
+  if (typeof window === 'undefined')
+    return {}
+
+  try {
+    const raw = window.sessionStorage.getItem(THREAD_STATE_STORAGE_KEY)
+    if (!raw)
+      return {}
+
+    const parsed = JSON.parse(raw) as PersistedThreadStates
+    return parsed && typeof parsed === 'object'
+      ? parsed
+      : {}
+  }
+  catch {
+    return {}
+  }
+}
+
+const persistedThreadStates = shallowRef<PersistedThreadStates>(
+  readPersistedThreadStates(),
+)
+
+const initialThreadState = computed(() => {
+  return persistedThreadStates.value[activeThreadId.value] ?? null
+})
+
+let persistTimer: number | null = null
+let pendingPersistState: MarkstreamThreadVirtualState | null = null
+
+function writePersistedThreadStates() {
+  persistTimer = null
+
+  if (typeof window === 'undefined' || !pendingPersistState)
+    return
+
+  const state = pendingPersistState
+  pendingPersistState = null
+
+  const threadKey = state.threadKey as ThreadId | undefined
+  if (!threadKey)
+    return
+
+  const next = {
+    ...persistedThreadStates.value,
+    [threadKey]: state,
+  }
+
+  persistedThreadStates.value = next
+
+  try {
+    window.sessionStorage.setItem(
+      THREAD_STATE_STORAGE_KEY,
+      JSON.stringify(next),
+    )
+  }
+  catch {}
+}
+
+function persistThreadState(state: MarkstreamThreadVirtualState) {
+  pendingPersistState = state
+
+  const threadKey = state.threadKey as ThreadId | undefined
+  if (threadKey) {
+    persistedThreadStates.value = {
+      ...persistedThreadStates.value,
+      [threadKey]: state,
+    }
+  }
+
+  if (typeof window === 'undefined')
+    return
+
+  if (persistTimer != null)
+    return
+
+  persistTimer = window.setTimeout(writePersistedThreadStates, 80)
+}
+
+function flushActiveThreadState() {
+  const state = timelineRef.value?.captureThreadState?.()
+  if (state)
+    persistThreadState(state)
+
+  if (persistTimer != null && typeof window !== 'undefined') {
+    window.clearTimeout(persistTimer)
+    writePersistedThreadStates()
+  }
+}
+
 function switchThread(threadId: ThreadId) {
+  if (threadId === activeThreadId.value)
+    return
+
+  flushActiveThreadState()
   activeThreadId.value = threadId
 }
 
@@ -103,19 +263,37 @@ function readSnapshot() {
     clientHeight: root?.clientHeight ?? 0,
     totalHeight: timelineRef.value?.getTotalHeight?.() ?? 0,
     state: timelineRef.value?.captureThreadState?.() ?? null,
+    visibleText: root?.textContent ?? '',
+    restoring: root?.classList.contains('is-restoring-thread') ?? false,
   }
 }
 
 async function nextFrame() {
   await nextTick()
   await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => resolve())
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => resolve())
+      return
+    }
+
+    setTimeout(resolve, 0)
   })
 }
 
+let previousScrollRestoration: ScrollRestoration | undefined
+
 onMounted(() => {
+  if ('scrollRestoration' in window.history) {
+    previousScrollRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+  }
+
+  window.addEventListener('pagehide', flushActiveThreadState)
+  window.addEventListener('beforeunload', flushActiveThreadState)
+
   window.__markstreamVirtualTimelineZero = {
     read: readSnapshot,
+    nextFrame,
     async scrollTo(offset: number) {
       timelineRef.value?.scrollToOffset(offset)
       await nextFrame()
@@ -131,6 +309,24 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  flushActiveThreadState()
+
+  if (
+    previousScrollRestoration
+    && typeof window !== 'undefined'
+    && 'scrollRestoration' in window.history
+  ) {
+    window.history.scrollRestoration = previousScrollRestoration
+  }
+
+  window.removeEventListener('pagehide', flushActiveThreadState)
+  window.removeEventListener('beforeunload', flushActiveThreadState)
+
+  if (persistTimer != null) {
+    window.clearTimeout(persistTimer)
+    persistTimer = null
+  }
+
   delete window.__markstreamVirtualTimelineZero
 })
 </script>
@@ -163,8 +359,10 @@ onBeforeUnmount(() => {
       class="timeline-surface"
       :items="timelineItems"
       :thread-key="activeThreadId"
+      :initial-thread-state="initialThreadState"
       :overscan="4"
       stick-to-bottom="auto"
+      @thread-state-change="persistThreadState"
     >
       <template #default="{ item, measureRef, markdownProps }">
         <div

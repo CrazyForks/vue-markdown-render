@@ -316,10 +316,17 @@ async function collectPageDebugState(page) {
     const app = document.querySelector('#app')
     const root = document.querySelector('[data-testid="virtual-scroll-root"]')
     const api = window.__markstreamVirtualScrollLab
+    const timelineApi = window.__markstreamVirtualTimelineZero
 
     let snapshot = null
     try {
       snapshot = api?.read?.() ?? null
+    }
+    catch {}
+
+    let timelineSnapshot = null
+    try {
+      timelineSnapshot = timelineApi?.read?.() ?? null
     }
     catch {}
 
@@ -328,6 +335,7 @@ async function collectPageDebugState(page) {
       readyState: document.readyState,
       title: document.title,
       hasLabApi: Boolean(api),
+      hasVirtualTimelineZeroApi: Boolean(timelineApi),
       hasApp: Boolean(app),
       appHtmlLength: app?.innerHTML?.length ?? 0,
       appText: app?.textContent?.slice(0, 1000) ?? '',
@@ -335,6 +343,7 @@ async function collectPageDebugState(page) {
       bodyText: document.body?.textContent?.slice(0, 1000) ?? '',
       scriptCount: document.scripts.length,
       snapshot,
+      timelineSnapshot,
     }
   }).catch(() => null)
 }
@@ -393,6 +402,190 @@ async function evaluateWithLab(page, task, arg) {
     const fn = eval(`(${fnSource})`)
     return fn(api, payload)
   }, [String(task), arg])
+}
+
+const virtualTimelineZeroStorageKey = 'markstream-vue:virtual-timeline-zero:thread-states:v1'
+
+function summarizeVirtualTimelineZeroSample(sample) {
+  if (!sample)
+    return null
+
+  const { storagePayload, ...rest } = sample
+
+  return {
+    ...rest,
+    visibleText: typeof rest.visibleText === 'string'
+      ? rest.visibleText.slice(0, 240)
+      : '',
+  }
+}
+
+async function waitForVirtualTimelineZeroReady(page, timeoutMs = 60000) {
+  await page.waitForFunction(() => {
+    const api = window.__markstreamVirtualTimelineZero
+    return Boolean(api && typeof api.read === 'function' && typeof api.nextFrame === 'function')
+  }, { timeout: timeoutMs })
+}
+
+async function runVirtualTimelineZeroReloadProbe(page, port) {
+  await page.goto(`http://${host}:${port}/virtual-timeline-zero`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  })
+  await waitForVirtualTimelineZeroReady(page)
+
+  await page.evaluate((storageKey) => {
+    window.sessionStorage.removeItem(storageKey)
+  }, virtualTimelineZeroStorageKey)
+
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await waitForVirtualTimelineZeroReady(page)
+
+  const beforeReload = await page.evaluate(async () => {
+    const api = window.__markstreamVirtualTimelineZero
+    let snapshot = api.read()
+
+    for (let i = 0; i < 120; i++) {
+      if (
+        snapshot.state?.itemHeights?.['a-md-1'] > 4000
+        && snapshot.state?.markdownStates?.['a-md-1']
+      ) {
+        break
+      }
+
+      await api.nextFrame()
+      snapshot = api.read()
+    }
+
+    const markdownHeight = Number(snapshot.state?.itemHeights?.['a-md-1'] ?? 0)
+    const offsetWithinItemPx = Math.min(7600, Math.max(1200, markdownHeight - 1600))
+    const targetScrollTop = ['a-d-1', 'a-u-1', 'a-t-1', 'a-tool-1']
+      .reduce((total, key) => total + Number(snapshot.state?.itemHeights?.[key] ?? 0), 0)
+      + offsetWithinItemPx
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      snapshot = await api.scrollTo(targetScrollTop)
+
+      for (let frame = 0; frame < 20; frame++)
+        await api.nextFrame()
+
+      snapshot = api.read()
+
+      if (
+        snapshot.state?.outerAnchor?.type !== 'bottom'
+        && Math.abs(snapshot.scrollTop - targetScrollTop) <= 32
+      ) {
+        break
+      }
+    }
+
+    const storagePayload = JSON.stringify({
+      [snapshot.state.threadKey]: snapshot.state,
+    })
+
+    return {
+      ...snapshot,
+      storagePayload,
+    }
+  })
+
+  assert(
+    beforeReload.state?.outerAnchor?.type !== 'bottom',
+    'virtual timeline reload probe did not reach a non-bottom anchor',
+    summarizeVirtualTimelineZeroSample(beforeReload),
+  )
+
+  await page.addInitScript(({ storageKey, storagePayload }) => {
+    window.sessionStorage.setItem(storageKey, storagePayload)
+  }, {
+    storageKey: virtualTimelineZeroStorageKey,
+    storagePayload: beforeReload.storagePayload,
+  })
+
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await waitForVirtualTimelineZeroReady(page)
+
+  const samples = []
+  const visibleSamples = []
+  for (let i = 0; i < 80 && visibleSamples.length < 12; i++) {
+    const sample = await page.evaluate(() => {
+      return window.__markstreamVirtualTimelineZero.read()
+    })
+    samples.push(sample)
+    if (!sample.restoring)
+      visibleSamples.push(sample)
+
+    await page.evaluate(() => {
+      return window.__markstreamVirtualTimelineZero.nextFrame()
+    })
+  }
+
+  const badSample = visibleSamples.find(sample => (
+    Math.abs(sample.scrollTop - beforeReload.scrollTop) > 32
+  ))
+
+  assert(
+    visibleSamples.length > 0,
+    'virtual timeline reload probe did not observe a visible restored frame',
+    {
+      beforeReload: summarizeVirtualTimelineZeroSample(beforeReload),
+      samples: samples.map(summarizeVirtualTimelineZeroSample),
+    },
+  )
+
+  assert(
+    !badSample,
+    'virtual timeline reload restored through a visible intermediate scroll position',
+    {
+      beforeReload: summarizeVirtualTimelineZeroSample(beforeReload),
+      samples: samples.map(summarizeVirtualTimelineZeroSample),
+      badSample: summarizeVirtualTimelineZeroSample(badSample),
+    },
+  )
+
+  const threadSwitch = await page.evaluate(async () => {
+    const api = window.__markstreamVirtualTimelineZero
+
+    const beforeSwitch = api.read()
+    const threadB = await api.switchThread('thread-b')
+    for (let i = 0; i < 12; i++)
+      await api.nextFrame()
+
+    const afterThreadBSettled = api.read()
+    const threadA = await api.switchThread('thread-a')
+    for (let i = 0; i < 12; i++)
+      await api.nextFrame()
+
+    return {
+      beforeSwitch,
+      threadB,
+      afterThreadBSettled,
+      threadA,
+      afterThreadARestored: api.read(),
+    }
+  })
+
+  assert(
+    threadSwitch.afterThreadBSettled.threadId === 'thread-b'
+    && threadSwitch.afterThreadARestored.threadId === 'thread-a',
+    'virtual timeline thread switch probe did not settle on the expected threads',
+    {
+      beforeSwitch: summarizeVirtualTimelineZeroSample(threadSwitch.beforeSwitch),
+      afterThreadBSettled: summarizeVirtualTimelineZeroSample(threadSwitch.afterThreadBSettled),
+      afterThreadARestored: summarizeVirtualTimelineZeroSample(threadSwitch.afterThreadARestored),
+    },
+  )
+
+  return {
+    beforeReload: summarizeVirtualTimelineZeroSample(beforeReload),
+    firstSample: summarizeVirtualTimelineZeroSample(samples[0]),
+    firstVisibleSample: summarizeVirtualTimelineZeroSample(visibleSamples[0]),
+    lastVisibleSample: summarizeVirtualTimelineZeroSample(visibleSamples[visibleSamples.length - 1]),
+    threadSwitch: {
+      afterThreadBSettled: summarizeVirtualTimelineZeroSample(threadSwitch.afterThreadBSettled),
+      afterThreadARestored: summarizeVirtualTimelineZeroSample(threadSwitch.afterThreadARestored),
+    },
+  }
 }
 
 async function run() {
@@ -812,10 +1005,15 @@ async function run() {
 
       assertNoPageErrors('virtual-scroll smoke e2e')
 
+      const virtualTimelineReload = await runVirtualTimelineZeroReloadProbe(page, port)
+
+      assertNoPageErrors('virtual-timeline-zero reload e2e')
+
       process.stdout.write(`${JSON.stringify({
         ok: true,
         mode,
         health: smoke.final.health,
+        virtualTimelineReload,
       }, null, 2)}\n`)
 
       return

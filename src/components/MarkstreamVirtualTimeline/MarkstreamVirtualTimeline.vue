@@ -94,9 +94,8 @@ const markdownLogicalHeightSources = new Map<string, MarkdownLogicalHeightSource
 const measuredElements = new Map<string, HTMLElement>()
 const resizeObservers = new Map<string, ResizeObserver>()
 const threadStates = new Map<string, MarkstreamThreadVirtualState>()
-const markdownRestoreItemKey = ref<string | null>(null)
-const markdownRestoreToken = ref(0)
 const restoringThread = ref(false)
+const restorePaintReady = ref(true)
 const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
 let rootResizeObserver: ResizeObserver | null = null
 let threadRestoreSeq = 0
@@ -104,7 +103,6 @@ let threadRestoreRaf: number | null = null
 let threadRestoreTimers: number[] = []
 let activeThreadRestoreSeq = 0
 let activeThreadRestoreAnchor: MarkstreamThreadAnchor | undefined
-let initialThreadStateConsumed = false
 let activeThreadStateSnapshot: MarkstreamThreadVirtualState | null = null
 
 const normalizedThreadKey = computed(() => props.threadKey == null ? undefined : String(props.threadKey))
@@ -565,7 +563,7 @@ function reconcileRecordSize(
   if (markdown > 0) {
     let next = Math.max(measured, markdown + chrome)
 
-    if (!options.allowMarkdownShrink && cachedSize > 0)
+    if ((!options.allowMarkdownShrink || restoringThread.value) && cachedSize > 0)
       next = Math.max(next, cachedSize)
 
     if (next > 0)
@@ -627,7 +625,7 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
     threadKey: normalizedThreadKey.value,
     scrollRoot: () => scrollRoot.value,
     restoreState: markdownStates.get(record.key) ?? null,
-    restoreAnchor: markdownRestoreItemKey.value === record.key ? markdownRestoreToken.value : false,
+    restoreAnchor: false,
     measurementKey: timelineMeasurementKey.value,
     settleMode: 'manual',
     settledToken: final,
@@ -813,6 +811,10 @@ function applyThreadRestorePass(
   updateScrollMetrics({ remember: false })
 }
 
+function markRestorePaintReady() {
+  restorePaintReady.value = true
+}
+
 function scheduleThreadRestorePass(
   seq = activeThreadRestoreSeq,
   anchor = activeThreadRestoreAnchor,
@@ -844,6 +846,7 @@ function finishThreadRestore(seq: number) {
   activeThreadRestoreAnchor = undefined
   activeThreadRestoreSeq = 0
   updateScrollMetrics()
+  markRestorePaintReady()
 }
 
 function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
@@ -856,6 +859,7 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
 
   clearThreadRestoreSchedule()
 
+  restorePaintReady.value = false
   restoringThread.value = Boolean(fallbackAnchor)
   activeThreadRestoreSeq = restoreSeq
   activeThreadRestoreAnchor = fallbackAnchor
@@ -876,11 +880,6 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
     markdownStates.set(key, markdownState)
     seedMarkdownLogicalHeightFromState(key, markdownState)
   }
-
-  markdownRestoreItemKey.value = anchor?.type === 'item'
-    ? anchor.itemKey
-    : null
-  markdownRestoreToken.value += 1
 
   if (props.stickToBottom === true) {
     bottomPinned.value = true
@@ -911,6 +910,7 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
     activeThreadRestoreAnchor = undefined
     activeThreadRestoreSeq = 0
     updateScrollMetrics({ remember: false })
+    markRestorePaintReady()
     return
   }
 
@@ -958,20 +958,27 @@ function cleanupObservers() {
   rootResizeObserver = null
 }
 
+function getExternalInitialThreadState(threadKey: string | undefined) {
+  const initial = props.initialThreadState
+
+  if (!initial)
+    return null
+
+  if ((initial.threadKey ?? '') !== (threadKey ?? ''))
+    return null
+
+  return initial
+}
+
 function resolveThreadStateForRestore(threadKey: string | undefined) {
-  if (!initialThreadStateConsumed) {
-    initialThreadStateConsumed = true
+  const memoryState = threadKey
+    ? threadStates.get(threadKey)
+    : null
 
-    const initial = props.initialThreadState
-    if (
-      initial
-      && (initial.threadKey ?? '') === (threadKey ?? '')
-    ) {
-      return initial
-    }
-  }
+  if (memoryState)
+    return memoryState
 
-  return threadKey ? threadStates.get(threadKey) : null
+  return getExternalInitialThreadState(threadKey)
 }
 
 watch(
@@ -1053,6 +1060,7 @@ defineExpose({
   <div
     ref="scrollRoot"
     class="markstream-virtual-timeline"
+    :class="{ 'is-restoring-thread': !restorePaintReady }"
     data-testid="markstream-virtual-timeline"
     @scroll="updateScrollMetrics()"
   >
@@ -1067,6 +1075,7 @@ defineExpose({
       class="markstream-virtual-timeline__item"
       :data-markstream-item-key="record.key"
       :data-markstream-item-kind="record.kind"
+      :style="{ minHeight: `${record.size}px` }"
     >
       <slot
         v-bind="getSlotProps(record)"
@@ -1113,6 +1122,10 @@ defineExpose({
   min-height: 0;
   overflow: auto;
   overflow-anchor: none;
+}
+
+.markstream-virtual-timeline.is-restoring-thread {
+  visibility: hidden;
 }
 
 .markstream-virtual-timeline__spacer {

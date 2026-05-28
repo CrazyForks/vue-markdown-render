@@ -6,6 +6,8 @@ import { flushAll } from './setup/flush-all'
 
 describe('playground /virtual-timeline-zero shell smoke', () => {
   beforeEach(() => {
+    window.sessionStorage.removeItem('markstream-vue:virtual-timeline-zero:thread-states:v1')
+
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(720)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(960)
@@ -19,6 +21,7 @@ describe('playground /virtual-timeline-zero shell smoke', () => {
   })
 
   afterEach(() => {
+    window.sessionStorage.removeItem('markstream-vue:virtual-timeline-zero:thread-states:v1')
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })

@@ -31,6 +31,20 @@ class ErrorInfographic {
   destroy() {}
 }
 
+class HeightChangingInfographic {
+  container: HTMLElement
+
+  constructor(options: { container: HTMLElement }) {
+    this.container = options.container
+  }
+
+  render() {
+    this.container.innerHTML = '<svg data-infographic="1" style="height: 900px"></svg>'
+  }
+
+  destroy() {}
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
@@ -124,6 +138,26 @@ describe('infographicBlockNode streaming errors', () => {
 
     expect(markPending).toHaveBeenCalledTimes(1)
     expect(markSettled).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it('keeps an externally estimated preview height stable after render', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+    setInfographicLoader(() => HeightChangingInfographic)
+
+    const wrapper = mount(InfographicBlockNode as any, {
+      props: {
+        node: createNode('infographic list-row-simple-horizontal-arrow'),
+        loading: false,
+        estimatedPreviewHeightPx: 360,
+      },
+    })
+
+    await flushAll()
+
+    const preview = wrapper.get('.infographic-preview').element as HTMLElement
+    expect(preview.style.height).toBe('360px')
 
     wrapper.unmount()
   })

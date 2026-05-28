@@ -92,7 +92,7 @@ describe('mermaid block max height', () => {
     setupState.updateContainerHeight(undefined, { force: true })
     await nextTick()
 
-    expect(container.style.height).toBe('500px')
+    expect(container.style.height).toBe('360px')
     wrapper.unmount()
   })
 

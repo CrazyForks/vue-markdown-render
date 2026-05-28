@@ -450,6 +450,8 @@ if (typeof window !== 'undefined') {
 const codeFontMin = 10
 const codeFontMax = 36
 const codeFontStep = 1
+const defaultPreFallbackFontSize = 12
+const defaultPreFallbackLineHeight = 18
 const defaultCodeFontSize = ref<number>(
   typeof props.monacoOptions?.fontSize === 'number' ? props.monacoOptions!.fontSize : Number.NaN,
 )
@@ -466,13 +468,15 @@ const preFallbackFontSize = computed(() => {
   const fromState = codeFontSize.value
   if (typeof fromState === 'number' && Number.isFinite(fromState) && fromState > 0)
     return fromState
-  return 14
+  return defaultPreFallbackFontSize
 })
 const preFallbackLineHeight = computed(() => {
   const fromOptions = props.monacoOptions?.lineHeight
   if (typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0)
     return fromOptions
-  return Math.max(12, Math.round(preFallbackFontSize.value * 1.35))
+  if (preFallbackFontSize.value === defaultPreFallbackFontSize)
+    return defaultPreFallbackLineHeight
+  return Math.max(12, Math.round(preFallbackFontSize.value * 1.5))
 })
 const preFallbackTabSize = computed(() => {
   const fromOptions = props.monacoOptions?.tabSize
@@ -491,11 +495,40 @@ const preFallbackVerticalPadding = computed(() => {
     : 0
   return { top, bottom }
 })
+// Keep computed height tight to content. Extra padding caused visible bottom gap.
+const CONTENT_PADDING = 0
+// Fine-tuned to avoid bottom gap at default font size
+const LINE_EXTRA_PER_LINE = 1.5
+const PIXEL_EPSILON = 1
 const estimatedVisibleContentHeight = computed(() => {
   const value = props.estimatedContentHeightPx
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? value
     : null
+})
+const preFallbackLocalMinHeight = computed(() => {
+  if (estimatedVisibleContentHeight.value != null)
+    return null
+
+  const countLines = (source: unknown) => {
+    const value = String(source ?? '')
+    if (!value)
+      return 1
+    return Math.max(1, value.split(/\r\n|\n|\r/).length)
+  }
+
+  if (isDiff.value) {
+    const lineCount = Math.max(
+      countLines(props.node.originalCode),
+      countLines(props.node.updatedCode),
+    )
+    return Math.round(lineCount * 30 + 32)
+  }
+
+  return Math.ceil(
+    countLines(props.node.code) * (preFallbackLineHeight.value + LINE_EXTRA_PER_LINE)
+    + PIXEL_EPSILON,
+  )
 })
 const estimatedVisibleBlockHeight = computed(() => {
   const value = props.estimatedHeightPx
@@ -505,7 +538,7 @@ const estimatedVisibleBlockHeight = computed(() => {
 })
 const preFallbackStyle = computed(() => {
   const fontFamily = props.monacoOptions?.fontFamily
-  return {
+  const style = {
     fontSize: `${preFallbackFontSize.value}px`,
     lineHeight: `${preFallbackLineHeight.value}px`,
     tabSize: preFallbackTabSize.value,
@@ -519,11 +552,22 @@ const preFallbackStyle = computed(() => {
           height: `${estimatedVisibleContentHeight.value}px`,
           minHeight: `${estimatedVisibleContentHeight.value}px`,
         }
-      : {}),
+      : preFallbackLocalMinHeight.value != null
+        ? {
+            minHeight: `${preFallbackLocalMinHeight.value}px`,
+          }
+        : {}),
     ...(typeof fontFamily === 'string' && fontFamily.trim()
       ? { '--markstream-code-font-family': fontFamily.trim() }
       : {}),
   } as Record<string, string | number>
+
+  style['--markstream-pre-line-number-top'] = `${preFallbackVerticalPadding.value.top}px`
+  style['--markstream-code-padding-left'] = '62px'
+  style['--markstream-pre-line-number-width'] = '36px'
+  style['--markstream-pre-line-number-gap'] = '0px'
+
+  return style
 })
 const shouldReserveEstimatedEditorHeight = computed(() => {
   return estimatedVisibleContentHeight.value != null
@@ -537,11 +581,6 @@ const codeEditorContainerStyle = computed(() => {
   }
 })
 const pendingEstimatedEditorHeightFloor = ref<number | null>(null)
-// Keep computed height tight to content. Extra padding caused visible bottom gap.
-const CONTENT_PADDING = 0
-// Fine-tuned to avoid bottom gap at default font size
-const LINE_EXTRA_PER_LINE = 1.5
-const PIXEL_EPSILON = 1
 
 function getPendingEstimatedEditorHeightFloor() {
   const value = pendingEstimatedEditorHeightFloor.value
@@ -2436,6 +2475,7 @@ onUnmounted(() => {
           :class="{ 'is-wrap': preFallbackWrap }"
           :style="preFallbackStyle"
           :node="props.node"
+          :show-line-numbers="true"
         />
       </div>
       <HtmlPreviewFrame
@@ -2712,18 +2752,17 @@ onUnmounted(() => {
   padding-left: var(--markstream-code-padding-left, 52px);
   background: transparent;
   color: var(--vscode-editor-foreground, inherit);
+  backface-visibility: visible;
+  transform: none;
+  -webkit-font-smoothing: auto;
   /* Match Monaco defaults to avoid a jarring swap while it loads */
-  font-size: var(--vscode-editor-font-size, 14px);
+  font-size: var(--vscode-editor-font-size, 12px);
+  line-height: var(--vscode-editor-line-height, 18px);
   font-weight: 400;
   font-family: var(
     --markstream-code-font-family,
-    ui-monospace,
-    SFMono-Regular,
-    SF Mono,
     Menlo,
     Monaco,
-    Consolas,
-    Liberation Mono,
     Courier New,
     monospace
   );
@@ -2733,11 +2772,17 @@ onUnmounted(() => {
   font-size: inherit;
   font-weight: inherit;
   line-height: inherit;
+  font-family: inherit;
 }
 
 :deep(pre.code-pre-fallback.is-wrap) {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+:deep(pre.code-pre-fallback.markstream-pre--diff-preview) {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .code-block-container.is-rendering .code-height-placeholder{

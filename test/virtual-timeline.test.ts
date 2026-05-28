@@ -777,6 +777,110 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('uses external initial state as a per-thread fallback after thread changes', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const threadAItems = [
+      { kind: 'user-message', id: 'a-u1', text: 'A top' },
+      { kind: 'assistant-markdown', id: 'a-m1', content: '# A large', final: true, revision: 1 },
+      { kind: 'user-message', id: 'a-u2', text: 'A bottom' },
+    ]
+    const threadBItems = [
+      { kind: 'user-message', id: 'b-u1', text: 'B top' },
+      { kind: 'assistant-markdown', id: 'b-m1', content: '# B large', final: true, revision: 1 },
+      { kind: 'user-message', id: 'b-u2', text: 'B bottom' },
+    ]
+
+    const threadAState = {
+      threadKey: 'thread-a',
+      outerAnchor: {
+        type: 'item' as const,
+        itemKey: 'a-m1',
+        offsetWithinItemPx: 240,
+      },
+      itemHeights: {
+        'a-u1': 80,
+        'a-m1': 1200,
+        'a-u2': 80,
+      },
+      markdownStates: {},
+    }
+    const threadBState = {
+      threadKey: 'thread-b',
+      outerAnchor: {
+        type: 'item' as const,
+        itemKey: 'b-m1',
+        offsetWithinItemPx: 120,
+      },
+      itemHeights: {
+        'b-u1': 60,
+        'b-m1': 900,
+        'b-u2': 60,
+      },
+      markdownStates: {},
+    }
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: threadAItems,
+        threadKey: 'thread-a',
+        stickToBottom: 'auto',
+        initialThreadState: threadAState,
+      },
+      slots: {
+        default(props: any) {
+          return h('div', { ref: props.measureRef }, props.item.text ?? props.markdownProps?.content ?? '')
+        },
+      },
+    })
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+
+    expect(root.scrollTop).toBe(80 + 240)
+
+    await wrapper.setProps({ initialThreadState: threadBState })
+    await wrapper.setProps({
+      items: threadBItems,
+      threadKey: 'thread-b',
+    })
+
+    expect((wrapper.vm as any).getItemSize('b-m1')).toBe(900)
+    expect(root.scrollTop).toBe(60 + 120)
+
+    await wrapper.setProps({
+      initialThreadState: {
+        ...threadAState,
+        outerAnchor: {
+          type: 'item' as const,
+          itemKey: 'a-u2',
+          offsetWithinItemPx: 0,
+        },
+        itemHeights: {
+          'a-u1': 10,
+          'a-m1': 10,
+          'a-u2': 10,
+        },
+      },
+    })
+    await wrapper.setProps({
+      items: threadAItems,
+      threadKey: 'thread-a',
+    })
+
+    expect((wrapper.vm as any).getItemSize('a-m1')).toBe(1200)
+    expect(root.scrollTop).toBe(80 + 240)
+
+    wrapper.unmount()
+  })
+
   it('preserves the outer anchor when an item above the viewport changes height', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
