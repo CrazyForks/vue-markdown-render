@@ -23,12 +23,33 @@ let cachedInfographic: InfographicConstructor | null = null
 let infographicLoader: InfographicLoader | null = null
 let loaderVersion = 0
 
+function normalizeInfographicModule(mod: unknown): InfographicConstructor | null {
+  if (!mod)
+    return null
+
+  const defaultExport = (mod as any).default ?? mod
+  const candidate = typeof defaultExport === 'function' && typeof defaultExport.prototype?.render === 'function'
+    ? defaultExport
+    : ((mod as any).Infographic ?? defaultExport?.Infographic)
+
+  return typeof candidate === 'function' ? candidate : null
+}
+
+/**
+ * Configure the optional infographic loader before `app.mount()` or before the
+ * first infographic block renders. Runtime toggles do not retroactively update
+ * already-mounted infographic blocks.
+ */
 export function setInfographicLoader(loader?: InfographicLoader | null) {
   infographicLoader = loader ?? null
   cachedInfographic = null
   loaderVersion++
 }
 
+/**
+ * Enable infographic rendering before `app.mount()` or before the first
+ * infographic block renders.
+ */
 export function enableInfographic(loader: InfographicLoader) {
   if (typeof loader !== 'function')
     throw new TypeError('enableInfographic requires a loader function for @antv/infographic')
@@ -54,17 +75,10 @@ export async function getInfographic(): Promise<InfographicConstructor | null> {
   const mod: any = await loader()
   if (version !== loaderVersion || loader !== infographicLoader)
     return null
-  if (!mod)
-    return null
-
-  // Normalize module
-  // Handle ESM default export or named export
-  const defaultExport = (mod && (mod as any).default) ? (mod as any).default : mod
-
-  const resolved = typeof defaultExport === 'function' && typeof defaultExport.prototype?.render === 'function'
-    ? defaultExport
-    : (mod.Infographic ?? defaultExport?.Infographic ?? defaultExport)
+  const resolved = normalizeInfographicModule(mod)
   if (version !== loaderVersion || loader !== infographicLoader)
+    return null
+  if (!resolved)
     return null
 
   cachedInfographic = resolved

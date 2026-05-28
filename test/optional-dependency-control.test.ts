@@ -118,6 +118,12 @@ describe('optional dependency controllers', () => {
       await expect(getInfographic()).resolves.toBeNull()
     })
 
+    it('returns null for an invalid infographic module shape', async () => {
+      setInfographicLoader(async () => ({}))
+
+      await expect(getInfographic()).resolves.toBeNull()
+    })
+
     it('requires an explicit loader when enabling infographic', () => {
       expect(() => enableInfographic(undefined as any)).toThrow('enableInfographic requires a loader')
     })
