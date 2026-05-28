@@ -8,24 +8,60 @@ export interface InfographicConstructor {
   new (options: { container: HTMLElement, width?: string | number, height?: string | number }): InfographicInstance
 }
 
-export type InfographicLoader = () => Promise<unknown> | unknown
+export type InfographicModuleLike
+  = InfographicConstructor
+    | {
+      default?: InfographicModuleLike
+      Infographic?: InfographicConstructor
+    }
+    | null
+    | undefined
 
-const defaultInfographicLoader: InfographicLoader = () => import('@antv/infographic')
+export type InfographicLoader = () => Promise<InfographicModuleLike> | InfographicModuleLike
 
-let cachedInfographic: any = null
-let infographicLoader: InfographicLoader | null = defaultInfographicLoader
+let cachedInfographic: InfographicConstructor | null = null
+let infographicLoader: InfographicLoader | null = null
+let loaderVersion = 0
 
-function resetCachedInfographic() {
-  cachedInfographic = null
+function normalizeInfographicModule(mod: unknown): InfographicConstructor | null {
+  if (!mod)
+    return null
+
+  const defaultExport = (mod as any).default ?? mod
+  const candidate = typeof defaultExport === 'function' && typeof defaultExport.prototype?.render === 'function'
+    ? defaultExport
+    : ((mod as any).Infographic ?? defaultExport?.Infographic)
+
+  return typeof candidate === 'function' ? candidate : null
 }
 
-export function setInfographicLoader(loader: InfographicLoader | null) {
-  infographicLoader = loader
-  resetCachedInfographic()
+/**
+ * Configure the optional infographic loader before `app.mount()` or before the
+ * first infographic block renders. Runtime toggles do not retroactively update
+ * already-mounted infographic blocks.
+ */
+export function setInfographicLoader(loader?: InfographicLoader | null) {
+  infographicLoader = loader ?? null
+  cachedInfographic = null
+  loaderVersion++
+}
+
+/**
+ * Enable infographic rendering before `app.mount()` or before the first
+ * infographic block renders.
+ */
+export function enableInfographic(loader: InfographicLoader) {
+  if (typeof loader !== 'function')
+    throw new TypeError('enableInfographic requires a loader function for @antv/infographic')
+  setInfographicLoader(loader)
+}
+
+export function disableInfographic() {
+  setInfographicLoader()
 }
 
 export function isInfographicEnabled() {
-  return infographicLoader !== null
+  return typeof infographicLoader === 'function'
 }
 
 export async function getInfographic(): Promise<InfographicConstructor | null> {
@@ -33,40 +69,18 @@ export async function getInfographic(): Promise<InfographicConstructor | null> {
     return cachedInfographic
 
   const loader = infographicLoader
+  const version = loaderVersion
   if (!loader)
     return null
-  let mod: any
-  try {
-    mod = await loader()
-  }
-  catch (err) {
-    if (loader === defaultInfographicLoader) {
-      throw new Error('Optional dependency "@antv/infographic" is not installed. Please install it to enable infographic diagrams.')
-    }
-    throw err
-  }
-  if (!mod)
+  const mod: any = await loader()
+  if (version !== loaderVersion || loader !== infographicLoader)
+    return null
+  const resolved = normalizeInfographicModule(mod)
+  if (version !== loaderVersion || loader !== infographicLoader)
+    return null
+  if (!resolved)
     return null
 
-  // Normalize module
-  // Handle ESM default export or named export
-  const defaultExport = (mod && (mod as any).default) ? (mod as any).default : mod
-
-  // If default export is the class itself
-  if (typeof defaultExport === 'function' && defaultExport.prototype && defaultExport.prototype.render) {
-    cachedInfographic = defaultExport
-  }
-  // If it's a named export { Infographic }
-  else if (mod.Infographic) {
-    cachedInfographic = mod.Infographic
-  }
-  else if (defaultExport && defaultExport.Infographic) {
-    cachedInfographic = defaultExport.Infographic
-  }
-  else {
-    // Fallback
-    cachedInfographic = defaultExport
-  }
-
-  return cachedInfographic as InfographicConstructor
+  cachedInfographic = resolved
+  return cachedInfographic
 }

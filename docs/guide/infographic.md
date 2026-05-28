@@ -10,6 +10,21 @@ This feature depends on the `@antv/infographic` library.
 npm install @antv/infographic
 ```
 
+Configure the optional loader in your app entry before `app.mount()` or before the first infographic block is rendered:
+
+```ts
+// main.ts
+import { setInfographicLoader } from 'markstream-vue'
+import { createApp } from 'vue'
+import App from './App.vue'
+
+setInfographicLoader(() => import('@antv/infographic'))
+
+createApp(App).mount('#app')
+```
+
+Migration note: infographic rendering is now explicit opt-in. If your app previously relied on charts working automatically after installing `@antv/infographic`, keep the package installed and add the loader setup above.
+
 ## 2. Example
 
 Use the `infographic` code block in Markdown to render charts:
