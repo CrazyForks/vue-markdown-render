@@ -1102,6 +1102,9 @@ function clearLayerMeasuredVars() {
     return
   layerEl.style.removeProperty('--stream-monaco-line-number-left')
   layerEl.style.removeProperty('--stream-monaco-line-number-width')
+  layerEl.style.removeProperty('--stream-monaco-line-number-gap-to-code')
+  layerEl.style.removeProperty('--stream-monaco-original-line-number-gap-to-code')
+  layerEl.style.removeProperty('--stream-monaco-modified-line-number-gap-to-code')
   layerEl.style.removeProperty('--stream-monaco-original-scrollable-left')
   layerEl.style.removeProperty('--stream-monaco-modified-scrollable-left')
 }
@@ -1144,6 +1147,7 @@ function syncDiffFallbackLayoutVarsFromEditor() {
     root: HTMLElement,
     paneSelector: string,
     scrollableVar: '--stream-monaco-original-scrollable-left' | '--stream-monaco-modified-scrollable-left',
+    gapVar: '--stream-monaco-original-line-number-gap-to-code' | '--stream-monaco-modified-line-number-gap-to-code',
   ) {
     const pane = root.querySelector(paneSelector) as HTMLElement | null
     if (!pane)
@@ -1154,24 +1158,50 @@ function syncDiffFallbackLayoutVarsFromEditor() {
     const lineNumber = pane.querySelector('.line-numbers') as HTMLElement | null
     const viewLine = pane.querySelector('.view-lines .view-line') as HTMLElement | null
     const margin = pane.querySelector('.margin') as HTMLElement | null
-    if (lineNumber) {
-      const rect = lineNumber.getBoundingClientRect()
-      setLayerPxVar('--stream-monaco-line-number-left', rect.left - paneRect.left)
-      setLayerPxVar('--stream-monaco-line-number-width', rect.width)
-    }
+
+    let contentLeft: number | null = null
+
     if (viewLine) {
       const rect = viewLine.getBoundingClientRect()
-      setLayerPxVar(scrollableVar, rect.left - paneRect.left)
-      return
+      contentLeft = rect.left - paneRect.left
+      setLayerPxVar(scrollableVar, contentLeft)
     }
-    if (margin) {
+    else if (margin) {
       const rect = margin.getBoundingClientRect()
-      setLayerPxVar(scrollableVar, rect.width)
+      contentLeft = rect.width
+      setLayerPxVar(scrollableVar, contentLeft)
+    }
+
+    if (lineNumber) {
+      const rect = lineNumber.getBoundingClientRect()
+
+      // Only trust the width when it looks like a real line-number slot, not
+      // just the text bounding box of a single digit (~8px).
+      if (rect.width >= 20 && rect.width <= 64)
+        setLayerPxVar('--stream-monaco-line-number-width', rect.width)
+
+      if (contentLeft != null) {
+        const gapToCode = contentLeft - (rect.right - paneRect.left)
+        if (Number.isFinite(gapToCode) && gapToCode >= 0 && gapToCode <= 32) {
+          setLayerPxVar(gapVar, gapToCode)
+          setLayerPxVar('--stream-monaco-line-number-gap-to-code', gapToCode)
+        }
+      }
     }
   }
 
-  measurePane(diffRoot, '.editor.original', '--stream-monaco-original-scrollable-left')
-  measurePane(diffRoot, '.editor.modified', '--stream-monaco-modified-scrollable-left')
+  measurePane(
+    diffRoot,
+    '.editor.original',
+    '--stream-monaco-original-scrollable-left',
+    '--stream-monaco-original-line-number-gap-to-code',
+  )
+  measurePane(
+    diffRoot,
+    '.editor.modified',
+    '--stream-monaco-modified-scrollable-left',
+    '--stream-monaco-modified-line-number-gap-to-code',
+  )
 }
 
 function syncEditorCssVars() {
@@ -2947,13 +2977,15 @@ onUnmounted(() => {
   --stream-monaco-gutter-guide: var(--markstream-diff-gutter-guide);
   --stream-monaco-gutter-marker-width: 3px;
   --stream-monaco-gutter-gap: 8px;
+  --stream-monaco-line-number-gap-to-code: var(--stream-monaco-gutter-gap);
   --stream-monaco-line-number: var(--markstream-diff-line-number);
   --stream-monaco-line-number-active: var(--markstream-diff-line-number-active);
   --stream-monaco-line-number-left: calc(
     var(--stream-monaco-gutter-marker-width) + var(--stream-monaco-gutter-gap)
   );
   --stream-monaco-line-number-width: 28px;
-  --stream-monaco-line-number-align: right;
+  --markstream-diff-line-number-align: var(--markstream-code-line-number-align, right);
+  --stream-monaco-line-number-align: var(--markstream-diff-line-number-align);
   --stream-monaco-original-margin-width: calc(
     var(--stream-monaco-gutter-marker-width) +
       (var(--stream-monaco-gutter-gap) * 2) +
@@ -2991,6 +3023,30 @@ onUnmounted(() => {
   --stream-monaco-added-border: hsl(var(--ms-diff-added) / 0.25);
   --stream-monaco-removed-border: hsl(var(--ms-diff-removed) / 0.25);
   --stream-monaco-widget-shadow: var(--markstream-diff-widget-shadow);
+}
+
+.code-block-container.is-diff :deep(.monaco-diff-editor .editor.original .margin-view-overlays .line-numbers) {
+  left: calc(
+    var(--stream-monaco-original-scrollable-left)
+    - var(--stream-monaco-line-number-gap-to-code)
+    - var(--stream-monaco-line-number-width)
+  ) !important;
+  width: var(--stream-monaco-line-number-width) !important;
+  padding: 0 !important;
+  text-align: var(--markstream-diff-line-number-align, right) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.code-block-container.is-diff :deep(.monaco-diff-editor .editor.modified .margin-view-overlays .line-numbers) {
+  left: calc(
+    var(--stream-monaco-modified-scrollable-left)
+    - var(--stream-monaco-modified-line-number-gap-to-code, var(--stream-monaco-line-number-gap-to-code))
+    - var(--stream-monaco-line-number-width)
+  ) !important;
+  width: var(--stream-monaco-line-number-width) !important;
+  padding: 0 !important;
+  text-align: var(--markstream-diff-line-number-align, right) !important;
+  font-variant-numeric: tabular-nums;
 }
 
 .code-editor-container.is-hidden {

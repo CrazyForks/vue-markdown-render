@@ -185,10 +185,6 @@ const ariaLabel = computed(() => {
   --markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 3px);
   --markstream-pre-diff-gutter-gap: var(--stream-monaco-gutter-gap, 8px);
   --markstream-pre-diff-line-number-width: var(--stream-monaco-line-number-width, 28px);
-  --markstream-pre-diff-line-number-left: var(
-    --stream-monaco-line-number-left,
-    calc(var(--markstream-pre-diff-gutter-marker-width) + var(--markstream-pre-diff-gutter-gap))
-  );
   --markstream-pre-diff-scrollable-left: var(
     --stream-monaco-original-scrollable-left,
     calc(
@@ -197,7 +193,16 @@ const ariaLabel = computed(() => {
       + var(--markstream-pre-diff-line-number-width)
     )
   );
-  --markstream-pre-diff-line-number-align: var(--stream-monaco-line-number-align, right);
+  --markstream-pre-diff-line-number-gap-to-code: var(
+    --stream-monaco-original-line-number-gap-to-code,
+    var(--stream-monaco-line-number-gap-to-code, var(--markstream-pre-diff-gutter-gap))
+  );
+  --markstream-pre-diff-line-number-left: calc(
+    var(--markstream-pre-diff-scrollable-left)
+    - var(--markstream-pre-diff-line-number-gap-to-code)
+    - var(--markstream-pre-diff-line-number-width)
+  );
+  --markstream-pre-diff-line-number-align: var(--markstream-diff-line-number-align, right);
 }
 
 .markstream-vue pre.markstream-pre--diff-preview > .markstream-pre__diff-code {
@@ -216,6 +221,10 @@ const ariaLabel = computed(() => {
   --markstream-pre-diff-scrollable-left: var(
     --stream-monaco-modified-scrollable-left,
     var(--stream-monaco-original-scrollable-left)
+  );
+  --markstream-pre-diff-line-number-gap-to-code: var(
+    --stream-monaco-modified-line-number-gap-to-code,
+    var(--stream-monaco-line-number-gap-to-code, var(--markstream-pre-diff-gutter-gap))
   );
   box-shadow: inset 1px 0 var(--markstream-diff-pane-divider, hsl(var(--ms-border)));
 }
