@@ -121,6 +121,22 @@ describe('custom HTML JSON content', () => {
     expect(() => JSON.parse(customData.content)).not.toThrow()
   })
 
+  it('preserves source payload when customHtmlTags are provided at parse time', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-parse-time-tags')
+    const payload = '{"quote":"ok"}'
+    const markdown = `<custom-data>${payload}</custom-data>`
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe(payload)
+    expect(customData?.raw).toBe(markdown)
+    expect(String(customData?.content ?? '')).not.toContain('“')
+    expect(String(customData?.content ?? '')).not.toContain('”')
+    expect(() => JSON.parse(customData.content)).not.toThrow()
+  })
+
   it('preserves trailing source while a streamed custom tag is still open', () => {
     const tags = ['custom-data']
     const md = getMarkdown('custom-html-json-quotes-open-trailing-source', { customHtmlTags: tags })
@@ -189,6 +205,7 @@ describe('custom HTML JSON content', () => {
 
     expect(customData?.content).toBe('{"a":"b"}')
     expect(String(customData?.content ?? '')).not.toContain('trailing')
+    expect(JSON.stringify(nodes)).toContain('trailing')
     expect(() => JSON.parse(customData.content)).not.toThrow()
   })
 

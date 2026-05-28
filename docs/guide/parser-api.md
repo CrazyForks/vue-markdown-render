@@ -182,14 +182,14 @@ Behavior:
 - **When the real closing tag arrives**, `autoClosed` disappears and `loading` becomes `false`.
 
 Extending the allowlist:
-To apply the same mid‑state suppression for custom tags (for example `<thinking>`), pass `customHtmlTags` when creating the markdown instance:
+To apply mid‑state suppression and source payload preservation for custom tags (for example `<thinking>`), pass `customHtmlTags` either when creating the markdown instance or in `ParseOptions`:
 
 ```ts
 const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
 ```
 
 Emitting custom nodes:
-If you want those tags to become custom node types (so `setCustomComponents` can map them directly), also pass `customHtmlTags` in `ParseOptions` or use the `custom-html-tags` prop on `MarkdownRender` (which wires this automatically):
+If you want those tags to become custom node types (so `setCustomComponents` can map them directly), pass `customHtmlTags` in `ParseOptions` or use the `custom-html-tags` prop on `MarkdownRender` (which wires this automatically):
 
 ```ts
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'

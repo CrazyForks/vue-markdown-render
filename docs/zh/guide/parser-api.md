@@ -174,14 +174,14 @@ dasdsad
 - **当真实闭合标签到达后**，`autoClosed` 消失，`loading=false`。
 
 扩展白名单：
-如果需要让自定义标签（例如 `<thinking>`）也享受相同的中间态吞并与自动补闭合策略，可在创建实例时传入 `customHtmlTags`：
+如果需要让自定义标签（例如 `<thinking>`）也享受相同的中间态吞并、自动补闭合和源码 payload 保留策略，可在创建实例时或 `ParseOptions` 中传入 `customHtmlTags`：
 
 ```ts
 const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
 ```
 
 输出自定义节点：
-如果希望这些标签直接产出自定义节点类型（便于 `setCustomComponents` 直接按 `type` 映射），可在 `ParseOptions` 中同时传入 `customHtmlTags`，或在 `MarkdownRender` 上使用 `custom-html-tags`（组件会自动透传）：
+如果希望这些标签直接产出自定义节点类型（便于 `setCustomComponents` 直接按 `type` 映射），可在 `ParseOptions` 中传入 `customHtmlTags`，或在 `MarkdownRender` 上使用 `custom-html-tags`（组件会自动透传）：
 
 ```ts
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'

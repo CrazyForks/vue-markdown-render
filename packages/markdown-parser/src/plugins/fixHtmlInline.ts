@@ -564,29 +564,52 @@ export interface FixHtmlInlineOptions {
   customHtmlTags?: readonly string[]
 }
 
+const BASE_AUTO_CLOSE_INLINE_TAGS = [
+  'a',
+  'span',
+  'strong',
+  'em',
+  'b',
+  'i',
+  'u',
+]
+
 export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineOptions = {}) {
-  const commonHtmlTags = buildCommonHtmlTagSet(options.customHtmlTags)
-  // Tags that should stay inline when we auto-append a closing tag at core stage.
-  const autoCloseInlineTagSet = new Set<string>([
-    'a',
-    'span',
-    'strong',
-    'em',
-    'b',
-    'i',
-    'u',
-  ])
-  const customTagSet = new Set<string>()
+  const configuredCustomTagSet = new Set<string>()
   if (options.customHtmlTags?.length) {
     for (const t of options.customHtmlTags) {
       const name = normalizeCustomHtmlTagName(t)
       if (!name)
         continue
-      customTagSet.add(name)
-      autoCloseInlineTagSet.add(name)
+      configuredCustomTagSet.add(name)
     }
   }
-  const shouldMergeHtmlBlockTag = (tag: string) => customTagSet.has(tag) || !commonHtmlTags.has(tag) || BLOCK_LEVEL_HTML_TAGS.has(tag)
+  const getRuleContext = (state: unknown) => {
+    const s = state as unknown as { env?: { __markstreamCustomHtmlTags?: readonly unknown[] } }
+    const customTagSet = new Set(configuredCustomTagSet)
+    const envTags = Array.isArray(s.env?.__markstreamCustomHtmlTags)
+      ? s.env.__markstreamCustomHtmlTags
+      : []
+    for (const t of envTags) {
+      const name = normalizeCustomHtmlTagName(String(t ?? ''))
+      if (name)
+        customTagSet.add(name)
+    }
+
+    const commonHtmlTags = buildCommonHtmlTagSet(Array.from(customTagSet))
+    const autoCloseInlineTagSet = new Set<string>(BASE_AUTO_CLOSE_INLINE_TAGS)
+    for (const tag of customTagSet)
+      autoCloseInlineTagSet.add(tag)
+
+    const shouldMergeHtmlBlockTag = (tag: string) => customTagSet.has(tag) || !commonHtmlTags.has(tag) || BLOCK_LEVEL_HTML_TAGS.has(tag)
+
+    return {
+      autoCloseInlineTagSet,
+      commonHtmlTags,
+      customTagSet,
+      shouldMergeHtmlBlockTag,
+    }
+  }
   const getHtmlBlockCarrierContent = (token: MarkdownToken & { content?: string, children?: MarkdownToken[] }) => {
     if (token.type === 'html_block')
       return String(token.content ?? '')
@@ -611,6 +634,7 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
   md.core.ruler.after('inline', 'fix_html_inline_streaming', (state: unknown) => {
     const s = state as unknown as { tokens?: MarkdownToken[] }
     const toks = s.tokens ?? []
+    const { commonHtmlTags, customTagSet } = getRuleContext(state)
     for (const t of toks) {
       const tok = t as MarkdownToken & { children?: MarkdownToken[], content?: string, raw?: string }
       if (tok.type !== 'inline' || !Array.isArray(tok.children))
@@ -656,6 +680,11 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
   md.core.ruler.push('fix_html_inline_tokens', (state: unknown) => {
     const s = state as unknown as { tokens?: MarkdownToken[] }
     const toks = s.tokens ?? []
+    const {
+      autoCloseInlineTagSet,
+      customTagSet,
+      shouldMergeHtmlBlockTag,
+    } = getRuleContext(state)
 
     // 有一些很特殊的场景，比如 html_block 开始 <thinking>，但是后面跟着很多段落,如果没匹配到</thinking>，中间的都应该合并为html_block的 content
     const tagStack: [string, number][] = []
@@ -829,8 +858,14 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
           const openTok = toks[top.index] as MarkdownToken & { content?: string, children?: MarkdownToken[] }
 
           // Close via an html_block token like "</thinking>"
-          if (tok.type === 'html_block' && getCloseRe(top.tag).test(content)) {
-            openTok.content = `${String(openTok.content ?? '')}\n${content}`
+          const htmlBlockCloseMatch = tok.type === 'html_block'
+            ? getCloseRe(top.tag).exec(content)
+            : null
+          if (htmlBlockCloseMatch) {
+            const closeEnd = htmlBlockCloseMatch.index + htmlBlockCloseMatch[0].length
+            const closeContent = content.slice(0, closeEnd)
+            const afterContent = content.slice(closeEnd)
+            openTok.content = `${String(openTok.content ?? '')}\n${closeContent}`
             if (Array.isArray(openTok.children)) {
               openTok.children.push({
                 type: 'html_inline',
@@ -838,9 +873,23 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
                 raw: `</${top.tag}>`,
               } as MarkdownToken)
             }
-            toks.splice(i, 1)
-            i--
             stack.pop()
+
+            const afterTrimmed = afterContent.replace(/^\s+/, '')
+            if (afterTrimmed) {
+              const replacement = afterTrimmed.startsWith('<')
+                ? [{ type: 'html_block', content: afterTrimmed } as MarkdownToken]
+                : [
+                    { type: 'paragraph_open', tag: 'p', nesting: 1 } as MarkdownToken,
+                    { type: 'inline', tag: '', nesting: 0, content: afterTrimmed, children: [{ type: 'text', content: afterTrimmed, raw: afterTrimmed }] } as MarkdownToken,
+                    { type: 'paragraph_close', tag: 'p', nesting: -1 } as MarkdownToken,
+                  ]
+              toks.splice(i, 1, ...replacement)
+            }
+            else {
+              toks.splice(i, 1)
+              i--
+            }
             continue
           }
 
