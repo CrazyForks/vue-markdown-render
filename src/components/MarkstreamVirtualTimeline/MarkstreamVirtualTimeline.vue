@@ -20,6 +20,10 @@ import {
   getMarkstreamTimelineItemRevision,
   isMarkstreamMarkdownTimelineItem,
 } from '../../composables/useMarkstreamVirtualAdapter'
+import {
+  getMarkdownItemChromeHeight,
+  readElementOuterHeight,
+} from '../../utils/virtualItemMeasurement'
 import MarkdownRender from '../NodeRenderer'
 
 defineOptions({ name: 'MarkstreamVirtualTimeline' })
@@ -75,9 +79,13 @@ const threadStates = new Map<string, MarkstreamThreadVirtualState>()
 const markdownRestoreItemKey = ref<string | null>(null)
 const markdownRestoreToken = ref(0)
 const restoringThread = ref(false)
+const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
 let rootResizeObserver: ResizeObserver | null = null
 let threadRestoreSeq = 0
 let threadRestoreRaf: number | null = null
+let threadRestoreTimers: number[] = []
+let activeThreadRestoreSeq = 0
+let activeThreadRestoreAnchor: MarkstreamThreadAnchor | undefined
 
 const normalizedThreadKey = computed(() => props.threadKey == null ? undefined : String(props.threadKey))
 const timelineMeasurementKey = computed(() => {
@@ -203,11 +211,18 @@ function shouldStickToBottom() {
   return bottomPinned.value
 }
 
-function cancelThreadRestoreRaf() {
+function clearThreadRestoreSchedule() {
   if (threadRestoreRaf != null && typeof cancelAnimationFrame === 'function')
     cancelAnimationFrame(threadRestoreRaf)
 
   threadRestoreRaf = null
+
+  if (typeof window !== 'undefined') {
+    for (const timer of threadRestoreTimers)
+      window.clearTimeout(timer)
+  }
+
+  threadRestoreTimers = []
 }
 
 function getViewportHeight() {
@@ -332,19 +347,18 @@ function setItemSize(key: string, size: number) {
   if (previous != null && Math.abs(previous - next) < 0.5)
     return
 
-  const shouldReconcile = !restoringThread.value
-  const anchorBeforeChange = shouldReconcile
-    ? captureOuterAnchor()
-    : undefined
-  const shouldPin = shouldReconcile && shouldStickToBottom()
+  if (restoringThread.value) {
+    itemSizes.set(key, next)
+    scheduleThreadRestorePass()
+    return
+  }
+
+  const anchorBeforeChange = captureOuterAnchor()
+  const shouldPin = shouldStickToBottom()
 
   itemSizes.set(key, next)
-
-  if (!restoringThread.value)
-    rememberThreadState()
-
-  if (shouldReconcile)
-    scheduleScrollReconcileAfterSizeChange(anchorBeforeChange, shouldPin)
+  rememberThreadState()
+  scheduleScrollReconcileAfterSizeChange(anchorBeforeChange, shouldPin)
 }
 
 function scheduleScrollReconcileAfterSizeChange(anchor: MarkstreamThreadAnchor | undefined, shouldPin: boolean) {
@@ -373,30 +387,29 @@ function resolveElement(el: Element | { $el?: Element | null } | null | undefine
   return value instanceof HTMLElement ? value : null
 }
 
-function readElementHeight(element: HTMLElement | null | undefined) {
-  if (!element)
-    return 0
-
-  return Math.ceil(Math.max(
-    0,
-    element.offsetHeight || 0,
-    element.scrollHeight || 0,
-    element.getBoundingClientRect?.().height || 0,
-  ))
-}
-
 function cleanupMeasuredElement(key: string) {
   resizeObservers.get(key)?.disconnect()
   resizeObservers.delete(key)
   measuredElements.delete(key)
 }
 
+function getMeasuredItemHeight(key: string) {
+  return readElementOuterHeight(measuredElements.get(key))
+}
+
+function getMeasuredMarkdownChromeHeight(key: string) {
+  return getMarkdownItemChromeHeight(measuredElements.get(key))
+}
+
 function reconcileRecordSize(record: TimelineRecord) {
-  const measured = readElementHeight(measuredElements.get(record.key))
+  const measured = getMeasuredItemHeight(record.key)
   const markdown = record.markdown
     ? (markdownLogicalHeights.get(record.key) ?? 0)
     : 0
-  const next = Math.max(measured, markdown)
+
+  const next = record.markdown && markdown > 0
+    ? Math.max(measured, markdown + getMeasuredMarkdownChromeHeight(record.key))
+    : measured
 
   if (next > 0)
     setItemSize(record.key, next)
@@ -457,6 +470,7 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
     content: getMarkstreamTimelineItemContent(record.item, record.index, props),
     final,
     nodeVirtual: 'auto' as const,
+    fade: !restoringThread.value,
     indexKey: getSessionKey(record),
     virtualScroll,
     onHeightChange(metrics: MarkstreamVirtualMetrics) {
@@ -588,6 +602,52 @@ function restoreOuterAnchor(
   return true
 }
 
+function applyThreadRestorePass(
+  seq: number,
+  anchor: MarkstreamThreadAnchor | undefined,
+) {
+  if (seq !== threadRestoreSeq)
+    return
+
+  if (anchor)
+    restoreOuterAnchor(anchor, { remember: false })
+
+  updateScrollMetrics({ remember: false })
+}
+
+function scheduleThreadRestorePass(
+  seq = activeThreadRestoreSeq,
+  anchor = activeThreadRestoreAnchor,
+) {
+  if (!anchor)
+    return
+
+  void nextTick(() => {
+    applyThreadRestorePass(seq, anchor)
+
+    if (threadRestoreRaf != null)
+      return
+
+    if (typeof requestAnimationFrame === 'function') {
+      threadRestoreRaf = requestAnimationFrame(() => {
+        threadRestoreRaf = null
+        applyThreadRestorePass(seq, anchor)
+      })
+    }
+  })
+}
+
+function finishThreadRestore(seq: number) {
+  if (seq !== threadRestoreSeq)
+    return
+
+  applyThreadRestorePass(seq, activeThreadRestoreAnchor)
+  restoringThread.value = false
+  activeThreadRestoreAnchor = undefined
+  activeThreadRestoreSeq = 0
+  updateScrollMetrics()
+}
+
 function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
   const restoreSeq = ++threadRestoreSeq
   const anchor = state?.outerAnchor
@@ -596,8 +656,11 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
       ? { type: 'bottom', distanceFromBottomPx: 0 }
       : undefined)
 
-  cancelThreadRestoreRaf()
-  restoringThread.value = true
+  clearThreadRestoreSchedule()
+
+  restoringThread.value = Boolean(fallbackAnchor)
+  activeThreadRestoreSeq = restoreSeq
+  activeThreadRestoreAnchor = fallbackAnchor
 
   cleanupMeasuredElements()
 
@@ -638,36 +701,39 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
     })
   }
 
-  const applyRestore = () => {
-    if (restoreSeq !== threadRestoreSeq)
-      return
-
-    if (fallbackAnchor)
-      restoreOuterAnchor(fallbackAnchor, { remember: false })
-
+  if (!fallbackAnchor) {
+    restoringThread.value = false
+    activeThreadRestoreAnchor = undefined
+    activeThreadRestoreSeq = 0
     updateScrollMetrics({ remember: false })
+    return
   }
 
   void nextTick(() => {
-    applyRestore()
+    applyThreadRestorePass(restoreSeq, fallbackAnchor)
 
     if (typeof requestAnimationFrame === 'function') {
       threadRestoreRaf = requestAnimationFrame(() => {
         threadRestoreRaf = null
-
-        applyRestore()
-
-        if (restoreSeq === threadRestoreSeq) {
-          restoringThread.value = false
-          updateScrollMetrics()
-        }
+        applyThreadRestorePass(restoreSeq, fallbackAnchor)
       })
-
-      return
     }
 
-    restoringThread.value = false
-    updateScrollMetrics()
+    if (typeof window !== 'undefined') {
+      THREAD_RESTORE_SETTLE_DELAYS.forEach((delay, index) => {
+        const timer = window.setTimeout(() => {
+          applyThreadRestorePass(restoreSeq, fallbackAnchor)
+
+          if (index === THREAD_RESTORE_SETTLE_DELAYS.length - 1)
+            finishThreadRestore(restoreSeq)
+        }, delay)
+
+        threadRestoreTimers.push(timer)
+      })
+    }
+    else {
+      finishThreadRestore(restoreSeq)
+    }
   })
 }
 
@@ -744,7 +810,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   rememberThreadState()
-  cancelThreadRestoreRaf()
+  clearThreadRestoreSchedule()
   cleanupObservers()
 })
 

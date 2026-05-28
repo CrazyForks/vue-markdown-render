@@ -6,6 +6,10 @@ import type {
   NodeRendererProps,
 } from '../types/node-renderer-props'
 import { getCurrentScope, nextTick, onScopeDispose, reactive, ref, toValue } from 'vue'
+import {
+  getMarkdownItemChromeHeight,
+  readElementOuterHeight,
+} from '../utils/virtualItemMeasurement'
 
 export type MarkstreamTimelineItemKey = string | number
 
@@ -87,7 +91,7 @@ export interface MarkstreamThreadVirtualState {
   markdownStates: Record<string, MarkstreamVirtualState>
 }
 
-export interface MarkstreamVirtualMarkdownProps extends Pick<NodeRendererProps, 'content' | 'final' | 'indexKey' | 'nodeVirtual' | 'virtualScroll'> {
+export interface MarkstreamVirtualMarkdownProps extends Pick<NodeRendererProps, 'content' | 'final' | 'indexKey' | 'nodeVirtual' | 'virtualScroll' | 'fade'> {
   onHeightChange: (metrics: MarkstreamVirtualMetrics) => void
   onVirtualStateChange: (state: MarkstreamVirtualState) => void
 }
@@ -232,8 +236,13 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   const resizeObservers = new Map<string, ResizeObserver>()
   const markdownRestoreItemKey = ref<string | null>(null)
   const markdownRestoreToken = ref(0)
+  const restoringThread = ref(false)
+  const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
   let restoreThreadSeq = 0
   let restoreThreadRaf: number | null = null
+  let restoreThreadTimers: number[] = []
+  let activeRestoreSeq = 0
+  let activeRestoreAnchor: MarkstreamThreadAnchor | undefined
 
   function getItems() {
     return [...toValue(options.items)]
@@ -296,11 +305,18 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     })
   }
 
-  function cancelRestoreThreadRaf() {
+  function clearRestoreThreadSchedule() {
     if (restoreThreadRaf != null && typeof cancelAnimationFrame === 'function')
       cancelAnimationFrame(restoreThreadRaf)
 
     restoreThreadRaf = null
+
+    if (typeof window !== 'undefined') {
+      for (const timer of restoreThreadTimers)
+        window.clearTimeout(timer)
+    }
+
+    restoreThreadTimers = []
   }
 
   function setItemSize(key: string, size: number) {
@@ -311,6 +327,13 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     const previous = itemHeights.get(key)
     if (previous != null && Math.abs(previous - normalized) < 0.5)
       return
+
+    if (restoringThread.value) {
+      itemHeights.set(key, normalized)
+      options.virtualizer.setItemSize(key, normalized)
+      scheduleActiveRestorePass()
+      return
+    }
 
     const shouldPreserve = shouldPreserveScrollAnchor()
     const anchorBeforeChange = shouldPreserve
@@ -341,28 +364,26 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     return value instanceof HTMLElement ? value : null
   }
 
-  function readElementHeight(element: HTMLElement | null | undefined) {
-    if (!element)
-      return 0
-
-    return Math.ceil(Math.max(
-      0,
-      element.offsetHeight || 0,
-      element.scrollHeight || 0,
-      element.getBoundingClientRect?.().height || 0,
-    ))
-  }
-
   function cleanupMeasuredElement(key: string) {
     resizeObservers.get(key)?.disconnect()
     resizeObservers.delete(key)
     measuredElements.delete(key)
   }
 
+  function getMeasuredItemHeight(key: string) {
+    return readElementOuterHeight(measuredElements.get(key))
+  }
+
+  function getMeasuredMarkdownChromeHeight(key: string) {
+    return getMarkdownItemChromeHeight(measuredElements.get(key))
+  }
+
   function reconcileItemSize(key: string) {
-    const measured = readElementHeight(measuredElements.get(key))
+    const measured = getMeasuredItemHeight(key)
     const markdown = markdownLogicalHeights.get(key) ?? 0
-    const next = Math.max(measured, markdown)
+    const next = markdown > 0
+      ? Math.max(measured, markdown + getMeasuredMarkdownChromeHeight(key))
+      : measured
 
     if (next > 0)
       setItemSize(key, next)
@@ -423,6 +444,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       content: getMarkstreamTimelineItemContent(item, index, options),
       final,
       nodeVirtual: 'auto',
+      fade: !restoringThread.value,
       indexKey: getSessionKey(item, index),
       virtualScroll,
       onHeightChange(metrics) {
@@ -549,11 +571,57 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     options.virtualizer.scrollToOffset(offset)
   }
 
+  function applyRestorePass(
+    seq: number,
+    anchor: MarkstreamThreadAnchor | undefined,
+  ) {
+    if (seq !== restoreThreadSeq)
+      return
+
+    restoreOuterAnchor(anchor)
+  }
+
+  function scheduleActiveRestorePass() {
+    const anchor = activeRestoreAnchor
+    const seq = activeRestoreSeq
+
+    if (!anchor)
+      return
+
+    void nextTick(() => {
+      applyRestorePass(seq, anchor)
+
+      if (restoreThreadRaf != null)
+        return
+
+      if (typeof requestAnimationFrame === 'function') {
+        restoreThreadRaf = requestAnimationFrame(() => {
+          restoreThreadRaf = null
+          applyRestorePass(seq, anchor)
+        })
+      }
+    })
+  }
+
+  function finishRestoreThread(seq: number) {
+    if (seq !== restoreThreadSeq)
+      return
+
+    applyRestorePass(seq, activeRestoreAnchor)
+    restoringThread.value = false
+    activeRestoreAnchor = undefined
+    activeRestoreSeq = 0
+  }
+
   function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
     const seq = ++restoreThreadSeq
     const anchor = state?.outerAnchor
 
-    cancelRestoreThreadRaf()
+    clearRestoreThreadSchedule()
+
+    restoringThread.value = Boolean(anchor)
+    activeRestoreSeq = seq
+    activeRestoreAnchor = anchor
 
     markdownLogicalHeights.clear()
     importItemHeights(state?.itemHeights ?? {})
@@ -564,29 +632,45 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       : null
     markdownRestoreToken.value += 1
 
-    const apply = () => {
-      if (seq !== restoreThreadSeq)
-        return
-
-      restoreOuterAnchor(anchor)
+    if (!anchor) {
+      restoringThread.value = false
+      activeRestoreAnchor = undefined
+      activeRestoreSeq = 0
+      return
     }
 
-    apply()
+    applyRestorePass(seq, anchor)
 
     void nextTick(() => {
-      apply()
+      applyRestorePass(seq, anchor)
 
       if (typeof requestAnimationFrame === 'function') {
         restoreThreadRaf = requestAnimationFrame(() => {
           restoreThreadRaf = null
-          apply()
+          applyRestorePass(seq, anchor)
         })
+      }
+
+      if (typeof window !== 'undefined') {
+        THREAD_RESTORE_SETTLE_DELAYS.forEach((delay, index) => {
+          const timer = window.setTimeout(() => {
+            applyRestorePass(seq, anchor)
+
+            if (index === THREAD_RESTORE_SETTLE_DELAYS.length - 1)
+              finishRestoreThread(seq)
+          }, delay)
+
+          restoreThreadTimers.push(timer)
+        })
+      }
+      else {
+        finishRestoreThread(seq)
       }
     })
   }
 
   function dispose() {
-    cancelRestoreThreadRaf()
+    clearRestoreThreadSchedule()
 
     for (const observer of resizeObservers.values())
       observer.disconnect()
