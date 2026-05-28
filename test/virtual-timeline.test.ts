@@ -881,6 +881,86 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('ignores one-pixel timeline item size drift', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    let measuredHeight = 100
+    const resizeCallbacks = new WeakMap<Element, ResizeObserverCallback>()
+
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      if (el.dataset.timelineDeadbandItem === 'a1')
+        return measuredHeight
+      return 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      if (el.dataset.timelineDeadbandItem === 'a1')
+        return measuredHeight
+      return 0
+    })
+    vi.stubGlobal('ResizeObserver', class {
+      callback: ResizeObserverCallback
+
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback
+      }
+
+      observe(element: Element) {
+        resizeCallbacks.set(element, this.callback)
+      }
+
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          { kind: 'user-message', id: 'a1', text: 'stable code block' },
+          { kind: 'user-message', id: 'u1', text: 'anchor item below' },
+        ],
+        threadKey: 'thread-a',
+        overscan: 10,
+        stickToBottom: false,
+        estimateItemHeight: (item: any) => item.id === 'a1' ? 100 : 500,
+      },
+      slots: {
+        default(props: any) {
+          if (props.itemKey === 'a1') {
+            return h('div', {
+              'ref': props.measureRef,
+              'data-timeline-deadband-item': props.itemKey,
+            }, props.item.text)
+          }
+
+          return h('div', props.item.text)
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const item = wrapper.find('[data-timeline-deadband-item="a1"]').element
+    resizeCallbacks.get(item)?.([], {} as ResizeObserver)
+    await nextTick()
+
+    expect((wrapper.vm as any).getItemSize('a1')).toBe(100)
+
+    measuredHeight = 101
+    resizeCallbacks.get(item)?.([], {} as ResizeObserver)
+    await nextTick()
+    await flushAnimationFrame()
+
+    expect((wrapper.vm as any).getItemSize('a1')).toBe(100)
+    expect((wrapper.vm as any).getTotalHeight()).toBe(600)
+
+    wrapper.unmount()
+  })
+
   it('preserves the outer anchor when an item above the viewport changes height', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)

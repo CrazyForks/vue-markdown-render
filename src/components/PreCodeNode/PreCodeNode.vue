@@ -23,10 +23,21 @@ const lineNumbers = computed(() => {
 })
 const isDiffPreview = computed(() => props.showLineNumbers === true && props.node?.diff === true)
 
-function toDiffPreviewLine(code: string, kind = 'context') {
+type DiffPreviewLineKind = 'context' | 'removed' | 'added' | 'hunk'
+
+function isBlankDiffPreviewLine(code: string) {
+  return String(code ?? '').trim().length === 0
+}
+
+function toDiffPreviewLine(code: string, kind: DiffPreviewLineKind = 'context') {
+  const empty = isBlankDiffPreviewLine(code)
   return {
     code,
-    kind,
+    // Do not paint terminal blank lines / visual spacer rows as added/removed.
+    // This keeps the pre fallback close to Monaco, where the empty continuation
+    // surface should not flash red/green before highlighting is ready.
+    kind: empty && kind !== 'hunk' ? 'context' : kind,
+    empty,
   }
 }
 
@@ -63,8 +74,8 @@ const diffPreviewPanes = computed(() => {
     ]
   }
 
-  const original = [] as Array<{ code: string, kind: string }>
-  const modified = [] as Array<{ code: string, kind: string }>
+  const original = [] as Array<{ code: string, kind: DiffPreviewLineKind, empty: boolean }>
+  const modified = [] as Array<{ code: string, kind: DiffPreviewLineKind, empty: boolean }>
 
   for (const raw of codeLines.value) {
     if (raw.startsWith('@@')) {
@@ -113,7 +124,7 @@ const ariaLabel = computed(() => {
     :data-markstream-line-numbers="props.showLineNumbers ? '1' : undefined"
     data-markstream-pre="1"
     tabindex="0"
-  ><code v-if="isDiffPreview" translate="no" class="markstream-pre__diff-code"><span v-for="pane in diffPreviewPanes" :key="pane.key" class="markstream-pre__diff-pane" :class="pane.className"><span v-for="line in pane.lines" :key="line.key" class="markstream-pre__diff-line" :class="`markstream-pre__diff-line--${line.kind}`"><span class="markstream-pre__diff-rail" aria-hidden="true" /><span class="markstream-pre__diff-number" aria-hidden="true">{{ line.number }}</span><span class="markstream-pre__diff-content">{{ line.code }}</span></span></span></code><template v-else><span v-if="props.showLineNumbers" class="markstream-pre__line-numbers" aria-hidden="true"><span v-for="line in lineNumbers" :key="line" class="markstream-pre__line-number">{{ line }}</span></span><code translate="no" class="markstream-pre__code" v-text="node.code" /></template></pre>
+  ><code v-if="isDiffPreview" translate="no" class="markstream-pre__diff-code"><span v-for="pane in diffPreviewPanes" :key="pane.key" class="markstream-pre__diff-pane" :class="pane.className"><span v-for="line in pane.lines" :key="line.key" class="markstream-pre__diff-line" :class="[`markstream-pre__diff-line--${line.kind}`, { 'markstream-pre__diff-line--empty': line.empty }]"><span class="markstream-pre__diff-rail" aria-hidden="true" /><span class="markstream-pre__diff-number" aria-hidden="true">{{ line.number }}</span><span class="markstream-pre__diff-content"><span class="markstream-pre__diff-content-inner">{{ line.code }}</span></span></span></span></code><template v-else><span v-if="props.showLineNumbers" class="markstream-pre__line-numbers" aria-hidden="true"><span v-for="line in lineNumbers" :key="line" class="markstream-pre__line-number">{{ line }}</span></span><code translate="no" class="markstream-pre__code" v-text="node.code" /></template></pre>
 </template>
 
 <style>
@@ -170,6 +181,10 @@ const ariaLabel = computed(() => {
 .markstream-vue pre.markstream-pre--diff-preview {
   padding-left: 0;
   padding-right: 0;
+  --markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 3px);
+  --markstream-pre-diff-gutter-gap: var(--stream-monaco-gutter-gap, 8px);
+  --markstream-pre-diff-line-number-width: var(--stream-monaco-line-number-width, 28px);
+  --markstream-pre-diff-line-number-align: var(--stream-monaco-line-number-align, right);
 }
 
 .markstream-vue pre.markstream-pre--diff-preview > .markstream-pre__diff-code {
@@ -191,45 +206,59 @@ const ariaLabel = computed(() => {
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line {
   position: relative;
   display: grid;
-  grid-template-columns: 12px 36px calc(100% - 36px);
-  min-height: var(--markstream-pre-diff-line-height, 36px);
+  grid-template-columns:
+    var(--markstream-pre-diff-gutter-marker-width, 3px)
+    var(--markstream-pre-diff-gutter-gap, 8px)
+    var(--markstream-pre-diff-line-number-width, 28px)
+    var(--markstream-pre-diff-gutter-gap, 8px)
+    minmax(0, 1fr);
+  min-height: var(--markstream-pre-diff-line-height, 30px);
+  align-items: start;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-pane--modified .markstream-pre__diff-line {
-  grid-template-columns: 13px 36px calc(100% - 36px);
+  grid-template-columns:
+    var(--markstream-pre-diff-gutter-marker-width, 3px)
+    var(--markstream-pre-diff-gutter-gap, 8px)
+    var(--markstream-pre-diff-line-number-width, 28px)
+    var(--markstream-pre-diff-gutter-gap, 8px)
+    minmax(0, 1fr);
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-rail {
-  position: absolute;
-  inset-block: 0;
-  left: 0;
-  width: var(--stream-monaco-gutter-marker-width, 3px);
+  grid-column: 1;
+  align-self: stretch;
+  width: var(--markstream-pre-diff-gutter-marker-width, 3px);
+  min-width: var(--markstream-pre-diff-gutter-marker-width, 3px);
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-number {
-  grid-column: 2;
+  grid-column: 3;
   color: var(--code-line-number);
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: var(--markstream-pre-diff-line-number-align, right);
   user-select: none;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-content {
-  grid-column: 3;
+  grid-column: 5;
   min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: normal;
 }
 
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-content-inner {
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added {
   color: var(--stream-monaco-added-fg, inherit);
-  background: var(--stream-monaco-added-line-fill, transparent);
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--removed {
   color: var(--stream-monaco-removed-fg, inherit);
-  background: var(--stream-monaco-removed-line-fill, transparent);
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--hunk {
@@ -237,12 +266,20 @@ const ariaLabel = computed(() => {
   background: var(--stream-monaco-unchanged-bg, transparent);
 }
 
-.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added > .markstream-pre__diff-rail {
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added:not(.markstream-pre__diff-line--empty) > .markstream-pre__diff-rail {
   background: var(--stream-monaco-added-gutter, currentColor);
 }
 
-.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--removed > .markstream-pre__diff-rail {
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty) > .markstream-pre__diff-rail {
   background: var(--stream-monaco-removed-gutter, currentColor);
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added:not(.markstream-pre__diff-line--empty) .markstream-pre__diff-content-inner {
+  background: var(--stream-monaco-added-line-fill, transparent);
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty) .markstream-pre__diff-content-inner {
+  background: var(--stream-monaco-removed-line-fill, transparent);
 }
 
 /* Keyboard accessibility: visible focus when scroll container is focused */

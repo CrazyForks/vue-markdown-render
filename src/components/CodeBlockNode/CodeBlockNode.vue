@@ -530,11 +530,41 @@ const preFallbackLocalMinHeight = computed(() => {
     + PIXEL_EPSILON,
   )
 })
+const preFallbackReservedContentHeight = computed(() => {
+  const estimated = estimatedVisibleContentHeight.value
+  if (estimated != null)
+    return Math.ceil(estimated)
+
+  const local = preFallbackLocalMinHeight.value
+  return local != null ? Math.ceil(local) : null
+})
 const estimatedVisibleBlockHeight = computed(() => {
   const value = props.estimatedHeightPx
   return typeof value === 'number' && Number.isFinite(value) && value > 0
     ? value
     : null
+})
+const pendingEstimatedEditorHeightFloor = ref<number | null>(null)
+
+function getPendingEstimatedEditorHeightFloor() {
+  const value = pendingEstimatedEditorHeightFloor.value
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : null
+}
+
+const reservedEditorContentHeight = computed(() => {
+  const floor = getPendingEstimatedEditorHeightFloor()
+  if (floor != null)
+    return floor
+
+  // While the fallback pre is visible, keep the hidden editor host at the same
+  // content height. When Monaco becomes visible, the grid row will not collapse
+  // by a browser rounding pixel.
+  if (showPreWhileMonacoLoads.value || !editorDisplayReady.value)
+    return preFallbackReservedContentHeight.value
+
+  return null
 })
 const preFallbackStyle = computed(() => {
   const fontFamily = props.monacoOptions?.fontFamily
@@ -567,30 +597,28 @@ const preFallbackStyle = computed(() => {
   style['--markstream-pre-line-number-width'] = '36px'
   style['--markstream-pre-line-number-gap'] = '0px'
 
+  if (isDiff.value) {
+    // Keep the pre diff fallback visually close to stream-monaco's diff line box.
+    style['--markstream-pre-diff-line-height'] = '30px'
+  }
+
   return style
 })
 const shouldReserveEstimatedEditorHeight = computed(() => {
-  return estimatedVisibleContentHeight.value != null
+  return reservedEditorContentHeight.value != null
     && (!editorDisplayReady.value || getPendingEstimatedEditorHeightFloor() != null)
 })
 const codeEditorContainerStyle = computed(() => {
-  if (!shouldReserveEstimatedEditorHeight.value)
+  const reserved = reservedEditorContentHeight.value
+  if (!shouldReserveEstimatedEditorHeight.value || reserved == null)
     return undefined
   return {
-    minHeight: `${estimatedVisibleContentHeight.value}px`,
+    minHeight: `${reserved}px`,
   }
 })
-const pendingEstimatedEditorHeightFloor = ref<number | null>(null)
-
-function getPendingEstimatedEditorHeightFloor() {
-  const value = pendingEstimatedEditorHeightFloor.value
-  return typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? Math.round(value)
-    : null
-}
 
 function armEstimatedEditorHeightFloor() {
-  const estimate = estimatedVisibleContentHeight.value
+  const estimate = preFallbackReservedContentHeight.value
   pendingEstimatedEditorHeightFloor.value = !editorMounted.value && estimate != null
     ? estimate
     : null
@@ -1702,7 +1730,8 @@ const containerStyle = computed(() => {
   if (max)
     s.maxWidth = max
   if (shouldReserveEstimatedEditorHeight.value) {
-    s.minHeight = `${estimatedVisibleBlockHeight.value ?? estimatedVisibleContentHeight.value}px`
+    const reserved = reservedEditorContentHeight.value
+    s.minHeight = `${estimatedVisibleBlockHeight.value ?? reserved}px`
   }
   if (!isDiff.value) {
     s.color = 'var(--vscode-editor-foreground, var(--markstream-code-fallback-fg))'

@@ -97,6 +97,7 @@ const threadStates = new Map<string, MarkstreamThreadVirtualState>()
 const restoringThread = ref(false)
 const restorePaintReady = ref(true)
 const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
+const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
 let rootResizeObserver: ResizeObserver | null = null
 let threadRestoreSeq = 0
 let threadRestoreRaf: number | null = null
@@ -486,8 +487,15 @@ function setItemSize(key: string, size: number) {
   const previous = itemSizes.get(key)
   const next = Math.ceil(size)
 
-  if (previous != null && Math.abs(previous - next) < 0.5)
+  // Monaco / pre fallback / browser font rounding can differ by exactly 1px.
+  // Treat that as measurement noise; otherwise an item above the current
+  // anchor will restore scrollTop by 1px and visibly shimmer on refresh.
+  if (
+    previous != null
+    && Math.abs(previous - next) <= ITEM_SIZE_RECONCILE_DEADBAND_PX
+  ) {
     return
+  }
 
   if (restoringThread.value) {
     itemSizes.set(key, next)
