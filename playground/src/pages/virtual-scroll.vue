@@ -1484,6 +1484,12 @@ function classifyProbePoint(probe: Element | null): ProbeKind {
     return hasRenderableMarkdownContent(markdownHost) ? 'content' : 'empty-card'
   }
 
+  const message = element.closest('.virtual-message')
+  if (message) {
+    const markdownHost = message.querySelector('.markdown-host')
+    return hasRenderableMarkdownContent(markdownHost) ? 'content' : 'empty-card'
+  }
+
   return 'blank'
 }
 
@@ -2318,6 +2324,7 @@ function buildLabSnapshot(stats: LabStats): VirtualScrollLabSnapshot {
 }
 
 function readLabSnapshot(): VirtualScrollLabSnapshot {
+  syncScrollStateFromRoot()
   return buildLabSnapshot(collectStats({ reconcile: false }))
 }
 

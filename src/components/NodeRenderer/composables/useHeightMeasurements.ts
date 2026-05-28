@@ -285,9 +285,12 @@ export function useHeightMeasurements(
     let changed = false
 
     if (importOptions.mode !== 'merge') {
-      for (const key of Object.keys(nodeHeights))
-        delete nodeHeights[Number(key)]
-      changed = true
+      const existingKeys = Object.keys(nodeHeights)
+      if (existingKeys.length > 0) {
+        for (const key of existingKeys)
+          delete nodeHeights[Number(key)]
+        changed = true
+      }
     }
 
     for (const entry of cache) {

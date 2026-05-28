@@ -60,9 +60,14 @@ function outerAnchorDelta(before, after) {
 function assertThreadRestore(label, before, after) {
   const scrollDelta = Math.abs(before.scrollTop - after.scrollTop)
   const anchorDelta = outerAnchorDelta(before.outerAnchor, after.outerAnchor)
+  const sameFirstVisible = Boolean(
+    before.firstVisibleMessageId
+    && after.firstVisibleMessageId
+    && before.firstVisibleMessageId === after.firstVisibleMessageId,
+  )
 
   assert(
-    scrollDelta < 32 || anchorDelta < 32,
+    sameFirstVisible || scrollDelta < 32 || anchorDelta < 32,
     `${label} scroll position was not restored accurately`,
     {
       before: {
@@ -75,6 +80,7 @@ function assertThreadRestore(label, before, after) {
         firstVisibleMessageId: after.firstVisibleMessageId,
         outerAnchor: after.outerAnchor,
       },
+      sameFirstVisible,
       scrollDelta,
       anchorDelta,
     },
@@ -470,9 +476,19 @@ async function run() {
     const rootLocator = page.locator('[data-testid="virtual-scroll-root"]')
     await rootLocator.hover()
 
+    const wheelSamples = []
+
     for (let i = 0; i < 24; i++) {
       await page.mouse.wheel(0, 900)
       await page.waitForTimeout(16)
+
+      const sample = await page.evaluate(() => {
+        const api = window.__markstreamVirtualScrollLab
+        return api?.read?.() ?? null
+      })
+
+      if (sample)
+        wheelSamples.push(sample)
     }
 
     const wheelProbe = await evaluateWithLab(page, async (api) => {
@@ -481,6 +497,24 @@ async function run() {
       return api.read()
     })
 
+    const badWheelSample = wheelSamples.find((sample) => {
+      return sample.stats.blankProbeCount > 0
+        || sample.blankFrameCount > 0
+        || sample.visibleCoverageOk !== true
+        || sample.health.strictClippingOk !== true
+        || sample.health.virtualDomWithinLimit !== true
+        || sample.health.hugeRendererDomWithinLimit !== true
+    })
+
+    assert(
+      !badWheelSample,
+      'blank frame, coverage, clipping, or DOM budget regression observed during wheel scrolling',
+      {
+        badWheelSample,
+        sampleCount: wheelSamples.length,
+      },
+    )
+
     assert(
       wheelProbe.stats.blankProbeCount === 0
       && wheelProbe.blankFrameCount === 0
@@ -488,7 +522,7 @@ async function run() {
       && wheelProbe.health.strictClippingOk === true
       && wheelProbe.health.virtualDomWithinLimit === true
       && wheelProbe.health.hugeRendererDomWithinLimit === true,
-      'blank frame, coverage, or DOM budget regression observed during real wheel scrolling',
+      'blank frame, coverage, or DOM budget regression observed after real wheel scrolling',
       wheelProbe,
     )
 

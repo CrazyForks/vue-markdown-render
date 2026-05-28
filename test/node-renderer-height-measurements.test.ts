@@ -259,6 +259,15 @@ describe('useHeightMeasurements', () => {
     expect(onHeightRecorded).toHaveBeenCalledTimes(1)
   })
 
+  it('does not notify when replace import leaves an empty cache unchanged', () => {
+    const onHeightRecorded = vi.fn()
+    const h = useHeightMeasurements({ onHeightRecorded })
+
+    h.importHeightCache([])
+
+    expect(onHeightRecorded).not.toHaveBeenCalled()
+  })
+
   it('ignores out-of-range imported height cache entries', () => {
     const h = useHeightMeasurements()
 

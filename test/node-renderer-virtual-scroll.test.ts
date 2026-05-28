@@ -1853,6 +1853,68 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not confirm prop-driven manual settledToken before settle finishes', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | null = null
+
+    try {
+      const platform = installManualMeasurementPlatform()
+      const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+      wrapper = mount(NodeRenderer, {
+        props: {
+          nodes: [createParagraph(1)],
+          final: true,
+          fade: false,
+          viewportPriority: false,
+          virtualScroll: {
+            enabled: true,
+            sessionKey: 'manual-token-settle-window',
+            settleMode: 'manual',
+            settledToken: true,
+            emitIntervalMs: 0,
+          },
+        },
+      })
+
+      await nextTick()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const contentEl = getRootNodeContentElements(wrapper.element)[0]!
+      platform.heights.set(contentEl, 40)
+      platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+      platform.flushFrames()
+      await nextTick()
+      await Promise.resolve()
+      platform.flushFrames()
+      await nextTick()
+
+      expect((wrapper.vm as any).getVirtualMetrics()).toMatchObject({
+        stable: false,
+        totalHeight: 40,
+      })
+      expect(wrapper.emitted('render-settled')).toBeUndefined()
+      expect(wrapper.emitted('render-final')).toBeUndefined()
+
+      await vi.advanceTimersByTimeAsync(120)
+      await nextTick()
+      await Promise.resolve()
+      platform.flushFrames()
+      await nextTick()
+
+      expect(wrapper.emitted('render-final')?.at(-1)?.[0]).toMatchObject({
+        phase: 'final',
+        stable: true,
+        totalHeight: 40,
+      })
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('does not emit stale final metrics after manual settledToken changes during settle', async () => {
     vi.useFakeTimers()
     let wrapper: ReturnType<typeof mount> | null = null

@@ -1812,6 +1812,7 @@ function getPlausibleVirtualizedContainerHeight(modelHeight: number, domHeight: 
 
 let imperativeVirtualSettleSessionKey: string | null = null
 let imperativeVirtualSettleThreadKey: string | undefined
+let lastManualSettleSignature: string | null = null
 
 function hasManualSettleSignal(token: unknown) {
   return token !== false && token != null && token !== ''
@@ -1860,11 +1861,18 @@ function isHostSettleConfirmed() {
   if (props.virtualScroll?.settleMode !== 'manual')
     return true
 
-  if (hasManualSettleSignal(props.virtualScroll?.settledToken))
-    return true
-
-  return imperativeVirtualSettleSessionKey === getVirtualSessionKey()
+  if (
+    imperativeVirtualSettleSessionKey === getVirtualSessionKey()
     && imperativeVirtualSettleThreadKey === getVirtualThreadKey()
+  ) {
+    return true
+  }
+
+  const token = props.virtualScroll?.settledToken
+  if (!hasManualSettleSignal(token))
+    return false
+
+  return lastManualSettleSignature === getManualSettleSignature(token)
 }
 
 function isLayoutSettled() {
@@ -3170,12 +3178,27 @@ async function settle(options: {
   if (!isSameSettleContext())
     return staleMetrics()
 
-  if (isInternalLayoutSettled()) {
+  const internallySettled = isInternalLayoutSettled()
+
+  if (internallySettled) {
     imperativeVirtualSettleSessionKey = sessionKeyAtStart
     imperativeVirtualSettleThreadKey = threadKeyAtStart
+
+    if (
+      props.virtualScroll?.settleMode === 'manual'
+      && expectedSettledTokenKey != null
+      && hasManualSettleSignal(props.virtualScroll?.settledToken)
+      && getManualSettleTokenKey() === expectedSettledTokenKey
+    ) {
+      lastManualSettleSignature = getManualSettleSignature(
+        props.virtualScroll.settledToken,
+      )
+    }
   }
 
-  const finalPhase = isSameSettleContext() && isLayoutSettled()
+  const finalPhase = isSameSettleContext()
+    && internallySettled
+    && isHostSettleConfirmed()
   const metrics = getVirtualMetrics(reason, finalPhase ? 'final' : undefined)
   emitVirtualMetricsNow(metrics, true)
   return metrics
@@ -4188,7 +4211,6 @@ watch(
 
 let autoSettledVirtualSignature: string | null = null
 let manualSettleInFlight = false
-let lastManualSettleSignature: string | null = null
 let lastVirtualLayoutEpochKey: string | null = null
 
 function resetVirtualSettleConfirmation() {
@@ -4571,7 +4593,9 @@ async function runManualSettleIfReady() {
       && metrics.stable
       && metrics.phase === 'final'
     ) {
-      lastManualSettleSignature = signature
+      lastManualSettleSignature = getManualSettleSignature(
+        props.virtualScroll?.settledToken,
+      )
     }
   }
   finally {
@@ -4600,6 +4624,7 @@ watch(
     () => props.virtualScroll?.settleMode,
     () => props.virtualScroll?.settledToken,
     () => getVirtualSessionKey(),
+    () => getVirtualThreadKey(),
     virtualLayoutEpochKey,
     pendingAsyncNodeCount,
     pendingHeightSettlingTaskCount,
