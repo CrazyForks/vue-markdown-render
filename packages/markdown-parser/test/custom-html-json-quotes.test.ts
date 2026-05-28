@@ -74,14 +74,37 @@ describe('custom HTML JSON content', () => {
   it('preserves line separators and straight quotes inside nested custom tags', () => {
     const tags = ['thinking']
     const md = getMarkdown('custom-html-json-quotes-nested-lines', { customHtmlTags: tags })
-    const markdown = '- prefix <thinking>line 1\n\n  line 2 "ok"</thinking>'
+    const content = 'line 1\nline 2 "ok"'
+    const markdown = `- prefix <thinking>${content}</thinking>`
 
     const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
     const thinking = findNodeByType(nodes, 'thinking')
 
-    expect(thinking?.content).toMatch(/^line 1\n+line 2 "ok"$/)
+    expect(thinking?.content).toBe(content)
     expect(String(thinking?.content ?? '')).not.toContain('“')
     expect(String(thinking?.content ?? '')).not.toContain('”')
+  })
+
+  it('preserves pretty JSON payload whitespace inside custom tags', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-pretty-json', { customHtmlTags: tags })
+    const payload = [
+      '{',
+      '  "type": "fileinfo",',
+      '',
+      '  "meta": {',
+      '    "title": "技能市场产品需求文档.md"',
+      '  }',
+      '}',
+    ].join('\n')
+    const markdown = `<custom-data>\n${payload}</custom-data>`
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe(payload)
+    expect(customData?.raw).toBe(markdown)
+    expect(() => JSON.parse(customData.content)).not.toThrow()
   })
 
   it('keeps typographer enabled for normal markdown text', () => {
