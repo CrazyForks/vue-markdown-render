@@ -32,12 +32,14 @@ const props = withDefaults(defineProps<MarkstreamVirtualTimelineProps<any>>(), {
   overscan: 4,
   overscanPx: 1200,
   stickToBottom: 'auto',
+  markdownFade: false,
 })
 
 const emit = defineEmits<{
   (e: 'height-change', payload: { itemKey: string, metrics: MarkstreamVirtualMetrics }): void
   (e: 'virtual-state-change', payload: { itemKey: string, state: MarkstreamVirtualState }): void
   (e: 'range-change', payload: { start: number, end: number }): void
+  (e: 'thread-state-change', payload: MarkstreamThreadVirtualState): void
 }>()
 
 /* eslint-disable vue/custom-event-name-casing -- Public timeline events are kebab-case. */
@@ -52,12 +54,17 @@ function emitVirtualStateChange(payload: { itemKey: string, state: MarkstreamVir
 function emitRangeChange(payload: { start: number, end: number }) {
   emit('range-change', payload)
 }
+
+function emitThreadStateChange(payload: MarkstreamThreadVirtualState) {
+  emit('thread-state-change', payload)
+}
 /* eslint-enable vue/custom-event-name-casing */
 
 interface TimelineRecord {
   item: any
   index: number
   key: string
+  renderKey: string
   kind: string
   offset: number
   size: number
@@ -97,8 +104,11 @@ let threadRestoreRaf: number | null = null
 let threadRestoreTimers: number[] = []
 let activeThreadRestoreSeq = 0
 let activeThreadRestoreAnchor: MarkstreamThreadAnchor | undefined
+let initialThreadStateConsumed = false
+let activeThreadStateSnapshot: MarkstreamThreadVirtualState | null = null
 
 const normalizedThreadKey = computed(() => props.threadKey == null ? undefined : String(props.threadKey))
+let activeThreadKeySnapshot = normalizedThreadKey.value
 const timelineMeasurementKey = computed(() => {
   return [
     props.measurementKey == null ? '' : String(props.measurementKey),
@@ -109,6 +119,7 @@ const timelineMeasurementKey = computed(() => {
 const layout = computed(() => {
   const records: TimelineRecord[] = []
   let offset = 0
+  const renderScopeKey = getTimelineRenderScopeKey()
 
   for (let index = 0; index < props.items.length; index++) {
     const item = props.items[index]
@@ -119,6 +130,7 @@ const layout = computed(() => {
       item,
       index,
       key,
+      renderKey: `${renderScopeKey}:${key}`,
       kind: getMarkstreamTimelineItemKind(item, index, props),
       offset,
       size,
@@ -203,6 +215,10 @@ const visibleWindow = computed(() => {
 
 function getItemKey(item: any, index: number) {
   return getMarkstreamTimelineItemKey(item, index, props)
+}
+
+function getTimelineRenderScopeKey() {
+  return normalizedThreadKey.value ?? 'timeline'
 }
 
 function getSessionKey(record: TimelineRecord) {
@@ -373,8 +389,12 @@ function updateScrollMetrics(options: { remember?: boolean } = {}) {
   updateLayoutWidthBucket()
   updateBottomPinned()
 
-  if (options.remember !== false && !restoringThread.value)
+  if (
+    options.remember === true
+    || (options.remember !== false && !restoringThread.value)
+  ) {
     rememberThreadState()
+  }
 }
 
 function applyScrollOffset(
@@ -402,8 +422,12 @@ function applyScrollOffset(
   if (options.updatePinned !== false)
     updateBottomPinned()
 
-  if (options.remember !== false && !restoringThread.value)
+  if (
+    options.remember === true
+    || (options.remember !== false && !restoringThread.value)
+  ) {
     rememberThreadState()
+  }
 }
 
 function scrollToOffset(offset: number) {
@@ -415,6 +439,32 @@ function scrollToOffset(offset: number) {
 
 function scrollToBottom() {
   scrollToOffset(layout.value.totalHeight - getViewportHeight())
+}
+
+function applyInitialScrollPosition() {
+  if (activeThreadRestoreAnchor) {
+    applyThreadRestorePass(activeThreadRestoreSeq, activeThreadRestoreAnchor)
+    updateScrollMetrics({ remember: false })
+    rememberThreadState()
+    return
+  }
+
+  if (props.stickToBottom === false) {
+    updateScrollMetrics({ remember: false })
+    rememberThreadState()
+    return
+  }
+
+  bottomPinned.value = true
+
+  applyScrollOffset(layout.value.totalHeight - getViewportHeight(), {
+    writeDom: true,
+    remember: false,
+    updatePinned: false,
+  })
+
+  updateScrollMetrics({ remember: false })
+  rememberThreadState()
 }
 
 function scrollToIndex(index: number, align: 'start' | 'center' | 'end' = 'start') {
@@ -589,7 +639,7 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
     content: getMarkstreamTimelineItemContent(record.item, record.index, props),
     final,
     nodeVirtual: 'auto' as const,
-    fade: !restoringThread.value,
+    fade: props.markdownFade === true,
     indexKey: getSessionKey(record),
     virtualScroll,
     onHeightChange(metrics: MarkstreamVirtualMetrics) {
@@ -677,28 +727,42 @@ function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
   }
 }
 
-function captureThreadState(): MarkstreamThreadVirtualState {
-  const savedHeights: Record<string, number> = {}
-  const savedMarkdownStates: Record<string, MarkstreamVirtualState> = {}
-
-  for (const [key, size] of itemSizes)
-    savedHeights[key] = size
-  for (const [key, state] of markdownStates)
-    savedMarkdownStates[key] = state
-
+function captureThreadStateForKey(threadKey = normalizedThreadKey.value): MarkstreamThreadVirtualState {
   return {
-    threadKey: normalizedThreadKey.value,
+    threadKey,
     outerAnchor: captureOuterAnchor(),
-    itemHeights: savedHeights,
-    markdownStates: savedMarkdownStates,
+    itemHeights: Object.fromEntries(
+      Array.from(itemSizes.entries())
+        .filter(([, size]) => Number.isFinite(size) && size > 0),
+    ),
+    markdownStates: Object.fromEntries(markdownStates.entries()),
   }
 }
 
-function rememberThreadState() {
-  const key = normalizedThreadKey.value
-  if (!key)
+function captureThreadState(): MarkstreamThreadVirtualState {
+  return captureThreadStateForKey(normalizedThreadKey.value)
+}
+
+function rememberThreadState(threadKey = normalizedThreadKey.value) {
+  if (!threadKey)
     return
-  threadStates.set(key, captureThreadState())
+
+  const state = captureThreadStateForKey(threadKey)
+  threadStates.set(threadKey, state)
+  if (threadKey === normalizedThreadKey.value)
+    activeThreadStateSnapshot = state
+  emitThreadStateChange(state)
+}
+
+function rememberPreviousThreadState(threadKey: string) {
+  if (activeThreadStateSnapshot?.threadKey === threadKey) {
+    threadStates.set(threadKey, activeThreadStateSnapshot)
+    emitThreadStateChange(activeThreadStateSnapshot)
+    return
+  }
+
+  if (!threadStates.has(threadKey))
+    rememberThreadState(threadKey)
 }
 
 function resolveOuterAnchorOffset(anchor: MarkstreamThreadAnchor | undefined) {
@@ -838,6 +902,10 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
     })
   }
 
+  activeThreadStateSnapshot = state?.threadKey === normalizedThreadKey.value
+    ? state
+    : null
+
   if (!fallbackAnchor) {
     restoringThread.value = false
     activeThreadRestoreAnchor = undefined
@@ -890,12 +958,38 @@ function cleanupObservers() {
   rootResizeObserver = null
 }
 
+function resolveThreadStateForRestore(threadKey: string | undefined) {
+  if (!initialThreadStateConsumed) {
+    initialThreadStateConsumed = true
+
+    const initial = props.initialThreadState
+    if (
+      initial
+      && (initial.threadKey ?? '') === (threadKey ?? '')
+    ) {
+      return initial
+    }
+  }
+
+  return threadKey ? threadStates.get(threadKey) : null
+}
+
 watch(
   normalizedThreadKey,
-  (threadKey) => {
-    restoreThreadState(threadKey ? threadStates.get(threadKey) : null)
+  (threadKey, previousThreadKey) => {
+    const oldKey = activeThreadKeySnapshot ?? previousThreadKey
+
+    if (oldKey && oldKey !== threadKey)
+      rememberPreviousThreadState(oldKey)
+
+    activeThreadKeySnapshot = threadKey
+
+    restoreThreadState(resolveThreadStateForRestore(threadKey))
   },
-  { flush: 'pre' },
+  {
+    immediate: true,
+    flush: 'sync',
+  },
 )
 
 watch(
@@ -927,22 +1021,13 @@ watch(
 )
 
 onMounted(() => {
-  updateScrollMetrics()
+  applyInitialScrollPosition()
 
   if (scrollRoot.value && typeof ResizeObserver !== 'undefined') {
     rootResizeObserver = new ResizeObserver(() => {
       updateScrollMetrics()
     })
     rootResizeObserver.observe(scrollRoot.value)
-  }
-
-  if (props.stickToBottom !== false) {
-    bottomPinned.value = true
-
-    void nextTick(() => {
-      scrollToBottom()
-      updateScrollMetrics()
-    })
   }
 })
 
@@ -978,7 +1063,7 @@ defineExpose({
     />
     <div
       v-for="record in visibleWindow.records"
-      :key="record.key"
+      :key="record.renderKey"
       class="markstream-virtual-timeline__item"
       :data-markstream-item-key="record.key"
       :data-markstream-item-kind="record.kind"

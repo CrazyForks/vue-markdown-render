@@ -42,6 +42,20 @@ export interface MarkstreamVirtualTimelineProps<T = MarkstreamTimelineItem> {
   overscanPx?: number
   stickToBottom?: boolean | 'auto'
   measurementKey?: string | number
+
+  /**
+   * Initial state for the active thread.
+   *
+   * Pass this before first render if the host persisted a previous state.
+   * This prevents a first-frame jump from estimated scrollTop to restored scrollTop.
+   */
+  initialThreadState?: MarkstreamThreadVirtualState | null
+
+  /**
+   * Default: false.
+   */
+  markdownFade?: boolean
+
   debug?: boolean
 }
 
@@ -108,6 +122,11 @@ export interface UseMarkstreamVirtualAdapterOptions<T = MarkstreamTimelineItem> 
 
   estimateItemHeight?: (item: T, index: number) => number
   measurementKey?: MaybeRefOrGetter<string | number | undefined>
+
+  /**
+   * Default: false.
+   */
+  markdownFade?: boolean
 
   /**
    * Preserve the outer scroll anchor when markdown logical height or measured
@@ -592,7 +611,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       content: getMarkstreamTimelineItemContent(item, index, options),
       final,
       nodeVirtual: 'auto',
-      fade: !restoringThread.value,
+      fade: options.markdownFade === true,
       indexKey: getSessionKey(item, index),
       virtualScroll,
       onHeightChange(metrics) {

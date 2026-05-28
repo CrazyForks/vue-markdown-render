@@ -332,6 +332,7 @@ const scrollTop = ref(0)
 const viewportHeight = ref(0)
 const totalHeight = ref(0)
 const widthBucket = ref(0)
+const isRestoringThread = ref(false)
 let rootResizeObserver: ResizeObserver | null = null
 
 const threadItems: Record<ThreadId, TimelineItem[]> = {
@@ -518,6 +519,8 @@ async function switchThread(threadId: ThreadId) {
   if (threadId === activeThreadId.value)
     return
 
+  isRestoringThread.value = true
+
   rememberThreadState()
 
   const saved = savedThreadStates.get(threadId)
@@ -527,7 +530,6 @@ async function switchThread(threadId: ThreadId) {
     adapter.preloadThreadState(null)
 
   activeThreadId.value = threadId
-
   rebuildOffsets()
 
   await nextTick()
@@ -541,9 +543,18 @@ async function switchThread(threadId: ThreadId) {
     scrollerRef.value?.scrollToPosition?.(0)
   }
 
-  await nextTick()
   scrollerRef.value?.forceUpdate?.(false)
   updateScrollMetrics()
+
+  await nextTick()
+
+  if (typeof requestAnimationFrame === 'function') {
+    await new Promise<void>(resolve => requestAnimationFrame(() => {
+      resolve()
+    }))
+  }
+
+  isRestoringThread.value = false
 }
 
 function scrollToTop() {
@@ -626,6 +637,7 @@ onBeforeUnmount(() => {
     <DynamicScroller
       ref="scrollerRef"
       class="message-scroller"
+      :class="{ 'is-restoring-thread': isRestoringThread }"
       :items="items"
       key-field="key"
       :min-item-size="72"
@@ -793,6 +805,16 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   overflow-anchor: none;
   background: #fff;
+}
+
+.message-scroller.is-restoring-thread {
+  pointer-events: none;
+}
+
+.message-scroller.is-restoring-thread :deep(.markdown-renderer),
+.message-scroller.is-restoring-thread .timeline-row {
+  transition: none !important;
+  animation: none !important;
 }
 
 .dynamic-row,
