@@ -36,7 +36,9 @@ describe('playground /virtual-timeline-zero shell smoke', () => {
     expect(wrapper.text()).toContain('Thread B')
     expect(wrapper.text()).toContain('Reading GitHub PR')
     expect(wrapper.find('[data-testid="markstream-virtual-timeline"]').exists()).toBe(true)
+    expect((window as any).__markstreamVirtualTimelineZero?.read().threadId).toBe('thread-a')
 
     wrapper.unmount()
+    expect((window as any).__markstreamVirtualTimelineZero).toBeUndefined()
   })
 })

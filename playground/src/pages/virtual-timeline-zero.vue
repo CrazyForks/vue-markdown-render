@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { computed, defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import MarkdownRender, { MarkstreamVirtualTimeline } from '../../../src/exports'
 import '../../../src/index.css'
 
@@ -15,7 +15,29 @@ type TimelineItem
     | { kind: 'error', id: string, message: string }
     | { kind: 'custom', id: string, component: Component }
 
+declare global {
+  interface Window {
+    __markstreamVirtualTimelineZero?: {
+      read: () => {
+        threadId: ThreadId
+        scrollTop: number
+        scrollHeight: number
+        clientHeight: number
+        totalHeight: number
+        state: unknown
+      }
+      scrollTo: (offset: number) => Promise<unknown>
+      switchThread: (threadId: ThreadId) => Promise<unknown>
+    }
+  }
+}
+
 const activeThreadId = ref<ThreadId>('thread-a')
+const timelineRef = ref<{
+  scrollToOffset: (offset: number) => void
+  captureThreadState: () => unknown
+  getTotalHeight: () => number
+} | null>(null)
 
 const InspectionPanel = defineComponent({
   name: 'InspectionPanel',
@@ -66,6 +88,51 @@ const timelineItems = computed(() => threadItems[activeThreadId.value])
 function switchThread(threadId: ThreadId) {
   activeThreadId.value = threadId
 }
+
+function getTimelineRoot() {
+  return document.querySelector<HTMLElement>('[data-testid="markstream-virtual-timeline"]')
+}
+
+function readSnapshot() {
+  const root = getTimelineRoot()
+
+  return {
+    threadId: activeThreadId.value,
+    scrollTop: root?.scrollTop ?? 0,
+    scrollHeight: root?.scrollHeight ?? 0,
+    clientHeight: root?.clientHeight ?? 0,
+    totalHeight: timelineRef.value?.getTotalHeight?.() ?? 0,
+    state: timelineRef.value?.captureThreadState?.() ?? null,
+  }
+}
+
+async function nextFrame() {
+  await nextTick()
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve())
+  })
+}
+
+onMounted(() => {
+  window.__markstreamVirtualTimelineZero = {
+    read: readSnapshot,
+    async scrollTo(offset: number) {
+      timelineRef.value?.scrollToOffset(offset)
+      await nextFrame()
+      return readSnapshot()
+    },
+    async switchThread(threadId: ThreadId) {
+      switchThread(threadId)
+      await nextFrame()
+      await nextFrame()
+      return readSnapshot()
+    },
+  }
+})
+
+onBeforeUnmount(() => {
+  delete window.__markstreamVirtualTimelineZero
+})
 </script>
 
 <template>
@@ -92,6 +159,7 @@ function switchThread(threadId: ThreadId) {
     </header>
 
     <MarkstreamVirtualTimeline
+      ref="timelineRef"
       class="timeline-surface"
       :items="timelineItems"
       :thread-key="activeThreadId"

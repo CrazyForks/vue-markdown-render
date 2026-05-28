@@ -463,4 +463,93 @@ describe('virtual timeline API', () => {
 
     scope.stop()
   })
+
+  it('restores per-thread scroll positions without auto-bottom overriding item anchors', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const makeThread = (prefix: string) => [
+      { kind: 'system-divider', id: `${prefix}-d`, text: prefix },
+      { kind: 'user-message', id: `${prefix}-u1`, text: `${prefix} user 1` },
+      { kind: 'assistant-markdown', id: `${prefix}-m1`, content: '# long\n\ncontent', final: true },
+      { kind: 'user-message', id: `${prefix}-u2`, text: `${prefix} user 2` },
+      { kind: 'assistant-markdown', id: `${prefix}-m2`, content: '# long\n\ncontent 2', final: true },
+    ]
+
+    const threadA = makeThread('a')
+    const threadB = makeThread('b')
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: threadA,
+        threadKey: 'thread-a',
+        overscan: 10,
+        stickToBottom: 'auto',
+        estimateItemHeight(item: any) {
+          if (item.kind === 'assistant-markdown')
+            return 640
+          if (item.kind === 'system-divider')
+            return 44
+          return 120
+        },
+      },
+      slots: {
+        default(props: any) {
+          return h('div', {
+            'ref': props.measureRef,
+            'data-kind': props.kind,
+          }, props.markdownProps?.content ?? props.item.text ?? '')
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+
+    ;(wrapper.vm as any).scrollToOffset(260)
+    await nextTick()
+
+    expect(root.scrollTop).toBe(260)
+
+    await wrapper.setProps({
+      items: threadB,
+      threadKey: 'thread-b',
+    })
+    await nextTick()
+    await flushAnimationFrame()
+
+    ;(wrapper.vm as any).scrollToOffset(520)
+    await nextTick()
+
+    expect(root.scrollTop).toBe(520)
+
+    await wrapper.setProps({
+      items: threadA,
+      threadKey: 'thread-a',
+    })
+    await nextTick()
+    await flushAnimationFrame()
+
+    expect(root.scrollTop).toBe(260)
+
+    await wrapper.setProps({
+      items: threadB,
+      threadKey: 'thread-b',
+    })
+    await nextTick()
+    await flushAnimationFrame()
+
+    expect(root.scrollTop).toBe(520)
+
+    wrapper.unmount()
+  })
 })

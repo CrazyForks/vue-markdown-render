@@ -74,7 +74,10 @@ const resizeObservers = new Map<string, ResizeObserver>()
 const threadStates = new Map<string, MarkstreamThreadVirtualState>()
 const markdownRestoreItemKey = ref<string | null>(null)
 const markdownRestoreToken = ref(0)
+const restoringThread = ref(false)
 let rootResizeObserver: ResizeObserver | null = null
+let threadRestoreSeq = 0
+let threadRestoreRaf: number | null = null
 
 const normalizedThreadKey = computed(() => props.threadKey == null ? undefined : String(props.threadKey))
 const timelineMeasurementKey = computed(() => {
@@ -200,8 +203,35 @@ function shouldStickToBottom() {
   return bottomPinned.value
 }
 
+function cancelThreadRestoreRaf() {
+  if (threadRestoreRaf != null && typeof cancelAnimationFrame === 'function')
+    cancelAnimationFrame(threadRestoreRaf)
+
+  threadRestoreRaf = null
+}
+
+function getViewportHeight() {
+  return Math.max(0, viewportHeight.value || scrollRoot.value?.clientHeight || 0)
+}
+
+function getMaxScrollOffset() {
+  return Math.max(0, layout.value.totalHeight - getViewportHeight())
+}
+
+function clampScrollOffset(offset: number) {
+  const numeric = Number(offset)
+
+  if (!Number.isFinite(numeric))
+    return 0
+
+  return Math.max(0, Math.min(numeric, getMaxScrollOffset()))
+}
+
 function distanceFromBottom() {
-  return layout.value.totalHeight - viewportHeight.value - scrollTop.value
+  return Math.max(
+    0,
+    layout.value.totalHeight - getViewportHeight() - scrollTop.value,
+  )
 }
 
 function updateBottomPinned() {
@@ -223,26 +253,59 @@ function updateLayoutWidthBucket() {
     : 0
 }
 
-function updateScrollMetrics() {
+function updateScrollMetrics(options: { remember?: boolean } = {}) {
   const root = scrollRoot.value
-  scrollTop.value = root?.scrollTop ?? 0
-  viewportHeight.value = root?.clientHeight ?? 0
+
+  if (root) {
+    scrollTop.value = Math.max(0, root.scrollTop || 0)
+    viewportHeight.value = root.clientHeight || 0
+  }
+
   updateLayoutWidthBucket()
   updateBottomPinned()
-  rememberThreadState()
+
+  if (options.remember !== false && !restoringThread.value)
+    rememberThreadState()
+}
+
+function applyScrollOffset(
+  offset: number,
+  options: {
+    writeDom?: boolean
+    remember?: boolean
+    updatePinned?: boolean
+  } = {},
+) {
+  const target = clampScrollOffset(offset)
+  const root = scrollRoot.value
+
+  scrollTop.value = target
+
+  if (root) {
+    viewportHeight.value = root.clientHeight || viewportHeight.value || 0
+
+    if (options.writeDom !== false && Math.abs((root.scrollTop || 0) - target) > 1)
+      root.scrollTop = target
+  }
+
+  updateLayoutWidthBucket()
+
+  if (options.updatePinned !== false)
+    updateBottomPinned()
+
+  if (options.remember !== false && !restoringThread.value)
+    rememberThreadState()
 }
 
 function scrollToOffset(offset: number) {
-  const root = scrollRoot.value
-  if (!root)
-    return
-
-  root.scrollTop = Math.max(0, offset)
-  updateScrollMetrics()
+  applyScrollOffset(offset, {
+    writeDom: true,
+    remember: true,
+  })
 }
 
 function scrollToBottom() {
-  scrollToOffset(Math.max(0, layout.value.totalHeight - viewportHeight.value))
+  scrollToOffset(layout.value.totalHeight - getViewportHeight())
 }
 
 function scrollToIndex(index: number, align: 'start' | 'center' | 'end' = 'start') {
@@ -269,13 +332,19 @@ function setItemSize(key: string, size: number) {
   if (previous != null && Math.abs(previous - next) < 0.5)
     return
 
-  const anchorBeforeChange = captureOuterAnchor()
-  const shouldPin = shouldStickToBottom()
+  const shouldReconcile = !restoringThread.value
+  const anchorBeforeChange = shouldReconcile
+    ? captureOuterAnchor()
+    : undefined
+  const shouldPin = shouldReconcile && shouldStickToBottom()
 
   itemSizes.set(key, next)
-  rememberThreadState()
 
-  scheduleScrollReconcileAfterSizeChange(anchorBeforeChange, shouldPin)
+  if (!restoringThread.value)
+    rememberThreadState()
+
+  if (shouldReconcile)
+    scheduleScrollReconcileAfterSizeChange(anchorBeforeChange, shouldPin)
 }
 
 function scheduleScrollReconcileAfterSizeChange(anchor: MarkstreamThreadAnchor | undefined, shouldPin: boolean) {
@@ -484,51 +553,120 @@ function rememberThreadState() {
   threadStates.set(key, captureThreadState())
 }
 
-function restoreOuterAnchor(anchor: MarkstreamThreadAnchor | undefined) {
+function resolveOuterAnchorOffset(anchor: MarkstreamThreadAnchor | undefined) {
   if (!anchor)
-    return
+    return null
 
   if (anchor.type === 'bottom') {
-    scrollToOffset(Math.max(
-      0,
-      layout.value.totalHeight - viewportHeight.value - anchor.distanceFromBottomPx,
-    ))
-    return
+    return layout.value.totalHeight
+      - getViewportHeight()
+      - Math.max(0, anchor.distanceFromBottomPx)
   }
 
   const record = layout.value.records.find(item => item.key === anchor.itemKey)
-  if (!record)
-    return
 
-  scrollToOffset(record.offset + anchor.offsetWithinItemPx)
+  if (!record)
+    return null
+
+  return record.offset + Math.max(0, anchor.offsetWithinItemPx)
+}
+
+function restoreOuterAnchor(
+  anchor: MarkstreamThreadAnchor | undefined,
+  options: { remember?: boolean } = {},
+) {
+  const offset = resolveOuterAnchorOffset(anchor)
+
+  if (offset == null)
+    return false
+
+  applyScrollOffset(offset, {
+    writeDom: true,
+    remember: options.remember === true,
+  })
+
+  return true
 }
 
 function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
+  const restoreSeq = ++threadRestoreSeq
+  const anchor = state?.outerAnchor
+  const fallbackAnchor: MarkstreamThreadAnchor | undefined = anchor
+    ?? (props.stickToBottom !== false
+      ? { type: 'bottom', distanceFromBottomPx: 0 }
+      : undefined)
+
+  cancelThreadRestoreRaf()
+  restoringThread.value = true
+
   cleanupMeasuredElements()
 
   itemSizes.clear()
   markdownStates.clear()
   markdownLogicalHeights.clear()
 
-  for (const [key, size] of Object.entries(state?.itemHeights ?? {}))
-    itemSizes.set(key, size)
+  for (const [key, size] of Object.entries(state?.itemHeights ?? {})) {
+    if (Number.isFinite(size) && size > 0)
+      itemSizes.set(key, Math.ceil(size))
+  }
+
   for (const [key, markdownState] of Object.entries(state?.markdownStates ?? {}))
     markdownStates.set(key, markdownState)
 
-  markdownRestoreItemKey.value = state?.outerAnchor?.type === 'item'
-    ? state.outerAnchor.itemKey
+  markdownRestoreItemKey.value = anchor?.type === 'item'
+    ? anchor.itemKey
     : null
   markdownRestoreToken.value += 1
 
+  if (props.stickToBottom === true) {
+    bottomPinned.value = true
+  }
+  else if (props.stickToBottom === false) {
+    bottomPinned.value = false
+  }
+  else {
+    bottomPinned.value = fallbackAnchor?.type === 'bottom'
+  }
+
+  const targetOffset = resolveOuterAnchorOffset(fallbackAnchor)
+
+  if (targetOffset != null) {
+    applyScrollOffset(targetOffset, {
+      writeDom: false,
+      remember: false,
+      updatePinned: false,
+    })
+  }
+
+  const applyRestore = () => {
+    if (restoreSeq !== threadRestoreSeq)
+      return
+
+    if (fallbackAnchor)
+      restoreOuterAnchor(fallbackAnchor, { remember: false })
+
+    updateScrollMetrics({ remember: false })
+  }
+
   void nextTick(() => {
-    if (state?.outerAnchor) {
-      restoreOuterAnchor(state.outerAnchor)
-    }
-    else if (props.stickToBottom !== false) {
-      bottomPinned.value = true
-      scrollToBottom()
+    applyRestore()
+
+    if (typeof requestAnimationFrame === 'function') {
+      threadRestoreRaf = requestAnimationFrame(() => {
+        threadRestoreRaf = null
+
+        applyRestore()
+
+        if (restoreSeq === threadRestoreSeq) {
+          restoringThread.value = false
+          updateScrollMetrics()
+        }
+      })
+
+      return
     }
 
+    restoringThread.value = false
     updateScrollMetrics()
   })
 }
@@ -553,6 +691,7 @@ watch(
   (threadKey) => {
     restoreThreadState(threadKey ? threadStates.get(threadKey) : null)
   },
+  { flush: 'pre' },
 )
 
 watch(
@@ -569,10 +708,15 @@ watch(
 watch(
   () => [props.items.length, layout.value.totalHeight],
   () => {
+    if (restoringThread.value)
+      return
+
     if (!shouldStickToBottom())
       return
+
     void nextTick(() => {
-      scrollToBottom()
+      if (!restoringThread.value)
+        scrollToBottom()
     })
   },
   { flush: 'post' },
@@ -600,6 +744,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   rememberThreadState()
+  cancelThreadRestoreRaf()
   cleanupObservers()
 })
 
@@ -620,7 +765,7 @@ defineExpose({
     ref="scrollRoot"
     class="markstream-virtual-timeline"
     data-testid="markstream-virtual-timeline"
-    @scroll="updateScrollMetrics"
+    @scroll="updateScrollMetrics()"
   >
     <div
       class="markstream-virtual-timeline__spacer"

@@ -232,6 +232,8 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   const resizeObservers = new Map<string, ResizeObserver>()
   const markdownRestoreItemKey = ref<string | null>(null)
   const markdownRestoreToken = ref(0)
+  let restoreThreadSeq = 0
+  let restoreThreadRaf: number | null = null
 
   function getItems() {
     return [...toValue(options.items)]
@@ -292,6 +294,13 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
         })
       }
     })
+  }
+
+  function cancelRestoreThreadRaf() {
+    if (restoreThreadRaf != null && typeof cancelAnimationFrame === 'function')
+      cancelAnimationFrame(restoreThreadRaf)
+
+    restoreThreadRaf = null
   }
 
   function setItemSize(key: string, size: number) {
@@ -541,21 +550,44 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   }
 
   function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
+    const seq = ++restoreThreadSeq
+    const anchor = state?.outerAnchor
+
+    cancelRestoreThreadRaf()
+
     markdownLogicalHeights.clear()
     importItemHeights(state?.itemHeights ?? {})
     importMarkdownStates(state?.markdownStates ?? {})
 
-    markdownRestoreItemKey.value = state?.outerAnchor?.type === 'item'
-      ? state.outerAnchor.itemKey
+    markdownRestoreItemKey.value = anchor?.type === 'item'
+      ? anchor.itemKey
       : null
     markdownRestoreToken.value += 1
 
+    const apply = () => {
+      if (seq !== restoreThreadSeq)
+        return
+
+      restoreOuterAnchor(anchor)
+    }
+
+    apply()
+
     void nextTick(() => {
-      restoreOuterAnchor(state?.outerAnchor)
+      apply()
+
+      if (typeof requestAnimationFrame === 'function') {
+        restoreThreadRaf = requestAnimationFrame(() => {
+          restoreThreadRaf = null
+          apply()
+        })
+      }
     })
   }
 
   function dispose() {
+    cancelRestoreThreadRaf()
+
     for (const observer of resizeObservers.values())
       observer.disconnect()
     resizeObservers.clear()
