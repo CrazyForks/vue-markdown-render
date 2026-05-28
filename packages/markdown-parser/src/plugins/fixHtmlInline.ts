@@ -163,15 +163,14 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
   if (!customTagSet.size)
     return
 
-  const customTagOpenNeedles = Array.from(customTagSet, tag => `<${tag}`)
+  const customTagOpenRes = Array.from(customTagSet, tag => new RegExp(String.raw`<\s*${escapeTagForRegExp(tag)}(?=[\s>/])`, 'i'))
   const stack: Array<{ tag: string, token: MarkdownToken, raw: string, inner: string }> = []
   let needsTopLevelSeparator = false
 
   const mayOpenCustomTag = (source: string) => {
     if (!source)
       return false
-    const lower = source.toLowerCase()
-    return customTagOpenNeedles.some(needle => lower.includes(needle))
+    return customTagOpenRes.some(re => re.test(source))
   }
 
   const appendToOpenFrames = (raw: string) => {

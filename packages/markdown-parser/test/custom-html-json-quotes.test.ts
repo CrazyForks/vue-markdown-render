@@ -107,6 +107,31 @@ describe('custom HTML JSON content', () => {
     expect(() => JSON.parse(customData.content)).not.toThrow()
   })
 
+  it('keeps source payload separate from markdown-rendered children', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-markdown-children', { customHtmlTags: tags })
+    const payload = '{"title":"**Report**","note":"don\'t change \\"quotes\\" or x_y"}'
+    const markdown = `<custom-data>${payload}</custom-data>`
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe(payload)
+    expect(customData?.raw).toBe(markdown)
+    expect(() => JSON.parse(customData.content)).not.toThrow()
+    expect(customData?.children?.some((child: any) => child.type === 'strong')).toBe(true)
+  })
+
+  it('does not confuse custom tag names with longer tag prefixes', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-prefix-tags', { customHtmlTags: tags })
+    const markdown = '<custom-data2>{"a":"b"}</custom-data2>'
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+
+    expect(findNodeByType(nodes, 'custom-data')).toBeUndefined()
+  })
+
   it('does not include a top-level html_block closing tag in custom JSON content', () => {
     const tags = ['custom-data']
     const md = getMarkdown('custom-html-json-quotes-html-block-close', { customHtmlTags: tags })
