@@ -31,12 +31,17 @@ const customDataChunks = [
   '>',
 ]
 
-function findCustomDataNode(nodes: any[]): any | undefined {
+function findNodeByType(nodes: any[], type: string): any | undefined {
   for (const node of nodes) {
-    if (node?.type === 'custom-data')
+    if (node?.type === type)
       return node
     if (Array.isArray(node?.children)) {
-      const found = findCustomDataNode(node.children)
+      const found = findNodeByType(node.children, type)
+      if (found)
+        return found
+    }
+    if (Array.isArray(node?.items)) {
+      const found = findNodeByType(node.items, type)
       if (found)
         return found
     }
@@ -52,7 +57,7 @@ describe('custom HTML JSON content', () => {
     for (const chunk of customDataChunks) {
       content += chunk
       const nodes = parseMarkdownToStructure(content, md, { customHtmlTags: tags, final: false }) as any[]
-      const customData = findCustomDataNode(nodes)
+      const customData = findNodeByType(nodes, 'custom-data')
       if (!customData?.content)
         continue
 
@@ -61,8 +66,21 @@ describe('custom HTML JSON content', () => {
     }
 
     const nodes = parseMarkdownToStructure(content, md, { customHtmlTags: tags, final: true }) as any[]
-    const customData = findCustomDataNode(nodes)
+    const customData = findNodeByType(nodes, 'custom-data')
     expect(customData?.content).toBe('{"type":"fileinfo","filename":"技能市场产品需求文档.md","url":"/center/ckeApi/api/tools/file/download?fileId=67e3e46d-f962-459d-a03d-366a0af5eb69"}')
     expect(() => JSON.parse(customData.content)).not.toThrow()
+  })
+
+  it('preserves line separators and straight quotes inside nested custom tags', () => {
+    const tags = ['thinking']
+    const md = getMarkdown('custom-html-json-quotes-nested-lines', { customHtmlTags: tags })
+    const markdown = '- prefix <thinking>line 1\n\n  line 2 "ok"</thinking>'
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const thinking = findNodeByType(nodes, 'thinking')
+
+    expect(thinking?.content).toMatch(/^line 1\n+line 2 "ok"$/)
+    expect(String(thinking?.content ?? '')).not.toContain('“')
+    expect(String(thinking?.content ?? '')).not.toContain('”')
   })
 })

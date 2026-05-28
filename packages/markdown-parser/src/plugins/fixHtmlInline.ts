@@ -164,6 +164,7 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
     return
 
   const stack: Array<{ tag: string, token: MarkdownToken, raw: string, inner: string }> = []
+  let needsTopLevelSeparator = false
 
   const appendToOpenFrames = (raw: string) => {
     if (!raw || !stack.length)
@@ -174,8 +175,18 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
     }
   }
 
-  const handleToken = (child: MarkdownToken) => {
-    const raw = tokenToRaw(child)
+  const appendTopLevelSeparator = () => {
+    if (!stack.length || !needsTopLevelSeparator)
+      return
+    appendToOpenFrames('\n')
+    needsTopLevelSeparator = false
+  }
+
+  const appendSourceGap = (gap: string) => {
+    appendToOpenFrames(gap.includes('\n') ? '\n' : gap)
+  }
+
+  const handleToken = (child: MarkdownToken, raw: string) => {
     const tag = child.type === 'html_inline'
       ? getHtmlInlineTagName(raw)
       : ''
@@ -217,13 +228,42 @@ function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<s
 
   for (const token of tokens) {
     if (token.type === 'inline' && Array.isArray(token.children)) {
-      for (const child of token.children)
-        handleToken(child)
+      appendTopLevelSeparator()
+
+      const source = String(token.content ?? '')
+      let cursor = 0
+      let sourceReliable = true
+      for (const child of token.children) {
+        const childRaw = tokenToRaw(child)
+        let raw = childRaw
+
+        if (sourceReliable && source && childRaw) {
+          const index = source.indexOf(childRaw, cursor)
+          if (index !== -1) {
+            appendSourceGap(source.slice(cursor, index))
+            raw = source.slice(index, index + childRaw.length)
+            cursor = index + childRaw.length
+          }
+          else {
+            sourceReliable = false
+          }
+        }
+
+        handleToken(child, raw)
+      }
+
+      if (sourceReliable && source && cursor < source.length)
+        appendSourceGap(source.slice(cursor))
+
+      needsTopLevelSeparator = stack.length > 0
       continue
     }
 
-    if (stack.length && typeof token.content === 'string')
+    if (stack.length && typeof token.content === 'string') {
+      appendTopLevelSeparator()
       appendToOpenFrames(token.content)
+      needsTopLevelSeparator = true
+    }
   }
 
   for (const frame of stack)
