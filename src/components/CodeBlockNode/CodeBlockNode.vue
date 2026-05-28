@@ -460,17 +460,22 @@ const codeFontMax = 36
 const codeFontStep = 1
 const defaultPreFallbackFontSize = 12
 const defaultPreFallbackLineHeight = 18
-const defaultDiffPreFallbackLineHeight = 30
 const defaultCodeFontSize = ref<number>(
   typeof props.monacoOptions?.fontSize === 'number' ? props.monacoOptions!.fontSize : Number.NaN,
 )
 const codeFontSize = ref<number>(defaultCodeFontSize.value)
+// Set by syncFallbackFontMetricsFromEditor() after Monaco renders; drive preFallback* computeds.
+const measuredEditorFontSize = ref<number | null>(null)
+const measuredEditorLineHeight = ref<number | null>(null)
 const fontBaselineReady = computed(() => {
   const a = defaultCodeFontSize.value
   const b = codeFontSize.value
   return typeof a === 'number' && Number.isFinite(a) && a > 0 && typeof b === 'number' && Number.isFinite(b) && b > 0
 })
 const preFallbackFontSize = computed(() => {
+  const measured = measuredEditorFontSize.value
+  if (typeof measured === 'number' && Number.isFinite(measured) && measured > 0)
+    return measured
   const fromOptions = props.monacoOptions?.fontSize
   if (typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0)
     return fromOptions
@@ -480,6 +485,9 @@ const preFallbackFontSize = computed(() => {
   return defaultPreFallbackFontSize
 })
 const preFallbackLineHeight = computed(() => {
+  const measured = measuredEditorLineHeight.value
+  if (typeof measured === 'number' && Number.isFinite(measured) && measured > 0)
+    return measured
   const fromOptions = props.monacoOptions?.lineHeight
   if (typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0)
     return fromOptions
@@ -487,16 +495,8 @@ const preFallbackLineHeight = computed(() => {
     return defaultPreFallbackLineHeight
   return Math.max(12, Math.round(preFallbackFontSize.value * 1.5))
 })
-// Effective line height for diff fallback: honours monacoOptions.lineHeight, else 30px.
-const preFallbackEffectiveLineHeight = computed(() => {
-  if (isDiff.value) {
-    const fromOptions = props.monacoOptions?.lineHeight
-    return typeof fromOptions === 'number' && Number.isFinite(fromOptions) && fromOptions > 0
-      ? fromOptions
-      : defaultDiffPreFallbackLineHeight
-  }
-  return preFallbackLineHeight.value
-})
+// Unified line height for both diff and non-diff fallback; uses measured values first.
+const preFallbackEffectiveLineHeight = computed(() => preFallbackLineHeight.value)
 // Max line count across both diff panes.
 const diffPreFallbackLineCount = computed(() => {
   const countLines = (source: unknown) => {
@@ -1085,6 +1085,95 @@ function shouldPreferPlainTextFallbackSurface(bg: string, fg: string, expectDark
 // Copy computed CSS variables from the editor DOM up to the component root so
 // the header (which lives alongside the editor but outside its inner DOM)
 // can use variables like --vscode-editor-foreground / --vscode-editor-background.
+function getCodeEditorLayerElement() {
+  const parent = codeEditor.value?.parentElement
+  return parent instanceof HTMLElement ? parent : null
+}
+
+function setLayerPxVar(name: string, value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value) || value <= 0)
+    return
+  getCodeEditorLayerElement()?.style.setProperty(name, `${value}px`)
+}
+
+function clearLayerMeasuredVars() {
+  const layerEl = getCodeEditorLayerElement()
+  if (!layerEl)
+    return
+  layerEl.style.removeProperty('--stream-monaco-line-number-left')
+  layerEl.style.removeProperty('--stream-monaco-line-number-width')
+  layerEl.style.removeProperty('--stream-monaco-original-scrollable-left')
+  layerEl.style.removeProperty('--stream-monaco-modified-scrollable-left')
+}
+
+function syncFallbackFontMetricsFromEditor() {
+  const fontSize = readActualFontSizeFromEditor()
+  if (fontSize && fontSize > 0) {
+    measuredEditorFontSize.value = fontSize
+    codeFontSize.value = fontSize
+    defaultCodeFontSize.value = fontSize
+  }
+  try {
+    const editor = isDiff.value
+      ? getDiffEditorView()?.getModifiedEditor?.() ?? getDiffEditorView()
+      : getEditorView()
+    const lineHeight = getLineHeightSafe(editor)
+    if (lineHeight && lineHeight > 0)
+      measuredEditorLineHeight.value = lineHeight
+  }
+  catch {}
+  try {
+    const domLineHeight = measureLineHeightFromDom()
+    if (domLineHeight && domLineHeight > 0)
+      measuredEditorLineHeight.value = domLineHeight
+  }
+  catch {}
+}
+
+function syncDiffFallbackLayoutVarsFromEditor() {
+  if (!isDiff.value)
+    return
+  const host = codeEditor.value
+  if (!host)
+    return
+  const diffRoot = host.querySelector('.monaco-diff-editor') as HTMLElement | null
+  if (!diffRoot)
+    return
+
+  function measurePane(
+    root: HTMLElement,
+    paneSelector: string,
+    scrollableVar: '--stream-monaco-original-scrollable-left' | '--stream-monaco-modified-scrollable-left',
+  ) {
+    const pane = root.querySelector(paneSelector) as HTMLElement | null
+    if (!pane)
+      return
+    const paneRect = pane.getBoundingClientRect()
+    if (paneRect.width <= 0)
+      return
+    const lineNumber = pane.querySelector('.line-numbers') as HTMLElement | null
+    const viewLine = pane.querySelector('.view-lines .view-line') as HTMLElement | null
+    const margin = pane.querySelector('.margin') as HTMLElement | null
+    if (lineNumber) {
+      const rect = lineNumber.getBoundingClientRect()
+      setLayerPxVar('--stream-monaco-line-number-left', rect.left - paneRect.left)
+      setLayerPxVar('--stream-monaco-line-number-width', rect.width)
+    }
+    if (viewLine) {
+      const rect = viewLine.getBoundingClientRect()
+      setLayerPxVar(scrollableVar, rect.left - paneRect.left)
+      return
+    }
+    if (margin) {
+      const rect = margin.getBoundingClientRect()
+      setLayerPxVar(scrollableVar, rect.width)
+    }
+  }
+
+  measurePane(diffRoot, '.editor.original', '--stream-monaco-original-scrollable-left')
+  measurePane(diffRoot, '.editor.modified', '--stream-monaco-modified-scrollable-left')
+}
+
 function syncEditorCssVars() {
   const editorEl = codeEditor.value as HTMLElement | null
   const rootEl = container.value as HTMLElement | null
@@ -2026,6 +2115,9 @@ async function runEditorCreation(el: HTMLElement) {
 
   editorCreationFailed.value = false
   editorDisplayReady.value = false
+  measuredEditorFontSize.value = null
+  measuredEditorLineHeight.value = null
+  clearLayerMeasuredVars()
   armEstimatedEditorHeightFloor()
   clearEditorHeightSyncBindings()
   clearInlineFoldProxies()
@@ -2070,6 +2162,8 @@ async function runEditorCreation(el: HTMLElement) {
     }
   }
 
+  syncFallbackFontMetricsFromEditor()
+
   if (!isExpanded.value && !isCollapsed.value)
     syncEditorHostHeight(false)
 
@@ -2079,6 +2173,7 @@ async function runEditorCreation(el: HTMLElement) {
   editorMounted.value = true
   bindEditorHeightSync()
   syncEditorCssVars()
+  syncFallbackFontMetricsFromEditor()
   syncInlineFoldProxies()
   refreshDiffStats()
   scheduleEditorHeightSync()
@@ -2086,6 +2181,8 @@ async function runEditorCreation(el: HTMLElement) {
   await waitForDiffEditorVisualReady()
   if (isUnmounted)
     return
+  syncFallbackFontMetricsFromEditor()
+  syncDiffFallbackLayoutVarsFromEditor()
   editorDisplayReady.value = true
 }
 

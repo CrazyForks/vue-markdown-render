@@ -224,9 +224,9 @@ const ariaLabel = computed(() => {
   position: relative;
   display: block;
   box-sizing: border-box;
-  min-height: var(--markstream-pre-diff-line-height, 30px);
+  min-height: var(--markstream-pre-diff-line-height, 18px);
   padding-left: var(--markstream-pre-diff-scrollable-left);
-  line-height: var(--markstream-pre-diff-line-height, 30px);
+  line-height: var(--markstream-pre-diff-line-height, 18px);
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line::before {
@@ -255,7 +255,7 @@ const ariaLabel = computed(() => {
   width: var(--markstream-pre-diff-line-number-width);
   color: var(--code-line-number);
   font-variant-numeric: tabular-nums;
-  line-height: var(--markstream-pre-diff-line-height, 30px);
+  line-height: var(--markstream-pre-diff-line-height, 18px);
   text-align: var(--markstream-pre-diff-line-number-align, right);
   user-select: none;
 }
@@ -265,7 +265,7 @@ const ariaLabel = computed(() => {
   z-index: 1;
   display: block;
   min-width: 0;
-  line-height: var(--markstream-pre-diff-line-height, 30px);
+  line-height: var(--markstream-pre-diff-line-height, 18px);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: normal;

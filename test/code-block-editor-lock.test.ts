@@ -270,7 +270,7 @@ describe('codeBlockNode editor creation locking', () => {
       const fallbackEl = fallback.element as HTMLElement
       expect(fallback.classes()).toContain('markstream-pre--diff-preview')
       expect(fallbackEl.style.height).toBe('')
-      expect(fallbackEl.style.minHeight).toBe('60px')
+      expect(fallbackEl.style.minHeight).toBe('36px')
       expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(2)
       expect(wrapper.findAll('.markstream-pre__diff-pane--original .markstream-pre__diff-content').map(node => node.text())).toEqual([
         'const oldValue = 1',
