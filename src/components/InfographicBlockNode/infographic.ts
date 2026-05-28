@@ -8,7 +8,16 @@ export interface InfographicConstructor {
   new (options: { container: HTMLElement, width?: string | number, height?: string | number }): InfographicInstance
 }
 
-export type InfographicLoader = () => Promise<unknown> | unknown
+export type InfographicModuleLike
+  = InfographicConstructor
+    | {
+      default?: InfographicModuleLike
+      Infographic?: InfographicConstructor
+    }
+    | null
+    | undefined
+
+export type InfographicLoader = () => Promise<InfographicModuleLike> | InfographicModuleLike
 
 let cachedInfographic: InfographicConstructor | null = null
 let infographicLoader: InfographicLoader | null = null

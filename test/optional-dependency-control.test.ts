@@ -101,7 +101,7 @@ describe('optional dependency controllers', () => {
         render() {}
       }
 
-      let resolve!: (value: object) => void
+      let resolve: (value: object) => void = () => {}
       const loader = vi.fn(() =>
         new Promise<object>((r) => {
           resolve = r
