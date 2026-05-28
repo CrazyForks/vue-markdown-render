@@ -61,7 +61,7 @@ export async function getInfographic(): Promise<InfographicConstructor | null> {
   // Handle ESM default export or named export
   const defaultExport = (mod && (mod as any).default) ? (mod as any).default : mod
 
-  const resolved = typeof defaultExport === 'function' && defaultExport.prototype?.render
+  const resolved = typeof defaultExport === 'function' && typeof defaultExport.prototype?.render === 'function'
     ? defaultExport
     : (mod.Infographic ?? defaultExport?.Infographic ?? defaultExport)
   if (version !== loaderVersion || loader !== infographicLoader)

@@ -101,10 +101,10 @@ describe('optional dependency controllers', () => {
         render() {}
       }
 
-      let resolve: (value: object) => void = () => {}
+      let resolveLoader: (value: object) => void = () => {}
       const loader = vi.fn(() =>
         new Promise<object>((r) => {
-          resolve = r
+          resolveLoader = r
         }),
       )
 
@@ -112,7 +112,7 @@ describe('optional dependency controllers', () => {
       const pending = getInfographic()
 
       disableInfographic()
-      resolve({ Infographic: CustomInfographic })
+      resolveLoader({ Infographic: CustomInfographic })
 
       await expect(pending).resolves.toBeNull()
       await expect(getInfographic()).resolves.toBeNull()
