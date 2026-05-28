@@ -83,4 +83,12 @@ describe('custom HTML JSON content', () => {
     expect(String(thinking?.content ?? '')).not.toContain('“')
     expect(String(thinking?.content ?? '')).not.toContain('”')
   })
+
+  it('keeps typographer enabled for normal markdown text', () => {
+    const md = getMarkdown('custom-html-json-quotes-normal-text')
+    const nodes = parseMarkdownToStructure('He said "ok".', md, { final: true }) as any[]
+    const text = nodes[0]?.children?.[0]?.content
+
+    expect(text).toBe('He said “ok”.')
+  })
 })
