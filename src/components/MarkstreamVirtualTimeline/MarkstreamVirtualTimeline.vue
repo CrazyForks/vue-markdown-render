@@ -65,6 +65,16 @@ interface TimelineRecord {
   component?: unknown
 }
 
+interface ReconcileRecordSizeOptions {
+  allowMarkdownShrink?: boolean
+}
+
+interface MarkdownLogicalHeightSource {
+  sessionKey: string
+  threadKey?: string
+  measurementKey?: string
+}
+
 const scrollRoot = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const viewportHeight = ref(0)
@@ -73,6 +83,7 @@ const bottomPinned = ref(true)
 const itemSizes = reactive(new Map<string, number>()) as Map<string, number>
 const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
 const markdownLogicalHeights = reactive(new Map<string, number>()) as Map<string, number>
+const markdownLogicalHeightSources = new Map<string, MarkdownLogicalHeightSource>()
 const measuredElements = new Map<string, HTMLElement>()
 const resizeObservers = new Map<string, ResizeObserver>()
 const threadStates = new Map<string, MarkstreamThreadVirtualState>()
@@ -201,6 +212,89 @@ function getSessionKey(record: TimelineRecord) {
     record.key,
     revision == null ? '' : String(revision),
   ].join(':')
+}
+
+function findRecordByKey(key: string) {
+  return layout.value.records.find(record => record.key === key)
+}
+
+function isCompatibleMarkdownSource(
+  record: TimelineRecord | undefined,
+  source: MarkdownLogicalHeightSource | null | undefined,
+) {
+  if (!record || !record.markdown || !source)
+    return false
+
+  if (source.sessionKey !== getSessionKey(record))
+    return false
+
+  if ((source.threadKey ?? '') !== (normalizedThreadKey.value ?? ''))
+    return false
+
+  if (
+    source.measurementKey
+    && source.measurementKey !== timelineMeasurementKey.value
+  ) {
+    return false
+  }
+
+  return true
+}
+
+function isCompatibleMarkdownState(
+  record: TimelineRecord | undefined,
+  state: MarkstreamVirtualState | null | undefined,
+) {
+  return isCompatibleMarkdownSource(record, state)
+}
+
+function getLogicalHeightFromMarkdownState(
+  key: string,
+  state = markdownStates.get(key),
+) {
+  const record = findRecordByKey(key)
+
+  if (!isCompatibleMarkdownState(record, state))
+    return 0
+
+  const height = Number(state?.metrics?.totalHeight)
+  return Number.isFinite(height) && height > 0
+    ? Math.ceil(height)
+    : 0
+}
+
+function setMarkdownLogicalHeight(
+  key: string,
+  height: number,
+  source: MarkdownLogicalHeightSource,
+) {
+  if (!Number.isFinite(height) || height <= 0)
+    return
+
+  markdownLogicalHeights.set(key, Math.ceil(height))
+  markdownLogicalHeightSources.set(key, source)
+}
+
+function seedMarkdownLogicalHeightFromState(
+  key: string,
+  state = markdownStates.get(key),
+) {
+  const height = getLogicalHeightFromMarkdownState(key, state)
+
+  if (height > 0)
+    setMarkdownLogicalHeight(key, height, state!)
+
+  return height
+}
+
+function getKnownMarkdownLogicalHeight(key: string) {
+  const record = findRecordByKey(key)
+  const source = markdownLogicalHeightSources.get(key)
+
+  if (isCompatibleMarkdownSource(record, source))
+    return markdownLogicalHeights.get(key) ?? 0
+
+  return seedMarkdownLogicalHeightFromState(key)
 }
 
 function shouldStickToBottom() {
@@ -401,18 +495,44 @@ function getMeasuredMarkdownChromeHeight(key: string) {
   return getMarkdownItemChromeHeight(measuredElements.get(key))
 }
 
-function reconcileRecordSize(record: TimelineRecord) {
+function reconcileRecordSize(
+  record: TimelineRecord,
+  options: ReconcileRecordSizeOptions = {},
+) {
   const measured = getMeasuredItemHeight(record.key)
-  const markdown = record.markdown
-    ? (markdownLogicalHeights.get(record.key) ?? 0)
-    : 0
 
-  const next = record.markdown && markdown > 0
-    ? Math.max(measured, markdown + getMeasuredMarkdownChromeHeight(record.key))
-    : measured
+  if (!record.markdown) {
+    if (measured > 0)
+      setItemSize(record.key, measured)
 
-  if (next > 0)
-    setItemSize(record.key, next)
+    return
+  }
+
+  const cachedSize = itemSizes.get(record.key) ?? 0
+  const markdown = getKnownMarkdownLogicalHeight(record.key)
+  const chrome = getMeasuredMarkdownChromeHeight(record.key)
+
+  if (markdown > 0) {
+    let next = Math.max(measured, markdown + chrome)
+
+    if (!options.allowMarkdownShrink && cachedSize > 0)
+      next = Math.max(next, cachedSize)
+
+    if (next > 0)
+      setItemSize(record.key, next)
+
+    return
+  }
+
+  if (cachedSize > 0) {
+    if (measured > cachedSize + 1)
+      setItemSize(record.key, measured)
+
+    return
+  }
+
+  if (measured > 0)
+    setItemSize(record.key, measured)
 }
 
 function setMeasuredItemElement(record: TimelineRecord, el: Element | { $el?: Element | null } | null | undefined) {
@@ -421,7 +541,6 @@ function setMeasuredItemElement(record: TimelineRecord, el: Element | { $el?: El
 
   if (!element) {
     cleanupMeasuredElement(record.key)
-    reconcileRecordSize(record)
     return
   }
 
@@ -474,17 +593,32 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
     indexKey: getSessionKey(record),
     virtualScroll,
     onHeightChange(metrics: MarkstreamVirtualMetrics) {
-      markdownLogicalHeights.set(record.key, metrics.totalHeight)
-      reconcileRecordSize(record)
+      if (metrics.sessionKey !== getSessionKey(record))
+        return
+
+      setMarkdownLogicalHeight(record.key, metrics.totalHeight, {
+        sessionKey: metrics.sessionKey,
+        threadKey: normalizedThreadKey.value,
+        measurementKey: timelineMeasurementKey.value,
+      })
+      reconcileRecordSize(record, {
+        allowMarkdownShrink: true,
+      })
 
       void nextTick(() => {
-        reconcileRecordSize(record)
+        reconcileRecordSize(record, {
+          allowMarkdownShrink: true,
+        })
       })
 
       emitHeightChange({ itemKey: record.key, metrics })
     },
     onVirtualStateChange(state: MarkstreamVirtualState) {
+      if (state.sessionKey !== getSessionKey(record))
+        return
+
       markdownStates.set(record.key, state)
+      seedMarkdownLogicalHeightFromState(record.key, state)
       rememberThreadState()
       emitVirtualStateChange({ itemKey: record.key, state })
     },
@@ -667,14 +801,17 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
   itemSizes.clear()
   markdownStates.clear()
   markdownLogicalHeights.clear()
+  markdownLogicalHeightSources.clear()
 
   for (const [key, size] of Object.entries(state?.itemHeights ?? {})) {
     if (Number.isFinite(size) && size > 0)
       itemSizes.set(key, Math.ceil(size))
   }
 
-  for (const [key, markdownState] of Object.entries(state?.markdownStates ?? {}))
+  for (const [key, markdownState] of Object.entries(state?.markdownStates ?? {})) {
     markdownStates.set(key, markdownState)
+    seedMarkdownLogicalHeightFromState(key, markdownState)
+  }
 
   markdownRestoreItemKey.value = anchor?.type === 'item'
     ? anchor.itemKey
@@ -695,7 +832,7 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
 
   if (targetOffset != null) {
     applyScrollOffset(targetOffset, {
-      writeDom: false,
+      writeDom: true,
       remember: false,
       updatePinned: false,
     })
@@ -748,6 +885,7 @@ function cleanupMeasuredElements() {
 function cleanupObservers() {
   cleanupMeasuredElements()
   markdownLogicalHeights.clear()
+  markdownLogicalHeightSources.clear()
   rootResizeObserver?.disconnect()
   rootResizeObserver = null
 }
@@ -889,15 +1027,18 @@ defineExpose({
   height: 100%;
   min-height: 0;
   overflow: auto;
+  overflow-anchor: none;
 }
 
 .markstream-virtual-timeline__spacer {
   flex: 0 0 auto;
+  overflow-anchor: none;
 }
 
 .markstream-virtual-timeline__item {
   display: flow-root;
   flex: 0 0 auto;
+  overflow-anchor: none;
 }
 
 .markstream-virtual-timeline__default-item {

@@ -519,12 +519,19 @@ async function switchThread(threadId: ThreadId) {
     return
 
   rememberThreadState()
-  activeThreadId.value = threadId
-
-  await nextTick()
-  rebuildOffsets()
 
   const saved = savedThreadStates.get(threadId)
+  if (saved)
+    adapter.preloadThreadState(saved.markstreamState)
+  else
+    adapter.preloadThreadState(null)
+
+  activeThreadId.value = threadId
+
+  rebuildOffsets()
+
+  await nextTick()
+
   if (saved) {
     scrollerRef.value?.restoreCache?.(saved.scrollerCache)
     adapter.restoreThreadState(saved.markstreamState)
@@ -535,6 +542,7 @@ async function switchThread(threadId: ThreadId) {
   }
 
   await nextTick()
+  scrollerRef.value?.forceUpdate?.(false)
   updateScrollMetrics()
 }
 
@@ -783,12 +791,14 @@ onBeforeUnmount(() => {
   border: 1px solid #dbe3ef;
   border-radius: 8px;
   overflow-y: auto;
+  overflow-anchor: none;
   background: #fff;
 }
 
 .dynamic-row,
 .timeline-row {
   display: flow-root;
+  overflow-anchor: none;
 }
 
 .timeline-row {

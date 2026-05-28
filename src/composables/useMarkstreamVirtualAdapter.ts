@@ -137,6 +137,7 @@ export interface MarkstreamVirtualAdapterController<T = MarkstreamTimelineItem> 
   measureItem: (item: T, index: number, el: Element | { $el?: Element | null } | null | undefined) => void
   markdownProps: (item: T, index: number) => MarkstreamVirtualMarkdownProps
   captureThreadState: () => MarkstreamThreadVirtualState
+  preloadThreadState: (state: MarkstreamThreadVirtualState | null | undefined) => void
   restoreThreadState: (state: MarkstreamThreadVirtualState | null | undefined) => void
   dispose: () => void
 }
@@ -229,9 +230,20 @@ export function estimateMarkstreamTimelineItemHeight<T>(
 export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   options: UseMarkstreamVirtualAdapterOptions<T>,
 ): MarkstreamVirtualAdapterController<T> {
+  interface ReconcileItemSizeOptions {
+    allowMarkdownShrink?: boolean
+  }
+
+  interface MarkdownLogicalHeightSource {
+    sessionKey: string
+    threadKey?: string
+    measurementKey?: string
+  }
+
   const itemHeights = reactive(new Map<string, number>()) as Map<string, number>
   const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
   const markdownLogicalHeights = reactive(new Map<string, number>()) as Map<string, number>
+  const markdownLogicalHeightSources = new Map<string, MarkdownLogicalHeightSource>()
   const measuredElements = new Map<string, HTMLElement>()
   const resizeObservers = new Map<string, ResizeObserver>()
   const markdownRestoreItemKey = ref<string | null>(null)
@@ -266,6 +278,114 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     const threadKey = normalizeThreadKey()
     const revision = getMarkstreamTimelineItemRevision(item, index, options)
     return [threadKey ?? 'timeline', itemKey, revision == null ? '' : String(revision)].join(':')
+  }
+
+  function normalizeMeasurementKey() {
+    const measurementKey = toValue(options.measurementKey)
+    return measurementKey == null ? undefined : String(measurementKey)
+  }
+
+  function findCurrentItemByKey(key: string) {
+    const items = getItems()
+
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index]!
+      if (getItemKey(item, index) === key)
+        return { item, index }
+    }
+
+    return null
+  }
+
+  function isCompatibleMarkdownSource(
+    key: string,
+    source: MarkdownLogicalHeightSource | null | undefined,
+  ) {
+    const match = findCurrentItemByKey(key)
+    if (!match || !source)
+      return false
+
+    if (!isMarkdownItem(match.item, match.index))
+      return false
+
+    if (source.sessionKey !== getSessionKey(match.item, match.index))
+      return false
+
+    if ((source.threadKey ?? '') !== (normalizeThreadKey() ?? ''))
+      return false
+
+    const measurementKey = normalizeMeasurementKey()
+    if (
+      source.measurementKey
+      && measurementKey != null
+      && source.measurementKey !== measurementKey
+    ) {
+      return false
+    }
+
+    return true
+  }
+
+  function isCurrentMarkdownKey(key: string) {
+    const match = findCurrentItemByKey(key)
+    return match ? isMarkdownItem(match.item, match.index) : false
+  }
+
+  function isCompatibleMarkdownState(
+    key: string,
+    state: MarkstreamVirtualState | null | undefined,
+  ) {
+    return isCompatibleMarkdownSource(key, state)
+  }
+
+  function getLogicalHeightFromMarkdownState(
+    key: string,
+    state = markdownStates.get(key),
+  ) {
+    if (!isCompatibleMarkdownState(key, state))
+      return 0
+
+    const height = Number(state?.metrics?.totalHeight)
+    return Number.isFinite(height) && height > 0
+      ? Math.ceil(height)
+      : 0
+  }
+
+  function setMarkdownLogicalHeight(
+    key: string,
+    height: number,
+    source: MarkdownLogicalHeightSource,
+  ) {
+    if (!Number.isFinite(height) || height <= 0)
+      return
+
+    markdownLogicalHeights.set(key, Math.ceil(height))
+    markdownLogicalHeightSources.set(key, source)
+  }
+
+  function seedMarkdownLogicalHeightFromState(
+    key: string,
+    state = markdownStates.get(key),
+    seedOptions: { trustImportedState?: boolean } = {},
+  ) {
+    const height = seedOptions.trustImportedState
+      ? Number(state?.metrics?.totalHeight)
+      : getLogicalHeightFromMarkdownState(key, state)
+
+    if (!Number.isFinite(height) || height <= 0 || !state)
+      return 0
+
+    setMarkdownLogicalHeight(key, Math.ceil(height), state)
+    return Math.ceil(height)
+  }
+
+  function getKnownMarkdownLogicalHeight(key: string) {
+    const source = markdownLogicalHeightSources.get(key)
+
+    if (isCompatibleMarkdownSource(key, source))
+      return markdownLogicalHeights.get(key) ?? 0
+
+    return seedMarkdownLogicalHeightFromState(key)
   }
 
   function normalizeHeight(size: number) {
@@ -378,15 +498,44 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     return getMarkdownItemChromeHeight(measuredElements.get(key))
   }
 
-  function reconcileItemSize(key: string) {
+  function reconcileItemSize(
+    key: string,
+    reconcileOptions: ReconcileItemSizeOptions = {},
+  ) {
     const measured = getMeasuredItemHeight(key)
-    const markdown = markdownLogicalHeights.get(key) ?? 0
-    const next = markdown > 0
-      ? Math.max(measured, markdown + getMeasuredMarkdownChromeHeight(key))
-      : measured
+    const cached = itemHeights.get(key) ?? options.virtualizer.getItemSize(key) ?? 0
 
-    if (next > 0)
-      setItemSize(key, next)
+    if (!isCurrentMarkdownKey(key)) {
+      if (measured > 0)
+        setItemSize(key, measured)
+
+      return
+    }
+
+    const markdown = getKnownMarkdownLogicalHeight(key)
+    const chrome = getMeasuredMarkdownChromeHeight(key)
+
+    if (markdown > 0) {
+      let next = Math.max(measured, markdown + chrome)
+
+      if (!reconcileOptions.allowMarkdownShrink && cached > 0)
+        next = Math.max(next, cached)
+
+      if (next > 0)
+        setItemSize(key, next)
+
+      return
+    }
+
+    if (cached > 0) {
+      if (measured > cached + 1)
+        setItemSize(key, measured)
+
+      return
+    }
+
+    if (measured > 0)
+      setItemSize(key, measured)
   }
 
   function measureItem(item: T, index: number, el: Element | { $el?: Element | null } | null | undefined) {
@@ -396,7 +545,6 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
 
     if (!element) {
       cleanupMeasuredElement(key)
-      reconcileItemSize(key)
       return
     }
 
@@ -448,15 +596,30 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       indexKey: getSessionKey(item, index),
       virtualScroll,
       onHeightChange(metrics) {
-        markdownLogicalHeights.set(itemKey, metrics.totalHeight)
-        reconcileItemSize(itemKey)
+        if (metrics.sessionKey !== getSessionKey(item, index))
+          return
+
+        setMarkdownLogicalHeight(itemKey, metrics.totalHeight, {
+          sessionKey: metrics.sessionKey,
+          threadKey,
+          measurementKey: normalizeMeasurementKey(),
+        })
+        reconcileItemSize(itemKey, {
+          allowMarkdownShrink: true,
+        })
 
         void nextTick(() => {
-          reconcileItemSize(itemKey)
+          reconcileItemSize(itemKey, {
+            allowMarkdownShrink: true,
+          })
         })
       },
       onVirtualStateChange(state) {
+        if (state.sessionKey !== getSessionKey(item, index))
+          return
+
         markdownStates.set(itemKey, state)
+        seedMarkdownLogicalHeightFromState(itemKey, state)
       },
     }
   }
@@ -545,8 +708,28 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
 
   function importMarkdownStates(states: Record<string, MarkstreamVirtualState>) {
     markdownStates.clear()
-    for (const [key, state] of Object.entries(states))
+    markdownLogicalHeights.clear()
+    markdownLogicalHeightSources.clear()
+
+    for (const [key, state] of Object.entries(states)) {
       markdownStates.set(key, state)
+      seedMarkdownLogicalHeightFromState(key, state, {
+        trustImportedState: true,
+      })
+    }
+  }
+
+  function preloadThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
+    if (!state) {
+      itemHeights.clear()
+      markdownStates.clear()
+      markdownLogicalHeights.clear()
+      markdownLogicalHeightSources.clear()
+      return
+    }
+
+    importItemHeights(state.itemHeights ?? {})
+    importMarkdownStates(state.markdownStates ?? {})
   }
 
   function restoreOuterAnchor(anchor: MarkstreamThreadAnchor | undefined) {
@@ -623,9 +806,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     activeRestoreSeq = seq
     activeRestoreAnchor = anchor
 
-    markdownLogicalHeights.clear()
-    importItemHeights(state?.itemHeights ?? {})
-    importMarkdownStates(state?.markdownStates ?? {})
+    preloadThreadState(state)
 
     markdownRestoreItemKey.value = anchor?.type === 'item'
       ? anchor.itemKey
@@ -677,6 +858,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     resizeObservers.clear()
     measuredElements.clear()
     markdownLogicalHeights.clear()
+    markdownLogicalHeightSources.clear()
   }
 
   if (getCurrentScope())
@@ -690,6 +872,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     measureItem,
     markdownProps,
     captureThreadState,
+    preloadThreadState,
     restoreThreadState,
     dispose,
   }
