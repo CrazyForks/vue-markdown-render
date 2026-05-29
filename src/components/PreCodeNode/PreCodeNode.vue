@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PreCodeNodeProps } from '../../types/component-props'
 
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps<PreCodeNodeProps>()
 
@@ -113,10 +113,166 @@ const ariaLabel = computed(() => {
   const lang = normalizedLanguage.value
   return lang ? `Code block: ${lang}` : 'Code block'
 })
+
+// ─── Diff row-height sync ────────────────────────────────────────────────────
+// Keeps the left and right diff panes in vertical lockstep when content wraps.
+// We measure each pane's natural line heights via DOM, then apply a shared
+// `min-height` so that line N on both sides always starts at the same Y.
+
+const preRef = ref<HTMLPreElement | null>(null)
+
+interface DiffLineMetric {
+  rowHeight: number
+  originalHeight: number
+  modifiedHeight: number
+}
+
+const diffLineMetrics = ref<DiffLineMetric[]>([])
+let diffLineMetricsRaf: number | null = null
+let diffResizeObserver: ResizeObserver | null = null
+
+function readPx(value: string | null | undefined) {
+  const parsed = Number.parseFloat(String(value ?? ''))
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
+}
+
+function readBaseDiffLineHeight(root: HTMLElement) {
+  const style = window.getComputedStyle(root)
+  const fromVar = readPx(style.getPropertyValue('--markstream-pre-diff-line-height'))
+  if (fromVar > 0)
+    return fromVar
+
+  const fromLineHeight = readPx(style.lineHeight)
+  return fromLineHeight > 0 ? fromLineHeight : 18
+}
+
+function readNaturalDiffLineHeight(line: HTMLElement | null, baseLineHeight: number) {
+  if (!line)
+    return baseLineHeight
+
+  const content = line.querySelector('.markstream-pre__diff-content') as HTMLElement | null
+  const contentRect = content?.getBoundingClientRect()
+  const contentHeight = contentRect?.height ?? 0
+
+  return Math.max(baseLineHeight, Math.ceil(contentHeight))
+}
+
+function areDiffMetricsEqual(a: DiffLineMetric[], b: DiffLineMetric[]) {
+  if (a.length !== b.length)
+    return false
+
+  return a.every((item, index) => {
+    const other = b[index]
+    return other
+      && Math.abs(item.rowHeight - other.rowHeight) <= 0.5
+      && Math.abs(item.originalHeight - other.originalHeight) <= 0.5
+      && Math.abs(item.modifiedHeight - other.modifiedHeight) <= 0.5
+  })
+}
+
+function syncDiffLineMetrics() {
+  diffLineMetricsRaf = null
+
+  const root = preRef.value
+  if (!root || !isDiffPreview.value) {
+    if (diffLineMetrics.value.length)
+      diffLineMetrics.value = []
+    return
+  }
+
+  const baseLineHeight = readBaseDiffLineHeight(root)
+
+  const originalLines = Array.from(
+    root.querySelectorAll<HTMLElement>('.markstream-pre__diff-pane--original .markstream-pre__diff-line'),
+  )
+  const modifiedLines = Array.from(
+    root.querySelectorAll<HTMLElement>('.markstream-pre__diff-pane--modified .markstream-pre__diff-line'),
+  )
+
+  const count = Math.max(originalLines.length, modifiedLines.length)
+  const next: DiffLineMetric[] = []
+
+  for (let i = 0; i < count; i++) {
+    const originalHeight = readNaturalDiffLineHeight(originalLines[i] ?? null, baseLineHeight)
+    const modifiedHeight = readNaturalDiffLineHeight(modifiedLines[i] ?? null, baseLineHeight)
+    const rowHeight = Math.max(baseLineHeight, originalHeight, modifiedHeight)
+
+    next.push({ rowHeight, originalHeight, modifiedHeight })
+  }
+
+  if (!areDiffMetricsEqual(diffLineMetrics.value, next))
+    diffLineMetrics.value = next
+}
+
+function scheduleDiffLineMetricsSync() {
+  if (typeof window === 'undefined')
+    return
+
+  if (diffLineMetricsRaf != null)
+    window.cancelAnimationFrame(diffLineMetricsRaf)
+
+  diffLineMetricsRaf = window.requestAnimationFrame(() => {
+    syncDiffLineMetrics()
+  })
+}
+
+function setupDiffResizeObserver(el: HTMLElement | null) {
+  diffResizeObserver?.disconnect()
+  diffResizeObserver = null
+
+  if (!el || typeof ResizeObserver === 'undefined')
+    return
+
+  diffResizeObserver = new ResizeObserver(() => {
+    scheduleDiffLineMetricsSync()
+  })
+  diffResizeObserver.observe(el)
+}
+
+watch(
+  preRef,
+  (el) => {
+    setupDiffResizeObserver(el)
+    void nextTick(() => scheduleDiffLineMetricsSync())
+  },
+  { flush: 'post' },
+)
+
+watch(
+  [isDiffPreview, diffPreviewPanes],
+  () => {
+    void nextTick(() => scheduleDiffLineMetricsSync())
+  },
+  { flush: 'post', immediate: true },
+)
+
+onBeforeUnmount(() => {
+  if (diffLineMetricsRaf != null) {
+    window.cancelAnimationFrame(diffLineMetricsRaf)
+    diffLineMetricsRaf = null
+  }
+
+  diffResizeObserver?.disconnect()
+  diffResizeObserver = null
+})
+
+function getDiffLineStyle(index: number, side: 'original' | 'modified') {
+  const metric = diffLineMetrics.value[index]
+  if (!metric)
+    return undefined
+
+  const contentHeight = side === 'original' ? metric.originalHeight : metric.modifiedHeight
+
+  return {
+    '--markstream-pre-diff-synced-row-height': `${Math.ceil(metric.rowHeight)}px`,
+    '--markstream-pre-diff-content-height': `${Math.ceil(contentHeight)}px`,
+  }
+}
 </script>
 
 <template>
   <pre
+    ref="preRef"
     :class="[languageClass, { 'markstream-pre--line-numbers': props.showLineNumbers, 'markstream-pre--diff-preview': isDiffPreview }]"
     :aria-busy="node.loading === true"
     :aria-label="ariaLabel"
@@ -124,7 +280,7 @@ const ariaLabel = computed(() => {
     :data-markstream-line-numbers="props.showLineNumbers ? '1' : undefined"
     data-markstream-pre="1"
     tabindex="0"
-  ><code v-if="isDiffPreview" translate="no" class="markstream-pre__diff-code"><span v-for="pane in diffPreviewPanes" :key="pane.key" class="markstream-pre__diff-pane" :class="pane.className"><span v-for="line in pane.lines" :key="line.key" class="markstream-pre__diff-line" :class="[`markstream-pre__diff-line--${line.kind}`, { 'markstream-pre__diff-line--empty': line.empty }]"><span class="markstream-pre__diff-rail" aria-hidden="true" /><span class="markstream-pre__diff-number" aria-hidden="true">{{ line.number }}</span><span class="markstream-pre__diff-content"><span class="markstream-pre__diff-content-inner">{{ line.code }}</span></span></span></span></code><template v-else><span v-if="props.showLineNumbers" class="markstream-pre__line-numbers" aria-hidden="true"><span v-for="line in lineNumbers" :key="line" class="markstream-pre__line-number">{{ line }}</span></span><code translate="no" class="markstream-pre__code" v-text="node.code" /></template></pre>
+  ><code v-if="isDiffPreview" translate="no" class="markstream-pre__diff-code"><span v-for="pane in diffPreviewPanes" :key="pane.key" class="markstream-pre__diff-pane" :class="pane.className"><span v-for="(line, index) in pane.lines" :key="line.key" class="markstream-pre__diff-line" :class="[`markstream-pre__diff-line--${line.kind}`, { 'markstream-pre__diff-line--empty': line.empty }]" :style="getDiffLineStyle(index, pane.key as 'original' | 'modified')"><span class="markstream-pre__diff-rail" aria-hidden="true" /><span class="markstream-pre__diff-number" aria-hidden="true">{{ line.number }}</span><span class="markstream-pre__diff-content"><span class="markstream-pre__diff-content-inner">{{ line.code }}</span></span></span></span></code><template v-else><span v-if="props.showLineNumbers" class="markstream-pre__line-numbers" aria-hidden="true"><span v-for="line in lineNumbers" :key="line" class="markstream-pre__line-number">{{ line }}</span></span><code translate="no" class="markstream-pre__code" v-text="node.code" /></template></pre>
 </template>
 
 <style>
@@ -233,7 +389,10 @@ const ariaLabel = computed(() => {
   position: relative;
   display: block;
   box-sizing: border-box;
-  min-height: var(--markstream-pre-diff-line-height, 18px);
+  min-height: var(
+    --markstream-pre-diff-synced-row-height,
+    var(--markstream-pre-diff-line-height, 18px)
+  );
   padding-left: var(--markstream-pre-diff-scrollable-left);
   line-height: var(--markstream-pre-diff-line-height, 18px);
 }
@@ -241,7 +400,12 @@ const ariaLabel = computed(() => {
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset-inline: 0;
+  top: 0;
+  height: var(
+    --markstream-pre-diff-content-height,
+    var(--markstream-pre-diff-line-height, 18px)
+  );
   z-index: 0;
   pointer-events: none;
   background: transparent;
@@ -250,8 +414,12 @@ const ariaLabel = computed(() => {
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-rail {
   position: absolute;
   z-index: 2;
-  inset-block: 0;
+  top: 0;
   left: 0;
+  height: var(
+    --markstream-pre-diff-content-height,
+    var(--markstream-pre-diff-line-height, 18px)
+  );
   width: var(--markstream-pre-diff-gutter-marker-width, 3px);
   min-width: var(--markstream-pre-diff-gutter-marker-width, 3px);
 }
@@ -276,9 +444,9 @@ const ariaLabel = computed(() => {
   min-width: 0;
   line-height: var(--markstream-pre-diff-line-height, 18px);
   white-space: pre-wrap;
-  overflow-wrap: normal;
-  word-break: break-all;
-  line-break: anywhere;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-break: auto;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-content-inner {
