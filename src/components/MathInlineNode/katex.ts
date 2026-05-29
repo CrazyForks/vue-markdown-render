@@ -67,18 +67,23 @@ export function isKatexEnabled() {
 }
 
 export function getKatexSync(): KatexModule | null {
+  // Check the loader type FIRST. When the default async loader (or no loader)
+  // is active, return null immediately. This ensures SSR and client hydration
+  // always produce the same initial output (fallback text) and avoids
+  // hydration mismatches caused by globalThis.katex or a stale cache being
+  // available only on one side.
+  const loader = katexLoader
+  if (!loader || loader === defaultKatexLoader)
+    return null
+
+  if (katex)
+    return katex
+
   const globalKatex = getGlobalKatex()
   if (globalKatex) {
     katex = globalKatex
     return katex
   }
-
-  if (katex)
-    return katex
-
-  const loader = katexLoader
-  if (!loader || loader === defaultKatexLoader)
-    return null
 
   try {
     const result = loader()
