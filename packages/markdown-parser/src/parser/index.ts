@@ -1763,40 +1763,6 @@ function ensureBlankLineAfterCustomHtmlCloseBeforeBlockMarkerSameLine(markdown: 
   return out
 }
 
-function ensureLineBreakAfterCustomHtmlCloseBeforeTrailingTextSameLine(markdown: string, tags: string[]) {
-  if (!markdown || !tags.length)
-    return markdown
-
-  const tagAlternation = tags
-    .map(tag => escapeTagForRegExp(String(tag ?? '').toLowerCase()))
-    .filter(Boolean)
-    .join('|')
-  if (!tagAlternation)
-    return markdown
-
-  const closeLineRe = new RegExp(String.raw`^([\t ]*<\s*\/\s*(?:${tagAlternation})\s*>)([\t ]+\S.*)$`, 'i')
-  let out = ''
-  let idx = 0
-
-  while (idx < markdown.length) {
-    const nl = markdown.indexOf('\n', idx)
-    const hasNl = nl !== -1
-    const isCrlf = hasNl && nl > idx && markdown[nl - 1] === '\r'
-    const lineEnd = hasNl ? (isCrlf ? nl - 1 : nl) : markdown.length
-    const line = markdown.slice(idx, lineEnd)
-    const newline = hasNl ? (isCrlf ? '\r\n' : '\n') : ''
-    const match = line.match(closeLineRe)
-
-    out += match
-      ? `${match[1]}\n${String(match[2] ?? '').replace(/^[\t ]+/, '')}`
-      : line
-    out += newline
-    idx = hasNl ? nl + 1 : markdown.length
-  }
-
-  return out
-}
-
 function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[]) {
   if (!markdown || !tags.length)
     return markdown
@@ -2284,7 +2250,6 @@ export function parseMarkdownToStructure(
       // newline after the custom block close. Split it into separate lines so the
       // "##" can be parsed as a heading (and to avoid being swallowed by HTML block parsing).
       safeMarkdown = ensureBlankLineAfterCustomHtmlCloseBeforeBlockMarkerSameLine(safeMarkdown, tags)
-      safeMarkdown = ensureLineBreakAfterCustomHtmlCloseBeforeTrailingTextSameLine(safeMarkdown, tags)
 
       // Fast path: no closing tag marker at all.
       if (!safeMarkdown.includes('</')) {

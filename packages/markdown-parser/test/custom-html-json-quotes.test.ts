@@ -209,6 +209,95 @@ describe('custom HTML JSON content', () => {
     expect(() => JSON.parse(customData.content)).not.toThrow()
   })
 
+  it('does not rewrite custom close-looking text inside fenced code', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-fenced-close-text', { customHtmlTags: tags })
+    const markdown = [
+      '```html',
+      '</custom-data> trailing',
+      '```',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+
+    expect(findNodeByType(nodes, 'custom-data')).toBeUndefined()
+    expect(JSON.stringify(nodes)).toContain('</custom-data> trailing')
+  })
+
+  it('does not rewrite custom close-looking text inside indented code', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-indented-close-text', { customHtmlTags: tags })
+    const markdown = '    </custom-data> trailing'
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const codeBlock = findNodeByType(nodes, 'code_block')
+
+    expect(findNodeByType(nodes, 'custom-data')).toBeUndefined()
+    expect(String(codeBlock?.code ?? codeBlock?.content ?? '')).toContain('</custom-data> trailing')
+  })
+
+  it('does not rewrite an isolated custom closing tag with trailing text', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-isolated-close-text', { customHtmlTags: tags })
+    const markdown = '</custom-data> trailing'
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+
+    expect(findNodeByType(nodes, 'custom-data')).toBeUndefined()
+    expect(JSON.stringify(nodes)).toContain('</custom-data> trailing')
+  })
+
+  it('preserves indentation after a custom closing tag with trailing code', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-close-trailing-code', { customHtmlTags: tags })
+    const markdown = [
+      '<custom-data>{"a":"b"}',
+      '</custom-data>    const value = 1',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+    const codeBlock = findNodeByType(nodes, 'code_block')
+
+    expect(customData?.content).toBe('{"a":"b"}')
+    expect(String(codeBlock?.code ?? codeBlock?.content ?? '')).toContain('const value = 1')
+  })
+
+  it('handles blockquote custom close tags with trailing text', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-blockquote-close-trailing', { customHtmlTags: tags })
+    const markdown = [
+      '> <custom-data>{"a":"b"}',
+      '> </custom-data> trailing',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(String(customData?.content ?? '').trimEnd()).toBe('{"a":"b"}')
+    expect(String(customData?.content ?? '')).not.toContain('trailing')
+    expect(JSON.stringify(nodes)).toContain('trailing')
+    expect(() => JSON.parse(customData.content)).not.toThrow()
+  })
+
+  it('handles custom close tags with no separating whitespace before trailing text', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-close-no-space-trailing', { customHtmlTags: tags })
+    const markdown = [
+      '- prefix <custom-data>{"a":"b"}',
+      '',
+      '</custom-data>trailing',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe('{"a":"b"}')
+    expect(String(customData?.content ?? '')).not.toContain('trailing')
+    expect(JSON.stringify(nodes)).toContain('trailing')
+    expect(() => JSON.parse(customData.content)).not.toThrow()
+  })
+
   it('keeps typographer enabled for normal markdown text', () => {
     const md = getMarkdown('custom-html-json-quotes-normal-text')
     const nodes = parseMarkdownToStructure('He said "ok".', md, { final: true }) as any[]

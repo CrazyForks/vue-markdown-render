@@ -629,6 +629,68 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
     token.raw = content
     token.children = []
   }
+  const stripLeadingLineSeparators = (content: string) => content.replace(/^(?:\r?\n)+/, '')
+  const isIndentedCodeTrailingContent = (content: string) => /^(?: {4}|\t)/.test(content)
+  const normalizeIndentedCodeTrailingContent = (content: string) => content.replace(/^(?: {4}|\t)/gm, '')
+  const createTrailingContentTokens = (
+    content: string,
+    textMode: 'inline' | 'paragraph' | 'text',
+  ): MarkdownToken[] => {
+    const source = stripLeadingLineSeparators(content)
+    if (!/\S/.test(source))
+      return []
+
+    if (isIndentedCodeTrailingContent(source)) {
+      return [{
+        type: 'code_block',
+        content: normalizeIndentedCodeTrailingContent(source),
+        raw: source,
+      } as MarkdownToken]
+    }
+
+    const text = source.replace(/^[\t ]+/, '')
+    if (!text)
+      return []
+
+    if (text.startsWith('<'))
+      return [{ type: 'html_block', content: text } as MarkdownToken]
+
+    const inlineToken = { type: 'inline', tag: '', nesting: 0, content: text, children: [{ type: 'text', content: text, raw: text }] } as MarkdownToken
+
+    if (textMode === 'paragraph') {
+      return [
+        { type: 'paragraph_open', tag: 'p', nesting: 1 } as MarkdownToken,
+        inlineToken,
+        { type: 'paragraph_close', tag: 'p', nesting: -1 } as MarkdownToken,
+      ]
+    }
+
+    if (textMode === 'text')
+      return [{ type: 'text', content: text, raw: text } as MarkdownToken]
+
+    return [inlineToken]
+  }
+  const getTrailingContentTextMode = (
+    tokens: MarkdownToken[],
+    index: number,
+    fallback: 'inline' | 'paragraph' | 'text',
+  ) => {
+    return tokens[index - 1]?.type === 'paragraph_open' && tokens[index + 1]?.type === 'paragraph_close'
+      ? 'inline'
+      : fallback
+  }
+  const appendTrailingInlineContent = (
+    token: MarkdownToken & { content?: string, children?: MarkdownToken[] },
+    content: string,
+  ) => {
+    const source = stripLeadingLineSeparators(content)
+    if (!/\S/.test(source) || token.type !== 'inline' || !Array.isArray(token.children))
+      return false
+
+    token.content = `${String(token.content ?? '')}${source}`
+    token.children.push({ type: 'text', content: source, raw: source } as MarkdownToken)
+    return true
+  }
   // Streaming mid-state: suppress partial inline HTML in text tokens until the
   // tag is fully closed with `>`, then allow it to be tokenized as html_inline.
   md.core.ruler.after('inline', 'fix_html_inline_streaming', (state: unknown) => {
@@ -707,7 +769,7 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
           const chunk = String((t as MarkdownToken).content ?? (t as MarkdownToken).raw ?? '')
 
           if (chunk) {
-            const openToken = toks[openIndex] as MarkdownToken & { content?: string, loading?: boolean }
+            const openToken = toks[openIndex] as MarkdownToken & { content?: string, loading?: boolean, children?: MarkdownToken[] }
             const mergedContent = `${String(openToken.content || '')}\n${chunk}`
             const openEnd = findTagCloseIndexOutsideQuotes(mergedContent)
             const closeRange = openEnd === -1
@@ -720,16 +782,16 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
               openToken.content = before
               openToken.loading = false
 
-              const afterTrimmed = after.replace(/^\s+/, '')
               // Remove current token after merging.
               toks.splice(i, 1)
               // Close the stack before reinserting trailing content.
               tagStack.pop()
-              if (afterTrimmed) {
-                toks.splice(i, 0, afterTrimmed.startsWith('<')
-                  ? ({ type: 'html_block', content: afterTrimmed } as MarkdownToken)
-                  : ({ type: 'inline', content: afterTrimmed, children: [{ type: 'text', content: afterTrimmed, raw: afterTrimmed }] } as MarkdownToken))
-              }
+              const appendedTrailing = appendTrailingInlineContent(openToken, after)
+              const replacement = appendedTrailing
+                ? []
+                : createTrailingContentTokens(after, getTrailingContentTextMode(toks, i, 'paragraph'))
+              if (replacement.length)
+                toks.splice(i, 0, ...replacement)
               i--
               continue
             }
@@ -875,15 +937,11 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
             }
             stack.pop()
 
-            const afterTrimmed = afterContent.replace(/^\s+/, '')
-            if (afterTrimmed) {
-              const replacement = afterTrimmed.startsWith('<')
-                ? [{ type: 'html_block', content: afterTrimmed } as MarkdownToken]
-                : [
-                    { type: 'paragraph_open', tag: 'p', nesting: 1 } as MarkdownToken,
-                    { type: 'inline', tag: '', nesting: 0, content: afterTrimmed, children: [{ type: 'text', content: afterTrimmed, raw: afterTrimmed }] } as MarkdownToken,
-                    { type: 'paragraph_close', tag: 'p', nesting: -1 } as MarkdownToken,
-                  ]
+            const appendedTrailing = appendTrailingInlineContent(openTok, afterContent)
+            const replacement = appendedTrailing
+              ? []
+              : createTrailingContentTokens(afterContent, getTrailingContentTextMode(toks, i, 'paragraph'))
+            if (replacement.length) {
               toks.splice(i, 1, ...replacement)
             }
             else {
@@ -921,12 +979,16 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
               const afterText = afterChildren.map((c: MarkdownToken) => String(c.content ?? c.raw ?? '')).join('')
               if (afterText.trim()) {
                 const trimmed = afterText.replace(/^\s+/, '')
-                if (trimmed.startsWith('<')) {
+                if (appendTrailingInlineContent(openTok, afterText)) {
+                  toks.splice(i, 1)
+                  i--
+                }
+                else if (trimmed.startsWith('<')) {
                   toks.splice(i, 1, { type: 'html_block', content: trimmed } as MarkdownToken)
                 }
                 else {
-                  toks.splice(i, 1, { type: 'paragraph_open', tag: 'p', nesting: 1 } as MarkdownToken, { type: 'inline', tag: '', nesting: 0, content: afterText, children: [{ type: 'text', content: afterText, raw: afterText }] } as MarkdownToken, { type: 'paragraph_close', tag: 'p', nesting: -1 } as MarkdownToken)
-                  // current index now points at paragraph_open; move on
+                  const replacement = createTrailingContentTokens(afterText, getTrailingContentTextMode(toks, i, 'paragraph'))
+                  toks.splice(i, 1, ...replacement)
                 }
               }
               else {
@@ -1045,12 +1107,9 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
 
             // Insert trailing content as a new token if present
             const afterContent = raw.slice(endTagIndex + closeLen) || ''
-            const afterTrimmed = afterContent.replace(/^\s+/, '')
-            if (afterTrimmed) {
-              toks.splice(i + 1, 0, afterTrimmed.startsWith('<')
-                ? ({ type: 'html_block', content: afterTrimmed } as MarkdownToken)
-                : ({ type: 'text', content: afterTrimmed, raw: afterTrimmed } as MarkdownToken))
-            }
+            const replacement = createTrailingContentTokens(afterContent, 'text')
+            if (replacement.length)
+              toks.splice(i + 1, 0, ...replacement)
           }
           else {
             // No closing tag yet (streaming mid-state)
