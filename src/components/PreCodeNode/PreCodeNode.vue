@@ -276,11 +276,16 @@ const ariaLabel = computed(() => {
   min-width: 0;
   line-height: var(--markstream-pre-diff-line-height, 18px);
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: normal;
+  overflow-wrap: normal;
+  word-break: break-all;
+  line-break: anywhere;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-content-inner {
+  white-space: inherit;
+  overflow-wrap: inherit;
+  word-break: inherit;
+  line-break: inherit;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }

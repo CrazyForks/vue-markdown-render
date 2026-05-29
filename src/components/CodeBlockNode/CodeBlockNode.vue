@@ -381,6 +381,7 @@ const preFallbackWrap = computed(() => {
   return String(wordWrap) !== 'off'
 })
 const showPreWhileMonacoLoads = computed(() => {
+  return true
   // If Monaco isn't available at all, the component renders a standalone PreCodeNode.
   if (usePreCodeRender.value)
     return false
@@ -539,9 +540,6 @@ const estimatedVisibleContentHeight = computed(() => {
     : null
 })
 const preFallbackLocalMinHeight = computed(() => {
-  if (estimatedVisibleContentHeight.value != null)
-    return null
-
   const countLines = (source: unknown) => {
     const value = String(source ?? '')
     if (!value)
@@ -549,9 +547,15 @@ const preFallbackLocalMinHeight = computed(() => {
     return Math.max(1, value.split(/\r\n|\n|\r/).length)
   }
 
+  // Diff fallback must be self-contained: height is always line-count based so
+  // first-paint has a stable minHeight even before Monaco creates its editor or
+  // any external estimatedContentHeightPx arrives.
   if (isDiff.value) {
     return Math.ceil(diffPreFallbackLineCount.value * preFallbackEffectiveLineHeight.value)
   }
+
+  if (estimatedVisibleContentHeight.value != null)
+    return null
 
   return Math.ceil(
     countLines(props.node.code) * (preFallbackLineHeight.value + LINE_EXTRA_PER_LINE)
@@ -559,6 +563,14 @@ const preFallbackLocalMinHeight = computed(() => {
   )
 })
 const preFallbackReservedContentHeight = computed(() => {
+  // Diff fallback uses its own line-count height so the hidden Monaco editor
+  // container stays sized correctly without relying on external estimated values
+  // that may carry vertical-padding offsets or be temporarily unavailable.
+  if (isDiff.value) {
+    const local = preFallbackLocalMinHeight.value
+    return local != null ? Math.ceil(local) : null
+  }
+
   const estimated = estimatedVisibleContentHeight.value
   if (estimated != null)
     return Math.ceil(estimated)

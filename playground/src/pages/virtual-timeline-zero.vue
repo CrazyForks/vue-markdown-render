@@ -36,11 +36,13 @@ declare global {
         state: unknown
         visibleText: string
         restoring: boolean
-        codeBlockProbe: {
-          blocks: number
-          enhanced: number
-          fallback: number
-        }
+        codeBlockProbe: Array<{
+          height: number
+          enhanced: boolean
+          diff: boolean
+          fallbackVisible: boolean
+          textLength: number
+        }>
       }
       nextFrame: () => Promise<void>
       scrollTo: (offset: number) => Promise<unknown>
@@ -258,13 +260,18 @@ function getTimelineRoot() {
   return document.querySelector<HTMLElement>('[data-testid="markstream-virtual-timeline"]')
 }
 
-function readDiffCodeBlockProbe(root: HTMLElement | null) {
-  const blocks = Array.from(root?.querySelectorAll<HTMLElement>('[data-markstream-code-block="1"].is-diff') ?? [])
-  return blocks.map(block => ({
-    enhanced: block.dataset.markstreamEnhanced === 'true',
-    fallbackVisible: Boolean(block.querySelector('pre.code-pre-fallback')),
-    hiddenEditor: Boolean(block.querySelector('.code-editor-container.is-hidden')),
-  }))
+function readCodeBlockProbe(root: HTMLElement | null) {
+  return Array.from(root?.querySelectorAll<HTMLElement>('[data-markstream-code-block="1"]') ?? [])
+    .map((block) => {
+      const rect = block.getBoundingClientRect()
+      return {
+        height: rect.height,
+        enhanced: block.dataset.markstreamEnhanced === 'true',
+        diff: block.classList.contains('is-diff'),
+        fallbackVisible: Boolean(block.querySelector('pre.code-pre-fallback')),
+        textLength: block.textContent?.length ?? 0,
+      }
+    })
 }
 
 function readSnapshot() {
@@ -279,12 +286,7 @@ function readSnapshot() {
     state: timelineRef.value?.captureThreadState?.() ?? null,
     visibleText: root?.textContent ?? '',
     restoring: root?.classList.contains('is-restoring-thread') ?? false,
-    codeBlockProbe: {
-      blocks: root?.querySelectorAll('[data-markstream-code-block="1"]').length ?? 0,
-      enhanced: root?.querySelectorAll('[data-markstream-code-block="1"][data-markstream-enhanced="true"]').length ?? 0,
-      fallback: root?.querySelectorAll('pre.code-pre-fallback').length ?? 0,
-    },
-    diffCodeBlockProbe: readDiffCodeBlockProbe(root ?? null),
+    codeBlockProbe: readCodeBlockProbe(root ?? null),
   }
 }
 
