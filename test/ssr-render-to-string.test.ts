@@ -8,7 +8,7 @@ import { createSSRApp, defineComponent, h } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { disableD2, enableD2 } from '../src/components/D2BlockNode/d2'
 import HtmlBlockNode from '../src/components/HtmlBlockNode/HtmlBlockNode.vue'
-import { setInfographicLoader } from '../src/components/InfographicBlockNode/infographic'
+import { disableInfographic } from '../src/components/InfographicBlockNode/infographic'
 import MarkdownCodeBlockNode from '../src/components/MarkdownCodeBlockNode'
 import MathBlockNode from '../src/components/MathBlockNode'
 import MathInlineNode from '../src/components/MathInlineNode'
@@ -19,8 +19,6 @@ import { VueRendererMarkdown } from '../src/exports'
 import { clearGlobalCustomComponents, removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 
 const BASIC_SCOPE = 'ssr-render-basic'
-const defaultInfographicLoader = () => import('@antv/infographic')
-
 async function renderComponent(component: any, props: Record<string, any>) {
   const app = createSSRApp({
     render: () => h(component, props),
@@ -77,7 +75,7 @@ describe('ssr renderToString coverage', () => {
     enableKatex()
     enableMermaid()
     enableD2()
-    setInfographicLoader(defaultInfographicLoader)
+    disableInfographic()
   })
 
   it('renders basic markdown, HTML, and custom HTML tags on the server', async () => {
@@ -791,7 +789,7 @@ data
   it('keeps diagram SSR fallbacks stable when optional loaders are unavailable', async () => {
     disableMermaid()
     disableD2()
-    setInfographicLoader(null)
+    disableInfographic()
 
     const html = await renderMarkdown(`
 \`\`\`mermaid

@@ -1,5 +1,6 @@
 import type { MathOptions } from 'stream-markdown-parser'
 import type { App, Component, DefineComponent, Plugin } from 'vue'
+import type { InfographicLoader } from './components/InfographicBlockNode/infographic'
 import type { CustomComponents as MarkstreamCustomComponents } from './types'
 import type {
   CodeBlockNodeProps,
@@ -29,6 +30,7 @@ import HighlightNode from './components/HighlightNode'
 import HtmlBlockNode from './components/HtmlBlockNode'
 import HtmlInlineNode from './components/HtmlInlineNode'
 import ImageNode from './components/ImageNode'
+import { disableInfographic, enableInfographic, isInfographicEnabled, setInfographicLoader } from './components/InfographicBlockNode/infographic'
 import InlineCodeNode from './components/InlineCodeNode'
 import InsertNode from './components/InsertNode'
 import LinkNode from './components/LinkNode'
@@ -76,6 +78,7 @@ const InfographicBlockNode = definePublicAsyncComponent<InfographicBlockNodeProp
 const D2BlockNode = definePublicAsyncComponent<D2BlockNodeProps>(() => import('./components/D2BlockNode'))
 
 export type { D2Loader } from './components/D2BlockNode/d2'
+export type { InfographicLoader } from './components/InfographicBlockNode/infographic'
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
@@ -162,6 +165,7 @@ export interface MarkstreamVuePluginOptions {
   components?: Partial<MarkstreamCustomComponents>
   getLanguageIcon?: LanguageIconResolver
   iconTheme?: string
+  infographicLoader?: InfographicLoader | null
   mathOptions?: MathOptions
 }
 
@@ -174,11 +178,13 @@ export {
   D2BlockNode,
   DefinitionListNode,
   disableD2,
+  disableInfographic,
   disableKatex,
   disableMermaid,
   EmojiNode,
   EmphasisNode,
   enableD2,
+  enableInfographic,
   enableKatex,
   enableMermaid,
   FootnoteAnchorNode,
@@ -195,6 +201,7 @@ export {
   InlineCodeNode,
   InsertNode,
   isD2Enabled,
+  isInfographicEnabled,
   isKatexEnabled,
   isMermaidEnabled,
   LinkNode,
@@ -213,6 +220,7 @@ export {
   setCustomComponents,
   setD2Loader,
   setDefaultI18nMap,
+  setInfographicLoader,
   setKatexLoader,
   setMermaidLoader,
   StrikethroughNode,
@@ -286,6 +294,8 @@ export const VueRendererMarkdown: Plugin = {
     // avoid importing inside module scope to keep SSR safe
     if (options?.mathOptions)
       setDefaultMathOptions(options.mathOptions)
+    if (options && 'infographicLoader' in options)
+      setInfographicLoader(options.infographicLoader ?? null)
     if (options?.components)
       app.provide(MARKSTREAM_CUSTOM_COMPONENTS_KEY, createCustomComponentsRef(options.components))
   },

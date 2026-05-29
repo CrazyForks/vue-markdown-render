@@ -10,6 +10,21 @@
 npm install @antv/infographic
 ```
 
+在应用入口中配置可选 loader，并确保它发生在 `app.mount()` 或首个 infographic 代码块渲染之前：
+
+```ts
+// main.ts
+import { setInfographicLoader } from 'markstream-vue'
+import { createApp } from 'vue'
+import App from './App.vue'
+
+setInfographicLoader(() => import('@antv/infographic'))
+
+createApp(App).mount('#app')
+```
+
+迁移提示：infographic 渲染现在需要显式 opt-in。如果你的应用之前依赖“安装 `@antv/infographic` 后自动渲染图表”的行为，请继续安装该依赖，并补上上面的 loader 配置。
+
 ## 2. 示例
 
 在 Markdown 中使用 `infographic` 代码块即可渲染图表：

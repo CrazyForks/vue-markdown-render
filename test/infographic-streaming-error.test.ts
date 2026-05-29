@@ -1,11 +1,9 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { setInfographicLoader } from '../src/components/InfographicBlockNode/infographic'
+import { disableInfographic, setInfographicLoader } from '../src/components/InfographicBlockNode/infographic'
 import InfographicBlockNode from '../src/components/InfographicBlockNode/InfographicBlockNode.vue'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../src/utils/nodeLifecycle'
 import { flushAll } from './setup/flush-all'
-
-const defaultInfographicLoader = () => import('@antv/infographic')
 
 function createNode(code: string) {
   return {
@@ -48,10 +46,29 @@ class HeightChangingInfographic {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
-  setInfographicLoader(defaultInfographicLoader)
+  disableInfographic()
 })
 
 describe('infographicBlockNode streaming errors', () => {
+  it('disables preview mode when infographic loading is not configured', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const wrapper = mount(InfographicBlockNode as any, {
+      props: {
+        node: createNode('infographic list-row-simple-horizontal-arrow'),
+        loading: true,
+      },
+    })
+
+    await flushAll()
+
+    const previewButton = wrapper.findAll('button').find(button => button.text().includes('Preview'))
+    expect(previewButton?.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('infographic list-row-simple-horizontal-arrow')
+
+    wrapper.unmount()
+  })
+
   it('only reports render errors after streaming completes', async () => {
     vi.stubGlobal('IntersectionObserver', undefined as any)
     setInfographicLoader(() => ErrorInfographic)

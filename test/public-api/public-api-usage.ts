@@ -4,6 +4,7 @@ import type {
   D2BlockNodeProps,
   ImageNodeProps,
   InfographicBlockNodeProps,
+  InfographicLoader,
   LinkNodeProps,
   MarkdownIt,
   MarkdownPluginRegistration,
@@ -37,9 +38,11 @@ import MarkdownRender, {
   CodeBlockNode,
   D2BlockNode,
   disableD2,
+  disableInfographic,
   disableKatex,
   disableMermaid,
   enableD2,
+  enableInfographic,
   enableKatex,
   enableMermaid,
   getCustomNodeComponents,
@@ -47,6 +50,7 @@ import MarkdownRender, {
   InfographicBlockNode,
   isBrokenMermaidSvg,
   isD2Enabled,
+  isInfographicEnabled,
   isKatexEnabled,
   isMermaidEnabled,
   MARKSTREAM_NODE_LIFECYCLE_KEY,
@@ -61,6 +65,7 @@ import MarkdownRender, {
   setCustomComponents,
   setD2Loader,
   setDefaultMathOptions,
+  setInfographicLoader,
   setKatexLoader,
   setMermaidLoader,
   toSafeMermaidSvgMarkup,
@@ -117,6 +122,13 @@ enableD2()
 disableD2()
 const d2Enabled = isD2Enabled()
 setD2Loader(async () => ({}))
+
+const infographicLoader: InfographicLoader = async () => ({})
+setInfographicLoader(infographicLoader)
+setInfographicLoader()
+enableInfographic(infographicLoader)
+disableInfographic()
+const infographicEnabled = isInfographicEnabled()
 
 setDefaultMathOptions({})
 
@@ -292,6 +304,7 @@ void scopedComponents
 void katexEnabled
 void mermaidEnabled
 void d2Enabled
+void infographicEnabled
 void nodes
 void controller
 void safeMermaidSvg
@@ -332,6 +345,7 @@ void onVirtualHeightChange
 void onVirtualStateChange
 void captureVirtualStatesBeforeThreadSwitch
 void restoreVirtualStateAfterThreadSwitch
+void infographicLoader
 void CodeBlockNode
 void D2BlockNode
 void MathBlockNode

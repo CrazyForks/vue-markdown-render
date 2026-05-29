@@ -4759,7 +4759,7 @@ const InfographicBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] Optional peer dependencies for InfographicBlockNode are missing. Falling back to preformatted code rendering. To enable Infographic rendering, please install "@antv/infographic".',
+        '[markstream-vue] Failed to load InfographicBlockNode. Falling back to preformatted code rendering. To enable Infographic rendering, install "@antv/infographic" and configure setInfographicLoader with a dynamic loader.',
         e,
       )
       return PreCodeNode
