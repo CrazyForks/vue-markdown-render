@@ -382,6 +382,11 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
     --stream-monaco-modified-line-number-gap-to-code,
     var(--stream-monaco-line-number-gap-to-code, var(--markstream-pre-diff-gutter-gap))
   );
+  --markstream-pre-diff-line-number-left: calc(
+    var(--markstream-pre-diff-scrollable-left)
+    - var(--markstream-pre-diff-line-number-gap-to-code)
+    - var(--markstream-pre-diff-line-number-width)
+  );
   box-shadow: inset 1px 0 var(--markstream-diff-pane-divider, hsl(var(--ms-border)));
 }
 
