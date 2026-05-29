@@ -323,8 +323,8 @@ export interface ParseOptions {
     /**
      * Custom HTML-like tag names that should be emitted as custom nodes
      * instead of `html_inline` when encountered (e.g. ['thinking']).
-     * Used by inline parsing; pair with `getMarkdown({ customHtmlTags })`
-     * to enable mid-state suppression for the same tags during streaming.
+     * Used by inline parsing and passed to markdown-it core rules for
+     * mid-state suppression during streaming.
      */
     customHtmlTags?: readonly string[];
     /**

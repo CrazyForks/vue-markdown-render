@@ -120,9 +120,14 @@ For a trusted custom tag, the emitted node typically includes:
 - `type`: the tag name, for example `thinking`
 - `tag`: the original tag name
 - `content`: the inner Markdown or text content
+- `raw`: the original tag fragment when available
 - `attrs`: extracted tag attributes when available
 - `loading`: whether the tag is still in a streaming mid-state
 - `autoClosed`: whether the parser temporarily auto-closed the tag during streaming
+
+For declared custom tags, use `content`/`raw` for source payloads such as JSON, YAML, or tool-call data. Use `children` or a nested renderer when the tag body should render as Markdown; those child nodes still follow the normal inline parsing pipeline.
+
+Because custom tags still use HTML-like delimiters, a literal closing tag such as `</custom-data>` inside a machine payload closes the custom node. Escape `<` in that payload, for example as `\u003c`, when the delimiter text must be preserved as data.
 
 The exact `attrs` shape can vary, so treat it as raw attribute data that your component normalizes for its own needs.
 

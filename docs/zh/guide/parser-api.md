@@ -91,6 +91,8 @@ setDefaultMathOptions({
 
 如果你希望某个自定义标签参与解析并产出自定义节点（以便 `setCustomComponents` 映射，并携带 attrs/content），请将其加入 `customHtmlTags`。
 
+对于声明过的自定义标签，`content` 和 `raw` 会尽量保留原始 payload，`children` 则仍是适合富文本展示的常规 Markdown 解析结果。
+
 ### ParseOptions: `requireClosingStrong`
 
 `requireClosingStrong`（boolean，可选）控制解析器在解析 inline 内容时如何处理未闭合的 `**` 加粗分隔符。默认值：`false`（更贴合流式场景）。
@@ -172,14 +174,14 @@ dasdsad
 - **当真实闭合标签到达后**，`autoClosed` 消失，`loading=false`。
 
 扩展白名单：
-如果需要让自定义标签（例如 `<thinking>`）也享受相同的中间态吞并与自动补闭合策略，可在创建实例时传入 `customHtmlTags`：
+如果需要让自定义标签（例如 `<thinking>`）也享受相同的中间态吞并、自动补闭合和源码 payload 保留策略，可在创建实例时或 `ParseOptions` 中传入 `customHtmlTags`：
 
 ```ts
 const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
 ```
 
 输出自定义节点：
-如果希望这些标签直接产出自定义节点类型（便于 `setCustomComponents` 直接按 `type` 映射），可在 `ParseOptions` 中同时传入 `customHtmlTags`，或在 `MarkdownRender` 上使用 `custom-html-tags`（组件会自动透传）：
+如果希望这些标签直接产出自定义节点类型（便于 `setCustomComponents` 直接按 `type` 映射），可在 `ParseOptions` 中传入 `customHtmlTags`，或在 `MarkdownRender` 上使用 `custom-html-tags`（组件会自动透传）：
 
 ```ts
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'

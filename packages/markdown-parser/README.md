@@ -319,6 +319,8 @@ const nodes = parseMarkdownToStructure(
 
 By default, non-standard HTML-like tags (for example `<question>`) are rendered as raw HTML elements once they are complete. Incomplete or malformed fragments stay as **literal text** so they do not swallow surrounding content during streaming or final renders. If you want them emitted as custom nodes (`type: 'question'` with parsed attrs/content), opt in via `customHtmlTags`.
 
+For declared custom tags, `content` and `raw` are kept close to the source payload (including quote- or whitespace-sensitive data such as JSON), while `children` still comes from normal inline Markdown parsing.
+
 ### Utility Functions
 
 #### `isMathLike(content)`

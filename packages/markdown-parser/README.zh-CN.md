@@ -317,6 +317,8 @@ const nodes = parseMarkdownToStructure(
 
 默认情况下，非标准的 HTML 类标签（例如 `<question>`）在完整闭合时会按原生 HTML 渲染（作为自定义元素输出）。未闭合或格式不完整的片段会保持为**纯文本**，避免在流式或最终渲染时吞掉周围内容。若希望它们作为自定义节点输出（`type: 'question'`，携带 attrs/content），需要在 `customHtmlTags` 中显式声明。
 
+对于声明过的自定义标签，`content` 和 `raw` 会尽量贴近源码 payload（包括 JSON 这类对引号或空白敏感的数据），而 `children` 仍来自常规 inline Markdown 解析。
+
 ### 工具函数
 
 #### `isMathLike(content)`

@@ -312,6 +312,9 @@ function parseTopLevelTokens(
   env: Record<string, unknown>,
   options: ParseOptions,
 ) {
+  if (options.customHtmlTags?.length)
+    env.__markstreamCustomHtmlTags = options.customHtmlTags
+
   if (!shouldUseTopLevelStreamParse(md, options))
     return md.parse(source, env)
 

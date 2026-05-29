@@ -146,6 +146,177 @@ function tokenToRaw(token: MarkdownToken) {
   return String(shape.raw ?? shape.content ?? shape.markup ?? '')
 }
 
+function getMutableMeta(token: MarkdownToken) {
+  const target = token as MarkdownToken & { meta?: Record<string, unknown> | null }
+  if (!target.meta)
+    target.meta = {}
+  return target.meta as Record<string, unknown>
+}
+
+function setCustomHtmlSourceMeta(token: MarkdownToken, raw: string, inner: string) {
+  const meta = getMutableMeta(token)
+  meta.markstreamCustomHtmlRaw = raw
+  meta.markstreamCustomHtmlInner = inner
+}
+
+function attachCustomHtmlSourceMeta(tokens: MarkdownToken[], customTagSet: Set<string>) {
+  if (!customTagSet.size)
+    return
+
+  const customTagOpenRes = Array.from(customTagSet, tag => new RegExp(String.raw`<\s*${escapeTagForRegExp(tag)}(?=[\s>/])`, 'i'))
+  const stack: Array<{ tag: string, token: MarkdownToken, raw: string, inner: string }> = []
+  let needsTopLevelSeparator = false
+
+  const mayOpenCustomTag = (source: string) => {
+    if (!source)
+      return false
+    return customTagOpenRes.some(re => re.test(source))
+  }
+
+  const appendToOpenFrames = (raw: string) => {
+    if (!raw || !stack.length)
+      return
+    for (const frame of stack) {
+      frame.raw += raw
+      frame.inner += raw
+    }
+  }
+
+  const appendTopLevelSeparator = () => {
+    if (!stack.length || !needsTopLevelSeparator)
+      return
+    appendToOpenFrames('\n')
+    needsTopLevelSeparator = false
+  }
+
+  const appendSourceGap = (gap: string) => {
+    appendToOpenFrames(gap)
+  }
+
+  const closeTopFrameWithRaw = (raw: string) => {
+    for (let i = 0; i < stack.length; i++) {
+      stack[i].raw += raw
+      if (i < stack.length - 1)
+        stack[i].inner += raw
+    }
+
+    const frame = stack.pop()!
+    setCustomHtmlSourceMeta(frame.token, frame.raw, frame.inner)
+  }
+
+  const getTopFrameClosePrefix = (raw: string) => {
+    const tag = stack[stack.length - 1]?.tag
+    if (!tag)
+      return null
+    const closePrefixRe = new RegExp(String.raw`^\s*<\s*\/\s*${escapeTagForRegExp(tag)}\s*>`, 'i')
+    return raw.match(closePrefixRe)?.[0] ?? null
+  }
+
+  const startsWithTopFrameClose = (source: string) => {
+    return !!getTopFrameClosePrefix(source)
+  }
+
+  const handleToken = (child: MarkdownToken, raw: string, knownTag?: string) => {
+    const tag = knownTag ?? (child.type === 'html_inline'
+      ? getHtmlInlineTagName(raw)
+      : '')
+    const isCustomTag = tag && customTagSet.has(tag)
+
+    if (!isCustomTag) {
+      appendToOpenFrames(raw)
+      return
+    }
+
+    const closing = isHtmlInlineClosingTag(raw)
+    const selfClosing = !closing && isSelfClosingHtmlInline(raw, tag)
+
+    if (closing) {
+      if (!stack.length || stack[stack.length - 1].tag !== tag) {
+        appendToOpenFrames(raw)
+        return
+      }
+
+      closeTopFrameWithRaw(raw)
+      return
+    }
+
+    appendToOpenFrames(raw)
+    if (selfClosing) {
+      setCustomHtmlSourceMeta(child, raw, '')
+      return
+    }
+
+    stack.push({ tag, token: child, raw, inner: '' })
+  }
+
+  for (const token of tokens) {
+    if (token.type === 'inline' && Array.isArray(token.children)) {
+      const source = String(token.content ?? '')
+      if (startsWithTopFrameClose(source))
+        needsTopLevelSeparator = false
+      else
+        appendTopLevelSeparator()
+
+      if (!stack.length && !mayOpenCustomTag(source)) {
+        needsTopLevelSeparator = false
+        continue
+      }
+
+      let cursor = 0
+      let sourceReliable = true
+      for (const child of token.children) {
+        const childRaw = tokenToRaw(child)
+        const tag = child.type === 'html_inline'
+          ? getHtmlInlineTagName(childRaw)
+          : ''
+        const isCustomTag = tag && customTagSet.has(tag)
+        let raw = childRaw
+
+        if (sourceReliable && source && childRaw && (stack.length || isCustomTag)) {
+          const index = source.indexOf(childRaw, cursor)
+          if (index !== -1) {
+            appendSourceGap(source.slice(cursor, index))
+            raw = source.slice(index, index + childRaw.length)
+            cursor = index + childRaw.length
+          }
+          else {
+            if (stack.length && !isCustomTag)
+              continue
+            sourceReliable = false
+          }
+        }
+
+        handleToken(child, raw, tag)
+      }
+
+      if (sourceReliable && source && cursor < source.length && stack.length)
+        appendSourceGap(source.slice(cursor))
+
+      needsTopLevelSeparator = stack.length > 0
+      continue
+    }
+
+    if (stack.length && typeof token.content === 'string') {
+      const raw = tokenToRaw(token)
+      const closePrefix = token.type === 'html_block' ? getTopFrameClosePrefix(raw) : null
+      if (closePrefix) {
+        closeTopFrameWithRaw(`${needsTopLevelSeparator ? '\n' : ''}${closePrefix}`)
+        needsTopLevelSeparator = stack.length > 0
+        continue
+      }
+      if (!token.content)
+        continue
+
+      appendTopLevelSeparator()
+      appendToOpenFrames(token.content)
+      needsTopLevelSeparator = true
+    }
+  }
+
+  for (const frame of stack)
+    setCustomHtmlSourceMeta(frame.token, frame.raw, frame.inner)
+}
+
 function isNonElementHtmlBlock(content: string) {
   return /^\s*<\s*[!?]/.test(content)
 }
@@ -393,29 +564,52 @@ export interface FixHtmlInlineOptions {
   customHtmlTags?: readonly string[]
 }
 
+const BASE_AUTO_CLOSE_INLINE_TAGS = [
+  'a',
+  'span',
+  'strong',
+  'em',
+  'b',
+  'i',
+  'u',
+]
+
 export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineOptions = {}) {
-  const commonHtmlTags = buildCommonHtmlTagSet(options.customHtmlTags)
-  // Tags that should stay inline when we auto-append a closing tag at core stage.
-  const autoCloseInlineTagSet = new Set<string>([
-    'a',
-    'span',
-    'strong',
-    'em',
-    'b',
-    'i',
-    'u',
-  ])
-  const customTagSet = new Set<string>()
+  const configuredCustomTagSet = new Set<string>()
   if (options.customHtmlTags?.length) {
     for (const t of options.customHtmlTags) {
       const name = normalizeCustomHtmlTagName(t)
       if (!name)
         continue
-      customTagSet.add(name)
-      autoCloseInlineTagSet.add(name)
+      configuredCustomTagSet.add(name)
     }
   }
-  const shouldMergeHtmlBlockTag = (tag: string) => customTagSet.has(tag) || !commonHtmlTags.has(tag) || BLOCK_LEVEL_HTML_TAGS.has(tag)
+  const getRuleContext = (state: unknown) => {
+    const s = state as unknown as { env?: { __markstreamCustomHtmlTags?: readonly unknown[] } }
+    const customTagSet = new Set(configuredCustomTagSet)
+    const envTags = Array.isArray(s.env?.__markstreamCustomHtmlTags)
+      ? s.env.__markstreamCustomHtmlTags
+      : []
+    for (const t of envTags) {
+      const name = normalizeCustomHtmlTagName(String(t ?? ''))
+      if (name)
+        customTagSet.add(name)
+    }
+
+    const commonHtmlTags = buildCommonHtmlTagSet(Array.from(customTagSet))
+    const autoCloseInlineTagSet = new Set<string>(BASE_AUTO_CLOSE_INLINE_TAGS)
+    for (const tag of customTagSet)
+      autoCloseInlineTagSet.add(tag)
+
+    const shouldMergeHtmlBlockTag = (tag: string) => customTagSet.has(tag) || !commonHtmlTags.has(tag) || BLOCK_LEVEL_HTML_TAGS.has(tag)
+
+    return {
+      autoCloseInlineTagSet,
+      commonHtmlTags,
+      customTagSet,
+      shouldMergeHtmlBlockTag,
+    }
+  }
   const getHtmlBlockCarrierContent = (token: MarkdownToken & { content?: string, children?: MarkdownToken[] }) => {
     if (token.type === 'html_block')
       return String(token.content ?? '')
@@ -435,11 +629,74 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
     token.raw = content
     token.children = []
   }
+  const stripLeadingLineSeparators = (content: string) => content.replace(/^(?:\r?\n)+/, '')
+  const isIndentedCodeTrailingContent = (content: string) => /^(?: {4}|\t)/.test(content)
+  const normalizeIndentedCodeTrailingContent = (content: string) => content.replace(/^(?: {4}|\t)/gm, '')
+  const createTrailingContentTokens = (
+    content: string,
+    textMode: 'inline' | 'paragraph' | 'text',
+  ): MarkdownToken[] => {
+    const source = stripLeadingLineSeparators(content)
+    if (!/\S/.test(source))
+      return []
+
+    if (isIndentedCodeTrailingContent(source)) {
+      return [{
+        type: 'code_block',
+        content: normalizeIndentedCodeTrailingContent(source),
+        raw: source,
+      } as MarkdownToken]
+    }
+
+    const text = source.replace(/^[\t ]+/, '')
+    if (!text)
+      return []
+
+    if (text.startsWith('<'))
+      return [{ type: 'html_block', content: text } as MarkdownToken]
+
+    const inlineToken = { type: 'inline', tag: '', nesting: 0, content: text, children: [{ type: 'text', content: text, raw: text }] } as MarkdownToken
+
+    if (textMode === 'paragraph') {
+      return [
+        { type: 'paragraph_open', tag: 'p', nesting: 1 } as MarkdownToken,
+        inlineToken,
+        { type: 'paragraph_close', tag: 'p', nesting: -1 } as MarkdownToken,
+      ]
+    }
+
+    if (textMode === 'text')
+      return [{ type: 'text', content: text, raw: text } as MarkdownToken]
+
+    return [inlineToken]
+  }
+  const getTrailingContentTextMode = (
+    tokens: MarkdownToken[],
+    index: number,
+    fallback: 'inline' | 'paragraph' | 'text',
+  ) => {
+    return tokens[index - 1]?.type === 'paragraph_open' && tokens[index + 1]?.type === 'paragraph_close'
+      ? 'inline'
+      : fallback
+  }
+  const appendTrailingInlineContent = (
+    token: MarkdownToken & { content?: string, children?: MarkdownToken[] },
+    content: string,
+  ) => {
+    const source = stripLeadingLineSeparators(content)
+    if (!/\S/.test(source) || token.type !== 'inline' || !Array.isArray(token.children))
+      return false
+
+    token.content = `${String(token.content ?? '')}${source}`
+    token.children.push({ type: 'text', content: source, raw: source } as MarkdownToken)
+    return true
+  }
   // Streaming mid-state: suppress partial inline HTML in text tokens until the
   // tag is fully closed with `>`, then allow it to be tokenized as html_inline.
   md.core.ruler.after('inline', 'fix_html_inline_streaming', (state: unknown) => {
     const s = state as unknown as { tokens?: MarkdownToken[] }
     const toks = s.tokens ?? []
+    const { commonHtmlTags, customTagSet } = getRuleContext(state)
     for (const t of toks) {
       const tok = t as MarkdownToken & { children?: MarkdownToken[], content?: string, raw?: string }
       if (tok.type !== 'inline' || !Array.isArray(tok.children))
@@ -476,6 +733,8 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
         console.error('[applyFixHtmlInlineTokens] failed to fix streaming html inline', e)
       }
     }
+
+    attachCustomHtmlSourceMeta(toks, customTagSet)
   })
 
   // Fix certain single-token inline HTML cases by expanding into [openTag, text, closeTag]
@@ -483,6 +742,11 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
   md.core.ruler.push('fix_html_inline_tokens', (state: unknown) => {
     const s = state as unknown as { tokens?: MarkdownToken[] }
     const toks = s.tokens ?? []
+    const {
+      autoCloseInlineTagSet,
+      customTagSet,
+      shouldMergeHtmlBlockTag,
+    } = getRuleContext(state)
 
     // 有一些很特殊的场景，比如 html_block 开始 <thinking>，但是后面跟着很多段落,如果没匹配到</thinking>，中间的都应该合并为html_block的 content
     const tagStack: [string, number][] = []
@@ -505,7 +769,7 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
           const chunk = String((t as MarkdownToken).content ?? (t as MarkdownToken).raw ?? '')
 
           if (chunk) {
-            const openToken = toks[openIndex] as MarkdownToken & { content?: string, loading?: boolean }
+            const openToken = toks[openIndex] as MarkdownToken & { content?: string, loading?: boolean, children?: MarkdownToken[] }
             const mergedContent = `${String(openToken.content || '')}\n${chunk}`
             const openEnd = findTagCloseIndexOutsideQuotes(mergedContent)
             const closeRange = openEnd === -1
@@ -518,16 +782,16 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
               openToken.content = before
               openToken.loading = false
 
-              const afterTrimmed = after.replace(/^\s+/, '')
               // Remove current token after merging.
               toks.splice(i, 1)
               // Close the stack before reinserting trailing content.
               tagStack.pop()
-              if (afterTrimmed) {
-                toks.splice(i, 0, afterTrimmed.startsWith('<')
-                  ? ({ type: 'html_block', content: afterTrimmed } as MarkdownToken)
-                  : ({ type: 'inline', content: afterTrimmed, children: [{ type: 'text', content: afterTrimmed, raw: afterTrimmed }] } as MarkdownToken))
-              }
+              const appendedTrailing = appendTrailingInlineContent(openToken, after)
+              const replacement = appendedTrailing
+                ? []
+                : createTrailingContentTokens(after, getTrailingContentTextMode(toks, i, 'paragraph'))
+              if (replacement.length)
+                toks.splice(i, 0, ...replacement)
               i--
               continue
             }
@@ -656,8 +920,14 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
           const openTok = toks[top.index] as MarkdownToken & { content?: string, children?: MarkdownToken[] }
 
           // Close via an html_block token like "</thinking>"
-          if (tok.type === 'html_block' && getCloseRe(top.tag).test(content)) {
-            openTok.content = `${String(openTok.content ?? '')}\n${content}`
+          const htmlBlockCloseMatch = tok.type === 'html_block'
+            ? getCloseRe(top.tag).exec(content)
+            : null
+          if (htmlBlockCloseMatch) {
+            const closeEnd = htmlBlockCloseMatch.index + htmlBlockCloseMatch[0].length
+            const closeContent = content.slice(0, closeEnd)
+            const afterContent = content.slice(closeEnd)
+            openTok.content = `${String(openTok.content ?? '')}\n${closeContent}`
             if (Array.isArray(openTok.children)) {
               openTok.children.push({
                 type: 'html_inline',
@@ -665,9 +935,19 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
                 raw: `</${top.tag}>`,
               } as MarkdownToken)
             }
-            toks.splice(i, 1)
-            i--
             stack.pop()
+
+            const appendedTrailing = appendTrailingInlineContent(openTok, afterContent)
+            const replacement = appendedTrailing
+              ? []
+              : createTrailingContentTokens(afterContent, getTrailingContentTextMode(toks, i, 'paragraph'))
+            if (replacement.length) {
+              toks.splice(i, 1, ...replacement)
+            }
+            else {
+              toks.splice(i, 1)
+              i--
+            }
             continue
           }
 
@@ -699,12 +979,16 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
               const afterText = afterChildren.map((c: MarkdownToken) => String(c.content ?? c.raw ?? '')).join('')
               if (afterText.trim()) {
                 const trimmed = afterText.replace(/^\s+/, '')
-                if (trimmed.startsWith('<')) {
+                if (appendTrailingInlineContent(openTok, afterText)) {
+                  toks.splice(i, 1)
+                  i--
+                }
+                else if (trimmed.startsWith('<')) {
                   toks.splice(i, 1, { type: 'html_block', content: trimmed } as MarkdownToken)
                 }
                 else {
-                  toks.splice(i, 1, { type: 'paragraph_open', tag: 'p', nesting: 1 } as MarkdownToken, { type: 'inline', tag: '', nesting: 0, content: afterText, children: [{ type: 'text', content: afterText, raw: afterText }] } as MarkdownToken, { type: 'paragraph_close', tag: 'p', nesting: -1 } as MarkdownToken)
-                  // current index now points at paragraph_open; move on
+                  const replacement = createTrailingContentTokens(afterText, getTrailingContentTextMode(toks, i, 'paragraph'))
+                  toks.splice(i, 1, ...replacement)
                 }
               }
               else {
@@ -823,12 +1107,9 @@ export function applyFixHtmlInlineTokens(md: MarkdownIt, options: FixHtmlInlineO
 
             // Insert trailing content as a new token if present
             const afterContent = raw.slice(endTagIndex + closeLen) || ''
-            const afterTrimmed = afterContent.replace(/^\s+/, '')
-            if (afterTrimmed) {
-              toks.splice(i + 1, 0, afterTrimmed.startsWith('<')
-                ? ({ type: 'html_block', content: afterTrimmed } as MarkdownToken)
-                : ({ type: 'text', content: afterTrimmed, raw: afterTrimmed } as MarkdownToken))
-            }
+            const replacement = createTrailingContentTokens(afterContent, 'text')
+            if (replacement.length)
+              toks.splice(i + 1, 0, ...replacement)
           }
           else {
             // No closing tag yet (streaming mid-state)

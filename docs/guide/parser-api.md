@@ -99,6 +99,8 @@ Non-standard HTML-like tags (for example `<question>`) render as raw HTML elemen
 
 If you want a custom tag to be emitted as a custom node (so it can be mapped via `setCustomComponents` with parsed attrs/content), add it to `customHtmlTags`.
 
+For declared custom tags, `content` and `raw` preserve the original payload as closely as possible, while `children` remains the normal Markdown-parsed representation for rich text.
+
 ### ParseOptions: `requireClosingStrong`
 
 `requireClosingStrong` (boolean | optional) controls how the parser treats unmatched `**` strong delimiters inside inline content. Default: `false` (streaming-friendly).
@@ -180,14 +182,14 @@ Behavior:
 - **When the real closing tag arrives**, `autoClosed` disappears and `loading` becomes `false`.
 
 Extending the allowlist:
-To apply the same mid‑state suppression for custom tags (for example `<thinking>`), pass `customHtmlTags` when creating the markdown instance:
+To apply mid‑state suppression and source payload preservation for custom tags (for example `<thinking>`), pass `customHtmlTags` either when creating the markdown instance or in `ParseOptions`:
 
 ```ts
 const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
 ```
 
 Emitting custom nodes:
-If you want those tags to become custom node types (so `setCustomComponents` can map them directly), also pass `customHtmlTags` in `ParseOptions` or use the `custom-html-tags` prop on `MarkdownRender` (which wires this automatically):
+If you want those tags to become custom node types (so `setCustomComponents` can map them directly), pass `customHtmlTags` in `ParseOptions` or use the `custom-html-tags` prop on `MarkdownRender` (which wires this automatically):
 
 ```ts
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'

@@ -363,6 +363,7 @@ function addChunk(chunk: string) {
 - `parse-options`：在组件上复用解析钩子（如 `preTransformTokens`、`requireClosingStrong`）。
 - `final`：标记“最终态/流结束”，关闭中间态 loading 解析并强制收敛未闭合结构。
 - `custom-html-tags`：扩展流式 HTML 白名单并将这些标签输出为自定义节点，便于 `setCustomComponents` 直接映射（如 `['thinking']`）。
+  声明过的自定义节点会尽量让 `content`/`raw` 保留原始标签 payload，`children` 则仍作为富文本场景下的 Markdown 渲染结果。
 - `setCustomComponents(customId?, mapping)`：为自定义标签/标记注册内嵌 Vue 组件（传 `custom-id` 可限定作用域）。
 
 示例：将 Markdown 占位符映射到 Vue 组件（作用域）
