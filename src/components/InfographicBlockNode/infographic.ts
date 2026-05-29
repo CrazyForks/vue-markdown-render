@@ -52,7 +52,7 @@ export function setInfographicLoader(loader?: InfographicLoader | null) {
  */
 export function enableInfographic(loader: InfographicLoader) {
   if (typeof loader !== 'function')
-    throw new TypeError('enableInfographic requires a loader function for @antv/infographic')
+    throw new TypeError('enableInfographic requires a loader function')
   setInfographicLoader(loader)
 }
 

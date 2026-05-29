@@ -62,7 +62,7 @@ describe('infographicBlockNode streaming errors', () => {
 
     await flushAll()
 
-    const previewButton = wrapper.findAll('button').find(button => button.text().includes('Preview'))
+    const previewButton = wrapper.findAll('button').find(btn => btn.text().includes('Preview'))
     expect(previewButton?.attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('infographic list-row-simple-horizontal-arrow')
 
