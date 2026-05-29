@@ -669,8 +669,18 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
     if (!found)
       throw new Error(`Could not locate PR analysis section 13. Last visible text: ${snapshot.visibleText.slice(0, 400)}`)
 
+    if (!finalReadySnapshot) {
+      throw new Error([
+        'Could not observe final measured markdown metrics before storing virtual-timeline-zero reload state.',
+        `Last itemHeight=${snapshot.state?.itemHeights?.['a-md-1'] ?? 'n/a'}`,
+        `Last metrics=${JSON.stringify(snapshot.state?.markdownStates?.['a-md-1']?.metrics ?? null)}`,
+      ].join('\n'))
+    }
+
+    const anchorSnapshot = finalReadySnapshot
+
     // Put the anchor just below the sensitive region.
-    snapshot = await api.scrollTo(Math.max(0, found.scrollTop + 120))
+    snapshot = await api.scrollTo(Math.max(0, anchorSnapshot.scrollTop + 120))
 
     for (let frame = 0; frame < 30; frame++)
       await api.nextFrame()

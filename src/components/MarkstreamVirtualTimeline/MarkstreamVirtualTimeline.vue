@@ -946,28 +946,45 @@ function isVisibleInRootRect(el: HTMLElement, rootRect: DOMRect) {
   return rect.bottom >= rootRect.top && rect.top <= rootRect.bottom
 }
 
-function hasMeaningfulNodeContent(slot: HTMLElement) {
+function hasElementContent(content: HTMLElement) {
+  if ((content.textContent ?? '').trim().length > 0)
+    return true
+
+  // Count any already-mounted element as meaningful for non-code nodes.
+  // Examples: <hr>, <br>, <img>, <table>, <blockquote>, sanitized HTML, etc.
+  if (content.childElementCount > 0)
+    return true
+
+  return false
+}
+
+function hasReadyCodeBlockContent(content: HTMLElement) {
+  return Boolean(content.querySelector([
+    'pre.code-pre-fallback',
+    '[data-markstream-code-block="1"]',
+    '.monaco-editor',
+    '.monaco-diff-editor',
+    '[data-markstream-code-loading="1"]',
+  ].join(',')))
+}
+
+function isVisibleNodeSlotReady(slot: HTMLElement) {
+  // NodeRenderer is still deferring this node.
+  if (slot.querySelector(':scope > .node-placeholder'))
+    return false
+
   const content = slot.querySelector<HTMLElement>(':scope > .node-content')
   if (!content)
     return false
 
-  // Text fallback, pre fallback, diagrams, math, Monaco, etc. all count as visible content.
-  if ((content.textContent ?? '').trim().length > 0)
-    return true
+  const nodeType = slot.dataset.nodeType ?? ''
 
-  return Boolean(content.querySelector([
-    'pre',
-    'svg',
-    'canvas',
-    '[data-markstream-code-block="1"]',
-    '[data-markstream-math]',
-    '.monaco-editor',
-    '.monaco-diff-editor',
-    '[data-mermaid-wrapper]',
-    '.mermaid-preview-area',
-    '.infographic-preview',
-    '.d2-output',
-  ].join(',')))
+  if (nodeType === 'code_block')
+    return hasReadyCodeBlockContent(content)
+
+  // For non-code nodes, the requirement is "not blank": a mounted element is
+  // enough, even when it has no text, because <hr>, <br>, <img>, etc. are valid.
+  return hasElementContent(content)
 }
 
 function isRestoreViewportReady() {
@@ -1007,11 +1024,7 @@ function isRestoreViewportReady() {
     .filter(slot => isVisibleInRootRect(slot, rootRect))
 
   for (const slot of visibleNodeSlots) {
-    // A placeholder means NodeRenderer itself is still deferring this node, so restore should stay hidden.
-    if (slot.querySelector(':scope > .node-placeholder'))
-      return false
-
-    if (!hasMeaningfulNodeContent(slot))
+    if (!isVisibleNodeSlotReady(slot))
       return false
   }
 
