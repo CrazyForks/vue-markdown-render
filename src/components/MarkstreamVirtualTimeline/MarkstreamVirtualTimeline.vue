@@ -941,9 +941,8 @@ function applyThreadRestorePass(
   updateScrollMetrics({ remember: false })
 }
 
-function isVisibleInRoot(el: HTMLElement, root: HTMLElement) {
+function isVisibleInRootRect(el: HTMLElement, rootRect: DOMRect) {
   const rect = el.getBoundingClientRect()
-  const rootRect = root.getBoundingClientRect()
   return rect.bottom >= rootRect.top && rect.top <= rootRect.bottom
 }
 
@@ -1003,8 +1002,9 @@ function isRestoreViewportReady() {
       return false
   }
 
+  const rootRect = root.getBoundingClientRect()
   const visibleNodeSlots = Array.from(root.querySelectorAll<HTMLElement>('[data-node-index]'))
-    .filter(slot => isVisibleInRoot(slot, root))
+    .filter(slot => isVisibleInRootRect(slot, rootRect))
 
   for (const slot of visibleNodeSlots) {
     // A placeholder means NodeRenderer itself is still deferring this node, so restore should stay hidden.

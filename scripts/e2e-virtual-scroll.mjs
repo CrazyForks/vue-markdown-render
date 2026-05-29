@@ -1158,10 +1158,19 @@ async function run() {
 
         const sameShapeAfter = api.read()
 
-        api.clearEvents()
         await api.scrollToRatio(1)
         for (let i = 0; i < 20; i++)
           await api.nextFrame()
+
+        // Let any scroll-to-bottom settlement / outer-anchor compensation finish before
+        // the streaming probe starts. Otherwise the probe records the intentional
+        // programmatic jump as a streaming jitter regression.
+        await api.settleVisibleRenderers()
+        for (let i = 0; i < 20; i++)
+          await api.nextFrame()
+
+        api.clearEvents()
+        await api.nextFrame()
 
         const streamingBefore = api.read()
 
