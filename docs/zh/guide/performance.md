@@ -97,6 +97,17 @@ const md = '# Virtualized transcript'
 />
 ```
 
+自定义 timeline row 时，把 `measureRef` 绑定到包含整行 chrome 的元素上。默认 Markdown row 没有额外 wrapper 高度；如果 bubble、avatar、toolbar 没有被测量，它们不会计入外层 item size：
+
+```vue
+<template v-slot:default="{ markdownProps, measureRef }">
+  <article :ref="measureRef" class="message-bubble">
+    <MarkdownRender v-bind="markdownProps" />
+    <MessageToolbar />
+  </article>
+</template>
+```
+
 如果业务已经有自己的外层 virtualizer，使用 `useMarkstreamVirtualAdapter()`，并把 `markdownProps(item, index)` 绑定到 Markdown item。底层 `virtualScroll` prop 继续作为高级 adapter/debug 协议保留。
 
 #### `vue-virtual-scroller` 示例

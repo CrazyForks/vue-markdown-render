@@ -82,12 +82,16 @@ interface MarkdownLogicalHeightSource {
   measurementKey?: string
 }
 
+type TimelineItemSizeSource = NonNullable<MarkstreamThreadVirtualState['itemSizeSources']>[string]
+
 const scrollRoot = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const viewportHeight = ref(0)
 const layoutWidthBucket = ref(0)
 const bottomPinned = ref(true)
+const exactBottomPinned = ref(true)
 const itemSizes = reactive(new Map<string, number>()) as Map<string, number>
+const itemSizeSources = new Map<string, TimelineItemSizeSource>()
 const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
 const markdownLogicalHeights = reactive(new Map<string, number>()) as Map<string, number>
 const markdownLogicalHeightSources = new Map<string, MarkdownLogicalHeightSource>()
@@ -123,17 +127,21 @@ const layout = computed(() => {
   for (let index = 0; index < props.items.length; index++) {
     const item = props.items[index]
     const key = getItemKey(item, index)
-    const size = itemSizes.get(key) ?? estimateMarkstreamTimelineItemHeight(item, index, props)
-
-    records.push({
+    const recordBase = {
       item,
       index,
       key,
-      renderKey: `${renderScopeKey}:${key}`,
       kind: getMarkstreamTimelineItemKind(item, index, props),
+      markdown: isMarkstreamMarkdownTimelineItem(item, index, props),
+    }
+    const size = getCompatibleItemSize(recordBase)
+      ?? estimateMarkstreamTimelineItemHeight(item, index, props)
+
+    records.push({
+      ...recordBase,
+      renderKey: `${renderScopeKey}:${key}`,
       offset,
       size,
-      markdown: isMarkstreamMarkdownTimelineItem(item, index, props),
       component: item?.component,
     })
 
@@ -220,13 +228,70 @@ function getTimelineRenderScopeKey() {
   return normalizedThreadKey.value ?? 'timeline'
 }
 
-function getSessionKey(record: TimelineRecord) {
+function getSessionKey(record: Pick<TimelineRecord, 'item' | 'index' | 'key'>) {
   const revision = getMarkstreamTimelineItemRevision(record.item, record.index, props)
   return [
     normalizedThreadKey.value ?? 'timeline',
     record.key,
     revision == null ? '' : String(revision),
   ].join(':')
+}
+
+function getItemSizeSourceKey(record: Pick<TimelineRecord, 'item' | 'index' | 'key' | 'markdown'>) {
+  if (record.markdown)
+    return getSessionKey(record)
+
+  const revision = getMarkstreamTimelineItemRevision(record.item, record.index, props)
+  return [
+    normalizedThreadKey.value ?? 'timeline',
+    record.key,
+    revision == null ? '' : String(revision),
+  ].join(':')
+}
+
+function getItemSizeSource(record: Pick<TimelineRecord, 'item' | 'index' | 'key' | 'markdown'>): TimelineItemSizeSource {
+  return {
+    sourceKey: getItemSizeSourceKey(record),
+    measurementKey: timelineMeasurementKey.value,
+    widthBucket: layoutWidthBucket.value,
+  }
+}
+
+function isSameItemSizeSource(
+  a: TimelineItemSizeSource | null | undefined,
+  b: TimelineItemSizeSource | null | undefined,
+) {
+  return (a?.sourceKey ?? '') === (b?.sourceKey ?? '')
+    && (a?.measurementKey ?? '') === (b?.measurementKey ?? '')
+    && (a?.widthBucket ?? 0) === (b?.widthBucket ?? 0)
+}
+
+function isCompatibleItemSizeSource(
+  record: Pick<TimelineRecord, 'item' | 'index' | 'key' | 'markdown'> | undefined,
+  source: TimelineItemSizeSource | null | undefined,
+) {
+  if (!record || !source)
+    return false
+
+  if (source.sourceKey !== getItemSizeSourceKey(record))
+    return false
+
+  if (source.measurementKey !== timelineMeasurementKey.value)
+    return false
+
+  if ((source.widthBucket ?? 0) !== layoutWidthBucket.value)
+    return false
+
+  return true
+}
+
+function getCompatibleItemSize(record: Pick<TimelineRecord, 'item' | 'index' | 'key' | 'markdown'>) {
+  const size = itemSizes.get(record.key)
+
+  if (!isCompatibleItemSizeSource(record, itemSizeSources.get(record.key)))
+    return null
+
+  return Number.isFinite(size) && size! > 0 ? size! : null
 }
 
 function findRecordByKey(key: string) {
@@ -246,12 +311,8 @@ function isCompatibleMarkdownSource(
   if ((source.threadKey ?? '') !== (normalizedThreadKey.value ?? ''))
     return false
 
-  if (
-    source.measurementKey
-    && source.measurementKey !== timelineMeasurementKey.value
-  ) {
+  if ((source.measurementKey ?? '') !== timelineMeasurementKey.value)
     return false
-  }
 
   return true
 }
@@ -312,14 +373,6 @@ function getKnownMarkdownLogicalHeight(key: string) {
   return seedMarkdownLogicalHeightFromState(key)
 }
 
-function shouldStickToBottom() {
-  if (props.stickToBottom === true)
-    return true
-  if (props.stickToBottom === false)
-    return false
-  return bottomPinned.value
-}
-
 function clearThreadRestoreSchedule() {
   if (threadRestoreRaf != null && typeof cancelAnimationFrame === 'function')
     cancelAnimationFrame(threadRestoreRaf)
@@ -359,6 +412,9 @@ function distanceFromBottom() {
 }
 
 function updateBottomPinned() {
+  const bottomDistance = distanceFromBottom()
+  exactBottomPinned.value = bottomDistance <= 2
+
   if (props.stickToBottom === true) {
     bottomPinned.value = true
     return
@@ -367,7 +423,7 @@ function updateBottomPinned() {
     bottomPinned.value = false
     return
   }
-  bottomPinned.value = distanceFromBottom() <= 48
+  bottomPinned.value = bottomDistance <= 48
 }
 
 function updateLayoutWidthBucket() {
@@ -480,12 +536,13 @@ function scrollToIndex(index: number, align: 'start' | 'center' | 'end' = 'start
   scrollToOffset(offset)
 }
 
-function setItemSize(key: string, size: number) {
+function setItemSize(key: string, size: number, source?: TimelineItemSizeSource) {
   if (!Number.isFinite(size) || size <= 0)
     return
 
   const previous = itemSizes.get(key)
   const next = Math.ceil(size)
+  const sourceChanged = source && !isSameItemSizeSource(itemSizeSources.get(key), source)
 
   // Monaco / pre fallback / browser font rounding can differ by exactly 1px.
   // Treat that as measurement noise; otherwise an item above the current
@@ -493,29 +550,59 @@ function setItemSize(key: string, size: number) {
   if (
     previous != null
     && Math.abs(previous - next) <= ITEM_SIZE_RECONCILE_DEADBAND_PX
+    && !sourceChanged
   ) {
     return
   }
 
   if (restoringThread.value) {
+    if (source)
+      itemSizeSources.set(key, source)
     itemSizes.set(key, next)
     scheduleThreadRestorePass()
     return
   }
 
   const anchorBeforeChange = captureOuterAnchor()
-  const shouldPin = shouldStickToBottom()
+  const bottomDistanceBeforeChange = distanceFromBottom()
+  const restoreAnchor = resolveSizeChangeRestoreAnchor(
+    anchorBeforeChange,
+    bottomDistanceBeforeChange,
+  )
 
+  if (source)
+    itemSizeSources.set(key, source)
   itemSizes.set(key, next)
   rememberThreadState()
-  scheduleScrollReconcileAfterSizeChange(anchorBeforeChange, shouldPin)
+  scheduleScrollReconcileAfterSizeChange(restoreAnchor)
 }
 
-function scheduleScrollReconcileAfterSizeChange(anchor: MarkstreamThreadAnchor | undefined, shouldPin: boolean) {
+function resolveSizeChangeRestoreAnchor(
+  anchor: MarkstreamThreadAnchor | undefined,
+  bottomDistanceBeforeChange: number,
+): MarkstreamThreadAnchor | undefined {
+  if (props.stickToBottom === true) {
+    return {
+      type: 'bottom',
+      distanceFromBottomPx: 0,
+    }
+  }
+
+  if (props.stickToBottom === 'auto' && bottomPinned.value) {
+    return {
+      type: 'bottom',
+      distanceFromBottomPx: bottomDistanceBeforeChange <= 2
+        ? 0
+        : bottomDistanceBeforeChange,
+    }
+  }
+
+  return anchor
+}
+
+function scheduleScrollReconcileAfterSizeChange(anchor: MarkstreamThreadAnchor | undefined) {
   const apply = () => {
-    if (shouldPin)
-      scrollToBottom()
-    else if (anchor)
+    if (anchor)
       restoreOuterAnchor(anchor)
 
     updateScrollMetrics()
@@ -559,12 +646,12 @@ function reconcileRecordSize(
 
   if (!record.markdown) {
     if (measured > 0)
-      setItemSize(record.key, measured)
+      setItemSize(record.key, measured, getItemSizeSource(record))
 
     return
   }
 
-  const cachedSize = itemSizes.get(record.key) ?? 0
+  const cachedSize = getCompatibleItemSize(record) ?? 0
   const markdown = getKnownMarkdownLogicalHeight(record.key)
   const chrome = getMeasuredMarkdownChromeHeight(record.key)
 
@@ -575,20 +662,20 @@ function reconcileRecordSize(
       next = Math.max(next, cachedSize)
 
     if (next > 0)
-      setItemSize(record.key, next)
+      setItemSize(record.key, next, getItemSizeSource(record))
 
     return
   }
 
   if (cachedSize > 0) {
     if (measured > cachedSize + 1)
-      setItemSize(record.key, measured)
+      setItemSize(record.key, measured, getItemSizeSource(record))
 
     return
   }
 
   if (measured > 0)
-    setItemSize(record.key, measured)
+    setItemSize(record.key, measured, getItemSizeSource(record))
 }
 
 function setMeasuredItemElement(record: TimelineRecord, el: Element | { $el?: Element | null } | null | undefined) {
@@ -627,12 +714,13 @@ function measureRecordElement(record: TimelineRecord) {
 
 function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProps {
   const final = getMarkstreamTimelineItemFinal(record.item, record.index, props)
+  const restoreState = markdownStates.get(record.key)
   const virtualScroll: MarkstreamVirtualScrollOptions = {
     enabled: true,
     sessionKey: getSessionKey(record),
     threadKey: normalizedThreadKey.value,
     scrollRoot: () => scrollRoot.value,
-    restoreState: markdownStates.get(record.key) ?? null,
+    restoreState: isCompatibleMarkdownState(record, restoreState) ? restoreState! : null,
     restoreAnchor: false,
     measurementKey: timelineMeasurementKey.value,
     settleMode: 'manual',
@@ -734,13 +822,25 @@ function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
 }
 
 function captureThreadStateForKey(threadKey = normalizedThreadKey.value): MarkstreamThreadVirtualState {
+  const itemHeights: Record<string, number> = {}
+  const itemSizeSourceSnapshot: NonNullable<MarkstreamThreadVirtualState['itemSizeSources']> = {}
+
+  for (const record of layout.value.records) {
+    const size = getCompatibleItemSize(record)
+    const source = itemSizeSources.get(record.key)
+    if (size != null && isCompatibleItemSizeSource(record, source)) {
+      itemHeights[record.key] = size
+      itemSizeSourceSnapshot[record.key] = source!
+    }
+  }
+
   return {
     threadKey,
+    measurementKey: timelineMeasurementKey.value,
+    widthBucket: layoutWidthBucket.value,
     outerAnchor: captureOuterAnchor(),
-    itemHeights: Object.fromEntries(
-      Array.from(itemSizes.entries())
-        .filter(([, size]) => Number.isFinite(size) && size > 0),
-    ),
+    itemHeights,
+    itemSizeSources: itemSizeSourceSnapshot,
     markdownStates: Object.fromEntries(markdownStates.entries()),
   }
 }
@@ -823,6 +923,52 @@ function markRestorePaintReady() {
   restorePaintReady.value = true
 }
 
+function canImportThreadItemHeights(state: MarkstreamThreadVirtualState | null | undefined) {
+  if (!state)
+    return false
+
+  return (state.measurementKey ?? '') === timelineMeasurementKey.value
+    && (state.widthBucket ?? 0) === layoutWidthBucket.value
+}
+
+function getCompatibleStateItemHeightEntries(state: MarkstreamThreadVirtualState | null | undefined) {
+  const entries: Array<[string, number, TimelineItemSizeSource]> = []
+
+  if (!canImportThreadItemHeights(state))
+    return entries
+
+  for (const [key, size] of Object.entries(state?.itemHeights ?? {})) {
+    if (!Number.isFinite(size) || size <= 0)
+      continue
+
+    const record = findRecordByKey(key)
+    const source = state?.itemSizeSources?.[key]
+    if (!isCompatibleItemSizeSource(record, source))
+      continue
+
+    entries.push([key, Math.ceil(size), source!])
+  }
+
+  return entries
+}
+
+function hasCompatibleMarkdownState(state: MarkstreamThreadVirtualState | null | undefined) {
+  for (const [key, markdownState] of Object.entries(state?.markdownStates ?? {})) {
+    if (isCompatibleMarkdownState(findRecordByKey(key), markdownState))
+      return true
+  }
+
+  return false
+}
+
+function hasRestorableThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
+  return Boolean(
+    state?.outerAnchor
+    || getCompatibleStateItemHeightEntries(state).length > 0
+    || hasCompatibleMarkdownState(state),
+  )
+}
+
 function scheduleThreadRestorePass(
   seq = activeThreadRestoreSeq,
   anchor = activeThreadRestoreAnchor,
@@ -859,29 +1005,35 @@ function finishThreadRestore(seq: number) {
 
 function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
   const restoreSeq = ++threadRestoreSeq
+
+  if (state?.widthBucket && layoutWidthBucket.value === 0)
+    layoutWidthBucket.value = state.widthBucket
+
   const anchor = state?.outerAnchor
+  const hasRealRestoreState = hasRestorableThreadState(state)
   const fallbackAnchor: MarkstreamThreadAnchor | undefined = anchor
-    ?? (props.stickToBottom !== false
+    ?? (hasRealRestoreState && props.stickToBottom !== false
       ? { type: 'bottom', distanceFromBottomPx: 0 }
       : undefined)
 
   clearThreadRestoreSchedule()
 
-  restorePaintReady.value = false
-  restoringThread.value = Boolean(fallbackAnchor)
+  restorePaintReady.value = !hasRealRestoreState
+  restoringThread.value = hasRealRestoreState && Boolean(fallbackAnchor)
   activeThreadRestoreSeq = restoreSeq
   activeThreadRestoreAnchor = fallbackAnchor
 
   cleanupMeasuredElements()
 
   itemSizes.clear()
+  itemSizeSources.clear()
   markdownStates.clear()
   markdownLogicalHeights.clear()
   markdownLogicalHeightSources.clear()
 
-  for (const [key, size] of Object.entries(state?.itemHeights ?? {})) {
-    if (Number.isFinite(size) && size > 0)
-      itemSizes.set(key, Math.ceil(size))
+  for (const [key, size, source] of getCompatibleStateItemHeightEntries(state)) {
+    itemSizeSources.set(key, source)
+    itemSizes.set(key, size)
   }
 
   for (const [key, markdownState] of Object.entries(state?.markdownStates ?? {})) {
@@ -891,12 +1043,16 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
 
   if (props.stickToBottom === true) {
     bottomPinned.value = true
+    exactBottomPinned.value = true
   }
   else if (props.stickToBottom === false) {
     bottomPinned.value = false
+    exactBottomPinned.value = false
   }
   else {
     bottomPinned.value = fallbackAnchor?.type === 'bottom'
+    exactBottomPinned.value = fallbackAnchor?.type === 'bottom'
+      && fallbackAnchor.distanceFromBottomPx <= 2
   }
 
   const targetOffset = resolveOuterAnchorOffset(fallbackAnchor)
@@ -912,6 +1068,26 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
   activeThreadStateSnapshot = state?.threadKey === normalizedThreadKey.value
     ? state
     : null
+
+  if (!hasRealRestoreState) {
+    restoringThread.value = false
+    activeThreadRestoreAnchor = undefined
+    activeThreadRestoreSeq = 0
+    updateScrollMetrics({ remember: false })
+    markRestorePaintReady()
+
+    if (props.stickToBottom !== false) {
+      bottomPinned.value = true
+      exactBottomPinned.value = true
+
+      void nextTick(() => {
+        if (!restoringThread.value)
+          scrollToBottom()
+      })
+    }
+
+    return
+  }
 
   if (!fallbackAnchor) {
     restoringThread.value = false
@@ -960,6 +1136,7 @@ function cleanupMeasuredElements() {
 
 function cleanupObservers() {
   cleanupMeasuredElements()
+  itemSizeSources.clear()
   markdownLogicalHeights.clear()
   markdownLogicalHeightSources.clear()
   rootResizeObserver?.disconnect()
@@ -1024,7 +1201,10 @@ watch(
     if (restoringThread.value)
       return
 
-    if (!shouldStickToBottom())
+    if (props.stickToBottom === false)
+      return
+
+    if (props.stickToBottom === 'auto' && !exactBottomPinned.value)
       return
 
     void nextTick(() => {
@@ -1036,6 +1216,7 @@ watch(
 )
 
 onMounted(() => {
+  updateLayoutWidthBucket()
   applyInitialScrollPosition()
 
   if (scrollRoot.value && typeof ResizeObserver !== 'undefined') {
@@ -1058,7 +1239,10 @@ defineExpose({
   scrollToBottom,
   scrollToIndex,
   scrollToOffset,
-  getItemSize: (key: string) => itemSizes.get(key),
+  getItemSize: (key: string) => {
+    const record = findRecordByKey(key)
+    return record ? getCompatibleItemSize(record) ?? undefined : undefined
+  },
   getTotalHeight: () => layout.value.totalHeight,
   getVisibleRange: () => ({ start: visibleWindow.value.start, end: visibleWindow.value.end }),
 })

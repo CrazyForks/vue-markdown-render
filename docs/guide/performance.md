@@ -158,6 +158,17 @@ For a mixed AI conversation surface, prefer the zero-config timeline entry:
 />
 ```
 
+If you customize timeline rows, bind `measureRef` to the element that contains the whole row chrome. The default Markdown row has no extra wrapper height, so unmeasured bubbles, avatars, or toolbars are not included in the outer item size:
+
+```vue
+<template v-slot:default="{ markdownProps, measureRef }">
+  <article :ref="measureRef" class="message-bubble">
+    <MarkdownRender v-bind="markdownProps" />
+    <MessageToolbar />
+  </article>
+</template>
+```
+
 If your app already owns the outer virtualizer, use `useMarkstreamVirtualAdapter()` and bind its `markdownProps(item, index)` to each Markdown item. The raw `virtualScroll` prop remains available as the advanced protocol for custom adapters and debugging.
 
 #### `vue-virtual-scroller` example
