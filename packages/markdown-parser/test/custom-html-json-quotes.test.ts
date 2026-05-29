@@ -149,6 +149,21 @@ describe('custom HTML JSON content', () => {
     expect(customData?.content).toBe(payload)
   })
 
+  it('keeps raw in a streamed custom tag source state instead of auto-closing it', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-open-raw-contract', { customHtmlTags: tags })
+    const payload = '{"a":"b"}'
+    const markdown = `<custom-data>\n${payload}`
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: false }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe(payload)
+    expect(customData?.raw).toBe(markdown)
+    expect(customData?.raw).not.toContain('</custom-data>')
+    expect(customData?.loading).toBe(true)
+  })
+
   it('keeps source payload separate from markdown-rendered children', () => {
     const tags = ['custom-data']
     const md = getMarkdown('custom-html-json-quotes-markdown-children', { customHtmlTags: tags })
@@ -172,6 +187,49 @@ describe('custom HTML JSON content', () => {
     const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
 
     expect(findNodeByType(nodes, 'custom-data')).toBeUndefined()
+  })
+
+  it('treats a literal custom closing tag inside JSON as the HTML delimiter', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-literal-close-delimiter', { customHtmlTags: tags })
+    const markdown = '<custom-data>{"text":"literal </custom-data> in json"}</custom-data>'
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe('{"text":"literal ')
+    expect(String(customData?.raw ?? '')).toBe('<custom-data>{"text":"literal </custom-data>')
+    expect(JSON.stringify(nodes)).toContain(' in json')
+    expect(() => JSON.parse(customData.content)).toThrow()
+  })
+
+  it('preserves escaped custom close markers inside JSON payloads', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-escaped-close-marker', { customHtmlTags: tags })
+    const payload = '{"text":"literal \\u003c/custom-data> in json"}'
+    const markdown = `<custom-data>${payload}</custom-data>`
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.content).toBe(payload)
+    expect(customData?.raw).toBe(markdown)
+    expect(JSON.parse(customData.content).text).toBe('literal </custom-data> in json')
+  })
+
+  it('preserves custom tag attrs with greater-than characters while keeping JSON payload source', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-attr-gt', { customHtmlTags: tags })
+    const payload = '{"a":"b"}'
+    const markdown = `<custom-data data-x="a>b">${payload}</custom-data>`
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const customData = findNodeByType(nodes, 'custom-data')
+
+    expect(customData?.attrs).toContainEqual(['data-x', 'a>b'])
+    expect(customData?.content).toBe(payload)
+    expect(customData?.raw).toBe(markdown)
+    expect(() => JSON.parse(customData.content)).not.toThrow()
   })
 
   it('does not include a top-level html_block closing tag in custom JSON content', () => {
@@ -224,6 +282,22 @@ describe('custom HTML JSON content', () => {
     expect(JSON.stringify(nodes)).toContain('</custom-data> trailing')
   })
 
+  it('does not emit custom nodes for complete custom tags inside fenced code', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-fenced-full-tag', { customHtmlTags: tags })
+    const markdown = [
+      '```html',
+      '<custom-data>{"a":"b"}</custom-data>',
+      '```',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const codeBlock = findNodeByType(nodes, 'code_block')
+
+    expect(findNodeByType(nodes, 'custom-data')).toBeUndefined()
+    expect(String(codeBlock?.code ?? codeBlock?.content ?? '')).toContain('<custom-data>{"a":"b"}</custom-data>')
+  })
+
   it('does not rewrite custom close-looking text inside indented code', () => {
     const tags = ['custom-data']
     const md = getMarkdown('custom-html-json-quotes-indented-close-text', { customHtmlTags: tags })
@@ -234,6 +308,18 @@ describe('custom HTML JSON content', () => {
 
     expect(findNodeByType(nodes, 'custom-data')).toBeUndefined()
     expect(String(codeBlock?.code ?? codeBlock?.content ?? '')).toContain('</custom-data> trailing')
+  })
+
+  it('does not emit custom nodes for complete custom tags inside indented code', () => {
+    const tags = ['custom-data']
+    const md = getMarkdown('custom-html-json-quotes-indented-full-tag', { customHtmlTags: tags })
+    const markdown = '    <custom-data>{"a":"b"}</custom-data>'
+
+    const nodes = parseMarkdownToStructure(markdown, md, { customHtmlTags: tags, final: true }) as any[]
+    const codeBlock = findNodeByType(nodes, 'code_block')
+
+    expect(findNodeByType(nodes, 'custom-data')).toBeUndefined()
+    expect(String(codeBlock?.code ?? codeBlock?.content ?? '')).toContain('<custom-data>{"a":"b"}</custom-data>')
   })
 
   it('does not rewrite an isolated custom closing tag with trailing text', () => {

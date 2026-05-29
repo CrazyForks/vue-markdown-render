@@ -127,6 +127,8 @@ For a trusted custom tag, the emitted node typically includes:
 
 For declared custom tags, use `content`/`raw` for source payloads such as JSON, YAML, or tool-call data. Use `children` or a nested renderer when the tag body should render as Markdown; those child nodes still follow the normal inline parsing pipeline.
 
+Because custom tags still use HTML-like delimiters, a literal closing tag such as `</custom-data>` inside a machine payload closes the custom node. Escape `<` in that payload, for example as `\u003c`, when the delimiter text must be preserved as data.
+
 The exact `attrs` shape can vary, so treat it as raw attribute data that your component normalizes for its own needs.
 
 Renderer node reuse compares common custom object fields such as `attrs`, `data`, `props`, and `payload` structurally. If a parser hook attaches other object fields to custom nodes, replace those objects when their contents change.
