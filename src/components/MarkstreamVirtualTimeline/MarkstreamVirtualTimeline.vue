@@ -373,6 +373,12 @@ function getKnownMarkdownLogicalHeight(key: string) {
   return seedMarkdownLogicalHeightFromState(key)
 }
 
+function isActiveThreadRestore(seq: number) {
+  return seq === threadRestoreSeq
+    && activeThreadRestoreSeq === seq
+    && !restorePaintReady.value
+}
+
 function clearThreadRestoreSchedule() {
   if (threadRestoreRaf != null && typeof cancelAnimationFrame === 'function')
     cancelAnimationFrame(threadRestoreRaf)
@@ -389,6 +395,13 @@ function clearThreadRestoreSchedule() {
 
 function getViewportHeight() {
   return Math.max(0, viewportHeight.value || scrollRoot.value?.clientHeight || 0)
+}
+
+function getRestoreLoadingStyle() {
+  return {
+    height: `${Math.max(1, getViewportHeight())}px`,
+    transform: `translateY(${scrollTop.value}px)`,
+  }
 }
 
 function getMaxScrollOffset() {
@@ -483,6 +496,15 @@ function applyScrollOffset(
   ) {
     rememberThreadState()
   }
+}
+
+function handleTimelineScroll() {
+  if (!restorePaintReady.value) {
+    applyThreadRestorePass(activeThreadRestoreSeq, activeThreadRestoreAnchor)
+    return
+  }
+
+  updateScrollMetrics()
 }
 
 function scrollToOffset(offset: number) {
@@ -919,6 +941,85 @@ function applyThreadRestorePass(
   updateScrollMetrics({ remember: false })
 }
 
+function isRestoreViewportReady() {
+  const root = scrollRoot.value
+  if (!root)
+    return false
+
+  if (!visibleWindow.value.records.length)
+    return false
+
+  const anchorOffset = resolveOuterAnchorOffset(activeThreadRestoreAnchor)
+  if (anchorOffset != null && Math.abs((root.scrollTop || 0) - clampScrollOffset(anchorOffset)) > 1)
+    return false
+
+  const itemElements = Array.from(root.querySelectorAll<HTMLElement>('[data-markstream-item-key]'))
+
+  for (const record of visibleWindow.value.records) {
+    const el = itemElements.find(item => item.dataset.markstreamItemKey === record.key)
+
+    if (!el)
+      return false
+
+    if (el.offsetHeight + 1 < record.size)
+      return false
+  }
+
+  const rootRect = root.getBoundingClientRect()
+  const codeSlots = root.querySelectorAll<HTMLElement>('[data-node-type="code_block"]')
+
+  for (const slot of Array.from(codeSlots)) {
+    const rect = slot.getBoundingClientRect()
+    const visible = rect.bottom >= rootRect.top && rect.top <= rootRect.bottom
+    if (!visible)
+      continue
+
+    const hasFallback = slot.querySelector('pre.code-pre-fallback')
+    const hasCodeRoot = slot.querySelector('[data-markstream-code-block="1"]')
+    const hasMonaco = slot.querySelector('.monaco-editor, .monaco-diff-editor')
+
+    if (!hasFallback && !hasCodeRoot && !hasMonaco)
+      return false
+  }
+
+  return true
+}
+
+async function waitRestoreViewportReady(seq: number) {
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
+  let stableFrames = 0
+
+  for (let i = 0; i < 40; i++) {
+    await nextTick()
+    await new Promise<void>((resolve) => {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => resolve())
+        return
+      }
+
+      resolve()
+    })
+
+    if (!isActiveThreadRestore(seq))
+      return false
+
+    applyThreadRestorePass(seq, activeThreadRestoreAnchor)
+
+    if (isRestoreViewportReady()) {
+      stableFrames += 1
+
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+      if (stableFrames >= 2 && now - startedAt >= 32)
+        return true
+    }
+    else {
+      stableFrames = 0
+    }
+  }
+
+  return false
+}
+
 function markRestorePaintReady() {
   restorePaintReady.value = true
 }
@@ -995,6 +1096,7 @@ function finishThreadRestore(seq: number) {
   if (seq !== threadRestoreSeq)
     return
 
+  clearThreadRestoreSchedule()
   applyThreadRestorePass(seq, activeThreadRestoreAnchor)
   restoringThread.value = false
   activeThreadRestoreAnchor = undefined
@@ -1101,13 +1203,6 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
   void nextTick(() => {
     applyThreadRestorePass(restoreSeq, fallbackAnchor)
 
-    if (typeof requestAnimationFrame === 'function') {
-      threadRestoreRaf = requestAnimationFrame(() => {
-        threadRestoreRaf = null
-        applyThreadRestorePass(restoreSeq, fallbackAnchor)
-      })
-    }
-
     if (typeof window !== 'undefined') {
       THREAD_RESTORE_SETTLE_DELAYS.forEach((delay, index) => {
         const timer = window.setTimeout(() => {
@@ -1122,7 +1217,15 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
     }
     else {
       finishThreadRestore(restoreSeq)
+      return
     }
+
+    void waitRestoreViewportReady(restoreSeq).then((ready) => {
+      if (!isActiveThreadRestore(restoreSeq) || !ready)
+        return
+
+      finishThreadRestore(restoreSeq)
+    })
   })
 }
 
@@ -1255,7 +1358,7 @@ defineExpose({
     :class="{ 'is-restoring-thread': !restorePaintReady }"
     data-markstream-virtual-timeline="1"
     data-testid="markstream-virtual-timeline"
-    @scroll="updateScrollMetrics()"
+    @scroll="handleTimelineScroll"
   >
     <div
       class="markstream-virtual-timeline__spacer"
@@ -1304,11 +1407,30 @@ defineExpose({
       :style="{ height: `${visibleWindow.bottomSpacerHeight}px` }"
       aria-hidden="true"
     />
+    <div
+      v-if="!restorePaintReady"
+      class="markstream-virtual-timeline__restore-loading"
+      :style="getRestoreLoadingStyle()"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <slot
+        name="restore-loading"
+        :thread-key="normalizedThreadKey"
+        :visible-records="visibleWindow.records"
+      >
+        <div class="markstream-virtual-timeline__restore-loading-card">
+          <span class="markstream-virtual-timeline__restore-spinner" aria-hidden="true" />
+          <span>Loading thread…</span>
+        </div>
+      </slot>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .markstream-virtual-timeline {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1317,8 +1439,51 @@ defineExpose({
   overflow-anchor: none;
 }
 
-.markstream-virtual-timeline.is-restoring-thread {
+.markstream-virtual-timeline.is-restoring-thread > .markstream-virtual-timeline__spacer,
+.markstream-virtual-timeline.is-restoring-thread > .markstream-virtual-timeline__item {
   visibility: hidden;
+}
+
+.markstream-virtual-timeline__restore-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  overflow: hidden;
+  background: color-mix(in srgb, Canvas 88%, transparent);
+  contain: strict;
+}
+
+.markstream-virtual-timeline__restore-loading-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgb(148 163 184 / 32%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  color: rgb(51 65 85);
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 8%);
+}
+
+.markstream-virtual-timeline__restore-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(148 163 184 / 35%);
+  border-top-color: rgb(51 65 85);
+  border-radius: 999px;
+  animation: markstream-timeline-restore-spin 0.8s linear infinite;
+}
+
+@keyframes markstream-timeline-restore-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .markstream-virtual-timeline__spacer {

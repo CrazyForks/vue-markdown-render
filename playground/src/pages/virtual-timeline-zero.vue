@@ -47,11 +47,18 @@ declare global {
       nextFrame: () => Promise<void>
       scrollTo: (offset: number) => Promise<unknown>
       switchThread: (threadId: ThreadId) => Promise<unknown>
+      startStreamingLastMessage: () => void
+      monitorBottomStreaming: () => Promise<unknown>
+      monitorNonBottomStreaming: () => Promise<unknown>
     }
   }
 }
 
 const activeThreadId = ref<ThreadId>('thread-a')
+const streamingContent = ref('')
+const streamingFinal = ref(true)
+const streamingRevision = ref(1)
+let streamingTimer: number | null = null
 const timelineRef = ref<{
   scrollToOffset: (offset: number) => void
   captureThreadState: () => MarkstreamThreadVirtualState
@@ -132,7 +139,7 @@ function makeLargeMarkdown(label: string, count: number) {
   }).join('\n\n')
 }
 
-const threadItems: Record<ThreadId, TimelineItem[]> = {
+const threadItems = computed<Record<ThreadId, TimelineItem[]>>(() => ({
   'thread-a': [
     { kind: 'system-divider', id: 'a-d-1', text: 'Today' },
     { kind: 'user-message', id: 'a-u-1', text: 'Audit this PR and keep the scroll position stable while tools run.' },
@@ -142,6 +149,13 @@ const threadItems: Record<ThreadId, TimelineItem[]> = {
     { kind: 'tool-call', id: 'a-tool-2', status: 'done', label: 'Search complete' },
     { kind: 'custom', id: 'a-custom-1', component: InspectionPanel },
     { kind: 'error', id: 'a-error-1', message: 'Tool call failed once and was retried.' },
+    {
+      kind: 'assistant-markdown',
+      id: 'a-streaming',
+      content: streamingContent.value,
+      final: streamingFinal.value,
+      revision: streamingRevision.value,
+    },
   ],
   'thread-b': [
     { kind: 'system-divider', id: 'b-d-1', text: 'Yesterday' },
@@ -150,9 +164,9 @@ const threadItems: Record<ThreadId, TimelineItem[]> = {
     { kind: 'tool-call', id: 'b-tool-1', status: 'done', label: 'Height cache imported' },
     { kind: 'assistant-markdown', id: 'b-md-2', content: makeLargeMarkdown('Restore notes', 12), final: true, revision: 1 },
   ],
-}
+}))
 
-const timelineItems = computed(() => threadItems[activeThreadId.value])
+const timelineItems = computed(() => threadItems.value[activeThreadId.value])
 
 const THREAD_STATE_STORAGE_KEY = 'markstream-vue:virtual-timeline-zero:thread-states:v1'
 
@@ -256,6 +270,45 @@ function switchThread(threadId: ThreadId) {
   activeThreadId.value = threadId
 }
 
+function startStreamingLastMessage() {
+  streamingContent.value = ''
+  streamingFinal.value = false
+  streamingRevision.value += 1
+
+  const chunks = Array.from({ length: 80 }, (_, index) => {
+    return [
+      `## Streaming section ${index + 1}`,
+      '',
+      `This is streaming markdown content with inline math $x_${index}=y_${index}$.`,
+      '',
+      '```ts',
+      `const streaming${index} = ${JSON.stringify({ index })}`,
+      '```',
+    ].join('\n')
+  })
+
+  let cursor = 0
+
+  if (streamingTimer != null) {
+    window.clearInterval(streamingTimer)
+    streamingTimer = null
+  }
+
+  streamingTimer = window.setInterval(() => {
+    streamingContent.value += `\n\n${chunks[cursor] ?? ''}`
+    cursor += 1
+
+    if (cursor >= chunks.length) {
+      streamingFinal.value = true
+
+      if (streamingTimer != null) {
+        window.clearInterval(streamingTimer)
+        streamingTimer = null
+      }
+    }
+  }, 24)
+}
+
 function getTimelineRoot() {
   return document.querySelector<HTMLElement>('[data-testid="markstream-virtual-timeline"]')
 }
@@ -327,6 +380,53 @@ onMounted(() => {
       await nextFrame()
       return readSnapshot()
     },
+    startStreamingLastMessage,
+    async monitorBottomStreaming() {
+      timelineRef.value?.scrollToOffset(timelineRef.value.getTotalHeight())
+      await nextFrame()
+
+      const before = readSnapshot()
+      startStreamingLastMessage()
+
+      const samples: ReturnType<typeof readSnapshot>[] = []
+      for (let i = 0; i < 180; i++) {
+        await nextFrame()
+        samples.push(readSnapshot())
+      }
+
+      return {
+        before,
+        samples,
+        maxDistanceFromBottom: Math.max(
+          ...samples.map(s => Math.max(0, s.scrollHeight - s.scrollTop - s.clientHeight)),
+        ),
+        blankFrames: samples.filter(s => !s.visibleText.trim()).length,
+      }
+    },
+    async monitorNonBottomStreaming() {
+      timelineRef.value?.scrollToOffset(1600)
+      await nextFrame()
+
+      const before = readSnapshot()
+      startStreamingLastMessage()
+
+      const samples: ReturnType<typeof readSnapshot>[] = []
+      for (let i = 0; i < 180; i++) {
+        await nextFrame()
+        samples.push(readSnapshot())
+      }
+
+      const scrollTops = samples.map(s => s.scrollTop)
+
+      return {
+        before,
+        samples,
+        scrollTopRange: Math.max(...scrollTops) - Math.min(...scrollTops),
+        firstVisibleTextStable: samples.every(
+          s => s.visibleText.slice(0, 120) === before.visibleText.slice(0, 120),
+        ),
+      }
+    },
   }
 })
 
@@ -343,6 +443,11 @@ onBeforeUnmount(() => {
 
   window.removeEventListener('pagehide', flushActiveThreadState)
   window.removeEventListener('beforeunload', flushActiveThreadState)
+
+  if (streamingTimer != null) {
+    window.clearInterval(streamingTimer)
+    streamingTimer = null
+  }
 
   if (persistTimer != null) {
     window.clearTimeout(persistTimer)
@@ -386,6 +491,13 @@ onBeforeUnmount(() => {
       stick-to-bottom="auto"
       @thread-state-change="persistThreadState"
     >
+      <template #restore-loading="{ threadKey }">
+        <div class="timeline-restore-loading">
+          <span class="timeline-restore-loading__spinner" />
+          <span>Restoring {{ threadKey }}…</span>
+        </div>
+      </template>
+
       <template #default="{ item, measureRef, markdownProps }">
         <div
           v-if="item.kind === 'system-divider'"
@@ -512,6 +624,34 @@ onBeforeUnmount(() => {
   border: 1px solid #dbe3ef;
   border-radius: 8px;
   background: #fff;
+}
+
+.timeline-restore-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  color: #334155;
+  font-size: 13px;
+  box-shadow: 0 10px 32px rgb(15 23 42 / 10%);
+}
+
+.timeline-restore-loading__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(148 163 184 / 35%);
+  border-top-color: #334155;
+  border-radius: 999px;
+  animation: timeline-restore-spin 0.8s linear infinite;
+}
+
+@keyframes timeline-restore-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .divider-row {
