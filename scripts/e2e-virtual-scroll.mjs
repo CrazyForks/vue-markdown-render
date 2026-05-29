@@ -417,6 +417,9 @@ function summarizeVirtualTimelineZeroSample(sample) {
     visibleText: typeof rest.visibleText === 'string'
       ? rest.visibleText.slice(0, 240)
       : '',
+    viewportText: typeof rest.viewportText === 'string'
+      ? rest.viewportText.slice(0, 240)
+      : '',
   }
 }
 
@@ -646,9 +649,10 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
         snapshot = api.read()
 
         const markdownMetrics = snapshot.state?.markdownStates?.['a-md-1']?.metrics
+        const viewportText = String(snapshot.viewportText || snapshot.visibleText || '')
         if (
-          snapshot.visibleText.includes('PR analysis section 13')
-          || snapshot.visibleText.includes('section13')
+          viewportText.includes('PR analysis section 13')
+          || viewportText.includes('section13')
         ) {
           found = snapshot
         }
@@ -700,6 +704,7 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
 
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
   await waitForVirtualTimelineZeroReady(page)
+  await waitForVirtualTimelineZeroPaintReady(page)
 
   const probe = await page.evaluate(async () => {
     const api = window.__markstreamVirtualTimelineZero
@@ -738,6 +743,7 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
         codeBlockProbe: sample.codeBlockProbe,
         itemHeight: sample.state?.itemHeights?.['a-md-1'],
         visibleText: String(sample.visibleText || '').slice(0, 240),
+        viewportText: String(sample.viewportText || '').slice(0, 240),
       })),
     }
   })
@@ -779,19 +785,42 @@ async function runVirtualTimelineZeroStreamingProbe(page, port) {
     timeout: 60000,
   })
   await waitForVirtualTimelineZeroReady(page)
+
+  await page.evaluate((storageKey) => {
+    window.sessionStorage.removeItem(storageKey)
+  }, virtualTimelineZeroStorageKey)
+
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await waitForVirtualTimelineZeroReady(page)
   await waitForVirtualTimelineZeroPaintReady(page)
 
-  const result = await page.evaluate(async () => {
+  const bottom = await page.evaluate(async () => {
     const api = window.__markstreamVirtualTimelineZero
 
-    if (!api || typeof api.monitorBottomStreaming !== 'function' || typeof api.monitorNonBottomStreaming !== 'function')
-      throw new Error('virtual-timeline-zero streaming monitor API is missing')
+    if (!api || typeof api.monitorBottomStreaming !== 'function')
+      throw new Error('virtual-timeline-zero bottom streaming monitor API is missing')
 
-    const bottom = await api.monitorBottomStreaming()
-    const nonBottom = await api.monitorNonBottomStreaming()
-
-    return { bottom, nonBottom }
+    return api.monitorBottomStreaming()
   })
+
+  await page.evaluate((storageKey) => {
+    window.sessionStorage.removeItem(storageKey)
+  }, virtualTimelineZeroStorageKey)
+
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await waitForVirtualTimelineZeroReady(page)
+  await waitForVirtualTimelineZeroPaintReady(page)
+
+  const nonBottom = await page.evaluate(async () => {
+    const api = window.__markstreamVirtualTimelineZero
+
+    if (!api || typeof api.monitorNonBottomStreaming !== 'function')
+      throw new Error('virtual-timeline-zero non-bottom streaming monitor API is missing')
+
+    return api.monitorNonBottomStreaming()
+  })
+
+  const result = { bottom, nonBottom }
 
   assert(
     result.bottom.maxDistanceFromBottom <= 2

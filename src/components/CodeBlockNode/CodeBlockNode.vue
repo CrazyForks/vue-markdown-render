@@ -718,19 +718,57 @@ async function revealEditorDisplay() {
     diffFallbackExitTimer = null
     diffFallbackExitActive.value = false
     diffFallbackFadingOut.value = false
+
+    // The final Monaco diff may collapse unchanged lines after the fallback
+    // handoff. Once the fallback layer is gone, release the fallback floor and
+    // resize to the folded diff summary height.
+    safeRaf(() => {
+      syncInlineFoldProxies()
+      scheduleEditorHeightSync()
+    })
   }, 120)
 }
 
-function resolveHeightWithEstimatedEditorFloor(height: number, clearWhenSatisfied = false) {
+function canReleaseEstimatedFloorForFoldedDiff() {
+  if (!isDiff.value)
+    return false
+
+  if (!editorMounted.value || !editorDisplayReady.value)
+    return false
+
+  // During fallback fade-out, keep the fallback/editor height locked to avoid
+  // exposing an intermediate jump. Release only after the fallback layer is gone.
+  if (diffFallbackExitActive.value || diffFallbackFadingOut.value)
+    return false
+
+  const editorHost = codeEditor.value
+  if (!editorHost)
+    return false
+
+  return hasVisibleDiffHiddenLines(editorHost)
+}
+
+function resolveHeightWithEstimatedEditorFloor(
+  height: number,
+  clearWhenSatisfied = false,
+  options: { allowBelowEstimatedFloor?: boolean } = {},
+) {
   const roundedHeight = Math.ceil(height)
   const floor = getPendingEstimatedEditorHeightFloor()
+
   if (floor == null)
     return roundedHeight
-  if (roundedHeight >= floor) {
-    if (clearWhenSatisfied && editorMounted.value)
+
+  const allowBelowFloor = options.allowBelowEstimatedFloor === true
+    || canReleaseEstimatedFloorForFoldedDiff()
+
+  if (roundedHeight >= floor || allowBelowFloor) {
+    if ((clearWhenSatisfied || allowBelowFloor) && editorMounted.value)
       clearEstimatedEditorHeightFloor()
+
     return roundedHeight
   }
+
   return floor
 }
 
@@ -1609,14 +1647,32 @@ function applyCollapsedContainerHeight(
   container: HTMLElement,
   contentHeight: number,
   maxHeight: number,
-  options: { clearEstimatedFloor?: boolean } = {},
+  options: {
+    clearEstimatedFloor?: boolean
+    allowBelowEstimatedFloor?: boolean
+  } = {},
 ) {
   const cappedHeight = Math.min(contentHeight, maxHeight)
-  const nextHeight = resolveHeightWithEstimatedEditorFloor(cappedHeight, options.clearEstimatedFloor === true)
+  const allowBelowEstimatedFloor = options.allowBelowEstimatedFloor === true
+    || canReleaseEstimatedFloorForFoldedDiff()
+
+  const nextHeight = resolveHeightWithEstimatedEditorFloor(
+    cappedHeight,
+    options.clearEstimatedFloor === true,
+    { allowBelowEstimatedFloor },
+  )
+
   const floor = getPendingEstimatedEditorHeightFloor()
-  container.style.minHeight = floor != null ? `${Math.min(floor, Math.ceil(maxHeight))}px` : '0px'
+
+  // If folded diff is ready, the fallback floor must be released; otherwise the
+  // final collapsed unchanged-lines UI keeps a large blank area below it.
+  container.style.minHeight = floor != null && !allowBelowEstimatedFloor
+    ? `${Math.min(floor, Math.ceil(maxHeight))}px`
+    : '0px'
+
   container.style.height = `${nextHeight}px`
   container.style.maxHeight = `${Math.ceil(maxHeight)}px`
+
   if (isDiff.value) {
     container.style.overflow = 'hidden'
   }
@@ -1624,6 +1680,7 @@ function applyCollapsedContainerHeight(
     const shouldScroll = contentHeight > maxHeight + PIXEL_EPSILON
     container.style.overflow = shouldScroll ? 'auto' : 'hidden'
   }
+
   return nextHeight
 }
 
@@ -1693,12 +1750,19 @@ function updateCollapsedHeight() {
     const rectH = Math.ceil((container.getBoundingClientRect?.().height) || 0)
     const estimatedDiffHeight = isDiff.value ? estimateDiffEditorContentHeight() : null
     const hasVisibleCollapsedDiffSummary = isDiff.value && hasVisibleDiffHiddenLines(container)
+    const foldedDiffReadyForShrink = hasVisibleCollapsedDiffSummary
+      && editorMounted.value
+      && editorDisplayReady.value
+      && !diffFallbackExitActive.value
+      && !diffFallbackFadingOut.value
     if (!hasVisibleCollapsedDiffSummary)
       lastStableCollapsedDiffHeight.value = null
     if (resumeGuardFrames > 0) {
       resumeGuardFrames--
       if (heightBeforeCollapse.value != null) {
-        const h = applyCollapsedContainerHeight(container, heightBeforeCollapse.value, max)
+        const h = applyCollapsedContainerHeight(container, heightBeforeCollapse.value, max, {
+          allowBelowEstimatedFloor: foldedDiffReadyForShrink,
+        })
         adjustScrollAfterHeightChange(container, oldHeight, h)
         return
       }
@@ -1727,7 +1791,10 @@ function updateCollapsedHeight() {
       const measuredHeight = shouldKeepLastStableCollapsedDiffHeight
         ? lastStableCollapsedDiffHeight.value!
         : shouldKeepCurrentCollapsedDiffHeight ? rectH : h0
-      const h = applyCollapsedContainerHeight(container, measuredHeight, max, { clearEstimatedFloor: true })
+      const h = applyCollapsedContainerHeight(container, measuredHeight, max, {
+        clearEstimatedFloor: true,
+        allowBelowEstimatedFloor: foldedDiffReadyForShrink,
+      })
       if (hasVisibleCollapsedDiffSummary && h < max - PIXEL_EPSILON) {
         lastStableCollapsedDiffHeight.value = h
         collapsedDiffSettleGuardUntil = Date.now() + 160
@@ -1738,7 +1805,9 @@ function updateCollapsedHeight() {
 
     // 2) 使用折叠前的内容高度（不更新记忆值）
     if (heightBeforeCollapse.value != null) {
-      const h = applyCollapsedContainerHeight(container, heightBeforeCollapse.value, max)
+      const h = applyCollapsedContainerHeight(container, heightBeforeCollapse.value, max, {
+        allowBelowEstimatedFloor: foldedDiffReadyForShrink,
+      })
       adjustScrollAfterHeightChange(container, oldHeight, h)
       return
     }
@@ -1761,7 +1830,9 @@ function updateCollapsedHeight() {
       const fallbackHeight = shouldKeepLastStableCollapsedDiffHeight
         ? lastStableCollapsedDiffHeight.value!
         : shouldKeepCurrentCollapsedDiffHeight ? rectH : stableFallbackHeight
-      const h = applyCollapsedContainerHeight(container, fallbackHeight, max)
+      const h = applyCollapsedContainerHeight(container, fallbackHeight, max, {
+        allowBelowEstimatedFloor: foldedDiffReadyForShrink,
+      })
       if (hasVisibleCollapsedDiffSummary && h < max - PIXEL_EPSILON) {
         lastStableCollapsedDiffHeight.value = h
         collapsedDiffSettleGuardUntil = Date.now() + 160
@@ -1772,7 +1843,9 @@ function updateCollapsedHeight() {
 
     const floor = getPendingEstimatedEditorHeightFloor()
     if (floor != null) {
-      const h = applyCollapsedContainerHeight(container, floor, max)
+      const h = applyCollapsedContainerHeight(container, floor, max, {
+        allowBelowEstimatedFloor: foldedDiffReadyForShrink,
+      })
       adjustScrollAfterHeightChange(container, oldHeight, h)
       return
     }
@@ -1780,7 +1853,9 @@ function updateCollapsedHeight() {
     // 4) 兜底：若有先前行高/字体，可估一个最小高度；否则保持现状，避免强制跳到 MAX
     const prev = Number.parseFloat(container.style.height)
     if (!Number.isNaN(prev) && prev > 0) {
-      const h = applyCollapsedContainerHeight(container, prev, max)
+      const h = applyCollapsedContainerHeight(container, prev, max, {
+        allowBelowEstimatedFloor: foldedDiffReadyForShrink,
+      })
       adjustScrollAfterHeightChange(container, oldHeight, h)
     }
     else if (!isDiff.value) {

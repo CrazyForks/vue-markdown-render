@@ -35,6 +35,7 @@ declare global {
         totalHeight: number
         state: unknown
         visibleText: string
+        viewportText: string
         restoring: boolean
         codeBlockProbe: Array<{
           height: number
@@ -337,6 +338,20 @@ function readCodeBlockProbe(root: HTMLElement | null) {
     })
 }
 
+function readViewportText(root: HTMLElement | null) {
+  if (!root)
+    return ''
+
+  const rootRect = root.getBoundingClientRect()
+  return Array.from(root.querySelectorAll<HTMLElement>('[data-markstream-item-key]'))
+    .filter((el) => {
+      const rect = el.getBoundingClientRect()
+      return rect.bottom >= rootRect.top && rect.top <= rootRect.bottom
+    })
+    .map(el => el.textContent ?? '')
+    .join('\n')
+}
+
 function readSnapshot() {
   const root = getTimelineRoot()
   const codeBlockProbe = readCodeBlockProbe(root ?? null)
@@ -349,6 +364,7 @@ function readSnapshot() {
     totalHeight: timelineRef.value?.getTotalHeight?.() ?? 0,
     state: timelineRef.value?.captureThreadState?.() ?? null,
     visibleText: root?.textContent ?? '',
+    viewportText: readViewportText(root ?? null),
     restoring: root?.classList.contains('is-restoring-thread') ?? false,
     codeBlockProbe,
     diffCodeBlockProbe: codeBlockProbe.filter(probe => probe.diff),
@@ -423,10 +439,18 @@ onMounted(() => {
       }
     },
     async monitorNonBottomStreaming() {
-      timelineRef.value?.scrollToOffset(1600)
-      await nextFrame()
+      const targetOffset = 1600
+      let before = readSnapshot()
 
-      const before = readSnapshot()
+      for (let i = 0; i < 80; i++) {
+        timelineRef.value?.scrollToOffset(targetOffset)
+        await nextFrame()
+        before = readSnapshot()
+
+        if (!before.restoring && Math.abs(before.scrollTop - targetOffset) <= 2)
+          break
+      }
+
       startStreamingLastMessage()
 
       const samples: ReturnType<typeof readSnapshot>[] = []
@@ -442,7 +466,7 @@ onMounted(() => {
         samples,
         scrollTopRange: Math.max(...scrollTops) - Math.min(...scrollTops),
         firstVisibleTextStable: samples.every(
-          s => s.visibleText.slice(0, 120) === before.visibleText.slice(0, 120),
+          s => s.viewportText.slice(0, 120) === before.viewportText.slice(0, 120),
         ),
       }
     },

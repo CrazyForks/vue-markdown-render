@@ -53,6 +53,19 @@ When passing standalone `heightCache`, also pass `heightCacheWidth`; otherwise t
 
 `final` means the source stream has completed. It does not guarantee that the layout has settled. Code blocks, diagrams, images, fonts, and custom components may still change height. `render-final` means this render session has passed the selected settle policy. For virtualized or offscreen nodes, `metrics.confidence` may still be `mixed`. Persist the height cache as authoritative only when `metrics.confidence` is `measured` or `final`, or when you persist the returned per-node `heightCache` together with `width`, `measurementKey`, and `contentHash`.
 
+### `MarkstreamVirtualTimeline` slots
+
+#### `restore-loading`
+
+Rendered while a previously measured thread is being restored. The slot is displayed as an absolutely positioned overlay inside the timeline scroll root and does not participate in item measurement.
+
+Slot props:
+
+- `threadKey`: current timeline thread key.
+- `visibleRecords`: records in the current virtual window.
+
+Do not insert loading rows into `items`; that changes offsets and can break scroll restoration.
+
 ### smooth-streaming and fade — pick one, not both
 
 `smooth-streaming` and `fade` both produce a "text appears gradually" effect, but at different layers:

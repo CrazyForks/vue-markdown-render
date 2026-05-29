@@ -931,6 +931,162 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('does not reveal restore loading when a visible code block shell is not ready', async () => {
+    vi.useFakeTimers()
+
+    let wrapper: any
+
+    try {
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
+
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      })
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: 'code', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: {
+              type: 'item',
+              itemKey: 'm1',
+              offsetWithinItemPx: 0,
+            },
+            itemHeights: { m1: 360 },
+            itemSizeSources: {
+              m1: timelineItemSource('thread-a', 'm1', 1),
+            },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', {
+              'ref': props.measureRef,
+              'data-markstream-item-key': props.itemKey,
+            }, [
+              h('div', {
+                'class': 'node-slot',
+                'data-node-index': '0',
+                'data-node-type': 'code_block',
+              }, [
+                h('div', { class: 'node-content' }, [
+                  h('div', {
+                    'data-markstream-code-block': '1',
+                    'data-markstream-enhanced': 'false',
+                  }),
+                ]),
+              ]),
+            ])
+          },
+        },
+      })
+
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(100)
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('treats visible mermaid pending placeholder as restore-ready code block content', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
+
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      return window.setTimeout(() => callback(performance.now()), 16)
+    })
+    vi.stubGlobal('cancelAnimationFrame', (handle: number) => {
+      window.clearTimeout(handle)
+    })
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          { kind: 'assistant-markdown', id: 'm1', content: 'mermaid', final: true, revision: 1 },
+        ],
+        threadKey: 'thread-a',
+        stickToBottom: false,
+        initialThreadState: {
+          threadKey: 'thread-a',
+          measurementKey: ':800',
+          widthBucket: 800,
+          outerAnchor: {
+            type: 'item',
+            itemKey: 'm1',
+            offsetWithinItemPx: 0,
+          },
+          itemHeights: { m1: 360 },
+          itemSizeSources: {
+            m1: timelineItemSource('thread-a', 'm1', 1),
+          },
+          markdownStates: {},
+        },
+      },
+      slots: {
+        default(props: any) {
+          return h('div', { ref: props.measureRef }, [
+            h('div', {
+              'class': 'node-slot',
+              'data-node-index': '0',
+              'data-node-type': 'code_block',
+            }, [
+              h('div', { class: 'node-content' }, [
+                h('div', {
+                  'data-markstream-mermaid': '1',
+                  'data-markstream-mode': 'pending',
+                }),
+              ]),
+            ]),
+          ])
+        },
+      },
+    })
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+    await vi.waitFor(async () => {
+      await nextTick()
+      await flushAnimationFrame()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }, { timeout: 320 })
+
+    wrapper.unmount()
+  })
+
   it('preloads initial thread state before first visible render', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)

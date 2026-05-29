@@ -1450,6 +1450,137 @@ describe('codeBlockNode diff defaults', () => {
 
     wrapper.unmount()
   })
+
+  it('releases diff fallback height floor after unchanged lines are folded', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const fullFallbackHeight = 41 * 18
+    const rect = (top: number, height: number, width = 240) => ({
+      x: 0,
+      y: top,
+      width,
+      height,
+      top,
+      left: 0,
+      right: width,
+      bottom: top + height,
+      toJSON: () => ({}),
+    }) as DOMRect
+    const setRect = (node: Element | null, top: number, height: number, width = 240) => {
+      if (!(node instanceof HTMLElement))
+        return
+      Object.defineProperty(node, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(top, height, width),
+      })
+    }
+    const makeSideEditor = () => ({
+      getModel: () => ({ getLineCount: () => 41 }),
+      getOption: () => 18,
+      getContentHeight: () => 80,
+      layout: vi.fn(),
+      onDidContentSizeChange: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+    })
+    const diffView = {
+      getLineChanges: vi.fn(() => [
+        {
+          originalStartLineNumber: 4,
+          originalEndLineNumber: 4,
+          modifiedStartLineNumber: 4,
+          modifiedEndLineNumber: 4,
+        },
+      ]),
+      getOriginalEditor: vi.fn(() => makeSideEditor()),
+      getModifiedEditor: vi.fn(() => makeSideEditor()),
+      onDidUpdateDiff: vi.fn(() => ({ dispose: vi.fn() })),
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+    }
+
+    helpers.getDiffEditorView.mockReturnValue(diffView as any)
+    helpers.createDiffEditor.mockImplementation(async (el: HTMLElement) => {
+      Object.defineProperty(el, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(0, Number.parseFloat(el.style.height || '') || fullFallbackHeight, 480),
+      })
+      el.innerHTML = `
+        <div class="monaco-diff-editor">
+          <div class="editor original">
+            <div class="view-lines">
+              <div class="view-line" style="height:18px"></div>
+              <div class="view-line" style="height:18px"></div>
+            </div>
+            <div class="diff-hidden-lines">
+              <div class="center" style="display:block;width:200px;height:28px">
+                <div>39 unmodified lines</div>
+              </div>
+            </div>
+          </div>
+          <div class="editor modified">
+            <div class="view-lines">
+              <div class="view-line" style="height:18px"></div>
+              <div class="view-line" style="height:18px"></div>
+            </div>
+            <div class="diff-hidden-lines">
+              <div class="center" style="display:block;width:200px;height:28px">
+                <div>39 unmodified lines</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+
+      setRect(el.querySelector('.monaco-diff-editor'), 0, 64, 480)
+      for (const [index, line] of Array.from(el.querySelectorAll('.view-lines .view-line')).entries())
+        setRect(line, index % 2 === 0 ? 0 : 18, 18)
+      for (const hiddenLines of Array.from(el.querySelectorAll('.diff-hidden-lines')))
+        setRect(hiddenLines, 36, 28)
+      for (const center of Array.from(el.querySelectorAll('.diff-hidden-lines .center')))
+        setRect(center, 36, 28, 200)
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      attachTo: document.body,
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          originalCode: Array.from({ length: 41 }, (_, i) => `same ${i}`).join('\n'),
+          updatedCode: Array.from({ length: 41 }, (_, i) => i === 3 ? `changed ${i}` : `same ${i}`).join('\n'),
+          code: '',
+          raw: '```diff\n...\n```',
+        },
+        loading: false,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          MAX_HEIGHT: 500,
+          diffHideUnchangedRegions: true,
+        },
+      },
+    })
+
+    try {
+      await waitForCreateDiffEditorCalls(1, helpers)
+      const editorHost = wrapper.get('.code-editor-container').element as HTMLElement
+
+      await vi.waitFor(() => {
+        expect(Number.parseFloat(editorHost.style.height || '0')).toBeGreaterThan(0)
+      })
+
+      await vi.waitFor(() => {
+        const height = Number.parseFloat(editorHost.style.height || '0')
+        const minHeight = Number.parseFloat(editorHost.style.minHeight || '0')
+
+        expect(height).toBeLessThan(500)
+        expect(minHeight).toBe(0)
+      })
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
 })
 
 describe('codeBlockNode theme updates', () => {

@@ -950,21 +950,50 @@ function hasElementContent(content: HTMLElement) {
   if ((content.textContent ?? '').trim().length > 0)
     return true
 
-  // Count any already-mounted element as meaningful for non-code nodes.
-  // Examples: <hr>, <br>, <img>, <table>, <blockquote>, sanitized HTML, etc.
-  if (content.childElementCount > 0)
-    return true
-
-  return false
+  return Boolean(content.querySelector([
+    'hr',
+    'br',
+    'table',
+    'blockquote',
+    'img',
+    'svg',
+    'canvas',
+    '[data-markstream-math]',
+    '[data-markstream-mermaid]',
+    '[data-markstream-infographic]',
+    '[data-markstream-d2]',
+    '[data-markstream-pre="1"]',
+  ].join(',')))
 }
 
 function hasReadyCodeBlockContent(content: HTMLElement) {
+  const codeBlock = content.querySelector<HTMLElement>('[data-markstream-code-block="1"]')
+
+  if (codeBlock) {
+    const enhanced = codeBlock.dataset.markstreamEnhanced === 'true'
+    const hasFallback = Boolean(codeBlock.querySelector('pre.code-pre-fallback'))
+    const hasHiddenEditor = Boolean(codeBlock.querySelector('.code-editor-container.is-hidden'))
+    const hasMonacoDom = Boolean(codeBlock.querySelector('.monaco-editor, .monaco-diff-editor'))
+
+    // Do not treat the outer code block shell itself as ready. It can exist while
+    // Monaco is not painted and the fallback has already disappeared.
+    return enhanced || hasFallback || hasHiddenEditor || hasMonacoDom
+  }
+
+  // Mermaid / Infographic / D2 are routed from code_block nodes but they do not
+  // render [data-markstream-code-block="1"]. Their pending placeholders already
+  // reserve a stable height, so those roots count as restore-ready content.
   return Boolean(content.querySelector([
-    'pre.code-pre-fallback',
-    '[data-markstream-code-block="1"]',
-    '.monaco-editor',
-    '.monaco-diff-editor',
-    '[data-markstream-code-loading="1"]',
+    '[data-markstream-mermaid]',
+    '[data-markstream-infographic]',
+    '[data-markstream-d2]',
+    '.mermaid-block-container',
+    '.mermaid-preview-area',
+    '.infographic-block-container',
+    '.infographic-preview',
+    '.d2-block-container',
+    '.d2-preview-area',
+    'pre[data-markstream-pre="1"]',
   ].join(',')))
 }
 
@@ -1357,8 +1386,19 @@ watch(
       return
 
     void nextTick(() => {
-      if (!restoringThread.value)
-        scrollToBottom()
+      if (restoringThread.value)
+        return
+
+      if (props.stickToBottom === false)
+        return
+
+      // The user (or host API) may have scrolled away after this post-flush
+      // watcher queued. Re-check before applying the delayed bottom snap so a
+      // stale auto-stick pass cannot override an explicit non-bottom position.
+      if (props.stickToBottom === 'auto' && !exactBottomPinned.value)
+        return
+
+      scrollToBottom()
     })
   },
   { flush: 'post' },
