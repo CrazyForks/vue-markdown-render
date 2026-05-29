@@ -427,6 +427,15 @@ async function waitForVirtualTimelineZeroReady(page, timeoutMs = 60000) {
   }, { timeout: timeoutMs })
 }
 
+async function waitForVirtualTimelineZeroPaintReady(page, timeoutMs = 60000) {
+  await waitForVirtualTimelineZeroReady(page, timeoutMs)
+  await page.waitForFunction(() => {
+    const api = window.__markstreamVirtualTimelineZero
+    const snapshot = api?.read?.()
+    return Boolean(snapshot && snapshot.restoring !== true)
+  }, { timeout: timeoutMs })
+}
+
 async function runVirtualTimelineZeroReloadProbe(page, port) {
   await page.goto(`http://${host}:${port}/virtual-timeline-zero`, {
     waitUntil: 'domcontentloaded',
@@ -619,24 +628,41 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
     }
 
     let found = null
+    let finalReadySnapshot = null
     const total = Math.max(1, snapshot.totalHeight || snapshot.scrollHeight || 1)
 
     // Locate the region around "PR analysis section 13", which is below the
     // section-6 area and keeps normal ts CodeBlockNode instances above it.
-    for (let offset = 0; offset < total; offset += 420) {
-      snapshot = await api.scrollTo(offset)
+    // Keep scanning until the markdown metrics are final enough for persistence;
+    // otherwise the reload probe stores a transient partial height cache and the
+    // e2e assertion reports expected measurement settlement as visible jitter.
+    for (let pass = 0; pass < 3 && !finalReadySnapshot; pass++) {
+      for (let offset = 0; offset < total; offset += 420) {
+        snapshot = await api.scrollTo(offset)
 
-      for (let frame = 0; frame < 8; frame++)
-        await api.nextFrame()
+        for (let frame = 0; frame < 8; frame++)
+          await api.nextFrame()
 
-      snapshot = api.read()
+        snapshot = api.read()
 
-      if (
-        snapshot.visibleText.includes('PR analysis section 13')
-        || snapshot.visibleText.includes('section13')
-      ) {
-        found = snapshot
-        break
+        const markdownMetrics = snapshot.state?.markdownStates?.['a-md-1']?.metrics
+        if (
+          snapshot.visibleText.includes('PR analysis section 13')
+          || snapshot.visibleText.includes('section13')
+        ) {
+          found = snapshot
+        }
+
+        if (
+          found
+          && markdownMetrics?.final === true
+          && markdownMetrics?.confidence === 'measured'
+          && Number(markdownMetrics?.measuredCount ?? 0) >= Number(markdownMetrics?.nodeCount ?? 1)
+          && Math.abs(Number(snapshot.state?.itemHeights?.['a-md-1'] ?? 0) - Number(markdownMetrics?.totalHeight ?? 0)) <= 96
+        ) {
+          finalReadySnapshot = found
+          break
+        }
       }
     }
 
@@ -734,6 +760,62 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
     lastVisible: summarizeVirtualTimelineZeroSample(probe.lastVisible),
     scrollTopRangePx: probe.scrollTopRangePx,
     itemHeightRangePx: probe.itemHeightRangePx,
+  }
+}
+
+async function runVirtualTimelineZeroStreamingProbe(page, port) {
+  await page.goto(`http://${host}:${port}/virtual-timeline-zero`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  })
+  await waitForVirtualTimelineZeroReady(page)
+  await waitForVirtualTimelineZeroPaintReady(page)
+
+  const result = await page.evaluate(async () => {
+    const api = window.__markstreamVirtualTimelineZero
+
+    if (!api || typeof api.monitorBottomStreaming !== 'function' || typeof api.monitorNonBottomStreaming !== 'function')
+      throw new Error('virtual-timeline-zero streaming monitor API is missing')
+
+    const bottom = await api.monitorBottomStreaming()
+    const nonBottom = await api.monitorNonBottomStreaming()
+
+    return { bottom, nonBottom }
+  })
+
+  assert(
+    result.bottom.maxDistanceFromBottom <= 2
+    && result.bottom.blankFrames === 0,
+    'virtual-timeline-zero bottom-pinned streaming caused bottom drift or blank frames',
+    {
+      maxDistanceFromBottom: result.bottom.maxDistanceFromBottom,
+      blankFrames: result.bottom.blankFrames,
+      before: summarizeVirtualTimelineZeroSample(result.bottom.before),
+      lastSample: summarizeVirtualTimelineZeroSample(result.bottom.samples?.at?.(-1)),
+    },
+  )
+
+  assert(
+    result.nonBottom.scrollTopRange <= 1
+    && result.nonBottom.firstVisibleTextStable === true,
+    'virtual-timeline-zero non-bottom streaming changed the visible viewport',
+    {
+      scrollTopRange: result.nonBottom.scrollTopRange,
+      firstVisibleTextStable: result.nonBottom.firstVisibleTextStable,
+      before: summarizeVirtualTimelineZeroSample(result.nonBottom.before),
+      lastSample: summarizeVirtualTimelineZeroSample(result.nonBottom.samples?.at?.(-1)),
+    },
+  )
+
+  return {
+    bottom: {
+      maxDistanceFromBottom: result.bottom.maxDistanceFromBottom,
+      blankFrames: result.bottom.blankFrames,
+    },
+    nonBottom: {
+      scrollTopRange: result.nonBottom.scrollTopRange,
+      firstVisibleTextStable: result.nonBottom.firstVisibleTextStable,
+    },
   }
 }
 
@@ -1205,8 +1287,9 @@ async function run() {
       assertNoPageErrors('virtual-scroll smoke e2e')
 
       const virtualTimelineReload = await runVirtualTimelineZeroReloadProbe(page, port)
-      const virtualTimelineCodeBlockJitter = await runVirtualTimelineZeroCodeBlockJitterProbe(page, port)
       const virtualTimelineDiffCodeBlockState = await runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port)
+      const virtualTimelineCodeBlockJitter = await runVirtualTimelineZeroCodeBlockJitterProbe(page, port)
+      const virtualTimelineStreaming = await runVirtualTimelineZeroStreamingProbe(page, port)
 
       assertNoPageErrors('virtual-timeline-zero reload e2e')
 
@@ -1217,6 +1300,7 @@ async function run() {
         virtualTimelineReload,
         virtualTimelineCodeBlockJitter,
         virtualTimelineDiffCodeBlockState,
+        virtualTimelineStreaming,
       }, null, 2)}\n`)
 
       return

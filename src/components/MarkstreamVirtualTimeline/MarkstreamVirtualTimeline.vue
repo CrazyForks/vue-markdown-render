@@ -101,7 +101,7 @@ const threadStates = new Map<string, MarkstreamThreadVirtualState>()
 const restoringThread = ref(false)
 const restorePaintReady = ref(true)
 const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
-const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
+const ITEM_SIZE_RECONCILE_DEADBAND_PX = 2
 let rootResizeObserver: ResizeObserver | null = null
 let threadRestoreSeq = 0
 let threadRestoreRaf: number | null = null
@@ -941,22 +941,60 @@ function applyThreadRestorePass(
   updateScrollMetrics({ remember: false })
 }
 
+function isVisibleInRoot(el: HTMLElement, root: HTMLElement) {
+  const rect = el.getBoundingClientRect()
+  const rootRect = root.getBoundingClientRect()
+  return rect.bottom >= rootRect.top && rect.top <= rootRect.bottom
+}
+
+function hasMeaningfulNodeContent(slot: HTMLElement) {
+  const content = slot.querySelector<HTMLElement>(':scope > .node-content')
+  if (!content)
+    return false
+
+  // Text fallback, pre fallback, diagrams, math, Monaco, etc. all count as visible content.
+  if ((content.textContent ?? '').trim().length > 0)
+    return true
+
+  return Boolean(content.querySelector([
+    'pre',
+    'svg',
+    'canvas',
+    '[data-markstream-code-block="1"]',
+    '[data-markstream-math]',
+    '.monaco-editor',
+    '.monaco-diff-editor',
+    '[data-mermaid-wrapper]',
+    '.mermaid-preview-area',
+    '.infographic-preview',
+    '.d2-output',
+  ].join(',')))
+}
+
 function isRestoreViewportReady() {
   const root = scrollRoot.value
   if (!root)
     return false
 
-  if (!visibleWindow.value.records.length)
+  const records = visibleWindow.value.records
+  if (!records.length)
     return false
 
   const anchorOffset = resolveOuterAnchorOffset(activeThreadRestoreAnchor)
-  if (anchorOffset != null && Math.abs((root.scrollTop || 0) - clampScrollOffset(anchorOffset)) > 1)
+  if (
+    anchorOffset != null
+    && Math.abs((root.scrollTop || 0) - clampScrollOffset(anchorOffset)) > 1
+  ) {
     return false
+  }
 
-  const itemElements = Array.from(root.querySelectorAll<HTMLElement>('[data-markstream-item-key]'))
+  const itemByKey = new Map(
+    Array.from(root.querySelectorAll<HTMLElement>('[data-markstream-item-key]'))
+      .map(el => [el.dataset.markstreamItemKey ?? '', el] as const),
+  )
 
-  for (const record of visibleWindow.value.records) {
-    const el = itemElements.find(item => item.dataset.markstreamItemKey === record.key)
+  for (const record of records) {
+    const el = itemByKey.get(record.key)
 
     if (!el)
       return false
@@ -965,20 +1003,15 @@ function isRestoreViewportReady() {
       return false
   }
 
-  const rootRect = root.getBoundingClientRect()
-  const codeSlots = root.querySelectorAll<HTMLElement>('[data-node-type="code_block"]')
+  const visibleNodeSlots = Array.from(root.querySelectorAll<HTMLElement>('[data-node-index]'))
+    .filter(slot => isVisibleInRoot(slot, root))
 
-  for (const slot of Array.from(codeSlots)) {
-    const rect = slot.getBoundingClientRect()
-    const visible = rect.bottom >= rootRect.top && rect.top <= rootRect.bottom
-    if (!visible)
-      continue
+  for (const slot of visibleNodeSlots) {
+    // A placeholder means NodeRenderer itself is still deferring this node, so restore should stay hidden.
+    if (slot.querySelector(':scope > .node-placeholder'))
+      return false
 
-    const hasFallback = slot.querySelector('pre.code-pre-fallback')
-    const hasCodeRoot = slot.querySelector('[data-markstream-code-block="1"]')
-    const hasMonaco = slot.querySelector('.monaco-editor, .monaco-diff-editor')
-
-    if (!hasFallback && !hasCodeRoot && !hasMonaco)
+    if (!hasMeaningfulNodeContent(slot))
       return false
   }
 

@@ -171,6 +171,32 @@ If you customize timeline rows, bind `measureRef` to the element that contains t
 
 If your app already owns the outer virtualizer, use `useMarkstreamVirtualAdapter()` and bind its `markdownProps(item, index)` to each Markdown item. The raw `virtualScroll` prop remains available as the advanced protocol for custom adapters and debugging.
 
+#### Thread restore loading
+
+`MarkstreamVirtualTimeline` hides the restoring rows until the restored viewport is ready. You can customize the non-layout loading overlay with the `restore-loading` slot. The overlay is absolutely positioned inside the scroll root, so it does not change `scrollHeight` or item measurements.
+
+```vue
+<MarkstreamVirtualTimeline
+  :items="timelineItems"
+  :thread-key="activeThreadId"
+  :initial-thread-state="savedThreadState"
+>
+  <template #restore-loading="{ threadKey }">
+    <div class="thread-restore-loading">
+      Restoring {{ threadKey }}…
+    </div>
+  </template>
+</MarkstreamVirtualTimeline>
+```
+
+The slot should not contain elements that affect document layout. Avoid inserting loading rows into `items`; that changes item offsets and defeats scroll restoration.
+
+#### Streaming stability
+
+For bottom-pinned streaming, `scrollTop` may change as content grows. The stable invariant is `distanceFromBottom <= 1px`.
+
+For non-bottom streaming, `scrollTop` and the current visible anchor should remain unchanged. If the actively streaming item itself is visible, its own height may grow unless the host buffers chunks or reserves a fixed height.
+
 #### `vue-virtual-scroller` example
 
 The playground includes a real runnable page: `playground/src/pages/virtual-scroller-markstream.vue` route `/virtual-scroller-markstream`. It uses `vue-virtual-scroller@3` `DynamicScroller` / `DynamicScrollerItem` and covers full Markdown syntax, Mermaid, KaTeX, rich code blocks, tables, HTML blocks, images, and footnotes. It is not pseudo-code.

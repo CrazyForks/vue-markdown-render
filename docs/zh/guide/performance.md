@@ -110,6 +110,32 @@ const md = '# Virtualized transcript'
 
 如果业务已经有自己的外层 virtualizer，使用 `useMarkstreamVirtualAdapter()`，并把 `markdownProps(item, index)` 绑定到 Markdown item。底层 `virtualScroll` prop 继续作为高级 adapter/debug 协议保留。
 
+#### Thread restore loading
+
+`MarkstreamVirtualTimeline` 会隐藏正在恢复的真实 rows，直到已恢复 viewport 准备就绪。你可以用 `restore-loading` slot 自定义不参与布局的 loading overlay。这个 overlay 以 absolute 方式定位在 scroll root 内，因此不会改变 `scrollHeight` 或 item 测量值。
+
+```vue
+<MarkstreamVirtualTimeline
+  :items="timelineItems"
+  :thread-key="activeThreadId"
+  :initial-thread-state="savedThreadState"
+>
+  <template #restore-loading="{ threadKey }">
+    <div class="thread-restore-loading">
+      正在恢复 {{ threadKey }}…
+    </div>
+  </template>
+</MarkstreamVirtualTimeline>
+```
+
+这个 slot 不应该包含会影响文档布局的元素。不要把 loading row 插入到 `items` 中；那会改变 item offsets，让滚动恢复失效。
+
+#### Streaming 稳定性
+
+底部 pinned streaming 时，内容增长会让 `scrollTop` 变化；稳定性不变量是 `distanceFromBottom <= 1px`。
+
+非底部 streaming 时，`scrollTop` 和当前可见 anchor 应保持不变。如果正在 streaming 的 item 本身可见，除非宿主侧缓冲 chunks 或预留固定高度，否则该 item 自身高度仍可能增长。
+
 #### `vue-virtual-scroller` 示例
 
 playground 里有一个真实可运行的完整页面：`playground/src/pages/virtual-scroller-markstream.vue`（路由 `/virtual-scroller-markstream`）。它使用 `vue-virtual-scroller@3` 的 `DynamicScroller` / `DynamicScrollerItem`，并覆盖完整 Markdown 语法、Mermaid、KaTeX、富代码块、表格、HTML block、图片和脚注，不是简化伪代码。

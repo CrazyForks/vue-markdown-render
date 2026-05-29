@@ -1091,13 +1091,15 @@ describe('codeBlockNode diff defaults', () => {
     await wrapper.setProps({ loading: false })
     await flushPendingMicrotasks()
 
-    expect(helpers.safeClean).toHaveBeenCalled()
-    expect(helpers.createDiffEditor).toHaveBeenCalledWith(
-      expect.any(HTMLElement),
-      'const a = 1\\nconst b = 2\\n',
-      'const a = 1\\nconst c = 3\\n',
-      'diff',
-    )
+    await vi.waitFor(() => {
+      expect(helpers.safeClean).toHaveBeenCalled()
+      expect(helpers.createDiffEditor).toHaveBeenCalledWith(
+        expect.any(HTMLElement),
+        'const a = 1\\nconst b = 2\\n',
+        'const a = 1\\nconst c = 3\\n',
+        'diff',
+      )
+    })
     await vi.waitFor(() => {
       expect(helpers.refreshDiffPresentation).toHaveBeenCalled()
     })

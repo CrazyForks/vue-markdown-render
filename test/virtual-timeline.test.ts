@@ -783,6 +783,85 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('shows a non-layout restore loading overlay while restored thread state is settling', async () => {
+    vi.useFakeTimers()
+
+    let wrapper: ReturnType<typeof mount> | null = null
+
+    try {
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      })
+
+      const items = [
+        { kind: 'user-message', id: 'u1', text: 'Top' },
+        { kind: 'assistant-markdown', id: 'm1', content: '# Large', final: true, revision: 1 },
+        { kind: 'user-message', id: 'u2', text: 'Bottom' },
+      ]
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items,
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: {
+              type: 'item',
+              itemKey: 'm1',
+              offsetWithinItemPx: 120,
+            },
+            itemHeights: {
+              u1: 80,
+              m1: 1200,
+              u2: 80,
+            },
+            itemSizeSources: {
+              u1: timelineItemSource('thread-a', 'u1'),
+              m1: timelineItemSource('thread-a', 'm1', 1),
+              u2: timelineItemSource('thread-a', 'u2'),
+            },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, props.item.text ?? props.markdownProps?.content ?? '')
+          },
+          'restore-loading': () => h('div', { 'data-testid': 'restore-loading' }, 'Restoring'),
+        },
+      })
+
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      const overlay = wrapper.find('.markstream-virtual-timeline__restore-loading')
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+      expect(overlay.exists()).toBe(true)
+      expect(overlay.classes()).toContain('markstream-virtual-timeline__restore-loading')
+      expect(wrapper.find('[data-testid="restore-loading"]').exists()).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+      expect(wrapper.find('[data-testid="restore-loading"]').exists()).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('preloads initial thread state before first visible render', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)

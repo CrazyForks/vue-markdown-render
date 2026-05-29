@@ -41,6 +41,15 @@ declare global {
           enhanced: boolean
           diff: boolean
           fallbackVisible: boolean
+          hiddenEditor: boolean
+          textLength: number
+        }>
+        diffCodeBlockProbe: Array<{
+          height: number
+          enhanced: boolean
+          diff: boolean
+          fallbackVisible: boolean
+          hiddenEditor: boolean
           textLength: number
         }>
       }
@@ -322,6 +331,7 @@ function readCodeBlockProbe(root: HTMLElement | null) {
         enhanced: block.dataset.markstreamEnhanced === 'true',
         diff: block.classList.contains('is-diff'),
         fallbackVisible: Boolean(block.querySelector('pre.code-pre-fallback')),
+        hiddenEditor: Boolean(block.querySelector('.code-editor-container.is-hidden')),
         textLength: block.textContent?.length ?? 0,
       }
     })
@@ -329,6 +339,7 @@ function readCodeBlockProbe(root: HTMLElement | null) {
 
 function readSnapshot() {
   const root = getTimelineRoot()
+  const codeBlockProbe = readCodeBlockProbe(root ?? null)
 
   return {
     threadId: activeThreadId.value,
@@ -339,7 +350,8 @@ function readSnapshot() {
     state: timelineRef.value?.captureThreadState?.() ?? null,
     visibleText: root?.textContent ?? '',
     restoring: root?.classList.contains('is-restoring-thread') ?? false,
-    codeBlockProbe: readCodeBlockProbe(root ?? null),
+    codeBlockProbe,
+    diffCodeBlockProbe: codeBlockProbe.filter(probe => probe.diff),
   }
 }
 
@@ -382,8 +394,15 @@ onMounted(() => {
     },
     startStreamingLastMessage,
     async monitorBottomStreaming() {
-      timelineRef.value?.scrollToOffset(timelineRef.value.getTotalHeight())
-      await nextFrame()
+      for (let i = 0; i < 80; i++) {
+        timelineRef.value?.scrollToOffset(timelineRef.value.getTotalHeight())
+        await nextFrame()
+
+        const snapshot = readSnapshot()
+        const distanceFromBottom = Math.max(0, snapshot.totalHeight - snapshot.scrollTop - snapshot.clientHeight)
+        if (!snapshot.restoring && distanceFromBottom <= 2)
+          break
+      }
 
       const before = readSnapshot()
       startStreamingLastMessage()
@@ -398,7 +417,7 @@ onMounted(() => {
         before,
         samples,
         maxDistanceFromBottom: Math.max(
-          ...samples.map(s => Math.max(0, s.scrollHeight - s.scrollTop - s.clientHeight)),
+          ...samples.map(s => Math.max(0, s.totalHeight - s.scrollTop - s.clientHeight)),
         ),
         blankFrames: samples.filter(s => !s.visibleText.trim()).length,
       }
