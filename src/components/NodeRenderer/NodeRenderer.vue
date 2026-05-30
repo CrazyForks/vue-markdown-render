@@ -1398,8 +1398,14 @@ function getEstimatedNodeHeightCount() {
   let count = 0
   const estimates = estimatedNodeHeights.value
   for (let i = 0; i < estimates.length; i++) {
-    if (estimates[i])
-      count++
+    if (!estimates[i])
+      continue
+
+    const measuredHeight = nodeHeights[i]
+    if (Number.isFinite(measuredHeight) && measuredHeight > 0)
+      continue
+
+    count++
   }
   return count
 }
