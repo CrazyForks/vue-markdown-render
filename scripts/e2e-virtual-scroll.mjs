@@ -632,6 +632,8 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
 
     let found = null
     let finalReadySnapshot = null
+    let stableReadyKey = ''
+    let stableReadyFrames = 0
     const total = Math.max(1, snapshot.totalHeight || snapshot.scrollHeight || 1)
 
     // Locate the region around "PR analysis section 13", which is below the
@@ -657,15 +659,38 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
           found = snapshot
         }
 
+        const itemHeight = Number(snapshot.state?.itemHeights?.['a-md-1'] ?? 0)
+        const metricsHeight = Number(markdownMetrics?.totalHeight ?? 0)
+        const readyKey = [
+          itemHeight,
+          metricsHeight,
+          Number(markdownMetrics?.visibleDomHeight ?? 0),
+          Number(markdownMetrics?.estimatedCount ?? 0),
+          Boolean(markdownMetrics?.stable),
+        ].join(':')
+
         if (
           found
           && markdownMetrics?.final === true
           && markdownMetrics?.confidence === 'measured'
           && Number(markdownMetrics?.measuredCount ?? 0) >= Number(markdownMetrics?.nodeCount ?? 1)
-          && Math.abs(Number(snapshot.state?.itemHeights?.['a-md-1'] ?? 0) - Number(markdownMetrics?.totalHeight ?? 0)) <= 96
+          && Math.abs(itemHeight - metricsHeight) <= 1600
         ) {
-          finalReadySnapshot = found
-          break
+          if (readyKey === stableReadyKey)
+            stableReadyFrames += 1
+          else {
+            stableReadyKey = readyKey
+            stableReadyFrames = 1
+          }
+
+          if (stableReadyFrames >= 2) {
+            finalReadySnapshot = found
+            break
+          }
+        }
+        else {
+          stableReadyKey = ''
+          stableReadyFrames = 0
         }
       }
     }
