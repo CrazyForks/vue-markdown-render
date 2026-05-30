@@ -24,11 +24,11 @@ const props = defineProps<{
   node?: ListItem
   item?: ListItem
   indexKey?: number | string
-  value?: number
   customId?: string
   typewriter?: boolean
   fade?: boolean
   showTooltips?: boolean
+  value?: number | null
 }>()
 
 defineEmits<{
@@ -37,13 +37,19 @@ defineEmits<{
 
 const itemNode = computed(() => props.node ?? props.item)
 
-const liValueAttr = computed(() =>
-  props.value == null ? {} : { value: props.value },
-)
+const EMPTY_LI_VALUE_ATTRS = Object.freeze({}) as Record<string, never>
+
+const liValueAttrs = computed(() => {
+  const { value } = props
+
+  return typeof value === 'number' && Number.isFinite(value)
+    ? { value }
+    : EMPTY_LI_VALUE_ATTRS
+})
 </script>
 
 <template>
-  <li class="list-item" dir="auto" v-bind="liValueAttr">
+  <li class="list-item" dir="auto" v-bind="liValueAttrs">
     <NodeRenderer
       v-bind="{ showTooltips: props.showTooltips }"
       :index-key="`list-item-${props.indexKey}`"
