@@ -63,7 +63,7 @@ import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import MarkdownCodeBlockNode from '../MarkdownCodeBlockNode'
 import { createMathBlockMinHeightCache, provideMathBlockMinHeightCache } from '../MathBlockNode/minHeightCache'
-import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
+import { CodeBlockNodeAsync, MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import { useBatchRenderingScheduler } from './composables/useBatchRenderingScheduler'
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useFocusSyncScheduler } from './composables/useFocusSyncScheduler'
@@ -1042,21 +1042,6 @@ function setupExperimentResizeObserver() {
   })
   experimentResizeObserver.observe(containerRef.value)
 }
-
-// 异步按需加载 CodeBlock 组件；失败时退回为 InlineCodeNode（内联代码渲染）
-const CodeBlockNodeAsync = defineAsyncComponent(async () => {
-  try {
-    const mod = await import('../../components/CodeBlockNode/CodeBlockNode.vue')
-    return mod.default
-  }
-  catch (e) {
-    console.warn(
-      '[markstream-vue] Optional peer dependencies for CodeBlockNode are missing. Falling back to inline-code rendering (no Monaco). To enable full code block features, please install "stream-monaco".',
-      e,
-    )
-    return PreCodeNode
-  }
-})
 
 const codeBlockComponent = computed(() => props.renderCodeBlocksAsPre ? PreCodeNode : CodeBlockNodeAsync)
 

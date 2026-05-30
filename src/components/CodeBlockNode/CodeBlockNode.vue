@@ -3254,6 +3254,13 @@ onUnmounted(() => {
 }
 
 .code-editor-container.is-hidden {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden;
   visibility: hidden;
   pointer-events: none;
 }

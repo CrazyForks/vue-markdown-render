@@ -220,7 +220,7 @@ function setupDiffResizeObserver(el: HTMLElement | null) {
   diffResizeObserver?.disconnect()
   diffResizeObserver = null
 
-  if (!el || typeof ResizeObserver === 'undefined')
+  if (!el || !isDiffPreview.value || typeof ResizeObserver === 'undefined')
     return
 
   diffResizeObserver = new ResizeObserver(() => {
@@ -241,6 +241,7 @@ watch(
 watch(
   [isDiffPreview, diffPreviewPanes],
   () => {
+    setupDiffResizeObserver(preRef.value)
     void nextTick(() => scheduleDiffLineMetricsSync())
   },
   { flush: 'post', immediate: true },

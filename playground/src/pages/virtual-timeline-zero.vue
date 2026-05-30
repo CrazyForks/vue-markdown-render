@@ -39,6 +39,9 @@ declare global {
         restoring: boolean
         codeBlockProbe: Array<{
           height: number
+          editorLayerHeight: number
+          fallbackHeight: number
+          editorHostHeight: number
           enhanced: boolean
           diff: boolean
           fallbackVisible: boolean
@@ -48,6 +51,9 @@ declare global {
         }>
         diffCodeBlockProbe: Array<{
           height: number
+          editorLayerHeight: number
+          fallbackHeight: number
+          editorHostHeight: number
           enhanced: boolean
           diff: boolean
           fallbackVisible: boolean
@@ -356,11 +362,18 @@ function readCodeBlockProbe(root: HTMLElement | null) {
   return Array.from(root?.querySelectorAll<HTMLElement>('[data-markstream-code-block="1"]') ?? [])
     .map((block) => {
       const rect = block.getBoundingClientRect()
+      const editorLayer = block.querySelector<HTMLElement>('.code-editor-layer')
+      const fallback = block.querySelector<HTMLElement>('pre.code-pre-fallback')
+      const editorHost = block.querySelector<HTMLElement>('.code-editor-container')
+
       return {
         height: rect.height,
+        editorLayerHeight: editorLayer?.getBoundingClientRect().height ?? 0,
+        fallbackHeight: fallback?.getBoundingClientRect().height ?? 0,
+        editorHostHeight: editorHost?.getBoundingClientRect().height ?? 0,
         enhanced: block.dataset.markstreamEnhanced === 'true',
         diff: block.classList.contains('is-diff'),
-        fallbackVisible: Boolean(block.querySelector('pre.code-pre-fallback')),
+        fallbackVisible: Boolean(fallback),
         hiddenEditor: Boolean(block.querySelector('.code-editor-container.is-hidden')),
         monacoVisible: hasVisibleMonacoProbe(block),
         textLength: block.textContent?.length ?? 0,

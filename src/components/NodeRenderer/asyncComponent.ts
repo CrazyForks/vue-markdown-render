@@ -1,6 +1,11 @@
-import type { MathBlockNodeProps, MathInlineNodeProps } from '../../types/component-props'
-import { defineAsyncComponent, h } from 'vue'
+import type {
+  CodeBlockNodeProps,
+  MathBlockNodeProps,
+  MathInlineNodeProps,
+} from '../../types/component-props'
+import { defineAsyncComponent, defineComponent, h } from 'vue'
 import { getKatex } from '../MathInlineNode/katex'
+import PreCodeNode from '../PreCodeNode'
 import TextNode from '../TextNode'
 
 interface ProcessLike {
@@ -9,6 +14,7 @@ interface ProcessLike {
   }
 }
 
+type CodeBlockFallbackProps = CodeBlockNodeProps & Record<string, unknown>
 type MathInlineFallbackProps = MathInlineNodeProps & Record<string, unknown>
 type MathBlockFallbackProps = MathBlockNodeProps & Record<string, unknown>
 
@@ -16,6 +22,41 @@ function getProcessEnv() {
   const processValue = Reflect.get(globalThis, 'process') as ProcessLike | undefined
   return processValue?.env
 }
+
+export const CodeBlockNodeLoading = defineComponent({
+  name: 'CodeBlockNodeLoading',
+  inheritAttrs: false,
+  setup(_props, { attrs }) {
+    const props = attrs as CodeBlockFallbackProps
+
+    return () => h(PreCodeNode as any, {
+      ...props,
+      'node': props.node,
+      'showLineNumbers': true,
+      'class': ['code-pre-fallback', attrs.class],
+      'data-markstream-code-loading': '1',
+    })
+  },
+})
+
+export const CodeBlockNodeAsync = defineAsyncComponent({
+  loader: async () => {
+    try {
+      const mod = await import('../../components/CodeBlockNode/CodeBlockNode.vue')
+      return mod.default
+    }
+    catch (e) {
+      console.warn(
+        '[markstream-vue] Optional peer dependencies for CodeBlockNode are missing. Falling back to preformatted code rendering (no Monaco). To enable full code block features, please install "stream-monaco".',
+        e,
+      )
+      return PreCodeNode
+    }
+  },
+  loadingComponent: CodeBlockNodeLoading,
+  delay: 0,
+  suspensible: false,
+})
 
 export const MathInlineNodeAsync = defineAsyncComponent(async () => {
   // In test environment prefer the simple text fallback to avoid

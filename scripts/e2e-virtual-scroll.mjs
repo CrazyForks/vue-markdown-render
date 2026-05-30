@@ -872,13 +872,13 @@ async function runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port) {
     timeout: 60000,
   })
   await waitForVirtualTimelineZeroReady(page)
+  await waitForVirtualTimelineZeroPaintReady(page)
 
   const result = await page.evaluate(async () => {
     const api = window.__markstreamVirtualTimelineZero
     const samples = []
     const total = Math.max(api.read().totalHeight, 1)
 
-    // Scroll through the entire timeline collecting diff block probe data.
     for (let offset = 0; offset < total; offset += 360) {
       await api.scrollTo(offset)
       for (let i = 0; i < 8; i++)
@@ -895,6 +895,11 @@ async function runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port) {
       }
     }
 
+    const observedProbeCount = samples.reduce(
+      (total, sample) => total + sample.probes.length,
+      0,
+    )
+
     const bad = samples.find(sample =>
       sample.probes.some(probe =>
         // Forbidden third state: fallback gone, Monaco not visible, and not enhanced.
@@ -903,8 +908,23 @@ async function runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port) {
       ),
     )
 
-    return { bad, sampleCount: samples.length }
+    const doubleHeightSample = samples.find(sample =>
+      sample.probes.some(probe =>
+        probe.fallbackVisible
+        && probe.hiddenEditor
+        && probe.editorHostHeight > 0
+        && probe.editorLayerHeight > probe.fallbackHeight + probe.editorHostHeight - 2,
+      ),
+    )
+
+    return { bad, doubleHeightSample, observedProbeCount, sampleCount: samples.length }
   })
+
+  assert(
+    result.observedProbeCount > 0,
+    'diff CodeBlockNode probe did not observe any diff code block',
+    result,
+  )
 
   assert(
     !result.bad,
@@ -912,8 +932,15 @@ async function runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port) {
     result,
   )
 
+  assert(
+    !result.doubleHeightSample,
+    'CodeBlock hidden editor participated in layout while fallback was visible',
+    result.doubleHeightSample,
+  )
+
   return {
     sampleCount: result.sampleCount,
+    observedProbeCount: result.observedProbeCount,
   }
 }
 
