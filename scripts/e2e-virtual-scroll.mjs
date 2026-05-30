@@ -661,29 +661,49 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
 
         const itemHeight = Number(snapshot.state?.itemHeights?.['a-md-1'] ?? 0)
         const metricsHeight = Number(markdownMetrics?.totalHeight ?? 0)
+        const visibleDomHeight = Number(markdownMetrics?.visibleDomHeight ?? 0)
+        const estimatedCount = Number(markdownMetrics?.estimatedCount ?? 0)
+        const measuredCount = Number(markdownMetrics?.measuredCount ?? 0)
+        const nodeCount = Number(markdownMetrics?.nodeCount ?? 1)
+
+        // Timeline item height includes assistant bubble chrome, so allow a small chrome
+        // tolerance, but never allow a large partial-measurement gap.
+        const heightDelta = Math.abs(itemHeight - metricsHeight)
+        const heightDeltaTolerance = Math.min(
+          320,
+          Math.max(96, Math.ceil(metricsHeight * 0.02)),
+        )
+
         const readyKey = [
           itemHeight,
           metricsHeight,
-          Number(markdownMetrics?.visibleDomHeight ?? 0),
-          Number(markdownMetrics?.estimatedCount ?? 0),
+          visibleDomHeight,
+          estimatedCount,
+          measuredCount,
+          nodeCount,
           Boolean(markdownMetrics?.stable),
         ].join(':')
 
         if (
           found
           && markdownMetrics?.final === true
+          && markdownMetrics?.stable === true
           && markdownMetrics?.confidence === 'measured'
-          && Number(markdownMetrics?.measuredCount ?? 0) >= Number(markdownMetrics?.nodeCount ?? 1)
-          && Math.abs(itemHeight - metricsHeight) <= 1600
+          && measuredCount >= nodeCount
+          && estimatedCount === 0
+          && itemHeight > 0
+          && metricsHeight > 0
+          && heightDelta <= heightDeltaTolerance
         ) {
-          if (readyKey === stableReadyKey)
+          if (readyKey === stableReadyKey) {
             stableReadyFrames += 1
+          }
           else {
             stableReadyKey = readyKey
             stableReadyFrames = 1
           }
 
-          if (stableReadyFrames >= 2) {
+          if (stableReadyFrames >= 3) {
             finalReadySnapshot = found
             break
           }
@@ -704,6 +724,19 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
         `Last itemHeight=${snapshot.state?.itemHeights?.['a-md-1'] ?? 'n/a'}`,
         `Last metrics=${JSON.stringify(snapshot.state?.markdownStates?.['a-md-1']?.metrics ?? null)}`,
       ].join('\n'))
+    }
+
+    const persistedHeightDelta = Math.abs(
+      Number(finalReadySnapshot.state?.itemHeights?.['a-md-1'] ?? 0)
+      - Number(finalReadySnapshot.state?.markdownStates?.['a-md-1']?.metrics?.totalHeight ?? 0),
+    )
+
+    if (persistedHeightDelta > 320) {
+      throw new Error(`virtual-timeline-zero stored a reload state before markdown item height was close to final metrics: ${JSON.stringify({
+        persistedHeightDelta,
+        itemHeight: finalReadySnapshot.state?.itemHeights?.['a-md-1'],
+        metrics: finalReadySnapshot.state?.markdownStates?.['a-md-1']?.metrics,
+      })}`)
     }
 
     const anchorSnapshot = finalReadySnapshot
@@ -882,6 +915,23 @@ async function runVirtualTimelineZeroStreamingProbe(page, port) {
       firstVisibleTextStable: result.nonBottom.firstVisibleTextStable,
       before: summarizeVirtualTimelineZeroSample(result.nonBottom.before),
       lastSample: summarizeVirtualTimelineZeroSample(result.nonBottom.samples?.at?.(-1)),
+    },
+  )
+
+  const bottomRestoringFrames = result.bottom.samples
+    .filter(sample => sample.restoring)
+    .length
+
+  const nonBottomRestoringFrames = result.nonBottom.samples
+    .filter(sample => sample.restoring)
+    .length
+
+  assert(
+    bottomRestoringFrames === 0 && nonBottomRestoringFrames === 0,
+    'virtual-timeline-zero streaming unexpectedly entered thread restore state',
+    {
+      bottomRestoringFrames,
+      nonBottomRestoringFrames,
     },
   )
 
