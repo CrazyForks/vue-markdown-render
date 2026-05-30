@@ -51,7 +51,7 @@ const liValueAttrs = computed(() => {
 <template>
   <li class="list-item" dir="auto" v-bind="liValueAttrs">
     <NodeRenderer
-      v-bind="{ showTooltips: props.showTooltips }"
+      :show-tooltips="props.showTooltips"
       :index-key="`list-item-${props.indexKey}`"
       :nodes="itemNode?.children ?? []"
       :custom-id="props.customId"
@@ -69,12 +69,13 @@ const liValueAttrs = computed(() => {
   padding-left: var(--ms-space-1_5);
 }
 
-ol > .list-item::marker{
+ol > .list-item::marker {
   color: var(--list-counter-marker);
   line-height: 1.6;
 }
-ul > .list-item::marker{
-  color: var(--list-marker)
+
+ul > .list-item::marker {
+  color: var(--list-marker);
 }
 
 /* 大列表滚动到视口时，嵌套 NodeRenderer 需要立即绘制内容，避免空白 */

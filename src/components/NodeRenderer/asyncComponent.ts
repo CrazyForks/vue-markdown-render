@@ -29,7 +29,7 @@ export const CodeBlockNodeLoading = defineComponent({
   setup(_props, { attrs }) {
     const props = attrs as CodeBlockFallbackProps
 
-    return () => h(PreCodeNode as any, {
+    return () => h(PreCodeNode, {
       ...props,
       'node': props.node,
       'showLineNumbers': true,

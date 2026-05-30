@@ -950,6 +950,68 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('treats visible control-only node content as restore-ready', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          { kind: 'assistant-markdown', id: 'm1', content: '- [ ] task', final: true, revision: 1 },
+        ],
+        threadKey: 'thread-a',
+        stickToBottom: false,
+        initialThreadState: {
+          threadKey: 'thread-a',
+          measurementKey: ':800',
+          widthBucket: 800,
+          outerAnchor: {
+            type: 'item',
+            itemKey: 'm1',
+            offsetWithinItemPx: 0,
+          },
+          itemHeights: { m1: 360 },
+          itemSizeSources: {
+            m1: timelineItemSource('thread-a', 'm1', 1),
+          },
+          markdownStates: {},
+        },
+      },
+      slots: {
+        default(props: any) {
+          return h('div', { ref: props.measureRef }, [
+            h('div', {
+              'class': 'node-slot',
+              'data-node-index': '0',
+              'data-node-type': 'checkbox_input',
+            }, [
+              h('div', { class: 'node-content' }, [
+                h('input', { 'type': 'checkbox', 'aria-label': 'task' }),
+              ]),
+            ]),
+          ])
+        },
+      },
+    })
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+    await waitForTimelineRestoreSettled(root)
+
+    expect(root.classList.contains('is-restoring-thread')).toBe(false)
+
+    wrapper.unmount()
+  })
+
   it('does not reveal restore loading when a visible code block shell is not ready', async () => {
     vi.useFakeTimers()
 

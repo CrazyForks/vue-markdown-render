@@ -1,5 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import ListItemNode from '../src/components/ListItemNode/ListItemNode.vue'
+import ListNode from '../src/components/ListNode/ListNode.vue'
 
 vi.mock('../src/components/NodeRenderer', () => ({
   default: {
@@ -27,9 +29,6 @@ vi.mock('../src/components/NodeRenderer', () => ({
     `,
   },
 }))
-
-import ListItemNode from '../src/components/ListItemNode/ListItemNode.vue'
-import ListNode from '../src/components/ListNode/ListNode.vue'
 
 function createParagraph(raw = 'item') {
   return {
@@ -69,7 +68,7 @@ function createListNode(options: {
 
 const mountOptions = {}
 
-describe('ListItemNode value/customId attributes', () => {
+describe('list item value/customId attributes', () => {
   it('does not leak value or custom-id attributes to unordered <li>', () => {
     const wrapper = mount(ListNode, {
       props: {
