@@ -43,6 +43,7 @@ describe('mathBlockNode loading state', () => {
 
     expect(mocks.renderKaTeXWithBackpressure).toHaveBeenCalled()
     expect(wrapper.attributes('data-markstream-mode')).toBe('loading')
+    expect(wrapper.attributes('data-markstream-pending')).toBe('true')
     expect(wrapper.find('.math-loading-overlay').exists()).toBe(true)
     expect(wrapper.find('.math-block__fallback').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('\\begin{pmatrix}')

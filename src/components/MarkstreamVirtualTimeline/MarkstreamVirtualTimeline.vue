@@ -180,6 +180,16 @@ function lowerBoundRecordByOffset(records: TimelineRecord[], offset: number) {
   return Math.min(Math.max(0, answer), Math.max(0, records.length - 1))
 }
 
+const effectiveOverscanItems = computed(() => {
+  const value = Math.max(0, props.overscan ?? 4)
+  return restorePaintReady.value ? value : Math.min(value, 1)
+})
+
+const effectiveOverscanPx = computed(() => {
+  const value = Math.max(0, props.overscanPx ?? 1200)
+  return restorePaintReady.value ? value : Math.min(value, 160)
+})
+
 const visibleWindow = computed(() => {
   const records = layout.value.records
   if (records.length === 0) {
@@ -192,8 +202,8 @@ const visibleWindow = computed(() => {
     }
   }
 
-  const overscanItems = Math.max(0, props.overscan ?? 4)
-  const overscanPx = Math.max(0, props.overscanPx ?? 1200)
+  const overscanItems = effectiveOverscanItems.value
+  const overscanPx = effectiveOverscanPx.value
   const viewportStart = Math.max(0, scrollTop.value)
   const viewportEnd = viewportStart + Math.max(1, viewportHeight.value)
 
@@ -1051,6 +1061,32 @@ function hasUsableRestoreFallback(el: HTMLElement | null) {
   return rect.width > 0 && rect.height > 0
 }
 
+function hasPendingVisualNode(content: HTMLElement) {
+  return Boolean(content.querySelector([
+    '[data-markstream-pending="true"]',
+    '[data-markstream-code-loading="1"]',
+  ].join(',')))
+}
+
+function hasReadyMathContent(content: HTMLElement) {
+  const mathNodes = Array.from(
+    content.querySelectorAll<HTMLElement>('[data-markstream-math]'),
+  )
+
+  if (!mathNodes.length)
+    return true
+
+  return mathNodes.every((node) => {
+    const mode = node.dataset.markstreamMode
+    const pending = node.dataset.markstreamPending === 'true'
+
+    if (pending || mode === 'loading')
+      return false
+
+    return mode === 'katex' || mode === 'fallback'
+  })
+}
+
 function hasReadyCodeBlockContent(content: HTMLElement) {
   // Async component loading fallback is intentionally visible enough to avoid a
   // blank node, but it is not layout-equivalent to the final CodeBlock shell.
@@ -1094,6 +1130,12 @@ function isVisibleNodeSlotReady(slot: HTMLElement) {
 
   const content = slot.querySelector<HTMLElement>(':scope > .node-content')
   if (!content)
+    return false
+
+  if (hasPendingVisualNode(content))
+    return false
+
+  if (!hasReadyMathContent(content))
     return false
 
   const nodeType = slot.dataset.nodeType ?? ''

@@ -27,12 +27,16 @@ export const CodeBlockNodeLoading = defineComponent({
   name: 'CodeBlockNodeLoading',
   inheritAttrs: false,
   setup(_props, { attrs }) {
-    const props = attrs as CodeBlockFallbackProps
+    const props = attrs as CodeBlockFallbackProps & {
+      estimatedHeightPx?: number
+      estimatedContentHeightPx?: number
+    }
 
     return () => h(PreCodeNode, {
       ...attrs,
       'node': props.node,
       'showLineNumbers': true,
+      'reservedHeightPx': props.estimatedContentHeightPx ?? props.estimatedHeightPx,
       'class': ['code-pre-fallback', attrs.class],
       'data-markstream-code-loading': '1',
     })

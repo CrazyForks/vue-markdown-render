@@ -22,6 +22,17 @@ const lineNumbers = computed(() => {
   return Array.from({ length: Math.max(1, codeLines.value.length) }, (_, index) => index + 1)
 })
 const isDiffPreview = computed(() => props.showLineNumbers === true && props.node?.diff === true)
+const reservedHeightStyle = computed(() => {
+  const value = Number(props.reservedHeightPx)
+  if (!Number.isFinite(value) || value <= 0)
+    return undefined
+
+  const height = `${Math.ceil(value)}px`
+
+  return {
+    minHeight: height,
+  }
+})
 
 type DiffPreviewLineKind = 'context' | 'removed' | 'added' | 'hunk'
 
@@ -274,6 +285,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
 <template>
   <pre
     ref="preRef"
+    :style="reservedHeightStyle"
     :class="[languageClass, { 'markstream-pre--line-numbers': props.showLineNumbers, 'markstream-pre--diff-preview': isDiffPreview }]"
     :aria-busy="node.loading === true"
     :aria-label="ariaLabel"

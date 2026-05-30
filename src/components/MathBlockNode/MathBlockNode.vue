@@ -70,10 +70,22 @@ let visibilityHandle: ReturnType<typeof registerVisibility> | null = null
 let resizeObserver: ResizeObserver | null = null
 let lifecyclePendingIndexKey = ''
 const renderingLoading = ref(initialState.loading)
+const renderingPending = ref(false)
 const lockedMinHeight = ref(resolveCachedMinHeight())
 
 if (initialState.html || initialState.text)
   hasRenderedOnce = true
+
+function markRenderPending() {
+  renderingPending.value = true
+}
+
+function clearRenderPending(renderId?: number) {
+  if (renderId != null && renderId !== currentRenderId)
+    return
+
+  renderingPending.value = false
+}
 
 function getHeightCacheKey() {
   if (props.indexKey == null)
@@ -155,11 +167,20 @@ function clearLifecyclePending() {
 async function renderMath() {
   if (isUnmounted) {
     clearLifecyclePending()
+    clearRenderPending()
     return
   }
 
+  if (currentAbortController) {
+    currentAbortController.abort()
+    currentAbortController = null
+  }
+
+  const renderId = ++currentRenderId
+
   if (!props.node.content) {
     clearLifecyclePending()
+    clearRenderPending()
     renderingLoading.value = false
     renderedHtml.value = ''
     renderedText.value = props.node.raw
@@ -167,6 +188,13 @@ async function renderMath() {
     captureHeight()
     return
   }
+
+  const abortController = new AbortController()
+  currentAbortController = abortController
+
+  // Mark pending before visibility wait. During restore, the element may be in
+  // layout but visually hidden; readiness must not reveal raw fallback as final.
+  markRenderPending()
 
   // Wait until near/in viewport to prioritize visible area
   if (!hasRenderedOnce) {
@@ -180,19 +208,11 @@ async function renderMath() {
     }
     catch {}
   }
-  if (isUnmounted)
+  if (isUnmounted || renderId !== currentRenderId || abortController.signal.aborted) {
+    if (!isUnmounted)
+      clearRenderPending(renderId)
     return
-
-  // cancel any previous in-flight render
-  if (currentAbortController) {
-    currentAbortController.abort()
-    currentAbortController = null
   }
-
-  // increment render id for this invocation; responses from older renders are ignored
-  const renderId = ++currentRenderId
-  const abortController = new AbortController()
-  currentAbortController = abortController
 
   markLifecyclePending()
   renderKaTeXWithBackpressure(mathContent.value, true, {
@@ -231,6 +251,9 @@ async function renderMath() {
       // under viewport bursts to avoid showing raw text.
       if (isWorkerInitFailure || isBusyOrTimeout) {
         const katex = await getKatex()
+        if (isUnmounted || renderId !== currentRenderId)
+          return
+
         if (katex) {
           try {
             const html = katex.renderToString(mathContent.value, {
@@ -253,7 +276,7 @@ async function renderMath() {
 
       // show raw fallback when we never successfully rendered before or when loading flag is false
 
-      if (isDisabled) {
+      if (isDisabled || !props.node.loading) {
         renderingLoading.value = false
         renderedHtml.value = ''
         renderedText.value = props.node.raw
@@ -261,19 +284,14 @@ async function renderMath() {
         return
       }
 
-      if (!hasRenderedOnce) {
+      if (!hasRenderedOnce)
         renderingLoading.value = true
-      }
-      if (!props.node.loading) {
-        renderingLoading.value = false
-        renderedHtml.value = ''
-        renderedText.value = props.node.raw
-        captureHeight()
-      }
     })
     .finally(() => {
-      if (!isUnmounted && renderId === currentRenderId)
+      if (!isUnmounted && renderId === currentRenderId) {
+        clearRenderPending(renderId)
         markLifecycleSettled()
+      }
     })
 }
 
@@ -329,6 +347,7 @@ onBeforeUnmount(() => {
     class="math-block text-center overflow-x-auto relative"
     data-markstream-math="block"
     :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
+    :data-markstream-pending="renderingPending ? 'true' : undefined"
     :style="lockedMinHeight ? { minHeight: `${lockedMinHeight}px` } : undefined"
   >
     <Transition name="math-fade">
