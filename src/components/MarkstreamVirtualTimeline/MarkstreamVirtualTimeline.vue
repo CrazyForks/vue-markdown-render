@@ -10,7 +10,7 @@ import type {
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualState,
 } from '../../types/node-renderer-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import {
   estimateMarkstreamTimelineItemHeight,
   getMarkstreamTimelineItemContent,
@@ -100,6 +100,8 @@ const resizeObservers = new Map<string, ResizeObserver>()
 const threadStates = new Map<string, MarkstreamThreadVirtualState>()
 const restoringThread = ref(false)
 const restorePaintReady = ref(true)
+const hostScrollManaged = ref(true)
+provide('markstreamHostScrollManaged', hostScrollManaged)
 const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
 let rootResizeObserver: ResizeObserver | null = null
@@ -1015,6 +1017,12 @@ function hasUsableRestoreFallback(el: HTMLElement | null) {
 }
 
 function hasReadyCodeBlockContent(content: HTMLElement) {
+  // Async component loading fallback is intentionally visible enough to avoid a
+  // blank node, but it is not layout-equivalent to the final CodeBlock shell.
+  // Do not use it as an early-reveal signal during thread restore.
+  if (content.querySelector('[data-markstream-code-loading="1"]'))
+    return false
+
   const codeBlock = content.querySelector<HTMLElement>('[data-markstream-code-block="1"]')
 
   if (codeBlock) {

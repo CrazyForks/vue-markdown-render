@@ -1,7 +1,7 @@
 import type { MarkstreamVirtualMetrics, MarkstreamVirtualState } from '../src/types/node-renderer-props'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { effectScope, h, nextTick } from 'vue'
+import { effectScope, h, inject, markRaw, nextTick } from 'vue'
 import MarkstreamVirtualTimeline from '../src/components/MarkstreamVirtualTimeline'
 import { useMarkstreamVirtualAdapter } from '../src/composables/useMarkstreamVirtualAdapter'
 import { flushAll } from './setup/flush-all'
@@ -159,6 +159,46 @@ describe('virtual timeline API', () => {
     expect(markdownSlot.markdownProps.virtualScroll.threadKey).toBe('thread-a')
     expect(markdownSlot.markdownProps.virtualScroll.sessionKey).toBe('thread-a:a1:')
     expect(markdownSlot.markdownProps.fade).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('provides host scroll managed context to timeline children', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const observed: boolean[] = []
+
+    const Probe = markRaw({
+      name: 'HostManagedProbe',
+      setup() {
+        const hostScrollManaged = inject<{ value: boolean } | null>('markstreamHostScrollManaged', null)
+        observed.push(hostScrollManaged?.value === true)
+        return () => h('div', { 'data-testid': 'host-managed-probe' }, 'probe')
+      },
+    })
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          { kind: 'custom', id: 'probe', component: Probe },
+        ],
+        threadKey: 'thread-a',
+        stickToBottom: false,
+      },
+    })
+
+    await nextTick()
+
+    expect(observed).toContain(true)
+    expect(wrapper.find('[data-testid="host-managed-probe"]').exists()).toBe(true)
 
     wrapper.unmount()
   })
@@ -1201,6 +1241,104 @@ describe('virtual timeline API', () => {
                     ]),
                     h('pre', { class: 'code-pre-fallback is-fading-out' }, 'fallback'),
                   ]),
+                ]),
+              ]),
+            ])
+          },
+        },
+      })
+
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(100)
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      // The fixed fallback window can still reveal eventually.
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not treat async code block loading fallback as restore-ready content', async () => {
+    vi.useFakeTimers()
+
+    let wrapper: any
+
+    try {
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+        x: 0,
+        y: 0,
+        top: 0,
+        right: 800,
+        bottom: 360,
+        left: 0,
+        width: 800,
+        height: 360,
+        toJSON: () => ({}),
+      } as DOMRect)
+
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+        return window.setTimeout(() => callback(performance.now()), 16)
+      })
+      vi.stubGlobal('cancelAnimationFrame', (handle: number) => {
+        window.clearTimeout(handle)
+      })
+
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      })
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: 'code', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: {
+              type: 'item',
+              itemKey: 'm1',
+              offsetWithinItemPx: 0,
+            },
+            itemHeights: { m1: 360 },
+            itemSizeSources: {
+              m1: timelineItemSource('thread-a', 'm1', 1),
+            },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, [
+              h('div', {
+                'class': 'node-slot',
+                'data-node-index': '0',
+                'data-node-type': 'code_block',
+              }, [
+                h('div', { class: 'node-content' }, [
+                  h('pre', {
+                    'class': 'code-pre-fallback',
+                    'data-markstream-pre': '1',
+                    'data-markstream-code-loading': '1',
+                  }, 'loading fallback'),
                 ]),
               ]),
             ])
