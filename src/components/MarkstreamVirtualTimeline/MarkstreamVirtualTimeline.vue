@@ -972,12 +972,11 @@ function hasReadyCodeBlockContent(content: HTMLElement) {
   if (codeBlock) {
     const enhanced = codeBlock.dataset.markstreamEnhanced === 'true'
     const hasFallback = Boolean(codeBlock.querySelector('pre.code-pre-fallback'))
-    const hasHiddenEditor = Boolean(codeBlock.querySelector('.code-editor-container.is-hidden'))
-    const hasMonacoDom = Boolean(codeBlock.querySelector('.monaco-editor, .monaco-diff-editor'))
+    const hasVisibleMonacoDom = Boolean(codeBlock.querySelector('.monaco-editor, .monaco-diff-editor'))
 
-    // Do not treat the outer code block shell itself as ready. It can exist while
-    // Monaco is not painted and the fallback has already disappeared.
-    return enhanced || hasFallback || hasHiddenEditor || hasMonacoDom
+    // Hidden editor alone is not a visible surface. It is only safe when the
+    // pre fallback is also present. Otherwise restore may reveal a blank shell.
+    return enhanced || hasFallback || hasVisibleMonacoDom
   }
 
   // Mermaid / Infographic / D2 are routed from code_block nodes but they do not

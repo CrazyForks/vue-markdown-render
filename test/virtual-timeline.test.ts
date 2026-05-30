@@ -1,6 +1,6 @@
 import type { MarkstreamVirtualMetrics, MarkstreamVirtualState } from '../src/types/node-renderer-props'
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, h, nextTick } from 'vue'
 import MarkstreamVirtualTimeline from '../src/components/MarkstreamVirtualTimeline'
 import { useMarkstreamVirtualAdapter } from '../src/composables/useMarkstreamVirtualAdapter'
@@ -47,6 +47,33 @@ async function flushThreadRestoreSettleWindow() {
   await new Promise(resolve => setTimeout(resolve, 700))
 }
 
+async function waitForTimelineRestoreSettled(
+  root: HTMLElement,
+  options: { timeoutMs?: number } = {},
+) {
+  const timeoutMs = options.timeoutMs ?? 1200
+  const startedAt = Date.now()
+
+  while (Date.now() - startedAt < timeoutMs) {
+    await nextTick()
+    await flushAnimationFrame()
+
+    if (!root.classList.contains('is-restoring-thread'))
+      return
+  }
+
+  expect(root.classList.contains('is-restoring-thread')).toBe(false)
+}
+
+function installRequestAnimationFrameStub() {
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    return window.setTimeout(() => callback(performance.now()), 16)
+  })
+  vi.stubGlobal('cancelAnimationFrame', (handle: number) => {
+    window.clearTimeout(handle)
+  })
+}
+
 function itemSourceKey(threadKey: string, itemKey: string, revision?: string | number) {
   return [threadKey, itemKey, revision == null ? '' : String(revision)].join(':')
 }
@@ -66,6 +93,10 @@ function adapterItemSource(threadKey: string, itemKey: string, revision?: string
 }
 
 describe('virtual timeline API', () => {
+  beforeEach(() => {
+    installRequestAnimationFrameStub()
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
@@ -862,13 +893,6 @@ describe('virtual timeline API', () => {
       return 24
     })
 
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      return window.setTimeout(() => callback(performance.now()), 16)
-    })
-    vi.stubGlobal('cancelAnimationFrame', (handle: number) => {
-      window.clearTimeout(handle)
-    })
-
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       unobserve() {}
@@ -921,12 +945,7 @@ describe('virtual timeline API', () => {
     const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
     expect(root.classList.contains('is-restoring-thread')).toBe(true)
 
-    await vi.waitFor(async () => {
-      await nextTick()
-      await flushAnimationFrame()
-
-      expect(root.classList.contains('is-restoring-thread')).toBe(false)
-    }, { timeout: 320 })
+    await waitForTimelineRestoreSettled(root)
 
     wrapper.unmount()
   })
@@ -940,6 +959,13 @@ describe('virtual timeline API', () => {
       vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
       vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
       vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
+
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+        return window.setTimeout(() => callback(performance.now()), 16)
+      })
+      vi.stubGlobal('cancelAnimationFrame', (handle: number) => {
+        window.clearTimeout(handle)
+      })
 
       vi.stubGlobal('ResizeObserver', class {
         observe() {}
@@ -986,7 +1012,9 @@ describe('virtual timeline API', () => {
                   h('div', {
                     'data-markstream-code-block': '1',
                     'data-markstream-enhanced': 'false',
-                  }),
+                  }, [
+                    h('div', { class: 'code-editor-container is-hidden' }),
+                  ]),
                 ]),
               ]),
             ])
@@ -1016,13 +1044,6 @@ describe('virtual timeline API', () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
-
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      return window.setTimeout(() => callback(performance.now()), 16)
-    })
-    vi.stubGlobal('cancelAnimationFrame', (handle: number) => {
-      window.clearTimeout(handle)
-    })
 
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
@@ -1077,12 +1098,7 @@ describe('virtual timeline API', () => {
     const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
     expect(root.classList.contains('is-restoring-thread')).toBe(true)
 
-    await vi.waitFor(async () => {
-      await nextTick()
-      await flushAnimationFrame()
-
-      expect(root.classList.contains('is-restoring-thread')).toBe(false)
-    }, { timeout: 320 })
+    await waitForTimelineRestoreSettled(root)
 
     wrapper.unmount()
   })

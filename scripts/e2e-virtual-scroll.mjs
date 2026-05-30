@@ -889,8 +889,9 @@ async function runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port) {
 
     const bad = samples.find(sample =>
       sample.probes.some(probe =>
-        // Forbidden third state: editor visible, fallback gone, not yet enhanced.
-        !probe.enhanced && !probe.fallbackVisible && !probe.hiddenEditor,
+        // Forbidden third state: fallback gone, Monaco not visible, and not enhanced.
+        // A hidden editor host alone is still a blank visible shell.
+        !probe.enhanced && !probe.fallbackVisible && !probe.monacoVisible,
       ),
     )
 

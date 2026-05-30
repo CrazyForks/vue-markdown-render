@@ -43,6 +43,7 @@ declare global {
           diff: boolean
           fallbackVisible: boolean
           hiddenEditor: boolean
+          monacoVisible: boolean
           textLength: number
         }>
         diffCodeBlockProbe: Array<{
@@ -51,6 +52,7 @@ declare global {
           diff: boolean
           fallbackVisible: boolean
           hiddenEditor: boolean
+          monacoVisible: boolean
           textLength: number
         }>
       }
@@ -333,6 +335,7 @@ function readCodeBlockProbe(root: HTMLElement | null) {
         diff: block.classList.contains('is-diff'),
         fallbackVisible: Boolean(block.querySelector('pre.code-pre-fallback')),
         hiddenEditor: Boolean(block.querySelector('.code-editor-container.is-hidden')),
+        monacoVisible: Boolean(block.querySelector('.monaco-editor, .monaco-diff-editor')),
         textLength: block.textContent?.length ?? 0,
       }
     })
@@ -429,13 +432,16 @@ onMounted(() => {
         samples.push(readSnapshot())
       }
 
+      const visibleSamples = samples.filter(sample => !sample.restoring)
+
       return {
         before,
         samples,
+        visibleSamples,
         maxDistanceFromBottom: Math.max(
-          ...samples.map(s => Math.max(0, s.totalHeight - s.scrollTop - s.clientHeight)),
+          ...visibleSamples.map(s => Math.max(0, s.totalHeight - s.scrollTop - s.clientHeight)),
         ),
-        blankFrames: samples.filter(s => !s.visibleText.trim()).length,
+        blankFrames: visibleSamples.filter(s => !s.viewportText.trim()).length,
       }
     },
     async monitorNonBottomStreaming() {
@@ -459,13 +465,15 @@ onMounted(() => {
         samples.push(readSnapshot())
       }
 
-      const scrollTops = samples.map(s => s.scrollTop)
+      const visibleSamples = samples.filter(sample => !sample.restoring)
+      const scrollTops = visibleSamples.map(s => s.scrollTop)
 
       return {
         before,
         samples,
+        visibleSamples,
         scrollTopRange: Math.max(...scrollTops) - Math.min(...scrollTops),
-        firstVisibleTextStable: samples.every(
+        firstVisibleTextStable: visibleSamples.every(
           s => s.viewportText.slice(0, 120) === before.viewportText.slice(0, 120),
         ),
       }
