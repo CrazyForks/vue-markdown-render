@@ -92,6 +92,7 @@ const bottomPinned = ref(true)
 const exactBottomPinned = ref(true)
 const itemSizes = reactive(new Map<string, number>()) as Map<string, number>
 const itemSizeSources = new Map<string, TimelineItemSizeSource>()
+const restoredItemHeightFloors = new Map<string, number>()
 const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
 const markdownLogicalHeights = reactive(new Map<string, number>()) as Map<string, number>
 const markdownLogicalHeightSources = new Map<string, MarkdownLogicalHeightSource>()
@@ -103,6 +104,8 @@ const restorePaintReady = ref(true)
 const hostScrollManaged = ref(true)
 provide('markstreamHostScrollManaged', hostScrollManaged)
 const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
+const THREAD_RESTORE_MIN_READY_MS = 320
+const THREAD_RESTORE_STABLE_FRAMES = 3
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
 let rootResizeObserver: ResizeObserver | null = null
 let threadRestoreSeq = 0
@@ -560,13 +563,45 @@ function scrollToIndex(index: number, align: 'start' | 'center' | 'end' = 'start
   scrollToOffset(offset)
 }
 
+function getRestoredItemHeightFloor(key: string, source?: TimelineItemSizeSource) {
+  const floor = restoredItemHeightFloors.get(key)
+  if (!Number.isFinite(floor) || floor == null || floor <= 0)
+    return 0
+
+  const currentSource = itemSizeSources.get(key)
+
+  if (source && currentSource && !isSameItemSizeSource(currentSource, source))
+    return 0
+
+  return Math.ceil(floor)
+}
+
+function clearRestoredItemHeightFloorIfSourceChanged(
+  key: string,
+  source?: TimelineItemSizeSource,
+) {
+  if (!source)
+    return
+
+  const currentSource = itemSizeSources.get(key)
+  if (currentSource && !isSameItemSizeSource(currentSource, source))
+    restoredItemHeightFloors.delete(key)
+}
+
 function setItemSize(key: string, size: number, source?: TimelineItemSizeSource) {
   if (!Number.isFinite(size) || size <= 0)
     return
 
   const previous = itemSizes.get(key)
-  const next = Math.ceil(size)
   const sourceChanged = source && !isSameItemSizeSource(itemSizeSources.get(key), source)
+
+  clearRestoredItemHeightFloorIfSourceChanged(key, source)
+
+  const restoredFloor = sourceChanged
+    ? 0
+    : getRestoredItemHeightFloor(key, source)
+
+  const next = Math.max(Math.ceil(size), restoredFloor)
 
   // Monaco / pre fallback / browser font rounding can differ by exactly 1px.
   // Treat that as measurement noise; otherwise an item above the current
@@ -1115,9 +1150,66 @@ function isRestoreViewportReady() {
   return true
 }
 
+function readRestoreViewportSignature() {
+  const root = scrollRoot.value
+  if (!root)
+    return ''
+
+  const rootRect = root.getBoundingClientRect()
+  const itemByKey = new Map(
+    Array.from(root.querySelectorAll<HTMLElement>('[data-markstream-item-key]'))
+      .map(el => [el.dataset.markstreamItemKey ?? '', el] as const),
+  )
+
+  const recordSignature = visibleWindow.value.records
+    .map((record) => {
+      const item = itemByKey.get(record.key)
+
+      return [
+        record.key,
+        record.size,
+        item?.offsetHeight ?? 0,
+        item?.scrollHeight ?? 0,
+      ].join(':')
+    })
+    .join('|')
+
+  const nodeSignature = Array.from(root.querySelectorAll<HTMLElement>('[data-node-index]'))
+    .filter(slot => isVisibleInRootRect(slot, rootRect))
+    .map((slot) => {
+      const rect = slot.getBoundingClientRect()
+      const content = slot.querySelector<HTMLElement>(':scope > .node-content')
+      const code = content?.querySelector<HTMLElement>('[data-markstream-code-block="1"]')
+      const fallback = content?.querySelector<HTMLElement>('pre.code-pre-fallback')
+      const editor = content?.querySelector<HTMLElement>('.monaco-editor, .monaco-diff-editor')
+
+      return [
+        slot.dataset.nodeIndex ?? '',
+        slot.dataset.nodeType ?? '',
+        Math.round(rect.height),
+        content?.offsetHeight ?? 0,
+        content?.scrollHeight ?? 0,
+        code?.dataset.markstreamEnhanced ?? '',
+        code ? Math.round(code.getBoundingClientRect().height) : 0,
+        fallback ? Math.round(fallback.getBoundingClientRect().height) : 0,
+        editor ? Math.round(editor.getBoundingClientRect().height) : 0,
+      ].join(':')
+    })
+    .join('|')
+
+  return [
+    Math.round(root.scrollTop || 0),
+    Math.round(root.scrollHeight || 0),
+    Math.round(layout.value.totalHeight || 0),
+    recordSignature,
+    nodeSignature,
+  ].join('\n')
+}
+
 async function waitRestoreViewportReady(seq: number) {
   const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
   let stableFrames = 0
+  let previousSignature = ''
 
   for (let i = 0; i < 40; i++) {
     await nextTick()
@@ -1135,15 +1227,23 @@ async function waitRestoreViewportReady(seq: number) {
 
     applyThreadRestorePass(seq, activeThreadRestoreAnchor)
 
-    if (isRestoreViewportReady()) {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    const ready = isRestoreViewportReady()
+    const signature = ready ? readRestoreViewportSignature() : ''
+
+    if (ready && signature === previousSignature && signature) {
       stableFrames += 1
 
-      const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
-      if (stableFrames >= 2 && now - startedAt >= 32)
+      if (
+        stableFrames >= THREAD_RESTORE_STABLE_FRAMES
+        && now - startedAt >= THREAD_RESTORE_MIN_READY_MS
+      ) {
         return true
+      }
     }
     else {
       stableFrames = 0
+      previousSignature = signature
     }
   }
 
@@ -1259,13 +1359,16 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
 
   itemSizes.clear()
   itemSizeSources.clear()
+  restoredItemHeightFloors.clear()
   markdownStates.clear()
   markdownLogicalHeights.clear()
   markdownLogicalHeightSources.clear()
 
   for (const [key, size, source] of getCompatibleStateItemHeightEntries(state)) {
+    const next = Math.ceil(size)
     itemSizeSources.set(key, source)
-    itemSizes.set(key, size)
+    itemSizes.set(key, next)
+    restoredItemHeightFloors.set(key, next)
   }
 
   for (const [key, markdownState] of Object.entries(state?.markdownStates ?? {})) {
@@ -1370,6 +1473,7 @@ function cleanupMeasuredElements() {
 function cleanupObservers() {
   cleanupMeasuredElements()
   itemSizeSources.clear()
+  restoredItemHeightFloors.clear()
   markdownLogicalHeights.clear()
   markdownLogicalHeightSources.clear()
   rootResizeObserver?.disconnect()

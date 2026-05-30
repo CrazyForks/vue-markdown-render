@@ -725,19 +725,23 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
     const scrollTops = stableWindow.map(sample => Number(sample.scrollTop || 0))
     const visibleItemHeights = stableWindow.map(sample => Number(sample.state?.itemHeights?.['a-md-1'] || 0))
     const baselineItemHeight = Number(beforeReloadItemHeight || 0)
-    const itemHeights = visibleItemHeights.filter(height => Math.abs(height - baselineItemHeight) > 2)
 
     const scrollTopMin = Math.min(...scrollTops)
     const scrollTopMax = Math.max(...scrollTops)
-    const itemHeightMin = itemHeights.length ? Math.min(...itemHeights) : baselineItemHeight
-    const itemHeightMax = itemHeights.length ? Math.max(...itemHeights) : baselineItemHeight
+
+    const itemHeightDeltaPx = Math.max(
+      0,
+      ...visibleItemHeights.map(height => Math.abs(height - baselineItemHeight)),
+    )
+    const itemHeightRangePx = Math.max(...visibleItemHeights) - Math.min(...visibleItemHeights)
 
     return {
       visibleSamples,
       firstVisible: visibleSamples[0] ?? null,
       lastVisible: visibleSamples[visibleSamples.length - 1] ?? null,
       scrollTopRangePx: scrollTopMax - scrollTopMin,
-      itemHeightRangePx: itemHeightMax - itemHeightMin,
+      itemHeightDeltaPx,
+      itemHeightRangePx,
       samples: samples.map(sample => ({
         scrollTop: sample.scrollTop,
         totalHeight: sample.totalHeight,
@@ -760,12 +764,15 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
   )
 
   assert(
-    probe.scrollTopRangePx <= 0.5 && probe.itemHeightRangePx <= 0.5,
+    probe.scrollTopRangePx <= 0.5
+    && probe.itemHeightRangePx <= 0.5
+    && probe.itemHeightDeltaPx <= 2,
     'CodeBlockNode caused visible reload jitter around PR analysis section 6/13',
     {
       beforeReload: summarizeVirtualTimelineZeroSample(beforeReload),
       scrollTopRangePx: probe.scrollTopRangePx,
       itemHeightRangePx: probe.itemHeightRangePx,
+      itemHeightDeltaPx: probe.itemHeightDeltaPx,
       firstVisible: summarizeVirtualTimelineZeroSample(probe.firstVisible),
       lastVisible: summarizeVirtualTimelineZeroSample(probe.lastVisible),
       samples: probe.samples,
@@ -778,6 +785,7 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
     lastVisible: summarizeVirtualTimelineZeroSample(probe.lastVisible),
     scrollTopRangePx: probe.scrollTopRangePx,
     itemHeightRangePx: probe.itemHeightRangePx,
+    itemHeightDeltaPx: probe.itemHeightDeltaPx,
   }
 }
 
