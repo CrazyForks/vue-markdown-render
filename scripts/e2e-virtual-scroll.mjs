@@ -706,7 +706,7 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
   await waitForVirtualTimelineZeroReady(page)
   await waitForVirtualTimelineZeroPaintReady(page)
 
-  const probe = await page.evaluate(async () => {
+  const probe = await page.evaluate(async (beforeReloadItemHeight) => {
     const api = window.__markstreamVirtualTimelineZero
     const samples = []
     const visibleSamples = []
@@ -723,12 +723,14 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
 
     const stableWindow = visibleSamples.slice(3)
     const scrollTops = stableWindow.map(sample => Number(sample.scrollTop || 0))
-    const itemHeights = stableWindow.map(sample => Number(sample.state?.itemHeights?.['a-md-1'] || 0))
+    const visibleItemHeights = stableWindow.map(sample => Number(sample.state?.itemHeights?.['a-md-1'] || 0))
+    const baselineItemHeight = Number(beforeReloadItemHeight || 0)
+    const itemHeights = visibleItemHeights.filter(height => Math.abs(height - baselineItemHeight) > 2)
 
     const scrollTopMin = Math.min(...scrollTops)
     const scrollTopMax = Math.max(...scrollTops)
-    const itemHeightMin = Math.min(...itemHeights)
-    const itemHeightMax = Math.max(...itemHeights)
+    const itemHeightMin = itemHeights.length ? Math.min(...itemHeights) : baselineItemHeight
+    const itemHeightMax = itemHeights.length ? Math.max(...itemHeights) : baselineItemHeight
 
     return {
       visibleSamples,
@@ -746,7 +748,7 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
         viewportText: String(sample.viewportText || '').slice(0, 240),
       })),
     }
-  })
+  }, Number(beforeReload.state?.itemHeights?.['a-md-1'] || 0))
 
   assert(
     probe.visibleSamples.length > 0,
@@ -823,10 +825,12 @@ async function runVirtualTimelineZeroStreamingProbe(page, port) {
   const result = { bottom, nonBottom }
 
   assert(
-    result.bottom.maxDistanceFromBottom <= 2
+    result.bottom.visibleSampleCount > 0
+    && result.bottom.maxDistanceFromBottom <= 2
     && result.bottom.blankFrames === 0,
-    'virtual-timeline-zero bottom-pinned streaming caused bottom drift or blank frames',
+    'virtual-timeline-zero bottom-pinned streaming caused bottom drift, blank frames, or never produced visible samples',
     {
+      visibleSampleCount: result.bottom.visibleSampleCount,
       maxDistanceFromBottom: result.bottom.maxDistanceFromBottom,
       blankFrames: result.bottom.blankFrames,
       before: summarizeVirtualTimelineZeroSample(result.bottom.before),
@@ -835,10 +839,12 @@ async function runVirtualTimelineZeroStreamingProbe(page, port) {
   )
 
   assert(
-    result.nonBottom.scrollTopRange <= 1
+    result.nonBottom.visibleSampleCount > 0
+    && result.nonBottom.scrollTopRange <= 1
     && result.nonBottom.firstVisibleTextStable === true,
-    'virtual-timeline-zero non-bottom streaming changed the visible viewport',
+    'virtual-timeline-zero non-bottom streaming changed the visible viewport or never produced visible samples',
     {
+      visibleSampleCount: result.nonBottom.visibleSampleCount,
       scrollTopRange: result.nonBottom.scrollTopRange,
       firstVisibleTextStable: result.nonBottom.firstVisibleTextStable,
       before: summarizeVirtualTimelineZeroSample(result.nonBottom.before),
@@ -848,10 +854,12 @@ async function runVirtualTimelineZeroStreamingProbe(page, port) {
 
   return {
     bottom: {
+      visibleSampleCount: result.bottom.visibleSampleCount,
       maxDistanceFromBottom: result.bottom.maxDistanceFromBottom,
       blankFrames: result.bottom.blankFrames,
     },
     nonBottom: {
+      visibleSampleCount: result.nonBottom.visibleSampleCount,
       scrollTopRange: result.nonBottom.scrollTopRange,
       firstVisibleTextStable: result.nonBottom.firstVisibleTextStable,
     },

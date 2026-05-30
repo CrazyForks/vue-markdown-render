@@ -101,7 +101,7 @@ const threadStates = new Map<string, MarkstreamThreadVirtualState>()
 const restoringThread = ref(false)
 const restorePaintReady = ref(true)
 const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
-const ITEM_SIZE_RECONCILE_DEADBAND_PX = 2
+const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
 let rootResizeObserver: ResizeObserver | null = null
 let threadRestoreSeq = 0
 let threadRestoreRaf: number | null = null
@@ -966,17 +966,43 @@ function hasElementContent(content: HTMLElement) {
   ].join(',')))
 }
 
+function isElementVisiblyPainted(el: HTMLElement) {
+  if (el.closest('.code-editor-container.is-hidden'))
+    return false
+
+  let current: HTMLElement | null = el
+  while (current) {
+    const style = window.getComputedStyle(current)
+    if (
+      style.display === 'none'
+      || style.visibility === 'hidden'
+      || Number.parseFloat(style.opacity || '1') <= 0.01
+    ) {
+      return false
+    }
+
+    current = current.parentElement
+  }
+
+  const rect = el.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 0
+}
+
+function hasVisibleMonacoDom(root: HTMLElement) {
+  return Array.from(root.querySelectorAll<HTMLElement>('.monaco-editor, .monaco-diff-editor'))
+    .some(isElementVisiblyPainted)
+}
+
 function hasReadyCodeBlockContent(content: HTMLElement) {
   const codeBlock = content.querySelector<HTMLElement>('[data-markstream-code-block="1"]')
 
   if (codeBlock) {
     const enhanced = codeBlock.dataset.markstreamEnhanced === 'true'
     const hasFallback = Boolean(codeBlock.querySelector('pre.code-pre-fallback'))
-    const hasVisibleMonacoDom = Boolean(codeBlock.querySelector('.monaco-editor, .monaco-diff-editor'))
 
     // Hidden editor alone is not a visible surface. It is only safe when the
     // pre fallback is also present. Otherwise restore may reveal a blank shell.
-    return enhanced || hasFallback || hasVisibleMonacoDom
+    return enhanced || hasFallback || hasVisibleMonacoDom(codeBlock)
   }
 
   // Mermaid / Infographic / D2 are routed from code_block nodes but they do not

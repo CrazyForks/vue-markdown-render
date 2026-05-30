@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { nextTick, ref } from 'vue'
 import CodeBlockNode from '../src/components/CodeBlockNode/CodeBlockNode.vue'
 import { isCodeBlockRuntimeReady, preloadCodeBlockRuntime } from '../src/components/CodeBlockNode/monaco'
 import { resetCodeBlockRuntimeReadyForTest } from '../src/components/CodeBlockNode/runtime'
@@ -357,6 +357,56 @@ describe('codeBlockNode editor creation locking', () => {
     resolveSecondCreate?.()
     await flushPendingMicrotasks()
     second.unmount()
+  })
+
+  it('keeps the `<pre>` fallback on warm remounts when hosted by an outer virtualizer', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    await expect(preloadCodeBlockRuntime()).resolves.toBe(true)
+    expect(isCodeBlockRuntimeReady()).toBe(true)
+
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      global: {
+        provide: {
+          markstreamHostScrollManaged: ref(true),
+        },
+      },
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
+    expect(wrapper.find('.code-editor-container').classes()).toContain('is-hidden')
+
+    resolveCreate?.()
+    await flushPendingMicrotasks()
+
+    await vi.waitFor(() => {
+      expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+      expect(wrapper.find('.code-editor-container').classes()).not.toContain('is-hidden')
+    })
+
+    wrapper.unmount()
   })
 
   it('lets callers preload the code block runtime before mounting', async () => {

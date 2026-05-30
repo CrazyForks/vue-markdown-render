@@ -325,6 +325,33 @@ function getTimelineRoot() {
   return document.querySelector<HTMLElement>('[data-testid="markstream-virtual-timeline"]')
 }
 
+function isProbeElementVisible(el: HTMLElement) {
+  if (el.closest('.code-editor-container.is-hidden'))
+    return false
+
+  let current: HTMLElement | null = el
+  while (current) {
+    const style = window.getComputedStyle(current)
+    if (
+      style.display === 'none'
+      || style.visibility === 'hidden'
+      || Number.parseFloat(style.opacity || '1') <= 0.01
+    ) {
+      return false
+    }
+
+    current = current.parentElement
+  }
+
+  const rect = el.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 0
+}
+
+function hasVisibleMonacoProbe(block: HTMLElement) {
+  return Array.from(block.querySelectorAll<HTMLElement>('.monaco-editor, .monaco-diff-editor'))
+    .some(isProbeElementVisible)
+}
+
 function readCodeBlockProbe(root: HTMLElement | null) {
   return Array.from(root?.querySelectorAll<HTMLElement>('[data-markstream-code-block="1"]') ?? [])
     .map((block) => {
@@ -335,7 +362,7 @@ function readCodeBlockProbe(root: HTMLElement | null) {
         diff: block.classList.contains('is-diff'),
         fallbackVisible: Boolean(block.querySelector('pre.code-pre-fallback')),
         hiddenEditor: Boolean(block.querySelector('.code-editor-container.is-hidden')),
-        monacoVisible: Boolean(block.querySelector('.monaco-editor, .monaco-diff-editor')),
+        monacoVisible: hasVisibleMonacoProbe(block),
         textLength: block.textContent?.length ?? 0,
       }
     })
@@ -433,14 +460,16 @@ onMounted(() => {
       }
 
       const visibleSamples = samples.filter(sample => !sample.restoring)
+      const maxDistanceFromBottom = visibleSamples.length
+        ? Math.max(...visibleSamples.map(s => Math.max(0, s.totalHeight - s.scrollTop - s.clientHeight)))
+        : Number.POSITIVE_INFINITY
 
       return {
         before,
         samples,
         visibleSamples,
-        maxDistanceFromBottom: Math.max(
-          ...visibleSamples.map(s => Math.max(0, s.totalHeight - s.scrollTop - s.clientHeight)),
-        ),
+        visibleSampleCount: visibleSamples.length,
+        maxDistanceFromBottom,
         blankFrames: visibleSamples.filter(s => !s.viewportText.trim()).length,
       }
     },
@@ -453,7 +482,7 @@ onMounted(() => {
         await nextFrame()
         before = readSnapshot()
 
-        if (!before.restoring && Math.abs(before.scrollTop - targetOffset) <= 2)
+        if (!before.restoring && Math.abs(before.scrollTop - targetOffset) <= 2 && before.viewportText.trim())
           break
       }
 
@@ -467,15 +496,21 @@ onMounted(() => {
 
       const visibleSamples = samples.filter(sample => !sample.restoring)
       const scrollTops = visibleSamples.map(s => s.scrollTop)
+      const scrollTopRange = scrollTops.length
+        ? Math.max(...scrollTops) - Math.min(...scrollTops)
+        : Number.POSITIVE_INFINITY
 
       return {
         before,
         samples,
         visibleSamples,
-        scrollTopRange: Math.max(...scrollTops) - Math.min(...scrollTops),
-        firstVisibleTextStable: visibleSamples.every(
-          s => s.viewportText.slice(0, 120) === before.viewportText.slice(0, 120),
-        ),
+        visibleSampleCount: visibleSamples.length,
+        scrollTopRange,
+        firstVisibleTextStable: visibleSamples.length > 0
+          && before.viewportText.trim().length > 0
+          && visibleSamples.every(
+            s => s.viewportText.slice(0, 120) === before.viewportText.slice(0, 120),
+          ),
       }
     },
   }

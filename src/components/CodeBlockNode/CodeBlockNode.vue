@@ -383,6 +383,21 @@ const preFallbackWrap = computed(() => {
     return true
   return String(wordWrap) !== 'off'
 })
+function isHostScrollManagedCodeBlockElement(el?: HTMLElement | null) {
+  if (hostScrollManaged?.value === true)
+    return true
+
+  if (!el)
+    return false
+
+  // Built-in zero-config timeline.
+  if (el.closest('[data-markstream-virtual-timeline="1"], .markstream-virtual-timeline'))
+    return true
+
+  // Common external virtualizer wrappers own scroll reconciliation and item height.
+  return Boolean(el.closest('.vue-recycle-scroller, [data-virtualizer], [data-virtual-scroll-root]'))
+}
+const codeBlockHostScrollManaged = computed(() => isHostScrollManagedCodeBlockElement(container.value))
 const showPreWhileMonacoLoads = computed(() => {
   // If Monaco isn't available at all, the component renders a standalone PreCodeNode.
   if (usePreCodeRender.value)
@@ -394,6 +409,11 @@ const showPreWhileMonacoLoads = computed(() => {
   // Keep the pre fallback over it until the diff surface is visually ready,
   // otherwise users see a third "plain editor" state between fallback and final.
   if (isDiff.value)
+    return !editorDisplayReady.value
+
+  // When an outer virtualizer owns scroll/item height, keep the fallback even
+  // for warm/preloaded runtime mounts so restore never waits on an empty editor host.
+  if (codeBlockHostScrollManaged.value)
     return !editorDisplayReady.value
 
   // Cold starts keep the fallback until Monaco settles; warm/preloaded mounts skip it.
@@ -1443,20 +1463,7 @@ function resolveScrollRootElement(node?: HTMLElement | null) {
 }
 
 function isExternallyManagedScroll(container: HTMLElement) {
-  if (hostScrollManaged?.value === true)
-    return true
-
-  // Built-in zero-config timeline.
-  if (container.closest('[data-markstream-virtual-timeline="1"], .markstream-virtual-timeline'))
-    return true
-
-  // Common external virtualizer wrapper. In this case the virtualizer owns
-  // scroll reconciliation and CodeBlockNode must not apply local scrollTop
-  // compensation.
-  if (container.closest('.vue-recycle-scroller, [data-virtualizer], [data-virtual-scroll-root]'))
-    return true
-
-  return false
+  return codeBlockHostScrollManaged.value || isHostScrollManagedCodeBlockElement(container)
 }
 
 function adjustScrollAfterHeightChange(container: HTMLElement, previousHeight: number, nextHeight: number) {
@@ -3247,14 +3254,7 @@ onUnmounted(() => {
 }
 
 .code-editor-container.is-hidden {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100% !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  overflow: hidden;
-  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 

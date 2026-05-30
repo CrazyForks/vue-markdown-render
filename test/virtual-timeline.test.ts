@@ -959,6 +959,21 @@ describe('virtual timeline API', () => {
       vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
       vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
       vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+        const el = this as HTMLElement
+        const hidden = el.closest?.('.code-editor-container.is-hidden')
+        return {
+          x: 0,
+          y: 0,
+          top: 0,
+          right: 800,
+          bottom: hidden ? 0 : 360,
+          left: 0,
+          width: hidden ? 0 : 800,
+          height: hidden ? 0 : 360,
+          toJSON: () => ({}),
+        } as DOMRect
+      })
 
       vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
         return window.setTimeout(() => callback(performance.now()), 16)
@@ -1013,7 +1028,9 @@ describe('virtual timeline API', () => {
                     'data-markstream-code-block': '1',
                     'data-markstream-enhanced': 'false',
                   }, [
-                    h('div', { class: 'code-editor-container is-hidden' }),
+                    h('div', { class: 'code-editor-container is-hidden' }, [
+                      h('div', { class: 'monaco-editor' }),
+                    ]),
                   ]),
                 ]),
               ]),
