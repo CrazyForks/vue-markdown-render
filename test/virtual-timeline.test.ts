@@ -1119,6 +1119,114 @@ describe('virtual timeline API', () => {
     }
   })
 
+  it('does not treat a fading code fallback as restore-ready before Monaco is visible', async () => {
+    vi.useFakeTimers()
+
+    let wrapper: any
+
+    try {
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+        const el = this as HTMLElement
+        const hidden = el.closest?.('.code-editor-container.is-hidden')
+        return {
+          x: 0,
+          y: 0,
+          top: 0,
+          right: 800,
+          bottom: hidden ? 0 : 360,
+          left: 0,
+          width: hidden ? 0 : 800,
+          height: hidden ? 0 : 360,
+          toJSON: () => ({}),
+        } as DOMRect
+      })
+
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+        return window.setTimeout(() => callback(performance.now()), 16)
+      })
+      vi.stubGlobal('cancelAnimationFrame', (handle: number) => {
+        window.clearTimeout(handle)
+      })
+
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      })
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: 'code', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: {
+              type: 'item',
+              itemKey: 'm1',
+              offsetWithinItemPx: 0,
+            },
+            itemHeights: { m1: 360 },
+            itemSizeSources: {
+              m1: timelineItemSource('thread-a', 'm1', 1),
+            },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', {
+              ref: props.measureRef,
+            }, [
+              h('div', {
+                'class': 'node-slot',
+                'data-node-index': '0',
+                'data-node-type': 'code_block',
+              }, [
+                h('div', { class: 'node-content' }, [
+                  h('div', {
+                    'data-markstream-code-block': '1',
+                    'data-markstream-enhanced': 'false',
+                  }, [
+                    h('div', { class: 'code-editor-container is-hidden' }, [
+                      h('div', { class: 'monaco-editor' }),
+                    ]),
+                    h('pre', { class: 'code-pre-fallback is-fading-out' }, 'fallback'),
+                  ]),
+                ]),
+              ]),
+            ])
+          },
+        },
+      })
+
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(100)
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      // The fixed fallback window can still reveal eventually.
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('treats visible mermaid pending placeholder as restore-ready code block content', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)

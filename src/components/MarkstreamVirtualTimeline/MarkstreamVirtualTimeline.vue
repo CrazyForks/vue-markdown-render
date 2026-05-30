@@ -999,15 +999,31 @@ function hasVisibleMonacoDom(root: HTMLElement) {
     .some(isElementVisiblyPainted)
 }
 
+function hasUsableRestoreFallback(el: HTMLElement | null) {
+  if (!el)
+    return false
+
+  if (el.classList.contains('is-fading-out'))
+    return false
+
+  const style = window.getComputedStyle(el)
+  if (style.display === 'none' || Number.parseFloat(style.opacity || '1') <= 0.01)
+    return false
+
+  const rect = el.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 0
+}
+
 function hasReadyCodeBlockContent(content: HTMLElement) {
   const codeBlock = content.querySelector<HTMLElement>('[data-markstream-code-block="1"]')
 
   if (codeBlock) {
     const enhanced = codeBlock.dataset.markstreamEnhanced === 'true'
-    const hasFallback = Boolean(codeBlock.querySelector('pre.code-pre-fallback'))
+    const fallback = codeBlock.querySelector<HTMLElement>('pre.code-pre-fallback')
+    const hasFallback = hasUsableRestoreFallback(fallback)
 
     // Hidden editor alone is not a visible surface. It is only safe when the
-    // pre fallback is also present. Otherwise restore may reveal a blank shell.
+    // pre fallback is still usable, Monaco is visibly painted, or the block is enhanced.
     return enhanced || hasFallback || hasVisibleMonacoDom(codeBlock)
   }
 

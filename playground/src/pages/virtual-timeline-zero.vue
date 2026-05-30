@@ -157,31 +157,57 @@ function makeLargeMarkdown(label: string, count: number) {
   }).join('\n\n')
 }
 
+const threadAStaticItems: TimelineItem[] = [
+  { kind: 'system-divider', id: 'a-d-1', text: 'Today' },
+  { kind: 'user-message', id: 'a-u-1', text: 'Audit this PR and keep the scroll position stable while tools run.' },
+  { kind: 'thinking', id: 'a-t-1', content: 'Inspecting changed files and estimating render cost.' },
+  { kind: 'tool-call', id: 'a-tool-1', status: 'running', label: 'Reading GitHub PR' },
+  {
+    kind: 'assistant-markdown',
+    id: 'a-md-1',
+    content: makeLargeMarkdown('PR analysis', 28),
+    final: true,
+    revision: 1,
+  },
+  { kind: 'tool-call', id: 'a-tool-2', status: 'done', label: 'Search complete' },
+  { kind: 'custom', id: 'a-custom-1', component: InspectionPanel },
+  { kind: 'error', id: 'a-error-1', message: 'Tool call failed once and was retried.' },
+]
+
+const threadBStaticItems: TimelineItem[] = [
+  { kind: 'system-divider', id: 'b-d-1', text: 'Yesterday' },
+  { kind: 'user-message', id: 'b-u-1', text: 'Summarize the virtual timeline contract.' },
+  {
+    kind: 'assistant-markdown',
+    id: 'b-md-1',
+    content: makeLargeMarkdown('Timeline contract', 18),
+    final: true,
+    revision: 2,
+  },
+  { kind: 'tool-call', id: 'b-tool-1', status: 'done', label: 'Height cache imported' },
+  {
+    kind: 'assistant-markdown',
+    id: 'b-md-2',
+    content: makeLargeMarkdown('Restore notes', 12),
+    final: true,
+    revision: 1,
+  },
+]
+
+const streamingItem = computed<TimelineItem>(() => ({
+  kind: 'assistant-markdown',
+  id: 'a-streaming',
+  content: streamingContent.value,
+  final: streamingFinal.value,
+  revision: streamingRevision.value,
+}))
+
 const threadItems = computed<Record<ThreadId, TimelineItem[]>>(() => ({
   'thread-a': [
-    { kind: 'system-divider', id: 'a-d-1', text: 'Today' },
-    { kind: 'user-message', id: 'a-u-1', text: 'Audit this PR and keep the scroll position stable while tools run.' },
-    { kind: 'thinking', id: 'a-t-1', content: 'Inspecting changed files and estimating render cost.' },
-    { kind: 'tool-call', id: 'a-tool-1', status: 'running', label: 'Reading GitHub PR' },
-    { kind: 'assistant-markdown', id: 'a-md-1', content: makeLargeMarkdown('PR analysis', 28), final: true, revision: 1 },
-    { kind: 'tool-call', id: 'a-tool-2', status: 'done', label: 'Search complete' },
-    { kind: 'custom', id: 'a-custom-1', component: InspectionPanel },
-    { kind: 'error', id: 'a-error-1', message: 'Tool call failed once and was retried.' },
-    {
-      kind: 'assistant-markdown',
-      id: 'a-streaming',
-      content: streamingContent.value,
-      final: streamingFinal.value,
-      revision: streamingRevision.value,
-    },
+    ...threadAStaticItems,
+    streamingItem.value,
   ],
-  'thread-b': [
-    { kind: 'system-divider', id: 'b-d-1', text: 'Yesterday' },
-    { kind: 'user-message', id: 'b-u-1', text: 'Summarize the virtual timeline contract.' },
-    { kind: 'assistant-markdown', id: 'b-md-1', content: makeLargeMarkdown('Timeline contract', 18), final: true, revision: 2 },
-    { kind: 'tool-call', id: 'b-tool-1', status: 'done', label: 'Height cache imported' },
-    { kind: 'assistant-markdown', id: 'b-md-2', content: makeLargeMarkdown('Restore notes', 12), final: true, revision: 1 },
-  ],
+  'thread-b': threadBStaticItems,
 }))
 
 const timelineItems = computed(() => threadItems.value[activeThreadId.value])
@@ -366,6 +392,8 @@ function readCodeBlockProbe(root: HTMLElement | null) {
       const fallback = block.querySelector<HTMLElement>('pre.code-pre-fallback')
       const editorHost = block.querySelector<HTMLElement>('.code-editor-container')
 
+      const fallbackVisible = Boolean(fallback && isProbeElementVisible(fallback))
+
       return {
         height: rect.height,
         editorLayerHeight: editorLayer?.getBoundingClientRect().height ?? 0,
@@ -373,7 +401,7 @@ function readCodeBlockProbe(root: HTMLElement | null) {
         editorHostHeight: editorHost?.getBoundingClientRect().height ?? 0,
         enhanced: block.dataset.markstreamEnhanced === 'true',
         diff: block.classList.contains('is-diff'),
-        fallbackVisible: Boolean(fallback),
+        fallbackVisible,
         hiddenEditor: Boolean(block.querySelector('.code-editor-container.is-hidden')),
         monacoVisible: hasVisibleMonacoProbe(block),
         textLength: block.textContent?.length ?? 0,

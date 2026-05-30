@@ -30,7 +30,6 @@ export const CodeBlockNodeLoading = defineComponent({
     const props = attrs as CodeBlockFallbackProps
 
     return () => h(PreCodeNode, {
-      ...props,
       'node': props.node,
       'showLineNumbers': true,
       'class': ['code-pre-fallback', attrs.class],
