@@ -120,12 +120,15 @@ const THREAD_RESTORE_MIN_READY_MS = 320
 const THREAD_RESTORE_STABLE_FRAMES = 3
 const THREAD_RESTORE_READY_RETRY_DELAY_MS = 160
 const THREAD_RESTORE_MAX_LOADING_MS = 8000
+const THREAD_STATE_REMEMBER_DELAY_MS = 80
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
 let rootResizeObserver: ResizeObserver | null = null
 let threadRestoreSeq = 0
 let threadRestoreRaf: number | null = null
 let threadRestoreTimers: number[] = []
 let threadRestoreReadyRetryTimer: number | null = null
+let threadStateRememberTimer: number | null = null
+let pendingThreadStateRememberKey: string | undefined
 let threadRestoreStartedAt = -1
 let activeThreadRestoreSeq = 0
 let activeThreadRestoreAnchor: MarkstreamThreadAnchor | undefined
@@ -262,22 +265,28 @@ function getTimelineRenderScopeKey() {
   return normalizedThreadKey.value ?? 'timeline'
 }
 
-function getSessionKey(record: Pick<TimelineRecord, 'item' | 'index' | 'key'>) {
+function getSessionKey(
+  record: Pick<TimelineRecord, 'item' | 'index' | 'key'>,
+  threadKey = normalizedThreadKey.value,
+) {
   const revision = getMarkstreamTimelineItemRevision(record.item, record.index, props)
   return [
-    normalizedThreadKey.value ?? 'timeline',
+    threadKey ?? 'timeline',
     record.key,
     revision == null ? '' : String(revision),
   ].join(':')
 }
 
-function getItemSizeSourceKey(record: Pick<TimelineRecord, 'item' | 'index' | 'key' | 'markdown'>) {
+function getItemSizeSourceKey(
+  record: Pick<TimelineRecord, 'item' | 'index' | 'key' | 'markdown'>,
+  threadKey = normalizedThreadKey.value,
+) {
   if (record.markdown)
-    return getSessionKey(record)
+    return getSessionKey(record, threadKey)
 
   const revision = getMarkstreamTimelineItemRevision(record.item, record.index, props)
   return [
-    normalizedThreadKey.value ?? 'timeline',
+    threadKey ?? 'timeline',
     record.key,
     revision == null ? '' : String(revision),
   ].join(':')
@@ -303,11 +312,12 @@ function isSameItemSizeSource(
 function isCompatibleItemSizeSource(
   record: Pick<TimelineRecord, 'item' | 'index' | 'key' | 'markdown'> | undefined,
   source: TimelineItemSizeSource | null | undefined,
+  threadKey = normalizedThreadKey.value,
 ) {
   if (!record || !source)
     return false
 
-  if (source.sourceKey !== getItemSizeSourceKey(record))
+  if (source.sourceKey !== getItemSizeSourceKey(record, threadKey))
     return false
 
   if (source.measurementKey !== timelineMeasurementKey.value)
@@ -319,10 +329,13 @@ function isCompatibleItemSizeSource(
   return true
 }
 
-function getCompatibleItemSize(record: Pick<TimelineRecord, 'item' | 'index' | 'key' | 'markdown'>) {
+function getCompatibleItemSize(
+  record: Pick<TimelineRecord, 'item' | 'index' | 'key' | 'markdown'>,
+  threadKey = normalizedThreadKey.value,
+) {
   const size = itemSizes.get(record.key)
 
-  if (!isCompatibleItemSizeSource(record, itemSizeSources.get(record.key)))
+  if (!isCompatibleItemSizeSource(record, itemSizeSources.get(record.key), threadKey))
     return null
 
   return Number.isFinite(size) && size! > 0 ? size! : null
@@ -695,7 +708,7 @@ function setItemSize(key: string, size: number, source?: TimelineItemSizeSource)
   if (source)
     itemSizeSources.set(key, source)
   itemSizes.set(key, next)
-  rememberThreadState()
+  scheduleThreadStateRemember()
   scheduleScrollReconcileAfterSizeChange(restoreAnchor)
 }
 
@@ -737,7 +750,7 @@ function scheduleScrollReconcileAfterSizeChange(anchor: MarkstreamThreadAnchor |
     if (anchor)
       restoreOuterAnchor(anchor)
 
-    updateScrollMetrics()
+    updateScrollMetrics({ remember: false })
   }
 
   apply()
@@ -905,7 +918,7 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
 
       markdownStates.set(record.key, state)
       seedMarkdownLogicalHeightFromState(record.key, state)
-      rememberThreadState()
+      scheduleThreadStateRemember()
       emitVirtualStateChange({ itemKey: record.key, state })
     },
   }
@@ -970,9 +983,9 @@ function captureThreadStateForKey(threadKey = normalizedThreadKey.value): Markst
   const itemSizeSourceSnapshot: NonNullable<MarkstreamThreadVirtualState['itemSizeSources']> = {}
 
   for (const record of layout.value.records) {
-    const size = getCompatibleItemSize(record)
+    const size = getCompatibleItemSize(record, threadKey)
     const source = itemSizeSources.get(record.key)
-    if (size != null && isCompatibleItemSizeSource(record, source)) {
+    if (size != null && isCompatibleItemSizeSource(record, source, threadKey)) {
       itemHeights[record.key] = size
       itemSizeSourceSnapshot[record.key] = source!
     }
@@ -995,16 +1008,60 @@ function captureThreadState(): MarkstreamThreadVirtualState {
 
 function rememberThreadState(threadKey = normalizedThreadKey.value) {
   if (!threadKey)
-    return
+    return undefined
 
   const state = captureThreadStateForKey(threadKey)
   threadStates.set(threadKey, state)
   if (threadKey === normalizedThreadKey.value)
     activeThreadStateSnapshot = state
   emitThreadStateChange(state)
+  return state
+}
+
+function clearThreadStateRememberSchedule() {
+  if (threadStateRememberTimer != null && typeof window !== 'undefined')
+    window.clearTimeout(threadStateRememberTimer)
+
+  threadStateRememberTimer = null
+  pendingThreadStateRememberKey = undefined
+}
+
+function flushThreadStateRemember() {
+  const threadKey = pendingThreadStateRememberKey
+
+  if (threadStateRememberTimer != null && typeof window !== 'undefined')
+    window.clearTimeout(threadStateRememberTimer)
+
+  threadStateRememberTimer = null
+  pendingThreadStateRememberKey = undefined
+
+  return threadKey ? rememberThreadState(threadKey) : undefined
+}
+
+function scheduleThreadStateRemember(threadKey = normalizedThreadKey.value) {
+  if (!threadKey)
+    return
+
+  pendingThreadStateRememberKey = threadKey
+
+  if (threadStateRememberTimer != null)
+    return
+
+  if (typeof window === 'undefined') {
+    flushThreadStateRemember()
+    return
+  }
+
+  threadStateRememberTimer = window.setTimeout(() => {
+    threadStateRememberTimer = null
+    flushThreadStateRemember()
+  }, THREAD_STATE_REMEMBER_DELAY_MS)
 }
 
 function rememberPreviousThreadState(threadKey: string) {
+  if (flushThreadStateRemember()?.threadKey === threadKey)
+    return
+
   if (activeThreadStateSnapshot?.threadKey === threadKey) {
     threadStates.set(threadKey, activeThreadStateSnapshot)
     emitThreadStateChange(activeThreadStateSnapshot)
@@ -1717,6 +1774,7 @@ function cleanupMeasuredElements() {
 }
 
 function cleanupObservers() {
+  clearThreadStateRememberSchedule()
   cleanupMeasuredElements()
   itemSizeSources.clear()
   restoredItemHeightFloors.clear()
@@ -1831,7 +1889,8 @@ onUpdated(() => {
 })
 
 onBeforeUnmount(() => {
-  rememberThreadState()
+  if (!flushThreadStateRemember())
+    rememberThreadState()
   clearThreadRestoreSchedule()
   cleanupObservers()
 })

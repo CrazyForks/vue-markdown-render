@@ -1115,6 +1115,156 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('coalesces thread state emits during markdown streaming updates', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(80)
+
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      })
+
+      const onThreadStateChange = vi.fn()
+      let markdownProps: any
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'a1', content: '# Streaming', final: false, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          overscan: 10,
+          onThreadStateChange,
+        },
+        slots: {
+          default(props: any) {
+            if (props.kind === 'assistant-markdown')
+              markdownProps = props.markdownProps
+
+            return h('div', { ref: props.measureRef }, props.markdownProps?.content ?? '')
+          },
+        },
+      })
+
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(100)
+      await nextTick()
+      onThreadStateChange.mockClear()
+
+      const sessionKey = markdownProps.virtualScroll.sessionKey
+
+      markdownProps.onHeightChange(createMetrics(600, sessionKey))
+      markdownProps.onHeightChange(createMetrics(700, sessionKey))
+      markdownProps.onVirtualStateChange({
+        sessionKey,
+        threadKey: 'thread-a',
+        metrics: createMetrics(700, sessionKey),
+        width: 800,
+        measurementKey: ':800',
+      } as MarkstreamVirtualState)
+
+      expect(onThreadStateChange).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(79)
+      expect(onThreadStateChange).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(1)
+
+      expect(onThreadStateChange).toHaveBeenCalledTimes(1)
+      const state = onThreadStateChange.mock.calls[0]![0] as any
+      expect(state.threadKey).toBe('thread-a')
+      expect(state.itemHeights.a1).toBe(700)
+      expect(state.markdownStates.a1.metrics.totalHeight).toBe(700)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('flushes pending thread state before switching threads', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(80)
+
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      })
+
+      const onThreadStateChange = vi.fn()
+      let markdownProps: any
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'a1', content: '# A', final: false, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          overscan: 10,
+          onThreadStateChange,
+        },
+        slots: {
+          default(props: any) {
+            if (props.kind === 'assistant-markdown')
+              markdownProps = props.markdownProps
+
+            return h('div', { ref: props.measureRef }, props.markdownProps?.content ?? '')
+          },
+        },
+      })
+
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(100)
+      await nextTick()
+      onThreadStateChange.mockClear()
+
+      const sessionKey = markdownProps.virtualScroll.sessionKey
+      markdownProps.onHeightChange(createMetrics(420, sessionKey))
+      markdownProps.onVirtualStateChange({
+        sessionKey,
+        threadKey: 'thread-a',
+        metrics: createMetrics(420, sessionKey),
+        width: 800,
+        measurementKey: ':800',
+      } as MarkstreamVirtualState)
+
+      expect(onThreadStateChange).not.toHaveBeenCalled()
+
+      await wrapper.setProps({ threadKey: 'thread-b' })
+
+      expect(onThreadStateChange).toHaveBeenCalledTimes(1)
+      const state = onThreadStateChange.mock.calls[0]![0] as any
+      expect(state.threadKey).toBe('thread-a')
+      expect(state.itemHeights.a1).toBe(420)
+      expect(state.markdownStates.a1.metrics.totalHeight).toBe(420)
+
+      await vi.advanceTimersByTimeAsync(100)
+      const previousThreadEmits = onThreadStateChange.mock.calls
+        .filter(call => (call[0] as any).threadKey === 'thread-a')
+      expect(previousThreadEmits).toHaveLength(1)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('does not hide the first mount when there is no restored thread state', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
