@@ -1437,19 +1437,32 @@ function isRestoreViewportReady() {
     return false
   }
 
-  const visibleItems = Array.from(root.querySelectorAll<HTMLElement>('[data-markstream-item-key]'))
-    .filter(el => isElementVisibleInScrollRoot(el, root))
+  const records = visibleWindow.value.records
+  if (!records.length)
+    return layout.value.records.length === 0
 
-  if (visibleItems.length === 0)
-    return true
+  const itemByKey = new Map(
+    Array.from(root.querySelectorAll<HTMLElement>('[data-markstream-item-key]'))
+      .map(el => [el.dataset.markstreamItemKey ?? '', el] as const),
+  )
 
-  for (const el of visibleItems) {
-    const key = el.dataset.markstreamItemKey ?? ''
-    const record = layout.value.records.find(item => item.key === key)
+  const visibleRecordEntries: Array<{ record: TimelineRecord, el: HTMLElement }> = []
 
-    if (!record)
-      return false
+  for (const record of records) {
+    const el = itemByKey.get(record.key)
+    if (!el)
+      continue
 
+    if (!isElementVisibleInScrollRoot(el, root))
+      continue
+
+    visibleRecordEntries.push({ record, el })
+  }
+
+  if (!visibleRecordEntries.length)
+    return false
+
+  for (const { record, el } of visibleRecordEntries) {
     if (el.offsetHeight + 1 < record.size)
       return false
 

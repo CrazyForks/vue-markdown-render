@@ -86,6 +86,68 @@ function timelineItemSource(threadKey: string, itemKey: string, revision?: strin
   }
 }
 
+function installVirtualTimelineGeometryStub(defaultHeight = 80, width = 800) {
+  function readBoxHeight(el: HTMLElement) {
+    const height = Number.parseFloat(el.style.height || '')
+    if (Number.isFinite(height))
+      return height
+
+    const minHeight = Number.parseFloat(el.style.minHeight || '')
+    if (Number.isFinite(minHeight))
+      return minHeight
+
+    return el.offsetHeight || defaultHeight
+  }
+
+  function readItemOffsetTop(item: HTMLElement) {
+    let top = 0
+    let sibling = item.previousElementSibling as HTMLElement | null
+
+    while (sibling) {
+      if (
+        sibling.classList.contains('markstream-virtual-timeline__spacer')
+        || sibling.classList.contains('markstream-virtual-timeline__item')
+      ) {
+        top += readBoxHeight(sibling)
+      }
+
+      sibling = sibling.previousElementSibling as HTMLElement | null
+    }
+
+    return top
+  }
+
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    const el = this as HTMLElement
+    const root = el.matches?.('[data-testid="markstream-virtual-timeline"]')
+      ? el
+      : el.closest?.('[data-testid="markstream-virtual-timeline"]') as HTMLElement | null
+    const item = el.hasAttribute('data-markstream-item-key')
+      ? el
+      : el.closest?.('[data-markstream-item-key]') as HTMLElement | null
+    const hidden = el.closest?.('.code-editor-container.is-hidden')
+    let top = 0
+    let height = root === el ? el.clientHeight || defaultHeight : readBoxHeight(el)
+
+    if (item) {
+      top = readItemOffsetTop(item) - (root?.scrollTop || 0)
+      height = el === item ? readBoxHeight(item) : readBoxHeight(el)
+    }
+
+    return {
+      x: 0,
+      y: top,
+      top,
+      right: hidden ? 0 : width,
+      bottom: hidden ? 0 : top + height,
+      left: 0,
+      width: hidden ? 0 : width,
+      height: hidden ? 0 : height,
+      toJSON: () => ({}),
+    } as DOMRect
+  })
+}
+
 function adapterItemSource(threadKey: string, itemKey: string, revision?: string | number) {
   return {
     sourceKey: itemSourceKey(threadKey, itemKey, revision),
@@ -834,6 +896,7 @@ describe('virtual timeline API', () => {
           return measuredHeight
         return 48
       })
+      installVirtualTimelineGeometryStub()
 
       vi.stubGlobal('ResizeObserver', class {
         observe() {}
@@ -944,6 +1007,7 @@ describe('virtual timeline API', () => {
           return 1200
         return 1200
       })
+      installVirtualTimelineGeometryStub(1200)
 
       vi.stubGlobal('ResizeObserver', class {
         observe() {}
@@ -1510,6 +1574,7 @@ describe('virtual timeline API', () => {
       const el = this as HTMLElement
       return Number.parseFloat(el.style.minHeight || '') || 80
     })
+    installVirtualTimelineGeometryStub()
 
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
@@ -1585,6 +1650,7 @@ describe('virtual timeline API', () => {
         return 360
       return 24
     })
+    installVirtualTimelineGeometryStub(360)
 
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
@@ -1647,6 +1713,7 @@ describe('virtual timeline API', () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
+    installVirtualTimelineGeometryStub(360)
 
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
