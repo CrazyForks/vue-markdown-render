@@ -734,6 +734,8 @@ function scheduleScrollReconcileAfterSizeChange(anchor: MarkstreamThreadAnchor |
     updateScrollMetrics()
   }
 
+  apply()
+
   void nextTick(() => {
     apply()
 
