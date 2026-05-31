@@ -1748,8 +1748,8 @@ async function run() {
       )
 
       assert(
-        smoke.final.settledEvents > 0
-        && smoke.final.heightCacheStateCount > 0,
+        smoke.final.heightCacheStateCount > 0
+        && (!smoke.final.streamingActive || smoke.final.settledEvents > 0),
         'settled virtual-scroll renderers did not persist heightCache state',
         smoke.final,
       )

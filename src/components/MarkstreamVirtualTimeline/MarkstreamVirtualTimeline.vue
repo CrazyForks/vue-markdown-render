@@ -132,6 +132,7 @@ let pendingThreadStateRememberKey: string | undefined
 let threadRestoreStartedAt = -1
 let activeThreadRestoreSeq = 0
 let activeThreadRestoreAnchor: MarkstreamThreadAnchor | undefined
+let activeThreadRestoreScrollTop: number | null = null
 let activeThreadRestoreRequiresMarkdownMetrics = false
 let activeThreadRestoreRequiresColdMarkdownMetrics = false
 let activeThreadStateSnapshot: MarkstreamThreadVirtualState | null = null
@@ -595,6 +596,12 @@ function applyScrollOffset(
 
 function handleTimelineScroll() {
   if (!restorePaintReady.value) {
+    const root = scrollRoot.value
+    const target = activeThreadRestoreScrollTop
+
+    if (root && target != null && Math.abs((root.scrollTop || 0) - target) > 1)
+      root.scrollTop = target
+
     applyThreadRestorePass(activeThreadRestoreSeq, activeThreadRestoreAnchor)
     return
   }
@@ -1128,8 +1135,10 @@ function applyThreadRestorePass(
   if (seq !== threadRestoreSeq)
     return
 
-  if (anchor)
-    restoreOuterAnchor(anchor, { remember: false })
+  if (anchor) {
+    const restored = restoreOuterAnchor(anchor, { remember: false })
+    activeThreadRestoreScrollTop = restored ? scrollTop.value : null
+  }
 
   updateScrollMetrics({ remember: false })
 }
@@ -1137,6 +1146,12 @@ function applyThreadRestorePass(
 function isVisibleInRootRect(el: HTMLElement, rootRect: DOMRect) {
   const rect = el.getBoundingClientRect()
   return rect.bottom >= rootRect.top && rect.top <= rootRect.bottom
+}
+
+function isElementVisibleInScrollRoot(el: HTMLElement, root: HTMLElement) {
+  const rect = el.getBoundingClientRect()
+  const rootRect = root.getBoundingClientRect()
+  return rect.bottom > rootRect.top && rect.top < rootRect.bottom
 }
 
 function hasElementContent(content: HTMLElement) {
@@ -1400,10 +1415,6 @@ function isRestoreViewportReady() {
   if (!root)
     return false
 
-  const records = visibleWindow.value.records
-  if (!records.length)
-    return false
-
   const anchorOffset = resolveOuterAnchorOffset(activeThreadRestoreAnchor)
   if (
     anchorOffset != null
@@ -1412,15 +1423,17 @@ function isRestoreViewportReady() {
     return false
   }
 
-  const itemByKey = new Map(
-    Array.from(root.querySelectorAll<HTMLElement>('[data-markstream-item-key]'))
-      .map(el => [el.dataset.markstreamItemKey ?? '', el] as const),
-  )
+  const visibleItems = Array.from(root.querySelectorAll<HTMLElement>('[data-markstream-item-key]'))
+    .filter(el => isElementVisibleInScrollRoot(el, root))
 
-  for (const record of records) {
-    const el = itemByKey.get(record.key)
+  if (visibleItems.length === 0)
+    return true
 
-    if (!el)
+  for (const el of visibleItems) {
+    const key = el.dataset.markstreamItemKey ?? ''
+    const record = layout.value.records.find(item => item.key === key)
+
+    if (!record)
       return false
 
     if (el.offsetHeight + 1 < record.size)
@@ -1747,6 +1760,7 @@ function finishThreadRestore(seq: number) {
   restoringThread.value = false
   threadRestoreStartedAt = -1
   activeThreadRestoreAnchor = undefined
+  activeThreadRestoreScrollTop = null
   activeThreadRestoreSeq = 0
 
   // Restored floors are only a restore-time guard against partial mounted DOM.
@@ -1831,6 +1845,9 @@ function restoreThreadState(
   }
 
   const targetOffset = resolveOuterAnchorOffset(fallbackAnchor)
+  activeThreadRestoreScrollTop = targetOffset == null
+    ? null
+    : clampScrollOffset(targetOffset)
 
   if (targetOffset != null) {
     applyScrollOffset(targetOffset, {
@@ -1847,6 +1864,7 @@ function restoreThreadState(
   if (!shouldGateRestore) {
     restoringThread.value = false
     activeThreadRestoreAnchor = undefined
+    activeThreadRestoreScrollTop = null
     activeThreadRestoreSeq = 0
     updateScrollMetrics({ remember: false })
     markRestorePaintReady()
@@ -1868,6 +1886,7 @@ function restoreThreadState(
   if (!fallbackAnchor) {
     restoringThread.value = false
     activeThreadRestoreAnchor = undefined
+    activeThreadRestoreScrollTop = null
     activeThreadRestoreSeq = 0
     updateScrollMetrics({ remember: false })
     markRestorePaintReady()

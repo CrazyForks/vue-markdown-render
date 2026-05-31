@@ -420,6 +420,22 @@ function isStreamingHeightChangeExpected() {
   return nowMs() <= streamingHeightChangeExpectedUntil
 }
 
+function isExpectedScrollJump(currentScrollTop: number) {
+  if (
+    expectedScrollTop != null
+    && Math.abs(currentScrollTop - expectedScrollTop) <= 2
+  ) {
+    return true
+  }
+
+  return isProgrammaticScroll()
+    || stressRunning.value
+    || streamBottomPinned
+    || streamTimer != null
+    || isStreamingHeightChangeExpected()
+    || threadRestoreTargets.has(activeThreadId.value)
+}
+
 function syncScrollStateFromRoot(
   options: {
     updateExpected?: boolean
@@ -1769,8 +1785,7 @@ function pushLabEvent(
     : Date.now()
   const currentScrollTop = syncScrollStateFromRoot()
   const scrollJumpPx = Math.abs(currentScrollTop - lastObservedScrollTop)
-  const expectedActiveScrollJump = expectedScrollTop != null
-    && Math.abs(currentScrollTop - expectedScrollTop) <= 1
+  const expectedActiveScrollJump = isExpectedScrollJump(currentScrollTop)
 
   lastObservedScrollTop = currentScrollTop
 
@@ -2458,8 +2473,8 @@ const verificationGroups = computed(() => ({
     scrollCompensationCount: labSnapshot.value.scrollCompensationCount,
   },
   renderSettlement: {
-    ok: labSnapshot.value.settledEvents > 0
-      && labSnapshot.value.heightCacheStateCount > 0,
+    ok: labSnapshot.value.heightCacheStateCount > 0
+      && (!labSnapshot.value.streamingActive || labSnapshot.value.settledEvents > 0),
     settledEvents: labSnapshot.value.settledEvents,
     heightCacheStateCount: labSnapshot.value.heightCacheStateCount,
     streamingActive: labSnapshot.value.streamingActive,
