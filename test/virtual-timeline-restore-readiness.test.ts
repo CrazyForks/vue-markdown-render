@@ -418,7 +418,7 @@ describe('virtual timeline restore visual readiness', () => {
     }
   })
 
-  it('reveals restore loading after max timeout when viewport readiness never arrives', async () => {
+  it('reveals restore loading after max timeout without warning by default', async () => {
     vi.useFakeTimers()
     let wrapper: ReturnType<typeof mount> | undefined
 
@@ -471,13 +471,13 @@ describe('virtual timeline restore visual readiness', () => {
       const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
       expect(root.classList.contains('is-restoring-thread')).toBe(true)
 
-      await vi.advanceTimersByTimeAsync(8500)
+      await vi.advanceTimersByTimeAsync(3500)
       await nextTick()
       await vi.advanceTimersByTimeAsync(1000)
       await nextTick()
 
       expect(root.classList.contains('is-restoring-thread')).toBe(false)
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('restore viewport did not become ready before timeout'))
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('restore viewport did not become ready before timeout'))
     }
     finally {
       wrapper?.unmount()

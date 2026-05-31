@@ -116,10 +116,10 @@ const hostScrollManaged = ref(true)
 provide('markstreamHostScrollManaged', hostScrollManaged)
 const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
 const THREAD_RESTORE_READY_POLL_FRAMES = 40
-const THREAD_RESTORE_MIN_READY_MS = 320
-const THREAD_RESTORE_STABLE_FRAMES = 3
-const THREAD_RESTORE_READY_RETRY_DELAY_MS = 160
-const THREAD_RESTORE_MAX_LOADING_MS = 8000
+const THREAD_RESTORE_MIN_READY_MS = 96
+const THREAD_RESTORE_STABLE_FRAMES = 2
+const THREAD_RESTORE_READY_RETRY_DELAY_MS = 120
+const THREAD_RESTORE_MAX_LOADING_MS = 3000
 const THREAD_STATE_REMEMBER_DELAY_MS = 80
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
 let rootResizeObserver: ResizeObserver | null = null
@@ -1375,39 +1375,52 @@ function hasRenderableMarkdownRecordContent(record: TimelineRecord, el: HTMLElem
   ].join(',')))
 }
 
+function hasTrustedRestoredItemHeight(record: TimelineRecord) {
+  const source = itemSizeSources.get(record.key)
+  const compatibleSize = getCompatibleItemSize(record) ?? 0
+  const restoredFloor = getRestoredItemHeightFloor(record.key, source)
+
+  return compatibleSize > 0 || restoredFloor > 0
+}
+
 function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement) {
   if (!record.markdown)
     return true
 
-  const renderer = el.querySelector<HTMLElement>('.markdown-renderer')
-  if (!renderer)
-    return true
-
   if (
     !activeThreadRestoreRequiresMarkdownMetrics
-    && !(
-      activeThreadRestoreRequiresColdMarkdownMetrics
-      && markdownStates.has(record.key)
-    )
+    && !activeThreadRestoreRequiresColdMarkdownMetrics
   ) {
     return true
   }
 
+  if (hasTrustedRestoredItemHeight(record))
+    return true
+
+  const source = getMarkstreamTimelineItemContent(record.item, record.index, props)
+  if (!String(source ?? '').trim())
+    return true
+
+  const renderer = el.querySelector<HTMLElement>('.markdown-renderer')
+  if (!renderer)
+    return false
+
   const state = markdownStates.get(record.key)
   if (!isCompatibleMarkdownState(record, state))
-    return false
+    return !activeThreadRestoreRequiresColdMarkdownMetrics
 
   const metrics = state?.metrics
-  if (!metrics)
-    return false
+  const totalHeight = Number(metrics?.totalHeight ?? 0)
 
-  const nodeCount = Math.max(0, Number(metrics.nodeCount ?? 0))
-  const measuredCount = Math.max(0, Number(metrics.measuredCount ?? 0))
-  const estimatedCount = Math.max(0, Number(metrics.estimatedCount ?? 0))
-
-  return metrics.final === true
-    && estimatedCount === 0
-    && measuredCount >= nodeCount
+  return Number.isFinite(totalHeight)
+    && totalHeight > 0
+    && (
+      metrics?.stable === true
+      || metrics?.final === true
+      || metrics?.confidence === 'measured'
+      || metrics?.confidence === 'final'
+      || metrics?.confidence === 'mixed'
+    )
 }
 
 function isRestoreViewportReady() {
@@ -1585,7 +1598,12 @@ function warnRestoreViewportNotReady(seq: number) {
 
   threadRestoreReadyWarnedSeq = seq
 
-  if (typeof import.meta !== 'undefined' && import.meta.env?.DEV && typeof console !== 'undefined') {
+  if (
+    props.debug === true
+    && typeof import.meta !== 'undefined'
+    && import.meta.env?.DEV
+    && typeof console !== 'undefined'
+  ) {
     console.warn(
       '[markstream-vue] MarkstreamVirtualTimeline restore viewport did not become ready; keeping restore loading visible.',
     )
@@ -1627,7 +1645,12 @@ function watchRestoreViewportReady(seq: number) {
 
     if (!ready) {
       if (hasRestoreLoadingTimedOut()) {
-        if (typeof console !== 'undefined') {
+        if (
+          props.debug === true
+          && typeof import.meta !== 'undefined'
+          && import.meta.env?.DEV
+          && typeof console !== 'undefined'
+        ) {
           console.warn(
             '[markstream-vue] MarkstreamVirtualTimeline restore viewport did not become ready before timeout; revealing the latest restored viewport.',
           )

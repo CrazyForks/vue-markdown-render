@@ -1444,6 +1444,18 @@ async function run() {
       )
     }
 
+    function assertNoRestoreViewportWarnings(label) {
+      const warnings = consoleMessages.filter(entry =>
+        String(entry.text || '').includes('MarkstreamVirtualTimeline restore viewport did not become ready'),
+      )
+
+      assert(
+        warnings.length === 0,
+        `${label} produced restore viewport readiness warnings`,
+        { warnings },
+      )
+    }
+
     await gotoWithServer(page, `http://${host}:${port}/virtual-scroll?profile=${profile}&strict=1`, {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
@@ -1815,6 +1827,7 @@ async function run() {
       const quickReloadHealth = await runVirtualScrollQuickReloadHealthProbe(page, port, ensureServerRunning)
 
       assertNoPageErrors('virtual-timeline-zero reload e2e')
+      assertNoRestoreViewportWarnings('virtual-timeline-zero e2e')
 
       process.stdout.write(`${JSON.stringify({
         ok: true,

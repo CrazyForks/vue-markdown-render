@@ -231,7 +231,8 @@ const SMALL_RENDERER_SLOT_BUDGET = 140
 const PAGE_CHROME_DOM_BUDGET = 2200
 const MESSAGE_DOM_BUDGET = 96
 const MARKDOWN_SLOT_DOM_MULTIPLIER = 5
-const DIAGNOSTICS_WARMUP_MS = 800
+const DIAGNOSTICS_READY_STABLE_FRAMES = 3
+const DIAGNOSTICS_READY_TIMEOUT_MS = 8000
 
 function readLabProfile(): LabProfile {
   if (typeof window === 'undefined')
@@ -302,7 +303,7 @@ const diagnosticsReady = ref(false)
 const labEvents = reactive<LabEvent[]>([])
 
 let statsRaf = 0
-let diagnosticsWarmupTimer: number | null = null
+let diagnosticsWarmupSeq = 0
 let stressRaf = 0
 let streamTimer: ReturnType<typeof window.setInterval> | null = null
 let resizeObserver: ResizeObserver | null = null
@@ -637,8 +638,14 @@ function setItemHeight(key: string, height: number) {
   if (!Number.isFinite(height) || height <= 0)
     return
 
+  const next = Math.ceil(height)
+  const previous = itemHeights.get(key)?.height
+
+  if (previous == null || Math.abs(previous - next) > 1)
+    markProgrammaticScroll(240)
+
   itemHeights.set(key, {
-    height: Math.ceil(height),
+    height: next,
     measurementKey: measurementKey.value,
   })
 }
@@ -2131,10 +2138,7 @@ function resetHeights() {
 }
 
 function clearDiagnosticsWarmupTimer() {
-  if (diagnosticsWarmupTimer != null && typeof window !== 'undefined')
-    window.clearTimeout(diagnosticsWarmupTimer)
-
-  diagnosticsWarmupTimer = null
+  diagnosticsWarmupSeq += 1
 }
 
 function resetObservedHealthState() {
@@ -2159,17 +2163,64 @@ function startDiagnosticsWarmup() {
   clearDiagnosticsWarmupTimer()
   resetObservedHealthState()
 
+  const seq = ++diagnosticsWarmupSeq
+
   if (typeof window === 'undefined') {
     diagnosticsReady.value = true
     return
   }
 
-  diagnosticsWarmupTimer = window.setTimeout(() => {
-    diagnosticsWarmupTimer = null
-    resetObservedHealthState()
-    diagnosticsReady.value = true
-    scheduleStats()
-  }, DIAGNOSTICS_WARMUP_MS)
+  void waitForDiagnosticsWarmupReady(seq)
+}
+
+function isStatsReadyForDiagnostics(stats: LabStats) {
+  return labReady.value
+    && stats.blankProbeCount === 0
+    && stats.placeholderProbeCount === 0
+    && stats.emptyCardProbeCount === 0
+    && stats.visibleCoverageOk === true
+    && stats.maxCoverageGapPx <= 24
+    && stats.maxItemOverflowPx <= 2
+    && stats.maxItemHeightDriftPx < 24
+    && stats.markdownSlotCount > 0
+    && stats.messageDomCount > 0
+}
+
+async function waitForDiagnosticsWarmupReady(seq: number) {
+  const startedAt = nowMs()
+  let stableFrames = 0
+
+  for (;;) {
+    if (seq !== diagnosticsWarmupSeq)
+      return
+
+    await nextTick()
+    await waitFrame()
+
+    if (seq !== diagnosticsWarmupSeq)
+      return
+
+    const stats = collectStats({ reconcile: true })
+    applyLabStats(stats)
+
+    if (isStatsReadyForDiagnostics(stats))
+      stableFrames += 1
+    else
+      stableFrames = 0
+
+    if (
+      stableFrames >= DIAGNOSTICS_READY_STABLE_FRAMES
+      || nowMs() - startedAt >= DIAGNOSTICS_READY_TIMEOUT_MS
+    ) {
+      if (seq !== diagnosticsWarmupSeq)
+        return
+
+      resetObservedHealthState()
+      diagnosticsReady.value = true
+      applyLabStats(collectStats({ reconcile: true }))
+      return
+    }
+  }
 }
 
 function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
@@ -3405,6 +3456,7 @@ button:hover {
   grid-row: 1;
   min-height: 0;
   overflow: auto;
+  overflow-anchor: none;
   contain: strict;
   position: relative;
 }
@@ -3429,6 +3481,7 @@ button:hover {
   position: relative;
   width: 100%;
   min-height: 100%;
+  overflow-anchor: none;
 }
 
 .virtual-message {
@@ -3440,6 +3493,7 @@ button:hover {
   padding: 0.75rem 1rem;
   will-change: transform;
   overflow: hidden;
+  overflow-anchor: none;
   contain: layout paint style;
 }
 
@@ -3450,10 +3504,12 @@ button:hover {
   background: var(--lab-panel);
   padding: 0.85rem;
   overflow: hidden;
+  overflow-anchor: none;
 }
 
 .markdown-host {
   min-width: 0;
+  overflow-anchor: none;
 }
 
 .virtual-message.user .message-card {

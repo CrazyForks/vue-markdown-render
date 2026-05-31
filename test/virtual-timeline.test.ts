@@ -924,6 +924,104 @@ describe('virtual timeline API', () => {
     }
   })
 
+  it('reveals restored viewport with restored item height even when markdown metrics are mixed', async () => {
+    vi.useFakeTimers()
+
+    let wrapper: any
+
+    try {
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+        const el = this as HTMLElement
+        if (el.classList.contains('markstream-virtual-timeline__item'))
+          return 1200
+        return 1200
+      })
+      vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function () {
+        const el = this as HTMLElement
+        if (el.classList.contains('markstream-virtual-timeline__item'))
+          return 1200
+        return 1200
+      })
+
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      })
+
+      const items = [
+        { kind: 'assistant-markdown', id: 'm1', content: '# Large', final: true, revision: 1 },
+      ]
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items,
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: {
+              type: 'item',
+              itemKey: 'm1',
+              offsetWithinItemPx: 120,
+            },
+            itemHeights: {
+              m1: 1200,
+            },
+            itemSizeSources: {
+              m1: timelineItemSource('thread-a', 'm1', 1),
+            },
+            markdownStates: {
+              m1: {
+                sessionKey: 'thread-a:m1:1',
+                threadKey: 'thread-a',
+                measurementKey: ':800',
+                width: 800,
+                metrics: {
+                  ...createMetrics(1000, 'thread-a:m1:1'),
+                  final: false,
+                  stable: false,
+                  confidence: 'mixed',
+                  nodeCount: 100,
+                  measuredCount: 8,
+                  estimatedCount: 92,
+                },
+              } as MarkstreamVirtualState,
+            },
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, [
+              h('div', { class: 'markdown-renderer' }, props.markdownProps?.content ?? ''),
+            ])
+          },
+          'restore-loading': () => h('div', { 'data-testid': 'restore-loading' }, 'Restoring'),
+        },
+      })
+
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(500)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+      expect(wrapper.find('[data-testid="restore-loading"]').exists()).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('does not shrink markdown item height from unstable intermediate metrics', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
