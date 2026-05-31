@@ -452,7 +452,10 @@ function getScrollContentStart() {
 
 function getScrollContentHeight() {
   const padding = readRootPaddingBlock()
-  return layout.value.totalHeight + padding.top + padding.bottom
+  return Math.max(
+    layout.value.totalHeight + padding.top + padding.bottom,
+    scrollRoot.value?.scrollHeight ?? 0,
+  )
 }
 
 function getLayoutViewportStart() {
