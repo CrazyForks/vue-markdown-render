@@ -829,6 +829,121 @@ async function runVirtualScrollQuickReloadHealthProbe(page, port, ensureServerRu
   }
 }
 
+async function runVirtualScrollToolbarInteractionProbe(page, port, ensureServerRunning) {
+  await gotoWithServer(page, `http://${host}:${port}/virtual-scroll?profile=smoke&strict=1`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  }, ensureServerRunning)
+  await waitForLabReady(page)
+
+  await page.getByRole('button', { name: 'Bottom' }).click()
+  await page.getByRole('button', { name: 'Stream last huge message' }).click()
+
+  const streamResult = await evaluateWithLab(page, async (api) => {
+    let latest = api.read()
+    let stableFrames = 0
+    const samples = []
+
+    for (let i = 0; i < 420; i++) {
+      await api.nextFrame()
+      latest = api.read()
+      samples.push(latest)
+
+      if (
+        !latest.streamingActive
+        && latest.labStatus === 'ok'
+        && latest.health.layoutIntegrityOk
+      ) {
+        stableFrames += 1
+      }
+      else {
+        stableFrames = 0
+      }
+
+      if (stableFrames >= 6)
+        break
+    }
+
+    return {
+      final: latest,
+      badSample: samples.find(sample =>
+        sample.health.maxObservedScrollJumpPx > 32
+        || sample.health.maxObservedHeightDriftPx >= 24
+        || String(sample.labStatus).includes('scroll jitter=')
+        || String(sample.labStatus).includes('observed height drift='),
+      ) ?? null,
+    }
+  })
+
+  assert(
+    !streamResult.badSample
+    && streamResult.final.labStatus === 'ok'
+    && streamResult.final.health.layoutIntegrityOk,
+    'virtual-scroll toolbar streaming produced scroll jitter or persistent height drift',
+    streamResult,
+  )
+
+  await page.getByRole('button', { name: 'Stress scroll' }).click()
+
+  const stressResult = await evaluateWithLab(page, async (api) => {
+    let latest = api.read()
+    const samples = []
+
+    for (let i = 0; i < 180; i++) {
+      await api.nextFrame()
+      latest = api.read()
+      samples.push(latest)
+    }
+
+    return {
+      during: latest,
+      badSample: samples.find(sample =>
+        sample.health.maxObservedScrollJumpPx > 32
+        || sample.health.maxObservedHeightDriftPx >= 24
+        || String(sample.labStatus).includes('scroll jitter=')
+        || String(sample.labStatus).includes('observed height drift='),
+      ) ?? null,
+    }
+  })
+
+  await page.getByRole('button', { name: 'Stop stress' }).click()
+
+  const final = await evaluateWithLab(page, async (api) => {
+    let latest = api.read()
+
+    for (let i = 0; i < 90; i++) {
+      await api.nextFrame()
+      latest = api.read()
+
+      if (latest.labStatus === 'ok' && latest.health.layoutIntegrityOk)
+        break
+    }
+
+    return latest
+  })
+
+  assert(
+    !stressResult.badSample
+    && final.labStatus === 'ok'
+    && final.health.layoutIntegrityOk,
+    'virtual-scroll toolbar fast scroll produced scroll jitter or persistent height drift',
+    { stressResult, final },
+  )
+
+  return {
+    streamStatus: streamResult.final.labStatus,
+    stressStatus: final.labStatus,
+    maxObservedScrollJumpPx: Math.max(
+      streamResult.final.health.maxObservedScrollJumpPx,
+      final.health.maxObservedScrollJumpPx,
+    ),
+    maxObservedHeightDriftPx: Math.max(
+      streamResult.final.health.maxObservedHeightDriftPx,
+      final.health.maxObservedHeightDriftPx,
+    ),
+  }
+}
+
 async function runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerRunning) {
   await gotoWithServer(page, `http://${host}:${port}/virtual-scroller-markstream`, {
     waitUntil: 'domcontentloaded',
@@ -1825,6 +1940,8 @@ async function run() {
       const virtualScrollerMarkstreamReload = await runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerRunning)
       await ensureServerRunning()
       const quickReloadHealth = await runVirtualScrollQuickReloadHealthProbe(page, port, ensureServerRunning)
+      await ensureServerRunning()
+      const toolbarInteraction = await runVirtualScrollToolbarInteractionProbe(page, port, ensureServerRunning)
 
       assertNoPageErrors('virtual-timeline-zero reload e2e')
       assertNoRestoreViewportWarnings('virtual-timeline-zero e2e')
@@ -1840,6 +1957,7 @@ async function run() {
         virtualTimelineDiffCodeBlockState,
         virtualTimelineStreaming,
         virtualScrollerMarkstreamReload,
+        toolbarInteraction,
       }, null, 2)}\n`)
 
       return
