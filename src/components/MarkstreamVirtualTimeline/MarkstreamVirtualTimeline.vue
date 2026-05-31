@@ -10,7 +10,7 @@ import type {
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualState,
 } from '../../types/node-renderer-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, provide, reactive, ref, watch } from 'vue'
 import {
   estimateMarkstreamTimelineItemHeight,
   getMarkstreamTimelineItemContent,
@@ -115,6 +115,7 @@ const restorePaintReady = ref(true)
 const hostScrollManaged = ref(true)
 provide('markstreamHostScrollManaged', hostScrollManaged)
 const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
+const THREAD_RESTORE_READY_POLL_FRAMES = 40
 const THREAD_RESTORE_MIN_READY_MS = 320
 const THREAD_RESTORE_STABLE_FRAMES = 3
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
@@ -125,6 +126,8 @@ let threadRestoreTimers: number[] = []
 let activeThreadRestoreSeq = 0
 let activeThreadRestoreAnchor: MarkstreamThreadAnchor | undefined
 let activeThreadStateSnapshot: MarkstreamThreadVirtualState | null = null
+let threadRestoreReadyWaitSeq = 0
+let threadRestoreReadyWarnedSeq = 0
 
 const normalizedThreadKey = computed(() => props.threadKey == null ? undefined : String(props.threadKey))
 let activeThreadKeySnapshot = normalizedThreadKey.value
@@ -1282,7 +1285,7 @@ async function waitRestoreViewportReady(seq: number) {
   let stableFrames = 0
   let previousSignature = ''
 
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < THREAD_RESTORE_READY_POLL_FRAMES; i++) {
     await nextTick()
     await new Promise<void>((resolve) => {
       if (typeof requestAnimationFrame === 'function') {
@@ -1321,8 +1324,45 @@ async function waitRestoreViewportReady(seq: number) {
   return false
 }
 
+function warnRestoreViewportNotReady(seq: number) {
+  if (threadRestoreReadyWarnedSeq === seq)
+    return
+
+  threadRestoreReadyWarnedSeq = seq
+
+  if (typeof import.meta !== 'undefined' && import.meta.env?.DEV && typeof console !== 'undefined') {
+    console.warn(
+      '[markstream-vue] MarkstreamVirtualTimeline restore viewport did not become ready; keeping restore loading visible.',
+    )
+  }
+}
+
+function watchRestoreViewportReady(seq: number) {
+  if (!isActiveThreadRestore(seq) || threadRestoreReadyWaitSeq === seq)
+    return
+
+  threadRestoreReadyWaitSeq = seq
+
+  void waitRestoreViewportReady(seq).then((ready) => {
+    if (threadRestoreReadyWaitSeq === seq)
+      threadRestoreReadyWaitSeq = 0
+
+    if (!isActiveThreadRestore(seq))
+      return
+
+    if (!ready) {
+      warnRestoreViewportNotReady(seq)
+      return
+    }
+
+    finishThreadRestore(seq)
+  })
+}
+
 function markRestorePaintReady() {
   restorePaintReady.value = true
+  threadRestoreReadyWaitSeq = 0
+  threadRestoreReadyWarnedSeq = 0
 }
 
 function canImportThreadItemHeights(state: MarkstreamThreadVirtualState | null | undefined) {
@@ -1426,6 +1466,8 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
       : undefined)
 
   clearThreadRestoreSchedule()
+  threadRestoreReadyWaitSeq = 0
+  threadRestoreReadyWarnedSeq = 0
 
   restorePaintReady.value = !hasRealRestoreState
   restoringThread.value = hasRealRestoreState && Boolean(fallbackAnchor)
@@ -1514,12 +1556,9 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
     applyThreadRestorePass(restoreSeq, fallbackAnchor)
 
     if (typeof window !== 'undefined') {
-      THREAD_RESTORE_SETTLE_DELAYS.forEach((delay, index) => {
+      THREAD_RESTORE_SETTLE_DELAYS.forEach((delay) => {
         const timer = window.setTimeout(() => {
           applyThreadRestorePass(restoreSeq, fallbackAnchor)
-
-          if (index === THREAD_RESTORE_SETTLE_DELAYS.length - 1)
-            finishThreadRestore(restoreSeq)
         }, delay)
 
         threadRestoreTimers.push(timer)
@@ -1530,12 +1569,7 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
       return
     }
 
-    void waitRestoreViewportReady(restoreSeq).then((ready) => {
-      if (!isActiveThreadRestore(restoreSeq) || !ready)
-        return
-
-      finishThreadRestore(restoreSeq)
-    })
+    watchRestoreViewportReady(restoreSeq)
   })
 }
 
@@ -1650,6 +1684,13 @@ onMounted(() => {
     })
     rootResizeObserver.observe(scrollRoot.value)
   }
+})
+
+onUpdated(() => {
+  if (restorePaintReady.value)
+    return
+
+  watchRestoreViewportReady(activeThreadRestoreSeq)
 })
 
 onBeforeUnmount(() => {

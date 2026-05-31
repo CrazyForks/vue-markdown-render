@@ -718,6 +718,8 @@ describe('virtual timeline API', () => {
       let measuredHeight = 120
       vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
         const el = this as HTMLElement
+        if (el.classList.contains('markstream-virtual-timeline__item'))
+          return Number.parseFloat(el.style.minHeight || '') || 48
         if (el.dataset.kind === 'assistant-markdown')
           return measuredHeight
         return 48
@@ -1152,6 +1154,10 @@ describe('virtual timeline API', () => {
   it('shows a non-layout restore loading overlay while restored thread state is settling', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      return Number.parseFloat(el.style.minHeight || '') || 80
+    })
 
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
@@ -1446,7 +1452,8 @@ describe('virtual timeline API', () => {
       await vi.advanceTimersByTimeAsync(700)
       await nextTick()
 
-      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+      // Without a ready fallback or visible Monaco surface, restore loading stays visible.
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
     }
     finally {
       wrapper?.unmount()
@@ -1553,8 +1560,8 @@ describe('virtual timeline API', () => {
       await vi.advanceTimersByTimeAsync(700)
       await nextTick()
 
-      // The fixed fallback window can still reveal eventually.
-      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+      // Without a ready fallback or visible Monaco surface, restore loading stays visible.
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
     }
     finally {
       wrapper?.unmount()
@@ -1651,8 +1658,8 @@ describe('virtual timeline API', () => {
       await vi.advanceTimersByTimeAsync(700)
       await nextTick()
 
-      // The fixed fallback window can still reveal eventually.
-      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+      // Without a ready fallback or visible Monaco surface, restore loading stays visible.
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
     }
     finally {
       wrapper?.unmount()

@@ -32,6 +32,8 @@ const reservedHeightStyle = computed(() => {
   return {
     height,
     minHeight: height,
+    maxHeight: height,
+    overflow: 'auto',
   }
 })
 

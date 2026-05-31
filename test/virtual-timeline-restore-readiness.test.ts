@@ -32,6 +32,37 @@ async function waitForTimelineRestoreSettled(
   expect(root.classList.contains('is-restoring-thread')).toBe(false)
 }
 
+function installRestoreGeometryStub(height = 360, width = 800) {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    const el = this as HTMLElement
+    const root = el.closest?.('[data-testid="markstream-virtual-timeline"]') as HTMLElement | null
+    const hidden = el.closest?.('.code-editor-container.is-hidden')
+    const isMeasureRoot = el.hasAttribute('data-test-top')
+    const ownTop = el.hasAttribute('data-test-top')
+      ? Number(el.dataset.testTop ?? '0')
+      : Number(el.querySelector<HTMLElement>('[data-test-top]')?.dataset.testTop ?? '0')
+    const ownHeight = el.hasAttribute('data-test-height')
+      ? Number(el.dataset.testHeight ?? String(height))
+      : Number(el.querySelector<HTMLElement>('[data-test-height]')?.dataset.testHeight ?? String(height))
+    const top = (isMeasureRoot || el.hasAttribute('data-markstream-item-key'))
+      ? ownTop - (root?.scrollTop || 0)
+      : 0
+    const rectHeight = (isMeasureRoot || el.hasAttribute('data-markstream-item-key')) ? ownHeight : height
+
+    return {
+      x: 0,
+      y: top,
+      top,
+      right: hidden ? 0 : width,
+      bottom: hidden ? 0 : top + rectHeight,
+      left: 0,
+      width: hidden ? 0 : width,
+      height: hidden ? 0 : rectHeight,
+      toJSON: () => ({}),
+    } as DOMRect
+  })
+}
+
 function timelineItemSource(threadKey: string, itemKey: string, revision?: string | number, widthBucket = 800) {
   return {
     sourceKey: [threadKey, itemKey, revision == null ? '' : String(revision)].join(':'),
@@ -72,17 +103,7 @@ describe('virtual timeline restore visual readiness', () => {
 
     try {
       stubTimelineDom()
-      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-        x: 0,
-        y: 0,
-        top: 0,
-        right: 800,
-        bottom: 360,
-        left: 0,
-        width: 800,
-        height: 360,
-        toJSON: () => ({}),
-      } as DOMRect)
+      installRestoreGeometryStub()
 
       wrapper = mount(MarkstreamVirtualTimeline, {
         attachTo: document.body,
@@ -180,6 +201,83 @@ describe('virtual timeline restore visual readiness', () => {
     wrapper.unmount()
   })
 
+  it('does not reveal restored viewport at settle timer while visible code block is still async-loading', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      stubTimelineDom()
+      installRestoreGeometryStub()
+
+      let codeReady = false
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: 'code', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
+            itemHeights: { m1: 360 },
+            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, [
+              h('div', { 'class': 'node-slot', 'data-node-index': '0', 'data-node-type': 'code_block' }, [
+                h('div', { class: 'node-content' }, [
+                  codeReady
+                    ? h('div', {
+                        'data-markstream-code-block': '1',
+                        'data-markstream-enhanced': 'true',
+                        class: 'code-block-container',
+                      }, 'ready code block')
+                    : h('pre', {
+                        'class': 'code-pre-fallback',
+                        'data-markstream-code-loading': '1',
+                        'style': 'height: 240px; min-height: 240px;',
+                      }, 'loading code block'),
+                ]),
+              ]),
+            ])
+          },
+        },
+      })
+
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      // This crosses the old 640ms forced reveal window.
+      await vi.advanceTimersByTimeAsync(800)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      codeReady = true
+      await wrapper.setProps({ items: [...wrapper.props('items')] })
+      await nextTick()
+
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('reserves async code block loading fallback height from block estimates', async () => {
     const { CodeBlockNodeLoading } = await import('../src/components/NodeRenderer/asyncComponent')
 
@@ -201,6 +299,8 @@ describe('virtual timeline restore visual readiness', () => {
     expect(pre.attributes('data-markstream-code-loading')).toBe('1')
     expect(pre.attributes('style')).toContain('height: 240px')
     expect(pre.attributes('style')).toContain('min-height: 240px')
+    expect(pre.attributes('style')).toContain('max-height: 240px')
+    expect(pre.attributes('style')).toContain('overflow: auto')
 
     wrapper.unmount()
   })
@@ -208,7 +308,14 @@ describe('virtual timeline restore visual readiness', () => {
   it('uses reduced overscan during restore and restores configured overscan after reveal', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(100)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
-    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(40)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      if (el.classList.contains('markstream-virtual-timeline__item'))
+        return Number.parseFloat(el.style.minHeight || '0') || 40
+
+      return 40
+    })
+    installRestoreGeometryStub(100)
     vi.stubGlobal('ResizeObserver', class {
       observe() {}
       unobserve() {}
@@ -241,7 +348,11 @@ describe('virtual timeline restore visual readiness', () => {
       },
       slots: {
         default(props: any) {
-          return h('div', { ref: props.measureRef }, props.item.text)
+          return h('div', {
+            'ref': props.measureRef,
+            'data-test-top': props.index * 40,
+            'data-test-height': 40,
+          }, props.item.text)
         },
       },
     })
