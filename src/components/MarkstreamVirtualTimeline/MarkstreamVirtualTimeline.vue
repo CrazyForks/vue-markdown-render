@@ -33,6 +33,7 @@ const props = withDefaults(defineProps<MarkstreamVirtualTimelineProps<any>>(), {
   overscanPx: 1200,
   stickToBottom: 'auto',
   markdownFade: false,
+  restoreMaxLoadingMs: false,
 })
 
 const emit = defineEmits<{
@@ -120,7 +121,6 @@ const THREAD_RESTORE_MIN_READY_MS = 96
 const THREAD_RESTORE_STABLE_FRAMES = 2
 const THREAD_RESTORE_COLD_STABLE_FRAMES = 8
 const THREAD_RESTORE_READY_RETRY_DELAY_MS = 120
-const THREAD_RESTORE_MAX_LOADING_MS = 3000
 const THREAD_STATE_REMEMBER_DELAY_MS = 80
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
 let rootResizeObserver: ResizeObserver | null = null
@@ -1585,9 +1585,23 @@ function getNowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now()
 }
 
+function getRestoreMaxLoadingMs() {
+  if (props.restoreMaxLoadingMs === false)
+    return Number.POSITIVE_INFINITY
+
+  const value = Number(props.restoreMaxLoadingMs)
+  return Number.isFinite(value) && value > 0
+    ? value
+    : Number.POSITIVE_INFINITY
+}
+
 function hasRestoreLoadingTimedOut() {
-  return threadRestoreStartedAt >= 0
-    && getNowMs() - threadRestoreStartedAt >= THREAD_RESTORE_MAX_LOADING_MS
+  if (threadRestoreStartedAt < 0)
+    return false
+
+  const maxLoadingMs = getRestoreMaxLoadingMs()
+  return Number.isFinite(maxLoadingMs)
+    && getNowMs() - threadRestoreStartedAt >= maxLoadingMs
 }
 
 function getRequiredRestoreStableFrames() {

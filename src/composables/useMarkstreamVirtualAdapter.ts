@@ -67,6 +67,11 @@ export interface MarkstreamVirtualTimelineProps<T = MarkstreamTimelineItem> {
    */
   markdownFade?: boolean
 
+  /**
+   * Default: false. Keep restore loading visible until the viewport is ready.
+   */
+  restoreMaxLoadingMs?: number | false
+
   debug?: boolean
 }
 
