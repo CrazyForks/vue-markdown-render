@@ -1,11 +1,70 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
-import VirtualScrollPage from '../playground/src/pages/virtual-scroll.vue'
 import { flushAll } from './setup/flush-all'
 
+vi.mock('../src/exports', async () => {
+  const { defineComponent, h, onMounted } = await import('vue')
+
+  return {
+    default: defineComponent({
+      props: {
+        content: { type: String, default: '' },
+        virtualScroll: { type: Object, default: null },
+      },
+      emits: ['height-change', 'virtual-state-change', 'render-settled'],
+      setup(props, { emit, expose }) {
+        const readSessionKey = () => String((props.virtualScroll as any)?.sessionKey ?? '')
+        const metrics = (reason = 'manual') => ({
+          reason,
+          sessionKey: readSessionKey(),
+          phase: 'final',
+          stable: true,
+          totalHeight: 240,
+        })
+        const captureVirtualState = () => ({
+          sessionKey: readSessionKey(),
+          width: 960,
+          metrics: metrics('manual'),
+          heightCache: [{ key: '0', top: 0, height: 240 }],
+        })
+
+        expose({
+          forceMeasure: async () => metrics('manual'),
+          captureVirtualState,
+          settle: async () => {
+            emit('render-settled', metrics('manual'))
+            return metrics('manual')
+          },
+        })
+
+        onMounted(() => {
+          const nextMetrics = metrics('mount')
+          emit('height-change', nextMetrics)
+          emit('virtual-state-change', captureVirtualState())
+          emit('render-settled', nextMetrics)
+        })
+
+        return () => h('div', { class: 'markstream-vue markdown-renderer' }, [
+          h('div', { class: 'node-slot' }, [
+            h('div', { class: 'node-content' }, props.content.slice(0, 80) || 'content'),
+          ]),
+        ])
+      },
+    }),
+  }
+})
+
 describe('playground /virtual-scroll shell smoke', () => {
+  let VirtualScrollPage: typeof import('../playground/src/pages/virtual-scroll.vue').default
   let originalElementFromPoint: typeof document.elementFromPoint | undefined
+  let originalLocationHref = ''
+
+  beforeAll(async () => {
+    originalLocationHref = window.location.href
+    window.history.replaceState(null, '', '/virtual-scroll?profile=smoke')
+    VirtualScrollPage = (await import('../playground/src/pages/virtual-scroll.vue')).default
+  })
 
   beforeEach(() => {
     originalElementFromPoint = document.elementFromPoint
@@ -44,6 +103,10 @@ describe('playground /virtual-scroll shell smoke', () => {
     else {
       delete (document as any).elementFromPoint
     }
+  })
+
+  afterAll(() => {
+    window.history.replaceState(null, '', originalLocationHref)
   })
 
   it('renders lab shell', async () => {
