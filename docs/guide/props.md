@@ -53,7 +53,7 @@ When passing standalone `heightCache`, also pass `heightCacheWidth`; otherwise t
 
 `final` means the source stream has completed. It does not guarantee that the layout has settled. Code blocks, diagrams, images, fonts, and custom components may still change height. `render-final` means this render session has passed the selected settle policy. For virtualized or offscreen nodes, `metrics.confidence` may still be `mixed`. Persist the height cache as authoritative only when `metrics.confidence` is `measured` or `final`, or when you persist the returned per-node `heightCache` together with `width`, `measurementKey`, and `contentHash`.
 
-### `MarkstreamVirtualTimeline` slots
+### `MarkstreamVirtualTimeline` restore UI
 
 #### `restore-loading`
 
