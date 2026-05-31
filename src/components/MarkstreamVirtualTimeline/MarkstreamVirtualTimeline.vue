@@ -660,9 +660,19 @@ function resolveSizeChangeRestoreAnchor(
   if (props.stickToBottom === 'auto' && bottomPinned.value) {
     return {
       type: 'bottom',
-      distanceFromBottomPx: bottomDistanceBeforeChange <= 2
+      // Important:
+      // During streaming, multiple item-size changes can happen before the
+      // previous nextTick/RAF scroll reconciliation has applied. In that window
+      // layout.totalHeight has already grown but scrollTop has not caught up yet,
+      // so bottomDistanceBeforeChange can be large even though the user was
+      // exactly pinned to bottom before the batch started.
+      //
+      // Preserve exact bottom pinning from the last committed scroll metrics.
+      // Only preserve a non-zero bottom distance when the user was intentionally
+      // near-bottom, but not exactly pinned.
+      distanceFromBottomPx: exactBottomPinned.value
         ? 0
-        : bottomDistanceBeforeChange,
+        : Math.max(0, bottomDistanceBeforeChange),
     }
   }
 

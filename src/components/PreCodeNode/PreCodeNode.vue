@@ -30,6 +30,7 @@ const reservedHeightStyle = computed(() => {
   const height = `${Math.ceil(value)}px`
 
   return {
+    height,
     minHeight: height,
   }
 })

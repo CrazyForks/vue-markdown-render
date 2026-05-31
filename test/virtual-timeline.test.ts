@@ -928,6 +928,61 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('keeps exact bottom pinning across consecutive markdown height growth before reconcile', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const items = [
+      { kind: 'assistant-markdown', id: 'm1', content: '# Streaming', final: false, revision: 1 },
+    ]
+
+    let markdownProps: any
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+        stickToBottom: 'auto',
+        overscan: 10,
+      },
+      slots: {
+        default(props: any) {
+          if (props.kind === 'assistant-markdown')
+            markdownProps = props.markdownProps
+
+          return h('div', { ref: props.measureRef }, props.markdownProps?.content ?? '')
+        },
+      },
+    })
+
+    await nextTick()
+    await flushAnimationFrame()
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    const sessionKey = markdownProps.virtualScroll.sessionKey
+
+    // Simulate multiple streaming height reports before the previous
+    // nextTick/RAF scroll reconcile has had a chance to apply.
+    markdownProps.onHeightChange(createMetrics(600, sessionKey))
+    markdownProps.onHeightChange(createMetrics(1000, sessionKey))
+
+    await nextTick()
+    await flushAnimationFrame()
+    await nextTick()
+
+    expect((wrapper.vm as any).getTotalHeight()).toBe(1000)
+    expect(root.scrollTop).toBe(700)
+
+    wrapper.unmount()
+  })
+
   it('does not hide the first mount when there is no restored thread state', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)

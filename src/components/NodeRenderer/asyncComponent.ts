@@ -36,7 +36,7 @@ export const CodeBlockNodeLoading = defineComponent({
       ...attrs,
       'node': props.node,
       'showLineNumbers': true,
-      'reservedHeightPx': props.estimatedContentHeightPx ?? props.estimatedHeightPx,
+      'reservedHeightPx': props.estimatedHeightPx ?? props.estimatedContentHeightPx,
       'class': ['code-pre-fallback', attrs.class],
       'data-markstream-code-loading': '1',
     })
