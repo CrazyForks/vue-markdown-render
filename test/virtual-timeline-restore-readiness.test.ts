@@ -227,6 +227,73 @@ describe('virtual timeline restore visual readiness', () => {
     }
   })
 
+  it('reveals restore loading after max timeout when viewport readiness never arrives', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      stubTimelineDom()
+      installRestoreGeometryStub()
+      vi.spyOn(performance, 'now').mockImplementation(() => Date.now())
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: 'code', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
+            itemHeights: { m1: 360 },
+            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, [
+              h('div', { 'class': 'node-slot', 'data-node-index': '0', 'data-node-type': 'code_block' }, [
+                h('div', { class: 'node-content' }, [
+                  h('div', {
+                    'data-markstream-code-block': '1',
+                    'data-markstream-enhanced': 'false',
+                  }, [
+                    h('div', { class: 'code-editor-container is-hidden' }, [
+                      h('div', { class: 'monaco-editor' }),
+                    ]),
+                  ]),
+                ]),
+              ]),
+            ])
+          },
+        },
+      })
+
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(8500)
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(1000)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('restore viewport did not become ready before timeout'))
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('treats settled math fallback content as restore-ready', async () => {
     stubTimelineDom()
 

@@ -1,6 +1,7 @@
 import type { MathOptions } from 'stream-markdown-parser'
 import type { App, Component, DefineComponent, Plugin } from 'vue'
 import type { InfographicLoader } from './components/InfographicBlockNode/infographic'
+import type { MarkstreamVirtualTimelineProps } from './composables/useMarkstreamVirtualAdapter'
 import type { CustomComponents as MarkstreamCustomComponents } from './types'
 import type {
   CodeBlockNodeProps,
@@ -37,7 +38,6 @@ import LinkNode from './components/LinkNode'
 import ListItemNode from './components/ListItemNode'
 import ListNode from './components/ListNode'
 import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
-import MarkstreamVirtualTimeline from './components/MarkstreamVirtualTimeline'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
 import MarkdownRender from './components/NodeRenderer'
@@ -76,6 +76,9 @@ const MathInlineNode = definePublicAsyncComponent<MathInlineNodeProps>(() => imp
 const MermaidBlockNode = definePublicAsyncComponent<MermaidBlockNodeProps>(() => import('./components/MermaidBlockNode'))
 const InfographicBlockNode = definePublicAsyncComponent<InfographicBlockNodeProps>(() => import('./components/InfographicBlockNode'))
 const D2BlockNode = definePublicAsyncComponent<D2BlockNodeProps>(() => import('./components/D2BlockNode'))
+const MarkstreamVirtualTimeline = definePublicAsyncComponent<MarkstreamVirtualTimelineProps<any>>(
+  () => import('./components/MarkstreamVirtualTimeline'),
+)
 
 export type { D2Loader } from './components/D2BlockNode/d2'
 export type { InfographicLoader } from './components/InfographicBlockNode/infographic'

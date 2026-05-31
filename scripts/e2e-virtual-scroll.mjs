@@ -426,7 +426,15 @@ function summarizeVirtualTimelineZeroSample(sample) {
 async function waitForVirtualTimelineZeroReady(page, timeoutMs = 60000) {
   await page.waitForFunction(() => {
     const api = window.__markstreamVirtualTimelineZero
-    return Boolean(api && typeof api.read === 'function' && typeof api.nextFrame === 'function')
+    const snapshot = api?.read?.()
+    return Boolean(
+      api
+      && typeof api.read === 'function'
+      && typeof api.nextFrame === 'function'
+      && document.querySelector('[data-testid="markstream-virtual-timeline"]')
+      && snapshot?.state
+      && snapshot.clientHeight > 0,
+    )
   }, { timeout: timeoutMs })
 }
 

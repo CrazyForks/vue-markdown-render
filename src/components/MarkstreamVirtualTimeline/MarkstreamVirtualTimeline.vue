@@ -119,12 +119,14 @@ const THREAD_RESTORE_READY_POLL_FRAMES = 40
 const THREAD_RESTORE_MIN_READY_MS = 320
 const THREAD_RESTORE_STABLE_FRAMES = 3
 const THREAD_RESTORE_READY_RETRY_DELAY_MS = 160
+const THREAD_RESTORE_MAX_LOADING_MS = 8000
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
 let rootResizeObserver: ResizeObserver | null = null
 let threadRestoreSeq = 0
 let threadRestoreRaf: number | null = null
 let threadRestoreTimers: number[] = []
 let threadRestoreReadyRetryTimer: number | null = null
+let threadRestoreStartedAt = -1
 let activeThreadRestoreSeq = 0
 let activeThreadRestoreAnchor: MarkstreamThreadAnchor | undefined
 let activeThreadStateSnapshot: MarkstreamThreadVirtualState | null = null
@@ -1287,8 +1289,17 @@ function readRestoreViewportSignature() {
   ].join('\n')
 }
 
+function getNowMs() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now()
+}
+
+function hasRestoreLoadingTimedOut() {
+  return threadRestoreStartedAt >= 0
+    && getNowMs() - threadRestoreStartedAt >= THREAD_RESTORE_MAX_LOADING_MS
+}
+
 async function waitRestoreViewportReady(seq: number) {
-  const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
+  const startedAt = getNowMs()
   let stableFrames = 0
   let previousSignature = ''
 
@@ -1308,7 +1319,7 @@ async function waitRestoreViewportReady(seq: number) {
 
     applyThreadRestorePass(seq, activeThreadRestoreAnchor)
 
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    const now = getNowMs()
     const ready = isRestoreViewportReady()
     const signature = ready ? readRestoreViewportSignature() : ''
 
@@ -1378,6 +1389,17 @@ function watchRestoreViewportReady(seq: number) {
       return
 
     if (!ready) {
+      if (hasRestoreLoadingTimedOut()) {
+        if (typeof console !== 'undefined') {
+          console.warn(
+            '[markstream-vue] MarkstreamVirtualTimeline restore viewport did not become ready before timeout; revealing the latest restored viewport.',
+          )
+        }
+
+        finishThreadRestore(seq)
+        return
+      }
+
       warnRestoreViewportNotReady(seq)
       scheduleRestoreViewportReadyRetry(seq)
       return
@@ -1389,6 +1411,7 @@ function watchRestoreViewportReady(seq: number) {
 
 function markRestorePaintReady() {
   restorePaintReady.value = true
+  threadRestoreStartedAt = -1
   threadRestoreReadyWaitSeq = 0
   threadRestoreReadyWarnedSeq = 0
 
@@ -1473,6 +1496,7 @@ function finishThreadRestore(seq: number) {
   clearThreadRestoreSchedule()
   applyThreadRestorePass(seq, activeThreadRestoreAnchor)
   restoringThread.value = false
+  threadRestoreStartedAt = -1
   activeThreadRestoreAnchor = undefined
   activeThreadRestoreSeq = 0
 
@@ -1506,6 +1530,9 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
   restoringThread.value = hasRealRestoreState && Boolean(fallbackAnchor)
   activeThreadRestoreSeq = restoreSeq
   activeThreadRestoreAnchor = fallbackAnchor
+  threadRestoreStartedAt = restoringThread.value
+    ? getNowMs()
+    : -1
 
   cleanupMeasuredElements()
 

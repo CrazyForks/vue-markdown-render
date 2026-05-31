@@ -32,6 +32,8 @@ describe('playground /virtual-timeline-zero shell smoke', () => {
     })
 
     await flushAll()
+    await vi.dynamicImportSettled()
+    await flushAll()
     await nextTick()
 
     expect(wrapper.text()).toContain('markstream-vue virtual timeline zero config')

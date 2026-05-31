@@ -743,7 +743,7 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-.timeline-surface {
+:global(.virtual-timeline-zero .timeline-surface.markstream-virtual-timeline) {
   height: calc(100vh - 104px);
   max-width: 1040px;
   margin: 0 auto;
@@ -869,7 +869,7 @@ onBeforeUnmount(() => {
     align-self: flex-start;
   }
 
-  .timeline-surface {
+  :global(.virtual-timeline-zero .timeline-surface.markstream-virtual-timeline) {
     height: calc(100vh - 142px);
     padding: 8px 10px;
   }
