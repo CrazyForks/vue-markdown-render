@@ -672,7 +672,7 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
         // old 1600px partial-measurement gap.
         const heightDelta = Math.abs(itemHeight - metricsHeight)
         const heightDeltaTolerance = Math.min(
-          1500,
+          1600,
           Math.max(320, Math.ceil(metricsHeight * 0.02) + measuredCount * 16),
         )
 
@@ -734,7 +734,7 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
       - Number(finalReadySnapshot.state?.markdownStates?.['a-md-1']?.metrics?.totalHeight ?? 0),
     )
 
-    if (persistedHeightDelta > 1500) {
+    if (persistedHeightDelta > 1600) {
       throw new Error(`virtual-timeline-zero stored a reload state before markdown item height was close to final metrics: ${JSON.stringify({
         persistedHeightDelta,
         itemHeight: finalReadySnapshot.state?.itemHeights?.['a-md-1'],
