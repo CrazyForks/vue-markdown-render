@@ -180,7 +180,7 @@ describe('virtual timeline restore visual readiness', () => {
     wrapper.unmount()
   })
 
-  it('reserves async code block loading fallback height from estimates', async () => {
+  it('reserves async code block loading fallback height from block estimates', async () => {
     const { CodeBlockNodeLoading } = await import('../src/components/NodeRenderer/asyncComponent')
 
     const wrapper = mount(CodeBlockNodeLoading as any, {
@@ -199,7 +199,8 @@ describe('virtual timeline restore visual readiness', () => {
 
     const pre = wrapper.get('pre.code-pre-fallback')
     expect(pre.attributes('data-markstream-code-loading')).toBe('1')
-    expect(pre.attributes('style')).toContain('min-height: 124px')
+    expect(pre.attributes('style')).toContain('height: 240px')
+    expect(pre.attributes('style')).toContain('min-height: 240px')
 
     wrapper.unmount()
   })

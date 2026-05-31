@@ -706,7 +706,7 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
-  it('keeps restored timeline item height as a visible-session floor after restore reveal', async () => {
+  it('releases restored timeline item height floor after restore reveal', async () => {
     vi.useFakeTimers()
 
     let wrapper: any
@@ -797,6 +797,8 @@ describe('virtual timeline API', () => {
       await vi.advanceTimersByTimeAsync(700)
       await nextTick()
 
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
       expect((wrapper.vm as any).getItemSize('a1')).toBe(1060)
 
       measuredHeight = 140
@@ -808,7 +810,7 @@ describe('virtual timeline API', () => {
       await vi.advanceTimersByTimeAsync(20)
       await nextTick()
 
-      expect((wrapper.vm as any).getItemSize('a1')).toBe(1060)
+      expect((wrapper.vm as any).getItemSize('a1')).toBe(140)
     }
     finally {
       wrapper?.unmount()

@@ -1383,7 +1383,13 @@ function finishThreadRestore(seq: number) {
   restoringThread.value = false
   activeThreadRestoreAnchor = undefined
   activeThreadRestoreSeq = 0
-  updateScrollMetrics()
+
+  // Restored floors are only a restore-time guard against partial mounted DOM.
+  // Once the restored viewport is ready, later stable/final measurements should
+  // be allowed to shrink stale persisted heights.
+  restoredItemHeightFloors.clear()
+
+  updateScrollMetrics({ remember: false })
   markRestorePaintReady()
 }
 
