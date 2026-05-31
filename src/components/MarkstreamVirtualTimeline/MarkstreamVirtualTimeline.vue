@@ -1436,7 +1436,7 @@ function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement)
 
   const state = markdownStates.get(record.key)
   if (!isCompatibleMarkdownState(record, state))
-    return !activeThreadRestoreRequiresColdMarkdownMetrics
+    return true
 
   const metrics = state?.metrics
   const totalHeight = Number(metrics?.totalHeight ?? 0)

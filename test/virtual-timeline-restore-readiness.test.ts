@@ -521,6 +521,83 @@ describe('virtual timeline restore visual readiness', () => {
     }
   })
 
+  it('reveals cold restored thread when visible markdown DOM is stable without persisted markdown state', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      stubTimelineDom()
+      installRestoreGeometryStub()
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: '# Cold thread\n\n```ts\nconst a = 1\n```', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-b',
+          stickToBottom: false,
+        },
+        slots: {
+          default(props: any) {
+            return h('article', {
+              'ref': props.measureRef,
+              'data-markstream-item-key': props.itemKey,
+            }, [
+              h('div', { class: 'markdown-renderer' }, [
+                h('div', {
+                  'class': 'node-slot',
+                  'data-node-index': '0',
+                  'data-node-type': 'heading',
+                }, [
+                  h('div', { class: 'node-content' }, '# Cold thread'),
+                ]),
+                h('div', {
+                  'class': 'node-slot',
+                  'data-node-index': '1',
+                  'data-node-type': 'code_block',
+                }, [
+                  h('div', { class: 'node-content' }, [
+                    h('div', {
+                      'data-markstream-code-block': '1',
+                      'data-markstream-enhanced': 'true',
+                      'class': 'code-block-container',
+                    }, [
+                      h('pre', { 'data-markstream-pre': '1' }, 'const a = 1'),
+                    ]),
+                  ]),
+                ]),
+              ]),
+            ])
+          },
+          'restore-loading': () => h('div', { 'data-testid': 'restore-loading' }, 'Restoring'),
+        },
+      })
+
+      await nextTick()
+
+      ;(wrapper.vm as any).restoreThreadState(null, { threadSwitch: true })
+
+      await nextTick()
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+      expect(wrapper.find('[data-testid="restore-loading"]').exists()).toBe(true)
+
+      for (let i = 0; i < 20; i++) {
+        await vi.advanceTimersByTimeAsync(32)
+        await nextTick()
+      }
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+      expect(wrapper.find('[data-testid="restore-loading"]').exists()).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps restore loading on a cold thread switch while initial restore is still pending', async () => {
     vi.useFakeTimers()
     let wrapper: ReturnType<typeof mount> | undefined

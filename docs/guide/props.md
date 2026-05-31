@@ -66,6 +66,15 @@ Slot props:
 
 Do not insert loading rows into `items`; that changes offsets and can break scroll restoration.
 
+#### `restore-max-loading-ms`
+
+Controls the maximum time the timeline may keep the restore loading overlay visible.
+
+- `false` (default): keep the overlay visible until the restored viewport is ready.
+- `number`: reveal after this many milliseconds even if the viewport readiness check has not passed.
+
+Keep the default when scroll and height stability are more important than showing partial content. Use a number only when your product prefers a bounded loading duration over strict visual stability.
+
 ### smooth-streaming and fade — pick one, not both
 
 `smooth-streaming` and `fade` both produce a "text appears gradually" effect, but at different layers:

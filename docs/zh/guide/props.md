@@ -58,6 +58,15 @@ Slot props：
 
 不要把 loading row 插入 `items`；这会改变 offset，并可能破坏滚动恢复。
 
+#### `restore-max-loading-ms`
+
+控制 timeline 在恢复 thread 时最多显示多久恢复 loading。
+
+- `false`（默认）：一直显示 loading，直到恢复后的可视区域通过 ready 检查。
+- `number`：即使 ready 检查尚未通过，也会在指定毫秒数后揭开。
+
+如果你更看重滚动和高度稳定，保留默认值。如果产品更看重 loading 时长有上限，再设置数字。
+
 ### smooth-streaming 与 fade —— 二选一，不要同时开启
 
 `smooth-streaming` 和 `fade` 都能实现"文本逐步出现"的效果，但作用在不同层面：
