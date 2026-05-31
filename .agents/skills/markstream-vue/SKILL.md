@@ -1,6 +1,6 @@
 ---
 name: markstream-vue
-description: Integrate markstream-vue into a Vue 3 app. Use when Codex needs to add the Vue 3 renderer, import CSS in the right order, choose between `content` and `nodes`, enable optional peers like Mermaid, KaTeX, D2, Monaco, or stream-markdown, or wire scoped custom components in a non-Nuxt Vue repository.
+description: Integrate markstream-vue into a Vue 3 app. Use when Codex needs to add the Vue 3 renderer, import CSS in the right order, choose between `content` and `nodes`, coordinate long AI timelines with `MarkstreamVirtualTimeline`, `useMarkstreamVirtualAdapter`, or `vue-virtual-scroller`, enable optional peers like Mermaid, KaTeX, D2, Monaco, or stream-markdown, or wire scoped custom components in a non-Nuxt Vue repository.
 ---
 
 # Markstream Vue 3
@@ -25,8 +25,14 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
      - Dynamic switch: `:smooth-streaming="isStreaming ? 'auto' : false"`, `:fade="!isStreaming"`.
    - Switch to `nodes` plus `final` only when the app needs custom AST control, worker preparsing, or structural updates beyond pacing.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
-5. Use `custom-id` plus scoped `setCustomComponents(...)` for overrides.
-6. Validate with the smallest useful dev, build, or typecheck command.
+5. For long AI transcripts or existing message virtualizers, choose the virtual-scroll path.
+   - Prefer `MarkstreamVirtualTimeline` when the app does not already own timeline virtualization.
+   - If the app already uses `vue-virtual-scroller` `DynamicScroller`, use `useMarkstreamVirtualAdapter()` and bind `adapter.markdownProps(item, index)` to Markdown items.
+   - Put `adapter.measureItem(item, index, el)` on the outer timeline row so row chrome is included in item height.
+   - Use Markstream's reported logical height (`metrics.totalHeight` through the adapter/virtualizer), not the renderer element's current `offsetHeight`, because Markdown node virtualization may only mount the live window.
+   - On thread switches, save `adapter.captureThreadState()` together with the scroller cache; restore the scroller cache before restoring the Markstream anchor.
+6. Use `custom-id` plus scoped `setCustomComponents(...)` for overrides.
+7. Validate with the smallest useful dev, build, or typecheck command.
 
 ## Default Decisions
 
@@ -35,6 +41,8 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 - For manual pacing with `nodes`, use `useSmoothMarkdownStream` directly: `enqueue()` chunks, `finish()` when done, render from `visible`, and wait for `caughtUp` before final parsing.
 - Streaming vs recovering history: when a chat message transitions from streaming to history (e.g. `final` becomes `true`), switch props dynamically — `smooth-streaming="auto"`, `fade=false` for streaming; `smooth-streaming=false`, `fade=true` for history. See `docs/guide/ai-chat-streaming.md` for full examples.
 - Prefer local component registration unless the repo already uses a shared plugin entry.
+- If a Vue 3 app already virtualizes messages, keep that outer virtualizer in charge and enable `virtual-scroll` only on large Markdown messages.
+- For `vue-virtual-scroller`, keep `sessionKey` tied to content identity (`thread:item:revision`) and `measurementKey` tied to layout identity such as width, theme, font, and density.
 - When Monaco code blocks need app-level preloading, import `preloadCodeBlockRuntime` from `markstream-vue`. Existing `getUseMonaco()` preloads remain valid; do not import `stream-monaco` directly just to warm workers.
 - Keep `html-policy="safe"` and Mermaid strict mode unless the task is explicitly preserving trusted legacy behavior.
 - If a trusted surface needs pre-hardening behavior, opt out locally with `html-policy="trusted"` and `:mermaid-props="{ isStrict: false }"`, and call out the trust boundary in the final handoff.
@@ -46,4 +54,5 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 - `docs/guide/installation.md`
 - `docs/guide/usage.md`
 - `docs/guide/ai-chat-streaming.md`
+- `docs/guide/performance.md`
 - `docs/guide/component-overrides.md`
