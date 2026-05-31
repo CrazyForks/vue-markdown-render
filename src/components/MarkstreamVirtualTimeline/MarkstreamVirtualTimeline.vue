@@ -132,6 +132,7 @@ let activeThreadRestoreAnchor: MarkstreamThreadAnchor | undefined
 let activeThreadStateSnapshot: MarkstreamThreadVirtualState | null = null
 let threadRestoreReadyWaitSeq = 0
 let threadRestoreReadyWarnedSeq = 0
+let rootPaddingBlock = { top: 0, bottom: 0 }
 
 const normalizedThreadKey = computed(() => props.threadKey == null ? undefined : String(props.threadKey))
 let activeThreadKeySnapshot = normalizedThreadKey.value
@@ -435,23 +436,25 @@ function getViewportHeight() {
   return Math.max(0, viewportHeight.value || scrollRoot.value?.clientHeight || 0)
 }
 
-function readRootPaddingBlock() {
+function updateRootPaddingBlock() {
   const root = scrollRoot.value
-  if (!root || typeof getComputedStyle !== 'function')
-    return { top: 0, bottom: 0 }
+  if (!root || typeof getComputedStyle !== 'function') {
+    rootPaddingBlock = { top: 0, bottom: 0 }
+    return
+  }
 
   const style = getComputedStyle(root)
   const top = Number.parseFloat(style.paddingTop) || 0
   const bottom = Number.parseFloat(style.paddingBottom) || 0
-  return { top, bottom }
+  rootPaddingBlock = { top, bottom }
 }
 
 function getScrollContentStart() {
-  return readRootPaddingBlock().top
+  return rootPaddingBlock.top
 }
 
 function getScrollContentHeight() {
-  const padding = readRootPaddingBlock()
+  const padding = rootPaddingBlock
   return Math.max(
     layout.value.totalHeight + padding.top + padding.bottom,
     scrollRoot.value?.scrollHeight ?? 0,
@@ -1807,11 +1810,13 @@ watch(
 )
 
 onMounted(() => {
+  updateRootPaddingBlock()
   updateLayoutWidthBucket()
   applyInitialScrollPosition()
 
   if (scrollRoot.value && typeof ResizeObserver !== 'undefined') {
     rootResizeObserver = new ResizeObserver(() => {
+      updateRootPaddingBlock()
       updateScrollMetrics()
     })
     rootResizeObserver.observe(scrollRoot.value)
