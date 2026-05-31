@@ -322,6 +322,118 @@ describe('virtual timeline restore visual readiness', () => {
     }
   })
 
+  it('does not reveal when a visible markdown item only has offscreen node slots', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      stubTimelineDom(1200)
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+        const el = this as HTMLElement
+        const root = el.closest?.('[data-testid="markstream-virtual-timeline"]') as HTMLElement | null
+        const ownTop = el.hasAttribute('data-test-top')
+          ? Number(el.dataset.testTop ?? '0')
+          : Number(el.querySelector<HTMLElement>('[data-test-top]')?.dataset.testTop ?? '0')
+        const ownHeight = el.hasAttribute('data-test-height')
+          ? Number(el.dataset.testHeight ?? '1200')
+          : Number(el.querySelector<HTMLElement>('[data-test-height]')?.dataset.testHeight ?? '1200')
+
+        if (el.matches?.('[data-testid="markstream-virtual-timeline"]')) {
+          return {
+            x: 0,
+            y: 0,
+            top: 0,
+            right: 800,
+            bottom: 300,
+            left: 0,
+            width: 800,
+            height: 300,
+            toJSON: () => ({}),
+          } as DOMRect
+        }
+
+        const top = (el.hasAttribute('data-test-top') || el.hasAttribute('data-markstream-item-key'))
+          ? ownTop - (root?.scrollTop || 0)
+          : 0
+
+        return {
+          x: 0,
+          y: top,
+          top,
+          right: 800,
+          bottom: top + ownHeight,
+          left: 0,
+          width: 800,
+          height: ownHeight,
+          toJSON: () => ({}),
+        } as DOMRect
+      })
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: '# Large', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
+            itemHeights: { m1: 1200 },
+            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', {
+              'ref': props.measureRef,
+              'data-test-top': '0',
+              'data-test-height': '1200',
+            }, [
+              h('div', { class: 'markdown-renderer' }, [
+                h('div', {
+                  'class': 'node-slot',
+                  'data-node-index': '0',
+                  'data-node-type': 'paragraph',
+                  'data-test-top': '1000',
+                  'data-test-height': '80',
+                }, [
+                  h('div', { class: 'node-content' }, 'Offscreen node content'),
+                ]),
+              ]),
+            ])
+          },
+        },
+      })
+
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(900)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      const slot = wrapper.get('[data-node-index="0"]').element as HTMLElement
+      slot.setAttribute('data-test-top', '0')
+
+      await vi.advanceTimersByTimeAsync(1200)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps restore loading on first cold thread switch until routed mermaid content is ready', async () => {
     vi.useFakeTimers()
     let wrapper: ReturnType<typeof mount> | undefined

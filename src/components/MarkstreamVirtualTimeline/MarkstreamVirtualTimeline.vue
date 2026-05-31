@@ -1376,6 +1376,34 @@ function hasRenderableMarkdownRecordContent(record: TimelineRecord, el: HTMLElem
   ].join(',')))
 }
 
+function hasVisibleReadyMarkdownRecordContent(
+  record: TimelineRecord,
+  el: HTMLElement,
+  root: HTMLElement,
+) {
+  if (!record.markdown)
+    return true
+
+  const source = getMarkstreamTimelineItemContent(record.item, record.index, props)
+  if (!String(source ?? '').trim())
+    return true
+
+  const rootRect = root.getBoundingClientRect()
+  const visibleNodeSlots = Array.from(el.querySelectorAll<HTMLElement>('[data-node-index]'))
+    .filter(slot => isVisibleInRootRect(slot, rootRect))
+
+  if (visibleNodeSlots.length > 0)
+    return visibleNodeSlots.every(slot => isVisibleNodeSlotReady(slot))
+
+  const renderer = el.querySelector<HTMLElement>('.markdown-renderer')
+  const contentRoot = renderer ?? el
+
+  if (contentRoot.querySelector('[data-node-index], .node-placeholder'))
+    return false
+
+  return hasRenderableMarkdownRecordContent(record, el)
+}
+
 function hasTrustedRestoredItemHeight(record: TimelineRecord) {
   const source = itemSizeSources.get(record.key)
   const compatibleSize = getCompatibleItemSize(record) ?? 0
@@ -1466,7 +1494,7 @@ function isRestoreViewportReady() {
     if (el.offsetHeight + 1 < record.size)
       return false
 
-    if (!hasRenderableMarkdownRecordContent(record, el))
+    if (!hasVisibleReadyMarkdownRecordContent(record, el, root))
       return false
 
     if (!hasReadyMarkdownRestoreMetrics(record, el))
