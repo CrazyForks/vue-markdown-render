@@ -410,10 +410,17 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     if ((source.threadKey ?? '') !== (normalizeThreadKey() ?? ''))
       return false
 
-    if ((source.measurementKey ?? '') !== (normalizeMeasurementKey() ?? ''))
+    if (!isCompatibleMarkdownMeasurementKey(source.measurementKey))
       return false
 
     return true
+  }
+
+  function isCompatibleMarkdownMeasurementKey(measurementKey: string | undefined) {
+    const expected = normalizeMeasurementKey() ?? ''
+    const actual = measurementKey ?? ''
+
+    return actual === expected || actual.startsWith(`${expected}\u0000`)
   }
 
   function isCurrentMarkdownKey(key: string) {

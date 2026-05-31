@@ -163,6 +163,67 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('passes renderer-scoped markdown restore state through timeline slot props', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(480)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(200)
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '# Restored', final: true, revision: 1 },
+    ]
+    const state: MarkstreamVirtualState = {
+      sessionKey: 'thread-a:a1:1',
+      threadKey: 'thread-a',
+      metrics: createMetrics(180, 'thread-a:a1:1'),
+      width: 640,
+      measurementKey: ':800\u0000light\u0000code-rich',
+    }
+    let restoreState: MarkstreamVirtualState | null | undefined
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+        stickToBottom: false,
+        initialThreadState: {
+          threadKey: 'thread-a',
+          measurementKey: ':800',
+          widthBucket: 800,
+          outerAnchor: {
+            type: 'item',
+            itemKey: 'a1',
+            offsetWithinItemPx: 0,
+          },
+          itemHeights: { a1: 200 },
+          itemSizeSources: {
+            a1: timelineItemSource('thread-a', 'a1', 1),
+          },
+          markdownStates: { a1: state },
+        },
+      },
+      slots: {
+        default(props: any) {
+          restoreState = props.markdownProps.virtualScroll.restoreState
+
+          return h('div', { ref: props.measureRef }, props.markdownProps.content)
+        },
+      },
+    })
+
+    await nextTick()
+
+    expect(restoreState?.measurementKey).toBe(':800\u0000light\u0000code-rich')
+    expect(restoreState?.sessionKey).toBe('thread-a:a1:1')
+
+    wrapper.unmount()
+  })
+
   it('provides host scroll managed context to timeline children', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
@@ -385,6 +446,49 @@ describe('virtual timeline API', () => {
     }
     markdownProps.onVirtualStateChange(state)
     expect(controller.markdownStates.get('a1')).toStrictEqual(state)
+
+    scope.stop()
+  })
+
+  it('passes renderer-scoped markdown restore state through adapter props', () => {
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '# Hello', final: true },
+    ]
+    const root = document.createElement('div')
+    const adapter = {
+      getScrollElement: () => root,
+      getScrollTop: () => 0,
+      setScrollTop: vi.fn(),
+      getViewportHeight: () => 400,
+      getTotalHeight: () => 0,
+      getItemOffset: () => 0,
+      getItemSize: () => 0,
+      setItemSize: vi.fn(),
+      getVisibleRange: () => ({ start: 0, end: 1 }),
+      scrollToOffset: vi.fn(),
+      scrollToIndex: vi.fn(),
+    }
+
+    const scope = effectScope()
+    const controller = scope.run(() => useMarkstreamVirtualAdapter({
+      items,
+      threadKey: 'thread-a',
+      measurementKey: ':800',
+      virtualizer: adapter,
+    }))!
+
+    const markdownProps = controller.markdownProps(items[0], 0)
+    const state: MarkstreamVirtualState = {
+      sessionKey: markdownProps.virtualScroll!.sessionKey!,
+      threadKey: 'thread-a',
+      metrics: createMetrics(640, markdownProps.virtualScroll!.sessionKey!),
+      width: 640,
+      measurementKey: ':800\u0000light\u0000code-rich',
+    }
+
+    markdownProps.onVirtualStateChange(state)
+
+    expect(controller.markdownProps(items[0], 0).virtualScroll!.restoreState).toBe(state)
 
     scope.stop()
   })
@@ -1898,67 +2002,99 @@ describe('virtual timeline API', () => {
     }
   })
 
-  it('treats visible mermaid pending placeholder as restore-ready code block content', async () => {
-    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
-    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
-    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
+  it('does not treat visible mermaid pending placeholder as restore-ready code block content', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
 
-    vi.stubGlobal('ResizeObserver', class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    })
+    try {
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(360)
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+        x: 0,
+        y: 0,
+        top: 0,
+        right: 800,
+        bottom: 360,
+        left: 0,
+        width: 800,
+        height: 360,
+        toJSON: () => ({}),
+      } as DOMRect)
 
-    const wrapper = mount(MarkstreamVirtualTimeline, {
-      attachTo: document.body,
-      props: {
-        items: [
-          { kind: 'assistant-markdown', id: 'm1', content: 'mermaid', final: true, revision: 1 },
-        ],
-        threadKey: 'thread-a',
-        stickToBottom: false,
-        initialThreadState: {
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      })
+
+      let mermaidReady = false
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: 'mermaid', final: true, revision: 1 },
+          ],
           threadKey: 'thread-a',
-          measurementKey: ':800',
-          widthBucket: 800,
-          outerAnchor: {
-            type: 'item',
-            itemKey: 'm1',
-            offsetWithinItemPx: 0,
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: {
+              type: 'item',
+              itemKey: 'm1',
+              offsetWithinItemPx: 0,
+            },
+            itemHeights: { m1: 360 },
+            itemSizeSources: {
+              m1: timelineItemSource('thread-a', 'm1', 1),
+            },
+            markdownStates: {},
           },
-          itemHeights: { m1: 360 },
-          itemSizeSources: {
-            m1: timelineItemSource('thread-a', 'm1', 1),
-          },
-          markdownStates: {},
         },
-      },
-      slots: {
-        default(props: any) {
-          return h('div', { ref: props.measureRef }, [
-            h('div', {
-              'class': 'node-slot',
-              'data-node-index': '0',
-              'data-node-type': 'code_block',
-            }, [
-              h('div', { class: 'node-content' }, [
-                h('div', {
-                  'data-markstream-mermaid': '1',
-                  'data-markstream-mode': 'pending',
-                }),
+        slots: {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, [
+              h('div', {
+                'class': 'node-slot',
+                'data-node-index': '0',
+                'data-node-type': 'code_block',
+              }, [
+                h('div', { class: 'node-content' }, [
+                  h('div', {
+                    'data-markstream-mermaid': '1',
+                    'data-markstream-mode': mermaidReady ? 'preview' : 'pending',
+                  }, mermaidReady
+                    ? [h('svg', { width: 100, height: 100 })]
+                    : [h('div', { class: 'mermaid-preview-area' })]),
+                ]),
               ]),
-            ]),
-          ])
+            ])
+          },
         },
-      },
-    })
+      })
 
-    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
-    expect(root.classList.contains('is-restoring-thread')).toBe(true)
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(900)
+      await nextTick()
 
-    await waitForTimelineRestoreSettled(root)
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
 
-    wrapper.unmount()
+      mermaidReady = true
+      await wrapper.setProps({ items: [...wrapper.props('items')] })
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
   })
 
   it('preloads initial thread state before first visible render', async () => {

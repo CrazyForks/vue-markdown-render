@@ -17,6 +17,7 @@ import 'katex/dist/katex.min.css'
 import 'vue-virtual-scroller/index.css'
 
 type ThreadId = 'thread-a' | 'thread-b'
+type RestoreAnchor = NonNullable<MarkstreamThreadVirtualState['outerAnchor']>
 
 setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())
@@ -52,6 +53,28 @@ interface ScrollerHandle {
 interface SavedThreadState {
   markstreamState: MarkstreamThreadVirtualState
   scrollerCache: CacheSnapshot | null
+}
+
+declare global {
+  interface Window {
+    __markstreamVirtualScrollerMarkstream?: {
+      read: () => {
+        scrollTop: number
+        totalHeight: number
+        visibleRange: { start: number, end: number }
+        restoring: boolean
+        viewportText: string
+      }
+      nextFrame: () => Promise<void>
+      scrollTo: (offset: number) => Promise<{
+        scrollTop: number
+        totalHeight: number
+        visibleRange: { start: number, end: number }
+        restoring: boolean
+        viewportText: string
+      }>
+    }
+  }
 }
 
 function makeKey(threadId: ThreadId, id: string) {
@@ -347,9 +370,21 @@ const totalHeight = ref(0)
 const widthBucket = ref(0)
 const itemHeightVersion = ref(0)
 const isRestoringThread = ref(false)
+const restorePaintReady = ref(true)
 let rootResizeObserver: ResizeObserver | null = null
 let itemHeightVersionPending = false
-let scrollerRefreshPending = false
+
+const EXTERNAL_RESTORE_MIN_READY_MS = 240
+const EXTERNAL_RESTORE_STABLE_FRAMES = 3
+const EXTERNAL_RESTORE_POLL_FRAMES = 80
+const EXTERNAL_RESTORE_RETRY_DELAY_MS = 160
+const EXTERNAL_RESTORE_MAX_LOADING_MS = 8000
+
+let externalRestoreSeq = 0
+let activeExternalRestoreAnchor: RestoreAnchor | undefined
+let externalRestoreStartedAt = -1
+let externalRestoreWaitSeq = 0
+let externalRestoreRetryTimer: number | null = null
 
 const VIRTUAL_SCROLLER_STORAGE_KEY = 'markstream-vue:virtual-scroller-markstream:thread-states:v1'
 
@@ -459,26 +494,6 @@ function scheduleItemHeightViewUpdate() {
   })
 }
 
-function scheduleScrollerRefresh() {
-  if (scrollerRefreshPending)
-    return
-
-  scrollerRefreshPending = true
-
-  const refresh = () => {
-    scrollerRefreshPending = false
-    scrollerRef.value?.forceUpdate?.(false)
-    updateScrollMetrics()
-  }
-
-  void nextTick(() => {
-    if (typeof requestAnimationFrame === 'function')
-      requestAnimationFrame(refresh)
-    else
-      refresh()
-  })
-}
-
 function getScrollElement() {
   const element = scrollerRef.value?.$el
   return element instanceof HTMLElement ? element : null
@@ -537,6 +552,452 @@ function getSizeForKey(key: string) {
   return itemHeights.get(key) ?? 0
 }
 
+function nowMs() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now()
+}
+
+function isActiveExternalRestore(seq: number) {
+  return seq === externalRestoreSeq
+    && isRestoringThread.value
+    && !restorePaintReady.value
+}
+
+function clearExternalRestoreRetryTimer() {
+  if (externalRestoreRetryTimer != null && typeof window !== 'undefined')
+    window.clearTimeout(externalRestoreRetryTimer)
+
+  externalRestoreRetryTimer = null
+}
+
+function clearExternalRestoreState() {
+  clearExternalRestoreRetryTimer()
+  activeExternalRestoreAnchor = undefined
+  externalRestoreStartedAt = -1
+  externalRestoreWaitSeq = 0
+}
+
+function resolveExternalAnchorOffset(anchor: RestoreAnchor | undefined) {
+  if (!anchor)
+    return null
+
+  const root = getScrollElement()
+  const viewport = root?.clientHeight ?? viewportHeight.value ?? 0
+  const total = root?.scrollHeight ?? totalHeight.value ?? 0
+
+  if (anchor.type === 'bottom') {
+    return Math.max(
+      0,
+      total - viewport - Math.max(0, anchor.distanceFromBottomPx),
+    )
+  }
+
+  return Math.max(
+    0,
+    getOffsetForKey(anchor.itemKey) + Math.max(0, anchor.offsetWithinItemPx),
+  )
+}
+
+function applyExternalRestorePass(seq = externalRestoreSeq) {
+  if (!isActiveExternalRestore(seq))
+    return
+
+  const offset = resolveExternalAnchorOffset(activeExternalRestoreAnchor)
+  if (offset != null)
+    scrollerRef.value?.scrollToPosition?.(offset)
+
+  scrollerRef.value?.forceUpdate?.(false)
+  updateScrollMetrics()
+}
+
+function getColdThreadAnchor(): RestoreAnchor | undefined {
+  const first = items.value[0]
+  if (!first)
+    return undefined
+
+  return {
+    type: 'item',
+    itemKey: first.key,
+    offsetWithinItemPx: 0,
+  }
+}
+
+function isVisibleInRoot(el: HTMLElement, rootRect: DOMRect) {
+  const rect = el.getBoundingClientRect()
+  return rect.bottom > rootRect.top + 1 && rect.top < rootRect.bottom - 1
+}
+
+function isElementVisiblyPainted(el: HTMLElement | null) {
+  if (!el)
+    return false
+
+  if (el.closest('.code-editor-container.is-hidden'))
+    return false
+
+  let current: HTMLElement | null = el
+  while (current) {
+    const style = window.getComputedStyle(current)
+    if (
+      style.display === 'none'
+      || style.visibility === 'hidden'
+      || Number.parseFloat(style.opacity || '1') <= 0.01
+    ) {
+      return false
+    }
+
+    current = current.parentElement
+  }
+
+  const rect = el.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 0
+}
+
+function hasVisibleMonacoDom(root: HTMLElement) {
+  return Array.from(root.querySelectorAll<HTMLElement>('.monaco-editor, .monaco-diff-editor'))
+    .some(isElementVisiblyPainted)
+}
+
+function hasElementContent(content: HTMLElement) {
+  if ((content.textContent ?? '').trim().length > 0)
+    return true
+
+  return Boolean(content.querySelector([
+    'hr',
+    'br',
+    'table',
+    'blockquote',
+    'img',
+    'svg',
+    'canvas',
+    'input',
+    'button',
+    'select',
+    'textarea',
+    '[role]',
+    '[aria-label]',
+    '[data-markstream-math]',
+    '[data-markstream-mermaid]',
+    '[data-markstream-infographic]',
+    '[data-markstream-d2]',
+    '[data-markstream-pre="1"]',
+    '[data-markstream-code-block="1"]',
+  ].join(',')))
+}
+
+function isMermaidReady(content: HTMLElement) {
+  const mermaid = content.querySelector<HTMLElement>('[data-markstream-mermaid], .mermaid-block-container')
+  if (!mermaid)
+    return true
+
+  if (mermaid.dataset.markstreamPending === 'true')
+    return false
+
+  const mode = mermaid.dataset.markstreamMode
+
+  if (mode === 'preview') {
+    return Boolean(
+      mermaid.querySelector('svg')
+      || mermaid.querySelector('[data-mermaid-svg-layer="1"] svg'),
+    )
+  }
+
+  if (mode === 'fallback') {
+    return Boolean(
+      mermaid.querySelector<HTMLElement>('.mermaid-source-code')
+        ?.textContent
+        ?.trim(),
+    )
+  }
+
+  return false
+}
+
+function isMathReady(content: HTMLElement) {
+  const mathNodes = Array.from(
+    content.querySelectorAll<HTMLElement>('[data-markstream-math]'),
+  )
+
+  return mathNodes.every((node) => {
+    if (node.dataset.markstreamPending === 'true')
+      return false
+
+    const mode = node.dataset.markstreamMode
+    return mode === 'katex' || mode === 'fallback'
+  })
+}
+
+function isCodeBlockReady(content: HTMLElement) {
+  if (content.querySelector('[data-markstream-code-loading="1"]'))
+    return false
+
+  const codeBlock = content.querySelector<HTMLElement>('[data-markstream-code-block="1"]')
+  if (!codeBlock)
+    return true
+
+  if (codeBlock.dataset.markstreamEnhanced === 'true')
+    return true
+
+  const fallback = codeBlock.querySelector<HTMLElement>('pre.code-pre-fallback')
+  if (isElementVisiblyPainted(fallback))
+    return true
+
+  return hasVisibleMonacoDom(codeBlock)
+}
+
+function isVisibleNodeSlotReady(slot: HTMLElement) {
+  if (slot.querySelector(':scope > .node-placeholder'))
+    return false
+
+  const content = slot.querySelector<HTMLElement>(':scope > .node-content')
+  if (!content)
+    return false
+
+  if (content.querySelector('[data-markstream-pending="true"]'))
+    return false
+
+  if (!isMathReady(content))
+    return false
+
+  if (!isMermaidReady(content))
+    return false
+
+  if (!isCodeBlockReady(content))
+    return false
+
+  return hasElementContent(content)
+}
+
+function isExternalRestoreViewportReady() {
+  const root = getScrollElement()
+  if (!root)
+    return false
+
+  const rows = Array.from(root.querySelectorAll<HTMLElement>('.timeline-row'))
+  if (!rows.length)
+    return false
+
+  const rootRect = root.getBoundingClientRect()
+  const visibleRows = rows.filter(row => isVisibleInRoot(row, rootRect))
+  if (!visibleRows.length)
+    return false
+
+  const visibleStart = visibleRange.value.start
+  const visibleEnd = visibleRange.value.end
+  for (const row of visibleRows) {
+    const rowIndex = Number(row.dataset.rowIndex)
+    if (!Number.isFinite(rowIndex) || rowIndex < visibleStart || rowIndex >= visibleEnd)
+      return false
+  }
+
+  const visibleSlots = Array.from(root.querySelectorAll<HTMLElement>('[data-node-index]'))
+    .filter(slot => isVisibleInRoot(slot, rootRect))
+
+  for (const slot of visibleSlots) {
+    if (!isVisibleNodeSlotReady(slot))
+      return false
+  }
+
+  return true
+}
+
+function readExternalRestoreSignature() {
+  const root = getScrollElement()
+  if (!root)
+    return ''
+
+  const rootRect = root.getBoundingClientRect()
+
+  const rowSignature = Array.from(root.querySelectorAll<HTMLElement>('.timeline-row'))
+    .filter(row => isVisibleInRoot(row, rootRect))
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+    .map((row) => {
+      const rect = row.getBoundingClientRect()
+      return [
+        row.dataset.rowKey ?? '',
+        row.dataset.rowIndex ?? '',
+        row.closest<HTMLElement>('.vue-recycle-scroller__item-view')?.style.transform ?? '',
+        Math.round(rect.top),
+        Math.round(rect.height),
+        row.offsetHeight,
+        row.scrollHeight,
+      ].join(':')
+    })
+    .join('|')
+
+  const nodeSignature = Array.from(root.querySelectorAll<HTMLElement>('[data-node-index]'))
+    .filter(slot => isVisibleInRoot(slot, rootRect))
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+    .map((slot) => {
+      const rect = slot.getBoundingClientRect()
+      const content = slot.querySelector<HTMLElement>(':scope > .node-content')
+      const code = content?.querySelector<HTMLElement>('[data-markstream-code-block="1"]')
+      const fallback = content?.querySelector<HTMLElement>('pre.code-pre-fallback')
+      const editor = content?.querySelector<HTMLElement>('.monaco-editor, .monaco-diff-editor')
+      const mermaid = content?.querySelector<HTMLElement>('[data-markstream-mermaid], .mermaid-block-container')
+      const math = content?.querySelector<HTMLElement>('[data-markstream-math]')
+
+      return [
+        slot.dataset.nodeIndex ?? '',
+        slot.dataset.nodeType ?? '',
+        Math.round(rect.height),
+        content?.offsetHeight ?? 0,
+        content?.scrollHeight ?? 0,
+        code?.dataset.markstreamEnhanced ?? '',
+        code ? Math.round(code.getBoundingClientRect().height) : 0,
+        fallback ? Math.round(fallback.getBoundingClientRect().height) : 0,
+        editor ? Math.round(editor.getBoundingClientRect().height) : 0,
+        mermaid?.dataset.markstreamMode ?? '',
+        mermaid?.dataset.markstreamPending ?? '',
+        math?.dataset.markstreamMode ?? '',
+        math?.dataset.markstreamPending ?? '',
+      ].join(':')
+    })
+    .join('|')
+
+  return [
+    Math.round(root.scrollTop || 0),
+    Math.round(root.scrollHeight || 0),
+    visibleRange.value.start,
+    visibleRange.value.end,
+    rowSignature,
+    nodeSignature,
+  ].join('\n')
+}
+
+async function nextFrame() {
+  await nextTick()
+  await new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame === 'function')
+      requestAnimationFrame(() => resolve())
+    else
+      setTimeout(resolve, 0)
+  })
+}
+
+async function waitExternalRestoreReady(seq: number) {
+  const startedAt = nowMs()
+  let previousSignature = ''
+  let stableFrames = 0
+
+  for (let i = 0; i < EXTERNAL_RESTORE_POLL_FRAMES; i++) {
+    await nextFrame()
+
+    if (!isActiveExternalRestore(seq))
+      return false
+
+    applyExternalRestorePass(seq)
+
+    const ready = isExternalRestoreViewportReady()
+    const signature = ready ? readExternalRestoreSignature() : ''
+
+    if (ready && signature && signature === previousSignature) {
+      stableFrames += 1
+
+      if (
+        stableFrames >= EXTERNAL_RESTORE_STABLE_FRAMES
+        && nowMs() - startedAt >= EXTERNAL_RESTORE_MIN_READY_MS
+      ) {
+        return true
+      }
+    }
+    else {
+      stableFrames = 0
+      previousSignature = signature
+    }
+  }
+
+  return false
+}
+
+function hasExternalRestoreTimedOut() {
+  return externalRestoreStartedAt >= 0
+    && nowMs() - externalRestoreStartedAt >= EXTERNAL_RESTORE_MAX_LOADING_MS
+}
+
+function finishExternalRestore(seq: number) {
+  if (seq !== externalRestoreSeq)
+    return
+
+  const offset = resolveExternalAnchorOffset(activeExternalRestoreAnchor)
+  if (offset != null)
+    scrollerRef.value?.scrollToPosition?.(offset)
+
+  restorePaintReady.value = true
+  isRestoringThread.value = false
+  clearExternalRestoreState()
+  updateScrollMetrics()
+}
+
+function scheduleExternalRestoreRetry(seq: number) {
+  if (!isActiveExternalRestore(seq))
+    return
+
+  if (typeof window === 'undefined')
+    return
+
+  clearExternalRestoreRetryTimer()
+
+  externalRestoreRetryTimer = window.setTimeout(() => {
+    externalRestoreRetryTimer = null
+
+    if (!isActiveExternalRestore(seq))
+      return
+
+    watchExternalRestoreReady(seq)
+  }, EXTERNAL_RESTORE_RETRY_DELAY_MS)
+}
+
+function watchExternalRestoreReady(seq: number) {
+  if (!isActiveExternalRestore(seq) || externalRestoreWaitSeq === seq)
+    return
+
+  externalRestoreWaitSeq = seq
+
+  void waitExternalRestoreReady(seq).then((ready) => {
+    if (externalRestoreWaitSeq === seq)
+      externalRestoreWaitSeq = 0
+
+    if (!isActiveExternalRestore(seq))
+      return
+
+    if (ready) {
+      finishExternalRestore(seq)
+      return
+    }
+
+    if (hasExternalRestoreTimedOut()) {
+      finishExternalRestore(seq)
+      return
+    }
+
+    scheduleExternalRestoreRetry(seq)
+  })
+}
+
+function readViewportText() {
+  const root = getScrollElement()
+  if (!root)
+    return ''
+
+  const rootRect = root.getBoundingClientRect()
+
+  return Array.from(root.querySelectorAll<HTMLElement>('.timeline-row'))
+    .filter(el => isVisibleInRoot(el, rootRect))
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+    .map(el => el.textContent ?? '')
+    .join('\n')
+}
+
+function readScrollerSnapshot() {
+  const root = getScrollElement()
+  return {
+    scrollTop: root?.scrollTop ?? 0,
+    totalHeight: root?.scrollHeight ?? 0,
+    visibleRange: { ...visibleRange.value },
+    restoring: !restorePaintReady.value,
+    viewportText: readViewportText(),
+  }
+}
+
 const virtualizer: MarkstreamOuterVirtualizerAdapter = {
   getScrollElement,
   getScrollTop: () => getScrollElement()?.scrollTop ?? 0,
@@ -553,7 +1014,15 @@ const virtualizer: MarkstreamOuterVirtualizerAdapter = {
     itemHeights.set(key, size)
     rebuildOffsets()
     scheduleItemHeightViewUpdate()
-    scheduleScrollerRefresh()
+
+    void nextTick(() => {
+      scrollerRef.value?.forceUpdate?.(false)
+
+      if (!restorePaintReady.value)
+        applyExternalRestorePass(externalRestoreSeq)
+      else
+        updateScrollMetrics()
+    })
   },
   getVisibleRange: () => visibleRange.value,
   scrollToOffset: offset => scrollerRef.value?.scrollToPosition?.(offset),
@@ -576,8 +1045,45 @@ const adapter = useMarkstreamVirtualAdapter<TimelineItem>({
 
 const initialSavedState = savedThreadStates.get(activeThreadId.value)
 
-if (initialSavedState)
+if (initialSavedState) {
   adapter.preloadThreadState(initialSavedState.markstreamState)
+  restorePaintReady.value = false
+  isRestoringThread.value = true
+}
+
+async function runExternalRestore(saved: SavedThreadState | null | undefined) {
+  const seq = ++externalRestoreSeq
+
+  clearExternalRestoreRetryTimer()
+
+  restorePaintReady.value = false
+  isRestoringThread.value = true
+  externalRestoreStartedAt = nowMs()
+
+  activeExternalRestoreAnchor = saved?.markstreamState.outerAnchor
+    ?? getColdThreadAnchor()
+
+  if (saved)
+    adapter.preloadThreadState(saved.markstreamState)
+  else
+    adapter.preloadThreadState(null)
+
+  rebuildOffsets()
+
+  await nextTick()
+
+  if (saved?.scrollerCache)
+    scrollerRef.value?.restoreCache?.(saved.scrollerCache)
+
+  if (saved)
+    adapter.restoreThreadState(saved.markstreamState)
+  else
+    adapter.restoreThreadState(null)
+
+  scrollerRef.value?.forceUpdate?.(false)
+  applyExternalRestorePass(seq)
+  watchExternalRestoreReady(seq)
+}
 
 function measureRow(
   item: TimelineItem,
@@ -628,42 +1134,15 @@ async function switchThread(threadId: ThreadId) {
   if (threadId === activeThreadId.value)
     return
 
-  isRestoringThread.value = true
-
   rememberThreadState()
-
-  const saved = savedThreadStates.get(threadId)
-  if (saved)
-    adapter.preloadThreadState(saved.markstreamState)
-  else
-    adapter.preloadThreadState(null)
 
   activeThreadId.value = threadId
   rebuildOffsets()
 
   await nextTick()
 
-  if (saved) {
-    scrollerRef.value?.restoreCache?.(saved.scrollerCache)
-    adapter.restoreThreadState(saved.markstreamState)
-  }
-  else {
-    adapter.restoreThreadState(null)
-    scrollerRef.value?.scrollToPosition?.(0)
-  }
-
-  scrollerRef.value?.forceUpdate?.(false)
-  updateScrollMetrics()
-
-  await nextTick()
-
-  if (typeof requestAnimationFrame === 'function') {
-    await new Promise<void>(resolve => requestAnimationFrame(() => {
-      resolve()
-    }))
-  }
-
-  isRestoringThread.value = false
+  const saved = savedThreadStates.get(threadId)
+  await runExternalRestore(saved ?? null)
 }
 
 function scrollToTop() {
@@ -677,6 +1156,11 @@ function scrollToBottom() {
 }
 
 function onScroll() {
+  if (!restorePaintReady.value) {
+    applyExternalRestorePass(externalRestoreSeq)
+    return
+  }
+
   updateScrollMetrics()
   rememberThreadState()
 }
@@ -684,18 +1168,7 @@ function onScroll() {
 onMounted(async () => {
   rebuildOffsets()
 
-  const initialSaved = savedThreadStates.get(activeThreadId.value)
-  if (initialSaved) {
-    isRestoringThread.value = true
-
-    await nextTick()
-
-    scrollerRef.value?.restoreCache?.(initialSaved.scrollerCache)
-    adapter.restoreThreadState(initialSaved.markstreamState)
-    scrollerRef.value?.forceUpdate?.(false)
-  }
-
-  updateScrollMetrics()
+  await nextTick()
 
   const root = getScrollElement()
   root?.addEventListener('scroll', onScroll, { passive: true })
@@ -707,24 +1180,40 @@ onMounted(async () => {
     rootResizeObserver.observe(root)
   }
 
-  if (initialSaved) {
-    await nextTick()
-
-    if (typeof requestAnimationFrame === 'function') {
-      await new Promise<void>(resolve => requestAnimationFrame(() => {
-        resolve()
-      }))
+  if (typeof window !== 'undefined') {
+    window.__markstreamVirtualScrollerMarkstream = {
+      read: readScrollerSnapshot,
+      nextFrame,
+      async scrollTo(offset: number) {
+        scrollerRef.value?.scrollToPosition?.(offset)
+        await nextFrame()
+        return readScrollerSnapshot()
+      },
     }
+  }
 
+  const initialSaved = savedThreadStates.get(activeThreadId.value)
+  if (initialSaved) {
+    await runExternalRestore(initialSaved)
+  }
+  else {
+    restorePaintReady.value = true
     isRestoringThread.value = false
+    updateScrollMetrics()
   }
 })
 
 onBeforeUnmount(() => {
-  rememberThreadState()
+  if (restorePaintReady.value)
+    rememberThreadState()
+
+  clearExternalRestoreState()
   getScrollElement()?.removeEventListener('scroll', onScroll)
   rootResizeObserver?.disconnect()
   adapter.dispose()
+
+  if (typeof window !== 'undefined')
+    delete window.__markstreamVirtualScrollerMarkstream
 })
 </script>
 
@@ -767,81 +1256,97 @@ onBeforeUnmount(() => {
       <span>{{ visibleRange.start }}-{{ visibleRange.end }} visible</span>
     </section>
 
-    <DynamicScroller
-      ref="scrollerRef"
-      class="message-scroller"
-      :class="{ 'is-restoring-thread': isRestoringThread }"
-      :items="items"
-      key-field="key"
-      :min-item-size="72"
-      :buffer="1800"
-      @resize="updateScrollMetrics"
-      @visible="updateScrollMetrics"
-    >
-      <template #default="{ item, index, active }">
-        <DynamicScrollerItem
-          :item="item"
-          :active="active"
-          :index="index"
-          tag="section"
-          class="dynamic-row"
-        >
-          <article
-            :ref="getRowRef(item, index)"
-            class="timeline-row"
-            :data-kind="item.kind"
+    <div class="message-scroller-shell">
+      <DynamicScroller
+        ref="scrollerRef"
+        class="message-scroller"
+        :class="{ 'is-restoring-thread': !restorePaintReady }"
+        :items="items"
+        key-field="key"
+        :min-item-size="72"
+        :buffer="1800"
+        @resize="updateScrollMetrics"
+        @visible="updateScrollMetrics"
+      >
+        <template #default="{ item, index, active }">
+          <DynamicScrollerItem
+            :item="item"
+            :active="active"
+            :index="index"
+            tag="section"
+            class="dynamic-row"
           >
-            <div
-              v-if="item.kind === 'system-divider'"
-              class="divider-row"
+            <article
+              :ref="getRowRef(item, index)"
+              class="timeline-row"
+              :data-kind="item.kind"
+              :data-row-index="index"
+              :data-row-key="item.key"
             >
-              {{ item.text }}
-            </div>
+              <div
+                v-if="item.kind === 'system-divider'"
+                class="divider-row"
+              >
+                {{ item.text }}
+              </div>
 
-            <div
-              v-else-if="item.kind === 'user-message'"
-              class="message-bubble user-bubble"
-            >
-              {{ item.text }}
-            </div>
+              <div
+                v-else-if="item.kind === 'user-message'"
+                class="message-bubble user-bubble"
+              >
+                {{ item.text }}
+              </div>
 
-            <div
-              v-else-if="item.kind === 'tool-call'"
-              class="status-row tool-row"
-            >
-              <span>{{ item.status }}</span>
-              {{ item.label }}
-            </div>
+              <div
+                v-else-if="item.kind === 'tool-call'"
+                class="status-row tool-row"
+              >
+                <span>{{ item.status }}</span>
+                {{ item.label }}
+              </div>
 
-            <div
-              v-else-if="item.kind === 'assistant-markdown'"
-              class="message-bubble assistant-bubble"
-            >
-              <MarkdownRender
-                v-bind="adapter.markdownProps(item, index)"
-                class="assistant-markdown"
-                :max-live-nodes="280"
-                :live-node-buffer="80"
-                :batch-rendering="true"
-                :code-block-props="{
-                  showHeader: true,
-                  showCopyButton: true,
-                  showCollapseButton: true,
-                  showExpandButton: true,
-                }"
-              />
-            </div>
+              <div
+                v-else-if="item.kind === 'assistant-markdown'"
+                class="message-bubble assistant-bubble"
+              >
+                <MarkdownRender
+                  v-bind="adapter.markdownProps(item, index)"
+                  class="assistant-markdown"
+                  :max-live-nodes="280"
+                  :live-node-buffer="80"
+                  :batch-rendering="true"
+                  :code-block-props="{
+                    showHeader: true,
+                    showCopyButton: true,
+                    showCollapseButton: true,
+                    showExpandButton: true,
+                  }"
+                />
+              </div>
 
-            <div
-              v-else-if="item.kind === 'error'"
-              class="status-row error-row"
-            >
-              {{ item.message }}
-            </div>
-          </article>
-        </DynamicScrollerItem>
-      </template>
-    </DynamicScroller>
+              <div
+                v-else-if="item.kind === 'error'"
+                class="status-row error-row"
+              >
+                {{ item.message }}
+              </div>
+            </article>
+          </DynamicScrollerItem>
+        </template>
+      </DynamicScroller>
+
+      <div
+        v-if="!restorePaintReady"
+        class="message-scroller-restore-loading"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div class="message-scroller-restore-loading__card">
+          <span class="message-scroller-restore-loading__spinner" aria-hidden="true" />
+          <span>Restoring thread...</span>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
 
@@ -928,6 +1433,12 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 
+.message-scroller-shell {
+  position: relative;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
 .message-scroller {
   height: calc(100vh - 128px);
   max-width: 1120px;
@@ -943,10 +1454,58 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
+.message-scroller.is-restoring-thread :deep(.vue-recycle-scroller__item-view),
+.message-scroller.is-restoring-thread .dynamic-row,
+.message-scroller.is-restoring-thread .timeline-row {
+  visibility: hidden;
+}
+
 .message-scroller.is-restoring-thread :deep(.markdown-renderer),
 .message-scroller.is-restoring-thread .timeline-row {
   transition: none !important;
   animation: none !important;
+}
+
+.message-scroller-restore-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: color-mix(in srgb, Canvas 88%, transparent);
+  contain: strict;
+  pointer-events: none;
+}
+
+.message-scroller-restore-loading__card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgb(148 163 184 / 32%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  color: rgb(51 65 85);
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 8%);
+}
+
+.message-scroller-restore-loading__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(148 163 184 / 35%);
+  border-top-color: rgb(51 65 85);
+  border-radius: 999px;
+  animation: message-scroller-restore-spin 0.8s linear infinite;
+}
+
+@keyframes message-scroller-restore-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .dynamic-row,

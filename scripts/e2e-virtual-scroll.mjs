@@ -37,6 +37,43 @@ function assert(condition, message, details) {
   throw new Error(`${message}${suffix}`)
 }
 
+function isRecoverableNavigationError(error) {
+  const message = String(error?.message || error)
+  return message.includes('ERR_CONNECTION_REFUSED')
+    || message.includes('ERR_HTTP_RESPONSE_CODE_FAILURE')
+}
+
+async function gotoWithServer(page, url, options, ensureServerRunning) {
+  await ensureServerRunning?.()
+
+  try {
+    return await page.goto(url, options)
+  }
+  catch (error) {
+    if (!ensureServerRunning || !isRecoverableNavigationError(error))
+      throw error
+
+    await ensureServerRunning()
+    return await page.goto(url, options)
+  }
+}
+
+async function reloadWithServer(page, options, ensureServerRunning) {
+  await ensureServerRunning?.()
+
+  try {
+    return await page.reload(options)
+  }
+  catch (error) {
+    if (!ensureServerRunning || !isRecoverableNavigationError(error))
+      throw error
+
+    const url = page.url()
+    await ensureServerRunning()
+    return await page.goto(url, options)
+  }
+}
+
 function outerAnchorDelta(before, after) {
   if (!before || !after || before.type !== after.type)
     return Number.POSITIVE_INFINITY
@@ -123,6 +160,32 @@ async function waitForPort(port, timeoutMs = 60000) {
   throw new Error(`Timed out waiting for ${host}:${port}`)
 }
 
+async function waitForHttpReady(port, pathName = '/', timeoutMs = 60000) {
+  const startedAt = Date.now()
+  const url = `http://${host}:${port}${pathName}`
+  let lastStatus = ''
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(2000),
+      })
+
+      lastStatus = `${response.status} ${response.statusText}`.trim()
+
+      if (response.ok)
+        return
+    }
+    catch (error) {
+      lastStatus = error?.message || String(error)
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 150))
+  }
+
+  throw new Error(`Timed out waiting for ${url} to be ready: ${lastStatus}`)
+}
+
 function killProcessTree(child) {
   if (!child || child.killed)
     return
@@ -189,7 +252,6 @@ function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
-      detached: process.platform !== 'win32',
       env: {
         ...process.env,
         CI: '1',
@@ -373,6 +435,7 @@ async function waitForLabReady(page, timeoutMs = 120000) {
         return Boolean(
           snapshot
           && snapshot.ready === true
+          && snapshot.labStatus !== 'warming'
           && snapshot.health
           && document.querySelector('[data-testid="virtual-scroll-root"]'),
         )
@@ -447,19 +510,20 @@ async function waitForVirtualTimelineZeroPaintReady(page, timeoutMs = 60000) {
   }, { timeout: timeoutMs })
 }
 
-async function runVirtualTimelineZeroReloadProbe(page, port) {
-  await page.goto(`http://${host}:${port}/virtual-timeline-zero`, {
+async function runVirtualTimelineZeroReloadProbe(page, port, ensureServerRunning) {
+  await gotoWithServer(page, `http://${host}:${port}/virtual-timeline-zero`, {
     waitUntil: 'domcontentloaded',
     timeout: 60000,
-  })
+  }, ensureServerRunning)
   await waitForVirtualTimelineZeroReady(page)
 
   await page.evaluate((storageKey) => {
     window.sessionStorage.removeItem(storageKey)
   }, virtualTimelineZeroStorageKey)
 
-  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
   await waitForVirtualTimelineZeroReady(page)
+  await waitForVirtualTimelineZeroPaintReady(page)
 
   const beforeReload = await page.evaluate(async () => {
     const api = window.__markstreamVirtualTimelineZero
@@ -522,12 +586,12 @@ async function runVirtualTimelineZeroReloadProbe(page, port) {
     storagePayload: beforeReload.storagePayload,
   })
 
-  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
   await waitForVirtualTimelineZeroReady(page)
 
   const samples = []
   const visibleSamples = []
-  for (let i = 0; i < 80 && visibleSamples.length < 12; i++) {
+  for (let i = 0; i < 300 && visibleSamples.length < 12; i++) {
     const sample = await page.evaluate(() => {
       return window.__markstreamVirtualTimelineZero.read()
     })
@@ -608,18 +672,277 @@ async function runVirtualTimelineZeroReloadProbe(page, port) {
   }
 }
 
-async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
-  await page.goto(`http://${host}:${port}/virtual-timeline-zero`, {
+async function runVirtualTimelineZeroColdThreadSwitchProbe(page, port, ensureServerRunning) {
+  await gotoWithServer(page, `http://${host}:${port}/virtual-timeline-zero`, {
     waitUntil: 'domcontentloaded',
     timeout: 60000,
-  })
+  }, ensureServerRunning)
   await waitForVirtualTimelineZeroReady(page)
 
   await page.evaluate((storageKey) => {
     window.sessionStorage.removeItem(storageKey)
   }, virtualTimelineZeroStorageKey)
 
-  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
+  await waitForVirtualTimelineZeroReady(page)
+
+  const result = await page.evaluate(async () => {
+    const api = window.__markstreamVirtualTimelineZero
+
+    const before = api.read()
+
+    const readVisibleMermaidProbes = () => {
+      const root = document.querySelector('[data-testid="markstream-virtual-timeline"]')
+      if (!root)
+        return []
+
+      const rootRect = root.getBoundingClientRect()
+      return Array.from(root.querySelectorAll('[data-markstream-mermaid]'))
+        .map((element) => {
+          const rect = element.getBoundingClientRect()
+          const visible = rect.bottom >= rootRect.top
+            && rect.top <= rootRect.bottom
+            && rect.width > 0
+            && rect.height > 0
+
+          return {
+            visible,
+            mode: element.getAttribute('data-markstream-mode') || '',
+            pending: element.getAttribute('data-markstream-pending') === 'true',
+            hasSvg: Boolean(element.querySelector('svg')),
+            sourceText: element.querySelector('.mermaid-source-code')?.textContent?.trim() || '',
+          }
+        })
+        .filter(probe => probe.visible)
+    }
+
+    const readSample = () => ({
+      ...api.read(),
+      visibleMermaidProbes: readVisibleMermaidProbes(),
+    })
+
+    const threadBButton = Array
+      .from(document.querySelectorAll('button'))
+      .find(button => button.textContent?.trim() === 'Thread B')
+
+    if (!threadBButton)
+      throw new Error('Thread B button not found')
+
+    threadBButton.click()
+
+    const samples = []
+    for (let i = 0; i < 120; i++) {
+      samples.push(readSample())
+      await api.nextFrame()
+    }
+
+    const visibleSamples = samples.filter(sample => !sample.restoring)
+    const firstVisible = visibleSamples[0] ?? null
+    const mermaidBlankVisible = visibleSamples.some(sample =>
+      sample.visibleMermaidProbes.some(probe =>
+        probe.pending
+        || probe.mode === 'pending'
+        || (probe.mode === 'preview' && !probe.hasSvg)
+        || (probe.mode === 'fallback' && !probe.sourceText),
+      ),
+    )
+    const scrollTops = visibleSamples.map(sample => sample.scrollTop)
+
+    return {
+      before,
+      firstVisible,
+      visibleSampleCount: visibleSamples.length,
+      restoringSampleCount: samples.filter(sample => sample.restoring).length,
+      visibleMermaidProbeCount: visibleSamples.reduce(
+        (total, sample) => total + sample.visibleMermaidProbes.length,
+        0,
+      ),
+      mermaidBlankVisible,
+      scrollTopRange: scrollTops.length
+        ? Math.max(...scrollTops) - Math.min(...scrollTops)
+        : Number.POSITIVE_INFINITY,
+      samples,
+    }
+  })
+
+  assert(
+    result.visibleSampleCount > 0
+    && result.restoringSampleCount > 0
+    && !result.mermaidBlankVisible
+    && result.scrollTopRange <= 1,
+    'virtual-timeline-zero cold Thread B switch exposed Mermaid DOM change before restore readiness',
+    {
+      visibleSampleCount: result.visibleSampleCount,
+      restoringSampleCount: result.restoringSampleCount,
+      visibleMermaidProbeCount: result.visibleMermaidProbeCount,
+      mermaidBlankVisible: result.mermaidBlankVisible,
+      scrollTopRange: result.scrollTopRange,
+      firstVisible: summarizeVirtualTimelineZeroSample(result.firstVisible),
+      samples: result.samples.map(summarizeVirtualTimelineZeroSample),
+    },
+  )
+
+  return {
+    visibleSampleCount: result.visibleSampleCount,
+    restoringSampleCount: result.restoringSampleCount,
+    visibleMermaidProbeCount: result.visibleMermaidProbeCount,
+    scrollTopRange: result.scrollTopRange,
+  }
+}
+
+async function runVirtualScrollQuickReloadHealthProbe(page, port, ensureServerRunning) {
+  await gotoWithServer(page, `http://${host}:${port}/virtual-scroll?profile=smoke&strict=1`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  }, ensureServerRunning)
+  await waitForLabReady(page)
+
+  for (let i = 0; i < 3; i++) {
+    await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
+    await waitForLabReady(page)
+  }
+
+  const result = await evaluateWithLab(page, async (api) => {
+    let latest = api.read()
+
+    for (let i = 0; i < 120; i++) {
+      await api.nextFrame()
+      latest = api.read()
+
+      if (latest.labStatus === 'ok' && latest.health.layoutIntegrityOk)
+        break
+    }
+
+    return latest
+  })
+
+  assert(
+    result.labStatus === 'ok'
+    && result.health.layoutIntegrityOk,
+    'virtual-scroll quick reload left layout diagnostics in a bad state',
+    result,
+  )
+
+  return {
+    labStatus: result.labStatus,
+    layoutIntegrityOk: result.health.layoutIntegrityOk,
+  }
+}
+
+async function runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerRunning) {
+  await gotoWithServer(page, `http://${host}:${port}/virtual-scroller-markstream`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  }, ensureServerRunning)
+
+  await page.waitForFunction(() => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    return Boolean(api && typeof api.read === 'function' && typeof api.nextFrame === 'function')
+  }, { timeout: 60000 })
+
+  const beforeReload = await page.evaluate(async () => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+
+    let snapshot = api.read()
+    for (let i = 0; i < 120; i++) {
+      await api.nextFrame()
+      snapshot = api.read()
+
+      if (!snapshot.restoring && snapshot.totalHeight > 100000)
+        break
+    }
+
+    await api.scrollTo(58772)
+
+    for (let i = 0; i < 60; i++)
+      await api.nextFrame()
+
+    snapshot = api.read()
+
+    return {
+      scrollTop: snapshot.scrollTop,
+      totalHeight: snapshot.totalHeight,
+      visibleRange: snapshot.visibleRange,
+      viewportText: snapshot.viewportText.slice(0, 240),
+    }
+  })
+
+  await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
+
+  await page.waitForFunction(() => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    return Boolean(api && typeof api.read === 'function' && typeof api.nextFrame === 'function')
+  }, { timeout: 60000 })
+
+  const result = await page.evaluate(async (before) => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    const samples = []
+    const visibleSamples = []
+
+    for (let i = 0; i < 180; i++) {
+      await api.nextFrame()
+      const sample = api.read()
+      samples.push(sample)
+
+      if (!sample.restoring)
+        visibleSamples.push(sample)
+    }
+
+    const firstVisible = visibleSamples[0] ?? null
+    const lastVisible = visibleSamples[visibleSamples.length - 1] ?? null
+    const scrollTops = visibleSamples.map(sample => sample.scrollTop)
+    const totalHeights = visibleSamples.map(sample => sample.totalHeight)
+
+    return {
+      before,
+      visibleSampleCount: visibleSamples.length,
+      firstVisible,
+      lastVisible,
+      scrollTopRange: scrollTops.length ? Math.max(...scrollTops) - Math.min(...scrollTops) : Number.POSITIVE_INFINITY,
+      totalHeightRange: totalHeights.length ? Math.max(...totalHeights) - Math.min(...totalHeights) : Number.POSITIVE_INFINITY,
+      firstViewportText: firstVisible?.viewportText?.slice?.(0, 240) ?? '',
+      lastViewportText: lastVisible?.viewportText?.slice?.(0, 240) ?? '',
+      samples: samples.map(sample => ({
+        scrollTop: sample.scrollTop,
+        totalHeight: sample.totalHeight,
+        visibleRange: sample.visibleRange,
+        restoring: sample.restoring,
+        viewportText: String(sample.viewportText || '').slice(0, 180),
+      })),
+    }
+  }, beforeReload)
+
+  assert(
+    result.visibleSampleCount > 0
+    && result.scrollTopRange <= 1
+    && result.totalHeightRange <= 1
+    && result.firstViewportText === result.before.viewportText
+    && result.firstViewportText === result.lastViewportText,
+    'virtual-scroller-markstream reload exposed visible row height / viewport text jitter',
+    result,
+  )
+
+  return {
+    beforeReload,
+    visibleSampleCount: result.visibleSampleCount,
+    scrollTopRange: result.scrollTopRange,
+    totalHeightRange: result.totalHeightRange,
+    firstViewportText: result.firstViewportText,
+  }
+}
+
+async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port, ensureServerRunning) {
+  await gotoWithServer(page, `http://${host}:${port}/virtual-timeline-zero`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  }, ensureServerRunning)
+  await waitForVirtualTimelineZeroReady(page)
+
+  await page.evaluate((storageKey) => {
+    window.sessionStorage.removeItem(storageKey)
+  }, virtualTimelineZeroStorageKey)
+
+  await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
   await waitForVirtualTimelineZeroReady(page)
 
   const beforeReload = await page.evaluate(async (storageKey) => {
@@ -771,7 +1094,7 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
     }
   }, virtualTimelineZeroStorageKey)
 
-  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
   await waitForVirtualTimelineZeroReady(page)
   await waitForVirtualTimelineZeroPaintReady(page)
 
@@ -858,18 +1181,18 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port) {
   }
 }
 
-async function runVirtualTimelineZeroStreamingProbe(page, port) {
-  await page.goto(`http://${host}:${port}/virtual-timeline-zero`, {
+async function runVirtualTimelineZeroStreamingProbe(page, port, ensureServerRunning) {
+  await gotoWithServer(page, `http://${host}:${port}/virtual-timeline-zero`, {
     waitUntil: 'domcontentloaded',
     timeout: 60000,
-  })
+  }, ensureServerRunning)
   await waitForVirtualTimelineZeroReady(page)
 
   await page.evaluate((storageKey) => {
     window.sessionStorage.removeItem(storageKey)
   }, virtualTimelineZeroStorageKey)
 
-  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
   await waitForVirtualTimelineZeroReady(page)
   await waitForVirtualTimelineZeroPaintReady(page)
 
@@ -886,7 +1209,7 @@ async function runVirtualTimelineZeroStreamingProbe(page, port) {
     window.sessionStorage.removeItem(storageKey)
   }, virtualTimelineZeroStorageKey)
 
-  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 })
+  await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
   await waitForVirtualTimelineZeroReady(page)
   await waitForVirtualTimelineZeroPaintReady(page)
 
@@ -960,11 +1283,11 @@ async function runVirtualTimelineZeroStreamingProbe(page, port) {
   }
 }
 
-async function runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port) {
-  await page.goto(`http://${host}:${port}/virtual-timeline-zero`, {
+async function runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port, ensureServerRunning) {
+  await gotoWithServer(page, `http://${host}:${port}/virtual-timeline-zero`, {
     waitUntil: 'domcontentloaded',
     timeout: 60000,
-  })
+  }, ensureServerRunning)
   await waitForVirtualTimelineZeroReady(page)
   await waitForVirtualTimelineZeroPaintReady(page)
 
@@ -1041,11 +1364,12 @@ async function runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port) {
 async function run() {
   const port = await findFreePort()
   const useDevServer = process.env.MARKSTREAM_E2E_VIRTUAL_SCROLL_DEV === '1'
+  const profile = stressMode ? 'stress' : 'smoke'
 
   if (!useDevServer)
     await buildPlaygroundForE2E()
 
-  const server = useDevServer
+  let server = useDevServer
     ? startDevServer(port)
     : startPreviewServer(port)
 
@@ -1057,6 +1381,19 @@ async function run() {
 
   try {
     await waitForPort(port)
+    await waitForHttpReady(port, `/virtual-scroll?profile=${profile}&strict=1`)
+
+    const ensureServerRunning = async () => {
+      if (!await isPortOpen(port)) {
+        killProcessTree(server.child)
+        server = useDevServer
+          ? startDevServer(port)
+          : startPreviewServer(port)
+        await waitForPort(port)
+      }
+
+      await waitForHttpReady(port, `/virtual-scroll?profile=${profile}&strict=1`)
+    }
 
     try {
       browser = await chromium.launch(resolveChromeLaunchOptions())
@@ -1107,12 +1444,10 @@ async function run() {
       )
     }
 
-    const profile = stressMode ? 'stress' : 'smoke'
-
-    await page.goto(`http://${host}:${port}/virtual-scroll?profile=${profile}&strict=1`, {
+    await gotoWithServer(page, `http://${host}:${port}/virtual-scroll?profile=${profile}&strict=1`, {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
-    })
+    }, ensureServerRunning)
 
     await waitForLabReady(page)
 
@@ -1464,10 +1799,20 @@ async function run() {
 
       assertNoPageErrors('virtual-scroll smoke e2e')
 
-      const virtualTimelineReload = await runVirtualTimelineZeroReloadProbe(page, port)
-      const virtualTimelineDiffCodeBlockState = await runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port)
-      const virtualTimelineCodeBlockJitter = await runVirtualTimelineZeroCodeBlockJitterProbe(page, port)
-      const virtualTimelineStreaming = await runVirtualTimelineZeroStreamingProbe(page, port)
+      await ensureServerRunning()
+      const virtualTimelineReload = await runVirtualTimelineZeroReloadProbe(page, port, ensureServerRunning)
+      await ensureServerRunning()
+      const virtualTimelineColdThreadSwitch = await runVirtualTimelineZeroColdThreadSwitchProbe(page, port, ensureServerRunning)
+      await ensureServerRunning()
+      const virtualTimelineDiffCodeBlockState = await runVirtualTimelineZeroDiffCodeBlockStateProbe(page, port, ensureServerRunning)
+      await ensureServerRunning()
+      const virtualTimelineCodeBlockJitter = await runVirtualTimelineZeroCodeBlockJitterProbe(page, port, ensureServerRunning)
+      await ensureServerRunning()
+      const virtualTimelineStreaming = await runVirtualTimelineZeroStreamingProbe(page, port, ensureServerRunning)
+      await ensureServerRunning()
+      const virtualScrollerMarkstreamReload = await runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerRunning)
+      await ensureServerRunning()
+      const quickReloadHealth = await runVirtualScrollQuickReloadHealthProbe(page, port, ensureServerRunning)
 
       assertNoPageErrors('virtual-timeline-zero reload e2e')
 
@@ -1475,10 +1820,13 @@ async function run() {
         ok: true,
         mode,
         health: smoke.final.health,
+        quickReloadHealth,
         virtualTimelineReload,
+        virtualTimelineColdThreadSwitch,
         virtualTimelineCodeBlockJitter,
         virtualTimelineDiffCodeBlockState,
         virtualTimelineStreaming,
+        virtualScrollerMarkstreamReload,
       }, null, 2)}\n`)
 
       return
@@ -1734,6 +2082,7 @@ async function run() {
       await api.toggleNarrowMode()
       await api.settleVisibleRenderers()
       await api.scrollToRatio(0.62)
+      await api.settleVisibleRenderers()
       const narrowAfter = await waitCurrentHealthyAndClear(180)
 
       await api.toggleSmallMessageCoordination()
@@ -2072,6 +2421,7 @@ async function run() {
       const before = api.read()
 
       await api.toggleDensity()
+      await api.settleVisibleRenderers()
       for (let i = 0; i < 30; i++)
         await api.nextFrame()
 
@@ -2096,7 +2446,7 @@ async function run() {
 
     assertThreadRestore(
       'anchor pollution probe',
-      anchorPollutionProbe.before,
+      anchorPollutionProbe.afterRelayout,
       anchorPollutionProbe.restored,
     )
 

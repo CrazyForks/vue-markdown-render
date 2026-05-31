@@ -132,10 +132,13 @@ let pendingThreadStateRememberKey: string | undefined
 let threadRestoreStartedAt = -1
 let activeThreadRestoreSeq = 0
 let activeThreadRestoreAnchor: MarkstreamThreadAnchor | undefined
+let activeThreadRestoreRequiresMarkdownMetrics = false
+let activeThreadRestoreRequiresColdMarkdownMetrics = false
 let activeThreadStateSnapshot: MarkstreamThreadVirtualState | null = null
 let threadRestoreReadyWaitSeq = 0
 let threadRestoreReadyWarnedSeq = 0
 let rootPaddingBlock = { top: 0, bottom: 0 }
+let initialThreadRestoreCompleted = false
 
 const normalizedThreadKey = computed(() => props.threadKey == null ? undefined : String(props.threadKey))
 let activeThreadKeySnapshot = normalizedThreadKey.value
@@ -358,10 +361,17 @@ function isCompatibleMarkdownSource(
   if ((source.threadKey ?? '') !== (normalizedThreadKey.value ?? ''))
     return false
 
-  if ((source.measurementKey ?? '') !== timelineMeasurementKey.value)
+  if (!isCompatibleMarkdownMeasurementKey(source.measurementKey))
     return false
 
   return true
+}
+
+function isCompatibleMarkdownMeasurementKey(measurementKey: string | undefined) {
+  const expected = timelineMeasurementKey.value
+  const actual = measurementKey ?? ''
+
+  return actual === expected || actual.startsWith(`${expected}\u0000`)
 }
 
 function isCompatibleMarkdownState(
@@ -466,10 +476,14 @@ function getScrollContentStart() {
   return rootPaddingBlock.top
 }
 
-function getScrollContentHeight() {
+function getLayoutScrollContentHeight() {
   const padding = rootPaddingBlock
+  return Math.max(0, layout.value.totalHeight + padding.top + padding.bottom)
+}
+
+function getScrollContentHeight() {
   return Math.max(
-    layout.value.totalHeight + padding.top + padding.bottom,
+    getLayoutScrollContentHeight(),
     scrollRoot.value?.scrollHeight ?? 0,
   )
 }
@@ -1077,7 +1091,7 @@ function resolveOuterAnchorOffset(anchor: MarkstreamThreadAnchor | undefined) {
     return null
 
   if (anchor.type === 'bottom') {
-    return getScrollContentHeight()
+    return (!restorePaintReady.value ? getLayoutScrollContentHeight() : getScrollContentHeight())
       - getViewportHeight()
       - Math.max(0, anchor.distanceFromBottomPx)
   }
@@ -1196,6 +1210,8 @@ function hasUsableRestoreFallback(el: HTMLElement | null) {
 function hasPendingVisualNode(content: HTMLElement) {
   return Boolean(content.querySelector([
     '[data-markstream-pending="true"]',
+    '[data-markstream-mermaid][data-markstream-mode="pending"]',
+    '.mermaid-block-container[data-markstream-mode="pending"]',
     '[data-markstream-code-loading="1"]',
   ].join(',')))
 }
@@ -1238,21 +1254,44 @@ function hasReadyCodeBlockContent(content: HTMLElement) {
     return enhanced || hasFallback || hasVisibleMonacoDom(codeBlock)
   }
 
-  // Mermaid / Infographic / D2 are routed from code_block nodes but they do not
-  // render [data-markstream-code-block="1"]. Their pending placeholders already
-  // reserve a stable height, so those roots count as restore-ready content.
-  return Boolean(content.querySelector([
-    '[data-markstream-mermaid]',
-    '[data-markstream-infographic]',
-    '[data-markstream-d2]',
-    '.mermaid-block-container',
-    '.mermaid-preview-area',
-    '.infographic-block-container',
-    '.infographic-preview',
-    '.d2-block-container',
-    '.d2-preview-area',
-    'pre[data-markstream-pre="1"]',
-  ].join(',')))
+  return hasReadyRoutedDiagramContent(content)
+}
+
+function hasReadyRoutedDiagramContent(content: HTMLElement) {
+  const mermaid = content.querySelector<HTMLElement>('[data-markstream-mermaid], .mermaid-block-container')
+  if (mermaid) {
+    if (mermaid.dataset.markstreamPending === 'true')
+      return false
+
+    const mode = mermaid.dataset.markstreamMode
+
+    if (mode === 'preview') {
+      return Boolean(
+        mermaid.querySelector('svg')
+        || mermaid.querySelector('[data-mermaid-svg-layer="1"] svg'),
+      )
+    }
+
+    if (mode === 'fallback') {
+      return Boolean(
+        mermaid.querySelector<HTMLElement>('.mermaid-source-code')
+          ?.textContent
+          ?.trim(),
+      )
+    }
+
+    return false
+  }
+
+  const infographic = content.querySelector<HTMLElement>('[data-markstream-infographic], .infographic-block-container')
+  if (infographic)
+    return infographic.dataset.markstreamPending !== 'true'
+
+  const d2 = content.querySelector<HTMLElement>('[data-markstream-d2], .d2-block-container')
+  if (d2)
+    return d2.dataset.markstreamPending !== 'true'
+
+  return Boolean(content.querySelector('pre[data-markstream-pre="1"]'))
 }
 
 function isVisibleNodeSlotReady(slot: HTMLElement) {
@@ -1291,8 +1330,11 @@ function hasRenderableMarkdownRecordContent(record: TimelineRecord, el: HTMLElem
   if (el.querySelector('[data-node-index]'))
     return true
 
-  const renderer = el.querySelector<HTMLElement>('.markdown-renderer, .markstream-vue')
+  const renderer = el.querySelector<HTMLElement>('.markdown-renderer')
   const contentRoot = renderer ?? el
+
+  if (hasPendingVisualNode(contentRoot))
+    return false
 
   if ((contentRoot.textContent ?? '').trim())
     return true
@@ -1316,6 +1358,41 @@ function hasRenderableMarkdownRecordContent(record: TimelineRecord, el: HTMLElem
     '[data-markstream-pre="1"]',
     '[data-markstream-code-block="1"]',
   ].join(',')))
+}
+
+function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement) {
+  if (!record.markdown)
+    return true
+
+  const renderer = el.querySelector<HTMLElement>('.markdown-renderer')
+  if (!renderer)
+    return true
+
+  if (
+    !activeThreadRestoreRequiresMarkdownMetrics
+    && !(
+      activeThreadRestoreRequiresColdMarkdownMetrics
+      && markdownStates.has(record.key)
+    )
+  ) {
+    return true
+  }
+
+  const state = markdownStates.get(record.key)
+  if (!isCompatibleMarkdownState(record, state))
+    return false
+
+  const metrics = state?.metrics
+  if (!metrics)
+    return false
+
+  const nodeCount = Math.max(0, Number(metrics.nodeCount ?? 0))
+  const measuredCount = Math.max(0, Number(metrics.measuredCount ?? 0))
+  const estimatedCount = Math.max(0, Number(metrics.estimatedCount ?? 0))
+
+  return metrics.final === true
+    && estimatedCount === 0
+    && measuredCount >= nodeCount
 }
 
 function isRestoreViewportReady() {
@@ -1351,9 +1428,24 @@ function isRestoreViewportReady() {
 
     if (!hasRenderableMarkdownRecordContent(record, el))
       return false
+
+    if (!hasReadyMarkdownRestoreMetrics(record, el))
+      return false
   }
 
   const rootRect = root.getBoundingClientRect()
+  const visiblePendingVisualNode = Array
+    .from(root.querySelectorAll<HTMLElement>([
+      '[data-markstream-pending="true"]',
+      '[data-markstream-mermaid][data-markstream-mode="pending"]',
+      '.mermaid-block-container[data-markstream-mode="pending"]',
+      '[data-markstream-code-loading="1"]',
+    ].join(',')))
+    .some(el => isVisibleInRootRect(el, rootRect))
+
+  if (visiblePendingVisualNode)
+    return false
+
   const visibleNodeSlots = Array.from(root.querySelectorAll<HTMLElement>('[data-node-index]'))
     .filter(slot => isVisibleInRootRect(slot, rootRect))
 
@@ -1546,11 +1638,36 @@ function markRestorePaintReady() {
   threadRestoreStartedAt = -1
   threadRestoreReadyWaitSeq = 0
   threadRestoreReadyWarnedSeq = 0
+  activeThreadRestoreRequiresMarkdownMetrics = false
+  activeThreadRestoreRequiresColdMarkdownMetrics = false
 
   if (threadRestoreReadyRetryTimer != null && typeof window !== 'undefined')
     window.clearTimeout(threadRestoreReadyRetryTimer)
 
   threadRestoreReadyRetryTimer = null
+}
+
+function markInitialThreadRestoreCompleted() {
+  initialThreadRestoreCompleted = true
+}
+
+function resolveColdThreadRestoreAnchor(): MarkstreamThreadAnchor | undefined {
+  if (props.stickToBottom !== false) {
+    return {
+      type: 'bottom',
+      distanceFromBottomPx: 0,
+    }
+  }
+
+  const first = layout.value.records[0]
+  if (!first)
+    return undefined
+
+  return {
+    type: 'item',
+    itemKey: first.key,
+    offsetWithinItemPx: 0,
+  }
 }
 
 function canImportThreadItemHeights(state: MarkstreamThreadVirtualState | null | undefined) {
@@ -1639,9 +1756,13 @@ function finishThreadRestore(seq: number) {
 
   updateScrollMetrics({ remember: false })
   markRestorePaintReady()
+  markInitialThreadRestoreCompleted()
 }
 
-function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefined) {
+function restoreThreadState(
+  state: MarkstreamThreadVirtualState | null | undefined,
+  options: { threadSwitch?: boolean } = {},
+) {
   const restoreSeq = ++threadRestoreSeq
 
   if (state?.widthBucket && layoutWidthBucket.value === 0)
@@ -1649,19 +1770,27 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
 
   const anchor = state?.outerAnchor
   const hasRealRestoreState = hasRestorableThreadState(state)
+  const shouldRequireMarkdownMetrics = hasCompatibleMarkdownState(state)
+
+  const isInitialThreadRestore = !initialThreadRestoreCompleted && options.threadSwitch !== true
+  const shouldGateColdThread = !isInitialThreadRestore && !hasRealRestoreState
+  const shouldGateRestore = hasRealRestoreState || shouldGateColdThread
+
   const fallbackAnchor: MarkstreamThreadAnchor | undefined = anchor
-    ?? (hasRealRestoreState && props.stickToBottom !== false
-      ? { type: 'bottom', distanceFromBottomPx: 0 }
+    ?? (shouldGateRestore
+      ? resolveColdThreadRestoreAnchor()
       : undefined)
 
   clearThreadRestoreSchedule()
   threadRestoreReadyWaitSeq = 0
   threadRestoreReadyWarnedSeq = 0
 
-  restorePaintReady.value = !hasRealRestoreState
-  restoringThread.value = hasRealRestoreState && Boolean(fallbackAnchor)
+  restorePaintReady.value = !shouldGateRestore
+  restoringThread.value = shouldGateRestore && Boolean(fallbackAnchor)
   activeThreadRestoreSeq = restoreSeq
   activeThreadRestoreAnchor = fallbackAnchor
+  activeThreadRestoreRequiresMarkdownMetrics = shouldGateRestore && shouldRequireMarkdownMetrics
+  activeThreadRestoreRequiresColdMarkdownMetrics = shouldGateRestore && shouldGateColdThread
   threadRestoreStartedAt = restoringThread.value
     ? getNowMs()
     : -1
@@ -1715,12 +1844,13 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
     ? state
     : null
 
-  if (!hasRealRestoreState) {
+  if (!shouldGateRestore) {
     restoringThread.value = false
     activeThreadRestoreAnchor = undefined
     activeThreadRestoreSeq = 0
     updateScrollMetrics({ remember: false })
     markRestorePaintReady()
+    markInitialThreadRestoreCompleted()
 
     if (props.stickToBottom !== false) {
       bottomPinned.value = true
@@ -1741,6 +1871,7 @@ function restoreThreadState(state: MarkstreamThreadVirtualState | null | undefin
     activeThreadRestoreSeq = 0
     updateScrollMetrics({ remember: false })
     markRestorePaintReady()
+    markInitialThreadRestoreCompleted()
     return
   }
 
@@ -1811,13 +1942,14 @@ watch(
   normalizedThreadKey,
   (threadKey, previousThreadKey) => {
     const oldKey = activeThreadKeySnapshot ?? previousThreadKey
+    const threadSwitch = Boolean(oldKey && oldKey !== threadKey)
 
-    if (oldKey && oldKey !== threadKey)
+    if (threadSwitch)
       rememberPreviousThreadState(oldKey)
 
     activeThreadKeySnapshot = threadKey
 
-    restoreThreadState(resolveThreadStateForRestore(threadKey))
+    restoreThreadState(resolveThreadStateForRestore(threadKey), { threadSwitch })
   },
   {
     immediate: true,

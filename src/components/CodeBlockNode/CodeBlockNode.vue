@@ -266,10 +266,11 @@ let getEditorView: () => MonacoEditorViewLike | null = () => ({ getModel: () => 
 let getDiffEditorView: () => MonacoDiffEditorViewLike | null = () => ({ getModel: () => ({ getLineCount: () => 1 }), getOption: () => 14, updateOptions: () => {} })
 let cleanupEditor: () => void = () => {}
 let safeClean = () => {}
-let refreshDiffPresentation: () => void = () => {}
+let refreshDiffPresentation: () => Promise<unknown> | unknown = () => {}
 let createEditorPromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
 let setTheme: (theme: CodeBlockMonacoTheme | undefined) => Promise<void> | void = async () => {}
+let pendingDiffResultErrorFilterInstalled = false
 const editorHeightSyncDisposables: MonacoDisposableLike[] = []
 const inlineFoldProxyCleanups: Array<() => void> = []
 let runtimeMonacoOptions: MonacoRuntimeOptions | null = null
@@ -305,6 +306,49 @@ function resolveDiffRenderPair(original: string, updated: string) {
   return {
     original: String(original ?? ''),
     updated: String(updated ?? ''),
+  }
+}
+
+function isPendingDiffResultError(error: unknown) {
+  return String((error as { message?: unknown } | null | undefined)?.message ?? error)
+    .includes('no diff result available')
+}
+
+function installPendingDiffResultErrorFilter() {
+  if (pendingDiffResultErrorFilterInstalled || typeof window === 'undefined')
+    return
+
+  pendingDiffResultErrorFilterInstalled = true
+
+  const handleError = (event: ErrorEvent | PromiseRejectionEvent) => {
+    const error = 'reason' in event
+      ? event.reason
+      : event.error ?? event.message
+
+    if (!isPendingDiffResultError(error))
+      return
+
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }
+
+  window.addEventListener('error', handleError, true)
+  window.addEventListener('unhandledrejection', handleError, true)
+}
+
+function refreshDiffPresentationSafely() {
+  try {
+    const result = refreshDiffPresentation()
+    if (result && typeof (result as Promise<unknown>).catch === 'function') {
+      void (result as Promise<unknown>).catch((error) => {
+        if (!isPendingDiffResultError(error))
+          warnCodeBlockDev('Failed to refresh Monaco diff presentation', error)
+      })
+    }
+  }
+  catch (error) {
+    if (!isPendingDiffResultError(error))
+      warnCodeBlockDev('Failed to refresh Monaco diff presentation', error)
   }
 }
 
@@ -1935,7 +1979,7 @@ async function waitForDiffEditorVisualReady() {
       if (isUnmounted)
         return
       try {
-        refreshDiffPresentation()
+        refreshDiffPresentationSafely()
         syncInlineFoldProxies()
         refreshDiffStats()
         scheduleEditorHeightSync()
@@ -1958,12 +2002,37 @@ async function waitForDiffEditorVisualReady() {
   if (isUnmounted)
     return
   try {
-    refreshDiffPresentation()
+    refreshDiffPresentationSafely()
     syncInlineFoldProxies()
     refreshDiffStats()
     scheduleEditorHeightSync()
   }
   catch {}
+}
+
+async function updateDiffCodeWithSettledResult(original: string, updated: string, language: string) {
+  try {
+    await updateDiffCode(original, updated, language)
+    return
+  }
+  catch (error) {
+    if (!isPendingDiffResultError(error))
+      throw error
+  }
+
+  await nextTick()
+  await waitForAnimationFrame()
+
+  if (isUnmounted || !isDiff.value)
+    return
+
+  try {
+    await updateDiffCode(original, updated, language)
+  }
+  catch (error) {
+    if (!isPendingDiffResultError(error))
+      throw error
+  }
 }
 
 function getMaxHeightValue(): number {
@@ -2015,15 +2084,22 @@ watch(
     if (shouldRefreshSettledDiff)
       syncRuntimeMonacoOptions()
 
-    await updateDiffCode(
-      pair.original,
-      pair.updated,
-      monacoLanguage.value,
-    )
+    try {
+      await updateDiffCodeWithSettledResult(
+        pair.original,
+        pair.updated,
+        monacoLanguage.value,
+      )
+    }
+    catch (error) {
+      warnCodeBlockDev('Failed to update Monaco diff editor', error)
+      return
+    }
+
     if (shouldRefreshSettledDiff) {
       if (isUnmounted || !isDiff.value)
         return
-      refreshDiffPresentation()
+      refreshDiffPresentationSafely()
       syncInlineFoldProxies()
       refreshDiffStats()
       scheduleEditorHeightSync()
@@ -2327,6 +2403,7 @@ async function runEditorCreation(el: HTMLElement) {
     return
 
   if (isDiff.value) {
+    installPendingDiffResultErrorFilter()
     safeClean()
     const pair = resolveDiffRenderPair(
       String(props.node.originalCode ?? ''),
@@ -2571,7 +2648,7 @@ function themeUpdate(options: { appearanceOnly?: boolean } = {}) {
   const themeToSet = resolveRequestedTheme()
   const syncPresentation = () => {
     if (isDiff.value)
-      refreshDiffPresentation()
+      refreshDiffPresentationSafely()
     safeRaf(() => {
       syncEditorCssVars()
       scheduleEditorHeightSync()
@@ -2809,7 +2886,7 @@ watch(
               await ensureEditorCreation(codeEditor.value as HTMLElement)
               if (isUnmounted || !isDiff.value)
                 return
-              refreshDiffPresentation()
+              refreshDiffPresentationSafely()
               syncInlineFoldProxies()
               refreshDiffStats()
             }

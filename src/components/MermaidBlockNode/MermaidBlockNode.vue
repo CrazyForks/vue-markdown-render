@@ -57,6 +57,7 @@ const DOMPURIFY_CONFIG = {
 } as const
 
 const mermaidAvailable = ref(false)
+const mermaidAvailabilityResolved = ref(typeof window === 'undefined')
 const mermaidSecurityLevel = computed(() => props.isStrict ? 'strict' : 'loose')
 const mermaidInitConfig = computed(() => ({
   startOnLoad: false,
@@ -162,6 +163,9 @@ async function resolveMermaidInstance() {
   catch (err) {
     mermaidAvailable.value = false
     throw err
+  }
+  finally {
+    mermaidAvailabilityResolved.value = true
   }
 }
 
@@ -396,6 +400,24 @@ const renderToken = ref(0)
 let currentWorkController: AbortController | null = null
 // Track whether an error is currently rendered to avoid being overwritten
 const hasRenderError = ref(false)
+const restoreVisualPending = computed(() => {
+  if (isCollapsed.value)
+    return false
+
+  if (!mermaidAvailabilityResolved.value)
+    return true
+
+  if (showSource.value)
+    return false
+
+  if (isRendering.value || renderQueue.value)
+    return true
+
+  if (!hasRenderedOnce.value)
+    return !(hasRenderError.value && Boolean(mermaidContent.value?.textContent?.trim()))
+
+  return false
+})
 const savedTransformState = ref({
   zoom: 1,
   translateX: 0,
@@ -2006,6 +2028,7 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
     class="mermaid-block-container rounded-lg border overflow-hidden"
     data-markstream-mermaid="1"
     :data-markstream-mode="showSource ? 'fallback' : hasRenderedOnce ? 'preview' : 'pending'"
+    :data-markstream-pending="restoreVisualPending ? 'true' : undefined"
     :class="[
       { 'is-rendering': props.loading, 'dark': props.isDark },
     ]"

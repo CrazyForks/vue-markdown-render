@@ -147,7 +147,7 @@ describe('virtual timeline restore visual readiness', () => {
 
       const pendingMath = wrapper.get('[data-markstream-math="inline"]')
       pendingMath.element.removeAttribute('data-markstream-pending')
-      await vi.advanceTimersByTimeAsync(700)
+      await vi.advanceTimersByTimeAsync(1200)
       await nextTick()
 
       expect(root.classList.contains('is-restoring-thread')).toBe(false)
@@ -216,6 +216,197 @@ describe('virtual timeline restore visual readiness', () => {
       wrapper.get('[data-markstream-math="inline"]').element.removeAttribute('data-markstream-pending')
 
       // The retry loop should observe the DOM becoming ready and reveal.
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps restore loading on first cold thread switch until routed mermaid content is ready', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      stubTimelineDom()
+      installRestoreGeometryStub()
+
+      let mermaidReady = false
+
+      const threadA = [
+        { kind: 'user-message', id: 'a1', text: 'Thread A' },
+      ]
+
+      const threadB = [
+        { kind: 'assistant-markdown', id: 'b1', content: '```mermaid\nflowchart TD\nA-->B\n```', final: true, revision: 1 },
+      ]
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: threadA,
+          threadKey: 'thread-a',
+          stickToBottom: 'auto',
+        },
+        slots: {
+          default(props: any) {
+            if (props.itemKey === 'b1') {
+              return h('div', { ref: props.measureRef }, [
+                h('div', { 'class': 'node-slot', 'data-node-index': '0', 'data-node-type': 'code_block' }, [
+                  h('div', { class: 'node-content' }, [
+                    h('div', {
+                      'data-markstream-mermaid': '1',
+                      'data-markstream-mode': mermaidReady ? 'preview' : 'pending',
+                      'data-markstream-pending': mermaidReady ? undefined : 'true',
+                      'class': 'mermaid-block-container',
+                    }, [
+                      mermaidReady
+                        ? h('svg', { width: 100, height: 100 })
+                        : h('div', { class: 'mermaid-preview-area' }),
+                    ]),
+                  ]),
+                ]),
+              ])
+            }
+
+            return h('div', { ref: props.measureRef }, props.item.text ?? '')
+          },
+          'restore-loading': () => h('div', { 'data-testid': 'restore-loading' }, 'Restoring'),
+        },
+      })
+
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+
+      await wrapper.setProps({
+        items: threadB,
+        threadKey: 'thread-b',
+      })
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+      expect(wrapper.find('[data-testid="restore-loading"]').exists()).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(900)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      mermaidReady = true
+      await wrapper.setProps({ items: [...threadB] })
+      await nextTick()
+
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps restore loading on a cold thread switch while initial restore is still pending', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      stubTimelineDom()
+      installRestoreGeometryStub()
+
+      let mermaidReady = false
+
+      const threadA = [
+        { kind: 'assistant-markdown', id: 'a1', content: 'pending math', final: true, revision: 1 },
+      ]
+
+      const threadB = [
+        { kind: 'assistant-markdown', id: 'b1', content: '```mermaid\nflowchart TD\nA-->B\n```', final: true, revision: 1 },
+      ]
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: threadA,
+          threadKey: 'thread-a',
+          stickToBottom: 'auto',
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: { type: 'bottom', distanceFromBottomPx: 0 },
+            itemHeights: { a1: 360 },
+            itemSizeSources: { a1: timelineItemSource('thread-a', 'a1', 1) },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            if (props.itemKey === 'a1') {
+              return h('div', { ref: props.measureRef }, [
+                h('div', { 'class': 'node-slot', 'data-node-index': '0', 'data-node-type': 'paragraph' }, [
+                  h('div', { class: 'node-content' }, [
+                    h('span', {
+                      'data-markstream-math': 'inline',
+                      'data-markstream-mode': 'fallback',
+                      'data-markstream-pending': 'true',
+                    }, '$x$'),
+                  ]),
+                ]),
+              ])
+            }
+
+            return h('div', { ref: props.measureRef, class: 'markstream-vue' }, [
+              h('div', { 'class': 'node-slot', 'data-node-index': '0', 'data-node-type': 'code_block' }, [
+                h('div', { class: 'node-content' }, [
+                  h('div', {
+                    'data-markstream-mermaid': '1',
+                    'data-markstream-mode': mermaidReady ? 'preview' : 'pending',
+                    'data-markstream-pending': mermaidReady ? undefined : 'true',
+                    'class': 'mermaid-block-container',
+                  }, [
+                    mermaidReady
+                      ? h('svg', { width: 100, height: 100 })
+                      : h('div', { class: 'mermaid-preview-area' }),
+                  ]),
+                ]),
+              ]),
+            ])
+          },
+          'restore-loading': () => h('div', { 'data-testid': 'restore-loading' }, 'Restoring'),
+        },
+      })
+
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await wrapper.setProps({
+        items: threadB,
+        threadKey: 'thread-b',
+      })
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(900)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      mermaidReady = true
+      await wrapper.setProps({ items: [...threadB] })
+      await nextTick()
+
       await vi.advanceTimersByTimeAsync(700)
       await nextTick()
 

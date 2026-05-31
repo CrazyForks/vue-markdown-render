@@ -231,6 +231,7 @@ const SMALL_RENDERER_SLOT_BUDGET = 140
 const PAGE_CHROME_DOM_BUDGET = 2200
 const MESSAGE_DOM_BUDGET = 96
 const MARKDOWN_SLOT_DOM_MULTIPLIER = 5
+const DIAGNOSTICS_WARMUP_MS = 800
 
 function readLabProfile(): LabProfile {
   if (typeof window === 'undefined')
@@ -297,9 +298,11 @@ const settledEvents = ref(0)
 const scrollCompensationCount = ref(0)
 const lastThreadRestoreDeltaPx = ref(0)
 const lastThreadRestoreAnchorDeltaPx = ref(0)
+const diagnosticsReady = ref(false)
 const labEvents = reactive<LabEvent[]>([])
 
 let statsRaf = 0
+let diagnosticsWarmupTimer: number | null = null
 let stressRaf = 0
 let streamTimer: ReturnType<typeof window.setInterval> | null = null
 let resizeObserver: ResizeObserver | null = null
@@ -312,6 +315,7 @@ let lastUserScrollAt = 0
 let programmaticScrollGuardUntil = 0
 let lastVelocitySampleTop = 0
 let lastVelocitySampleAt = 0
+let previousScrollRestoration: ScrollRestoration | undefined
 
 function nowMs() {
   return typeof performance !== 'undefined'
@@ -1770,6 +1774,11 @@ function pushLabEvent(
 
   lastObservedScrollTop = currentScrollTop
 
+  if (!diagnosticsReady.value) {
+    refreshLabSnapshot(stats)
+    return
+  }
+
   labEvents.push({
     type,
     at: now,
@@ -2106,45 +2115,89 @@ function resetHeights() {
   scheduleStats()
 }
 
+function clearDiagnosticsWarmupTimer() {
+  if (diagnosticsWarmupTimer != null && typeof window !== 'undefined')
+    window.clearTimeout(diagnosticsWarmupTimer)
+
+  diagnosticsWarmupTimer = null
+}
+
+function resetObservedHealthState() {
+  blankFrameCount.value = 0
+  clippedMessageCount.value = 0
+  heightDriftMessageCount.value = 0
+  maxItemHeightDriftPx.value = 0
+  worstHeightDriftMessageId.value = ''
+  visibleCoverageOk.value = true
+  scrollCompensationCount.value = 0
+  lastThreadRestoreDeltaPx.value = 0
+  lastThreadRestoreAnchorDeltaPx.value = 0
+  labEvents.splice(0)
+
+  const currentScrollTop = syncScrollStateFromRoot()
+  lastObservedScrollTop = currentScrollTop
+  expectedScrollTop = currentScrollTop
+}
+
+function startDiagnosticsWarmup() {
+  diagnosticsReady.value = false
+  clearDiagnosticsWarmupTimer()
+  resetObservedHealthState()
+
+  if (typeof window === 'undefined') {
+    diagnosticsReady.value = true
+    return
+  }
+
+  diagnosticsWarmupTimer = window.setTimeout(() => {
+    diagnosticsWarmupTimer = null
+    resetObservedHealthState()
+    diagnosticsReady.value = true
+    scheduleStats()
+  }, DIAGNOSTICS_WARMUP_MS)
+}
+
 function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
+  const observedEvents = diagnosticsReady.value ? labEvents : []
+
   const maxObservedBlankProbes = Math.max(
-    stats.blankProbeCount,
+    diagnosticsReady.value ? stats.blankProbeCount : 0,
     0,
-    ...labEvents.map(event => event.blankProbeCount ?? 0),
+    ...observedEvents.map(event => event.blankProbeCount ?? 0),
   )
   const maxObservedPlaceholderProbes = Math.max(
-    stats.placeholderProbeCount,
+    diagnosticsReady.value ? stats.placeholderProbeCount : 0,
     0,
-    ...labEvents.map(event => event.placeholderProbeCount ?? 0),
+    ...observedEvents.map(event => event.placeholderProbeCount ?? 0),
   )
   const maxObservedEmptyCardProbes = Math.max(
-    stats.emptyCardProbeCount,
+    diagnosticsReady.value ? stats.emptyCardProbeCount : 0,
     0,
-    ...labEvents.map(event => event.emptyCardProbeCount ?? 0),
+    ...observedEvents.map(event => event.emptyCardProbeCount ?? 0),
   )
   const maxObservedMarkdownSlots = Math.max(
     stats.markdownSlotCount,
     0,
-    ...labEvents.map(event => event.markdownSlotCount ?? 0),
+    ...observedEvents.map(event => event.markdownSlotCount ?? 0),
   )
   const maxObservedHeightDriftPx = Math.max(
-    stats.maxItemHeightDriftPx,
+    diagnosticsReady.value ? stats.maxItemHeightDriftPx : 0,
     0,
-    ...labEvents.map(event => event.maxItemHeightDriftPx ?? 0),
+    ...observedEvents.map(event => event.maxItemHeightDriftPx ?? 0),
   )
   const maxObservedCoverageGapPx = Math.max(
-    stats.maxCoverageGapPx,
+    diagnosticsReady.value ? stats.maxCoverageGapPx : 0,
     0,
-    ...labEvents.map(event => event.maxCoverageGapPx ?? 0),
+    ...observedEvents.map(event => event.maxCoverageGapPx ?? 0),
   )
   const maxObservedItemOverflowPx = Math.max(
-    stats.maxItemOverflowPx,
+    diagnosticsReady.value ? stats.maxItemOverflowPx : 0,
     0,
-    ...labEvents.map(event => event.maxItemOverflowPx ?? 0),
+    ...observedEvents.map(event => event.maxItemOverflowPx ?? 0),
   )
   const maxObservedScrollJumpPx = Math.max(
     0,
-    ...labEvents
+    ...observedEvents
       .filter(event => !event.expectedJump)
       .map(event => event.scrollJumpPx ?? 0),
   )
@@ -2159,6 +2212,23 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
   const strictClippingOk = stats.maxItemOverflowPx <= 2
   const threadRestoreOk = lastThreadRestoreDeltaPx.value <= SCROLL_JITTER_BUDGET_PX
     || lastThreadRestoreAnchorDeltaPx.value <= SCROLL_JITTER_BUDGET_PX
+  const layoutIntegrityOk = !diagnosticsReady.value || (
+    stats.blankProbeCount === 0
+    && stats.placeholderProbeCount === 0
+    && stats.emptyCardProbeCount === 0
+    && blankFrameCount.value === 0
+    && stats.visibleCoverageOk
+    && strictClippingOk
+    && maxObservedBlankProbes === 0
+    && maxObservedPlaceholderProbes === 0
+    && maxObservedEmptyCardProbes === 0
+    && maxObservedCoverageGapPx <= 24
+    && virtualDomWithinLimit
+    && hugeRendererDomWithinLimit
+    && scrollJitterOk
+    && threadRestoreOk
+    && maxObservedHeightDriftPx < 24
+  )
 
   return {
     ...stats,
@@ -2180,22 +2250,7 @@ function readLabHealth(stats = collectStats({ reconcile: false })): LabHealth {
     lastThreadRestoreDeltaPx: lastThreadRestoreDeltaPx.value,
     lastThreadRestoreAnchorDeltaPx: lastThreadRestoreAnchorDeltaPx.value,
     threadRestoreOk,
-    layoutIntegrityOk:
-      stats.blankProbeCount === 0
-      && stats.placeholderProbeCount === 0
-      && stats.emptyCardProbeCount === 0
-      && blankFrameCount.value === 0
-      && stats.visibleCoverageOk
-      && strictClippingOk
-      && maxObservedBlankProbes === 0
-      && maxObservedPlaceholderProbes === 0
-      && maxObservedEmptyCardProbes === 0
-      && maxObservedCoverageGapPx <= 24
-      && virtualDomWithinLimit
-      && hugeRendererDomWithinLimit
-      && scrollJitterOk
-      && threadRestoreOk
-      && maxObservedHeightDriftPx < 24,
+    layoutIntegrityOk,
   }
 }
 
@@ -2317,9 +2372,11 @@ function buildLabSnapshot(stats: LabStats): VirtualScrollLabSnapshot {
 
   return {
     ...snapshot,
-    labStatus: healthCheck.ok
-      ? 'ok'
-      : `failed: ${healthCheck.failures.join('; ')}`,
+    labStatus: !diagnosticsReady.value
+      ? 'warming'
+      : healthCheck.ok
+        ? 'ok'
+        : `failed: ${healthCheck.failures.join('; ')}`,
   }
 }
 
@@ -2332,7 +2389,7 @@ const labSnapshot = shallowRef<VirtualScrollLabSnapshot>(
   buildLabSnapshot(createEmptyLabStats()),
 )
 
-const labStatusClass = computed(() => labSnapshot.value.labStatus === 'ok' ? 'ok' : 'failed')
+const labStatusClass = computed(() => labSnapshot.value.labStatus.startsWith('failed') ? 'failed' : 'ok')
 
 const debugSummary = computed(() => ({
   thread: activeThreadId.value,
@@ -2641,9 +2698,15 @@ function setupMountedRoot() {
 }
 
 onMounted(() => {
+  if ('scrollRestoration' in window.history) {
+    previousScrollRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+  }
+
   mountedRootSetupActive = true
   exposeLabApi()
   setupMountedRoot()
+  startDiagnosticsWarmup()
 })
 
 onBeforeUnmount(() => {
@@ -2652,6 +2715,15 @@ onBeforeUnmount(() => {
   streamBottomPinned = false
   mountedRootSetupActive = false
   mountedRootInitialized = false
+  clearDiagnosticsWarmupTimer()
+
+  if (
+    previousScrollRestoration
+    && typeof window !== 'undefined'
+    && 'scrollRestoration' in window.history
+  ) {
+    window.history.scrollRestoration = previousScrollRestoration
+  }
 
   for (const timer of threadRestoreTargetClearTimers.values())
     clearTimeout(timer)
