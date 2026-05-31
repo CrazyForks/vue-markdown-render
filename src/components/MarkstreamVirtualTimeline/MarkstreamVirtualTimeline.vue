@@ -222,7 +222,7 @@ const visibleWindow = computed(() => {
 
   const overscanItems = effectiveOverscanItems.value
   const overscanPx = effectiveOverscanPx.value
-  const viewportStart = Math.max(0, scrollTop.value)
+  const viewportStart = getLayoutViewportStart()
   const viewportEnd = viewportStart + Math.max(1, viewportHeight.value)
 
   let start = lowerBoundRecordByOffset(
@@ -435,6 +435,30 @@ function getViewportHeight() {
   return Math.max(0, viewportHeight.value || scrollRoot.value?.clientHeight || 0)
 }
 
+function readRootPaddingBlock() {
+  const root = scrollRoot.value
+  if (!root || typeof getComputedStyle !== 'function')
+    return { top: 0, bottom: 0 }
+
+  const style = getComputedStyle(root)
+  const top = Number.parseFloat(style.paddingTop) || 0
+  const bottom = Number.parseFloat(style.paddingBottom) || 0
+  return { top, bottom }
+}
+
+function getScrollContentStart() {
+  return readRootPaddingBlock().top
+}
+
+function getScrollContentHeight() {
+  const padding = readRootPaddingBlock()
+  return layout.value.totalHeight + padding.top + padding.bottom
+}
+
+function getLayoutViewportStart() {
+  return Math.max(0, scrollTop.value - getScrollContentStart())
+}
+
 function getRestoreLoadingStyle() {
   return {
     height: `${Math.max(1, getViewportHeight())}px`,
@@ -443,7 +467,7 @@ function getRestoreLoadingStyle() {
 }
 
 function getMaxScrollOffset() {
-  return Math.max(0, layout.value.totalHeight - getViewportHeight())
+  return Math.max(0, getScrollContentHeight() - getViewportHeight())
 }
 
 function clampScrollOffset(offset: number) {
@@ -458,7 +482,7 @@ function clampScrollOffset(offset: number) {
 function distanceFromBottom() {
   return Math.max(
     0,
-    layout.value.totalHeight - getViewportHeight() - scrollTop.value,
+    getMaxScrollOffset() - scrollTop.value,
   )
 }
 
@@ -553,7 +577,7 @@ function scrollToOffset(offset: number) {
 }
 
 function scrollToBottom() {
-  scrollToOffset(layout.value.totalHeight - getViewportHeight())
+  scrollToOffset(getMaxScrollOffset())
 }
 
 function applyInitialScrollPosition() {
@@ -572,7 +596,7 @@ function applyInitialScrollPosition() {
 
   bottomPinned.value = true
 
-  applyScrollOffset(layout.value.totalHeight - getViewportHeight(), {
+  applyScrollOffset(getMaxScrollOffset(), {
     writeDom: true,
     remember: false,
     updatePinned: false,
@@ -587,7 +611,7 @@ function scrollToIndex(index: number, align: 'start' | 'center' | 'end' = 'start
   if (!record)
     return
 
-  let offset = record.offset
+  let offset = getScrollContentStart() + record.offset
   if (align === 'center')
     offset -= (viewportHeight.value - record.size) / 2
   else if (align === 'end')
@@ -910,12 +934,14 @@ function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
     }
   }
 
+  const layoutScrollTop = getLayoutViewportStart()
+
   for (const record of layout.value.records) {
-    if (scrollTop.value >= record.offset && scrollTop.value < record.offset + record.size) {
+    if (layoutScrollTop >= record.offset && layoutScrollTop < record.offset + record.size) {
       return {
         type: 'item',
         itemKey: record.key,
-        offsetWithinItemPx: scrollTop.value - record.offset,
+        offsetWithinItemPx: layoutScrollTop - record.offset,
       }
     }
   }
@@ -986,7 +1012,7 @@ function resolveOuterAnchorOffset(anchor: MarkstreamThreadAnchor | undefined) {
     return null
 
   if (anchor.type === 'bottom') {
-    return layout.value.totalHeight
+    return getScrollContentHeight()
       - getViewportHeight()
       - Math.max(0, anchor.distanceFromBottomPx)
   }
@@ -996,7 +1022,7 @@ function resolveOuterAnchorOffset(anchor: MarkstreamThreadAnchor | undefined) {
   if (!record)
     return null
 
-  return record.offset + Math.max(0, anchor.offsetWithinItemPx)
+  return getScrollContentStart() + record.offset + Math.max(0, anchor.offsetWithinItemPx)
 }
 
 function restoreOuterAnchor(
