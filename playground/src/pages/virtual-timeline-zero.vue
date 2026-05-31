@@ -442,6 +442,10 @@ function readSnapshot() {
   }
 }
 
+function readDistanceFromBottom(snapshot: ReturnType<typeof readSnapshot>) {
+  return Math.max(0, snapshot.scrollHeight - snapshot.scrollTop - snapshot.clientHeight)
+}
+
 async function nextFrame() {
   await nextTick()
   await new Promise<void>((resolve) => {
@@ -486,7 +490,7 @@ onMounted(() => {
         await nextFrame()
 
         const snapshot = readSnapshot()
-        const distanceFromBottom = Math.max(0, snapshot.totalHeight - snapshot.scrollTop - snapshot.clientHeight)
+        const distanceFromBottom = readDistanceFromBottom(snapshot)
         if (!snapshot.restoring && distanceFromBottom <= 2)
           break
       }
@@ -502,7 +506,7 @@ onMounted(() => {
 
       const visibleSamples = samples.filter(sample => !sample.restoring)
       const maxDistanceFromBottom = visibleSamples.length
-        ? Math.max(...visibleSamples.map(s => Math.max(0, s.totalHeight - s.scrollTop - s.clientHeight)))
+        ? Math.max(...visibleSamples.map(readDistanceFromBottom))
         : Number.POSITIVE_INFINITY
 
       return {

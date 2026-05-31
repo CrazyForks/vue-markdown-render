@@ -1189,6 +1189,44 @@ function isVisibleNodeSlotReady(slot: HTMLElement) {
   return hasElementContent(content)
 }
 
+function hasRenderableMarkdownRecordContent(record: TimelineRecord, el: HTMLElement) {
+  if (!record.markdown)
+    return true
+
+  const source = getMarkstreamTimelineItemContent(record.item, record.index, props)
+  if (!String(source ?? '').trim())
+    return true
+
+  if (el.querySelector('[data-node-index]'))
+    return true
+
+  const renderer = el.querySelector<HTMLElement>('.markdown-renderer, .markstream-vue')
+  const contentRoot = renderer ?? el
+
+  if ((contentRoot.textContent ?? '').trim())
+    return true
+
+  return Boolean(contentRoot.querySelector([
+    'hr',
+    'br',
+    'table',
+    'blockquote',
+    'img',
+    'svg',
+    'canvas',
+    'input',
+    'button',
+    '[role]',
+    '[aria-label]',
+    '[data-markstream-math]',
+    '[data-markstream-mermaid]',
+    '[data-markstream-infographic]',
+    '[data-markstream-d2]',
+    '[data-markstream-pre="1"]',
+    '[data-markstream-code-block="1"]',
+  ].join(',')))
+}
+
 function isRestoreViewportReady() {
   const root = scrollRoot.value
   if (!root)
@@ -1218,6 +1256,9 @@ function isRestoreViewportReady() {
       return false
 
     if (el.offsetHeight + 1 < record.size)
+      return false
+
+    if (!hasRenderableMarkdownRecordContent(record, el))
       return false
   }
 
