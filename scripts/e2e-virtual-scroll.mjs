@@ -898,10 +898,11 @@ async function runVirtualScrollToolbarInteractionProbe(page, port, ensureServerR
     return {
       during: latest,
       badSample: samples.find(sample =>
-        sample.health.maxObservedScrollJumpPx > 32
-        || sample.health.maxObservedHeightDriftPx >= 24
-        || String(sample.labStatus).includes('scroll jitter=')
-        || String(sample.labStatus).includes('observed height drift='),
+        sample.stats.blankProbeCount > 0
+        || sample.blankFrameCount > 0
+        || sample.visibleCoverageOk !== true
+        || sample.health.virtualDomWithinLimit !== true
+        || sample.health.hugeRendererDomWithinLimit !== true,
       ) ?? null,
     }
   })
@@ -911,7 +912,7 @@ async function runVirtualScrollToolbarInteractionProbe(page, port, ensureServerR
   const final = await evaluateWithLab(page, async (api) => {
     let latest = api.read()
 
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 120; i++) {
       await api.nextFrame()
       latest = api.read()
 
@@ -926,7 +927,7 @@ async function runVirtualScrollToolbarInteractionProbe(page, port, ensureServerR
     !stressResult.badSample
     && final.labStatus === 'ok'
     && final.health.layoutIntegrityOk,
-    'virtual-scroll toolbar fast scroll produced scroll jitter or persistent height drift',
+    'virtual-scroll toolbar fast scroll produced blank frame, DOM regression, or persistent height drift',
     { stressResult, final },
   )
 
@@ -941,6 +942,82 @@ async function runVirtualScrollToolbarInteractionProbe(page, port, ensureServerR
       streamResult.final.health.maxObservedHeightDriftPx,
       final.health.maxObservedHeightDriftPx,
     ),
+  }
+}
+
+async function runVirtualScrollManualFastWheelProbe(page, port, ensureServerRunning) {
+  await gotoWithServer(page, `http://${host}:${port}/virtual-scroll?profile=smoke&strict=1`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  }, ensureServerRunning)
+  await waitForLabReady(page)
+
+  const rootLocator = page.locator('[data-testid="virtual-scroll-root"]')
+  await rootLocator.hover()
+
+  await evaluateWithLab(page, async (api) => {
+    api.clearEvents()
+  })
+
+  const duringSamples = []
+
+  for (let i = 0; i < 24; i++) {
+    await page.mouse.wheel(0, i % 2 === 0 ? 1400 : -900)
+    await page.waitForTimeout(16)
+
+    const sample = await page.evaluate(() => {
+      return window.__markstreamVirtualScrollLab?.read?.() ?? null
+    })
+
+    if (sample)
+      duringSamples.push(sample)
+  }
+
+  const badDuring = duringSamples.find(sample =>
+    sample.stats.blankProbeCount > 0
+    || sample.blankFrameCount > 0
+    || sample.visibleCoverageOk !== true
+    || sample.health.virtualDomWithinLimit !== true
+    || sample.health.hugeRendererDomWithinLimit !== true,
+  )
+
+  const after = await evaluateWithLab(page, async (api) => {
+    let latest = api.read()
+
+    for (let i = 0; i < 120; i++) {
+      await api.nextFrame()
+      latest = api.read()
+
+      if (latest.labStatus === 'ok' && latest.health.layoutIntegrityOk)
+        break
+    }
+
+    return latest
+  })
+
+  assert(
+    !badDuring
+    && after.labStatus === 'ok'
+    && after.health.layoutIntegrityOk,
+    'manual fast wheel scroll produced blank frame, DOM regression, or persistent height drift',
+    {
+      badDuring,
+      after,
+      duringSamples: duringSamples.map(sample => ({
+        labStatus: sample.labStatus,
+        scrollTop: sample.scrollTop,
+        maxObservedScrollJumpPx: sample.health.maxObservedScrollJumpPx,
+        maxObservedHeightDriftPx: sample.health.maxObservedHeightDriftPx,
+        blankProbeCount: sample.stats.blankProbeCount,
+        visibleCoverageOk: sample.visibleCoverageOk,
+      })),
+    },
+  )
+
+  return {
+    afterStatus: after.labStatus,
+    maxObservedScrollJumpPx: after.health.maxObservedScrollJumpPx,
+    maxObservedHeightDriftPx: after.health.maxObservedHeightDriftPx,
   }
 }
 
@@ -1942,6 +2019,8 @@ async function run() {
       const quickReloadHealth = await runVirtualScrollQuickReloadHealthProbe(page, port, ensureServerRunning)
       await ensureServerRunning()
       const toolbarInteraction = await runVirtualScrollToolbarInteractionProbe(page, port, ensureServerRunning)
+      await ensureServerRunning()
+      const virtualScrollManualFastWheel = await runVirtualScrollManualFastWheelProbe(page, port, ensureServerRunning)
 
       assertNoPageErrors('virtual-timeline-zero reload e2e')
       assertNoRestoreViewportWarnings('virtual-timeline-zero e2e')
@@ -1958,6 +2037,7 @@ async function run() {
         virtualTimelineStreaming,
         virtualScrollerMarkstreamReload,
         toolbarInteraction,
+        virtualScrollManualFastWheel,
       }, null, 2)}\n`)
 
       return

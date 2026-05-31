@@ -226,6 +226,7 @@ const narrowMode = ref(false)
 const reverseFlexMode = ref(false)
 const SCROLL_JITTER_BUDGET_PX = 32
 const USER_SCROLL_COMPENSATION_GUARD_MS = 180
+const USER_SCROLL_DIAGNOSTIC_GUARD_MS = 600
 const PROGRAMMATIC_SCROLL_GUARD_MS = 160
 const RESTORE_TARGET_RELEASE_DELAY_MS = 1200
 const COORDINATED_RENDERER_SLOT_EXTRA = 24
@@ -358,6 +359,19 @@ function isProgrammaticScroll() {
   return nowMs() <= programmaticScrollGuardUntil
 }
 
+function isRecentUserScroll() {
+  return lastUserScrollAt > 0
+    && nowMs() - lastUserScrollAt <= USER_SCROLL_DIAGNOSTIC_GUARD_MS
+}
+
+function isActiveViewportMotion() {
+  return stressRunning.value || isRecentUserScroll()
+}
+
+function shouldReconcileVisibleDomDuringStats() {
+  return !isActiveViewportMotion()
+}
+
 function clearThreadRestoreTargetTimer(threadId: ThreadId) {
   const timer = threadRestoreTargetClearTimers.get(threadId)
   if (!timer)
@@ -432,6 +446,7 @@ function isExpectedScrollJump(currentScrollTop: number) {
   }
 
   return isProgrammaticScroll()
+    || isRecentUserScroll()
     || stressRunning.value
     || streamBottomPinned
     || streamTimer != null
@@ -441,6 +456,7 @@ function isExpectedScrollJump(currentScrollTop: number) {
 
 function isExpectedLayoutChange() {
   return isProgrammaticScroll()
+    || isRecentUserScroll()
     || stressRunning.value
     || streamTimer != null
     || isStreamingHeightChangeExpected()
@@ -1400,10 +1416,13 @@ function onScroll() {
     return
 
   const programmatic = isProgrammaticScroll()
+  const previousExpectedScrollTop = expectedScrollTop
 
-  syncScrollStateFromRoot({ updateExpected: true })
+  const currentScrollTop = syncScrollStateFromRoot({ updateExpected: true })
+  const expectedProgrammaticScroll = previousExpectedScrollTop != null
+    && Math.abs(currentScrollTop - previousExpectedScrollTop) <= 2
 
-  if (!programmatic)
+  if (!programmatic || !expectedProgrammaticScroll)
     lastUserScrollAt = nowMs()
 
   if (streamBottomPinned && !streamTimer && getCurrentDistanceFromBottom() > 64)
@@ -1424,7 +1443,9 @@ function scheduleVisibleDomReconcile() {
   statsRaf = requestAnimationFrame(() => {
     statsRaf = 0
     syncScrollStateFromRoot()
-    applyLabStats(collectStats({ reconcile: true }))
+    applyLabStats(collectStats({
+      reconcile: shouldReconcileVisibleDomDuringStats(),
+    }))
   })
 }
 
@@ -1663,7 +1684,7 @@ function collectStats(options: CollectStatsOptions = {}) {
   if (!root)
     return createEmptyLabStats()
 
-  const reconcile = options.reconcile === true
+  const reconcile = options.reconcile === true && shouldReconcileVisibleDomDuringStats()
 
   const domCount = root.querySelectorAll('*').length
   const messageCount = root.querySelectorAll('.virtual-message').length
@@ -1853,13 +1874,16 @@ function scheduleLabEvent(
       return
 
     syncScrollStateFromRoot()
-    if (options.reconcileBeforeRecord)
+
+    const canReconcile = shouldReconcileVisibleDomDuringStats()
+
+    if (options.reconcileBeforeRecord && canReconcile)
       applyLabStats(collectStats({ reconcile: true }))
 
     const stats = collectStats({ reconcile: false })
     pushLabEvent(type, payload, stats)
 
-    if (!options.reconcileBeforeRecord)
+    if (!options.reconcileBeforeRecord && canReconcile)
       applyLabStats(collectStats({ reconcile: true }))
   })
 }

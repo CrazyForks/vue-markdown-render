@@ -118,6 +118,7 @@ const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
 const THREAD_RESTORE_READY_POLL_FRAMES = 40
 const THREAD_RESTORE_MIN_READY_MS = 96
 const THREAD_RESTORE_STABLE_FRAMES = 2
+const THREAD_RESTORE_COLD_STABLE_FRAMES = 8
 const THREAD_RESTORE_READY_RETRY_DELAY_MS = 120
 const THREAD_RESTORE_MAX_LOADING_MS = 3000
 const THREAD_STATE_REMEMBER_DELAY_MS = 80
@@ -1548,6 +1549,12 @@ function hasRestoreLoadingTimedOut() {
     && getNowMs() - threadRestoreStartedAt >= THREAD_RESTORE_MAX_LOADING_MS
 }
 
+function getRequiredRestoreStableFrames() {
+  return activeThreadRestoreRequiresColdMarkdownMetrics
+    ? THREAD_RESTORE_COLD_STABLE_FRAMES
+    : THREAD_RESTORE_STABLE_FRAMES
+}
+
 async function waitRestoreViewportReady(seq: number) {
   const startedAt = getNowMs()
   let stableFrames = 0
@@ -1577,7 +1584,7 @@ async function waitRestoreViewportReady(seq: number) {
       stableFrames += 1
 
       if (
-        stableFrames >= THREAD_RESTORE_STABLE_FRAMES
+        stableFrames >= getRequiredRestoreStableFrames()
         && now - startedAt >= THREAD_RESTORE_MIN_READY_MS
       ) {
         return true
