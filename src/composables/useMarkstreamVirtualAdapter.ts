@@ -5,7 +5,7 @@ import type {
   MarkstreamVirtualState,
   NodeRendererProps,
 } from '../types/node-renderer-props'
-import { getCurrentScope, nextTick, onScopeDispose, reactive, ref, toValue } from 'vue'
+import { getCurrentScope, nextTick, onScopeDispose, reactive, ref, toRaw, toValue } from 'vue'
 import {
   getMarkdownItemChromeHeight,
   readElementOuterHeight,
@@ -284,6 +284,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
   const markdownLogicalHeights = reactive(new Map<string, number>()) as Map<string, number>
   const markdownLogicalHeightSources = new Map<string, MarkdownLogicalHeightSource>()
+  const markdownPropsCache = new Map<string, MarkstreamVirtualMarkdownProps>()
   const measuredElements = new Map<string, HTMLElement>()
   const resizeObservers = new Map<string, ResizeObserver>()
   const restoringThread = ref(false)
@@ -683,27 +684,45 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     const itemKey = getItemKey(item, index)
     const final = getMarkstreamTimelineItemFinal(item, index, options)
     const threadKey = normalizeThreadKey()
-    const restoreState = markdownStates.get(itemKey)
+    const content = getMarkstreamTimelineItemContent(item, index, options)
+    const sessionKey = getSessionKey(item, index)
+    const measurementKey = toValue(options.measurementKey)
+    const cacheKey = [
+      itemKey,
+      sessionKey,
+      final ? 'final' : 'live',
+      measurementKey == null ? '' : String(measurementKey),
+    ].join(':')
+    const restoreState = toRaw(markdownStates).get(itemKey)
+    const cached = markdownPropsCache.get(cacheKey)
+
+    if (cached && cached.content === content) {
+      if (cached.virtualScroll)
+        cached.virtualScroll.restoreState = isCompatibleMarkdownState(itemKey, restoreState) ? restoreState! : null
+
+      return cached
+    }
+
     const virtualScroll: MarkstreamVirtualScrollOptions = {
       enabled: true,
-      sessionKey: getSessionKey(item, index),
+      sessionKey,
       threadKey,
       scrollRoot: () => options.virtualizer.getScrollElement(),
       restoreState: isCompatibleMarkdownState(itemKey, restoreState) ? restoreState! : null,
       restoreAnchor: false,
-      measurementKey: toValue(options.measurementKey),
+      measurementKey,
       settleMode: 'manual',
       settledToken: final,
       emitIntervalMs: 32,
       heightDiffThresholdPx: 1,
     }
 
-    return {
-      content: getMarkstreamTimelineItemContent(item, index, options),
+    const props: MarkstreamVirtualMarkdownProps = {
+      content,
       final,
       nodeVirtual: 'auto',
       fade: options.markdownFade === true,
-      indexKey: getSessionKey(item, index),
+      indexKey: sessionKey,
       virtualScroll,
       onHeightChange(metrics) {
         if (metrics.sessionKey !== getSessionKey(item, index))
@@ -736,9 +755,13 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
           return
 
         markdownStates.set(itemKey, state)
+        virtualScroll.restoreState = state
         seedMarkdownLogicalHeightFromState(itemKey, state)
       },
     }
+
+    markdownPropsCache.set(cacheKey, props)
+    return props
   }
 
   function exportItemHeights() {
@@ -1003,6 +1026,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     itemSizeSources.clear()
     markdownLogicalHeights.clear()
     markdownLogicalHeightSources.clear()
+    markdownPropsCache.clear()
   }
 
   if (getCurrentScope())

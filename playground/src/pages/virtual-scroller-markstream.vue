@@ -4,7 +4,7 @@ import type {
   MarkstreamOuterVirtualizerAdapter,
   MarkstreamThreadVirtualState,
 } from '../../../src/exports'
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
 import { getUseMonaco } from '../../../src/components/CodeBlockNode/monaco'
 import MarkdownRender, { useMarkstreamVirtualAdapter } from '../../../src/exports'
@@ -336,16 +336,20 @@ function makeThread(threadId: ThreadId, label: string, markdownCount: number): T
 
 const activeThreadId = ref<ThreadId>('thread-a')
 const scrollerRef = ref<ScrollerHandle | null>(null)
-const itemHeights = reactive(new Map<string, number>()) as Map<string, number>
-const itemOffsets = reactive(new Map<string, number>()) as Map<string, number>
+const itemHeights = new Map<string, number>()
+const itemOffsets = new Map<string, number>()
 const savedThreadStates = new Map<ThreadId, SavedThreadState>()
+const rowRefCallbacks = new Map<string, (el: Element | { $el?: Element | null } | null | undefined) => void>()
 const visibleRange = ref({ start: 0, end: 0 })
 const scrollTop = ref(0)
 const viewportHeight = ref(0)
 const totalHeight = ref(0)
 const widthBucket = ref(0)
+const itemHeightVersion = ref(0)
 const isRestoringThread = ref(false)
 let rootResizeObserver: ResizeObserver | null = null
+let itemHeightVersionPending = false
+let scrollerRefreshPending = false
 
 const VIRTUAL_SCROLLER_STORAGE_KEY = 'markstream-vue:virtual-scroller-markstream:thread-states:v1'
 
@@ -388,6 +392,8 @@ const measurementKey = computed(() => [
 ].join(':'))
 
 const storedHeightCount = computed(() => {
+  void itemHeightVersion.value
+
   let count = 0
   for (const item of items.value) {
     if (itemHeights.has(item.key))
@@ -434,6 +440,45 @@ function rebuildOffsets() {
   }
 }
 
+function scheduleItemHeightViewUpdate() {
+  if (itemHeightVersionPending)
+    return
+
+  itemHeightVersionPending = true
+
+  const update = () => {
+    itemHeightVersionPending = false
+    itemHeightVersion.value += 1
+  }
+
+  void nextTick(() => {
+    if (typeof requestAnimationFrame === 'function')
+      requestAnimationFrame(update)
+    else
+      update()
+  })
+}
+
+function scheduleScrollerRefresh() {
+  if (scrollerRefreshPending)
+    return
+
+  scrollerRefreshPending = true
+
+  const refresh = () => {
+    scrollerRefreshPending = false
+    scrollerRef.value?.forceUpdate?.(false)
+    updateScrollMetrics()
+  }
+
+  void nextTick(() => {
+    if (typeof requestAnimationFrame === 'function')
+      requestAnimationFrame(refresh)
+    else
+      refresh()
+  })
+}
+
 function getScrollElement() {
   const element = scrollerRef.value?.$el
   return element instanceof HTMLElement ? element : null
@@ -462,10 +507,13 @@ function updateScrollMetrics() {
 
   const start = scrollerRef.value?.findItemIndex?.(scrollTop.value) ?? 0
   const end = scrollerRef.value?.findItemIndex?.(scrollTop.value + viewportHeight.value) ?? start
-  visibleRange.value = {
+  const nextRange = {
     start: Math.min(Math.max(0, start), Math.max(0, items.value.length - 1)),
     end: Math.min(items.value.length, Math.max(end + 1, start + 1)),
   }
+
+  if (visibleRange.value.start !== nextRange.start || visibleRange.value.end !== nextRange.end)
+    visibleRange.value = nextRange
 }
 
 function getOffsetForKey(key: string) {
@@ -504,11 +552,8 @@ const virtualizer: MarkstreamOuterVirtualizerAdapter = {
 
     itemHeights.set(key, size)
     rebuildOffsets()
-
-    void nextTick(() => {
-      scrollerRef.value?.forceUpdate?.(false)
-      updateScrollMetrics()
-    })
+    scheduleItemHeightViewUpdate()
+    scheduleScrollerRefresh()
   },
   getVisibleRange: () => visibleRange.value,
   scrollToOffset: offset => scrollerRef.value?.scrollToPosition?.(offset),
@@ -534,17 +579,25 @@ const initialSavedState = savedThreadStates.get(activeThreadId.value)
 if (initialSavedState)
   adapter.preloadThreadState(initialSavedState.markstreamState)
 
-function getRowStyle(item: TimelineItem) {
-  const height = itemHeights.get(item.key)
-  return height ? { minHeight: `${height}px` } : undefined
-}
-
 function measureRow(
   item: TimelineItem,
   index: number,
   el: Element | { $el?: Element | null } | null | undefined,
 ) {
   adapter.measureItem(item, index, el)
+}
+
+function getRowRef(item: TimelineItem, index: number) {
+  const existing = rowRefCallbacks.get(item.key)
+  if (existing)
+    return existing
+
+  const callback = (el: Element | { $el?: Element | null } | null | undefined) => {
+    measureRow(item, index, el)
+  }
+
+  rowRefCallbacks.set(item.key, callback)
+  return callback
 }
 
 function rememberThreadState(threadId: ThreadId = activeThreadId.value) {
@@ -734,9 +787,8 @@ onBeforeUnmount(() => {
           class="dynamic-row"
         >
           <article
-            :ref="el => measureRow(item, index, el)"
+            :ref="getRowRef(item, index)"
             class="timeline-row"
-            :style="getRowStyle(item)"
             :data-kind="item.kind"
           >
             <div
@@ -904,6 +956,7 @@ onBeforeUnmount(() => {
 }
 
 .timeline-row {
+  box-sizing: border-box;
   padding: 6px 16px;
 }
 
