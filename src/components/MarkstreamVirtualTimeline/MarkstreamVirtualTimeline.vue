@@ -1146,7 +1146,10 @@ function applyThreadRestorePass(
 
 function isVisibleInRootRect(el: HTMLElement, rootRect: DOMRect) {
   const rect = el.getBoundingClientRect()
-  return rect.bottom >= rootRect.top && rect.top <= rootRect.bottom
+  return rect.width > 0
+    && rect.height > 0
+    && rect.bottom > rootRect.top
+    && rect.top < rootRect.bottom
 }
 
 function isElementVisibleInScrollRoot(el: HTMLElement, root: HTMLElement) {
