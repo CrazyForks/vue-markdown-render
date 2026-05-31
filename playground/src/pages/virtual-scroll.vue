@@ -1838,6 +1838,12 @@ function pushLabEvent(
     return
   }
 
+  const {
+    expectedJump: payloadExpectedJump,
+    expectedLayoutChange: payloadExpectedLayoutChange,
+    ...eventPayload
+  } = payload
+
   labEvents.push({
     type,
     at: now,
@@ -1853,9 +1859,9 @@ function pushLabEvent(
     maxCoverageGapPx: stats.maxCoverageGapPx,
     maxItemOverflowPx: stats.maxItemOverflowPx,
     scrollJumpPx,
-    expectedJump: payload.expectedJump ?? expectedActiveScrollJump,
-    expectedLayoutChange: payload.expectedLayoutChange ?? expectedActiveLayoutChange,
-    ...payload,
+    ...eventPayload,
+    expectedJump: payloadExpectedJump ?? expectedActiveScrollJump,
+    expectedLayoutChange: payloadExpectedLayoutChange ?? expectedActiveLayoutChange,
   })
 
   while (labEvents.length > 300)

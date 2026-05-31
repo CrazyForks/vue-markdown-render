@@ -946,7 +946,7 @@ async function runVirtualScrollToolbarInteractionProbe(page, port, ensureServerR
 }
 
 async function runVirtualScrollManualFastWheelProbe(page, port, ensureServerRunning) {
-  await gotoWithServer(page, `http://${host}:${port}/virtual-scroll?profile=smoke&strict=1`, {
+  await gotoWithServer(page, `http://${host}:${port}/virtual-scroll`, {
     waitUntil: 'domcontentloaded',
     timeout: 60000,
   }, ensureServerRunning)
@@ -964,6 +964,18 @@ async function runVirtualScrollManualFastWheelProbe(page, port, ensureServerRunn
   for (let i = 0; i < 24; i++) {
     await page.mouse.wheel(0, i % 2 === 0 ? 1400 : -900)
     await page.waitForTimeout(16)
+
+    const sample = await page.evaluate(() => {
+      return window.__markstreamVirtualScrollLab?.read?.() ?? null
+    })
+
+    if (sample)
+      duringSamples.push(sample)
+  }
+
+  for (let i = 0; i < 80; i++) {
+    await page.mouse.wheel(0, 1600)
+    await page.waitForTimeout(8)
 
     const sample = await page.evaluate(() => {
       return window.__markstreamVirtualScrollLab?.read?.() ?? null
