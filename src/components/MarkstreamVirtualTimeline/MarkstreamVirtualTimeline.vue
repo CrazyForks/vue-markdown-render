@@ -118,11 +118,13 @@ const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
 const THREAD_RESTORE_READY_POLL_FRAMES = 40
 const THREAD_RESTORE_MIN_READY_MS = 320
 const THREAD_RESTORE_STABLE_FRAMES = 3
+const THREAD_RESTORE_READY_RETRY_DELAY_MS = 160
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
 let rootResizeObserver: ResizeObserver | null = null
 let threadRestoreSeq = 0
 let threadRestoreRaf: number | null = null
 let threadRestoreTimers: number[] = []
+let threadRestoreReadyRetryTimer: number | null = null
 let activeThreadRestoreSeq = 0
 let activeThreadRestoreAnchor: MarkstreamThreadAnchor | undefined
 let activeThreadStateSnapshot: MarkstreamThreadVirtualState | null = null
@@ -413,6 +415,11 @@ function clearThreadRestoreSchedule() {
     cancelAnimationFrame(threadRestoreRaf)
 
   threadRestoreRaf = null
+
+  if (threadRestoreReadyRetryTimer != null && typeof window !== 'undefined')
+    window.clearTimeout(threadRestoreReadyRetryTimer)
+
+  threadRestoreReadyRetryTimer = null
 
   if (typeof window !== 'undefined') {
     for (const timer of threadRestoreTimers)
@@ -1337,6 +1344,26 @@ function warnRestoreViewportNotReady(seq: number) {
   }
 }
 
+function scheduleRestoreViewportReadyRetry(seq: number) {
+  if (!isActiveThreadRestore(seq))
+    return
+
+  if (typeof window === 'undefined')
+    return
+
+  if (threadRestoreReadyRetryTimer != null)
+    window.clearTimeout(threadRestoreReadyRetryTimer)
+
+  threadRestoreReadyRetryTimer = window.setTimeout(() => {
+    threadRestoreReadyRetryTimer = null
+
+    if (!isActiveThreadRestore(seq))
+      return
+
+    watchRestoreViewportReady(seq)
+  }, THREAD_RESTORE_READY_RETRY_DELAY_MS)
+}
+
 function watchRestoreViewportReady(seq: number) {
   if (!isActiveThreadRestore(seq) || threadRestoreReadyWaitSeq === seq)
     return
@@ -1352,6 +1379,7 @@ function watchRestoreViewportReady(seq: number) {
 
     if (!ready) {
       warnRestoreViewportNotReady(seq)
+      scheduleRestoreViewportReadyRetry(seq)
       return
     }
 
@@ -1363,6 +1391,11 @@ function markRestorePaintReady() {
   restorePaintReady.value = true
   threadRestoreReadyWaitSeq = 0
   threadRestoreReadyWarnedSeq = 0
+
+  if (threadRestoreReadyRetryTimer != null && typeof window !== 'undefined')
+    window.clearTimeout(threadRestoreReadyRetryTimer)
+
+  threadRestoreReadyRetryTimer = null
 }
 
 function canImportThreadItemHeights(state: MarkstreamThreadVirtualState | null | undefined) {

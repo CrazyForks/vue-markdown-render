@@ -158,6 +158,75 @@ describe('virtual timeline restore visual readiness', () => {
     }
   })
 
+  it('keeps polling restore readiness after the first poll window', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      stubTimelineDom()
+      installRestoreGeometryStub()
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: 'late math', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
+            itemHeights: { m1: 360 },
+            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, [
+              h('div', { 'class': 'node-slot', 'data-node-index': '0', 'data-node-type': 'paragraph' }, [
+                h('div', { class: 'node-content' }, [
+                  h('span', {
+                    'data-markstream-math': 'inline',
+                    'data-markstream-mode': 'fallback',
+                    'data-markstream-pending': 'true',
+                  }, '$x$'),
+                ]),
+              ]),
+            ])
+          },
+        },
+      })
+
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      // Let the initial 40-frame readiness window expire.
+      await vi.advanceTimersByTimeAsync(900)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      // Change DOM readiness without triggering a Vue component update.
+      wrapper.get('[data-markstream-math="inline"]').element.removeAttribute('data-markstream-pending')
+
+      // The retry loop should observe the DOM becoming ready and reveal.
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('treats settled math fallback content as restore-ready', async () => {
     stubTimelineDom()
 
@@ -238,7 +307,7 @@ describe('virtual timeline restore visual readiness', () => {
                     ? h('div', {
                         'data-markstream-code-block': '1',
                         'data-markstream-enhanced': 'true',
-                        class: 'code-block-container',
+                        'class': 'code-block-container',
                       }, 'ready code block')
                     : h('pre', {
                         'class': 'code-pre-fallback',
