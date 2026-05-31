@@ -60,6 +60,17 @@ function emitThreadStateChange(payload: MarkstreamThreadVirtualState) {
 }
 /* eslint-enable vue/custom-event-name-casing */
 
+function shouldAllowMarkdownShrink(metrics: MarkstreamVirtualMetrics) {
+  if (metrics.phase === 'final')
+    return true
+
+  if (!metrics.stable)
+    return false
+
+  return metrics.confidence === 'measured'
+    || metrics.confidence === 'final'
+}
+
 interface TimelineRecord {
   item: any
   index: number
@@ -824,13 +835,21 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
         threadKey: normalizedThreadKey.value,
         measurementKey: timelineMeasurementKey.value,
       })
+
+      const allowMarkdownShrink = shouldAllowMarkdownShrink(metrics)
+      const logicalHeight = Math.ceil(metrics.totalHeight)
+
       reconcileRecordSize(record, {
-        allowMarkdownShrink: true,
+        allowMarkdownShrink,
       })
 
       void nextTick(() => {
+        // Avoid applying a stale delayed shrink after a newer metrics event.
+        if (getKnownMarkdownLogicalHeight(record.key) !== logicalHeight)
+          return
+
         reconcileRecordSize(record, {
-          allowMarkdownShrink: true,
+          allowMarkdownShrink,
         })
       })
 

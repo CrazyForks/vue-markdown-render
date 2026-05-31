@@ -11,6 +11,17 @@ import {
   readElementOuterHeight,
 } from '../utils/virtualItemMeasurement'
 
+function shouldAllowMarkdownShrink(metrics: MarkstreamVirtualMetrics) {
+  if (metrics.phase === 'final')
+    return true
+
+  if (!metrics.stable)
+    return false
+
+  return metrics.confidence === 'measured'
+    || metrics.confidence === 'final'
+}
+
 export type MarkstreamTimelineItemKey = string | number
 
 export interface MarkstreamTimelineItem {
@@ -703,13 +714,20 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
           threadKey,
           measurementKey: normalizeMeasurementKey(),
         })
+
+        const allowMarkdownShrink = shouldAllowMarkdownShrink(metrics)
+        const logicalHeight = Math.ceil(metrics.totalHeight)
+
         reconcileItemSize(itemKey, {
-          allowMarkdownShrink: true,
+          allowMarkdownShrink,
         })
 
         void nextTick(() => {
+          if (getKnownMarkdownLogicalHeight(itemKey) !== logicalHeight)
+            return
+
           reconcileItemSize(itemKey, {
-            allowMarkdownShrink: true,
+            allowMarkdownShrink,
           })
         })
       },

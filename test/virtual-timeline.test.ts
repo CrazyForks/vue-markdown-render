@@ -818,6 +818,134 @@ describe('virtual timeline API', () => {
     }
   })
 
+  it('does not shrink markdown item height from unstable intermediate metrics', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const slotProps: any[] = []
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          { kind: 'assistant-markdown', id: 'm1', content: '# Large', final: false, revision: 1 },
+        ],
+        threadKey: 'thread-a',
+        overscan: 10,
+        stickToBottom: false,
+      },
+      slots: {
+        default(props: any) {
+          slotProps.push(props)
+          return h('div', { ref: props.measureRef }, props.markdownProps?.content ?? '')
+        },
+      },
+    })
+
+    await nextTick()
+
+    const markdown = slotProps.find(props => props.kind === 'assistant-markdown')
+    expect(markdown).toBeTruthy()
+
+    const sessionKey = markdown.markdownProps.virtualScroll.sessionKey
+
+    markdown.markdownProps.onHeightChange({
+      ...createMetrics(1000, sessionKey),
+      phase: 'measuring',
+      stable: true,
+      confidence: 'measured',
+    })
+
+    await nextTick()
+    expect((wrapper.vm as any).getItemSize('m1')).toBe(1000)
+
+    markdown.markdownProps.onHeightChange({
+      ...createMetrics(640, sessionKey),
+      phase: 'measuring',
+      final: false,
+      stable: false,
+      confidence: 'mixed',
+      measuredCount: 1,
+      estimatedCount: 2,
+    })
+
+    await nextTick()
+    await flushAnimationFrame()
+
+    expect((wrapper.vm as any).getItemSize('m1')).toBe(1000)
+
+    wrapper.unmount()
+  })
+
+  it('adapter does not shrink markdown item height from unstable intermediate metrics', async () => {
+    const items = [
+      { kind: 'assistant-markdown', id: 'm1', content: '# Large', final: false, revision: 1 },
+    ]
+
+    const sizes = new Map<string, number>()
+    const root = document.createElement('div')
+
+    const adapter = {
+      getScrollElement: () => root,
+      getScrollTop: () => 0,
+      setScrollTop: vi.fn(),
+      getViewportHeight: () => 300,
+      getTotalHeight: () => sizes.get('m1') ?? 0,
+      getItemOffset: () => 0,
+      getItemSize: (key: string) => sizes.get(key) ?? 0,
+      setItemSize: (key: string, size: number) => {
+        sizes.set(key, size)
+      },
+      getVisibleRange: () => ({ start: 0, end: 1 }),
+      scrollToOffset: vi.fn(),
+      scrollToIndex: vi.fn(),
+    }
+
+    const scope = effectScope()
+
+    const controller = scope.run(() => useMarkstreamVirtualAdapter({
+      items,
+      threadKey: 'thread-a',
+      getRevision: item => item.revision,
+      virtualizer: adapter,
+    }))!
+
+    const markdownProps = controller.markdownProps(items[0], 0)
+    const sessionKey = markdownProps.virtualScroll!.sessionKey!
+
+    markdownProps.onHeightChange({
+      ...createMetrics(1000, sessionKey),
+      phase: 'measuring',
+      stable: true,
+      confidence: 'measured',
+    })
+
+    expect(sizes.get('m1')).toBe(1000)
+
+    markdownProps.onHeightChange({
+      ...createMetrics(640, sessionKey),
+      phase: 'measuring',
+      final: false,
+      stable: false,
+      confidence: 'mixed',
+      measuredCount: 1,
+      estimatedCount: 2,
+    })
+
+    await nextTick()
+    await flushAnimationFrame()
+
+    expect(sizes.get('m1')).toBe(1000)
+
+    scope.stop()
+  })
+
   it('adapter does not shrink restored markdown height to partial DOM before markdown metrics arrive', () => {
     const items = [
       { kind: 'assistant-markdown', id: 'a1', content: '# A', final: true, revision: 1 },
