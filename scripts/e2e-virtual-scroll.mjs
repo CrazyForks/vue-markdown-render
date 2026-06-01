@@ -747,6 +747,7 @@ async function runVirtualTimelineZeroColdThreadSwitchProbe(page, port, ensureSer
       ),
     )
     const scrollTops = visibleSamples.map(sample => sample.scrollTop)
+    const totalHeights = visibleSamples.map(sample => Number(sample.totalHeight || 0))
 
     return {
       before,
@@ -761,6 +762,9 @@ async function runVirtualTimelineZeroColdThreadSwitchProbe(page, port, ensureSer
       scrollTopRange: scrollTops.length
         ? Math.max(...scrollTops) - Math.min(...scrollTops)
         : Number.POSITIVE_INFINITY,
+      totalHeightRange: totalHeights.length
+        ? Math.max(...totalHeights) - Math.min(...totalHeights)
+        : Number.POSITIVE_INFINITY,
       samples,
     }
   })
@@ -769,14 +773,16 @@ async function runVirtualTimelineZeroColdThreadSwitchProbe(page, port, ensureSer
     result.visibleSampleCount > 0
     && result.restoringSampleCount > 0
     && !result.mermaidBlankVisible
-    && result.scrollTopRange <= 1,
-    'virtual-timeline-zero cold Thread B switch exposed Mermaid DOM change before restore readiness',
+    && result.scrollTopRange <= 1
+    && result.totalHeightRange <= 1,
+    'virtual-timeline-zero cold Thread B switch exposed DOM/height change before restore readiness',
     {
       visibleSampleCount: result.visibleSampleCount,
       restoringSampleCount: result.restoringSampleCount,
       visibleMermaidProbeCount: result.visibleMermaidProbeCount,
       mermaidBlankVisible: result.mermaidBlankVisible,
       scrollTopRange: result.scrollTopRange,
+      totalHeightRange: result.totalHeightRange,
       firstVisible: summarizeVirtualTimelineZeroSample(result.firstVisible),
       samples: result.samples.map(summarizeVirtualTimelineZeroSample),
     },
@@ -787,6 +793,7 @@ async function runVirtualTimelineZeroColdThreadSwitchProbe(page, port, ensureSer
     restoringSampleCount: result.restoringSampleCount,
     visibleMermaidProbeCount: result.visibleMermaidProbeCount,
     scrollTopRange: result.scrollTopRange,
+    totalHeightRange: result.totalHeightRange,
   }
 }
 

@@ -1379,6 +1379,27 @@ function hasRenderableMarkdownRecordContent(record: TimelineRecord, el: HTMLElem
   ].join(',')))
 }
 
+function isRestoredMarkdownFloorTailVisible(
+  record: TimelineRecord,
+  el: HTMLElement,
+  contentRoot: HTMLElement,
+  rootRect: DOMRect,
+) {
+  if (activeThreadRestoreAnchor?.type !== 'bottom')
+    return false
+
+  if (!hasTrustedRestoredItemHeight(record))
+    return false
+
+  const contentRect = contentRoot.getBoundingClientRect()
+  const itemRect = el.getBoundingClientRect()
+
+  return contentRect.width > 0
+    && contentRect.height > 0
+    && contentRect.bottom <= rootRect.top + 1
+    && itemRect.bottom > rootRect.top
+}
+
 function hasVisibleReadyMarkdownRecordContent(
   record: TimelineRecord,
   el: HTMLElement,
@@ -1401,8 +1422,12 @@ function hasVisibleReadyMarkdownRecordContent(
   const renderer = el.querySelector<HTMLElement>('.markdown-renderer')
   const contentRoot = renderer ?? el
 
-  if (contentRoot.querySelector('[data-node-index], .node-placeholder'))
+  if (contentRoot.querySelector('[data-node-index], .node-placeholder')) {
+    if (isRestoredMarkdownFloorTailVisible(record, el, contentRoot, rootRect))
+      return hasRenderableMarkdownRecordContent(record, el)
+
     return false
+  }
 
   return hasRenderableMarkdownRecordContent(record, el)
 }
@@ -1439,7 +1464,7 @@ function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement)
 
   const state = markdownStates.get(record.key)
   if (!isCompatibleMarkdownState(record, state))
-    return true
+    return false
 
   const metrics = state?.metrics
   const totalHeight = Number(metrics?.totalHeight ?? 0)
@@ -1542,12 +1567,15 @@ function readRestoreViewportSignature() {
   const recordSignature = visibleWindow.value.records
     .map((record) => {
       const item = itemByKey.get(record.key)
+      const renderer = item?.querySelector<HTMLElement>('.markdown-renderer')
 
       return [
         record.key,
         record.size,
         item?.offsetHeight ?? 0,
         item?.scrollHeight ?? 0,
+        renderer?.offsetHeight ?? 0,
+        renderer?.scrollHeight ?? 0,
       ].join(':')
     })
     .join('|')

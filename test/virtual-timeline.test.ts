@@ -1567,6 +1567,114 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('does not reveal a cold markdown thread before visible markdown metrics arrive', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+        const el = this as HTMLElement
+        return Number.parseFloat(el.style.minHeight || '') || 360
+      })
+      installVirtualTimelineGeometryStub(360)
+
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      })
+
+      const threadA = [
+        { kind: 'user-message', id: 'a-u1', text: 'Thread A' },
+      ]
+      const threadB = [
+        {
+          kind: 'assistant-markdown',
+          id: 'b-md',
+          content: '# Cold thread\n\nMarkdown content',
+          final: true,
+          revision: 1,
+        },
+      ]
+
+      let latestMarkdownProps: any
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: threadA,
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          overscan: 10,
+        },
+        slots: {
+          default(props: any) {
+            if (props.kind === 'assistant-markdown') {
+              latestMarkdownProps = props.markdownProps
+
+              return h('div', { class: 'markdown-renderer' }, [
+                h('div', {
+                  'class': 'node-slot',
+                  'data-node-index': '0',
+                  'data-node-type': 'heading',
+                }, [
+                  h('div', { class: 'node-content' }, [
+                    h('h1', props.markdownProps.content),
+                  ]),
+                ]),
+              ])
+            }
+
+            return h('div', { ref: props.measureRef }, props.item.text)
+          },
+        },
+      })
+
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(100)
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+
+      await wrapper.setProps({
+        items: threadB,
+        threadKey: 'thread-b',
+      })
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(900)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      const sessionKey = latestMarkdownProps.virtualScroll.sessionKey
+      const metrics = createMetrics(720, sessionKey)
+
+      latestMarkdownProps.onHeightChange(metrics)
+      latestMarkdownProps.onVirtualStateChange({
+        sessionKey,
+        threadKey: 'thread-b',
+        metrics,
+        width: 800,
+        measurementKey: ':800',
+      } as MarkstreamVirtualState)
+
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('shows a non-layout restore loading overlay while restored thread state is settling', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
