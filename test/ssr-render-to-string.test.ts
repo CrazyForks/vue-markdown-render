@@ -127,6 +127,37 @@ Footnotes are server-rendered.[^1]
     expect(html).toContain('Footnote body')
   })
 
+  it('uses virtual sessionKey as the default index prefix on the server', async () => {
+    const scopeId = 'ssr-render-virtual-prefix'
+
+    setCustomComponents(scopeId, {
+      probe: defineComponent({
+        name: 'SsrVirtualPrefixProbeNode',
+        props: {
+          node: { type: Object, required: true },
+          indexKey: { type: [String, Number], required: true },
+        },
+        setup(props) {
+          return () => h('div', { 'data-ssr-index-key': String(props.indexKey) }, 'probe')
+        },
+      }) as any,
+    })
+
+    const html = await renderComponent(MarkdownRender, {
+      customId: scopeId,
+      nodes: [{ type: 'probe', raw: '<probe />', content: '' }],
+      final: true,
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'ssr-session',
+      },
+    })
+
+    expect(html).toContain('data-ssr-index-key="virtual-ssr-session-0"')
+
+    removeCustomComponents(scopeId)
+  })
+
   it('keeps plugin custom components scoped to each SSR app instance', async () => {
     const ThinkingNode = defineComponent({
       name: 'SsrThinkingNode',

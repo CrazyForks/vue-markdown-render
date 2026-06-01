@@ -14,6 +14,7 @@ export interface BatchRenderingSchedulerOptions {
   parsedNodesIdentity: ComputedRef<unknown>
   parsedNodeCount: ComputedRef<number>
   desiredRenderedCount: ComputedRef<number>
+  datasetKey: ComputedRef<unknown>
 
   batchingEnabled: ComputedRef<boolean>
   incrementalRenderingActive: ComputedRef<boolean>
@@ -23,7 +24,7 @@ export interface BatchRenderingSchedulerOptions {
   renderedCount: Ref<number>
   adaptiveBatchSize: Ref<number>
   previousRenderContext: Ref<{
-    key: NodeRendererProps['indexKey']
+    key: unknown
     total: number
   }>
   previousBatchConfig: Ref<{
@@ -56,6 +57,7 @@ export function useBatchRenderingScheduler(
     parsedNodesIdentity,
     parsedNodeCount,
     desiredRenderedCount,
+    datasetKey,
     batchingEnabled,
     incrementalRenderingActive,
     resolvedBatchSize,
@@ -202,20 +204,20 @@ export function useBatchRenderingScheduler(
     [
       parsedNodesIdentity,
       parsedNodeCount,
+      datasetKey,
       incrementalRenderingActive,
       resolvedBatchSize,
       resolvedInitialBatch,
       () => props.renderBatchDelay,
-      () => props.indexKey,
     ],
     () => {
       const total = parsedNodeCount.value
       const prevCtx = previousRenderContext.value
-      const datasetKey = props.indexKey
-      const datasetKeyChanged = datasetKey !== undefined && datasetKey !== prevCtx.key
+      const currentDatasetKey = datasetKey.value
+      const datasetKeyChanged = !Object.is(currentDatasetKey, prevCtx.key)
       const lengthChanged = total !== prevCtx.total
       const datasetChanged = datasetKeyChanged || lengthChanged
-      previousRenderContext.value = { key: datasetKey, total }
+      previousRenderContext.value = { key: currentDatasetKey, total }
 
       const prevBatch = previousBatchConfig.value
       const currentDelay = props.renderBatchDelay ?? 16

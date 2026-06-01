@@ -1,12 +1,14 @@
 <script setup lang="ts">
 // Exported props interface for MermaidBlockNode
 import type { MermaidBlockEvent, MermaidBlockNodeProps } from '../../types/component-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import mermaidIcon from '../../icon/mermaid.svg?raw'
 import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, getMermaidDiagramKind, parsePositiveNumber } from '../../utils/diagramHeight'
+import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
 
@@ -55,6 +57,7 @@ const DOMPURIFY_CONFIG = {
 } as const
 
 const mermaidAvailable = ref(false)
+const mermaidAvailabilityResolved = ref(typeof window === 'undefined')
 const mermaidSecurityLevel = computed(() => props.isStrict ? 'strict' : 'loose')
 const mermaidInitConfig = computed(() => ({
   startOnLoad: false,
@@ -161,10 +164,14 @@ async function resolveMermaidInstance() {
     mermaidAvailable.value = false
     throw err
   }
+  finally {
+    mermaidAvailabilityResolved.value = true
+  }
 }
 
 const copyText = ref(false)
 const isCollapsed = ref(false)
+const blockContainer = ref<HTMLElement>()
 const mermaidContainer = ref<HTMLElement>()
 const mermaidContent = ref<HTMLElement>()
 const modalContent = ref<HTMLElement>()
@@ -172,6 +179,68 @@ const modalCloneWrapper = ref<HTMLElement | null>(null)
 const registerViewport = useViewportPriority()
 const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
+const attrs = useAttrs()
+const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
+let lifecyclePendingIndexKey = ''
+let lifecyclePendingCount = 0
+let lifecycleSettleGeneration = 0
+const lifecycleIndexKey = computed(() => {
+  return resolveLifecycleIndexKey(props, attrs)
+})
+
+function reportLifecycleHeight(indexKey = lifecycleIndexKey.value) {
+  if (!indexKey || !blockContainer.value)
+    return
+  lifecycle?.reportHeight(indexKey, blockContainer.value.offsetHeight)
+}
+
+function markLifecyclePending() {
+  const indexKey = lifecycleIndexKey.value
+  if (!indexKey)
+    return
+
+  if (lifecyclePendingIndexKey && lifecyclePendingIndexKey !== indexKey) {
+    lifecycle?.markSettled(lifecyclePendingIndexKey)
+    lifecyclePendingCount = 0
+  }
+
+  lifecyclePendingIndexKey = indexKey
+  lifecyclePendingCount += 1
+  lifecycleSettleGeneration += 1
+
+  if (lifecyclePendingCount === 1)
+    lifecycle?.markPending(indexKey)
+}
+
+async function markLifecycleSettled() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!indexKey)
+    return
+
+  lifecyclePendingCount = Math.max(0, lifecyclePendingCount - 1)
+  if (lifecyclePendingCount > 0)
+    return
+
+  lifecyclePendingIndexKey = ''
+  const generation = ++lifecycleSettleGeneration
+  await nextTick()
+  if (generation !== lifecycleSettleGeneration)
+    return
+
+  reportLifecycleHeight(indexKey)
+  lifecycle?.markSettled(indexKey)
+}
+
+function clearLifecyclePending() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!indexKey)
+    return
+
+  lifecyclePendingIndexKey = ''
+  lifecyclePendingCount = 0
+  lifecycleSettleGeneration += 1
+  lifecycle?.markSettled(indexKey)
+}
 // Mode container used to animate height between Source and Preview
 const modeContainerRef = ref<HTMLElement>()
 const baseFixedCode = computed(() => {
@@ -211,6 +280,10 @@ function resolveEstimatedPreviewHeight() {
   return clampPreviewHeight(
     parsePositiveNumber(props.estimatedPreviewHeightPx) ?? estimateMermaidPreviewHeight(baseFixedCode.value),
   )
+}
+
+function hasExternalPreviewHeightEstimate() {
+  return parsePositiveNumber(props.estimatedPreviewHeightPx) != null
 }
 
 function resolveInitialContainerHeight() {
@@ -327,6 +400,24 @@ const renderToken = ref(0)
 let currentWorkController: AbortController | null = null
 // Track whether an error is currently rendered to avoid being overwritten
 const hasRenderError = ref(false)
+const restoreVisualPending = computed(() => {
+  if (isCollapsed.value)
+    return false
+
+  if (!mermaidAvailabilityResolved.value)
+    return true
+
+  if (showSource.value)
+    return false
+
+  if (isRendering.value || renderQueue.value)
+    return true
+
+  if (!hasRenderedOnce.value)
+    return !(hasRenderError.value && Boolean(mermaidContent.value?.textContent?.trim()))
+
+  return false
+})
 const savedTransformState = ref({
   zoom: 1,
   translateX: 0,
@@ -378,6 +469,7 @@ if (typeof window !== 'undefined') {
 onBeforeUnmount(() => {
   viewportHandle.value?.destroy()
   viewportHandle.value = null
+  clearLifecyclePending()
   clearProgressiveRenderDebounceTimer()
 })
 
@@ -805,7 +897,7 @@ function updateContainerHeight(newContainerWidth?: number, options?: { force?: b
     const resolvedHeight = maxHeight == null ? newHeight : Math.min(newHeight, maxHeight)
     const previewHeight = Math.max(resolvedHeight, resolveEstimatedPreviewHeight())
     contentHeight.value = `${Math.max(newHeight, previewHeight)}px`
-    if (!freezePreviewHeight)
+    if (!freezePreviewHeight && !hasExternalPreviewHeightEstimate())
       containerHeight.value = `${previewHeight}px`
   }
 }
@@ -1206,6 +1298,7 @@ async function initMermaid() {
   }
 
   isRendering.value = true
+  markLifecyclePending()
 
   renderQueue.value = (async () => {
     try {
@@ -1290,6 +1383,7 @@ async function initMermaid() {
     finally {
       isRendering.value = false
       renderQueue.value = null
+      void markLifecycleSettled()
     }
   })()
 
@@ -1348,6 +1442,7 @@ async function renderPartial(code: string) {
     return
 
   isRendering.value = true
+  markLifecyclePending()
   try {
     const mermaidInstance = await resolveMermaidInstance()
     if (!mermaidInstance)
@@ -1378,6 +1473,7 @@ async function renderPartial(code: string) {
   }
   finally {
     isRendering.value = false
+    void markLifecycleSettled()
   }
 }
 
@@ -1386,76 +1482,85 @@ async function renderPartial(code: string) {
 async function progressiveRender() {
   const scheduledAt = Date.now()
   const token = ++renderToken.value
-  // cancel any previous ongoing progressive work
-  if (currentWorkController) {
-    currentWorkController.abort()
-  }
-  currentWorkController = new AbortController()
-  const signal = currentWorkController.signal
-  const theme = props.isDark ? 'dark' : 'light'
-  const base = baseFixedCode.value
-  // 新增：去除所有空白字符后做比较
-  const normalizedBase = base.replace(/\s+/g, '')
-  if (!base.trim()) {
-    if (shouldKeepPreviewForEmptyStreamingSource())
-      return
-    if (mermaidContent.value)
-      clearElement(mermaidContent.value)
-    lastSvgSnapshot.value = null
-    lastRenderedCode.value = ''
-    hasRenderError.value = false
-    return
-  }
-  // 如果和上一次渲染的 code（去除空白）一致，则跳过渲染
-  if (normalizedBase === lastRenderedCode.value) {
-    return
-  }
-  try {
-    const res = await canParseOrPrefix(base, theme, { signal, timeoutMs: timeouts.value.worker })
-    if (res.fullOk) {
-      const rendered = await initMermaid()
-      if (!rendered)
-        return
-      // Guard against race: if a newer render started, skip flag changes
-      if (renderToken.value === token) {
-        lastSvgSnapshot.value = mermaidContent.value?.innerHTML ?? null
-        // 记录本次渲染的 code（去除空白）
-        lastRenderedCode.value = normalizedBase
-        hasRenderError.value = false
-      }
-      return
-    }
-    // If stopPreviewPolling just happened after this work was queued, avoid partials
-    const justStopped = lastPreviewStopAt && scheduledAt <= lastPreviewStopAt
-    if (res.prefixOk && res.prefix && canApplyPartialPreview() && !justStopped) {
-      // render a best-effort partial preview
-      await renderPartial(res.prefix)
-      return
-    }
-  }
-  catch (e: any) {
-    // aborted -> do nothing
-    if (e?.name === 'AbortError')
-      return
-    // fallthrough to restore last success
-  }
 
-  // Worker/main parse failed -> restore last successful full SVG (if any), do not render prefix
-  if (renderToken.value !== token)
-    return
-  // 若当前处于错误显示状态，避免用缓存覆盖错误，直到下一次成功渲染
-  if (hasRenderError.value)
-    return
-  // If we cannot apply partial and also shouldn't restore cached (e.g., error state), bail
-  const cached = svgCache.value[theme]
-  if (cached && mermaidContent.value) {
-    const rendered = renderSvgToTarget(mermaidContent.value, cached.svg)
-    if (rendered) {
-      lastMermaidBindFunctions = cached.bindFunctions ?? null
-      bindMermaidInteractions(rendered.bindTarget)
+  markLifecyclePending()
+
+  try {
+    // cancel any previous ongoing progressive work
+    if (currentWorkController) {
+      currentWorkController.abort()
     }
+    currentWorkController = new AbortController()
+    const signal = currentWorkController.signal
+    const theme = props.isDark ? 'dark' : 'light'
+    const base = baseFixedCode.value
+    // 新增：去除所有空白字符后做比较
+    const normalizedBase = base.replace(/\s+/g, '')
+    if (!base.trim()) {
+      if (shouldKeepPreviewForEmptyStreamingSource())
+        return
+      if (mermaidContent.value)
+        clearElement(mermaidContent.value)
+      lastSvgSnapshot.value = null
+      lastRenderedCode.value = ''
+      hasRenderError.value = false
+      return
+    }
+    // 如果和上一次渲染的 code（去除空白）一致，则跳过渲染
+    if (normalizedBase === lastRenderedCode.value) {
+      return
+    }
+
+    try {
+      const res = await canParseOrPrefix(base, theme, { signal, timeoutMs: timeouts.value.worker })
+      if (res.fullOk) {
+        const rendered = await initMermaid()
+        if (!rendered)
+          return
+        // Guard against race: if a newer render started, skip flag changes
+        if (renderToken.value === token) {
+          lastSvgSnapshot.value = mermaidContent.value?.innerHTML ?? null
+          // 记录本次渲染的 code（去除空白）
+          lastRenderedCode.value = normalizedBase
+          hasRenderError.value = false
+        }
+        return
+      }
+      // If stopPreviewPolling just happened after this work was queued, avoid partials
+      const justStopped = lastPreviewStopAt && scheduledAt <= lastPreviewStopAt
+      if (res.prefixOk && res.prefix && canApplyPartialPreview() && !justStopped) {
+        // render a best-effort partial preview
+        await renderPartial(res.prefix)
+        return
+      }
+    }
+    catch (e: any) {
+      // aborted -> do nothing
+      if (e?.name === 'AbortError')
+        return
+      // fallthrough to restore last success
+    }
+
+    // Worker/main parse failed -> restore last successful full SVG (if any), do not render prefix
+    if (renderToken.value !== token)
+      return
+    // 若当前处于错误显示状态，避免用缓存覆盖错误，直到下一次成功渲染
+    if (hasRenderError.value)
+      return
+    // If we cannot apply partial and also shouldn't restore cached (e.g., error state), bail
+    const cached = svgCache.value[theme]
+    if (cached && mermaidContent.value) {
+      const rendered = renderSvgToTarget(mermaidContent.value, cached.svg)
+      if (rendered) {
+        lastMermaidBindFunctions = cached.bindFunctions ?? null
+        bindMermaidInteractions(rendered.bindTarget)
+      }
+    }
+    // else: keep current DOM (could be empty on very first run)
   }
-  // else: keep current DOM (could be empty on very first run)
+  finally {
+    void markLifecycleSettled()
+  }
 }
 
 function stopPreviewPolling() {
@@ -1887,6 +1992,7 @@ onUnmounted(() => {
   terminateMermaidWorker()
   stopPreviewPolling()
   clearRenderRetryTimer()
+  clearLifecyclePending()
 })
 
 watch(
@@ -1918,9 +2024,11 @@ const computedButtonStyle = 'mermaid-action-btn p-[var(--ms-action-btn-padding)]
 
 <template>
   <div
+    ref="blockContainer"
     class="mermaid-block-container rounded-lg border overflow-hidden"
     data-markstream-mermaid="1"
     :data-markstream-mode="showSource ? 'fallback' : hasRenderedOnce ? 'preview' : 'pending'"
+    :data-markstream-pending="restoreVisualPending ? 'true' : undefined"
     :class="[
       { 'is-rendering': props.loading, 'dark': props.isDark },
     ]"

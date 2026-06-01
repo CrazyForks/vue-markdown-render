@@ -118,6 +118,28 @@ describe('node renderer measurement performance', () => {
     wrapper.unmount()
   })
 
+  it('disables node virtualization when nodeVirtual is false', async () => {
+    CountingResizeObserver.observeCalls = 0
+    vi.stubGlobal('ResizeObserver', CountingResizeObserver as any)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: Array.from({ length: 6 }, (_, index) => createParagraph(index)),
+        viewportPriority: false,
+        maxLiveNodes: 2,
+        nodeVirtual: false,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('virtualized')
+    expect(wrapper.findAll('.node-slot')).toHaveLength(6)
+    expect(CountingResizeObserver.observeCalls).toBe(0)
+    wrapper.unmount()
+  })
+
   it('still measures node heights when virtualization is on', async () => {
     CountingResizeObserver.observeCalls = 0
     vi.stubGlobal('ResizeObserver', CountingResizeObserver as any)

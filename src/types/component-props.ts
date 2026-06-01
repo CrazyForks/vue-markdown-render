@@ -150,6 +150,12 @@ export interface LinkNodeProps {
 
 export interface PreCodeNodeProps {
   node: CodeBlockNode
+  showLineNumbers?: boolean
+  /**
+   * Optional reserved visual height for async/loading fallbacks.
+   * Used by virtual-scroll restore paths to avoid a zero/short pending frame.
+   */
+  reservedHeightPx?: number
 }
 
 export interface MermaidBlockNodeProps {

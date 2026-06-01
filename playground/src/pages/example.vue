@@ -10,8 +10,8 @@ import { setMermaidWorker } from '../../../src/workers/mermaidWorkerClient'
 import 'katex/dist/katex.min.css'
 
 // Workers
-setKaTeXWorker(() => new KatexWorker())
-setMermaidWorker(() => new MermaidWorker())
+setKaTeXWorker(new KatexWorker())
+setMermaidWorker(new MermaidWorker())
 getUseMonaco()
 
 const isDark = ref(

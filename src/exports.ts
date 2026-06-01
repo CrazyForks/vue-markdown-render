@@ -1,6 +1,7 @@
 import type { MathOptions } from 'stream-markdown-parser'
 import type { App, Component, DefineComponent, Plugin } from 'vue'
 import type { InfographicLoader } from './components/InfographicBlockNode/infographic'
+import type { MarkstreamVirtualTimelineProps } from './composables/useMarkstreamVirtualAdapter'
 import type { CustomComponents as MarkstreamCustomComponents } from './types'
 import type {
   CodeBlockNodeProps,
@@ -52,6 +53,7 @@ import TextNode from './components/TextNode'
 import ThematicBreakNode from './components/ThematicBreakNode'
 import Tooltip from './components/Tooltip'
 import VmrContainerNode from './components/VmrContainerNode'
+import { useMarkstreamVirtualAdapter } from './composables/useMarkstreamVirtualAdapter'
 import { setDefaultI18nMap } from './composables/useSafeI18n'
 import { useSmoothMarkdownStream } from './composables/useSmoothMarkdownStream'
 import { setIconTheme } from './icon-themes'
@@ -74,12 +76,29 @@ const MathInlineNode = definePublicAsyncComponent<MathInlineNodeProps>(() => imp
 const MermaidBlockNode = definePublicAsyncComponent<MermaidBlockNodeProps>(() => import('./components/MermaidBlockNode'))
 const InfographicBlockNode = definePublicAsyncComponent<InfographicBlockNodeProps>(() => import('./components/InfographicBlockNode'))
 const D2BlockNode = definePublicAsyncComponent<D2BlockNodeProps>(() => import('./components/D2BlockNode'))
+const MarkstreamVirtualTimeline = definePublicAsyncComponent<MarkstreamVirtualTimelineProps<any>>(
+  () => import('./components/MarkstreamVirtualTimeline'),
+)
 
 export type { D2Loader } from './components/D2BlockNode/d2'
 export type { InfographicLoader } from './components/InfographicBlockNode/infographic'
 export type { KatexLoader } from './components/MathInlineNode/katex'
 
 export type { MermaidLoader } from './components/MermaidBlockNode/mermaid'
+export type {
+  MarkstreamBottomAnchor,
+  MarkstreamOuterAnchor,
+  MarkstreamOuterVirtualizerAdapter,
+  MarkstreamThreadAnchor,
+  MarkstreamThreadVirtualState,
+  MarkstreamTimelineItem,
+  MarkstreamTimelineItemKey,
+  MarkstreamVirtualAdapterController,
+  MarkstreamVirtualMarkdownProps,
+  MarkstreamVirtualTimelineProps,
+  MarkstreamVisibleRange,
+  UseMarkstreamVirtualAdapterOptions,
+} from './composables/useMarkstreamVirtualAdapter'
 export type {
   SmoothMarkdownStreamController,
   SmoothMarkdownStreamOptions,
@@ -111,9 +130,31 @@ export type {
   MermaidBlockNodeProps,
   PreCodeNodeProps,
 } from './types/component-props'
-export type { NodeRendererProps } from './types/node-renderer-props'
+export type {
+  MarkstreamCaptureVirtualStateOptions,
+  MarkstreamHeightCache,
+  MarkstreamHeightCacheEntry,
+  MarkstreamMeasuredHeightCacheEntry,
+  MarkstreamNodeLifecycle,
+  MarkstreamRendererHandle,
+  MarkstreamScrollRoot,
+  MarkstreamScrollRootLike,
+  MarkstreamScrollRootRef,
+  MarkstreamScrollRootResolver,
+  MarkstreamVirtualAnchor,
+  MarkstreamVirtualConfidence,
+  MarkstreamVirtualMetrics,
+  MarkstreamVirtualPhase,
+  MarkstreamVirtualReason,
+  MarkstreamVirtualScrollHeightCacheOptions,
+  MarkstreamVirtualScrollOptions,
+  MarkstreamVirtualScrollSharedOptions,
+  MarkstreamVirtualState,
+  NodeRendererProps,
+} from './types/node-renderer-props'
 // Export centralized props interfaces so they appear in package d.ts
 export * from './utils'
+export { MARKSTREAM_NODE_LIFECYCLE_KEY, useMarkstreamNodeLifecycle } from './utils/nodeLifecycle'
 export * from './workers/katexCdnWorker'
 export * from './workers/katexWorkerClient'
 export * from './workers/mermaidCdnWorker'
@@ -171,6 +212,7 @@ export {
   ListNode,
   MarkdownCodeBlockNode,
   MarkdownRender,
+  MarkstreamVirtualTimeline,
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
@@ -192,6 +234,7 @@ export {
   TextNode,
   ThematicBreakNode,
   Tooltip,
+  useMarkstreamVirtualAdapter,
   useSmoothMarkdownStream,
   VmrContainerNode,
 }
@@ -237,6 +280,7 @@ const componentMap: Record<string, Component> = {
   VmrContainerNode,
   ReferenceNode,
   MarkdownCodeBlockNode,
+  MarkstreamVirtualTimeline,
 }
 
 export const VueRendererMarkdown: Plugin = {

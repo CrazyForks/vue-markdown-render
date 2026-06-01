@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import type { InfographicBlockNodeProps } from '../../types/component-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import infographicIcon from '../../icon/infographic.svg?raw'
 import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
+import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { getInfographic, isInfographicEnabled } from './infographic'
 
 const props = withDefaults(
@@ -40,6 +42,53 @@ const modalCloneWrapper = ref<HTMLElement | null>(null)
 const hasPreview = ref(false)
 const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
+const attrs = useAttrs()
+const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
+let lifecyclePendingIndexKey = ''
+const lifecycleIndexKey = computed(() => {
+  return resolveLifecycleIndexKey(props, attrs)
+})
+
+function reportLifecycleHeight(indexKey = lifecycleIndexKey.value) {
+  if (!indexKey || !viewportTarget.value)
+    return
+  lifecycle?.reportHeight(indexKey, viewportTarget.value.offsetHeight)
+}
+
+function markLifecyclePending() {
+  const indexKey = lifecycleIndexKey.value
+  if (!indexKey)
+    return
+
+  if (lifecyclePendingIndexKey === indexKey)
+    return
+
+  if (lifecyclePendingIndexKey)
+    lifecycle?.markSettled(lifecyclePendingIndexKey)
+
+  lifecyclePendingIndexKey = indexKey
+  lifecycle?.markPending(indexKey)
+}
+
+async function markLifecycleSettled() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!indexKey)
+    return
+
+  lifecyclePendingIndexKey = ''
+  await nextTick()
+  reportLifecycleHeight(indexKey)
+  lifecycle?.markSettled(indexKey)
+}
+
+function clearLifecyclePending() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!indexKey)
+    return
+
+  lifecyclePendingIndexKey = ''
+  lifecycle?.markSettled(indexKey)
+}
 
 if (typeof window !== 'undefined') {
   watch(
@@ -98,9 +147,12 @@ const estimatedPreviewHeight = computed(() =>
   ),
 )
 const containerHeight = ref<string>(`${estimatedPreviewHeight.value}px`)
+const hasExternalPreviewHeightEstimate = computed(() => parsePositiveNumber(props.estimatedPreviewHeightPx) != null)
 
 function updateContainerHeight() {
   if (!infographicContainer.value)
+    return
+  if (hasExternalPreviewHeightEstimate.value)
     return
 
   const actualHeight = infographicContainer.value.scrollHeight
@@ -363,6 +415,7 @@ async function renderInfographic(force = false) {
     return
 
   renderInFlight = true
+  markLifecyclePending()
   const previousHtml = infographicContainer.value.innerHTML
   const previousHasPreview = hasPreview.value
 
@@ -446,6 +499,9 @@ async function renderInfographic(force = false) {
         void renderInfographic(forceNext)
       })
     }
+    else {
+      void markLifecycleSettled()
+    }
   }
 }
 
@@ -526,6 +582,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   viewportHandle.value?.destroy()
   viewportHandle.value = null
+  clearLifecyclePending()
   if (infographicInstance) {
     infographicInstance.destroy?.()
     infographicInstance = null

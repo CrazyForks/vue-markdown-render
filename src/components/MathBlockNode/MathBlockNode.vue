@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { MathBlockNodeProps } from '../../types/component-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useViewportPriority } from '../../composables/viewportPriority'
+import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 
@@ -10,7 +12,11 @@ import { useMathBlockMinHeightCache } from './minHeightCache'
 
 const props = defineProps<MathBlockNodeProps>()
 const containerEl = ref<HTMLElement | null>(null)
+const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 const mathContent = computed(() => normalizeKaTeXRenderInput(props.node.content))
+const lifecycleIndexKey = computed(() => {
+  return resolveLifecycleIndexKey(props, {})
+})
 
 function resolveInitialState() {
   if (!props.node.content) {
@@ -62,11 +68,24 @@ const minHeightCacheContext = useMathBlockMinHeightCache()
 const registerVisibility = useViewportPriority()
 let visibilityHandle: ReturnType<typeof registerVisibility> | null = null
 let resizeObserver: ResizeObserver | null = null
+let lifecyclePendingIndexKey = ''
 const renderingLoading = ref(initialState.loading)
+const renderingPending = ref(false)
 const lockedMinHeight = ref(resolveCachedMinHeight())
 
 if (initialState.html || initialState.text)
   hasRenderedOnce = true
+
+function markRenderPending() {
+  renderingPending.value = true
+}
+
+function clearRenderPending(renderId?: number) {
+  if (renderId != null && renderId !== currentRenderId)
+    return
+
+  renderingPending.value = false
+}
 
 function getHeightCacheKey() {
   if (props.indexKey == null)
@@ -104,11 +123,64 @@ function captureHeight() {
   })
 }
 
+function markLifecyclePending() {
+  const indexKey = lifecycleIndexKey.value
+  if (!lifecycle || !indexKey)
+    return
+
+  if (lifecyclePendingIndexKey === indexKey)
+    return
+
+  if (lifecyclePendingIndexKey)
+    lifecycle.markSettled(lifecyclePendingIndexKey)
+
+  lifecyclePendingIndexKey = indexKey
+  lifecycle.markPending(indexKey)
+}
+
+function markLifecycleSettled() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!lifecycle || !indexKey)
+    return
+
+  lifecyclePendingIndexKey = ''
+  nextTick(() => {
+    if (!isUnmounted) {
+      const height = containerEl.value?.offsetHeight ?? 0
+      if (height > 0)
+        lifecycle.reportHeight(indexKey, height)
+    }
+    lifecycle.markSettled(indexKey)
+  })
+}
+
+function clearLifecyclePending() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!lifecycle || !indexKey)
+    return
+
+  lifecyclePendingIndexKey = ''
+  lifecycle.markSettled(indexKey)
+}
+
 // Function to render math using KaTeX
 async function renderMath() {
-  if (isUnmounted)
+  if (isUnmounted) {
+    clearLifecyclePending()
+    clearRenderPending()
     return
+  }
+
+  if (currentAbortController) {
+    currentAbortController.abort()
+    currentAbortController = null
+  }
+
+  const renderId = ++currentRenderId
+
   if (!props.node.content) {
+    clearLifecyclePending()
+    clearRenderPending()
     renderingLoading.value = false
     renderedHtml.value = ''
     renderedText.value = props.node.raw
@@ -116,6 +188,13 @@ async function renderMath() {
     captureHeight()
     return
   }
+
+  const abortController = new AbortController()
+  currentAbortController = abortController
+
+  // Mark pending before visibility wait. During restore, the element may be in
+  // layout but visually hidden; readiness must not reveal raw fallback as final.
+  markRenderPending()
 
   // Wait until near/in viewport to prioritize visible area
   if (!hasRenderedOnce) {
@@ -129,18 +208,13 @@ async function renderMath() {
     }
     catch {}
   }
-
-  // cancel any previous in-flight render
-  if (currentAbortController) {
-    currentAbortController.abort()
-    currentAbortController = null
+  if (isUnmounted || renderId !== currentRenderId || abortController.signal.aborted) {
+    if (!isUnmounted)
+      clearRenderPending(renderId)
+    return
   }
 
-  // increment render id for this invocation; responses from older renders are ignored
-  const renderId = ++currentRenderId
-  const abortController = new AbortController()
-  currentAbortController = abortController
-
+  markLifecyclePending()
   renderKaTeXWithBackpressure(mathContent.value, true, {
     timeout: 3000,
     waitTimeout: 2000,
@@ -177,6 +251,9 @@ async function renderMath() {
       // under viewport bursts to avoid showing raw text.
       if (isWorkerInitFailure || isBusyOrTimeout) {
         const katex = await getKatex()
+        if (isUnmounted || renderId !== currentRenderId)
+          return
+
         if (katex) {
           try {
             const html = katex.renderToString(mathContent.value, {
@@ -199,7 +276,7 @@ async function renderMath() {
 
       // show raw fallback when we never successfully rendered before or when loading flag is false
 
-      if (isDisabled) {
+      if (isDisabled || !props.node.loading) {
         renderingLoading.value = false
         renderedHtml.value = ''
         renderedText.value = props.node.raw
@@ -207,14 +284,13 @@ async function renderMath() {
         return
       }
 
-      if (!hasRenderedOnce) {
+      if (!hasRenderedOnce)
         renderingLoading.value = true
-      }
-      if (!props.node.loading) {
-        renderingLoading.value = false
-        renderedHtml.value = ''
-        renderedText.value = props.node.raw
-        captureHeight()
+    })
+    .finally(() => {
+      if (!isUnmounted && renderId === currentRenderId) {
+        clearRenderPending(renderId)
+        markLifecycleSettled()
       }
     })
 }
@@ -224,6 +300,7 @@ watch(
   () => {
     renderMath()
   },
+  { flush: 'post' },
 )
 
 watch(
@@ -252,6 +329,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   // prevent any pending worker responses from touching the DOM
   isUnmounted = true
+  clearLifecyclePending()
   if (currentAbortController) {
     currentAbortController.abort()
     currentAbortController = null
@@ -269,6 +347,7 @@ onBeforeUnmount(() => {
     class="math-block text-center overflow-x-auto relative"
     data-markstream-math="block"
     :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
+    :data-markstream-pending="renderingPending ? 'true' : undefined"
     :style="lockedMinHeight ? { minHeight: `${lockedMinHeight}px` } : undefined"
   >
     <Transition name="math-fade">

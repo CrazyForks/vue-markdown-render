@@ -618,6 +618,9 @@ async function runScenario(browser, port, mode) {
 }
 
 function assertScenario(result) {
+  const maxLongTaskMs = Number(process.env.MARKSTREAM_BENCHMARK_MAX_LONG_TASK_MS || 700)
+  const maxLongTaskTotalMs = Number(process.env.MARKSTREAM_BENCHMARK_MAX_LONG_TASK_TOTAL_MS || 1800)
+
   if (result.sample !== 'stress' && !(result.codeBlockCount > 0))
     throw new Error(`[${result.mode}] Expected at least one rendered code block.`)
   if (result.sample === 'baseline' && !(result.mermaidCount > 0))
@@ -647,10 +650,10 @@ function assertScenario(result) {
     throw new Error(`[${result.mode}] CLS should stay within 0.05. Got ${result.cls}.`)
   if (!(result.settleTimeMs <= 6000))
     throw new Error(`[${result.mode}] Settle time should stay within 6000ms. Got ${result.settleTimeMs}.`)
-  if (!(result.longTaskMaxMs <= 700))
-    throw new Error(`[${result.mode}] Max long task should stay within 700ms. Got ${result.longTaskMaxMs}.`)
-  if (!(result.longTaskTotalMs <= 1800))
-    throw new Error(`[${result.mode}] Total long task time should stay within 1800ms. Got ${result.longTaskTotalMs}.`)
+  if (!(result.longTaskMaxMs <= maxLongTaskMs))
+    throw new Error(`[${result.mode}] Max long task should stay within ${maxLongTaskMs}ms. Got ${result.longTaskMaxMs}.`)
+  if (!(result.longTaskTotalMs <= maxLongTaskTotalMs))
+    throw new Error(`[${result.mode}] Total long task time should stay within ${maxLongTaskTotalMs}ms. Got ${result.longTaskTotalMs}.`)
   if (!(result.rendererDomNodeCount <= 5000))
     throw new Error(`[${result.mode}] Renderer DOM node count budget exceeded. Got ${result.rendererDomNodeCount}.`)
   if (result.fullScroll.fallbackCount !== 0)

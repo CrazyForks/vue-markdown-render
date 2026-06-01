@@ -58,22 +58,27 @@ let currentRenderId = 0
 let isUnmounted = false
 let currentAbortController: AbortController | null = null
 const renderingLoading = ref(initialState.loading)
+const renderingPending = ref(false)
 const registerVisibility = useViewportPriority()
 let visibilityHandle: ReturnType<typeof registerVisibility> | null = null
 
 if (initialState.html || initialState.text)
   hasRenderedOnce = true
 
+function markRenderPending() {
+  renderingPending.value = true
+}
+
+function clearRenderPending(renderId?: number) {
+  if (renderId != null && renderId !== currentRenderId)
+    return
+
+  renderingPending.value = false
+}
+
 async function renderMath() {
   if (isUnmounted)
     return
-  if (!props.node.content) {
-    renderingLoading.value = false
-    renderedHtml.value = ''
-    renderedText.value = props.node.raw
-    hasRenderedOnce = true
-    return
-  }
 
   if (currentAbortController) {
     currentAbortController.abort()
@@ -81,8 +86,22 @@ async function renderMath() {
   }
 
   const renderId = ++currentRenderId
+
+  if (!props.node.content) {
+    clearRenderPending()
+    renderingLoading.value = false
+    renderedHtml.value = ''
+    renderedText.value = props.node.raw
+    hasRenderedOnce = true
+    return
+  }
+
   const abortController = new AbortController()
   currentAbortController = abortController
+
+  // Mark pending before visibility wait. During restore, the element may be in
+  // layout but visually hidden; readiness must not reveal raw fallback as final.
+  markRenderPending()
 
   // Defer heavy work until visible on first render
   if (!hasRenderedOnce) {
@@ -94,6 +113,11 @@ async function renderMath() {
       await visibilityHandle?.whenVisible
     }
     catch {}
+  }
+
+  if (isUnmounted || renderId !== currentRenderId || abortController.signal.aborted) {
+    clearRenderPending(renderId)
+    return
   }
 
   renderKaTeXWithBackpressure(mathContent.value, displayMode.value, {
@@ -125,6 +149,9 @@ async function renderMath() {
 
       if (isWorkerInitFailure || isBusyOrTimeout) {
         const katex = await getKatex()
+        if (isUnmounted || renderId !== currentRenderId)
+          return
+
         if (katex) {
           try {
             const html = katex.renderToString(mathContent.value, {
@@ -144,27 +171,20 @@ async function renderMath() {
           return
         }
       }
-      if (isDisabled) {
+      if (isDisabled || !props.node.loading) {
         renderingLoading.value = false
         renderedHtml.value = ''
         renderedText.value = props.node.raw
         return
       }
       // If we reach here, the worker render failed and sync fallback was not possible.
-      // Stop the spinner and show raw text when we have not rendered once yet
-      // or the node isn't in loading mode.
-      if (!hasRenderedOnce) {
-        renderingLoading.value = !isDisabled
-      }
-      if (!props.node.loading) {
-        renderingLoading.value = false
-        renderedHtml.value = ''
-        renderedText.value = props.node.raw
-      }
-      else if (isDisabled) {
-        renderedHtml.value = ''
-        renderedText.value = props.node.raw
-      }
+      // Stop the spinner and show raw text when we have not rendered once yet.
+      if (!hasRenderedOnce)
+        renderingLoading.value = true
+    })
+    .finally(() => {
+      if (!isUnmounted)
+        clearRenderPending(renderId)
     })
 }
 
@@ -198,6 +218,7 @@ onBeforeUnmount(() => {
     class="math-inline-wrapper"
     data-markstream-math="inline"
     :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
+    :data-markstream-pending="renderingPending ? 'true' : undefined"
   >
     <span v-if="renderedHtml" class="math-inline" v-html="renderedHtml" />
     <span v-else-if="renderedText" class="math-inline math-inline--fallback">{{ renderedText }}</span>

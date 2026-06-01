@@ -23,6 +23,15 @@ function createHarness(options: {
   document.body.appendChild(root)
   root.appendChild(container)
 
+  Object.defineProperty(root, 'scrollHeight', {
+    configurable: true,
+    value: 1200,
+  })
+  Object.defineProperty(root, 'clientHeight', {
+    configurable: true,
+    value: 400,
+  })
+
   const count = ref(options.count ?? 5)
   const containerRef = ref<HTMLElement | undefined>(container)
 

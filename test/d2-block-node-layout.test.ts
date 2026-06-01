@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import D2BlockNode from '../src/components/D2BlockNode/D2BlockNode.vue'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../src/utils/nodeLifecycle'
 
 vi.mock('../src/components/D2BlockNode/d2', () => ({
   getD2: vi.fn(async () => class FakeD2 {
@@ -63,5 +64,44 @@ describe('d2 block layout', () => {
     expect(wrapper.get('.d2-block-body').attributes('style') || '').not.toContain('5079')
 
     wrapper.unmount()
+  })
+
+  it('reports async render lifecycle height when preview settles', async () => {
+    const heightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(96)
+    const lifecycle = {
+      reportHeight: vi.fn(),
+      markPending: vi.fn(),
+      markSettled: vi.fn(),
+    }
+    const wrapper = mount(D2BlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'd2',
+          code: 'a -> b',
+          raw: '```d2\na -> b\n```',
+        },
+        loading: false,
+      },
+      attrs: {
+        'index-key': 'd2-1',
+      },
+      global: {
+        provide: {
+          [MARKSTREAM_NODE_LIFECYCLE_KEY]: lifecycle,
+        },
+      },
+      attachTo: document.body,
+    })
+
+    await waitForPreview(wrapper)
+    await nextTick()
+
+    expect(lifecycle.markPending).toHaveBeenCalledWith('d2-1')
+    expect(lifecycle.reportHeight).toHaveBeenCalledWith('d2-1', 96)
+    expect(lifecycle.markSettled).toHaveBeenCalledWith('d2-1')
+
+    wrapper.unmount()
+    heightSpy.mockRestore()
   })
 })

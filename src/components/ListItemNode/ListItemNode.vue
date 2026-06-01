@@ -24,11 +24,11 @@ const props = defineProps<{
   node?: ListItem
   item?: ListItem
   indexKey?: number | string
-  value?: number
   customId?: string
   typewriter?: boolean
   fade?: boolean
   showTooltips?: boolean
+  value?: number | null
 }>()
 
 defineEmits<{
@@ -37,15 +37,21 @@ defineEmits<{
 
 const itemNode = computed(() => props.node ?? props.item)
 
-const liValueAttr = computed(() =>
-  props.value == null ? {} : { value: props.value },
-)
+const EMPTY_LI_VALUE_ATTRS = Object.freeze({}) as Record<string, never>
+
+const liValueAttrs = computed(() => {
+  const { value } = props
+
+  return typeof value === 'number' && Number.isFinite(value)
+    ? { value }
+    : EMPTY_LI_VALUE_ATTRS
+})
 </script>
 
 <template>
-  <li class="list-item" dir="auto" v-bind="liValueAttr">
+  <li class="list-item" dir="auto" v-bind="liValueAttrs">
     <NodeRenderer
-      v-bind="{ showTooltips: props.showTooltips }"
+      :show-tooltips="props.showTooltips"
       :index-key="`list-item-${props.indexKey}`"
       :nodes="itemNode?.children ?? []"
       :custom-id="props.customId"
@@ -63,12 +69,13 @@ const liValueAttr = computed(() =>
   padding-left: var(--ms-space-1_5);
 }
 
-ol > .list-item::marker{
+ol > .list-item::marker {
   color: var(--list-counter-marker);
   line-height: 1.6;
 }
-ul > .list-item::marker{
-  color: var(--list-marker)
+
+ul > .list-item::marker {
+  color: var(--list-marker);
 }
 
 /* 大列表滚动到视口时，嵌套 NodeRenderer 需要立即绘制内容，避免空白 */

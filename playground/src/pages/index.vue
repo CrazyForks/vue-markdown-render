@@ -147,6 +147,24 @@ function goToThemeGallery() {
   })
 }
 
+function goToVirtualScrollLab() {
+  router.push('/virtual-scroll').catch(() => {
+    window.location.href = '/virtual-scroll'
+  })
+}
+
+function goToVirtualTimelineZero() {
+  router.push('/virtual-timeline-zero').catch(() => {
+    window.location.href = '/virtual-timeline-zero'
+  })
+}
+
+function goToVirtualScrollerMarkstream() {
+  router.push('/virtual-scroller-markstream').catch(() => {
+    window.location.href = '/virtual-scroller-markstream'
+  })
+}
+
 // Keep persisted values within reasonable bounds on hydration.
 watchEffect(() => {
   if (streamChunkDelayMin.value !== normalizedChunkDelayRange.value.min)
@@ -745,6 +763,21 @@ onBeforeUnmount(() => {
             <button class="nav-btn nav-btn--themes" @click="goToThemeGallery">
               <Icon icon="carbon:color-palette" class="nav-btn__icon" />
               <span class="nav-btn__text">Themes</span>
+            </button>
+
+            <button class="nav-btn nav-btn--virtual" @click="goToVirtualScrollLab">
+              <Icon icon="carbon:list" class="nav-btn__icon" />
+              <span class="nav-btn__text">Virtual scroll lab</span>
+            </button>
+
+            <button class="nav-btn nav-btn--virtual" @click="goToVirtualTimelineZero">
+              <Icon icon="carbon:flow" class="nav-btn__icon" />
+              <span class="nav-btn__text">Virtual timeline</span>
+            </button>
+
+            <button class="nav-btn nav-btn--virtual" @click="goToVirtualScrollerMarkstream">
+              <Icon icon="carbon:data-vis-1" class="nav-btn__icon" />
+              <span class="nav-btn__text">Vue scroller</span>
             </button>
 
             <button
@@ -1381,6 +1414,7 @@ onBeforeUnmount(() => {
 .nav-btn--github { background: #24292f; }
 .nav-btn--docs { background: #0f766e; }
 .nav-btn--themes { background: #0e7490; }
+.nav-btn--virtual { background: #4338ca; }
 .nav-btn--retry { background: #0f766e; }
 .nav-btn--stream { background: #c2410c; }
 .nav-btn--test { background: #0369a1; }

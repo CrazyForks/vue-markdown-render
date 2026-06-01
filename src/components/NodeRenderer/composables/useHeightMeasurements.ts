@@ -1,4 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
+import type { MarkstreamInternalHeightCache } from '../../../types/node-renderer-props'
 import { computed, reactive, ref } from 'vue'
 
 export interface HeightMeasurementsOptions {
@@ -20,6 +21,10 @@ export interface HeightMeasurements {
   pruneHeightMeasurements: (size: number) => void
   rebuildHeightTrees: (size: number) => void
   recordNodeHeight: (index: number, height: number, options?: { allowShrink?: boolean }) => void
+  removeNodeHeight: (index: number, options?: { notify?: boolean }) => boolean
+  removeNodeHeights: (indices: Iterable<number>, options?: { notify?: boolean }) => number
+  exportHeightCache: () => MarkstreamInternalHeightCache
+  importHeightCache: (cache: MarkstreamInternalHeightCache, options?: { mode?: 'replace' | 'merge' }) => void
 
   fenwickRangeSum: (tree: number[], start: number, end: number) => number
 }
@@ -126,17 +131,52 @@ export function useHeightMeasurements(
     heightKnownTree.value = countTree
   }
 
-  function recordNodeHeight(index: number, height: number, recordOptions: { allowShrink?: boolean } = {}) {
+  function recomputeHeightStats() {
+    let total = 0
+    let count = 0
+    const boundedSize = heightTreeSize.value
+
+    for (const [rawIndex, rawHeight] of Object.entries(nodeHeights)) {
+      const index = Number(rawIndex)
+      const height = Number(rawHeight)
+
+      if (
+        !Number.isFinite(index)
+        || index < 0
+        || (boundedSize > 0 && index >= boundedSize)
+        || !Number.isFinite(height)
+        || height <= 0
+      ) {
+        delete nodeHeights[index]
+        continue
+      }
+
+      total += height
+      count++
+    }
+
+    heightStats.total = total
+    heightStats.count = count
+  }
+
+  function recordNodeHeightInternal(
+    index: number,
+    height: number,
+    recordOptions: {
+      allowShrink?: boolean
+      notify?: boolean
+    } = {},
+  ) {
     if (!Number.isFinite(height) || height <= 0)
-      return
+      return false
 
     const previous = nodeHeights[index]
     if (previous) {
       if (recordOptions.allowShrink === false && height < previous)
-        return
+        return false
 
       if (Math.abs(height - previous) <= 1)
-        return
+        return false
     }
 
     nodeHeights[index] = height
@@ -167,6 +207,121 @@ export function useHeightMeasurements(
       }
     }
 
+    if (recordOptions.notify !== false)
+      options.onHeightRecorded?.()
+
+    return true
+  }
+
+  function recordNodeHeight(index: number, height: number, recordOptions: { allowShrink?: boolean } = {}) {
+    recordNodeHeightInternal(index, height, {
+      ...recordOptions,
+      notify: true,
+    })
+  }
+
+  function removeNodeHeightInternal(index: number) {
+    if (!Number.isInteger(index) || index < 0)
+      return false
+
+    const previous = nodeHeights[index]
+    if (!Number.isFinite(previous) || previous <= 0)
+      return false
+
+    delete nodeHeights[index]
+    heightStats.total = Math.max(0, heightStats.total - previous)
+    heightStats.count = Math.max(0, heightStats.count - 1)
+
+    if (heightTreeSize.value > index) {
+      const sumTree = heightSumTree.value
+      const countTree = heightKnownTree.value
+
+      if (sumTree.length && countTree.length) {
+        fenwickUpdate(sumTree, index, -previous)
+        fenwickUpdate(countTree, index, -1)
+      }
+    }
+
+    return true
+  }
+
+  function removeNodeHeight(index: number, removeOptions: { notify?: boolean } = {}) {
+    const changed = removeNodeHeightInternal(index)
+    if (changed && removeOptions.notify !== false)
+      options.onHeightRecorded?.()
+    return changed
+  }
+
+  function removeNodeHeights(indices: Iterable<number>, removeOptions: { notify?: boolean } = {}) {
+    let removed = 0
+
+    for (const rawIndex of indices) {
+      const index = Number(rawIndex)
+      if (removeNodeHeightInternal(index))
+        removed++
+    }
+
+    if (removed > 0 && removeOptions.notify !== false)
+      options.onHeightRecorded?.()
+
+    return removed
+  }
+
+  function exportHeightCache(): MarkstreamInternalHeightCache {
+    return Object.entries(nodeHeights)
+      .map(([rawIndex, rawHeight]) => ({
+        index: Number(rawIndex),
+        height: Number(rawHeight),
+      }))
+      .filter(entry => Number.isFinite(entry.index) && entry.index >= 0 && Number.isFinite(entry.height) && entry.height > 0)
+      .sort((a, b) => a.index - b.index)
+  }
+
+  function importHeightCache(cache: MarkstreamInternalHeightCache, importOptions: { mode?: 'replace' | 'merge' } = {}) {
+    if (!Array.isArray(cache))
+      return
+
+    const targetTreeSize = heightTreeSize.value
+    let changed = false
+
+    if (importOptions.mode !== 'merge') {
+      const existingKeys = Object.keys(nodeHeights)
+      if (existingKeys.length > 0) {
+        for (const key of existingKeys)
+          delete nodeHeights[Number(key)]
+        changed = true
+      }
+    }
+
+    for (const entry of cache) {
+      const index = Number(entry.index)
+      const height = Number(entry.height)
+
+      if (!Number.isInteger(index) || index < 0)
+        continue
+
+      if (targetTreeSize > 0 && index >= targetTreeSize)
+        continue
+
+      if (!Number.isFinite(height) || height <= 0)
+        continue
+
+      const previous = nodeHeights[index]
+      if (previous && Math.abs(previous - height) <= 1)
+        continue
+
+      nodeHeights[index] = height
+      changed = true
+    }
+
+    if (!changed)
+      return
+
+    recomputeHeightStats()
+
+    if (targetTreeSize > 0)
+      rebuildHeightTrees(targetTreeSize)
+
     options.onHeightRecorded?.()
   }
 
@@ -188,6 +343,10 @@ export function useHeightMeasurements(
     pruneHeightMeasurements,
     rebuildHeightTrees,
     recordNodeHeight,
+    removeNodeHeight,
+    removeNodeHeights,
+    exportHeightCache,
+    importHeightCache,
 
     fenwickRangeSum,
   }

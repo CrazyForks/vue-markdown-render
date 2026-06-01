@@ -2,8 +2,19 @@
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { CustomComponents } from '../../types'
 import type { CodeBlockPreviewPayload } from '../../types/component-props'
-import type { NodeRendererProps } from '../../types/node-renderer-props'
-import { computed, defineAsyncComponent, markRaw, nextTick, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
+import type {
+  MarkstreamCaptureVirtualStateOptions,
+  MarkstreamHeightCache,
+  MarkstreamNodeLifecycle,
+  MarkstreamRendererHandle,
+  MarkstreamVirtualAnchor,
+  MarkstreamVirtualMetrics,
+  MarkstreamVirtualPhase,
+  MarkstreamVirtualReason,
+  MarkstreamVirtualState,
+  NodeRendererProps,
+} from '../../types/node-renderer-props'
+import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -46,11 +57,13 @@ import {
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { isReservedNodeComponentKey, useCustomNodeComponents } from '../../utils/nodeComponents'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
+import { setNormalizedElementScrollTop } from '../../utils/normalizedScroll'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import MarkdownCodeBlockNode from '../MarkdownCodeBlockNode'
 import { createMathBlockMinHeightCache, provideMathBlockMinHeightCache } from '../MathBlockNode/minHeightCache'
-import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
+import { CodeBlockNodeAsync, MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import { useBatchRenderingScheduler } from './composables/useBatchRenderingScheduler'
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useFocusSyncScheduler } from './composables/useFocusSyncScheduler'
@@ -102,6 +115,7 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
   deferNodesUntilVisible: true,
   maxLiveNodes: 320,
   liveNodeBuffer: 60,
+  nodeVirtual: 'auto',
 })
 
 const emit = defineEmits<{
@@ -110,11 +124,44 @@ const emit = defineEmits<{
   (e: 'click', event: MouseEvent): void
   (e: 'mouseover', event: MouseEvent): void
   (e: 'mouseout', event: MouseEvent): void
+  (e: 'virtual-state-change', payload: MarkstreamVirtualState): void
+  (e: 'height-change', payload: MarkstreamVirtualMetrics): void
+  (e: 'render-settled', payload: MarkstreamVirtualMetrics): void
+  (e: 'render-final', payload: MarkstreamVirtualMetrics): void
+  (e: 'anchor-change', payload: MarkstreamVirtualAnchor): void
 }>()
+
+/* eslint-disable vue/custom-event-name-casing -- Public virtualScroll events are kebab-case. */
+function emitHeightChange(metrics: MarkstreamVirtualMetrics) {
+  emit('height-change', metrics)
+}
+
+function emitVirtualStateChange(state: MarkstreamVirtualState) {
+  emit('virtual-state-change', state)
+}
+
+function emitAnchorChange(anchor: MarkstreamVirtualAnchor) {
+  emit('anchor-change', anchor)
+}
+
+function emitRenderSettled(metrics: MarkstreamVirtualMetrics) {
+  emit('render-settled', metrics)
+}
+
+function emitRenderFinal(metrics: MarkstreamVirtualMetrics) {
+  emit('render-final', metrics)
+}
+/* eslint-enable vue/custom-event-name-casing */
+
 const MAX_DEFERRED_NODE_COUNT = 900
 const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
 const CONTENT_STREAMING_TAIL_IDLE_MS = 1200
+const HEIGHT_CACHE_WIDTH_BUCKET_PX = 32
+const UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET = -1
+const BOTTOM_ANCHOR_CAPTURE_MAX_DISTANCE_PX = 160
+const BOTTOM_ANCHOR_SCROLL_ROOT_MAX_DISTANCE_PX = 64
+const BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX = 32
 
 const containerRef = ref<HTMLElement>()
 const paragraphProbeWrapperRef = ref<HTMLElement | null>(null)
@@ -133,6 +180,31 @@ const textStreamState = new Map<string, string>()
 const streamRenderVersion = ref(0)
 const experimentContainerWidth = ref(0)
 const simpleTextProbeProfile = ref(createEmptySimpleTextProbeProfile())
+function resolveVirtualScrollRoot() {
+  if (props.virtualScroll?.enabled !== true)
+    return null
+
+  const root = props.virtualScroll?.scrollRoot
+  const resolved = typeof root === 'function' ? root() : root
+  return unwrapVirtualScrollRoot(resolved)
+}
+
+function unwrapVirtualScrollRoot(value: unknown): HTMLElement | null {
+  if (!value)
+    return null
+
+  if (typeof HTMLElement !== 'undefined' && value instanceof HTMLElement)
+    return value
+
+  if (typeof value === 'object' && 'value' in value)
+    return unwrapVirtualScrollRoot((value as { value: unknown }).value)
+
+  if (typeof value === 'object' && '$el' in value)
+    return unwrapVirtualScrollRoot((value as { $el: unknown }).$el)
+
+  return null
+}
+
 const {
   isClient,
   renderAsFragment,
@@ -150,6 +222,7 @@ const {
   getOffsetTopWithinRoot,
 } = useViewportRoot(containerRef, {
   isClient,
+  scrollRoot: resolveVirtualScrollRoot,
 })
 provide('markstreamShowTooltips', resolvedShowTooltips)
 provide('markstreamHtmlPolicy', resolvedHtmlPolicy)
@@ -317,18 +390,59 @@ const heightExperimentEnabled = computed(() => Boolean(
   && !isNestedListItemRenderer
   && heightExperimentConfig.value?.enabled,
 ))
-const textEstimationEnabled = computed(() => heightExperimentEnabled.value && heightExperimentConfig.value?.textEstimation !== false)
-const codeBlockEstimationEnabled = computed(() => heightExperimentEnabled.value && heightExperimentConfig.value?.codeBlockEstimation !== false)
-const experimentProbeWidth = computed(() => Math.max(320, experimentContainerWidth.value || containerRef.value?.clientWidth || 640))
+const virtualScrollRequested = computed(() => Boolean(
+  !renderAsFragment.value
+  && props.virtualScroll?.enabled,
+))
+const virtualScrollMounted = ref(false)
+onMounted(() => {
+  virtualScrollMounted.value = true
+})
+
+const virtualScrollEnabled = computed(() => Boolean(
+  isClient
+  && virtualScrollRequested.value,
+))
+
+// Children such as CodeBlockNode must not mutate the outer scrollTop when the
+// host virtualizer / Markdown virtual-scroll contract already owns anchoring.
+provide('markstreamHostScrollManaged', virtualScrollEnabled)
+const virtualScrollDomEnabled = computed(() => Boolean(
+  virtualScrollMounted.value
+  && virtualScrollEnabled.value,
+))
+const heightEstimationActive = computed(() => heightExperimentEnabled.value || virtualScrollEnabled.value)
+const heightEstimationDomActive = computed(() => heightExperimentEnabled.value || virtualScrollDomEnabled.value)
+const textEstimationEnabled = computed(() => {
+  return heightEstimationActive.value
+    && heightExperimentConfig.value?.textEstimation !== false
+})
+const codeBlockEstimationEnabled = computed(() => {
+  return heightEstimationActive.value
+    && heightExperimentConfig.value?.codeBlockEstimation !== false
+})
+function getMeasuredContainerWidth() {
+  const width = experimentContainerWidth.value || containerRef.value?.clientWidth || 0
+  return Number.isFinite(width) && width > 0 ? width : 0
+}
+
+const experimentProbeWidth = computed(() => {
+  const measured = getMeasuredContainerWidth()
+  return measured > 0 ? Math.max(1, Math.round(measured)) : 640
+})
 const maxLiveNodesResolved = computed(() => Math.max(1, props.maxLiveNodes ?? 320))
 const virtualizationEnabled = computed(() => {
   if (renderAsFragment.value)
     return false
+  if (props.nodeVirtual === false)
+    return false
   if ((props.maxLiveNodes ?? 0) <= 0)
     return false
+  if (props.nodeVirtual === true)
+    return parsedNodes.value.length > 0
   return parsedNodes.value.length > maxLiveNodesResolved.value
 })
-const shouldMeasureNodeHeights = computed(() => virtualizationEnabled.value || heightExperimentEnabled.value)
+const shouldMeasureNodeHeights = computed(() => virtualizationEnabled.value || heightExperimentEnabled.value || virtualScrollEnabled.value)
 // Viewport priority is used to defer heavy work (Monaco/Mermaid/KaTeX) until
 // nodes approach the viewport. Node-level deferral is controlled separately
 // via `deferNodes`.
@@ -369,6 +483,7 @@ const {
 const nodeSlotElements = new Map<number, HTMLElement | null>()
 const nodeContentResizeObservers = new Map<number, ResizeObserver>()
 const codeBlockRenderCache = new WeakMap<object, { signature: string, node: ParsedNode }>()
+const nodeHeightSignatures = new Map<number, string>()
 const nodeSlotVersion = ref(0)
 const sortedNodeSlots = computed(() => {
   // Track a manual version so we only rebuild when slots change.
@@ -376,8 +491,37 @@ const sortedNodeSlots = computed(() => {
   return Array.from(nodeSlotElements.entries()).sort((a, b) => a[0] - b[0])
 })
 const scrollRootElement = ref<HTMLElement | null>(null)
+const activeVirtualBottomAnchor = ref<Extract<MarkstreamVirtualAnchor, { type: 'bottom' }> | null>(null)
+let virtualBottomRestoreRaf: number | null = null
+let virtualBottomRestoreScrollGuardUntil = 0
+let virtualBottomRestoreScrollGuardTarget: number | null = null
+
+function guardVirtualBottomProgrammaticScroll(target: number) {
+  virtualBottomRestoreScrollGuardUntil = getVirtualNow() + 120
+  virtualBottomRestoreScrollGuardTarget = target
+}
+
+function consumeVirtualBottomProgrammaticScrollGuard(box: { scrollTop: number }) {
+  if (getVirtualNow() >= virtualBottomRestoreScrollGuardUntil) {
+    virtualBottomRestoreScrollGuardTarget = null
+    return false
+  }
+
+  const guardedTarget = virtualBottomRestoreScrollGuardTarget
+  if (guardedTarget == null)
+    return true
+
+  const guarded = Math.abs(box.scrollTop - guardedTarget) <= 2
+  if (!guarded)
+    virtualBottomRestoreScrollGuardTarget = null
+
+  return guarded
+}
 const {
   activeRestoreAnchor,
+  getRelativeScrollTopWithinContainer,
+  setRelativeScrollTopWithinContainer,
+  resolveAnchorOffset,
   clearRestoreReconcile,
   scheduleRestoreReconcile,
   captureRestoreAnchor,
@@ -394,6 +538,7 @@ const {
   resolveScrollContainer: () => scrollRootElement.value || resolveScrollContainer(),
   getNormalizedScrollTop,
   getOffsetTopWithinRoot,
+  isReverseFlexScrollRoot,
 
   estimateIndexForOffset,
   estimateHeightRange,
@@ -407,17 +552,82 @@ const {
   heightSumTree,
   heightKnownTree,
   averageNodeHeight,
-  resetHeightMeasurements,
+  resetHeightMeasurements: resetMeasuredHeightMeasurements,
   pruneHeightMeasurements,
   rebuildHeightTrees,
-  recordNodeHeight,
+  recordNodeHeight: recordMeasuredNodeHeight,
+  removeNodeHeights: removeMeasuredNodeHeights,
+  exportHeightCache,
+  importHeightCache: importMeasuredHeightCache,
   fenwickRangeSum,
 } = useHeightMeasurements({
   onHeightRecorded: () => {
+    markFallbackHeightPrefixDirty()
+    if (virtualScrollEnabled.value)
+      resetVirtualSettleConfirmation()
     if (activeRestoreAnchor.value)
       scheduleRestoreReconcile()
+    if (activeVirtualBottomAnchor.value)
+      scheduleVirtualBottomRestoreReconcile()
+    scheduleVirtualMetricsEmit('node-resize')
   },
 })
+
+function resetHeightMeasurements() {
+  resetMeasuredHeightMeasurements()
+  nodeHeightSignatures.clear()
+}
+
+function rememberNodeHeightSignature(index: number) {
+  if (!Number.isInteger(index) || index < 0 || index >= parsedNodes.value.length)
+    return
+
+  nodeHeightSignatures.set(index, getNodeHeightCacheSignature(index))
+}
+
+function forgetNodeHeightSignatures(indices: Iterable<number>) {
+  for (const index of indices)
+    nodeHeightSignatures.delete(index)
+}
+
+function recordNodeHeight(
+  index: number,
+  height: number,
+  options: { allowShrink?: boolean } = {},
+) {
+  const before = nodeHeights[index]
+  recordMeasuredNodeHeight(index, height, options)
+  const after = nodeHeights[index]
+
+  if (after && after > 0)
+    rememberNodeHeightSignature(index)
+  else if (before)
+    nodeHeightSignatures.delete(index)
+}
+
+function getNodeLayoutHeight(index: number, contentEl: HTMLElement) {
+  const slotHeight = nodeSlotElements.get(index)?.offsetHeight ?? 0
+  return slotHeight > 0 ? slotHeight : contentEl.offsetHeight
+}
+
+function removeNodeHeights(
+  indices: Iterable<number>,
+  options: { notify?: boolean } = {},
+) {
+  const list = Array.from(indices, Number)
+  const removed = removeMeasuredNodeHeights(list, options)
+  if (removed > 0)
+    forgetNodeHeightSignatures(list)
+  return removed
+}
+
+function importHeightCache(
+  cache: MarkstreamHeightCache,
+  options: { mode?: 'replace' | 'merge' } = {},
+) {
+  importMeasuredHeightCache(cache, options)
+  seedCurrentNodeHeightSignatures()
+}
 const deferNodes = computed(() => {
   if (renderAsFragment.value)
     return false
@@ -437,6 +647,7 @@ const deferNodes = computed(() => {
   return viewportPriorityEnabled.value
 })
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
+const scrollListenerEnabled = computed(() => virtualizationEnabled.value || virtualScrollEnabled.value)
 const {
   liveNodeBufferResolved,
   focusIndex,
@@ -453,7 +664,42 @@ const nodeContentVersions = new Map<number, number>()
 const nodeContentDeferredMeasureTimers = new Map<number, number[]>()
 const finalHeightConvergenceTimers: number[] = []
 const pendingHeightMeasurements = new Map<number, { height: number, allowShrink: boolean, version: number, el: HTMLElement }>()
+const activeHeightSettlingTimers = new Set<number>()
+const heightSettlingTimerVersion = ref(0)
+let heightSettlingTimerVersionQueued = false
+const pendingHeightSettlingTaskCount = computed(() => {
+  void heightSettlingTimerVersion.value
+  return activeHeightSettlingTimers.size
+})
+
+interface PendingAsyncNodeRecord {
+  index: number
+  sessionKey: string
+  threadKey?: string
+  layoutEpochKey: string
+}
+
+const pendingAsyncNodeCounts = new Map<string, number>()
+const pendingAsyncNodeRecords = new Map<string, PendingAsyncNodeRecord>()
+const pendingAsyncNodeVersion = ref(0)
+const pendingAsyncNodeCount = computed(() => {
+  void pendingAsyncNodeVersion.value
+
+  let total = 0
+  for (const count of pendingAsyncNodeCounts.values())
+    total += Math.max(0, count)
+
+  return total
+})
 let heightMeasurementRaf: number | null = null
+let fallbackHeightPrefixDirty = true
+let fallbackHeightPrefixCache: number[] = [0]
+let fallbackHeightPrefixCacheKey = ''
+
+function markFallbackHeightPrefixDirty() {
+  fallbackHeightPrefixDirty = true
+}
+
 const desiredRenderedCount = computed(() => {
   if (!virtualizationEnabled.value)
     return parsedNodes.value.length
@@ -462,6 +708,67 @@ const desiredRenderedCount = computed(() => {
   const target = Math.min(parsedNodes.value.length, windowEnd)
   return Math.max(renderedCount.value, target)
 })
+
+function bumpHeightSettlingTimerVersion() {
+  if (heightSettlingTimerVersionQueued)
+    return
+
+  heightSettlingTimerVersionQueued = true
+  queueMicrotask(() => {
+    heightSettlingTimerVersionQueued = false
+    heightSettlingTimerVersion.value += 1
+  })
+}
+
+function scheduleHeightSettlingTimer(
+  delay: number,
+  task: () => void,
+  reason: MarkstreamVirtualReason = 'node-resize',
+) {
+  if (!isClient || typeof window === 'undefined')
+    return null
+
+  const timer = window.setTimeout(() => {
+    if (activeHeightSettlingTimers.delete(timer))
+      bumpHeightSettlingTimerVersion()
+
+    try {
+      task()
+    }
+    finally {
+      scheduleVirtualMetricsEmit(reason)
+    }
+  }, Math.max(0, delay))
+
+  activeHeightSettlingTimers.add(timer)
+  bumpHeightSettlingTimerVersion()
+  return timer
+}
+
+function clearHeightSettlingTimer(timer: number | null | undefined) {
+  if (!isClient || timer == null)
+    return
+
+  if (activeHeightSettlingTimers.delete(timer))
+    bumpHeightSettlingTimerVersion()
+
+  window.clearTimeout(timer)
+}
+
+function clearAllHeightSettlingTimers() {
+  if (isClient && typeof window !== 'undefined') {
+    for (const timer of activeHeightSettlingTimers)
+      window.clearTimeout(timer)
+  }
+
+  if (activeHeightSettlingTimers.size) {
+    activeHeightSettlingTimers.clear()
+    bumpHeightSettlingTimerVersion()
+  }
+
+  finalHeightConvergenceTimers.length = 0
+  nodeContentDeferredMeasureTimers.clear()
+}
 
 function ensureExperimentProbeNodes() {
   if (paragraphProbeNode.value && listItemProbeNode.value && listProbeNode.value && headingProbeNodes.value?.[1])
@@ -554,9 +861,19 @@ const {
 } = useScrollListener({
   isClient,
   virtualizationEnabled,
+  listenerEnabled: scrollListenerEnabled,
   scrollRootElement,
   resolveScrollContainer,
   scheduleFocusSync,
+  onScroll: handleVirtualScrollRootScroll,
+  getScrollTop: (root) => {
+    const doc = root.ownerDocument || containerRef.value?.ownerDocument || document
+    const isViewportRoot = root === doc.documentElement
+      || root === doc.body
+      || root === doc.scrollingElement
+
+    return getNormalizedScrollTop(root, doc, isViewportRoot)
+  },
 })
 
 function syncFocusToScroll(force = false) {
@@ -583,8 +900,10 @@ function syncFocusToScroll(force = false) {
     const offsetFromBottom = Math.max(0, distanceFromBottom) + Math.max(0, viewportHeight) * 0.5
     const estimated = estimateIndexForOffsetFromEnd(offsetFromBottom)
     const next = clamp(estimated, 0, Math.max(0, total - 1))
-    if (force || Math.abs(next - focusIndex.value) > 1)
+    if (force || Math.abs(next - focusIndex.value) > 1) {
       focusIndex.value = next
+      updateLiveRange()
+    }
     return
   }
 
@@ -631,12 +950,14 @@ function syncFocusToScroll(force = false) {
     const targetOffset = relativeScrollTop + Math.max(0, viewportHeight) * 0.5
     const estimated = estimateIndexForOffset(targetOffset)
     focusIndex.value = clamp(estimated, 0, Math.max(0, parsedNodes.value.length - 1))
+    updateLiveRange()
     return
   }
   const midpoint = Math.round((firstVisible + lastVisible) / 2)
   if (!force && Math.abs(midpoint - focusIndex.value) <= 1)
     return
   focusIndex.value = clamp(midpoint, 0, Math.max(0, parsedNodes.value.length - 1))
+  updateLiveRange()
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -662,8 +983,9 @@ function setHeadingProbeWrapper(level: number, el: HTMLElement | null) {
 }
 
 function readSimpleTextProbeProfile() {
-  if (!heightExperimentEnabled.value || typeof window === 'undefined') {
+  if (!heightEstimationActive.value || typeof window === 'undefined') {
     simpleTextProbeProfile.value = createEmptySimpleTextProbeProfile()
+    markFallbackHeightPrefixDirty()
     return
   }
 
@@ -687,10 +1009,11 @@ function readSimpleTextProbeProfile() {
   }
 
   simpleTextProbeProfile.value = nextProfile
+  markFallbackHeightPrefixDirty()
 }
 
 function updateExperimentContainerWidth() {
-  if (!heightExperimentEnabled.value) {
+  if (!heightEstimationActive.value) {
     experimentContainerWidth.value = 0
     return
   }
@@ -707,30 +1030,18 @@ function cleanupExperimentResizeObserver() {
 
 function setupExperimentResizeObserver() {
   cleanupExperimentResizeObserver()
-  if (!heightExperimentEnabled.value || !containerRef.value || typeof ResizeObserver === 'undefined')
+  if (!heightEstimationActive.value || !containerRef.value || typeof ResizeObserver === 'undefined')
     return
   experimentResizeObserver = new ResizeObserver(() => {
     updateExperimentContainerWidth()
     if (activeRestoreAnchor.value)
       scheduleRestoreReconcile()
+    if (activeVirtualBottomAnchor.value)
+      scheduleVirtualBottomRestoreReconcile()
+    scheduleVirtualMetricsEmit('resize')
   })
   experimentResizeObserver.observe(containerRef.value)
 }
-
-// 异步按需加载 CodeBlock 组件；失败时退回为 InlineCodeNode（内联代码渲染）
-const CodeBlockNodeAsync = defineAsyncComponent(async () => {
-  try {
-    const mod = await import('../../components/CodeBlockNode/CodeBlockNode.vue')
-    return mod.default
-  }
-  catch (e) {
-    console.warn(
-      '[markstream-vue] Optional peer dependencies for CodeBlockNode are missing. Falling back to inline-code rendering (no Monaco). To enable full code block features, please install "stream-monaco".',
-      e,
-    )
-    return PreCodeNode
-  }
-})
 
 const codeBlockComponent = computed(() => props.renderCodeBlocksAsPre ? PreCodeNode : CodeBlockNodeAsync)
 
@@ -754,7 +1065,7 @@ function resolveCodeBlockShowHeader() {
 
 const estimatedNodeHeights = computed(() => {
   const nodes = parsedNodes.value
-  if (!nodes.length || !heightExperimentEnabled.value)
+  if (!nodes.length || !heightEstimationActive.value)
     return nodes.map(() => null)
 
   const width = experimentContainerWidth.value || containerRef.value?.clientWidth || 0
@@ -773,7 +1084,7 @@ const estimatedNodeHeights = computed(() => {
 
     if (codeBlockEstimationEnabled.value && node.type === 'code_block') {
       const rendererKind = resolveCodeBlockRendererKind(node)
-      if (rendererKind === 'monaco' || rendererKind === 'markdown') {
+      if (rendererKind === 'monaco' || rendererKind === 'markdown' || rendererKind === 'pre') {
         return estimateCodeBlockHeight(node, {
           rendererKind,
           monacoOptions: props.codeBlockMonacoOptions,
@@ -787,12 +1098,216 @@ const estimatedNodeHeights = computed(() => {
 })
 
 function getFallbackNodeHeight(index: number) {
-  return nodeHeights[index] ?? estimatedNodeHeights.value[index]?.height ?? averageNodeHeight.value
+  const measured = nodeHeights[index]
+  if (Number.isFinite(measured) && measured > 0)
+    return measured
+
+  const estimated = estimatedNodeHeights.value[index]?.height
+  if (Number.isFinite(estimated) && estimated > 0)
+    return estimated
+
+  return Math.max(
+    averageNodeHeight.value,
+    getStaticNodeHeightFallback(index),
+  )
+}
+
+function getStaticNodeHeightFallback(index: number) {
+  const node = parsedNodes.value[index] as any
+  if (!node || typeof node !== 'object')
+    return 32
+
+  const type = String(node.type ?? '')
+  const width = getMeasuredContainerWidth() || 640
+
+  switch (type) {
+    case 'heading':
+      return 44
+
+    case 'paragraph':
+      return estimateTextFallbackHeight(
+        String(node.raw ?? node.content ?? ''),
+        width,
+        34,
+      )
+
+    case 'list': {
+      const items = Array.isArray(node.items) ? node.items.length : 1
+      return Math.max(48, items * 30 + 12)
+    }
+
+    case 'list_item':
+      return estimateTextFallbackHeight(
+        String(node.raw ?? node.content ?? ''),
+        width,
+        34,
+      )
+
+    case 'blockquote':
+      return estimateTextFallbackHeight(
+        String(node.raw ?? node.content ?? ''),
+        width,
+        56,
+      )
+
+    case 'table': {
+      const rowCount = Array.isArray(node.rows)
+        ? node.rows.length
+        : Array.isArray(node.children)
+          ? node.children.length
+          : 3
+      return Math.max(120, rowCount * 38 + 48)
+    }
+
+    case 'code_block':
+      return estimateTextFallbackHeight(
+        String(node.code ?? node.raw ?? ''),
+        width,
+        96,
+        20,
+      )
+
+    case 'math_block':
+      return 72
+
+    case 'image':
+      return 220
+
+    case 'admonition':
+    case 'vmr_container':
+    case 'html_block':
+      return estimateTextFallbackHeight(
+        String(node.raw ?? node.content ?? ''),
+        width,
+        96,
+      )
+
+    case 'thematic_break':
+      return 24
+
+    default:
+      return estimateTextFallbackHeight(
+        String(node.raw ?? node.content ?? ''),
+        width,
+        40,
+      )
+  }
+}
+
+function estimateTextFallbackHeight(
+  text: string,
+  width: number,
+  minHeight: number,
+  lineHeight = 22,
+) {
+  const source = String(text ?? '')
+  if (!source)
+    return minHeight
+
+  const charsPerLine = Math.max(18, Math.floor(Math.max(320, width) / 8))
+  const hardLines = source.split(/\r?\n/).length
+  const softLines = Math.ceil(source.length / charsPerLine)
+  const lines = Math.max(1, hardLines, softLines)
+
+  return Math.max(minHeight, Math.ceil(lines * lineHeight + 12))
+}
+
+function getHeightCacheWidthBucket(width: unknown) {
+  const numeric = Number(width)
+  if (!Number.isFinite(numeric) || numeric <= 0)
+    return UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET
+
+  return Math.round(numeric / HEIGHT_CACHE_WIDTH_BUCKET_PX)
+}
+
+function getFallbackHeightPrefix() {
+  const total = parsedNodes.value.length
+  const width = experimentContainerWidth.value || containerRef.value?.clientWidth || 0
+  const widthBucket = getHeightCacheWidthBucket(width)
+  const measurementKey = props.virtualScroll?.measurementKey == null
+    ? ''
+    : String(props.virtualScroll.measurementKey)
+  const key = [
+    total,
+    heightStats.count,
+    Math.round(heightStats.total),
+    Math.round(averageNodeHeight.value * 100),
+    measurementKey,
+    widthBucket,
+    heightEstimationActive.value ? 1 : 0,
+    heightEstimationExperimentRevision.value,
+    streamRenderVersion.value,
+  ].join(':')
+
+  if (!fallbackHeightPrefixDirty && fallbackHeightPrefixCacheKey === key)
+    return fallbackHeightPrefixCache
+
+  const prefix = new Array<number>(total + 1)
+  prefix[0] = 0
+
+  for (let i = 0; i < total; i++) {
+    prefix[i + 1] = prefix[i] + (
+      heightEstimationActive.value
+        ? getFallbackNodeHeight(i)
+        : (nodeHeights[i] ?? averageNodeHeight.value)
+    )
+  }
+
+  fallbackHeightPrefixCache = prefix
+  fallbackHeightPrefixCacheKey = key
+  fallbackHeightPrefixDirty = false
+
+  return prefix
+}
+
+function estimateHeightRangeFromPrefix(start: number, end: number) {
+  const total = parsedNodes.value.length
+  const boundedStart = clamp(Math.trunc(start), 0, total)
+  const boundedEnd = clamp(Math.trunc(end), boundedStart, total)
+  if (boundedStart >= boundedEnd)
+    return 0
+
+  const prefix = getFallbackHeightPrefix()
+  return (prefix[boundedEnd] ?? 0) - (prefix[boundedStart] ?? 0)
+}
+
+function estimateIndexForOffsetFromPrefix(offsetPx: number) {
+  const nodes = parsedNodes.value
+  const total = nodes.length
+  if (total <= 0)
+    return 0
+  if (offsetPx <= 0)
+    return 0
+
+  const prefix = getFallbackHeightPrefix()
+  const totalHeight = prefix[total] ?? 0
+  if (offsetPx >= totalHeight)
+    return total - 1
+
+  let low = 0
+  let high = total - 1
+  let answer = total - 1
+
+  while (low <= high) {
+    const mid = (low + high) >> 1
+    const midEnd = prefix[mid + 1] ?? 0
+
+    if (midEnd >= offsetPx) {
+      answer = mid
+      high = mid - 1
+    }
+    else {
+      low = mid + 1
+    }
+  }
+
+  return answer
 }
 
 watch(
   () => parsedNodes.value.length,
   (length) => {
+    markFallbackHeightPrefixDirty()
     if (length <= 0) {
       resetHeightMeasurements()
       return
@@ -808,11 +1323,8 @@ watch(
 function estimateHeightRange(start: number, end: number) {
   if (start >= end)
     return 0
-  if (heightExperimentEnabled.value) {
-    let total = 0
-    for (let i = start; i < end; i++)
-      total += getFallbackNodeHeight(i)
-    return total
+  if (heightEstimationActive.value) {
+    return estimateHeightRangeFromPrefix(start, end)
   }
   if (heightTreeSize.value !== parsedNodes.value.length) {
     let total = 0
@@ -868,17 +1380,57 @@ const bottomSpacerHeight = computed(() => {
   return estimateHeightRange(end, total)
 })
 
-function buildExperimentReport() {
-  const nodes = parsedNodes.value
+interface VirtualHeightSummary {
+  totalNodes: number
+  measuredCount: number
+  estimatedCount: number
+  averageNodeHeight: number
+  topSpacerHeight: number
+  bottomSpacerHeight: number
+  estimatedTotalHeight: number
+  width: number
+}
+
+function getEstimatedNodeHeightCount() {
+  if (!heightEstimationActive.value)
+    return 0
+
+  let count = 0
+  const estimates = estimatedNodeHeights.value
+  for (let i = 0; i < estimates.length; i++) {
+    if (!estimates[i])
+      continue
+
+    const measuredHeight = nodeHeights[i]
+    if (Number.isFinite(measuredHeight) && measuredHeight > 0)
+      continue
+
+    count++
+  }
+  return count
+}
+
+function buildVirtualHeightSummary(): VirtualHeightSummary {
+  const totalNodes = parsedNodes.value.length
+
   return {
-    totalNodes: nodes.length,
+    totalNodes,
     measuredCount: heightStats.count,
-    estimatedCount: estimatedNodeHeights.value.filter(Boolean).length,
+    estimatedCount: getEstimatedNodeHeightCount(),
     averageNodeHeight: averageNodeHeight.value,
     topSpacerHeight: topSpacerHeight.value,
     bottomSpacerHeight: bottomSpacerHeight.value,
-    estimatedTotalHeight: estimateHeightRange(0, nodes.length),
-    width: experimentContainerWidth.value || containerRef.value?.clientWidth || 0,
+    estimatedTotalHeight: estimateHeightRange(0, totalNodes),
+    width: getCurrentVirtualWidth(),
+  }
+}
+
+function buildExperimentReport() {
+  const nodes = parsedNodes.value
+  const summary = buildVirtualHeightSummary()
+
+  return {
+    ...summary,
     probe: {
       paragraphReady: Boolean(simpleTextProbeProfile.value.paragraph),
       listItemReady: Boolean(simpleTextProbeProfile.value.listItem),
@@ -899,19 +1451,2151 @@ function buildExperimentReport() {
   }
 }
 
+function getCurrentIndexPrefix() {
+  if (props.indexKey != null)
+    return String(props.indexKey)
+
+  if (virtualScrollRequested.value)
+    return `virtual-${getVirtualSessionKey()}`
+
+  return 'markdown-renderer'
+}
+
+function resolveLifecycleNodeIndex(indexKey: string | number) {
+  const key = String(indexKey)
+  const prefix = `${getCurrentIndexPrefix()}-`
+  if (!key.startsWith(prefix))
+    return null
+
+  const match = key.slice(prefix.length).match(/^(\d+)(?:$|-)/)
+  if (!match)
+    return null
+
+  const index = Number(match[1])
+  if (!Number.isInteger(index) || index < 0 || index >= parsedNodes.value.length)
+    return null
+
+  return index
+}
+
+function getVirtualSessionKey() {
+  const explicit = props.virtualScroll?.sessionKey
+  if (explicit != null && explicit !== '')
+    return String(explicit)
+
+  return String(props.indexKey ?? props.customId ?? instanceMsgId)
+}
+
+function getVirtualThreadKey() {
+  const key = props.virtualScroll?.threadKey
+  return key == null || key === '' ? undefined : String(key)
+}
+
+function isSameVirtualThreadKey(threadKey: string | undefined) {
+  return (threadKey ?? '') === (getVirtualThreadKey() ?? '')
+}
+
+function getHostVirtualMeasurementKey() {
+  const key = props.virtualScroll?.measurementKey
+  return key == null ? '' : String(key)
+}
+
+function getVirtualRendererLayoutKey() {
+  const monaco = props.codeBlockMonacoOptions
+  const codeProps = props.codeBlockProps
+
+  return [
+    props.isDark ? 'dark' : 'light',
+    props.renderCodeBlocksAsPre ? 'code-pre' : 'code-rich',
+    props.codeBlockStream === false ? 'code-static' : 'code-stream',
+    stringifyVirtualToken(props.codeBlockMinWidth),
+    stringifyVirtualToken(props.codeBlockMaxWidth),
+    stringifyVirtualToken(monaco?.fontSize),
+    stringifyVirtualToken(monaco?.lineHeight),
+    stringifyVirtualToken(monaco?.fontFamily),
+    stringifyVirtualToken(monaco?.tabSize),
+    stringifyVirtualToken(monaco?.MAX_HEIGHT),
+    stringifyVirtualToken(monaco?.wordWrap),
+    stringifyVirtualToken(monaco?.wrappingIndent),
+    stringifyVirtualToken(monaco?.padding),
+    stringifyVirtualToken(codeProps?.showHeader),
+    stringifyVirtualToken(codeProps?.showCopyButton),
+    stringifyVirtualToken(codeProps?.showExpandButton),
+    stringifyVirtualToken(codeProps?.showPreviewButton),
+    stringifyVirtualToken(codeProps?.showCollapseButton),
+    stringifyVirtualToken(codeProps?.showFontSizeButtons),
+  ].join('\u0000')
+}
+
+function getVirtualMeasurementKey() {
+  return [
+    getHostVirtualMeasurementKey(),
+    getVirtualRendererLayoutKey(),
+  ].join('\u0000')
+}
+
+function getCurrentVirtualWidth() {
+  return getMeasuredContainerWidth()
+}
+
+const virtualLayoutWidthBucket = computed(() => {
+  return getHeightCacheWidthBucket(getCurrentVirtualWidth())
+})
+
+const virtualLayoutEpochKey = computed(() => {
+  return [
+    getVirtualMeasurementKey(),
+    virtualLayoutWidthBucket.value,
+  ].join('\u0000')
+})
+
+const batchDatasetKey = computed(() => {
+  if (virtualScrollRequested.value) {
+    return [
+      'virtual',
+      getVirtualThreadKey() ?? '',
+      getVirtualSessionKey(),
+      virtualLayoutEpochKey.value,
+    ].join('\u0000')
+  }
+
+  return props.indexKey
+})
+
+function bumpAsyncNodeVersion() {
+  pendingAsyncNodeVersion.value += 1
+}
+
+function getPendingAsyncNodeRecord(index: number): PendingAsyncNodeRecord {
+  return {
+    index,
+    sessionKey: getVirtualSessionKey(),
+    threadKey: getVirtualThreadKey(),
+    layoutEpochKey: virtualLayoutEpochKey.value,
+  }
+}
+
+function isUsablePendingAsyncNodeRecord(record: PendingAsyncNodeRecord | undefined) {
+  if (!record)
+    return false
+
+  if (!Number.isInteger(record.index) || record.index < 0 || record.index >= parsedNodes.value.length)
+    return false
+
+  return record.sessionKey === getVirtualSessionKey()
+    && record.threadKey === getVirtualThreadKey()
+    && record.layoutEpochKey === virtualLayoutEpochKey.value
+}
+
+function resolveLifecycleNodeIndexForPendingKey(indexKey: string | number) {
+  const key = String(indexKey)
+  const record = pendingAsyncNodeRecords.get(key)
+
+  if (record)
+    return isUsablePendingAsyncNodeRecord(record) ? record.index : null
+
+  return resolveLifecycleNodeIndex(key)
+}
+
+function hasPendingAsyncNodeKey(indexKey: string | number) {
+  return pendingAsyncNodeCounts.has(String(indexKey))
+}
+
+function incrementPendingAsyncNodeKey(key: string, index: number) {
+  const previousRecord = pendingAsyncNodeRecords.get(key)
+  if (previousRecord && isUsablePendingAsyncNodeRecord(previousRecord)) {
+    pendingAsyncNodeCounts.set(
+      key,
+      Math.max(0, pendingAsyncNodeCounts.get(key) ?? 0) + 1,
+    )
+    bumpAsyncNodeVersion()
+    scheduleVirtualMetricsEmit('async-node')
+    return
+  }
+
+  pendingAsyncNodeCounts.set(key, 1)
+  pendingAsyncNodeRecords.set(key, getPendingAsyncNodeRecord(index))
+  bumpAsyncNodeVersion()
+
+  scheduleVirtualMetricsEmit('async-node')
+}
+
+function pruneStalePendingAsyncNodeKeys(reason: MarkstreamVirtualReason = 'async-node') {
+  let changed = false
+
+  for (const [key, record] of Array.from(pendingAsyncNodeRecords.entries())) {
+    if (isUsablePendingAsyncNodeRecord(record))
+      continue
+
+    pendingAsyncNodeRecords.delete(key)
+    pendingAsyncNodeCounts.delete(key)
+    changed = true
+  }
+
+  if (!changed)
+    return
+
+  bumpAsyncNodeVersion()
+  scheduleVirtualMetricsEmit(reason)
+}
+
+function decrementPendingAsyncNodeKey(key: string) {
+  const previous = pendingAsyncNodeCounts.get(key) ?? 0
+  if (previous <= 0)
+    return false
+
+  if (previous <= 1) {
+    pendingAsyncNodeCounts.delete(key)
+    pendingAsyncNodeRecords.delete(key)
+  }
+  else {
+    pendingAsyncNodeCounts.set(key, previous - 1)
+  }
+  bumpAsyncNodeVersion()
+
+  if (previous === 1) {
+    scheduleVirtualMetricsEmit('async-node')
+  }
+
+  return true
+}
+
+function clearPendingAsyncNodeKeysForIndex(index: number) {
+  const nodeKey = `${getCurrentIndexPrefix()}-${index}`
+  let changed = false
+
+  for (const key of Array.from(pendingAsyncNodeCounts.keys())) {
+    const record = pendingAsyncNodeRecords.get(key)
+    const belongsToIndex = record?.index === index
+      || key === nodeKey
+      || key.startsWith(`${nodeKey}-`)
+
+    if (belongsToIndex) {
+      pendingAsyncNodeCounts.delete(key)
+      pendingAsyncNodeRecords.delete(key)
+      changed = true
+    }
+  }
+
+  if (changed) {
+    bumpAsyncNodeVersion()
+    scheduleVirtualMetricsEmit('async-node')
+  }
+}
+
+function clearAllPendingAsyncNodeKeys(reason: MarkstreamVirtualReason = 'async-node') {
+  if (!pendingAsyncNodeCounts.size && !pendingAsyncNodeRecords.size)
+    return
+
+  pendingAsyncNodeCounts.clear()
+  pendingAsyncNodeRecords.clear()
+  bumpAsyncNodeVersion()
+  scheduleVirtualMetricsEmit(reason)
+}
+
+const parentNodeLifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
+
+const localNodeLifecycle: MarkstreamNodeLifecycle = {
+  reportHeight(indexKey, height) {
+    if (!virtualScrollEnabled.value)
+      return
+
+    const index = resolveLifecycleNodeIndexForPendingKey(indexKey)
+    if (index == null)
+      return
+
+    const currentEl = nodeContentElements.get(index)
+    if (!currentEl)
+      return
+
+    const measuredHeight = Number(height)
+    const wrapperHeight = getNodeLayoutHeight(index, currentEl)
+    const nextHeight = Number.isFinite(measuredHeight) && measuredHeight > 0
+      ? Math.max(measuredHeight, wrapperHeight || 0)
+      : wrapperHeight
+
+    recordNodeHeight(index, nextHeight)
+  },
+  markPending(indexKey) {
+    if (!virtualScrollEnabled.value)
+      return
+
+    const index = resolveLifecycleNodeIndex(indexKey)
+    if (index == null)
+      return
+
+    const key = String(indexKey)
+    incrementPendingAsyncNodeKey(key, index)
+  },
+  markSettled(indexKey) {
+    if (!virtualScrollEnabled.value)
+      return
+
+    const key = String(indexKey)
+    const index = resolveLifecycleNodeIndexForPendingKey(indexKey)
+    if (index == null && !hasPendingAsyncNodeKey(key))
+      return
+
+    if (!decrementPendingAsyncNodeKey(key))
+      return
+
+    if (index != null)
+      measureTrackedNodeHeights()
+  },
+}
+
+const providedNodeLifecycle: MarkstreamNodeLifecycle = {
+  reportHeight(indexKey, height) {
+    localNodeLifecycle.reportHeight(indexKey, height)
+    parentNodeLifecycle?.reportHeight(indexKey, height)
+  },
+  markPending(indexKey) {
+    localNodeLifecycle.markPending(indexKey)
+    parentNodeLifecycle?.markPending(indexKey)
+  },
+  markSettled(indexKey) {
+    localNodeLifecycle.markSettled(indexKey)
+    parentNodeLifecycle?.markSettled(indexKey)
+  },
+}
+
+provide(MARKSTREAM_NODE_LIFECYCLE_KEY, providedNodeLifecycle)
+
+function getVisibleDomHeight() {
+  let total = 0
+
+  for (const el of nodeContentElements.values())
+    total += el?.offsetHeight ?? 0
+
+  return Math.ceil(Math.max(0, total))
+}
+
+function getVirtualizedDomLogicalHeight() {
+  let total = topSpacerHeight.value + bottomSpacerHeight.value
+
+  for (const el of nodeSlotElements.values()) {
+    if (!el)
+      continue
+
+    total += Math.max(
+      0,
+      el.offsetHeight || 0,
+      el.getBoundingClientRect?.().height || 0,
+    )
+  }
+
+  return Math.ceil(Math.max(0, total))
+}
+
+function getPlausibleVirtualizedContainerHeight(modelHeight: number, domHeight: number) {
+  if (modelHeight <= 0 || domHeight <= 0)
+    return 0
+
+  // Accept small real DOM drift, but reject stale container scrollHeight.
+  const driftBudget = Math.max(512, modelHeight * 0.05)
+  return domHeight <= modelHeight + driftBudget
+    ? Math.ceil(domHeight)
+    : 0
+}
+
+let imperativeVirtualSettleSessionKey: string | null = null
+let imperativeVirtualSettleThreadKey: string | undefined
+let lastManualSettleSignature: string | null = null
+
+function hasManualSettleSignal(token: unknown) {
+  return token !== false && token != null && token !== ''
+}
+
+function hasMountedVirtualWindowContent() {
+  if (!virtualizationEnabled.value)
+    return true
+
+  const total = parsedNodes.value.length
+  const start = clamp(liveRange.start, 0, total)
+  const end = clamp(liveRange.end, start, total)
+
+  if (start >= end)
+    return true
+
+  for (let index = start; index < end; index++) {
+    if (!nodeSlotElements.has(index))
+      return false
+
+    if (shouldRenderNode(index) && !nodeContentElements.has(index))
+      return false
+  }
+
+  return true
+}
+
+function hasRenderedDesiredNodes() {
+  if (virtualizationEnabled.value)
+    return hasMountedVirtualWindowContent()
+
+  return renderedCount.value >= desiredRenderedCount.value
+}
+
+function isInternalLayoutSettled() {
+  return effectiveFinal.value === true
+    && !contentStreamingTailActive.value
+    && pendingAsyncNodeCount.value === 0
+    && activeHeightSettlingTimers.size === 0
+    && pendingHeightMeasurements.size === 0
+    && heightMeasurementRaf == null
+    && hasRenderedDesiredNodes()
+}
+
+function isHostSettleConfirmed() {
+  if (props.virtualScroll?.settleMode !== 'manual')
+    return true
+
+  if (
+    imperativeVirtualSettleSessionKey === getVirtualSessionKey()
+    && imperativeVirtualSettleThreadKey === getVirtualThreadKey()
+  ) {
+    return true
+  }
+
+  const token = props.virtualScroll?.settledToken
+  if (!hasManualSettleSignal(token))
+    return false
+
+  return lastManualSettleSignature === getManualSettleSignature(token)
+}
+
+function isLayoutSettled() {
+  return isInternalLayoutSettled() && isHostSettleConfirmed()
+}
+
+function resolveVirtualPhase(phase?: MarkstreamVirtualPhase): MarkstreamVirtualPhase {
+  if (phase)
+    return phase
+  if (effectiveFinal.value !== true)
+    return parsedNodes.value.length > 0 ? 'streaming' : 'estimating'
+  if (!hasRenderedDesiredNodes() || pendingHeightMeasurements.size > 0 || heightMeasurementRaf != null)
+    return 'measuring'
+  return isLayoutSettled() ? 'settled' : 'settling'
+}
+
+function resolveVirtualConfidence(
+  phase: MarkstreamVirtualPhase,
+  report: Pick<VirtualHeightSummary, 'totalNodes' | 'measuredCount' | 'estimatedCount'>,
+) {
+  if (report.totalNodes <= 0)
+    return phase === 'final' ? 'final' : 'estimate'
+
+  if (report.measuredCount >= report.totalNodes)
+    return phase === 'final' ? 'final' : 'measured'
+
+  if (report.measuredCount > 0 || report.estimatedCount > 0)
+    return 'mixed'
+
+  return 'estimate'
+}
+
+function getVirtualMetrics(
+  reason: MarkstreamVirtualReason = 'manual',
+  phase?: MarkstreamVirtualPhase,
+): MarkstreamVirtualMetrics {
+  const summary = buildVirtualHeightSummary()
+  const resolvedPhase = resolveVirtualPhase(phase)
+
+  return {
+    sessionKey: getVirtualSessionKey(),
+    threadKey: getVirtualThreadKey(),
+    phase: resolvedPhase,
+    nodeCount: summary.totalNodes,
+    liveRange: { start: liveRange.start, end: liveRange.end },
+    renderedCount: renderedCount.value,
+    measuredCount: summary.measuredCount,
+    estimatedCount: summary.estimatedCount,
+    averageNodeHeight: summary.averageNodeHeight,
+    topSpacerHeight: summary.topSpacerHeight,
+    bottomSpacerHeight: summary.bottomSpacerHeight,
+    visibleDomHeight: getVisibleDomHeight(),
+    totalHeight: getRendererLogicalHeight(),
+    width: summary.width,
+    final: effectiveFinal.value === true,
+    stable: isLayoutSettled(),
+    confidence: resolveVirtualConfidence(resolvedPhase, summary),
+    reason,
+  }
+}
+
+function getScrollBox() {
+  const root = scrollRootElement.value || resolveScrollContainer()
+  const container = containerRef.value
+  if (!root || !container)
+    return null
+
+  const doc = root.ownerDocument || container.ownerDocument || document
+  const isViewportRoot = root === doc.documentElement
+    || root === doc.body
+    || root === doc.scrollingElement
+  const scrollTop = getNormalizedScrollTop(root, doc, isViewportRoot)
+  const scrollHeight = isViewportRoot
+    ? Math.max(doc.documentElement?.scrollHeight ?? 0, doc.body?.scrollHeight ?? 0, root.scrollHeight ?? 0)
+    : root.scrollHeight
+  const clientHeight = isViewportRoot
+    ? (doc.documentElement?.clientHeight || root.clientHeight || 0)
+    : root.clientHeight
+
+  return {
+    root,
+    doc,
+    isViewportRoot,
+    scrollTop,
+    scrollHeight,
+    clientHeight,
+  }
+}
+
+function getRendererLogicalHeight() {
+  const total = parsedNodes.value.length
+  const modelHeight = Math.max(0, estimateHeightRange(0, total))
+  const domHeight = Math.max(
+    0,
+    containerRef.value?.scrollHeight ?? 0,
+    containerRef.value?.offsetHeight ?? 0,
+  )
+
+  if (total <= 0)
+    return Math.ceil(domHeight)
+
+  if (virtualizationEnabled.value) {
+    if (modelHeight > 0) {
+      return Math.max(
+        1,
+        Math.ceil(modelHeight),
+        getVirtualizedDomLogicalHeight(),
+        getPlausibleVirtualizedContainerHeight(modelHeight, domHeight),
+      )
+    }
+
+    return Math.max(1, Math.ceil(domHeight))
+  }
+
+  if (virtualScrollEnabled.value) {
+    const hasModelHeight = modelHeight > 0
+      || heightStats.count > 0
+      || getEstimatedNodeHeightCount() > 0
+
+    if (!hasModelHeight)
+      return Math.ceil(domHeight)
+
+    if (incrementalRenderingActive.value && renderedCount.value < total) {
+      return Math.max(
+        1,
+        Math.ceil(domHeight),
+        Math.ceil(modelHeight),
+      )
+    }
+
+    // Non-internal-virtualized mode mounts the full renderer DOM, so the outer
+    // virtualizer must not receive less than the actual DOM box.
+    return Math.max(
+      1,
+      Math.ceil(domHeight),
+      Math.ceil(modelHeight),
+    )
+  }
+
+  return Math.max(
+    1,
+    Math.ceil(domHeight),
+    Math.ceil(modelHeight),
+  )
+}
+
+function getViewportBottomInRoot(box: NonNullable<ReturnType<typeof getScrollBox>>) {
+  return box.isViewportRoot
+    ? box.clientHeight
+    : box.root.getBoundingClientRect().bottom
+}
+
+function getVirtualViewportRect(box: NonNullable<ReturnType<typeof getScrollBox>>) {
+  if (box.isViewportRoot) {
+    return {
+      top: 0,
+      bottom: box.clientHeight,
+    }
+  }
+
+  const rect = box.root.getBoundingClientRect()
+  return {
+    top: rect.top,
+    bottom: rect.bottom,
+  }
+}
+
+function getRendererBottomDistanceFromViewport(
+  box: NonNullable<ReturnType<typeof getScrollBox>>,
+) {
+  const container = containerRef.value
+  if (!container)
+    return null
+
+  const containerRect = container.getBoundingClientRect()
+  const viewportBottom = getViewportBottomInRoot(box)
+
+  return viewportBottom - containerRect.bottom
+}
+
+function captureBottomVirtualAnchor(): MarkstreamVirtualAnchor | null {
+  const box = getScrollBox()
+  const container = containerRef.value
+  if (!box || !container)
+    return null
+
+  const scrollRootDistanceFromBottom = Math.max(
+    0,
+    box.scrollHeight - box.scrollTop - box.clientHeight,
+  )
+  if (scrollRootDistanceFromBottom > BOTTOM_ANCHOR_SCROLL_ROOT_MAX_DISTANCE_PX)
+    return null
+
+  const rendererBottomDistance = getRendererBottomDistanceFromViewport(box)
+  if (rendererBottomDistance == null)
+    return null
+
+  const rendererBottomIsNearViewportBottom
+    = rendererBottomDistance >= -8
+      && rendererBottomDistance <= BOTTOM_ANCHOR_CAPTURE_MAX_DISTANCE_PX
+
+  if (!rendererBottomIsNearViewportBottom)
+    return null
+
+  return {
+    type: 'bottom',
+    distanceFromBottomPx: Math.max(0, rendererBottomDistance),
+  }
+}
+
+function isRendererNearVirtualViewport(extraMarginPx = 64) {
+  const box = getScrollBox()
+  const container = containerRef.value
+
+  if (!box || !container)
+    return false
+
+  const viewport = getVirtualViewportRect(box)
+  const rect = container.getBoundingClientRect()
+
+  return rect.bottom >= viewport.top - extraMarginPx
+    && rect.top <= viewport.bottom + extraMarginPx
+}
+
+function createFallbackNodeAnchor(): MarkstreamVirtualAnchor | null {
+  const total = parsedNodes.value.length
+
+  if (total <= 0)
+    return null
+
+  return {
+    type: 'node',
+    nodeIndex: clamp(focusIndex.value, 0, Math.max(0, total - 1)),
+    offsetWithinNodePx: 0,
+  }
+}
+
+interface CapturedVirtualAnchorResult {
+  anchor: MarkstreamVirtualAnchor
+  captured: boolean
+}
+
+function captureVirtualAnchor(
+  options: {
+    allowFallback?: boolean
+    requireViewport?: boolean
+  } = {},
+): CapturedVirtualAnchorResult | null {
+  const requireViewport = options.requireViewport !== false
+  const nearViewport = isRendererNearVirtualViewport()
+
+  if (requireViewport && !nearViewport)
+    return null
+
+  const bottomAnchor = captureBottomVirtualAnchor()
+  if (bottomAnchor) {
+    return {
+      anchor: bottomAnchor,
+      captured: true,
+    }
+  }
+
+  const anchor = captureRestoreAnchor()
+  if (anchor) {
+    return {
+      anchor: {
+        type: 'node',
+        nodeIndex: anchor.nodeIndex,
+        offsetWithinNodePx: anchor.offsetWithinNodePx,
+      },
+      captured: nearViewport,
+    }
+  }
+
+  if (options.allowFallback === true) {
+    const fallback = createFallbackNodeAnchor()
+    return fallback
+      ? {
+          anchor: fallback,
+          captured: false,
+        }
+      : null
+  }
+
+  return null
+}
+
+function hashVirtualString(input: string) {
+  let hash = 2166136261
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+
+  return (hash >>> 0).toString(36)
+}
+
+function hashVirtualPartInto(seed: number, part: string) {
+  let hash = seed
+  for (let i = 0; i < part.length; i++) {
+    hash ^= part.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+
+  hash ^= 0x1F
+  hash = Math.imul(hash, 16777619)
+  return hash
+}
+
+const HEIGHT_CACHE_SIGNATURE_MAX_DEPTH = 6
+const HEIGHT_CACHE_SIGNATURE_MAX_ARRAY_ITEMS = 160
+const HEIGHT_CACHE_SIGNATURE_MAX_STRING_CHARS = 8192
+const HEIGHT_CACHE_STRUCTURAL_KEYS = new Set([
+  'children',
+  'items',
+  'header',
+  'rows',
+  'cells',
+  'attrs',
+  'data',
+  'term',
+  'definition',
+])
+
+function signatureString(value: string) {
+  const source = value.length > HEIGHT_CACHE_SIGNATURE_MAX_STRING_CHARS
+    ? `${value.slice(0, HEIGHT_CACHE_SIGNATURE_MAX_STRING_CHARS)}...${value.length}`
+    : value
+
+  return `${value.length}:${hashVirtualString(source)}`
+}
+
+function stableHeightSignatureValue(
+  value: unknown,
+  seen = new WeakSet<object>(),
+  depth = 0,
+): string {
+  if (value == null || typeof value === 'number' || typeof value === 'boolean')
+    return String(value)
+
+  if (typeof value === 'string')
+    return `s:${signatureString(value)}`
+
+  if (typeof value === 'function')
+    return 'fn'
+
+  if (typeof value !== 'object')
+    return typeof value
+
+  if (seen.has(value))
+    return 'cycle'
+
+  if (depth >= HEIGHT_CACHE_SIGNATURE_MAX_DEPTH)
+    return 'max-depth'
+
+  seen.add(value)
+
+  try {
+    if (Array.isArray(value)) {
+      if (value.length <= HEIGHT_CACHE_SIGNATURE_MAX_ARRAY_ITEMS) {
+        const signatures: string[] = []
+        for (let i = 0; i < value.length; i++)
+          signatures.push(stableHeightSignatureValue(value[i], seen, depth + 1))
+
+        return `a:${value.length}:${signatures.join(',')}`
+      }
+
+      const headParts: string[] = []
+      const tailParts: string[] = []
+      const tailStart = Math.max(0, value.length - 32)
+      let aggregateHash = 2166136261
+
+      for (let i = 0; i < value.length; i++) {
+        const signature = stableHeightSignatureValue(value[i], seen, depth + 1)
+        aggregateHash = hashVirtualPartInto(aggregateHash, signature)
+
+        if (i < 32)
+          headParts.push(signature)
+        if (i >= tailStart)
+          tailParts.push(signature)
+      }
+
+      return [
+        `a:${value.length}`,
+        `h=${headParts.join(',')}`,
+        `t=${tailParts.join(',')}`,
+        `all=${(aggregateHash >>> 0).toString(36)}`,
+      ].join(':')
+    }
+
+    const record = value as Record<string, unknown>
+    const keys = Object.keys(record)
+      .filter((key) => {
+        const field = record[key]
+
+        if (key === 'parent' || key === 'el' || key === 'component')
+          return false
+
+        if (
+          field == null
+          || typeof field === 'string'
+          || typeof field === 'number'
+          || typeof field === 'boolean'
+        ) {
+          return true
+        }
+
+        return HEIGHT_CACHE_STRUCTURAL_KEYS.has(key)
+      })
+      .sort()
+
+    return `o:${keys.length}:${keys
+      .map(key => `${key}=${stableHeightSignatureValue(record[key], seen, depth + 1)}`)
+      .join(';')}`
+  }
+  finally {
+    seen.delete(value)
+  }
+}
+
+let virtualContentHashRevision = -1
+let virtualContentHashCache = ''
+
+function getNodeHeightCacheSignature(index: number) {
+  const node = parsedNodes.value[index]
+  if (!node)
+    return ''
+
+  return hashVirtualString(stableHeightSignatureValue(node))
+}
+
+function getVirtualContentHash() {
+  const revision = streamRenderVersion.value
+  if (virtualContentHashRevision === revision)
+    return virtualContentHashCache
+
+  let hash = 2166136261
+
+  for (let i = 0; i < parsedNodes.value.length; i++) {
+    const signature = getNodeHeightCacheSignature(i)
+    for (let j = 0; j < signature.length; j++) {
+      hash ^= signature.charCodeAt(j)
+      hash = Math.imul(hash, 16777619)
+    }
+  }
+
+  virtualContentHashCache = (hash >>> 0).toString(36)
+  virtualContentHashRevision = revision
+  return virtualContentHashCache
+}
+
+function exportVirtualHeightCache(): MarkstreamHeightCache {
+  const cache = exportHeightCache()
+    .map((entry): MarkstreamHeightCache[number] | null => {
+      const node = parsedNodes.value[entry.index] as any
+      if (!node)
+        return null
+
+      return {
+        ...entry,
+        nodeType: String(node.type ?? ''),
+        signature: getNodeHeightCacheSignature(entry.index),
+      }
+    })
+    .filter((entry): entry is MarkstreamHeightCache[number] => Boolean(entry))
+
+  return limitVirtualHeightCache(cache)
+}
+
+function getVirtualHeightCacheLimit() {
+  const raw = Number(props.virtualScroll?.heightCacheLimit ?? 5000)
+
+  if (!Number.isFinite(raw) || raw <= 0)
+    return Number.POSITIVE_INFINITY
+
+  return Math.max(1, Math.trunc(raw))
+}
+
+function limitVirtualHeightCache(cache: MarkstreamHeightCache): MarkstreamHeightCache {
+  const limit = getVirtualHeightCacheLimit()
+
+  if (!Number.isFinite(limit) || cache.length <= limit)
+    return cache
+
+  const keep = new Map<number, MarkstreamHeightCache[number]>()
+  const add = (entry: MarkstreamHeightCache[number] | undefined) => {
+    if (!entry || keep.size >= limit)
+      return
+
+    keep.set(entry.index, entry)
+  }
+
+  const total = parsedNodes.value.length
+  const aroundStart = clamp(
+    liveRange.start - liveNodeBufferResolved.value * 2,
+    0,
+    total,
+  )
+  const aroundEnd = clamp(
+    liveRange.end + liveNodeBufferResolved.value * 2,
+    aroundStart,
+    total,
+  )
+
+  for (const entry of cache) {
+    if (entry.index >= aroundStart && entry.index < aroundEnd)
+      add(entry)
+  }
+
+  const step = Math.max(1, Math.ceil(cache.length / limit))
+  for (let i = 0; i < cache.length && keep.size < limit; i += step)
+    add(cache[i])
+
+  for (let i = cache.length - 1; i >= 0 && keep.size < limit; i -= step)
+    add(cache[i])
+
+  return Array.from(keep.values())
+    .sort((a, b) => a.index - b.index)
+    .slice(0, limit)
+}
+
+function isHeightCacheEntryCompatible(entry: MarkstreamHeightCache[number]) {
+  const node = parsedNodes.value[entry.index] as any
+  if (!node)
+    return false
+
+  if (entry.nodeType && entry.nodeType !== String(node.type ?? ''))
+    return false
+
+  if (entry.signature && entry.signature !== getNodeHeightCacheSignature(entry.index))
+    return false
+
+  return true
+}
+
+function captureVirtualStateFromMetrics(
+  metrics: MarkstreamVirtualMetrics,
+  options: {
+    includeHeightCache?: boolean
+    includeContentHash?: boolean
+    allowAnchorFallback?: boolean
+    requireViewport?: boolean
+    includeEmptyState?: boolean
+  } = {},
+): MarkstreamVirtualState | null {
+  const includeHeightCache = options.includeHeightCache === true
+  const includeContentHash = options.includeContentHash ?? includeHeightCache
+  const heightCache = includeHeightCache
+    ? exportVirtualHeightCache()
+    : []
+  const capturedAnchor = captureVirtualAnchor({
+    allowFallback: options.allowAnchorFallback === true,
+    requireViewport: options.requireViewport,
+  })
+
+  if (!capturedAnchor && !heightCache.length && options.includeEmptyState !== true)
+    return null
+
+  return {
+    sessionKey: metrics.sessionKey,
+    threadKey: metrics.threadKey,
+    ...(capturedAnchor
+      ? {
+          anchor: capturedAnchor.anchor,
+          anchorCaptured: capturedAnchor.captured,
+        }
+      : {
+          anchorCaptured: false,
+        }),
+    metrics,
+    width: metrics.width,
+    contentHash: includeContentHash ? getVirtualContentHash() : undefined,
+    measurementKey: getVirtualMeasurementKey() || undefined,
+    heightCache: heightCache.length ? heightCache : undefined,
+  }
+}
+
+function captureVirtualState(options: MarkstreamCaptureVirtualStateOptions = {}) {
+  return captureVirtualStateFromMetrics(getVirtualMetrics('manual'), {
+    includeHeightCache: true,
+    includeContentHash: true,
+    allowAnchorFallback: options.allowFallbackAnchor === true,
+    requireViewport: options.requireViewport === true,
+    includeEmptyState: options.includeEmptyState ?? true,
+  })
+}
+
+function setNormalizedScrollTop(root: HTMLElement, doc: Document, targetNormalized: number) {
+  setNormalizedElementScrollTop(root, doc, targetNormalized, {
+    isReverseFlexScrollRoot,
+    getNormalizedScrollTop,
+  })
+}
+
+function getRendererBottomOffsetWithinRoot(
+  box: NonNullable<ReturnType<typeof getScrollBox>>,
+) {
+  const container = containerRef.value
+  if (!container)
+    return null
+
+  const rendererTop = getOffsetTopWithinRoot(container, box.root)
+  const domHeight = Math.max(
+    0,
+    container.offsetHeight || 0,
+    container.scrollHeight || 0,
+    container.getBoundingClientRect?.().height || 0,
+  )
+  const logicalHeight = getRendererLogicalHeight()
+
+  return rendererTop + Math.max(domHeight, logicalHeight)
+}
+
+function applyBottomVirtualAnchor(anchor: Extract<MarkstreamVirtualAnchor, { type: 'bottom' }>) {
+  const box = getScrollBox()
+  if (!box)
+    return
+
+  const rendererBottom = getRendererBottomOffsetWithinRoot(box)
+  if (rendererBottom == null)
+    return
+
+  const distance = Math.max(0, anchor.distanceFromBottomPx)
+
+  // Keep renderer bottom `distance` px above viewport bottom.
+  const target = Math.max(
+    0,
+    rendererBottom - box.clientHeight - distance,
+  )
+
+  guardVirtualBottomProgrammaticScroll(target)
+
+  if (box.isViewportRoot) {
+    box.doc.defaultView?.scrollTo?.(0, target)
+    return
+  }
+
+  setNormalizedScrollTop(box.root, box.doc, target)
+}
+
+const virtualBottomRestoreTimers: number[] = []
+
+function clearVirtualBottomRestoreTimers() {
+  if (!isClient)
+    return
+
+  if (virtualBottomRestoreRaf != null) {
+    cancelFrame?.(virtualBottomRestoreRaf)
+    virtualBottomRestoreRaf = null
+  }
+
+  while (virtualBottomRestoreTimers.length) {
+    const timer = virtualBottomRestoreTimers.pop()
+    if (timer != null)
+      window.clearTimeout(timer)
+  }
+}
+
+function clearActiveVirtualBottomAnchor(reason?: MarkstreamVirtualReason) {
+  const hadAnchor = Boolean(activeVirtualBottomAnchor.value)
+  activeVirtualBottomAnchor.value = null
+  virtualBottomRestoreScrollGuardUntil = 0
+  virtualBottomRestoreScrollGuardTarget = null
+  clearVirtualBottomRestoreTimers()
+
+  if (hadAnchor && reason)
+    scheduleVirtualMetricsEmit(reason)
+}
+
+function scheduleVirtualBottomRestoreReconcile() {
+  if (!activeVirtualBottomAnchor.value || !isClient)
+    return
+
+  if (virtualBottomRestoreRaf != null)
+    return
+
+  const run = () => {
+    virtualBottomRestoreRaf = null
+
+    const anchor = activeVirtualBottomAnchor.value
+    if (anchor)
+      applyBottomVirtualAnchor(anchor)
+  }
+
+  virtualBottomRestoreRaf = requestFrame
+    ? requestFrame(run)
+    : null
+
+  if (virtualBottomRestoreRaf == null)
+    run()
+}
+
+function handleVirtualScrollRootScroll() {
+  const anchor = activeVirtualBottomAnchor.value
+  if (!anchor)
+    return
+
+  const box = getScrollBox()
+  if (!box)
+    return
+
+  if (consumeVirtualBottomProgrammaticScrollGuard(box))
+    return
+
+  const rendererBottomDistance = getRendererBottomDistanceFromViewport(box)
+  if (rendererBottomDistance == null) {
+    clearActiveVirtualBottomAnchor('restore')
+    return
+  }
+
+  if (
+    rendererBottomDistance < -BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX
+    || (
+      Math.abs(
+        Math.max(0, rendererBottomDistance) - Math.max(0, anchor.distanceFromBottomPx),
+      ) > BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX
+    )
+  ) {
+    clearActiveVirtualBottomAnchor('restore')
+  }
+}
+
+function restoreVirtualAnchor(anchor: MarkstreamVirtualAnchor) {
+  const apply = () => {
+    if (anchor.type === 'node') {
+      clearActiveVirtualBottomAnchor()
+
+      restoreAnchor({
+        nodeIndex: anchor.nodeIndex,
+        offsetWithinNodePx: anchor.offsetWithinNodePx,
+      })
+      return
+    }
+
+    clearRestoreReconcile()
+    activeRestoreAnchor.value = null
+    activeVirtualBottomAnchor.value = anchor
+    clearVirtualBottomRestoreTimers()
+
+    applyBottomVirtualAnchor(anchor)
+
+    if (!isClient)
+      return
+
+    for (const delay of [0, 120, 280, 480]) {
+      virtualBottomRestoreTimers.push(window.setTimeout(() => {
+        const activeAnchor = activeVirtualBottomAnchor.value
+        if (activeAnchor)
+          applyBottomVirtualAnchor(activeAnchor)
+      }, delay))
+    }
+  }
+
+  if (primeVirtualWindowForAnchor(anchor)) {
+    void nextTick(apply)
+    return
+  }
+
+  apply()
+}
+
+function primeVirtualWindowForAnchor(anchor: MarkstreamVirtualAnchor) {
+  if (!virtualizationEnabled.value)
+    return false
+
+  const total = parsedNodes.value.length
+  if (total <= 0)
+    return false
+
+  focusIndex.value = anchor.type === 'node'
+    ? clamp(anchor.nodeIndex, 0, total - 1)
+    : total - 1
+
+  updateLiveRange()
+  return true
+}
+
+function getBoundedHeightCache(
+  cache: MarkstreamHeightCache,
+  options: {
+    requireCompatibilityMetadata?: boolean
+    requireSignature?: boolean
+  } = {},
+) {
+  const length = parsedNodes.value.length
+  if (length <= 0)
+    return []
+
+  return cache.filter((entry) => {
+    if (!Number.isInteger(entry.index) || entry.index < 0 || entry.index >= length)
+      return false
+
+    if (!Number.isFinite(entry.height) || entry.height <= 0)
+      return false
+
+    if (options.requireSignature && !entry.signature)
+      return false
+
+    if (options.requireCompatibilityMetadata && !entry.nodeType && !entry.signature)
+      return false
+
+    return isHeightCacheEntryCompatible(entry)
+  })
+}
+
+function canReuseHeightCacheForWidth(savedWidth: number | null | undefined) {
+  const currentWidth = getCurrentVirtualWidth()
+  const currentBucket = getHeightCacheWidthBucket(currentWidth)
+  const savedBucket = getHeightCacheWidthBucket(savedWidth)
+
+  if (currentBucket === UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET)
+    return false
+
+  if (savedBucket === UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET)
+    return false
+
+  return currentBucket === savedBucket
+}
+
+function getVirtualStateSavedWidth(state: MarkstreamVirtualState | null | undefined) {
+  const explicitWidth = Number(state?.width)
+  if (Number.isFinite(explicitWidth) && explicitWidth > 0)
+    return explicitWidth
+
+  const metricsWidth = Number(state?.metrics?.width)
+  if (Number.isFinite(metricsWidth) && metricsWidth > 0)
+    return metricsWidth
+
+  return null
+}
+
+function canRestoreVirtualStateCache(state: MarkstreamVirtualState) {
+  if (state.sessionKey !== getVirtualSessionKey())
+    return false
+
+  if (!isSameVirtualThreadKey(state.threadKey))
+    return false
+
+  if ((state.measurementKey ?? '') !== getVirtualMeasurementKey())
+    return false
+
+  if (!canReuseHeightCacheForWidth(getVirtualStateSavedWidth(state)))
+    return false
+
+  if (!hasRestoreCacheCompatibilityMetadata(state))
+    return false
+
+  return true
+}
+
+function getRestoreContentHashMatch(state: MarkstreamVirtualState) {
+  return Boolean(
+    state.contentHash
+    && state.contentHash === getVirtualContentHash(),
+  )
+}
+
+function shouldRequireRestoreEntrySignature(state: MarkstreamVirtualState) {
+  return !getRestoreContentHashMatch(state)
+}
+
+function hasRestoreCacheCompatibilityMetadata(state: MarkstreamVirtualState) {
+  const cache = state.heightCache
+  if (!cache?.length)
+    return false
+
+  if (getRestoreContentHashMatch(state))
+    return cache.some(entry => Boolean(entry.nodeType || entry.signature))
+
+  return cache.some(entry => Boolean(entry.signature))
+}
+
+function canReuseStandaloneHeightCache() {
+  const cacheWidth = props.virtualScroll?.heightCacheWidth
+  return canReuseHeightCacheForWidth(cacheWidth)
+}
+
+let lastImportedVirtualHeightCacheSignature: string | null = null
+let lastImportedVirtualHeightCacheSource: 'restore' | 'standalone' | null = null
+let lastAppliedVirtualRestoreSignature: string | null = null
+let pendingImperativeVirtualRestoreState: MarkstreamVirtualState | null = null
+let pendingImperativeVirtualRestoreOptions:
+  { restoreAnchor: boolean, restoreToken: string, allowUncapturedAnchor: boolean } | null = null
+let warnedStandaloneHeightCacheWithoutSignature = false
+
+function warnStandaloneHeightCacheIgnored(reason: string) {
+  if (
+    warnedStandaloneHeightCacheWithoutSignature
+    || typeof console === 'undefined'
+    || !(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV)
+  ) {
+    return
+  }
+
+  warnedStandaloneHeightCacheWithoutSignature = true
+  console.warn(
+    `[markstream-vue] virtualScroll.heightCache ignored: ${reason}. `
+    + 'Use heightCache exported from virtual-state-change/render-settled, '
+    + 'and pass heightCacheWidth from the same state.',
+  )
+}
+
+function getHeightCacheSignature(cache: MarkstreamHeightCache) {
+  const payload = cache
+    .map((entry) => {
+      return [
+        entry.index,
+        Math.round(entry.height * 10),
+        entry.nodeType ?? '',
+        entry.signature ?? '',
+      ].join('\u0002')
+    })
+    .join('\u0001')
+
+  const widthBucket = getHeightCacheWidthBucket(getCurrentVirtualWidth())
+
+  return [
+    getVirtualThreadKey() ?? '',
+    getVirtualSessionKey(),
+    getVirtualMeasurementKey(),
+    parsedNodes.value.length,
+    widthBucket,
+    cache.length,
+    hashVirtualString(payload),
+  ].join(':')
+}
+
+function tryImportVirtualHeightCache(cache = props.virtualScroll?.heightCache) {
+  if (!virtualScrollEnabled.value || !cache?.length)
+    return false
+
+  if (parsedNodes.value.length <= 0)
+    return false
+
+  if (!canReuseStandaloneHeightCache())
+    return false
+
+  const boundedCache = getBoundedHeightCache(cache, {
+    requireSignature: true,
+  })
+
+  if (!boundedCache.length) {
+    warnStandaloneHeightCacheIgnored(
+      'standalone heightCache entries must include compatible signature metadata',
+    )
+    return false
+  }
+
+  const signature = getHeightCacheSignature(boundedCache)
+  if (signature === lastImportedVirtualHeightCacheSignature) {
+    lastImportedVirtualHeightCacheSource = 'standalone'
+    return true
+  }
+
+  importHeightCache(boundedCache, { mode: 'merge' })
+  markFallbackHeightPrefixDirty()
+  lastImportedVirtualHeightCacheSignature = signature
+  lastImportedVirtualHeightCacheSource = 'standalone'
+  resetVirtualMetricsEventDedupes()
+  scheduleVirtualMetricsEmit('restore')
+  return true
+}
+
+function getVirtualRestoreAnchorToken() {
+  const token = props.virtualScroll?.restoreAnchor
+
+  if (token == null || token === false)
+    return null
+
+  return token === true ? 'true' : String(token)
+}
+
+function getVirtualAnchorRestoreSignature(
+  state: MarkstreamVirtualState,
+  token: string,
+) {
+  const anchor = state.anchor
+  const anchorKey = !anchor
+    ? 'none'
+    : anchor.type === 'bottom'
+      ? `bottom:${Math.round(anchor.distanceFromBottomPx)}`
+      : `node:${anchor.nodeIndex}:${Math.round(anchor.offsetWithinNodePx)}`
+
+  return [
+    getVirtualThreadKey() ?? '',
+    getVirtualSessionKey(),
+    getVirtualMeasurementKey(),
+    virtualLayoutWidthBucket.value,
+    token,
+    anchorKey,
+  ].join(':')
+}
+
+function applyVirtualRestoreState(
+  state: MarkstreamVirtualState | null | undefined,
+  options: {
+    restoreAnchor?: boolean
+    restoreToken?: string
+    allowUncapturedAnchor?: boolean
+  } = {},
+) {
+  if (!virtualScrollEnabled.value || !state)
+    return false
+
+  if (state.sessionKey !== getVirtualSessionKey())
+    return false
+
+  if (!isSameVirtualThreadKey(state.threadKey))
+    return false
+
+  if (parsedNodes.value.length <= 0)
+    return false
+
+  const wantsCacheImport = Boolean(state.heightCache?.length)
+  const waitingForCacheWidth = wantsCacheImport && !hasKnownVirtualWidth()
+  const restorableAnchor = state.anchor && (
+    state.anchorCaptured !== false
+    || options.allowUncapturedAnchor === true
+  )
+    ? state.anchor
+    : null
+  const wantsAnchorRestore = options.restoreAnchor === true && Boolean(restorableAnchor)
+  const waitingForAnchorWidth = wantsAnchorRestore
+    && !hasKnownVirtualWidth()
+    && Number(getVirtualStateSavedWidth(state)) > 0
+  let importedCache = false
+
+  if (state.heightCache?.length && canRestoreVirtualStateCache(state)) {
+    const boundedCache = getBoundedHeightCache(state.heightCache, {
+      requireCompatibilityMetadata: !state.contentHash,
+      requireSignature: shouldRequireRestoreEntrySignature(state),
+    })
+
+    if (boundedCache.length) {
+      importHeightCache(boundedCache, { mode: 'merge' })
+      markFallbackHeightPrefixDirty()
+      lastImportedVirtualHeightCacheSignature = getHeightCacheSignature(boundedCache)
+      lastImportedVirtualHeightCacheSource = 'restore'
+      resetVirtualMetricsEventDedupes()
+      importedCache = true
+    }
+  }
+
+  if (waitingForCacheWidth || waitingForAnchorWidth)
+    return false
+
+  if (!options.restoreAnchor) {
+    if (importedCache)
+      scheduleVirtualMetricsEmit('restore')
+
+    return true
+  }
+
+  if (!restorableAnchor) {
+    if (importedCache)
+      scheduleVirtualMetricsEmit('restore')
+
+    return true
+  }
+
+  const restoreToken = options.restoreToken ?? 'imperative'
+  const signature = getVirtualAnchorRestoreSignature(state, restoreToken)
+
+  if (lastAppliedVirtualRestoreSignature === signature) {
+    if (importedCache)
+      scheduleVirtualMetricsEmit('restore')
+
+    return true
+  }
+
+  lastAppliedVirtualRestoreSignature = signature
+  restoreVirtualAnchor(restorableAnchor)
+  scheduleVirtualMetricsEmit('restore')
+  return true
+}
+
+function hasKnownVirtualWidth() {
+  const width = getCurrentVirtualWidth()
+  return Number.isFinite(width) && width > 0
+}
+
+function shouldKeepPendingVirtualRestoreState(state: MarkstreamVirtualState) {
+  if (state.sessionKey !== getVirtualSessionKey())
+    return false
+
+  if (!isSameVirtualThreadKey(state.threadKey))
+    return false
+
+  if (parsedNodes.value.length <= 0)
+    return true
+
+  if (state.heightCache?.length && !hasKnownVirtualWidth())
+    return true
+
+  if (state.anchor && Number(getVirtualStateSavedWidth(state)) > 0 && !hasKnownVirtualWidth())
+    return true
+
+  return false
+}
+
+function restoreVirtualState(
+  state: MarkstreamVirtualState,
+  options: {
+    restoreAnchor?: boolean
+    restoreToken?: string | number | boolean
+    allowUncapturedAnchor?: boolean
+  } = {},
+) {
+  const restoreAnchorOption = options.restoreAnchor === true
+  const restoreToken = options.restoreToken == null
+    ? 'imperative'
+    : String(options.restoreToken)
+
+  pendingImperativeVirtualRestoreState = state
+  pendingImperativeVirtualRestoreOptions = {
+    restoreAnchor: restoreAnchorOption,
+    restoreToken,
+    allowUncapturedAnchor: options.allowUncapturedAnchor === true,
+  }
+
+  const applied = applyVirtualRestoreState(state, {
+    restoreAnchor: restoreAnchorOption,
+    restoreToken,
+    allowUncapturedAnchor: options.allowUncapturedAnchor === true,
+  })
+
+  if (applied || !shouldKeepPendingVirtualRestoreState(state)) {
+    pendingImperativeVirtualRestoreState = null
+    pendingImperativeVirtualRestoreOptions = null
+  }
+}
+
+function seedCurrentNodeHeightSignatures() {
+  nodeHeightSignatures.clear()
+  for (const rawIndex of Object.keys(nodeHeights)) {
+    const index = Number(rawIndex)
+    if (Number.isInteger(index) && index >= 0 && index < parsedNodes.value.length)
+      rememberNodeHeightSignature(index)
+  }
+}
+
+function invalidateChangedNodeHeights(reason: MarkstreamVirtualReason = 'content') {
+  if (!virtualScrollEnabled.value)
+    return
+
+  const staleIndices: number[] = []
+  const total = parsedNodes.value.length
+
+  for (const index of Array.from(nodeHeightSignatures.keys())) {
+    if (index >= total) {
+      staleIndices.push(index)
+      continue
+    }
+
+    const signature = getNodeHeightCacheSignature(index)
+    const previousSignature = nodeHeightSignatures.get(index)
+
+    if (previousSignature != null && previousSignature !== signature)
+      staleIndices.push(index)
+
+    nodeHeightSignatures.set(index, signature)
+  }
+
+  for (const index of Array.from(nodeHeightSignatures.keys())) {
+    if (index >= total)
+      nodeHeightSignatures.delete(index)
+  }
+
+  if (!staleIndices.length)
+    return
+
+  removeNodeHeights(staleIndices, { notify: false })
+  markFallbackHeightPrefixDirty()
+  resetVirtualSettleConfirmation()
+
+  if (activeRestoreAnchor.value)
+    scheduleRestoreReconcile()
+  if (activeVirtualBottomAnchor.value)
+    scheduleVirtualBottomRestoreReconcile()
+
+  scheduleVirtualMetricsEmit(reason)
+}
+
+function forceFlushPendingHeightMeasurements() {
+  if (heightMeasurementRaf != null) {
+    cancelFrame?.(heightMeasurementRaf)
+    heightMeasurementRaf = null
+  }
+  flushPendingHeightMeasurements()
+}
+
+function waitForVirtualFrame() {
+  if (!isClient || isTestEnv)
+    return Promise.resolve()
+
+  return new Promise<void>((resolve) => {
+    let settled = false
+    let timeout: ReturnType<typeof setTimeout> | null = null
+    const finish = () => {
+      if (settled)
+        return
+      settled = true
+      if (timeout != null)
+        window.clearTimeout(timeout)
+      resolve()
+    }
+
+    if (requestFrame) {
+      requestFrame(finish)
+      timeout = window.setTimeout(finish, 50)
+      return
+    }
+    timeout = window.setTimeout(finish, 0)
+  })
+}
+
+function waitForVirtualTimeout(timeoutMs: number) {
+  if (!isClient || timeoutMs <= 0)
+    return Promise.resolve()
+  return new Promise<void>(resolve => window.setTimeout(resolve, timeoutMs))
+}
+
+async function forceMeasure(reason: MarkstreamVirtualReason = 'manual') {
+  await nextTick()
+  await waitForVirtualFrame()
+
+  measureTrackedNodeHeights()
+  forceFlushPendingHeightMeasurements()
+
+  await nextTick()
+
+  const metrics = getVirtualMetrics(reason)
+  emitVirtualMetricsNow(metrics, true)
+  return metrics
+}
+
+function isSameVirtualSession(
+  sessionKey: string,
+  threadKey = getVirtualThreadKey(),
+  layoutEpochKey = virtualLayoutEpochKey.value,
+) {
+  return getVirtualSessionKey() === sessionKey
+    && getVirtualThreadKey() === threadKey
+    && virtualLayoutEpochKey.value === layoutEpochKey
+}
+
+async function settle(options: {
+  frames?: number
+  timeoutMs?: number
+  reason?: MarkstreamVirtualReason
+  expectedSettledTokenKey?: string
+  flushPendingTimers?: boolean
+} = {}) {
+  const sessionKeyAtStart = getVirtualSessionKey()
+  const threadKeyAtStart = getVirtualThreadKey()
+  const layoutEpochKeyAtStart = virtualLayoutEpochKey.value
+  const frames = options.frames ?? 2
+  const timeoutMs = options.timeoutMs ?? 120
+  const reason = options.reason ?? 'manual'
+  const expectedSettledTokenKey = options.expectedSettledTokenKey
+  const shouldFinalizeSettlingTimers = options.flushPendingTimers === true
+  const staleBaseMetrics = getVirtualMetrics(reason)
+  const staleMetrics = (): MarkstreamVirtualMetrics => ({
+    ...staleBaseMetrics,
+    phase: staleBaseMetrics.final ? 'settling' : staleBaseMetrics.phase,
+    stable: false,
+    confidence: staleBaseMetrics.confidence === 'final'
+      ? 'mixed'
+      : staleBaseMetrics.confidence,
+    reason,
+  })
+  const isSameSettleContext = () => {
+    return isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart)
+      && (
+        expectedSettledTokenKey == null
+        || getManualSettleTokenKey() === expectedSettledTokenKey
+      )
+  }
+
+  for (let i = 0; i < frames; i++) {
+    await nextTick()
+    if (!isSameSettleContext())
+      return staleMetrics()
+
+    await waitForVirtualFrame()
+    if (!isSameSettleContext())
+      return staleMetrics()
+
+    measureTrackedNodeHeights()
+    forceFlushPendingHeightMeasurements()
+  }
+
+  await waitForVirtualTimeout(timeoutMs)
+  if (!isSameSettleContext())
+    return staleMetrics()
+
+  if (shouldFinalizeSettlingTimers)
+    clearAllHeightSettlingTimers()
+
+  measureTrackedNodeHeights()
+  forceFlushPendingHeightMeasurements()
+
+  if (!isSameSettleContext())
+    return staleMetrics()
+
+  const internallySettled = isInternalLayoutSettled()
+
+  if (internallySettled) {
+    imperativeVirtualSettleSessionKey = sessionKeyAtStart
+    imperativeVirtualSettleThreadKey = threadKeyAtStart
+
+    if (
+      props.virtualScroll?.settleMode === 'manual'
+      && expectedSettledTokenKey != null
+      && hasManualSettleSignal(props.virtualScroll?.settledToken)
+      && getManualSettleTokenKey() === expectedSettledTokenKey
+    ) {
+      lastManualSettleSignature = getManualSettleSignature(
+        props.virtualScroll.settledToken,
+      )
+    }
+  }
+
+  const finalPhase = isSameSettleContext()
+    && internallySettled
+    && isHostSettleConfirmed()
+  const metrics = getVirtualMetrics(reason, finalPhase ? 'final' : undefined)
+  emitVirtualMetricsNow(metrics, true)
+  return metrics
+}
+
+function scrollToNode(
+  index: number,
+  align: 'start' | 'center' | 'end' | 'nearest' = 'start',
+) {
+  clearActiveVirtualBottomAnchor()
+  clearRestoreReconcile()
+
+  const total = parsedNodes.value.length
+  if (total <= 0)
+    return
+
+  const boundedIndex = clamp(index, 0, total - 1)
+
+  const apply = () => {
+    const nodeTop = resolveAnchorOffset({
+      nodeIndex: boundedIndex,
+      offsetWithinNodePx: 0,
+    })
+    const nodeHeight = getFallbackNodeHeight(boundedIndex)
+    const box = getScrollBox()
+    const viewportHeight = box?.clientHeight ?? 0
+    const current = getRelativeScrollTopWithinContainer()
+
+    let target = nodeTop
+    if (align === 'center') {
+      target = nodeTop - viewportHeight / 2 + nodeHeight / 2
+    }
+    else if (align === 'end') {
+      target = nodeTop - viewportHeight + nodeHeight
+    }
+    else if (align === 'nearest' && current != null) {
+      if (nodeTop >= current && nodeTop + nodeHeight <= current + viewportHeight)
+        return
+      target = nodeTop < current ? nodeTop : nodeTop - viewportHeight + nodeHeight
+    }
+
+    setRelativeScrollTopWithinContainer(Math.max(0, target))
+    scheduleFocusSync({ immediate: true })
+    if (virtualizationEnabled.value) {
+      focusIndex.value = boundedIndex
+      updateLiveRange()
+    }
+  }
+
+  if (virtualizationEnabled.value) {
+    focusIndex.value = boundedIndex
+    updateLiveRange()
+    void nextTick(apply)
+    return
+  }
+
+  apply()
+}
+
+let pendingVirtualMetricsReason: MarkstreamVirtualReason = 'content'
+let virtualMetricsEmitRaf: number | null = null
+let virtualMetricsEmitTimer: number | null = null
+let lastVirtualEmitAt = 0
+let lastEmittedVirtualMetrics: MarkstreamVirtualMetrics | null = null
+let lastEmittedVirtualStateKey: string | null = null
+let lastSettledVirtualEventKey: string | null = null
+let lastFinalVirtualEventKey: string | null = null
+
+interface VirtualStateEmitCandidate {
+  state: MarkstreamVirtualState | null
+}
+
+function getVirtualNow() {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now()
+}
+
+function shouldEmitVirtualMetrics(metrics: MarkstreamVirtualMetrics) {
+  const previous = lastEmittedVirtualMetrics
+  if (!previous)
+    return true
+
+  const threshold = props.virtualScroll?.heightDiffThresholdPx ?? 1
+
+  return Math.abs(metrics.totalHeight - previous.totalHeight) > threshold
+    || metrics.sessionKey !== previous.sessionKey
+    || metrics.phase !== previous.phase
+    || metrics.stable !== previous.stable
+    || metrics.final !== previous.final
+    || metrics.threadKey !== previous.threadKey
+    || metrics.nodeCount !== previous.nodeCount
+    || metrics.measuredCount !== previous.measuredCount
+    || metrics.width !== previous.width
+}
+
+function stringifyVirtualToken(value: unknown) {
+  if (value == null)
+    return ''
+
+  if (
+    typeof value === 'string'
+    || typeof value === 'number'
+    || typeof value === 'boolean'
+  ) {
+    return String(value)
+  }
+
+  try {
+    return JSON.stringify(value)
+  }
+  catch {
+    return String(value)
+  }
+}
+
+function getManualSettleTokenKey(token: unknown = props.virtualScroll?.settledToken) {
+  return stringifyVirtualToken(token)
+}
+
+function getVirtualMetricsEventKey(
+  phase: 'settled' | 'final',
+  metrics: MarkstreamVirtualMetrics,
+) {
+  return [
+    phase,
+    metrics.sessionKey,
+    metrics.threadKey ?? '',
+    getVirtualMeasurementKey(),
+    getVirtualContentHash(),
+    stringifyVirtualToken(props.virtualScroll?.settledToken),
+    Math.round(metrics.totalHeight),
+    Math.round(metrics.width),
+  ].join('\u0000')
+}
+
+function resetVirtualMetricsEventDedupes() {
+  lastSettledVirtualEventKey = null
+  lastFinalVirtualEventKey = null
+  lastEmittedVirtualStateKey = null
+}
+
+function getVirtualAnchorEventKey(anchor: MarkstreamVirtualAnchor) {
+  if (anchor.type === 'bottom')
+    return `bottom:${Math.round(anchor.distanceFromBottomPx)}`
+
+  return `node:${anchor.nodeIndex}:${Math.round(anchor.offsetWithinNodePx)}`
+}
+
+function getVirtualStateHeightCacheSignature(state: MarkstreamVirtualState) {
+  const cache = state.heightCache
+  if (!cache?.length)
+    return ''
+
+  return getHeightCacheSignature(cache)
+}
+
+function getVirtualStateEventKey(state: MarkstreamVirtualState) {
+  const metrics = state.metrics
+  const anchorKey = state.anchor
+    ? getVirtualAnchorEventKey(state.anchor)
+    : 'none'
+
+  return [
+    state.sessionKey,
+    state.threadKey ?? '',
+    state.measurementKey ?? getVirtualMeasurementKey(),
+    state.contentHash ?? '',
+    getVirtualStateHeightCacheSignature(state),
+    anchorKey,
+    state.anchorCaptured ? 1 : 0,
+    metrics.liveRange.start,
+    metrics.liveRange.end,
+    metrics.renderedCount,
+    metrics.nodeCount,
+    Math.round(metrics.totalHeight),
+    Math.round(metrics.width),
+    metrics.phase,
+    metrics.stable ? 1 : 0,
+  ].join('\u0000')
+}
+
+function shouldEmitVirtualState(state: MarkstreamVirtualState, force = false) {
+  if (force)
+    return true
+
+  const key = getVirtualStateEventKey(state)
+  return key !== lastEmittedVirtualStateKey
+}
+
+function getVirtualStateForEmit(
+  metrics: MarkstreamVirtualMetrics,
+  force = false,
+): VirtualStateEmitCandidate {
+  if (force || metrics.stable || metrics.phase === 'final') {
+    const state = captureVirtualStateFromMetrics(metrics, {
+      includeHeightCache: true,
+    })
+
+    return {
+      state,
+    }
+  }
+
+  return {
+    state: captureVirtualStateFromMetrics(metrics),
+  }
+}
+
+function shouldDelayVirtualMetricsUntilDom(force = false) {
+  return !force
+    && virtualScrollRequested.value
+    && !virtualScrollDomEnabled.value
+}
+
+function emitVirtualMetricsNow(metrics: MarkstreamVirtualMetrics, force = false) {
+  if (!virtualScrollEnabled.value)
+    return
+  if (shouldDelayVirtualMetricsUntilDom(force))
+    return
+
+  const shouldEmitHeight = force || shouldEmitVirtualMetrics(metrics)
+  const candidate = getVirtualStateForEmit(metrics, force)
+  const state = candidate.state
+  const shouldEmitState = Boolean(
+    state && (shouldEmitHeight || shouldEmitVirtualState(state, force)),
+  )
+
+  if (shouldEmitHeight) {
+    emitHeightChange(metrics)
+    lastEmittedVirtualMetrics = metrics
+    lastVirtualEmitAt = getVirtualNow()
+  }
+
+  if (state && shouldEmitState) {
+    emitVirtualStateChange(state)
+    if (state.anchor)
+      emitAnchorChange(state.anchor)
+    lastEmittedVirtualStateKey = getVirtualStateEventKey(state)
+  }
+
+  if (metrics.stable) {
+    const eventKey = getVirtualMetricsEventKey('settled', metrics)
+
+    if (eventKey !== lastSettledVirtualEventKey) {
+      lastSettledVirtualEventKey = eventKey
+
+      const settledState = captureVirtualStateFromMetrics(metrics, {
+        includeHeightCache: true,
+      })
+      if (settledState) {
+        emitVirtualStateChange(settledState)
+        lastEmittedVirtualStateKey = getVirtualStateEventKey(settledState)
+      }
+
+      emitRenderSettled(metrics)
+    }
+  }
+
+  if (metrics.phase === 'final') {
+    const eventKey = getVirtualMetricsEventKey('final', metrics)
+
+    if (eventKey !== lastFinalVirtualEventKey) {
+      lastFinalVirtualEventKey = eventKey
+
+      const finalState = captureVirtualStateFromMetrics(metrics, {
+        includeHeightCache: true,
+      })
+      if (finalState) {
+        emitVirtualStateChange(finalState)
+        lastEmittedVirtualStateKey = getVirtualStateEventKey(finalState)
+      }
+
+      emitRenderFinal(metrics)
+    }
+  }
+}
+
+function flushVirtualStateBeforeUnmount() {
+  if (!virtualScrollEnabled.value)
+    return
+
+  try {
+    measureTrackedNodeHeights()
+    forceFlushPendingHeightMeasurements()
+
+    const metrics = getVirtualMetrics('manual')
+
+    if (shouldEmitVirtualMetrics(metrics)) {
+      emitHeightChange(metrics)
+      lastEmittedVirtualMetrics = metrics
+      lastVirtualEmitAt = getVirtualNow()
+    }
+
+    const state = captureVirtualStateFromMetrics(metrics, {
+      includeHeightCache: true,
+      includeContentHash: true,
+      allowAnchorFallback: false,
+      requireViewport: true,
+      includeEmptyState: true,
+    })
+
+    if (state) {
+      emitVirtualStateChange(state)
+
+      if (state.anchor)
+        emitAnchorChange(state.anchor)
+
+      lastEmittedVirtualStateKey = getVirtualStateEventKey(state)
+    }
+  }
+  catch {
+    // Unmount cleanup must never throw.
+  }
+}
+
+watch(
+  virtualScrollDomEnabled,
+  (enabled) => {
+    if (enabled)
+      scheduleVirtualMetricsEmit('content')
+  },
+  { flush: 'post' },
+)
+
+function clearVirtualMetricsSchedule() {
+  if (virtualMetricsEmitRaf != null) {
+    cancelFrame?.(virtualMetricsEmitRaf)
+    virtualMetricsEmitRaf = null
+  }
+  if (virtualMetricsEmitTimer != null && isClient) {
+    window.clearTimeout(virtualMetricsEmitTimer)
+    virtualMetricsEmitTimer = null
+  }
+}
+
+function flushVirtualMetricsEmit() {
+  virtualMetricsEmitRaf = null
+  virtualMetricsEmitTimer = null
+  if (shouldForceMeasureBeforeVirtualMetrics(pendingVirtualMetricsReason)) {
+    measureTrackedNodeHeights()
+    forceFlushPendingHeightMeasurements()
+  }
+  emitVirtualMetricsNow(getVirtualMetrics(pendingVirtualMetricsReason))
+}
+
+function shouldForceMeasureBeforeVirtualMetrics(reason: MarkstreamVirtualReason) {
+  if (pendingHeightMeasurements.size > 0 || heightMeasurementRaf != null)
+    return true
+
+  switch (reason) {
+    case 'node-resize':
+    case 'async-node':
+    case 'resize':
+    case 'restore':
+    case 'final':
+    case 'manual':
+      return true
+
+    case 'batch':
+    case 'content':
+    default:
+      return false
+  }
+}
+
+function scheduleVirtualMetricsEmit(reason: MarkstreamVirtualReason) {
+  if (!virtualScrollEnabled.value)
+    return
+
+  pendingVirtualMetricsReason = reason
+  if (virtualMetricsEmitRaf != null || virtualMetricsEmitTimer != null)
+    return
+
+  const interval = Math.max(0, props.virtualScroll?.emitIntervalMs ?? 32)
+  const waitMs = Math.max(0, interval - (getVirtualNow() - lastVirtualEmitAt))
+  const scheduleFrame = () => {
+    virtualMetricsEmitTimer = null
+    virtualMetricsEmitRaf = requestFrame
+      ? requestFrame(flushVirtualMetricsEmit)
+      : null
+
+    if (virtualMetricsEmitRaf == null)
+      flushVirtualMetricsEmit()
+  }
+
+  if (isClient && waitMs > 0) {
+    virtualMetricsEmitTimer = window.setTimeout(scheduleFrame, waitMs)
+    return
+  }
+
+  scheduleFrame()
+}
+
+defineExpose<MarkstreamRendererHandle>({
+  getVirtualMetrics,
+  captureVirtualState,
+  restoreVirtualState,
+  forceMeasure,
+  settle,
+  scrollToNode,
+})
+
 function estimateIndexForOffset(offsetPx: number) {
   if (offsetPx <= 0)
     return 0
   const nodes = parsedNodes.value
-  if (heightExperimentEnabled.value) {
-    let remaining = offsetPx
-    for (let i = 0; i < nodes.length; i++) {
-      const height = getFallbackNodeHeight(i)
-      if (remaining <= height)
-        return i
-      remaining -= height
-    }
-    return Math.max(0, nodes.length - 1)
+  if (heightEstimationActive.value) {
+    return estimateIndexForOffsetFromPrefix(offsetPx)
   }
   if (heightTreeSize.value === nodes.length && heightSumTree.value.length && heightKnownTree.value.length) {
     const avg = averageNodeHeight.value
@@ -956,15 +3640,10 @@ function estimateIndexForOffsetFromEnd(offsetPx: number) {
     return 0
   if (offsetPx <= 0)
     return Math.max(0, nodes.length - 1)
-  if (heightExperimentEnabled.value) {
-    let remaining = offsetPx
-    for (let i = nodes.length - 1; i >= 0; i--) {
-      const height = getFallbackNodeHeight(i)
-      if (remaining <= height)
-        return i
-      remaining -= height
-    }
-    return 0
+  if (heightEstimationActive.value) {
+    const prefix = getFallbackHeightPrefix()
+    const totalHeight = prefix[nodes.length] ?? 0
+    return estimateIndexForOffsetFromPrefix(Math.max(0, totalHeight - offsetPx))
   }
   if (heightTreeSize.value === nodes.length) {
     const totalHeight = estimateHeightRange(0, nodes.length)
@@ -1170,7 +3849,7 @@ function queueNodeHeightRecord(index: number, el: HTMLElement, height: number) {
 }
 
 function measureNodeHeight(index: number, el: HTMLElement) {
-  queueNodeHeightRecord(index, el, el.offsetHeight)
+  queueNodeHeightRecord(index, el, getNodeLayoutHeight(index, el))
 }
 
 function measureTrackedNodeHeights() {
@@ -1181,13 +3860,9 @@ function measureTrackedNodeHeights() {
 }
 
 function clearFinalHeightConvergenceTimers() {
-  if (!isClient)
-    return
-
   while (finalHeightConvergenceTimers.length) {
     const timer = finalHeightConvergenceTimers.pop()
-    if (timer != null)
-      window.clearTimeout(timer)
+    clearHeightSettlingTimer(timer)
   }
 }
 
@@ -1197,24 +3872,28 @@ function scheduleFinalHeightConvergence() {
 
   clearFinalHeightConvergenceTimers()
   for (const delay of [80, 240, 640]) {
-    const timer = window.setTimeout(() => {
+    const timer = scheduleHeightSettlingTimer(delay, () => {
       for (const [index, el] of nodeContentElements) {
         if (el)
           measureNodeHeight(index, el)
       }
-    }, delay)
+    }, 'final')
 
-    finalHeightConvergenceTimers.push(timer)
+    if (timer != null)
+      finalHeightConvergenceTimers.push(timer)
   }
 }
 
 function setNodeContentRef(index: number, el: HTMLElement | null) {
+  if (!el)
+    clearPendingAsyncNodeKeysForIndex(index)
+
   pendingHeightMeasurements.delete(index)
   bumpNodeContentVersion(index)
   const previousTimers = nodeContentDeferredMeasureTimers.get(index)
   if (previousTimers) {
     for (const id of previousTimers)
-      window.clearTimeout(id)
+      clearHeightSettlingTimer(id)
     nodeContentDeferredMeasureTimers.delete(index)
   }
   const previousObserver = nodeContentResizeObservers.get(index)
@@ -1247,10 +3926,12 @@ function setNodeContentRef(index: number, el: HTMLElement | null) {
         : []
 
     if (deferredMeasureDelays.length) {
-      nodeContentDeferredMeasureTimers.set(
-        index,
-        deferredMeasureDelays.map(delay => window.setTimeout(measure, delay)),
-      )
+      const timers = deferredMeasureDelays
+        .map(delay => scheduleHeightSettlingTimer(delay, measure, 'node-resize'))
+        .filter((timer): timer is number => timer != null)
+
+      if (timers.length)
+        nodeContentDeferredMeasureTimers.set(index, timers)
     }
   }
 }
@@ -1265,7 +3946,7 @@ watch(
     nodeContentResizeObservers.clear()
     for (const timers of nodeContentDeferredMeasureTimers.values()) {
       for (const id of timers)
-        window.clearTimeout(id)
+        clearHeightSettlingTimer(id)
     }
     nodeContentDeferredMeasureTimers.clear()
     nodeContentVersions.clear()
@@ -1280,7 +3961,27 @@ watch(
   (final) => {
     if (final)
       scheduleFinalHeightConvergence()
+    scheduleVirtualMetricsEmit(final ? 'final' : 'content')
   },
+)
+
+watch(
+  [() => parsedNodes.value.length, () => renderedCount.value],
+  () => {
+    if (activeVirtualBottomAnchor.value)
+      scheduleVirtualBottomRestoreReconcile()
+
+    scheduleVirtualMetricsEmit('content')
+  },
+  { flush: 'post', immediate: true },
+)
+
+watch(
+  [() => liveRange.start, () => liveRange.end],
+  () => {
+    scheduleVirtualMetricsEmit('batch')
+  },
+  { flush: 'post' },
 )
 
 const VIEWPORT_FALLBACK_DELAY = 1800
@@ -1343,6 +4044,7 @@ const {
   parsedNodesIdentity,
   parsedNodeCount,
   desiredRenderedCount,
+  datasetKey: batchDatasetKey,
   batchingEnabled,
   incrementalRenderingActive,
   resolvedBatchSize,
@@ -1358,6 +4060,8 @@ const {
   onDatasetKeyChanged: (total) => {
     clearPendingHeightMeasurements()
     resetHeightMeasurements()
+    markFallbackHeightPrefixDirty()
+    resetVirtualMetricsEventDedupes()
     if (total > 0)
       rebuildHeightTrees(total)
   },
@@ -1368,17 +4072,27 @@ const {
 })
 
 watch(
-  () => virtualizationEnabled.value,
-  (enabled) => {
-    if (!enabled) {
+  [
+    scrollListenerEnabled,
+    virtualizationEnabled,
+    () => containerRef.value,
+    () => resolveVirtualScrollRoot(),
+  ],
+  ([listenerEnabled, virtualized]) => {
+    if (!listenerEnabled) {
       cleanupScrollListener()
       cancelScheduledFocusSync()
       return
     }
+
     setupScrollListener()
-    scheduleFocusSync({ immediate: true })
+
+    if (virtualized)
+      scheduleFocusSync({ immediate: true })
+    else
+      cancelScheduledFocusSync()
   },
-  { immediate: true },
+  { flush: 'post', immediate: true },
 )
 
 // Some scroll containers (e.g. `flex-direction: column-reverse` chat lists)
@@ -1396,17 +4110,7 @@ watch(
 )
 
 watch(
-  () => containerRef.value,
-  () => {
-    if (!virtualizationEnabled.value)
-      return
-    setupScrollListener()
-    scheduleFocusSync({ immediate: true })
-  },
-)
-
-watch(
-  heightExperimentEnabled,
+  heightEstimationActive,
   (enabled) => {
     if (!enabled)
       return
@@ -1416,9 +4120,9 @@ watch(
 )
 
 watch(
-  [() => containerRef.value, heightExperimentEnabled],
+  [() => containerRef.value, heightEstimationActive],
   () => {
-    if (!heightExperimentEnabled.value) {
+    if (!heightEstimationActive.value) {
       cleanupExperimentResizeObserver()
       experimentContainerWidth.value = 0
       return
@@ -1430,10 +4134,15 @@ watch(
 )
 
 watch(
-  [heightExperimentEnabled, experimentProbeWidth],
+  [
+    heightEstimationActive,
+    experimentProbeWidth,
+    virtualLayoutEpochKey,
+  ],
   async () => {
-    if (!heightExperimentEnabled.value) {
+    if (!heightEstimationActive.value) {
       simpleTextProbeProfile.value = createEmptySimpleTextProbeProfile()
+      markFallbackHeightPrefixDirty()
       return
     }
     await nextTick()
@@ -1451,12 +4160,16 @@ watch(
 )
 
 watch(
-  [heightExperimentEnabled, experimentContainerWidth],
+  [heightEstimationActive, experimentContainerWidth],
   () => {
+    markFallbackHeightPrefixDirty()
     if (virtualizationEnabled.value)
       scheduleFocusSync({ immediate: true })
     if (activeRestoreAnchor.value)
       scheduleRestoreReconcile()
+    if (activeVirtualBottomAnchor.value)
+      scheduleVirtualBottomRestoreReconcile()
+    scheduleVirtualMetricsEmit('resize')
   },
   { immediate: false },
 )
@@ -1504,6 +4217,437 @@ watch(
     updateLiveRange()
   },
   { immediate: true },
+)
+
+let autoSettledVirtualSignature: string | null = null
+let manualSettleInFlight = false
+let lastVirtualLayoutEpochKey: string | null = null
+
+function resetVirtualSettleConfirmation() {
+  autoSettledVirtualSignature = null
+  imperativeVirtualSettleSessionKey = null
+  imperativeVirtualSettleThreadKey = undefined
+  lastManualSettleSignature = null
+  resetVirtualMetricsEventDedupes()
+}
+
+function getAutoVirtualSettleSignature() {
+  const total = parsedNodes.value.length
+
+  return [
+    getVirtualThreadKey() ?? '',
+    getVirtualSessionKey(),
+    getVirtualMeasurementKey(),
+    virtualLayoutWidthBucket.value,
+    total,
+    Math.round(estimateHeightRange(0, total)),
+    Math.round(getCurrentVirtualWidth()),
+    heightStats.count,
+    Math.round(heightStats.total),
+  ].join(':')
+}
+
+function resetVirtualSessionMeasurements() {
+  clearPendingHeightMeasurements()
+  resetHeightMeasurements()
+  markFallbackHeightPrefixDirty()
+  nodeHeightSignatures.clear()
+
+  const total = parsedNodes.value.length
+  if (total > 0)
+    rebuildHeightTrees(total)
+
+  seedCurrentNodeHeightSignatures()
+}
+
+function resetVirtualSessionRuntimeState() {
+  clearVirtualMetricsSchedule()
+  clearAllHeightSettlingTimers()
+  lastEmittedVirtualMetrics = null
+  lastImportedVirtualHeightCacheSignature = null
+  lastImportedVirtualHeightCacheSource = null
+  lastAppliedVirtualRestoreSignature = null
+  pendingImperativeVirtualRestoreState = null
+  pendingImperativeVirtualRestoreOptions = null
+  manualSettleInFlight = false
+  resetVirtualSettleConfirmation()
+
+  clearAllPendingAsyncNodeKeys('restore')
+
+  clearRestoreReconcile()
+  clearActiveVirtualBottomAnchor()
+}
+
+function resetVirtualLayoutMeasurements(reason: MarkstreamVirtualReason = 'resize') {
+  clearPendingHeightMeasurements()
+  resetHeightMeasurements()
+  markFallbackHeightPrefixDirty()
+  nodeHeightSignatures.clear()
+
+  const total = parsedNodes.value.length
+  if (total > 0)
+    rebuildHeightTrees(total)
+
+  seedCurrentNodeHeightSignatures()
+
+  lastImportedVirtualHeightCacheSignature = null
+  lastImportedVirtualHeightCacheSource = null
+  lastAppliedVirtualRestoreSignature = null
+  lastEmittedVirtualMetrics = null
+  manualSettleInFlight = false
+  resetVirtualSettleConfirmation()
+
+  tryImportVirtualHeightCache()
+
+  void nextTick(() => {
+    measureTrackedNodeHeights()
+
+    if (activeRestoreAnchor.value)
+      scheduleRestoreReconcile()
+    if (activeVirtualBottomAnchor.value)
+      scheduleVirtualBottomRestoreReconcile()
+
+    scheduleVirtualMetricsEmit(reason)
+  })
+}
+
+watch(
+  virtualScrollEnabled,
+  (enabled, previous) => {
+    if (enabled === previous)
+      return
+
+    if (!enabled) {
+      resetVirtualSessionRuntimeState()
+      clearVirtualMetricsSchedule()
+      return
+    }
+
+    resetVirtualSessionRuntimeState()
+    resetVirtualSessionMeasurements()
+    lastVirtualLayoutEpochKey = virtualLayoutEpochKey.value
+    scheduleVirtualMetricsEmit('content')
+  },
+  { flush: 'post' },
+)
+
+watch(
+  [virtualScrollEnabled, virtualLayoutEpochKey],
+  ([enabled, epochKey]) => {
+    if (!enabled) {
+      lastVirtualLayoutEpochKey = null
+      return
+    }
+
+    if (lastVirtualLayoutEpochKey == null) {
+      lastVirtualLayoutEpochKey = epochKey
+      return
+    }
+
+    if (lastVirtualLayoutEpochKey === epochKey)
+      return
+
+    lastVirtualLayoutEpochKey = epochKey
+    resetVirtualLayoutMeasurements('resize')
+  },
+  { flush: 'post', immediate: true },
+)
+
+watch(
+  [virtualScrollEnabled, () => getVirtualSessionKey(), () => getVirtualThreadKey()],
+  ([enabled]) => {
+    if (!enabled)
+      return
+
+    resetVirtualSessionRuntimeState()
+    resetVirtualSessionMeasurements()
+    clearAllPendingAsyncNodeKeys('content')
+    scheduleVirtualMetricsEmit('content')
+  },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    () => getVirtualSessionKey(),
+    () => getVirtualThreadKey(),
+    virtualLayoutEpochKey,
+    () => parsedNodes.value.length,
+  ],
+  ([enabled]) => {
+    if (enabled)
+      pruneStalePendingAsyncNodeKeys('async-node')
+  },
+  { flush: 'post' },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    () => props.virtualScroll?.sessionKey,
+    () => props.virtualScroll?.measurementKey,
+    () => props.indexKey,
+    () => streamRenderVersion.value,
+  ],
+  ([enabled]) => {
+    if (enabled) {
+      resetVirtualMetricsEventDedupes()
+      invalidateChangedNodeHeights('content')
+    }
+  },
+  { flush: 'post', immediate: true },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    () => parsedNodes.value.length,
+    () => getVirtualSessionKey(),
+    () => getVirtualThreadKey(),
+  ],
+  ([enabled, length, sessionKey, threadKey], [previousEnabled, previousLength, previousSessionKey, previousThreadKey]) => {
+    if (!enabled || !previousEnabled)
+      return
+
+    if (sessionKey !== previousSessionKey || threadKey !== previousThreadKey)
+      return
+
+    if (length !== previousLength)
+      resetVirtualSettleConfirmation()
+  },
+  { flush: 'post' },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    () => props.virtualScroll?.heightCache,
+    () => props.virtualScroll?.heightCacheWidth,
+    () => props.virtualScroll?.restoreState,
+    () => props.virtualScroll?.measurementKey,
+    () => parsedNodes.value.length,
+    () => getVirtualSessionKey(),
+    experimentContainerWidth,
+  ],
+  () => {
+    tryImportVirtualHeightCache()
+  },
+  { flush: 'post', immediate: true },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    () => props.virtualScroll?.restoreState,
+    () => props.virtualScroll?.restoreAnchor,
+    () => props.virtualScroll?.measurementKey,
+    () => parsedNodes.value.length,
+    () => getVirtualSessionKey(),
+    experimentContainerWidth,
+  ],
+  async ([enabled, state]) => {
+    if (!enabled || !state)
+      return
+
+    await nextTick()
+
+    const restoreToken = getVirtualRestoreAnchorToken()
+    applyVirtualRestoreState(state, {
+      restoreAnchor: restoreToken != null,
+      restoreToken: restoreToken ?? undefined,
+    })
+  },
+  { flush: 'post', immediate: true },
+)
+
+watch(
+  [virtualScrollEnabled, experimentContainerWidth, () => props.virtualScroll?.restoreState, () => props.virtualScroll?.measurementKey],
+  ([enabled]) => {
+    if (!enabled)
+      return
+
+    const state = props.virtualScroll?.restoreState
+    if (!state || !lastImportedVirtualHeightCacheSignature)
+      return
+
+    if (lastImportedVirtualHeightCacheSource !== 'restore')
+      return
+
+    if (canRestoreVirtualStateCache(state))
+      return
+
+    resetVirtualSessionMeasurements()
+    lastImportedVirtualHeightCacheSignature = null
+    lastImportedVirtualHeightCacheSource = null
+    scheduleVirtualMetricsEmit('resize')
+  },
+  { flush: 'post' },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    () => parsedNodes.value.length,
+    () => getVirtualSessionKey(),
+    experimentContainerWidth,
+  ],
+  async ([enabled]) => {
+    const state = pendingImperativeVirtualRestoreState
+    const options = pendingImperativeVirtualRestoreOptions
+    if (!enabled || !state)
+      return
+
+    await nextTick()
+
+    const applied = applyVirtualRestoreState(state, {
+      restoreAnchor: options?.restoreAnchor === true,
+      restoreToken: options?.restoreToken ?? 'imperative',
+      allowUncapturedAnchor: options?.allowUncapturedAnchor === true,
+    })
+
+    if (applied || !shouldKeepPendingVirtualRestoreState(state)) {
+      pendingImperativeVirtualRestoreState = null
+      pendingImperativeVirtualRestoreOptions = null
+    }
+  },
+  { flush: 'post', immediate: true },
+)
+
+watch(
+  [
+    virtualScrollEnabled,
+    effectiveFinal,
+    () => props.virtualScroll?.settleMode,
+    () => getVirtualSessionKey(),
+    () => getVirtualThreadKey(),
+    virtualLayoutEpochKey,
+    pendingAsyncNodeCount,
+    pendingHeightSettlingTaskCount,
+    () => renderedCount.value,
+    desiredRenderedCount,
+    () => heightStats.count,
+    () => heightStats.total,
+  ],
+  ([enabled, final, settleMode]) => {
+    if (!enabled || final !== true || settleMode === 'manual')
+      return
+    if (!isLayoutSettled())
+      return
+
+    const signature = getAutoVirtualSettleSignature()
+
+    if (autoSettledVirtualSignature === signature)
+      return
+
+    autoSettledVirtualSignature = signature
+
+    void settle({ reason: 'final' }).then((metrics) => {
+      if (!metrics.stable && autoSettledVirtualSignature === signature)
+        autoSettledVirtualSignature = null
+    })
+  },
+  { flush: 'post', immediate: true },
+)
+
+function getManualSettleSignature(token: unknown) {
+  return [
+    getVirtualThreadKey() ?? '',
+    getVirtualSessionKey(),
+    getVirtualMeasurementKey(),
+    virtualLayoutWidthBucket.value,
+    getManualSettleTokenKey(token),
+    parsedNodes.value.length,
+    Math.round(estimateHeightRange(0, parsedNodes.value.length)),
+    Math.round(getCurrentVirtualWidth()),
+    heightStats.count,
+    Math.round(heightStats.total),
+  ].join(':')
+}
+
+async function runManualSettleIfReady() {
+  const token = props.virtualScroll?.settledToken
+  const tokenKeyAtStart = getManualSettleTokenKey(token)
+  const sessionKeyAtStart = getVirtualSessionKey()
+  const threadKeyAtStart = getVirtualThreadKey()
+  const layoutEpochKeyAtStart = virtualLayoutEpochKey.value
+
+  if (!virtualScrollEnabled.value)
+    return
+  if (props.virtualScroll?.settleMode !== 'manual')
+    return
+  if (!hasManualSettleSignal(token))
+    return
+
+  if (!isInternalLayoutSettled()) {
+    scheduleVirtualMetricsEmit('manual')
+    return
+  }
+
+  const signature = getManualSettleSignature(token)
+  if (signature === lastManualSettleSignature || manualSettleInFlight)
+    return
+
+  manualSettleInFlight = true
+  try {
+    const metrics = await settle({
+      reason: 'manual',
+      expectedSettledTokenKey: tokenKeyAtStart,
+    })
+    const tokenStillCurrent = getManualSettleTokenKey() === tokenKeyAtStart
+
+    if (
+      isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart)
+      && metrics.sessionKey === sessionKeyAtStart
+      && metrics.threadKey === threadKeyAtStart
+      && tokenStillCurrent
+      && metrics.stable
+      && metrics.phase === 'final'
+    ) {
+      lastManualSettleSignature = getManualSettleSignature(
+        props.virtualScroll?.settledToken,
+      )
+    }
+  }
+  finally {
+    manualSettleInFlight = false
+
+    await nextTick()
+    const currentToken = props.virtualScroll?.settledToken
+    const currentSignature = hasManualSettleSignal(currentToken)
+      ? getManualSettleSignature(currentToken)
+      : ''
+
+    if (
+      isSameVirtualSession(sessionKeyAtStart, threadKeyAtStart, layoutEpochKeyAtStart)
+      && currentSignature
+      && lastManualSettleSignature !== currentSignature
+    ) {
+      void runManualSettleIfReady()
+    }
+  }
+}
+
+watch(
+  [
+    virtualScrollEnabled,
+    effectiveFinal,
+    () => props.virtualScroll?.settleMode,
+    () => props.virtualScroll?.settledToken,
+    () => getVirtualSessionKey(),
+    () => getVirtualThreadKey(),
+    virtualLayoutEpochKey,
+    pendingAsyncNodeCount,
+    pendingHeightSettlingTaskCount,
+    () => renderedCount.value,
+    desiredRenderedCount,
+    () => parsedNodes.value.length,
+    () => heightStats.count,
+    () => heightStats.total,
+  ],
+  () => {
+    void runManualSettleIfReady()
+  },
+  { flush: 'post', immediate: true },
 )
 
 watch(
@@ -1556,6 +4700,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  flushVirtualStateBeforeUnmount()
   cleanupBatchScheduler()
   destroyNodeVisibilityState()
   clearContentStreamingTailIdleTimer()
@@ -1564,14 +4709,17 @@ onBeforeUnmount(() => {
   nodeContentResizeObservers.clear()
   for (const timers of nodeContentDeferredMeasureTimers.values()) {
     for (const id of timers)
-      window.clearTimeout(id)
+      clearHeightSettlingTimer(id)
   }
   nodeContentDeferredMeasureTimers.clear()
   nodeContentVersions.clear()
+  nodeHeightSignatures.clear()
   clearFinalHeightConvergenceTimers()
   clearPendingHeightMeasurements()
   cleanupExperimentResizeObserver()
   clearRestoreReconcile()
+  clearActiveVirtualBottomAnchor()
+  clearVirtualMetricsSchedule()
   cleanupScrollListener()
   cancelScheduledFocusSync()
 })
@@ -1665,7 +4813,7 @@ const nodeComponents: Partial<CustomComponents> = {
   // 可以添加更多节点类型
   // 例如:custom_node: CustomNode,
 }
-const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'))
+const indexPrefix = computed(() => getCurrentIndexPrefix())
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode
   stream: props.codeBlockStream,
@@ -2209,15 +5357,19 @@ onBeforeUnmount(() => {
     v-else
     ref="containerRef"
     class="markstream-vue markdown-renderer"
-    :class="[{ dark: props.isDark }, { virtualized: virtualizationEnabled }]"
+    :class="[
+      { dark: props.isDark },
+      { virtualized: virtualizationEnabled },
+      { 'virtual-scroll-coordinated': virtualScrollDomEnabled },
+    ]"
     :data-custom-id="props.customId"
     @click="handleContainerClick"
     @mouseover="handleContainerMouseover"
     @mouseout="handleContainerMouseout"
   >
-    <template v-if="heightExperimentEnabled || virtualizationEnabled">
+    <template v-if="heightEstimationDomActive || virtualizationEnabled">
       <div
-        v-if="heightExperimentEnabled"
+        v-if="heightEstimationDomActive"
         class="height-estimation-probes"
         :style="{ width: `${experimentProbeWidth}px` }"
         aria-hidden="true"
@@ -2405,7 +5557,8 @@ onBeforeUnmount(() => {
   contain-intrinsic-size: 800px 600px;
 }
 
-.markdown-renderer.virtualized {
+.markdown-renderer.virtualized,
+.markdown-renderer.virtual-scroll-coordinated {
   /* When virtualization is active, `content-visibility: auto` can keep the
      whole subtree unpainted until the scroll container dispatches a scroll
      event in some layouts (e.g. complex chat shells). The virtual window
@@ -2430,6 +5583,13 @@ onBeforeUnmount(() => {
 
 .node-content {
   width: 100%;
+}
+
+.markdown-renderer.virtualized .node-slot,
+.markdown-renderer.virtualized .node-content,
+.markdown-renderer.virtual-scroll-coordinated .node-slot,
+.markdown-renderer.virtual-scroll-coordinated .node-content {
+  display: flow-root;
 }
 
 .node-placeholder {

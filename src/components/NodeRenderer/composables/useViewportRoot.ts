@@ -4,6 +4,7 @@ const SCROLL_PARENT_OVERFLOW_RE = /auto|scroll|overlay/i
 
 export interface ViewportRootOptions {
   isClient: boolean
+  scrollRoot?: () => HTMLElement | null
 }
 
 export interface ViewportRootController {
@@ -40,9 +41,17 @@ export function useViewportRoot(
   containerRef: Ref<HTMLElement | undefined>,
   options: ViewportRootOptions,
 ): ViewportRootController {
+  function resolveExplicitScrollRoot() {
+    return options.scrollRoot?.() ?? null
+  }
+
   function resolveViewportRoot(node?: HTMLElement | null) {
     if (typeof window === 'undefined')
       return null
+
+    const explicitRoot = resolveExplicitScrollRoot()
+    if (explicitRoot)
+      return explicitRoot
 
     const base = node ?? containerRef.value
 
@@ -70,6 +79,10 @@ export function useViewportRoot(
   }
 
   function resolveScrollContainer(node?: HTMLElement | null) {
+    const explicitRoot = resolveExplicitScrollRoot()
+    if (explicitRoot)
+      return explicitRoot
+
     const resolved = resolveViewportRoot(node ?? containerRef.value ?? null)
 
     if (resolved)
@@ -110,7 +123,7 @@ export function useViewportRoot(
     isViewportRoot: boolean,
   ) {
     if (isViewportRoot)
-      return doc.documentElement?.scrollTop ?? doc.body?.scrollTop ?? 0
+      return getDocumentScrollTop(doc)
 
     const raw = root.scrollTop
 
@@ -126,17 +139,36 @@ export function useViewportRoot(
     return max - distanceFromBottom
   }
 
+  function isDocumentScrollRoot(root: HTMLElement, doc: Document) {
+    return root === doc.documentElement
+      || root === doc.body
+      || root === doc.scrollingElement
+  }
+
+  function getDocumentScrollTop(doc: Document) {
+    const scrollingTop = Number((doc.scrollingElement as HTMLElement | null)?.scrollTop)
+    const documentTop = Number(doc.documentElement?.scrollTop ?? 0)
+    const bodyTop = Number(doc.body?.scrollTop ?? 0)
+
+    return Math.max(
+      0,
+      Number.isFinite(scrollingTop) ? scrollingTop : 0,
+      Number.isFinite(documentTop) ? documentTop : 0,
+      Number.isFinite(bodyTop) ? bodyTop : 0,
+    )
+  }
+
   function getOffsetTopWithinRoot(node: HTMLElement, root: HTMLElement) {
-    let current: HTMLElement | null = node
-    let total = 0
-    let guard = 0
+    const doc = root.ownerDocument || node.ownerDocument || document
 
-    while (current && current !== root && guard++ < 64) {
-      total += current.offsetTop || 0
-      current = current.offsetParent as HTMLElement | null
-    }
+    if (isDocumentScrollRoot(root, doc))
+      return node.getBoundingClientRect().top + getDocumentScrollTop(doc)
 
-    return total
+    const rootRect = root.getBoundingClientRect()
+    const nodeRect = node.getBoundingClientRect()
+    const normalizedScrollTop = getNormalizedScrollTop(root, doc, false)
+
+    return nodeRect.top - rootRect.top + normalizedScrollTop
   }
 
   return {

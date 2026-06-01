@@ -8,6 +8,22 @@ import type {
   LinkNodeProps,
   MarkdownIt,
   MarkdownPluginRegistration,
+  MarkstreamHeightCacheEntry,
+  MarkstreamMeasuredHeightCacheEntry,
+  MarkstreamNodeLifecycle,
+  MarkstreamOuterVirtualizerAdapter,
+  MarkstreamRendererHandle,
+  MarkstreamScrollRootLike,
+  MarkstreamScrollRootRef,
+  MarkstreamScrollRootResolver,
+  MarkstreamThreadVirtualState,
+  MarkstreamTimelineItem,
+  MarkstreamVirtualMetrics,
+  MarkstreamVirtualScrollHeightCacheOptions,
+  MarkstreamVirtualScrollOptions,
+  MarkstreamVirtualScrollSharedOptions,
+  MarkstreamVirtualState,
+  MarkstreamVirtualTimelineProps,
   MarkstreamVuePluginOptions,
   MathBlockNodeProps,
   MathInlineNodeProps,
@@ -37,6 +53,8 @@ import MarkdownRender, {
   isInfographicEnabled,
   isKatexEnabled,
   isMermaidEnabled,
+  MARKSTREAM_NODE_LIFECYCLE_KEY,
+  MarkstreamVirtualTimeline,
   MathBlockNode,
   MathInlineNode,
   MermaidBlockNode,
@@ -52,9 +70,12 @@ import MarkdownRender, {
   setMermaidLoader,
   toSafeMermaidSvgMarkup,
   toSafeSvgElement,
+  useMarkstreamNodeLifecycle,
+  useMarkstreamVirtualAdapter,
   useSmoothMarkdownStream,
   VueRendererMarkdown,
 } from 'markstream-vue'
+import { ref } from 'vue'
 
 const component = MarkdownRender
 const plugin = VueRendererMarkdown
@@ -66,6 +87,11 @@ const props: NodeRendererProps = {
   smoothStreaming: 'auto',
   parseCoalesceMs: 80,
   maxLiveNodes: 320,
+  nodeVirtual: 'auto',
+  virtualScroll: {
+    enabled: true,
+    sessionKey: 'public-api-session',
+  },
 }
 
 const options: SmoothMarkdownStreamOptions = {}
@@ -122,6 +148,114 @@ const imageProps: Partial<ImageNodeProps> = {}
 const linkProps: Partial<LinkNodeProps> = {}
 const d2Props: Partial<D2BlockNodeProps> = {}
 const infographicProps: Partial<InfographicBlockNodeProps> = {}
+const virtualScrollOptions: MarkstreamVirtualScrollOptions = {
+  enabled: true,
+  sessionKey: 'public-api-session',
+}
+const virtualScrollHeightCacheOptions: MarkstreamVirtualScrollHeightCacheOptions = {
+  heightCache: [{ index: 0, height: 120, nodeType: 'paragraph', signature: 'public-api-signature' }],
+  heightCacheWidth: 600,
+}
+const heightCacheEntry: MarkstreamHeightCacheEntry = {
+  index: 0,
+  height: 120,
+  nodeType: 'paragraph',
+  signature: 'public-api-signature',
+}
+const measuredHeightCacheEntry: MarkstreamMeasuredHeightCacheEntry = {
+  index: 0,
+  height: 120,
+}
+const virtualScrollSharedOptions: MarkstreamVirtualScrollSharedOptions = {
+  measurementKey: 'public-api-measurement',
+  heightCache: null,
+}
+const virtualScrollOptionsWithoutSessionKey: MarkstreamVirtualScrollOptions = {
+  enabled: false,
+}
+const virtualMetrics: MarkstreamVirtualMetrics | null = null
+const virtualState: MarkstreamVirtualState | null = null
+const rendererHandle: MarkstreamRendererHandle | null = null
+const nodeLifecycle: MarkstreamNodeLifecycle | null = null
+const timelineItem: MarkstreamTimelineItem = {
+  id: 'a1',
+  kind: 'assistant-markdown',
+  content: '# Public API',
+  final: true,
+}
+const virtualTimelineProps: MarkstreamVirtualTimelineProps = {
+  items: [timelineItem],
+  threadKey: 'public-api-thread',
+}
+const virtualScrollRootRef = ref<HTMLElement | null>(null) satisfies MarkstreamScrollRootRef
+const virtualScrollRootLike: MarkstreamScrollRootLike = virtualScrollRootRef
+const virtualScrollRootResolver: MarkstreamScrollRootResolver = () => virtualScrollRootRef
+const rendererRefs = new Map<string, MarkstreamRendererHandle>()
+const savedVirtualStates = new Map<string, MarkstreamVirtualState>()
+const logicalHeights = new Map<string, number>()
+const outerVirtualizer = {
+  resizeItem(_messageId: string, _height: number) {},
+}
+const outerVirtualizerAdapter: MarkstreamOuterVirtualizerAdapter = {
+  getScrollElement: () => virtualScrollRootRef.value,
+  getScrollTop: () => virtualScrollRootRef.value?.scrollTop ?? 0,
+  setScrollTop: (top) => {
+    if (virtualScrollRootRef.value)
+      virtualScrollRootRef.value.scrollTop = top
+  },
+  getViewportHeight: () => virtualScrollRootRef.value?.clientHeight ?? 0,
+  getTotalHeight: () => 0,
+  getItemOffset: () => 0,
+  getItemSize: () => 0,
+  setItemSize: (_key, _height) => {},
+  getVisibleRange: () => ({ start: 0, end: 1 }),
+  scrollToOffset: (_offset) => {},
+  scrollToIndex: (_index, _align) => {},
+}
+const virtualAdapter = useMarkstreamVirtualAdapter({
+  items: [timelineItem],
+  threadKey: 'public-api-thread',
+  virtualizer: outerVirtualizerAdapter,
+})
+const threadVirtualState: MarkstreamThreadVirtualState = virtualAdapter.captureThreadState()
+
+function onVirtualHeightChange(messageId: string, metrics: MarkstreamVirtualMetrics) {
+  logicalHeights.set(messageId, metrics.totalHeight)
+  outerVirtualizer.resizeItem(messageId, metrics.totalHeight)
+}
+
+function onVirtualStateChange(messageId: string, state: MarkstreamVirtualState) {
+  savedVirtualStates.set(messageId, state)
+}
+
+function captureVirtualStatesBeforeThreadSwitch() {
+  for (const [messageId, renderer] of rendererRefs) {
+    const state = renderer.captureVirtualState({
+      requireViewport: true,
+      includeEmptyState: true,
+    })
+
+    if (state)
+      savedVirtualStates.set(messageId, state)
+  }
+}
+
+function restoreVirtualStateAfterThreadSwitch(messageId: string, restoreToken: number) {
+  const renderer = rendererRefs.get(messageId)
+  const state = savedVirtualStates.get(messageId)
+
+  if (!renderer || !state)
+    return
+
+  renderer.restoreVirtualState(state, {
+    restoreAnchor: true,
+    restoreToken,
+  })
+}
+void MARKSTREAM_NODE_LIFECYCLE_KEY
+void useMarkstreamNodeLifecycle
+void MarkstreamVirtualTimeline
+void useMarkstreamVirtualAdapter
 
 // Verify named async components retain their concrete types
 // (not erased to generic Component)
@@ -185,6 +319,32 @@ void imageProps
 void linkProps
 void d2Props
 void infographicProps
+void virtualScrollOptions
+void virtualScrollHeightCacheOptions
+void heightCacheEntry
+void measuredHeightCacheEntry
+void virtualScrollSharedOptions
+void virtualScrollOptionsWithoutSessionKey
+void virtualMetrics
+void virtualState
+void rendererHandle
+void nodeLifecycle
+void timelineItem
+void virtualTimelineProps
+void virtualScrollRootRef
+void virtualScrollRootLike
+void virtualScrollRootResolver
+void rendererRefs
+void savedVirtualStates
+void logicalHeights
+void outerVirtualizer
+void outerVirtualizerAdapter
+void virtualAdapter
+void threadVirtualState
+void onVirtualHeightChange
+void onVirtualStateChange
+void captureVirtualStatesBeforeThreadSwitch
+void restoreVirtualStateAfterThreadSwitch
 void infographicLoader
 void CodeBlockNode
 void D2BlockNode

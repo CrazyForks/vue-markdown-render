@@ -15,12 +15,18 @@ function createRoot() {
 function createHarness(options: {
   isClient?: boolean
   virtualized?: boolean
+  listenerEnabled?: boolean
   root?: HTMLElement | null
+  onScroll?: () => void
+  getScrollTop?: (root: HTMLElement) => number
 } = {}) {
   const root = ref<HTMLElement | null>(
     options.root === undefined ? createRoot() : options.root,
   )
   const virtualized = ref(options.virtualized ?? true)
+  const listenerEnabled = options.listenerEnabled == null
+    ? null
+    : ref(options.listenerEnabled)
   const scrollRootElement = ref<HTMLElement | null>(null)
   const resolveScrollContainer = vi.fn(() => root.value)
   const scheduleFocusSync = vi.fn()
@@ -28,14 +34,20 @@ function createHarness(options: {
   const listener = useScrollListener({
     isClient: options.isClient ?? true,
     virtualizationEnabled: computed(() => virtualized.value),
+    listenerEnabled: listenerEnabled
+      ? computed(() => listenerEnabled.value)
+      : undefined,
     scrollRootElement,
     resolveScrollContainer,
     scheduleFocusSync,
+    onScroll: options.onScroll,
+    getScrollTop: options.getScrollTop,
   })
 
   return {
     root,
     virtualized,
+    listenerEnabled,
     scrollRootElement,
     resolveScrollContainer,
     scheduleFocusSync,
@@ -71,6 +83,24 @@ describe('useScrollListener', () => {
     expect(h.scrollRootElement.value).toBeNull()
   })
 
+  it('can attach a virtual-scroll-only listener without scheduling focus sync', () => {
+    const onScroll = vi.fn()
+    const h = createHarness({
+      virtualized: false,
+      listenerEnabled: true,
+      onScroll,
+    })
+
+    h.listener.setupScrollListener()
+
+    expect(h.scrollRootElement.value).toBe(h.root.value)
+
+    h.root.value!.dispatchEvent(new Event('scroll'))
+
+    expect(onScroll).toHaveBeenCalledTimes(1)
+    expect(h.scheduleFocusSync).not.toHaveBeenCalled()
+  })
+
   it('does nothing when no scroll root is resolved', () => {
     const h = createHarness({
       root: null,
@@ -80,6 +110,47 @@ describe('useScrollListener', () => {
 
     expect(h.resolveScrollContainer).toHaveBeenCalledTimes(1)
     expect(h.scrollRootElement.value).toBeNull()
+  })
+
+  it('detaches the old listener when the scroll root disappears', () => {
+    const oldRoot = createRoot()
+    const h = createHarness({
+      root: oldRoot,
+    })
+    const removeEventListener = vi.spyOn(oldRoot, 'removeEventListener')
+
+    h.listener.setupScrollListener()
+    expect(h.scrollRootElement.value).toBe(oldRoot)
+
+    h.root.value = null
+    h.listener.setupScrollListener()
+
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+    expect(h.scrollRootElement.value).toBeNull()
+
+    oldRoot.dispatchEvent(new Event('scroll'))
+    expect(h.scheduleFocusSync).not.toHaveBeenCalled()
+  })
+
+  it('detaches the old listener when listenerEnabled becomes false', () => {
+    const root = createRoot()
+    const h = createHarness({
+      root,
+      listenerEnabled: true,
+    })
+    const removeEventListener = vi.spyOn(root, 'removeEventListener')
+
+    h.listener.setupScrollListener()
+    expect(h.scrollRootElement.value).toBe(root)
+
+    h.listenerEnabled!.value = false
+    h.listener.setupScrollListener()
+
+    expect(removeEventListener).toHaveBeenCalledTimes(1)
+    expect(h.scrollRootElement.value).toBeNull()
+
+    root.dispatchEvent(new Event('scroll'))
+    expect(h.scheduleFocusSync).not.toHaveBeenCalled()
   })
 
   it('attaches a passive scroll listener and stores the scroll root', () => {
@@ -100,6 +171,66 @@ describe('useScrollListener', () => {
 
     expect(h.scheduleFocusSync).toHaveBeenCalledTimes(1)
     expect(h.scheduleFocusSync).toHaveBeenCalledWith()
+  })
+
+  it('schedules immediate focus sync for the first large scroll jump', () => {
+    const root = createRoot()
+    Object.defineProperty(root, 'clientHeight', {
+      configurable: true,
+      value: 600,
+    })
+
+    root.scrollTop = 0
+
+    const h = createHarness({ root })
+
+    h.listener.setupScrollListener()
+
+    root.scrollTop = 3000
+    root.dispatchEvent(new Event('scroll'))
+
+    expect(h.scheduleFocusSync).toHaveBeenCalledWith({ immediate: true })
+  })
+
+  it('uses normalized scrollTop values for large jump detection', () => {
+    const root = createRoot()
+    Object.defineProperty(root, 'clientHeight', {
+      configurable: true,
+      value: 600,
+    })
+    Object.defineProperty(root, 'scrollTop', {
+      configurable: true,
+      value: 0,
+      writable: true,
+    })
+
+    const getScrollTop = vi.fn(() => {
+      return root.scrollTop === 0 ? 3000 : 1000
+    })
+    const h = createHarness({ root, getScrollTop })
+
+    h.listener.setupScrollListener()
+
+    root.scrollTop = -120
+    root.dispatchEvent(new Event('scroll'))
+
+    expect(getScrollTop).toHaveBeenCalledWith(root)
+    expect(h.scheduleFocusSync).toHaveBeenCalledWith({ immediate: true })
+  })
+
+  it('runs the external scroll hook before scheduling focus sync', () => {
+    const calls: string[] = []
+    const h = createHarness({
+      onScroll: () => calls.push('hook'),
+    })
+    h.scheduleFocusSync.mockImplementation(() => {
+      calls.push('focus')
+    })
+
+    h.listener.setupScrollListener()
+    h.root.value!.dispatchEvent(new Event('scroll'))
+
+    expect(calls).toEqual(['hook', 'focus'])
   })
 
   it('does not attach a duplicate listener for the same root', () => {

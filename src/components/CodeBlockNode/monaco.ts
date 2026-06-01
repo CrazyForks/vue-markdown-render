@@ -59,7 +59,7 @@ export interface MonacoHelpers {
   getDiffEditorView?: () => MonacoDiffEditorViewLike | null
   cleanupEditor?: () => void
   safeClean?: () => void
-  refreshDiffPresentation?: () => void
+  refreshDiffPresentation?: () => Promise<unknown> | unknown
   setTheme?: (theme: CodeBlockMonacoTheme | undefined) => Promise<void> | void
 }
 

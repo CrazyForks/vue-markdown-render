@@ -11,6 +11,7 @@ description: markstream-vue 1.0 稳定范围、发布门禁、性能报告和发
 - Vue 3 `MarkdownRender`。
 - 原始 `content` 渲染和预解析 `nodes` 渲染。
 - `final`、`typewriter`、`smoothStreaming`、`useSmoothMarkdownStream`。
+- 通过 `virtualScroll`、`MarkstreamVirtualMetrics`、`MarkstreamVirtualState`、`MarkstreamRendererHandle` 与宿主 virtual-scroll 协作。
 - 默认安全 HTML 策略 `htmlPolicy="safe"`。
 - 可选 Mermaid、KaTeX、D2、Infographic、Monaco 集成。
 - Vue / Vite / Nuxt / VitePress SSR import 与 render-to-string。

@@ -1,6 +1,6 @@
 ---
 name: markstream-install
-description: Install and wire markstream-vue, markstream-react, markstream-vue2, markstream-angular, or markstream-svelte into an existing repository. Use when Codex needs to choose the right package, install the smallest peer-dependency set, fix CSS/reset order, decide between `content` and `nodes`, or add a minimal working renderer example.
+description: Install and wire markstream-vue, markstream-react, markstream-vue2, markstream-angular, or markstream-svelte into an existing repository. Use when Codex needs to choose the right package, install the smallest peer-dependency set, fix CSS/reset order, decide between `content`, `nodes`, and Vue 3 virtual-scroll coordination, or add a minimal working renderer example.
 ---
 
 # Markstream Install
@@ -25,6 +25,7 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
    - Import `katex/dist/katex.min.css` when math is enabled.
 4. Add the smallest working render example.
     - Use `content` for static or low-frequency rendering.
+    - In Vue 3 apps with long AI conversations, thread restore, or an existing message virtualizer such as `vue-virtual-scroller`, do not stop at a trivial renderer. Use `MarkstreamVirtualTimeline` or `useMarkstreamVirtualAdapter()` and follow `docs/guide/performance.md`.
     - For streaming AI chat, start with `content` and built-in smooth streaming.
       - Auto mode is the default: `smoothStreaming="auto"` / `smooth-streaming="auto"`.
       - Auto pacing activates when `typewriter=true` or `maxLiveNodes <= 0` / `max-live-nodes <= 0`.
@@ -49,6 +50,7 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
 - Prefer the minimal peer set over "install everything".
 - Prefer `content` for most streaming chat now that built-in smooth streaming is available across Vue 3, Vue 2, React, Svelte, and Angular.
 - Move to `nodes` only when another layer owns parsing or AST transforms.
+- For Vue 3 apps that already virtualize messages, keep the outer virtualizer responsible for mounted rows; use Markstream virtual-scroll coordination so item height comes from `metrics.totalHeight`, not the renderer DOM height.
 - When using `content` for streaming, smooth streaming (`smooth-streaming="auto"`) is on by default for `typewriter` or `max-live-nodes <= 0`. Set `:smooth-streaming="false"` to preserve raw chunk cadence.
 - Streaming vs recovering history: when a chat message transitions from streaming to history, switch props dynamically — `smooth-streaming="auto"`, `fade=false` for streaming; `smooth-streaming=false`, `fade=true` for history. See `docs/guide/ai-chat-streaming.md` for full examples.
 - Treat CSS order as a first-class part of installation, not a later cleanup.
@@ -60,5 +62,6 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
 
 - `docs/guide/installation.md`
 - `docs/guide/usage.md`
+- `docs/guide/performance.md`
 - `docs/guide/troubleshooting.md`
 - `docs/guide/component-overrides.md`

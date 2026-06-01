@@ -1,5 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 import { ref } from 'vue'
+import { setNormalizedElementScrollTop } from '../../../utils/normalizedScroll'
 
 export interface RestoreAnchor {
   nodeIndex: number
@@ -22,6 +23,7 @@ export interface ScrollRestoreOptions {
     isViewportRoot: boolean,
   ) => number
   getOffsetTopWithinRoot: (node: HTMLElement, root: HTMLElement) => number
+  isReverseFlexScrollRoot?: (root: HTMLElement) => boolean
 
   estimateIndexForOffset: (offsetPx: number) => number
   estimateHeightRange: (start: number, end: number) => number
@@ -52,6 +54,7 @@ export function useScrollRestore(options: ScrollRestoreOptions): ScrollRestore {
     resolveScrollContainer,
     getNormalizedScrollTop,
     getOffsetTopWithinRoot,
+    isReverseFlexScrollRoot,
     estimateIndexForOffset,
     estimateHeightRange,
     getFallbackNodeHeight,
@@ -109,7 +112,12 @@ export function useScrollRestore(options: ScrollRestoreOptions): ScrollRestore {
       return
     }
 
-    root.scrollTop = getOffsetTopWithinRoot(container, root) + next
+    const absoluteTarget = getOffsetTopWithinRoot(container, root) + next
+
+    setNormalizedElementScrollTop(root, doc, absoluteTarget, {
+      isReverseFlexScrollRoot: candidate => isReverseFlexScrollRoot?.(candidate) ?? false,
+      getNormalizedScrollTop,
+    })
   }
 
   function resolveAnchorOffset(anchor: RestoreAnchor) {

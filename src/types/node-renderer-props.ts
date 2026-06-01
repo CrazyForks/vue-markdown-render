@@ -1,4 +1,5 @@
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
+import type { Ref } from 'vue'
 import type { SmoothMarkdownStreamOptions } from '../composables/useSmoothMarkdownStream'
 import type {
   CodeBlockMonacoOptions,
@@ -10,6 +11,252 @@ import type {
 } from './component-props'
 
 export type NodeRendererCodeBlockProps = Partial<Omit<CodeBlockNodeProps, 'node'>> & Record<string, unknown>
+
+export type MarkstreamVirtualPhase
+  = | 'estimating'
+    | 'streaming'
+    | 'measuring'
+    | 'settling'
+    | 'settled'
+    | 'final'
+
+export type MarkstreamVirtualConfidence
+  = | 'estimate'
+    | 'mixed'
+    | 'measured'
+    | 'final'
+
+export type MarkstreamVirtualReason
+  = | 'content'
+    | 'parse'
+    | 'batch'
+    | 'resize'
+    | 'node-resize'
+    | 'async-node'
+    | 'font'
+    | 'theme'
+    | 'final'
+    | 'restore'
+    | 'manual'
+
+export type MarkstreamVirtualAnchor
+  = | {
+    type: 'node'
+    nodeIndex: number
+    offsetWithinNodePx: number
+  }
+  | {
+    type: 'bottom'
+    distanceFromBottomPx: number
+  }
+
+export interface MarkstreamMeasuredHeightCacheEntry {
+  index: number
+  height: number
+}
+
+export interface MarkstreamHeightCacheEntry extends MarkstreamMeasuredHeightCacheEntry {
+  /**
+   * Compatibility metadata.
+   *
+   * MarkdownRender exports these fields for newly captured caches, and
+   * standalone virtualScroll.heightCache imports require signature at runtime.
+   */
+  nodeType?: string
+  signature: string
+}
+
+export type MarkstreamHeightCache = MarkstreamHeightCacheEntry[]
+export type MarkstreamInternalHeightCache = MarkstreamMeasuredHeightCacheEntry[]
+
+export interface MarkstreamVirtualMetrics {
+  sessionKey: string
+  threadKey?: string
+  phase: MarkstreamVirtualPhase
+  nodeCount: number
+  liveRange: {
+    start: number
+    end: number
+  }
+  renderedCount: number
+  measuredCount: number
+  estimatedCount: number
+  averageNodeHeight: number
+  topSpacerHeight: number
+  bottomSpacerHeight: number
+  visibleDomHeight: number
+  totalHeight: number
+  width: number
+  final: boolean
+  stable: boolean
+  confidence: MarkstreamVirtualConfidence
+  reason: MarkstreamVirtualReason
+}
+
+export interface MarkstreamVirtualState {
+  sessionKey: string
+  threadKey?: string
+  /**
+   * Present only when this renderer is close enough to the scrollRoot viewport
+   * to own a restore anchor. Automatic height/cache state may omit it.
+   */
+  anchor?: MarkstreamVirtualAnchor
+  /**
+   * true means `anchor` was captured from this renderer's current visible or
+   * near-visible viewport area. false/undefined means the state is primarily
+   * for metrics and height cache.
+   */
+  anchorCaptured?: boolean
+  metrics: MarkstreamVirtualMetrics
+  width: number
+  contentHash?: string
+  measurementKey?: string
+  heightCache?: MarkstreamHeightCache
+}
+
+export type MarkstreamScrollRoot = HTMLElement | null | undefined
+export type MarkstreamScrollRootRef = Ref<MarkstreamScrollRoot>
+export type MarkstreamScrollRootLike
+  = | MarkstreamScrollRoot
+    | MarkstreamScrollRootRef
+    | {
+      $el?: MarkstreamScrollRoot
+    }
+export type MarkstreamScrollRootResolver = () => MarkstreamScrollRootLike
+
+export type MarkstreamVirtualScrollHeightCacheOptions
+  = | {
+    heightCache?: null | undefined
+    heightCacheWidth?: number
+  }
+  | {
+    /**
+     * Cached measured node heights.
+     *
+     * When this is supplied outside restoreState, heightCacheWidth is required
+     * so the renderer can reject stale layout caches after width changes.
+     */
+    heightCache: MarkstreamHeightCache
+    heightCacheWidth: number
+  }
+
+interface MarkstreamVirtualScrollSharedBaseOptions {
+  scrollRoot?: MarkstreamScrollRootLike | MarkstreamScrollRootResolver
+  threadKey?: string
+  restoreState?: MarkstreamVirtualState | null
+  /**
+   * Apply `restoreState.anchor` to the shared scroll root.
+   *
+   * By default `restoreState` imports compatible height cache only, so several
+   * MarkdownRender instances can mount with persisted state without fighting
+   * over the same outer scroll root.
+   */
+  restoreAnchor?: boolean | string | number
+  /**
+   * Extra cache invalidation key for layout-affecting host state:
+   * theme, font, density, custom component style revision, Monaco line height, etc.
+   */
+  measurementKey?: string | number
+  settleMode?: 'auto' | 'manual'
+  settledToken?: string | number | boolean
+  emitIntervalMs?: number
+  heightDiffThresholdPx?: number
+  /**
+   * Maximum number of measured node-height records emitted in heightCache.
+   *
+   * Default: 5000. Set <= 0 to export all compatible measured heights.
+   * Large values improve restore precision but increase event/state payload size.
+   */
+  heightCacheLimit?: number
+}
+
+export type MarkstreamVirtualScrollSharedOptions
+  = MarkstreamVirtualScrollSharedBaseOptions & MarkstreamVirtualScrollHeightCacheOptions
+
+export type MarkstreamVirtualScrollOptions
+  = | (MarkstreamVirtualScrollSharedOptions & {
+    enabled: true
+    sessionKey: string
+  })
+  | (MarkstreamVirtualScrollSharedOptions & {
+    enabled: boolean
+    sessionKey: string
+  })
+  | (MarkstreamVirtualScrollSharedOptions & {
+    enabled?: false
+    sessionKey?: string
+  })
+
+export interface MarkstreamCaptureVirtualStateOptions {
+  /**
+   * Default: false for imperative capture.
+   *
+   * Event-driven state emission still uses viewport-gated capture internally,
+   * but a host virtualizer can opt into viewport-gated imperative capture
+   * during thread switch.
+   */
+  requireViewport?: boolean
+  /**
+   * Default: false.
+   *
+   * When true, captureVirtualState() may include a best-effort node anchor even
+   * if the renderer is not near the viewport. Such anchors are emitted with
+   * anchorCaptured=false and are not auto-restored unless explicitly opted in.
+   */
+  allowFallbackAnchor?: boolean
+  /**
+   * Default: true.
+   */
+  includeEmptyState?: boolean
+}
+
+export interface MarkstreamRendererHandle {
+  getVirtualMetrics: () => MarkstreamVirtualMetrics
+  captureVirtualState: (
+    options?: MarkstreamCaptureVirtualStateOptions,
+  ) => MarkstreamVirtualState | null
+  restoreVirtualState: (
+    state: MarkstreamVirtualState,
+    options?: {
+      /**
+       * Default: false.
+       *
+       * Only works when state.anchor exists. Cache import still works without
+       * anchor.
+       */
+      restoreAnchor?: boolean
+      restoreToken?: string | number | boolean
+      /**
+       * Default: false.
+       *
+       * Set true only when the caller knows an anchor with
+       * anchorCaptured=false still belongs to the active viewport context.
+       */
+      allowUncapturedAnchor?: boolean
+    },
+  ) => void
+  forceMeasure: (reason?: MarkstreamVirtualReason) => Promise<MarkstreamVirtualMetrics>
+  settle: (options?: {
+    frames?: number
+    timeoutMs?: number
+    reason?: MarkstreamVirtualReason
+    /**
+     * Force-clear pending delayed height-settling timers before returning.
+     * Default: false. Use only when the host knows async layout work is done.
+     */
+    flushPendingTimers?: boolean
+  }) => Promise<MarkstreamVirtualMetrics>
+  scrollToNode: (
+    index: number,
+    align?: 'start' | 'center' | 'end' | 'nearest',
+  ) => void
+}
+
+export interface MarkstreamNodeLifecycle {
+  reportHeight: (indexKey: string | number, height: number) => void
+  markPending: (indexKey: string | number) => void
+  markSettled: (indexKey: string | number) => void
+}
 
 export interface NodeRendererProps {
   /** Raw Markdown input. Omit this when you pass pre-parsed nodes instead. */
@@ -105,6 +352,15 @@ export interface NodeRendererProps {
   maxLiveNodes?: number
   /** Number of nodes to keep before/after focus. Default: 60 */
   liveNodeBuffer?: number
+  /**
+   * Controls node-level virtualization inside this Markdown document only.
+   *
+   * It does not virtualize a chat/timeline list. Use MarkstreamVirtualTimeline
+   * or useMarkstreamVirtualAdapter for the outer conversation surface.
+   */
+  nodeVirtual?: boolean | 'auto'
+  /** Advanced: report logical height and restore state to an outer virtual scroller. */
+  virtualScroll?: MarkstreamVirtualScrollOptions
   /** Internal: render nodes as a fragment without container wrappers */
   renderAsFragment?: boolean
 }

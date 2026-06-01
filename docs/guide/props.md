@@ -8,7 +8,7 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 
 ## 1.0 API tiers
 
-Stable props for 1.x: `content`, `nodes`, `final`, `parseOptions`, `customMarkdownIt`, `customHtmlTags`, `htmlPolicy`, `showTooltips`, `isDark`, `customId`, `typewriter`, `smoothStreaming`, `smoothStreamingOptions`, `renderCodeBlocksAsPre`, `codeBlockStream`, `codeBlockProps`, `codeBlockMonacoOptions`, `codeBlockDarkTheme`, `codeBlockLightTheme`, `mermaidProps`, `d2Props`, `infographicProps`, `batchRendering`, `deferNodesUntilVisible`, `maxLiveNodes`, and `liveNodeBuffer`.
+Stable props for 1.x: `content`, `nodes`, `final`, `parseOptions`, `customMarkdownIt`, `customHtmlTags`, `htmlPolicy`, `showTooltips`, `isDark`, `customId`, `typewriter`, `smoothStreaming`, `smoothStreamingOptions`, `renderCodeBlocksAsPre`, `codeBlockStream`, `codeBlockProps`, `codeBlockMonacoOptions`, `codeBlockDarkTheme`, `codeBlockLightTheme`, `mermaidProps`, `d2Props`, `infographicProps`, `batchRendering`, `deferNodesUntilVisible`, `maxLiveNodes`, `liveNodeBuffer`, `nodeVirtual`, and `virtualScroll`.
 
 Advanced performance tuning prop: `parseCoalesceMs` is available in 1.x, but its scheduling semantics may be refined.
 
@@ -34,10 +34,46 @@ Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`,
 | `smooth-streaming-options` | `SmoothMarkdownStreamOptions` | – | Options for built-in stream pacing (`minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`). Read when the renderer is created; recreate the renderer with a different `key` if you need to change them dynamically. |
 | `parse-coalesce-ms` | `number` | `80` | Performance tuning knob for the minimum interval between parse commits while built-in smooth streaming coalesces character-only updates. It does not throttle raw `content` prop updates when `smooth-streaming=false` and has no effect in `nodes` mode. Set `0` to parse every smooth-stream commit. Default scheduling may be optimized in future releases. |
 | `fade` | `boolean` | `true` | Enables non-code-node enter fade and appended-text fade. Disable if you need zero animation for SSR snapshots. |
+| `node-virtual` | `boolean \| 'auto'` | `'auto'` | Controls node-level virtualization inside this Markdown document only. It does not virtualize a chat or timeline list. |
+| `virtual-scroll` | `MarkstreamVirtualScrollOptions` | – | Advanced host virtual-scroll coordination. Use this when an outer timeline virtualizer needs logical `totalHeight`, restore state, and settle/final events instead of reading the current DOM height. When `enabled=true`, pass a stable `sessionKey`. |
 
 ::: tip SSR and smooth streaming
 For SSR with static initial content, prefer `smooth-streaming="auto"` (the default). The `auto` mode includes a mounted gate that prevents pacing initial content from blank on the first client render. Use `smooth-streaming=true` only when you explicitly want to pace the first client-side content as well — this can cause a hydration mismatch or a first-paint flash of empty content in SSR setups.
 :::
+
+### Virtual scroll coordination
+
+Use `MarkstreamVirtualTimeline` for zero-config mixed AI timelines, or `useMarkstreamVirtualAdapter` when you already have a third-party virtualizer. The raw `virtual-scroll` prop is the advanced Markdown item protocol those integrations use internally.
+
+When `virtual-scroll.enabled` is true, `MarkdownRender` reports the logical height of the full Markdown document through `height-change`.
+
+Use `metrics.totalHeight` as the outer virtualizer item size. Do not use the current DOM `offsetHeight`, because the renderer may internally virtualize Markdown nodes and keep only a live window in the DOM.
+
+When passing standalone `heightCache`, also pass `heightCacheWidth`; otherwise the cache is ignored to avoid reusing stale measurements after width changes.
+
+`final` means the source stream has completed. It does not guarantee that the layout has settled. Code blocks, diagrams, images, fonts, and custom components may still change height. `render-final` means this render session has passed the selected settle policy. For virtualized or offscreen nodes, `metrics.confidence` may still be `mixed`. Persist the height cache as authoritative only when `metrics.confidence` is `measured` or `final`, or when you persist the returned per-node `heightCache` together with `width`, `measurementKey`, and `contentHash`.
+
+### `MarkstreamVirtualTimeline` restore UI
+
+#### `restore-loading`
+
+Rendered while a previously measured thread is being restored. The slot is displayed as an absolutely positioned overlay inside the timeline scroll root and does not participate in item measurement.
+
+Slot props:
+
+- `threadKey`: current timeline thread key.
+- `visibleRecords`: records in the current virtual window.
+
+Do not insert loading rows into `items`; that changes offsets and can break scroll restoration.
+
+#### `restore-max-loading-ms`
+
+Controls the maximum time the timeline may keep the restore loading overlay visible.
+
+- `false` (default): keep the overlay visible until the restored viewport is ready.
+- `number`: reveal after this many milliseconds even if the viewport readiness check has not passed.
+
+Keep the default when scroll and height stability are more important than showing partial content. Use a number only when your product prefers a bounded loading duration over strict visual stability.
 
 ### smooth-streaming and fade — pick one, not both
 
@@ -137,6 +173,7 @@ Use `html-policy="escape"` when you want literal HTML text to stay visible inste
 | `render-batch-delay` | `16` | Extra delay (ms) before each batch after rAF. |
 | `render-batch-budget-ms` | `6` | Time budget (ms) before adaptive batch sizes shrink. |
 | `render-batch-idle-timeout-ms` | `120` | Timeout (ms) for `requestIdleCallback` slices (when available). |
+| `virtual-scroll` | – | Reports logical height and restore state to an outer virtualizer. Listen to `height-change` and use `metrics.totalHeight` as the message/item size. When `enabled=true`, pass a stable `sessionKey`. |
 
 ## Global code block options (forwarded from `MarkdownRender`)
 

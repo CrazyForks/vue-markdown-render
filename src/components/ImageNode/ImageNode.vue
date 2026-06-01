@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { ImageNodeProps } from '../../types/component-props'
 import { sanitizeImageSrc } from 'stream-markdown-parser'
-import { computed, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
+import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
+import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 
 const props = withDefaults(defineProps<ImageNodeProps>(), {
   fallbackSrc: '',
@@ -12,10 +14,17 @@ const props = withDefaults(defineProps<ImageNodeProps>(), {
 
 const emit = defineEmits<{ (e: 'load', src: string): void, (e: 'error', src: string): void, (e: 'click', payload: [Event, string]): void }>()
 
+const IMAGE_LIFECYCLE_PENDING_TIMEOUT_MS = 8000
+
 const imageLoaded = ref(false)
 const hasError = ref(false)
 const activeSrc = ref('')
 const imageStage = ref<'primary' | 'fallback' | 'failed'>('primary')
+const rootRef = ref<HTMLElement | null>(null)
+const attrs = useAttrs()
+const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
+let lifecyclePendingIndexKey = ''
+let lifecyclePendingTimer: ReturnType<typeof setTimeout> | null = null
 
 const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))
 const safeFallbackSrc = computed(() => sanitizeImageSrc(props.fallbackSrc))
@@ -27,6 +36,83 @@ const showError = computed(() => imageStage.value === 'failed')
 
 // Shimmer overlay only for lazy images while a renderable image is downloading.
 const showShimmer = computed(() => !useEagerImagePath.value && !imageLoaded.value && !hasError.value && imageStage.value !== 'failed' && activeSrc.value.length > 0)
+const lifecycleIndexKey = computed(() => {
+  return resolveLifecycleIndexKey(props, attrs)
+})
+
+function reportLifecycleHeight(indexKey = lifecycleIndexKey.value) {
+  if (!indexKey || !rootRef.value)
+    return
+  lifecycle?.reportHeight(indexKey, rootRef.value.offsetHeight)
+}
+
+function scheduleLifecycleHeightReport(indexKey = lifecycleIndexKey.value) {
+  if (!indexKey)
+    return
+
+  void nextTick(() => {
+    reportLifecycleHeight(indexKey)
+  })
+}
+
+function clearLifecyclePendingTimer() {
+  if (!lifecyclePendingTimer)
+    return
+
+  clearTimeout(lifecyclePendingTimer)
+  lifecyclePendingTimer = null
+}
+
+function markLifecyclePending() {
+  const indexKey = lifecycleIndexKey.value
+  if (!indexKey)
+    return
+
+  if (lifecyclePendingIndexKey === indexKey)
+    return
+
+  if (lifecyclePendingIndexKey)
+    lifecycle?.markSettled(lifecyclePendingIndexKey)
+
+  clearLifecyclePendingTimer()
+
+  lifecyclePendingIndexKey = indexKey
+  lifecycle?.markPending(indexKey)
+
+  if (typeof window !== 'undefined') {
+    lifecyclePendingTimer = window.setTimeout(() => {
+      if (lifecyclePendingIndexKey !== indexKey)
+        return
+
+      scheduleLifecycleHeightReport(indexKey)
+      void markLifecycleSettled()
+    }, IMAGE_LIFECYCLE_PENDING_TIMEOUT_MS)
+  }
+}
+
+async function markLifecycleSettled() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!indexKey)
+    return
+
+  clearLifecyclePendingTimer()
+
+  lifecyclePendingIndexKey = ''
+  await nextTick()
+  reportLifecycleHeight(indexKey)
+  lifecycle?.markSettled(indexKey)
+}
+
+function clearLifecyclePending() {
+  const indexKey = lifecyclePendingIndexKey
+  if (!indexKey)
+    return
+
+  clearLifecyclePendingTimer()
+
+  lifecyclePendingIndexKey = ''
+  lifecycle?.markSettled(indexKey)
+}
 
 function handleImageError() {
   if (imageStage.value === 'primary' && safeFallbackSrc.value && safeFallbackSrc.value !== activeSrc.value) {
@@ -34,18 +120,21 @@ function handleImageError() {
     activeSrc.value = safeFallbackSrc.value
     imageLoaded.value = false
     hasError.value = false
+    scheduleLifecycleHeightReport()
     return
   }
 
   imageStage.value = 'failed'
   hasError.value = true
   emit('error', activeSrc.value)
+  scheduleLifecycleHeightReport()
 }
 
 function handleImageLoad() {
   imageLoaded.value = true
   hasError.value = false
   emit('load', displaySrc.value)
+  scheduleLifecycleHeightReport()
 }
 
 function handleClick(e: Event) {
@@ -87,10 +176,41 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  [showImage, imageLoaded, hasError, displaySrc, () => props.lazy],
+  ([visible, loaded, error, src, lazy]) => {
+    if (!visible || !src || error) {
+      void markLifecycleSettled()
+      scheduleLifecycleHeightReport()
+      return
+    }
+
+    if (loaded) {
+      void markLifecycleSettled()
+      scheduleLifecycleHeightReport()
+      return
+    }
+
+    if (lazy) {
+      markLifecyclePending()
+      scheduleLifecycleHeightReport()
+      return
+    }
+
+    if (!loaded && !error)
+      markLifecyclePending()
+  },
+  { flush: 'post', immediate: true },
+)
+
+onBeforeUnmount(() => {
+  clearLifecyclePending()
+})
 </script>
 
 <template>
-  <span class="image-node-container">
+  <span ref="rootRef" class="image-node-container">
     <img
       v-if="showImage"
       :src="displaySrc"
