@@ -1297,7 +1297,7 @@ describe('virtual timeline restore visual readiness', () => {
     wrapper.unmount()
   })
 
-  it('uses reduced overscan during restore and restores configured overscan after reveal', async () => {
+  it('keeps configured item overscan mounted during restore', async () => {
     const itemHeight = 88
 
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(100)
@@ -1356,12 +1356,12 @@ describe('virtual timeline restore visual readiness', () => {
     const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
     expect(root.classList.contains('is-restoring-thread')).toBe(true)
     const restoreItemCount = wrapper.findAll('.markstream-virtual-timeline__item').length
-    expect(restoreItemCount).toBeLessThan(items.length)
+    expect(restoreItemCount).toBe(items.length)
 
     await waitForTimelineRestoreSettled(root)
     await nextTick()
 
-    expect(wrapper.findAll('.markstream-virtual-timeline__item').length).toBeGreaterThan(restoreItemCount)
+    expect(wrapper.findAll('.markstream-virtual-timeline__item').length).toBe(restoreItemCount)
 
     wrapper.unmount()
   })

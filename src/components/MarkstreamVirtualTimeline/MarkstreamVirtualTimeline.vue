@@ -210,7 +210,7 @@ function lowerBoundRecordByOffset(records: TimelineRecord[], offset: number) {
 
 const effectiveOverscanItems = computed(() => {
   const value = Math.max(0, props.overscan ?? 4)
-  return restorePaintReady.value ? value : Math.min(value, 1)
+  return value
 })
 
 const effectiveOverscanPx = computed(() => {
