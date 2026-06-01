@@ -333,12 +333,11 @@ const isCompactSettings = useMediaQuery('(max-width: 1023px)')
 const shouldShowSettingsPanel = computed(() => !isCompactSettings.value || showSettings.value)
 
 // Use reversed column layout and let the browser handle native scrolling.
-// Removed custom JS scroll management (observers, programmatic scroll, and
-// pointer/wheel/touch heuristics) to rely on CSS `flex-direction: column-reverse`.
 const messagesContainer = ref<HTMLElement | null>(null)
+const scrollRoot = ref<HTMLElement | null>(null)
 
-// 性能友好的监听：使用 ResizeObserver 监听容器和渲染内容变化，
-// 当内容高度超过容器可见高度时，在滚动容器上添加 `disable-min-height` 类以移除渲染器的 min-height。
+// 性能友好的监听：使用 ResizeObserver 监听消息区域和渲染内容变化，
+// 当内容高度超过全屏滚动区域时，在消息区域上添加 `disable-min-height` 类以移除渲染器的 min-height。
 // 注意：不要直接对 `.markdown-renderer` 做 `classList.add()`，因为它的 class 由 Vue patch，
 // 在切换模式/主题等触发更新时会被覆盖，导致 `disable-min-height` 丢失。
 let __roContainer: ResizeObserver | null = null
@@ -382,8 +381,8 @@ function scheduleCheckMinHeight() {
     // consider clearing after several consecutive non-overflow readings.
     if (__minHeightDisabled || hadClass) {
       container.classList.add('disable-min-height')
-      const containerDelta = container.scrollHeight - container.clientHeight
-      const shouldRemove = containerDelta > 1
+      const root = scrollRoot.value || document.scrollingElement || document.documentElement
+      const shouldRemove = root.scrollHeight - root.clientHeight > 1
 
       if (shouldRemove) {
         __clearConfirmations = 0
@@ -402,8 +401,8 @@ function scheduleCheckMinHeight() {
 
     // Not latched: probe by temporarily unsetting min-height (same rAF tick).
     container.classList.add('disable-min-height')
-    const containerDelta = container.scrollHeight - container.clientHeight
-    const probeOverflow = containerDelta > 1
+    const root = scrollRoot.value || document.scrollingElement || document.documentElement
+    const probeOverflow = root.scrollHeight - root.clientHeight > 1
     if (probeOverflow)
       __overflowConfirmations++
     else
@@ -448,6 +447,7 @@ onMounted(() => {
     }
   }
   startStreamSimulation()
+
   // 初始检查和观察
   const container = messagesContainer.value
   if (!container)
@@ -711,7 +711,7 @@ onBeforeUnmount(() => {
     </Transition>
 
     <!-- Main chat area -->
-    <div class="chat-wrapper" :class="{ 'chat-wrapper--with-sidebar': !isCompactSettings }">
+    <div ref="scrollRoot" class="chat-wrapper" :class="{ 'chat-wrapper--with-sidebar': !isCompactSettings }">
       <div class="chat-container">
         <!-- Header bar -->
         <header class="chat-header">
@@ -1177,10 +1177,15 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: 1;
   display: flex;
+  flex-direction: column-reverse;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  box-sizing: border-box;
   height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 20px;
+  overscroll-behavior: contain;
   transition: padding-right 0.3s ease;
 }
 
@@ -1190,12 +1195,12 @@ onBeforeUnmount(() => {
 
 /* ─── Chat Container ─── */
 .chat-container {
+  flex: 0 0 auto;
   width: 100%;
   max-width: 960px;
-  height: calc(100vh - 40px);
+  min-height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   border-radius: 24px;
   border: 1px solid var(--play-border);
   background:
@@ -1422,20 +1427,20 @@ onBeforeUnmount(() => {
 
 /* ─── Chat Messages ─── */
 .chat-messages {
-  flex: 1;
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column-reverse;
-  overflow-y: auto;
   scroll-behavior: smooth;
-  overscroll-behavior: contain;
 }
 
 .chat-messages > .markdown-renderer {
+  flex: 1 1 auto;
   min-height: 100%;
   box-sizing: border-box;
 }
 
 .chat-messages.disable-min-height > .markdown-renderer {
+  flex: 0 1 auto;
   min-height: unset !important;
 }
 
@@ -1467,7 +1472,7 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
   .chat-wrapper { padding: 10px; }
   .chat-wrapper--with-sidebar { padding-right: 10px; }
-  .chat-container { border-radius: 18px; height: calc(100vh - 20px); }
+  .chat-container { border-radius: 18px; min-height: calc(100vh - 20px); }
   .chat-header__nav { gap: 4px; }
   .chat-overview { grid-template-columns: 1fr; padding: 14px 16px; }
   .chat-overview__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
