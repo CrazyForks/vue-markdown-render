@@ -5118,6 +5118,7 @@ const TYPEWRITER_CURSOR_EXCLUDED_SELECTOR = [
   '[data-node-type="math_block"]',
   '[data-node-type="html_block"]',
   '[data-node-type="image"]',
+  '[data-node-type="thematic_break"]',
   'script',
   'style',
 ].join(',')
@@ -5193,21 +5194,6 @@ function hideTypewriterCursorElement() {
     typewriterCursorRef.value.style.visibility = 'hidden'
 }
 
-function getTypewriterCursorSearchRoot() {
-  const items = renderedItems.value
-  for (let index = items.length - 1; index >= 0; index--) {
-    const item = items[index]
-    if (!item || shouldSkipTypewriterCursorForNode(item.node) || !shouldRenderNode(item.index))
-      continue
-
-    const slot = nodeSlotElements.get(item.index)
-    if (slot)
-      return slot
-  }
-
-  return null
-}
-
 function isAcceptedTypewriterCursorTextNode(node: Node): node is Text {
   if (node.nodeType !== Node.TEXT_NODE)
     return false
@@ -5250,18 +5236,37 @@ function getLastTextNode(root: HTMLElement) {
   return null
 }
 
+function getTypewriterCursorTextTarget() {
+  const items = renderedItems.value
+  for (let index = items.length - 1; index >= 0; index--) {
+    const item = items[index]
+    if (!item || shouldSkipTypewriterCursorForNode(item.node) || !shouldRenderNode(item.index))
+      continue
+
+    const slot = nodeSlotElements.get(item.index)
+    if (!slot)
+      continue
+
+    const text = getLastTextNode(slot)
+    if (text)
+      return { slot, text }
+  }
+
+  return null
+}
+
 function updateTypewriterCursorPosition() {
   if (!isClient || !showTypewriterCursor.value || !containerRef.value || !typewriterCursorRef.value)
     return
 
   const root = containerRef.value
   const cursor = typewriterCursorRef.value
-  const searchRoot = getTypewriterCursorSearchRoot()
   cursor.style.visibility = 'hidden'
-  if (!searchRoot)
+  const target = getTypewriterCursorTextTarget()
+  if (!target)
     return
 
-  const lastText = getLastTextNode(searchRoot)
+  const lastText = target.text
   let left = 0
   let top = 0
   let height = 20

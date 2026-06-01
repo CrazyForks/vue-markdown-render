@@ -4,7 +4,9 @@
 
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { h } from 'vue'
 import NodeRenderer from '../src/components/NodeRenderer'
+import { removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
 
 function rect(partial: Partial<DOMRect>): DOMRect {
@@ -193,6 +195,76 @@ describe('typewriter cursor position', () => {
     expect(measuredSlot instanceof HTMLElement && measuredSlot.matches('.node-slot[data-node-index="1"]')).toBe(true)
 
     wrapper.unmount()
+  })
+
+  it('falls back to previous rendered text slot when the last non-excluded slot has no text', async () => {
+    const scopeId = 'typewriter-empty-tail'
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const EmptyNode = {
+      name: 'EmptyNode',
+      setup() {
+        return () => h('span', { class: 'empty-node' })
+      },
+    }
+    setCustomComponents(scopeId, { 'empty-node': EmptyNode })
+
+    let rangeNode: Node | null = null
+    let measuredText = ''
+    let measuredSlot: Element | null = null
+    const originalCreateRange = document.createRange.bind(document)
+    vi.spyOn(document, 'createRange').mockImplementation(() => {
+      const range = originalCreateRange()
+      range.setStart = vi.fn((node: Node) => {
+        rangeNode = node
+      })
+      range.setEnd = vi.fn((node: Node) => {
+        rangeNode = node
+      })
+      range.getClientRects = vi.fn(() => {
+        measuredText = rangeNode?.textContent ?? ''
+        measuredSlot = rangeNode?.parentElement?.closest('.node-slot[data-node-index]') ?? null
+        return [
+          rect({ right: 50, top: 20, bottom: 40, height: 20 }),
+        ] as unknown as DOMRectList
+      })
+      return range
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        customId: scopeId,
+        customHtmlTags: ['empty-node'],
+        typewriter: true,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    try {
+      await flushAll()
+      queuedFrames.length = 0
+
+      await wrapper.setProps({ content: 'hello\n\n<empty-node></empty-node>' })
+      await flushAll()
+      await runNextFrame(queuedFrames, performance.now() + 16)
+
+      expect(measuredText).toBe('hello')
+      expect(measuredSlot instanceof HTMLElement && measuredSlot.matches('.node-slot[data-node-index="0"]')).toBe(true)
+      expect((wrapper.get('.typewriter-cursor').element as HTMLElement).style.visibility).toBe('visible')
+    }
+    finally {
+      wrapper.unmount()
+      removeCustomComponents(scopeId)
+    }
   })
 
   it('repositions when incremental rendering mounts the next slot', async () => {
