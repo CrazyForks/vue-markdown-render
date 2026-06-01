@@ -25,7 +25,21 @@ const requiredSubpaths = [
   './workers/mermaidParser.worker',
 ]
 
-const isolatedRootExports = ['MarkdownRender', 'VueRendererMarkdown', 'CodeBlockNode']
+const isolatedRootExports = [
+  'MarkdownRender',
+  'VueRendererMarkdown',
+  'CodeBlockNode',
+  'MarkdownCodeBlockNode',
+  'MathBlockNode',
+  'MathInlineNode',
+  'MermaidBlockNode',
+  'D2BlockNode',
+  'InfographicBlockNode',
+  'MarkstreamVirtualTimeline',
+  'Tooltip',
+  'useMarkstreamVirtualAdapter',
+  'useSmoothMarkdownStream',
+]
 
 const runtimeSubpathChecks = [
   {
