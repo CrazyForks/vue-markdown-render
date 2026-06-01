@@ -147,11 +147,36 @@ export function useBatchRenderingScheduler(
 
       // Keep a frame boundary before the next batch without charging RAF wait time as commit cost.
       if (requestFrame) {
+        let finished = false
+        let timeout: number | null = null
+
+        const finishOnce = () => {
+          if (finished)
+            return
+          finished = true
+          finish()
+        }
+
         const raf = requestFrame(() => {
           commitMeasurementRafs.delete(raf)
-          finish()
+          if (timeout != null) {
+            window.clearTimeout(timeout)
+            commitMeasurementTimeouts.delete(timeout)
+            timeout = null
+          }
+          finishOnce()
         })
         commitMeasurementRafs.add(raf)
+
+        timeout = window.setTimeout(() => {
+          if (timeout != null)
+            commitMeasurementTimeouts.delete(timeout)
+          timeout = null
+          cancelFrame?.(raf)
+          commitMeasurementRafs.delete(raf)
+          finishOnce()
+        }, Math.max(32, props.renderBatchIdleTimeoutMs ?? 120))
+        commitMeasurementTimeouts.add(timeout)
         return
       }
 

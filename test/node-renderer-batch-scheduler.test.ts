@@ -136,6 +136,7 @@ describe('useBatchRenderingScheduler', () => {
 
     vi.clearAllTimers()
     vi.useRealTimers()
+    vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
@@ -229,6 +230,46 @@ describe('useBatchRenderingScheduler', () => {
     vi.advanceTimersByTime(0)
 
     expect(h.adaptiveBatchSize.value).toBe(5)
+  })
+
+  it('uses timeout fallback when RAF boundary does not fire', async () => {
+    let currentTime = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
+
+    let frameHandle = 0
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      frameHandle += 1
+      if (frameHandle === 1)
+        window.setTimeout(() => callback(currentTime), 0)
+      return frameHandle
+    }) as unknown as typeof window.requestAnimationFrame
+    const cancelFrame = vi.fn() as unknown as typeof window.cancelAnimationFrame
+
+    const h = createHarness({
+      total: 16,
+      initialBatch: 8,
+      batchSize: 8,
+      delay: 10,
+      requestFrame,
+      cancelFrame,
+    })
+
+    expect(h.renderedCount.value).toBe(8)
+
+    vi.advanceTimersByTime(10)
+    currentTime = 8
+    await nextTick()
+
+    expect(h.renderedCount.value).toBe(16)
+    expect(h.adaptiveBatchSize.value).toBe(8)
+
+    vi.advanceTimersByTime(119)
+    expect(h.adaptiveBatchSize.value).toBe(8)
+
+    vi.advanceTimersByTime(1)
+
+    expect(h.adaptiveBatchSize.value).toBe(5)
+    expect(cancelFrame).toHaveBeenCalledWith(2)
   })
 
   it('does not apply multiple idle batches before commit feedback', async () => {
