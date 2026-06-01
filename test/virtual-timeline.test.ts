@@ -1614,7 +1614,10 @@ describe('virtual timeline API', () => {
             if (props.kind === 'assistant-markdown') {
               latestMarkdownProps = props.markdownProps
 
-              return h('div', { class: 'markdown-renderer' }, [
+              return h('div', {
+                ref: props.measureRef,
+                class: 'markdown-renderer',
+              }, [
                 h('div', {
                   'class': 'node-slot',
                   'data-node-index': '0',

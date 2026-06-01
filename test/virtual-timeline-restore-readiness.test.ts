@@ -1,3 +1,4 @@
+import type { MarkstreamVirtualMetrics, MarkstreamVirtualState } from '../src/types/node-renderer-props'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, nextTick } from 'vue'
@@ -69,6 +70,42 @@ function timelineItemSource(threadKey: string, itemKey: string, revision?: strin
     measurementKey: `:${widthBucket}`,
     widthBucket,
   }
+}
+
+function createMetrics(totalHeight: number, sessionKey: string): MarkstreamVirtualMetrics {
+  return {
+    sessionKey,
+    phase: 'measuring',
+    nodeCount: 1,
+    liveRange: { start: 0, end: 1 },
+    renderedCount: 1,
+    measuredCount: 1,
+    estimatedCount: 0,
+    averageNodeHeight: totalHeight,
+    topSpacerHeight: 0,
+    bottomSpacerHeight: 0,
+    visibleDomHeight: totalHeight,
+    totalHeight,
+    width: 800,
+    final: true,
+    stable: true,
+    confidence: 'measured',
+    reason: 'manual',
+  }
+}
+
+function markMarkdownMetricsReady(markdownProps: any, totalHeight = 360) {
+  const sessionKey = markdownProps.virtualScroll.sessionKey
+  const metrics = createMetrics(totalHeight, sessionKey)
+
+  markdownProps.onHeightChange(metrics)
+  markdownProps.onVirtualStateChange({
+    sessionKey,
+    threadKey: markdownProps.virtualScroll.threadKey,
+    metrics,
+    width: 800,
+    measurementKey: ':800',
+  } as MarkstreamVirtualState)
 }
 
 function stubTimelineDom(height = 360) {
@@ -700,6 +737,7 @@ describe('virtual timeline restore visual readiness', () => {
       installRestoreGeometryStub()
 
       let mermaidReady = false
+      let latestMarkdownProps: any
 
       const threadA = [
         { kind: 'user-message', id: 'a1', text: 'Thread A' },
@@ -719,7 +757,12 @@ describe('virtual timeline restore visual readiness', () => {
         slots: {
           default(props: any) {
             if (props.itemKey === 'b1') {
-              return h('div', { ref: props.measureRef }, [
+              latestMarkdownProps = props.markdownProps
+
+              return h('div', {
+                ref: props.measureRef,
+                class: 'markdown-renderer',
+              }, [
                 h('div', { 'class': 'node-slot', 'data-node-index': '0', 'data-node-type': 'code_block' }, [
                   h('div', { class: 'node-content' }, [
                     h('div', {
@@ -766,6 +809,7 @@ describe('virtual timeline restore visual readiness', () => {
       mermaidReady = true
       await wrapper.setProps({ items: [...threadB] })
       await nextTick()
+      markMarkdownMetricsReady(latestMarkdownProps)
 
       await vi.advanceTimersByTimeAsync(700)
       await nextTick()
@@ -778,13 +822,15 @@ describe('virtual timeline restore visual readiness', () => {
     }
   })
 
-  it('reveals cold restored thread when visible markdown DOM is stable without persisted markdown state', async () => {
+  it('reveals cold restored thread when visible markdown DOM and metrics are stable without persisted markdown state', async () => {
     vi.useFakeTimers()
     let wrapper: ReturnType<typeof mount> | undefined
 
     try {
       stubTimelineDom()
       installRestoreGeometryStub()
+
+      let latestMarkdownProps: any
 
       wrapper = mount(MarkstreamVirtualTimeline, {
         attachTo: document.body,
@@ -797,6 +843,8 @@ describe('virtual timeline restore visual readiness', () => {
         },
         slots: {
           default(props: any) {
+            latestMarkdownProps = props.markdownProps
+
             return h('article', {
               'ref': props.measureRef,
               'data-markstream-item-key': props.itemKey,
@@ -846,6 +894,12 @@ describe('virtual timeline restore visual readiness', () => {
         await nextTick()
       }
 
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      markMarkdownMetricsReady(latestMarkdownProps)
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
       expect(root.classList.contains('is-restoring-thread')).toBe(false)
       expect(wrapper.find('[data-testid="restore-loading"]').exists()).toBe(false)
     }
@@ -864,6 +918,7 @@ describe('virtual timeline restore visual readiness', () => {
       installRestoreGeometryStub()
 
       let mermaidReady = false
+      let latestMarkdownProps: any
 
       const threadA = [
         { kind: 'assistant-markdown', id: 'a1', content: 'pending math', final: true, revision: 1 },
@@ -905,7 +960,9 @@ describe('virtual timeline restore visual readiness', () => {
               ])
             }
 
-            return h('div', { ref: props.measureRef, class: 'markstream-vue' }, [
+            latestMarkdownProps = props.markdownProps
+
+            return h('div', { ref: props.measureRef, class: 'markstream-vue markdown-renderer' }, [
               h('div', { 'class': 'node-slot', 'data-node-index': '0', 'data-node-type': 'code_block' }, [
                 h('div', { class: 'node-content' }, [
                   h('div', {
@@ -947,6 +1004,7 @@ describe('virtual timeline restore visual readiness', () => {
       mermaidReady = true
       await wrapper.setProps({ items: [...threadB] })
       await nextTick()
+      markMarkdownMetricsReady(latestMarkdownProps)
 
       await vi.advanceTimersByTimeAsync(700)
       await nextTick()

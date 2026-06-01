@@ -105,6 +105,7 @@ const exactBottomPinned = ref(true)
 const itemSizes = reactive(new Map<string, number>()) as Map<string, number>
 const itemSizeSources = new Map<string, TimelineItemSizeSource>()
 const restoredItemHeightFloors = new Map<string, number>()
+const restoredItemHeightFloorSources = new Map<string, TimelineItemSizeSource>()
 const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
 const markdownLogicalHeights = reactive(new Map<string, number>()) as Map<string, number>
 const markdownLogicalHeightSources = new Map<string, MarkdownLogicalHeightSource>()
@@ -666,12 +667,28 @@ function getRestoredItemHeightFloor(key: string, source?: TimelineItemSizeSource
   if (!Number.isFinite(floor) || floor == null || floor <= 0)
     return 0
 
-  const currentSource = itemSizeSources.get(key)
-
-  if (source && currentSource && !isSameItemSizeSource(currentSource, source))
+  const floorSource = restoredItemHeightFloorSources.get(key)
+  if (source && floorSource && !isSameRestoredItemHeightFloorSource(floorSource, source))
     return 0
 
   return Math.ceil(floor)
+}
+
+function isSameRestoredItemHeightFloorSource(
+  floorSource: TimelineItemSizeSource,
+  source: TimelineItemSizeSource,
+) {
+  return floorSource.sourceKey === source.sourceKey
+    && (
+      (source.widthBucket ?? 0) === 0
+      || (floorSource.widthBucket ?? 0) === 0
+      || (source.widthBucket ?? 0) === (floorSource.widthBucket ?? 0)
+    )
+    && (
+      source.measurementKey === ':0'
+      || floorSource.measurementKey === ':0'
+      || source.measurementKey === floorSource.measurementKey
+    )
 }
 
 function clearRestoredItemHeightFloorIfSourceChanged(
@@ -681,9 +698,11 @@ function clearRestoredItemHeightFloorIfSourceChanged(
   if (!source)
     return
 
-  const currentSource = itemSizeSources.get(key)
-  if (currentSource && !isSameItemSizeSource(currentSource, source))
+  const floorSource = restoredItemHeightFloorSources.get(key)
+  if (floorSource && !isSameRestoredItemHeightFloorSource(floorSource, source)) {
     restoredItemHeightFloors.delete(key)
+    restoredItemHeightFloorSources.delete(key)
+  }
 }
 
 function setItemSize(key: string, size: number, source?: TimelineItemSizeSource) {
@@ -1388,7 +1407,7 @@ function isRestoredMarkdownFloorTailVisible(
   if (activeThreadRestoreAnchor?.type !== 'bottom')
     return false
 
-  if (!hasTrustedRestoredItemHeight(record))
+  if (!hasTrustedRestoredItemHeightFloor(record))
     return false
 
   const contentRect = contentRoot.getBoundingClientRect()
@@ -1432,12 +1451,11 @@ function hasVisibleReadyMarkdownRecordContent(
   return hasRenderableMarkdownRecordContent(record, el)
 }
 
-function hasTrustedRestoredItemHeight(record: TimelineRecord) {
+function hasTrustedRestoredItemHeightFloor(record: TimelineRecord) {
   const source = itemSizeSources.get(record.key)
-  const compatibleSize = getCompatibleItemSize(record) ?? 0
   const restoredFloor = getRestoredItemHeightFloor(record.key, source)
 
-  return compatibleSize > 0 || restoredFloor > 0
+  return restoredFloor > 0
 }
 
 function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement) {
@@ -1451,7 +1469,7 @@ function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement)
     return true
   }
 
-  if (hasTrustedRestoredItemHeight(record))
+  if (hasTrustedRestoredItemHeightFloor(record))
     return true
 
   const source = getMarkstreamTimelineItemContent(record.item, record.index, props)
@@ -1883,6 +1901,7 @@ function finishThreadRestore(seq: number) {
   // Once the restored viewport is ready, later stable/final measurements should
   // be allowed to shrink stale persisted heights.
   restoredItemHeightFloors.clear()
+  restoredItemHeightFloorSources.clear()
 
   updateScrollMetrics({ remember: false })
   markRestorePaintReady()
@@ -1930,6 +1949,7 @@ function restoreThreadState(
   itemSizes.clear()
   itemSizeSources.clear()
   restoredItemHeightFloors.clear()
+  restoredItemHeightFloorSources.clear()
   markdownStates.clear()
   markdownLogicalHeights.clear()
   markdownLogicalHeightSources.clear()
@@ -1939,6 +1959,7 @@ function restoreThreadState(
     itemSizeSources.set(key, source)
     itemSizes.set(key, next)
     restoredItemHeightFloors.set(key, next)
+    restoredItemHeightFloorSources.set(key, source)
   }
 
   for (const [key, markdownState] of Object.entries(state?.markdownStates ?? {})) {
@@ -2044,6 +2065,7 @@ function cleanupObservers() {
   cleanupMeasuredElements()
   itemSizeSources.clear()
   restoredItemHeightFloors.clear()
+  restoredItemHeightFloorSources.clear()
   markdownLogicalHeights.clear()
   markdownLogicalHeightSources.clear()
   rootResizeObserver?.disconnect()
