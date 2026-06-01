@@ -246,9 +246,17 @@ export function useBatchRenderingScheduler(
     })
   }
 
-  function requestNextBatch() {
+  function requestNextBatch(
+    increment?: number,
+    opts: { immediate?: boolean } = {},
+  ) {
     if (commitMeasurementPending) {
       followupBatchRequested = true
+      return
+    }
+
+    if (increment != null) {
+      scheduleBatch(increment, opts)
       return
     }
 
@@ -344,7 +352,7 @@ export function useBatchRenderingScheduler(
 
       const baseInitial = Math.max(1, resolvedInitialBatch.value || resolvedBatchSize.value || total)
       if (renderedCount.value < targetCount)
-        scheduleBatch(baseInitial, { immediate: !isClient })
+        requestNextBatch(baseInitial, { immediate: !isClient })
       else
         cleanupNodeVisibility(renderedCount.value)
     },

@@ -272,6 +272,47 @@ describe('useBatchRenderingScheduler', () => {
     expect(h.renderedCount.value).toBe(21)
   })
 
+  it('delays same-length parsed node identity follow-up until commit feedback updates adaptive size', async () => {
+    let currentTime = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
+    const requestFrame = ((callback: FrameRequestCallback) => {
+      return window.setTimeout(() => callback(currentTime), 0)
+    }) as typeof window.requestAnimationFrame
+    const cancelFrame = ((handle: number) => {
+      window.clearTimeout(handle)
+    }) as typeof window.cancelAnimationFrame
+
+    const h = createHarness({
+      total: 24,
+      initialBatch: 8,
+      batchSize: 8,
+      delay: 10,
+      requestFrame,
+      cancelFrame,
+    })
+
+    expect(h.renderedCount.value).toBe(8)
+
+    vi.advanceTimersByTime(10)
+    expect(h.renderedCount.value).toBe(16)
+
+    h.parsedNodes.value = makeNodes(24)
+    currentTime = 8
+    await nextTick()
+
+    expect(h.adaptiveBatchSize.value).toBe(8)
+
+    vi.advanceTimersByTime(0)
+
+    expect(h.adaptiveBatchSize.value).toBe(5)
+
+    vi.runOnlyPendingTimers()
+    vi.advanceTimersByTime(10)
+    await nextTick()
+
+    expect(h.renderedCount.value).toBe(21)
+  })
+
   it('does not schedule follow-up after cleanup cancels commit measurement', async () => {
     let currentTime = 0
     vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
