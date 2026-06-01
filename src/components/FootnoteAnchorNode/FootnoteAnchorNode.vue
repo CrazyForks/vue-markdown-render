@@ -1,16 +1,14 @@
 <script setup lang="ts">
 const props = defineProps<{ node: { type: 'footnote_anchor', id: string, raw?: string } }>()
 
-function scrollToReference(e) {
+function scrollToReference(e: MouseEvent) {
   e.preventDefault()
   if (typeof document === 'undefined')
     return
   const id = `fnref-${String(props.node.id ?? '')}`
-  // Try to find the reference element rendered by FootnoteReferenceNode.
-  // FootnoteReferenceNode renders a span. We search for .footnote-link text matching [id].
   const anchors = document.getElementById(id)
   if (anchors) {
-    anchors.scrollIntoView({ behavior: 'smooth' })
+    anchors.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 }
 </script>

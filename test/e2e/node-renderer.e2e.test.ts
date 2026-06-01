@@ -419,8 +419,12 @@ After`,
         document.body.appendChild(wrapper.element)
         try {
           await reference.trigger('click')
-          expect(scrollIntoView).toHaveBeenCalled()
+          expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth' })
           expect(warnSpy).not.toHaveBeenCalled()
+
+          scrollIntoView.mockClear()
+          await footerAnchor.trigger('click')
+          expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' })
         }
         finally {
           if (wrapper.element.parentNode === document.body)
