@@ -63,8 +63,8 @@
       "import": "./dist/index.js"
     },
     "./utils": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js"
     },
     "./utils/katex-threshold": {
       "types": "./dist/utils/katex-threshold.d.ts",

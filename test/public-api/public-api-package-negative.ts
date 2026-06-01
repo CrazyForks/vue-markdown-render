@@ -1,5 +1,5 @@
-// @ts-expect-error Declared subpaths must still reject unknown exports.
-import { __missingUtilsExport } from 'markstream-vue/utils'
+// @ts-expect-error Declared utilities subpath must reject unknown and root-only exports.
+import { __missingUtilsExport, VueRendererMarkdown as __unexpectedUtilsRenderer } from 'markstream-vue/utils'
 
 // @ts-expect-error Isolated utility subpaths must not expose renderer/root exports.
 import { MarkdownRender as __unexpectedKatexThresholdRenderer } from 'markstream-vue/utils/katex-threshold'
@@ -10,4 +10,5 @@ import { __missingWorkerExport, MarkdownRender as __unexpectedWorkerRenderer } f
 void __missingUtilsExport
 void __missingWorkerExport
 void __unexpectedKatexThresholdRenderer
+void __unexpectedUtilsRenderer
 void __unexpectedWorkerRenderer
