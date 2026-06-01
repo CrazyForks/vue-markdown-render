@@ -12,6 +12,25 @@ function getStreamStats(md: ReturnType<typeof getMarkdown>) {
   return (md as any).stream.stats()
 }
 
+function deepFreeze(value: unknown, seen = new WeakSet<object>()) {
+  if (!value || typeof value !== 'object')
+    return value
+
+  const object = value as object
+  if (seen.has(object))
+    return value
+
+  seen.add(object)
+
+  for (const key of Reflect.ownKeys(object)) {
+    const descriptor = Object.getOwnPropertyDescriptor(object, key)
+    if (descriptor && 'value' in descriptor)
+      deepFreeze(descriptor.value, seen)
+  }
+
+  return Object.freeze(object)
+}
+
 describe('parseMarkdownToStructure stream parser integration', () => {
   it('uses markdown-it-ts stream.parse for top-level append-heavy parses', () => {
     const md = getMarkdown('stream-parser-top-level')
@@ -307,6 +326,39 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     const serialized = JSON.stringify(second[0]?.children)
     expect(serialized).toContain('after')
     expect(serialized).not.toContain(') after')
+  })
+
+  it('does not mutate cached stream tokens during no-transform cache-hit processing', () => {
+    const md = getMarkdown('stream-parser-cache-freeze-no-mutation')
+    const source = [
+      '1. [site](https://example.com) after',
+      '2. **bold [link](https://example.com)**',
+      '',
+      '```html',
+      '<antArtifact type="application/vnd.ant.react">x</antArtifact>',
+      '```',
+      '',
+      '<details><summary>Hi</summary>Body</details>',
+    ].join('\n')
+
+    ;(md as any).stream.resetStats()
+
+    const first = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    })
+
+    deepFreeze((md as any).stream.peek())
+
+    expect(() => {
+      const second = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      })
+      expect(second).toEqual(first)
+    }).not.toThrow()
+
+    expect(getStreamStats(md).cacheHits).toBeGreaterThan(0)
   })
 
   it('does not clone stream tokens without transform hooks', () => {

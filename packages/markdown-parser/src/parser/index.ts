@@ -12,6 +12,7 @@ import { parseHardBreak } from './node-parsers/hardbreak-parser'
 import { parseHtmlBlock } from './node-parsers/html-block-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
+import { copyTokenShallow } from './token-copy'
 
 type ParsedNodeWithFields = ParsedNode & {
   children?: ParsedNode[]
@@ -226,16 +227,8 @@ function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>())
 }
 
 function cloneMarkdownToken(token: Token, cloneObjectFields = true): Token {
-  if (!cloneObjectFields) {
-    const cloned = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as Token
-    if (Array.isArray(token.attrs))
-      cloned.attrs = token.attrs.map(attr => [...attr] as [string, string])
-    if (Array.isArray(token.map))
-      cloned.map = [...token.map] as [number, number]
-    if (Array.isArray(token.children))
-      cloned.children = token.children.map(child => cloneMarkdownToken(child, cloneObjectFields))
-    return cloned
-  }
+  if (!cloneObjectFields)
+    return copyTokenShallow(token as unknown as MarkdownToken) as unknown as Token
 
   const cloned = Object.create(Object.getPrototypeOf(token)) as Token
   const seen = new WeakMap<object, unknown>()

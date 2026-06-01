@@ -7,19 +7,10 @@ import type {
 } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
+import { copyTokenShallow } from '../token-copy'
 import { parseCommonBlockToken } from './block-token-parser'
 import { parseBlockquote } from './blockquote-parser'
 import { containerTokenHandlers } from './container-token-handlers'
-
-function copyInlineToken(token: MarkdownToken) {
-  const copy = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as MarkdownToken
-  if (Array.isArray(token.children)) {
-    copy.children = token.children.map((child) => {
-      return Object.assign(Object.create(Object.getPrototypeOf(child)), child) as MarkdownToken
-    })
-  }
-  return copy
-}
 
 function trimInlineTokenTail(token: MarkdownToken) {
   const rawContent = String(token.content ?? '')
@@ -130,7 +121,7 @@ export function parseList(
       while (k < tokens.length && tokens[k].type !== 'list_item_close') {
         // Handle different block types inside list items
         if (tokens[k].type === 'paragraph_open') {
-          const contentToken = copyInlineToken(tokens[k + 1])
+          const contentToken = copyTokenShallow(tokens[k + 1])
           const preToken = tokens[k - 1]
           stripLeakedOrderedListMarkerSuffix(contentToken)
           trimInlineTokenTail(contentToken)
