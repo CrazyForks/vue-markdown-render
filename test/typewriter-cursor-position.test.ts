@@ -395,6 +395,8 @@ describe('typewriter cursor position', () => {
       await flushAll()
 
       expect(wrapper.find('.node-slot[data-node-index="1"] .node-content').exists()).toBe(true)
+      // Batch commit-cost measurement uses one RAF before the cursor measurement RAF.
+      await runNextFrame(queuedFrames, performance.now() + 64)
       await runNextFrame(queuedFrames, performance.now() + 64)
       expect(measuredText).toBe('second')
     }

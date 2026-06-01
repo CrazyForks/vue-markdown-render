@@ -24,6 +24,8 @@ function createHarness(options: {
   batchSize?: number
   delay?: number
   incremental?: boolean
+  requestFrame?: typeof window.requestAnimationFrame | null
+  cancelFrame?: typeof window.cancelAnimationFrame | null
 } = {}) {
   const props = reactive<SchedulerProps>({
     indexKey: 'message-1',
@@ -91,8 +93,8 @@ function createHarness(options: {
       previousRenderContext,
       previousBatchConfig,
 
-      requestFrame: null,
-      cancelFrame: null,
+      requestFrame: options.requestFrame ?? null,
+      cancelFrame: options.cancelFrame ?? null,
       hasIdleCallback: false,
 
       cleanupNodeVisibility,
@@ -155,6 +157,39 @@ describe('useBatchRenderingScheduler', () => {
     expect(h.renderedCount.value).toBe(8)
 
     expect(h.cleanupNodeVisibility).toHaveBeenLastCalledWith(8)
+  })
+
+  it('adjusts adaptive batch size from post-flush commit cost', async () => {
+    let currentTime = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
+    const requestFrame = ((callback: FrameRequestCallback) => {
+      return window.setTimeout(() => callback(currentTime), 0)
+    }) as typeof window.requestAnimationFrame
+    const cancelFrame = ((handle: number) => {
+      window.clearTimeout(handle)
+    }) as typeof window.cancelAnimationFrame
+
+    const h = createHarness({
+      total: 16,
+      initialBatch: 8,
+      batchSize: 8,
+      delay: 10,
+      requestFrame,
+      cancelFrame,
+    })
+
+    expect(h.renderedCount.value).toBe(8)
+
+    vi.advanceTimersByTime(10)
+    await nextTick()
+
+    expect(h.renderedCount.value).toBe(16)
+    expect(h.adaptiveBatchSize.value).toBe(8)
+
+    currentTime = 20
+    vi.advanceTimersByTime(0)
+
+    expect(h.adaptiveBatchSize.value).toBe(5)
   })
 
   it('continues scheduling when desired rendered count grows', async () => {

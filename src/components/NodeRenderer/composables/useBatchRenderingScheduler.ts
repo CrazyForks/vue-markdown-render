@@ -1,6 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { NodeRendererProps } from '../../../types/node-renderer-props'
-import { watch } from 'vue'
+import { nextTick, watch } from 'vue'
 
 export interface IdleDeadlineLike {
   timeRemaining?: () => number
@@ -79,6 +79,9 @@ export function useBatchRenderingScheduler(
   let batchPending = false
   let pendingIncrement: number | null = null
   let batchIdle: number | null = null
+  let commitMeasurementGeneration = 0
+  const commitMeasurementRafs = new Set<number>()
+  const commitMeasurementTimeouts = new Set<number>()
 
   function cleanupBatchScheduler() {
     if (!isClient)
@@ -95,8 +98,55 @@ export function useBatchRenderingScheduler(
       window.cancelIdleCallback(batchIdle)
       batchIdle = null
     }
+    commitMeasurementGeneration += 1
+    for (const raf of commitMeasurementRafs)
+      cancelFrame?.(raf)
+    commitMeasurementRafs.clear()
+    for (const timeout of commitMeasurementTimeouts)
+      window.clearTimeout(timeout)
+    commitMeasurementTimeouts.clear()
     batchPending = false
     pendingIncrement = null
+  }
+
+  function now() {
+    return typeof performance !== 'undefined' ? performance.now() : Date.now()
+  }
+
+  function measureBatchCommitCost(start: number, syncElapsed: number, afterMeasure: () => void) {
+    if (!isClient) {
+      adjustAdaptiveBatchSize(syncElapsed)
+      afterMeasure()
+      return
+    }
+
+    const generation = commitMeasurementGeneration
+    void nextTick().then(() => {
+      if (generation !== commitMeasurementGeneration)
+        return
+
+      const finish = () => {
+        if (generation !== commitMeasurementGeneration)
+          return
+        adjustAdaptiveBatchSize(Math.max(syncElapsed, now() - start))
+        afterMeasure()
+      }
+
+      if (requestFrame) {
+        const raf = requestFrame(() => {
+          commitMeasurementRafs.delete(raf)
+          finish()
+        })
+        commitMeasurementRafs.add(raf)
+        return
+      }
+
+      const timeout = window.setTimeout(() => {
+        commitMeasurementTimeouts.delete(timeout)
+        finish()
+      }, 0)
+      commitMeasurementTimeouts.add(timeout)
+    })
   }
 
   function scheduleBatch(increment: number, opts: { immediate?: boolean } = {}) {
@@ -108,6 +158,8 @@ export function useBatchRenderingScheduler(
 
     const amount = Math.max(1, increment)
     const run = (deadline?: IdleDeadlineLike) => {
+      const runStart = now()
+      let syncElapsed = 0
       batchRaf = null
       batchTimeout = null
       batchIdle = null
@@ -117,12 +169,11 @@ export function useBatchRenderingScheduler(
       const budgetMs = Math.max(2, props.renderBatchBudgetMs ?? 6)
 
       const applyAndMeasure = (size: number) => {
-        const start = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        const start = now()
         renderedCount.value = Math.min(target, renderedCount.value + Math.max(1, size))
         cleanupNodeVisibility(renderedCount.value)
-        const end = typeof performance !== 'undefined' ? performance.now() : Date.now()
-        const elapsed = end - start
-        adjustAdaptiveBatchSize(elapsed)
+        const elapsed = now() - start
+        syncElapsed = Math.max(syncElapsed, elapsed)
         return elapsed
       }
 
@@ -141,8 +192,10 @@ export function useBatchRenderingScheduler(
         nextSize = Math.max(1, Math.round(adaptiveBatchSize.value))
       }
 
-      if (renderedCount.value < target)
-        queueNextBatch()
+      measureBatchCommitCost(runStart, syncElapsed, () => {
+        if (renderedCount.value < desiredRenderedCount.value)
+          queueNextBatch()
+      })
     }
 
     if (!isClient || opts.immediate) {
