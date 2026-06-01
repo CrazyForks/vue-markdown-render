@@ -49,7 +49,7 @@ describe('typewriter cursor position', () => {
       if (index >= 0)
         queuedFrames.splice(index, 1)
     }) as typeof cancelAnimationFrame)
-    const createTreeWalkerSpy = vi.spyOn(document, 'createTreeWalker')
+    const measuredSlots: HTMLElement[] = []
 
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
       const element = this as HTMLElement
@@ -74,6 +74,10 @@ describe('typewriter cursor position', () => {
       range.getClientRects = vi.fn(() => {
         let previousLength = 0
         let sibling = rangeNode?.parentElement?.previousSibling ?? null
+        const slot = rangeNode?.parentElement?.closest('.node-slot[data-node-index]')
+        if (slot instanceof HTMLElement)
+          measuredSlots.push(slot)
+
         while (sibling) {
           previousLength += sibling.textContent?.length ?? 0
           sibling = sibling.previousSibling
@@ -130,10 +134,8 @@ describe('typewriter cursor position', () => {
     const secondVisibleLength = wrapper.get('.text-node').text().length
     expect(secondVisibleLength).toBeGreaterThan(firstVisibleLength)
     expect(cursor.style.transform).toBe(`translate(${Math.max(0, secondVisibleLength * 10 - 20)}px, 50px)`)
-    expect(createTreeWalkerSpy).toHaveBeenCalled()
-    expect(createTreeWalkerSpy.mock.calls.every(([root]) => {
-      return root instanceof HTMLElement && root.matches('.node-slot[data-node-index]')
-    })).toBe(true)
+    expect(measuredSlots.length).toBeGreaterThan(0)
+    expect(measuredSlots.every(slot => slot.matches('.node-slot[data-node-index]'))).toBe(true)
 
     wrapper.unmount()
   })
@@ -145,14 +147,26 @@ describe('typewriter cursor position', () => {
       return queuedFrames.length
     }) as typeof requestAnimationFrame)
     vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
-    const createTreeWalkerSpy = vi.spyOn(document, 'createTreeWalker')
 
+    let rangeNode: Node | null = null
+    let measuredText = ''
+    let measuredSlot: Element | null = null
     const originalCreateRange = document.createRange.bind(document)
     vi.spyOn(document, 'createRange').mockImplementation(() => {
       const range = originalCreateRange()
-      range.getClientRects = vi.fn(() => [
-        rect({ right: 40, top: 20, bottom: 40, height: 20 }),
-      ] as unknown as DOMRectList)
+      range.setStart = vi.fn((node: Node) => {
+        rangeNode = node
+      })
+      range.setEnd = vi.fn((node: Node) => {
+        rangeNode = node
+      })
+      range.getClientRects = vi.fn(() => {
+        measuredText = rangeNode?.textContent ?? ''
+        measuredSlot = rangeNode?.parentElement?.closest('.node-slot[data-node-index]') ?? null
+        return [
+          rect({ right: 40, top: 20, bottom: 40, height: 20 }),
+        ] as unknown as DOMRectList
+      })
       return range
     })
 
@@ -175,11 +189,90 @@ describe('typewriter cursor position', () => {
     await flushAll()
     await runNextFrame(queuedFrames, performance.now() + 16)
 
-    const roots = createTreeWalkerSpy.mock.calls.map(([root]) => root as HTMLElement)
-    expect(roots.length).toBeGreaterThan(0)
-    expect(roots.every(root => root.matches('.node-slot[data-node-index="1"]'))).toBe(true)
+    expect(measuredText).toBe('last')
+    expect(measuredSlot instanceof HTMLElement && measuredSlot.matches('.node-slot[data-node-index="1"]')).toBe(true)
 
     wrapper.unmount()
+  })
+
+  it('repositions when incremental rendering mounts the next slot', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    const queuedFrames: FrameRequestCallback[] = []
+    const frameIds = new WeakMap<FrameRequestCallback, number>()
+    let nextFrameId = 1
+    let wrapper: ReturnType<typeof mount> | null = null
+    let rangeNode: Node | null = null
+    let measuredText = ''
+
+    process.env.NODE_ENV = 'development'
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      const id = nextFrameId++
+      frameIds.set(cb, id)
+      queuedFrames.push(cb)
+      return id
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', ((id: number) => {
+      const index = queuedFrames.findIndex(cb => frameIds.get(cb) === id)
+      if (index >= 0)
+        queuedFrames.splice(index, 1)
+    }) as typeof cancelAnimationFrame)
+
+    const originalCreateRange = document.createRange.bind(document)
+    vi.spyOn(document, 'createRange').mockImplementation(() => {
+      const range = originalCreateRange()
+      range.setStart = vi.fn((node: Node) => {
+        rangeNode = node
+      })
+      range.setEnd = vi.fn((node: Node) => {
+        rangeNode = node
+      })
+      range.getClientRects = vi.fn(() => {
+        measuredText = rangeNode?.textContent ?? ''
+        return [
+          rect({ right: measuredText.length * 10, top: 20, bottom: 40, height: 20 }),
+        ] as unknown as DOMRectList
+      })
+      return range
+    })
+
+    try {
+      wrapper = mount(NodeRenderer, {
+        props: {
+          content: '',
+          typewriter: true,
+          smoothStreaming: false,
+          batchRendering: true,
+          maxLiveNodes: 0,
+          initialRenderBatchSize: 1,
+          renderBatchSize: 1,
+          renderBatchDelay: 20,
+          viewportPriority: false,
+          deferNodesUntilVisible: false,
+        },
+      })
+
+      await flushAll()
+      queuedFrames.length = 0
+
+      await wrapper.setProps({ content: 'first\n\nsecond' })
+      await flushAll()
+
+      expect(wrapper.find('.node-slot[data-node-index="1"] .node-placeholder').exists()).toBe(true)
+      await runNextFrame(queuedFrames, performance.now() + 16)
+      await runNextFrame(queuedFrames, performance.now() + 32)
+      expect(measuredText).toBe('first')
+
+      await new Promise(resolve => setTimeout(resolve, 25))
+      await flushAll()
+
+      expect(wrapper.find('.node-slot[data-node-index="1"] .node-content').exists()).toBe(true)
+      await runNextFrame(queuedFrames, performance.now() + 64)
+      expect(measuredText).toBe('second')
+    }
+    finally {
+      wrapper?.unmount()
+      process.env.NODE_ENV = originalNodeEnv
+    }
   })
 
   it('cancels pending cursor RAF when cursor is hidden before the frame runs', async () => {

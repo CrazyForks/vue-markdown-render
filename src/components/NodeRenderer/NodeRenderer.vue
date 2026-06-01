@@ -5109,6 +5109,18 @@ let typewriterCursorRafVersion = 0
 let lastTypewriterContentLength = 0
 let lastTypewriterVisibleLength = 0
 const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image', 'thematic_break'])
+const TYPEWRITER_CURSOR_EXCLUDED_SELECTOR = [
+  '.typewriter-cursor',
+  '.height-estimation-probes',
+  '[data-node-type="code_block"]',
+  '[data-node-type="admonition"]',
+  '[data-node-type="table"]',
+  '[data-node-type="math_block"]',
+  '[data-node-type="html_block"]',
+  '[data-node-type="image"]',
+  'script',
+  'style',
+].join(',')
 
 function shouldSkipTypewriterCursorForNode(node: unknown) {
   if (!node || typeof node !== 'object')
@@ -5196,31 +5208,46 @@ function getTypewriterCursorSearchRoot() {
   return null
 }
 
+function isAcceptedTypewriterCursorTextNode(node: Node): node is Text {
+  if (node.nodeType !== Node.TEXT_NODE)
+    return false
+
+  const text = node.textContent ?? ''
+  if (!text.trim())
+    return false
+
+  const parent = node.parentElement
+  if (!parent)
+    return false
+
+  return !parent.closest(TYPEWRITER_CURSOR_EXCLUDED_SELECTOR)
+}
+
 function getLastTextNode(root: HTMLElement) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const text = node.textContent ?? ''
-      if (!text.trim())
-        return NodeFilter.FILTER_REJECT
+  let current: Node | null = root.lastChild
 
-      const parent = node.parentElement
-      if (!parent)
-        return NodeFilter.FILTER_REJECT
-      if (parent.closest('.typewriter-cursor, .height-estimation-probes, [data-node-type="code_block"], [data-node-type="admonition"], [data-node-type="table"], [data-node-type="math_block"], [data-node-type="html_block"], [data-node-type="image"], script, style'))
-        return NodeFilter.FILTER_REJECT
-
-      return NodeFilter.FILTER_ACCEPT
-    },
-  })
-
-  let last: Text | null = null
-  let current = walker.nextNode()
   while (current) {
-    last = current as Text
-    current = walker.nextNode()
+    if (isAcceptedTypewriterCursorTextNode(current))
+      return current
+
+    if (current.nodeType === Node.ELEMENT_NODE) {
+      const element = current as Element
+      if (!element.matches(TYPEWRITER_CURSOR_EXCLUDED_SELECTOR) && element.lastChild) {
+        current = element.lastChild
+        continue
+      }
+    }
+
+    while (current && current !== root && !current.previousSibling)
+      current = current.parentNode
+
+    if (!current || current === root)
+      break
+
+    current = current.previousSibling
   }
 
-  return last
+  return null
 }
 
 function updateTypewriterCursorPosition() {
@@ -5340,6 +5367,7 @@ watch(
     await nextTick()
     scheduleTypewriterCursorPositionUpdate()
     typewriterCursorTimeout = setTimeout(() => {
+      typewriterCursorTimeout = undefined
       showTypewriterCursor.value = false
     }, 3000)
   },
@@ -5353,6 +5381,18 @@ watch(
       hideTypewriterCursorElement()
       return
     }
+    await nextTick()
+    scheduleTypewriterCursorPositionUpdate()
+  },
+  { flush: 'post' },
+)
+
+watch(
+  [() => renderedCount.value, () => liveRange.start, () => liveRange.end],
+  async () => {
+    if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value || !showTypewriterCursor.value)
+      return
+
     await nextTick()
     scheduleTypewriterCursorPositionUpdate()
   },
