@@ -29,6 +29,10 @@ const preferredVueI18nEntry = path.resolve(
   path.dirname(require.resolve('vue-i18n/package.json', { paths: [__dirname] })),
   'dist/vue-i18n.mjs',
 )
+const antvInfographicBrowserEntry = path.resolve(
+  fs.realpathSync(path.resolve(__dirname, 'node_modules/@antv/infographic')),
+  'dist/infographic.min.js',
+)
 
 export default defineConfig(({ command }) => {
   const streamMonacoAlias = command === 'serve'
@@ -62,6 +66,7 @@ export default defineConfig(({ command }) => {
         'stream-markdown-parser': path.resolve(__dirname, '../packages/markdown-parser/src/index.ts'),
         'markstream-core': path.resolve(__dirname, '../packages/markstream-core/src/index.ts'),
         'vue-i18n': preferredVueI18nEntry,
+        '@antv/infographic': antvInfographicBrowserEntry,
         ...(streamMonacoAlias
           ? { 'stream-monaco': streamMonacoAlias }
           : {}),
