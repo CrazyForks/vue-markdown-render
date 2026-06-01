@@ -7,7 +7,7 @@ import type {
 } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
-import { copyTokenShallow } from '../token-copy'
+import { cloneTokenWithMutableChildren } from '../token-copy'
 import { parseCommonBlockToken } from './block-token-parser'
 import { parseBlockquote } from './blockquote-parser'
 import { containerTokenHandlers } from './container-token-handlers'
@@ -128,7 +128,7 @@ export function parseList(
         if (tokens[k].type === 'paragraph_open') {
           const originalContentToken = tokens[k + 1]
           const contentToken = needsListParagraphTokenPatch(originalContentToken)
-            ? copyTokenShallow(originalContentToken)
+            ? cloneTokenWithMutableChildren(originalContentToken)
             : originalContentToken
           const preToken = tokens[k - 1]
           if (contentToken !== originalContentToken) {

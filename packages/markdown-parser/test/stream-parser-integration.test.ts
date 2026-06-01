@@ -423,6 +423,51 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(getStreamStats(md).cacheHits).toBeGreaterThan(0)
   })
 
+  it('does not mutate cached list paragraph tokens when stripping leaked ordered-list markers', () => {
+    const md = getMarkdown('stream-parser-list-jitter-no-mutation')
+    ;(md as any).core.ruler.push('test_leaked_ordered_list_marker', (state: any) => {
+      const inline = state.tokens?.find((token: any, index: number) => {
+        return token.type === 'inline' && state.tokens?.[index - 1]?.type === 'paragraph_open'
+      })
+      if (!inline)
+        return
+
+      inline.content = 'alpha\n\n2.'
+      inline.children = [
+        { type: 'text', content: 'alpha', raw: 'alpha' },
+        { type: 'softbreak', content: '', raw: '\n' },
+        { type: 'softbreak', content: '', raw: '\n' },
+        { type: 'text', content: '2.', raw: '2.' },
+      ]
+    })
+    ;(md as any).stream.resetStats()
+
+    const source = '1. alpha'
+    const first = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+    const cachedInline = (md as any).stream.peek().find((token: any) => token.type === 'inline')
+
+    expect(first[0]?.items?.[0]?.children?.[0]?.raw).toBe('alpha')
+    expect(cachedInline?.content).toBe('alpha\n\n2.')
+    expect(cachedInline?.children?.at(-1)?.content).toBe('2.')
+
+    deepFreeze((md as any).stream.peek())
+
+    expect(() => {
+      const second = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      })
+      expect(second).toEqual(first)
+    }).not.toThrow()
+
+    expect(getStreamStats(md).cacheHits).toBeGreaterThan(0)
+    expect(cachedInline?.content).toBe('alpha\n\n2.')
+    expect(cachedInline?.children?.at(-1)?.content).toBe('2.')
+  })
+
   it('does not clone stream tokens without transform hooks', () => {
     const md = getMarkdown('stream-parser-skip-token-clone')
     ;(md as any).core.ruler.push('test_large_token_meta', (state: any) => {

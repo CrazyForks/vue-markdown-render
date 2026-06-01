@@ -1,6 +1,6 @@
 import type { InternalParseOptions, MarkdownToken, ParsedNode, ParseOptions, TextNode } from '../../types'
 import { inferLinkifyDemotionContext, isDecodedFromRawPunycode, shouldDemoteFilenameLikeLinkify } from '../linkifyHeuristics'
-import { copyTokenShallow } from '../token-copy'
+import { cloneTokenWithMutableChildren } from '../token-copy'
 import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
@@ -857,7 +857,7 @@ export function parseInlineTokens(
   function pushToken(token: MarkdownToken) {
     // push a raw token into result as a ParsedNode (best effort cast)
     resetCurrentTextNode()
-    const node = copyTokenShallow(token) as unknown as ParsedNode
+    const node = cloneTokenWithMutableChildren(token) as unknown as ParsedNode
     result.push(node)
   }
 
@@ -1743,7 +1743,7 @@ export function parseInlineTokens(
             loading = false
             const trailingAfterClose = lastContent.slice(1)
             if (trailingAfterClose) {
-              const trailingToken = copyTokenShallow(last)
+              const trailingToken = cloneTokenWithMutableChildren(last)
               trailingToken.content = trailingAfterClose
               trailingToken.raw = trailingAfterClose
               ensureWorkingTokens()[i + 4] = trailingToken

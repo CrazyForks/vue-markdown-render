@@ -1,6 +1,6 @@
 import type { MarkdownToken } from '../types'
 
-export function copyTokenShallow<T extends MarkdownToken>(token: T): T {
+export function cloneTokenWithMutableChildren<T extends MarkdownToken>(token: T): T {
   const copy = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as MarkdownToken
 
   if (Array.isArray(token.attrs))
@@ -10,7 +10,7 @@ export function copyTokenShallow<T extends MarkdownToken>(token: T): T {
     copy.map = [...token.map]
 
   if (Array.isArray(token.children))
-    copy.children = token.children.map(child => copyTokenShallow(child))
+    copy.children = token.children.map(child => cloneTokenWithMutableChildren(child))
 
   return copy as T
 }

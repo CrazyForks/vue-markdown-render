@@ -1,6 +1,6 @@
 import type { InternalParseOptions, LinkNode, MarkdownToken, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../index'
-import { copyTokenShallow } from '../token-copy'
+import { cloneTokenWithMutableChildren } from '../token-copy'
 
 type AttrTuple = [string, string]
 
@@ -81,7 +81,7 @@ export function parseLinkToken(
   ) {
     const originalContent = String(lastLinkToken.content ?? '')
     const originalRaw = String(lastLinkToken.raw ?? originalContent)
-    const adjustedLastLinkToken = copyTokenShallow(lastLinkToken)
+    const adjustedLastLinkToken = cloneTokenWithMutableChildren(lastLinkToken)
     adjustedLastLinkToken.content = originalContent.slice(0, -2)
     adjustedLastLinkToken.raw = originalRaw.replace(/\*\*$/, '')
     childTokens = linkTokens.slice()
