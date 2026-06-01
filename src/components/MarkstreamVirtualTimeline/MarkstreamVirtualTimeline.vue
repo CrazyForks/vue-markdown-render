@@ -351,9 +351,20 @@ function getLayoutItemsSignature() {
     isMarkstreamMarkdownTimelineItem(item, index, props) ? 1 : 0,
     getMarkstreamTimelineItemRevision(item, index, props) ?? '',
     getMarkstreamTimelineItemFinal(item, index, props) ? 1 : 0,
-    getMarkstreamTimelineItemContent(item, index, props).length,
+    isMarkstreamMarkdownTimelineItem(item, index, props)
+      ? ''
+      : getMarkstreamTimelineItemContent(item, index, props).length,
     item?.component ? 1 : 0,
   ].join('\u0001')).join('\u0000')
+}
+
+function getRecordItem(record: Pick<TimelineRecord, 'item' | 'index'>) {
+  return props.items[record.index] ?? record.item
+}
+
+function getRecordComponent(record: TimelineRecord) {
+  const item = getRecordItem(record) as any
+  return item?.component ?? record.component
 }
 
 watch(
@@ -370,7 +381,8 @@ function getSessionKey(
   record: Pick<TimelineRecord, 'item' | 'index' | 'key'>,
   threadKey = normalizedThreadKey.value,
 ) {
-  const revision = getMarkstreamTimelineItemRevision(record.item, record.index, props)
+  const item = getRecordItem(record)
+  const revision = getMarkstreamTimelineItemRevision(item, record.index, props)
   return [
     threadKey ?? 'timeline',
     record.key,
@@ -385,7 +397,8 @@ function getItemSizeSourceKey(
   if (record.markdown)
     return getSessionKey(record, threadKey)
 
-  const revision = getMarkstreamTimelineItemRevision(record.item, record.index, props)
+  const item = getRecordItem(record)
+  const revision = getMarkstreamTimelineItemRevision(item, record.index, props)
   return [
     threadKey ?? 'timeline',
     record.key,
@@ -999,7 +1012,8 @@ function measureRecordElement(record: TimelineRecord) {
 }
 
 function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProps {
-  const final = getMarkstreamTimelineItemFinal(record.item, record.index, props)
+  const item = getRecordItem(record)
+  const final = getMarkstreamTimelineItemFinal(item, record.index, props)
   const restoreState = markdownStates.get(record.key)
   const virtualScroll: MarkstreamVirtualScrollOptions = {
     enabled: true,
@@ -1016,7 +1030,7 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
   }
 
   return {
-    content: getMarkstreamTimelineItemContent(record.item, record.index, props),
+    content: getMarkstreamTimelineItemContent(item, record.index, props),
     final,
     nodeVirtual: 'auto' as const,
     fade: props.markdownFade === true,
@@ -1064,8 +1078,9 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
 }
 
 function getSlotProps(record: TimelineRecord) {
+  const item = getRecordItem(record)
   return {
-    item: record.item,
+    item,
     index: record.index,
     itemKey: record.key,
     kind: record.kind,
@@ -1075,14 +1090,14 @@ function getSlotProps(record: TimelineRecord) {
 }
 
 function getRecordText(record: TimelineRecord) {
-  const item = record.item ?? {}
+  const item = getRecordItem(record) ?? {}
   if (typeof item.text === 'string')
     return item.text
   if (typeof item.message === 'string')
     return item.message
   if (typeof item.label === 'string')
     return item.label
-  return getMarkstreamTimelineItemContent(record.item, record.index, props)
+  return getMarkstreamTimelineItemContent(item, record.index, props)
 }
 
 function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
@@ -1096,7 +1111,9 @@ function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
 
   const layoutScrollTop = getLayoutViewportStart()
 
-  for (const record of layout.value.records) {
+  const index = lowerBoundRecordByOffset(layoutScrollTop)
+  const record = layout.value.records[index]
+  if (record) {
     const recordOffset = getRecordOffset(record)
     if (layoutScrollTop >= recordOffset && layoutScrollTop < recordOffset + record.size) {
       return {
@@ -1460,7 +1477,7 @@ function hasRenderableMarkdownRecordContent(record: TimelineRecord, el: HTMLElem
   if (!record.markdown)
     return true
 
-  const source = getMarkstreamTimelineItemContent(record.item, record.index, props)
+  const source = getMarkstreamTimelineItemContent(getRecordItem(record), record.index, props)
   if (!String(source ?? '').trim())
     return true
 
@@ -1526,7 +1543,7 @@ function hasVisibleReadyMarkdownRecordContent(
   if (!record.markdown)
     return true
 
-  const source = getMarkstreamTimelineItemContent(record.item, record.index, props)
+  const source = getMarkstreamTimelineItemContent(getRecordItem(record), record.index, props)
   if (!String(source ?? '').trim())
     return true
 
@@ -1571,7 +1588,7 @@ function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement)
   if (hasTrustedRestoredItemHeightFloor(record))
     return true
 
-  const source = getMarkstreamTimelineItemContent(record.item, record.index, props)
+  const source = getMarkstreamTimelineItemContent(getRecordItem(record), record.index, props)
   if (!String(source ?? '').trim())
     return true
 
@@ -2330,10 +2347,10 @@ defineExpose({
           v-bind="getMarkdownProps(record)"
         />
         <component
-          :is="record.component"
-          v-else-if="record.component"
+          :is="getRecordComponent(record)"
+          v-else-if="getRecordComponent(record)"
           :ref="measureRecordElement(record)"
-          :item="record.item"
+          :item="getRecordItem(record)"
         />
         <div
           v-else
@@ -2342,10 +2359,10 @@ defineExpose({
           :class="`markstream-virtual-timeline__default-item--${record.kind || 'item'}`"
         >
           <span
-            v-if="record.kind === 'tool-call' && record.item.status"
+            v-if="record.kind === 'tool-call' && getRecordItem(record)?.status"
             class="markstream-virtual-timeline__status"
           >
-            {{ record.item.status }}
+            {{ getRecordItem(record)?.status }}
           </span>
           {{ getRecordText(record) }}
         </div>

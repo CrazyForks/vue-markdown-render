@@ -16,7 +16,7 @@ import type {
   NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
-import { computed, defineAsyncComponent, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -103,21 +103,15 @@ defineOptions({ name: 'NodeRenderer' })
 
 const props = withDefaults(defineProps<NodeRendererProps>(), {
   codeBlockStream: true,
-  showTooltips: true,
+  renderCodeBlocksAsPre: undefined,
+  showTooltips: undefined,
   typewriter: false,
   smoothStreaming: 'auto',
-  fade: true,
-  batchRendering: true,
+  fade: undefined,
+  batchRendering: undefined,
   debugPerformance: false,
-  initialRenderBatchSize: 40,
-  renderBatchSize: 80,
-  renderBatchDelay: 16,
-  renderBatchBudgetMs: 6,
-  renderBatchIdleTimeoutMs: 120,
-  deferNodesUntilVisible: true,
-  maxLiveNodes: 320,
-  liveNodeBuffer: 60,
-  nodeVirtual: 'auto',
+  deferNodesUntilVisible: undefined,
+  nodeVirtual: undefined,
 })
 
 const emit = defineEmits<{
@@ -133,7 +127,6 @@ const emit = defineEmits<{
   (e: 'anchor-change', payload: MarkstreamVirtualAnchor): void
 }>()
 
-const instance = getCurrentInstance()
 const RENDERER_MODE_DEFAULTS: Record<NodeRendererMode, Pick<
   NodeRendererProps,
   | 'showTooltips'
@@ -193,20 +186,6 @@ const RENDERER_MODE_DEFAULTS: Record<NodeRendererMode, Pick<
   },
 }
 
-function toKebabPropName(name: string) {
-  return name.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`)
-}
-
-function hasExplicitProp(name: keyof NodeRendererProps) {
-  const rawProps = instance?.vnode.props as Record<string, unknown> | null | undefined
-  if (!rawProps)
-    return false
-
-  const camelName = String(name)
-  return Object.prototype.hasOwnProperty.call(rawProps, camelName)
-    || Object.prototype.hasOwnProperty.call(rawProps, toKebabPropName(camelName))
-}
-
 const resolvedMode = computed<NodeRendererMode>(() => props.mode ?? 'docs')
 const resolvedCodeRenderer = computed<NodeRendererCodeRenderer>(() => {
   if (props.renderCodeBlocksAsPre === true)
@@ -215,18 +194,25 @@ const resolvedCodeRenderer = computed<NodeRendererCodeRenderer>(() => {
   if (props.codeRenderer)
     return props.codeRenderer
 
-  if (hasExplicitProp('renderCodeBlocksAsPre') && props.renderCodeBlocksAsPre === false)
+  if (props.renderCodeBlocksAsPre === false)
     return 'monaco'
 
   return resolvedMode.value === 'docs' ? 'monaco' : 'pre'
 })
 const resolvedModeDefaults = computed(() => RENDERER_MODE_DEFAULTS[resolvedMode.value])
+type RendererModeDefaultKey = keyof typeof RENDERER_MODE_DEFAULTS.docs
+
+function isRendererModeDefaultKey(key: PropertyKey): key is RendererModeDefaultKey {
+  return typeof key === 'string' && key in resolvedModeDefaults.value
+}
+
 const rendererProps = new Proxy(props, {
   get(target, key, receiver) {
-    if (typeof key === 'string' && key in resolvedModeDefaults.value && !hasExplicitProp(key as keyof NodeRendererProps))
-      return resolvedModeDefaults.value[key as keyof typeof resolvedModeDefaults.value]
+    const value = Reflect.get(target, key, receiver)
+    if (isRendererModeDefaultKey(key))
+      return value ?? resolvedModeDefaults.value[key]
 
-    return Reflect.get(target, key, receiver)
+    return value
   },
 }) as Readonly<NodeRendererProps>
 
@@ -3998,6 +3984,7 @@ function unobserveNodeContentElement(index: number) {
     return
 
   nodeContentResizeObserver?.unobserve(previous)
+  nodeContentResizeObserverIndexes.delete(previous)
   nodeContentResizeObserverTargets.delete(index)
 }
 

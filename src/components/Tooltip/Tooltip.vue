@@ -23,10 +23,18 @@ const ready = ref(false)
 
 let cleanupAutoUpdate: (() => void) | null = null
 let floatingPromise: Promise<typeof import('@floating-ui/dom')> | null = null
+let visibilityRunId = 0
 
 function loadFloating() {
   floatingPromise ??= import('@floating-ui/dom')
   return floatingPromise
+}
+
+function cleanupPositionObserver() {
+  if (cleanupAutoUpdate) {
+    cleanupAutoUpdate()
+    cleanupAutoUpdate = null
+  }
 }
 
 async function updatePosition() {
@@ -65,13 +73,18 @@ async function updatePosition() {
 watch(
   () => props.visible,
   async (v) => {
+    const runId = ++visibilityRunId
     if (v) {
       ready.value = false
       await nextTick()
+      if (runId !== visibilityRunId || !props.visible)
+        return
       if (props.anchorEl && tooltip.value) {
         try {
           const rect = props.anchorEl.getBoundingClientRect()
           await updatePosition()
+          if (runId !== visibilityRunId || !props.visible || !props.anchorEl || !tooltip.value)
+            return
           const targetTransform = style.value.transform
           if (props.originX != null && props.originY != null) {
             const dx = Math.abs(Number(props.originX) - rect.left)
@@ -80,8 +93,12 @@ watch(
             if (dist > 120) {
               style.value.transform = `translate3d(${Math.round(props.originX)}px, ${Math.round(props.originY)}px, 0)`
               await nextTick()
+              if (runId !== visibilityRunId || !props.visible)
+                return
               ready.value = true
               await nextTick()
+              if (runId !== visibilityRunId || !props.visible)
+                return
               style.value.transform = targetTransform
             }
             else {
@@ -92,13 +109,21 @@ watch(
             ready.value = true
           }
           const { autoUpdate } = await loadFloating()
+          if (runId !== visibilityRunId || !props.visible || !props.anchorEl || !tooltip.value)
+            return
+          cleanupPositionObserver()
           cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, updatePosition)
         }
         catch {
-          ready.value = true
+          if (runId !== visibilityRunId || !props.visible)
+            return
+          ready.value = false
           if (props.anchorEl && tooltip.value) {
             try {
               const { autoUpdate } = await loadFloating()
+              if (runId !== visibilityRunId || !props.visible || !props.anchorEl || !tooltip.value)
+                return
+              cleanupPositionObserver()
               cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, updatePosition)
             }
             catch {}
@@ -111,10 +136,7 @@ watch(
     }
     else {
       ready.value = false
-      if (cleanupAutoUpdate) {
-        cleanupAutoUpdate()
-        cleanupAutoUpdate = null
-      }
+      cleanupPositionObserver()
     }
   },
 )
@@ -126,13 +148,15 @@ watch([
 ], async () => {
   if (props.visible && props.anchorEl && tooltip.value) {
     await nextTick()
+    if (!props.visible || !props.anchorEl || !tooltip.value)
+      return
     await updatePosition()
   }
 })
 
 onBeforeUnmount(() => {
-  if (cleanupAutoUpdate)
-    cleanupAutoUpdate()
+  visibilityRunId += 1
+  cleanupPositionObserver()
 })
 </script>
 

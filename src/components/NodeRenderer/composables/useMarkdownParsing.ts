@@ -125,6 +125,7 @@ const MAX_SIGNATURE_DEPTH = 6
 const MAX_SIGNATURE_KEYS = 80
 const MAX_SIGNATURE_ARRAY_ITEMS = 200
 const MAX_SIGNATURE_STRING_CHARS = 8192
+const MAX_CHEAP_NODE_KEY_DEPTH = 4
 const objectIdentityIds = new WeakMap<object, number>()
 const nodeSignatureCache = new WeakMap<object, string>()
 let nextObjectIdentityId = 1
@@ -442,6 +443,97 @@ function getDirtyTailNodeCount(
     : Math.max(nextNodes.length, previousNodes.length) - dirtyStartIndex
 }
 
+function getCheapParsedNodeKeyIfSafe(node: ParsedNode, depth = 0): string | null {
+  if (depth >= MAX_CHEAP_NODE_KEY_DEPTH)
+    return null
+
+  const record = node as Record<string, unknown>
+  const parts: string[] = [`type=${node.type}`]
+  const keys = Object.keys(record).sort()
+
+  for (const key of keys) {
+    if (key === 'type' || key === 'children')
+      continue
+
+    const value = record[key]
+    if (typeof value === 'string') {
+      parts.push(`${key}=s:${value.length}:${value}`)
+      continue
+    }
+    if (typeof value === 'number' || typeof value === 'boolean' || value == null) {
+      parts.push(`${key}=${String(value)}`)
+      continue
+    }
+
+    return null
+  }
+
+  if ('children' in record) {
+    const children = record.children
+    if (!Array.isArray(children))
+      return null
+
+    parts.push(`children=${children.length}`)
+    for (const child of children) {
+      if (!isParsedNodeLike(child))
+        return null
+
+      const childKey = getCheapParsedNodeKeyIfSafe(child, depth + 1)
+      if (childKey == null)
+        return null
+
+      parts.push(childKey)
+    }
+  }
+
+  return parts.join('\u0001')
+}
+
+function areTopLevelNodesStable(previous: ParsedNode | undefined, next: ParsedNode | undefined) {
+  if (!previous || !next)
+    return false
+  if (previous === next)
+    return true
+  if (previous.type !== next.type)
+    return false
+
+  const previousKey = getCheapParsedNodeKeyIfSafe(previous)
+  const nextKey = getCheapParsedNodeKeyIfSafe(next)
+  if (previousKey != null && nextKey != null)
+    return previousKey === nextKey
+
+  return isParsedNodeStable(previous, next)
+}
+
+function areTopLevelNodesStableWithMetrics(
+  previous: ParsedNode | undefined,
+  next: ParsedNode | undefined,
+  signatureTiming: ParsedNodeSignatureTimingMetrics,
+) {
+  if (!previous || !next)
+    return false
+  if (previous === next)
+    return true
+  if (previous.type !== next.type)
+    return false
+
+  let previousKey: string | null = null
+  let nextKey: string | null = null
+  trackSignatureTiming(
+    signatureTiming,
+    'stabilizeSignatureMs',
+    () => {
+      previousKey = getCheapParsedNodeKeyIfSafe(previous)
+      nextKey = getCheapParsedNodeKeyIfSafe(next)
+    },
+  )
+
+  if (previousKey != null && nextKey != null)
+    return previousKey === nextKey
+
+  return isParsedNodeStableWithMetrics(previous, next, signatureTiming)
+}
+
 function findDirtyStartIndex(nextNodes: ParsedNode[], previousNodes: ParsedNode[]) {
   const limit = Math.min(nextNodes.length, previousNodes.length)
 
@@ -449,7 +541,7 @@ function findDirtyStartIndex(nextNodes: ParsedNode[], previousNodes: ParsedNode[
     const previous = previousNodes[index]
     const next = nextNodes[index]
 
-    if (!previous || !isParsedNodeStable(previous, next))
+    if (!areTopLevelNodesStable(previous, next))
       return index
   }
 
@@ -467,7 +559,7 @@ function findDirtyStartIndexWithMetrics(
     const previous = previousNodes[index]
     const next = nextNodes[index]
 
-    if (!previous || !isParsedNodeStableWithMetrics(previous, next, signatureTiming)) {
+    if (!areTopLevelNodesStableWithMetrics(previous, next, signatureTiming)) {
       return index
     }
   }
