@@ -16,7 +16,7 @@ export interface MonacoEditorViewLike {
   getModel?: () => MonacoModelLike | null | undefined
   getOption?: (option: unknown) => unknown
   updateOptions?: (options: Record<string, unknown>) => void
-  layout?: () => void
+  layout?: (dimension?: { width: number, height: number }) => void
   getContentHeight?: () => number
   onDidContentSizeChange?: (listener: () => void) => MonacoDisposableLike | void
   onDidLayoutChange?: (listener: () => void) => MonacoDisposableLike | void

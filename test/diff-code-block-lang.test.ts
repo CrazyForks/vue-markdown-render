@@ -32,6 +32,45 @@ function collectCodeBlocks(nodes: any[]): any[] {
 }
 
 describe('parseMarkdownToStructure - diff code block metadata', () => {
+  it('keeps streaming `diff json:package.json` frames marked as diff from the first content frame', () => {
+    const md = getMarkdown('streaming-diff-frames')
+    const frames = [
+      [
+        '```diff json:package.json',
+        '{',
+      ].join('\n'),
+      [
+        '```diff json:package.json',
+        '{',
+        '  "name": "markstream-vue",',
+        '  "type": "module",',
+      ].join('\n'),
+      [
+        '```diff json:package.json',
+        '{',
+        '  "name": "markstream-vue",',
+        '  "type": "module",',
+        '-  "version": "0.0.49",',
+      ].join('\n'),
+      [
+        '```diff json:package.json',
+        '{',
+        '  "name": "markstream-vue",',
+        '  "type": "module",',
+        '-  "version": "0.0.49",',
+        '+  "version": "0.0.54-beta.1",',
+      ].join('\n'),
+    ]
+
+    for (const frame of frames) {
+      const blocks = collectCodeBlocks(parseMarkdownToStructure(frame, md))
+      expect(blocks).toHaveLength(1)
+      expect(blocks[0].diff).toBe(true)
+      expect(String(blocks[0].language)).toMatch(/^json(:|$)/)
+      expect(blocks[0].loading).toBe(true)
+    }
+  })
+
   it('preserves diff=true and language/file for `diff json:package.json` fence', () => {
     const md = getMarkdown('t')
     const markdown = [

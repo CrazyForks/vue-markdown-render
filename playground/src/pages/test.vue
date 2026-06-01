@@ -179,16 +179,28 @@ function resolveInitialDarkMode() {
     : false
 }
 
-const testPageMonacoOptions = {
-  renderSideBySide: false,
-  useInlineViewWhenSpaceIsLimited: true,
-  maxComputationTime: 0,
-  ignoreTrimWhitespace: false,
-  renderIndicators: true,
-  diffAlgorithm: 'legacy',
-  diffHideUnchangedRegions,
-  hideUnchangedRegions: diffHideUnchangedRegions,
-} as const
+const diffLayoutMode = computed(() => {
+  if (typeof window === 'undefined')
+    return 'inline'
+
+  return new URL(window.location.href).searchParams.get('diffLayout') === 'side-by-side'
+    ? 'side-by-side'
+    : 'inline'
+})
+
+const testPageMonacoOptions = computed(() => {
+  const sideBySide = diffLayoutMode.value === 'side-by-side'
+  return {
+    renderSideBySide: sideBySide,
+    useInlineViewWhenSpaceIsLimited: !sideBySide,
+    maxComputationTime: 0,
+    ignoreTrimWhitespace: false,
+    renderIndicators: true,
+    diffAlgorithm: 'legacy',
+    diffHideUnchangedRegions,
+    hideUnchangedRegions: diffHideUnchangedRegions,
+  } as const
+})
 
 const selectedSampleId = useLocalStorage<SampleId>('vmr-test-sample', 'baseline')
 const input = ref<string>(sampleCards[0].content)
@@ -2796,6 +2808,9 @@ watch(mermaidEnabled, (enabled) => {
                 <span class="stream-summary__item">Delay {{ streamDelayRangeLabel }}</span>
                 <span class="stream-summary__item">Burst {{ streamBurstiness }}%</span>
                 <span class="stream-summary__item" :class="{ 'stream-summary__item--active': codeBlockStream }">代码块流式</span>
+                <span class="stream-summary__item" :class="{ 'stream-summary__item--active': diffLayoutMode === 'side-by-side' }">
+                  Diff {{ diffLayoutMode === 'side-by-side' ? '2 列' : '1 列' }}
+                </span>
                 <span class="stream-summary__item" :class="{ 'stream-summary__item--active': viewportPriority }">viewportPriority</span>
                 <span class="stream-summary__item" :class="{ 'stream-summary__item--active': batchRendering }">batchRendering</span>
                 <span class="stream-summary__item" :class="{ 'stream-summary__item--active': typewriter }">typewriter</span>

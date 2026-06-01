@@ -60,6 +60,7 @@ export interface CodeBlockMonacoOptions {
   languages?: CodeBlockMonacoLanguage[]
   renderSideBySide?: boolean
   useInlineViewWhenSpaceIsLimited?: boolean
+  renderSideBySideInlineBreakpoint?: number
   enableSplitViewResizing?: boolean
   ignoreTrimWhitespace?: boolean
   maxComputationTime?: number
@@ -151,6 +152,7 @@ export interface LinkNodeProps {
 export interface PreCodeNodeProps {
   node: CodeBlockNode
   showLineNumbers?: boolean
+  diffInline?: boolean
   /**
    * Optional reserved visual height for async/loading fallbacks.
    * Used by virtual-scroll restore paths to avoid a zero/short pending frame.

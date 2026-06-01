@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
@@ -235,6 +237,103 @@ describe('codeBlockNode editor creation locking', () => {
     }
   })
 
+  it('caps ordinary code block fallback and outer reserve when the estimate exceeds MAX_HEIGHT', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const code = Array.from({ length: 80 }, (_, index) => `print(${index})`).join('\n')
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'python',
+          code,
+          raw: `\`\`\`python\n${code}\n\`\`\``,
+        },
+        estimatedHeightPx: 1200,
+        estimatedContentHeightPx: 1200,
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          MAX_HEIGHT: 320,
+        },
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateEditorCalls(1, helpers)
+
+      const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+      const host = wrapper.get('.code-editor-container').element as HTMLElement
+      const block = wrapper.get('.code-block-container').element as HTMLElement
+      expect(fallback.style.height).toBe('320px')
+      expect(fallback.style.minHeight).toBe('320px')
+      expect(fallback.style.maxHeight).toBe('320px')
+      expect(fallback.style.overflow).toBe('auto')
+      expect(host.style.minHeight).toBe('320px')
+      expect(block.style.minHeight).toBe('320px')
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('does not keep the ordinary block shell taller than a capped scrolling editor', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.getEditorView.mockReturnValue({
+      getModel: () => ({ getLineCount: () => 80 }),
+      getOption: () => 18,
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+      getContentHeight: () => 1200,
+      onDidContentSizeChange: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+    })
+
+    const code = Array.from({ length: 80 }, (_, index) => `print(${index})`).join('\n')
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'python',
+          code,
+          raw: `\`\`\`python\n${code}\n\`\`\``,
+        },
+        estimatedHeightPx: 1200,
+        estimatedContentHeightPx: 1200,
+        loading: false,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          MAX_HEIGHT: 320,
+        },
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+
+    const host = wrapper.get('.code-editor-container').element as HTMLElement
+    const block = wrapper.get('.code-block-container').element as HTMLElement
+    await vi.waitFor(() => {
+      expect(host.style.height).toBe('320px')
+      expect(host.style.maxHeight).toBe('320px')
+      expect(host.style.overflow).toBe('auto')
+      expect(Number.parseFloat(block.style.minHeight || '0')).toBeLessThanOrEqual(320)
+    })
+
+    wrapper.unmount()
+  })
+
   it('renders a side-by-side diff fallback while Monaco is mounting', async () => {
     const helpers = getStreamMonacoHelpers()
     let resolveCreate: (() => void) | null = null
@@ -269,6 +368,7 @@ describe('codeBlockNode editor creation locking', () => {
       const fallback = wrapper.get('pre.code-pre-fallback')
       const fallbackEl = fallback.element as HTMLElement
       expect(fallback.classes()).toContain('markstream-pre--diff-preview')
+      expect(fallback.classes()).not.toContain('markstream-pre--diff-inline')
       expect(fallbackEl.style.height).toBe('')
       expect(fallbackEl.style.minHeight).toBe('36px')
       expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(2)
@@ -289,6 +389,522 @@ describe('codeBlockNode editor creation locking', () => {
       resolveCreate?.()
       wrapper.unmount()
     }
+  })
+
+  it('keeps side-by-side diff fallback stable across streaming frames', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createDiffEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const frames = [
+      '{\n  "name": "markstream-vue",',
+      '{\n  "name": "markstream-vue",\n  "type": "module",\n-  "version": "0.0.49",',
+      '{\n  "name": "markstream-vue",\n  "type": "module",\n-  "version": "0.0.49",\n+  "version": "0.0.54-beta.1",\n  "packageManager": "pnpm@10.16.1",',
+      '{\n  "name": "markstream-vue",\n  "type": "module",\n-  "version": "0.0.49",\n+  "version": "0.0.54-beta.1",\n  "packageManager": "pnpm@10.16.1",\n  "description": "A Vue 3 component",\n}',
+    ]
+    const toNode = (code: string) => ({
+      type: 'code_block',
+      language: 'json:package.json',
+      code,
+      raw: `\`\`\`diff json:package.json\n${code}`,
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: toNode(frames[0]),
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          renderSideBySide: true,
+          useInlineViewWhenSpaceIsLimited: false,
+          MAX_HEIGHT: 500,
+        },
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateDiffEditorCalls(1, helpers)
+
+      let previousHeight = 0
+      for (const code of frames) {
+        await wrapper.setProps({ node: toNode(code) })
+        await flushPendingMicrotasks()
+
+        const fallback = wrapper.get('pre.code-pre-fallback')
+        const fallbackEl = fallback.element as HTMLElement
+        const panes = wrapper.findAll('.markstream-pre__diff-pane')
+        expect(fallback.classes()).toContain('markstream-pre--diff-preview')
+        expect(fallback.classes()).not.toContain('markstream-pre--diff-inline')
+        expect(panes).toHaveLength(2)
+        expect(wrapper.find('.markstream-pre__diff-pane--original').exists()).toBe(true)
+        expect(wrapper.find('.markstream-pre__diff-pane--modified').exists()).toBe(true)
+        expect(fallbackEl.style.fontSize).toBe('12px')
+        expect(fallbackEl.style.lineHeight).toBe('18px')
+        expect(fallbackEl.style.maxHeight).toBe('500px')
+        expect(fallbackEl.style.overflow).toBe('auto')
+
+        const height = Number.parseFloat(fallbackEl.style.minHeight || fallbackEl.style.height || '0')
+        expect(height).toBeGreaterThanOrEqual(previousHeight)
+        previousHeight = height
+      }
+
+      const originalText = wrapper.find('.markstream-pre__diff-pane--original').text()
+      const modifiedText = wrapper.find('.markstream-pre__diff-pane--modified').text()
+      expect(originalText).toContain('"version": "0.0.49"')
+      expect(modifiedText).toContain('"version": "0.0.54-beta.1"')
+      expect(helpers.useMonaco.mock.calls[0]?.[0]?.renderSideBySide).toBe(true)
+      expect(helpers.useMonaco.mock.calls[0]?.[0]?.useInlineViewWhenSpaceIsLimited).toBe(false)
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('caps long streaming diff fallback height at MAX_HEIGHT while Monaco is mounting', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createDiffEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const originalCode = Array.from({ length: 80 }, (_, index) => `  "old${index}": true`).join('\n')
+    const updatedCode = Array.from({ length: 80 }, (_, index) => `  "new${index}": true`).join('\n')
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode,
+          updatedCode,
+          raw: '```diff json:package.json\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          MAX_HEIGHT: 320,
+        },
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateDiffEditorCalls(1, helpers)
+
+      const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+      expect(fallback.style.height).toBe('320px')
+      expect(fallback.style.minHeight).toBe('320px')
+      expect(fallback.style.maxHeight).toBe('320px')
+      expect(fallback.style.overflow).toBe('auto')
+      expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(2)
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('uses inline diff fallback when Monaco diff is configured inline', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createDiffEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '-const oldValue = 1\n+const newValue = 2\n const stable = true',
+          diff: true,
+          originalCode: 'const oldValue = 1\nconst stable = true',
+          updatedCode: 'const newValue = 2\nconst stable = true',
+          raw: '```diff\n-const oldValue = 1\n+const newValue = 2\n const stable = true\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          renderSideBySide: false,
+          useInlineViewWhenSpaceIsLimited: true,
+        },
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateDiffEditorCalls(1, helpers)
+
+      const fallback = wrapper.get('pre.code-pre-fallback')
+      expect(fallback.classes()).toContain('markstream-pre--diff-preview')
+      expect(fallback.classes()).toContain('markstream-pre--diff-inline')
+      expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(1)
+      expect(wrapper.findAll('.markstream-pre__diff-content').map(node => node.text())).toEqual([
+        'const oldValue = 1',
+        'const newValue = 2',
+        'const stable = true',
+      ])
+      expect(helpers.useMonaco.mock.calls[0]?.[0]?.renderSideBySide).toBe(false)
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('sizes inline diff fallback from ordered inline rows when only original and updated sides are available', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createDiffEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -2 +2 @@',
+          diff: true,
+          originalCode: 'same before\nold value\nsame after',
+          updatedCode: 'same before\nnew value\nsame after',
+          raw: '```diff\n@@ -2 +2 @@\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          renderSideBySide: false,
+          useInlineViewWhenSpaceIsLimited: true,
+        },
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateDiffEditorCalls(1, helpers)
+
+      const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+      expect(fallback.style.minHeight).toBe('72px')
+      expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(1)
+      expect(wrapper.findAll('.markstream-pre__diff-content').map(node => node.text())).toEqual([
+        'same before',
+        'old value',
+        'new value',
+        'same after',
+      ])
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('uses the viewport width for the first inline fallback frame before container measurement exists', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const originalInnerWidth = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 820,
+    })
+    let resolveCreate: (() => void) | null = null
+    helpers.createDiffEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '-old\n+new',
+          diff: true,
+          originalCode: 'old',
+          updatedCode: 'new',
+          raw: '```diff\n-old\n+new\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          useInlineViewWhenSpaceIsLimited: true,
+          renderSideBySideInlineBreakpoint: 900,
+        },
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateDiffEditorCalls(1, helpers)
+
+      expect(wrapper.get('pre.code-pre-fallback').classes()).toContain('markstream-pre--diff-inline')
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: originalInnerWidth,
+      })
+    }
+  })
+
+  it('keeps streaming diff fallback height, font size, and line height monotonic across frames', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createDiffEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+    const lines = (count: number, prefix: string) =>
+      Array.from({ length: count }, (_, index) => `${prefix} ${index}`).join('\n')
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: lines(6, 'old'),
+          updatedCode: lines(6, 'new'),
+          raw: '```diff\n-old\n+new',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          MAX_HEIGHT: 500,
+        },
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateDiffEditorCalls(1, helpers)
+
+      const readFallbackMetrics = () => {
+        const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+        return {
+          minHeight: fallback.style.minHeight,
+          fontSize: fallback.style.fontSize,
+          lineHeight: fallback.style.lineHeight,
+          diffLineHeight: fallback.style.getPropertyValue('--markstream-pre-diff-line-height'),
+        }
+      }
+
+      expect(readFallbackMetrics()).toEqual({
+        minHeight: '108px',
+        fontSize: '12px',
+        lineHeight: '18px',
+        diffLineHeight: '18px',
+      })
+
+      await wrapper.setProps({
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: lines(3, 'old'),
+          updatedCode: lines(3, 'new'),
+          raw: '```diff\n-old\n+new',
+        },
+      })
+      await flushPendingMicrotasks()
+
+      expect(readFallbackMetrics()).toEqual({
+        minHeight: '108px',
+        fontSize: '12px',
+        lineHeight: '18px',
+        diffLineHeight: '18px',
+      })
+
+      await wrapper.setProps({
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: lines(10, 'old'),
+          updatedCode: lines(10, 'new'),
+          raw: '```diff\n-old\n+new',
+        },
+      })
+      await flushPendingMicrotasks()
+
+      expect(readFallbackMetrics()).toEqual({
+        minHeight: '180px',
+        fontSize: '12px',
+        lineHeight: '18px',
+        diffLineHeight: '18px',
+      })
+
+      await wrapper.setProps({
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: lines(4, 'old'),
+          updatedCode: lines(4, 'new'),
+          raw: '```diff\n-old\n+new',
+        },
+      })
+      await flushPendingMicrotasks()
+
+      expect(readFallbackMetrics()).toEqual({
+        minHeight: '180px',
+        fontSize: '12px',
+        lineHeight: '18px',
+        diffLineHeight: '18px',
+      })
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('does not move visible streaming diff fallback lines when Monaco reports later metrics', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.getEditor.mockReturnValue({
+      EditorOption: {
+        fontInfo: 'fontInfo',
+        lineHeight: 'lineHeight',
+      },
+    })
+    const sideEditor = {
+      getModel: () => ({ getLineCount: () => 2 }),
+      getOption: vi.fn((option: unknown) => {
+        if (option === 'fontInfo')
+          return { fontSize: 16 }
+        if (option === 'lineHeight')
+          return 24
+        return undefined
+      }),
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+      onDidContentSizeChange: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+    }
+    helpers.getDiffEditorView.mockReturnValue({
+      getOriginalEditor: () => sideEditor,
+      getModifiedEditor: () => sideEditor,
+      getLineChanges: () => null,
+      onDidUpdateDiff: () => ({ dispose: vi.fn() }),
+      getModel: () => ({ getLineCount: () => 2 }),
+      getOption: sideEditor.getOption,
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+    })
+    helpers.createDiffEditor.mockImplementation(async (el: HTMLElement) => {
+      const root = document.createElement('div')
+      root.className = 'monaco-diff-editor'
+      el.appendChild(root)
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '{\n  "name":',
+          diff: true,
+          originalCode: '{\n  "name":',
+          updatedCode: '{\n  "name":',
+          raw: '```diff json:package.json\n{\n  "name":',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+
+    const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+    expect(fallback.style.fontSize).toBe('12px')
+    expect(fallback.style.lineHeight).toBe('18px')
+    expect(fallback.style.getPropertyValue('--markstream-pre-diff-line-height')).toBe('18px')
+
+    wrapper.unmount()
+  })
+
+  it('forces a diff editor layout after each streaming diff update', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const diffEditor = helpers.getDiffEditorView() as any
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: 'old',
+          updatedCode: 'new',
+          raw: '```diff\n-old\n+new\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          renderSideBySide: false,
+        },
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+
+    helpers.updateDiff.mockClear()
+    diffEditor?.layout?.mockClear()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'diff',
+        code: '@@ -1 +1 @@',
+        diff: true,
+        originalCode: 'old',
+        updatedCode: 'newer',
+        raw: '```diff\n-old\n+newer\n```',
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateDiff).toHaveBeenCalledWith('old', 'newer', 'diff')
+    expect(diffEditor?.layout).toHaveBeenCalled()
+
+    wrapper.unmount()
   })
 
   it('does not render the `<pre>` fallback on warm remounts after the runtime is ready', async () => {
@@ -708,6 +1324,63 @@ describe('codeBlockNode editor creation locking', () => {
 
     wrapper.unmount()
   })
+
+  it('keeps raw diff fence mid-frames on the diff path before the parser flag arrives', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createDiffEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'json:package.json',
+          code: '{\n  "name": "markstream-vue",',
+          raw: '```diff json:package.json\n{\n  "name": "markstream-vue",',
+        },
+        loading: true,
+        stream: true,
+        theme: 'vitesse-dark',
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    expect(helpers.createEditor).not.toHaveBeenCalled()
+    expect(wrapper.get('.code-block-container').classes()).toContain('is-diff')
+    expect(wrapper.get('.code-block-container').classes()).toContain('is-dark')
+    expect(wrapper.get('pre.code-pre-fallback').classes()).toContain('markstream-pre--diff-preview')
+
+    helpers.createDiffEditor.mockClear()
+    helpers.safeClean.mockClear()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'json:package.json',
+        code: '@@ -1 +1 @@',
+        diff: true,
+        originalCode: '{\n  "name": "markstream-vue",\n  "version": "0.0.49",',
+        updatedCode: '{\n  "name": "markstream-vue",\n  "version": "0.0.54-beta.1",',
+        raw: '```diff json:package.json\n{\n  "name": "markstream-vue",\n-  "version": "0.0.49",\n+  "version": "0.0.54-beta.1",',
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.createDiffEditor).not.toHaveBeenCalled()
+    expect(helpers.safeClean).not.toHaveBeenCalled()
+
+    resolveCreate?.()
+    await flushPendingMicrotasks()
+    wrapper.unmount()
+  })
 })
 
 describe('codeBlockNode language normalization', () => {
@@ -742,6 +1415,32 @@ describe('codeBlockNode language normalization', () => {
 describe('codeBlockNode diff defaults', () => {
   beforeEach(() => {
     resetStreamMonacoHelpers()
+  })
+
+  it('keeps inline diff modified editor internals full-width so the scrollbar stays at the shell edge', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/CodeBlockNode/CodeBlockNode.vue'),
+      'utf8',
+    )
+
+    expect(source).toContain('stream-monaco-diff-inline .monaco-diff-editor .editor.modified .monaco-editor')
+    expect(source).toContain('stream-monaco-diff-inline .monaco-diff-editor .editor.modified .overflow-guard')
+    expect(source).toContain('stream-monaco-diff-inline .monaco-diff-editor .editor.modified .monaco-scrollable-element.editor-scrollable')
+    expect(source).toContain('stream-monaco-diff-root .monaco-diff-editor:not(.side-by-side) .editor.modified .overflow-guard')
+    expect(source).toContain('stream-monaco-diff-root .monaco-diff-editor:not(.side-by-side) .editor.modified .monaco-scrollable-element.editor-scrollable')
+    expect(source).toContain('width: calc(100% - var(--stream-monaco-modified-scrollable-left')
+  })
+
+  it('uses a dark diff fallback surface before Monaco theme variables are available', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/CodeBlockNode/CodeBlockNode.vue'),
+      'utf8',
+    )
+
+    expect(source).toContain('--markstream-diff-editor-bg: #121212')
+    expect(source).toContain('--markstream-diff-editor-fg: #e5e5e5')
+    expect(source).toContain('--markstream-diff-added-fg: hsl(152 42% 60%)')
+    expect(source).toContain('--markstream-diff-removed-fg: hsl(0 58% 58%)')
   })
 
   it('defaults diff blocks to the line-info collapsed preset', async () => {
@@ -783,12 +1482,15 @@ describe('codeBlockNode diff defaults', () => {
     expect(monacoOptions.lineDecorationsWidth).toBe(4)
     expect(monacoOptions.lineNumbersMinChars).toBe(2)
     expect(monacoOptions.glyphMargin).toBe(false)
+    expect(monacoOptions.minimap).toEqual({ enabled: false })
     expect(monacoOptions.fontSize).toBeUndefined()
     expect(monacoOptions.lineHeight).toBeUndefined()
     expect(monacoOptions.renderOverviewRuler).toBe(false)
     expect(monacoOptions.overviewRulerBorder).toBe(false)
     expect(monacoOptions.hideCursorInOverviewRuler).toBe(true)
     expect(monacoOptions.scrollBeyondLastLine).toBe(false)
+    expect(monacoOptions.renderSideBySide).toBe(true)
+    expect(monacoOptions.useInlineViewWhenSpaceIsLimited).toBe(false)
     expect(monacoOptions.padding).toBeUndefined()
     expect(monacoOptions.diffHunkActionsOnHover).toBe(false)
     expect(monacoOptions.diffHunkHoverHideDelayMs).toBeUndefined()
@@ -1110,8 +1812,9 @@ describe('codeBlockNode diff defaults', () => {
     wrapper.unmount()
   })
 
-  it('recreates diff presentation when loading transitions from true to false', async () => {
+  it('refreshes settled diff presentation without recreating the editor when loading transitions from true to false', async () => {
     const helpers = getStreamMonacoHelpers()
+    const diffEditor = helpers.getDiffEditorView() as any
 
     const wrapper = mount(CodeBlockNode, {
       props: {
@@ -1132,26 +1835,38 @@ describe('codeBlockNode diff defaults', () => {
 
     await waitForCreateDiffEditorCalls(1, helpers)
     await flushPendingMicrotasks()
+    await vi.waitFor(() => {
+      expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+    })
 
     helpers.createDiffEditor.mockClear()
     helpers.safeClean.mockClear()
     helpers.refreshDiffPresentation.mockClear()
     helpers.updateDiff.mockClear()
+    diffEditor?.layout?.mockClear()
 
     await wrapper.setProps({ loading: false })
     await flushPendingMicrotasks()
 
     await vi.waitFor(() => {
-      expect(helpers.safeClean).toHaveBeenCalled()
-      expect(helpers.createDiffEditor).toHaveBeenCalledWith(
-        expect.any(HTMLElement),
-        'const a = 1\\nconst b = 2\\n',
-        'const a = 1\\nconst c = 3\\n',
-        'diff',
-      )
-    })
-    await vi.waitFor(() => {
       expect(helpers.refreshDiffPresentation).toHaveBeenCalled()
+    })
+    expect(helpers.safeClean).not.toHaveBeenCalled()
+    expect(helpers.createDiffEditor).not.toHaveBeenCalled()
+    expect(helpers.updateDiff).toHaveBeenCalledWith(
+      'const a = 1\\nconst b = 2\\n',
+      'const a = 1\\nconst c = 3\\n',
+      'diff',
+    )
+    expect(diffEditor?.layout).toHaveBeenCalled()
+    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+
+    const monacoOptions = helpers.useMonaco.mock.calls[0]?.[0] ?? {}
+    expect(monacoOptions.diffHideUnchangedRegions).toEqual({
+      enabled: true,
+      contextLineCount: 2,
+      minimumLineCount: 4,
+      revealLineCount: 5,
     })
 
     wrapper.unmount()
@@ -1182,14 +1897,28 @@ describe('codeBlockNode diff defaults', () => {
 
     helpers.refreshDiffPresentation.mockClear()
     helpers.safeClean.mockClear()
+    helpers.createDiffEditor.mockClear()
 
     await wrapper.setProps({ loading: true })
     await flushPendingMicrotasks()
 
+    await vi.waitFor(() => {
+      expect(helpers.refreshDiffPresentation).toHaveBeenCalled()
+    })
+    const monacoOptions = helpers.useMonaco.mock.calls[0]?.[0] ?? {}
+    expect(monacoOptions.diffHideUnchangedRegions).toEqual({
+      enabled: false,
+      contextLineCount: 2,
+      minimumLineCount: 4,
+      revealLineCount: 0,
+    })
+    helpers.refreshDiffPresentation.mockClear()
+
     await wrapper.setProps({ loading: false })
     await flushPendingMicrotasks()
 
-    expect(helpers.safeClean).toHaveBeenCalled()
+    expect(helpers.safeClean).not.toHaveBeenCalled()
+    expect(helpers.createDiffEditor).not.toHaveBeenCalled()
     await vi.waitFor(() => {
       expect(helpers.refreshDiffPresentation).toHaveBeenCalled()
     })
@@ -1429,6 +2158,64 @@ describe('codeBlockNode diff defaults', () => {
     expect(Number.parseFloat(host.style.height)).toBeGreaterThan(0)
     expect(host.style.height).not.toBe('500px')
     expect(host.style.maxHeight).toBe('500px')
+
+    wrapper.unmount()
+  })
+
+  it('does not shrink the streaming diff host when Monaco reports a smaller partial frame', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let lineCount = 20
+    let contentSizeListener: (() => void) | null = null
+    const makeSideEditor = () => ({
+      onDidContentSizeChange: vi.fn((listener: () => void) => {
+        contentSizeListener = listener
+        return { dispose: vi.fn() }
+      }),
+      onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+      getModel: vi.fn(() => ({ getLineCount: () => lineCount })),
+      getOption: vi.fn(() => 14),
+    })
+    const diffEditor = {
+      getOriginalEditor: vi.fn(() => makeSideEditor()),
+      getModifiedEditor: vi.fn(() => makeSideEditor()),
+      onDidUpdateDiff: vi.fn(() => ({ dispose: vi.fn() })),
+      getLineChanges: vi.fn(() => []),
+      getModel: vi.fn(() => ({ getLineCount: () => 1 })),
+      getOption: vi.fn(() => 14),
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+    }
+    helpers.getDiffEditorView.mockReturnValue(diffEditor as any)
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: Array.from({ length: 20 }, (_, index) => `old ${index}`).join('\n'),
+          updatedCode: Array.from({ length: 20 }, (_, index) => `new ${index}`).join('\n'),
+          raw: '```diff\n-old\n+new',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+
+    const host = wrapper.get('.code-editor-container').element as HTMLElement
+    const initialHeight = Number.parseFloat(host.style.height)
+    expect(initialHeight).toBeGreaterThan(300)
+
+    lineCount = 3
+    contentSizeListener?.()
+    await flushPendingMicrotasks()
+
+    expect(Number.parseFloat(host.style.height)).toBe(initialHeight)
 
     wrapper.unmount()
   })

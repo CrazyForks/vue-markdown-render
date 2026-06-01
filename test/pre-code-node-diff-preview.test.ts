@@ -168,4 +168,35 @@ describe('pre code node diff preview', () => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
+
+  it('renders inline diff fallback as one ordered diff stream instead of stacked panes', () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffInline: true,
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          originalCode: 'same before\nold value\nsame after',
+          updatedCode: 'same before\nnew value\nsame after',
+          code: '',
+          raw: '```diff\n-old value\n+new value\n```',
+        },
+      },
+    })
+
+    expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(1)
+    expect(wrapper.find('.markstream-pre__diff-pane--inline').exists()).toBe(true)
+    expect(wrapper.findAll('.markstream-pre__diff-content').map(node => node.text())).toEqual([
+      'same before',
+      'old value',
+      'new value',
+      'same after',
+    ])
+    expect(wrapper.findAll('.markstream-pre__diff-line--removed')).toHaveLength(1)
+    expect(wrapper.findAll('.markstream-pre__diff-line--added')).toHaveLength(1)
+
+    wrapper.unmount()
+  })
 })
