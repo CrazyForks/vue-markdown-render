@@ -34,6 +34,32 @@ interface ParserTimingMetrics {
   parseMarkdownToStructureTotalMs?: number
 }
 
+interface ParsedNodeSignatureTimingMetrics {
+  /** Instrumented wall time for timed signature calls, including timing overhead. */
+  signatureMs: number
+  stabilizeSignatureMs: number
+  primeSignatureMs: number
+  signatureCallCount: number
+  stabilizeSignatureCallCount: number
+  primeSignatureCallCount: number
+}
+
+interface ParsedNodeStabilizeMetrics {
+  /** Count of reused nodes anywhere in nextNodes, including unchanged suffix nodes after dirtyStartIndex. */
+  reusedNodeCount: number
+  /** First boundary where previousNodes and nextNodes diverge; -1 means no dirty tail. */
+  dirtyStartIndex: number
+  /** Count of stable leading nodes in nextNodes. */
+  stablePrefixNodeCount: number
+  /** Count of nodes in the dirty tail across previousNodes and nextNodes. */
+  dirtyTailNodeCount: number
+}
+
+interface ParsedNodeStabilizeResult {
+  nodes: ParsedNode[]
+  metrics: ParsedNodeStabilizeMetrics
+}
+
 export interface MarkdownParsingOptions {
   instanceMsgId: string
   renderContent: ComputedRef<string>
@@ -356,6 +382,56 @@ function isParsedNodeStable(previous: ParsedNode, next: ParsedNode) {
   return getParsedNodeSignature(previous) === getParsedNodeSignature(next)
 }
 
+function trackSignatureTiming<T>(
+  metrics: ParsedNodeSignatureTimingMetrics,
+  metricKey: 'stabilizeSignatureMs' | 'primeSignatureMs',
+  callback: () => T,
+) {
+  const startedAt = getNow()
+  const countKey = metricKey === 'stabilizeSignatureMs'
+    ? 'stabilizeSignatureCallCount'
+    : 'primeSignatureCallCount'
+  try {
+    return callback()
+  }
+  finally {
+    metrics[metricKey] += getNow() - startedAt
+    metrics[countKey] += 1
+    metrics.signatureMs = metrics.stabilizeSignatureMs + metrics.primeSignatureMs
+    metrics.signatureCallCount = metrics.stabilizeSignatureCallCount + metrics.primeSignatureCallCount
+  }
+}
+
+function getParsedNodeSignatureWithTiming(
+  node: ParsedNode,
+  metrics: ParsedNodeSignatureTimingMetrics,
+  metricKey: 'stabilizeSignatureMs' | 'primeSignatureMs',
+) {
+  return trackSignatureTiming(
+    metrics,
+    metricKey,
+    () => getParsedNodeSignature(node),
+  )
+}
+
+function isParsedNodeStableWithMetrics(
+  previous: ParsedNode,
+  next: ParsedNode,
+  metrics: ParsedNodeSignatureTimingMetrics,
+) {
+  return getParsedNodeSignatureWithTiming(previous, metrics, 'stabilizeSignatureMs')
+    === getParsedNodeSignatureWithTiming(next, metrics, 'stabilizeSignatureMs')
+}
+
+function getInitialStabilizeMetrics(nodeCount: number): ParsedNodeStabilizeMetrics {
+  return {
+    reusedNodeCount: 0,
+    dirtyStartIndex: nodeCount > 0 ? 0 : -1,
+    stablePrefixNodeCount: 0,
+    dirtyTailNodeCount: nodeCount,
+  }
+}
+
 function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode[]) {
   if (!previousNodes.length)
     return nextNodes
@@ -379,9 +455,71 @@ function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode
   return identical ? previousNodes : stableNodes
 }
 
+function stabilizeParsedNodesWithMetrics(
+  nextNodes: ParsedNode[],
+  previousNodes: ParsedNode[],
+  signatureTiming: ParsedNodeSignatureTimingMetrics,
+): ParsedNodeStabilizeResult {
+  if (!previousNodes.length) {
+    return {
+      nodes: nextNodes,
+      metrics: getInitialStabilizeMetrics(nextNodes.length),
+    }
+  }
+
+  const stableNodes = new Array<ParsedNode>(nextNodes.length)
+  let identical = nextNodes.length === previousNodes.length
+  let reusedNodeCount = 0
+  let dirtyStartIndex = -1
+
+  for (let index = 0; index < nextNodes.length; index++) {
+    const previous = previousNodes[index]
+    const next = nextNodes[index]
+
+    if (previous && isParsedNodeStableWithMetrics(previous, next, signatureTiming)) {
+      stableNodes[index] = previous
+      reusedNodeCount += 1
+    }
+    else {
+      stableNodes[index] = next
+      if (dirtyStartIndex < 0)
+        dirtyStartIndex = index
+      identical = false
+    }
+  }
+
+  if (dirtyStartIndex < 0 && nextNodes.length !== previousNodes.length)
+    dirtyStartIndex = Math.min(nextNodes.length, previousNodes.length)
+
+  const stablePrefixNodeCount = dirtyStartIndex < 0 ? nextNodes.length : dirtyStartIndex
+
+  return {
+    nodes: identical ? previousNodes : stableNodes,
+    metrics: {
+      reusedNodeCount,
+      dirtyStartIndex,
+      stablePrefixNodeCount,
+      dirtyTailNodeCount: dirtyStartIndex < 0 ? 0 : Math.max(nextNodes.length, previousNodes.length) - dirtyStartIndex,
+    },
+  }
+}
+
 function primeParsedNodeSignatures(nodes: ParsedNode[]) {
   for (const node of nodes)
     getParsedNodeSignature(node)
+}
+
+function primeParsedNodeSignaturesWithMetrics(
+  nodes: ParsedNode[],
+  signatureTiming: ParsedNodeSignatureTimingMetrics,
+) {
+  for (const node of nodes) {
+    trackSignatureTiming(
+      signatureTiming,
+      'primeSignatureMs',
+      () => getParsedNodeSignature(node),
+    )
+  }
 }
 
 function getStreamStatsDelta(current: StreamStatsLike, previous: StreamStatsLike | null) {
@@ -562,7 +700,8 @@ export function useMarkdownParsing(
       return []
     }
 
-    const parseStart = options.debugPerformanceEnabled.value
+    const collectPerformanceMetrics = options.debugPerformanceEnabled.value
+    const parseStart = collectPerformanceMetrics
       ? getNow()
       : 0
     const md = mdInstance.value
@@ -577,11 +716,11 @@ export function useMarkdownParsing(
       resetStreamParseCache(md)
     }
 
-    const streamStatsBefore = options.debugPerformanceEnabled.value
+    const streamStatsBefore = collectPerformanceMetrics
       ? readStreamStats(md)
       : null
 
-    const parserTiming: ParserTimingMetrics | undefined = options.debugPerformanceEnabled.value
+    const parserTiming: ParserTimingMetrics | undefined = collectPerformanceMetrics
       ? {}
       : undefined
     const parseOptionsForCall = parserTiming
@@ -593,15 +732,51 @@ export function useMarkdownParsing(
       md,
       parseOptionsForCall,
     )
-    const reuseStart = options.debugPerformanceEnabled.value
+    const reuseStart = collectPerformanceMetrics
       ? getNow()
       : 0
-    const parsed = canReuseParsedNodes
-      ? stabilizeParsedNodes(nextParsed, previousParsedNodes)
-      : nextParsed
+    const signatureTiming: ParsedNodeSignatureTimingMetrics | undefined = collectPerformanceMetrics
+      ? {
+          signatureMs: 0,
+          stabilizeSignatureMs: 0,
+          primeSignatureMs: 0,
+          signatureCallCount: 0,
+          stabilizeSignatureCallCount: 0,
+          primeSignatureCallCount: 0,
+        }
+      : undefined
+    let stabilizeMetrics: ParsedNodeStabilizeMetrics | undefined = collectPerformanceMetrics
+      ? getInitialStabilizeMetrics(nextParsed.length)
+      : undefined
+    let stabilizeMs = 0
+    let parsed: ParsedNode[]
 
-    primeParsedNodeSignatures(parsed)
-    const nodeReuseMs = options.debugPerformanceEnabled.value
+    if (canReuseParsedNodes) {
+      const stabilizeStart = collectPerformanceMetrics
+        ? getNow()
+        : 0
+      if (signatureTiming) {
+        const result = stabilizeParsedNodesWithMetrics(nextParsed, previousParsedNodes, signatureTiming)
+        parsed = result.nodes
+        stabilizeMetrics = result.metrics
+      }
+      else {
+        parsed = stabilizeParsedNodes(nextParsed, previousParsedNodes)
+      }
+      stabilizeMs = collectPerformanceMetrics
+        ? getNow() - stabilizeStart
+        : 0
+    }
+    else {
+      parsed = nextParsed
+    }
+
+    if (signatureTiming)
+      primeParsedNodeSignaturesWithMetrics(parsed, signatureTiming)
+    else
+      primeParsedNodeSignatures(parsed)
+
+    const nodeReuseMs = collectPerformanceMetrics
       ? getNow() - reuseStart
       : 0
     parseCommitCount += 1
@@ -609,7 +784,7 @@ export function useMarkdownParsing(
     previousParseSemanticKey = currentParseSemanticKey
     previousParsedNodes = parsed
 
-    if (options.debugPerformanceEnabled.value) {
+    if (collectPerformanceMetrics) {
       const streamStats = readStreamStats(md)
       const usedStream = typeof streamStats?.total === 'number'
         && streamStats.total > (streamStatsBefore?.total ?? 0)
@@ -622,6 +797,14 @@ export function useMarkdownParsing(
         parseCommitCount,
         parseCoalescedCount,
         nodeReuseMs,
+        signatureMs: signatureTiming?.signatureMs ?? 0,
+        stabilizeSignatureMs: signatureTiming?.stabilizeSignatureMs ?? 0,
+        primeSignatureMs: signatureTiming?.primeSignatureMs ?? 0,
+        signatureCallCount: signatureTiming?.signatureCallCount ?? 0,
+        stabilizeSignatureCallCount: signatureTiming?.stabilizeSignatureCallCount ?? 0,
+        primeSignatureCallCount: signatureTiming?.primeSignatureCallCount ?? 0,
+        stabilizeMs,
+        ...(stabilizeMetrics ?? {}),
         ...(parserTiming
           ? Object.fromEntries(PARSE_TIMING_KEYS.map(key => [key, parserTiming[key] ?? 0]))
           : {}),
