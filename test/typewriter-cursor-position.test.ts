@@ -21,6 +21,13 @@ function rect(partial: Partial<DOMRect>): DOMRect {
   }
 }
 
+async function runNextFrame(queuedFrames: FrameRequestCallback[], now: number) {
+  const frame = queuedFrames.shift()
+  expect(frame).toBeDefined()
+  frame?.(now)
+  await flushAll()
+}
+
 describe('typewriter cursor position', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -34,6 +41,7 @@ describe('typewriter cursor position', () => {
       return queuedFrames.length
     }) as typeof requestAnimationFrame)
     vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+    const createTreeWalkerSpy = vi.spyOn(document, 'createTreeWalker')
 
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
       const element = this as HTMLElement
@@ -98,8 +106,8 @@ describe('typewriter cursor position', () => {
     await flushAll()
 
     const baseline = performance.now()
-    queuedFrames.shift()?.(baseline + 50)
-    await flushAll()
+    await runNextFrame(queuedFrames, baseline + 50)
+    await runNextFrame(queuedFrames, baseline + 66)
 
     const cursor = wrapper.get('.typewriter-cursor').element as HTMLElement
     const firstVisibleLength = wrapper.get('.text-node').text().length
@@ -107,12 +115,16 @@ describe('typewriter cursor position', () => {
     expect(cursor.style.transform).toBe(`translate(${Math.max(0, firstVisibleLength * 10 - 20)}px, 50px)`)
     expect(cursor.style.visibility).toBe('visible')
 
-    queuedFrames.shift()?.(baseline + 100)
-    await flushAll()
+    await runNextFrame(queuedFrames, baseline + 100)
+    await runNextFrame(queuedFrames, baseline + 116)
 
     const secondVisibleLength = wrapper.get('.text-node').text().length
     expect(secondVisibleLength).toBeGreaterThan(firstVisibleLength)
     expect(cursor.style.transform).toBe(`translate(${Math.max(0, secondVisibleLength * 10 - 20)}px, 50px)`)
+    expect(createTreeWalkerSpy).toHaveBeenCalled()
+    expect(createTreeWalkerSpy.mock.calls.every(([root]) => {
+      return root instanceof HTMLElement && root.matches('.node-slot[data-node-index]')
+    })).toBe(true)
 
     wrapper.unmount()
   })

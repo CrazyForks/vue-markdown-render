@@ -304,6 +304,7 @@ describe('node renderer smooth streaming', () => {
     // When nodes are provided, smooth streaming must not activate
     // regardless of typewriter or smoothStreaming='auto'
     expect(wrapper.text()).toContain('hello')
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
     expect(queuedFrames.length).toBe(0)
 
     wrapper.unmount()

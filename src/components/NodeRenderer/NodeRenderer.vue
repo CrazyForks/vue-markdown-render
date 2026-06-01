@@ -5104,6 +5104,7 @@ function handleFragmentMouseout(event: MouseEvent) {
 const typewriterCursorRef = ref<HTMLElement | null>(null)
 const showTypewriterCursor = ref(false)
 let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
+let typewriterCursorRaf: number | null = null
 let lastTypewriterContentLength = 0
 let lastTypewriterVisibleLength = 0
 const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image'])
@@ -5163,9 +5164,32 @@ function clearTypewriterCursorTimeout() {
   typewriterCursorTimeout = undefined
 }
 
+function clearTypewriterCursorRaf() {
+  if (typewriterCursorRaf == null)
+    return
+  cancelFrame?.(typewriterCursorRaf)
+  typewriterCursorRaf = null
+}
+
 function hideTypewriterCursorElement() {
+  clearTypewriterCursorRaf()
   if (typewriterCursorRef.value)
     typewriterCursorRef.value.style.visibility = 'hidden'
+}
+
+function getTypewriterCursorSearchRoot() {
+  const items = renderedItems.value
+  for (let index = items.length - 1; index >= 0; index--) {
+    const item = items[index]
+    if (!item || shouldSkipTypewriterCursorForNode(item.node) || !shouldRenderNode(item.index))
+      continue
+
+    const slot = nodeSlotElements.get(item.index)
+    if (slot)
+      return slot
+  }
+
+  return null
 }
 
 function getLastTextNode(root: HTMLElement) {
@@ -5201,9 +5225,13 @@ function updateTypewriterCursorPosition() {
 
   const root = containerRef.value
   const cursor = typewriterCursorRef.value
-  const lastText = getLastTextNode(root)
+  const searchRoot = getTypewriterCursorSearchRoot()
   const rootRect = root.getBoundingClientRect()
   cursor.style.visibility = 'hidden'
+  if (!searchRoot)
+    return
+
+  const lastText = getLastTextNode(searchRoot)
   let left = 0
   let top = 0
   let height = 20
@@ -5236,6 +5264,25 @@ function updateTypewriterCursorPosition() {
   cursor.style.visibility = 'visible'
 }
 
+function scheduleTypewriterCursorPositionUpdate() {
+  if (!isClient || !showTypewriterCursor.value)
+    return
+  if (typewriterCursorRaf != null)
+    return
+
+  const run = () => {
+    typewriterCursorRaf = null
+    updateTypewriterCursorPosition()
+  }
+
+  if (requestFrame) {
+    typewriterCursorRaf = requestFrame(run)
+    return
+  }
+
+  run()
+}
+
 watch(
   [renderContent, () => props.content, () => props.nodes, () => props.typewriter, effectiveFinal],
   async () => {
@@ -5247,6 +5294,16 @@ watch(
     if (effectiveFinal.value) {
       showTypewriterCursor.value = false
       clearTypewriterCursorTimeout()
+      hideTypewriterCursorElement()
+      return
+    }
+
+    if (props.nodes?.length) {
+      showTypewriterCursor.value = false
+      clearTypewriterCursorTimeout()
+      hideTypewriterCursorElement()
+      lastTypewriterContentLength = getTypewriterContentLength()
+      lastTypewriterVisibleLength = getTypewriterVisibleLength()
       return
     }
 
@@ -5256,8 +5313,10 @@ watch(
     const sourceGrowing = nextLength > lastTypewriterContentLength
     const visibleGrowing = nextVisibleLength > lastTypewriterVisibleLength
     if (props.typewriter === false || !cursorAllowed || (!sourceGrowing && !visibleGrowing)) {
-      if (props.typewriter === false || !cursorAllowed)
+      if (props.typewriter === false || !cursorAllowed) {
         showTypewriterCursor.value = false
+        hideTypewriterCursorElement()
+      }
       lastTypewriterContentLength = nextLength
       lastTypewriterVisibleLength = nextVisibleLength
       return
@@ -5269,7 +5328,7 @@ watch(
     hideTypewriterCursorElement()
     clearTypewriterCursorTimeout()
     await nextTick()
-    updateTypewriterCursorPosition()
+    scheduleTypewriterCursorPositionUpdate()
     typewriterCursorTimeout = setTimeout(() => {
       showTypewriterCursor.value = false
     }, 3000)
@@ -5280,16 +5339,19 @@ watch(
 watch(
   showTypewriterCursor,
   async (visible) => {
-    if (!visible)
+    if (!visible) {
+      hideTypewriterCursorElement()
       return
+    }
     await nextTick()
-    updateTypewriterCursorPosition()
+    scheduleTypewriterCursorPositionUpdate()
   },
   { flush: 'post' },
 )
 
 onBeforeUnmount(() => {
   clearTypewriterCursorTimeout()
+  clearTypewriterCursorRaf()
   mathBlockMinHeightCache.clear()
 })
 </script>
