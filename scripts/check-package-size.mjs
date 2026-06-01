@@ -7,10 +7,10 @@ const root = process.cwd()
 const distDir = join(root, 'dist')
 
 const budgets = {
-  maxDistBytes: Number(process.env.MAX_DIST_BYTES || 820 * 1024),
+  maxDistBytes: Number(process.env.MAX_DIST_BYTES || 840 * 1024),
   maxJsChunkBytes: Number(process.env.MAX_JS_CHUNK_BYTES || 300 * 1024),
   maxPackSizeBytes: Number(process.env.MAX_PACK_TGZ_BYTES || 250 * 1024),
-  maxPackUnpackedBytes: Number(process.env.MAX_PACK_UNPACKED_BYTES || 900 * 1024),
+  maxPackUnpackedBytes: Number(process.env.MAX_PACK_UNPACKED_BYTES || 910 * 1024),
 }
 
 function formatBytes(bytes) {

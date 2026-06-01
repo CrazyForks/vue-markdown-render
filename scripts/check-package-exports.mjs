@@ -25,12 +25,27 @@ const requiredSubpaths = [
   './workers/mermaidParser.worker',
 ]
 
-const isolatedRootExports = ['MarkdownRender', 'VueRendererMarkdown', 'CodeBlockNode']
+const isolatedRootExports = [
+  'MarkdownRender',
+  'VueRendererMarkdown',
+  'CodeBlockNode',
+  'MarkdownCodeBlockNode',
+  'MathBlockNode',
+  'MathInlineNode',
+  'MermaidBlockNode',
+  'D2BlockNode',
+  'InfographicBlockNode',
+  'MarkstreamVirtualTimeline',
+  'Tooltip',
+  'useMarkstreamVirtualAdapter',
+  'useSmoothMarkdownStream',
+]
 
 const runtimeSubpathChecks = [
   {
     subpath: './utils',
     exports: ['getLanguageIcon', 'normalizeLanguageIdentifier', 'parseMarkdownToStructure', 'safeRaf'],
+    forbiddenExports: isolatedRootExports,
   },
   {
     subpath: './utils/katex-threshold',
@@ -71,10 +86,6 @@ const runtimeSubpathChecks = [
 
 const failures = []
 const rootImportTarget = typeof pkg.exports?.['.'] === 'object' ? pkg.exports['.'].import : undefined
-const rootBackedSubpathsAllowed = new Set([
-  './utils',
-])
-
 function normalizeTargets(entry) {
   if (typeof entry === 'string')
     return [{ condition: 'default', target: entry }]
@@ -130,7 +141,6 @@ for (const subpath of requiredSubpaths) {
     && typeof entry.import === 'string'
     && typeof rootImportTarget === 'string'
     && entry.import === rootImportTarget
-    && !rootBackedSubpathsAllowed.has(subpath)
   ) {
     failures.push(`${subpath} should not import the root bundle (${rootImportTarget})`)
   }

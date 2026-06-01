@@ -1,13 +1,24 @@
-// @ts-expect-error Declared subpaths must still reject unknown exports.
-import { __missingUtilsExport } from 'markstream-vue/utils'
+import type * as MarkstreamUtils from 'markstream-vue/utils'
+import type * as KatexThresholdUtils from 'markstream-vue/utils/katex-threshold'
+import type * as KatexWorkerClient from 'markstream-vue/workers/katexWorkerClient'
+
+// @ts-expect-error Declared utilities subpath must reject unknown exports.
+type MissingUtilsExport = typeof MarkstreamUtils.__missingUtilsExport
+
+// @ts-expect-error Utilities subpath must not expose root-only renderer exports.
+type UnexpectedUtilsRenderer = typeof MarkstreamUtils.VueRendererMarkdown
 
 // @ts-expect-error Isolated utility subpaths must not expose renderer/root exports.
-import { MarkdownRender as __unexpectedKatexThresholdRenderer } from 'markstream-vue/utils/katex-threshold'
+type UnexpectedKatexThresholdRenderer = typeof KatexThresholdUtils.MarkdownRender
 
-// @ts-expect-error Declared worker subpaths must reject unknown and root-only exports.
-import { __missingWorkerExport, MarkdownRender as __unexpectedWorkerRenderer } from 'markstream-vue/workers/katexWorkerClient'
+// @ts-expect-error Declared worker subpaths must reject unknown exports.
+type MissingWorkerExport = typeof KatexWorkerClient.__missingWorkerExport
 
-void __missingUtilsExport
-void __missingWorkerExport
-void __unexpectedKatexThresholdRenderer
-void __unexpectedWorkerRenderer
+// @ts-expect-error Declared worker subpaths must reject root-only exports.
+type UnexpectedWorkerRenderer = typeof KatexWorkerClient.MarkdownRender
+
+void (null as unknown as MissingUtilsExport)
+void (null as unknown as MissingWorkerExport)
+void (null as unknown as UnexpectedKatexThresholdRenderer)
+void (null as unknown as UnexpectedUtilsRenderer)
+void (null as unknown as UnexpectedWorkerRenderer)
