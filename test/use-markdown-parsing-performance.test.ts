@@ -686,6 +686,50 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('does not allocate combined cheap keys for large unchanged code blocks', () => {
+    const largeLine = 'x'.repeat(100_000)
+    const content = ref([
+      '```ts',
+      'const value = 1',
+      largeLine,
+      '```',
+      '',
+      'tail',
+    ].join('\n'))
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+    const firstCode = state.parsedNodes.value[0]
+    const originalJoin = Array.prototype.join
+    let combinedLargeCheapKeyCount = 0
+    const joinSpy = vi.spyOn(Array.prototype, 'join').mockImplementation(function (this: unknown[], separator?: string) {
+      if (
+        separator === '\u0001'
+        && this.some(part => typeof part === 'string'
+          && /^(?:raw|code|content)=s:\d+:/.test(part)
+          && part.length > 50_000)
+      ) {
+        combinedLargeCheapKeyCount += 1
+      }
+
+      return originalJoin.call(this, separator)
+    })
+
+    try {
+      logPerf.mockClear()
+      content.value = `${content.value}\n\nappend`
+
+      expect(state.parsedNodes.value[0]).toBe(firstCode)
+      expect(combinedLargeCheapKeyCount).toBe(0)
+
+      const data = logPerf.mock.calls.at(-1)?.[1]
+      expect(data?.dirtyStartIndex).toBeGreaterThanOrEqual(1)
+    }
+    finally {
+      joinSpy.mockRestore()
+      scope.stop()
+    }
+  })
+
   it('logs stream stats deltas when debug performance is enabled', () => {
     const content = ref('alpha')
     const logPerf = vi.fn()

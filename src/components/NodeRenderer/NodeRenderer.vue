@@ -186,13 +186,24 @@ const RENDERER_MODE_DEFAULTS: Record<NodeRendererMode, Pick<
   },
 }
 
-const resolvedMode = computed<NodeRendererMode>(() => props.mode ?? 'docs')
+function normalizeRendererMode(value: unknown): NodeRendererMode {
+  return value === 'chat' || value === 'minimal' || value === 'docs'
+    ? value
+    : 'docs'
+}
+
+const resolvedMode = computed<NodeRendererMode>(() => normalizeRendererMode(props.mode))
 const resolvedCodeRenderer = computed<NodeRendererCodeRenderer>(() => {
   if (props.renderCodeBlocksAsPre === true)
     return 'pre'
 
-  if (props.codeRenderer)
+  if (
+    props.codeRenderer === 'pre'
+    || props.codeRenderer === 'shiki'
+    || props.codeRenderer === 'monaco'
+  ) {
     return props.codeRenderer
+  }
 
   if (props.renderCodeBlocksAsPre === false)
     return 'monaco'
@@ -5128,6 +5139,16 @@ function getCodeBlockLanguage(node: ParsedNode) {
     : ''
 }
 
+function hasExactCodeLanguageOverride(language: string) {
+  return Boolean(language && customComponentsMap.value[language])
+}
+
+function shouldUseGenericCodeBlockBindings(node: ParsedNode, language: string) {
+  return node.type === 'code_block'
+    && resolvedCodeRenderer.value === 'pre'
+    && !hasExactCodeLanguageOverride(language)
+}
+
 // Decide which component to use for a given node. Ensure that code blocks
 // with language `mermaid` are rendered with `MermaidBlockNode` (unless a
 // custom component named `mermaid` is registered for the given customId).
@@ -5186,6 +5207,9 @@ function getNodeComponent(node: ParsedNode, language?: string) {
 
 function getBindingsFor(node: ParsedNode, language?: string) {
   const lang = language ?? getCodeBlockLanguage(node)
+  if (shouldUseGenericCodeBlockBindings(node, lang))
+    return codeBlockBindings.value
+
   if (lang === 'mermaid')
     return mermaidBindings.value
 

@@ -443,50 +443,103 @@ function getDirtyTailNodeCount(
     : Math.max(nextNodes.length, previousNodes.length) - dirtyStartIndex
 }
 
-function getCheapParsedNodeKeyIfSafe(node: ParsedNode, depth = 0): string | null {
+function compareCheapParsedNodesIfSafe(
+  previous: ParsedNode,
+  next: ParsedNode,
+  depth = 0,
+): boolean | null {
   if (depth >= MAX_CHEAP_NODE_KEY_DEPTH)
     return null
 
-  const record = node as Record<string, unknown>
-  const parts: string[] = [`type=${node.type}`]
-  const keys = Object.keys(record).sort()
+  if (previous.type !== next.type)
+    return false
 
-  for (const key of keys) {
-    if (key === 'type' || key === 'children')
-      continue
+  const previousRecord = previous as Record<string, unknown>
+  const nextRecord = next as Record<string, unknown>
+  const previousKeys = Object.keys(previousRecord)
+    .filter(key => key !== 'type' && key !== 'children')
+    .sort()
+  const nextKeys = Object.keys(nextRecord)
+    .filter(key => key !== 'type' && key !== 'children')
+    .sort()
 
-    const value = record[key]
-    if (typeof value === 'string') {
-      parts.push(`${key}=s:${value.length}:${value}`)
+  if (previousKeys.length !== nextKeys.length)
+    return false
+
+  for (let index = 0; index < previousKeys.length; index++) {
+    const key = previousKeys[index]!
+    if (key !== nextKeys[index])
+      return false
+
+    const previousValue = previousRecord[key]
+    const nextValue = nextRecord[key]
+
+    if (typeof previousValue !== typeof nextValue)
+      return false
+
+    if (typeof previousValue === 'string') {
+      if (
+        typeof nextValue !== 'string'
+        || previousValue.length !== nextValue.length
+        || previousValue !== nextValue
+      ) {
+        return false
+      }
       continue
     }
-    if (typeof value === 'number' || typeof value === 'boolean' || value == null) {
-      parts.push(`${key}=${String(value)}`)
+
+    if (
+      typeof previousValue === 'number'
+      || typeof previousValue === 'boolean'
+      || previousValue == null
+    ) {
+      if (!Object.is(previousValue, nextValue))
+        return false
       continue
     }
 
     return null
   }
 
-  if ('children' in record) {
-    const children = record.children
-    if (!Array.isArray(children))
+  const previousHasChildren = Object.prototype.hasOwnProperty.call(previousRecord, 'children')
+  const nextHasChildren = Object.prototype.hasOwnProperty.call(nextRecord, 'children')
+
+  if (previousHasChildren !== nextHasChildren)
+    return false
+
+  if (!previousHasChildren)
+    return true
+
+  const previousChildren = previousRecord.children
+  const nextChildren = nextRecord.children
+
+  if (!Array.isArray(previousChildren) || !Array.isArray(nextChildren))
+    return null
+
+  if (previousChildren.length !== nextChildren.length)
+    return false
+
+  for (let index = 0; index < previousChildren.length; index++) {
+    const previousChild = previousChildren[index]
+    const nextChild = nextChildren[index]
+
+    if (!isParsedNodeLike(previousChild) || !isParsedNodeLike(nextChild))
       return null
 
-    parts.push(`children=${children.length}`)
-    for (const child of children) {
-      if (!isParsedNodeLike(child))
-        return null
+    const childResult = compareCheapParsedNodesIfSafe(
+      previousChild,
+      nextChild,
+      depth + 1,
+    )
 
-      const childKey = getCheapParsedNodeKeyIfSafe(child, depth + 1)
-      if (childKey == null)
-        return null
+    if (childResult == null)
+      return null
 
-      parts.push(childKey)
-    }
+    if (!childResult)
+      return false
   }
 
-  return parts.join('\u0001')
+  return true
 }
 
 function areTopLevelNodesStable(previous: ParsedNode | undefined, next: ParsedNode | undefined) {
@@ -497,10 +550,9 @@ function areTopLevelNodesStable(previous: ParsedNode | undefined, next: ParsedNo
   if (previous.type !== next.type)
     return false
 
-  const previousKey = getCheapParsedNodeKeyIfSafe(previous)
-  const nextKey = getCheapParsedNodeKeyIfSafe(next)
-  if (previousKey != null && nextKey != null)
-    return previousKey === nextKey
+  const cheapResult = compareCheapParsedNodesIfSafe(previous, next)
+  if (cheapResult != null)
+    return cheapResult
 
   return isParsedNodeStable(previous, next)
 }
@@ -517,19 +569,17 @@ function areTopLevelNodesStableWithMetrics(
   if (previous.type !== next.type)
     return false
 
-  let previousKey: string | null = null
-  let nextKey: string | null = null
+  let cheapResult: boolean | null = null
   trackSignatureTiming(
     signatureTiming,
     'stabilizeSignatureMs',
     () => {
-      previousKey = getCheapParsedNodeKeyIfSafe(previous)
-      nextKey = getCheapParsedNodeKeyIfSafe(next)
+      cheapResult = compareCheapParsedNodesIfSafe(previous, next)
     },
   )
 
-  if (previousKey != null && nextKey != null)
-    return previousKey === nextKey
+  if (cheapResult != null)
+    return cheapResult
 
   return isParsedNodeStableWithMetrics(previous, next, signatureTiming)
 }

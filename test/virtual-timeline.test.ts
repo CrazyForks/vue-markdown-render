@@ -1326,6 +1326,48 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('captures the next item when scrollTop is exactly on an item boundary', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(100)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          { id: 'a', kind: 'user-message', text: 'A' },
+          { id: 'b', kind: 'user-message', text: 'B' },
+          { id: 'c', kind: 'user-message', text: 'C' },
+        ],
+        threadKey: 'thread-boundary',
+        stickToBottom: false,
+        overscan: 0,
+        overscanPx: 0,
+        estimateItemHeight: () => 100,
+      },
+    })
+
+    await flushAll()
+
+    const root = wrapper.get('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    root.scrollTop = 100
+    root.dispatchEvent(new Event('scroll'))
+    await nextTick()
+
+    expect((wrapper.vm as any).captureThreadState().outerAnchor).toEqual({
+      type: 'item',
+      itemKey: 'b',
+      offsetWithinItemPx: 0,
+    })
+
+    wrapper.unmount()
+  })
+
   it('keeps exact bottom pinning across consecutive markdown height growth before reconcile', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)

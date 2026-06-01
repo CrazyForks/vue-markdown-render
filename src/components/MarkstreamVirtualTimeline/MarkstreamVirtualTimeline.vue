@@ -181,7 +181,7 @@ class TimelineFenwickTree {
     return sum
   }
 
-  lowerBound(offset: number) {
+  lowerBound(offset: number, mode: 'gte' | 'gt' = 'gte') {
     const count = this.tree.length - 1
     if (count <= 0)
       return 0
@@ -198,9 +198,16 @@ class TimelineFenwickTree {
     let sum = 0
     for (; bit > 0; bit >>= 1) {
       const next = index + bit
-      if (next < this.tree.length && sum + this.tree[next]! < offset) {
-        index = next
-        sum += this.tree[next]!
+      if (next < this.tree.length) {
+        const nextSum = sum + this.tree[next]!
+        const shouldAdvance = mode === 'gt'
+          ? nextSum <= offset
+          : nextSum < offset
+
+        if (shouldAdvance) {
+          index = next
+          sum = nextSum
+        }
       }
     }
 
@@ -280,9 +287,9 @@ function updateLayoutRecordSize(key: string, size: number) {
   layoutRevision.value += 1
 }
 
-function lowerBoundRecordByOffset(offset: number) {
+function lowerBoundRecordByOffset(offset: number, mode: 'gte' | 'gt' = 'gte') {
   void layoutRevision.value
-  return layoutSizeTree.value.lowerBound(offset)
+  return layoutSizeTree.value.lowerBound(offset, mode)
 }
 
 const effectiveOverscanItems = computed(() => {
@@ -312,7 +319,7 @@ const visibleWindow = computed(() => {
   const viewportStart = getLayoutViewportStart()
   const viewportEnd = viewportStart + Math.max(1, viewportHeight.value)
 
-  let start = lowerBoundRecordByOffset(Math.max(0, viewportStart - overscanPx))
+  let start = lowerBoundRecordByOffset(Math.max(0, viewportStart - overscanPx), 'gt')
   let end = lowerBoundRecordByOffset(Math.min(layout.value.totalHeight, viewportEnd + overscanPx)) + 1
 
   start = Math.max(0, start - overscanItems)
@@ -1111,7 +1118,7 @@ function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
 
   const layoutScrollTop = getLayoutViewportStart()
 
-  const index = lowerBoundRecordByOffset(layoutScrollTop)
+  const index = lowerBoundRecordByOffset(layoutScrollTop, 'gt')
   const record = layout.value.records[index]
   if (record) {
     const recordOffset = getRecordOffset(record)

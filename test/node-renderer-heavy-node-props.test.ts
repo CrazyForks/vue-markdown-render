@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it } from 'vitest'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, inject } from 'vue'
 import MermaidBlockNode from '../src/components/MermaidBlockNode'
 import NodeRenderer from '../src/components/NodeRenderer'
 import { removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
@@ -36,6 +36,18 @@ const GenericCodeBlockProbe = defineComponent({
       'class': 'generic-code-block-probe',
       'data-language': String((props.node as any)?.language ?? ''),
       'data-show-header': String(props.showHeader),
+    })
+  },
+})
+
+const FadeProbe = defineComponent({
+  name: 'FadeProbe',
+  setup() {
+    const fade = inject<{ value?: boolean } | undefined>('markstreamFade', undefined)
+
+    return () => h('div', {
+      'class': 'fade-probe',
+      'data-fade': String(fade?.value),
     })
   },
 })
@@ -143,6 +155,26 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     expect(wrapper.get('a[href="https://vuejs.org"]').attributes('title')).toBe('https://vuejs.org')
   })
 
+  it('falls back to docs mode for invalid runtime mode input', async () => {
+    setCustomComponents(customId, {
+      paragraph: FadeProbe,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        mode: 'invalid' as any,
+        content: 'hello',
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.get('.fade-probe').attributes('data-fade')).toBe('true')
+  })
+
   it('honors explicit pre code renderer in the default mode', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
@@ -162,6 +194,54 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
 
     expect(wrapper.find('pre[data-markstream-pre="1"]').exists()).toBe(true)
     expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
+  })
+
+  it('ignores invalid runtime codeRenderer values', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        mode: 'chat',
+        codeRenderer: 'invalid' as any,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.find('pre[data-markstream-pre="1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
+  })
+
+  it('uses codeBlockProps for Mermaid fences when codeRenderer is pre', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        codeRenderer: 'pre',
+        codeBlockProps: {
+          showLineNumbers: true,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'mermaid',
+            code: 'graph LR\nA-->B\n',
+            raw: '```mermaid\ngraph LR\nA-->B\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.find('[data-markstream-mermaid="1"]').exists()).toBe(false)
+    const pre = wrapper.get('pre[data-markstream-pre="1"]')
+    expect(pre.text()).toContain('graph LR')
+    expect(pre.attributes('data-markstream-line-numbers')).toBe('1')
   })
 
   it('renders a reserved Mermaid shell before the async component resolves', () => {
