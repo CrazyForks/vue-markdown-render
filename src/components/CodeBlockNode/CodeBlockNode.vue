@@ -1113,7 +1113,8 @@ function measureRenderedDiffHeight(container: HTMLElement): number | null {
     return null
   try {
     const hostRect = container.getBoundingClientRect()
-    if (hostRect.height <= 0)
+    const hostStyle = window.getComputedStyle(container)
+    if (hostStyle.display === 'none' || hostStyle.visibility === 'hidden')
       return null
 
     const selectors = [
