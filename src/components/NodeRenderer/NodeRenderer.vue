@@ -5107,7 +5107,7 @@ let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
 let typewriterCursorRaf: number | null = null
 let lastTypewriterContentLength = 0
 let lastTypewriterVisibleLength = 0
-const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image'])
+const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image', 'thematic_break'])
 
 function shouldSkipTypewriterCursorForNode(node: unknown) {
   if (!node || typeof node !== 'object')
@@ -5226,7 +5226,6 @@ function updateTypewriterCursorPosition() {
   const root = containerRef.value
   const cursor = typewriterCursorRef.value
   const searchRoot = getTypewriterCursorSearchRoot()
-  const rootRect = root.getBoundingClientRect()
   cursor.style.visibility = 'hidden'
   if (!searchRoot)
     return
@@ -5248,6 +5247,7 @@ function updateTypewriterCursorPosition() {
     const rect = rects?.[rects.length - 1] ?? lastText.parentElement?.getBoundingClientRect()
 
     if (rect) {
+      const rootRect = root.getBoundingClientRect()
       left = rect.right - rootRect.left + root.scrollLeft
       top = rect.top - rootRect.top + root.scrollTop
       height = rect.height || height

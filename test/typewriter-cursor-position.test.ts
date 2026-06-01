@@ -128,4 +128,48 @@ describe('typewriter cursor position', () => {
 
     wrapper.unmount()
   })
+
+  it('cancels pending cursor RAF when cursor is hidden before the frame runs', async () => {
+    const queuedFrameIds: number[] = []
+    const cancelAnimationFrameSpy = vi.fn((id: number) => {
+      const index = queuedFrameIds.indexOf(id)
+      if (index >= 0)
+        queuedFrameIds.splice(index, 1)
+    })
+    let nextFrameId = 1
+
+    vi.stubGlobal('requestAnimationFrame', (() => {
+      const id = nextFrameId++
+      queuedFrameIds.push(id)
+      return id
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrameSpy as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: true,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello world' })
+    await flushAll()
+
+    expect(queuedFrameIds).toHaveLength(1)
+    const cursorFrameId = queuedFrameIds[0]
+
+    await wrapper.setProps({ final: true })
+    await flushAll()
+
+    expect(cancelAnimationFrameSpy).toHaveBeenCalledWith(cursorFrameId)
+    expect(queuedFrameIds).toHaveLength(0)
+
+    wrapper.unmount()
+  })
 })
