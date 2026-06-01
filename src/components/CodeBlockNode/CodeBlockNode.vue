@@ -1162,6 +1162,9 @@ function measureRenderedDiffHeight(container: HTMLElement): number | null {
 function hasVisibleDiffHiddenLines(container: HTMLElement): boolean {
   if (typeof window === 'undefined')
     return false
+  const hostRect = container.getBoundingClientRect()
+  if (hostRect.width <= 0 || hostRect.height <= 0)
+    return false
   const nodes = container.querySelectorAll(
     '.editor.modified .diff-hidden-lines .center, .stream-monaco-diff-unchanged-bridge',
   )
@@ -1175,6 +1178,8 @@ function hasVisibleDiffHiddenLines(container: HTMLElement): boolean {
       continue
     const rect = node.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0)
+      continue
+    if (rect.bottom <= hostRect.top || rect.top >= hostRect.bottom)
       continue
     return true
   }
@@ -1824,11 +1829,9 @@ function updateCollapsedHeight() {
       ? (
           hasVisibleCollapsedDiffSummary
             ? measuredDiffHeight
-            : (
-                estimatedDiffHeight != null && estimatedDiffHeight > max
-                  ? Math.max(measuredDiffHeight ?? 0, estimatedDiffHeight)
-                  : measuredDiffHeight ?? estimatedDiffHeight
-              )
+            : estimatedDiffHeight != null
+              ? Math.max(measuredDiffHeight ?? 0, estimatedDiffHeight)
+              : measuredDiffHeight
         )
       : computeContentHeight()
     // 1) 有实时内容高度 -> 采用并记忆原始内容高度（未裁剪前），用于下一次恢复

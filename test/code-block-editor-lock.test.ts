@@ -1501,6 +1501,121 @@ describe('codeBlockNode diff defaults', () => {
     wrapper.unmount()
   })
 
+  it('keeps done diff height from collapsing to a partial render after the fallback floor is released', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let modelLineCount = 1
+    let didUpdateDiff: (() => void) | null = null
+    const rect = (top: number, height: number, width = 240) => ({
+      x: 0,
+      y: top,
+      width,
+      height,
+      top,
+      left: 0,
+      right: width,
+      bottom: top + height,
+      toJSON: () => ({}),
+    }) as DOMRect
+    const setRect = (node: Element | null, top: number, height: number, width = 240) => {
+      if (!(node instanceof HTMLElement))
+        return
+      Object.defineProperty(node, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(top, height, width),
+      })
+    }
+    const makeSideEditor = () => ({
+      getModel: () => ({ getLineCount: () => modelLineCount }),
+      getOption: () => 18,
+      getContentHeight: () => 24,
+      layout: vi.fn(),
+      onDidContentSizeChange: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+    })
+    const diffView = {
+      getLineChanges: vi.fn(() => []),
+      getOriginalEditor: vi.fn(() => makeSideEditor()),
+      getModifiedEditor: vi.fn(() => makeSideEditor()),
+      onDidUpdateDiff: vi.fn((listener: () => void) => {
+        didUpdateDiff = listener
+        return { dispose: vi.fn() }
+      }),
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+    }
+
+    helpers.getDiffEditorView.mockReturnValue(diffView as any)
+    helpers.createDiffEditor.mockImplementation(async (el: HTMLElement) => {
+      Object.defineProperty(el, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(0, Number.parseFloat(el.style.height || '') || 18, 480),
+      })
+      el.innerHTML = `
+        <div class="monaco-diff-editor">
+          <div class="editor original">
+            <div class="view-lines">
+              <div class="view-line" style="height:18px"></div>
+            </div>
+          </div>
+          <div class="editor modified">
+            <div class="view-lines">
+              <div class="view-line" style="height:18px"></div>
+            </div>
+          </div>
+          <div class="stream-monaco-diff-unchanged-bridge">39 unmodified lines</div>
+        </div>
+      `
+      setRect(el.querySelector('.monaco-diff-editor'), 0, 18, 480)
+      for (const line of Array.from(el.querySelectorAll('.view-lines .view-line')))
+        setRect(line, 0, 18)
+      setRect(el.querySelector('.stream-monaco-diff-unchanged-bridge'), -1000, 24, 480)
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      attachTo: document.body,
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          originalCode: 'same',
+          updatedCode: 'changed',
+          code: '',
+          raw: '```diff\n-same\n+changed\n```',
+        },
+        loading: false,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          MAX_HEIGHT: 500,
+          diffHideUnchangedRegions: true,
+        },
+      },
+    })
+
+    try {
+      await waitForCreateDiffEditorCalls(1, helpers)
+      const editorHost = wrapper.get('.code-editor-container').element as HTMLElement
+
+      await vi.waitFor(() => {
+        expect(didUpdateDiff).toBeTypeOf('function')
+        expect(Number.parseFloat(editorHost.style.height || '0')).toBeLessThan(100)
+        expect(editorHost.style.minHeight).toBe('0px')
+      })
+
+      modelLineCount = 20
+      didUpdateDiff?.()
+      await flushPendingMicrotasks()
+
+      await vi.waitFor(() => {
+        expect(Number.parseFloat(editorHost.style.height || '0')).toBeGreaterThan(300)
+      })
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
   it('releases diff fallback height floor after unchanged lines are folded', async () => {
     const helpers = getStreamMonacoHelpers()
     const fullFallbackHeight = 41 * 18
