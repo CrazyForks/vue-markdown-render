@@ -1729,21 +1729,22 @@ export function parseInlineTokens(
         const last = tokens[i + 4]
         let index = 4
         let loading = true
+        let trailingAfterClose = ''
+        let trailingToken: MarkdownToken | null = null
         if (last?.type === 'text') {
           const lastContent = String(last.content ?? '')
           if (lastContent.startsWith(')')) {
             loading = false
-            const trailing = lastContent.slice(1)
-            if (trailing) {
-              last.content = trailing
-              last.raw = trailing
-            }
-            else {
-              index++
+            trailingAfterClose = lastContent.slice(1)
+            index++
+            if (trailingAfterClose) {
+              trailingToken = Object.assign(Object.create(Object.getPrototypeOf(last)), last) as MarkdownToken
+              trailingToken.content = trailingAfterClose
+              trailingToken.raw = trailingAfterClose
             }
           }
           else if (lastContent === '.') {
-            i++
+            index++
           }
         }
 
@@ -1762,6 +1763,8 @@ export function parseInlineTokens(
             loading,
           } as ParsedNode)
         }
+        if (trailingToken)
+          pushInlineTextContent(trailingAfterClose, trailingToken)
         i += index
         return true
       }

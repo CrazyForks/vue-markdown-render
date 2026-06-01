@@ -274,6 +274,41 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(second[0]?.children).toHaveLength(1)
   })
 
+  it('does not mutate cached stream tokens in markdown-link linkify fallback', () => {
+    const md = getMarkdown('stream-parser-linkify-tail-no-mutation')
+    ;(md as any).core.ruler.after('fix_link_tokens', 'test_linkify_markdown_tail_tokens', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (!inline)
+        return
+
+      inline.content = '[site](https://example.com) after'
+      inline.children = [
+        { type: 'text', content: '[site](', raw: '[site](' },
+        { type: 'link_open', tag: 'a', nesting: 1, markup: 'linkify', attrs: [['href', 'https://example.com']] },
+        { type: 'text', content: 'https://example.com', raw: 'https://example.com' },
+        { type: 'link_close', tag: 'a', nesting: -1, markup: 'linkify' },
+        { type: 'text', content: ') after', raw: ') after' },
+      ]
+    })
+
+    const source = 'placeholder'
+    const first = parseMarkdownToStructure(source, md, { final: false, streamParse: true }) as any[]
+    const cachedInline = (md as any).stream.peek().find((token: any) => token.type === 'inline')
+    const cachedTrailing = cachedInline?.children?.[4]
+
+    expect(cachedTrailing?.content).toBe(') after')
+    expect(cachedTrailing?.raw).toBe(') after')
+
+    const second = parseMarkdownToStructure(source, md, { final: false, streamParse: true }) as any[]
+
+    expect(getStreamStats(md).cacheHits).toBeGreaterThan(0)
+    expect(second).toEqual(first)
+
+    const serialized = JSON.stringify(second[0]?.children)
+    expect(serialized).toContain('after')
+    expect(serialized).not.toContain(') after')
+  })
+
   it('does not clone stream tokens without transform hooks', () => {
     const md = getMarkdown('stream-parser-skip-token-clone')
     ;(md as any).core.ruler.push('test_large_token_meta', (state: any) => {
