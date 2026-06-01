@@ -2734,6 +2734,87 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('updates measured item height without re-estimating the full timeline', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    let firstItemHeight = 50
+    const resizeCallbacks = new WeakMap<Element, ResizeObserverCallback>()
+
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      if (el.dataset.timelineFenwickItem === 'item-0')
+        return firstItemHeight
+      if (el.dataset.timelineFenwickItem)
+        return 50
+      return 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      if (el.dataset.timelineFenwickItem === 'item-0')
+        return firstItemHeight
+      if (el.dataset.timelineFenwickItem)
+        return 50
+      return 0
+    })
+    vi.stubGlobal('ResizeObserver', class {
+      callback: ResizeObserverCallback
+
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback
+      }
+
+      observe(element: Element) {
+        resizeCallbacks.set(element, this.callback)
+      }
+
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const estimateItemHeight = vi.fn(() => 50)
+    const items = Array.from({ length: 40 }, (_, index) => ({
+      kind: 'user-message',
+      id: `item-${index}`,
+      text: `Item ${index}`,
+    }))
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+        stickToBottom: false,
+        estimateItemHeight,
+      },
+      slots: {
+        default(props: any) {
+          return h('div', {
+            'ref': props.measureRef,
+            'data-timeline-fenwick-item': props.item.id,
+          }, props.item.text)
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    expect((wrapper.vm as any).getTotalHeight()).toBe(40 * 50)
+    estimateItemHeight.mockClear()
+
+    const firstItem = wrapper.get('[data-timeline-fenwick-item="item-0"]').element
+    firstItemHeight = 120
+    resizeCallbacks.get(firstItem)?.([], {} as ResizeObserver)
+    await nextTick()
+    await flushAnimationFrame()
+
+    expect((wrapper.vm as any).getTotalHeight()).toBe((40 * 50) + 70)
+    expect(estimateItemHeight).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
   it('preserves the outer anchor when an item above the viewport changes height', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)

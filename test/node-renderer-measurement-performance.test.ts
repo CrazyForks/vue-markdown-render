@@ -4,7 +4,12 @@ import { nextTick } from 'vue'
 import { flushAll } from './setup/flush-all'
 
 class CountingResizeObserver {
+  static constructorCalls = 0
   static observeCalls = 0
+
+  constructor() {
+    CountingResizeObserver.constructorCalls += 1
+  }
 
   observe() {
     CountingResizeObserver.observeCalls += 1
@@ -141,6 +146,7 @@ describe('node renderer measurement performance', () => {
   })
 
   it('still measures node heights when virtualization is on', async () => {
+    CountingResizeObserver.constructorCalls = 0
     CountingResizeObserver.observeCalls = 0
     vi.stubGlobal('ResizeObserver', CountingResizeObserver as any)
 
@@ -157,6 +163,7 @@ describe('node renderer measurement performance', () => {
     await flushAll()
 
     expect(CountingResizeObserver.observeCalls).toBeGreaterThan(0)
+    expect(CountingResizeObserver.constructorCalls).toBe(1)
     wrapper.unmount()
   })
 

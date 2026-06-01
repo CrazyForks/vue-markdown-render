@@ -1,5 +1,4 @@
-import { createApp, h, ref } from 'vue'
-import Tooltip from '../components/Tooltip/Tooltip.vue'
+import { ref } from 'vue'
 
 const visible = ref(false)
 const content = ref('')
@@ -12,6 +11,7 @@ const tooltipIsDark = ref<boolean | null>(null)
 
 let showTimer: ReturnType<typeof setTimeout> | null = null
 let hideTimer: ReturnType<typeof setTimeout> | null = null
+let showRequestId = 0
 
 function clearTimers() {
   if (showTimer) {
@@ -26,14 +26,20 @@ function clearTimers() {
 
 // Mount singleton Tooltip once
 let mounted = false
-function ensureMounted() {
+let mountPromise: Promise<void> | null = null
+
+async function ensureMounted() {
   if (mounted)
     return
   if (typeof document === 'undefined')
     return
 
-  try {
-    mounted = true
+  mountPromise ??= (async () => {
+    const [{ createApp, h }, { default: Tooltip }] = await Promise.all([
+      import('vue'),
+      import('../components/Tooltip/Tooltip.vue'),
+    ])
+
     const container = document.createElement('div')
     container.setAttribute('data-singleton-tooltip', '1')
     document.body.appendChild(container)
@@ -54,9 +60,15 @@ function ensureMounted() {
     }
 
     createApp(App).mount(container)
+    mounted = true
+  })()
+
+  try {
+    await mountPromise
   }
   catch (err) {
     mounted = false
+    mountPromise = null
     console.warn('[markstream-vue] Failed to mount Tooltip component. Tooltips will be disabled.', err)
   }
 }
@@ -71,9 +83,14 @@ export function showTooltipForAnchor(
 ) {
   if (!el)
     return
+  const requestId = ++showRequestId
   ensureMounted()
   clearTimers()
-  const doShow = () => {
+  const doShow = async () => {
+    await ensureMounted()
+    if (!mounted || requestId !== showRequestId)
+      return
+
     tooltipId.value = `tooltip-${Date.now()}-${Math.floor(Math.random() * 1000)}`
     anchorEl.value = el
     content.value = text
@@ -90,11 +107,12 @@ export function showTooltipForAnchor(
     catch {}
   }
   if (immediate)
-    doShow()
+    void doShow()
   else showTimer = setTimeout(doShow, 80)
 }
 
 export function hideTooltip(immediate = false) {
+  showRequestId += 1
   clearTimers()
   const doHide = () => {
     if (anchorEl.value && tooltipId.value) {

@@ -51,7 +51,6 @@ import SuperscriptNode from './components/SuperscriptNode'
 import TableNode from './components/TableNode'
 import TextNode from './components/TextNode'
 import ThematicBreakNode from './components/ThematicBreakNode'
-import Tooltip from './components/Tooltip'
 import VmrContainerNode from './components/VmrContainerNode'
 import { useMarkstreamVirtualAdapter } from './composables/useMarkstreamVirtualAdapter'
 import { setDefaultI18nMap } from './composables/useSafeI18n'
@@ -76,6 +75,7 @@ const MathInlineNode = definePublicAsyncComponent<MathInlineNodeProps>(() => imp
 const MermaidBlockNode = definePublicAsyncComponent<MermaidBlockNodeProps>(() => import('./components/MermaidBlockNode'))
 const InfographicBlockNode = definePublicAsyncComponent<InfographicBlockNodeProps>(() => import('./components/InfographicBlockNode'))
 const D2BlockNode = definePublicAsyncComponent<D2BlockNodeProps>(() => import('./components/D2BlockNode'))
+const Tooltip = definePublicAsyncComponent<Record<string, unknown>>(() => import('./components/Tooltip'))
 const MarkstreamVirtualTimeline = definePublicAsyncComponent<MarkstreamVirtualTimelineProps<any>>(
   () => import('./components/MarkstreamVirtualTimeline'),
 )
@@ -150,6 +150,8 @@ export type {
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualScrollSharedOptions,
   MarkstreamVirtualState,
+  NodeRendererCodeRenderer,
+  NodeRendererMode,
   NodeRendererProps,
 } from './types/node-renderer-props'
 // Export centralized props interfaces so they appear in package d.ts

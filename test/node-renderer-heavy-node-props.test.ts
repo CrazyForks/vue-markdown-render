@@ -121,6 +121,49 @@ afterEach(() => {
 })
 
 describe('nodeRenderer heavy-node prop forwarding', () => {
+  it('uses lightweight chat mode defaults for code blocks and tooltips', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        mode: 'chat',
+        content: [
+          '[Vue](https://vuejs.org)',
+          '',
+          '```ts',
+          'console.log(1)',
+          '```',
+        ].join('\n'),
+        final: true,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.find('pre[data-markstream-pre="1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
+    expect(wrapper.get('a[href="https://vuejs.org"]').attributes('title')).toBe('https://vuejs.org')
+  })
+
+  it('honors explicit pre code renderer in the default mode', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        codeRenderer: 'pre',
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.find('pre[data-markstream-pre="1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
+  })
+
   it('renders a reserved Mermaid shell before the async component resolves', () => {
     const wrapper = mount(NodeRenderer, {
       props: {

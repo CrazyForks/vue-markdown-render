@@ -11,6 +11,8 @@ import type {
 } from './component-props'
 
 export type NodeRendererCodeBlockProps = Partial<Omit<CodeBlockNodeProps, 'node'>> & Record<string, unknown>
+export type NodeRendererMode = 'docs' | 'chat' | 'minimal'
+export type NodeRendererCodeRenderer = 'pre' | 'shiki' | 'monaco'
 
 export type MarkstreamVirtualPhase
   = | 'estimating'
@@ -278,6 +280,8 @@ export interface NodeRendererProps {
    * and are emitted as custom nodes (e.g. ['thinking']). Forwarded to `getMarkdown()`.
    */
   customHtmlTags?: readonly string[]
+  /** Preset renderer tuning. Default keeps the existing docs/rich path. */
+  mode?: NodeRendererMode
   /** HTML rendering policy for html_block/html_inline nodes. Default: safe */
   htmlPolicy?: HtmlPolicy
   /** Enable priority rendering for visible viewport area */
@@ -294,6 +298,8 @@ export interface NodeRendererProps {
   codeBlockLightTheme?: CodeBlockMonacoTheme
   /** Monaco editor options forwarded to every `CodeBlockNode`. */
   codeBlockMonacoOptions?: CodeBlockMonacoOptions
+  /** Code block renderer. `renderCodeBlocksAsPre` still takes precedence when true. */
+  codeRenderer?: NodeRendererCodeRenderer
   /** If true, render all `code_block` nodes as plain <pre><code> blocks instead of the full CodeBlockNode */
   renderCodeBlocksAsPre?: boolean
   /** Minimum width forwarded to CodeBlockNode (px or CSS unit) */

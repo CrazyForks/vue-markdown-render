@@ -12,9 +12,11 @@ import type {
   MarkstreamVirtualPhase,
   MarkstreamVirtualReason,
   MarkstreamVirtualState,
+  NodeRendererCodeRenderer,
+  NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
-import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -131,6 +133,103 @@ const emit = defineEmits<{
   (e: 'anchor-change', payload: MarkstreamVirtualAnchor): void
 }>()
 
+const instance = getCurrentInstance()
+const RENDERER_MODE_DEFAULTS: Record<NodeRendererMode, Pick<
+  NodeRendererProps,
+  | 'showTooltips'
+  | 'fade'
+  | 'batchRendering'
+  | 'initialRenderBatchSize'
+  | 'renderBatchSize'
+  | 'renderBatchDelay'
+  | 'renderBatchBudgetMs'
+  | 'renderBatchIdleTimeoutMs'
+  | 'deferNodesUntilVisible'
+  | 'maxLiveNodes'
+  | 'liveNodeBuffer'
+  | 'nodeVirtual'
+>> = {
+  docs: {
+    showTooltips: true,
+    fade: true,
+    batchRendering: true,
+    initialRenderBatchSize: 40,
+    renderBatchSize: 80,
+    renderBatchDelay: 16,
+    renderBatchBudgetMs: 6,
+    renderBatchIdleTimeoutMs: 120,
+    deferNodesUntilVisible: true,
+    maxLiveNodes: 320,
+    liveNodeBuffer: 60,
+    nodeVirtual: 'auto',
+  },
+  chat: {
+    showTooltips: false,
+    fade: false,
+    batchRendering: true,
+    initialRenderBatchSize: 16,
+    renderBatchSize: 16,
+    renderBatchDelay: 8,
+    renderBatchBudgetMs: 4,
+    renderBatchIdleTimeoutMs: 120,
+    deferNodesUntilVisible: true,
+    maxLiveNodes: 0,
+    liveNodeBuffer: 0,
+    nodeVirtual: 'auto',
+  },
+  minimal: {
+    showTooltips: false,
+    fade: false,
+    batchRendering: true,
+    initialRenderBatchSize: 16,
+    renderBatchSize: 16,
+    renderBatchDelay: 8,
+    renderBatchBudgetMs: 4,
+    renderBatchIdleTimeoutMs: 120,
+    deferNodesUntilVisible: true,
+    maxLiveNodes: 0,
+    liveNodeBuffer: 0,
+    nodeVirtual: 'auto',
+  },
+}
+
+function toKebabPropName(name: string) {
+  return name.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`)
+}
+
+function hasExplicitProp(name: keyof NodeRendererProps) {
+  const rawProps = instance?.vnode.props as Record<string, unknown> | null | undefined
+  if (!rawProps)
+    return false
+
+  const camelName = String(name)
+  return Object.prototype.hasOwnProperty.call(rawProps, camelName)
+    || Object.prototype.hasOwnProperty.call(rawProps, toKebabPropName(camelName))
+}
+
+const resolvedMode = computed<NodeRendererMode>(() => props.mode ?? 'docs')
+const resolvedCodeRenderer = computed<NodeRendererCodeRenderer>(() => {
+  if (props.renderCodeBlocksAsPre === true)
+    return 'pre'
+
+  if (props.codeRenderer)
+    return props.codeRenderer
+
+  if (hasExplicitProp('renderCodeBlocksAsPre') && props.renderCodeBlocksAsPre === false)
+    return 'monaco'
+
+  return resolvedMode.value === 'docs' ? 'monaco' : 'pre'
+})
+const resolvedModeDefaults = computed(() => RENDERER_MODE_DEFAULTS[resolvedMode.value])
+const rendererProps = new Proxy(props, {
+  get(target, key, receiver) {
+    if (typeof key === 'string' && key in resolvedModeDefaults.value && !hasExplicitProp(key as keyof NodeRendererProps))
+      return resolvedModeDefaults.value[key as keyof typeof resolvedModeDefaults.value]
+
+    return Reflect.get(target, key, receiver)
+  },
+}) as Readonly<NodeRendererProps>
+
 /* eslint-disable vue/custom-event-name-casing -- Public virtualScroll events are kebab-case. */
 function emitHeightChange(metrics: MarkstreamVirtualMetrics) {
   emit('height-change', metrics)
@@ -213,7 +312,7 @@ const {
   resolvedHtmlPolicy,
   inheritedSmoothStreaming,
   ownsTypewriterCursor,
-} = useResolvedRendererOptions(props)
+} = useResolvedRendererOptions(rendererProps)
 const {
   resolveViewportRoot,
   resolveScrollContainer,
@@ -227,7 +326,7 @@ const {
 provide('markstreamShowTooltips', resolvedShowTooltips)
 provide('markstreamHtmlPolicy', resolvedHtmlPolicy)
 provide('markstreamTypewriter', computed(() => props.typewriter !== false))
-provide('markstreamFade', computed(() => props.fade !== false))
+provide('markstreamFade', computed(() => rendererProps.fade !== false))
 provide('markstreamTypewriterCursor', computed(() => true))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)
@@ -238,7 +337,7 @@ const {
   smoothStreamingEnabled,
   renderContent,
   effectiveFinal,
-} = useSmoothStreamingBridge(props, {
+} = useSmoothStreamingBridge(rendererProps, {
   isClient,
   inheritedSmoothStreaming,
 })
@@ -347,11 +446,13 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   customMarkdownIt: props.customMarkdownIt,
   htmlPolicy: resolvedHtmlPolicy.value,
   viewportPriority: props.viewportPriority,
-  codeBlockStream: props.codeBlockStream,
+  mode: resolvedMode.value,
+  codeRenderer: resolvedCodeRenderer.value,
+  codeBlockStream: rendererProps.codeBlockStream,
   codeBlockDarkTheme: props.codeBlockDarkTheme,
   codeBlockLightTheme: props.codeBlockLightTheme,
   codeBlockMonacoOptions: props.codeBlockMonacoOptions,
-  renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
+  renderCodeBlocksAsPre: rendererProps.renderCodeBlocksAsPre,
   codeBlockMinWidth: props.codeBlockMinWidth,
   codeBlockMaxWidth: props.codeBlockMaxWidth,
   codeBlockProps: props.codeBlockProps,
@@ -364,7 +465,7 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   typewriter: props.typewriter,
   smoothStreamingOptions: props.smoothStreamingOptions,
   parseCoalesceMs: props.parseCoalesceMs,
-  fade: props.fade,
+  fade: rendererProps.fade,
 }))
 provide('markstreamNestedRendererProps', nestedRendererProps)
 const parsedNodesIdentity = computed(() => parsedNodes.value)
@@ -430,15 +531,15 @@ const experimentProbeWidth = computed(() => {
   const measured = getMeasuredContainerWidth()
   return measured > 0 ? Math.max(1, Math.round(measured)) : 640
 })
-const maxLiveNodesResolved = computed(() => Math.max(1, props.maxLiveNodes ?? 320))
+const maxLiveNodesResolved = computed(() => Math.max(1, rendererProps.maxLiveNodes ?? 320))
 const virtualizationEnabled = computed(() => {
   if (renderAsFragment.value)
     return false
-  if (props.nodeVirtual === false)
+  if (rendererProps.nodeVirtual === false)
     return false
-  if ((props.maxLiveNodes ?? 0) <= 0)
+  if ((rendererProps.maxLiveNodes ?? 0) <= 0)
     return false
-  if (props.nodeVirtual === true)
+  if (rendererProps.nodeVirtual === true)
     return parsedNodes.value.length > 0
   return parsedNodes.value.length > maxLiveNodesResolved.value
 })
@@ -475,13 +576,15 @@ const {
   previousRenderContext,
   adaptiveBatchSize,
   previousBatchConfig,
-} = useBatchRenderingState(props, {
+} = useBatchRenderingState(rendererProps, {
   isClient,
   isTestEnv,
   renderAsFragment,
 })
 const nodeSlotElements = new Map<number, HTMLElement | null>()
-const nodeContentResizeObservers = new Map<number, ResizeObserver>()
+const nodeContentResizeObserverTargets = new Map<number, HTMLElement>()
+const nodeContentResizeObserverIndexes = new WeakMap<Element, number>()
+let nodeContentResizeObserver: ResizeObserver | null = null
 const codeBlockRenderCache = new WeakMap<object, { signature: string, node: ParsedNode }>()
 const nodeHeightSignatures = new Map<number, string>()
 const nodeSlotVersion = ref(0)
@@ -631,11 +734,11 @@ function importHeightCache(
 const deferNodes = computed(() => {
   if (renderAsFragment.value)
     return false
-  if (props.deferNodesUntilVisible === false)
+  if (rendererProps.deferNodesUntilVisible === false)
     return false
   // In the incremental/batched mode (`maxLiveNodes <= 0`), placeholders are
   // driven by the batch scheduler rather than viewport deferral.
-  if ((props.maxLiveNodes ?? 0) <= 0)
+  if ((rendererProps.maxLiveNodes ?? 0) <= 0)
     return false
   // When virtualization is active, the virtual window already limits DOM work.
   // Keep rendering immediate within that window (no placeholders).
@@ -653,7 +756,7 @@ const {
   focusIndex,
   liveRange,
   updateLiveRange,
-} = useLiveRangeState(props, {
+} = useLiveRangeState(rendererProps, {
   parsedNodeCount,
   virtualizationEnabled,
   maxLiveNodesResolved,
@@ -1043,7 +1146,13 @@ function setupExperimentResizeObserver() {
   experimentResizeObserver.observe(containerRef.value)
 }
 
-const codeBlockComponent = computed(() => props.renderCodeBlocksAsPre ? PreCodeNode : CodeBlockNodeAsync)
+const codeBlockComponent = computed(() => {
+  if (resolvedCodeRenderer.value === 'pre')
+    return PreCodeNode
+  if (resolvedCodeRenderer.value === 'shiki')
+    return MarkdownCodeBlockNode
+  return CodeBlockNodeAsync
+})
 
 function resolveCodeBlockRendererKind(node: ParsedNode) {
   if (node.type !== 'code_block')
@@ -1506,8 +1615,12 @@ function getVirtualRendererLayoutKey() {
 
   return [
     props.isDark ? 'dark' : 'light',
-    props.renderCodeBlocksAsPre ? 'code-pre' : 'code-rich',
-    props.codeBlockStream === false ? 'code-static' : 'code-stream',
+    resolvedCodeRenderer.value === 'monaco'
+      ? 'code-rich'
+      : resolvedCodeRenderer.value === 'pre'
+        ? 'code-pre'
+        : 'code-shiki',
+    rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
     stringifyVirtualToken(props.codeBlockMinWidth),
     stringifyVirtualToken(props.codeBlockMaxWidth),
     stringifyVirtualToken(monaco?.fontSize),
@@ -3859,6 +3972,41 @@ function measureTrackedNodeHeights() {
   }
 }
 
+function getNodeContentResizeObserver() {
+  if (nodeContentResizeObserver || typeof ResizeObserver === 'undefined')
+    return nodeContentResizeObserver
+
+  nodeContentResizeObserver = new ResizeObserver((entries) => {
+    if (!entries.length) {
+      measureTrackedNodeHeights()
+      return
+    }
+
+    for (const entry of entries) {
+      const index = nodeContentResizeObserverIndexes.get(entry.target)
+      const el = nodeContentResizeObserverTargets.get(index ?? -1)
+      if (index != null && el)
+        measureNodeHeight(index, el)
+    }
+  })
+  return nodeContentResizeObserver
+}
+
+function unobserveNodeContentElement(index: number) {
+  const previous = nodeContentResizeObserverTargets.get(index)
+  if (!previous)
+    return
+
+  nodeContentResizeObserver?.unobserve(previous)
+  nodeContentResizeObserverTargets.delete(index)
+}
+
+function disconnectNodeContentResizeObserver() {
+  nodeContentResizeObserver?.disconnect()
+  nodeContentResizeObserver = null
+  nodeContentResizeObserverTargets.clear()
+}
+
 function clearFinalHeightConvergenceTimers() {
   while (finalHeightConvergenceTimers.length) {
     const timer = finalHeightConvergenceTimers.pop()
@@ -3896,11 +4044,7 @@ function setNodeContentRef(index: number, el: HTMLElement | null) {
       clearHeightSettlingTimer(id)
     nodeContentDeferredMeasureTimers.delete(index)
   }
-  const previousObserver = nodeContentResizeObservers.get(index)
-  if (previousObserver) {
-    previousObserver.disconnect()
-    nodeContentResizeObservers.delete(index)
-  }
+  unobserveNodeContentElement(index)
   if (!el || !shouldMeasureNodeHeights.value) {
     nodeContentElements.delete(index)
     nodeContentVersions.delete(index)
@@ -3911,12 +4055,11 @@ function setNodeContentRef(index: number, el: HTMLElement | null) {
     measureNodeHeight(index, el)
   }
   queueMicrotask(measure)
-  if (typeof ResizeObserver !== 'undefined') {
-    const observer = new ResizeObserver(() => {
-      measure()
-    })
+  const observer = getNodeContentResizeObserver()
+  if (observer) {
+    nodeContentResizeObserverTargets.set(index, el)
+    nodeContentResizeObserverIndexes.set(el, index)
     observer.observe(el)
-    nodeContentResizeObservers.set(index, observer)
   }
   if (typeof window !== 'undefined') {
     const deferredMeasureDelays = parsedNodes.value[index]?.type === 'code_block'
@@ -3941,9 +4084,7 @@ watch(
   (enabled) => {
     if (enabled)
       return
-    for (const observer of nodeContentResizeObservers.values())
-      observer.disconnect()
-    nodeContentResizeObservers.clear()
+    disconnectNodeContentResizeObserver()
     for (const timers of nodeContentDeferredMeasureTimers.values()) {
       for (const id of timers)
         clearHeightSettlingTimer(id)
@@ -4038,7 +4179,7 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
 const {
   cleanupBatchScheduler,
 } = useBatchRenderingScheduler({
-  props,
+  props: rendererProps,
   isClient,
   isTestEnv,
   parsedNodesIdentity,
@@ -4704,9 +4845,7 @@ onBeforeUnmount(() => {
   cleanupBatchScheduler()
   destroyNodeVisibilityState()
   clearContentStreamingTailIdleTimer()
-  for (const observer of nodeContentResizeObservers.values())
-    observer.disconnect()
-  nodeContentResizeObservers.clear()
+  disconnectNodeContentResizeObserver()
   for (const timers of nodeContentDeferredMeasureTimers.values()) {
     for (const id of timers)
       clearHeightSettlingTimer(id)
@@ -4816,7 +4955,7 @@ const nodeComponents: Partial<CustomComponents> = {
 const indexPrefix = computed(() => getCurrentIndexPrefix())
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode
-  stream: props.codeBlockStream,
+  stream: rendererProps.codeBlockStream,
   darkTheme: props.codeBlockDarkTheme,
   lightTheme: props.codeBlockLightTheme,
   monacoOptions: props.codeBlockMonacoOptions,
@@ -4837,7 +4976,7 @@ const infographicBindings = computed(() => ({
 }))
 const nonCodeBindings = computed(() => ({
   typewriter: props.typewriter,
-  fade: props.fade,
+  fade: rendererProps.fade,
   // Forward customHtmlTags for non-whitelisted tag detection in child components
   customHtmlTags: mergedParseOptions.value.customHtmlTags,
 }))
@@ -5015,6 +5154,11 @@ function getNodeComponent(node: ParsedNode, language?: string) {
     const customForLanguage = lang ? customComponents[lang] : undefined
     if (customForLanguage)
       return customForLanguage
+
+    if (resolvedCodeRenderer.value === 'pre') {
+      const customCodeBlock = customComponents.code_block
+      return customCodeBlock || PreCodeNode
+    }
 
     // Keep Mermaid blocks routed to MermaidBlockNode unless a specific
     // `mermaid` override is provided.
@@ -5547,7 +5691,7 @@ onBeforeUnmount(() => {
         >
           <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
           <transition
-            v-if="!item.isCodeBlock && props.fade !== false"
+            v-if="!item.isCodeBlock && rendererProps.fade !== false"
             name="fade"
             appear
           >

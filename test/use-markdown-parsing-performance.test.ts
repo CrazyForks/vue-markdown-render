@@ -766,6 +766,29 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('primes signatures only for the dirty tail after append reuse', () => {
+    const content = ref(buildParagraphs(6))
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    expect(state.parsedNodes.value.length).toBe(6)
+    logPerf.mockClear()
+
+    content.value = `${content.value}\n\nAppended paragraph.`
+    expect(state.parsedNodes.value.length).toBe(7)
+
+    const data = logPerf.mock.calls.at(-1)?.[1]
+    expect(data).toMatchObject({
+      reusedNodeCount: 6,
+      dirtyStartIndex: 6,
+      stablePrefixNodeCount: 6,
+      dirtyTailNodeCount: 1,
+      primeSignatureCallCount: 1,
+    })
+
+    scope.stop()
+  })
+
   it('logs dirty tail range when appending into the last existing paragraph', () => {
     const content = ref('one\n\ntwo\n\nthree')
     const logPerf = vi.fn()

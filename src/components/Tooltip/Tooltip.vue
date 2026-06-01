@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { arrow as arrowMiddleware, autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps<{
@@ -23,10 +22,17 @@ const actualPlacement = ref<string>(props.placement ?? 'top')
 const ready = ref(false)
 
 let cleanupAutoUpdate: (() => void) | null = null
+let floatingPromise: Promise<typeof import('@floating-ui/dom')> | null = null
+
+function loadFloating() {
+  floatingPromise ??= import('@floating-ui/dom')
+  return floatingPromise
+}
 
 async function updatePosition() {
   if (!props.anchorEl || !tooltip.value)
     return
+  const { arrow: arrowMiddleware, computePosition, flip, offset, shift } = await loadFloating()
   const middleware = [
     offset(props.offset ?? 6),
     flip(),
@@ -85,12 +91,18 @@ watch(
           else {
             ready.value = true
           }
+          const { autoUpdate } = await loadFloating()
           cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, updatePosition)
         }
         catch {
-          await updatePosition()
           ready.value = true
-          cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, updatePosition)
+          if (props.anchorEl && tooltip.value) {
+            try {
+              const { autoUpdate } = await loadFloating()
+              cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, updatePosition)
+            }
+            catch {}
+          }
         }
       }
       else {

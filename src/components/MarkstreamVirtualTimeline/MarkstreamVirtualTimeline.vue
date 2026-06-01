@@ -10,7 +10,7 @@ import type {
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualState,
 } from '../../types/node-renderer-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, provide, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, provide, reactive, ref, shallowRef, watch } from 'vue'
 import {
   estimateMarkstreamTimelineItemHeight,
   getMarkstreamTimelineItemContent,
@@ -152,10 +152,81 @@ const timelineMeasurementKey = computed(() => {
   ].join(':')
 })
 
+class TimelineFenwickTree {
+  private tree: number[]
+  total: number
+
+  constructor(values: number[]) {
+    this.tree = Array.from({ length: values.length + 1 }, () => 0)
+    this.total = 0
+    values.forEach((value, index) => this.add(index, value))
+  }
+
+  add(index: number, delta: number) {
+    if (!Number.isFinite(delta) || delta === 0)
+      return
+
+    this.total += delta
+    for (let cursor = index + 1; cursor < this.tree.length; cursor += cursor & -cursor)
+      this.tree[cursor]! += delta
+  }
+
+  prefixSum(count: number) {
+    let cursor = Math.max(0, Math.min(count, this.tree.length - 1))
+    let sum = 0
+    while (cursor > 0) {
+      sum += this.tree[cursor]!
+      cursor -= cursor & -cursor
+    }
+    return sum
+  }
+
+  lowerBound(offset: number) {
+    const count = this.tree.length - 1
+    if (count <= 0)
+      return 0
+    if (offset <= 0)
+      return 0
+    if (offset >= this.total)
+      return count - 1
+
+    let index = 0
+    let bit = 1
+    while ((bit << 1) < this.tree.length)
+      bit <<= 1
+
+    let sum = 0
+    for (; bit > 0; bit >>= 1) {
+      const next = index + bit
+      if (next < this.tree.length && sum + this.tree[next]! < offset) {
+        index = next
+        sum += this.tree[next]!
+      }
+    }
+
+    return Math.min(index, count - 1)
+  }
+}
+
+const layoutRecords = shallowRef<TimelineRecord[]>([])
+const layoutRecordByKey = new Map<string, TimelineRecord>()
+const layoutSizeTree = shallowRef(new TimelineFenwickTree([]))
+const layoutRevision = ref(0)
+
 const layout = computed(() => {
+  void layoutRevision.value
+  return {
+    records: layoutRecords.value,
+    totalHeight: layoutSizeTree.value.total,
+  }
+})
+
+function rebuildLayoutRecords() {
   const records: TimelineRecord[] = []
-  let offset = 0
+  const sizes: number[] = []
   const renderScopeKey = getTimelineRenderScopeKey()
+
+  layoutRecordByKey.clear()
 
   for (let index = 0; index < props.items.length; index++) {
     const item = props.items[index]
@@ -169,43 +240,49 @@ const layout = computed(() => {
     }
     const size = getCompatibleItemSize(recordBase)
       ?? estimateMarkstreamTimelineItemHeight(item, index, props)
-
-    records.push({
+    const record = {
       ...recordBase,
       renderKey: `${renderScopeKey}:${key}`,
-      offset,
+      offset: 0,
       size,
       component: item?.component,
-    })
-
-    offset += size
-  }
-
-  return {
-    records,
-    totalHeight: offset,
-  }
-})
-
-function lowerBoundRecordByOffset(records: TimelineRecord[], offset: number) {
-  let low = 0
-  let high = Math.max(0, records.length - 1)
-  let answer = records.length
-
-  while (low <= high) {
-    const mid = (low + high) >> 1
-    const record = records[mid]!
-
-    if (record.offset + record.size >= offset) {
-      answer = mid
-      high = mid - 1
     }
-    else {
-      low = mid + 1
+
+    records.push(record)
+    sizes.push(size)
+    if (!layoutRecordByKey.has(key)) {
+      layoutRecordByKey.set(key, record)
     }
   }
 
-  return Math.min(Math.max(0, answer), Math.max(0, records.length - 1))
+  layoutRecords.value = records
+  layoutSizeTree.value = new TimelineFenwickTree(sizes)
+  layoutRevision.value += 1
+}
+
+function getRecordOffset(record: Pick<TimelineRecord, 'index'>) {
+  void layoutRevision.value
+  return layoutSizeTree.value.prefixSum(record.index)
+}
+
+function updateLayoutRecordSize(key: string, size: number) {
+  const record = layoutRecordByKey.get(key)
+  if (!record)
+    return
+
+  const next = Math.ceil(size)
+  const delta = next - record.size
+  if (delta === 0)
+    return
+
+  record.size = next
+  layoutSizeTree.value.add(record.index, delta)
+  layoutRevision.value += 1
+}
+
+function lowerBoundRecordByOffset(offset: number) {
+  void layoutRevision.value
+  return layoutSizeTree.value.lowerBound(offset)
 }
 
 const effectiveOverscanItems = computed(() => {
@@ -235,14 +312,8 @@ const visibleWindow = computed(() => {
   const viewportStart = getLayoutViewportStart()
   const viewportEnd = viewportStart + Math.max(1, viewportHeight.value)
 
-  let start = lowerBoundRecordByOffset(
-    records,
-    Math.max(0, viewportStart - overscanPx),
-  )
-  let end = lowerBoundRecordByOffset(
-    records,
-    Math.min(layout.value.totalHeight, viewportEnd + overscanPx),
-  ) + 1
+  let start = lowerBoundRecordByOffset(Math.max(0, viewportStart - overscanPx))
+  let end = lowerBoundRecordByOffset(Math.min(layout.value.totalHeight, viewportEnd + overscanPx)) + 1
 
   start = Math.max(0, start - overscanItems)
   end = Math.min(records.length, Math.max(end + overscanItems, start + 1))
@@ -250,15 +321,17 @@ const visibleWindow = computed(() => {
   const visibleRecords = records.slice(start, end)
   const first = visibleRecords[0]
   const last = visibleRecords[visibleRecords.length - 1]
+  const firstOffset = first ? getRecordOffset(first) : 0
+  const lastOffset = last ? getRecordOffset(last) : 0
 
   return {
     start,
     end,
     records: visibleRecords,
-    topSpacerHeight: first?.offset ?? 0,
+    topSpacerHeight: firstOffset,
     bottomSpacerHeight: Math.max(
       0,
-      layout.value.totalHeight - ((last?.offset ?? 0) + (last?.size ?? 0)),
+      layout.value.totalHeight - (lastOffset + (last?.size ?? 0)),
     ),
   }
 })
@@ -270,6 +343,28 @@ function getItemKey(item: any, index: number) {
 function getTimelineRenderScopeKey() {
   return normalizedThreadKey.value ?? 'timeline'
 }
+
+function getLayoutItemsSignature() {
+  return props.items.map((item, index) => [
+    getItemKey(item, index),
+    getMarkstreamTimelineItemKind(item, index, props),
+    isMarkstreamMarkdownTimelineItem(item, index, props) ? 1 : 0,
+    getMarkstreamTimelineItemRevision(item, index, props) ?? '',
+    getMarkstreamTimelineItemFinal(item, index, props) ? 1 : 0,
+    getMarkstreamTimelineItemContent(item, index, props).length,
+    item?.component ? 1 : 0,
+  ].join('\u0001')).join('\u0000')
+}
+
+watch(
+  () => [
+    getLayoutItemsSignature(),
+    timelineMeasurementKey.value,
+    normalizedThreadKey.value,
+  ],
+  () => rebuildLayoutRecords(),
+  { immediate: true, flush: 'sync' },
+)
 
 function getSessionKey(
   record: Pick<TimelineRecord, 'item' | 'index' | 'key'>,
@@ -348,7 +443,8 @@ function getCompatibleItemSize(
 }
 
 function findRecordByKey(key: string) {
-  return layout.value.records.find(record => record.key === key)
+  void layout.value
+  return layoutRecordByKey.get(key)
 }
 
 function isCompatibleMarkdownSource(
@@ -653,7 +749,7 @@ function scrollToIndex(index: number, align: 'start' | 'center' | 'end' = 'start
   if (!record)
     return
 
-  let offset = getScrollContentStart() + record.offset
+  let offset = getScrollContentStart() + getRecordOffset(record)
   if (align === 'center')
     offset -= (viewportHeight.value - record.size) / 2
   else if (align === 'end')
@@ -735,6 +831,7 @@ function setItemSize(key: string, size: number, source?: TimelineItemSizeSource)
     if (source)
       itemSizeSources.set(key, source)
     itemSizes.set(key, next)
+    updateLayoutRecordSize(key, next)
     scheduleThreadRestorePass()
     return
   }
@@ -749,6 +846,7 @@ function setItemSize(key: string, size: number, source?: TimelineItemSizeSource)
   if (source)
     itemSizeSources.set(key, source)
   itemSizes.set(key, next)
+  updateLayoutRecordSize(key, next)
   scheduleThreadStateRemember()
   scheduleScrollReconcileAfterSizeChange(restoreAnchor)
 }
@@ -999,11 +1097,12 @@ function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
   const layoutScrollTop = getLayoutViewportStart()
 
   for (const record of layout.value.records) {
-    if (layoutScrollTop >= record.offset && layoutScrollTop < record.offset + record.size) {
+    const recordOffset = getRecordOffset(record)
+    if (layoutScrollTop >= recordOffset && layoutScrollTop < recordOffset + record.size) {
       return {
         type: 'item',
         itemKey: record.key,
-        offsetWithinItemPx: layoutScrollTop - record.offset,
+        offsetWithinItemPx: layoutScrollTop - recordOffset,
       }
     }
   }
@@ -1128,7 +1227,7 @@ function resolveOuterAnchorOffset(anchor: MarkstreamThreadAnchor | undefined) {
   if (!record)
     return null
 
-  return getScrollContentStart() + record.offset + Math.max(0, anchor.offsetWithinItemPx)
+  return getScrollContentStart() + getRecordOffset(record) + Math.max(0, anchor.offsetWithinItemPx)
 }
 
 function restoreOuterAnchor(
@@ -1966,6 +2065,8 @@ function restoreThreadState(
     markdownStates.set(key, markdownState)
     seedMarkdownLogicalHeightFromState(key, markdownState)
   }
+
+  rebuildLayoutRecords()
 
   if (props.stickToBottom === true) {
     bottomPinned.value = true
