@@ -5105,6 +5105,7 @@ const typewriterCursorRef = ref<HTMLElement | null>(null)
 const showTypewriterCursor = ref(false)
 let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
 let typewriterCursorRaf: number | null = null
+let typewriterCursorRafVersion = 0
 let lastTypewriterContentLength = 0
 let lastTypewriterVisibleLength = 0
 const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image', 'thematic_break'])
@@ -5165,8 +5166,11 @@ function clearTypewriterCursorTimeout() {
 }
 
 function clearTypewriterCursorRaf() {
+  typewriterCursorRafVersion += 1
+
   if (typewriterCursorRaf == null)
     return
+
   cancelFrame?.(typewriterCursorRaf)
   typewriterCursorRaf = null
 }
@@ -5270,8 +5274,11 @@ function scheduleTypewriterCursorPositionUpdate() {
   if (typewriterCursorRaf != null)
     return
 
+  const version = typewriterCursorRafVersion
   const run = () => {
     typewriterCursorRaf = null
+    if (version !== typewriterCursorRafVersion)
+      return
     updateTypewriterCursorPosition()
   }
 
@@ -5327,7 +5334,8 @@ watch(
     lastTypewriterContentLength = nextLength
     lastTypewriterVisibleLength = nextVisibleLength
     showTypewriterCursor.value = true
-    hideTypewriterCursorElement()
+    if (typewriterCursorRef.value)
+      typewriterCursorRef.value.style.visibility = 'hidden'
     clearTypewriterCursorTimeout()
     await nextTick()
     scheduleTypewriterCursorPositionUpdate()

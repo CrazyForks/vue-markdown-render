@@ -36,11 +36,19 @@ describe('typewriter cursor position', () => {
 
   it('repositions while smooth visible content catches up after the source stops growing', async () => {
     const queuedFrames: FrameRequestCallback[] = []
+    const frameIds = new WeakMap<FrameRequestCallback, number>()
+    let nextFrameId = 1
     vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      const id = nextFrameId++
+      frameIds.set(cb, id)
       queuedFrames.push(cb)
-      return queuedFrames.length
+      return id
     }) as typeof requestAnimationFrame)
-    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', ((id: number) => {
+      const index = queuedFrames.findIndex(cb => frameIds.get(cb) === id)
+      if (index >= 0)
+        queuedFrames.splice(index, 1)
+    }) as typeof cancelAnimationFrame)
     const createTreeWalkerSpy = vi.spyOn(document, 'createTreeWalker')
 
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
@@ -101,7 +109,7 @@ describe('typewriter cursor position', () => {
     queuedFrames.length = 0
 
     await wrapper.setProps({
-      content: 'abcdefghij',
+      content: 'abcdefghijklmnopqrst',
     })
     await flushAll()
 
@@ -117,6 +125,7 @@ describe('typewriter cursor position', () => {
 
     await runNextFrame(queuedFrames, baseline + 100)
     await runNextFrame(queuedFrames, baseline + 116)
+    await runNextFrame(queuedFrames, baseline + 132)
 
     const secondVisibleLength = wrapper.get('.text-node').text().length
     expect(secondVisibleLength).toBeGreaterThan(firstVisibleLength)
@@ -125,6 +134,50 @@ describe('typewriter cursor position', () => {
     expect(createTreeWalkerSpy.mock.calls.every(([root]) => {
       return root instanceof HTMLElement && root.matches('.node-slot[data-node-index]')
     })).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('scans only the last rendered text node slot', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+    const createTreeWalkerSpy = vi.spyOn(document, 'createTreeWalker')
+
+    const originalCreateRange = document.createRange.bind(document)
+    vi.spyOn(document, 'createRange').mockImplementation(() => {
+      const range = originalCreateRange()
+      range.getClientRects = vi.fn(() => [
+        rect({ right: 40, top: 20, bottom: 40, height: 20 }),
+      ] as unknown as DOMRectList)
+      return range
+    })
+
+    const huge = 'x'.repeat(20_000)
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: true,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+    queuedFrames.length = 0
+
+    await wrapper.setProps({ content: `${huge}\n\nlast` })
+    await flushAll()
+    await runNextFrame(queuedFrames, performance.now() + 16)
+
+    const roots = createTreeWalkerSpy.mock.calls.map(([root]) => root as HTMLElement)
+    expect(roots.length).toBeGreaterThan(0)
+    expect(roots.every(root => root.matches('.node-slot[data-node-index="1"]'))).toBe(true)
 
     wrapper.unmount()
   })
@@ -169,6 +222,78 @@ describe('typewriter cursor position', () => {
 
     expect(cancelAnimationFrameSpy).toHaveBeenCalledWith(cursorFrameId)
     expect(queuedFrameIds).toHaveLength(0)
+
+    wrapper.unmount()
+  })
+
+  it('does not flash cursor when leaving nodes mode with unchanged content', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [
+          { type: 'paragraph', raw: 'node text', children: [{ type: 'text', content: 'node text', raw: 'node text' }] },
+        ],
+        content: 'already here',
+        typewriter: true,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+    expect(queuedFrames).toHaveLength(0)
+
+    await wrapper.setProps({ nodes: undefined })
+    await flushAll()
+
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+    expect(queuedFrames).toHaveLength(0)
+
+    await wrapper.setProps({ content: 'already here!' })
+    await flushAll()
+
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(true)
+    expect(queuedFrames).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
+  it('does not show cursor when content ends with a thematic break', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: true,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello\n\n---' })
+    await flushAll()
+
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+    expect(queuedFrames).toHaveLength(0)
 
     wrapper.unmount()
   })
