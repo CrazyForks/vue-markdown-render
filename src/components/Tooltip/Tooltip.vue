@@ -70,6 +70,39 @@ async function updatePosition() {
   }
 }
 
+function applyFallbackPosition() {
+  const anchor = props.anchorEl
+  if (!anchor)
+    return false
+
+  const rect = anchor.getBoundingClientRect()
+  const gap = props.offset ?? 6
+  const placement = props.placement ?? 'top'
+
+  let x = rect.left
+  let y = rect.top
+
+  if (placement === 'bottom') {
+    y = rect.bottom + gap
+  }
+  else if (placement === 'left') {
+    x = rect.left - gap
+  }
+  else if (placement === 'right') {
+    x = rect.right + gap
+  }
+  else {
+    y = rect.top - gap
+  }
+
+  style.value.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`
+  style.value.left = '0px'
+  style.value.top = '0px'
+  actualPlacement.value = placement
+  arrowStyle.value = {}
+  return true
+}
+
 watch(
   () => props.visible,
   async (v) => {
@@ -117,14 +150,21 @@ watch(
         catch {
           if (runId !== visibilityRunId || !props.visible)
             return
-          ready.value = false
+          ready.value = applyFallbackPosition()
           if (props.anchorEl && tooltip.value) {
             try {
               const { autoUpdate } = await loadFloating()
               if (runId !== visibilityRunId || !props.visible || !props.anchorEl || !tooltip.value)
                 return
               cleanupPositionObserver()
-              cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, updatePosition)
+              cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, async () => {
+                try {
+                  await updatePosition()
+                }
+                catch {
+                  applyFallbackPosition()
+                }
+              })
             }
             catch {}
           }
@@ -141,16 +181,25 @@ watch(
   },
 )
 
+let updateRunId = 0
+
 watch([
   () => props.anchorEl,
   () => props.placement,
   () => props.content,
 ], async () => {
+  const runId = ++updateRunId
+
   if (props.visible && props.anchorEl && tooltip.value) {
     await nextTick()
-    if (!props.visible || !props.anchorEl || !tooltip.value)
+    if (runId !== updateRunId || !props.visible || !props.anchorEl || !tooltip.value)
       return
-    await updatePosition()
+    try {
+      await updatePosition()
+    }
+    catch {
+      applyFallbackPosition()
+    }
   }
 })
 

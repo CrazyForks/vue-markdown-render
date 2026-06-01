@@ -352,17 +352,20 @@ function getTimelineRenderScopeKey() {
 }
 
 function getLayoutItemsSignature() {
-  return props.items.map((item, index) => [
-    getItemKey(item, index),
-    getMarkstreamTimelineItemKind(item, index, props),
-    isMarkstreamMarkdownTimelineItem(item, index, props) ? 1 : 0,
-    getMarkstreamTimelineItemRevision(item, index, props) ?? '',
-    getMarkstreamTimelineItemFinal(item, index, props) ? 1 : 0,
-    isMarkstreamMarkdownTimelineItem(item, index, props)
-      ? ''
-      : getMarkstreamTimelineItemContent(item, index, props).length,
-    item?.component ? 1 : 0,
-  ].join('\u0001')).join('\u0000')
+  return props.items.map((item, index) => {
+    const markdown = isMarkstreamMarkdownTimelineItem(item, index, props)
+    const estimatedSize = Math.ceil(estimateMarkstreamTimelineItemHeight(item, index, props))
+
+    return [
+      getItemKey(item, index),
+      getMarkstreamTimelineItemKind(item, index, props),
+      markdown ? 1 : 0,
+      getMarkstreamTimelineItemRevision(item, index, props) ?? '',
+      getMarkstreamTimelineItemFinal(item, index, props) ? 1 : 0,
+      Number.isFinite(estimatedSize) && estimatedSize > 0 ? estimatedSize : 0,
+      item?.component ? 1 : 0,
+    ].join('\u0001')
+  }).join('\u0000')
 }
 
 function getRecordItem(record: Pick<TimelineRecord, 'item' | 'index'>) {
@@ -1246,7 +1249,7 @@ function resolveOuterAnchorOffset(anchor: MarkstreamThreadAnchor | undefined) {
       - Math.max(0, anchor.distanceFromBottomPx)
   }
 
-  const record = layout.value.records.find(item => item.key === anchor.itemKey)
+  const record = findRecordByKey(anchor.itemKey)
 
   if (!record)
     return null

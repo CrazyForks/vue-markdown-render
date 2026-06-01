@@ -1,7 +1,7 @@
 import type { MarkstreamVirtualMetrics, MarkstreamVirtualState } from '../src/types/node-renderer-props'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { effectScope, h, inject, markRaw, nextTick } from 'vue'
+import { defineComponent, effectScope, h, inject, markRaw, nextTick, reactive } from 'vue'
 import MarkstreamVirtualTimeline from '../src/components/MarkstreamVirtualTimeline'
 import { useMarkstreamVirtualAdapter } from '../src/composables/useMarkstreamVirtualAdapter'
 import { flushAll } from './setup/flush-all'
@@ -2853,6 +2853,59 @@ describe('virtual timeline API', () => {
 
     expect((wrapper.vm as any).getTotalHeight()).toBe((40 * 50) + 70)
     expect(estimateItemHeight).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('rebuilds layout when estimated item height changes without an item signature change', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const state = reactive<{ items: any[] }>({
+      items: [
+        { kind: 'user-message', id: 'a1', text: 'Same text', density: 'compact' },
+        { kind: 'user-message', id: 'u1', text: 'Anchor' },
+      ],
+    })
+    const estimateItemHeight = vi.fn((item: any) => item.id === 'a1' && item.density === 'expanded' ? 180 : 60)
+    const Host = defineComponent({
+      setup() {
+        return () => h(MarkstreamVirtualTimeline, {
+          items: state.items,
+          threadKey: 'thread-a',
+          overscan: 10,
+          stickToBottom: false,
+          estimateItemHeight,
+        }, {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, props.item.text)
+          },
+        })
+      },
+    })
+
+    const wrapper = mount(Host, { attachTo: document.body })
+
+    await flushAll()
+    await nextTick()
+
+    const timeline = wrapper.getComponent(MarkstreamVirtualTimeline)
+    const timelineApi = (timeline.vm as any).$?.exposed
+    expect(timelineApi.getTotalHeight()).toBe(120)
+
+    estimateItemHeight.mockClear()
+    state.items[0].density = 'expanded'
+    await nextTick()
+    await flushAll()
+
+    expect(timelineApi.getTotalHeight()).toBe(240)
+    expect(estimateItemHeight).toHaveBeenCalled()
 
     wrapper.unmount()
   })

@@ -4,6 +4,7 @@ const process = require('node:process')
 
 const distDir = path.resolve(__dirname, '..', 'dist')
 const typesDir = path.join(distDir, 'types')
+const STRIP_DTS_COMMENTS = process.env.STRIP_DTS_COMMENTS === '1'
 
 function rewriteTypesEntry(content) {
   return content
@@ -16,7 +17,14 @@ function referencesTypesDir(content) {
 }
 
 function stripDeclarationComments(content) {
-  return content.replace(/\/\*\*[\s\S]*?\*\//g, '')
+  if (!STRIP_DTS_COMMENTS)
+    return content
+
+  return content.replace(/\/\*\*[\s\S]*?\*\//g, (comment) => {
+    return /@(?:deprecated|default|see|example|public|remarks)\b/.test(comment)
+      ? comment
+      : ''
+  })
 }
 
 function stripDistDeclarationComments(dir = distDir) {
