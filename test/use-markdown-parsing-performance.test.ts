@@ -696,13 +696,48 @@ describe('useMarkdownParsing performance behavior', () => {
     const data = logPerf.mock.calls.at(-1)?.[1]
     expect(data).toMatchObject({
       nodeReuseMs: expect.any(Number),
+      signatureMs: expect.any(Number),
+      stabilizeMs: expect.any(Number),
+      reusedNodeCount: 0,
+      dirtyStartIndex: 0,
+      dirtyNodeCount: 1,
       streamDelta: expect.objectContaining({
         total: expect.any(Number),
       }),
       streamStats: expect.any(Object),
     })
     expect(data?.nodeReuseMs).toBeGreaterThanOrEqual(0)
+    expect(data?.signatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.stabilizeMs).toBeGreaterThanOrEqual(0)
     expect(typeof data?.streamMode === 'string' || data?.streamMode == null).toBe(true)
+
+    scope.stop()
+  })
+
+  it('logs stabilize dirty range metrics for append reuse', () => {
+    const content = ref(buildParagraphs(3))
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    expect(state.parsedNodes.value.length).toBe(3)
+    logPerf.mockClear()
+
+    content.value = `${content.value}\n\nAppended paragraph.`
+    expect(state.parsedNodes.value.length).toBe(4)
+
+    const data = logPerf.mock.calls.at(-1)?.[1]
+    expect(data).toMatchObject({
+      parseCommitCount: 2,
+      nodeReuseMs: expect.any(Number),
+      signatureMs: expect.any(Number),
+      stabilizeMs: expect.any(Number),
+      reusedNodeCount: 3,
+      dirtyStartIndex: 3,
+      dirtyNodeCount: 1,
+    })
+    expect(data?.nodeReuseMs).toBeGreaterThanOrEqual(0)
+    expect(data?.signatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.stabilizeMs).toBeGreaterThanOrEqual(0)
 
     scope.stop()
   })
@@ -730,10 +765,17 @@ describe('useMarkdownParsing performance behavior', () => {
       parseCommitCount: 2,
       parseCoalescedCount: expect.any(Number),
       nodeReuseMs: expect.any(Number),
+      signatureMs: expect.any(Number),
+      stabilizeMs: expect.any(Number),
+      reusedNodeCount: expect.any(Number),
+      dirtyStartIndex: expect.any(Number),
+      dirtyNodeCount: expect.any(Number),
       streamDelta: expect.any(Object),
     })
     expect(data?.parseCoalescedCount).toBeGreaterThan(0)
     expect(data?.nodeReuseMs).toBeGreaterThanOrEqual(0)
+    expect(data?.signatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.stabilizeMs).toBeGreaterThanOrEqual(0)
     expect((streamDelta?.appendHits ?? 0) + (streamDelta?.tailHits ?? 0) + (streamDelta?.cacheHits ?? 0)).toBeGreaterThan(0)
 
     scope.stop()
