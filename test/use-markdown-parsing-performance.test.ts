@@ -702,6 +702,7 @@ describe('useMarkdownParsing performance behavior', () => {
       stabilizeMs: expect.any(Number),
       reusedNodeCount: 0,
       dirtyStartIndex: 0,
+      stablePrefixNodeCount: 0,
       dirtyTailNodeCount: 1,
       streamDelta: expect.objectContaining({
         total: expect.any(Number),
@@ -740,6 +741,7 @@ describe('useMarkdownParsing performance behavior', () => {
       stabilizeMs: expect.any(Number),
       reusedNodeCount: 3,
       dirtyStartIndex: 3,
+      stablePrefixNodeCount: 3,
       dirtyTailNodeCount: 1,
     })
     expect(data?.nodeReuseMs).toBeGreaterThanOrEqual(0)
@@ -767,6 +769,7 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(data).toMatchObject({
       reusedNodeCount: 2,
       dirtyStartIndex: 2,
+      stablePrefixNodeCount: 2,
       dirtyTailNodeCount: 1,
     })
 
@@ -788,7 +791,36 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(data).toMatchObject({
       reusedNodeCount: 1,
       dirtyStartIndex: 0,
+      stablePrefixNodeCount: 0,
       dirtyTailNodeCount: 2,
+    })
+
+    scope.stop()
+  })
+
+  it('reports dirty tail range when append parsing shrinks node count', () => {
+    const content = ref('one\n\ntwo')
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        postTransformTokens: tokens => tokens.some(token => token.content === 'drop-tail')
+          ? tokens.slice(0, 3)
+          : tokens,
+      },
+    }, ref(true), logPerf)
+
+    expect(state.parsedNodes.value.length).toBe(2)
+    logPerf.mockClear()
+
+    content.value += '\n\ndrop-tail'
+    expect(state.parsedNodes.value.length).toBe(1)
+
+    const data = logPerf.mock.calls.at(-1)?.[1]
+    expect(data).toMatchObject({
+      reusedNodeCount: 1,
+      dirtyStartIndex: 1,
+      stablePrefixNodeCount: 1,
+      dirtyTailNodeCount: 1,
     })
 
     scope.stop()
@@ -823,6 +855,7 @@ describe('useMarkdownParsing performance behavior', () => {
       stabilizeMs: expect.any(Number),
       reusedNodeCount: expect.any(Number),
       dirtyStartIndex: expect.any(Number),
+      stablePrefixNodeCount: expect.any(Number),
       dirtyTailNodeCount: expect.any(Number),
       streamDelta: expect.any(Object),
     })
