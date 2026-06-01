@@ -7,6 +7,7 @@ import type {
 } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
+import { cloneTokenWithMutableChildren } from '../token-copy'
 import { parseCommonBlockToken } from './block-token-parser'
 import { parseBlockquote } from './blockquote-parser'
 import { containerTokenHandlers } from './container-token-handlers'
@@ -95,6 +96,11 @@ function stripLeakedOrderedListMarkerSuffix(token: MarkdownToken) {
   }
 }
 
+function needsListParagraphTokenPatch(token: MarkdownToken) {
+  const rawContent = String(token.content ?? '')
+  return /[ \t\r\n]+$/.test(rawContent) || /\r?\n\s*\d+[.)]?\s*$/.test(rawContent)
+}
+
 export function parseList(
   tokens: MarkdownToken[],
   index: number,
@@ -120,16 +126,22 @@ export function parseList(
       while (k < tokens.length && tokens[k].type !== 'list_item_close') {
         // Handle different block types inside list items
         if (tokens[k].type === 'paragraph_open') {
-          const contentToken = tokens[k + 1]
+          const originalContentToken = tokens[k + 1]
+          const contentToken = needsListParagraphTokenPatch(originalContentToken)
+            ? cloneTokenWithMutableChildren(originalContentToken)
+            : originalContentToken
           const preToken = tokens[k - 1]
-          stripLeakedOrderedListMarkerSuffix(contentToken)
-          trimInlineTokenTail(contentToken)
+          if (contentToken !== originalContentToken) {
+            stripLeakedOrderedListMarkerSuffix(contentToken)
+            trimInlineTokenTail(contentToken)
+          }
+          const paragraphRaw = String(contentToken.content ?? '')
           itemChildren.push({
             type: 'paragraph',
-            children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken, linkifyContext.options()),
-            raw: String(contentToken.content ?? ''),
+            children: parseInlineTokens(contentToken.children || [], paragraphRaw, preToken, linkifyContext.options()),
+            raw: paragraphRaw,
           })
-          linkifyContext.remember(String(contentToken.content ?? ''))
+          linkifyContext.remember(paragraphRaw)
           k += 3 // Skip paragraph_open, inline, paragraph_close
         }
         else if (tokens[k].type === 'blockquote_open') {

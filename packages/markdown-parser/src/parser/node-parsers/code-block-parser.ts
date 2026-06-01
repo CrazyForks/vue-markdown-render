@@ -11,10 +11,10 @@ export function parseCodeBlock(token: MarkdownToken): CodeBlockNode {
 
   const contentStr = String(token.content ?? '')
   const match = contentStr.match(/ type="application\/vnd\.ant\.([^"]+)"/)
+  let code = contentStr
   if (match?.[1]) {
     // 需要把 <antArtifact> 标签去掉
-    // mutate token.content safely by assigning the cleaned string
-    token.content = contentStr
+    code = contentStr
       .replace(/<antArtifact[^>]*>/g, '')
       .replace(/<\/antArtifact>/g, '')
   }
@@ -22,8 +22,8 @@ export function parseCodeBlock(token: MarkdownToken): CodeBlockNode {
   return {
     type: 'code_block',
     language: match ? match[1] : String(token.info ?? ''),
-    code: String(token.content ?? ''),
-    raw: String(token.content ?? ''),
+    code,
+    raw: code,
     loading: !hasMap,
   }
 }

@@ -12,6 +12,7 @@ import { parseHardBreak } from './node-parsers/hardbreak-parser'
 import { parseHtmlBlock } from './node-parsers/html-block-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
+import { cloneTokenWithMutableChildren } from './token-copy'
 
 type ParsedNodeWithFields = ParsedNode & {
   children?: ParsedNode[]
@@ -226,16 +227,8 @@ function safeCloneTokenField<T>(value: T, seen = new WeakMap<object, unknown>())
 }
 
 function cloneMarkdownToken(token: Token, cloneObjectFields = true): Token {
-  if (!cloneObjectFields) {
-    const cloned = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as Token
-    if (Array.isArray(token.attrs))
-      cloned.attrs = token.attrs.map(attr => [...attr] as [string, string])
-    if (Array.isArray(token.map))
-      cloned.map = [...token.map] as [number, number]
-    if (Array.isArray(token.children))
-      cloned.children = token.children.map(child => cloneMarkdownToken(child, cloneObjectFields))
-    return cloned
-  }
+  if (!cloneObjectFields)
+    return cloneTokenWithMutableChildren(token as unknown as MarkdownToken) as unknown as Token
 
   const cloned = Object.create(Object.getPrototypeOf(token)) as Token
   const seen = new WeakMap<object, unknown>()
@@ -301,7 +294,7 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
     && typeof stream.reset === 'function'
 }
 
-function shouldCloneTopLevelStreamTokenObjectFields(options: ParseOptions) {
+function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
   return typeof options.preTransformTokens === 'function'
     || typeof options.postTransformTokens === 'function'
 }
@@ -319,13 +312,15 @@ function parseTopLevelTokens(
     return md.parse(source, env)
 
   const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
-  const cloneObjectFields = shouldCloneTopLevelStreamTokenObjectFields(options)
+  if (!shouldCloneTopLevelStreamTokens(options))
+    return tokens
+
   const timing = getParseTiming(options)
   if (!timing)
-    return cloneMarkdownTokens(tokens, cloneObjectFields)
+    return cloneMarkdownTokens(tokens, true)
 
   const startedAt = getParserNow()
-  const cloned = cloneMarkdownTokens(tokens, cloneObjectFields)
+  const cloned = cloneMarkdownTokens(tokens, true)
   addTiming(timing, 'tokenCloneMs', getParserNow() - startedAt)
   return cloned
 }

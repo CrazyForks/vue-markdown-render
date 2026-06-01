@@ -1,5 +1,6 @@
 import type { InternalParseOptions, MarkdownToken, ParsedNode, ParseOptions, TextNode } from '../../types'
 import { inferLinkifyDemotionContext, isDecodedFromRawPunycode, shouldDemoteFilenameLikeLinkify } from '../linkifyHeuristics'
+import { cloneTokenWithMutableChildren } from '../token-copy'
 import { parseCheckboxInputToken, parseCheckboxToken } from './checkbox-parser'
 import { parseEmojiToken } from './emoji-parser'
 import { parseEmphasisToken } from './emphasis-parser'
@@ -372,6 +373,13 @@ export function parseInlineTokens(
   let i = 0
   // Default to strict matching for strong unless caller explicitly sets false
   const requireClosingStrong = options?.requireClosingStrong
+  const originalTokens = tokens
+
+  function ensureWorkingTokens() {
+    if (tokens === originalTokens)
+      tokens = tokens.slice()
+    return tokens
+  }
 
   // Helpers to manage text node merging and pushing parsed nodes
   function resetCurrentTextNode() {
@@ -849,7 +857,8 @@ export function parseInlineTokens(
   function pushToken(token: MarkdownToken) {
     // push a raw token into result as a ParsedNode (best effort cast)
     resetCurrentTextNode()
-    result.push(token as ParsedNode)
+    const node = cloneTokenWithMutableChildren(token) as unknown as ParsedNode
+    result.push(node)
   }
 
   // backward-compatible alias used by existing call sites that pass parsed nodes
@@ -1732,17 +1741,19 @@ export function parseInlineTokens(
           const lastContent = String(last.content ?? '')
           if (lastContent.startsWith(')')) {
             loading = false
-            const trailing = lastContent.slice(1)
-            if (trailing) {
-              last.content = trailing
-              last.raw = trailing
+            const trailingAfterClose = lastContent.slice(1)
+            if (trailingAfterClose) {
+              const trailingToken = cloneTokenWithMutableChildren(last)
+              trailingToken.content = trailingAfterClose
+              trailingToken.raw = trailingAfterClose
+              ensureWorkingTokens()[i + 4] = trailingToken
             }
             else {
               index++
             }
           }
           else if (lastContent === '.') {
-            i++
+            index++
           }
         }
 

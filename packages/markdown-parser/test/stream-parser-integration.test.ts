@@ -12,6 +12,25 @@ function getStreamStats(md: ReturnType<typeof getMarkdown>) {
   return (md as any).stream.stats()
 }
 
+function deepFreeze(value: unknown, seen = new WeakSet<object>()) {
+  if (!value || typeof value !== 'object')
+    return value
+
+  const object = value as object
+  if (seen.has(object))
+    return value
+
+  seen.add(object)
+
+  for (const key of Reflect.ownKeys(object)) {
+    const descriptor = Object.getOwnPropertyDescriptor(object, key)
+    if (descriptor && 'value' in descriptor)
+      deepFreeze(descriptor.value, seen)
+  }
+
+  return Object.freeze(object)
+}
+
 describe('parseMarkdownToStructure stream parser integration', () => {
   it('uses markdown-it-ts stream.parse for top-level append-heavy parses', () => {
     const md = getMarkdown('stream-parser-top-level')
@@ -274,7 +293,182 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(second[0]?.children).toHaveLength(1)
   })
 
-  it('does not deep-clone stream tokens without transform hooks', () => {
+  it('does not mutate cached stream tokens in markdown-link linkify fallback', () => {
+    const md = getMarkdown('stream-parser-linkify-tail-no-mutation')
+    ;(md as any).core.ruler.after('fix_link_tokens', 'test_linkify_markdown_tail_tokens', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (!inline)
+        return
+
+      inline.content = '[site](https://example.com) after'
+      inline.children = [
+        { type: 'text', content: '[site](', raw: '[site](' },
+        { type: 'link_open', tag: 'a', nesting: 1, markup: 'linkify', attrs: [['href', 'https://example.com']] },
+        { type: 'text', content: 'https://example.com', raw: 'https://example.com' },
+        { type: 'link_close', tag: 'a', nesting: -1, markup: 'linkify' },
+        { type: 'text', content: ') after', raw: ') after' },
+      ]
+    })
+
+    const source = 'placeholder'
+    const first = parseMarkdownToStructure(source, md, { final: false, streamParse: true }) as any[]
+    const cachedInline = (md as any).stream.peek().find((token: any) => token.type === 'inline')
+    const cachedTrailing = cachedInline?.children?.[4]
+
+    expect(cachedTrailing?.content).toBe(') after')
+    expect(cachedTrailing?.raw).toBe(') after')
+
+    const second = parseMarkdownToStructure(source, md, { final: false, streamParse: true }) as any[]
+
+    expect(getStreamStats(md).cacheHits).toBeGreaterThan(0)
+    expect(second).toEqual(first)
+
+    const serialized = JSON.stringify(second[0]?.children)
+    expect(serialized).toContain('after')
+    expect(serialized).not.toContain(') after')
+  })
+
+  it('preserves following markdown-link linkify fallback when close text starts another link', () => {
+    const md = getMarkdown('stream-parser-linkify-chain-no-mutation')
+    ;(md as any).core.ruler.after('fix_link_tokens', 'test_chained_markdown_linkify_tokens', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (!inline)
+        return
+
+      inline.content = '[a](https://a.com) [b](https://b.com)'
+      inline.children = [
+        { type: 'text', content: '[a](', raw: '[a](' },
+        { type: 'link_open', tag: 'a', nesting: 1, markup: 'linkify', attrs: [['href', 'https://a.com']] },
+        { type: 'text', content: 'https://a.com', raw: 'https://a.com' },
+        { type: 'link_close', tag: 'a', nesting: -1, markup: 'linkify' },
+        { type: 'text', content: ') [b](', raw: ') [b](' },
+        { type: 'link_open', tag: 'a', nesting: 1, markup: 'linkify', attrs: [['href', 'https://b.com']] },
+        { type: 'text', content: 'https://b.com', raw: 'https://b.com' },
+        { type: 'link_close', tag: 'a', nesting: -1, markup: 'linkify' },
+        { type: 'text', content: ')', raw: ')' },
+      ]
+    })
+
+    const nodes = parseMarkdownToStructure('placeholder', md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+    const serialized = JSON.stringify(nodes)
+
+    expect(serialized.match(/"type":"link"/g) ?? []).toHaveLength(2)
+    expect(serialized).toContain('"href":"https://a.com"')
+    expect(serialized).toContain('"href":"https://b.com"')
+    expect(serialized).not.toContain('"href":""')
+  })
+
+  it('does not mutate frozen stream tokens during first-pass processing', () => {
+    const md = getMarkdown('stream-parser-first-pass-freeze-no-mutation')
+    ;(md as any).core.ruler.push('test_freeze_stream_tokens_after_plugins', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (!inline)
+        return
+
+      inline.content = '[site](https://example.com) after'
+      inline.children = [
+        { type: 'text', content: '[site](', raw: '[site](' },
+        { type: 'link_open', tag: 'a', nesting: 1, markup: 'linkify', attrs: [['href', 'https://example.com']] },
+        { type: 'text', content: 'https://example.com', raw: 'https://example.com' },
+        { type: 'link_close', tag: 'a', nesting: -1, markup: 'linkify' },
+        { type: 'text', content: ') after', raw: ') after' },
+      ]
+      deepFreeze(state.tokens)
+    })
+
+    let nodes: any[] = []
+    expect(() => {
+      nodes = parseMarkdownToStructure('placeholder', md, { final: false, streamParse: true }) as any[]
+    }).not.toThrow()
+
+    const serialized = JSON.stringify(nodes[0]?.children)
+    expect(serialized).toContain('"href":"https://example.com"')
+    expect(serialized).toContain('after')
+    expect(serialized).not.toContain(') after')
+  })
+
+  it('does not mutate cached stream tokens during no-transform cache-hit processing', () => {
+    const md = getMarkdown('stream-parser-cache-freeze-no-mutation')
+    const source = [
+      '1. [site](https://example.com) after',
+      '2. **bold [link](https://example.com)**',
+      '',
+      '```html',
+      '<antArtifact type="application/vnd.ant.react">x</antArtifact>',
+      '```',
+      '',
+      '<details><summary>Hi</summary>Body</details>',
+    ].join('\n')
+
+    ;(md as any).stream.resetStats()
+
+    const first = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    })
+
+    deepFreeze((md as any).stream.peek())
+
+    expect(() => {
+      const second = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      })
+      expect(second).toEqual(first)
+    }).not.toThrow()
+
+    expect(getStreamStats(md).cacheHits).toBeGreaterThan(0)
+  })
+
+  it('does not mutate cached list paragraph tokens when stripping leaked ordered-list markers', () => {
+    const md = getMarkdown('stream-parser-list-jitter-no-mutation')
+    ;(md as any).core.ruler.push('test_leaked_ordered_list_marker', (state: any) => {
+      const inline = state.tokens?.find((token: any, index: number) => {
+        return token.type === 'inline' && state.tokens?.[index - 1]?.type === 'paragraph_open'
+      })
+      if (!inline)
+        return
+
+      inline.content = 'alpha\n\n2.'
+      inline.children = [
+        { type: 'text', content: 'alpha', raw: 'alpha' },
+        { type: 'softbreak', content: '', raw: '\n' },
+        { type: 'softbreak', content: '', raw: '\n' },
+        { type: 'text', content: '2.', raw: '2.' },
+      ]
+    })
+    ;(md as any).stream.resetStats()
+
+    const source = '1. alpha'
+    const first = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+    const cachedInline = (md as any).stream.peek().find((token: any) => token.type === 'inline')
+
+    expect(first[0]?.items?.[0]?.children?.[0]?.raw).toBe('alpha')
+    expect(cachedInline?.content).toBe('alpha\n\n2.')
+    expect(cachedInline?.children?.at(-1)?.content).toBe('2.')
+
+    deepFreeze((md as any).stream.peek())
+
+    expect(() => {
+      const second = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      })
+      expect(second).toEqual(first)
+    }).not.toThrow()
+
+    expect(getStreamStats(md).cacheHits).toBeGreaterThan(0)
+    expect(cachedInline?.content).toBe('alpha\n\n2.')
+    expect(cachedInline?.children?.at(-1)?.content).toBe('2.')
+  })
+
+  it('does not clone stream tokens without transform hooks', () => {
     const md = getMarkdown('stream-parser-skip-token-clone')
     ;(md as any).core.ruler.push('test_large_token_meta', (state: any) => {
       const inline = state.tokens?.find((token: any) => token.type === 'inline')
@@ -297,11 +491,14 @@ describe('parseMarkdownToStructure stream parser integration', () => {
       }
     })
 
+    const timing: { tokenCloneMs?: number } = {}
     const nodes = parseMarkdownToStructure(buildLargeAppendFriendlyDoc(40), md, {
       streamParse: true,
-    }) as any[]
+      __timing: timing,
+    } as any) as any[]
 
     expect(nodes).toHaveLength(40)
+    expect(timing.tokenCloneMs ?? 0).toBe(0)
   })
 
   it('deep-clones cached stream token object fields before transform hooks', () => {
