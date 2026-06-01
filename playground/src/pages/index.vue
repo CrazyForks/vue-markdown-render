@@ -985,6 +985,7 @@ onBeforeUnmount(() => {
   top: 0;
   right: 0;
   height: 100vh;
+  backdrop-filter: none;
   border-radius: 0;
   border-right: 0;
   border-top: 0;
