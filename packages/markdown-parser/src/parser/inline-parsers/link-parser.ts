@@ -70,6 +70,7 @@ export function parseLinkToken(
     loading = false
   }
 
+  let childTokens = linkTokens
   const lastLinkToken = linkTokens[linkTokens.length - 1]
   if (
     (options as InternalParseOptions | undefined)?.__insideStrong
@@ -79,12 +80,15 @@ export function parseLinkToken(
   ) {
     const originalContent = String(lastLinkToken.content ?? '')
     const originalRaw = String(lastLinkToken.raw ?? originalContent)
-    lastLinkToken.content = originalContent.slice(0, -2)
-    lastLinkToken.raw = originalRaw.replace(/\*\*$/, '')
+    const adjustedLastLinkToken = Object.assign(Object.create(Object.getPrototypeOf(lastLinkToken)), lastLinkToken) as MarkdownToken
+    adjustedLastLinkToken.content = originalContent.slice(0, -2)
+    adjustedLastLinkToken.raw = originalRaw.replace(/\*\*$/, '')
+    childTokens = linkTokens.slice()
+    childTokens[childTokens.length - 1] = adjustedLastLinkToken
   }
 
   // Parse the collected tokens as inline content
-  const children = parseInlineTokens(linkTokens, undefined, undefined, options)
+  const children = parseInlineTokens(childTokens, undefined, undefined, options)
   const linkText = children
     .map((node) => {
       const nodeAny = node as unknown as { content?: string, raw?: string }

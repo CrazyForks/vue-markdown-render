@@ -274,7 +274,7 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(second[0]?.children).toHaveLength(1)
   })
 
-  it('does not deep-clone stream tokens without transform hooks', () => {
+  it('does not clone stream tokens without transform hooks', () => {
     const md = getMarkdown('stream-parser-skip-token-clone')
     ;(md as any).core.ruler.push('test_large_token_meta', (state: any) => {
       const inline = state.tokens?.find((token: any) => token.type === 'inline')
@@ -297,11 +297,14 @@ describe('parseMarkdownToStructure stream parser integration', () => {
       }
     })
 
+    const timing: { tokenCloneMs?: number } = {}
     const nodes = parseMarkdownToStructure(buildLargeAppendFriendlyDoc(40), md, {
       streamParse: true,
-    }) as any[]
+      __timing: timing,
+    } as any) as any[]
 
     expect(nodes).toHaveLength(40)
+    expect(timing.tokenCloneMs ?? 0).toBe(0)
   })
 
   it('deep-clones cached stream token object fields before transform hooks', () => {

@@ -849,7 +849,8 @@ export function parseInlineTokens(
   function pushToken(token: MarkdownToken) {
     // push a raw token into result as a ParsedNode (best effort cast)
     resetCurrentTextNode()
-    result.push(token as ParsedNode)
+    const node = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as ParsedNode
+    result.push(node)
   }
 
   // backward-compatible alias used by existing call sites that pass parsed nodes

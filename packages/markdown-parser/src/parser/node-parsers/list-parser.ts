@@ -11,6 +11,16 @@ import { parseCommonBlockToken } from './block-token-parser'
 import { parseBlockquote } from './blockquote-parser'
 import { containerTokenHandlers } from './container-token-handlers'
 
+function copyInlineToken(token: MarkdownToken) {
+  const copy = Object.assign(Object.create(Object.getPrototypeOf(token)), token) as MarkdownToken
+  if (Array.isArray(token.children)) {
+    copy.children = token.children.map((child) => {
+      return Object.assign(Object.create(Object.getPrototypeOf(child)), child) as MarkdownToken
+    })
+  }
+  return copy
+}
+
 function trimInlineTokenTail(token: MarkdownToken) {
   const rawContent = String(token.content ?? '')
   const trimmed = rawContent.replace(/[ \t\r\n]+$/g, '')
@@ -120,16 +130,17 @@ export function parseList(
       while (k < tokens.length && tokens[k].type !== 'list_item_close') {
         // Handle different block types inside list items
         if (tokens[k].type === 'paragraph_open') {
-          const contentToken = tokens[k + 1]
+          const contentToken = copyInlineToken(tokens[k + 1])
           const preToken = tokens[k - 1]
           stripLeakedOrderedListMarkerSuffix(contentToken)
           trimInlineTokenTail(contentToken)
+          const paragraphRaw = String(contentToken.content ?? '')
           itemChildren.push({
             type: 'paragraph',
-            children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), preToken, linkifyContext.options()),
-            raw: String(contentToken.content ?? ''),
+            children: parseInlineTokens(contentToken.children || [], paragraphRaw, preToken, linkifyContext.options()),
+            raw: paragraphRaw,
           })
-          linkifyContext.remember(String(contentToken.content ?? ''))
+          linkifyContext.remember(paragraphRaw)
           k += 3 // Skip paragraph_open, inline, paragraph_close
         }
         else if (tokens[k].type === 'blockquote_open') {

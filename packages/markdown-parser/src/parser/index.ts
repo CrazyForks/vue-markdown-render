@@ -301,7 +301,7 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
     && typeof stream.reset === 'function'
 }
 
-function shouldCloneTopLevelStreamTokenObjectFields(options: ParseOptions) {
+function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
   return typeof options.preTransformTokens === 'function'
     || typeof options.postTransformTokens === 'function'
 }
@@ -319,13 +319,15 @@ function parseTopLevelTokens(
     return md.parse(source, env)
 
   const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
-  const cloneObjectFields = shouldCloneTopLevelStreamTokenObjectFields(options)
+  if (!shouldCloneTopLevelStreamTokens(options))
+    return tokens
+
   const timing = getParseTiming(options)
   if (!timing)
-    return cloneMarkdownTokens(tokens, cloneObjectFields)
+    return cloneMarkdownTokens(tokens, true)
 
   const startedAt = getParserNow()
-  const cloned = cloneMarkdownTokens(tokens, cloneObjectFields)
+  const cloned = cloneMarkdownTokens(tokens, true)
   addTiming(timing, 'tokenCloneMs', getParserNow() - startedAt)
   return cloned
 }
