@@ -1,3 +1,4 @@
+import { setInfographicLoader } from 'markstream-vue'
 import { createPinia } from 'pinia'
 import routes from 'virtual:generated-pages'
 import { createApp } from 'vue'
@@ -13,6 +14,7 @@ import '@unocss/reset/tailwind.css'
 import './styles/main.css'
 
 const app = createApp(App)
+setInfographicLoader(() => import('@antv/infographic'))
 app.use(createPinia())
 
 const router = createRouter({

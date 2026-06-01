@@ -10,6 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@antv/infographic": "^0.2.19",
     "@iconify-json/carbon": "^1.2.21",
     "@iconify/vue": "^5.0.1",
     "@tailwindcss/typography": "^0.5.19",
