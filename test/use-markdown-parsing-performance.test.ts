@@ -697,10 +697,12 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(data).toMatchObject({
       nodeReuseMs: expect.any(Number),
       signatureMs: expect.any(Number),
+      stabilizeSignatureMs: expect.any(Number),
+      primeSignatureMs: expect.any(Number),
       stabilizeMs: expect.any(Number),
       reusedNodeCount: 0,
       dirtyStartIndex: 0,
-      dirtyNodeCount: 1,
+      dirtyTailNodeCount: 1,
       streamDelta: expect.objectContaining({
         total: expect.any(Number),
       }),
@@ -708,6 +710,9 @@ describe('useMarkdownParsing performance behavior', () => {
     })
     expect(data?.nodeReuseMs).toBeGreaterThanOrEqual(0)
     expect(data?.signatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.stabilizeSignatureMs).toBe(0)
+    expect(data?.primeSignatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.signatureMs).toBe(data?.stabilizeSignatureMs + data?.primeSignatureMs)
     expect(data?.stabilizeMs).toBeGreaterThanOrEqual(0)
     expect(typeof data?.streamMode === 'string' || data?.streamMode == null).toBe(true)
 
@@ -730,14 +735,61 @@ describe('useMarkdownParsing performance behavior', () => {
       parseCommitCount: 2,
       nodeReuseMs: expect.any(Number),
       signatureMs: expect.any(Number),
+      stabilizeSignatureMs: expect.any(Number),
+      primeSignatureMs: expect.any(Number),
       stabilizeMs: expect.any(Number),
       reusedNodeCount: 3,
       dirtyStartIndex: 3,
-      dirtyNodeCount: 1,
+      dirtyTailNodeCount: 1,
     })
     expect(data?.nodeReuseMs).toBeGreaterThanOrEqual(0)
     expect(data?.signatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.stabilizeSignatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.primeSignatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.signatureMs).toBe(data?.stabilizeSignatureMs + data?.primeSignatureMs)
     expect(data?.stabilizeMs).toBeGreaterThanOrEqual(0)
+
+    scope.stop()
+  })
+
+  it('logs dirty tail range when appending into the last existing paragraph', () => {
+    const content = ref('one\n\ntwo\n\nthree')
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    expect(state.parsedNodes.value.length).toBe(3)
+    logPerf.mockClear()
+
+    content.value += ' appended tail'
+    expect(state.parsedNodes.value.length).toBe(3)
+
+    const data = logPerf.mock.calls.at(-1)?.[1]
+    expect(data).toMatchObject({
+      reusedNodeCount: 2,
+      dirtyStartIndex: 2,
+      dirtyTailNodeCount: 1,
+    })
+
+    scope.stop()
+  })
+
+  it('reports dirty tail range including unchanged suffix nodes', () => {
+    const content = ref('| Link |\n| - |\n| [x][ref] |\n\nlater\n\n')
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    expect(state.parsedNodes.value.length).toBe(2)
+    logPerf.mockClear()
+
+    content.value += '[ref]: https://example.com\n'
+    expect(state.parsedNodes.value.length).toBe(2)
+
+    const data = logPerf.mock.calls.at(-1)?.[1]
+    expect(data).toMatchObject({
+      reusedNodeCount: 1,
+      dirtyStartIndex: 0,
+      dirtyTailNodeCount: 2,
+    })
 
     scope.stop()
   })
@@ -766,15 +818,20 @@ describe('useMarkdownParsing performance behavior', () => {
       parseCoalescedCount: expect.any(Number),
       nodeReuseMs: expect.any(Number),
       signatureMs: expect.any(Number),
+      stabilizeSignatureMs: expect.any(Number),
+      primeSignatureMs: expect.any(Number),
       stabilizeMs: expect.any(Number),
       reusedNodeCount: expect.any(Number),
       dirtyStartIndex: expect.any(Number),
-      dirtyNodeCount: expect.any(Number),
+      dirtyTailNodeCount: expect.any(Number),
       streamDelta: expect.any(Object),
     })
     expect(data?.parseCoalescedCount).toBeGreaterThan(0)
     expect(data?.nodeReuseMs).toBeGreaterThanOrEqual(0)
     expect(data?.signatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.stabilizeSignatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.primeSignatureMs).toBeGreaterThanOrEqual(0)
+    expect(data?.signatureMs).toBe(data?.stabilizeSignatureMs + data?.primeSignatureMs)
     expect(data?.stabilizeMs).toBeGreaterThanOrEqual(0)
     expect((streamDelta?.appendHits ?? 0) + (streamDelta?.tailHits ?? 0) + (streamDelta?.cacheHits ?? 0)).toBeGreaterThan(0)
 

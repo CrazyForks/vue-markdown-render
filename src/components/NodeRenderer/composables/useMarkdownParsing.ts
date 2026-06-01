@@ -36,12 +36,14 @@ interface ParserTimingMetrics {
 
 interface ParsedNodeSignatureTimingMetrics {
   signatureMs: number
+  stabilizeSignatureMs: number
+  primeSignatureMs: number
 }
 
 interface ParsedNodeStabilizeMetrics {
   reusedNodeCount: number
   dirtyStartIndex: number
-  dirtyNodeCount: number
+  dirtyTailNodeCount: number
 }
 
 interface ParsedNodeStabilizeResult {
@@ -117,6 +119,7 @@ const MAX_SIGNATURE_STRING_CHARS = 8192
 const objectIdentityIds = new WeakMap<object, number>()
 const nodeSignatureCache = new WeakMap<object, string>()
 let activeSignatureTimingMetrics: ParsedNodeSignatureTimingMetrics | undefined
+let activeSignatureTimingMetricKey: 'stabilizeSignatureMs' | 'primeSignatureMs' | undefined
 let signatureTimingDepth = 0
 let nextObjectIdentityId = 1
 
@@ -350,52 +353,75 @@ function getParsedNodeSignature(
   depth = 0,
 ) {
   const metrics = activeSignatureTimingMetrics
-  const shouldMeasure = metrics != null && signatureTimingDepth === 0
+  const metricKey = activeSignatureTimingMetricKey
+
+  if (!metrics || !metricKey)
+    return getParsedNodeSignatureImpl(node, seen, depth)
+
+  const shouldMeasure = signatureTimingDepth === 0
   const startedAt = shouldMeasure ? getNow() : 0
   signatureTimingDepth += 1
 
   try {
-    const cached = nodeSignatureCache.get(node as object)
-    if (cached)
-      return cached
-
-    const object = node as object
-    const existing = seen.get(object)
-    if (existing)
-      return `node-cycle:${existing}`
-
-    if (depth >= MAX_SIGNATURE_DEPTH)
-      return `node:${node.type}:${getIdentityKey(object)}`
-
-    const id = getIdentityKey(object)
-    seen.set(object, id)
-
-    const signature = buildCheapNodeSignature(node, seen, depth)
-    nodeSignatureCache.set(object, signature)
-    return signature
+    return getParsedNodeSignatureImpl(node, seen, depth)
   }
   finally {
     signatureTimingDepth -= 1
-    if (shouldMeasure)
-      metrics.signatureMs += getNow() - startedAt
+    if (shouldMeasure) {
+      const elapsed = getNow() - startedAt
+      metrics[metricKey] += elapsed
+      metrics.signatureMs = metrics.stabilizeSignatureMs + metrics.primeSignatureMs
+    }
   }
+}
+
+function getParsedNodeSignatureImpl(
+  node: ParsedNode,
+  seen = new WeakMap<object, string>(),
+  depth = 0,
+) {
+  const cached = nodeSignatureCache.get(node as object)
+  if (cached)
+    return cached
+
+  const object = node as object
+  const existing = seen.get(object)
+  if (existing)
+    return `node-cycle:${existing}`
+
+  if (depth >= MAX_SIGNATURE_DEPTH)
+    return `node:${node.type}:${getIdentityKey(object)}`
+
+  const id = getIdentityKey(object)
+  seen.set(object, id)
+
+  const signature = buildCheapNodeSignature(node, seen, depth)
+  nodeSignatureCache.set(object, signature)
+  return signature
 }
 
 function isParsedNodeStable(previous: ParsedNode, next: ParsedNode) {
   return getParsedNodeSignature(previous) === getParsedNodeSignature(next)
 }
 
-function withSignatureTiming<T>(metrics: ParsedNodeSignatureTimingMetrics | undefined, callback: () => T) {
-  if (!metrics)
+function withSignatureTiming<T>(
+  metrics: ParsedNodeSignatureTimingMetrics | undefined,
+  metricKey: 'stabilizeSignatureMs' | 'primeSignatureMs',
+  callback: () => T,
+) {
+  if (!metrics && !activeSignatureTimingMetrics)
     return callback()
 
   const previousMetrics = activeSignatureTimingMetrics
+  const previousMetricKey = activeSignatureTimingMetricKey
   activeSignatureTimingMetrics = metrics
+  activeSignatureTimingMetricKey = metrics ? metricKey : undefined
   try {
     return callback()
   }
   finally {
     activeSignatureTimingMetrics = previousMetrics
+    activeSignatureTimingMetricKey = previousMetricKey
   }
 }
 
@@ -403,7 +429,7 @@ function getInitialStabilizeMetrics(nodeCount: number): ParsedNodeStabilizeMetri
   return {
     reusedNodeCount: 0,
     dirtyStartIndex: nodeCount > 0 ? 0 : -1,
-    dirtyNodeCount: nodeCount,
+    dirtyTailNodeCount: nodeCount,
   }
 }
 
@@ -444,7 +470,7 @@ function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode
     metrics: {
       reusedNodeCount,
       dirtyStartIndex,
-      dirtyNodeCount: dirtyStartIndex < 0 ? 0 : Math.max(0, nextNodes.length - dirtyStartIndex),
+      dirtyTailNodeCount: dirtyStartIndex < 0 ? 0 : Math.max(0, nextNodes.length - dirtyStartIndex),
     },
   }
 }
@@ -667,7 +693,7 @@ export function useMarkdownParsing(
       ? getNow()
       : 0
     const signatureTiming: ParsedNodeSignatureTimingMetrics | undefined = options.debugPerformanceEnabled.value
-      ? { signatureMs: 0 }
+      ? { signatureMs: 0, stabilizeSignatureMs: 0, primeSignatureMs: 0 }
       : undefined
     let stabilizeMetrics = getInitialStabilizeMetrics(nextParsed.length)
     let stabilizeMs = 0
@@ -679,6 +705,7 @@ export function useMarkdownParsing(
         : 0
       const result = withSignatureTiming(
         signatureTiming,
+        'stabilizeSignatureMs',
         () => stabilizeParsedNodes(nextParsed, previousParsedNodes),
       )
 
@@ -694,6 +721,7 @@ export function useMarkdownParsing(
 
     withSignatureTiming(
       signatureTiming,
+      'primeSignatureMs',
       () => primeParsedNodeSignatures(parsed),
     )
     const nodeReuseMs = options.debugPerformanceEnabled.value
@@ -718,6 +746,8 @@ export function useMarkdownParsing(
         parseCoalescedCount,
         nodeReuseMs,
         signatureMs: signatureTiming?.signatureMs ?? 0,
+        stabilizeSignatureMs: signatureTiming?.stabilizeSignatureMs ?? 0,
+        primeSignatureMs: signatureTiming?.primeSignatureMs ?? 0,
         stabilizeMs,
         ...stabilizeMetrics,
         ...(parserTiming
