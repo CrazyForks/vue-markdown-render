@@ -5108,17 +5108,20 @@ let typewriterCursorRaf: number | null = null
 let typewriterCursorRafVersion = 0
 let lastTypewriterContentLength = 0
 let lastTypewriterVisibleLength = 0
-const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image', 'thematic_break'])
+const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPE_LIST = [
+  'code_block',
+  'admonition',
+  'table',
+  'math_block',
+  'html_block',
+  'image',
+  'thematic_break',
+] as const
+const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES: ReadonlySet<string> = new Set(TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPE_LIST)
 const TYPEWRITER_CURSOR_EXCLUDED_SELECTOR = [
   '.typewriter-cursor',
   '.height-estimation-probes',
-  '[data-node-type="code_block"]',
-  '[data-node-type="admonition"]',
-  '[data-node-type="table"]',
-  '[data-node-type="math_block"]',
-  '[data-node-type="html_block"]',
-  '[data-node-type="image"]',
-  '[data-node-type="thematic_break"]',
+  ...TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPE_LIST.map(type => `[data-node-type="${type}"]`),
   'script',
   'style',
 ].join(',')
