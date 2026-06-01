@@ -172,4 +172,40 @@ describe('typewriter cursor position', () => {
 
     wrapper.unmount()
   })
+
+  it('keeps content baseline while cursor is disabled in nodes mode', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const longText = 'x'.repeat(1000)
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [
+          { type: 'paragraph', raw: longText, children: [{ type: 'text', content: longText, raw: longText }] },
+        ],
+        typewriter: true,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+    expect(queuedFrames).toHaveLength(0)
+
+    await wrapper.setProps({ nodes: undefined, content: 'hi' })
+    await flushAll()
+
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(true)
+    expect(queuedFrames).toHaveLength(1)
+
+    wrapper.unmount()
+  })
 })

@@ -5302,8 +5302,10 @@ watch(
       showTypewriterCursor.value = false
       clearTypewriterCursorTimeout()
       hideTypewriterCursorElement()
-      lastTypewriterContentLength = getTypewriterContentLength()
-      lastTypewriterVisibleLength = getTypewriterVisibleLength()
+      // Cursor is disabled in nodes mode; keep the baseline on content so
+      // switching back to content mode can show it again.
+      lastTypewriterContentLength = (props.content ?? '').length
+      lastTypewriterVisibleLength = renderContent.value.length
       return
     }
 
