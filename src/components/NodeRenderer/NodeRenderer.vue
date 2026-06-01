@@ -5249,7 +5249,7 @@ function getTypewriterCursorTextTarget() {
 
     const text = getLastTextNode(slot)
     if (text)
-      return { slot, text }
+      return text
   }
 
   return null
@@ -5262,11 +5262,10 @@ function updateTypewriterCursorPosition() {
   const root = containerRef.value
   const cursor = typewriterCursorRef.value
   cursor.style.visibility = 'hidden'
-  const target = getTypewriterCursorTextTarget()
-  if (!target)
+  const lastText = getTypewriterCursorTextTarget()
+  if (!lastText)
     return
 
-  const lastText = target.text
   let left = 0
   let top = 0
   let height = 20

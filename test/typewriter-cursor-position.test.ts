@@ -197,6 +197,63 @@ describe('typewriter cursor position', () => {
     wrapper.unmount()
   })
 
+  it('coalesces cursor positioning into one RAF and measures latest content', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    let rangeNode: Node | null = null
+    let measuredText = ''
+    const originalCreateRange = document.createRange.bind(document)
+    vi.spyOn(document, 'createRange').mockImplementation(() => {
+      const range = originalCreateRange()
+      range.setStart = vi.fn((node: Node) => {
+        rangeNode = node
+      })
+      range.setEnd = vi.fn((node: Node) => {
+        rangeNode = node
+      })
+      range.getClientRects = vi.fn(() => {
+        measuredText = rangeNode?.textContent ?? ''
+        return [
+          rect({ right: measuredText.length * 10, top: 20, bottom: 40, height: 20 }),
+        ] as unknown as DOMRectList
+      })
+      return range
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: true,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+    queuedFrames.length = 0
+
+    await wrapper.setProps({ content: 'hello' })
+    await flushAll()
+    expect(queuedFrames).toHaveLength(1)
+
+    await wrapper.setProps({ content: 'hello world' })
+    await flushAll()
+    expect(queuedFrames).toHaveLength(1)
+
+    await runNextFrame(queuedFrames, performance.now() + 16)
+    expect(wrapper.get('.text-node').text()).toBe('hello world')
+    expect(measuredText).toBe(' world')
+
+    wrapper.unmount()
+  })
+
   it('falls back to previous rendered text slot when the last non-excluded slot has no text', async () => {
     const scopeId = 'typewriter-empty-tail'
     const queuedFrames: FrameRequestCallback[] = []
