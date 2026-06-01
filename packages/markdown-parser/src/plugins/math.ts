@@ -1154,6 +1154,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
     const firstLineContent
       = lineText === openDelim ? '' : lineText.slice(openDelim.length)
+    const fallbackPlainBracketClose = !strict && openDelim === '\\[' ? ']' : ''
 
     if (firstLineContent.includes(closeDelim)) {
       const endIndex = firstLineContent.indexOf(closeDelim)
@@ -1169,6 +1170,11 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const lineStart = s.bMarks[nextLine] + s.tShift[nextLine]
         const lineEnd = s.eMarks[nextLine]
         const currentLine = s.src.slice(lineStart, lineEnd)
+        if (fallbackPlainBracketClose && currentLine.trim() === fallbackPlainBracketClose) {
+          closeDelim = fallbackPlainBracketClose
+          found = true
+          break
+        }
         if (currentLine.trim() === closeDelim) {
           found = true
           break
