@@ -373,6 +373,13 @@ export function parseInlineTokens(
   let i = 0
   // Default to strict matching for strong unless caller explicitly sets false
   const requireClosingStrong = options?.requireClosingStrong
+  const originalTokens = tokens
+
+  function ensureWorkingTokens() {
+    if (tokens === originalTokens)
+      tokens = tokens.slice()
+    return tokens
+  }
 
   // Helpers to manage text node merging and pushing parsed nodes
   function resetCurrentTextNode() {
@@ -1730,18 +1737,19 @@ export function parseInlineTokens(
         const last = tokens[i + 4]
         let index = 4
         let loading = true
-        let trailingAfterClose = ''
-        let trailingToken: MarkdownToken | null = null
         if (last?.type === 'text') {
           const lastContent = String(last.content ?? '')
           if (lastContent.startsWith(')')) {
             loading = false
-            trailingAfterClose = lastContent.slice(1)
-            index++
+            const trailingAfterClose = lastContent.slice(1)
             if (trailingAfterClose) {
-              trailingToken = copyTokenShallow(last)
+              const trailingToken = copyTokenShallow(last)
               trailingToken.content = trailingAfterClose
               trailingToken.raw = trailingAfterClose
+              ensureWorkingTokens()[i + 4] = trailingToken
+            }
+            else {
+              index++
             }
           }
           else if (lastContent === '.') {
@@ -1764,8 +1772,6 @@ export function parseInlineTokens(
             loading,
           } as ParsedNode)
         }
-        if (trailingToken)
-          pushInlineTextContent(trailingAfterClose, trailingToken)
         i += index
         return true
       }

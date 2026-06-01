@@ -96,6 +96,11 @@ function stripLeakedOrderedListMarkerSuffix(token: MarkdownToken) {
   }
 }
 
+function needsListParagraphTokenPatch(token: MarkdownToken) {
+  const rawContent = String(token.content ?? '')
+  return /[ \t\r\n]+$/.test(rawContent) || /\r?\n\s*\d+[.)]?\s*$/.test(rawContent)
+}
+
 export function parseList(
   tokens: MarkdownToken[],
   index: number,
@@ -121,10 +126,15 @@ export function parseList(
       while (k < tokens.length && tokens[k].type !== 'list_item_close') {
         // Handle different block types inside list items
         if (tokens[k].type === 'paragraph_open') {
-          const contentToken = copyTokenShallow(tokens[k + 1])
+          const originalContentToken = tokens[k + 1]
+          const contentToken = needsListParagraphTokenPatch(originalContentToken)
+            ? copyTokenShallow(originalContentToken)
+            : originalContentToken
           const preToken = tokens[k - 1]
-          stripLeakedOrderedListMarkerSuffix(contentToken)
-          trimInlineTokenTail(contentToken)
+          if (contentToken !== originalContentToken) {
+            stripLeakedOrderedListMarkerSuffix(contentToken)
+            trimInlineTokenTail(contentToken)
+          }
           const paragraphRaw = String(contentToken.content ?? '')
           itemChildren.push({
             type: 'paragraph',

@@ -328,6 +328,68 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(serialized).not.toContain(') after')
   })
 
+  it('preserves following markdown-link linkify fallback when close text starts another link', () => {
+    const md = getMarkdown('stream-parser-linkify-chain-no-mutation')
+    ;(md as any).core.ruler.after('fix_link_tokens', 'test_chained_markdown_linkify_tokens', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (!inline)
+        return
+
+      inline.content = '[a](https://a.com) [b](https://b.com)'
+      inline.children = [
+        { type: 'text', content: '[a](', raw: '[a](' },
+        { type: 'link_open', tag: 'a', nesting: 1, markup: 'linkify', attrs: [['href', 'https://a.com']] },
+        { type: 'text', content: 'https://a.com', raw: 'https://a.com' },
+        { type: 'link_close', tag: 'a', nesting: -1, markup: 'linkify' },
+        { type: 'text', content: ') [b](', raw: ') [b](' },
+        { type: 'link_open', tag: 'a', nesting: 1, markup: 'linkify', attrs: [['href', 'https://b.com']] },
+        { type: 'text', content: 'https://b.com', raw: 'https://b.com' },
+        { type: 'link_close', tag: 'a', nesting: -1, markup: 'linkify' },
+        { type: 'text', content: ')', raw: ')' },
+      ]
+    })
+
+    const nodes = parseMarkdownToStructure('placeholder', md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+    const serialized = JSON.stringify(nodes)
+
+    expect(serialized.match(/"type":"link"/g) ?? []).toHaveLength(2)
+    expect(serialized).toContain('"href":"https://a.com"')
+    expect(serialized).toContain('"href":"https://b.com"')
+    expect(serialized).not.toContain('"href":""')
+  })
+
+  it('does not mutate frozen stream tokens during first-pass processing', () => {
+    const md = getMarkdown('stream-parser-first-pass-freeze-no-mutation')
+    ;(md as any).core.ruler.push('test_freeze_stream_tokens_after_plugins', (state: any) => {
+      const inline = state.tokens?.find((token: any) => token.type === 'inline')
+      if (!inline)
+        return
+
+      inline.content = '[site](https://example.com) after'
+      inline.children = [
+        { type: 'text', content: '[site](', raw: '[site](' },
+        { type: 'link_open', tag: 'a', nesting: 1, markup: 'linkify', attrs: [['href', 'https://example.com']] },
+        { type: 'text', content: 'https://example.com', raw: 'https://example.com' },
+        { type: 'link_close', tag: 'a', nesting: -1, markup: 'linkify' },
+        { type: 'text', content: ') after', raw: ') after' },
+      ]
+      deepFreeze(state.tokens)
+    })
+
+    let nodes: any[] = []
+    expect(() => {
+      nodes = parseMarkdownToStructure('placeholder', md, { final: false, streamParse: true }) as any[]
+    }).not.toThrow()
+
+    const serialized = JSON.stringify(nodes[0]?.children)
+    expect(serialized).toContain('"href":"https://example.com"')
+    expect(serialized).toContain('after')
+    expect(serialized).not.toContain(') after')
+  })
+
   it('does not mutate cached stream tokens during no-transform cache-hit processing', () => {
     const md = getMarkdown('stream-parser-cache-freeze-no-mutation')
     const source = [
