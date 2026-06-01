@@ -23,6 +23,7 @@ function createHarness(options: {
   initialBatch?: number
   batchSize?: number
   delay?: number
+  desiredCount?: number
   incremental?: boolean
   requestFrame?: typeof window.requestAnimationFrame | null
   cancelFrame?: typeof window.cancelAnimationFrame | null
@@ -37,7 +38,8 @@ function createHarness(options: {
   const parsedNodes = ref(makeNodes(options.total ?? 8))
   const parsedNodesIdentity = computed(() => parsedNodes.value)
   const parsedNodeCount = computed(() => parsedNodes.value.length)
-  const desiredRenderedCount = computed(() => parsedNodeCount.value)
+  const desiredCount = ref<number | null>(options.desiredCount ?? null)
+  const desiredRenderedCount = computed(() => desiredCount.value ?? parsedNodeCount.value)
   const datasetKey = computed(() => props.indexKey)
 
   const batchingEnabled = computed(() => true)
@@ -111,12 +113,14 @@ function createHarness(options: {
   return {
     props,
     parsedNodes,
+    desiredCount,
     incremental,
     renderedCount,
     adaptiveBatchSize,
     cleanupNodeVisibility,
     onDatasetKeyChanged,
     onDatasetChanged,
+    cleanupBatchScheduler: () => scheduler?.cleanupBatchScheduler(),
   }
 }
 
@@ -159,6 +163,40 @@ describe('useBatchRenderingScheduler', () => {
     expect(h.cleanupNodeVisibility).toHaveBeenLastCalledWith(8)
   })
 
+  it('does not adjust adaptive batch size from RAF wait time', async () => {
+    let currentTime = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
+    const requestFrame = ((callback: FrameRequestCallback) => {
+      return window.setTimeout(() => callback(currentTime), 0)
+    }) as typeof window.requestAnimationFrame
+    const cancelFrame = ((handle: number) => {
+      window.clearTimeout(handle)
+    }) as typeof window.cancelAnimationFrame
+
+    const h = createHarness({
+      total: 16,
+      initialBatch: 8,
+      batchSize: 8,
+      delay: 10,
+      requestFrame,
+      cancelFrame,
+    })
+
+    expect(h.renderedCount.value).toBe(8)
+
+    vi.advanceTimersByTime(10)
+    currentTime = 1
+    await nextTick()
+
+    expect(h.renderedCount.value).toBe(16)
+    expect(h.adaptiveBatchSize.value).toBe(8)
+
+    currentTime = 20
+    vi.advanceTimersByTime(0)
+
+    expect(h.adaptiveBatchSize.value).toBe(8)
+  })
+
   it('adjusts adaptive batch size from post-flush commit cost', async () => {
     let currentTime = 0
     vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
@@ -181,15 +219,92 @@ describe('useBatchRenderingScheduler', () => {
     expect(h.renderedCount.value).toBe(8)
 
     vi.advanceTimersByTime(10)
+    currentTime = 8
     await nextTick()
 
     expect(h.renderedCount.value).toBe(16)
     expect(h.adaptiveBatchSize.value).toBe(8)
 
-    currentTime = 20
     vi.advanceTimersByTime(0)
 
     expect(h.adaptiveBatchSize.value).toBe(5)
+  })
+
+  it('delays desired-count follow-up until commit feedback updates adaptive size', async () => {
+    let currentTime = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
+    const requestFrame = ((callback: FrameRequestCallback) => {
+      return window.setTimeout(() => callback(currentTime), 0)
+    }) as typeof window.requestAnimationFrame
+    const cancelFrame = ((handle: number) => {
+      window.clearTimeout(handle)
+    }) as typeof window.cancelAnimationFrame
+
+    const h = createHarness({
+      total: 24,
+      desiredCount: 16,
+      initialBatch: 8,
+      batchSize: 8,
+      delay: 10,
+      requestFrame,
+      cancelFrame,
+    })
+
+    expect(h.renderedCount.value).toBe(8)
+
+    vi.advanceTimersByTime(10)
+    expect(h.renderedCount.value).toBe(16)
+
+    h.desiredCount.value = 24
+    currentTime = 8
+    await nextTick()
+
+    expect(h.adaptiveBatchSize.value).toBe(8)
+
+    vi.advanceTimersByTime(0)
+
+    expect(h.adaptiveBatchSize.value).toBe(5)
+
+    vi.runOnlyPendingTimers()
+    vi.advanceTimersByTime(10)
+    await nextTick()
+
+    expect(h.renderedCount.value).toBe(21)
+  })
+
+  it('does not schedule follow-up after cleanup cancels commit measurement', async () => {
+    let currentTime = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
+    const requestFrame = ((callback: FrameRequestCallback) => {
+      return window.setTimeout(() => callback(currentTime), 0)
+    }) as typeof window.requestAnimationFrame
+    const cancelFrame = ((handle: number) => {
+      window.clearTimeout(handle)
+    }) as typeof window.cancelAnimationFrame
+
+    const h = createHarness({
+      total: 24,
+      desiredCount: 16,
+      initialBatch: 8,
+      batchSize: 8,
+      delay: 10,
+      requestFrame,
+      cancelFrame,
+    })
+
+    vi.advanceTimersByTime(10)
+    expect(h.renderedCount.value).toBe(16)
+
+    h.desiredCount.value = 24
+    currentTime = 8
+    await nextTick()
+    h.cleanupBatchScheduler()
+
+    vi.advanceTimersByTime(0)
+    vi.advanceTimersByTime(10)
+
+    expect(h.adaptiveBatchSize.value).toBe(8)
+    expect(h.renderedCount.value).toBe(16)
   })
 
   it('continues scheduling when desired rendered count grows', async () => {
