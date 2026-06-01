@@ -5104,9 +5104,27 @@ function handleFragmentMouseout(event: MouseEvent) {
 const typewriterCursorRef = ref<HTMLElement | null>(null)
 const showTypewriterCursor = ref(false)
 let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
+let typewriterCursorRaf: number | null = null
+let typewriterCursorRafVersion = 0
 let lastTypewriterContentLength = 0
 let lastTypewriterVisibleLength = 0
-const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES = new Set(['code_block', 'admonition', 'table', 'math_block', 'html_block', 'image'])
+const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPE_LIST = [
+  'code_block',
+  'admonition',
+  'table',
+  'math_block',
+  'html_block',
+  'image',
+  'thematic_break',
+] as const
+const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPES: ReadonlySet<string> = new Set(TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPE_LIST)
+const TYPEWRITER_CURSOR_EXCLUDED_SELECTOR = [
+  '.typewriter-cursor',
+  '.height-estimation-probes',
+  ...TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPE_LIST.map(type => `[data-node-type="${type}"]`),
+  'script',
+  'style',
+].join(',')
 
 function shouldSkipTypewriterCursorForNode(node: unknown) {
   if (!node || typeof node !== 'object')
@@ -5163,36 +5181,81 @@ function clearTypewriterCursorTimeout() {
   typewriterCursorTimeout = undefined
 }
 
+function clearTypewriterCursorRaf() {
+  typewriterCursorRafVersion += 1
+
+  if (typewriterCursorRaf == null)
+    return
+
+  cancelFrame?.(typewriterCursorRaf)
+  typewriterCursorRaf = null
+}
+
 function hideTypewriterCursorElement() {
+  clearTypewriterCursorRaf()
   if (typewriterCursorRef.value)
     typewriterCursorRef.value.style.visibility = 'hidden'
 }
 
+function isAcceptedTypewriterCursorTextNode(node: Node): node is Text {
+  if (node.nodeType !== Node.TEXT_NODE)
+    return false
+
+  const text = node.textContent ?? ''
+  if (!text.trim())
+    return false
+
+  const parent = node.parentElement
+  if (!parent)
+    return false
+
+  return !parent.closest(TYPEWRITER_CURSOR_EXCLUDED_SELECTOR)
+}
+
 function getLastTextNode(root: HTMLElement) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const text = node.textContent ?? ''
-      if (!text.trim())
-        return NodeFilter.FILTER_REJECT
+  let current: Node | null = root.lastChild
 
-      const parent = node.parentElement
-      if (!parent)
-        return NodeFilter.FILTER_REJECT
-      if (parent.closest('.typewriter-cursor, .height-estimation-probes, [data-node-type="code_block"], [data-node-type="admonition"], [data-node-type="table"], [data-node-type="math_block"], [data-node-type="html_block"], [data-node-type="image"], script, style'))
-        return NodeFilter.FILTER_REJECT
-
-      return NodeFilter.FILTER_ACCEPT
-    },
-  })
-
-  let last: Text | null = null
-  let current = walker.nextNode()
   while (current) {
-    last = current as Text
-    current = walker.nextNode()
+    if (isAcceptedTypewriterCursorTextNode(current))
+      return current
+
+    if (current.nodeType === Node.ELEMENT_NODE) {
+      const element = current as Element
+      if (!element.matches(TYPEWRITER_CURSOR_EXCLUDED_SELECTOR) && element.lastChild) {
+        current = element.lastChild
+        continue
+      }
+    }
+
+    while (current && current !== root && !current.previousSibling)
+      current = current.parentNode
+
+    if (!current || current === root)
+      break
+
+    current = current.previousSibling
   }
 
-  return last
+  return null
+}
+
+function getTypewriterCursorTextTarget() {
+  const items = renderedItems.value
+  for (let index = items.length - 1; index >= 0; index--) {
+    const item = items[index]
+    if (!item || shouldSkipTypewriterCursorForNode(item.node) || !shouldRenderNode(item.index))
+      continue
+
+    const slot = nodeSlotElements.get(item.index)
+    if (!slot)
+      continue
+
+    const text = getLastTextNode(slot)
+    if (text)
+      return text
+  }
+
+  return null
 }
 
 function updateTypewriterCursorPosition() {
@@ -5201,9 +5264,11 @@ function updateTypewriterCursorPosition() {
 
   const root = containerRef.value
   const cursor = typewriterCursorRef.value
-  const lastText = getLastTextNode(root)
-  const rootRect = root.getBoundingClientRect()
   cursor.style.visibility = 'hidden'
+  const lastText = getTypewriterCursorTextTarget()
+  if (!lastText)
+    return
+
   let left = 0
   let top = 0
   let height = 20
@@ -5220,6 +5285,7 @@ function updateTypewriterCursorPosition() {
     const rect = rects?.[rects.length - 1] ?? lastText.parentElement?.getBoundingClientRect()
 
     if (rect) {
+      const rootRect = root.getBoundingClientRect()
       left = rect.right - rootRect.left + root.scrollLeft
       top = rect.top - rootRect.top + root.scrollTop
       height = rect.height || height
@@ -5236,6 +5302,28 @@ function updateTypewriterCursorPosition() {
   cursor.style.visibility = 'visible'
 }
 
+function scheduleTypewriterCursorPositionUpdate() {
+  if (!isClient || !showTypewriterCursor.value)
+    return
+  if (typewriterCursorRaf != null)
+    return
+
+  const version = typewriterCursorRafVersion
+  const run = () => {
+    typewriterCursorRaf = null
+    if (version !== typewriterCursorRafVersion)
+      return
+    updateTypewriterCursorPosition()
+  }
+
+  if (requestFrame) {
+    typewriterCursorRaf = requestFrame(run)
+    return
+  }
+
+  run()
+}
+
 watch(
   [renderContent, () => props.content, () => props.nodes, () => props.typewriter, effectiveFinal],
   async () => {
@@ -5247,6 +5335,18 @@ watch(
     if (effectiveFinal.value) {
       showTypewriterCursor.value = false
       clearTypewriterCursorTimeout()
+      hideTypewriterCursorElement()
+      return
+    }
+
+    if (props.nodes?.length) {
+      showTypewriterCursor.value = false
+      clearTypewriterCursorTimeout()
+      hideTypewriterCursorElement()
+      // Cursor is disabled in nodes mode; keep the baseline on content so
+      // switching back to content mode can show it again.
+      lastTypewriterContentLength = (props.content ?? '').length
+      lastTypewriterVisibleLength = renderContent.value.length
       return
     }
 
@@ -5256,8 +5356,10 @@ watch(
     const sourceGrowing = nextLength > lastTypewriterContentLength
     const visibleGrowing = nextVisibleLength > lastTypewriterVisibleLength
     if (props.typewriter === false || !cursorAllowed || (!sourceGrowing && !visibleGrowing)) {
-      if (props.typewriter === false || !cursorAllowed)
+      if (props.typewriter === false || !cursorAllowed) {
         showTypewriterCursor.value = false
+        hideTypewriterCursorElement()
+      }
       lastTypewriterContentLength = nextLength
       lastTypewriterVisibleLength = nextVisibleLength
       return
@@ -5266,11 +5368,13 @@ watch(
     lastTypewriterContentLength = nextLength
     lastTypewriterVisibleLength = nextVisibleLength
     showTypewriterCursor.value = true
-    hideTypewriterCursorElement()
+    if (typewriterCursorRef.value)
+      typewriterCursorRef.value.style.visibility = 'hidden'
     clearTypewriterCursorTimeout()
     await nextTick()
-    updateTypewriterCursorPosition()
+    scheduleTypewriterCursorPositionUpdate()
     typewriterCursorTimeout = setTimeout(() => {
+      typewriterCursorTimeout = undefined
       showTypewriterCursor.value = false
     }, 3000)
   },
@@ -5280,16 +5384,31 @@ watch(
 watch(
   showTypewriterCursor,
   async (visible) => {
-    if (!visible)
+    if (!visible) {
+      hideTypewriterCursorElement()
       return
+    }
     await nextTick()
-    updateTypewriterCursorPosition()
+    scheduleTypewriterCursorPositionUpdate()
+  },
+  { flush: 'post' },
+)
+
+watch(
+  [() => renderedCount.value, () => liveRange.start, () => liveRange.end],
+  async () => {
+    if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value || !showTypewriterCursor.value)
+      return
+
+    await nextTick()
+    scheduleTypewriterCursorPositionUpdate()
   },
   { flush: 'post' },
 )
 
 onBeforeUnmount(() => {
   clearTypewriterCursorTimeout()
+  clearTypewriterCursorRaf()
   mathBlockMinHeightCache.clear()
 })
 </script>
