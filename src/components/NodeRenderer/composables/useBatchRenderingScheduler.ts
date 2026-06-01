@@ -2,10 +2,6 @@ import type { ComputedRef, Ref } from 'vue'
 import type { NodeRendererProps } from '../../../types/node-renderer-props'
 import { nextTick, watch } from 'vue'
 
-export interface IdleDeadlineLike {
-  timeRemaining?: () => number
-}
-
 export interface BatchRenderingSchedulerOptions {
   props: Readonly<NodeRendererProps>
   isClient: boolean
@@ -128,7 +124,7 @@ export function useBatchRenderingScheduler(
       queueNextBatchNow()
   }
 
-  function measureBatchCommitCost(start: number, syncElapsed: number) {
+  function measureBatchPostFlushCost(start: number, syncElapsed: number) {
     if (!isClient) {
       finishCommitMeasurement(syncElapsed)
       return
@@ -149,6 +145,7 @@ export function useBatchRenderingScheduler(
         finishCommitMeasurement(measuredCost)
       }
 
+      // Keep a frame boundary before the next batch without charging RAF wait time as commit cost.
       if (requestFrame) {
         const raf = requestFrame(() => {
           commitMeasurementRafs.delete(raf)
@@ -174,7 +171,7 @@ export function useBatchRenderingScheduler(
       return
 
     const amount = Math.max(1, increment)
-    const run = (deadline?: IdleDeadlineLike) => {
+    const run = () => {
       const runStart = now()
       let syncElapsed = 0
       batchRaf = null
@@ -183,35 +180,13 @@ export function useBatchRenderingScheduler(
       batchPending = false
       const applied = pendingIncrement != null ? pendingIncrement : amount
       pendingIncrement = null
-      const budgetMs = Math.max(2, props.renderBatchBudgetMs ?? 6)
 
-      const applyAndMeasure = (size: number) => {
-        const start = now()
-        renderedCount.value = Math.min(target, renderedCount.value + Math.max(1, size))
-        cleanupNodeVisibility(renderedCount.value)
-        const elapsed = now() - start
-        syncElapsed = Math.max(syncElapsed, elapsed)
-        return elapsed
-      }
+      const start = now()
+      renderedCount.value = Math.min(target, renderedCount.value + applied)
+      cleanupNodeVisibility(renderedCount.value)
+      syncElapsed = now() - start
 
-      let nextSize = applied
-      while (true) {
-        const elapsed = applyAndMeasure(nextSize)
-        if (renderedCount.value >= target)
-          break
-        if (elapsed > budgetMs)
-          break
-        if (!deadline)
-          break
-        const remaining = typeof deadline.timeRemaining === 'function'
-          ? deadline.timeRemaining()
-          : 0
-        if (remaining <= budgetMs * 0.5)
-          break
-        nextSize = Math.max(1, Math.round(adaptiveBatchSize.value))
-      }
-
-      measureBatchCommitCost(runStart, syncElapsed)
+      measureBatchPostFlushCost(runStart, syncElapsed)
     }
 
     if (!isClient || opts.immediate) {
@@ -227,9 +202,7 @@ export function useBatchRenderingScheduler(
 
     if (!isTestEnv && hasIdleCallback && window.requestIdleCallback) {
       const timeout = Math.max(0, props.renderBatchIdleTimeoutMs ?? 120)
-      batchIdle = window.requestIdleCallback((deadline) => {
-        run(deadline)
-      }, { timeout })
+      batchIdle = window.requestIdleCallback(() => run(), { timeout })
       return
     }
 
@@ -251,6 +224,7 @@ export function useBatchRenderingScheduler(
     opts: { immediate?: boolean } = {},
   ) {
     if (commitMeasurementPending) {
+      // Use the post-feedback adaptive size instead of the stale requested increment.
       followupBatchRequested = true
       return
     }

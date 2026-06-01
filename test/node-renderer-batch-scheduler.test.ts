@@ -27,6 +27,7 @@ function createHarness(options: {
   incremental?: boolean
   requestFrame?: typeof window.requestAnimationFrame | null
   cancelFrame?: typeof window.cancelAnimationFrame | null
+  hasIdleCallback?: boolean
 } = {}) {
   const props = reactive<SchedulerProps>({
     indexKey: 'message-1',
@@ -97,7 +98,7 @@ function createHarness(options: {
 
       requestFrame: options.requestFrame ?? null,
       cancelFrame: options.cancelFrame ?? null,
-      hasIdleCallback: false,
+      hasIdleCallback: options.hasIdleCallback ?? false,
 
       cleanupNodeVisibility,
       onDatasetKeyChanged,
@@ -228,6 +229,66 @@ describe('useBatchRenderingScheduler', () => {
     vi.advanceTimersByTime(0)
 
     expect(h.adaptiveBatchSize.value).toBe(5)
+  })
+
+  it('does not apply multiple idle batches before commit feedback', async () => {
+    let currentTime = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
+
+    const frames: FrameRequestCallback[] = []
+    const requestFrame = ((callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    }) as typeof window.requestAnimationFrame
+    const cancelFrame = vi.fn() as unknown as typeof window.cancelAnimationFrame
+
+    const idleCallbacks: IdleRequestCallback[] = []
+    const requestIdleCallback = vi.fn((callback: IdleRequestCallback) => {
+      idleCallbacks.push(callback)
+      return idleCallbacks.length
+    }) as unknown as typeof window.requestIdleCallback
+
+    vi.stubGlobal('requestIdleCallback', requestIdleCallback)
+    vi.stubGlobal('cancelIdleCallback', vi.fn())
+
+    const h = createHarness({
+      total: 64,
+      initialBatch: 8,
+      batchSize: 8,
+      delay: 10,
+      requestFrame,
+      cancelFrame,
+      hasIdleCallback: true,
+    })
+
+    expect(h.renderedCount.value).toBe(8)
+    expect(idleCallbacks).toHaveLength(1)
+
+    idleCallbacks.shift()?.({
+      didTimeout: false,
+      timeRemaining: () => 50,
+    } as IdleDeadline)
+
+    expect(h.renderedCount.value).toBe(16)
+    expect(idleCallbacks).toHaveLength(0)
+
+    currentTime = 8
+    await nextTick()
+
+    expect(h.adaptiveBatchSize.value).toBe(8)
+    expect(frames).toHaveLength(1)
+
+    frames.shift()?.(currentTime)
+
+    expect(h.adaptiveBatchSize.value).toBe(5)
+    expect(idleCallbacks).toHaveLength(1)
+
+    idleCallbacks.shift()?.({
+      didTimeout: false,
+      timeRemaining: () => 50,
+    } as IdleDeadline)
+
+    expect(h.renderedCount.value).toBe(21)
   })
 
   it('delays desired-count follow-up until commit feedback updates adaptive size', async () => {
