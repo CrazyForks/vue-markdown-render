@@ -699,6 +699,9 @@ describe('useMarkdownParsing performance behavior', () => {
       signatureMs: expect.any(Number),
       stabilizeSignatureMs: expect.any(Number),
       primeSignatureMs: expect.any(Number),
+      signatureCallCount: expect.any(Number),
+      stabilizeSignatureCallCount: expect.any(Number),
+      primeSignatureCallCount: expect.any(Number),
       stabilizeMs: expect.any(Number),
       reusedNodeCount: 0,
       dirtyStartIndex: 0,
@@ -714,6 +717,9 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(data?.stabilizeSignatureMs).toBe(0)
     expect(data?.primeSignatureMs).toBeGreaterThanOrEqual(0)
     expect(data?.signatureMs).toBe(data?.stabilizeSignatureMs + data?.primeSignatureMs)
+    expect(data?.stabilizeSignatureCallCount).toBe(0)
+    expect(data?.primeSignatureCallCount).toBe(1)
+    expect(data?.signatureCallCount).toBe(data?.stabilizeSignatureCallCount + data?.primeSignatureCallCount)
     expect(data?.stabilizeMs).toBeGreaterThanOrEqual(0)
     expect(typeof data?.streamMode === 'string' || data?.streamMode == null).toBe(true)
 
@@ -738,6 +744,9 @@ describe('useMarkdownParsing performance behavior', () => {
       signatureMs: expect.any(Number),
       stabilizeSignatureMs: expect.any(Number),
       primeSignatureMs: expect.any(Number),
+      signatureCallCount: expect.any(Number),
+      stabilizeSignatureCallCount: expect.any(Number),
+      primeSignatureCallCount: expect.any(Number),
       stabilizeMs: expect.any(Number),
       reusedNodeCount: 3,
       dirtyStartIndex: 3,
@@ -749,6 +758,9 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(data?.stabilizeSignatureMs).toBeGreaterThanOrEqual(0)
     expect(data?.primeSignatureMs).toBeGreaterThanOrEqual(0)
     expect(data?.signatureMs).toBe(data?.stabilizeSignatureMs + data?.primeSignatureMs)
+    expect(data?.stabilizeSignatureCallCount).toBeGreaterThan(0)
+    expect(data?.primeSignatureCallCount).toBeGreaterThan(0)
+    expect(data?.signatureCallCount).toBe(data?.stabilizeSignatureCallCount + data?.primeSignatureCallCount)
     expect(data?.stabilizeMs).toBeGreaterThanOrEqual(0)
 
     scope.stop()
@@ -852,6 +864,9 @@ describe('useMarkdownParsing performance behavior', () => {
       signatureMs: expect.any(Number),
       stabilizeSignatureMs: expect.any(Number),
       primeSignatureMs: expect.any(Number),
+      signatureCallCount: expect.any(Number),
+      stabilizeSignatureCallCount: expect.any(Number),
+      primeSignatureCallCount: expect.any(Number),
       stabilizeMs: expect.any(Number),
       reusedNodeCount: expect.any(Number),
       dirtyStartIndex: expect.any(Number),
@@ -865,6 +880,9 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(data?.stabilizeSignatureMs).toBeGreaterThanOrEqual(0)
     expect(data?.primeSignatureMs).toBeGreaterThanOrEqual(0)
     expect(data?.signatureMs).toBe(data?.stabilizeSignatureMs + data?.primeSignatureMs)
+    expect(data?.stabilizeSignatureCallCount).toBeGreaterThan(0)
+    expect(data?.primeSignatureCallCount).toBeGreaterThan(0)
+    expect(data?.signatureCallCount).toBe(data?.stabilizeSignatureCallCount + data?.primeSignatureCallCount)
     expect(data?.stabilizeMs).toBeGreaterThanOrEqual(0)
     expect((streamDelta?.appendHits ?? 0) + (streamDelta?.tailHits ?? 0) + (streamDelta?.cacheHits ?? 0)).toBeGreaterThan(0)
 

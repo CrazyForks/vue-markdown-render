@@ -35,15 +35,19 @@ interface ParserTimingMetrics {
 }
 
 interface ParsedNodeSignatureTimingMetrics {
+  /** Instrumented wall time for timed signature calls, including timing overhead. */
   signatureMs: number
   stabilizeSignatureMs: number
   primeSignatureMs: number
+  signatureCallCount: number
+  stabilizeSignatureCallCount: number
+  primeSignatureCallCount: number
 }
 
 interface ParsedNodeStabilizeMetrics {
   /** Count of reused nodes anywhere in nextNodes, including unchanged suffix nodes after dirtyStartIndex. */
   reusedNodeCount: number
-  /** First index whose node identity/signature changed; -1 means no dirty node. */
+  /** First boundary where previousNodes and nextNodes diverge; -1 means no dirty tail. */
   dirtyStartIndex: number
   /** Count of stable leading nodes in nextNodes. */
   stablePrefixNodeCount: number
@@ -384,12 +388,17 @@ function trackSignatureTiming<T>(
   callback: () => T,
 ) {
   const startedAt = getNow()
+  const countKey = metricKey === 'stabilizeSignatureMs'
+    ? 'stabilizeSignatureCallCount'
+    : 'primeSignatureCallCount'
   try {
     return callback()
   }
   finally {
     metrics[metricKey] += getNow() - startedAt
+    metrics[countKey] += 1
     metrics.signatureMs = metrics.stabilizeSignatureMs + metrics.primeSignatureMs
+    metrics.signatureCallCount = metrics.stabilizeSignatureCallCount + metrics.primeSignatureCallCount
   }
 }
 
@@ -727,7 +736,14 @@ export function useMarkdownParsing(
       ? getNow()
       : 0
     const signatureTiming: ParsedNodeSignatureTimingMetrics | undefined = collectPerformanceMetrics
-      ? { signatureMs: 0, stabilizeSignatureMs: 0, primeSignatureMs: 0 }
+      ? {
+          signatureMs: 0,
+          stabilizeSignatureMs: 0,
+          primeSignatureMs: 0,
+          signatureCallCount: 0,
+          stabilizeSignatureCallCount: 0,
+          primeSignatureCallCount: 0,
+        }
       : undefined
     let stabilizeMetrics: ParsedNodeStabilizeMetrics | undefined = collectPerformanceMetrics
       ? getInitialStabilizeMetrics(nextParsed.length)
@@ -784,6 +800,9 @@ export function useMarkdownParsing(
         signatureMs: signatureTiming?.signatureMs ?? 0,
         stabilizeSignatureMs: signatureTiming?.stabilizeSignatureMs ?? 0,
         primeSignatureMs: signatureTiming?.primeSignatureMs ?? 0,
+        signatureCallCount: signatureTiming?.signatureCallCount ?? 0,
+        stabilizeSignatureCallCount: signatureTiming?.stabilizeSignatureCallCount ?? 0,
+        primeSignatureCallCount: signatureTiming?.primeSignatureCallCount ?? 0,
         stabilizeMs,
         ...(stabilizeMetrics ?? {}),
         ...(parserTiming
