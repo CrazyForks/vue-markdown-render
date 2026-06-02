@@ -5839,9 +5839,10 @@ onBeforeUnmount(() => {
         >
           <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
           <transition
-            v-if="!item.isCodeBlock && rendererProps.fade !== false"
+            v-if="!item.isCodeBlock"
             name="fade"
-            appear
+            :css="rendererProps.fade !== false"
+            :appear="rendererProps.fade !== false"
           >
             <component
               :is="item.component"

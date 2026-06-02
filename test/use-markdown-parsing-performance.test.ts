@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import type { NodeRendererProps } from '../src/types/node-renderer-props'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { computed, effectScope, reactive, ref } from 'vue'
+import { computed, effectScope, reactive, ref, watch } from 'vue'
 import { useMarkdownParsing } from '../src/components/NodeRenderer/composables/useMarkdownParsing'
 
 function createParsingState(
@@ -154,6 +154,40 @@ describe('useMarkdownParsing performance behavior', () => {
 
     await vi.advanceTimersByTimeAsync(999)
     expect(state.parsedNodes.value[0]?.raw).toBe(next)
+
+    scope.stop()
+  })
+
+  it('reuses unchanged prefix when final flushes coalesced smooth-streaming content', () => {
+    vi.useFakeTimers()
+
+    const firstParagraph = 'alpha '.repeat(20).trim()
+    const secondParagraph = 'beta '.repeat(20).trim()
+    const initial = `${firstParagraph}\n\n${secondParagraph}`
+    const next = `${initial} gamma`
+    const content = ref(initial)
+    const smooth = ref(true)
+    const { final, scope, state } = createParsingState(content, smooth, {
+      parseCoalesceMs: 1000,
+    })
+    const first = state.parsedNodes.value
+    const reset = vi.spyOn((state.mdInstance.value as any).stream, 'reset')
+
+    expect(first).toHaveLength(2)
+
+    content.value = next
+
+    // Appended text has no block boundary, so smooth parsing should still be
+    // coalesced until final forces a flush.
+    expect(state.parsedNodes.value).toBe(first)
+
+    final.value = true
+    const second = state.parsedNodes.value
+
+    expect(reset).toHaveBeenCalled()
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).not.toBe(first[1])
+    expect(second[1]?.raw).toBe(`${secondParagraph} gamma`)
 
     scope.stop()
   })
@@ -338,15 +372,120 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
-  it('does not reuse stale ParsedNode references when final changes', () => {
-    const content = ref('**hello')
+  it('reuses unchanged ParsedNode references across final-only transitions', () => {
+    const content = ref('alpha\n\nbeta')
     const { final, scope, state } = createParsingState(content)
-    const first = state.parsedNodes.value[0]
+    const first = state.parsedNodes.value
+    const reset = vi.spyOn((state.mdInstance.value as any).stream, 'reset')
 
     final.value = true
-    const second = state.parsedNodes.value[0]
+    const second = state.parsedNodes.value
 
-    expect(second).not.toBe(first)
+    expect(reset).toHaveBeenCalled()
+    expect(second).toBe(first)
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).toBe(first[1])
+
+    scope.stop()
+  })
+
+  it('does not notify parsedNodes watchers when final-only output is identical', () => {
+    const content = ref('alpha\n\nbeta')
+    const { final, scope, state } = createParsingState(content)
+    const first = state.parsedNodes.value
+    const parsedNodesChanged = vi.fn()
+    const stop = watch(state.parsedNodes, parsedNodesChanged, { flush: 'sync' })
+
+    final.value = true
+
+    expect(state.parsedNodes.value).toBe(first)
+    expect(parsedNodesChanged).not.toHaveBeenCalled()
+
+    stop()
+    scope.stop()
+  })
+
+  it('reuses unchanged ParsedNode references across final-only transitions with streamParse auto', () => {
+    const content = ref('alpha\n\nbeta')
+    const { final, scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        streamParse: 'auto',
+      },
+    })
+    const first = state.parsedNodes.value
+    const reset = vi.spyOn((state.mdInstance.value as any).stream, 'reset')
+
+    final.value = true
+    const second = state.parsedNodes.value
+
+    expect(reset).toHaveBeenCalled()
+    expect(second).toBe(first)
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).toBe(first[1])
+
+    scope.stop()
+  })
+
+  it('reuses unchanged prefix but replaces final-sensitive nodes when final changes', () => {
+    const content = ref([
+      'alpha',
+      '',
+      '<details>',
+      '<summary>Steps</summary>',
+      'body',
+    ].join('\n'))
+    const { final, scope, state } = createParsingState(content)
+
+    const first = state.parsedNodes.value
+    const firstPrefix = first[0]
+    const firstDetails = first[1] as any
+
+    expect(firstPrefix?.raw).toBe('alpha')
+    expect(firstDetails?.type).toBe('html_block')
+    expect(firstDetails?.loading).toBe(true)
+
+    final.value = true
+    const second = state.parsedNodes.value
+    const secondDetails = second[1] as any
+
+    expect(second[0]).toBe(firstPrefix)
+    expect(secondDetails).not.toBe(firstDetails)
+    expect(secondDetails?.type).toBe('html_block')
+    expect(secondDetails?.loading).toBe(false)
+
+    scope.stop()
+  })
+
+  it('replaces final-sensitive tail but reuses prefix with streamParse auto', () => {
+    const content = ref([
+      'alpha',
+      '',
+      '<details>',
+      '<summary>Steps</summary>',
+      'body',
+    ].join('\n'))
+    const { final, scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        streamParse: 'auto',
+      },
+    })
+
+    const first = state.parsedNodes.value
+    const firstPrefix = first[0]
+    const firstDetails = first[1] as any
+
+    expect(firstPrefix?.raw).toBe('alpha')
+    expect(firstDetails?.type).toBe('html_block')
+    expect(firstDetails?.loading).toBe(true)
+
+    final.value = true
+    const second = state.parsedNodes.value
+    const secondDetails = second[1] as any
+
+    expect(second[0]).toBe(firstPrefix)
+    expect(secondDetails).not.toBe(firstDetails)
+    expect(secondDetails?.type).toBe('html_block')
+    expect(secondDetails?.loading).toBe(false)
 
     scope.stop()
   })

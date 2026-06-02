@@ -187,6 +187,31 @@ describe('node renderer smooth streaming', () => {
     wrapper.unmount()
   })
 
+  it('does not bump streamRenderVersion when final-only parse output is identical', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: 'alpha\n\nbeta',
+        final: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await nextTick()
+
+    const initialVersion = readStreamRenderVersion(wrapper)
+    const initialHtml = wrapper.html()
+
+    await wrapper.setProps({ final: true })
+    await nextTick()
+
+    expect(readStreamRenderVersion(wrapper)).toBe(initialVersion)
+    expect(wrapper.html()).toBe(initialHtml)
+
+    wrapper.unmount()
+  })
+
   it('nested renderer does not double-pace when parent has smooth streaming enabled', async () => {
     // When a parent renderer is already smoothing, a nested NodeRenderer
     // (e.g. inside a thinking block or custom HTML tag) should not apply
