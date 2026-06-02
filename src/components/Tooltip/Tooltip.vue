@@ -22,6 +22,8 @@ const actualPlacement = ref<string>(props.placement ?? 'top')
 const ready = ref(false)
 
 let cleanupAutoUpdate: (() => void) | null = null
+let observedAnchorEl: HTMLElement | null = null
+let observedTooltipEl: HTMLElement | null = null
 let floatingModule: typeof import('@floating-ui/dom') | null = null
 let floatingPromise: Promise<typeof import('@floating-ui/dom')> | null = null
 let visibilityRunId = 0
@@ -50,6 +52,33 @@ function cleanupPositionObserver() {
     cleanupAutoUpdate()
     cleanupAutoUpdate = null
   }
+  observedAnchorEl = null
+  observedTooltipEl = null
+}
+
+async function setupPositionObserver(runIsCurrent: () => boolean) {
+  const anchor = props.anchorEl
+  const tooltipEl = tooltip.value
+
+  if (!props.visible || !anchor || !tooltipEl)
+    return
+
+  if (observedAnchorEl === anchor && observedTooltipEl === tooltipEl)
+    return
+
+  const { autoUpdate } = await loadFloating()
+
+  if (!runIsCurrent() || !props.visible || props.anchorEl !== anchor || tooltip.value !== tooltipEl)
+    return
+
+  cleanupPositionObserver()
+  observedAnchorEl = anchor
+  observedTooltipEl = tooltipEl
+  cleanupAutoUpdate = autoUpdate(anchor, tooltipEl, () => {
+    void updatePosition().catch(() => {
+      applyFallbackPosition()
+    })
+  })
 }
 
 async function updatePosition() {
@@ -174,15 +203,7 @@ watch(
           else {
             ready.value = true
           }
-          const { autoUpdate } = await loadFloating()
-          if (runId !== visibilityRunId || !props.visible || !props.anchorEl || !tooltip.value)
-            return
-          cleanupPositionObserver()
-          cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, () => {
-            void updatePosition().catch(() => {
-              applyFallbackPosition()
-            })
-          })
+          await setupPositionObserver(() => runId === visibilityRunId)
         }
         catch {
           if (runId !== visibilityRunId || !props.visible)
@@ -190,15 +211,7 @@ watch(
           ready.value = applyFallbackPosition()
           if (props.anchorEl && tooltip.value) {
             try {
-              const { autoUpdate } = await loadFloating()
-              if (runId !== visibilityRunId || !props.visible || !props.anchorEl || !tooltip.value)
-                return
-              cleanupPositionObserver()
-              cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, async () => {
-                const positioned = await updatePosition().catch(() => false)
-                if (!positioned)
-                  applyFallbackPosition()
-              })
+              await setupPositionObserver(() => runId === visibilityRunId)
             }
             catch {}
           }
@@ -238,6 +251,8 @@ watch([
     catch {
       applyFallbackPosition()
     }
+
+    await setupPositionObserver(() => runId === updateRunId)
   }
 })
 

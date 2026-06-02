@@ -1,5 +1,6 @@
+import { autoUpdate, computePosition } from '@floating-ui/dom'
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Tooltip from '../src/components/Tooltip/Tooltip.vue'
 import { flushAll } from './setup/flush-all'
 
@@ -32,6 +33,17 @@ function rect(left: number, top: number, width: number, height: number) {
 }
 
 describe('tooltip fallback positioning', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(autoUpdate).mockImplementation((_anchor: HTMLElement, _tooltip: HTMLElement, update: () => unknown) => {
+      void Promise.resolve().then(update)
+      return vi.fn()
+    })
+    vi.mocked(computePosition).mockImplementation(async () => {
+      throw new Error('position failed')
+    })
+  })
+
   afterEach(() => {
     document.body.innerHTML = ''
   })
@@ -95,6 +107,48 @@ describe('tooltip fallback positioning', () => {
     expect(tooltip.style.display).not.toBe('none')
     expect(tooltip.style.visibility).toBe('visible')
     expect(tooltip.style.transform).toBe('translate3d(20px, 24px, 0)')
+
+    wrapper.unmount()
+  })
+
+  it('rebinds autoUpdate when the visible tooltip moves to another anchor', async () => {
+    const cleanupA = vi.fn()
+    const cleanupB = vi.fn()
+    vi.mocked(autoUpdate)
+      .mockReturnValueOnce(cleanupA)
+      .mockReturnValueOnce(cleanupB)
+    vi.mocked(computePosition).mockResolvedValue({
+      x: 10,
+      y: 20,
+      placement: 'top',
+      strategy: 'fixed',
+      middlewareData: {},
+    })
+
+    const anchorA = document.createElement('button')
+    const anchorB = document.createElement('button')
+    document.body.append(anchorA, anchorB)
+
+    const wrapper = mount(Tooltip, {
+      attachTo: document.body,
+      props: {
+        visible: false,
+        anchorEl: anchorA,
+        content: 'A',
+        placement: 'top',
+      },
+    })
+
+    await wrapper.setProps({ visible: true })
+    await flushAll()
+
+    expect(autoUpdate).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({ anchorEl: anchorB, content: 'B' })
+    await flushAll()
+
+    expect(cleanupA).toHaveBeenCalled()
+    expect(autoUpdate).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
   })

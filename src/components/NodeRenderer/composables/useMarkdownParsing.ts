@@ -126,7 +126,6 @@ const MAX_SIGNATURE_KEYS = 80
 const MAX_SIGNATURE_ARRAY_ITEMS = 200
 const MAX_SIGNATURE_STRING_CHARS = 8192
 const MAX_CHEAP_NODE_KEY_DEPTH = 4
-const MAX_CHEAP_EXACT_STRING_COMPARE_CHARS = 4096
 const objectIdentityIds = new WeakMap<object, number>()
 const nodeSignatureCache = new WeakMap<object, string>()
 let nextObjectIdentityId = 1
@@ -444,14 +443,8 @@ function getDirtyTailNodeCount(
     : Math.max(nextNodes.length, previousNodes.length) - dirtyStartIndex
 }
 
-function compareCheapStringIfSafe(previous: string, next: string): boolean | null {
-  if (previous.length !== next.length)
-    return false
-
-  if (previous.length <= MAX_CHEAP_EXACT_STRING_COMPARE_CHARS)
-    return previous === next
-
-  return null
+function compareCheapStringIfSafe(previous: string, next: string) {
+  return previous.length === next.length && previous === next
 }
 
 function compareCheapParsedNodesIfSafe(
@@ -492,11 +485,7 @@ function compareCheapParsedNodesIfSafe(
       if (typeof nextValue !== 'string')
         return false
 
-      const stringResult = compareCheapStringIfSafe(previousValue, nextValue)
-      if (stringResult == null)
-        return null
-
-      if (!stringResult)
+      if (!compareCheapStringIfSafe(previousValue, nextValue))
         return false
 
       continue

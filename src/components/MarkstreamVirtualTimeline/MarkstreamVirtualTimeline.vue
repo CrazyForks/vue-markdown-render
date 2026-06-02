@@ -387,6 +387,15 @@ function getIdentityToken(value: unknown) {
   return String(id)
 }
 
+function hashTimelineString(value: string) {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(36)
+}
+
 function getCheapTimelineItemContentSignature(item: any, index: number, markdown: boolean) {
   if (markdown)
     return ''
@@ -402,7 +411,7 @@ function getCheapTimelineItemContentSignature(item: any, index: number, markdown
   if (!text)
     return ''
 
-  return `${text.length}:${text.slice(0, 64)}:${text.slice(-64)}`
+  return `${text.length}:${hashTimelineString(text)}`
 }
 
 function getEstimatedItemHeightSignature(item: any, index: number) {

@@ -670,8 +670,8 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
-  it('does not reuse a custom node when long same-length string content changes in the middle', () => {
-    let dynamicContent = `${'a'.repeat(5000)}MID-A${'z'.repeat(5000)}`
+  it('does not reuse a custom node when long same-length string content changes after the old sampled prefix', () => {
+    let dynamicContent = `${'a'.repeat(9000)}MID-A${'z'.repeat(5000)}`
     const content = ref('custom')
     const { scope, state } = createParsingState(content, ref(false), {
       parseOptions: {
@@ -694,7 +694,7 @@ describe('useMarkdownParsing performance behavior', () => {
 
     expect(firstChart?.content).toContain('MID-A')
 
-    dynamicContent = `${'a'.repeat(5000)}MID-B${'z'.repeat(5000)}`
+    dynamicContent = `${'a'.repeat(9000)}MID-B${'z'.repeat(5000)}`
     content.value = `${content.value}\n\nAppended paragraph.`
 
     const secondParagraph = state.parsedNodes.value[0] as any
@@ -744,6 +744,7 @@ describe('useMarkdownParsing performance behavior', () => {
 
       const data = logPerf.mock.calls.at(-1)?.[1]
       expect(data?.dirtyStartIndex).toBeGreaterThanOrEqual(1)
+      expect(data?.stabilizeSignatureCallCount).toBe(data?.dirtyStartIndex)
       expect(data?.primeSignatureCallCount).toBeLessThanOrEqual(2)
     }
     finally {

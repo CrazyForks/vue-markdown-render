@@ -3239,6 +3239,65 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('rebuilds layout when same-length non-markdown content changes in the middle', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const state = reactive<{ items: any[] }>({
+      items: [
+        {
+          kind: 'user-message',
+          id: 'a1',
+          text: `${'x'.repeat(80)} ${'y'.repeat(80)}`,
+        },
+        { kind: 'user-message', id: 'u1', text: 'Anchor' },
+      ],
+    })
+    const estimateItemHeight = vi.fn((item: any) => {
+      return String(item.text).includes('\n') ? 180 : 60
+    })
+    const Host = defineComponent({
+      setup() {
+        return () => h(MarkstreamVirtualTimeline, {
+          items: state.items,
+          threadKey: 'same-length-middle-change',
+          overscan: 10,
+          stickToBottom: false,
+          estimateItemHeight,
+        }, {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, props.item.text)
+          },
+        })
+      },
+    })
+
+    const wrapper = mount(Host, { attachTo: document.body })
+
+    await flushAll()
+    await nextTick()
+
+    const timeline = wrapper.getComponent(MarkstreamVirtualTimeline)
+    const timelineApi = (timeline.vm as any).$?.exposed
+    expect(timelineApi.getTotalHeight()).toBe(120)
+
+    estimateItemHeight.mockClear()
+    state.items[0].text = `${'x'.repeat(80)}\n${'y'.repeat(80)}`
+    await nextTick()
+    await flushAll()
+
+    expect(timelineApi.getTotalHeight()).toBe(240)
+    expect(estimateItemHeight).toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
   it('rebuilds timeline layout when estimateItemHeight output changes without explicit layoutRevision', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
