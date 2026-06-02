@@ -34,7 +34,7 @@ const isDark: MarkdownRenderProps['isDark'] = false
 
 如果使用 Nuxt 或 SSR，请用 `<client-only>` 包裹。
 
-如果是高频 SSE / token 级流式输出，推荐在外部完成解析后传 `:nodes`，而不是每个 chunk 都让 `MarkdownRender` 重新解析整篇内容。
+如果是聊天类流式输出，优先从 `content` + 内置 smooth streaming 开始（`typewriter` 或 `max-live-nodes <= 0` 会启用 `smooth-streaming="auto"`）。如果你已经在 worker/store 中解析，或需要完整 AST 控制，再改用 `:nodes` + `:final`。
 
 快速试一下：
 

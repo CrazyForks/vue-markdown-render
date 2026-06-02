@@ -247,7 +247,7 @@ export function Message({ markdown }: { markdown: string }) {
 
 1. 先把 `react-markdown` 换成 `MarkdownRender`，继续使用 `content`。
 2. 再迁移自定义渲染器和插件逻辑。
-3. 如果后面要接 SSE / 聊天流输出，再把解析挪到组件外，改传 `nodes`。
+3. 如果后面要接 SSE / 聊天流输出，先使用 `content` + 内置 smooth streaming；只有当 worker/store 已经接管解析、流更新频率极高，或你需要完整 AST 控制时，再把解析挪到组件外并改传 `nodes`。
 
 ```tsx
 import MarkdownRender from 'markstream-react'
@@ -267,7 +267,7 @@ export function Message() {
 }
 ```
 
-对于高频流式输出来说，这个 `nodes` 方案通常就是迁移到 `markstream-react` 的最大价值之一。
+多数聊天流优先从更简单的 `content` + smooth streaming 开始；这个 `nodes` 方案是解析和渲染需要独立调度时的进阶路径。
 
 ## 迁移检查清单
 
@@ -276,7 +276,7 @@ export function Message() {
 - 把 `components` 覆盖迁到 `setCustomComponents(customId, mapping)`
 - 先删除已经冗余的插件，再按需补回真正还需要的能力
 - 重新检查任何依赖 `rehype` 的 HTML 过滤或变换逻辑
-- 如果你的应用要渲染增量输出，进一步从 `content` 升级到解析后的 `nodes`
+- 如果你的应用要渲染增量输出，先评估 `content` + smooth streaming；需要 AST 控制或外部解析时再升级到 `nodes`
 
 ## 相关文档
 

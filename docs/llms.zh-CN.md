@@ -49,10 +49,11 @@
 
 2) **渲染层**（`markstream-vue`）
    - 默认组件：`MarkdownRender`（文档里也常写 `NodeRenderer`）
-   - 输入：`content: string`（内部解析）或 `nodes: ParsedNode[]`（流式更推荐）
+   - 输入：`content: string`（内部解析，多数聊天流优先推荐）或 `nodes: ParsedNode[]`（当外层已经接管解析或需要 AST 控制时使用）
    - 性能工具：
      - 虚拟化窗口（`maxLiveNodes`, `liveNodeBuffer`）
-     - 分批渲染（更平滑“打字机”体验）
+     - Smooth streaming（`smooth-streaming`, `typewriter`）：文本 pacing 和光标
+     - 分批渲染：关闭虚拟化时控制节点挂载节奏
      - 重节点延迟渲染（`viewportPriority`, `deferNodesUntilVisible`）
 
 ---
@@ -126,10 +127,12 @@
 
 - 表述： “一坨一坨冒出来”, “不平滑”
 - 步骤：
-  - 调整 batch（`renderBatchSize` / `renderBatchDelay`）
+  - 优先用 `content` + 内置 smooth streaming（`typewriter=true` 或 `max-live-nodes<=0` 会启用 `smooth-streaming="auto"`）
+  - active smooth streaming 期间保持 `fade=false`；完整历史消息/静态内容再用 `fade=true`
+  - 关闭虚拟化时再调整 batch（`renderBatchSize` / `renderBatchDelay`）
   - 保持重节点延迟（`viewportPriority`, `deferNodesUntilVisible`）
 - 最小追问： “你更新 `content/nodes` 的频率（每 token 还是每 chunk）？batch 参数是多少？”
-- 文档：`docs/guide/performance.md`, `docs/guide/props.md`
+- 文档：`docs/guide/ai-chat-streaming.md`, `docs/guide/performance.md`, `docs/guide/props.md`
 
 ### 长文档：性能/内存
 

@@ -27,22 +27,22 @@ const interval = setInterval(() => {
 </template>
 ```
 
-## Typewriter + fade example
-- Use `typewriter` for the blinking stream cursor and `fade` for enter/appended-text fade.
+## Typewriter streaming example
+- Use `typewriter` for the blinking stream cursor. During smooth streaming, keep `fade` disabled; use `fade=true` for completed/static content that arrives all at once.
 
 ## Rendering with `nodes`
 - Call `parseMarkdownToStructure` from `stream-markdown-parser` and pass `nodes` to `MarkdownRender` for custom rendering.
 
-Try this — quickly stream a Markdown string with the cursor and fade enabled:
+Try this — quickly stream a Markdown string with the cursor enabled:
 
 ```vue
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
 
-const md = '# Streaming test\n\nThis text appears with a subtle enter animation and cursor.'
+const md = '# Streaming test\n\nThis text appears with paced streaming and a cursor.'
 </script>
 
 <template>
-  <MarkdownRender :content="md" :typewriter="true" :fade="true" />
+  <MarkdownRender :content="md" :typewriter="true" :fade="false" />
 </template>
 ```

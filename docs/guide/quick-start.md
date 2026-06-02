@@ -54,4 +54,4 @@ const md: MarkdownRenderProps['content'] = `# Hello world\n\nTry a simple Mermai
 
 Install `mermaid` or `@terrastruct/d2` to render those diagrams; without them the renderer falls back to showing source text.
 
-For high-frequency streaming, the highest-throughput setup is usually: parse outside the component and pass `:nodes` into `MarkdownRender`, instead of reparsing the entire `content` string every token. See `/guide/usage` and `/guide/performance`.
+For chat-style streaming, start with `content` plus the built-in smooth streaming path (`typewriter` or `max-live-nodes <= 0` enables `smooth-streaming="auto"`). If another layer already parses in a worker/store or you need AST control, pass `:nodes` + `:final` instead. See `/guide/usage`, `/guide/ai-chat-streaming`, and `/guide/performance`.

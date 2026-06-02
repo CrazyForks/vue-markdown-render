@@ -49,10 +49,11 @@ There are two layers:
 
 2) **Renderer layer** (`markstream-vue`)
    - Default component: `MarkdownRender` (also referred to as `NodeRenderer`)
-   - Takes either `content: string` (parses internally) or `nodes: ParsedNode[]` (recommended for streaming)
+   - Takes either `content: string` (parses internally, recommended first for most chat streams) or `nodes: ParsedNode[]` (when another layer owns parsing or AST control)
    - Performance tools:
      - Virtualization window (`maxLiveNodes`, `liveNodeBuffer`)
-     - Batch rendering (steady “typewriter” feel)
+     - Smooth streaming (`smooth-streaming`, `typewriter`) for text pacing and cursor
+     - Batch rendering for node mounting cadence when virtualization is disabled
      - Defer heavy nodes until visible (`viewportPriority`, `deferNodesUntilVisible`)
 
 ---
@@ -126,10 +127,12 @@ Use these as “answer skeletons”: quick steps + minimal repro questions + whe
 
 - Signals: “bursty”, “jumpy”, “not smooth”
 - Steps:
-  - Enable/tune batching (`renderBatchSize` / `renderBatchDelay`)
+  - Use `content` with built-in smooth streaming first (`typewriter=true` or `max-live-nodes<=0` enables `smooth-streaming="auto"`)
+  - Keep `fade=false` during active smooth streaming; use `fade=true` for completed history/static content
+  - Enable/tune batching (`renderBatchSize` / `renderBatchDelay`) when virtualization is disabled
   - Keep heavy nodes deferred (`viewportPriority`, `deferNodesUntilVisible`)
 - Ask: “How often do you update `content/nodes` (per token? per chunk?) and what batch props are set?”
-- Docs: `docs/guide/performance.md`, `docs/guide/props.md`
+- Docs: `docs/guide/ai-chat-streaming.md`, `docs/guide/performance.md`, `docs/guide/props.md`
 
 ### Large documents: perf/memory
 

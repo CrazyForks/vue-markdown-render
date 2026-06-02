@@ -198,7 +198,7 @@ const isStreaming = computed(() => !final.value)
 </template>
 ```
 
-When the stream ends, set `final.value = true`. The renderer instantly switches from smooth pacing + no-fade to no-pacing + fade-in, giving history content a clean entry animation without the flicker that would occur if both features were on simultaneously.
+When the stream ends, set `final.value = true`. The renderer switches from smooth pacing + no-fade to no-pacing + fade without remounting unchanged content. That avoids completion flicker; `fade=true` then applies to completed/history content that mounts later or arrives all at once.
 
 ### Static / SSR snapshot (no animation)
 

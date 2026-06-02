@@ -247,7 +247,7 @@ You do not need to adopt streaming on day one. A practical migration path is:
 
 1. Replace `react-markdown` with `MarkdownRender` and keep using `content`.
 2. Migrate custom renderers and plugin logic.
-3. If you later render SSE/chat output, parse outside the component and pass `nodes`.
+3. If you later render SSE/chat output, start with `content` plus the built-in smooth streaming path. Move parsing outside the component and pass `nodes` only when a worker/store already owns parsing, the stream is extremely high frequency, or you need AST control.
 
 ```tsx
 import MarkdownRender from 'markstream-react'
@@ -267,7 +267,7 @@ export function Message() {
 }
 ```
 
-For high-frequency streaming, this `nodes` flow is usually the biggest reason to migrate.
+For most chat streams, the simpler `content` + smooth streaming path is the first step. This `nodes` flow is the advanced path when parsing and rendering need to be scheduled independently.
 
 ## Migration checklist
 
@@ -276,7 +276,7 @@ For high-frequency streaming, this `nodes` flow is usually the biggest reason to
 - Move `components` overrides into `setCustomComponents(customId, mapping)`.
 - Remove plugins that are now redundant before re-adding custom ones.
 - Re-check any `rehype`-based HTML filtering or transformation logic.
-- If your app renders incremental output, move from `content` to parsed `nodes`.
+- If your app renders incremental output, evaluate `content` + smooth streaming first; upgrade to `nodes` when you need AST control or external parsing.
 
 ## Related docs
 

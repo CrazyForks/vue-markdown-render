@@ -44,8 +44,8 @@ pnpm benchmark:1.0
 
 有些 LLM 会一次推送大量文本，导致前端表现为“卡顿一会儿再一次性显示”。想让用户始终看到稳定、连续的输出，可以：
 
-- **需要光标时显式开启 `typewriter`，并保持 `fade` 开启**，这样流式输出可以显示闪烁光标，非代码节点会通过淡入动画平滑呈现，而不是瞬间跳出；流式追加出来的新文本片段也会补一段局部短 fade，不会把整块一起压暗。
-- **调整批次渲染参数**：调低 `initialRenderBatchSize` / `renderBatchSize`（如 `12` / `24`），并设置一个 20–30 ms 的 `renderBatchDelay`，让每次渲染只插入很小的一段文本。
+- **需要光标时显式开启 `typewriter`，并在 smooth streaming 期间关闭 `fade`**。`smooth-streaming="auto"` 已经在内容层完成 pacing；再叠加 `fade` 会让每个小提交都重新触发 opacity 动画，容易产生闪烁。`fade=true` 更适合完整历史消息或静态内容一次性进入的场景。
+- **用 smooth streaming options 调整文本 pacing**：后端一次推送大段文本时，优先调整 `smooth-streaming-options`。`initialRenderBatchSize` / `renderBatchSize` / `renderBatchDelay` 这类 batching props 主要控制关闭虚拟化时的节点挂载节奏，不是主要的文本 pacing 控制。
 - **在上游做节流或拆包**：把后端一次性推送的大段文本按段落拆分，或用 50–100 ms 的防抖再更新 `content`，减少一次性 diff。
 - **保留延迟可见渲染**：继续启用 `deferNodesUntilVisible` / `viewportPriority`，避免 Mermaid、Monaco 这类重型节点阻塞文字流。
 - **必要时降级代码块**：在突发大块传输时暂时关闭 `codeBlockStream` 或启用 `renderCodeBlocksAsPre`，避免语法高亮抢占时间片。

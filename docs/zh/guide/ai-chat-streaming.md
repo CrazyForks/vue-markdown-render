@@ -198,7 +198,7 @@ const isStreaming = computed(() => !final.value)
 </template>
 ```
 
-当流结束时，设置 `final.value = true`。渲染器会立即从 smooth pacing + 无 fade 切换到无 pacing + 淡入，使历史消息获得干净的入场动画，而不会出现两者同时开启时产生的闪烁。
+当流结束时，设置 `final.value = true`。渲染器会从 smooth pacing + 无 fade 切换到无 pacing + fade，但不会 remount 未变化的内容，从而避免完成瞬间闪烁；`fade=true` 会作用于之后新挂载的完整历史消息，或一次性到达的完整内容。
 
 ### 静态 / SSR 快照（无动画）
 
