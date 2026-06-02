@@ -69,4 +69,33 @@ describe('tooltip fallback positioning', () => {
 
     wrapper.unmount()
   })
+
+  it('keeps tooltip measurable while positioning before ready', async () => {
+    const anchor = document.createElement('button')
+    anchor.getBoundingClientRect = () => rect(20, 50, 40, 20)
+    document.body.appendChild(anchor)
+
+    const wrapper = mount(Tooltip, {
+      attachTo: document.body,
+      props: {
+        visible: false,
+        anchorEl: anchor,
+        content: 'Tip',
+        placement: 'top',
+        offset: 6,
+      },
+    })
+
+    const tooltip = document.querySelector<HTMLElement>('.tooltip-element')!
+    tooltip.getBoundingClientRect = () => rect(0, 0, 80, 20)
+
+    await wrapper.setProps({ visible: true })
+    await flushAll()
+
+    expect(tooltip.style.display).not.toBe('none')
+    expect(tooltip.style.visibility).toBe('visible')
+    expect(tooltip.style.transform).toBe('translate3d(20px, 24px, 0)')
+
+    wrapper.unmount()
+  })
 })

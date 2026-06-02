@@ -237,10 +237,17 @@ onBeforeUnmount(() => {
     <div class="markstream-vue" :class="{ dark: isDark }">
       <transition name="tooltip" appear>
         <div
-          v-show="visible && ready"
+          v-show="visible"
           :id="props.id"
           ref="tooltip"
-          :style="{ position: 'fixed', left: style.left, top: style.top, transform: style.transform }"
+          :style="{
+            position: 'fixed',
+            left: style.left,
+            top: style.top,
+            transform: style.transform,
+            visibility: ready ? 'visible' : 'hidden',
+            pointerEvents: ready ? undefined : 'none',
+          }"
           class="tooltip-element"
           role="tooltip"
         >

@@ -367,7 +367,7 @@ function getComponentIdentityToken(component: unknown) {
   if (typeof component === 'string')
     return `s:${component}`
 
-  return 'component'
+  return `o:${getIdentityToken(component)}`
 }
 
 const identityIds = new WeakMap<object, number>()
@@ -386,6 +386,24 @@ function getIdentityToken(value: unknown) {
   return String(id)
 }
 
+function getCheapTimelineItemContentSignature(item: any, index: number, markdown: boolean) {
+  if (markdown)
+    return ''
+
+  const text = typeof item?.text === 'string'
+    ? item.text
+    : typeof item?.message === 'string'
+      ? item.message
+      : typeof item?.label === 'string'
+        ? item.label
+        : String(getMarkstreamTimelineItemContent(item, index, props) ?? '')
+
+  if (!text)
+    return ''
+
+  return `${text.length}:${text.slice(0, 64)}:${text.slice(-64)}`
+}
+
 function getLayoutItemsSignature() {
   return props.items.map((item, index) => {
     const markdown = isMarkstreamMarkdownTimelineItem(item, index, props)
@@ -396,6 +414,7 @@ function getLayoutItemsSignature() {
       markdown ? 1 : 0,
       getMarkstreamTimelineItemRevision(item, index, props) ?? '',
       getMarkstreamTimelineItemFinal(item, index, props) ? 1 : 0,
+      getCheapTimelineItemContentSignature(item, index, markdown),
       getComponentIdentityToken(item?.component),
     ].join('\u0001')
   }).join('\u0000')

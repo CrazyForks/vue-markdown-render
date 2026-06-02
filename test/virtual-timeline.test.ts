@@ -2918,7 +2918,7 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
-  it('rebuilds layout when estimated item height changes with item revision', async () => {
+  it('rebuilds layout when cheap non-markdown content signature changes without revision', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
 
@@ -2930,11 +2930,11 @@ describe('virtual timeline API', () => {
 
     const state = reactive<{ items: any[] }>({
       items: [
-        { kind: 'user-message', id: 'a1', text: 'Same text', density: 'compact', revision: 1 },
-        { kind: 'user-message', id: 'u1', text: 'Anchor', revision: 1 },
+        { kind: 'user-message', id: 'a1', text: 'Short' },
+        { kind: 'user-message', id: 'u1', text: 'Anchor' },
       ],
     })
-    const estimateItemHeight = vi.fn((item: any) => item.id === 'a1' && item.density === 'expanded' ? 180 : 60)
+    const estimateItemHeight = vi.fn((item: any) => item.id === 'a1' && item.text.length > 20 ? 180 : 60)
     const Host = defineComponent({
       setup() {
         return () => h(MarkstreamVirtualTimeline, {
@@ -2961,8 +2961,7 @@ describe('virtual timeline API', () => {
     expect(timelineApi.getTotalHeight()).toBe(120)
 
     estimateItemHeight.mockClear()
-    state.items[0].density = 'expanded'
-    state.items[0].revision += 1
+    state.items[0].text = 'This text is long enough to change the estimated height'
     await nextTick()
     await flushAll()
 
