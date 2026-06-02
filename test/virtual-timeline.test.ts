@@ -573,6 +573,45 @@ describe('virtual timeline API', () => {
     scope.stop()
   })
 
+  it('passes markdown mode and code renderer through useMarkstreamVirtualAdapter', () => {
+    const item = {
+      kind: 'assistant-markdown',
+      id: 'a1',
+      content: '```ts\nconsole.log(1)\n```',
+      final: true,
+    }
+    const root = document.createElement('div')
+    const adapter = {
+      getScrollElement: () => root,
+      getScrollTop: () => 0,
+      setScrollTop: vi.fn(),
+      getViewportHeight: () => 480,
+      getTotalHeight: () => 0,
+      getItemOffset: () => 0,
+      getItemSize: () => 100,
+      setItemSize: vi.fn(),
+      getVisibleRange: () => ({ start: 0, end: 1 }),
+      scrollToOffset: vi.fn(),
+      scrollToIndex: vi.fn(),
+    }
+
+    const scope = effectScope()
+    const controller = scope.run(() => useMarkstreamVirtualAdapter({
+      items: [item],
+      threadKey: 'thread-a',
+      markdownMode: 'chat',
+      markdownCodeRenderer: 'pre',
+      virtualizer: adapter,
+    }))!
+
+    const props = controller.markdownProps(item, 0)
+
+    expect(props.mode).toBe('chat')
+    expect(props.codeRenderer).toBe('pre')
+
+    scope.stop()
+  })
+
   it('passes renderer-scoped markdown restore state through adapter props', () => {
     const items = [
       { kind: 'assistant-markdown', id: 'a1', content: '# Hello', final: true },

@@ -63,9 +63,8 @@ import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { setNormalizedElementScrollTop } from '../../utils/normalizedScroll'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
-import MarkdownCodeBlockNode from '../MarkdownCodeBlockNode'
 import { createMathBlockMinHeightCache, provideMathBlockMinHeightCache } from '../MathBlockNode/minHeightCache'
-import { CodeBlockNodeAsync, MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
+import { CodeBlockNodeAsync, CodeBlockNodeLoading, MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import { useBatchRenderingScheduler } from './composables/useBatchRenderingScheduler'
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useFocusSyncScheduler } from './composables/useFocusSyncScheduler'
@@ -1187,11 +1186,25 @@ function setupExperimentResizeObserver() {
   experimentResizeObserver.observe(containerRef.value)
 }
 
+const MarkdownCodeBlockNodeAsync = defineAsyncComponent({
+  loader: async () => {
+    const mod = await import('../MarkdownCodeBlockNode')
+    return mod.default
+  },
+  loadingComponent: CodeBlockNodeLoading,
+  delay: 0,
+  suspensible: false,
+})
+
+function isMarkdownCodeBlockComponent(component: unknown) {
+  return component === MarkdownCodeBlockNodeAsync
+}
+
 const codeBlockComponent = computed(() => {
   if (resolvedCodeRenderer.value === 'pre')
     return PreCodeNode
   if (resolvedCodeRenderer.value === 'shiki')
-    return MarkdownCodeBlockNode
+    return MarkdownCodeBlockNodeAsync
   return CodeBlockNodeAsync
 })
 
@@ -1199,7 +1212,7 @@ function resolveCodeBlockRendererKind(node: ParsedNode) {
   if (node.type !== 'code_block')
     return null
   const component = getNodeComponent(node, getCodeBlockLanguage(node))
-  if (component === MarkdownCodeBlockNode)
+  if (isMarkdownCodeBlockComponent(component))
     return 'markdown'
   if (component === PreCodeNode)
     return 'pre'
@@ -5257,9 +5270,9 @@ function shouldUsePreCodeBindings(
   component: unknown,
 ) {
   return node.type === 'code_block'
-    && component === PreCodeNode
     && resolvedCodeRenderer.value === 'pre'
     && !hasExactCodeLanguageOverride(language)
+    && (component === PreCodeNode || component === customComponentsMap.value.code_block)
 }
 
 // Decide which component to use for a given node. Ensure that code blocks
@@ -5323,7 +5336,7 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
   if (component && shouldUsePreCodeBindings(node, lang, component))
     return preCodeBlockBindings.value
 
-  if (node.type === 'code_block' && component === MarkdownCodeBlockNode)
+  if (node.type === 'code_block' && isMarkdownCodeBlockComponent(component))
     return shikiCodeBlockBindings.value
 
   if (lang === 'mermaid')

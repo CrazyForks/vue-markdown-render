@@ -1,10 +1,26 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, inject } from 'vue'
 import MermaidBlockNode from '../src/components/MermaidBlockNode'
 import NodeRenderer from '../src/components/NodeRenderer'
 import { removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
+
+vi.mock('../src/components/MarkdownCodeBlockNode', async () => {
+  const { defineComponent, h } = await import('vue')
+  return {
+    default: defineComponent({
+      name: 'MarkdownCodeBlockNodeProbe',
+      inheritAttrs: false,
+      setup(_, { attrs }) {
+        return () => h('div', {
+          'class': 'code-block-container',
+          'data-has-monaco-options': String(Object.prototype.hasOwnProperty.call(attrs, 'monacoOptions')),
+        })
+      },
+    }),
+  }
+})
 
 const customId = 'vue3-heavy-props-test'
 
@@ -36,6 +52,25 @@ const GenericCodeBlockProbe = defineComponent({
       'class': 'generic-code-block-probe',
       'data-language': String((props.node as any)?.language ?? ''),
       'data-show-header': String(props.showHeader),
+    })
+  },
+})
+
+const GenericCodeBlockAttrsProbe = defineComponent({
+  name: 'GenericCodeBlockAttrsProbe',
+  props: {
+    node: { type: Object, required: true },
+    showHeader: Boolean,
+    showLineNumbers: Boolean,
+  },
+  setup(props, { attrs }) {
+    return () => h('div', {
+      'class': 'generic-code-block-attrs-probe',
+      'data-language': String((props.node as any)?.language ?? ''),
+      'data-show-header': String(props.showHeader),
+      'data-show-line-numbers': String(props.showLineNumbers),
+      'data-has-monaco-options': String(Object.prototype.hasOwnProperty.call(attrs, 'monacoOptions')),
+      'data-has-themes': String(Object.prototype.hasOwnProperty.call(attrs, 'themes')),
     })
   },
 })
@@ -228,6 +263,41 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     expect(pre.attributes('style')).toContain('120px')
   })
 
+  it('passes lightweight pre props to generic code_block overrides in pre mode', async () => {
+    setCustomComponents(customId, {
+      code_block: GenericCodeBlockAttrsProbe,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        codeRenderer: 'pre',
+        codeBlockMonacoOptions: { fontSize: 16 },
+        themes: ['vitesse-dark'],
+        codeBlockProps: {
+          showLineNumbers: true,
+          showHeader: false,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.generic-code-block-attrs-probe')
+    expect(probe.attributes('data-show-header')).toBe('false')
+    expect(probe.attributes('data-show-line-numbers')).toBe('true')
+    expect(probe.attributes('data-has-monaco-options')).toBe('false')
+    expect(probe.attributes('data-has-themes')).toBe('false')
+  })
+
   it('does not pass Monaco-only props to the shiki renderer', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
@@ -244,10 +314,12 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
       },
     })
 
-    await flushAll()
+    for (let attempt = 0; attempt < 10 && !wrapper.find('.code-block-container').exists(); attempt++)
+      await flushAll()
 
+    const shiki = wrapper.get('.code-block-container')
     expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
-    expect(wrapper.get('.code-block-container').attributes()).not.toHaveProperty('monacooptions')
+    expect(shiki.attributes('data-has-monaco-options')).toBe('false')
   })
 
   it('ignores invalid runtime codeRenderer values', async () => {

@@ -153,6 +153,9 @@ export interface UseMarkstreamVirtualAdapterOptions<T = MarkstreamTimelineItem> 
   estimateItemHeight?: (item: T, index: number) => number
   measurementKey?: MaybeRefOrGetter<string | number | undefined>
 
+  markdownMode?: MaybeRefOrGetter<NodeRendererMode | undefined>
+  markdownCodeRenderer?: MaybeRefOrGetter<NodeRendererCodeRenderer | undefined>
+
   /**
    * Default: false.
    */
@@ -332,6 +335,20 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   function normalizeMeasurementKey() {
     const measurementKey = toValue(options.measurementKey)
     return measurementKey == null ? undefined : String(measurementKey)
+  }
+
+  function normalizeMarkdownMode(): NodeRendererMode {
+    const mode = toValue(options.markdownMode)
+    return mode === 'chat' || mode === 'minimal' || mode === 'docs'
+      ? mode
+      : 'docs'
+  }
+
+  function normalizeMarkdownCodeRenderer(): NodeRendererCodeRenderer {
+    const renderer = toValue(options.markdownCodeRenderer)
+    return renderer === 'pre' || renderer === 'shiki' || renderer === 'monaco'
+      ? renderer
+      : 'monaco'
   }
 
   function getItemSizeSourceKey(item: T, index: number) {
@@ -704,11 +721,16 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     const content = getMarkstreamTimelineItemContent(item, index, options)
     const sessionKey = getSessionKey(item, index)
     const measurementKey = toValue(options.measurementKey)
+    const markdownMode = normalizeMarkdownMode()
+    const markdownCodeRenderer = normalizeMarkdownCodeRenderer()
     const cacheKey = [
       itemKey,
       sessionKey,
       final ? 'final' : 'live',
       measurementKey == null ? '' : String(measurementKey),
+      markdownMode,
+      markdownCodeRenderer,
+      options.markdownFade === true ? 'fade' : 'no-fade',
     ].join(':')
     const restoreState = toRaw(markdownStates).get(itemKey)
     const cached = markdownPropsCache.get(cacheKey)
@@ -737,6 +759,8 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     const props: MarkstreamVirtualMarkdownProps = {
       content,
       final,
+      mode: markdownMode,
+      codeRenderer: markdownCodeRenderer,
       nodeVirtual: 'auto',
       fade: options.markdownFade === true,
       indexKey: sessionKey,
