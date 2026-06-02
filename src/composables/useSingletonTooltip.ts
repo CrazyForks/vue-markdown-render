@@ -27,9 +27,10 @@ function clearTimers() {
 // Mount singleton Tooltip once
 let mounted = false
 let mountPromise: Promise<void> | null = null
+let mountDisabled = false
 
 async function ensureMounted() {
-  if (mounted)
+  if (mounted || mountDisabled)
     return
   if (typeof document === 'undefined')
     return
@@ -69,6 +70,7 @@ async function ensureMounted() {
   catch (err) {
     mounted = false
     mountPromise = null
+    mountDisabled = true
     console.warn('[markstream-vue] Failed to mount Tooltip component. Tooltips will be disabled.', err)
   }
 }

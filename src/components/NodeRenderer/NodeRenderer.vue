@@ -5264,6 +5264,10 @@ function hasExactCodeLanguageOverride(language: string) {
   return Boolean(language && customComponentsMap.value[language])
 }
 
+function isCustomCodeBlockComponent(component: unknown) {
+  return Boolean(component && component === customComponentsMap.value.code_block)
+}
+
 function shouldUsePreCodeBindings(
   node: ParsedNode,
   language: string,
@@ -5272,7 +5276,7 @@ function shouldUsePreCodeBindings(
   return node.type === 'code_block'
     && resolvedCodeRenderer.value === 'pre'
     && !hasExactCodeLanguageOverride(language)
-    && (component === PreCodeNode || component === customComponentsMap.value.code_block)
+    && component === PreCodeNode
 }
 
 // Decide which component to use for a given node. Ensure that code blocks
@@ -5335,6 +5339,9 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
   const lang = language ?? getCodeBlockLanguage(node)
   if (component && shouldUsePreCodeBindings(node, lang, component))
     return preCodeBlockBindings.value
+
+  if (node.type === 'code_block' && isCustomCodeBlockComponent(component))
+    return codeBlockBindings.value
 
   if (node.type === 'code_block' && isMarkdownCodeBlockComponent(component))
     return shikiCodeBlockBindings.value

@@ -420,6 +420,19 @@ function getLayoutItemsSignature() {
   }).join('\u0000')
 }
 
+function getLayoutRebuildSignature() {
+  const explicit = props.layoutRevision
+  if (explicit != null) {
+    return [
+      'explicit',
+      String(explicit),
+      props.items.length,
+    ].join('\u0001')
+  }
+
+  return getLayoutItemsSignature()
+}
+
 function getRecordLiveItem(record: Pick<TimelineRecord, 'item' | 'index'>) {
   return props.items[record.index] ?? record.item
 }
@@ -434,16 +447,16 @@ function getRecordComponent(record: TimelineRecord) {
 }
 
 watch(
-  () => [
-    getLayoutItemsSignature(),
-    timelineMeasurementKey.value,
-    normalizedThreadKey.value,
-    getIdentityToken(props.estimateItemHeight),
-    getIdentityToken(props.getKey),
-    getIdentityToken(props.getKind),
-    getIdentityToken(props.getContent),
-    getIdentityToken(props.getFinal),
-    getIdentityToken(props.getRevision),
+  [
+    () => getLayoutRebuildSignature(),
+    timelineMeasurementKey,
+    normalizedThreadKey,
+    () => getIdentityToken(props.estimateItemHeight),
+    () => getIdentityToken(props.getKey),
+    () => getIdentityToken(props.getKind),
+    () => getIdentityToken(props.getContent),
+    () => getIdentityToken(props.getFinal),
+    () => getIdentityToken(props.getRevision),
   ],
   () => rebuildLayoutRecords(),
   { immediate: true, flush: 'sync' },

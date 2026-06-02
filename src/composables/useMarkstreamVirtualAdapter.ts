@@ -42,6 +42,7 @@ export interface MarkstreamTimelineItem {
 export interface MarkstreamVirtualTimelineProps<T = MarkstreamTimelineItem> {
   items: T[]
   threadKey?: MarkstreamTimelineItemKey
+  layoutRevision?: MarkstreamTimelineItemKey
 
   getKey?: (item: T, index: number) => MarkstreamTimelineItemKey
   getKind?: (item: T, index: number) => string
@@ -143,6 +144,7 @@ export interface MarkstreamVirtualMarkdownProps extends Pick<NodeRendererProps, 
 export interface UseMarkstreamVirtualAdapterOptions<T = MarkstreamTimelineItem> {
   items: MaybeRefOrGetter<readonly T[]>
   threadKey?: MaybeRefOrGetter<MarkstreamTimelineItemKey | undefined>
+  layoutRevision?: MaybeRefOrGetter<MarkstreamTimelineItemKey | undefined>
 
   getKey?: (item: T, index: number) => MarkstreamTimelineItemKey
   getKind?: (item: T, index: number) => string

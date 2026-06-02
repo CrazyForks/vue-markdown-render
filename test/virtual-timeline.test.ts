@@ -347,6 +347,62 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('uses layoutRevision instead of scanning items for stable content updates', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(480)
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const getKind = vi.fn((item: any) => item.kind)
+    const slotContents: string[] = []
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          { kind: 'assistant-markdown', id: 'a1', content: '# A', final: false },
+        ],
+        threadKey: 'thread-a',
+        layoutRevision: 1,
+        getKind,
+        overscan: 10,
+        stickToBottom: false,
+      },
+      slots: {
+        default(props: any) {
+          slotContents.push(props.markdownProps.content)
+          return h('div', { ref: props.measureRef }, props.markdownProps.content)
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const callsAfterInitialLayout = getKind.mock.calls.length
+
+    await wrapper.setProps({
+      items: [
+        { kind: 'assistant-markdown', id: 'a1', content: '# B', final: false },
+      ],
+      layoutRevision: 1,
+    })
+    await flushAll()
+    await nextTick()
+
+    expect(getKind).toHaveBeenCalledTimes(callsAfterInitialLayout)
+    expect(slotContents.at(-1)).toBe('# B')
+
+    await wrapper.setProps({ layoutRevision: 2 })
+    await flushAll()
+    await nextTick()
+
+    expect(getKind.mock.calls.length).toBeGreaterThan(callsAfterInitialLayout)
+
+    wrapper.unmount()
+  })
+
   it('provides host scroll managed context to timeline children', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)

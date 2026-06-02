@@ -69,6 +69,7 @@ const GenericCodeBlockAttrsProbe = defineComponent({
       'data-language': String((props.node as any)?.language ?? ''),
       'data-show-header': String(props.showHeader),
       'data-show-line-numbers': String(props.showLineNumbers),
+      'data-has-stream': String(Object.prototype.hasOwnProperty.call(attrs, 'stream')),
       'data-has-monaco-options': String(Object.prototype.hasOwnProperty.call(attrs, 'monacoOptions')),
       'data-has-themes': String(Object.prototype.hasOwnProperty.call(attrs, 'themes')),
     })
@@ -263,7 +264,7 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     expect(pre.attributes('style')).toContain('120px')
   })
 
-  it('passes lightweight pre props to generic code_block overrides in pre mode', async () => {
+  it('keeps generic code_block bindings for custom code_block overrides in pre mode', async () => {
     setCustomComponents(customId, {
       code_block: GenericCodeBlockAttrsProbe,
     })
@@ -281,9 +282,9 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
         nodes: [
           {
             type: 'code_block',
-            language: 'ts',
-            code: 'const value = 1',
-            raw: '```ts\nconst value = 1\n```',
+            language: 'mermaid',
+            code: 'graph LR\nA-->B\n',
+            raw: '```mermaid\ngraph LR\nA-->B\n```',
           },
         ],
       },
@@ -292,10 +293,12 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     await flushAll()
 
     const probe = wrapper.get('.generic-code-block-attrs-probe')
+    expect(probe.attributes('data-language')).toBe('mermaid')
     expect(probe.attributes('data-show-header')).toBe('false')
     expect(probe.attributes('data-show-line-numbers')).toBe('true')
-    expect(probe.attributes('data-has-monaco-options')).toBe('false')
-    expect(probe.attributes('data-has-themes')).toBe('false')
+    expect(probe.attributes('data-has-stream')).toBe('true')
+    expect(probe.attributes('data-has-monaco-options')).toBe('true')
+    expect(probe.attributes('data-has-themes')).toBe('true')
   })
 
   it('does not pass Monaco-only props to the shiki renderer', async () => {

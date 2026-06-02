@@ -59,9 +59,6 @@ import { setIconTheme } from './icon-themes'
 import { setLanguageIconResolver } from './utils/languageIcon'
 import { clearGlobalCustomComponents, createCustomComponentsRef, getCustomNodeComponents, MARKSTREAM_CUSTOM_COMPONENTS_KEY, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
 import './index.css'
-// Re-add top-level worker imports so builds emit worker bundles into `dist/`
-import './workers/katexRenderer.worker?worker'
-import './workers/mermaidParser.worker?worker'
 
 function definePublicAsyncComponent<TProps extends object>(
   loader: () => Promise<{ default: Component }>,
