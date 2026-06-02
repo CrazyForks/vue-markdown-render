@@ -217,10 +217,71 @@ describe('virtual timeline API', () => {
 
     const markdownSlot = slotProps.find(props => props.kind === 'assistant-markdown')
     expect(markdownSlot.markdownProps.nodeVirtual).toBe('auto')
+    expect(markdownSlot.markdownProps.mode).toBe('chat')
+    expect(markdownSlot.markdownProps.codeRenderer).toBe('pre')
     expect(markdownSlot.markdownProps.virtualScroll.enabled).toBe(true)
     expect(markdownSlot.markdownProps.virtualScroll.threadKey).toBe('thread-a')
     expect(markdownSlot.markdownProps.virtualScroll.sessionKey).toBe('thread-a:a1:')
     expect(markdownSlot.markdownProps.fade).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('keeps delayed markdown metrics tied to the original timeline record after reorder', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const state = reactive({
+      items: [
+        { id: 'a', kind: 'assistant-markdown', content: 'A', revision: 1, final: false },
+        { id: 'b', kind: 'assistant-markdown', content: 'B', revision: 2, final: false },
+      ],
+    })
+    const slotProps: any[] = []
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: state.items,
+        threadKey: 'thread-reorder',
+        stickToBottom: false,
+        overscan: 10,
+        estimateItemHeight: () => 100,
+      },
+      slots: {
+        default(props: any) {
+          slotProps.push(props)
+          return h('div', { ref: props.measureRef }, props.markdownProps.content)
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const originalA = slotProps.find(props => props.itemKey === 'a')
+    expect(originalA.markdownProps.virtualScroll.sessionKey).toBe('thread-reorder:a:1')
+
+    state.items.reverse()
+    await nextTick()
+    await flushAll()
+
+    originalA.markdownProps.onHeightChange(
+      createMetrics(240, originalA.markdownProps.virtualScroll.sessionKey),
+    )
+
+    expect(wrapper.emitted('height-change')?.at(-1)?.[0]).toMatchObject({
+      itemKey: 'a',
+      metrics: {
+        sessionKey: 'thread-reorder:a:1',
+      },
+    })
 
     wrapper.unmount()
   })
@@ -2907,6 +2968,57 @@ describe('virtual timeline API', () => {
 
     expect(timelineApi.getTotalHeight()).toBe(240)
     expect(estimateItemHeight).toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('rebuilds layout when the estimate item height function changes', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const items = [
+      { kind: 'user-message', id: 'a1', text: 'Same text' },
+      { kind: 'user-message', id: 'u1', text: 'Anchor' },
+    ]
+    const state = reactive<{ estimateItemHeight: (item: any) => number }>({
+      estimateItemHeight: () => 60,
+    })
+    const Host = defineComponent({
+      setup() {
+        return () => h(MarkstreamVirtualTimeline, {
+          items,
+          threadKey: 'thread-a',
+          overscan: 10,
+          stickToBottom: false,
+          estimateItemHeight: state.estimateItemHeight,
+        }, {
+          default(props: any) {
+            return h('div', props.item.text)
+          },
+        })
+      },
+    })
+
+    const wrapper = mount(Host, { attachTo: document.body })
+
+    await flushAll()
+    await nextTick()
+
+    const timeline = wrapper.getComponent(MarkstreamVirtualTimeline)
+    const timelineApi = (timeline.vm as any).$?.exposed
+    expect(timelineApi.getTotalHeight()).toBe(120)
+
+    state.estimateItemHeight = (item: any) => item.id === 'a1' ? 180 : 60
+    await nextTick()
+    await flushAll()
+
+    expect(timelineApi.getTotalHeight()).toBe(240)
 
     wrapper.unmount()
   })

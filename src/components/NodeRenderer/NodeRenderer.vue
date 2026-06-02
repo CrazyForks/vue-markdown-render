@@ -4996,7 +4996,7 @@ const nodeComponents: Partial<CustomComponents> = {
 }
 const indexPrefix = computed(() => getCurrentIndexPrefix())
 const codeBlockBindings = computed(() => ({
-  // streaming behavior control for CodeBlockNode
+  // streaming behavior control for CodeBlockNode / MarkdownCodeBlockNode
   stream: rendererProps.codeBlockStream,
   darkTheme: props.codeBlockDarkTheme,
   lightTheme: props.codeBlockLightTheme,
@@ -5007,6 +5007,34 @@ const codeBlockBindings = computed(() => ({
   ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
   ...(props.codeBlockProps || {}),
 }))
+
+function pickBoolean(value: unknown) {
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function pickPositiveNumber(value: unknown) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : undefined
+}
+
+const preCodeBlockBindings = computed(() => {
+  const source = (props.codeBlockProps || {}) as Record<string, unknown>
+  const bindings: Record<string, unknown> = {}
+
+  const showLineNumbers = pickBoolean(source.showLineNumbers)
+  if (showLineNumbers !== undefined)
+    bindings.showLineNumbers = showLineNumbers
+
+  const diffInline = pickBoolean(source.diffInline)
+  if (diffInline !== undefined)
+    bindings.diffInline = diffInline
+
+  const reservedHeightPx = pickPositiveNumber(source.reservedHeightPx)
+  if (reservedHeightPx !== undefined)
+    bindings.reservedHeightPx = reservedHeightPx
+
+  return bindings
+})
 const mermaidBindings = computed(() => ({
   ...(props.mermaidProps || {}),
 }))
@@ -5122,16 +5150,30 @@ const renderedItems = computed(() => {
       }
     }
 
-    let bindings = { ...getBindingsFor(node, language) } as Record<string, unknown>
+    const usesPreCodeBindings = shouldUsePreCodeBindings(node, language, component)
+    let bindings = { ...getBindingsFor(node, language, component) } as Record<string, unknown>
     const estimatedHeight = estimatedNodeHeights.value[item.index]
     if (node.type === 'code_block' && estimatedHeight?.kind === 'code-block') {
-      bindings = {
-        ...bindings,
-        estimatedHeightPx: estimatedHeight.height,
-        estimatedContentHeightPx: estimatedHeight.contentHeight,
+      if (usesPreCodeBindings) {
+        bindings = {
+          ...bindings,
+          reservedHeightPx: estimatedHeight.height ?? estimatedHeight.contentHeight,
+        }
+      }
+      else {
+        bindings = {
+          ...bindings,
+          estimatedHeightPx: estimatedHeight.height,
+          estimatedContentHeightPx: estimatedHeight.contentHeight,
+        }
       }
     }
-    if (node.type === 'code_block' && language === 'mermaid' && parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
+    if (
+      !usesPreCodeBindings
+      && node.type === 'code_block'
+      && language === 'mermaid'
+      && parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null
+    ) {
       bindings = {
         ...bindings,
         estimatedPreviewHeightPx: clampMermaidPreviewHeight(
@@ -5139,7 +5181,12 @@ const renderedItems = computed(() => {
         ),
       }
     }
-    if (node.type === 'code_block' && language === 'infographic' && parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
+    if (
+      !usesPreCodeBindings
+      && node.type === 'code_block'
+      && language === 'infographic'
+      && parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null
+    ) {
       bindings = {
         ...bindings,
         estimatedPreviewHeightPx: clampInfographicPreviewHeight(
@@ -5187,8 +5234,13 @@ function hasExactCodeLanguageOverride(language: string) {
   return Boolean(language && customComponentsMap.value[language])
 }
 
-function shouldUseGenericCodeBlockBindings(node: ParsedNode, language: string) {
+function shouldUsePreCodeBindings(
+  node: ParsedNode,
+  language: string,
+  component: unknown,
+) {
   return node.type === 'code_block'
+    && component === PreCodeNode
     && resolvedCodeRenderer.value === 'pre'
     && !hasExactCodeLanguageOverride(language)
 }
@@ -5249,10 +5301,10 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   return nodeComponents[String(node.type)] || FallbackComponent
 }
 
-function getBindingsFor(node: ParsedNode, language?: string) {
+function getBindingsFor(node: ParsedNode, language?: string, component?: unknown) {
   const lang = language ?? getCodeBlockLanguage(node)
-  if (shouldUseGenericCodeBlockBindings(node, lang))
-    return codeBlockBindings.value
+  if (component && shouldUsePreCodeBindings(node, lang, component))
+    return preCodeBlockBindings.value
 
   if (lang === 'mermaid')
     return mermaidBindings.value

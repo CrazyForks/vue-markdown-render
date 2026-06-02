@@ -3,6 +3,8 @@ import type {
   MarkstreamVirtualMetrics,
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualState,
+  NodeRendererCodeRenderer,
+  NodeRendererMode,
   NodeRendererProps,
 } from '../types/node-renderer-props'
 import { getCurrentScope, nextTick, onScopeDispose, reactive, ref, toRaw, toValue } from 'vue'
@@ -53,6 +55,9 @@ export interface MarkstreamVirtualTimelineProps<T = MarkstreamTimelineItem> {
   overscanPx?: number
   stickToBottom?: boolean | 'auto'
   measurementKey?: string | number
+
+  markdownMode?: NodeRendererMode
+  markdownCodeRenderer?: NodeRendererCodeRenderer
 
   /**
    * Initial state for the active thread.
@@ -130,7 +135,7 @@ export interface MarkstreamThreadVirtualState {
 
 type MarkstreamItemSizeSource = NonNullable<MarkstreamThreadVirtualState['itemSizeSources']>[string]
 
-export interface MarkstreamVirtualMarkdownProps extends Pick<NodeRendererProps, 'content' | 'final' | 'indexKey' | 'nodeVirtual' | 'virtualScroll' | 'fade'> {
+export interface MarkstreamVirtualMarkdownProps extends Pick<NodeRendererProps, 'content' | 'final' | 'indexKey' | 'nodeVirtual' | 'virtualScroll' | 'fade' | 'mode' | 'codeRenderer'> {
   onHeightChange: (metrics: MarkstreamVirtualMetrics) => void
   onVirtualStateChange: (state: MarkstreamVirtualState) => void
 }

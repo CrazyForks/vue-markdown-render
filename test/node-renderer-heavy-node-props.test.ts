@@ -196,6 +196,38 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
   })
 
+  it('does not leak rich code block props onto the pre renderer', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        codeRenderer: 'pre',
+        codeBlockMonacoOptions: { fontSize: 16 },
+        themes: ['vitesse-dark'],
+        codeBlockProps: {
+          showLineNumbers: true,
+          showCopyButton: true,
+          reservedHeightPx: 120,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const pre = wrapper.get('pre[data-markstream-pre="1"]')
+    expect(pre.attributes('data-markstream-line-numbers')).toBe('1')
+    expect(pre.attributes()).not.toHaveProperty('monacooptions')
+    expect(pre.attributes()).not.toHaveProperty('themes')
+    expect(pre.attributes()).not.toHaveProperty('showcopybutton')
+    expect(pre.attributes('style')).toContain('120px')
+  })
+
   it('ignores invalid runtime codeRenderer values', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {

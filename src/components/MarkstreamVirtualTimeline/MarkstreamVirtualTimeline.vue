@@ -33,6 +33,8 @@ const props = withDefaults(defineProps<MarkstreamVirtualTimelineProps<any>>(), {
   overscanPx: 1200,
   stickToBottom: 'auto',
   markdownFade: false,
+  markdownMode: 'chat',
+  markdownCodeRenderer: 'pre',
   restoreMaxLoadingMs: false,
 })
 
@@ -368,6 +370,22 @@ function getComponentIdentityToken(component: unknown) {
   return 'component'
 }
 
+const identityIds = new WeakMap<object, number>()
+let nextIdentityId = 1
+
+function getIdentityToken(value: unknown) {
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null)
+    return String(value ?? '')
+
+  const object = value as object
+  let id = identityIds.get(object)
+  if (!id) {
+    id = nextIdentityId++
+    identityIds.set(object, id)
+  }
+  return String(id)
+}
+
 function getLayoutItemsSignature() {
   return props.items.map((item, index) => {
     const markdown = isMarkstreamMarkdownTimelineItem(item, index, props)
@@ -383,12 +401,16 @@ function getLayoutItemsSignature() {
   }).join('\u0000')
 }
 
-function getRecordItem(record: Pick<TimelineRecord, 'item' | 'index'>) {
+function getRecordLiveItem(record: Pick<TimelineRecord, 'item' | 'index'>) {
   return props.items[record.index] ?? record.item
 }
 
+function getRecordIdentityItem(record: Pick<TimelineRecord, 'item'>) {
+  return record.item
+}
+
 function getRecordComponent(record: TimelineRecord) {
-  const item = getRecordItem(record) as any
+  const item = getRecordLiveItem(record) as any
   return item?.component ?? record.component
 }
 
@@ -397,6 +419,12 @@ watch(
     getLayoutItemsSignature(),
     timelineMeasurementKey.value,
     normalizedThreadKey.value,
+    getIdentityToken(props.estimateItemHeight),
+    getIdentityToken(props.getKey),
+    getIdentityToken(props.getKind),
+    getIdentityToken(props.getContent),
+    getIdentityToken(props.getFinal),
+    getIdentityToken(props.getRevision),
   ],
   () => rebuildLayoutRecords(),
   { immediate: true, flush: 'sync' },
@@ -406,7 +434,7 @@ function getSessionKey(
   record: Pick<TimelineRecord, 'item' | 'index' | 'key'>,
   threadKey = normalizedThreadKey.value,
 ) {
-  const item = getRecordItem(record)
+  const item = getRecordIdentityItem(record)
   const revision = getMarkstreamTimelineItemRevision(item, record.index, props)
   return [
     threadKey ?? 'timeline',
@@ -422,7 +450,7 @@ function getItemSizeSourceKey(
   if (record.markdown)
     return getSessionKey(record, threadKey)
 
-  const item = getRecordItem(record)
+  const item = getRecordIdentityItem(record)
   const revision = getMarkstreamTimelineItemRevision(item, record.index, props)
   return [
     threadKey ?? 'timeline',
@@ -1037,7 +1065,7 @@ function measureRecordElement(record: TimelineRecord) {
 }
 
 function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProps {
-  const item = getRecordItem(record)
+  const item = getRecordLiveItem(record)
   const final = getMarkstreamTimelineItemFinal(item, record.index, props)
   const restoreState = markdownStates.get(record.key)
   const virtualScroll: MarkstreamVirtualScrollOptions = {
@@ -1057,6 +1085,8 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
   return {
     content: getMarkstreamTimelineItemContent(item, record.index, props),
     final,
+    mode: props.markdownMode,
+    codeRenderer: props.markdownCodeRenderer,
     nodeVirtual: 'auto' as const,
     fade: props.markdownFade === true,
     indexKey: getSessionKey(record),
@@ -1103,7 +1133,7 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
 }
 
 function getSlotProps(record: TimelineRecord) {
-  const item = getRecordItem(record)
+  const item = getRecordLiveItem(record)
   return {
     item,
     index: record.index,
@@ -1115,7 +1145,7 @@ function getSlotProps(record: TimelineRecord) {
 }
 
 function getRecordText(record: TimelineRecord) {
-  const item = getRecordItem(record) ?? {}
+  const item = getRecordLiveItem(record) ?? {}
   if (typeof item.text === 'string')
     return item.text
   if (typeof item.message === 'string')
@@ -1502,7 +1532,7 @@ function hasRenderableMarkdownRecordContent(record: TimelineRecord, el: HTMLElem
   if (!record.markdown)
     return true
 
-  const source = getMarkstreamTimelineItemContent(getRecordItem(record), record.index, props)
+  const source = getMarkstreamTimelineItemContent(getRecordLiveItem(record), record.index, props)
   if (!String(source ?? '').trim())
     return true
 
@@ -1568,7 +1598,7 @@ function hasVisibleReadyMarkdownRecordContent(
   if (!record.markdown)
     return true
 
-  const source = getMarkstreamTimelineItemContent(getRecordItem(record), record.index, props)
+  const source = getMarkstreamTimelineItemContent(getRecordLiveItem(record), record.index, props)
   if (!String(source ?? '').trim())
     return true
 
@@ -1613,7 +1643,7 @@ function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement)
   if (hasTrustedRestoredItemHeightFloor(record))
     return true
 
-  const source = getMarkstreamTimelineItemContent(getRecordItem(record), record.index, props)
+  const source = getMarkstreamTimelineItemContent(getRecordLiveItem(record), record.index, props)
   if (!String(source ?? '').trim())
     return true
 
@@ -2375,7 +2405,7 @@ defineExpose({
           :is="getRecordComponent(record)"
           v-else-if="getRecordComponent(record)"
           :ref="measureRecordElement(record)"
-          :item="getRecordItem(record)"
+          :item="getRecordLiveItem(record)"
         />
         <div
           v-else
@@ -2384,10 +2414,10 @@ defineExpose({
           :class="`markstream-virtual-timeline__default-item--${record.kind || 'item'}`"
         >
           <span
-            v-if="record.kind === 'tool-call' && getRecordItem(record)?.status"
+            v-if="record.kind === 'tool-call' && getRecordLiveItem(record)?.status"
             class="markstream-virtual-timeline__status"
           >
-            {{ getRecordItem(record)?.status }}
+            {{ getRecordLiveItem(record)?.status }}
           </span>
           {{ getRecordText(record) }}
         </div>
