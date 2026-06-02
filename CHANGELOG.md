@@ -1,3 +1,52 @@
+## [1.0.1-beta.3](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.1-beta.2...markstream-vue@1.0.1-beta.3) (2026-06-02)
+
+
+### Bug Fixes
+
+* add batch commit raf fallback ([25cd9e1](https://github.com/Simon-He95/markstream-vue/commit/25cd9e1b18f468ec8037ef6b7bf7d99de301c6b1))
+* address perf size follow-up regressions ([f96e4d4](https://github.com/Simon-He95/markstream-vue/commit/f96e4d433fd5518a0135e7d78f6cf332490a2e23))
+* address perf size review gaps ([da26cdb](https://github.com/Simon-He95/markstream-vue/commit/da26cdbc504b526d68925abf1303d01e816f370d))
+* address remaining review regressions ([079ff08](https://github.com/Simon-He95/markstream-vue/commit/079ff08a87524d83cbff1f6809253c3743ec747e))
+* address renderer review regressions ([0689c69](https://github.com/Simon-He95/markstream-vue/commit/0689c6902945a6f5868b6ea18d491f9955e029f3))
+* address size review regressions ([7d18b31](https://github.com/Simon-He95/markstream-vue/commit/7d18b31f4dfec43c6110d6b92881f856bc3ce352))
+* address streaming renderer regressions ([2b3f1d5](https://github.com/Simon-He95/markstream-vue/commit/2b3f1d5e7a75a05c3544655edde08e1a3c43e688))
+* address streaming renderer review ([d5a4374](https://github.com/Simon-He95/markstream-vue/commit/d5a4374c3d36a3819e15a6390d3c1afb53ecca93))
+* address timeline tooltip and dts regressions ([27106d8](https://github.com/Simon-He95/markstream-vue/commit/27106d8f673d880edf77154aaa8efc727709ba6a))
+* address typewriter cursor review nits ([a31f434](https://github.com/Simon-He95/markstream-vue/commit/a31f434982e07042c365224be1a64629d36c07d5))
+* align virtual timeline performance defaults ([36e0a78](https://github.com/Simon-He95/markstream-vue/commit/36e0a783e1f9384adae644a96977e8dcdeb4f140))
+* avoid mutating cached linkify tail tokens ([54854af](https://github.com/Simon-He95/markstream-vue/commit/54854af1fb6b74c123bfd3ab4be3d307eb5d975e))
+* clarify parse metrics and count signature calls ([ef40e22](https://github.com/Simon-He95/markstream-vue/commit/ef40e221bc639a9f692277fd4bc92b851a74f347))
+* gate batch commit feedback ([c1b9ccf](https://github.com/Simon-He95/markstream-vue/commit/c1b9ccf0dabfed5fd769273c5fe5a0e22883341c))
+* gate identity batch followups ([0c53d8a](https://github.com/Simon-He95/markstream-vue/commit/0c53d8ad523a6a686d6d55ea185b1dcc94e9603b))
+* gate idle batch commit feedback ([faf98b6](https://github.com/Simon-He95/markstream-vue/commit/faf98b626990d6dd2878f2ebec49af2c37d0a160))
+* harden typewriter cursor RAF scheduling ([d88afd8](https://github.com/Simon-He95/markstream-vue/commit/d88afd8e14cee167273df2202d0415b24892afe6))
+* isolate utils package entry ([4d53fd9](https://github.com/Simon-He95/markstream-vue/commit/4d53fd973322fd5ff39389bce08df56f5a6febc5))
+* keep cursor baseline out of nodes mode ([659c814](https://github.com/Simon-He95/markstream-vue/commit/659c81484e75cd06420b1a082751e6ca3dfcd25e))
+* keep parse metrics debug-only ([574ef01](https://github.com/Simon-He95/markstream-vue/commit/574ef01f82cee2c3789864ef42ee8dc3064a3b11))
+* keep typewriter cursor on previous text slot ([ab9119f](https://github.com/Simon-He95/markstream-vue/commit/ab9119fffd983585b4fcab38b4c0dbe198f04322))
+* log parse stabilize metrics ([f570815](https://github.com/Simon-He95/markstream-vue/commit/f570815dbb92ede883720883cd039f6061041983))
+* measure batch commit cost ([a2baa48](https://github.com/Simon-He95/markstream-vue/commit/a2baa48d4c49d9ca479b72381429ef7f320cb893))
+* **parser:** cover local token mutation copies ([ee213bd](https://github.com/Simon-He95/markstream-vue/commit/ee213bddcedc2bfdb62463ccaa821ab99be9461b))
+* **parser:** harden stream token copy-on-write ([9da5cea](https://github.com/Simon-He95/markstream-vue/commit/9da5cea9020f26b1f64456052536d7b1bdbc0a77))
+* **parser:** preserve chained linkify fallback context ([eabe088](https://github.com/Simon-He95/markstream-vue/commit/eabe088495c4480ecf6ce9b858a235a10cf68881))
+* preserve lightweight markdown render paths ([294f71e](https://github.com/Simon-He95/markstream-vue/commit/294f71eec25e75c74e56894cef672f199a57fdae))
+* preserve node reuse on final transition ([c0c9566](https://github.com/Simon-He95/markstream-vue/commit/c0c9566d06924950bd0f355c9ff823cce95a302e))
+* reduce typewriter cursor dom scanning ([162d4a4](https://github.com/Simon-He95/markstream-vue/commit/162d4a4fcaa4795bf7d16d379eaabe06f46ce128))
+* refine parsing performance metrics ([de145e8](https://github.com/Simon-He95/markstream-vue/commit/de145e8a1e440b7251d5ffaa4acc4df56742f299))
+* resolve renderer review regressions ([e667bd2](https://github.com/Simon-He95/markstream-vue/commit/e667bd288d7db1fddef9de5c46ea461bab0c09a5))
+* scope virtual timeline markdown measurements ([e9db3c8](https://github.com/Simon-He95/markstream-vue/commit/e9db3c81fe427055ad0bc89369cc2e2cd7342c3b))
+* skip stream token clone without transforms ([04ac3b8](https://github.com/Simon-He95/markstream-vue/commit/04ac3b8bb1f12525c999d80d4987b0a0a6dff73d))
+* stabilize timeline and pre renderer props ([7808edc](https://github.com/Simon-He95/markstream-vue/commit/7808edc656f5111e4a45162c711e76944d400279))
+* tighten typewriter cursor cleanup ([0709919](https://github.com/Simon-He95/markstream-vue/commit/0709919bc0d6bd2da543e37972ef38be02956056))
+* tighten typewriter cursor repositioning ([05ecc23](https://github.com/Simon-He95/markstream-vue/commit/05ecc231f9ef81c6069eab70fd20433835eb2f84))
+
+
+### Performance Improvements
+
+* optimize streaming renderer defaults ([0bd17d4](https://github.com/Simon-He95/markstream-vue/commit/0bd17d4e430bb806bd3a4c123e2d08803e15bd3d))
+
+
+
 ## [1.0.1-beta.2](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.1-beta.1...markstream-vue@1.0.1-beta.2) (2026-06-01)
 
 
