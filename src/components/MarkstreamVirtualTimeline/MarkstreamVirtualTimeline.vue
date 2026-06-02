@@ -9,8 +9,10 @@ import type {
   MarkstreamVirtualMetrics,
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualState,
+  NodeRendererCodeRenderer,
+  NodeRendererMode,
 } from '../../types/node-renderer-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, provide, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, provide, reactive, ref, shallowRef, watch } from 'vue'
 import {
   estimateMarkstreamTimelineItemHeight,
   getMarkstreamTimelineItemContent,
@@ -33,6 +35,7 @@ const props = withDefaults(defineProps<MarkstreamVirtualTimelineProps<any>>(), {
   overscanPx: 1200,
   stickToBottom: 'auto',
   markdownFade: false,
+  markdownMode: 'docs',
   restoreMaxLoadingMs: false,
 })
 
@@ -145,17 +148,128 @@ let initialThreadRestoreCompleted = false
 
 const normalizedThreadKey = computed(() => props.threadKey == null ? undefined : String(props.threadKey))
 let activeThreadKeySnapshot = normalizedThreadKey.value
-const timelineMeasurementKey = computed(() => {
+
+function normalizeTimelineMarkdownMode(value: unknown): NodeRendererMode {
+  return value === 'chat' || value === 'minimal' || value === 'docs'
+    ? value
+    : 'docs'
+}
+
+function normalizeTimelineMarkdownCodeRenderer(
+  value: unknown,
+  mode = normalizeTimelineMarkdownMode(props.markdownMode),
+): NodeRendererCodeRenderer {
+  if (value === 'pre' || value === 'shiki' || value === 'monaco')
+    return value
+
+  return mode === 'docs' ? 'monaco' : 'pre'
+}
+
+const normalizedTimelineMarkdownMode = computed(() => {
+  return normalizeTimelineMarkdownMode(props.markdownMode)
+})
+
+const normalizedTimelineMarkdownCodeRenderer = computed(() => {
+  return normalizeTimelineMarkdownCodeRenderer(
+    props.markdownCodeRenderer,
+    normalizedTimelineMarkdownMode.value,
+  )
+})
+
+const timelineBaseMeasurementKey = computed(() => {
   return [
     props.measurementKey == null ? '' : String(props.measurementKey),
     layoutWidthBucket.value,
   ].join(':')
 })
 
+const timelineMarkdownMeasurementKey = computed(() => {
+  return `${timelineBaseMeasurementKey.value}\u0001${normalizedTimelineMarkdownMode.value}\u0001${normalizedTimelineMarkdownCodeRenderer.value}`
+})
+
+class TimelineFenwickTree {
+  private tree: number[]
+  total: number
+
+  constructor(values: number[]) {
+    this.tree = Array.from({ length: values.length + 1 }, () => 0)
+    this.total = 0
+    values.forEach((value, index) => this.add(index, value))
+  }
+
+  add(index: number, delta: number) {
+    if (!Number.isFinite(delta) || delta === 0)
+      return
+
+    this.total += delta
+    for (let cursor = index + 1; cursor < this.tree.length; cursor += cursor & -cursor)
+      this.tree[cursor]! += delta
+  }
+
+  prefixSum(count: number) {
+    let cursor = Math.max(0, Math.min(count, this.tree.length - 1))
+    let sum = 0
+    while (cursor > 0) {
+      sum += this.tree[cursor]!
+      cursor -= cursor & -cursor
+    }
+    return sum
+  }
+
+  lowerBound(offset: number, mode: 'gte' | 'gt' = 'gte') {
+    const count = this.tree.length - 1
+    if (count <= 0)
+      return 0
+    if (offset <= 0)
+      return 0
+    if (offset >= this.total)
+      return count - 1
+
+    let index = 0
+    let bit = 1
+    while ((bit << 1) < this.tree.length)
+      bit <<= 1
+
+    let sum = 0
+    for (; bit > 0; bit >>= 1) {
+      const next = index + bit
+      if (next < this.tree.length) {
+        const nextSum = sum + this.tree[next]!
+        const shouldAdvance = mode === 'gt'
+          ? nextSum <= offset
+          : nextSum < offset
+
+        if (shouldAdvance) {
+          index = next
+          sum = nextSum
+        }
+      }
+    }
+
+    return Math.min(index, count - 1)
+  }
+}
+
+const layoutRecords = shallowRef<TimelineRecord[]>([])
+const layoutRecordByKey = new Map<string, TimelineRecord>()
+const layoutSizeTree = shallowRef(new TimelineFenwickTree([]))
+const layoutRevision = ref(0)
+let layoutEstimateSnapshot: Array<number | undefined> = []
+
 const layout = computed(() => {
+  void layoutRevision.value
+  return {
+    records: layoutRecords.value,
+    totalHeight: layoutSizeTree.value.total,
+  }
+})
+
+function rebuildLayoutRecords() {
   const records: TimelineRecord[] = []
-  let offset = 0
+  const sizes: number[] = []
   const renderScopeKey = getTimelineRenderScopeKey()
+
+  layoutRecordByKey.clear()
 
   for (let index = 0; index < props.items.length; index++) {
     const item = props.items[index]
@@ -167,45 +281,62 @@ const layout = computed(() => {
       kind: getMarkstreamTimelineItemKind(item, index, props),
       markdown: isMarkstreamMarkdownTimelineItem(item, index, props),
     }
-    const size = getCompatibleItemSize(recordBase)
-      ?? estimateMarkstreamTimelineItemHeight(item, index, props)
-
-    records.push({
+    let size = getCompatibleItemSize(recordBase)
+    if (size == null) {
+      size = layoutEstimateSnapshot[index]
+        ?? estimateMarkstreamTimelineItemHeight(item, index, props)
+    }
+    const record = {
       ...recordBase,
       renderKey: `${renderScopeKey}:${key}`,
-      offset,
+      offset: 0,
       size,
       component: item?.component,
-    })
+    }
 
-    offset += size
+    records.push(record)
+    sizes.push(size)
+    if (!layoutRecordByKey.has(key)) {
+      layoutRecordByKey.set(key, record)
+    }
   }
 
+  layoutRecords.value = records
+  layoutSizeTree.value = new TimelineFenwickTree(sizes)
+  layoutEstimateSnapshot = []
+  layoutRevision.value += 1
+}
+
+function getRecordOffset(record: Pick<TimelineRecord, 'index'>) {
+  void layoutRevision.value
+  return layoutSizeTree.value.prefixSum(record.index)
+}
+
+function materializeVisibleRecord(record: TimelineRecord): TimelineRecord {
   return {
-    records,
-    totalHeight: offset,
+    ...record,
+    offset: getRecordOffset(record),
   }
-})
+}
 
-function lowerBoundRecordByOffset(records: TimelineRecord[], offset: number) {
-  let low = 0
-  let high = Math.max(0, records.length - 1)
-  let answer = records.length
+function updateLayoutRecordSize(key: string, size: number) {
+  const record = layoutRecordByKey.get(key)
+  if (!record)
+    return
 
-  while (low <= high) {
-    const mid = (low + high) >> 1
-    const record = records[mid]!
+  const next = Math.ceil(size)
+  const delta = next - record.size
+  if (delta === 0)
+    return
 
-    if (record.offset + record.size >= offset) {
-      answer = mid
-      high = mid - 1
-    }
-    else {
-      low = mid + 1
-    }
-  }
+  record.size = next
+  layoutSizeTree.value.add(record.index, delta)
+  layoutRevision.value += 1
+}
 
-  return Math.min(Math.max(0, answer), Math.max(0, records.length - 1))
+function lowerBoundRecordByOffset(offset: number, mode: 'gte' | 'gt' = 'gte') {
+  void layoutRevision.value
+  return layoutSizeTree.value.lowerBound(offset, mode)
 }
 
 const effectiveOverscanItems = computed(() => {
@@ -235,30 +366,26 @@ const visibleWindow = computed(() => {
   const viewportStart = getLayoutViewportStart()
   const viewportEnd = viewportStart + Math.max(1, viewportHeight.value)
 
-  let start = lowerBoundRecordByOffset(
-    records,
-    Math.max(0, viewportStart - overscanPx),
-  )
-  let end = lowerBoundRecordByOffset(
-    records,
-    Math.min(layout.value.totalHeight, viewportEnd + overscanPx),
-  ) + 1
+  let start = lowerBoundRecordByOffset(Math.max(0, viewportStart - overscanPx), 'gt')
+  let end = lowerBoundRecordByOffset(Math.min(layout.value.totalHeight, viewportEnd + overscanPx)) + 1
 
   start = Math.max(0, start - overscanItems)
   end = Math.min(records.length, Math.max(end + overscanItems, start + 1))
 
-  const visibleRecords = records.slice(start, end)
+  const visibleRecords = records.slice(start, end).map(materializeVisibleRecord)
   const first = visibleRecords[0]
   const last = visibleRecords[visibleRecords.length - 1]
+  const firstOffset = first?.offset ?? 0
+  const lastOffset = last?.offset ?? 0
 
   return {
     start,
     end,
     records: visibleRecords,
-    topSpacerHeight: first?.offset ?? 0,
+    topSpacerHeight: firstOffset,
     bottomSpacerHeight: Math.max(
       0,
-      layout.value.totalHeight - ((last?.offset ?? 0) + (last?.size ?? 0)),
+      layout.value.totalHeight - (lastOffset + (last?.size ?? 0)),
     ),
   }
 })
@@ -271,11 +398,138 @@ function getTimelineRenderScopeKey() {
   return normalizedThreadKey.value ?? 'timeline'
 }
 
+function getComponentIdentityToken(component: unknown) {
+  if (!component)
+    return ''
+
+  if (typeof component === 'string')
+    return `s:${component}`
+
+  return `o:${getIdentityToken(component)}`
+}
+
+const identityIds = new WeakMap<object, number>()
+let nextIdentityId = 1
+
+function getIdentityToken(value: unknown) {
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null)
+    return String(value ?? '')
+
+  const object = value as object
+  let id = identityIds.get(object)
+  if (!id) {
+    id = nextIdentityId++
+    identityIds.set(object, id)
+  }
+  return String(id)
+}
+
+function hashTimelineString(value: string) {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(36)
+}
+
+function getCheapTimelineItemContentSignature(item: any, index: number, markdown: boolean) {
+  if (markdown)
+    return ''
+
+  const text = typeof item?.text === 'string'
+    ? item.text
+    : typeof item?.message === 'string'
+      ? item.message
+      : typeof item?.label === 'string'
+        ? item.label
+        : String(getMarkstreamTimelineItemContent(item, index, props) ?? '')
+
+  if (!text)
+    return ''
+
+  return `${text.length}:${hashTimelineString(text)}`
+}
+
+function getEstimatedItemHeightSignature(item: any, index: number) {
+  if (typeof props.estimateItemHeight !== 'function')
+    return ''
+
+  const estimated = props.estimateItemHeight(item, index)
+  if (!Number.isFinite(estimated) || estimated <= 0)
+    return ''
+
+  const value = Math.ceil(estimated)
+  layoutEstimateSnapshot[index] = value
+  return String(value)
+}
+
+function getLayoutItemsSignature() {
+  return props.items.map((item, index) => {
+    const key = getItemKey(item, index)
+    const markdown = isMarkstreamMarkdownTimelineItem(item, index, props)
+
+    return [
+      key,
+      getMarkstreamTimelineItemKind(item, index, props),
+      markdown ? 1 : 0,
+      getMarkstreamTimelineItemRevision(item, index, props) ?? '',
+      getEstimatedItemHeightSignature(item, index),
+      getCheapTimelineItemContentSignature(item, index, markdown),
+      getComponentIdentityToken(item?.component),
+    ].join('\u0001')
+  }).join('\u0000')
+}
+
+function getLayoutRebuildSignature() {
+  const explicit = props.layoutRevision
+  if (explicit != null) {
+    return [
+      'explicit',
+      String(explicit),
+      props.items.length,
+    ].join('\u0001')
+  }
+
+  return getLayoutItemsSignature()
+}
+
+function getRecordLiveItem(record: Pick<TimelineRecord, 'item' | 'index'>) {
+  return props.items[record.index] ?? record.item
+}
+
+function getRecordIdentityItem(record: Pick<TimelineRecord, 'item'>) {
+  return record.item
+}
+
+function getRecordComponent(record: TimelineRecord) {
+  const item = getRecordLiveItem(record) as any
+  return item?.component ?? record.component
+}
+
+watch(
+  [
+    () => getLayoutRebuildSignature(),
+    timelineBaseMeasurementKey,
+    timelineMarkdownMeasurementKey,
+    normalizedThreadKey,
+    () => getIdentityToken(props.estimateItemHeight),
+    () => getIdentityToken(props.getKey),
+    () => getIdentityToken(props.getKind),
+    () => getIdentityToken(props.getContent),
+    () => getIdentityToken(props.getFinal),
+    () => getIdentityToken(props.getRevision),
+  ],
+  () => rebuildLayoutRecords(),
+  { immediate: true, flush: 'sync' },
+)
+
 function getSessionKey(
   record: Pick<TimelineRecord, 'item' | 'index' | 'key'>,
   threadKey = normalizedThreadKey.value,
 ) {
-  const revision = getMarkstreamTimelineItemRevision(record.item, record.index, props)
+  const item = getRecordIdentityItem(record)
+  const revision = getMarkstreamTimelineItemRevision(item, record.index, props)
   return [
     threadKey ?? 'timeline',
     record.key,
@@ -290,7 +544,8 @@ function getItemSizeSourceKey(
   if (record.markdown)
     return getSessionKey(record, threadKey)
 
-  const revision = getMarkstreamTimelineItemRevision(record.item, record.index, props)
+  const item = getRecordIdentityItem(record)
+  const revision = getMarkstreamTimelineItemRevision(item, record.index, props)
   return [
     threadKey ?? 'timeline',
     record.key,
@@ -301,7 +556,7 @@ function getItemSizeSourceKey(
 function getItemSizeSource(record: Pick<TimelineRecord, 'item' | 'index' | 'key' | 'markdown'>): TimelineItemSizeSource {
   return {
     sourceKey: getItemSizeSourceKey(record),
-    measurementKey: timelineMeasurementKey.value,
+    measurementKey: record.markdown ? timelineMarkdownMeasurementKey.value : timelineBaseMeasurementKey.value,
     widthBucket: layoutWidthBucket.value,
   }
 }
@@ -326,7 +581,7 @@ function isCompatibleItemSizeSource(
   if (source.sourceKey !== getItemSizeSourceKey(record, threadKey))
     return false
 
-  if (source.measurementKey !== timelineMeasurementKey.value)
+  if (source.measurementKey !== (record.markdown ? timelineMarkdownMeasurementKey.value : timelineBaseMeasurementKey.value))
     return false
 
   if ((source.widthBucket ?? 0) !== layoutWidthBucket.value)
@@ -348,7 +603,8 @@ function getCompatibleItemSize(
 }
 
 function findRecordByKey(key: string) {
-  return layout.value.records.find(record => record.key === key)
+  void layout.value
+  return layoutRecordByKey.get(key)
 }
 
 function isCompatibleMarkdownSource(
@@ -371,7 +627,7 @@ function isCompatibleMarkdownSource(
 }
 
 function isCompatibleMarkdownMeasurementKey(measurementKey: string | undefined) {
-  const expected = timelineMeasurementKey.value
+  const expected = timelineMarkdownMeasurementKey.value
   const actual = measurementKey ?? ''
 
   return actual === expected || actual.startsWith(`${expected}\u0000`)
@@ -653,7 +909,7 @@ function scrollToIndex(index: number, align: 'start' | 'center' | 'end' = 'start
   if (!record)
     return
 
-  let offset = getScrollContentStart() + record.offset
+  let offset = getScrollContentStart() + getRecordOffset(record)
   if (align === 'center')
     offset -= (viewportHeight.value - record.size) / 2
   else if (align === 'end')
@@ -685,10 +941,14 @@ function isSameRestoredItemHeightFloorSource(
       || (source.widthBucket ?? 0) === (floorSource.widthBucket ?? 0)
     )
     && (
-      source.measurementKey === ':0'
-      || floorSource.measurementKey === ':0'
+      isZeroWidthTimelineMeasurementKey(source.measurementKey)
+      || isZeroWidthTimelineMeasurementKey(floorSource.measurementKey)
       || source.measurementKey === floorSource.measurementKey
     )
+}
+
+function isZeroWidthTimelineMeasurementKey(measurementKey: string | undefined) {
+  return measurementKey === ':0' || measurementKey?.startsWith(':0\u0001') === true
 }
 
 function clearRestoredItemHeightFloorIfSourceChanged(
@@ -735,6 +995,7 @@ function setItemSize(key: string, size: number, source?: TimelineItemSizeSource)
     if (source)
       itemSizeSources.set(key, source)
     itemSizes.set(key, next)
+    updateLayoutRecordSize(key, next)
     scheduleThreadRestorePass()
     return
   }
@@ -749,6 +1010,7 @@ function setItemSize(key: string, size: number, source?: TimelineItemSizeSource)
   if (source)
     itemSizeSources.set(key, source)
   itemSizes.set(key, next)
+  updateLayoutRecordSize(key, next)
   scheduleThreadStateRemember()
   scheduleScrollReconcileAfterSizeChange(restoreAnchor)
 }
@@ -901,8 +1163,11 @@ function measureRecordElement(record: TimelineRecord) {
 }
 
 function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProps {
-  const final = getMarkstreamTimelineItemFinal(record.item, record.index, props)
+  const item = getRecordLiveItem(record)
+  const final = getMarkstreamTimelineItemFinal(item, record.index, props)
   const restoreState = markdownStates.get(record.key)
+  const markdownMode = normalizedTimelineMarkdownMode.value
+  const markdownCodeRenderer = normalizedTimelineMarkdownCodeRenderer.value
   const virtualScroll: MarkstreamVirtualScrollOptions = {
     enabled: true,
     sessionKey: getSessionKey(record),
@@ -910,7 +1175,7 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
     scrollRoot: () => scrollRoot.value,
     restoreState: isCompatibleMarkdownState(record, restoreState) ? restoreState! : null,
     restoreAnchor: false,
-    measurementKey: timelineMeasurementKey.value,
+    measurementKey: timelineMarkdownMeasurementKey.value,
     settleMode: 'manual',
     settledToken: final,
     emitIntervalMs: 32,
@@ -918,8 +1183,10 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
   }
 
   return {
-    content: getMarkstreamTimelineItemContent(record.item, record.index, props),
+    content: getMarkstreamTimelineItemContent(item, record.index, props),
     final,
+    mode: markdownMode,
+    codeRenderer: markdownCodeRenderer,
     nodeVirtual: 'auto' as const,
     fade: props.markdownFade === true,
     indexKey: getSessionKey(record),
@@ -931,7 +1198,7 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
       setMarkdownLogicalHeight(record.key, metrics.totalHeight, {
         sessionKey: metrics.sessionKey,
         threadKey: normalizedThreadKey.value,
-        measurementKey: timelineMeasurementKey.value,
+        measurementKey: timelineMarkdownMeasurementKey.value,
       })
 
       const allowMarkdownShrink = shouldAllowMarkdownShrink(metrics)
@@ -966,8 +1233,9 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
 }
 
 function getSlotProps(record: TimelineRecord) {
+  const item = getRecordLiveItem(record)
   return {
-    item: record.item,
+    item,
     index: record.index,
     itemKey: record.key,
     kind: record.kind,
@@ -977,14 +1245,14 @@ function getSlotProps(record: TimelineRecord) {
 }
 
 function getRecordText(record: TimelineRecord) {
-  const item = record.item ?? {}
+  const item = getRecordLiveItem(record) ?? {}
   if (typeof item.text === 'string')
     return item.text
   if (typeof item.message === 'string')
     return item.message
   if (typeof item.label === 'string')
     return item.label
-  return getMarkstreamTimelineItemContent(record.item, record.index, props)
+  return getMarkstreamTimelineItemContent(item, record.index, props)
 }
 
 function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
@@ -998,12 +1266,15 @@ function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
 
   const layoutScrollTop = getLayoutViewportStart()
 
-  for (const record of layout.value.records) {
-    if (layoutScrollTop >= record.offset && layoutScrollTop < record.offset + record.size) {
+  const index = lowerBoundRecordByOffset(layoutScrollTop, 'gt')
+  const record = layout.value.records[index]
+  if (record) {
+    const recordOffset = getRecordOffset(record)
+    if (layoutScrollTop >= recordOffset && layoutScrollTop < recordOffset + record.size) {
       return {
         type: 'item',
         itemKey: record.key,
-        offsetWithinItemPx: layoutScrollTop - record.offset,
+        offsetWithinItemPx: layoutScrollTop - recordOffset,
       }
     }
   }
@@ -1034,7 +1305,7 @@ function captureThreadStateForKey(threadKey = normalizedThreadKey.value): Markst
 
   return {
     threadKey,
-    measurementKey: timelineMeasurementKey.value,
+    measurementKey: timelineBaseMeasurementKey.value,
     widthBucket: layoutWidthBucket.value,
     outerAnchor: captureOuterAnchor(),
     itemHeights,
@@ -1123,12 +1394,12 @@ function resolveOuterAnchorOffset(anchor: MarkstreamThreadAnchor | undefined) {
       - Math.max(0, anchor.distanceFromBottomPx)
   }
 
-  const record = layout.value.records.find(item => item.key === anchor.itemKey)
+  const record = findRecordByKey(anchor.itemKey)
 
   if (!record)
     return null
 
-  return getScrollContentStart() + record.offset + Math.max(0, anchor.offsetWithinItemPx)
+  return getScrollContentStart() + getRecordOffset(record) + Math.max(0, anchor.offsetWithinItemPx)
 }
 
 function restoreOuterAnchor(
@@ -1361,7 +1632,7 @@ function hasRenderableMarkdownRecordContent(record: TimelineRecord, el: HTMLElem
   if (!record.markdown)
     return true
 
-  const source = getMarkstreamTimelineItemContent(record.item, record.index, props)
+  const source = getMarkstreamTimelineItemContent(getRecordLiveItem(record), record.index, props)
   if (!String(source ?? '').trim())
     return true
 
@@ -1427,7 +1698,7 @@ function hasVisibleReadyMarkdownRecordContent(
   if (!record.markdown)
     return true
 
-  const source = getMarkstreamTimelineItemContent(record.item, record.index, props)
+  const source = getMarkstreamTimelineItemContent(getRecordLiveItem(record), record.index, props)
   if (!String(source ?? '').trim())
     return true
 
@@ -1472,7 +1743,7 @@ function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement)
   if (hasTrustedRestoredItemHeightFloor(record))
     return true
 
-  const source = getMarkstreamTimelineItemContent(record.item, record.index, props)
+  const source = getMarkstreamTimelineItemContent(getRecordLiveItem(record), record.index, props)
   if (!String(source ?? '').trim())
     return true
 
@@ -1821,7 +2092,7 @@ function canImportThreadItemHeights(state: MarkstreamThreadVirtualState | null |
   if (!state)
     return false
 
-  return (state.measurementKey ?? '') === timelineMeasurementKey.value
+  return (state.measurementKey ?? '') === timelineBaseMeasurementKey.value
     && (state.widthBucket ?? 0) === layoutWidthBucket.value
 }
 
@@ -1966,6 +2237,8 @@ function restoreThreadState(
     markdownStates.set(key, markdownState)
     seedMarkdownLogicalHeightFromState(key, markdownState)
   }
+
+  rebuildLayoutRecords()
 
   if (props.stickToBottom === true) {
     bottomPinned.value = true
@@ -2229,10 +2502,10 @@ defineExpose({
           v-bind="getMarkdownProps(record)"
         />
         <component
-          :is="record.component"
-          v-else-if="record.component"
+          :is="getRecordComponent(record)"
+          v-else-if="getRecordComponent(record)"
           :ref="measureRecordElement(record)"
-          :item="record.item"
+          :item="getRecordLiveItem(record)"
         />
         <div
           v-else
@@ -2241,10 +2514,10 @@ defineExpose({
           :class="`markstream-virtual-timeline__default-item--${record.kind || 'item'}`"
         >
           <span
-            v-if="record.kind === 'tool-call' && record.item.status"
+            v-if="record.kind === 'tool-call' && getRecordLiveItem(record)?.status"
             class="markstream-virtual-timeline__status"
           >
-            {{ record.item.status }}
+            {{ getRecordLiveItem(record)?.status }}
           </span>
           {{ getRecordText(record) }}
         </div>

@@ -670,6 +670,43 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('does not reuse a custom node when long same-length string content changes after the old sampled prefix', () => {
+    let dynamicContent = `${'a'.repeat(9000)}MID-A${'z'.repeat(5000)}`
+    const content = ref('custom')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        preTransformTokens(tokens) {
+          for (const token of tokens as any[]) {
+            if (token.type === 'inline') {
+              token.children = [{
+                type: 'chart',
+                raw: 'chart',
+                content: dynamicContent,
+              }]
+            }
+          }
+          return tokens
+        },
+      },
+    })
+    const firstParagraph = state.parsedNodes.value[0] as any
+    const firstChart = firstParagraph.children?.[0]
+
+    expect(firstChart?.content).toContain('MID-A')
+
+    dynamicContent = `${'a'.repeat(9000)}MID-B${'z'.repeat(5000)}`
+    content.value = `${content.value}\n\nAppended paragraph.`
+
+    const secondParagraph = state.parsedNodes.value[0] as any
+    const secondChart = secondParagraph.children?.[0]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(secondChart).not.toBe(firstChart)
+    expect(secondChart?.content).toContain('MID-B')
+
+    scope.stop()
+  })
+
   it('does not deep-stringify previous ParsedNodes during large append reuse', () => {
     const stringify = vi.spyOn(JSON, 'stringify')
     const content = ref(buildParagraphs(5000))
@@ -684,6 +721,35 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(stringify.mock.calls.length).toBeLessThan(20)
 
     scope.stop()
+  })
+
+  it('does not prime stable prefix signatures for unchanged large string fields', () => {
+    const largeLine = 'x'.repeat(100_000)
+    const content = ref([
+      '```ts',
+      largeLine,
+      '```',
+      '',
+      'tail',
+    ].join('\n'))
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+    const firstCode = state.parsedNodes.value[0]
+
+    try {
+      logPerf.mockClear()
+      content.value = `${content.value}\n\nappend`
+
+      expect(state.parsedNodes.value[0]).toBe(firstCode)
+
+      const data = logPerf.mock.calls.at(-1)?.[1]
+      expect(data?.dirtyStartIndex).toBeGreaterThanOrEqual(1)
+      expect(data?.stabilizeSignatureCallCount).toBe(data?.dirtyStartIndex)
+      expect(data?.primeSignatureCallCount).toBeLessThanOrEqual(2)
+    }
+    finally {
+      scope.stop()
+    }
   })
 
   it('logs stream stats deltas when debug performance is enabled', () => {
@@ -762,6 +828,29 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(data?.primeSignatureCallCount).toBeGreaterThan(0)
     expect(data?.signatureCallCount).toBe(data?.stabilizeSignatureCallCount + data?.primeSignatureCallCount)
     expect(data?.stabilizeMs).toBeGreaterThanOrEqual(0)
+
+    scope.stop()
+  })
+
+  it('primes signatures only for the dirty tail after append reuse', () => {
+    const content = ref(buildParagraphs(6))
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    expect(state.parsedNodes.value.length).toBe(6)
+    logPerf.mockClear()
+
+    content.value = `${content.value}\n\nAppended paragraph.`
+    expect(state.parsedNodes.value.length).toBe(7)
+
+    const data = logPerf.mock.calls.at(-1)?.[1]
+    expect(data).toMatchObject({
+      reusedNodeCount: 6,
+      dirtyStartIndex: 6,
+      stablePrefixNodeCount: 6,
+      dirtyTailNodeCount: 1,
+      primeSignatureCallCount: 1,
+    })
 
     scope.stop()
   })

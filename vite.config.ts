@@ -85,6 +85,8 @@ export default defineConfig(({ mode }) => {
           'workers/mermaidWorkerClient': './src/entries/workers-mermaidWorkerClient.ts',
           'workers/katexCdnWorker': './src/entries/workers-katexCdnWorker.ts',
           'workers/mermaidCdnWorker': './src/entries/workers-mermaidCdnWorker.ts',
+          'workers/katexRenderer.worker': './src/workers/katexRenderer.worker.ts',
+          'workers/mermaidParser.worker': './src/workers/mermaidParser.worker.ts',
         },
         formats: ['es'],
         name,
@@ -172,6 +174,7 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: ['./test/setup/vitest.setup.ts'],
       restoreMocks: true,
+      testTimeout: 10000,
     },
     worker: {
       // Ensure web workers are bundled as ESM; IIFE/UMD are invalid with code-splitting

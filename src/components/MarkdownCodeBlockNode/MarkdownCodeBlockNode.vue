@@ -4,7 +4,12 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
-import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier } from '../../utils'
+import {
+  getLanguageIcon,
+  languageIconsRevision,
+  languageMap,
+  normalizeLanguageIdentifier,
+} from '../../utils/languageIcon'
 import CodeBlockShell from '../CodeBlockNode/CodeBlockShell.vue'
 
 const props = withDefaults(

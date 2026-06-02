@@ -1,9 +1,15 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import NodeRenderer from '../src/components/NodeRenderer'
+import { hideTooltip } from '../src/composables/useSingletonTooltip'
 import { flushAll } from './setup/flush-all'
 
 describe('nodeRenderer showTooltips prop', () => {
+  afterEach(() => {
+    hideTooltip(true)
+    vi.useRealTimers()
+  })
+
   it('disables LinkNode tooltip when showTooltips is false', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
@@ -57,8 +63,11 @@ describe('nodeRenderer showTooltips prop', () => {
     expect(link.exists()).toBe(true)
     expect(link.text()).toBe('http://你好.com')
 
+    vi.useFakeTimers()
     await link.trigger('mouseenter', { clientX: 10, clientY: 10 })
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await vi.advanceTimersByTimeAsync(80)
+    await vi.dynamicImportSettled()
+    vi.useRealTimers()
     await flushAll()
 
     expect(document.querySelector('.tooltip-element')?.textContent?.trim()).toBe('http://你好.com')

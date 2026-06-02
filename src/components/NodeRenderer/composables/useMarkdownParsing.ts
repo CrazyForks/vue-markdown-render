@@ -125,6 +125,7 @@ const MAX_SIGNATURE_DEPTH = 6
 const MAX_SIGNATURE_KEYS = 80
 const MAX_SIGNATURE_ARRAY_ITEMS = 200
 const MAX_SIGNATURE_STRING_CHARS = 8192
+const MAX_CHEAP_NODE_KEY_DEPTH = 4
 const objectIdentityIds = new WeakMap<object, number>()
 const nodeSignatureCache = new WeakMap<object, string>()
 let nextObjectIdentityId = 1
@@ -432,27 +433,240 @@ function getInitialStabilizeMetrics(nodeCount: number): ParsedNodeStabilizeMetri
   }
 }
 
-function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode[]) {
-  if (!previousNodes.length)
-    return nextNodes
+function getDirtyTailNodeCount(
+  dirtyStartIndex: number,
+  nextNodes: ParsedNode[],
+  previousNodes: ParsedNode[],
+) {
+  return dirtyStartIndex < 0
+    ? 0
+    : Math.max(nextNodes.length, previousNodes.length) - dirtyStartIndex
+}
 
-  const stableNodes = new Array<ParsedNode>(nextNodes.length)
-  let identical = nextNodes.length === previousNodes.length
+function compareCheapStringIfSafe(previous: string, next: string) {
+  return previous.length === next.length && previous === next
+}
 
-  for (let index = 0; index < nextNodes.length; index++) {
+function compareCheapParsedNodesIfSafe(
+  previous: ParsedNode,
+  next: ParsedNode,
+  depth = 0,
+): boolean | null {
+  if (depth >= MAX_CHEAP_NODE_KEY_DEPTH)
+    return null
+
+  if (previous.type !== next.type)
+    return false
+
+  const previousRecord = previous as Record<string, unknown>
+  const nextRecord = next as Record<string, unknown>
+  const previousKeys = Object.keys(previousRecord)
+    .filter(key => key !== 'type' && key !== 'children')
+    .sort()
+  const nextKeys = Object.keys(nextRecord)
+    .filter(key => key !== 'type' && key !== 'children')
+    .sort()
+
+  if (previousKeys.length !== nextKeys.length)
+    return false
+
+  for (let index = 0; index < previousKeys.length; index++) {
+    const key = previousKeys[index]!
+    if (key !== nextKeys[index])
+      return false
+
+    const previousValue = previousRecord[key]
+    const nextValue = nextRecord[key]
+
+    if (typeof previousValue !== typeof nextValue)
+      return false
+
+    if (typeof previousValue === 'string') {
+      if (typeof nextValue !== 'string')
+        return false
+
+      if (!compareCheapStringIfSafe(previousValue, nextValue))
+        return false
+
+      continue
+    }
+
+    if (
+      typeof previousValue === 'number'
+      || typeof previousValue === 'boolean'
+      || previousValue == null
+    ) {
+      if (!Object.is(previousValue, nextValue))
+        return false
+      continue
+    }
+
+    return null
+  }
+
+  const previousHasChildren = Object.prototype.hasOwnProperty.call(previousRecord, 'children')
+  const nextHasChildren = Object.prototype.hasOwnProperty.call(nextRecord, 'children')
+
+  if (previousHasChildren !== nextHasChildren)
+    return false
+
+  if (!previousHasChildren)
+    return true
+
+  const previousChildren = previousRecord.children
+  const nextChildren = nextRecord.children
+
+  if (!Array.isArray(previousChildren) || !Array.isArray(nextChildren))
+    return null
+
+  if (previousChildren.length !== nextChildren.length)
+    return false
+
+  for (let index = 0; index < previousChildren.length; index++) {
+    const previousChild = previousChildren[index]
+    const nextChild = nextChildren[index]
+
+    if (!isParsedNodeLike(previousChild) || !isParsedNodeLike(nextChild))
+      return null
+
+    const childResult = compareCheapParsedNodesIfSafe(
+      previousChild,
+      nextChild,
+      depth + 1,
+    )
+
+    if (childResult == null)
+      return null
+
+    if (!childResult)
+      return false
+  }
+
+  return true
+}
+
+function areTopLevelNodesStable(previous: ParsedNode | undefined, next: ParsedNode | undefined) {
+  if (!previous || !next)
+    return false
+  if (previous === next)
+    return true
+  if (previous.type !== next.type)
+    return false
+
+  const cheapResult = compareCheapParsedNodesIfSafe(previous, next)
+  if (cheapResult != null)
+    return cheapResult
+
+  return isParsedNodeStable(previous, next)
+}
+
+function areTopLevelNodesStableWithMetrics(
+  previous: ParsedNode | undefined,
+  next: ParsedNode | undefined,
+  signatureTiming: ParsedNodeSignatureTimingMetrics,
+) {
+  if (!previous || !next)
+    return false
+  if (previous === next)
+    return true
+  if (previous.type !== next.type)
+    return false
+
+  let cheapResult: boolean | null = null
+  trackSignatureTiming(
+    signatureTiming,
+    'stabilizeSignatureMs',
+    () => {
+      cheapResult = compareCheapParsedNodesIfSafe(previous, next)
+    },
+  )
+
+  if (cheapResult != null)
+    return cheapResult
+
+  return isParsedNodeStableWithMetrics(previous, next, signatureTiming)
+}
+
+function findDirtyStartIndex(nextNodes: ParsedNode[], previousNodes: ParsedNode[]) {
+  const limit = Math.min(nextNodes.length, previousNodes.length)
+
+  for (let index = 0; index < limit; index++) {
+    const previous = previousNodes[index]
+    const next = nextNodes[index]
+
+    if (!areTopLevelNodesStable(previous, next))
+      return index
+  }
+
+  return nextNodes.length === previousNodes.length ? -1 : limit
+}
+
+function findDirtyStartIndexWithMetrics(
+  nextNodes: ParsedNode[],
+  previousNodes: ParsedNode[],
+  signatureTiming: ParsedNodeSignatureTimingMetrics,
+) {
+  const limit = Math.min(nextNodes.length, previousNodes.length)
+
+  for (let index = 0; index < limit; index++) {
+    const previous = previousNodes[index]
+    const next = nextNodes[index]
+
+    if (!areTopLevelNodesStableWithMetrics(previous, next, signatureTiming)) {
+      return index
+    }
+  }
+
+  return nextNodes.length === previousNodes.length ? -1 : limit
+}
+
+function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode[]): ParsedNodeStabilizeResult {
+  if (!previousNodes.length) {
+    return {
+      nodes: nextNodes,
+      metrics: getInitialStabilizeMetrics(nextNodes.length),
+    }
+  }
+
+  const dirtyStartIndex = findDirtyStartIndex(nextNodes, previousNodes)
+
+  if (dirtyStartIndex < 0) {
+    return {
+      nodes: previousNodes,
+      metrics: {
+        reusedNodeCount: nextNodes.length,
+        dirtyStartIndex,
+        stablePrefixNodeCount: nextNodes.length,
+        dirtyTailNodeCount: 0,
+      },
+    }
+  }
+
+  const stableNodes = nextNodes.slice()
+  let reusedNodeCount = dirtyStartIndex
+
+  for (let index = 0; index < dirtyStartIndex; index++)
+    stableNodes[index] = previousNodes[index]!
+
+  for (let index = dirtyStartIndex; index < nextNodes.length; index++) {
     const previous = previousNodes[index]
     const next = nextNodes[index]
 
     if (previous && isParsedNodeStable(previous, next)) {
       stableNodes[index] = previous
-    }
-    else {
-      stableNodes[index] = next
-      identical = false
+      reusedNodeCount += 1
     }
   }
 
-  return identical ? previousNodes : stableNodes
+  return {
+    nodes: stableNodes,
+    metrics: {
+      reusedNodeCount,
+      dirtyStartIndex,
+      stablePrefixNodeCount: dirtyStartIndex,
+      dirtyTailNodeCount: getDirtyTailNodeCount(dirtyStartIndex, nextNodes, previousNodes),
+    },
+  }
 }
 
 function stabilizeParsedNodesWithMetrics(
@@ -467,12 +681,27 @@ function stabilizeParsedNodesWithMetrics(
     }
   }
 
-  const stableNodes = new Array<ParsedNode>(nextNodes.length)
-  let identical = nextNodes.length === previousNodes.length
-  let reusedNodeCount = 0
-  let dirtyStartIndex = -1
+  const dirtyStartIndex = findDirtyStartIndexWithMetrics(nextNodes, previousNodes, signatureTiming)
 
-  for (let index = 0; index < nextNodes.length; index++) {
+  if (dirtyStartIndex < 0) {
+    return {
+      nodes: previousNodes,
+      metrics: {
+        reusedNodeCount: nextNodes.length,
+        dirtyStartIndex,
+        stablePrefixNodeCount: nextNodes.length,
+        dirtyTailNodeCount: 0,
+      },
+    }
+  }
+
+  const stableNodes = nextNodes.slice()
+  let reusedNodeCount = dirtyStartIndex
+
+  for (let index = 0; index < dirtyStartIndex; index++)
+    stableNodes[index] = previousNodes[index]!
+
+  for (let index = dirtyStartIndex; index < nextNodes.length; index++) {
     const previous = previousNodes[index]
     const next = nextNodes[index]
 
@@ -480,44 +709,34 @@ function stabilizeParsedNodesWithMetrics(
       stableNodes[index] = previous
       reusedNodeCount += 1
     }
-    else {
-      stableNodes[index] = next
-      if (dirtyStartIndex < 0)
-        dirtyStartIndex = index
-      identical = false
-    }
   }
 
-  if (dirtyStartIndex < 0 && nextNodes.length !== previousNodes.length)
-    dirtyStartIndex = Math.min(nextNodes.length, previousNodes.length)
-
-  const stablePrefixNodeCount = dirtyStartIndex < 0 ? nextNodes.length : dirtyStartIndex
-
   return {
-    nodes: identical ? previousNodes : stableNodes,
+    nodes: stableNodes,
     metrics: {
       reusedNodeCount,
       dirtyStartIndex,
-      stablePrefixNodeCount,
-      dirtyTailNodeCount: dirtyStartIndex < 0 ? 0 : Math.max(nextNodes.length, previousNodes.length) - dirtyStartIndex,
+      stablePrefixNodeCount: dirtyStartIndex,
+      dirtyTailNodeCount: getDirtyTailNodeCount(dirtyStartIndex, nextNodes, previousNodes),
     },
   }
 }
 
-function primeParsedNodeSignatures(nodes: ParsedNode[]) {
-  for (const node of nodes)
-    getParsedNodeSignature(node)
+function primeParsedNodeSignatures(nodes: ParsedNode[], startIndex = 0) {
+  for (let index = Math.max(0, startIndex); index < nodes.length; index++)
+    getParsedNodeSignature(nodes[index]!)
 }
 
 function primeParsedNodeSignaturesWithMetrics(
   nodes: ParsedNode[],
   signatureTiming: ParsedNodeSignatureTimingMetrics,
+  startIndex = 0,
 ) {
-  for (const node of nodes) {
+  for (let index = Math.max(0, startIndex); index < nodes.length; index++) {
     trackSignatureTiming(
       signatureTiming,
       'primeSignatureMs',
-      () => getParsedNodeSignature(node),
+      () => getParsedNodeSignature(nodes[index]!),
     )
   }
 }
@@ -750,6 +969,7 @@ export function useMarkdownParsing(
       : undefined
     let stabilizeMs = 0
     let parsed: ParsedNode[]
+    let primeStartIndex = 0
 
     if (canReuseParsedNodes) {
       const stabilizeStart = collectPerformanceMetrics
@@ -761,20 +981,25 @@ export function useMarkdownParsing(
         stabilizeMetrics = result.metrics
       }
       else {
-        parsed = stabilizeParsedNodes(nextParsed, previousParsedNodes)
+        const result = stabilizeParsedNodes(nextParsed, previousParsedNodes)
+        parsed = result.nodes
+        stabilizeMetrics = result.metrics
       }
       stabilizeMs = collectPerformanceMetrics
         ? getNow() - stabilizeStart
         : 0
+      primeStartIndex = stabilizeMetrics?.dirtyStartIndex == null || stabilizeMetrics.dirtyStartIndex < 0
+        ? parsed.length
+        : stabilizeMetrics.dirtyStartIndex
     }
     else {
       parsed = nextParsed
     }
 
     if (signatureTiming)
-      primeParsedNodeSignaturesWithMetrics(parsed, signatureTiming)
+      primeParsedNodeSignaturesWithMetrics(parsed, signatureTiming, primeStartIndex)
     else
-      primeParsedNodeSignatures(parsed)
+      primeParsedNodeSignatures(parsed, primeStartIndex)
 
     const nodeReuseMs = collectPerformanceMetrics
       ? getNow() - reuseStart

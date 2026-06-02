@@ -37,7 +37,6 @@ import InsertNode from './components/InsertNode'
 import LinkNode from './components/LinkNode'
 import ListItemNode from './components/ListItemNode'
 import ListNode from './components/ListNode'
-import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
 import MarkdownRender from './components/NodeRenderer'
@@ -51,7 +50,6 @@ import SuperscriptNode from './components/SuperscriptNode'
 import TableNode from './components/TableNode'
 import TextNode from './components/TextNode'
 import ThematicBreakNode from './components/ThematicBreakNode'
-import Tooltip from './components/Tooltip'
 import VmrContainerNode from './components/VmrContainerNode'
 import { useMarkstreamVirtualAdapter } from './composables/useMarkstreamVirtualAdapter'
 import { setDefaultI18nMap } from './composables/useSafeI18n'
@@ -60,9 +58,6 @@ import { setIconTheme } from './icon-themes'
 import { setLanguageIconResolver } from './utils/languageIcon'
 import { clearGlobalCustomComponents, createCustomComponentsRef, getCustomNodeComponents, MARKSTREAM_CUSTOM_COMPONENTS_KEY, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
 import './index.css'
-// Re-add top-level worker imports so builds emit worker bundles into `dist/`
-import './workers/katexRenderer.worker?worker'
-import './workers/mermaidParser.worker?worker'
 
 function definePublicAsyncComponent<TProps extends object>(
   loader: () => Promise<{ default: Component }>,
@@ -76,6 +71,10 @@ const MathInlineNode = definePublicAsyncComponent<MathInlineNodeProps>(() => imp
 const MermaidBlockNode = definePublicAsyncComponent<MermaidBlockNodeProps>(() => import('./components/MermaidBlockNode'))
 const InfographicBlockNode = definePublicAsyncComponent<InfographicBlockNodeProps>(() => import('./components/InfographicBlockNode'))
 const D2BlockNode = definePublicAsyncComponent<D2BlockNodeProps>(() => import('./components/D2BlockNode'))
+const Tooltip = definePublicAsyncComponent<Record<string, unknown>>(() => import('./components/Tooltip'))
+const MarkdownCodeBlockNode = definePublicAsyncComponent<Record<string, unknown>>(
+  () => import('./components/MarkdownCodeBlockNode'),
+)
 const MarkstreamVirtualTimeline = definePublicAsyncComponent<MarkstreamVirtualTimelineProps<any>>(
   () => import('./components/MarkstreamVirtualTimeline'),
 )
@@ -150,6 +149,8 @@ export type {
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualScrollSharedOptions,
   MarkstreamVirtualState,
+  NodeRendererCodeRenderer,
+  NodeRendererMode,
   NodeRendererProps,
 } from './types/node-renderer-props'
 // Export centralized props interfaces so they appear in package d.ts

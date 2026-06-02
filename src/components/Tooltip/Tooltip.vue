@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { arrow as arrowMiddleware, autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps<{
@@ -23,21 +22,92 @@ const actualPlacement = ref<string>(props.placement ?? 'top')
 const ready = ref(false)
 
 let cleanupAutoUpdate: (() => void) | null = null
+let observedAnchorEl: HTMLElement | null = null
+let observedTooltipEl: HTMLElement | null = null
+let floatingModule: typeof import('@floating-ui/dom') | null = null
+let floatingPromise: Promise<typeof import('@floating-ui/dom')> | null = null
+let visibilityRunId = 0
+
+function loadFloating() {
+  if (floatingModule)
+    return Promise.resolve(floatingModule)
+
+  if (!floatingPromise) {
+    floatingPromise = import('@floating-ui/dom')
+      .then((mod) => {
+        floatingModule = mod
+        return mod
+      })
+      .catch((error) => {
+        floatingPromise = null
+        throw error
+      })
+  }
+
+  return floatingPromise
+}
+
+function cleanupPositionObserver() {
+  if (cleanupAutoUpdate) {
+    cleanupAutoUpdate()
+    cleanupAutoUpdate = null
+  }
+  observedAnchorEl = null
+  observedTooltipEl = null
+}
+
+async function setupPositionObserver(runIsCurrent: () => boolean) {
+  const anchor = props.anchorEl
+  const tooltipEl = tooltip.value
+
+  if (!props.visible || !anchor || !tooltipEl)
+    return
+
+  if (observedAnchorEl === anchor && observedTooltipEl === tooltipEl)
+    return
+
+  const { autoUpdate } = await loadFloating()
+
+  if (!runIsCurrent() || !props.visible || props.anchorEl !== anchor || tooltip.value !== tooltipEl)
+    return
+
+  cleanupPositionObserver()
+  observedAnchorEl = anchor
+  observedTooltipEl = tooltipEl
+  cleanupAutoUpdate = autoUpdate(anchor, tooltipEl, () => {
+    void updatePosition().catch(() => {
+      applyFallbackPosition()
+    })
+  })
+}
 
 async function updatePosition() {
-  if (!props.anchorEl || !tooltip.value)
-    return
+  const anchor = props.anchorEl
+  const tooltipEl = tooltip.value
+
+  if (!props.visible || !anchor || !tooltipEl)
+    return false
+
+  const { arrow: arrowMiddleware, computePosition, flip, offset, shift } = await loadFloating()
+
+  if (!props.visible || props.anchorEl !== anchor || tooltip.value !== tooltipEl)
+    return false
+
   const middleware = [
     offset(props.offset ?? 6),
     flip(),
     shift({ padding: 6 }),
     ...(arrowEl.value ? [arrowMiddleware({ element: arrowEl.value, padding: 4 })] : []),
   ]
-  const { x, y, placement, middlewareData } = await computePosition(props.anchorEl, tooltip.value, {
+  const { x, y, placement, middlewareData } = await computePosition(anchor, tooltipEl, {
     placement: props.placement ?? 'top',
     middleware,
     strategy: 'fixed',
   })
+
+  if (!props.visible || props.anchorEl !== anchor || tooltip.value !== tooltipEl)
+    return false
+
   style.value.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`
   style.value.left = '0px'
   style.value.top = '0px'
@@ -54,18 +124,62 @@ async function updatePosition() {
       [staticSide]: '-3px',
     }
   }
+
+  return true
+}
+
+function applyFallbackPosition() {
+  const anchor = props.anchorEl
+  const tooltipEl = tooltip.value
+  if (!anchor || !tooltipEl)
+    return false
+
+  const rect = anchor.getBoundingClientRect()
+  const tooltipRect = tooltipEl.getBoundingClientRect()
+  const gap = props.offset ?? 6
+  const placement = props.placement ?? 'top'
+
+  let x = rect.left
+  let y = rect.top
+
+  if (placement === 'bottom') {
+    y = rect.bottom + gap
+  }
+  else if (placement === 'left') {
+    x = rect.left - tooltipRect.width - gap
+  }
+  else if (placement === 'right') {
+    x = rect.right + gap
+  }
+  else {
+    y = rect.top - tooltipRect.height - gap
+  }
+
+  style.value.transform = `translate3d(${Math.round(Math.max(0, x))}px, ${Math.round(Math.max(0, y))}px, 0)`
+  style.value.left = '0px'
+  style.value.top = '0px'
+  actualPlacement.value = placement
+  arrowStyle.value = {}
+  return true
 }
 
 watch(
   () => props.visible,
   async (v) => {
+    const runId = ++visibilityRunId
     if (v) {
       ready.value = false
       await nextTick()
+      if (runId !== visibilityRunId || !props.visible)
+        return
       if (props.anchorEl && tooltip.value) {
         try {
-          const rect = props.anchorEl.getBoundingClientRect()
-          await updatePosition()
+          const anchor = props.anchorEl
+          const tooltipEl = tooltip.value
+          const rect = anchor.getBoundingClientRect()
+          const positioned = await updatePosition()
+          if (!positioned || runId !== visibilityRunId || !props.visible || props.anchorEl !== anchor || tooltip.value !== tooltipEl)
+            return
           const targetTransform = style.value.transform
           if (props.originX != null && props.originY != null) {
             const dx = Math.abs(Number(props.originX) - rect.left)
@@ -74,8 +188,12 @@ watch(
             if (dist > 120) {
               style.value.transform = `translate3d(${Math.round(props.originX)}px, ${Math.round(props.originY)}px, 0)`
               await nextTick()
+              if (runId !== visibilityRunId || !props.visible)
+                return
               ready.value = true
               await nextTick()
+              if (runId !== visibilityRunId || !props.visible)
+                return
               style.value.transform = targetTransform
             }
             else {
@@ -85,12 +203,18 @@ watch(
           else {
             ready.value = true
           }
-          cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, updatePosition)
+          await setupPositionObserver(() => runId === visibilityRunId)
         }
         catch {
-          await updatePosition()
-          ready.value = true
-          cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, updatePosition)
+          if (runId !== visibilityRunId || !props.visible)
+            return
+          ready.value = applyFallbackPosition()
+          if (props.anchorEl && tooltip.value) {
+            try {
+              await setupPositionObserver(() => runId === visibilityRunId)
+            }
+            catch {}
+          }
         }
       }
       else {
@@ -99,28 +223,42 @@ watch(
     }
     else {
       ready.value = false
-      if (cleanupAutoUpdate) {
-        cleanupAutoUpdate()
-        cleanupAutoUpdate = null
-      }
+      cleanupPositionObserver()
     }
   },
 )
+
+let updateRunId = 0
 
 watch([
   () => props.anchorEl,
   () => props.placement,
   () => props.content,
 ], async () => {
+  const runId = ++updateRunId
+
   if (props.visible && props.anchorEl && tooltip.value) {
     await nextTick()
-    await updatePosition()
+    if (runId !== updateRunId || !props.visible || !props.anchorEl || !tooltip.value)
+      return
+    try {
+      const positioned = await updatePosition()
+      if (runId !== updateRunId || !props.visible || !props.anchorEl || !tooltip.value)
+        return
+      if (!positioned)
+        applyFallbackPosition()
+    }
+    catch {
+      applyFallbackPosition()
+    }
+
+    await setupPositionObserver(() => runId === updateRunId)
   }
 })
 
 onBeforeUnmount(() => {
-  if (cleanupAutoUpdate)
-    cleanupAutoUpdate()
+  visibilityRunId += 1
+  cleanupPositionObserver()
 })
 </script>
 
@@ -129,10 +267,17 @@ onBeforeUnmount(() => {
     <div class="markstream-vue" :class="{ dark: isDark }">
       <transition name="tooltip" appear>
         <div
-          v-show="visible && ready"
+          v-show="visible"
           :id="props.id"
           ref="tooltip"
-          :style="{ position: 'fixed', left: style.left, top: style.top, transform: style.transform }"
+          :style="{
+            position: 'fixed',
+            left: style.left,
+            top: style.top,
+            transform: style.transform,
+            visibility: ready ? 'visible' : 'hidden',
+            pointerEvents: ready ? undefined : 'none',
+          }"
           class="tooltip-element"
           role="tooltip"
         >

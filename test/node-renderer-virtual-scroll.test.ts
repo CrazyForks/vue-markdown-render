@@ -2569,6 +2569,42 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not change pre renderer virtual layout key when monaco options change', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createCodeBlock(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        codeRenderer: 'pre',
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'pre-layout-key',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const initialKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(initialKey).toContain('code-pre')
+
+    await wrapper.setProps({
+      codeBlockMonacoOptions: {
+        fontSize: 18,
+        lineHeight: 28,
+      },
+    })
+    await flushAll()
+
+    expect((wrapper.vm as any).captureVirtualState()?.measurementKey).toBe(initialKey)
+
+    wrapper.unmount()
+  })
+
   it('treats prop restoreState as cache-only unless restoreAnchor is provided', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 

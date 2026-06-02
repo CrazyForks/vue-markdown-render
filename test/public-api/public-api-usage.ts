@@ -186,6 +186,7 @@ const timelineItem: MarkstreamTimelineItem = {
 const virtualTimelineProps: MarkstreamVirtualTimelineProps = {
   items: [timelineItem],
   threadKey: 'public-api-thread',
+  layoutRevision: 1,
 }
 const virtualScrollRootRef = ref<HTMLElement | null>(null) satisfies MarkstreamScrollRootRef
 const virtualScrollRootLike: MarkstreamScrollRootLike = virtualScrollRootRef
@@ -215,6 +216,7 @@ const outerVirtualizerAdapter: MarkstreamOuterVirtualizerAdapter = {
 const virtualAdapter = useMarkstreamVirtualAdapter({
   items: [timelineItem],
   threadKey: 'public-api-thread',
+  layoutRevision: 1,
   virtualizer: outerVirtualizerAdapter,
 })
 const threadVirtualState: MarkstreamThreadVirtualState = virtualAdapter.captureThreadState()
