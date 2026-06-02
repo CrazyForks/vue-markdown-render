@@ -157,18 +157,28 @@ function getIdentityKey(value: unknown) {
   return String(id)
 }
 
-function stableParseKey(options: RendererParseOptions, md: MarkdownIt, customMarkdownIt: NodeRendererProps['customMarkdownIt']) {
-  return JSON.stringify({
+function stableParseKey(
+  options: RendererParseOptions,
+  md: MarkdownIt,
+  customMarkdownIt: NodeRendererProps['customMarkdownIt'],
+  config: { includeFinal?: boolean } = {},
+) {
+  const includeFinal = config.includeFinal !== false
+  const key: Record<string, unknown> = {
     md: getIdentityKey(md),
     customMarkdownIt: getIdentityKey(customMarkdownIt),
-    final: options.final === true,
     requireClosingStrong: options.requireClosingStrong === true,
     customHtmlTags: options.customHtmlTags ?? [],
     streamParse: options.streamParse ?? 'auto',
     validateLink: getIdentityKey(options.validateLink),
     preTransformTokens: getIdentityKey(options.preTransformTokens),
     postTransformTokens: getIdentityKey(options.postTransformTokens),
-  })
+  }
+
+  if (includeFinal)
+    key.final = options.final === true
+
+  return JSON.stringify(key)
 }
 
 function resetStreamParseCache(md: MarkdownIt) {
@@ -763,7 +773,8 @@ export function useMarkdownParsing(
   const smoothStreamingEnabled = options.smoothStreamingEnabled ?? computed(() => false)
   const contentToParse = ref(options.renderContent.value)
   let previousParsedNodes: ParsedNode[] = []
-  let previousParseSemanticKey = ''
+  let previousParserCacheSemanticKey = ''
+  let previousNodeReuseSemanticKey = ''
   let previousContent = ''
   let parseCoalesceTimer: ReturnType<typeof setTimeout> | undefined
   let parseCommitCount = 0
@@ -868,8 +879,8 @@ export function useMarkdownParsing(
 
     return {
       ...base,
-      // Keep renderer content parses on the stream parser by default; final
-      // transitions still reset cache through the parse semantic key.
+      // Keep renderer content parses on the stream parser by default. Final
+      // transitions reset parser cache without invalidating unchanged node reuse.
       streamParse: base.streamParse ?? true,
       ...(hasFinal ? { final: resolvedFinal } : {}),
       ...(hasCustom ? { customHtmlTags } : {}),
@@ -884,22 +895,39 @@ export function useMarkdownParsing(
     )
   })
 
-  const parseSemanticKey = computed(() => stableParseKey(
+  const parserCacheSemanticKey = computed(() => stableParseKey(
     mergedParseOptions.value,
     mdInstance.value,
     props.customMarkdownIt,
+    { includeFinal: true },
+  ))
+
+  const nodeReuseSemanticKey = computed(() => stableParseKey(
+    mergedParseOptions.value,
+    mdInstance.value,
+    props.customMarkdownIt,
+    { includeFinal: false },
   ))
 
   watch(
-    parseSemanticKey,
-    (currentParseSemanticKey, previousKey) => {
-      if (!previousKey || currentParseSemanticKey === previousKey)
+    [parserCacheSemanticKey, nodeReuseSemanticKey],
+    ([currentParserCacheKey, currentNodeReuseKey], [previousParserCacheKey, previousNodeReuseKey]) => {
+      if (!previousParserCacheKey)
         return
 
+      if (
+        currentParserCacheKey === previousParserCacheKey
+        && currentNodeReuseKey === previousNodeReuseKey
+      ) {
+        return
+      }
+
       flushParseContent()
-      previousParsedNodes = []
-      previousContent = ''
-      resetStreamParseCache(mdInstance.value)
+
+      if (currentNodeReuseKey !== previousNodeReuseKey) {
+        previousParsedNodes = []
+        previousContent = ''
+      }
     },
     { flush: 'sync' },
   )
@@ -924,16 +952,27 @@ export function useMarkdownParsing(
       ? getNow()
       : 0
     const md = mdInstance.value
-    const currentParseSemanticKey = parseSemanticKey.value
-    const canReuseParsedNodes = previousParsedNodes.length > 0
-      && content.startsWith(previousContent)
-      && currentParseSemanticKey === previousParseSemanticKey
+    const currentParserCacheSemanticKey = parserCacheSemanticKey.value
+    const currentNodeReuseSemanticKey = nodeReuseSemanticKey.value
 
-    if (previousParseSemanticKey && currentParseSemanticKey !== previousParseSemanticKey) {
-      previousParsedNodes = []
-      previousContent = ''
+    if (
+      previousParserCacheSemanticKey
+      && currentParserCacheSemanticKey !== previousParserCacheSemanticKey
+    ) {
       resetStreamParseCache(md)
     }
+
+    if (
+      previousNodeReuseSemanticKey
+      && currentNodeReuseSemanticKey !== previousNodeReuseSemanticKey
+    ) {
+      previousParsedNodes = []
+      previousContent = ''
+    }
+
+    const canReuseParsedNodes = previousParsedNodes.length > 0
+      && content.startsWith(previousContent)
+      && currentNodeReuseSemanticKey === previousNodeReuseSemanticKey
 
     const streamStatsBefore = collectPerformanceMetrics
       ? readStreamStats(md)
@@ -1006,7 +1045,8 @@ export function useMarkdownParsing(
       : 0
     parseCommitCount += 1
     previousContent = content
-    previousParseSemanticKey = currentParseSemanticKey
+    previousParserCacheSemanticKey = currentParserCacheSemanticKey
+    previousNodeReuseSemanticKey = currentNodeReuseSemanticKey
     previousParsedNodes = parsed
 
     if (collectPerformanceMetrics) {

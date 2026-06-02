@@ -338,15 +338,49 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
-  it('does not reuse stale ParsedNode references when final changes', () => {
-    const content = ref('**hello')
+  it('reuses unchanged ParsedNode references across final-only transitions', () => {
+    const content = ref('alpha\n\nbeta')
     const { final, scope, state } = createParsingState(content)
-    const first = state.parsedNodes.value[0]
+    const first = state.parsedNodes.value
+    const reset = vi.spyOn((state.mdInstance.value as any).stream, 'reset')
 
     final.value = true
-    const second = state.parsedNodes.value[0]
+    const second = state.parsedNodes.value
 
-    expect(second).not.toBe(first)
+    expect(reset).toHaveBeenCalled()
+    expect(second).toBe(first)
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).toBe(first[1])
+
+    scope.stop()
+  })
+
+  it('reuses unchanged prefix but replaces final-sensitive nodes when final changes', () => {
+    const content = ref([
+      'alpha',
+      '',
+      '<details>',
+      '<summary>Steps</summary>',
+      'body',
+    ].join('\n'))
+    const { final, scope, state } = createParsingState(content)
+
+    const first = state.parsedNodes.value
+    const firstPrefix = first[0]
+    const firstDetails = first[1] as any
+
+    expect(firstPrefix?.raw).toBe('alpha')
+    expect(firstDetails?.type).toBe('html_block')
+    expect(firstDetails?.loading).toBe(true)
+
+    final.value = true
+    const second = state.parsedNodes.value
+    const secondDetails = second[1] as any
+
+    expect(second[0]).toBe(firstPrefix)
+    expect(secondDetails).not.toBe(firstDetails)
+    expect(secondDetails?.type).toBe('html_block')
+    expect(secondDetails?.loading).toBe(false)
 
     scope.stop()
   })
