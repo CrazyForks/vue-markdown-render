@@ -72,6 +72,18 @@ function timelineItemSource(threadKey: string, itemKey: string, revision?: strin
   }
 }
 
+function timelineMarkdownMeasurementKey(widthBucket = 800, mode = 'docs', codeRenderer = 'monaco') {
+  return [`:${widthBucket}`, mode, codeRenderer].join('\u0001')
+}
+
+function timelineMarkdownItemSource(threadKey: string, itemKey: string, revision?: string | number, widthBucket = 800) {
+  return {
+    sourceKey: [threadKey, itemKey, revision == null ? '' : String(revision)].join(':'),
+    measurementKey: timelineMarkdownMeasurementKey(widthBucket),
+    widthBucket,
+  }
+}
+
 function createMetrics(totalHeight: number, sessionKey: string): MarkstreamVirtualMetrics {
   return {
     sessionKey,
@@ -104,7 +116,7 @@ function markMarkdownMetricsReady(markdownProps: any, totalHeight = 360) {
     threadKey: markdownProps.virtualScroll.threadKey,
     metrics,
     width: 800,
-    measurementKey: ':800',
+    measurementKey: markdownProps.virtualScroll.measurementKey,
   } as MarkstreamVirtualState)
 }
 
@@ -154,7 +166,7 @@ describe('virtual timeline restore visual readiness', () => {
             widthBucket: 800,
             outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
             itemHeights: { m1: 360 },
-            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
             markdownStates: {},
           },
         },
@@ -217,7 +229,7 @@ describe('virtual timeline restore visual readiness', () => {
             widthBucket: 800,
             outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
             itemHeights: { m1: 360 },
-            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
             markdownStates: {},
           },
         },
@@ -335,7 +347,7 @@ describe('virtual timeline restore visual readiness', () => {
             widthBucket: 800,
             outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
             itemHeights: { m1: 1200 },
-            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
             markdownStates: {},
           },
         },
@@ -420,7 +432,7 @@ describe('virtual timeline restore visual readiness', () => {
             widthBucket: 800,
             outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
             itemHeights: { m1: 1200 },
-            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
             markdownStates: {},
           },
         },
@@ -552,7 +564,7 @@ describe('virtual timeline restore visual readiness', () => {
             widthBucket: 800,
             outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
             itemHeights: { m1: 360 },
-            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
             markdownStates: {},
           },
         },
@@ -685,7 +697,7 @@ describe('virtual timeline restore visual readiness', () => {
             widthBucket: 800,
             outerAnchor: { type: 'bottom', distanceFromBottomPx: 0 },
             itemHeights: { m1: 600 },
-            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
             markdownStates: {},
           },
         },
@@ -940,7 +952,7 @@ describe('virtual timeline restore visual readiness', () => {
             widthBucket: 800,
             outerAnchor: { type: 'bottom', distanceFromBottomPx: 0 },
             itemHeights: { a1: 360 },
-            itemSizeSources: { a1: timelineItemSource('thread-a', 'a1', 1) },
+            itemSizeSources: { a1: timelineMarkdownItemSource('thread-a', 'a1', 1) },
             markdownStates: {},
           },
         },
@@ -1042,7 +1054,7 @@ describe('virtual timeline restore visual readiness', () => {
             widthBucket: 800,
             outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
             itemHeights: { m1: 360 },
-            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
             markdownStates: {},
           },
         },
@@ -1107,7 +1119,7 @@ describe('virtual timeline restore visual readiness', () => {
             widthBucket: 800,
             outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
             itemHeights: { m1: 360 },
-            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
             markdownStates: {},
           },
         },
@@ -1165,7 +1177,7 @@ describe('virtual timeline restore visual readiness', () => {
           widthBucket: 800,
           outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
           itemHeights: { m1: 360 },
-          itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+          itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
           markdownStates: {},
         },
       },
@@ -1217,7 +1229,7 @@ describe('virtual timeline restore visual readiness', () => {
             widthBucket: 800,
             outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
             itemHeights: { m1: 360 },
-            itemSizeSources: { m1: timelineItemSource('thread-a', 'm1', 1) },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
             markdownStates: {},
           },
         },

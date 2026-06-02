@@ -86,6 +86,18 @@ function timelineItemSource(threadKey: string, itemKey: string, revision?: strin
   }
 }
 
+function timelineMarkdownMeasurementKey(widthBucket = 800, mode = 'docs', codeRenderer = 'monaco') {
+  return [`:${widthBucket}`, mode, codeRenderer].join('\u0001')
+}
+
+function timelineMarkdownItemSource(threadKey: string, itemKey: string, revision?: string | number, widthBucket = 800) {
+  return {
+    sourceKey: itemSourceKey(threadKey, itemKey, revision),
+    measurementKey: timelineMarkdownMeasurementKey(widthBucket),
+    widthBucket,
+  }
+}
+
 function installVirtualTimelineGeometryStub(defaultHeight = 80, width = 800) {
   function readBoxHeight(el: HTMLElement) {
     const height = Number.parseFloat(el.style.height || '')
@@ -148,9 +160,14 @@ function installVirtualTimelineGeometryStub(defaultHeight = 80, width = 800) {
   })
 }
 
-function adapterItemSource(threadKey: string, itemKey: string, revision?: string | number) {
+function adapterMarkdownMeasurementKey(base = '', mode = 'docs', codeRenderer = 'monaco') {
+  return [base, mode, codeRenderer].join('\u0001')
+}
+
+function adapterMarkdownItemSource(threadKey: string, itemKey: string, revision?: string | number) {
   return {
     sourceKey: itemSourceKey(threadKey, itemKey, revision),
+    measurementKey: adapterMarkdownMeasurementKey(),
   }
 }
 
@@ -314,6 +331,67 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('changes markdown virtual measurement key when markdown code renderer changes', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(64)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const slotProps: any[] = []
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          {
+            id: 'a1',
+            kind: 'assistant-markdown',
+            content: '```ts\nconsole.log(1)\n```',
+            final: true,
+          },
+        ],
+        threadKey: 'renderer-key-change',
+        markdownMode: 'docs',
+        markdownCodeRenderer: 'monaco',
+        overscan: 10,
+        stickToBottom: false,
+      },
+      slots: {
+        default(props: any) {
+          slotProps.push(props)
+          return h('div', { ref: props.measureRef }, props.markdownProps.content)
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const firstSlot = slotProps.filter(props => props.kind === 'assistant-markdown').at(-1)
+    const firstKey = firstSlot.markdownProps.virtualScroll.measurementKey
+    expect(firstKey).toBe(timelineMarkdownMeasurementKey(800, 'docs', 'monaco'))
+
+    slotProps.length = 0
+    await wrapper.setProps({
+      markdownCodeRenderer: 'pre',
+    })
+    await flushAll()
+    await nextTick()
+
+    const secondSlot = slotProps.filter(props => props.kind === 'assistant-markdown').at(-1)
+    const secondKey = secondSlot.markdownProps.virtualScroll.measurementKey
+
+    expect(secondKey).toBe(timelineMarkdownMeasurementKey(800, 'docs', 'pre'))
+    expect(secondKey).not.toBe(firstKey)
+    expect((wrapper.vm as any).captureThreadState().itemSizeSources.a1.measurementKey).toBe(secondKey)
+
+    wrapper.unmount()
+  })
+
   it('keeps delayed markdown metrics tied to the original timeline record after reorder', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
@@ -391,7 +469,7 @@ describe('virtual timeline API', () => {
       threadKey: 'thread-a',
       metrics: createMetrics(180, 'thread-a:a1:1'),
       width: 640,
-      measurementKey: ':800\u0000light\u0000code-rich',
+      measurementKey: `${timelineMarkdownMeasurementKey()}\u0000light\u0000code-rich`,
     }
     let restoreState: MarkstreamVirtualState | null | undefined
 
@@ -412,7 +490,7 @@ describe('virtual timeline API', () => {
           },
           itemHeights: { a1: 200 },
           itemSizeSources: {
-            a1: timelineItemSource('thread-a', 'a1', 1),
+            a1: timelineMarkdownItemSource('thread-a', 'a1', 1),
           },
           markdownStates: { a1: state },
         },
@@ -428,7 +506,7 @@ describe('virtual timeline API', () => {
 
     await nextTick()
 
-    expect(restoreState?.measurementKey).toBe(':800\u0000light\u0000code-rich')
+    expect(restoreState?.measurementKey).toBe(`${timelineMarkdownMeasurementKey()}\u0000light\u0000code-rich`)
     expect(restoreState?.sessionKey).toBe('thread-a:a1:1')
 
     wrapper.unmount()
@@ -534,6 +612,54 @@ describe('virtual timeline API', () => {
     await flushAll()
 
     expect(estimateItemHeight).toHaveBeenCalledTimes(callsAfterInitialLayout)
+
+    wrapper.unmount()
+  })
+
+  it('does not call estimateItemHeight twice per item during a content-driven layout rebuild', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const state = reactive({
+      items: Array.from({ length: 20 }, (_, index) => ({
+        id: `item-${index}`,
+        kind: 'user-message',
+        text: `Item ${index}`,
+      })),
+    })
+    const estimateItemHeight = vi.fn(() => 64)
+    const Host = defineComponent({
+      setup() {
+        return () => h(MarkstreamVirtualTimeline, {
+          items: state.items,
+          threadKey: 'estimate-once',
+          stickToBottom: false,
+          overscan: 10,
+          estimateItemHeight,
+        }, {
+          default(props: any) {
+            return h('div', props.item.text)
+          },
+        })
+      },
+    })
+
+    const wrapper = mount(Host, { attachTo: document.body })
+    await flushAll()
+    await nextTick()
+
+    estimateItemHeight.mockClear()
+    state.items[0]!.text = 'Updated item 0'
+    await nextTick()
+    await flushAll()
+
+    expect(estimateItemHeight).toHaveBeenCalledTimes(state.items.length)
 
     wrapper.unmount()
   })
@@ -799,6 +925,7 @@ describe('virtual timeline API', () => {
 
     expect(props.mode).toBe('chat')
     expect(props.codeRenderer).toBe('pre')
+    expect(props.virtualScroll!.measurementKey).toBe(adapterMarkdownMeasurementKey('', 'chat', 'pre'))
 
     scope.stop()
   })
@@ -874,7 +1001,7 @@ describe('virtual timeline API', () => {
       threadKey: 'thread-a',
       metrics: createMetrics(640, markdownProps.virtualScroll!.sessionKey!),
       width: 640,
-      measurementKey: ':800\u0000light\u0000code-rich',
+      measurementKey: `${adapterMarkdownMeasurementKey(':800')}\u0000light\u0000code-rich`,
     }
 
     markdownProps.onVirtualStateChange(state)
@@ -1176,7 +1303,7 @@ describe('virtual timeline API', () => {
         u1: 80,
       },
       itemSizeSources: {
-        a1: timelineItemSource('thread-a', 'a1', 1),
+        a1: timelineMarkdownItemSource('thread-a', 'a1', 1),
         u1: timelineItemSource('thread-a', 'u1'),
       },
       markdownStates: {
@@ -1185,7 +1312,7 @@ describe('virtual timeline API', () => {
           threadKey: 'thread-a',
           metrics: createMetrics(1000, 'thread-a:a1:1'),
           width: 800,
-          measurementKey: ':800',
+          measurementKey: timelineMarkdownMeasurementKey(),
         } as MarkstreamVirtualState,
       },
     })
@@ -1274,7 +1401,7 @@ describe('virtual timeline API', () => {
           u1: 80,
         },
         itemSizeSources: {
-          a1: timelineItemSource('thread-a', 'a1', 1),
+          a1: timelineMarkdownItemSource('thread-a', 'a1', 1),
           u1: timelineItemSource('thread-a', 'u1'),
         },
         markdownStates: {
@@ -1283,7 +1410,7 @@ describe('virtual timeline API', () => {
             threadKey: 'thread-a',
             metrics: createMetrics(1000, 'thread-a:a1:1'),
             width: 800,
-            measurementKey: ':800',
+            measurementKey: timelineMarkdownMeasurementKey(),
           } as MarkstreamVirtualState,
         },
       })
@@ -1367,13 +1494,13 @@ describe('virtual timeline API', () => {
               m1: 1200,
             },
             itemSizeSources: {
-              m1: timelineItemSource('thread-a', 'm1', 1),
+              m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
             },
             markdownStates: {
               m1: {
                 sessionKey: 'thread-a:m1:1',
                 threadKey: 'thread-a',
-                measurementKey: ':800',
+                measurementKey: timelineMarkdownMeasurementKey(),
                 width: 800,
                 metrics: {
                   ...createMetrics(1000, 'thread-a:m1:1'),
@@ -1586,7 +1713,7 @@ describe('virtual timeline API', () => {
         a1: 1060,
       },
       itemSizeSources: {
-        a1: adapterItemSource('thread-a', 'a1', 1),
+        a1: adapterMarkdownItemSource('thread-a', 'a1', 1),
       },
       markdownStates: {
         a1: {
@@ -2035,7 +2162,7 @@ describe('virtual timeline API', () => {
         threadKey: 'thread-b',
         metrics,
         width: 800,
-        measurementKey: ':800',
+        measurementKey: latestMarkdownProps.virtualScroll.measurementKey,
       } as MarkstreamVirtualState)
 
       await vi.advanceTimersByTimeAsync(700)
@@ -2092,7 +2219,7 @@ describe('virtual timeline API', () => {
           },
           itemSizeSources: {
             u1: timelineItemSource('thread-a', 'u1'),
-            m1: timelineItemSource('thread-a', 'm1', 1),
+            m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
             u2: timelineItemSource('thread-a', 'u2'),
           },
           markdownStates: {},
@@ -2161,7 +2288,7 @@ describe('virtual timeline API', () => {
             m1: 360,
           },
           itemSizeSources: {
-            m1: timelineItemSource('thread-a', 'm1', 1),
+            m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
           },
           markdownStates: {},
         },
@@ -2222,7 +2349,7 @@ describe('virtual timeline API', () => {
           },
           itemHeights: { m1: 360 },
           itemSizeSources: {
-            m1: timelineItemSource('thread-a', 'm1', 1),
+            m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
           },
           markdownStates: {},
         },
@@ -2307,7 +2434,7 @@ describe('virtual timeline API', () => {
             },
             itemHeights: { m1: 360 },
             itemSizeSources: {
-              m1: timelineItemSource('thread-a', 'm1', 1),
+              m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
             },
             markdownStates: {},
           },
@@ -2392,7 +2519,7 @@ describe('virtual timeline API', () => {
             },
             itemHeights: { m1: 360 },
             itemSizeSources: {
-              m1: timelineItemSource('thread-a', 'm1', 1),
+              m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
             },
             markdownStates: {},
           },
@@ -2500,7 +2627,7 @@ describe('virtual timeline API', () => {
             },
             itemHeights: { m1: 360 },
             itemSizeSources: {
-              m1: timelineItemSource('thread-a', 'm1', 1),
+              m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
             },
             markdownStates: {},
           },
@@ -2604,7 +2731,7 @@ describe('virtual timeline API', () => {
             },
             itemHeights: { m1: 360 },
             itemSizeSources: {
-              m1: timelineItemSource('thread-a', 'm1', 1),
+              m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
             },
             markdownStates: {},
           },
@@ -2696,7 +2823,7 @@ describe('virtual timeline API', () => {
             },
             itemHeights: { m1: 360 },
             itemSizeSources: {
-              m1: timelineItemSource('thread-a', 'm1', 1),
+              m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
             },
             markdownStates: {},
           },
@@ -2782,7 +2909,7 @@ describe('virtual timeline API', () => {
           },
           itemSizeSources: {
             u1: timelineItemSource('thread-a', 'u1'),
-            m1: timelineItemSource('thread-a', 'm1', 1),
+            m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
             u2: timelineItemSource('thread-a', 'u2'),
           },
           markdownStates: {},
@@ -2836,7 +2963,7 @@ describe('virtual timeline API', () => {
             m1: 10000,
           },
           itemSizeSources: {
-            m1: timelineItemSource('thread-a', 'm1', 1),
+            m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
           },
           markdownStates: {},
         },
@@ -2882,7 +3009,7 @@ describe('virtual timeline API', () => {
             m1: 1200,
           },
           itemSizeSources: {
-            m1: timelineItemSource('thread-a', 'm1', 1, 800),
+            m1: timelineMarkdownItemSource('thread-a', 'm1', 1, 800),
           },
           markdownStates: {},
         },
@@ -2939,7 +3066,7 @@ describe('virtual timeline API', () => {
       },
       itemSizeSources: {
         'a-u1': timelineItemSource('thread-a', 'a-u1'),
-        'a-m1': timelineItemSource('thread-a', 'a-m1', 1),
+        'a-m1': timelineMarkdownItemSource('thread-a', 'a-m1', 1),
         'a-u2': timelineItemSource('thread-a', 'a-u2'),
       },
       markdownStates: {},
@@ -2960,7 +3087,7 @@ describe('virtual timeline API', () => {
       },
       itemSizeSources: {
         'b-u1': timelineItemSource('thread-b', 'b-u1'),
-        'b-m1': timelineItemSource('thread-b', 'b-m1', 1),
+        'b-m1': timelineMarkdownItemSource('thread-b', 'b-m1', 1),
         'b-u2': timelineItemSource('thread-b', 'b-u2'),
       },
       markdownStates: {},
@@ -3009,7 +3136,7 @@ describe('virtual timeline API', () => {
         },
         itemSizeSources: {
           'a-u1': timelineItemSource('thread-a', 'a-u1'),
-          'a-m1': timelineItemSource('thread-a', 'a-m1', 1),
+          'a-m1': timelineMarkdownItemSource('thread-a', 'a-m1', 1),
           'a-u2': timelineItemSource('thread-a', 'a-u2'),
         },
       },

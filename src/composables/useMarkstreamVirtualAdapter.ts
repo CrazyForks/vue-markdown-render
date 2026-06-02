@@ -343,7 +343,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     return [threadKey ?? 'timeline', itemKey, revision == null ? '' : String(revision)].join(':')
   }
 
-  function normalizeMeasurementKey() {
+  function normalizeBaseMeasurementKey() {
     const measurementKey = toValue(options.measurementKey)
     return measurementKey == null ? undefined : String(measurementKey)
   }
@@ -363,6 +363,10 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     return normalizeMarkdownMode() === 'docs' ? 'monaco' : 'pre'
   }
 
+  function normalizeMarkdownMeasurementKey() {
+    return `${normalizeBaseMeasurementKey() ?? ''}\u0001${normalizeMarkdownMode()}\u0001${normalizeMarkdownCodeRenderer()}`
+  }
+
   function getItemSizeSourceKey(item: T, index: number) {
     if (isMarkdownItem(item, index))
       return getSessionKey(item, index)
@@ -374,7 +378,9 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   }
 
   function getItemSizeSource(item: T, index: number): MarkstreamItemSizeSource {
-    const measurementKey = normalizeMeasurementKey()
+    const measurementKey = isMarkdownItem(item, index)
+      ? normalizeMarkdownMeasurementKey()
+      : normalizeBaseMeasurementKey()
     return {
       sourceKey: getItemSizeSourceKey(item, index),
       ...(measurementKey == null ? {} : { measurementKey }),
@@ -404,7 +410,10 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     if (source.sourceKey !== getItemSizeSourceKey(match.item, match.index))
       return false
 
-    if ((source.measurementKey ?? '') !== (normalizeMeasurementKey() ?? ''))
+    const measurementKey = isMarkdownItem(match.item, match.index)
+      ? normalizeMarkdownMeasurementKey()
+      : normalizeBaseMeasurementKey()
+    if ((source.measurementKey ?? '') !== (measurementKey ?? ''))
       return false
 
     return true
@@ -456,7 +465,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   }
 
   function isCompatibleMarkdownMeasurementKey(measurementKey: string | undefined) {
-    const expected = normalizeMeasurementKey() ?? ''
+    const expected = normalizeMarkdownMeasurementKey()
     const actual = measurementKey ?? ''
 
     return actual === expected || actual.startsWith(`${expected}\u0000`)
@@ -732,14 +741,14 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     const threadKey = normalizeThreadKey()
     const content = getMarkstreamTimelineItemContent(item, index, options)
     const sessionKey = getSessionKey(item, index)
-    const measurementKey = toValue(options.measurementKey)
+    const measurementKey = normalizeMarkdownMeasurementKey()
     const markdownMode = normalizeMarkdownMode()
     const markdownCodeRenderer = normalizeMarkdownCodeRenderer()
     const cacheKey = [
       itemKey,
       sessionKey,
       final ? 'final' : 'live',
-      measurementKey == null ? '' : String(measurementKey),
+      measurementKey,
       markdownMode,
       markdownCodeRenderer,
       options.markdownFade === true ? 'fade' : 'no-fade',
@@ -784,7 +793,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
         setMarkdownLogicalHeight(itemKey, metrics.totalHeight, {
           sessionKey: metrics.sessionKey,
           threadKey,
-          measurementKey: normalizeMeasurementKey(),
+          measurementKey: normalizeMarkdownMeasurementKey(),
         })
 
         const allowMarkdownShrink = shouldAllowMarkdownShrink(metrics)
@@ -892,7 +901,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   }
 
   function captureThreadState(): MarkstreamThreadVirtualState {
-    const measurementKey = normalizeMeasurementKey()
+    const measurementKey = normalizeBaseMeasurementKey()
     return {
       threadKey: normalizeThreadKey(),
       ...(measurementKey == null ? {} : { measurementKey }),
@@ -904,7 +913,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   }
 
   function canImportItemHeights(state: MarkstreamThreadVirtualState) {
-    return (state.measurementKey ?? '') === (normalizeMeasurementKey() ?? '')
+    return (state.measurementKey ?? '') === (normalizeBaseMeasurementKey() ?? '')
   }
 
   function importItemHeights(state: MarkstreamThreadVirtualState) {
