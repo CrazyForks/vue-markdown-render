@@ -158,6 +158,40 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('reuses unchanged prefix when final flushes coalesced smooth-streaming content', () => {
+    vi.useFakeTimers()
+
+    const firstParagraph = 'alpha '.repeat(20).trim()
+    const secondParagraph = 'beta '.repeat(20).trim()
+    const initial = `${firstParagraph}\n\n${secondParagraph}`
+    const next = `${initial} gamma`
+    const content = ref(initial)
+    const smooth = ref(true)
+    const { final, scope, state } = createParsingState(content, smooth, {
+      parseCoalesceMs: 1000,
+    })
+    const first = state.parsedNodes.value
+    const reset = vi.spyOn((state.mdInstance.value as any).stream, 'reset')
+
+    expect(first).toHaveLength(2)
+
+    content.value = next
+
+    // Appended text has no block boundary, so smooth parsing should still be
+    // coalesced until final forces a flush.
+    expect(state.parsedNodes.value).toBe(first)
+
+    final.value = true
+    const second = state.parsedNodes.value
+
+    expect(reset).toHaveBeenCalled()
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).not.toBe(first[1])
+    expect(second[1]?.raw).toBe(`${secondParagraph} gamma`)
+
+    scope.stop()
+  })
+
   it('flushes pending coalesced content before applying parse semantic changes', () => {
     vi.useFakeTimers()
     const initial = 'hello '.repeat(18).trim()
