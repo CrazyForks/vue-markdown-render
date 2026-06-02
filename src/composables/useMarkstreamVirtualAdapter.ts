@@ -357,9 +357,10 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
 
   function normalizeMarkdownCodeRenderer(): NodeRendererCodeRenderer {
     const renderer = toValue(options.markdownCodeRenderer)
-    return renderer === 'pre' || renderer === 'shiki' || renderer === 'monaco'
-      ? renderer
-      : 'monaco'
+    if (renderer === 'pre' || renderer === 'shiki' || renderer === 'monaco')
+      return renderer
+
+    return normalizeMarkdownMode() === 'docs' ? 'monaco' : 'pre'
   }
 
   function getItemSizeSourceKey(item: T, index: number) {

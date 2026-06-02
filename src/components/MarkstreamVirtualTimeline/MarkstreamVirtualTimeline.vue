@@ -9,6 +9,8 @@ import type {
   MarkstreamVirtualMetrics,
   MarkstreamVirtualScrollOptions,
   MarkstreamVirtualState,
+  NodeRendererCodeRenderer,
+  NodeRendererMode,
 } from '../../types/node-renderer-props'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, provide, reactive, ref, shallowRef, watch } from 'vue'
 import {
@@ -34,7 +36,6 @@ const props = withDefaults(defineProps<MarkstreamVirtualTimelineProps<any>>(), {
   stickToBottom: 'auto',
   markdownFade: false,
   markdownMode: 'docs',
-  markdownCodeRenderer: 'monaco',
   restoreMaxLoadingMs: false,
 })
 
@@ -404,6 +405,17 @@ function getCheapTimelineItemContentSignature(item: any, index: number, markdown
   return `${text.length}:${text.slice(0, 64)}:${text.slice(-64)}`
 }
 
+function getEstimatedItemHeightSignature(item: any, index: number) {
+  if (typeof props.estimateItemHeight !== 'function')
+    return ''
+
+  const estimated = props.estimateItemHeight(item, index)
+
+  return Number.isFinite(estimated) && estimated > 0
+    ? String(Math.ceil(estimated))
+    : ''
+}
+
 function getLayoutItemsSignature() {
   return props.items.map((item, index) => {
     const markdown = isMarkstreamMarkdownTimelineItem(item, index, props)
@@ -413,6 +425,7 @@ function getLayoutItemsSignature() {
       getMarkstreamTimelineItemKind(item, index, props),
       markdown ? 1 : 0,
       getMarkstreamTimelineItemRevision(item, index, props) ?? '',
+      getEstimatedItemHeightSignature(item, index),
       getCheapTimelineItemContentSignature(item, index, markdown),
       getComponentIdentityToken(item?.component),
     ].join('\u0001')
@@ -1095,10 +1108,28 @@ function measureRecordElement(record: TimelineRecord) {
   }
 }
 
+function normalizeTimelineMarkdownMode(value: unknown): NodeRendererMode {
+  return value === 'chat' || value === 'minimal' || value === 'docs'
+    ? value
+    : 'docs'
+}
+
+function normalizeTimelineMarkdownCodeRenderer(
+  value: unknown,
+  mode = normalizeTimelineMarkdownMode(props.markdownMode),
+): NodeRendererCodeRenderer {
+  if (value === 'pre' || value === 'shiki' || value === 'monaco')
+    return value
+
+  return mode === 'docs' ? 'monaco' : 'pre'
+}
+
 function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProps {
   const item = getRecordLiveItem(record)
   const final = getMarkstreamTimelineItemFinal(item, record.index, props)
   const restoreState = markdownStates.get(record.key)
+  const markdownMode = normalizeTimelineMarkdownMode(props.markdownMode)
+  const markdownCodeRenderer = normalizeTimelineMarkdownCodeRenderer(props.markdownCodeRenderer, markdownMode)
   const virtualScroll: MarkstreamVirtualScrollOptions = {
     enabled: true,
     sessionKey: getSessionKey(record),
@@ -1116,8 +1147,8 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
   return {
     content: getMarkstreamTimelineItemContent(item, record.index, props),
     final,
-    mode: props.markdownMode,
-    codeRenderer: props.markdownCodeRenderer,
+    mode: markdownMode,
+    codeRenderer: markdownCodeRenderer,
     nodeVirtual: 'auto' as const,
     fade: props.markdownFade === true,
     indexKey: getSessionKey(record),

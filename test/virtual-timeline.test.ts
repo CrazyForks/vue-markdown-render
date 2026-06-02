@@ -227,6 +227,93 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('defaults timeline chat mode markdown code renderer to pre', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(480)
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const slotProps: any[] = []
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          {
+            kind: 'assistant-markdown',
+            id: 'a1',
+            content: '```ts\nconsole.log(1)\n```',
+            final: true,
+          },
+        ],
+        threadKey: 'thread-chat',
+        markdownMode: 'chat',
+        overscan: 10,
+        stickToBottom: false,
+      },
+      slots: {
+        default(props: any) {
+          slotProps.push(props)
+          return h('div', { ref: props.measureRef }, props.markdownProps.content)
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const markdownSlot = slotProps.find(props => props.kind === 'assistant-markdown')
+    expect(markdownSlot.markdownProps.mode).toBe('chat')
+    expect(markdownSlot.markdownProps.codeRenderer).toBe('pre')
+
+    wrapper.unmount()
+  })
+
+  it('allows timeline chat mode to opt back into monaco code renderer', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(480)
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const slotProps: any[] = []
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          {
+            kind: 'assistant-markdown',
+            id: 'a1',
+            content: '```ts\nconsole.log(1)\n```',
+            final: true,
+          },
+        ],
+        threadKey: 'thread-chat-rich',
+        markdownMode: 'chat',
+        markdownCodeRenderer: 'monaco',
+        overscan: 10,
+        stickToBottom: false,
+      },
+      slots: {
+        default(props: any) {
+          slotProps.push(props)
+          return h('div', { ref: props.measureRef }, props.markdownProps.content)
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const markdownSlot = slotProps.find(props => props.kind === 'assistant-markdown')
+    expect(markdownSlot.markdownProps.mode).toBe('chat')
+    expect(markdownSlot.markdownProps.codeRenderer).toBe('monaco')
+
+    wrapper.unmount()
+  })
+
   it('keeps delayed markdown metrics tied to the original timeline record after reorder', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
@@ -705,6 +792,44 @@ describe('virtual timeline API', () => {
       threadKey: 'thread-a',
       markdownMode: 'chat',
       markdownCodeRenderer: 'pre',
+      virtualizer: adapter,
+    }))!
+
+    const props = controller.markdownProps(item, 0)
+
+    expect(props.mode).toBe('chat')
+    expect(props.codeRenderer).toBe('pre')
+
+    scope.stop()
+  })
+
+  it('defaults adapter chat mode markdown code renderer to pre', () => {
+    const item = {
+      kind: 'assistant-markdown',
+      id: 'a1',
+      content: '```ts\nconsole.log(1)\n```',
+      final: true,
+    }
+    const root = document.createElement('div')
+    const adapter = {
+      getScrollElement: () => root,
+      getScrollTop: () => 0,
+      setScrollTop: vi.fn(),
+      getViewportHeight: () => 480,
+      getTotalHeight: () => 0,
+      getItemOffset: () => 0,
+      getItemSize: () => 100,
+      setItemSize: vi.fn(),
+      getVisibleRange: () => ({ start: 0, end: 1 }),
+      scrollToOffset: vi.fn(),
+      scrollToIndex: vi.fn(),
+    }
+
+    const scope = effectScope()
+    const controller = scope.run(() => useMarkstreamVirtualAdapter({
+      items: [item],
+      threadKey: 'thread-a',
+      markdownMode: 'chat',
       virtualizer: adapter,
     }))!
 
@@ -3110,6 +3235,54 @@ describe('virtual timeline API', () => {
 
     expect(timelineApi.getTotalHeight()).toBe(240)
     expect(estimateItemHeight).toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('rebuilds timeline layout when estimateItemHeight output changes without explicit layoutRevision', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const state = reactive({
+      estimated: 120,
+    })
+    const Host = defineComponent({
+      setup() {
+        return () => h(MarkstreamVirtualTimeline, {
+          items: [
+            { kind: 'system-divider', id: 'd1', text: 'Today' },
+          ],
+          threadKey: 'estimate-change',
+          stickToBottom: false,
+          overscan: 10,
+          estimateItemHeight: () => state.estimated,
+        }, {
+          default(props: any) {
+            return h('div', props.item.text)
+          },
+        })
+      },
+    })
+
+    const wrapper = mount(Host, { attachTo: document.body })
+    await flushAll()
+    await nextTick()
+
+    const timeline = wrapper.getComponent(MarkstreamVirtualTimeline)
+    const timelineApi = (timeline.vm as any).$?.exposed
+    expect(timelineApi.getTotalHeight()).toBe(120)
+
+    state.estimated = 220
+    await nextTick()
+    await flushAll()
+
+    expect(timelineApi.getTotalHeight()).toBe(220)
 
     wrapper.unmount()
   })

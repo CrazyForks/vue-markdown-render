@@ -1664,14 +1664,15 @@ function getHostVirtualMeasurementKey() {
 }
 
 function getVirtualRendererLayoutKey() {
-  const monaco = props.codeBlockMonacoOptions
+  const renderer = resolvedCodeRenderer.value
+  const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
   const codeProps = props.codeBlockProps
 
   return [
     props.isDark ? 'dark' : 'light',
-    resolvedCodeRenderer.value === 'monaco'
+    renderer === 'monaco'
       ? 'code-rich'
-      : resolvedCodeRenderer.value === 'pre'
+      : renderer === 'pre'
         ? 'code-pre'
         : 'code-shiki',
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
