@@ -161,6 +161,28 @@ Import `markstream-vue/index.css` after your reset (e.g., use `@import 'markstre
 For untrusted user-generated content, prefer `htmlPolicy="escape"` so raw HTML is rendered as text.
 If your app intentionally scales root font size on mobile, use `markstream-vue/index.px.css` to avoid `rem`-based global scaling side effects.
 
+Choose the renderer mode by surface:
+
+```vue
+<!-- AI chat / SSE output: steady pacing, no opacity animation flicker -->
+<MarkdownRender
+  mode="chat"
+  :content="message"
+  :final="isDone"
+  smooth-streaming="auto"
+  :fade="false"
+/>
+
+<!-- Rich docs: larger render batches, tooltips, and fade are enabled by default -->
+<MarkdownRender
+  mode="docs"
+  :content="doc"
+  :final="true"
+/>
+```
+
+Use `mode="minimal"` when you want the lightweight chat defaults without chat-specific presentation choices. Avoid combining high-frequency `smooth-streaming` with `fade`; it can turn a steady stream into repeated opacity restarts.
+
 Renderer CSS is scoped under an internal `.markstream-vue` container to minimize global style conflicts. If you render exported node components outside of `MarkdownRender`, wrap them in an element with class `markstream-vue`.
 
 For dark theme variables, either add a `.dark` class on an ancestor, or pass `:is-dark="true"` to `MarkdownRender` to scope dark mode to the renderer.

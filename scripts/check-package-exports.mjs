@@ -86,6 +86,8 @@ const runtimeSubpathChecks = [
 
 const failures = []
 const rootImportTarget = typeof pkg.exports?.['.'] === 'object' ? pkg.exports['.'].import : undefined
+const cssImportPattern = /import\s+["'][^"']+\.css["']|from\s+["'][^"']+\.css["']/
+
 function normalizeTargets(entry) {
   if (typeof entry === 'string')
     return [{ condition: 'default', target: entry }]
@@ -143,6 +145,15 @@ for (const subpath of requiredSubpaths) {
     && entry.import === rootImportTarget
   ) {
     failures.push(`${subpath} should not import the root bundle (${rootImportTarget})`)
+  }
+}
+
+if (typeof rootImportTarget === 'string') {
+  const rootImportPath = join(root, rootImportTarget)
+  if (existsSync(rootImportPath)) {
+    const rootImportSource = readFileSync(rootImportPath, 'utf8')
+    if (cssImportPattern.test(rootImportSource))
+      failures.push(`${rootImportTarget} should not import CSS; keep styles on the explicit ./index.css subpath`)
   }
 }
 
