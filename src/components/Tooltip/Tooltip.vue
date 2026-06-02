@@ -38,20 +38,32 @@ function cleanupPositionObserver() {
 }
 
 async function updatePosition() {
-  if (!props.anchorEl || !tooltip.value)
-    return
+  const anchor = props.anchorEl
+  const tooltipEl = tooltip.value
+
+  if (!props.visible || !anchor || !tooltipEl)
+    return false
+
   const { arrow: arrowMiddleware, computePosition, flip, offset, shift } = await loadFloating()
+
+  if (!props.visible || props.anchorEl !== anchor || tooltip.value !== tooltipEl)
+    return false
+
   const middleware = [
     offset(props.offset ?? 6),
     flip(),
     shift({ padding: 6 }),
     ...(arrowEl.value ? [arrowMiddleware({ element: arrowEl.value, padding: 4 })] : []),
   ]
-  const { x, y, placement, middlewareData } = await computePosition(props.anchorEl, tooltip.value, {
+  const { x, y, placement, middlewareData } = await computePosition(anchor, tooltipEl, {
     placement: props.placement ?? 'top',
     middleware,
     strategy: 'fixed',
   })
+
+  if (!props.visible || props.anchorEl !== anchor || tooltip.value !== tooltipEl)
+    return false
+
   style.value.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`
   style.value.left = '0px'
   style.value.top = '0px'
@@ -68,14 +80,18 @@ async function updatePosition() {
       [staticSide]: '-3px',
     }
   }
+
+  return true
 }
 
 function applyFallbackPosition() {
   const anchor = props.anchorEl
-  if (!anchor)
+  const tooltipEl = tooltip.value
+  if (!anchor || !tooltipEl)
     return false
 
   const rect = anchor.getBoundingClientRect()
+  const tooltipRect = tooltipEl.getBoundingClientRect()
   const gap = props.offset ?? 6
   const placement = props.placement ?? 'top'
 
@@ -86,16 +102,16 @@ function applyFallbackPosition() {
     y = rect.bottom + gap
   }
   else if (placement === 'left') {
-    x = rect.left - gap
+    x = rect.left - tooltipRect.width - gap
   }
   else if (placement === 'right') {
     x = rect.right + gap
   }
   else {
-    y = rect.top - gap
+    y = rect.top - tooltipRect.height - gap
   }
 
-  style.value.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`
+  style.value.transform = `translate3d(${Math.round(Math.max(0, x))}px, ${Math.round(Math.max(0, y))}px, 0)`
   style.value.left = '0px'
   style.value.top = '0px'
   actualPlacement.value = placement
@@ -114,9 +130,11 @@ watch(
         return
       if (props.anchorEl && tooltip.value) {
         try {
-          const rect = props.anchorEl.getBoundingClientRect()
-          await updatePosition()
-          if (runId !== visibilityRunId || !props.visible || !props.anchorEl || !tooltip.value)
+          const anchor = props.anchorEl
+          const tooltipEl = tooltip.value
+          const rect = anchor.getBoundingClientRect()
+          const positioned = await updatePosition()
+          if (!positioned || runId !== visibilityRunId || !props.visible || props.anchorEl !== anchor || tooltip.value !== tooltipEl)
             return
           const targetTransform = style.value.transform
           if (props.originX != null && props.originY != null) {
@@ -145,7 +163,11 @@ watch(
           if (runId !== visibilityRunId || !props.visible || !props.anchorEl || !tooltip.value)
             return
           cleanupPositionObserver()
-          cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, updatePosition)
+          cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, () => {
+            void updatePosition().catch(() => {
+              applyFallbackPosition()
+            })
+          })
         }
         catch {
           if (runId !== visibilityRunId || !props.visible)
@@ -158,12 +180,9 @@ watch(
                 return
               cleanupPositionObserver()
               cleanupAutoUpdate = autoUpdate(props.anchorEl, tooltip.value, async () => {
-                try {
-                  await updatePosition()
-                }
-                catch {
+                const positioned = await updatePosition().catch(() => false)
+                if (!positioned)
                   applyFallbackPosition()
-                }
               })
             }
             catch {}
@@ -195,7 +214,11 @@ watch([
     if (runId !== updateRunId || !props.visible || !props.anchorEl || !tooltip.value)
       return
     try {
-      await updatePosition()
+      const positioned = await updatePosition()
+      if (runId !== updateRunId || !props.visible || !props.anchorEl || !tooltip.value)
+        return
+      if (!positioned)
+        applyFallbackPosition()
     }
     catch {
       applyFallbackPosition()

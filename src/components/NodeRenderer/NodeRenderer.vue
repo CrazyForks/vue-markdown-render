@@ -211,21 +211,65 @@ const resolvedCodeRenderer = computed<NodeRendererCodeRenderer>(() => {
   return resolvedMode.value === 'docs' ? 'monaco' : 'pre'
 })
 const resolvedModeDefaults = computed(() => RENDERER_MODE_DEFAULTS[resolvedMode.value])
-type RendererModeDefaultKey = keyof typeof RENDERER_MODE_DEFAULTS.docs
+const resolvedShowTooltipsProp = computed(() => props.showTooltips ?? resolvedModeDefaults.value.showTooltips)
+const resolvedFade = computed(() => props.fade ?? resolvedModeDefaults.value.fade)
+const resolvedBatchRendering = computed(() => props.batchRendering ?? resolvedModeDefaults.value.batchRendering)
+const resolvedInitialRenderBatchSize = computed(() => props.initialRenderBatchSize ?? resolvedModeDefaults.value.initialRenderBatchSize)
+const resolvedRenderBatchSize = computed(() => props.renderBatchSize ?? resolvedModeDefaults.value.renderBatchSize)
+const resolvedRenderBatchDelay = computed(() => props.renderBatchDelay ?? resolvedModeDefaults.value.renderBatchDelay)
+const resolvedRenderBatchBudgetMs = computed(() => props.renderBatchBudgetMs ?? resolvedModeDefaults.value.renderBatchBudgetMs)
+const resolvedRenderBatchIdleTimeoutMs = computed(() => props.renderBatchIdleTimeoutMs ?? resolvedModeDefaults.value.renderBatchIdleTimeoutMs)
+const resolvedDeferNodesUntilVisible = computed(() => props.deferNodesUntilVisible ?? resolvedModeDefaults.value.deferNodesUntilVisible)
+const resolvedMaxLiveNodes = computed(() => props.maxLiveNodes ?? resolvedModeDefaults.value.maxLiveNodes)
+const resolvedLiveNodeBuffer = computed(() => props.liveNodeBuffer ?? resolvedModeDefaults.value.liveNodeBuffer)
+const resolvedNodeVirtual = computed(() => props.nodeVirtual ?? resolvedModeDefaults.value.nodeVirtual)
 
-function isRendererModeDefaultKey(key: PropertyKey): key is RendererModeDefaultKey {
-  return typeof key === 'string' && key in resolvedModeDefaults.value
-}
-
-const rendererProps = new Proxy(props, {
-  get(target, key, receiver) {
-    const value = Reflect.get(target, key, receiver)
-    if (isRendererModeDefaultKey(key))
-      return value ?? resolvedModeDefaults.value[key]
-
-    return value
-  },
-}) as Readonly<NodeRendererProps>
+const rendererProps = {
+  get content() { return props.content },
+  get nodes() { return props.nodes },
+  get final() { return props.final },
+  get parseOptions() { return props.parseOptions },
+  get customMarkdownIt() { return props.customMarkdownIt },
+  get debugPerformance() { return props.debugPerformance },
+  get customHtmlTags() { return props.customHtmlTags },
+  get mode() { return props.mode },
+  get htmlPolicy() { return props.htmlPolicy },
+  get viewportPriority() { return props.viewportPriority },
+  get codeBlockStream() { return props.codeBlockStream },
+  get codeBlockDarkTheme() { return props.codeBlockDarkTheme },
+  get codeBlockLightTheme() { return props.codeBlockLightTheme },
+  get codeBlockMonacoOptions() { return props.codeBlockMonacoOptions },
+  get codeRenderer() { return props.codeRenderer },
+  get renderCodeBlocksAsPre() { return props.renderCodeBlocksAsPre },
+  get codeBlockMinWidth() { return props.codeBlockMinWidth },
+  get codeBlockMaxWidth() { return props.codeBlockMaxWidth },
+  get codeBlockProps() { return props.codeBlockProps },
+  get mermaidProps() { return props.mermaidProps },
+  get d2Props() { return props.d2Props },
+  get infographicProps() { return props.infographicProps },
+  get showTooltips() { return resolvedShowTooltipsProp.value },
+  get themes() { return props.themes },
+  get isDark() { return props.isDark },
+  get customId() { return props.customId },
+  get indexKey() { return props.indexKey },
+  get typewriter() { return props.typewriter },
+  get smoothStreaming() { return props.smoothStreaming },
+  get smoothStreamingOptions() { return props.smoothStreamingOptions },
+  get parseCoalesceMs() { return props.parseCoalesceMs },
+  get fade() { return resolvedFade.value },
+  get batchRendering() { return resolvedBatchRendering.value },
+  get initialRenderBatchSize() { return resolvedInitialRenderBatchSize.value },
+  get renderBatchSize() { return resolvedRenderBatchSize.value },
+  get renderBatchDelay() { return resolvedRenderBatchDelay.value },
+  get renderBatchBudgetMs() { return resolvedRenderBatchBudgetMs.value },
+  get renderBatchIdleTimeoutMs() { return resolvedRenderBatchIdleTimeoutMs.value },
+  get deferNodesUntilVisible() { return resolvedDeferNodesUntilVisible.value },
+  get maxLiveNodes() { return resolvedMaxLiveNodes.value },
+  get liveNodeBuffer() { return resolvedLiveNodeBuffer.value },
+  get nodeVirtual() { return resolvedNodeVirtual.value },
+  get virtualScroll() { return props.virtualScroll },
+  get renderAsFragment() { return props.renderAsFragment },
+} as Readonly<NodeRendererProps>
 
 /* eslint-disable vue/custom-event-name-casing -- Public virtualScroll events are kebab-case. */
 function emitHeightChange(metrics: MarkstreamVirtualMetrics) {

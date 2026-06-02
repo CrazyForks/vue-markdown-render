@@ -52,18 +52,20 @@ describe('tooltip fallback positioning', () => {
       },
     })
 
+    const tooltip = document.querySelector<HTMLElement>('.tooltip-element')!
+    tooltip.getBoundingClientRect = () => rect(0, 0, 80, 20)
+
     await wrapper.setProps({ visible: true })
     await flushAll()
 
-    const tooltip = document.querySelector<HTMLElement>('.tooltip-element')
-    expect(tooltip?.textContent).toContain('Copy')
-    expect(tooltip?.style.display).not.toBe('none')
-    expect(tooltip?.style.transform).toBe('translate3d(12px, 28px, 0)')
+    expect(tooltip.textContent).toContain('Copy')
+    expect(tooltip.style.display).not.toBe('none')
+    expect(tooltip.style.transform).toBe('translate3d(12px, 8px, 0)')
 
     await wrapper.setProps({ content: 'Copied' })
     await flushAll()
 
-    expect(document.querySelector<HTMLElement>('.tooltip-element')?.style.transform).toBe('translate3d(12px, 28px, 0)')
+    expect(document.querySelector<HTMLElement>('.tooltip-element')?.style.transform).toBe('translate3d(12px, 8px, 0)')
 
     wrapper.unmount()
   })

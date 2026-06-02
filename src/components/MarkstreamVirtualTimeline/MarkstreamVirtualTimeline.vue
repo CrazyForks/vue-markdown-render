@@ -272,6 +272,13 @@ function getRecordOffset(record: Pick<TimelineRecord, 'index'>) {
   return layoutSizeTree.value.prefixSum(record.index)
 }
 
+function materializeVisibleRecord(record: TimelineRecord): TimelineRecord {
+  return {
+    ...record,
+    offset: getRecordOffset(record),
+  }
+}
+
 function updateLayoutRecordSize(key: string, size: number) {
   const record = layoutRecordByKey.get(key)
   if (!record)
@@ -325,11 +332,11 @@ const visibleWindow = computed(() => {
   start = Math.max(0, start - overscanItems)
   end = Math.min(records.length, Math.max(end + overscanItems, start + 1))
 
-  const visibleRecords = records.slice(start, end)
+  const visibleRecords = records.slice(start, end).map(materializeVisibleRecord)
   const first = visibleRecords[0]
   const last = visibleRecords[visibleRecords.length - 1]
-  const firstOffset = first ? getRecordOffset(first) : 0
-  const lastOffset = last ? getRecordOffset(last) : 0
+  const firstOffset = first?.offset ?? 0
+  const lastOffset = last?.offset ?? 0
 
   return {
     start,
@@ -351,10 +358,19 @@ function getTimelineRenderScopeKey() {
   return normalizedThreadKey.value ?? 'timeline'
 }
 
+function getComponentIdentityToken(component: unknown) {
+  if (!component)
+    return ''
+
+  if (typeof component === 'string')
+    return `s:${component}`
+
+  return 'component'
+}
+
 function getLayoutItemsSignature() {
   return props.items.map((item, index) => {
     const markdown = isMarkstreamMarkdownTimelineItem(item, index, props)
-    const estimatedSize = Math.ceil(estimateMarkstreamTimelineItemHeight(item, index, props))
 
     return [
       getItemKey(item, index),
@@ -362,8 +378,7 @@ function getLayoutItemsSignature() {
       markdown ? 1 : 0,
       getMarkstreamTimelineItemRevision(item, index, props) ?? '',
       getMarkstreamTimelineItemFinal(item, index, props) ? 1 : 0,
-      Number.isFinite(estimatedSize) && estimatedSize > 0 ? estimatedSize : 0,
-      item?.component ? 1 : 0,
+      getComponentIdentityToken(item?.component),
     ].join('\u0001')
   }).join('\u0000')
 }

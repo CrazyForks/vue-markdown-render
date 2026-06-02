@@ -2857,7 +2857,7 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
-  it('rebuilds layout when estimated item height changes without an item signature change', async () => {
+  it('rebuilds layout when estimated item height changes with item revision', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
 
@@ -2869,8 +2869,8 @@ describe('virtual timeline API', () => {
 
     const state = reactive<{ items: any[] }>({
       items: [
-        { kind: 'user-message', id: 'a1', text: 'Same text', density: 'compact' },
-        { kind: 'user-message', id: 'u1', text: 'Anchor' },
+        { kind: 'user-message', id: 'a1', text: 'Same text', density: 'compact', revision: 1 },
+        { kind: 'user-message', id: 'u1', text: 'Anchor', revision: 1 },
       ],
     })
     const estimateItemHeight = vi.fn((item: any) => item.id === 'a1' && item.density === 'expanded' ? 180 : 60)
@@ -2901,6 +2901,7 @@ describe('virtual timeline API', () => {
 
     estimateItemHeight.mockClear()
     state.items[0].density = 'expanded'
+    state.items[0].revision += 1
     await nextTick()
     await flushAll()
 

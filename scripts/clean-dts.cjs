@@ -5,6 +5,7 @@ const process = require('node:process')
 const distDir = path.resolve(__dirname, '..', 'dist')
 const typesDir = path.join(distDir, 'types')
 const STRIP_DTS_COMMENTS = process.env.STRIP_DTS_COMMENTS === '1'
+  || process.argv.includes('--strip-comments')
 
 function rewriteTypesEntry(content) {
   return content
