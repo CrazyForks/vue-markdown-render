@@ -33,8 +33,8 @@ const props = withDefaults(defineProps<MarkstreamVirtualTimelineProps<any>>(), {
   overscanPx: 1200,
   stickToBottom: 'auto',
   markdownFade: false,
-  markdownMode: 'chat',
-  markdownCodeRenderer: 'pre',
+  markdownMode: 'docs',
+  markdownCodeRenderer: 'monaco',
   restoreMaxLoadingMs: false,
 })
 

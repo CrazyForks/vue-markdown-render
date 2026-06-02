@@ -217,8 +217,8 @@ describe('virtual timeline API', () => {
 
     const markdownSlot = slotProps.find(props => props.kind === 'assistant-markdown')
     expect(markdownSlot.markdownProps.nodeVirtual).toBe('auto')
-    expect(markdownSlot.markdownProps.mode).toBe('chat')
-    expect(markdownSlot.markdownProps.codeRenderer).toBe('pre')
+    expect(markdownSlot.markdownProps.mode).toBe('docs')
+    expect(markdownSlot.markdownProps.codeRenderer).toBe('monaco')
     expect(markdownSlot.markdownProps.virtualScroll.enabled).toBe(true)
     expect(markdownSlot.markdownProps.virtualScroll.threadKey).toBe('thread-a')
     expect(markdownSlot.markdownProps.virtualScroll.sessionKey).toBe('thread-a:a1:')

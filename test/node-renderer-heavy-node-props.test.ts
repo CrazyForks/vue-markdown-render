@@ -228,6 +228,28 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     expect(pre.attributes('style')).toContain('120px')
   })
 
+  it('does not pass Monaco-only props to the shiki renderer', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        codeRenderer: 'shiki',
+        codeBlockMonacoOptions: { fontSize: 18 },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
+    expect(wrapper.get('.code-block-container').attributes()).not.toHaveProperty('monacooptions')
+  })
+
   it('ignores invalid runtime codeRenderer values', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {

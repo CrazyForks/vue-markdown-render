@@ -5035,6 +5035,23 @@ const preCodeBlockBindings = computed(() => {
 
   return bindings
 })
+
+const shikiCodeBlockBindings = computed(() => {
+  const source = (props.codeBlockProps || {}) as Record<string, unknown>
+  return {
+    stream: rendererProps.codeBlockStream,
+    darkTheme: props.codeBlockDarkTheme,
+    lightTheme: props.codeBlockLightTheme,
+    themes: props.themes,
+    minWidth: props.codeBlockMinWidth,
+    maxWidth: props.codeBlockMaxWidth,
+    ...(typeof resolvedShowTooltips.value === 'boolean'
+      ? { showTooltips: resolvedShowTooltips.value }
+      : {}),
+    ...source,
+  }
+})
+
 const mermaidBindings = computed(() => ({
   ...(props.mermaidProps || {}),
 }))
@@ -5305,6 +5322,9 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
   const lang = language ?? getCodeBlockLanguage(node)
   if (component && shouldUsePreCodeBindings(node, lang, component))
     return preCodeBlockBindings.value
+
+  if (node.type === 'code_block' && component === MarkdownCodeBlockNode)
+    return shikiCodeBlockBindings.value
 
   if (lang === 'mermaid')
     return mermaidBindings.value

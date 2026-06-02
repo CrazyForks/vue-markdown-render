@@ -670,6 +670,43 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('does not reuse a custom node when long same-length string content changes in the middle', () => {
+    let dynamicContent = `${'a'.repeat(5000)}MID-A${'z'.repeat(5000)}`
+    const content = ref('custom')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        preTransformTokens(tokens) {
+          for (const token of tokens as any[]) {
+            if (token.type === 'inline') {
+              token.children = [{
+                type: 'chart',
+                raw: 'chart',
+                content: dynamicContent,
+              }]
+            }
+          }
+          return tokens
+        },
+      },
+    })
+    const firstParagraph = state.parsedNodes.value[0] as any
+    const firstChart = firstParagraph.children?.[0]
+
+    expect(firstChart?.content).toContain('MID-A')
+
+    dynamicContent = `${'a'.repeat(5000)}MID-B${'z'.repeat(5000)}`
+    content.value = `${content.value}\n\nAppended paragraph.`
+
+    const secondParagraph = state.parsedNodes.value[0] as any
+    const secondChart = secondParagraph.children?.[0]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(secondChart).not.toBe(firstChart)
+    expect(secondChart?.content).toContain('MID-B')
+
+    scope.stop()
+  })
+
   it('does not deep-stringify previous ParsedNodes during large append reuse', () => {
     const stringify = vi.spyOn(JSON, 'stringify')
     const content = ref(buildParagraphs(5000))

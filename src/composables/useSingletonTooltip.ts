@@ -84,7 +84,6 @@ export function showTooltipForAnchor(
   if (!el)
     return
   const requestId = ++showRequestId
-  ensureMounted()
   clearTimers()
   const doShow = async () => {
     await ensureMounted()
