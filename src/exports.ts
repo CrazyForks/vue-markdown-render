@@ -37,7 +37,6 @@ import InsertNode from './components/InsertNode'
 import LinkNode from './components/LinkNode'
 import ListItemNode from './components/ListItemNode'
 import ListNode from './components/ListNode'
-import MarkdownCodeBlockNode from './components/MarkdownCodeBlockNode'
 import { disableKatex, enableKatex, isKatexEnabled, setKatexLoader } from './components/MathInlineNode/katex'
 import { disableMermaid, enableMermaid, isMermaidEnabled, setMermaidLoader } from './components/MermaidBlockNode/mermaid'
 import MarkdownRender from './components/NodeRenderer'
@@ -73,6 +72,9 @@ const MermaidBlockNode = definePublicAsyncComponent<MermaidBlockNodeProps>(() =>
 const InfographicBlockNode = definePublicAsyncComponent<InfographicBlockNodeProps>(() => import('./components/InfographicBlockNode'))
 const D2BlockNode = definePublicAsyncComponent<D2BlockNodeProps>(() => import('./components/D2BlockNode'))
 const Tooltip = definePublicAsyncComponent<Record<string, unknown>>(() => import('./components/Tooltip'))
+const MarkdownCodeBlockNode = definePublicAsyncComponent<Record<string, unknown>>(
+  () => import('./components/MarkdownCodeBlockNode'),
+)
 const MarkstreamVirtualTimeline = definePublicAsyncComponent<MarkstreamVirtualTimelineProps<any>>(
   () => import('./components/MarkstreamVirtualTimeline'),
 )

@@ -42,6 +42,15 @@ export interface MarkstreamTimelineItem {
 export interface MarkstreamVirtualTimelineProps<T = MarkstreamTimelineItem> {
   items: T[]
   threadKey?: MarkstreamTimelineItemKey
+
+  /**
+   * Optional external layout invalidation token.
+   *
+   * When provided, MarkstreamVirtualTimeline skips per-item content/kind scanning
+   * and rebuilds the Fenwick layout only when this token or item count changes.
+   * Bump it whenever item key/kind/markdown-ness/component/estimated-height inputs change.
+   * Pure markdown content/final updates can keep the same value.
+   */
   layoutRevision?: MarkstreamTimelineItemKey
 
   getKey?: (item: T, index: number) => MarkstreamTimelineItemKey

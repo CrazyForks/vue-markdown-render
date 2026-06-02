@@ -22,11 +22,26 @@ const actualPlacement = ref<string>(props.placement ?? 'top')
 const ready = ref(false)
 
 let cleanupAutoUpdate: (() => void) | null = null
+let floatingModule: typeof import('@floating-ui/dom') | null = null
 let floatingPromise: Promise<typeof import('@floating-ui/dom')> | null = null
 let visibilityRunId = 0
 
 function loadFloating() {
-  floatingPromise ??= import('@floating-ui/dom')
+  if (floatingModule)
+    return Promise.resolve(floatingModule)
+
+  if (!floatingPromise) {
+    floatingPromise = import('@floating-ui/dom')
+      .then((mod) => {
+        floatingModule = mod
+        return mod
+      })
+      .catch((error) => {
+        floatingPromise = null
+        throw error
+      })
+  }
+
   return floatingPromise
 }
 

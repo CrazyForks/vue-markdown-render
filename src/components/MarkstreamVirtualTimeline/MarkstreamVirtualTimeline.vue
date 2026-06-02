@@ -413,7 +413,6 @@ function getLayoutItemsSignature() {
       getMarkstreamTimelineItemKind(item, index, props),
       markdown ? 1 : 0,
       getMarkstreamTimelineItemRevision(item, index, props) ?? '',
-      getMarkstreamTimelineItemFinal(item, index, props) ? 1 : 0,
       getCheapTimelineItemContentSignature(item, index, markdown),
       getComponentIdentityToken(item?.component),
     ].join('\u0001')

@@ -403,6 +403,54 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('does not rebuild timeline layout when only markdown final changes', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const state = reactive({
+      items: [
+        { kind: 'assistant-markdown', id: 'a1', content: '# A', final: false },
+        { kind: 'user-message', id: 'u1', text: 'B' },
+      ],
+    })
+    const estimateItemHeight = vi.fn(() => 100)
+    const Host = defineComponent({
+      setup() {
+        return () => h(MarkstreamVirtualTimeline, {
+          items: state.items,
+          threadKey: 'thread-final',
+          overscan: 10,
+          stickToBottom: false,
+          estimateItemHeight,
+        }, {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, props.markdownProps?.content ?? props.item.text)
+          },
+        })
+      },
+    })
+
+    const wrapper = mount(Host, { attachTo: document.body })
+    await flushAll()
+    await nextTick()
+
+    const callsAfterInitialLayout = estimateItemHeight.mock.calls.length
+
+    state.items[0].final = true
+    await nextTick()
+    await flushAll()
+
+    expect(estimateItemHeight).toHaveBeenCalledTimes(callsAfterInitialLayout)
+
+    wrapper.unmount()
+  })
+
   it('provides host scroll managed context to timeline children', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
