@@ -93,6 +93,7 @@ const runtimeSubpathChecks = [
 const failures = []
 const bareStaticImportSpecifierPattern = /\bimport\s*["']([^"']+)["']/g
 const fromStaticImportSpecifierPattern = /\b(?:import|export)[^'"]+\bfrom\s*["']([^"']+)["']/g
+const dynamicImportSpecifierPattern = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g
 
 function normalizeTargets(entry) {
   if (typeof entry === 'string')
@@ -151,12 +152,16 @@ function getStaticImportSpecifiers(source) {
   const specifiers = []
   bareStaticImportSpecifierPattern.lastIndex = 0
   fromStaticImportSpecifierPattern.lastIndex = 0
+  dynamicImportSpecifierPattern.lastIndex = 0
 
   let match
   while ((match = bareStaticImportSpecifierPattern.exec(source)))
     specifiers.push(match[1])
 
   while ((match = fromStaticImportSpecifierPattern.exec(source)))
+    specifiers.push(match[1])
+
+  while ((match = dynamicImportSpecifierPattern.exec(source)))
     specifiers.push(match[1])
 
   return specifiers
@@ -240,13 +245,12 @@ for (const subpath of requiredSubpaths) {
   for (const { condition, target } of targets)
     assertTargetExists(subpath, condition, target)
 
-  if (
-    subpath !== '.'
-    && typeof entry === 'object'
-    && typeof entry.import === 'string'
-    && rootJsTargetSet.has(entry.import)
-  ) {
-    failures.push(`${subpath} should not import the root bundle (${entry.import})`)
+  if (subpath !== '.') {
+    for (const { condition, target } of getPackageJsTargets(subpath)) {
+      if (rootJsTargetSet.has(target)) {
+        failures.push(`${subpath} condition "${condition}" should not import the root bundle (${target})`)
+      }
+    }
   }
 }
 
