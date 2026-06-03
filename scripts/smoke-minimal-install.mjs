@@ -137,7 +137,7 @@ const packedCssContracts = {
   'package/dist/index.tailwind.css': ['--ms-background:', '--ms-foreground:'],
 }
 
-const packedStyleEntryArtifactPattern = /^package\/dist\/(?:[^/]+\/)*(?:styles|styles-entry)(?:[.-]|$)/
+const packedStyleEntryArtifactPattern = /^package\/dist\/(?:styles|styles-entry)\.(?:mjs|cjs|js)(?:\.map)?$/
 
 function stripImportQuery(specifier) {
   return String(specifier).split(/[?#]/, 1)[0]
