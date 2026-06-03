@@ -1,6 +1,6 @@
 ---
 name: markstream-vue
-description: Integrate markstream-vue into a Vue 3 app. Use when Codex needs to add the Vue 3 renderer, import CSS in the right order, choose between `content` and `nodes`, coordinate long AI timelines with `MarkstreamVirtualTimeline`, `useMarkstreamVirtualAdapter`, or `vue-virtual-scroller`, enable optional peers like Mermaid, KaTeX, D2, Monaco, or stream-markdown, or wire scoped custom components in a non-Nuxt Vue repository.
+description: Integrate markstream-vue into a Vue 3 app. Use when Codex needs to add the Vue 3 renderer, import CSS in the right order, choose `mode="chat"`, `mode="docs"`, or `mode="minimal"`, choose between `content` and `nodes`, coordinate long AI timelines with `MarkstreamVirtualTimeline`, `useMarkstreamVirtualAdapter`, or `vue-virtual-scroller`, enable optional peers like Mermaid, KaTeX, D2, Monaco, or stream-markdown, or wire scoped custom components in a non-Nuxt Vue repository.
 ---
 
 # Markstream Vue 3
@@ -13,16 +13,18 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 2. Install `markstream-vue` plus only the optional peers required by the requested features.
 3. Import `markstream-vue/index.css` after resets.
    - In Tailwind or UnoCSS projects, use `@import 'markstream-vue/index.css' layer(components);`.
-4. Start with `<MarkdownRender :content="markdown" />`.
-   - For AI chat or streaming UIs, use `typewriter` or `:max-live-nodes="0"` — smooth streaming is auto-enabled (`smooth-streaming="auto"`, the default) and paces visible output so bursty chunks appear steadily.
+   - The root JS import does not inject styles; use `markstream-vue/index.css` or `markstream-vue/index.px.css` explicitly.
+4. Start with `content` and choose the renderer mode by surface.
+   - Use `mode="chat"` for AI chat or SSE output. It uses lightweight batches, `<pre>` code rendering by default, `fade=false`, and `max-live-nodes=0`; `smooth-streaming="auto"` paces visible output.
+   - Use `mode="docs"` for rich document surfaces. It is the default, enables larger batches, tooltips, fade, and Monaco-backed code blocks when the peer is installed.
+   - Use `mode="minimal"` when the surface is lightweight but not chat.
+   - If a docs page does not need Monaco-backed code blocks, set `:render-code-blocks-as-pre="true"`.
    - `typewriter` only controls the blinking cursor and defaults to `false`.
-   - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
    - Set `:smooth-streaming="false"` to preserve raw chunk cadence; set `:smooth-streaming="true"` to force smooth pacing even on first-screen content (may cause hydration mismatch in SSR).
-   - When smooth streaming is on, pair it with `:fade="false"` to avoid delta fade (280 ms) stacking with high-commit pacing.
+   - When overriding mode defaults on a high-frequency stream, pair smooth streaming with `:fade="false"` to avoid delta fade (280 ms) stacking with high-commit pacing.
    - **Streaming vs recovering history**: in chat UIs the same `MarkdownRender` starts streaming and later switches to history when `final=true`.
-     - Streaming: `smooth-streaming="auto"`, `fade=false`, `typewriter=true`. Smooth pacing handles gradual appearance; fade would flicker.
-     - Recovering history: `smooth-streaming=false`, `fade=true`, `typewriter=false`. Content is already complete — pacing would slow it down, but fade gives a polished entry animation.
-     - Dynamic switch: `:smooth-streaming="isStreaming ? 'auto' : false"`, `:fade="!isStreaming"`.
+     - Streaming: `mode="chat"`, `smooth-streaming="auto"`, `:fade="false"`, `typewriter=true`.
+     - Recovering history: `mode="docs"` or `mode="minimal"`, `:smooth-streaming="false"`, `:fade="true"`, `typewriter=false`.
    - Switch to `nodes` plus `final` only when the app needs custom AST control, worker preparsing, or structural updates beyond pacing.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 5. For long AI transcripts or existing message virtualizers, choose the virtual-scroll path.
@@ -31,15 +33,16 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
    - Put `adapter.measureItem(item, index, el)` on the outer timeline row so row chrome is included in item height.
    - Use Markstream's reported logical height (`metrics.totalHeight` through the adapter/virtualizer), not the renderer element's current `offsetHeight`, because Markdown node virtualization may only mount the live window.
    - On thread switches, save `adapter.captureThreadState()` together with the scroller cache; restore the scroller cache before restoring the Markstream anchor.
-6. Use `custom-id` plus scoped `setCustomComponents(...)` for overrides.
+6. Use `custom-id` plus scoped `setCustomComponents(...)` for local overrides, or import `{ VueRendererMarkdown }` from `markstream-vue` and install it when the repo already has an app-level plugin entry.
 7. Validate with the smallest useful dev, build, or typecheck command.
 
 ## Default Decisions
 
-- Vue 3 apps default to `content`.
+- Vue 3 apps default to `content`; choose `mode` before fine-tuning lower-level render props.
+- Omit `mode` only when the surface should use rich docs defaults.
 - Smooth streaming (`smooth-streaming="auto"`) is on by default when `typewriter` or `max-live-nodes <= 0`. It only paces the `content` path; `nodes` mode is never affected.
 - For manual pacing with `nodes`, use `useSmoothMarkdownStream` directly: `enqueue()` chunks, `finish()` when done, render from `visible`, and wait for `caughtUp` before final parsing.
-- Streaming vs recovering history: when a chat message transitions from streaming to history (e.g. `final` becomes `true`), switch props dynamically — `smooth-streaming="auto"`, `fade=false` for streaming; `smooth-streaming=false`, `fade=true` for history. See `docs/guide/ai-chat-streaming.md` for full examples.
+- Streaming vs recovering history: when a chat message transitions from streaming to history (e.g. `final` becomes `true`), switch from `mode="chat"` streaming defaults to a history mode and disable smooth streaming. See `docs/guide/ai-chat-streaming.md` for full examples.
 - Prefer local component registration unless the repo already uses a shared plugin entry.
 - If a Vue 3 app already virtualizes messages, keep that outer virtualizer in charge and enable `virtual-scroll` only on large Markdown messages.
 - For `vue-virtual-scroller`, keep `sessionKey` tied to content identity (`thread:item:revision`) and `measurementKey` tied to layout identity such as width, theme, font, and density.

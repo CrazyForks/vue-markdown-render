@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -38,20 +38,7 @@ const requiredCssMarkers = {
   './index.tailwind.css': ['--ms-background:', '--ms-foreground:'],
 }
 
-const forbiddenStyleEntryArtifacts = [
-  'dist/styles.js',
-  'dist/styles.mjs',
-  'dist/styles.cjs',
-  'dist/styles.js.map',
-  'dist/styles.mjs.map',
-  'dist/styles.cjs.map',
-  'dist/styles.d.ts',
-  'dist/styles.d.mts',
-  'dist/styles.d.cts',
-  'dist/styles.d.ts.map',
-  'dist/styles.d.mts.map',
-  'dist/styles.d.cts.map',
-]
+const forbiddenStyleEntryArtifactPattern = /^styles(?:\.|$)/
 
 const isolatedRootExports = [
   'MarkdownRender',
@@ -439,12 +426,26 @@ function checkCssSubpathContent() {
 }
 
 function checkNoStyleEntryArtifacts() {
-  for (const artifact of forbiddenStyleEntryArtifacts) {
-    if (isExistingFile(resolve(root, artifact))) {
-      failures.push(
-        `${artifact} must not be present in dist. styles-entry.ts is only a CSS build entry; run scripts/cleanup-style-entry.mjs after the library build.`,
-      )
-    }
+  const distDir = resolve(root, 'dist')
+  let entries = []
+
+  try {
+    entries = readdirSync(distDir, { withFileTypes: true })
+  }
+  catch {
+    return
+  }
+
+  for (const entry of entries) {
+    if (!entry.isFile())
+      continue
+    if (!forbiddenStyleEntryArtifactPattern.test(entry.name))
+      continue
+
+    const artifact = `dist/${entry.name}`
+    failures.push(
+      `${artifact} must not be present in dist. styles-entry.ts is only a CSS build entry; CSS must be emitted as dist/index.css through the explicit markstream-vue/index.css subpath.`,
+    )
   }
 }
 

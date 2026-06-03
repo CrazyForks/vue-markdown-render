@@ -1,6 +1,6 @@
 ---
 name: markstream-nuxt
-description: Integrate markstream-vue into a Nuxt 3 or Nuxt 4 app. Use when Codex needs client-only boundaries, SSR-safe setup, browser-only peer gating, worker-aware initialization, or a safe `MarkdownRender` integration inside pages, components, or Nuxt plugins.
+description: Integrate markstream-vue into a Nuxt 3 or Nuxt 4 app. Use when Codex needs client-only boundaries, SSR-safe setup, browser-only peer gating, worker-aware initialization, renderer `mode` selection, or a safe `MarkdownRender` integration inside pages, components, or Nuxt plugins.
 ---
 
 # Markstream Nuxt
@@ -14,15 +14,16 @@ Use this skill when the host app is Nuxt and SSR boundaries matter.
 3. Keep browser-only peers behind client-only boundaries.
    - Prefer `<client-only>` wrappers, `.client` plugins, or guarded setup paths.
 4. Import `markstream-vue/index.css` from a client-safe app shell or plugin.
-5. Start with `content`, and move to `nodes` plus `final` only when the UI needs custom AST control.
-   - For streaming AI chat, use `typewriter` or `:max-live-nodes="0"` — smooth streaming (`smooth-streaming="auto"`) paces visible output automatically.
+   - The root JS import does not inject styles; use `markstream-vue/index.css` or `markstream-vue/index.px.css` explicitly.
+5. Start with `content`, choose the renderer mode by surface, and move to `nodes` plus `final` only when the UI needs custom AST control.
+   - Use `mode="chat"` for AI chat or SSE output. It uses lightweight batches, `<pre>` code rendering by default, `fade=false`, and `max-live-nodes=0`; `smooth-streaming="auto"` paces visible output.
+   - Use `mode="docs"` for rich document surfaces. It is the default, enables larger batches, tooltips, fade, and Monaco-backed code blocks when the peer is installed.
+   - Use `mode="minimal"` for lightweight non-chat surfaces.
    - `typewriter` only controls the blinking cursor and defaults to `false`.
-   - `fade` controls node enter and streamed-text fade animations and defaults to `true`.
-   - When smooth streaming is on, pair it with `:fade="false"` to avoid delta fade stacking with high-commit pacing.
+   - When overriding mode defaults on a high-frequency stream, pair smooth streaming with `:fade="false"` to avoid delta fade stacking with high-commit pacing.
    - **Streaming vs recovering history**: in chat UIs the same `MarkdownRender` starts streaming and later switches to history when `final=true`.
-     - Streaming: `smooth-streaming="auto"`, `fade=false`, `typewriter=true`. Smooth pacing handles gradual appearance; fade would flicker.
-     - Recovering history: `smooth-streaming=false`, `fade=true`, `typewriter=false`. Content is already complete — pacing would slow it down, but fade gives a polished entry animation.
-     - Dynamic switch: `:smooth-streaming="isStreaming ? 'auto' : false"`, `:fade="!isStreaming"`.
+     - Streaming: `mode="chat"`, `smooth-streaming="auto"`, `:fade="false"`, `typewriter=true`.
+     - Recovering history: `mode="docs"` or `mode="minimal"`, `:smooth-streaming="false"`, `:fade="true"`, `typewriter=false`.
    - In SSR, avoid `smooth-streaming="true"` on first-screen content; the mounted gate inside `auto` prevents hydration mismatch.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 6. Validate with the smallest relevant Nuxt dev, build, or typecheck command.
@@ -30,6 +31,7 @@ Use this skill when the host app is Nuxt and SSR boundaries matter.
 ## Default Decisions
 
 - SSR safety comes before feature completeness.
+- Omit `mode` only when the surface should use rich docs defaults.
 - Smooth streaming is SSR-safe in `auto` mode (the default) because it gates on mount. Do not use `smooth-streaming="true"` for first-screen SSR content — it bypasses the mounted gate and can cause hydration mismatch or blank flash.
 - Avoid import-time access to browser globals from server code paths.
 - Treat Monaco, Mermaid workers, and similar heavy peers as client-only unless the repo already has a proven SSR pattern.
