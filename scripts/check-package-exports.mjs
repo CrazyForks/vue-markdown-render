@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -205,24 +205,37 @@ function resolveLocalJsImport(importerPath, specifier) {
   return candidates.find(isExistingFile) ?? null
 }
 
-function collectStaticCssImports(entryPath) {
+function isRootPackageSpecifier(specifier) {
+  return specifier === pkg.name
+}
+
+function collectStaticImportGraph(entryPath) {
   const queue = [entryPath]
-  const visited = new Set()
+  const jsFiles = new Set()
   const cssImports = []
+  const rootPackageImports = []
 
   while (queue.length > 0) {
     const current = queue.pop()
     const fullPath = resolve(current)
 
-    if (visited.has(fullPath) || !existsSync(fullPath))
+    if (jsFiles.has(fullPath) || !isExistingFile(fullPath))
       continue
 
-    visited.add(fullPath)
+    jsFiles.add(fullPath)
 
     const source = readFileSync(fullPath, 'utf8')
     for (const specifier of getStaticImportSpecifiers(source, fullPath)) {
       if (isCssSpecifier(specifier)) {
         cssImports.push({
+          importer: fullPath,
+          specifier,
+        })
+        continue
+      }
+
+      if (isRootPackageSpecifier(specifier)) {
+        rootPackageImports.push({
           importer: fullPath,
           specifier,
         })
@@ -235,7 +248,11 @@ function collectStaticCssImports(entryPath) {
     }
   }
 
-  return cssImports
+  return {
+    jsFiles,
+    cssImports,
+    rootPackageImports,
+  }
 }
 
 function resolvePackageTarget(target) {
@@ -264,15 +281,6 @@ for (const subpath of requiredSubpaths) {
 
   for (const { condition, target } of targets)
     assertTargetExists(subpath, condition, target)
-
-  if (subpath !== '.') {
-    for (const { condition, target } of getPackageJsTargets(subpath)) {
-      const resolvedTarget = resolvePackageTarget(target)
-      if (rootJsTargetSet.has(resolvedTarget)) {
-        failures.push(`${subpath} condition "${condition}" should not import the root bundle (${target})`)
-      }
-    }
-  }
 }
 
 for (const subpath of requiredCssSubpaths) {
@@ -289,18 +297,54 @@ for (const subpath of requiredCssSubpaths) {
   }
 }
 
-for (const { condition, target } of rootJsTargets) {
-  const rootImportPath = resolve(root, target)
-  if (!existsSync(rootImportPath))
+function formatImportTrace(imports) {
+  return imports.map(({ importer, specifier }) => {
+    return `    ${relative(root, importer)} imports ${specifier}`
+  })
+}
+
+function formatReachedRootTargets(targets) {
+  return targets.map((target) => {
+    return `    reaches ${relative(root, target)}`
+  })
+}
+
+const packageJsTargetChecks = []
+
+for (const subpath of requiredSubpaths) {
+  for (const { condition, target } of getPackageJsTargets(subpath)) {
+    const entryPath = resolvePackageTarget(target)
+    if (!isExistingFile(entryPath))
+      continue
+
+    packageJsTargetChecks.push({
+      subpath,
+      condition,
+      target,
+      graph: collectStaticImportGraph(entryPath),
+    })
+  }
+}
+
+for (const { subpath, condition, target, graph } of packageJsTargetChecks) {
+  if (graph.cssImports.length > 0) {
+    failures.push([
+      `${subpath} condition "${condition}" target ${target} should not statically import CSS; keep styles on explicit CSS subpaths.`,
+      ...formatImportTrace(graph.cssImports),
+    ].join('\n'))
+  }
+
+  if (subpath === '.')
     continue
 
-  const cssImports = collectStaticCssImports(rootImportPath)
-  if (cssImports.length > 0) {
+  const reachedRootTargets = [...rootJsTargetSet]
+    .filter(rootTarget => graph.jsFiles.has(rootTarget))
+
+  if (reachedRootTargets.length > 0 || graph.rootPackageImports.length > 0) {
     failures.push([
-      `. condition "${condition}" target ${target} should not statically import CSS; keep styles on explicit CSS subpaths.`,
-      ...cssImports.map(({ importer, specifier }) => {
-        return `    ${relative(root, importer)} imports ${specifier}`
-      }),
+      `${subpath} condition "${condition}" target ${target} should not statically import the root bundle.`,
+      ...formatReachedRootTargets(reachedRootTargets),
+      ...formatImportTrace(graph.rootPackageImports),
     ].join('\n'))
   }
 }
