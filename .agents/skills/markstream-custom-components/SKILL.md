@@ -1,6 +1,6 @@
 ---
 name: markstream-custom-components
-description: Override built-in Markstream node renderers and add trusted custom tags. Use when Codex needs to apply `setCustomComponents`, keep overrides scoped with `customId`, map override keys like `image`, `code_block`, `mermaid`, or `link`, or wire `customHtmlTags` and nested renderers for tags such as `thinking`.
+description: Override built-in Markstream node renderers and add trusted custom tags. Use when Codex needs to apply `setCustomComponents`, install `VueRendererMarkdown` with scoped Vue app components, keep overrides scoped with `customId`, map override keys like `image`, `code_block`, `mermaid`, or `link`, or wire `customHtmlTags` and nested renderers for tags such as `thinking`.
 ---
 
 # Markstream Custom Components
@@ -18,6 +18,7 @@ Read [references/patterns.md](references/patterns.md) before choosing an overrid
 2. Prefer scoped mappings.
    - Use `setCustomComponents(customId, mapping)` instead of global mappings whenever practical.
    - Pass the same `customId` or `custom-id` to the renderer instance.
+   - In Vue 3 app/plugin setup, import `{ VueRendererMarkdown }` from `markstream-vue` and install it with `{ components }` when the override should be scoped to the Vue app instance.
 3. Start with the smallest safe override.
    - Leaf-like nodes (`image`, `link`, `inline_code`, `mermaid`) are easier than container nodes (`heading`, `paragraph`, `list_item`).
    - If the request only changes Mermaid, use `mermaid`, not `code_block`.

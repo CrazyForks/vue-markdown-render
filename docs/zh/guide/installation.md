@@ -44,7 +44,7 @@ pnpm add markstream-vue stream-markdown
 pnpm add markstream-vue stream-monaco mermaid katex
 ```
 
-然后继续看 [AI 聊天与流式输出](/zh/guide/ai-chat-streaming)，里面会把 `nodes` + `final` 的推荐接法和聊天场景调优串起来。
+然后继续看 [AI 聊天与流式输出](/zh/guide/ai-chat-streaming)，里面会串起 `mode="chat"`、`content` 流式渲染、`final` 结束态处理，以及由上层负责解析时才需要的可选 `nodes` 路径。
 
 ### 图表型内容较多
 
@@ -60,7 +60,14 @@ pnpm add markstream-vue stream-markdown stream-monaco mermaid @terrastruct/d2 ka
 
 ## 4. CSS 顺序和安装同样重要
 
-主包入口已经带了默认样式，但如果你的项目有 reset、Tailwind 或 UnoCSS，通常还是建议显式控制 CSS 顺序：
+根 JavaScript 入口不会自动注入渲染器样式。请在应用入口或 CSS 管线中显式导入一个已发布的 CSS subpath，并确保它位于 reset/base 之后、业务覆盖样式之前。
+
+```ts
+// main.ts
+import 'markstream-vue/index.css'
+```
+
+在 Tailwind 或 UnoCSS 项目里，建议把 Markstream 样式放到 component layer：
 
 ```css
 @import 'modern-css-reset';
@@ -68,6 +75,8 @@ pnpm add markstream-vue stream-markdown stream-monaco mermaid @terrastruct/d2 ka
 
 @import 'markstream-vue/index.css' layer(components);
 ```
+
+如果你的移动端会主动调大根字号，请改用 `markstream-vue/index.px.css`。只有在需要 Tailwind-ready CSS 变体时才使用 `markstream-vue/index.tailwind.css`。
 
 如果你使用数学公式，还要额外引入 KaTeX 的 CSS：
 

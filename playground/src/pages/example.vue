@@ -123,13 +123,12 @@ const shikiNode = {
   type: 'code_block' as const,
   language: 'typescript',
   code: `import { createApp } from 'vue'
-import { VueRendererMarkdown } from 'markstream-vue'
+import { setIconTheme } from 'markstream-vue'
 
-const app = createApp(App)
-app.use(VueRendererMarkdown, {
-  iconTheme: 'material',
-})
-app.mount('#app')`,
+setIconTheme('material')
+
+createApp(App)
+  .mount('#app')`,
   raw: '',
 }
 

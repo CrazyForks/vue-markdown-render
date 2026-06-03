@@ -153,6 +153,30 @@ createApp({
 确保在 CSS reset（如 `@tailwind base` 或 `@unocss/reset`）之后导入 `markstream-vue/index.css`，推荐使用 `@import 'markstream-vue/index.css' layer(components);` 以避免 Tailwind/UnoCSS 覆盖组件样式。根据需求再按需安装可选 peer 依赖：`stream-monaco`（Monaco 代码块）、`shiki` + `stream-markdown`（Shiki 高亮）、`mermaid`（Mermaid 图表）、`katex`（数学公式）。
 如果你的移动端会主动调大根字号（`html`/`body`），建议改用 `markstream-vue/index.px.css`，避免 `rem` 跟随根字号导致整体放大。
 
+按使用场景选择渲染模式：
+
+```vue
+<!-- AI 聊天 / SSE 输出：稳定节奏，不叠加透明度动画，避免闪烁 -->
+<MarkdownRender
+  mode="chat"
+  :content="message"
+  :final="isDone"
+  smooth-streaming="auto"
+  :fade="false"
+/>
+
+<!-- 富文档：默认启用更大的渲染批次、tooltip 和 fade -->
+<MarkdownRender
+  mode="docs"
+  :content="doc"
+  :final="true"
+/>
+```
+
+当你想要和 `chat` 相同的轻量默认值，但当前页面不是聊天语义时，可以使用 `mode="minimal"`。避免把高频 `smooth-streaming` 和 `fade` 同时开启，否则稳定的流式输出可能变成反复重启的透明度动画。
+同一条聊天消息不要仅因为 `final` 变为 `true` 就从 `mode="chat"` 切到 `mode="docs"`。保持 mode 稳定，只切换 `smooth-streaming`、`typewriter`、`fade` 等节奏/动画 props；`docs` 会改变默认代码块渲染器和布局策略。
+如果文档页不需要 Monaco 代码块，建议设置 `:render-code-blocks-as-pre="true"`；如果需要富 Monaco 代码块 UI，请安装 `stream-monaco`，否则渲染器会按设计降级为 `<pre>` 渲染。
+
 渲染器的 CSS 会作用于内部 `.markstream-vue` 容器下，以尽量降低对全局的影响；如果你脱离 `MarkdownRender` 单独使用导出的节点组件，请在外层包一层带 `markstream-vue` 类名的容器。
 
 暗色变量可以通过给祖先节点加 `.dark`，或直接给 `MarkdownRender` 传入 `:is-dark="true"`（仅对渲染器生效）。
@@ -167,7 +191,7 @@ createApp({
 />
 ```
 
-语言图标默认使用内置的 `material` theme。进阶接入可以用导出的 helper 查看或切换 icon theme，也可以在 `app.use(VueRendererMarkdown, { iconTheme })` 时指定初始主题：
+语言图标默认使用内置的 `material` theme。新接入建议在 `app.mount()` 之前通过导出的 helper 查看或切换 icon theme。旧的 `app.use(VueRendererMarkdown, { iconTheme })` 选项在 1.x 仍可用，但它会修改进程级全局状态，因此优先使用 helper。
 
 ```ts
 import { getRegisteredThemes, setIconTheme } from 'markstream-vue'

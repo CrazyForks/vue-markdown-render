@@ -10,8 +10,17 @@ type InstallableComponent<T> = T & {
 const _NodeRenderer = NodeRenderer as InstallableComponent<typeof NodeRenderer>
 
 _NodeRenderer.install = (app: App) => {
-  const compName = _NodeRenderer.__name ?? _NodeRenderer.name ?? 'NodeRenderer'
-  app.component(compName as string, NodeRenderer)
+  const names = new Set(
+    [
+      'MarkdownRender',
+      'NodeRenderer',
+      _NodeRenderer.__name,
+      _NodeRenderer.name,
+    ].filter((name): name is string => Boolean(name)),
+  )
+
+  for (const name of names)
+    app.component(name, NodeRenderer)
 }
 
 export default _NodeRenderer

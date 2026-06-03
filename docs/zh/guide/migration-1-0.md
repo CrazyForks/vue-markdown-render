@@ -45,6 +45,7 @@ app.use(VueRendererMarkdown, {
 ## beta/rc 到 1.0 的 breaking 或 intentional changes
 
 - npm package 只发布 `dist`，不再暴露 CLI `bin`。
+- 根 JavaScript 入口不再自动注入渲染器样式。请在应用入口或 CSS 管线中显式导入 `markstream-vue/index.css`、`markstream-vue/index.px.css` 或 `markstream-vue/index.tailwind.css`。
 - 底层 CDN/worker 实现文件只为 bundler 兼容保留 import 能力；文档化的 worker client exports 才是稳定 API。
 - Safe HTML 与 URL protocol allowlist 默认更严格。
 - Mermaid SVG 会在 mount 前 sanitize；除非对可信图表显式开启，否则 Mermaid interactions 会被禁用。

@@ -161,6 +161,30 @@ Import `markstream-vue/index.css` after your reset (e.g., use `@import 'markstre
 For untrusted user-generated content, prefer `htmlPolicy="escape"` so raw HTML is rendered as text.
 If your app intentionally scales root font size on mobile, use `markstream-vue/index.px.css` to avoid `rem`-based global scaling side effects.
 
+Choose the renderer mode by surface:
+
+```vue
+<!-- AI chat / SSE output: steady pacing, no opacity animation flicker -->
+<MarkdownRender
+  mode="chat"
+  :content="message"
+  :final="isDone"
+  smooth-streaming="auto"
+  :fade="false"
+/>
+
+<!-- Rich docs: larger render batches, tooltips, and fade are enabled by default -->
+<MarkdownRender
+  mode="docs"
+  :content="doc"
+  :final="true"
+/>
+```
+
+Use `mode="minimal"` when you want the same lightweight defaults as `chat`, but prefer a neutral mode name for non-chat surfaces. Avoid combining high-frequency `smooth-streaming` with `fade`; it can turn a steady stream into repeated opacity restarts.
+For the same chat message, do not switch from `mode="chat"` to `mode="docs"` only because `final` changed. Keep the mode stable and switch pacing/animation props (`smooth-streaming`, `typewriter`, `fade`) instead; `docs` changes the default code renderer and layout strategy.
+For docs pages that do not need Monaco-backed code blocks, set `:render-code-blocks-as-pre="true"`. If you want the rich Monaco-backed code-block UI, install `stream-monaco`; otherwise the renderer intentionally falls back to `<pre>` rendering.
+
 Renderer CSS is scoped under an internal `.markstream-vue` container to minimize global style conflicts. If you render exported node components outside of `MarkdownRender`, wrap them in an element with class `markstream-vue`.
 
 For dark theme variables, either add a `.dark` class on an ancestor, or pass `:is-dark="true"` to `MarkdownRender` to scope dark mode to the renderer.
@@ -175,7 +199,7 @@ Prefer the unified code-block `theme` prop for new integrations. When you render
 />
 ```
 
-Language icons use the built-in `material` theme by default. Advanced integrations can inspect or switch icon themes with the exported helpers, or set an initial theme with `app.use(VueRendererMarkdown, { iconTheme })`:
+Language icons use the built-in `material` theme by default. For new integrations, inspect or switch icon themes with the exported helpers before `app.mount()`. The legacy `app.use(VueRendererMarkdown, { iconTheme })` option still works in 1.x, but prefer helpers because icon configuration is process-global state.
 
 ```ts
 import { getRegisteredThemes, setIconTheme } from 'markstream-vue'

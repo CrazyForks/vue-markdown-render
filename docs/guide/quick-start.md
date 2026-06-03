@@ -1,10 +1,17 @@
 ---
-description: Start rendering Markdown with markstream-vue in the smallest possible Vue example, including the default CSS behavior and next steps.
+description: Start rendering Markdown with markstream-vue in the smallest possible Vue example, including the explicit renderer CSS import and next steps.
 ---
 
 # Quick Start
 
-A minimal example using the library:
+Import the renderer CSS once from your app entry or CSS pipeline:
+
+```ts
+// main.ts
+import 'markstream-vue/index.css'
+```
+
+Then render Markdown:
 
 ```vue twoslash
 <script setup lang="ts">
@@ -28,7 +35,7 @@ const isDark: MarkdownRenderProps['isDark'] = false
 
 If you want prop-level hover, start with `MarkdownRenderProps['content']`, `MarkdownRenderProps['customId']`, `MarkdownRenderProps['isDark']`, or the matching template attributes above. Hovering the component name itself is usually less informative in Vue snippets.
 
-Note: the packaged CSS is scoped under an internal `.markstream-vue` container to reduce global style conflicts. The main package entry already imports the default stylesheet; add `import 'markstream-vue/index.css'` only when you want explicit control over CSS order in your app shell.
+Note: the packaged CSS is scoped under an internal `.markstream-vue` container to reduce global style conflicts. The root JavaScript entry does not inject this stylesheet, so keep the CSS import in your app shell. Use `@import 'markstream-vue/index.css' layer(components);` when your CSS pipeline needs precise layer ordering.
 
 For dark theme variables, either add `.dark` on an ancestor or pass `:is-dark="true"` to scope dark mode to the renderer.
 
@@ -54,4 +61,4 @@ const md: MarkdownRenderProps['content'] = `# Hello world\n\nTry a simple Mermai
 
 Install `mermaid` or `@terrastruct/d2` to render those diagrams; without them the renderer falls back to showing source text.
 
-For chat-style streaming, start with `content` plus the built-in smooth streaming path (`typewriter` or `max-live-nodes <= 0` enables `smooth-streaming="auto"`). If another layer already parses in a worker/store or you need AST control, pass `:nodes` + `:final` instead. See `/guide/usage`, `/guide/ai-chat-streaming`, and `/guide/performance`.
+For chat-style streaming, start with `mode="chat"` plus `content`; `max-live-nodes <= 0` in chat mode enables `smooth-streaming="auto"` and keeps fade off by default. If another layer already parses in a worker/store or you need AST control, pass `:nodes` + `:final` instead. See `/guide/usage`, `/guide/ai-chat-streaming`, and `/guide/performance`.

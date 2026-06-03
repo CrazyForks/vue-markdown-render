@@ -1,5 +1,5 @@
 ---
-description: Build AI chat and streaming Markdown UIs with nodes plus final patterns, performance guidance, trusted custom tags, and SSR-safe setup.
+description: Build AI chat and streaming Markdown UIs with content, built-in smooth streaming, performance guidance, trusted custom tags, and SSR-safe setup.
 ---
 
 # AI Chat & Streaming

@@ -57,7 +57,6 @@ import { useSmoothMarkdownStream } from './composables/useSmoothMarkdownStream'
 import { setIconTheme } from './icon-themes'
 import { setLanguageIconResolver } from './utils/languageIcon'
 import { clearGlobalCustomComponents, createCustomComponentsRef, getCustomNodeComponents, MARKSTREAM_CUSTOM_COMPONENTS_KEY, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
-import './index.css'
 
 function definePublicAsyncComponent<TProps extends object>(
   loader: () => Promise<{ default: Component }>,
@@ -166,10 +165,39 @@ export type { MathOptions } from 'stream-markdown-parser'
 export interface CustomComponents extends MarkstreamCustomComponents {}
 
 export interface MarkstreamVuePluginOptions {
+  /**
+   * App-scoped custom components.
+   */
   components?: Partial<MarkstreamCustomComponents>
+
+  /**
+   * @deprecated Prefer setLanguageIconResolver() before app.mount().
+   *
+   * Kept for 1.x compatibility. This still mutates process-global icon
+   * resolution state, so avoid it in multi-tenant SSR apps.
+   */
   getLanguageIcon?: LanguageIconResolver
+
+  /**
+   * @deprecated Prefer setIconTheme() before app.mount().
+   *
+   * Kept for 1.x compatibility. This still mutates process-global icon
+   * theme state, so avoid it in multi-tenant SSR apps.
+   */
   iconTheme?: string
+
+  /**
+   * @deprecated Prefer setInfographicLoader() before app.mount().
+   *
+   * Kept for 1.x compatibility.
+   */
   infographicLoader?: InfographicLoader | null
+
+  /**
+   * @deprecated Prefer setDefaultMathOptions() before app.mount().
+   *
+   * Kept for 1.x compatibility.
+   */
   mathOptions?: MathOptions
 }
 
@@ -243,6 +271,8 @@ export {
 export default MarkdownRender
 
 const componentMap: Record<string, Component> = {
+  MarkdownRender,
+  NodeRenderer: MarkdownRender,
   AdmonitionNode,
   BlockquoteNode,
   CheckboxNode,
@@ -282,24 +312,24 @@ const componentMap: Record<string, Component> = {
   ReferenceNode,
   MarkdownCodeBlockNode,
   MarkstreamVirtualTimeline,
+  Tooltip,
 }
 
-export const VueRendererMarkdown: Plugin = {
+export const VueRendererMarkdown: Plugin<[options?: MarkstreamVuePluginOptions]> = {
   install(app: App, options?: MarkstreamVuePluginOptions) {
     Object.entries(componentMap).forEach(([name, component]) => {
       app.component(name, component)
     })
-    // Theme is set first, then user resolver is applied on top (resolver takes priority)
+
     if (options?.iconTheme)
       setIconTheme(options.iconTheme)
     if (options?.getLanguageIcon)
       setLanguageIconResolver(options.getLanguageIcon)
-    // optional global math options
-    // avoid importing inside module scope to keep SSR safe
     if (options?.mathOptions)
       setDefaultMathOptions(options.mathOptions)
     if (options && 'infographicLoader' in options)
       setInfographicLoader(options.infographicLoader ?? null)
+
     if (options?.components)
       app.provide(MARKSTREAM_CUSTOM_COMPONENTS_KEY, createCustomComponentsRef(options.components))
   },

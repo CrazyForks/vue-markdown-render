@@ -45,6 +45,7 @@ app.use(VueRendererMarkdown, {
 ## Breaking or intentional changes from beta/rc
 
 - The npm package publishes `dist` only and no longer exposes a CLI `bin`.
+- The root JavaScript import no longer injects renderer styles. Import `markstream-vue/index.css`, `markstream-vue/index.px.css`, or `markstream-vue/index.tailwind.css` explicitly from your app entry or CSS pipeline.
 - Low-level CDN/worker implementation files are importable only for bundler compatibility; documented worker client exports are the stable surface.
 - Safe HTML and URL protocol allowlists are stricter by default.
 - Mermaid SVG is sanitized before mounting, and Mermaid interactions are disabled unless explicitly enabled for trusted diagrams.

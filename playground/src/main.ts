@@ -5,7 +5,7 @@ import { createApp } from 'vue'
 // import { setDefaultI18nMap } from '../../src/exports'
 // import { createI18n } from 'vue-i18n'
 import { createRouter, createWebHistory } from 'vue-router'
-// import { VueRendererMarkdown } from '../../src/exports'
+// import { setLanguageIconResolver } from '../../src/exports'
 import App from './App.vue'
 import { installPlaygroundSeo } from './seo'
 // import JsLocalIcon from './assets/javascript.svg?raw'
@@ -24,17 +24,16 @@ const router = createRouter({
 installPlaygroundSeo(router)
 app.use(router)
 
-// Demo: override icons via plugin options (preferred)
+// Demo: override icons through the process-global helper.
+// Avoid this pattern in multi-tenant SSR apps.
 // const SHELL_ICON_URL = 'https://raw.githubusercontent.com/catppuccin/vscode-icons/refs/heads/main/icons/mocha/bash.svg'
-// app.use(VueRendererMarkdown, {
-//   getLanguageIcon(lang: string) {
+// setLanguageIconResolver((lang: string) => {
 //     const l = (lang || '').toLowerCase()
 //     if (l === 'shellscript' || l === 'sh' || l === 'bash')
 //       return `<img src="${SHELL_ICON_URL}" alt="${l}" />`
 //     if (l === 'javascript' || l === 'js')
 //       return JsLocalIcon
 //     return undefined
-//   },
 // })
 
 // Optional: if you don't use `vue-i18n`, replace built-in fallback translations
