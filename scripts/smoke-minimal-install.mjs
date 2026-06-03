@@ -80,6 +80,35 @@ function readTgzEntry(tarball, entryName) {
   throw new Error(`Packed tarball entry not found: ${entryName}`)
 }
 
+function readTgzEntries(tarball, filter) {
+  const archive = gunzipSync(readFileSync(tarball))
+  const entries = new Map()
+  let offset = 0
+
+  while (offset + 512 <= archive.length) {
+    const header = archive.subarray(offset, offset + 512)
+    if (header.every(byte => byte === 0))
+      break
+
+    const name = readTarString(header.subarray(0, 100))
+    const prefix = readTarString(header.subarray(345, 500))
+    const path = prefix ? `${prefix}/${name}` : name
+    const size = Number.parseInt(readTarString(header.subarray(124, 136)) || '0', 8)
+    const bodyOffset = offset + 512
+
+    if (filter(path)) {
+      entries.set(
+        path,
+        archive.subarray(bodyOffset, bodyOffset + size).toString('utf8'),
+      )
+    }
+
+    offset = bodyOffset + Math.ceil(size / 512) * 512
+  }
+
+  return entries
+}
+
 function hasTgzPathPrefix(tarball, pathPrefix) {
   const archive = gunzipSync(readFileSync(tarball))
   let offset = 0
@@ -107,13 +136,19 @@ const packedCssContracts = {
   'package/dist/index.tailwind.css': ['--ms-background:', '--ms-foreground:'],
 }
 
-function assertNoCssImportInPackedRootJs(rootJs) {
+function assertNoCssImportInPackedJs(tarball) {
   const cssSpecifierPattern = /['"][^'"]*\.css(?:[?#][^'"]*)?['"]/
+  const jsEntries = readTgzEntries(tarball, path => (
+    path.startsWith('package/dist/')
+    && /\.(?:mjs|js|cjs)$/.test(path)
+  ))
 
-  if (cssSpecifierPattern.test(rootJs)) {
-    throw new Error(
-      'Packed package root bundle must not import CSS. Import CSS only through markstream-vue/index.css, index.px.css, or index.tailwind.css.',
-    )
+  for (const [path, source] of jsEntries) {
+    if (cssSpecifierPattern.test(source)) {
+      throw new Error(
+        `${path} must not import CSS. Import CSS only through markstream-vue/index.css, index.px.css, or index.tailwind.css.`,
+      )
+    }
   }
 }
 
@@ -127,8 +162,7 @@ function assertPackedCssContract(tarball) {
       throw new Error(`Packed tarball leaked style-only JS entry: ${leakedPath}`)
   }
 
-  const rootJs = readTgzEntry(tarball, 'package/dist/index.js')
-  assertNoCssImportInPackedRootJs(rootJs)
+  assertNoCssImportInPackedJs(tarball)
 
   for (const [entryName, markers] of Object.entries(packedCssContracts)) {
     const css = readTgzEntry(tarball, entryName)

@@ -261,7 +261,7 @@ function isRootPackageSpecifier(specifier) {
   return specifier === pkg.name
 }
 
-function collectStaticImportGraph(entryPath) {
+function collectImportGraph(entryPath) {
   const queue = [entryPath]
   const jsFiles = new Set()
   const cssImports = []
@@ -297,22 +297,21 @@ function collectStaticImportGraph(entryPath) {
         continue
       }
 
-      if (kind !== 'static') {
-        if (kind === 'dynamic') {
-          const resolvedImport = resolveLocalJsImport(fullPath, specifier)
-          if (resolvedImport) {
-            relativeDynamicJsImports.push({
-              importer: fullPath,
-              specifier,
-              resolved: resolvedImport,
-            })
-          }
-        }
+      const resolvedImport = resolveLocalJsImport(fullPath, specifier)
+      if (!resolvedImport)
+        continue
+
+      if (kind === 'dynamic') {
+        relativeDynamicJsImports.push({
+          importer: fullPath,
+          specifier,
+          resolved: resolvedImport,
+        })
+        queue.push(resolvedImport)
         continue
       }
 
-      const resolvedImport = resolveLocalJsImport(fullPath, specifier)
-      if (resolvedImport)
+      if (kind === 'static')
         queue.push(resolvedImport)
     }
   }
@@ -450,7 +449,7 @@ for (const subpath of requiredSubpaths) {
       subpath,
       condition,
       target,
-      graph: collectStaticImportGraph(entryPath),
+      graph: collectImportGraph(entryPath),
     })
   }
 }
@@ -458,7 +457,7 @@ for (const subpath of requiredSubpaths) {
 for (const { subpath, condition, target, graph } of packageJsTargetChecks) {
   if (graph.cssImports.length > 0) {
     failures.push([
-      `${subpath} condition "${condition}" target ${target} should not statically import CSS; keep styles on explicit CSS subpaths.`,
+      `${subpath} condition "${condition}" target ${target} should not import CSS; keep styles on explicit CSS subpaths.`,
       ...formatImportTrace(graph.cssImports),
     ].join('\n'))
   }
