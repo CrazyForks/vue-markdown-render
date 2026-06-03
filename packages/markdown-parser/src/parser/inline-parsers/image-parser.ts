@@ -1,5 +1,26 @@
 import type { ImageNode, MarkdownToken } from '../../types'
 
+function stringifyAltToken(token: MarkdownToken): string {
+  if (token.type === 'math_inline') {
+    if (token.raw)
+      return String(token.raw)
+    const markup = token.markup === '$$' ? '$$' : '$'
+    return `${markup}${String(token.content ?? '')}${markup}`
+  }
+
+  if (Array.isArray(token.children) && token.children.length > 0)
+    return token.children.map(child => stringifyAltToken(child)).join('')
+
+  return String(token.content ?? '')
+}
+
+function getAltFromTokenChildren(token: MarkdownToken | null | undefined) {
+  if (!token || !Array.isArray(token.children) || token.children.length === 0)
+    return ''
+
+  return token.children.map(child => stringifyAltToken(child)).join('')
+}
+
 export function parseImageToken(token: MarkdownToken, loading = false): ImageNode {
   // Some call-sites pass an outer/inline token whose children contain the
   // actual image token (with attrs). Prefer token.attrs when present; when
@@ -23,12 +44,12 @@ export function parseImageToken(token: MarkdownToken, loading = false): ImageNod
   }
   const src = String(attrs.find(attr => attr[0] === 'src')?.[1] ?? '')
   const altAttr = attrs.find(attr => attr[0] === 'alt')?.[1]
-  // Prefer a non-empty alt attribute. If attrs were sourced from an inner
-  // child token prefer that child's `content` over the parent's `token.content`
-  // because the parent may contain the raw markdown instead of the plain alt
-  // text.
+  const childAlt = getAltFromTokenChildren(childWithAttrs ?? token)
   let alt = ''
-  if (altAttr != null && String(altAttr).length > 0) {
+  if (childAlt) {
+    alt = childAlt
+  }
+  else if (altAttr != null && String(altAttr).length > 0) {
     alt = String(altAttr)
   }
   else if (childWithAttrs?.content != null && String(childWithAttrs.content).length > 0) {

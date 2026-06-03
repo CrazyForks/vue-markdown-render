@@ -1183,6 +1183,9 @@ export function parseInlineTokens(
         else if (recoverOuterImageLinkFromSyntheticLinkToken(token)) {
           i++
         }
+        else if (recoverMarkdownImageFromLoadingImageTail(token)) {
+          i++
+        }
         else if (recoverMarkdownImageFromTrailingBang(token)) {
           i++
         }
@@ -1347,6 +1350,9 @@ export function parseInlineTokens(
   }
 
   function handleLinkOpen(token: MarkdownToken) {
+    if (recoverMarkdownImageFromLoadingImageTailLinkOpen(token))
+      return
+
     if (shouldTreatLinkOpenAsTextInEscapedOuterImageTail()) {
       const { node, nextIndex } = parseLinkToken(tokens, i, options)
       const text = String(node.text || node.href || '')
@@ -1426,6 +1432,18 @@ export function parseInlineTokens(
     pushParsed(node)
   }
 
+  function recoverMarkdownImageFromLoadingImageTailLinkOpen(token: MarkdownToken): boolean {
+    if (token.markup !== 'linkify')
+      return false
+
+    const { node, nextIndex } = parseLinkToken(tokens, i, options)
+    if (!recoverMarkdownImageFromLoadingImageTailLink(node, nextIndex))
+      return false
+
+    i = nextIndex
+    return true
+  }
+
   function handleReference(token: MarkdownToken) {
     resetCurrentTextNode()
     pushNode(parseReferenceToken(token))
@@ -1469,6 +1487,61 @@ export function parseInlineTokens(
       children: [{ type: 'text', content: label, raw: label }],
       raw: String(`[${label}](${href}${linkToken.title ? ` "${linkToken.title}"` : ''})`),
     } as ParsedNode)
+    return true
+  }
+
+  function recoverMarkdownImageFromLoadingImageTail(token: MarkdownToken): boolean {
+    if (token.type !== 'link')
+      return false
+
+    const linkToken = token as MarkdownToken & { href?: string, loading?: boolean, title?: string | null }
+    const href = String(linkToken.href ?? '')
+    if (!href)
+      return false
+
+    return recoverMarkdownImageFromLoadingImageTailLink({
+      href,
+      title: linkToken.title == null || linkToken.title === '' ? null : String(linkToken.title),
+      loading: Boolean(linkToken.loading),
+    }, i + 1)
+  }
+
+  function recoverMarkdownImageFromLoadingImageTailLink(
+    link: { href: string, loading?: boolean, title: string | null },
+    nextIndex: number,
+  ): boolean {
+    const previous = result[result.length - 1] as ParsedNode & {
+      alt?: string
+      loading?: boolean
+      raw?: string
+      src?: string
+    } | undefined
+    if (previous?.type !== 'image' || previous.src || !previous.loading || !String(previous.raw ?? '').endsWith(']('))
+      return false
+
+    const nextToken = tokens[nextIndex]
+    const nextContent = String(nextToken?.content ?? '')
+    if (nextToken?.type !== 'text' || !nextContent.startsWith(')'))
+      return false
+
+    result.pop()
+    currentTextNode = null
+
+    const alt = String(previous.alt ?? '')
+    pushParsed({
+      type: 'image',
+      src: link.href,
+      alt,
+      title: link.title,
+      raw: String(`![${alt}](${link.href}${link.title ? ` "${link.title}"` : ''})`),
+      loading: Boolean(link.loading),
+    } as ParsedNode)
+
+    const trailing = nextContent.slice(1)
+    const adjustedNext = cloneTokenWithMutableChildren(nextToken)
+    adjustedNext.content = trailing
+    adjustedNext.raw = trailing
+    ensureWorkingTokens()[nextIndex] = adjustedNext
     return true
   }
 
