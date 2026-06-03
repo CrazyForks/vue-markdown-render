@@ -103,6 +103,20 @@ const runtimeSubpathChecks = [
 
 const failures = []
 
+const declaredExportSubpaths = Object.keys(pkg.exports ?? {})
+const requiredSubpathSet = new Set(requiredSubpaths)
+const uncheckedExportSubpaths = declaredExportSubpaths
+  .filter(subpath => !requiredSubpathSet.has(subpath))
+  .sort()
+
+if (uncheckedExportSubpaths.length > 0) {
+  failures.push([
+    'package.json exports contains subpaths that are not covered by scripts/check-package-exports.mjs requiredSubpaths.',
+    'Add them to requiredSubpaths so CSS/root-bundle isolation checks cannot be bypassed:',
+    ...uncheckedExportSubpaths.map(subpath => `    ${subpath}`),
+  ].join('\n'))
+}
+
 function normalizeTargets(entry) {
   if (typeof entry === 'string')
     return [{ condition: 'default', target: entry }]
@@ -515,7 +529,7 @@ function formatResolvedImportTrace(imports) {
 
 const packageJsTargetChecks = []
 
-for (const subpath of requiredSubpaths) {
+for (const subpath of declaredExportSubpaths) {
   for (const { condition, target } of getPackageJsTargets(subpath)) {
     const entryPath = resolvePackageTarget(target)
     if (!isExistingFile(entryPath))
