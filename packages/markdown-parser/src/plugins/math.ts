@@ -342,24 +342,27 @@ function findRangeAt(ranges: Array<[number, number]>, index: number): [number, n
   return null
 }
 
-function buildImageRanges(src: string): Array<[number, number]> {
+function buildImageRanges(src: string, allowIncomplete = false): Array<[number, number]> {
   const ranges: Array<[number, number]> = []
   let i = 0
   while (i < src.length - 1) {
     if (src[i] === '!' && src[i + 1] === '[') {
       const start = i
       let j = i + 2
-      while (j < src.length) {
+      let labelDepth = 1
+      while (j < src.length && labelDepth > 0) {
         if (src[j] === '\\' && j + 1 < src.length) {
           j += 2
           continue
         }
-        if (src[j] === ']')
-          break
+        if (src[j] === '[')
+          labelDepth++
+        else if (src[j] === ']')
+          labelDepth--
         j++
       }
-      if (j < src.length && src[j] === ']' && j + 1 < src.length && src[j + 1] === '(') {
-        let k = j + 2
+      if (labelDepth === 0 && j < src.length && src[j] === '(') {
+        let k = j + 1
         let depth = 1
         while (k < src.length && depth > 0) {
           if (src[k] === '\\' && k + 1 < src.length) {
@@ -375,6 +378,11 @@ function buildImageRanges(src: string): Array<[number, number]> {
         if (depth === 0) {
           ranges.push([start, k])
           i = k
+          continue
+        }
+        if (allowIncomplete) {
+          ranges.push([start, src.length])
+          i = src.length
           continue
         }
       }
@@ -513,7 +521,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       // We'll scan the entire inline source and tokenize all occurrences
       const src = s.src
       const codeSpanRanges = buildCodeSpanRanges(src)
-      const imageRanges = buildImageRanges(src)
+      const imageRanges = buildImageRanges(src, allowLoading)
       let foundAny = false
       // Reset searchPos for $$ to allow it to scan the full content
       // even after $ rule has processed some text
