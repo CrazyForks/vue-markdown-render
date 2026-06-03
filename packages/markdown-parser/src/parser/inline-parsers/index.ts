@@ -1267,10 +1267,6 @@ export function parseInlineTokens(
     }
 
     const nextToken = tokens[i + 1]
-    if (pPreToken?.type === 'list_item_open' && /^\d$/.test(content)) {
-      i++
-      return
-    }
     if (
       ((content === '`' || content === '|' || content === '$') && !hasEscapedMarkup(token, `\\${content}`))
       || (/^\*+$/.test(content) && !hasEscapedMarkup(token, '\\*'))
