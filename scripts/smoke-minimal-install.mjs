@@ -101,6 +101,44 @@ function hasTgzPathPrefix(tarball, pathPrefix) {
   return false
 }
 
+const packedCssContracts = {
+  'package/dist/index.css': ['--ms-background:', '--ms-foreground:', '--code-bg:'],
+  'package/dist/index.px.css': ['--ms-background:', '--ms-foreground:', '--code-bg:'],
+  'package/dist/index.tailwind.css': ['--ms-background:', '--ms-foreground:'],
+}
+
+function assertNoCssImportInPackedRootJs(rootJs) {
+  const cssSpecifierPattern = /['"][^'"]*\.css(?:[?#][^'"]*)?['"]/
+
+  if (cssSpecifierPattern.test(rootJs)) {
+    throw new Error(
+      'Packed package root bundle must not import CSS. Import CSS only through markstream-vue/index.css, index.px.css, or index.tailwind.css.',
+    )
+  }
+}
+
+function assertPackedCssContract(tarball) {
+  for (const leakedPath of [
+    'package/dist/styles.js',
+    'package/dist/styles.mjs',
+    'package/dist/styles.cjs',
+  ]) {
+    if (hasTgzPathPrefix(tarball, leakedPath))
+      throw new Error(`Packed tarball leaked style-only JS entry: ${leakedPath}`)
+  }
+
+  const rootJs = readTgzEntry(tarball, 'package/dist/index.js')
+  assertNoCssImportInPackedRootJs(rootJs)
+
+  for (const [entryName, markers] of Object.entries(packedCssContracts)) {
+    const css = readTgzEntry(tarball, entryName)
+    for (const marker of markers) {
+      if (!css.includes(marker))
+        throw new Error(`${entryName} is missing expected CSS marker: ${marker}`)
+    }
+  }
+}
+
 function ensureBuiltArtifacts() {
   const parserDist = join(root, 'packages/markdown-parser/dist/index.js')
   const coreDist = join(root, 'packages/markstream-core/dist/index.js')
@@ -178,6 +216,8 @@ try {
   packedParserTarball = packWorkspacePackage(join(root, 'packages/markdown-parser'))
   packedCoreTarball = packWorkspacePackage(join(root, 'packages/markstream-core'))
   packedTarball = packWorkspacePackage(root)
+
+  assertPackedCssContract(packedTarball)
 
   const packedPackageJson = JSON.parse(readTgzEntry(packedTarball, 'package/package.json'))
   if (packedPackageJson.bin)

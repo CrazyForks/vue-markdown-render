@@ -265,7 +265,7 @@ function collectStaticImportGraph(entryPath) {
   const queue = [entryPath]
   const jsFiles = new Set()
   const cssImports = []
-  const rootPackageImports = []
+  const rootPackageReferences = []
 
   while (queue.length > 0) {
     const current = queue.pop()
@@ -287,8 +287,8 @@ function collectStaticImportGraph(entryPath) {
         continue
       }
 
-      if (kind === 'static' && isRootPackageSpecifier(specifier)) {
-        rootPackageImports.push({
+      if (isRootPackageSpecifier(specifier)) {
+        rootPackageReferences.push({
           importer: fullPath,
           specifier,
           kind,
@@ -308,7 +308,7 @@ function collectStaticImportGraph(entryPath) {
   return {
     jsFiles,
     cssImports,
-    rootPackageImports,
+    rootPackageReferences,
   }
 }
 
@@ -450,11 +450,11 @@ for (const { subpath, condition, target, graph } of packageJsTargetChecks) {
   const reachedRootTargets = [...rootJsTargetSet]
     .filter(rootTarget => graph.jsFiles.has(rootTarget))
 
-  if (reachedRootTargets.length > 0 || graph.rootPackageImports.length > 0) {
+  if (reachedRootTargets.length > 0 || graph.rootPackageReferences.length > 0) {
     failures.push([
-      `${subpath} condition "${condition}" target ${target} should not statically import the root bundle.`,
+      `${subpath} condition "${condition}" target ${target} should not import or dynamically import the root bundle.`,
       ...formatReachedRootTargets(reachedRootTargets),
-      ...formatImportTrace(graph.rootPackageImports),
+      ...formatImportTrace(graph.rootPackageReferences),
     ].join('\n'))
   }
 }
