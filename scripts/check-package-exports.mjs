@@ -425,24 +425,40 @@ function checkCssSubpathContent() {
   }
 }
 
-function checkNoStyleEntryArtifacts() {
-  const distDir = resolve(root, 'dist')
+function collectStyleEntryArtifacts(dir, artifacts = []) {
   let entries = []
 
   try {
-    entries = readdirSync(distDir, { withFileTypes: true })
+    entries = readdirSync(dir, { withFileTypes: true })
   }
   catch {
-    return
+    return artifacts
   }
 
   for (const entry of entries) {
-    if (!entry.isFile())
+    const fullPath = join(dir, entry.name)
+
+    if (entry.isDirectory()) {
+      collectStyleEntryArtifacts(fullPath, artifacts)
       continue
-    if (!forbiddenStyleEntryArtifactPattern.test(entry.name))
+    }
+
+    if (entry.isFile() && forbiddenStyleEntryArtifactPattern.test(entry.name))
+      artifacts.push(fullPath)
+  }
+
+  return artifacts
+}
+
+function checkNoStyleEntryArtifacts() {
+  const distDir = resolve(root, 'dist')
+
+  for (const artifactPath of collectStyleEntryArtifacts(distDir)) {
+    const artifact = relative(root, artifactPath)
+
+    if (!artifact)
       continue
 
-    const artifact = `dist/${entry.name}`
     failures.push(
       `${artifact} must not be present in dist. styles-entry.ts is only a CSS build entry; CSS must be emitted as dist/index.css through the explicit markstream-vue/index.css subpath.`,
     )
