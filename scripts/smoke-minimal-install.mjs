@@ -193,6 +193,14 @@ function collectCssModuleReferences(source, filename) {
     }
 
     if (
+      ts.isCallExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'require'
+    ) {
+      pushReference(getLiteralSpecifier(node.arguments[0]), 'require')
+    }
+
+    if (
       ts.isNewExpression(node)
       && ts.isIdentifier(node.expression)
       && node.expression.text === 'URL'
@@ -228,15 +236,21 @@ function assertNoCssImportInPackedJs(tarball) {
   }
 }
 
-function assertPackedCssContract(tarball) {
-  for (const leakedPath of [
-    'package/dist/styles.js',
-    'package/dist/styles.mjs',
-    'package/dist/styles.cjs',
-  ]) {
-    if (hasTgzPathPrefix(tarball, leakedPath))
-      throw new Error(`Packed tarball leaked style-only JS entry: ${leakedPath}`)
+function assertNoStyleEntryLeak(tarball) {
+  const leaked = [...readTgzEntries(
+    tarball,
+    path => path.startsWith('package/dist/styles.'),
+  ).keys()]
+
+  if (leaked.length > 0) {
+    throw new Error(
+      `Packed tarball leaked style-only build artifacts:\n${leaked.map(path => `  - ${path}`).join('\n')}`,
+    )
   }
+}
+
+function assertPackedCssContract(tarball) {
+  assertNoStyleEntryLeak(tarball)
 
   assertNoCssImportInPackedJs(tarball)
 

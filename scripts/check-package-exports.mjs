@@ -145,7 +145,7 @@ function stripImportQuery(specifier) {
 
 function isJsTarget(target) {
   const cleanTarget = stripImportQuery(target)
-  return /\.(?:mjs|js)$/.test(cleanTarget)
+  return /\.(?:mjs|cjs|js)$/.test(cleanTarget)
 }
 
 function getPackageJsTargets(subpath) {
@@ -217,6 +217,14 @@ function getModuleReferences(source, filename) {
     }
 
     if (
+      ts.isCallExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'require'
+    ) {
+      pushReference(getLiteralSpecifier(node.arguments[0]), 'require')
+    }
+
+    if (
       ts.isNewExpression(node)
       && ts.isIdentifier(node.expression)
       && node.expression.text === 'URL'
@@ -240,18 +248,20 @@ function resolveLocalJsImport(importerPath, specifier) {
     return null
 
   const basename = cleanSpecifier.split('/').pop() ?? ''
-  if (basename.includes('.') && !/\.(?:mjs|js)$/.test(basename))
+  if (basename.includes('.') && !/\.(?:mjs|cjs|js)$/.test(basename))
     return null
 
   const resolved = resolve(dirname(importerPath), cleanSpecifier)
-  const candidates = /\.(?:mjs|js)$/.test(basename)
+  const candidates = /\.(?:mjs|cjs|js)$/.test(basename)
     ? [resolved]
     : [
         resolved,
         `${resolved}.js`,
         `${resolved}.mjs`,
+        `${resolved}.cjs`,
         join(resolved, 'index.js'),
         join(resolved, 'index.mjs'),
+        join(resolved, 'index.cjs'),
       ]
 
   return candidates.find(isExistingFile) ?? null
