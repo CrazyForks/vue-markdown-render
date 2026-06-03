@@ -190,7 +190,7 @@ createApp({
 />
 ```
 
-语言图标默认使用内置的 `material` theme。进阶接入可以用导出的 helper 查看或切换 icon theme，也可以在 `app.use(VueRendererMarkdown, { iconTheme })` 时指定初始主题：
+语言图标默认使用内置的 `material` theme。新接入建议在 `app.mount()` 之前通过导出的 helper 查看或切换 icon theme。旧的 `app.use(VueRendererMarkdown, { iconTheme })` 选项在 1.x 仍可用，但它会修改进程级全局状态，因此优先使用 helper。
 
 ```ts
 import { getRegisteredThemes, setIconTheme } from 'markstream-vue'

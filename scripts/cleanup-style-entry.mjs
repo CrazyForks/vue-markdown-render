@@ -10,4 +10,10 @@ await Promise.all([
   'dist/styles.js.map',
   'dist/styles.mjs.map',
   'dist/styles.cjs.map',
+  'dist/styles.d.ts',
+  'dist/styles.d.mts',
+  'dist/styles.d.cts',
+  'dist/styles.d.ts.map',
+  'dist/styles.d.mts.map',
+  'dist/styles.d.cts.map',
 ].map(file => rm(file, { force: true })))

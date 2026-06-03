@@ -38,6 +38,21 @@ const requiredCssMarkers = {
   './index.tailwind.css': ['--ms-background:', '--ms-foreground:'],
 }
 
+const forbiddenStyleEntryArtifacts = [
+  'dist/styles.js',
+  'dist/styles.mjs',
+  'dist/styles.cjs',
+  'dist/styles.js.map',
+  'dist/styles.mjs.map',
+  'dist/styles.cjs.map',
+  'dist/styles.d.ts',
+  'dist/styles.d.mts',
+  'dist/styles.d.cts',
+  'dist/styles.d.ts.map',
+  'dist/styles.d.mts.map',
+  'dist/styles.d.cts.map',
+]
+
 const isolatedRootExports = [
   'MarkdownRender',
   'VueRendererMarkdown',
@@ -423,8 +438,19 @@ function checkCssSubpathContent() {
   }
 }
 
+function checkNoStyleEntryArtifacts() {
+  for (const artifact of forbiddenStyleEntryArtifacts) {
+    if (isExistingFile(resolve(root, artifact))) {
+      failures.push(
+        `${artifact} must not be present in dist. styles-entry.ts is only a CSS build entry; run scripts/cleanup-style-entry.mjs after the library build.`,
+      )
+    }
+  }
+}
+
 checkCssSubpathContent()
 checkSourceRootEntryDoesNotImportCss()
+checkNoStyleEntryArtifacts()
 
 function formatImportTrace(imports) {
   return imports.map(({ importer, specifier, kind = 'static' }) => {

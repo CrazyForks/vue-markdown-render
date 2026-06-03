@@ -198,7 +198,7 @@ Prefer the unified code-block `theme` prop for new integrations. When you render
 />
 ```
 
-Language icons use the built-in `material` theme by default. Advanced integrations can inspect or switch icon themes with the exported helpers, or set an initial theme with `app.use(VueRendererMarkdown, { iconTheme })`:
+Language icons use the built-in `material` theme by default. For new integrations, inspect or switch icon themes with the exported helpers before `app.mount()`. The legacy `app.use(VueRendererMarkdown, { iconTheme })` option still works in 1.x, but prefer helpers because icon configuration is process-global state.
 
 ```ts
 import { getRegisteredThemes, setIconTheme } from 'markstream-vue'
