@@ -266,6 +266,7 @@ function collectStaticImportGraph(entryPath) {
   const jsFiles = new Set()
   const cssImports = []
   const rootPackageReferences = []
+  const relativeDynamicJsImports = []
 
   while (queue.length > 0) {
     const current = queue.pop()
@@ -296,8 +297,19 @@ function collectStaticImportGraph(entryPath) {
         continue
       }
 
-      if (kind !== 'static')
+      if (kind !== 'static') {
+        if (kind === 'dynamic') {
+          const resolvedImport = resolveLocalJsImport(fullPath, specifier)
+          if (resolvedImport) {
+            relativeDynamicJsImports.push({
+              importer: fullPath,
+              specifier,
+              resolved: resolvedImport,
+            })
+          }
+        }
         continue
+      }
 
       const resolvedImport = resolveLocalJsImport(fullPath, specifier)
       if (resolvedImport)
@@ -309,6 +321,7 @@ function collectStaticImportGraph(entryPath) {
     jsFiles,
     cssImports,
     rootPackageReferences,
+    relativeDynamicJsImports,
   }
 }
 
@@ -419,6 +432,12 @@ function formatReachedRootTargets(targets) {
   })
 }
 
+function formatDynamicImportTrace(imports) {
+  return imports.map(({ importer, specifier, resolved }) => {
+    return `    ${relative(root, importer)} dynamically imports ${specifier} -> ${relative(root, resolved)}`
+  })
+}
+
 const packageJsTargetChecks = []
 
 for (const subpath of requiredSubpaths) {
@@ -449,12 +468,19 @@ for (const { subpath, condition, target, graph } of packageJsTargetChecks) {
 
   const reachedRootTargets = [...rootJsTargetSet]
     .filter(rootTarget => graph.jsFiles.has(rootTarget))
+  const dynamicRootReferences = graph.relativeDynamicJsImports
+    .filter(({ resolved }) => rootJsTargetSet.has(resolve(resolved)))
 
-  if (reachedRootTargets.length > 0 || graph.rootPackageReferences.length > 0) {
+  if (
+    reachedRootTargets.length > 0
+    || graph.rootPackageReferences.length > 0
+    || dynamicRootReferences.length > 0
+  ) {
     failures.push([
       `${subpath} condition "${condition}" target ${target} should not import or dynamically import the root bundle.`,
       ...formatReachedRootTargets(reachedRootTargets),
       ...formatImportTrace(graph.rootPackageReferences),
+      ...formatDynamicImportTrace(dynamicRootReferences),
     ].join('\n'))
   }
 }

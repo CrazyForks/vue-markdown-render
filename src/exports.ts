@@ -242,6 +242,8 @@ export {
 export default MarkdownRender
 
 const componentMap: Record<string, Component> = {
+  MarkdownRender,
+  NodeRenderer: MarkdownRender,
   AdmonitionNode,
   BlockquoteNode,
   CheckboxNode,
