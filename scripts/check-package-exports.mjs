@@ -39,6 +39,7 @@ const requiredCssMarkers = {
 }
 
 const forbiddenStyleEntryArtifactPattern = /^(?:styles|styles-entry)\.(?:mjs|cjs|js)(?:\.map)?$/
+const requiredCssSideEffectPattern = '**/*.css'
 
 const isolatedRootExports = [
   'default',
@@ -428,6 +429,17 @@ function checkCssSubpathContent() {
   }
 }
 
+function checkPackageCssSideEffects() {
+  if (pkg.sideEffects === true)
+    return
+
+  if (!Array.isArray(pkg.sideEffects) || !pkg.sideEffects.includes(requiredCssSideEffectPattern)) {
+    failures.push(
+      `package.json sideEffects must include "${requiredCssSideEffectPattern}" so explicit CSS subpath imports are not tree-shaken by consumers.`,
+    )
+  }
+}
+
 function collectStyleEntryArtifacts(dir, artifacts = []) {
   let entries = []
 
@@ -469,6 +481,7 @@ function checkNoStyleEntryArtifacts() {
 }
 
 checkCssSubpathContent()
+checkPackageCssSideEffects()
 checkSourceRootEntryDoesNotImportCss()
 checkNoStyleEntryArtifacts()
 

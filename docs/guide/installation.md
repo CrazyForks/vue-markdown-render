@@ -44,7 +44,7 @@ Then continue with [Docs Site & VitePress](/guide/vitepress-docs-integration) if
 pnpm add markstream-vue stream-monaco mermaid katex
 ```
 
-Then follow [AI Chat & Streaming](/guide/ai-chat-streaming) for the recommended `nodes` + `final` data flow and chat-specific tuning.
+Then follow [AI Chat & Streaming](/guide/ai-chat-streaming) for `mode="chat"`, `content` streaming, `final` handling, and the optional `nodes` path when another layer owns parsing.
 
 ### Diagram-heavy content
 
@@ -60,7 +60,14 @@ pnpm add markstream-vue stream-markdown stream-monaco mermaid @terrastruct/d2 ka
 
 ## 4. CSS order matters as much as installation
 
-The package entry already imports the default stylesheet, but when your app uses reset layers or utility frameworks you usually want explicit control over order.
+The root JavaScript entry does not inject renderer styles. Import one published CSS subpath from your app entry or CSS pipeline, after resets and before app-specific overrides.
+
+```ts
+// main.ts
+import 'markstream-vue/index.css'
+```
+
+For Tailwind or UnoCSS, keep Markstream styles in the component layer after reset/base styles:
 
 ```css
 @import 'modern-css-reset';
@@ -68,6 +75,8 @@ The package entry already imports the default stylesheet, but when your app uses
 
 @import 'markstream-vue/index.css' layer(components);
 ```
+
+Use `markstream-vue/index.px.css` instead when your app intentionally scales the root font size on mobile. Use `markstream-vue/index.tailwind.css` only when you want the Tailwind-ready CSS variant.
 
 Also import KaTeX CSS when you use math:
 
