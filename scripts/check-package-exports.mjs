@@ -41,6 +41,7 @@ const requiredCssMarkers = {
 const forbiddenStyleEntryArtifactPattern = /^(?:styles|styles-entry)\.(?:mjs|cjs|js)(?:\.map)?$/
 
 const isolatedRootExports = [
+  'default',
   'MarkdownRender',
   'VueRendererMarkdown',
   'CodeBlockNode',
