@@ -5,6 +5,7 @@ import type {
   ImageNodeProps,
   InfographicBlockNodeProps,
   InfographicLoader,
+  LanguageIconResolver,
   LinkNodeProps,
   MarkdownIt,
   MarkdownPluginRegistration,
@@ -27,6 +28,7 @@ import type {
   MarkstreamVuePluginOptions,
   MathBlockNodeProps,
   MathInlineNodeProps,
+  MathOptions,
   MermaidBlockNodeProps,
   NodeRendererProps,
   SmoothMarkdownStreamOptions,
@@ -65,8 +67,10 @@ import MarkdownRender, {
   setCustomComponents,
   setD2Loader,
   setDefaultMathOptions,
+  setIconTheme,
   setInfographicLoader,
   setKatexLoader,
+  setLanguageIconResolver,
   setMermaidLoader,
   toSafeMermaidSvgMarkup,
   toSafeSvgElement,
@@ -96,9 +100,20 @@ const props: NodeRendererProps = {
 
 const options: SmoothMarkdownStreamOptions = {}
 const customComponents: CustomComponents = {}
+const pluginLanguageIconResolver: LanguageIconResolver = lang => `custom-${lang}`
+const pluginMathOptions: MathOptions = {}
+const pluginIconTheme = 'material'
+const infographicLoader: InfographicLoader = async () => ({})
 const pluginOptions: MarkstreamVuePluginOptions = {
   components: customComponents,
+  getLanguageIcon: pluginLanguageIconResolver,
+  iconTheme: pluginIconTheme,
+  infographicLoader,
+  mathOptions: pluginMathOptions,
 }
+
+setIconTheme(pluginIconTheme)
+setLanguageIconResolver(pluginLanguageIconResolver)
 
 setCustomComponents('docs', customComponents)
 setCustomComponents(customComponents)
@@ -123,7 +138,6 @@ disableD2()
 const d2Enabled = isD2Enabled()
 setD2Loader(async () => ({}))
 
-const infographicLoader: InfographicLoader = async () => ({})
 setInfographicLoader(infographicLoader)
 setInfographicLoader()
 enableInfographic(infographicLoader)

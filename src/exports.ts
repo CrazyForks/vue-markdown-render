@@ -1,4 +1,6 @@
+import type { MathOptions } from 'stream-markdown-parser'
 import type { App, Component, DefineComponent, Plugin } from 'vue'
+import type { InfographicLoader } from './components/InfographicBlockNode/infographic'
 import type { MarkstreamVirtualTimelineProps } from './composables/useMarkstreamVirtualAdapter'
 import type { CustomComponents as MarkstreamCustomComponents } from './types'
 import type {
@@ -9,6 +11,8 @@ import type {
   MathInlineNodeProps,
   MermaidBlockNodeProps,
 } from './types/component-props'
+import type { LanguageIconResolver } from './utils/languageIcon'
+import { setDefaultMathOptions } from 'stream-markdown-parser'
 import { defineAsyncComponent } from 'vue'
 import AdmonitionNode from './components/AdmonitionNode'
 
@@ -50,6 +54,8 @@ import VmrContainerNode from './components/VmrContainerNode'
 import { useMarkstreamVirtualAdapter } from './composables/useMarkstreamVirtualAdapter'
 import { setDefaultI18nMap } from './composables/useSafeI18n'
 import { useSmoothMarkdownStream } from './composables/useSmoothMarkdownStream'
+import { setIconTheme } from './icon-themes'
+import { setLanguageIconResolver } from './utils/languageIcon'
 import { clearGlobalCustomComponents, createCustomComponentsRef, getCustomNodeComponents, MARKSTREAM_CUSTOM_COMPONENTS_KEY, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
 
 function definePublicAsyncComponent<TProps extends object>(
@@ -161,15 +167,38 @@ export interface CustomComponents extends MarkstreamCustomComponents {}
 export interface MarkstreamVuePluginOptions {
   /**
    * App-scoped custom components.
-   *
-   * Keep process-global configuration on the explicit setter APIs:
-   * setIconTheme(), setLanguageIconResolver(), setDefaultMathOptions(),
-   * setInfographicLoader(), etc.
-   *
-   * This keeps VueRendererMarkdown safe for SSR / multi-tenant apps where
-   * app.use() may run once per request or per app instance.
    */
   components?: Partial<MarkstreamCustomComponents>
+
+  /**
+   * @deprecated Prefer setLanguageIconResolver() before app.mount().
+   *
+   * Kept for 1.x compatibility. This still mutates process-global icon
+   * resolution state, so avoid it in multi-tenant SSR apps.
+   */
+  getLanguageIcon?: LanguageIconResolver
+
+  /**
+   * @deprecated Prefer setIconTheme() before app.mount().
+   *
+   * Kept for 1.x compatibility. This still mutates process-global icon
+   * theme state, so avoid it in multi-tenant SSR apps.
+   */
+  iconTheme?: string
+
+  /**
+   * @deprecated Prefer setInfographicLoader() before app.mount().
+   *
+   * Kept for 1.x compatibility.
+   */
+  infographicLoader?: InfographicLoader | null
+
+  /**
+   * @deprecated Prefer setDefaultMathOptions() before app.mount().
+   *
+   * Kept for 1.x compatibility.
+   */
+  mathOptions?: MathOptions
 }
 
 export {
@@ -290,6 +319,15 @@ export const VueRendererMarkdown: Plugin = {
     Object.entries(componentMap).forEach(([name, component]) => {
       app.component(name, component)
     })
+
+    if (options?.iconTheme)
+      setIconTheme(options.iconTheme)
+    if (options?.getLanguageIcon)
+      setLanguageIconResolver(options.getLanguageIcon)
+    if (options?.mathOptions)
+      setDefaultMathOptions(options.mathOptions)
+    if (options && 'infographicLoader' in options)
+      setInfographicLoader(options.infographicLoader ?? null)
 
     if (options?.components)
       app.provide(MARKSTREAM_CUSTOM_COMPONENTS_KEY, createCustomComponentsRef(options.components))
