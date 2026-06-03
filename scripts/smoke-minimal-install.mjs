@@ -6,6 +6,7 @@ import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { gunzipSync } from 'node:zlib'
+import ts from 'typescript'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const tmp = mkdtempSync(join(tmpdir(), 'markstream-vue-minimal-'))
@@ -136,17 +137,92 @@ const packedCssContracts = {
   'package/dist/index.tailwind.css': ['--ms-background:', '--ms-foreground:'],
 }
 
+function stripImportQuery(specifier) {
+  return String(specifier).split(/[?#]/, 1)[0]
+}
+
+function isCssSpecifier(specifier) {
+  return stripImportQuery(specifier).endsWith('.css')
+}
+
+function getLiteralSpecifier(node) {
+  if (!node)
+    return null
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+    return node.text
+  return null
+}
+
+function isImportMetaUrl(node) {
+  return ts.isPropertyAccessExpression(node)
+    && node.name.text === 'url'
+    && ts.isMetaProperty(node.expression)
+    && node.expression.keywordToken === ts.SyntaxKind.ImportKeyword
+    && node.expression.name.text === 'meta'
+}
+
+function collectCssModuleReferences(source, filename) {
+  const sourceFile = ts.createSourceFile(
+    filename,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS,
+  )
+  const references = []
+
+  function pushReference(specifier, kind) {
+    if (!specifier || !isCssSpecifier(specifier))
+      return
+    references.push({ specifier, kind })
+  }
+
+  function visit(node) {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+      && node.moduleSpecifier
+    ) {
+      pushReference(getLiteralSpecifier(node.moduleSpecifier), 'static')
+    }
+
+    if (
+      ts.isCallExpression(node)
+      && node.expression.kind === ts.SyntaxKind.ImportKeyword
+    ) {
+      pushReference(getLiteralSpecifier(node.arguments[0]), 'dynamic')
+    }
+
+    if (
+      ts.isNewExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'URL'
+      && node.arguments?.length >= 2
+      && isImportMetaUrl(node.arguments[1])
+    ) {
+      pushReference(getLiteralSpecifier(node.arguments[0]), 'asset')
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return references
+}
+
 function assertNoCssImportInPackedJs(tarball) {
-  const cssSpecifierPattern = /['"][^'"]*\.css(?:[?#][^'"]*)?['"]/
   const jsEntries = readTgzEntries(tarball, path => (
     path.startsWith('package/dist/')
     && /\.(?:mjs|js|cjs)$/.test(path)
   ))
 
   for (const [path, source] of jsEntries) {
-    if (cssSpecifierPattern.test(source)) {
+    const cssReferences = collectCssModuleReferences(source, path)
+    if (cssReferences.length > 0) {
       throw new Error(
-        `${path} must not import CSS. Import CSS only through markstream-vue/index.css, index.px.css, or index.tailwind.css.`,
+        [
+          `${path} must not import CSS. Import CSS only through markstream-vue/index.css, index.px.css, or index.tailwind.css.`,
+          ...cssReferences.map(({ specifier, kind }) => `  - ${kind}: ${specifier}`),
+        ].join('\n'),
       )
     }
   }
@@ -358,7 +434,7 @@ try {
     '',
     '<a href="javascript:alert(1)">bad</a>',
   ].join('\n')
-  writeProjectFile('ssr-import.mjs', `import { existsSync } from 'node:fs'\nimport { fileURLToPath } from 'node:url'\nimport { createSSRApp, defineComponent, h } from 'vue'\nimport { renderToString } from '@vue/server-renderer'\nimport MarkdownRender, { MarkdownRender as NamedMarkdownRender, VueRendererMarkdown } from 'markstream-vue'\n\nconst mod = await import('markstream-vue')\nif (!mod.default || !mod.MarkdownRender || !NamedMarkdownRender)\n  throw new Error('Root package import did not expose MarkdownRender')\n\nfor (const cssSpecifier of ['markstream-vue/index.css', 'markstream-vue/index.tailwind.css', 'markstream-vue/index.px.css']) {\n  const cssUrl = import.meta.resolve(cssSpecifier)\n  if (!existsSync(fileURLToPath(cssUrl)))\n    throw new Error(\`\${cssSpecifier} export did not resolve to a file\`)\n}\n\nawait import('markstream-vue/workers/katexWorkerClient')\nawait import('markstream-vue/workers/mermaidWorkerClient')\nawait import('markstream-vue/workers/katexCdnWorker')\nawait import('markstream-vue/workers/mermaidCdnWorker')\n\nfor (const workerSpecifier of ['markstream-vue/workers/katexRenderer.worker', 'markstream-vue/workers/mermaidParser.worker']) {\n  const workerUrl = import.meta.resolve(workerSpecifier)\n  if (!existsSync(fileURLToPath(workerUrl)))\n    throw new Error(\`\${workerSpecifier} export did not resolve to a packed file\`)\n}\n\nconst tailwind = await import('markstream-vue/tailwind')\nif (typeof tailwind.default !== 'string' || !tailwind.default.includes('markstream-vue'))\n  throw new Error('Tailwind export did not expose the generated safelist')\n\nconst ThinkingNode = defineComponent({\n  name: 'SsrSmokeThinkingNode',\n  setup(_, { slots }) {\n    return () => h('aside', { 'data-ssr-smoke-thinking': '1' }, slots.default?.() ?? [])\n  },\n})\n\nconst app = createSSRApp({\n  render: () => h(MarkdownRender, {\n    content: ${JSON.stringify(`${ssrMarkdown}\\n\\n<thinking>ssr app component</thinking>`)},\n    final: true,\n  }),\n})\napp.use(VueRendererMarkdown, { components: { thinking: ThinkingNode } })\n\nconst html = await renderToString(app)\n\nif (!html || !html.includes('console.log'))\n  throw new Error('SSR render did not include code content')\n\nif (!html.includes('data-ssr-smoke-thinking'))\n  throw new Error('SSR app-scoped custom component did not render')\n\nif (/javascript:alert/i.test(html))\n  throw new Error('SSR render kept unsafe javascript URL')\n`)
+  writeProjectFile('ssr-import.mjs', `import { existsSync } from 'node:fs'\nimport { fileURLToPath } from 'node:url'\nimport { createSSRApp, defineComponent, h } from 'vue'\nimport { renderToString } from '@vue/server-renderer'\nimport MarkdownRender, { MarkdownRender as NamedMarkdownRender, VueRendererMarkdown } from 'markstream-vue'\n\nconst mod = await import('markstream-vue')\nif (!mod.default || !mod.MarkdownRender || !NamedMarkdownRender)\n  throw new Error('Root package import did not expose MarkdownRender')\n\nfor (const cssSpecifier of ['markstream-vue/index.css', 'markstream-vue/index.tailwind.css', 'markstream-vue/index.px.css']) {\n  const cssUrl = import.meta.resolve(cssSpecifier)\n  if (!existsSync(fileURLToPath(cssUrl)))\n    throw new Error(\`\${cssSpecifier} export did not resolve to a file\`)\n}\n\nawait import('markstream-vue/workers/katexWorkerClient')\nawait import('markstream-vue/workers/mermaidWorkerClient')\nawait import('markstream-vue/workers/katexCdnWorker')\nawait import('markstream-vue/workers/mermaidCdnWorker')\n\nfor (const workerSpecifier of ['markstream-vue/workers/katexRenderer.worker', 'markstream-vue/workers/mermaidParser.worker']) {\n  const workerUrl = import.meta.resolve(workerSpecifier)\n  if (!existsSync(fileURLToPath(workerUrl)))\n    throw new Error(\`\${workerSpecifier} export did not resolve to a packed file\`)\n}\n\nconst tailwind = await import('markstream-vue/tailwind')\nif (typeof tailwind.default !== 'string' || !tailwind.default.includes('markstream-vue'))\n  throw new Error('Tailwind export did not expose the generated safelist')\n\nconst ThinkingNode = defineComponent({\n  name: 'SsrSmokeThinkingNode',\n  setup(_, { slots }) {\n    return () => h('aside', { 'data-ssr-smoke-thinking': '1' }, slots.default?.() ?? [])\n  },\n})\n\nconst app = createSSRApp({\n  render: () => h(MarkdownRender, {\n    content: ${JSON.stringify(`${ssrMarkdown}\\n\\n<thinking>ssr app component</thinking>`)},\n    final: true,\n  }),\n})\napp.use(VueRendererMarkdown, { components: { thinking: ThinkingNode } })\n\nfor (const name of ['MarkdownRender', 'NodeRenderer', 'Tooltip']) {\n  if (!app.component(name)) {\n    throw new Error('VueRendererMarkdown did not register global component: ' + name)\n  }\n}\n\nconst html = await renderToString(app)\n\nif (!html || !html.includes('console.log'))\n  throw new Error('SSR render did not include code content')\n\nif (!html.includes('data-ssr-smoke-thinking'))\n  throw new Error('SSR app-scoped custom component did not render')\n\nif (/javascript:alert/i.test(html))\n  throw new Error('SSR render kept unsafe javascript URL')\n`)
 
   run('pnpm', ['install', '--ignore-workspace'], { cwd: tmp })
   if (!installOptionalPeers)

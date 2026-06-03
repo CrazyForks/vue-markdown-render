@@ -494,6 +494,8 @@ async function checkRootRuntimeExports() {
       failures.push('. is missing runtime export "MarkdownRender"')
     if (!('VueRendererMarkdown' in mod))
       failures.push('. is missing runtime export "VueRendererMarkdown"')
+    else if (typeof mod.VueRendererMarkdown?.install !== 'function')
+      failures.push('. runtime export "VueRendererMarkdown" should be a Vue plugin with install(app, options)')
 
     if ('default' in mod && 'MarkdownRender' in mod && mod.default !== mod.MarkdownRender)
       failures.push('. default export should reference MarkdownRender')

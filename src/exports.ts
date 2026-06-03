@@ -312,6 +312,7 @@ const componentMap: Record<string, Component> = {
   ReferenceNode,
   MarkdownCodeBlockNode,
   MarkstreamVirtualTimeline,
+  Tooltip,
 }
 
 export const VueRendererMarkdown: Plugin = {
