@@ -73,6 +73,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: pnpm run build:parser && pnpm build
 
+      - name: Build playground deploy target (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm play:deploy:check
+
       - name: Virtual scroll playground e2e (Ubuntu only)
         if: matrix.os == 'ubuntu-latest'
         run: pnpm run test:e2e:virtual-scroll:ci
