@@ -313,14 +313,15 @@ function collectImportGraph(entryPath) {
       if (!resolvedImport)
         continue
 
-      if (kind === 'dynamic' || kind === 'require') {
+      if (kind === 'dynamic' || kind === 'require' || kind === 'asset') {
         relativeResolvedJsImports.push({
           importer: fullPath,
           specifier,
           resolved: resolvedImport,
           kind,
         })
-        queue.push(resolvedImport)
+        if (kind !== 'asset')
+          queue.push(resolvedImport)
         continue
       }
 
@@ -491,7 +492,9 @@ function formatResolvedImportTrace(imports) {
       ? 'dynamically imports'
       : kind === 'require'
         ? 'requires'
-        : 'imports'
+        : kind === 'asset'
+          ? 'references'
+          : 'imports'
     return `    ${relative(root, importer)} ${verb} ${specifier} -> ${relative(root, resolved)}`
   })
 }
