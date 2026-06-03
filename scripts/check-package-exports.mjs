@@ -91,7 +91,6 @@ const runtimeSubpathChecks = [
 ]
 
 const failures = []
-const rootImportTarget = typeof pkg.exports?.['.'] === 'object' ? pkg.exports['.'].import : undefined
 const bareStaticImportSpecifierPattern = /\bimport\s*["']([^"']+)["']/g
 const fromStaticImportSpecifierPattern = /\b(?:import|export)[^'"]+\bfrom\s*["']([^"']+)["']/g
 
@@ -128,6 +127,16 @@ function getPackageSpecifier(subpath) {
 
 function stripImportQuery(specifier) {
   return String(specifier).split(/[?#]/, 1)[0]
+}
+
+function isJsTarget(target) {
+  const cleanTarget = stripImportQuery(target)
+  return /\.(?:mjs|js)$/.test(cleanTarget)
+}
+
+function getPackageJsTargets(subpath) {
+  return normalizeTargets(pkg.exports?.[subpath])
+    .filter(({ target }) => typeof target === 'string' && isJsTarget(target))
 }
 
 function isCssSpecifier(specifier) {
@@ -210,6 +219,9 @@ function collectStaticCssImports(entryPath) {
   return cssImports
 }
 
+const rootJsTargets = getPackageJsTargets('.')
+const rootJsTargetSet = new Set(rootJsTargets.map(({ target }) => target))
+
 for (const subpath of requiredSubpaths) {
   const entry = pkg.exports?.[subpath]
 
@@ -232,10 +244,9 @@ for (const subpath of requiredSubpaths) {
     subpath !== '.'
     && typeof entry === 'object'
     && typeof entry.import === 'string'
-    && typeof rootImportTarget === 'string'
-    && entry.import === rootImportTarget
+    && rootJsTargetSet.has(entry.import)
   ) {
-    failures.push(`${subpath} should not import the root bundle (${rootImportTarget})`)
+    failures.push(`${subpath} should not import the root bundle (${entry.import})`)
   }
 }
 
@@ -253,20 +264,43 @@ for (const subpath of requiredCssSubpaths) {
   }
 }
 
-if (typeof rootImportTarget === 'string') {
-  const rootImportPath = join(root, rootImportTarget)
-  if (existsSync(rootImportPath)) {
-    const cssImports = collectStaticCssImports(rootImportPath)
-    if (cssImports.length > 0) {
-      failures.push([
-        `${rootImportTarget} should not statically import CSS; keep styles on explicit CSS subpaths.`,
-        ...cssImports.map(({ importer, specifier }) => {
-          return `    ${relative(root, importer)} imports ${specifier}`
-        }),
-      ].join('\n'))
-    }
+for (const { condition, target } of rootJsTargets) {
+  const rootImportPath = join(root, target)
+  if (!existsSync(rootImportPath))
+    continue
+
+  const cssImports = collectStaticCssImports(rootImportPath)
+  if (cssImports.length > 0) {
+    failures.push([
+      `. condition "${condition}" target ${target} should not statically import CSS; keep styles on explicit CSS subpaths.`,
+      ...cssImports.map(({ importer, specifier }) => {
+        return `    ${relative(root, importer)} imports ${specifier}`
+      }),
+    ].join('\n'))
   }
 }
+
+async function checkRootRuntimeExports() {
+  try {
+    const mod = await import(getPackageSpecifier('.'))
+
+    if (!('default' in mod))
+      failures.push('. is missing runtime export "default"')
+    if (!('MarkdownRender' in mod))
+      failures.push('. is missing runtime export "MarkdownRender"')
+    if (!('VueRendererMarkdown' in mod))
+      failures.push('. is missing runtime export "VueRendererMarkdown"')
+
+    if ('default' in mod && 'MarkdownRender' in mod && mod.default !== mod.MarkdownRender)
+      failures.push('. default export should reference MarkdownRender')
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    failures.push(`. failed runtime import check: ${message}`)
+  }
+}
+
+await checkRootRuntimeExports()
 
 for (const { subpath, exports: requiredExports, forbiddenExports = [] } of runtimeSubpathChecks) {
   const specifier = getPackageSpecifier(subpath)
