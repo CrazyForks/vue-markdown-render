@@ -137,6 +137,8 @@ const packedCssContracts = {
   'package/dist/index.tailwind.css': ['--ms-background:', '--ms-foreground:'],
 }
 
+const packedStyleEntryArtifactPattern = /^package\/dist\/styles(?:\.|$)/
+
 function stripImportQuery(specifier) {
   return String(specifier).split(/[?#]/, 1)[0]
 }
@@ -239,7 +241,7 @@ function assertNoCssImportInPackedJs(tarball) {
 function assertNoStyleEntryLeak(tarball) {
   const leaked = [...readTgzEntries(
     tarball,
-    path => path.startsWith('package/dist/styles.'),
+    path => packedStyleEntryArtifactPattern.test(path),
   ).keys()]
 
   if (leaked.length > 0) {

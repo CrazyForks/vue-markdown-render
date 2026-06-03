@@ -1,19 +1,24 @@
-import { rm } from 'node:fs/promises'
+import { readdir, rm } from 'node:fs/promises'
+import { join } from 'node:path'
 
 // `styles-entry.ts` exists only to force Vite to emit the explicit CSS file
 // exported through `markstream-vue/index.css`. The JS entry itself must never
 // be published or imported by consumers.
-await Promise.all([
-  'dist/styles.js',
-  'dist/styles.mjs',
-  'dist/styles.cjs',
-  'dist/styles.js.map',
-  'dist/styles.mjs.map',
-  'dist/styles.cjs.map',
-  'dist/styles.d.ts',
-  'dist/styles.d.mts',
-  'dist/styles.d.cts',
-  'dist/styles.d.ts.map',
-  'dist/styles.d.mts.map',
-  'dist/styles.d.cts.map',
-].map(file => rm(file, { force: true })))
+const distDir = 'dist'
+const forbiddenStyleEntryArtifactPattern = /^styles(?:\.|$)/
+
+let entries = []
+
+try {
+  entries = await readdir(distDir)
+}
+catch (error) {
+  if (error?.code !== 'ENOENT')
+    throw error
+}
+
+await Promise.all(
+  entries
+    .filter(name => forbiddenStyleEntryArtifactPattern.test(name))
+    .map(name => rm(join(distDir, name), { recursive: true, force: true })),
+)

@@ -315,7 +315,7 @@ const componentMap: Record<string, Component> = {
   Tooltip,
 }
 
-export const VueRendererMarkdown: Plugin = {
+export const VueRendererMarkdown: Plugin<[options?: MarkstreamVuePluginOptions]> = {
   install(app: App, options?: MarkstreamVuePluginOptions) {
     Object.entries(componentMap).forEach(([name, component]) => {
       app.component(name, component)

@@ -79,7 +79,7 @@ import MarkdownRender, {
   useSmoothMarkdownStream,
   VueRendererMarkdown,
 } from 'markstream-vue'
-import { ref } from 'vue'
+import { createApp, ref } from 'vue'
 
 const component = MarkdownRender
 const plugin = VueRendererMarkdown
@@ -111,6 +111,14 @@ const pluginOptions: MarkstreamVuePluginOptions = {
   infographicLoader,
   mathOptions: pluginMathOptions,
 }
+
+const pluginApp = createApp({ render: () => null })
+
+pluginApp.use(plugin, pluginOptions)
+pluginApp.use(VueRendererMarkdown, pluginOptions)
+
+// @ts-expect-error MarkstreamVuePluginOptions rejects unknown plugin options.
+pluginApp.use(plugin, { components: customComponents, unknownOption: true })
 
 setIconTheme(pluginIconTheme)
 setLanguageIconResolver(pluginLanguageIconResolver)
