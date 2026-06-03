@@ -57,7 +57,6 @@ import { useSmoothMarkdownStream } from './composables/useSmoothMarkdownStream'
 import { setIconTheme } from './icon-themes'
 import { setLanguageIconResolver } from './utils/languageIcon'
 import { clearGlobalCustomComponents, createCustomComponentsRef, getCustomNodeComponents, MARKSTREAM_CUSTOM_COMPONENTS_KEY, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
-import './index.css'
 
 function definePublicAsyncComponent<TProps extends object>(
   loader: () => Promise<{ default: Component }>,

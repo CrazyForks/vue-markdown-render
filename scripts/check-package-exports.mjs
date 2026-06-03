@@ -155,30 +155,76 @@ function isRelativeSpecifier(specifier) {
   return specifier.startsWith('./') || specifier.startsWith('../')
 }
 
-function getStaticImportSpecifiers(source, filename) {
+function getScriptKind(filename) {
+  if (/\.[cm]?tsx$/.test(filename))
+    return ts.ScriptKind.TSX
+  if (/\.[cm]?ts$/.test(filename))
+    return ts.ScriptKind.TS
+  return ts.ScriptKind.JS
+}
+
+function getLiteralSpecifier(node) {
+  if (!node)
+    return null
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+    return node.text
+  return null
+}
+
+function isImportMetaUrl(node) {
+  return ts.isPropertyAccessExpression(node)
+    && node.name.text === 'url'
+    && ts.isMetaProperty(node.expression)
+    && node.expression.keywordToken === ts.SyntaxKind.ImportKeyword
+    && node.expression.name.text === 'meta'
+}
+
+function getModuleReferences(source, filename) {
   const sourceFile = ts.createSourceFile(
     filename,
     source,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.JS,
+    getScriptKind(filename),
   )
-  const specifiers = []
+  const references = []
+
+  function pushReference(specifier, kind) {
+    if (!specifier)
+      return
+    references.push({ specifier, kind })
+  }
 
   function visit(node) {
     if (
       (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
       && node.moduleSpecifier
-      && ts.isStringLiteralLike(node.moduleSpecifier)
     ) {
-      specifiers.push(node.moduleSpecifier.text)
+      pushReference(getLiteralSpecifier(node.moduleSpecifier), 'static')
+    }
+
+    if (
+      ts.isCallExpression(node)
+      && node.expression.kind === ts.SyntaxKind.ImportKeyword
+    ) {
+      pushReference(getLiteralSpecifier(node.arguments[0]), 'dynamic')
+    }
+
+    if (
+      ts.isNewExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'URL'
+      && node.arguments?.length >= 2
+      && isImportMetaUrl(node.arguments[1])
+    ) {
+      pushReference(getLiteralSpecifier(node.arguments[0]), 'asset')
     }
 
     ts.forEachChild(node, visit)
   }
 
   visit(sourceFile)
-  return specifiers
+  return references
 }
 
 function resolveLocalJsImport(importerPath, specifier) {
@@ -225,22 +271,27 @@ function collectStaticImportGraph(entryPath) {
     jsFiles.add(fullPath)
 
     const source = readFileSync(fullPath, 'utf8')
-    for (const specifier of getStaticImportSpecifiers(source, fullPath)) {
+    for (const { specifier, kind } of getModuleReferences(source, fullPath)) {
       if (isCssSpecifier(specifier)) {
         cssImports.push({
           importer: fullPath,
           specifier,
+          kind,
         })
         continue
       }
 
-      if (isRootPackageSpecifier(specifier)) {
+      if (kind === 'static' && isRootPackageSpecifier(specifier)) {
         rootPackageImports.push({
           importer: fullPath,
           specifier,
+          kind,
         })
         continue
       }
+
+      if (kind !== 'static')
+        continue
 
       const resolvedImport = resolveLocalJsImport(fullPath, specifier)
       if (resolvedImport)
@@ -263,6 +314,27 @@ function resolvePackageTarget(target) {
 
 const rootJsTargets = getPackageJsTargets('.')
 const rootJsTargetSet = new Set(rootJsTargets.map(({ target }) => resolvePackageTarget(target)))
+
+function checkSourceRootEntryDoesNotImportCss() {
+  const sourceEntry = resolve(root, 'src/exports.ts')
+  if (!isExistingFile(sourceEntry))
+    return
+
+  const cssReferences = getModuleReferences(readFileSync(sourceEntry, 'utf8'), sourceEntry)
+    .filter(({ specifier }) => isCssSpecifier(specifier))
+    .map(({ specifier, kind }) => ({
+      importer: sourceEntry,
+      specifier,
+      kind,
+    }))
+
+  if (cssReferences.length > 0) {
+    failures.push([
+      'src/exports.ts should not import CSS; keep renderer styles on explicit package CSS subpaths.',
+      ...formatImportTrace(cssReferences),
+    ].join('\n'))
+  }
+}
 
 for (const subpath of requiredSubpaths) {
   const entry = pkg.exports?.[subpath]
@@ -297,9 +369,14 @@ for (const subpath of requiredCssSubpaths) {
   }
 }
 
+checkSourceRootEntryDoesNotImportCss()
+
 function formatImportTrace(imports) {
-  return imports.map(({ importer, specifier }) => {
-    return `    ${relative(root, importer)} imports ${specifier}`
+  return imports.map(({ importer, specifier, kind = 'static' }) => {
+    const verb = kind === 'asset'
+      ? 'references'
+      : 'imports'
+    return `    ${relative(root, importer)} ${verb} ${specifier} (${kind})`
   })
 }
 
