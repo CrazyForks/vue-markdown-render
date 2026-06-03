@@ -40,7 +40,8 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
       - For high-frequency smooth streams, consider `fade=false` / `:fade="false"` / `[fade]="false"` to avoid fade stacking.
     - **Streaming vs recovering history**: in chat UIs the same renderer starts streaming and later switches to history when `final` becomes `true`.
       - Vue 3 streaming: `mode="chat"`, `smooth-streaming="auto"`, `:fade="false"`, `typewriter=true`.
-      - Vue 3 recovering history: `mode="docs"` or `mode="minimal"`, `:smooth-streaming="false"`, `:fade="true"`, `typewriter=false`.
+      - Vue 3 recovering/completed chat history: keep `mode="chat"` on the same chat row; use `:smooth-streaming="false"`, `typewriter=false`, and only set `:fade="true"` when the host explicitly wants a history-entry animation.
+      - Use `mode="minimal"` for lightweight non-chat recovered content, and use `mode="docs"` only for rich document surfaces.
       - Other packages streaming: `smoothStreaming="auto"` / `smooth-streaming="auto"`, `fade=false`, `typewriter=true`.
       - Other packages recovering history: `smoothStreaming=false` / `smooth-streaming=false`, `fade=true`, `typewriter=false`.
       - Dynamic switch: `smoothStreaming={isStreaming ? 'auto' : false}`, `fade={!isStreaming}`.
@@ -61,7 +62,7 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
 - Move to `nodes` only when another layer owns parsing or AST transforms.
 - For Vue 3 apps that already virtualize messages, keep the outer virtualizer responsible for mounted rows; use Markstream virtual-scroll coordination so item height comes from `metrics.totalHeight`, not the renderer DOM height.
 - When using `content` for streaming, smooth streaming (`smooth-streaming="auto"`) is on by default for `typewriter` or `max-live-nodes <= 0`. Set `:smooth-streaming="false"` to preserve raw chunk cadence.
-- Streaming vs recovering history: when a chat message transitions from streaming to history, switch props dynamically — `smooth-streaming="auto"`, `fade=false` for streaming; `smooth-streaming=false`, `fade=true` for history. See `docs/guide/ai-chat-streaming.md` for full examples.
+- Streaming vs recovering history: when a chat message transitions from streaming to history, keep the renderer mode stable and switch props dynamically — `smooth-streaming="auto"`, `fade=false` for streaming; `smooth-streaming=false`, optional `fade=true` for history. See `docs/guide/ai-chat-streaming.md` for full examples.
 - Treat CSS order as a first-class part of installation, not a later cleanup.
 - When the request includes SSR, explicitly gate browser-only peers behind client-only boundaries.
 - Do not widen HTML or Mermaid security defaults unless the user explicitly needs trusted legacy compatibility.

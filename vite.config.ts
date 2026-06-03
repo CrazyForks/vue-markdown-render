@@ -53,6 +53,7 @@ export default defineConfig(({ mode }) => {
     build = {
       target: 'es2015',
       cssTarget: 'chrome61',
+      cssCodeSplit: false,
       // emit assets at dist root (no assets/ folder)
       assetsDir: '',
       copyPublicDir: false,

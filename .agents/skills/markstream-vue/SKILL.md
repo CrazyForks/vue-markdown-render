@@ -24,7 +24,8 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
    - When overriding mode defaults on a high-frequency stream, pair smooth streaming with `:fade="false"` to avoid delta fade (280 ms) stacking with high-commit pacing.
    - **Streaming vs recovering history**: in chat UIs the same `MarkdownRender` starts streaming and later switches to history when `final=true`.
      - Streaming: `mode="chat"`, `smooth-streaming="auto"`, `:fade="false"`, `typewriter=true`.
-     - Recovering history: `mode="docs"` or `mode="minimal"`, `:smooth-streaming="false"`, `:fade="true"`, `typewriter=false`.
+     - Recovering/completed chat history: keep `mode="chat"` on the same chat row to avoid switching code renderer or layout strategy when `final=true`; use `:smooth-streaming="false"`, `typewriter=false`, and only set `:fade="true"` when the host explicitly wants a history-entry animation.
+     - Use `mode="minimal"` for lightweight non-chat recovered content, and use `mode="docs"` only for rich document surfaces, not for finalizing an existing chat message.
    - Switch to `nodes` plus `final` only when the app needs custom AST control, worker preparsing, or structural updates beyond pacing.
    - Remember that `html-policy` now defaults to `safe`, and Mermaid strict mode is on by default through `mermaid-props`.
 5. For long AI transcripts or existing message virtualizers, choose the virtual-scroll path.
@@ -42,7 +43,7 @@ Use this skill when the host app is plain Vue 3, typically Vite-based, and not N
 - Omit `mode` only when the surface should use rich docs defaults.
 - Smooth streaming (`smooth-streaming="auto"`) is on by default when `typewriter` or `max-live-nodes <= 0`. It only paces the `content` path; `nodes` mode is never affected.
 - For manual pacing with `nodes`, use `useSmoothMarkdownStream` directly: `enqueue()` chunks, `finish()` when done, render from `visible`, and wait for `caughtUp` before final parsing.
-- Streaming vs recovering history: when a chat message transitions from streaming to history (e.g. `final` becomes `true`), switch from `mode="chat"` streaming defaults to a history mode and disable smooth streaming. See `docs/guide/ai-chat-streaming.md` for full examples.
+- Streaming vs recovering history: keep the same renderer mode for a given chat row; when `final=true`, disable smooth streaming/typewriter and optionally enable fade. Switch to `mode="docs"` only when moving content into a separate rich document surface. See `docs/guide/ai-chat-streaming.md` for full examples.
 - Prefer local component registration unless the repo already uses a shared plugin entry.
 - If a Vue 3 app already virtualizes messages, keep that outer virtualizer in charge and enable `virtual-scroll` only on large Markdown messages.
 - For `vue-virtual-scroller`, keep `sessionKey` tied to content identity (`thread:item:revision`) and `measurementKey` tied to layout identity such as width, theme, font, and density.

@@ -20,6 +20,7 @@ export default defineConfig({
   build: {
     target: 'es2015',
     cssTarget: 'chrome61',
+    cssCodeSplit: false,
     copyPublicDir: false,
     // Build into a temporary folder; we copy only `index.tailwind.css`
     // into `dist/` and delete the rest.

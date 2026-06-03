@@ -174,6 +174,7 @@ createApp({
 ```
 
 当你想要和 `chat` 相同的轻量默认值，但当前页面不是聊天语义时，可以使用 `mode="minimal"`。避免把高频 `smooth-streaming` 和 `fade` 同时开启，否则稳定的流式输出可能变成反复重启的透明度动画。
+同一条聊天消息不要仅因为 `final` 变为 `true` 就从 `mode="chat"` 切到 `mode="docs"`。保持 mode 稳定，只切换 `smooth-streaming`、`typewriter`、`fade` 等节奏/动画 props；`docs` 会改变默认代码块渲染器和布局策略。
 如果文档页不需要 Monaco 代码块，建议设置 `:render-code-blocks-as-pre="true"`；如果需要富 Monaco 代码块 UI，请安装 `stream-monaco`，否则渲染器会按设计降级为 `<pre>` 渲染。
 
 渲染器的 CSS 会作用于内部 `.markstream-vue` 容器下，以尽量降低对全局的影响；如果你脱离 `MarkdownRender` 单独使用导出的节点组件，请在外层包一层带 `markstream-vue` 类名的容器。

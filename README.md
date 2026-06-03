@@ -182,6 +182,7 @@ Choose the renderer mode by surface:
 ```
 
 Use `mode="minimal"` when you want the same lightweight defaults as `chat`, but prefer a neutral mode name for non-chat surfaces. Avoid combining high-frequency `smooth-streaming` with `fade`; it can turn a steady stream into repeated opacity restarts.
+For the same chat message, do not switch from `mode="chat"` to `mode="docs"` only because `final` changed. Keep the mode stable and switch pacing/animation props (`smooth-streaming`, `typewriter`, `fade`) instead; `docs` changes the default code renderer and layout strategy.
 For docs pages that do not need Monaco-backed code blocks, set `:render-code-blocks-as-pre="true"`. If you want the rich Monaco-backed code-block UI, install `stream-monaco`; otherwise the renderer intentionally falls back to `<pre>` rendering.
 
 Renderer CSS is scoped under an internal `.markstream-vue` container to minimize global style conflicts. If you render exported node components outside of `MarkdownRender`, wrap them in an element with class `markstream-vue`.

@@ -35,7 +35,7 @@ Read [references/adoption-checklist.md](references/adoption-checklist.md) before
    - If the app streams `content` and only needs pacing, `smooth-streaming="auto"` (the default) handles it without requiring `nodes`.
    - Move to `nodes` only when the app needs custom AST control, worker preparsing, or high-frequency structural updates.
    - When smooth streaming is on outside Vue 3 `mode="chat"` defaults, pair it with `:fade="false"`.
-   - **Streaming vs recovering history**: when migrating a chat UI, handle the streaming → history transition. Vue 3 streaming: `mode="chat"`, `smooth-streaming="auto"`, `:fade="false"`. Vue 3 history: `mode="docs"` or `mode="minimal"`, `:smooth-streaming="false"`, `:fade="true"`.
+   - **Streaming vs recovering history**: when migrating a chat UI, keep `mode="chat"` on the same chat row and switch pacing/animation props instead. Vue 3 streaming: `mode="chat"`, `smooth-streaming="auto"`, `:fade="false"`. Vue 3 completed chat history: `mode="chat"`, `:smooth-streaming="false"`, optional `:fade="true"`. Use `mode="docs"` only for separate rich document surfaces.
 7. Validate and summarize.
    - Run the smallest relevant tests or build.
    - Report direct mappings, TODOs, and remaining verification work.
