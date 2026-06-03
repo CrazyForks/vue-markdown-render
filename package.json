@@ -150,7 +150,7 @@
     "play:vue2": "pnpm run -C playground-vue2 dev",
     "play:vue2-cli": "pnpm run -C playground-vue2-cli dev",
     "play:build": "pnpm run -C playground build",
-    "play:deploy:check": "pnpm play:build",
+    "play:deploy:check": "pnpm play:build && node scripts/check-playground-dist-css.mjs",
     "play:vue2:build": "pnpm run -C playground-vue2 build",
     "play:vue2:preview": "pnpm run -C playground-vue2 preview",
     "play:nuxt": "pnpm run -C playground-nuxt dev",

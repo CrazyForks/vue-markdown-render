@@ -38,7 +38,7 @@ const requiredCssMarkers = {
   './index.tailwind.css': ['--ms-background:', '--ms-foreground:'],
 }
 
-const forbiddenStyleEntryArtifactPattern = /^styles(?:\.|$)/
+const forbiddenStyleEntryArtifactPattern = /^(?:styles|styles-entry)(?:[.-]|$)/
 
 const isolatedRootExports = [
   'MarkdownRender',

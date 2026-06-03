@@ -6,7 +6,7 @@ import process from 'node:process'
 // exported through `markstream-vue/index.css`. The JS entry itself must never
 // be published or imported by consumers.
 const distDir = 'dist'
-const forbiddenStyleEntryArtifactPattern = /^styles(?:\.|$)/
+const forbiddenStyleEntryArtifactPattern = /^(?:styles|styles-entry)(?:[.-]|$)/
 
 async function collectStyleEntryArtifacts(dir, artifacts = []) {
   let entries = []
