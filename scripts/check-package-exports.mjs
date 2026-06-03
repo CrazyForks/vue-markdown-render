@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
@@ -23,6 +23,12 @@ const requiredSubpaths = [
   './workers/mermaidCdnWorker',
   './workers/katexRenderer.worker',
   './workers/mermaidParser.worker',
+]
+
+const requiredCssSubpaths = [
+  './index.css',
+  './index.px.css',
+  './index.tailwind.css',
 ]
 
 const isolatedRootExports = [
@@ -86,7 +92,8 @@ const runtimeSubpathChecks = [
 
 const failures = []
 const rootImportTarget = typeof pkg.exports?.['.'] === 'object' ? pkg.exports['.'].import : undefined
-const cssImportPattern = /import\s+["'][^"']+\.css["']|from\s+["'][^"']+\.css["']/
+const bareStaticImportSpecifierPattern = /\bimport\s*["']([^"']+)["']/g
+const fromStaticImportSpecifierPattern = /\b(?:import|export)[^'"]+\bfrom\s*["']([^"']+)["']/g
 
 function normalizeTargets(entry) {
   if (typeof entry === 'string')
@@ -119,6 +126,90 @@ function getPackageSpecifier(subpath) {
   return `${pkg.name}/${subpath.slice(2)}`
 }
 
+function stripImportQuery(specifier) {
+  return String(specifier).split(/[?#]/, 1)[0]
+}
+
+function isCssSpecifier(specifier) {
+  return stripImportQuery(specifier).endsWith('.css')
+}
+
+function isRelativeSpecifier(specifier) {
+  return specifier.startsWith('./') || specifier.startsWith('../')
+}
+
+function getStaticImportSpecifiers(source) {
+  const specifiers = []
+  bareStaticImportSpecifierPattern.lastIndex = 0
+  fromStaticImportSpecifierPattern.lastIndex = 0
+
+  let match
+  while ((match = bareStaticImportSpecifierPattern.exec(source)))
+    specifiers.push(match[1])
+
+  while ((match = fromStaticImportSpecifierPattern.exec(source)))
+    specifiers.push(match[1])
+
+  return specifiers
+}
+
+function resolveLocalJsImport(importerPath, specifier) {
+  const cleanSpecifier = stripImportQuery(specifier)
+
+  if (!isRelativeSpecifier(cleanSpecifier))
+    return null
+
+  const basename = cleanSpecifier.split('/').pop() ?? ''
+  if (basename.includes('.') && !/\.(?:mjs|js)$/.test(basename))
+    return null
+
+  const resolved = resolve(dirname(importerPath), cleanSpecifier)
+  const candidates = /\.(?:mjs|js)$/.test(basename)
+    ? [resolved]
+    : [
+        resolved,
+        `${resolved}.js`,
+        `${resolved}.mjs`,
+        join(resolved, 'index.js'),
+        join(resolved, 'index.mjs'),
+      ]
+
+  return candidates.find(candidate => existsSync(candidate)) ?? null
+}
+
+function collectStaticCssImports(entryPath) {
+  const queue = [entryPath]
+  const visited = new Set()
+  const cssImports = []
+
+  while (queue.length > 0) {
+    const current = queue.pop()
+    const fullPath = resolve(current)
+
+    if (visited.has(fullPath) || !existsSync(fullPath))
+      continue
+
+    visited.add(fullPath)
+
+    const source = readFileSync(fullPath, 'utf8')
+    for (const specifier of getStaticImportSpecifiers(source)) {
+      if (isCssSpecifier(specifier)) {
+        cssImports.push({
+          importer: fullPath,
+          specifier,
+        })
+        continue
+      }
+
+      const resolvedImport = resolveLocalJsImport(fullPath, specifier)
+      if (resolvedImport)
+        queue.push(resolvedImport)
+    }
+  }
+
+  return cssImports
+}
+
 for (const subpath of requiredSubpaths) {
   const entry = pkg.exports?.[subpath]
 
@@ -148,12 +239,32 @@ for (const subpath of requiredSubpaths) {
   }
 }
 
+for (const subpath of requiredCssSubpaths) {
+  const entry = pkg.exports?.[subpath]
+  if (!entry)
+    continue
+
+  for (const { condition, target } of normalizeTargets(entry)) {
+    if (!target.endsWith('.css')) {
+      failures.push(
+        `${subpath} condition "${condition}" should point to a CSS file, got ${target}`,
+      )
+    }
+  }
+}
+
 if (typeof rootImportTarget === 'string') {
   const rootImportPath = join(root, rootImportTarget)
   if (existsSync(rootImportPath)) {
-    const rootImportSource = readFileSync(rootImportPath, 'utf8')
-    if (cssImportPattern.test(rootImportSource))
-      failures.push(`${rootImportTarget} should not import CSS; keep styles on the explicit ./index.css subpath`)
+    const cssImports = collectStaticCssImports(rootImportPath)
+    if (cssImports.length > 0) {
+      failures.push([
+        `${rootImportTarget} should not statically import CSS; keep styles on explicit CSS subpaths.`,
+        ...cssImports.map(({ importer, specifier }) => {
+          return `    ${relative(root, importer)} imports ${specifier}`
+        }),
+      ].join('\n'))
+    }
   }
 }
 

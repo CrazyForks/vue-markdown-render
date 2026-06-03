@@ -7,7 +7,6 @@
 # One export name per line. Lines starting with # are comments. Blank lines ignored.
 #
 # Components (user-facing Vue components)
-default
 AdmonitionNode
 BlockquoteNode
 CheckboxNode

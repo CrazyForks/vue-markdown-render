@@ -181,7 +181,7 @@ Choose the renderer mode by surface:
 />
 ```
 
-Use `mode="minimal"` when you want the lightweight chat defaults without chat-specific presentation choices. Avoid combining high-frequency `smooth-streaming` with `fade`; it can turn a steady stream into repeated opacity restarts.
+Use `mode="minimal"` when you want the same lightweight defaults as `chat`, but prefer a neutral mode name for non-chat surfaces. Avoid combining high-frequency `smooth-streaming` with `fade`; it can turn a steady stream into repeated opacity restarts.
 
 Renderer CSS is scoped under an internal `.markstream-vue` container to minimize global style conflicts. If you render exported node components outside of `MarkdownRender`, wrap them in an element with class `markstream-vue`.
 
