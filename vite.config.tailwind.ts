@@ -26,10 +26,13 @@ export default defineConfig({
     outDir: 'dist-tw',
     emptyOutDir: true,
     lib: {
-      entry: './src/exports.ts',
+      entry: {
+        index: './src/exports.ts',
+        styles: './src/styles-entry.ts',
+      },
       formats: ['es'],
       name,
-      fileName: 'index',
+      fileName: (_, entryName) => `${entryName}.js`,
     },
     rollupOptions: {
       // Externalise large runtime/highlighter/editor libs so we don't
@@ -71,7 +74,7 @@ export default defineConfig({
           vue: 'Vue',
         },
         exports: 'named',
-        entryFileNames: 'index.js',
+        entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name].js',
         // Emit CSS asset with a distinct name so consumers can pick the
         // "tailwind-ready" CSS separately (index.tailwind.css).

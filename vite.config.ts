@@ -77,6 +77,7 @@ export default defineConfig(({ mode }) => {
       lib: {
         entry: {
           'index': './src/exports.ts',
+          'styles': './src/styles-entry.ts',
           'utils/index': './src/entries/utils.ts',
           'utils/katex-threshold': './src/entries/utils-katex-threshold.ts',
           'utils/performance-monitor': './src/entries/utils-performance-monitor.ts',

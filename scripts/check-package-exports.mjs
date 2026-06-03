@@ -32,6 +32,12 @@ const requiredCssSubpaths = [
   './index.tailwind.css',
 ]
 
+const requiredCssMarkers = {
+  './index.css': ['--ms-background:', '--ms-foreground:', '--code-bg:'],
+  './index.px.css': ['--ms-background:', '--ms-foreground:', '--code-bg:'],
+  './index.tailwind.css': ['--ms-background:', '--ms-foreground:'],
+}
+
 const isolatedRootExports = [
   'MarkdownRender',
   'VueRendererMarkdown',
@@ -369,6 +375,33 @@ for (const subpath of requiredCssSubpaths) {
   }
 }
 
+function checkCssSubpathContent() {
+  for (const [subpath, markers] of Object.entries(requiredCssMarkers)) {
+    const entry = pkg.exports?.[subpath]
+    if (!entry)
+      continue
+
+    for (const { condition, target } of normalizeTargets(entry)) {
+      if (!target.endsWith('.css'))
+        continue
+
+      const fullPath = resolve(root, target)
+      if (!isExistingFile(fullPath))
+        continue
+
+      const css = readFileSync(fullPath, 'utf8')
+      for (const marker of markers) {
+        if (!css.includes(marker)) {
+          failures.push(
+            `${subpath} condition "${condition}" target ${target} is missing CSS marker "${marker}". Did src/index.css get included in the CSS build entry?`,
+          )
+        }
+      }
+    }
+  }
+}
+
+checkCssSubpathContent()
 checkSourceRootEntryDoesNotImportCss()
 
 function formatImportTrace(imports) {
