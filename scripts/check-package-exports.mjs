@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const root = process.cwd()
 
@@ -91,9 +92,6 @@ const runtimeSubpathChecks = [
 ]
 
 const failures = []
-const bareStaticImportSpecifierPattern = /\bimport\s*["']([^"']+)["']/g
-const fromStaticImportSpecifierPattern = /\b(?:import|export)[^'"]+\bfrom\s*["']([^"']+)["']/g
-const dynamicImportSpecifierPattern = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g
 
 function normalizeTargets(entry) {
   if (typeof entry === 'string')
@@ -107,12 +105,21 @@ function normalizeTargets(entry) {
     .map(([condition, target]) => ({ condition, target }))
 }
 
+function isExistingFile(path) {
+  try {
+    return statSync(path).isFile()
+  }
+  catch {
+    return false
+  }
+}
+
 function assertTargetExists(subpath, condition, target) {
   if (!target.startsWith('./'))
     return
 
-  const fullPath = join(root, target)
-  if (!existsSync(fullPath)) {
+  const fullPath = resolve(root, target)
+  if (!isExistingFile(fullPath)) {
     failures.push(
       `${subpath} condition "${condition}" points to missing file: ${target}`,
     )
@@ -148,22 +155,29 @@ function isRelativeSpecifier(specifier) {
   return specifier.startsWith('./') || specifier.startsWith('../')
 }
 
-function getStaticImportSpecifiers(source) {
+function getStaticImportSpecifiers(source, filename) {
+  const sourceFile = ts.createSourceFile(
+    filename,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS,
+  )
   const specifiers = []
-  bareStaticImportSpecifierPattern.lastIndex = 0
-  fromStaticImportSpecifierPattern.lastIndex = 0
-  dynamicImportSpecifierPattern.lastIndex = 0
 
-  let match
-  while ((match = bareStaticImportSpecifierPattern.exec(source)))
-    specifiers.push(match[1])
+  function visit(node) {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+      && node.moduleSpecifier
+      && ts.isStringLiteralLike(node.moduleSpecifier)
+    ) {
+      specifiers.push(node.moduleSpecifier.text)
+    }
 
-  while ((match = fromStaticImportSpecifierPattern.exec(source)))
-    specifiers.push(match[1])
+    ts.forEachChild(node, visit)
+  }
 
-  while ((match = dynamicImportSpecifierPattern.exec(source)))
-    specifiers.push(match[1])
-
+  visit(sourceFile)
   return specifiers
 }
 
@@ -188,7 +202,7 @@ function resolveLocalJsImport(importerPath, specifier) {
         join(resolved, 'index.mjs'),
       ]
 
-  return candidates.find(candidate => existsSync(candidate)) ?? null
+  return candidates.find(isExistingFile) ?? null
 }
 
 function collectStaticCssImports(entryPath) {
@@ -206,7 +220,7 @@ function collectStaticCssImports(entryPath) {
     visited.add(fullPath)
 
     const source = readFileSync(fullPath, 'utf8')
-    for (const specifier of getStaticImportSpecifiers(source)) {
+    for (const specifier of getStaticImportSpecifiers(source, fullPath)) {
       if (isCssSpecifier(specifier)) {
         cssImports.push({
           importer: fullPath,
@@ -224,8 +238,14 @@ function collectStaticCssImports(entryPath) {
   return cssImports
 }
 
+function resolvePackageTarget(target) {
+  if (!target.startsWith('./'))
+    return target
+  return resolve(root, target)
+}
+
 const rootJsTargets = getPackageJsTargets('.')
-const rootJsTargetSet = new Set(rootJsTargets.map(({ target }) => target))
+const rootJsTargetSet = new Set(rootJsTargets.map(({ target }) => resolvePackageTarget(target)))
 
 for (const subpath of requiredSubpaths) {
   const entry = pkg.exports?.[subpath]
@@ -247,7 +267,8 @@ for (const subpath of requiredSubpaths) {
 
   if (subpath !== '.') {
     for (const { condition, target } of getPackageJsTargets(subpath)) {
-      if (rootJsTargetSet.has(target)) {
+      const resolvedTarget = resolvePackageTarget(target)
+      if (rootJsTargetSet.has(resolvedTarget)) {
         failures.push(`${subpath} condition "${condition}" should not import the root bundle (${target})`)
       }
     }
@@ -269,7 +290,7 @@ for (const subpath of requiredCssSubpaths) {
 }
 
 for (const { condition, target } of rootJsTargets) {
-  const rootImportPath = join(root, target)
+  const rootImportPath = resolve(root, target)
   if (!existsSync(rootImportPath))
     continue
 
