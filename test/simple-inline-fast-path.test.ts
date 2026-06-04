@@ -82,4 +82,41 @@ describe('simple inline fast path', () => {
     expect(item.get('.markdown-renderer').exists()).toBe(true)
     expect(item.get('.custom-paragraph-node').text()).toBe('overridden')
   })
+
+  it('does not bypass a custom text component in simple table cells', async () => {
+    const scopeId = 'simple-inline-text-override'
+
+    setCustomComponents(scopeId, {
+      text: defineComponent({
+        name: 'CustomTextNode',
+        props: {
+          node: { type: Object, required: true },
+        },
+        setup(props) {
+          return () => h(
+            'span',
+            { class: 'custom-text-node' },
+            String((props.node as any).content ?? (props.node as any).raw ?? ''),
+          )
+        },
+      }),
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: [
+          '| Name | Value |',
+          '| --- | --- |',
+          '| Vue | Fast path |',
+        ].join('\n'),
+        customId: scopeId,
+        final: true,
+        batchRendering: false,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.findAll('.custom-text-node').map(node => node.text())).toContain('Fast path')
+  })
 })

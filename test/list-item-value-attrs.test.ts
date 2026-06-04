@@ -95,10 +95,10 @@ describe('list item value/customId attributes', () => {
       expect(item.attributes('custom-id')).toBeUndefined()
     }
 
-    const nestedRenderers = wrapper.findAll('[data-testid="node-renderer"]')
-    expect(nestedRenderers).toHaveLength(2)
-    expect(nestedRenderers[0]!.attributes('data-custom-id')).toBe('message-1')
-    expect(nestedRenderers[1]!.attributes('data-custom-id')).toBe('message-1')
+    const textNodes = wrapper.findAll('.text-node')
+    expect(textNodes).toHaveLength(2)
+    expect(textNodes[0]!.attributes('custom-id')).toBe('message-1')
+    expect(textNodes[1]!.attributes('custom-id')).toBe('message-1')
   })
 
   it('keeps explicit li values for ordered lists, including start=0', () => {
@@ -140,7 +140,7 @@ describe('list item value/customId attributes', () => {
 
     expect(wrapper.get('li').attributes('value')).toBe('3')
     expect(wrapper.get('li').attributes('custom-id')).toBeUndefined()
-    expect(wrapper.get('[data-testid="node-renderer"]').attributes('data-custom-id')).toBe(
+    expect(wrapper.get('.text-node').attributes('custom-id')).toBe(
       'message-3',
     )
 

@@ -656,10 +656,10 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
             <!--v-if-->
             <thead data-v-8fb37ab3="">
               <tr data-v-8fb37ab3="">
-                <th data-v-8fb37ab3="" dir="auto" class="text-left"><span data-v-a84b8095="" class="whitespace-pre-wrap break-words text-node" index-key="table-th-markdown-renderer-0-0-0"><span data-v-a84b8095="">Name</span>
+                <th data-v-8fb37ab3="" dir="auto" class="text-left"><span data-v-a84b8095="" data-v-8fb37ab3="" class="whitespace-pre-wrap break-words text-node" index-key="table-th-markdown-renderer-0-0-0"><span data-v-a84b8095="">Name</span>
                   <!--v-if--></span><button data-v-8fb37ab3="" type="button" class="table-node__resize-handle" aria-label="Resize columns 1 and 2"></button>
                 </th>
-                <th data-v-8fb37ab3="" dir="auto" class="text-left"><span data-v-a84b8095="" class="whitespace-pre-wrap break-words text-node" index-key="table-th-markdown-renderer-0-1-0"><span data-v-a84b8095="">Role</span>
+                <th data-v-8fb37ab3="" dir="auto" class="text-left"><span data-v-a84b8095="" data-v-8fb37ab3="" class="whitespace-pre-wrap break-words text-node" index-key="table-th-markdown-renderer-0-1-0"><span data-v-a84b8095="">Role</span>
                   <!--v-if--></span>
                   <!--v-if-->
                 </th>
@@ -667,10 +667,10 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
             </thead>
             <tbody data-v-8fb37ab3="">
               <tr data-v-8fb37ab3="">
-                <td data-v-8fb37ab3="" class="text-left" dir="auto"><span data-v-a84b8095="" class="whitespace-pre-wrap break-words text-node" index-key="table-td-markdown-renderer-0-0-0-0"><span data-v-a84b8095="">Alice</span>
+                <td data-v-8fb37ab3="" class="text-left" dir="auto"><span data-v-a84b8095="" data-v-8fb37ab3="" class="whitespace-pre-wrap break-words text-node" index-key="table-td-markdown-renderer-0-0-0-0"><span data-v-a84b8095="">Alice</span>
                   <!--v-if--></span>
                 </td>
-                <td data-v-8fb37ab3="" class="text-left" dir="auto"><span data-v-a84b8095="" class="whitespace-pre-wrap break-words text-node" index-key="table-td-markdown-renderer-0-0-1-0"><span data-v-a84b8095="">Developer</span>
+                <td data-v-8fb37ab3="" class="text-left" dir="auto"><span data-v-a84b8095="" data-v-8fb37ab3="" class="whitespace-pre-wrap break-words text-node" index-key="table-td-markdown-renderer-0-0-1-0"><span data-v-a84b8095="">Developer</span>
                   <!--v-if--></span>
                 </td>
               </tr>
