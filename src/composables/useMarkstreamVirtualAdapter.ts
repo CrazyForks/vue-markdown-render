@@ -202,6 +202,7 @@ export interface MarkstreamVirtualAdapterController<T = MarkstreamTimelineItem> 
   markdownStates: Map<string, MarkstreamVirtualState>
   getItemKey: (item: T, index: number) => string
   isMarkdownItem: (item: T, index: number) => boolean
+  isRestoringThread: () => boolean
   measureItem: (item: T, index: number, el: Element | { $el?: Element | null } | null | undefined) => void
   markdownProps: (item: T, index: number) => MarkstreamVirtualMarkdownProps
   captureThreadState: () => MarkstreamThreadVirtualState
@@ -828,6 +829,15 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       return
     }
 
+    const match = findCurrentItemByKey(key)
+    if (match && !getMarkstreamTimelineItemContent(match.item, match.index, options).trim()) {
+      if (measured > 0)
+        setItemSize(key, measured)
+
+      logItemLayoutReads()
+      return
+    }
+
     if (cached > 0) {
       if (measured > cached + 1)
         setItemSize(key, measured)
@@ -1156,8 +1166,9 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     if (seq !== restoreThreadSeq)
       return
 
-    applyRestorePass(seq, activeRestoreAnchor)
     restoringThread.value = false
+    flushPendingLayoutReconciles()
+    applyRestorePass(seq, activeRestoreAnchor)
     activeRestoreAnchor = undefined
     activeRestoreSeq = 0
   }
@@ -1234,6 +1245,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     markdownStates,
     getItemKey,
     isMarkdownItem,
+    isRestoringThread: () => restoringThread.value,
     measureItem,
     markdownProps,
     captureThreadState,

@@ -1280,11 +1280,24 @@ function reconcileRecordSize(
     if ((!options.allowMarkdownShrink || restoringThread.value) && cachedSize > 0)
       next = Math.max(next, cachedSize)
 
-    if (options.allowMarkdownShrink && !restoringThread.value)
+    const restoredFloor = getRestoredItemHeightFloor(record.key, itemSizeSource)
+    if (restoredFloor > 0 && markdown > restoredFloor + ITEM_SIZE_RECONCILE_DEADBAND_PX && !restoringThread.value)
+      clearRestoredItemHeightFloor(record.key)
+    else if (options.allowMarkdownShrink && !restoringThread.value)
       clearRestoredItemHeightFloor(record.key)
 
     if (next > 0)
       setItemSize(record.key, next, itemSizeSource, options)
+
+    logRecordLayoutReads()
+    return
+  }
+
+  if (!String(getMarkstreamTimelineItemContent(getRecordLiveItem(record), record.index, props)).trim()) {
+    if (measured > 0) {
+      clearRestoredItemHeightFloor(record.key)
+      setItemSize(record.key, measured, itemSizeSource, options)
+    }
 
     logRecordLayoutReads()
     return

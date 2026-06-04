@@ -2216,14 +2216,16 @@ function getScrollBox() {
 function getRendererLogicalHeight() {
   const total = parsedNodes.value.length
   const modelHeight = Math.max(0, estimateHeightRange(0, total))
+  const offsetHeight = readLayout('getRendererLogicalHeight.offsetHeight', () => containerRef.value?.offsetHeight ?? 0)
   const domHeight = Math.max(
     0,
-    readLayout('getRendererLogicalHeight.scrollHeight', () => containerRef.value?.scrollHeight ?? 0),
-    readLayout('getRendererLogicalHeight.offsetHeight', () => containerRef.value?.offsetHeight ?? 0),
+    offsetHeight > 0
+      ? offsetHeight
+      : readLayout('getRendererLogicalHeight.scrollHeight', () => containerRef.value?.scrollHeight ?? 0),
   )
 
   if (total <= 0)
-    return Math.ceil(domHeight)
+    return Math.ceil(offsetHeight)
 
   if (virtualizationEnabled.value) {
     if (modelHeight > 0) {
@@ -2726,11 +2728,15 @@ function getRendererBottomOffsetWithinRoot(
     return null
 
   const rendererTop = getOffsetTopWithinRoot(container, box.root)
+  const total = parsedNodes.value.length
+  const offsetHeight = readLayout('getRendererBottomOffsetWithinRoot.offsetHeight', () => container.offsetHeight || 0)
   const domHeight = Math.max(
     0,
-    readLayout('getRendererBottomOffsetWithinRoot.offsetHeight', () => container.offsetHeight || 0),
-    readLayout('getRendererBottomOffsetWithinRoot.scrollHeight', () => container.scrollHeight || 0),
-    readLayout('getRendererBottomOffsetWithinRoot.getBoundingClientRect', () => container.getBoundingClientRect?.().height || 0),
+    offsetHeight > 0
+      ? offsetHeight
+      : total > 0
+        ? readLayout('getRendererBottomOffsetWithinRoot.scrollHeight', () => container.scrollHeight || 0)
+        : 0,
   )
   const logicalHeight = getRendererLogicalHeight()
 

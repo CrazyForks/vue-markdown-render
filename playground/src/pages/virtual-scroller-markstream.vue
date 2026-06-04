@@ -3,6 +3,7 @@ import type { CacheSnapshot, ScrollToOptions } from 'vue-virtual-scroller'
 import type {
   MarkstreamOuterVirtualizerAdapter,
   MarkstreamThreadVirtualState,
+  MarkstreamVirtualAdapterController,
 } from '../../../src/exports'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
@@ -371,10 +372,12 @@ const widthBucket = ref(0)
 const itemHeightVersion = ref(0)
 const isRestoringThread = ref(false)
 const restorePaintReady = ref(true)
+const restoreRowsVisible = ref(true)
 let rootResizeObserver: ResizeObserver | null = null
 let itemHeightVersionPending = false
 
 const EXTERNAL_RESTORE_MIN_READY_MS = 240
+const EXTERNAL_RESTORE_VISIBLE_MIN_READY_MS = 640
 const EXTERNAL_RESTORE_STABLE_FRAMES = 3
 const EXTERNAL_RESTORE_POLL_FRAMES = 80
 const EXTERNAL_RESTORE_RETRY_DELAY_MS = 160
@@ -385,6 +388,7 @@ let activeExternalRestoreAnchor: RestoreAnchor | undefined
 let externalRestoreStartedAt = -1
 let externalRestoreWaitSeq = 0
 let externalRestoreRetryTimer: number | null = null
+let adapter: MarkstreamVirtualAdapterController<TimelineItem>
 
 const VIRTUAL_SCROLLER_STORAGE_KEY = 'markstream-vue:virtual-scroller-markstream:thread-states:v1'
 
@@ -767,6 +771,9 @@ function isVisibleNodeSlotReady(slot: HTMLElement) {
 }
 
 function isExternalRestoreViewportReady() {
+  if (adapter.isRestoringThread())
+    return false
+
   const root = getScrollElement()
   if (!root)
     return false
@@ -913,6 +920,51 @@ function hasExternalRestoreTimedOut() {
     && nowMs() - externalRestoreStartedAt >= EXTERNAL_RESTORE_MAX_LOADING_MS
 }
 
+async function waitExternalRestoreVisibleReady(seq: number) {
+  const startedAt = nowMs()
+  let previousSignature = ''
+  let stableFrames = 0
+
+  for (let i = 0; i < EXTERNAL_RESTORE_POLL_FRAMES; i++) {
+    await nextFrame()
+
+    if (!isActiveExternalRestore(seq))
+      return
+
+    applyExternalRestorePass(seq)
+
+    const signature = readExternalRestoreSignature()
+    if (signature && signature === previousSignature) {
+      stableFrames += 1
+
+      if (
+        stableFrames >= EXTERNAL_RESTORE_STABLE_FRAMES
+        && nowMs() - startedAt >= EXTERNAL_RESTORE_VISIBLE_MIN_READY_MS
+      ) {
+        completeExternalRestore(seq)
+        return
+      }
+    }
+    else {
+      stableFrames = 0
+      previousSignature = signature
+    }
+  }
+
+  completeExternalRestore(seq)
+}
+
+function completeExternalRestore(seq: number) {
+  if (seq !== externalRestoreSeq)
+    return
+
+  restorePaintReady.value = true
+  restoreRowsVisible.value = true
+  isRestoringThread.value = false
+  clearExternalRestoreState()
+  updateScrollMetrics()
+}
+
 function finishExternalRestore(seq: number) {
   if (seq !== externalRestoreSeq)
     return
@@ -921,10 +973,9 @@ function finishExternalRestore(seq: number) {
   if (offset != null)
     scrollerRef.value?.scrollToPosition?.(offset)
 
-  restorePaintReady.value = true
-  isRestoringThread.value = false
-  clearExternalRestoreState()
+  restoreRowsVisible.value = true
   updateScrollMetrics()
+  void waitExternalRestoreVisibleReady(seq)
 }
 
 function scheduleExternalRestoreRetry(seq: number) {
@@ -1030,7 +1081,7 @@ const virtualizer: MarkstreamOuterVirtualizerAdapter = {
   measureElement: () => {},
 }
 
-const adapter = useMarkstreamVirtualAdapter<TimelineItem>({
+adapter = useMarkstreamVirtualAdapter<TimelineItem>({
   items,
   threadKey: activeThreadId,
   getKey: getItemKey,
@@ -1057,6 +1108,7 @@ async function runExternalRestore(saved: SavedThreadState | null | undefined) {
   clearExternalRestoreRetryTimer()
 
   restorePaintReady.value = false
+  restoreRowsVisible.value = false
   isRestoringThread.value = true
   externalRestoreStartedAt = nowMs()
 
@@ -1260,7 +1312,10 @@ onBeforeUnmount(() => {
       <DynamicScroller
         ref="scrollerRef"
         class="message-scroller"
-        :class="{ 'is-restoring-thread': !restorePaintReady }"
+        :class="{
+          'is-restoring-thread': !restorePaintReady,
+          'is-restore-layout-hidden': !restoreRowsVisible,
+        }"
         :items="items"
         key-field="key"
         :min-item-size="72"
@@ -1454,9 +1509,9 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.message-scroller.is-restoring-thread :deep(.vue-recycle-scroller__item-view),
-.message-scroller.is-restoring-thread .dynamic-row,
-.message-scroller.is-restoring-thread .timeline-row {
+.message-scroller.is-restore-layout-hidden :deep(.vue-recycle-scroller__item-view),
+.message-scroller.is-restore-layout-hidden .dynamic-row,
+.message-scroller.is-restore-layout-hidden .timeline-row {
   visibility: hidden;
 }
 

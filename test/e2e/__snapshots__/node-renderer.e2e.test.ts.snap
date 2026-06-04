@@ -641,7 +641,10 @@ exports[`markdownRender node e2e coverage > renders table node 1`] = `
       <transition-stub data-v-8dfe8a80="" name="fade" appear="true" persisted="false" css="true">
         <div data-v-8fb37ab3="" data-v-8dfe8a80="" class="table-node-wrapper" loading="false">
           <table data-v-8fb37ab3="" class="table-node" aria-busy="false">
-            <!--v-if-->
+            <colgroup data-v-8fb37ab3="">
+              <col data-v-8fb37ab3="" style="width: 50%;">
+              <col data-v-8fb37ab3="" style="width: 50%;">
+            </colgroup>
             <thead data-v-8fb37ab3="">
               <tr data-v-8fb37ab3="">
                 <th data-v-8fb37ab3="" dir="auto" class="text-left"><span data-v-a84b8095="" class="text-node" index-key="table-th-markdown-renderer-0-0-0"><span data-v-a84b8095="">Name</span>
