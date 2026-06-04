@@ -69,6 +69,24 @@ describe('simple inline fast path', () => {
     expect(paragraph.find('.text-node-stream-delta').exists()).toBe(false)
   })
 
+  it('renders inline code without stream span wrappers when fade is disabled', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '`code`',
+        final: true,
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    const code = wrapper.get('code.inline-code')
+    expect(code.text()).toBe('code')
+    expect(code.element.childElementCount).toBe(0)
+    expect(code.find('.inline-code-stream-delta').exists()).toBe(false)
+  })
+
   it('does not bypass a custom text component for top-level paragraphs', async () => {
     const scopeId = 'simple-inline-paragraph-text-override'
 
