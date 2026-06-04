@@ -135,7 +135,15 @@ provide('markstreamFade', computed(() => props.fade))
 .blockquote > .paragraph-node {
   font-size: var(--ms-text-body);
   line-height: var(--ms-leading-body);
-  margin: 0;
+  margin: var(--ms-flow-paragraph-y) 0;
+}
+
+.blockquote > .paragraph-node:first-child {
+  margin-top: 0;
+}
+
+.blockquote > .paragraph-node:last-child {
+  margin-bottom: 0;
 }
 
 /* 防止内部 NodeRenderer 使用 content-visibility: auto 时在大文档滚动中出现“高但空白”的占位 */

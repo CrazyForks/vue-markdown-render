@@ -20,6 +20,7 @@ import InsertNode from '../InsertNode'
 import LinkNode from '../LinkNode'
 import { MathInlineNodeAsync } from '../NodeRenderer/asyncComponent'
 import ReferenceNode from '../ReferenceNode'
+import { getPlainTextContent } from '../SimpleInlineRenderer/simpleInline'
 import StrikethroughNode from '../StrikethroughNode'
 import StrongNode from '../StrongNode'
 import SubscriptNode from '../SubscriptNode'
@@ -48,6 +49,7 @@ const props = defineProps<{
 
 const overrides = useCustomNodeComponents(() => props.customId)
 const inheritedHtmlPolicy = inject<{ value?: HtmlPolicy } | undefined>('markstreamHtmlPolicy', undefined)
+const inheritedFade = inject<{ value?: boolean } | undefined>('markstreamFade', undefined)
 const inheritedParseOptions = inject<{ value?: NodeRendererProps['parseOptions'] } | undefined>('markstreamParseOptions', undefined)
 const inheritedCustomMarkdownIt = inject<{ value?: NodeRendererProps['customMarkdownIt'] } | undefined>('markstreamCustomMarkdownIt', undefined)
 const inheritedNestedRendererProps = inject<{ value?: Partial<NodeRendererProps> } | undefined>('markstreamNestedRendererProps', undefined)
@@ -127,6 +129,17 @@ const renderedChildren = computed(() => {
   }
 
   return children
+})
+
+const canRenderPlainTextParagraph = computed(() => {
+  return inheritedFade?.value === false && !(overrides.value as any).text
+})
+
+const plainTextContent = computed(() => {
+  if (!canRenderPlainTextParagraph.value)
+    return null
+
+  return getPlainTextContent(renderedChildren.value)
 })
 
 function getChildProps(child: NodeChild, index: number) {
@@ -209,8 +222,14 @@ const processedChildren = computed(() => renderedChildren.value.map((child, inde
 
 <template>
   <p dir="auto" class="paragraph-node">
+    <span
+      v-if="plainTextContent !== null"
+      class="simple-inline-text whitespace-pre-wrap break-words text-node"
+      :custom-id="props.customId"
+    >{{ plainTextContent }}</span>
     <template
       v-for="item in processedChildren"
+      v-else
       :key="item.key"
     >
       <template v-if="isMediaOnlyParagraph && isWhitespaceText(item.originalChild)">

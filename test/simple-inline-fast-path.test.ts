@@ -51,6 +51,94 @@ describe('simple inline fast path', () => {
     expect(paragraph.find('.text-node-stream-delta').exists()).toBe(false)
   })
 
+  it('uses a lightweight plain text node for top-level paragraphs when fade is disabled', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: 'Fast path paragraph',
+        final: true,
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    const paragraph = wrapper.get('p.paragraph-node')
+    expect(paragraph.text()).toBe('Fast path paragraph')
+    expect(paragraph.get('.simple-inline-text').text()).toBe('Fast path paragraph')
+    expect(paragraph.find('.text-node-stream-delta').exists()).toBe(false)
+  })
+
+  it('does not bypass a custom text component for top-level paragraphs', async () => {
+    const scopeId = 'simple-inline-paragraph-text-override'
+
+    setCustomComponents(scopeId, {
+      text: defineComponent({
+        name: 'CustomParagraphTextNode',
+        props: {
+          node: { type: Object, required: true },
+        },
+        setup(props) {
+          return () => h(
+            'span',
+            { class: 'custom-text-node' },
+            String((props.node as any).content ?? (props.node as any).raw ?? ''),
+          )
+        },
+      }),
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: 'Custom paragraph text',
+        customId: scopeId,
+        final: true,
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.get('.custom-text-node').text()).toBe('Custom paragraph text')
+    expect(wrapper.find('.simple-inline-text').exists()).toBe(false)
+  })
+
+  it('uses a lightweight plain text node for headings when fade is disabled', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '# Fast heading',
+        final: true,
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    const heading = wrapper.get('h1.heading-node')
+    expect(heading.text()).toBe('Fast heading')
+    expect(heading.get('.simple-inline-text').text()).toBe('Fast heading')
+    expect(heading.find('.text-node-stream-delta').exists()).toBe(false)
+  })
+
+  it('keeps heading inline rendering when heading is not plain text', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '# Fast **heading**',
+        final: true,
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    const heading = wrapper.get('h1.heading-node')
+    expect(heading.get('strong.strong-node').text()).toBe('heading')
+    expect(heading.find('.simple-inline-text').exists()).toBe(false)
+  })
+
   it('renders simple table cells without nested renderer wrappers', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {

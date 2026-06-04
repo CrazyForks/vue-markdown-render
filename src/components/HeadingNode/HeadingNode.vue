@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import CheckboxNode from '../CheckboxNode'
 import EmojiNode from '../EmojiNode'
@@ -14,6 +14,7 @@ import LinkNode from '../LinkNode'
 import NodeChildRenderer from '../NodeChildRenderer'
 import { MathInlineNodeAsync } from '../NodeRenderer/asyncComponent'
 import ReferenceNode from '../ReferenceNode'
+import { getPlainTextContent } from '../SimpleInlineRenderer/simpleInline'
 import StrikethroughNode from '../StrikethroughNode'
 import StrongNode from '../StrongNode'
 import SubscriptNode from '../SubscriptNode'
@@ -41,6 +42,14 @@ const props = defineProps<{
 }>()
 
 const overrides = useCustomNodeComponents(() => props.customId)
+const inheritedFade = inject<{ value?: boolean } | undefined>('markstreamFade', undefined)
+
+const plainTextContent = computed(() => {
+  if (inheritedFade?.value !== false || (overrides.value as any).text)
+    return null
+
+  return getPlainTextContent(props.node.children)
+})
 
 const nodeComponents = computed(() => ({
   text: TextNode,
@@ -73,14 +82,21 @@ const nodeComponents = computed(() => ({
     dir="auto"
     v-bind="node.attrs"
   >
-    <NodeChildRenderer
-      v-for="(child, index) in node.children"
-      :key="`${indexKey || 'heading'}-${index}`"
-      :components="nodeComponents"
+    <span
+      v-if="plainTextContent !== null"
+      class="simple-inline-text whitespace-pre-wrap break-words text-node"
       :custom-id="props.customId"
-      :node="child"
-      :index-key="`${indexKey || 'heading'}-${index}`"
-    />
+    >{{ plainTextContent }}</span>
+    <template v-else>
+      <NodeChildRenderer
+        v-for="(child, index) in node.children"
+        :key="`${indexKey || 'heading'}-${index}`"
+        :components="nodeComponents"
+        :custom-id="props.customId"
+        :node="child"
+        :index-key="`${indexKey || 'heading'}-${index}`"
+      />
+    </template>
   </component>
 </template>
 
