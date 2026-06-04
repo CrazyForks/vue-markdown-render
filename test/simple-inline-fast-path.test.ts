@@ -30,6 +30,27 @@ describe('simple inline fast path', () => {
     expect(item.get('a[href="https://vuejs.org"]').attributes('title')).toBe('https://vuejs.org')
   })
 
+  it('uses a lightweight plain text node for simple list item paragraphs when fade is disabled', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '- Fast path list item',
+        final: true,
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    const item = wrapper.get('li.list-item')
+    expect(item.find('.markdown-renderer').exists()).toBe(false)
+
+    const paragraph = item.get('p.paragraph-node')
+    expect(paragraph.text()).toBe('Fast path list item')
+    expect(paragraph.get('.simple-inline-text').text()).toBe('Fast path list item')
+    expect(paragraph.find('.text-node-stream-delta').exists()).toBe(false)
+  })
+
   it('renders simple table cells without nested renderer wrappers', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {

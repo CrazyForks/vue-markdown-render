@@ -153,11 +153,11 @@ exports[`markdownRender node e2e coverage > renders complex inline code with emp
       <transition-stub data-v-8dfe8a80="" name="fade" appear="true" persisted="false" css="true">
         <ol data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-decimal" is-dark="false">
           <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="1">
-            <p data-v-93ee5c2d="" data-v-d94d2511="" dir="auto" class="paragraph-node"><strong data-v-b1e65240="" data-v-93ee5c2d="" class="strong-node"><span data-v-a84b8095="" data-v-b1e65240="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-0-0"><span data-v-a84b8095="">整合冗余条款：</span><!--v-if--></span></strong><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-1"><span data-v-a84b8095=""> 将原</span>
-              <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline-code" index-key="list-item-markdown-renderer-0-0-paragraph-2"><span data-v-36040df8="">1-(5)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-3"><span data-v-a84b8095="">、</span>
-              <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline-code" index-key="list-item-markdown-renderer-0-0-paragraph-4"><span data-v-36040df8="">3-(3)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-5"><span data-v-a84b8095="">、</span>
-              <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline-code" index-key="list-item-markdown-renderer-0-0-paragraph-6"><span data-v-36040df8="">3-(4)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-7"><span data-v-a84b8095="">中关于“缴纳费用”和“告知法律状态变化”的核心义务合并，统一放入</span>
-              <!--v-if--></span><code data-v-36040df8="" data-v-93ee5c2d="" class="inline-code" index-key="list-item-markdown-renderer-0-0-paragraph-8"><span data-v-36040df8="">1-(4)</span><!--v-if--></code><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-9"><span data-v-a84b8095="">“法律状态维护与通知义务”中，使其逻辑更集中，避免了在不同部分重复提及相似义务。</span>
+            <p data-v-d94d2511="" dir="auto" class="paragraph-node"><strong data-v-b1e65240="" class="strong-node"><span data-v-a84b8095="" data-v-b1e65240="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-0-0"><span data-v-a84b8095="">整合冗余条款：</span><!--v-if--></span></strong><span data-v-a84b8095="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-1"><span data-v-a84b8095=""> 将原</span>
+              <!--v-if--></span><code data-v-36040df8="" class="inline-code" index-key="list-item-markdown-renderer-0-0-paragraph-2"><span data-v-36040df8="">1-(5)</span><!--v-if--></code><span data-v-a84b8095="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-3"><span data-v-a84b8095="">、</span>
+              <!--v-if--></span><code data-v-36040df8="" class="inline-code" index-key="list-item-markdown-renderer-0-0-paragraph-4"><span data-v-36040df8="">3-(3)</span><!--v-if--></code><span data-v-a84b8095="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-5"><span data-v-a84b8095="">、</span>
+              <!--v-if--></span><code data-v-36040df8="" class="inline-code" index-key="list-item-markdown-renderer-0-0-paragraph-6"><span data-v-36040df8="">3-(4)</span><!--v-if--></code><span data-v-a84b8095="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-7"><span data-v-a84b8095="">中关于“缴纳费用”和“告知法律状态变化”的核心义务合并，统一放入</span>
+              <!--v-if--></span><code data-v-36040df8="" class="inline-code" index-key="list-item-markdown-renderer-0-0-paragraph-8"><span data-v-36040df8="">1-(4)</span><!--v-if--></code><span data-v-a84b8095="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-9"><span data-v-a84b8095="">“法律状态维护与通知义务”中，使其逻辑更集中，避免了在不同部分重复提及相似义务。</span>
               <!--v-if--></span>
             </p>
           </li>
@@ -493,12 +493,12 @@ exports[`markdownRender node e2e coverage > renders ordered list node 1`] = `
       <transition-stub data-v-8dfe8a80="" name="fade" appear="true" persisted="false" css="true">
         <ol data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-decimal" is-dark="false">
           <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="1">
-            <p data-v-93ee5c2d="" data-v-d94d2511="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-0"><span data-v-a84b8095="">First entry</span>
+            <p data-v-d94d2511="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" data-v-d94d2511="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-0"><span data-v-a84b8095="">First entry</span>
               <!--v-if--></span>
             </p>
           </li>
           <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="2">
-            <p data-v-93ee5c2d="" data-v-d94d2511="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-1-paragraph-0"><span data-v-a84b8095="">Second entry</span>
+            <p data-v-d94d2511="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" data-v-d94d2511="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-1-paragraph-0"><span data-v-a84b8095="">Second entry</span>
               <!--v-if--></span>
             </p>
           </li>
@@ -733,12 +733,12 @@ exports[`markdownRender node e2e coverage > renders unordered list node 1`] = `
       <transition-stub data-v-8dfe8a80="" name="fade" appear="true" persisted="false" css="true">
         <ul data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-disc" is-dark="false">
           <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
-            <p data-v-93ee5c2d="" data-v-d94d2511="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-0"><span data-v-a84b8095="">Item one</span>
+            <p data-v-d94d2511="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" data-v-d94d2511="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-0-paragraph-0"><span data-v-a84b8095="">Item one</span>
               <!--v-if--></span>
             </p>
           </li>
           <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
-            <p data-v-93ee5c2d="" data-v-d94d2511="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-1-paragraph-0"><span data-v-a84b8095="">Item two</span>
+            <p data-v-d94d2511="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" data-v-d94d2511="" class="whitespace-pre-wrap break-words text-node" index-key="list-item-markdown-renderer-0-1-paragraph-0"><span data-v-a84b8095="">Item two</span>
               <!--v-if--></span>
             </p>
           </li>

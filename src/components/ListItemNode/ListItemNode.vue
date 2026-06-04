@@ -2,7 +2,6 @@
 import { computed, provide } from 'vue'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import NodeRenderer from '../NodeRenderer'
-import ParagraphNode from '../ParagraphNode'
 import SimpleInlineRenderer from '../SimpleInlineRenderer'
 import { areSimpleInlineNodes } from '../SimpleInlineRenderer/simpleInline'
 
@@ -41,7 +40,7 @@ defineEmits<{
 
 const itemNode = computed(() => props.node ?? props.item)
 const customComponents = useCustomNodeComponents(() => props.customId)
-const simpleParagraphNode = computed(() => {
+const simpleParagraphChildren = computed(() => {
   if ((customComponents.value as any).paragraph)
     return null
 
@@ -53,10 +52,11 @@ const simpleParagraphNode = computed(() => {
   if (child?.type !== 'paragraph' || !Array.isArray((child as any).children))
     return null
 
-  return areSimpleInlineNodes((child as any).children) ? child : null
+  const paragraphChildren = (child as any).children
+  return areSimpleInlineNodes(paragraphChildren) ? paragraphChildren : null
 })
 const simpleInlineChildren = computed(() => {
-  if (simpleParagraphNode.value)
+  if (simpleParagraphChildren.value)
     return null
 
   const children = itemNode.value?.children
@@ -79,12 +79,17 @@ provide('markstreamFade', computed(() => props.fade))
 
 <template>
   <li class="list-item" dir="auto" v-bind="liValueAttrs">
-    <ParagraphNode
-      v-if="simpleParagraphNode"
-      :node="simpleParagraphNode as any"
-      :custom-id="props.customId"
-      :index-key="`list-item-${props.indexKey}-paragraph`"
-    />
+    <p
+      v-if="simpleParagraphChildren"
+      dir="auto"
+      class="paragraph-node"
+    >
+      <SimpleInlineRenderer
+        :nodes="simpleParagraphChildren"
+        :custom-id="props.customId"
+        :index-key="`list-item-${props.indexKey}-paragraph`"
+      />
+    </p>
     <SimpleInlineRenderer
       v-else-if="simpleInlineChildren"
       :nodes="simpleInlineChildren"
@@ -118,6 +123,12 @@ ol > .list-item::marker {
 
 ul > .list-item::marker {
   color: var(--list-marker);
+}
+
+.list-item > .paragraph-node {
+  font-size: var(--ms-text-body);
+  line-height: var(--ms-leading-body);
+  margin: 0;
 }
 
 /* 大列表滚动到视口时，嵌套 NodeRenderer 需要立即绘制内容，避免空白 */
