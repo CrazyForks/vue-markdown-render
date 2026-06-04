@@ -965,6 +965,11 @@ function clearRestoredItemHeightFloorIfSourceChanged(
   }
 }
 
+function clearRestoredItemHeightFloor(key: string) {
+  restoredItemHeightFloors.delete(key)
+  restoredItemHeightFloorSources.delete(key)
+}
+
 function setItemSize(key: string, size: number, source?: TimelineItemSizeSource) {
   if (!Number.isFinite(size) || size <= 0)
     return
@@ -974,11 +979,10 @@ function setItemSize(key: string, size: number, source?: TimelineItemSizeSource)
 
   clearRestoredItemHeightFloorIfSourceChanged(key, source)
 
-  const restoredFloor = sourceChanged
-    ? 0
-    : getRestoredItemHeightFloor(key, source)
-
-  const next = Math.max(Math.ceil(size), restoredFloor)
+  const restoredFloor = getRestoredItemHeightFloor(key, source)
+  const next = restoredFloor > 0
+    ? restoredFloor
+    : Math.ceil(size)
 
   // Monaco / pre fallback / browser font rounding can differ by exactly 1px.
   // Treat that as measurement noise; otherwise an item above the current
@@ -1110,6 +1114,9 @@ function reconcileRecordSize(
 
     if ((!options.allowMarkdownShrink || restoringThread.value) && cachedSize > 0)
       next = Math.max(next, cachedSize)
+
+    if (options.allowMarkdownShrink && !restoringThread.value)
+      clearRestoredItemHeightFloor(record.key)
 
     if (next > 0)
       setItemSize(record.key, next, getItemSizeSource(record))
@@ -1857,6 +1864,7 @@ function readRestoreViewportSignature() {
     .map((record) => {
       const item = itemByKey.get(record.key)
       const renderer = item?.querySelector<HTMLElement>('.markdown-renderer')
+      const metrics = markdownStates.get(record.key)?.metrics
 
       return [
         record.key,
@@ -1865,6 +1873,13 @@ function readRestoreViewportSignature() {
         item?.scrollHeight ?? 0,
         renderer?.offsetHeight ?? 0,
         renderer?.scrollHeight ?? 0,
+        metrics ? Math.round(Number(metrics.totalHeight || 0)) : '',
+        metrics?.measuredCount ?? '',
+        metrics?.estimatedCount ?? '',
+        metrics?.nodeCount ?? '',
+        metrics?.final === true ? 1 : 0,
+        metrics?.stable === true ? 1 : 0,
+        metrics?.confidence ?? '',
       ].join(':')
     })
     .join('|')
@@ -2168,11 +2183,10 @@ function finishThreadRestore(seq: number) {
   activeThreadRestoreScrollTop = null
   activeThreadRestoreSeq = 0
 
-  // Restored floors are only a restore-time guard against partial mounted DOM.
-  // Once the restored viewport is ready, later stable/final measurements should
-  // be allowed to shrink stale persisted heights.
-  restoredItemHeightFloors.clear()
-  restoredItemHeightFloorSources.clear()
+  for (const record of layout.value.records) {
+    if (!record.markdown)
+      clearRestoredItemHeightFloor(record.key)
+  }
 
   updateScrollMetrics({ remember: false })
   markRestorePaintReady()

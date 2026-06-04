@@ -276,6 +276,87 @@ describe('virtual timeline restore visual readiness', () => {
     }
   })
 
+  it('keeps restored item height while restore DOM measures taller temporarily', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+        const el = this as HTMLElement
+        const measured = el.hasAttribute('data-test-height')
+          ? Number(el.dataset.testHeight)
+          : Number(el.querySelector<HTMLElement>('[data-test-height]')?.dataset.testHeight)
+
+        return Number.isFinite(measured) && measured > 0 ? measured : 80
+      })
+      installRestoreGeometryStub(80)
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      })
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: '# Ready', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
+            itemHeights: { m1: 320 },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', {
+              'ref': props.measureRef,
+              'data-test-top': '0',
+              'data-test-height': '420',
+            }, [
+              h('div', { class: 'markdown-renderer' }, [
+                h('div', {
+                  'class': 'node-slot',
+                  'data-node-index': '0',
+                  'data-node-type': 'heading',
+                }, [
+                  h('div', { class: 'node-content' }, '# Ready'),
+                ]),
+              ]),
+            ])
+          },
+        },
+      })
+
+      await nextTick()
+
+      const timeline = wrapper.vm as unknown as { getItemSize: (key: string) => number | undefined }
+      expect(timeline.getItemSize('m1')).toBe(320)
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(1200)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+      expect(timeline.getItemSize('m1')).toBe(320)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('does not treat an empty visible restore viewport as ready', async () => {
     vi.useFakeTimers()
     let wrapper: ReturnType<typeof mount> | undefined

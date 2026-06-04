@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import type { SimpleInlineNode } from '../SimpleInlineRenderer/simpleInline'
+import { computed, onBeforeUnmount, provide, ref, watch } from 'vue'
+import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import NodeRenderer from '../NodeRenderer'
+import SimpleInlineRenderer from '../SimpleInlineRenderer'
+import { getPlainTextContent, resolveSimpleInlineChildren } from '../SimpleInlineRenderer/simpleInline'
+
+type TableCellChildNode = SimpleInlineNode & {
+  raw: string
+}
 
 interface TableCellNode {
   type: 'table_cell'
   header: boolean
-  children: {
-    type: string
-    raw: string
-  }[]
+  children: TableCellChildNode[]
   raw: string
   align?: 'left' | 'right' | 'center'
 }
@@ -34,9 +39,15 @@ const props = defineProps<{
   typewriter?: boolean
   fade?: boolean
   customId?: string
+  showTooltips?: boolean
 }>()
 
 defineEmits(['copy'])
+
+interface SimpleCellInfo {
+  simpleChildren: readonly SimpleInlineNode[] | null
+  plainText: string | null
+}
 
 const isLoading = computed(() => props.node.loading ?? false)
 const bodyRows = computed(() => props.node.rows ?? [])
@@ -57,6 +68,58 @@ const columnStyles = computed(() =>
   columnWidths.value.map(width => width > 0 ? { width: `${width}px` } : undefined),
 )
 const hasColumnWidths = computed(() => columnWidths.value.length > 0)
+
+provide('markstreamShowTooltips', computed(() => props.showTooltips))
+provide('markstreamFade', computed(() => props.fade))
+
+const customComponents = useCustomNodeComponents(() => props.customId)
+const hasTextOverride = computed(() =>
+  Boolean((customComponents.value as any).text),
+)
+const hasParagraphOverride = computed(() =>
+  Boolean((customComponents.value as any).paragraph),
+)
+function canRenderPlainTextCell() {
+  return props.fade === false && !hasTextOverride.value
+}
+
+const simpleCellCache = new WeakMap<TableCellNode, {
+  children: TableCellNode['children']
+  textFastPath: boolean
+  paragraphFastPath: boolean
+  info: SimpleCellInfo
+}>()
+
+function getSimpleCellInfo(cell: TableCellNode): SimpleCellInfo {
+  const textFastPath = canRenderPlainTextCell()
+  const paragraphFastPath = !hasParagraphOverride.value
+
+  const cached = simpleCellCache.get(cell)
+  if (
+    cached?.children === cell.children
+    && cached.textFastPath === textFastPath
+    && cached.paragraphFastPath === paragraphFastPath
+  ) {
+    return cached.info
+  }
+
+  const simpleChildren = resolveSimpleInlineChildren(cell.children as any, paragraphFastPath, true)
+
+  const info: SimpleCellInfo = {
+    simpleChildren,
+    plainText: simpleChildren && textFastPath
+      ? getPlainTextContent(simpleChildren)
+      : null,
+  }
+
+  simpleCellCache.set(cell, {
+    children: cell.children,
+    textFastPath,
+    paragraphFastPath,
+    info,
+  })
+  return info
+}
 
 function measureHeaderWidths() {
   const cells = tableRef.value?.querySelectorAll('thead th')
@@ -139,7 +202,7 @@ onBeforeUnmount(stopColumnResize)
       <colgroup v-if="hasColumnWidths">
         <col
           v-for="(_, index) in node.header.cells"
-          :key="`col-${index}`"
+          :key="index"
           :style="columnStyles[index]"
         >
       </colgroup>
@@ -147,7 +210,7 @@ onBeforeUnmount(stopColumnResize)
         <tr>
           <th
             v-for="(cell, index) in node.header.cells"
-            :key="`header-${index}`"
+            :key="index"
             dir="auto"
             :class="[
               cell.align === 'right'
@@ -157,12 +220,25 @@ onBeforeUnmount(stopColumnResize)
                   : 'text-left',
             ]"
           >
+            <span
+              v-if="getSimpleCellInfo(cell).plainText !== null"
+              class="text-node"
+              :custom-id="props.customId"
+            >{{ getSimpleCellInfo(cell).plainText }}</span>
+            <SimpleInlineRenderer
+              v-else-if="getSimpleCellInfo(cell).simpleChildren"
+              :nodes="getSimpleCellInfo(cell).simpleChildren as any"
+              :custom-id="props.customId"
+              :index-key="`table-th-${props.indexKey}-${index}`"
+            />
             <NodeRenderer
+              v-else
               :nodes="cell.children"
               :index-key="`table-th-${props.indexKey}`"
               :custom-id="props.customId"
               :typewriter="props.typewriter"
               :fade="props.fade"
+              :show-tooltips="props.showTooltips"
               @copy="$emit('copy', $event)"
             />
             <button
@@ -178,11 +254,11 @@ onBeforeUnmount(stopColumnResize)
       <tbody>
         <tr
           v-for="(row, rowIndex) in bodyRows"
-          :key="`row-${rowIndex}`"
+          :key="rowIndex"
         >
           <td
             v-for="(cell, cellIndex) in row.cells"
-            :key="`cell-${rowIndex}-${cellIndex}`"
+            :key="cellIndex"
             :class="[
               cell.align === 'right'
                 ? 'text-right'
@@ -192,12 +268,25 @@ onBeforeUnmount(stopColumnResize)
             ]"
             dir="auto"
           >
+            <span
+              v-if="getSimpleCellInfo(cell).plainText !== null"
+              class="text-node"
+              :custom-id="props.customId"
+            >{{ getSimpleCellInfo(cell).plainText }}</span>
+            <SimpleInlineRenderer
+              v-else-if="getSimpleCellInfo(cell).simpleChildren"
+              :nodes="getSimpleCellInfo(cell).simpleChildren as any"
+              :custom-id="props.customId"
+              :index-key="`table-td-${props.indexKey}-${rowIndex}-${cellIndex}`"
+            />
             <NodeRenderer
+              v-else
               :nodes="cell.children"
               :index-key="`table-td-${props.indexKey}`"
               :custom-id="props.customId"
               :typewriter="props.typewriter"
               :fade="props.fade"
+              :show-tooltips="props.showTooltips"
               @copy="$emit('copy', $event)"
             />
           </td>

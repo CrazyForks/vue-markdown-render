@@ -29,6 +29,8 @@ const fadeEnabled = computed(() => {
     return inheritedFade.value
   return true
 })
+const codeContent = computed(() => String(props.node.code ?? ''))
+const canRenderStaticCode = computed(() => !fadeEnabled.value)
 const streamStateKey = computed(() => {
   const raw = attrs['index-key'] ?? attrs.indexKey
   if (raw == null || raw === '')
@@ -103,14 +105,17 @@ const streamedDeltaClass = computed(() => (
   <code
     class="inline-code"
   >
-    <span v-if="settledCode">{{ settledCode }}</span>
-    <span
-      v-if="streamedDelta"
-      class="inline-code-stream-delta" :class="[streamedDeltaClass]"
-      @animationend="settleStreamedDelta"
-    >
-      {{ streamedDelta }}
-    </span>
+    <template v-if="canRenderStaticCode">{{ codeContent }}</template>
+    <template v-else>
+      <span v-if="settledCode">{{ settledCode }}</span>
+      <span
+        v-if="streamedDelta"
+        class="inline-code-stream-delta" :class="[streamedDeltaClass]"
+        @animationend="settleStreamedDelta"
+      >
+        {{ streamedDelta }}
+      </span>
+    </template>
   </code>
 </template>
 

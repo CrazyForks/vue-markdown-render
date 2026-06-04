@@ -3693,6 +3693,11 @@ onUnmounted(() => {
   transition: opacity 120ms ease-out;
 }
 
+.code-block-container.is-diff :deep(pre.code-pre-fallback.markstream-pre--diff-preview .markstream-pre__diff-pane) {
+  box-sizing: border-box;
+  padding-bottom: 10px;
+}
+
 :deep(pre.code-pre-fallback.is-fading-out) {
   opacity: 0;
   pointer-events: none;

@@ -5089,6 +5089,14 @@ const listBindings = computed(() => ({
   ...nonCodeBindings.value,
   ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
 }))
+const blockquoteBindings = computed(() => ({
+  ...nonCodeBindings.value,
+  ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
+}))
+const tableBindings = computed(() => ({
+  ...nonCodeBindings.value,
+  ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
+}))
 
 function getCodeBlockRenderNode(node: ParsedNode) {
   if (node.type !== 'code_block')
@@ -5361,6 +5369,12 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
 
   if (node.type === 'list')
     return listBindings.value
+
+  if (node.type === 'blockquote')
+    return blockquoteBindings.value
+
+  if (node.type === 'table')
+    return tableBindings.value
 
   return node.type === 'code_block'
     ? codeBlockBindings.value

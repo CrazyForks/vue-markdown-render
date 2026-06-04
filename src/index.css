@@ -18,6 +18,11 @@
   margin-left: calc(-1 * var(--ms-flow-list-indent));
 }
 
+.markstream-vue .text-node {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
 @tailwind components;
 @tailwind utilities;
 
