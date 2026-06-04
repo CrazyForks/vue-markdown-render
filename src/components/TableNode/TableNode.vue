@@ -63,8 +63,22 @@ const hasColumnWidths = computed(() => columnWidths.value.length > 0)
 provide('markstreamShowTooltips', computed(() => true))
 provide('markstreamFade', computed(() => props.fade))
 
+const simpleCellCache = new WeakMap<TableCellNode, {
+  children: TableCellNode['children']
+  result: boolean
+}>()
+
 function canRenderSimpleCell(cell: TableCellNode) {
-  return areSimpleInlineNodes(cell.children)
+  const cached = simpleCellCache.get(cell)
+  if (cached?.children === cell.children)
+    return cached.result
+
+  const result = areSimpleInlineNodes(cell.children)
+  simpleCellCache.set(cell, {
+    children: cell.children,
+    result,
+  })
+  return result
 }
 
 function measureHeaderWidths() {

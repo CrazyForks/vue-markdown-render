@@ -53,6 +53,28 @@ describe('simple inline fast path', () => {
     expect(table.get('code.inline-code').text()).toBe('code')
   })
 
+  it('uses a lightweight plain text node when simple table text has fade disabled', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: [
+          '| Name | Value |',
+          '| --- | --- |',
+          '| Vue | Fast path |',
+        ].join('\n'),
+        final: true,
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    const valueCell = wrapper.get('tbody td:nth-child(2)')
+    expect(valueCell.text()).toBe('Fast path')
+    expect(valueCell.find('.markdown-renderer').exists()).toBe(false)
+    expect(valueCell.find('.text-node-stream-delta').exists()).toBe(false)
+  })
+
   it('keeps the nested renderer path when paragraph has a custom component', async () => {
     const scopeId = 'simple-inline-paragraph-override'
     setCustomComponents(scopeId, {
