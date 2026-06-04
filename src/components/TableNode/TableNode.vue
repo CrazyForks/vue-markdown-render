@@ -317,6 +317,7 @@ onBeforeUnmount(stopColumnResize)
 
 .table-node {
   width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   margin: var(--ms-flow-table-y) 0;

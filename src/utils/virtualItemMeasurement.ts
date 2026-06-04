@@ -3,9 +3,22 @@ function readCssPx(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-export function readElementBoxHeight(element: HTMLElement | null | undefined) {
+export type VirtualItemLayoutReadCounter = (label: string) => void
+
+function countLayoutRead(counter: VirtualItemLayoutReadCounter | undefined, label: string) {
+  counter?.(label)
+}
+
+export function readElementBoxHeight(
+  element: HTMLElement | null | undefined,
+  countRead?: VirtualItemLayoutReadCounter,
+) {
   if (!element)
     return 0
+
+  countLayoutRead(countRead, 'readElementBoxHeight.offsetHeight')
+  countLayoutRead(countRead, 'readElementBoxHeight.scrollHeight')
+  countLayoutRead(countRead, 'readElementBoxHeight.getBoundingClientRect')
 
   return Math.ceil(Math.max(
     0,
@@ -15,11 +28,15 @@ export function readElementBoxHeight(element: HTMLElement | null | undefined) {
   ))
 }
 
-export function readElementOuterHeight(element: HTMLElement | null | undefined) {
-  const boxHeight = readElementBoxHeight(element)
+export function readElementOuterHeight(
+  element: HTMLElement | null | undefined,
+  countRead?: VirtualItemLayoutReadCounter,
+) {
+  const boxHeight = readElementBoxHeight(element, countRead)
   if (!element || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function')
     return boxHeight
 
+  countLayoutRead(countRead, 'readElementOuterHeight.getComputedStyle')
   const style = window.getComputedStyle(element)
   const marginTop = readCssPx(style.marginTop)
   const marginBottom = readCssPx(style.marginBottom)
@@ -37,7 +54,10 @@ export function findMarkstreamRenderer(element: HTMLElement | null | undefined) 
   return element.querySelector<HTMLElement>('.markstream-vue.markdown-renderer')
 }
 
-export function getMarkdownItemChromeHeight(element: HTMLElement | null | undefined) {
+export function getMarkdownItemChromeHeight(
+  element: HTMLElement | null | undefined,
+  countRead?: VirtualItemLayoutReadCounter,
+) {
   if (!element)
     return 0
 
@@ -45,8 +65,8 @@ export function getMarkdownItemChromeHeight(element: HTMLElement | null | undefi
   if (!renderer)
     return 0
 
-  const outer = readElementOuterHeight(element)
-  const rendererBox = readElementBoxHeight(renderer)
+  const outer = readElementOuterHeight(element, countRead)
+  const rendererBox = readElementBoxHeight(renderer, countRead)
 
   return Math.max(0, outer - rendererBox)
 }

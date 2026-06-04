@@ -201,7 +201,26 @@ function shouldFlushParseImmediately(previous: string, next: string) {
 
   return appended.endsWith('\n')
     || appended.includes('\n\n')
-    || /(?:^|\n)(?:#{1,6}\s|[-+*]\s+|\d+[.)]\s+|>\s*|`{3,}|~{3,}|\|)/.test(appended)
+    || /(?:^|\n)(?:#{1,6}\s|[-+*]\s+|\d+[.)]\s+|>\s*|`{3,}|~{3,})/.test(appended)
+    || endsWithTableDelimiterLine(next)
+}
+
+function endsWithTableDelimiterLine(value: string) {
+  const lineStart = value.lastIndexOf('\n') + 1
+  const line = value.slice(lineStart).trim()
+  if (!line.includes('|'))
+    return false
+
+  const cells = line
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+
+  return cells.length >= 2 && cells.every((cell) => {
+    const marker = cell.trim()
+    return marker.length >= 1
+      && marker.replace(/^:/, '').replace(/:$/, '').split('').every(char => char === '-')
+  })
 }
 
 function resolveParseCoalesceMs(props: Readonly<NodeRendererProps>) {

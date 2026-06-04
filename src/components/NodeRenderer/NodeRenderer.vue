@@ -448,7 +448,90 @@ watch(
 function logPerf(label: string, data: Record<string, unknown>) {
   if (!debugPerformanceEnabled.value)
     return
-  console.info(`[markstream-vue][perf] ${label}`, data)
+
+  const layoutReads = takeLayoutReadStats()
+  console.info(`[markstream-vue][perf] ${label}`, layoutReads
+    ? { ...data, layoutReads }
+    : data)
+}
+
+const layoutReadCounts = new Map<string, number>()
+const layoutReadFrameCounts = new Map<string, number>()
+let layoutReadFrameScheduled = false
+let maxLayoutReadsPerFrame = 0
+
+function getMapTotal(map: Map<string, number>) {
+  let total = 0
+  for (const count of map.values())
+    total += count
+  return total
+}
+
+function toSortedRecord(map: Map<string, number>) {
+  return Object.fromEntries(
+    Array.from(map.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+  )
+}
+
+function flushLayoutReadFrameCounts() {
+  maxLayoutReadsPerFrame = Math.max(maxLayoutReadsPerFrame, getMapTotal(layoutReadFrameCounts))
+  layoutReadFrameCounts.clear()
+  layoutReadFrameScheduled = false
+}
+
+function scheduleLayoutReadFrameFlush() {
+  if (layoutReadFrameScheduled)
+    return
+
+  layoutReadFrameScheduled = true
+  if (isClient && typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(flushLayoutReadFrameCounts)
+    return
+  }
+
+  if (typeof queueMicrotask === 'function') {
+    queueMicrotask(flushLayoutReadFrameCounts)
+    return
+  }
+
+  setTimeout(flushLayoutReadFrameCounts, 0)
+}
+
+function recordLayoutRead(label: string) {
+  if (!debugPerformanceEnabled.value)
+    return
+
+  layoutReadCounts.set(label, (layoutReadCounts.get(label) ?? 0) + 1)
+  layoutReadFrameCounts.set(label, (layoutReadFrameCounts.get(label) ?? 0) + 1)
+  scheduleLayoutReadFrameFlush()
+}
+
+function readLayout<T>(label: string, read: () => T): T {
+  recordLayoutRead(label)
+  return read()
+}
+
+function takeLayoutReadStats() {
+  if (!debugPerformanceEnabled.value)
+    return null
+
+  const total = getMapTotal(layoutReadCounts)
+  const currentFrameTotal = getMapTotal(layoutReadFrameCounts)
+  const maxPerFrame = Math.max(maxLayoutReadsPerFrame, currentFrameTotal)
+  if (total <= 0 && maxPerFrame <= 0)
+    return null
+
+  const snapshot = {
+    total,
+    maxPerFrame,
+    byLabel: toSortedRecord(layoutReadCounts),
+  }
+
+  layoutReadCounts.clear()
+  layoutReadFrameCounts.clear()
+  maxLayoutReadsPerFrame = 0
+
+  return snapshot
 }
 const instanceMsgId = props.customId
   ? `renderer-${props.customId}`
@@ -563,7 +646,10 @@ const codeBlockEstimationEnabled = computed(() => {
     && heightExperimentConfig.value?.codeBlockEstimation !== false
 })
 function getMeasuredContainerWidth() {
-  const width = experimentContainerWidth.value || containerRef.value?.clientWidth || 0
+  const width = experimentContainerWidth.value || readLayout(
+    'getMeasuredContainerWidth.clientWidth',
+    () => containerRef.value?.clientWidth || 0,
+  )
   return Number.isFinite(width) && width > 0 ? width : 0
 }
 
@@ -749,8 +835,13 @@ function recordNodeHeight(
 }
 
 function getNodeLayoutHeight(index: number, contentEl: HTMLElement) {
-  const slotHeight = nodeSlotElements.get(index)?.offsetHeight ?? 0
-  return slotHeight > 0 ? slotHeight : contentEl.offsetHeight
+  const slotHeight = readLayout(
+    'getNodeLayoutHeight.slot.offsetHeight',
+    () => nodeSlotElements.get(index)?.offsetHeight ?? 0,
+  )
+  return slotHeight > 0
+    ? slotHeight
+    : readLayout('getNodeLayoutHeight.content.offsetHeight', () => contentEl.offsetHeight)
 }
 
 function removeNodeHeights(
@@ -1015,7 +1106,7 @@ const {
       || root === doc.body
       || root === doc.scrollingElement
 
-    return getNormalizedScrollTop(root, doc, isViewportRoot)
+    return readLayout('scrollListener.getScrollTop', () => getNormalizedScrollTop(root, doc, isViewportRoot))
   },
 })
 
@@ -1036,8 +1127,8 @@ function syncFocusToScroll(force = false) {
     // distance from the bottom (often 0 when pinned). Estimating focus from
     // the end keeps the virtual window responsive while scrolling upward
     // through large spacers.
-    const viewportHeight = root.clientHeight || 0
-    const raw = root.scrollTop
+    const viewportHeight = readLayout('syncFocusToScroll.clientHeight', () => root.clientHeight || 0)
+    const raw = readLayout('syncFocusToScroll.scrollTop', () => root.scrollTop)
     // Some browsers report negative scrollTop with `flex-direction: column-reverse`.
     const distanceFromBottom = raw < 0 ? -raw : raw
     const offsetFromBottom = Math.max(0, distanceFromBottom) + Math.max(0, viewportHeight) * 0.5
@@ -1050,10 +1141,12 @@ function syncFocusToScroll(force = false) {
     return
   }
 
-  const rootRect = !isViewportRoot ? root.getBoundingClientRect() : null
+  const rootRect = !isViewportRoot
+    ? readLayout('syncFocusToScroll.root.getBoundingClientRect', () => root.getBoundingClientRect())
+    : null
   const viewportTop = isViewportRoot ? 0 : rootRect!.top
   const viewportBottom = isViewportRoot
-    ? (view?.innerHeight ?? root.clientHeight ?? 0)
+    ? readLayout('syncFocusToScroll.viewport.clientHeight', () => view?.innerHeight ?? root.clientHeight ?? 0)
     : rootRect!.bottom
   const entries = sortedNodeSlots.value
   let firstVisible: number | null = null
@@ -1061,7 +1154,7 @@ function syncFocusToScroll(force = false) {
   for (const [index, el] of entries) {
     if (!el)
       continue
-    const rect = el.getBoundingClientRect()
+    const rect = readLayout('syncFocusToScroll.slot.getBoundingClientRect', () => el.getBoundingClientRect())
     if (rect.bottom <= viewportTop || rect.top >= viewportBottom)
       continue
     if (firstVisible == null)
@@ -1072,14 +1165,16 @@ function syncFocusToScroll(force = false) {
     const container = containerRef.value
     if (!container)
       return
-    const rootRect = isViewportRoot ? { top: 0 } : root.getBoundingClientRect()
-    const rootScrollTop = getNormalizedScrollTop(root, doc, isViewportRoot)
+    const rootRect = isViewportRoot
+      ? { top: 0 }
+      : readLayout('syncFocusToScroll.fallback.root.getBoundingClientRect', () => root.getBoundingClientRect())
+    const rootScrollTop = readLayout('syncFocusToScroll.fallback.scrollTop', () => getNormalizedScrollTop(root, doc, isViewportRoot))
     const relativeScrollTop = isViewportRoot
       ? (() => {
           // For viewport scrolling, estimate how far we've scrolled into the
           // container by its visual position (negative top means we've scrolled
           // past it).
-          const containerRect = container.getBoundingClientRect()
+          const containerRect = readLayout('syncFocusToScroll.fallback.container.getBoundingClientRect', () => container.getBoundingClientRect())
           const rel = (isViewportRoot ? 0 : rootRect.top) - containerRect.top
           return Math.max(0, rel)
         })()
@@ -1088,8 +1183,8 @@ function syncFocusToScroll(force = false) {
           return Math.max(0, rootScrollTop - offsetTop)
         })()
     const viewportHeight = isViewportRoot
-      ? (view?.innerHeight ?? doc?.documentElement?.clientHeight ?? root.clientHeight ?? 0)
-      : root.clientHeight
+      ? readLayout('syncFocusToScroll.fallback.viewport.clientHeight', () => view?.innerHeight ?? doc?.documentElement?.clientHeight ?? root.clientHeight ?? 0)
+      : readLayout('syncFocusToScroll.fallback.root.clientHeight', () => root.clientHeight)
     const targetOffset = relativeScrollTop + Math.max(0, viewportHeight) * 0.5
     const estimated = estimateIndexForOffset(targetOffset)
     focusIndex.value = clamp(estimated, 0, Math.max(0, parsedNodes.value.length - 1))
@@ -1141,8 +1236,8 @@ function readSimpleTextProbeProfile() {
   const listItemTextEl = listItemRoot?.querySelector('.paragraph-node') as HTMLElement | null
   nextProfile.listItem = buildBlockTextProfile(listItemProbeWrapperRef.value, listItemTextEl, 'pre-wrap')
 
-  const listHeight = listProbeWrapperRef.value?.offsetHeight ?? 0
-  const listItemHeight = listItemProbeWrapperRef.value?.offsetHeight ?? 0
+  const listHeight = readLayout('readSimpleTextProbeProfile.list.offsetHeight', () => listProbeWrapperRef.value?.offsetHeight ?? 0)
+  const listItemHeight = readLayout('readSimpleTextProbeProfile.listItem.offsetHeight', () => listItemProbeWrapperRef.value?.offsetHeight ?? 0)
   nextProfile.listWrapperOverhead = Math.max(0, listHeight - listItemHeight)
 
   for (let level = 1; level <= 6; level++) {
@@ -1160,7 +1255,7 @@ function updateExperimentContainerWidth() {
     experimentContainerWidth.value = 0
     return
   }
-  const width = containerRef.value?.clientWidth ?? 0
+  const width = readLayout('updateExperimentContainerWidth.clientWidth', () => containerRef.value?.clientWidth ?? 0)
   experimentContainerWidth.value = width > 0 ? width : 0
 }
 
@@ -1231,7 +1326,7 @@ const estimatedNodeHeights = computed(() => {
   if (!nodes.length || !heightEstimationActive.value)
     return nodes.map(() => null)
 
-  const width = experimentContainerWidth.value || containerRef.value?.clientWidth || 0
+  const width = experimentContainerWidth.value || readLayout('estimatedNodeHeights.clientWidth', () => containerRef.value?.clientWidth || 0)
   if (!Number.isFinite(width) || width <= 0)
     return nodes.map(() => null)
 
@@ -1385,7 +1480,7 @@ function getHeightCacheWidthBucket(width: unknown) {
 
 function getFallbackHeightPrefix() {
   const total = parsedNodes.value.length
-  const width = experimentContainerWidth.value || containerRef.value?.clientWidth || 0
+  const width = experimentContainerWidth.value || readLayout('getFallbackHeightPrefix.clientWidth', () => containerRef.value?.clientWidth || 0)
   const widthBucket = getHeightCacheWidthBucket(width)
   const measurementKey = props.virtualScroll?.measurementKey == null
     ? ''
@@ -1933,7 +2028,7 @@ function getVisibleDomHeight() {
   let total = 0
 
   for (const el of nodeContentElements.values())
-    total += el?.offsetHeight ?? 0
+    total += readLayout('getVisibleDomHeight.offsetHeight', () => el?.offsetHeight ?? 0)
 
   return Math.ceil(Math.max(0, total))
 }
@@ -1947,8 +2042,8 @@ function getVirtualizedDomLogicalHeight() {
 
     total += Math.max(
       0,
-      el.offsetHeight || 0,
-      el.getBoundingClientRect?.().height || 0,
+      readLayout('getVirtualizedDomLogicalHeight.offsetHeight', () => el.offsetHeight || 0),
+      readLayout('getVirtualizedDomLogicalHeight.getBoundingClientRect', () => el.getBoundingClientRect?.().height || 0),
     )
   }
 
@@ -2100,13 +2195,13 @@ function getScrollBox() {
   const isViewportRoot = root === doc.documentElement
     || root === doc.body
     || root === doc.scrollingElement
-  const scrollTop = getNormalizedScrollTop(root, doc, isViewportRoot)
-  const scrollHeight = isViewportRoot
+  const scrollTop = readLayout('getScrollBox.scrollTop', () => getNormalizedScrollTop(root, doc, isViewportRoot))
+  const scrollHeight = readLayout('getScrollBox.scrollHeight', () => isViewportRoot
     ? Math.max(doc.documentElement?.scrollHeight ?? 0, doc.body?.scrollHeight ?? 0, root.scrollHeight ?? 0)
-    : root.scrollHeight
-  const clientHeight = isViewportRoot
+    : root.scrollHeight)
+  const clientHeight = readLayout('getScrollBox.clientHeight', () => isViewportRoot
     ? (doc.documentElement?.clientHeight || root.clientHeight || 0)
-    : root.clientHeight
+    : root.clientHeight)
 
   return {
     root,
@@ -2123,8 +2218,8 @@ function getRendererLogicalHeight() {
   const modelHeight = Math.max(0, estimateHeightRange(0, total))
   const domHeight = Math.max(
     0,
-    containerRef.value?.scrollHeight ?? 0,
-    containerRef.value?.offsetHeight ?? 0,
+    readLayout('getRendererLogicalHeight.scrollHeight', () => containerRef.value?.scrollHeight ?? 0),
+    readLayout('getRendererLogicalHeight.offsetHeight', () => containerRef.value?.offsetHeight ?? 0),
   )
 
   if (total <= 0)
@@ -2178,7 +2273,7 @@ function getRendererLogicalHeight() {
 function getViewportBottomInRoot(box: NonNullable<ReturnType<typeof getScrollBox>>) {
   return box.isViewportRoot
     ? box.clientHeight
-    : box.root.getBoundingClientRect().bottom
+    : readLayout('getViewportBottomInRoot.getBoundingClientRect', () => box.root.getBoundingClientRect().bottom)
 }
 
 function getVirtualViewportRect(box: NonNullable<ReturnType<typeof getScrollBox>>) {
@@ -2189,7 +2284,7 @@ function getVirtualViewportRect(box: NonNullable<ReturnType<typeof getScrollBox>
     }
   }
 
-  const rect = box.root.getBoundingClientRect()
+  const rect = readLayout('getVirtualViewportRect.getBoundingClientRect', () => box.root.getBoundingClientRect())
   return {
     top: rect.top,
     bottom: rect.bottom,
@@ -2203,7 +2298,7 @@ function getRendererBottomDistanceFromViewport(
   if (!container)
     return null
 
-  const containerRect = container.getBoundingClientRect()
+  const containerRect = readLayout('getRendererBottomDistanceFromViewport.getBoundingClientRect', () => container.getBoundingClientRect())
   const viewportBottom = getViewportBottomInRoot(box)
 
   return viewportBottom - containerRect.bottom
@@ -2247,7 +2342,7 @@ function isRendererNearVirtualViewport(extraMarginPx = 64) {
     return false
 
   const viewport = getVirtualViewportRect(box)
-  const rect = container.getBoundingClientRect()
+  const rect = readLayout('isRendererNearVirtualViewport.getBoundingClientRect', () => container.getBoundingClientRect())
 
   return rect.bottom >= viewport.top - extraMarginPx
     && rect.top <= viewport.bottom + extraMarginPx
@@ -2633,9 +2728,9 @@ function getRendererBottomOffsetWithinRoot(
   const rendererTop = getOffsetTopWithinRoot(container, box.root)
   const domHeight = Math.max(
     0,
-    container.offsetHeight || 0,
-    container.scrollHeight || 0,
-    container.getBoundingClientRect?.().height || 0,
+    readLayout('getRendererBottomOffsetWithinRoot.offsetHeight', () => container.offsetHeight || 0),
+    readLayout('getRendererBottomOffsetWithinRoot.scrollHeight', () => container.scrollHeight || 0),
+    readLayout('getRendererBottomOffsetWithinRoot.getBoundingClientRect', () => container.getBoundingClientRect?.().height || 0),
   )
   const logicalHeight = getRendererLogicalHeight()
 
@@ -4204,12 +4299,14 @@ function scheduleVisibilityFallback(index: number) {
     const doc = el.ownerDocument || document
     const view = doc.defaultView || window
     const isViewportRoot = !root || root === doc.documentElement || root === doc.body
-    const rootRect = !isViewportRoot && root ? root.getBoundingClientRect() : null
+    const rootRect = !isViewportRoot && root
+      ? readLayout('nodeVisibilityFallback.root.getBoundingClientRect', () => root.getBoundingClientRect())
+      : null
     const viewportTop = isViewportRoot ? 0 : rootRect!.top
     const viewportBottom = isViewportRoot
-      ? (view.innerHeight ?? root?.clientHeight ?? 0)
+      ? readLayout('nodeVisibilityFallback.clientHeight', () => view.innerHeight ?? root?.clientHeight ?? 0)
       : rootRect!.bottom
-    const rect = el.getBoundingClientRect()
+    const rect = readLayout('nodeVisibilityFallback.node.getBoundingClientRect', () => el.getBoundingClientRect())
     const nearViewport = rect.bottom >= (viewportTop - VIEWPORT_FALLBACK_MARGIN_PX)
       && rect.top <= (viewportBottom + VIEWPORT_FALLBACK_MARGIN_PX)
 
@@ -5591,7 +5688,7 @@ function updateTypewriterCursorPosition() {
     const rect = rects?.[rects.length - 1] ?? lastText.parentElement?.getBoundingClientRect()
 
     if (rect) {
-      const rootRect = root.getBoundingClientRect()
+      const rootRect = readLayout('typewriterCursor.root.getBoundingClientRect', () => root.getBoundingClientRect())
       left = rect.right - rootRect.left + root.scrollLeft
       top = rect.top - rootRect.top + root.scrollTop
       height = rect.height || height

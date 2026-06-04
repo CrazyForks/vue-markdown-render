@@ -233,7 +233,7 @@ describe('virtual timeline API', () => {
     expect(wrapper.text()).toContain('# Result')
 
     const markdownSlot = slotProps.find(props => props.kind === 'assistant-markdown')
-    expect(markdownSlot.markdownProps.nodeVirtual).toBe('auto')
+    expect(markdownSlot.markdownProps.nodeVirtual).toBe(false)
     expect(markdownSlot.markdownProps.mode).toBe('docs')
     expect(markdownSlot.markdownProps.codeRenderer).toBe('monaco')
     expect(markdownSlot.markdownProps.virtualScroll.enabled).toBe(true)
@@ -836,7 +836,7 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
-  it('connects markdown logical height and non-markdown measurements to an outer adapter', () => {
+  it('connects markdown logical height and non-markdown measurements to an outer adapter', async () => {
     const items = [
       { kind: 'user-message', id: 'u1', text: 'hello' },
       { kind: 'assistant-markdown', id: 'a1', content: '# Hello', final: true },
@@ -877,6 +877,7 @@ describe('virtual timeline API', () => {
 
     const markdownProps = controller.markdownProps(items[1], 1)
     markdownProps.onHeightChange(createMetrics(640, markdownProps.virtualScroll!.sessionKey!))
+    await flushAnimationFrame()
     expect(sizes.get('a1')).toBe(640)
 
     const state: MarkstreamVirtualState = {
@@ -1059,7 +1060,7 @@ describe('virtual timeline API', () => {
     scope.stop()
   })
 
-  it('adds wrapper chrome to markdown logical height when logical height is larger than mounted DOM', () => {
+  it('adds wrapper chrome to markdown logical height when logical height is larger than mounted DOM', async () => {
     const items = [
       { kind: 'assistant-markdown', id: 'a1', content: '# Hello', final: true },
     ]
@@ -1121,6 +1122,7 @@ describe('virtual timeline API', () => {
       createMetrics(1000, markdownProps.virtualScroll!.sessionKey!),
     )
 
+    await flushAnimationFrame()
     expect(sizes.get('a1')).toBe(1060)
 
     scope.stop()
@@ -1178,7 +1180,7 @@ describe('virtual timeline API', () => {
     scope.stop()
   })
 
-  it('keeps markdown item height as max(wrapper height, markdown logical height)', () => {
+  it('keeps markdown item height as max(wrapper height, markdown logical height)', async () => {
     const items = [
       { kind: 'assistant-markdown', id: 'a1', content: '# Hello', final: true },
     ]
@@ -1226,6 +1228,7 @@ describe('virtual timeline API', () => {
       createMetrics(640, markdownProps.virtualScroll!.sessionKey!),
     )
 
+    await flushAnimationFrame()
     expect(sizes.get('a1')).toBe(640)
 
     wrapperHeight = 720
@@ -1234,6 +1237,7 @@ describe('virtual timeline API', () => {
       createMetrics(640, markdownProps.virtualScroll!.sessionKey!),
     )
 
+    await flushAnimationFrame()
     expect(sizes.get('a1')).toBe(720)
 
     scope.stop()
@@ -1586,7 +1590,7 @@ describe('virtual timeline API', () => {
       confidence: 'measured',
     })
 
-    await nextTick()
+    await flushAnimationFrame()
     expect((wrapper.vm as any).getItemSize('m1')).toBe(1000)
 
     markdown.markdownProps.onHeightChange({
@@ -1650,6 +1654,7 @@ describe('virtual timeline API', () => {
       confidence: 'measured',
     })
 
+    await flushAnimationFrame()
     expect(sizes.get('m1')).toBe(1000)
 
     markdownProps.onHeightChange({

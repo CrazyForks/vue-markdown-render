@@ -46,6 +46,9 @@ const emit = defineEmits<{
   (e: 'thread-state-change', payload: MarkstreamThreadVirtualState): void
 }>()
 
+const TIMELINE_MARKDOWN_EMIT_INTERVAL_MS = 96
+const TIMELINE_MARKDOWN_HEIGHT_DIFF_THRESHOLD_PX = 4
+
 /* eslint-disable vue/custom-event-name-casing -- Public timeline events are kebab-case. */
 function emitHeightChange(payload: { itemKey: string, metrics: MarkstreamVirtualMetrics }) {
   emit('height-change', payload)
@@ -75,6 +78,46 @@ function shouldAllowMarkdownShrink(metrics: MarkstreamVirtualMetrics) {
     || metrics.confidence === 'final'
 }
 
+const layoutReadCounts = new Map<string, number>()
+
+function recordLayoutRead(label: string) {
+  if (props.debug !== true)
+    return
+
+  layoutReadCounts.set(label, (layoutReadCounts.get(label) ?? 0) + 1)
+}
+
+function takeLayoutReadStats() {
+  if (props.debug !== true || layoutReadCounts.size === 0)
+    return null
+
+  let total = 0
+  for (const count of layoutReadCounts.values())
+    total += count
+
+  const snapshot = {
+    total,
+    byLabel: Object.fromEntries(
+      Array.from(layoutReadCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+    ),
+  }
+
+  layoutReadCounts.clear()
+  return snapshot
+}
+
+function logLayoutReads(label: string, itemKey: string) {
+  const layoutReads = takeLayoutReadStats()
+  if (!layoutReads)
+    return
+
+  console.info('[markstream-vue][timeline][perf] layout-reads', {
+    label,
+    itemKey,
+    layoutReads,
+  })
+}
+
 interface TimelineRecord {
   item: any
   index: number
@@ -89,6 +132,10 @@ interface TimelineRecord {
 
 interface ReconcileRecordSizeOptions {
   allowMarkdownShrink?: boolean
+  markdownLogicalHeight?: number
+  rememberThreadKey?: string
+  source?: TimelineItemSizeSource
+  updateLayout?: boolean
 }
 
 interface MarkdownLogicalHeightSource {
@@ -98,6 +145,13 @@ interface MarkdownLogicalHeightSource {
 }
 
 type TimelineItemSizeSource = NonNullable<MarkstreamThreadVirtualState['itemSizeSources']>[string]
+
+interface PendingMarkdownReconcile {
+  allowMarkdownShrink: boolean
+  itemSizeSource: TimelineItemSizeSource
+  logicalHeight: number
+  threadKey?: string
+}
 
 const scrollRoot = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
@@ -970,7 +1024,12 @@ function clearRestoredItemHeightFloor(key: string) {
   restoredItemHeightFloorSources.delete(key)
 }
 
-function setItemSize(key: string, size: number, source?: TimelineItemSizeSource) {
+function setItemSize(
+  key: string,
+  size: number,
+  source?: TimelineItemSizeSource,
+  options: { rememberThreadKey?: string, updateLayout?: boolean } = {},
+) {
   if (!Number.isFinite(size) || size <= 0)
     return
 
@@ -995,6 +1054,14 @@ function setItemSize(key: string, size: number, source?: TimelineItemSizeSource)
     return
   }
 
+  if (options.updateLayout === false) {
+    if (source)
+      itemSizeSources.set(key, source)
+    itemSizes.set(key, next)
+    scheduleThreadStateRemember(options.rememberThreadKey)
+    return
+  }
+
   if (restoringThread.value) {
     if (source)
       itemSizeSources.set(key, source)
@@ -1015,7 +1082,7 @@ function setItemSize(key: string, size: number, source?: TimelineItemSizeSource)
     itemSizeSources.set(key, source)
   itemSizes.set(key, next)
   updateLayoutRecordSize(key, next)
-  scheduleThreadStateRemember()
+  scheduleThreadStateRemember(options.rememberThreadKey)
   scheduleScrollReconcileAfterSizeChange(restoreAnchor)
 }
 
@@ -1052,25 +1119,106 @@ function resolveSizeChangeRestoreAnchor(
   return anchor
 }
 
-function scheduleScrollReconcileAfterSizeChange(anchor: MarkstreamThreadAnchor | undefined) {
-  const apply = () => {
-    if (anchor)
-      restoreOuterAnchor(anchor)
+const pendingScrollReconcile = {
+  scheduled: false,
+  raf: null as number | null,
+  anchor: undefined as MarkstreamThreadAnchor | undefined,
+}
 
-    updateScrollMetrics({ remember: false })
+const pendingMarkdownReconciles = new Map<string, PendingMarkdownReconcile>()
+let markdownReconcileScheduled = false
+let markdownReconcileRaf: number | null = null
+
+function requestFrameOrNextTick(callback: () => void) {
+  if (typeof requestAnimationFrame === 'function')
+    return requestAnimationFrame(callback)
+
+  void nextTick(callback)
+  return null
+}
+
+function cancelTimelineRaf(id: number | null) {
+  if (id != null && typeof cancelAnimationFrame === 'function')
+    cancelAnimationFrame(id)
+}
+
+function scheduleScrollReconcileAfterSizeChange(anchor: MarkstreamThreadAnchor | undefined) {
+  if (anchor)
+    pendingScrollReconcile.anchor = anchor
+
+  if (pendingScrollReconcile.scheduled)
+    return
+
+  pendingScrollReconcile.scheduled = true
+  pendingScrollReconcile.raf = requestFrameOrNextTick(flushScrollReconcile)
+}
+
+function flushScrollReconcile() {
+  if (!pendingScrollReconcile.scheduled)
+    return
+
+  pendingScrollReconcile.scheduled = false
+  pendingScrollReconcile.raf = null
+  const pendingAnchor = pendingScrollReconcile.anchor
+  pendingScrollReconcile.anchor = undefined
+
+  if (pendingAnchor)
+    restoreOuterAnchor(pendingAnchor)
+
+  updateScrollMetrics({ remember: false })
+}
+
+function clearPendingScrollReconcile() {
+  cancelTimelineRaf(pendingScrollReconcile.raf)
+  pendingScrollReconcile.scheduled = false
+  pendingScrollReconcile.raf = null
+  pendingScrollReconcile.anchor = undefined
+}
+
+function flushMarkdownReconciles() {
+  if (!markdownReconcileScheduled)
+    return
+
+  markdownReconcileScheduled = false
+  markdownReconcileRaf = null
+  const entries = Array.from(pendingMarkdownReconciles.entries())
+  pendingMarkdownReconciles.clear()
+
+  for (const [key, pending] of entries) {
+    if (markdownLogicalHeights.get(key) !== pending.logicalHeight)
+      continue
+
+    const record = layoutRecordByKey.get(key)
+    if (!record)
+      continue
+
+    const updateLayout = (pending.threadKey ?? '') === (normalizedThreadKey.value ?? '')
+    reconcileRecordSize(record, {
+      allowMarkdownShrink: pending.allowMarkdownShrink,
+      markdownLogicalHeight: pending.logicalHeight,
+      rememberThreadKey: pending.threadKey,
+      source: pending.itemSizeSource,
+      updateLayout,
+    })
   }
 
-  apply()
+  flushScrollReconcile()
+}
 
-  void nextTick(() => {
-    apply()
+function scheduleMarkdownReconcile(record: TimelineRecord, pending: PendingMarkdownReconcile) {
+  pendingMarkdownReconciles.set(record.key, pending)
+  if (markdownReconcileScheduled)
+    return
 
-    if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(() => {
-        apply()
-      })
-    }
-  })
+  markdownReconcileScheduled = true
+  markdownReconcileRaf = requestFrameOrNextTick(flushMarkdownReconciles)
+}
+
+function clearPendingMarkdownReconciles() {
+  cancelTimelineRaf(markdownReconcileRaf)
+  markdownReconcileScheduled = false
+  markdownReconcileRaf = null
+  pendingMarkdownReconciles.clear()
 }
 
 function resolveElement(el: Element | { $el?: Element | null } | null | undefined) {
@@ -1085,11 +1233,11 @@ function cleanupMeasuredElement(key: string) {
 }
 
 function getMeasuredItemHeight(key: string) {
-  return readElementOuterHeight(measuredElements.get(key))
+  return readElementOuterHeight(measuredElements.get(key), recordLayoutRead)
 }
 
 function getMeasuredMarkdownChromeHeight(key: string) {
-  return getMarkdownItemChromeHeight(measuredElements.get(key))
+  return getMarkdownItemChromeHeight(measuredElements.get(key), recordLayoutRead)
 }
 
 function reconcileRecordSize(
@@ -1097,16 +1245,27 @@ function reconcileRecordSize(
   options: ReconcileRecordSizeOptions = {},
 ) {
   const measured = getMeasuredItemHeight(record.key)
+  const itemSizeSource = options.source ?? getItemSizeSource(record)
+  let didLogLayoutReads = false
+  const logRecordLayoutReads = () => {
+    if (didLogLayoutReads)
+      return
+    didLogLayoutReads = true
+    logLayoutReads('reconcileRecordSize', record.key)
+  }
 
   if (!record.markdown) {
     if (measured > 0)
-      setItemSize(record.key, measured, getItemSizeSource(record))
+      setItemSize(record.key, measured, itemSizeSource, options)
 
+    logRecordLayoutReads()
     return
   }
 
-  const cachedSize = getCompatibleItemSize(record) ?? 0
-  const markdown = getKnownMarkdownLogicalHeight(record.key)
+  const cachedSize = isSameItemSizeSource(itemSizeSources.get(record.key), itemSizeSource)
+    ? itemSizes.get(record.key) ?? 0
+    : 0
+  const markdown = options.markdownLogicalHeight ?? getKnownMarkdownLogicalHeight(record.key)
   const chrome = getMeasuredMarkdownChromeHeight(record.key)
 
   if (markdown > 0) {
@@ -1119,20 +1278,24 @@ function reconcileRecordSize(
       clearRestoredItemHeightFloor(record.key)
 
     if (next > 0)
-      setItemSize(record.key, next, getItemSizeSource(record))
+      setItemSize(record.key, next, itemSizeSource, options)
 
+    logRecordLayoutReads()
     return
   }
 
   if (cachedSize > 0) {
     if (measured > cachedSize + 1)
-      setItemSize(record.key, measured, getItemSizeSource(record))
+      setItemSize(record.key, measured, itemSizeSource, options)
 
+    logRecordLayoutReads()
     return
   }
 
   if (measured > 0)
-    setItemSize(record.key, measured, getItemSizeSource(record))
+    setItemSize(record.key, measured, itemSizeSource, options)
+
+  logRecordLayoutReads()
 }
 
 function setMeasuredItemElement(record: TimelineRecord, el: Element | { $el?: Element | null } | null | undefined) {
@@ -1185,8 +1348,8 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
     measurementKey: timelineMarkdownMeasurementKey.value,
     settleMode: 'manual',
     settledToken: final,
-    emitIntervalMs: 32,
-    heightDiffThresholdPx: 1,
+    emitIntervalMs: TIMELINE_MARKDOWN_EMIT_INTERVAL_MS,
+    heightDiffThresholdPx: TIMELINE_MARKDOWN_HEIGHT_DIFF_THRESHOLD_PX,
   }
 
   return {
@@ -1194,7 +1357,7 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
     final,
     mode: markdownMode,
     codeRenderer: markdownCodeRenderer,
-    nodeVirtual: 'auto' as const,
+    nodeVirtual: false,
     fade: props.markdownFade === true,
     indexKey: getSessionKey(record),
     virtualScroll,
@@ -1211,18 +1374,11 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
       const allowMarkdownShrink = shouldAllowMarkdownShrink(metrics)
       const logicalHeight = Math.ceil(metrics.totalHeight)
 
-      reconcileRecordSize(record, {
+      scheduleMarkdownReconcile(record, {
         allowMarkdownShrink,
-      })
-
-      void nextTick(() => {
-        // Avoid applying a stale delayed shrink after a newer metrics event.
-        if (getKnownMarkdownLogicalHeight(record.key) !== logicalHeight)
-          return
-
-        reconcileRecordSize(record, {
-          allowMarkdownShrink,
-        })
+        itemSizeSource: getItemSizeSource(record),
+        logicalHeight,
+        threadKey: normalizedThreadKey.value,
       })
 
       emitHeightChange({ itemKey: record.key, metrics })
@@ -1298,6 +1454,8 @@ function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
 }
 
 function captureThreadStateForKey(threadKey = normalizedThreadKey.value): MarkstreamThreadVirtualState {
+  flushMarkdownReconciles()
+
   const itemHeights: Record<string, number> = {}
   const itemSizeSourceSnapshot: NonNullable<MarkstreamThreadVirtualState['itemSizeSources']> = {}
 
@@ -1378,6 +1536,8 @@ function scheduleThreadStateRemember(threadKey = normalizedThreadKey.value) {
 }
 
 function rememberPreviousThreadState(threadKey: string) {
+  flushMarkdownReconciles()
+
   if (flushThreadStateRemember()?.threadKey === threadKey)
     return
 
@@ -2349,6 +2509,8 @@ function cleanupMeasuredElements() {
 
 function cleanupObservers() {
   clearThreadStateRememberSchedule()
+  clearPendingScrollReconcile()
+  clearPendingMarkdownReconciles()
   cleanupMeasuredElements()
   itemSizeSources.clear()
   restoredItemHeightFloors.clear()
