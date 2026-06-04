@@ -3,7 +3,7 @@ import { computed, provide } from 'vue'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import NodeRenderer from '../NodeRenderer'
 import SimpleInlineRenderer from '../SimpleInlineRenderer'
-import { areSimpleInlineNodes, getPlainTextContent } from '../SimpleInlineRenderer/simpleInline'
+import { getPlainTextContent, resolveSimpleInlineChildren } from '../SimpleInlineRenderer/simpleInline'
 
 // child node shape used across many node components
 interface NodeChild {
@@ -36,42 +36,26 @@ defineEmits<{
 }>()
 
 const customComponents = useCustomNodeComponents(() => props.customId)
-const simpleParagraphChildren = computed(() => {
-  if ((customComponents.value as any).paragraph)
-    return null
-
-  const children = props.node.children
-  if (!Array.isArray(children) || children.length !== 1)
-    return null
-
-  const child = children[0]
-  if (child?.type !== 'paragraph' || !Array.isArray(child.children))
-    return null
-
-  const paragraphChildren = child.children
-  return areSimpleInlineNodes(paragraphChildren) ? paragraphChildren : null
-})
-const simpleInlineChildren = computed(() => {
-  if (simpleParagraphChildren.value)
-    return null
-
-  const children = props.node.children
-  return areSimpleInlineNodes(children) ? children : null
+const hasParagraphOverride = computed(() =>
+  Boolean((customComponents.value as any).paragraph),
+)
+const hasTextOverride = computed(() =>
+  Boolean((customComponents.value as any).text),
+)
+const simpleBlockChildren = computed(() => {
+  return resolveSimpleInlineChildren(props.node.children as any, {
+    allowSingleParagraph: !hasParagraphOverride.value,
+    allowEmpty: false,
+  })
 })
 const canRenderPlainTextInline = computed(() => {
-  return props.fade === false && !(customComponents.value as any).text
+  return props.fade === false && !hasTextOverride.value
 })
-const simpleParagraphPlainText = computed(() => {
+const simpleBlockPlainText = computed(() => {
   if (!canRenderPlainTextInline.value)
     return null
 
-  return getPlainTextContent(simpleParagraphChildren.value)
-})
-const simpleInlinePlainText = computed(() => {
-  if (!canRenderPlainTextInline.value)
-    return null
-
-  return getPlainTextContent(simpleInlineChildren.value)
+  return getPlainTextContent(simpleBlockChildren.value)
 })
 
 provide('markstreamShowTooltips', computed(() => props.showTooltips))
@@ -81,33 +65,22 @@ provide('markstreamFade', computed(() => props.fade))
 <template>
   <blockquote class="blockquote blockquote-node" dir="auto" :cite="node.cite">
     <p
-      v-if="simpleParagraphChildren"
+      v-if="simpleBlockChildren"
       dir="auto"
       class="paragraph-node"
     >
       <span
-        v-if="simpleParagraphPlainText !== null"
+        v-if="simpleBlockPlainText !== null"
         class="simple-inline-text whitespace-pre-wrap break-words text-node"
         :custom-id="props.customId"
-      >{{ simpleParagraphPlainText }}</span>
+      >{{ simpleBlockPlainText }}</span>
       <SimpleInlineRenderer
         v-else
-        :nodes="simpleParagraphChildren"
+        :nodes="simpleBlockChildren as any"
         :custom-id="props.customId"
         :index-key="`blockquote-${props.indexKey}-paragraph`"
       />
     </p>
-    <span
-      v-else-if="simpleInlinePlainText !== null"
-      class="simple-inline-text whitespace-pre-wrap break-words text-node"
-      :custom-id="props.customId"
-    >{{ simpleInlinePlainText }}</span>
-    <SimpleInlineRenderer
-      v-else-if="simpleInlineChildren"
-      :nodes="simpleInlineChildren"
-      :custom-id="props.customId"
-      :index-key="`blockquote-${props.indexKey}`"
-    />
     <NodeRenderer
       v-else
       :show-tooltips="props.showTooltips"

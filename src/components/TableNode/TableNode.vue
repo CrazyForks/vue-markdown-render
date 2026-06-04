@@ -1,17 +1,19 @@
 <script setup lang="ts">
+import type { SimpleInlineNode } from '../SimpleInlineRenderer/simpleInline'
 import { computed, onBeforeUnmount, provide, ref, watch } from 'vue'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import NodeRenderer from '../NodeRenderer'
 import SimpleInlineRenderer from '../SimpleInlineRenderer'
-import { areSimpleInlineNodes, getPlainTextContent } from '../SimpleInlineRenderer/simpleInline'
+import { getPlainTextContent, resolveSimpleInlineChildren } from '../SimpleInlineRenderer/simpleInline'
+
+type TableCellChildNode = SimpleInlineNode & {
+  raw: string
+}
 
 interface TableCellNode {
   type: 'table_cell'
   header: boolean
-  children: {
-    type: string
-    raw: string
-  }[]
+  children: TableCellChildNode[]
   raw: string
   align?: 'left' | 'right' | 'center'
 }
@@ -37,9 +39,31 @@ const props = defineProps<{
   typewriter?: boolean
   fade?: boolean
   customId?: string
+  showTooltips?: boolean
 }>()
 
 defineEmits(['copy'])
+
+interface SimpleCellInfo {
+  simpleChildren: readonly SimpleInlineNode[] | null
+  plainText: string | null
+}
+
+interface RenderHeaderCell {
+  cell: TableCellNode
+  index: number
+  info: SimpleCellInfo
+}
+
+interface RenderBodyRow {
+  row: TableRowNode
+  rowIndex: number
+  cells: Array<{
+    cell: TableCellNode
+    cellIndex: number
+    info: SimpleCellInfo
+  }>
+}
 
 const isLoading = computed(() => props.node.loading ?? false)
 const bodyRows = computed(() => props.node.rows ?? [])
@@ -61,48 +85,80 @@ const columnStyles = computed(() =>
 )
 const hasColumnWidths = computed(() => columnWidths.value.length > 0)
 
-provide('markstreamShowTooltips', computed(() => true))
+provide('markstreamShowTooltips', computed(() => props.showTooltips))
 provide('markstreamFade', computed(() => props.fade))
 
 const customComponents = useCustomNodeComponents(() => props.customId)
+const hasTextOverride = computed(() =>
+  Boolean((customComponents.value as any).text),
+)
+const hasParagraphOverride = computed(() =>
+  Boolean((customComponents.value as any).paragraph),
+)
 const canRenderPlainTextCell = computed(() => {
-  return props.fade === false && !(customComponents.value as any).text
+  return props.fade === false && !hasTextOverride.value
 })
 
 const simpleCellCache = new WeakMap<TableCellNode, {
   children: TableCellNode['children']
   textFastPath: boolean
-  canRender: boolean
-  plainText: string | null
+  paragraphFastPath: boolean
+  info: SimpleCellInfo
 }>()
 
-function getSimpleCellInfo(cell: TableCellNode) {
+function getSimpleCellInfo(cell: TableCellNode): SimpleCellInfo {
   const textFastPath = canRenderPlainTextCell.value
-  const cached = simpleCellCache.get(cell)
-  if (cached?.children === cell.children && cached.textFastPath === textFastPath)
-    return cached
+  const paragraphFastPath = !hasParagraphOverride.value
 
-  const canRender = areSimpleInlineNodes(cell.children)
-  const info = {
-    children: cell.children,
-    textFastPath,
-    canRender,
-    plainText: canRender && textFastPath
-      ? getPlainTextContent(cell.children)
+  const cached = simpleCellCache.get(cell)
+  if (
+    cached?.children === cell.children
+    && cached.textFastPath === textFastPath
+    && cached.paragraphFastPath === paragraphFastPath
+  ) {
+    return cached.info
+  }
+
+  const simpleChildren = resolveSimpleInlineChildren(cell.children as any, {
+    allowSingleParagraph: paragraphFastPath,
+    allowEmpty: true,
+  })
+
+  const info: SimpleCellInfo = {
+    simpleChildren,
+    plainText: simpleChildren && textFastPath
+      ? getPlainTextContent(simpleChildren)
       : null,
   }
 
-  simpleCellCache.set(cell, info)
+  simpleCellCache.set(cell, {
+    children: cell.children,
+    textFastPath,
+    paragraphFastPath,
+    info,
+  })
   return info
 }
 
-function canRenderSimpleCell(cell: TableCellNode) {
-  return getSimpleCellInfo(cell).canRender
-}
+const headerRenderCells = computed<RenderHeaderCell[]>(() => {
+  return props.node.header.cells.map((cell, index) => ({
+    cell,
+    index,
+    info: getSimpleCellInfo(cell),
+  }))
+})
 
-function getSimpleCellPlainText(cell: TableCellNode) {
-  return getSimpleCellInfo(cell).plainText
-}
+const bodyRenderRows = computed<RenderBodyRow[]>(() => {
+  return bodyRows.value.map((row, rowIndex) => ({
+    row,
+    rowIndex,
+    cells: row.cells.map((cell, cellIndex) => ({
+      cell,
+      cellIndex,
+      info: getSimpleCellInfo(cell),
+    })),
+  }))
+})
 
 function measureHeaderWidths() {
   const cells = tableRef.value?.querySelectorAll('thead th')
@@ -192,82 +248,84 @@ onBeforeUnmount(stopColumnResize)
       <thead>
         <tr>
           <th
-            v-for="(cell, index) in node.header.cells"
-            :key="`header-${index}`"
+            v-for="item in headerRenderCells"
+            :key="`header-${item.index}`"
             dir="auto"
             :class="[
-              cell.align === 'right'
+              item.cell.align === 'right'
                 ? 'text-right'
-                : cell.align === 'center'
+                : item.cell.align === 'center'
                   ? 'text-center'
                   : 'text-left',
             ]"
           >
             <span
-              v-if="getSimpleCellPlainText(cell) !== null"
+              v-if="item.info.plainText !== null"
               class="simple-inline-text whitespace-pre-wrap break-words text-node"
               :custom-id="props.customId"
-            >{{ getSimpleCellPlainText(cell) }}</span>
+            >{{ item.info.plainText }}</span>
             <SimpleInlineRenderer
-              v-else-if="canRenderSimpleCell(cell)"
-              :nodes="cell.children"
+              v-else-if="item.info.simpleChildren"
+              :nodes="item.info.simpleChildren as any"
               :custom-id="props.customId"
-              :index-key="`table-th-${props.indexKey}-${index}`"
+              :index-key="`table-th-${props.indexKey}-${item.index}`"
             />
             <NodeRenderer
               v-else
-              :nodes="cell.children"
+              :nodes="item.cell.children"
               :index-key="`table-th-${props.indexKey}`"
               :custom-id="props.customId"
               :typewriter="props.typewriter"
               :fade="props.fade"
+              :show-tooltips="props.showTooltips"
               @copy="$emit('copy', $event)"
             />
             <button
-              v-if="index < node.header.cells.length - 1"
+              v-if="item.index < node.header.cells.length - 1"
               type="button"
               class="table-node__resize-handle"
-              :aria-label="`Resize columns ${index + 1} and ${index + 2}`"
-              @pointerdown="startColumnResize(index, $event)"
+              :aria-label="`Resize columns ${item.index + 1} and ${item.index + 2}`"
+              @pointerdown="startColumnResize(item.index, $event)"
             />
           </th>
         </tr>
       </thead>
       <tbody>
         <tr
-          v-for="(row, rowIndex) in bodyRows"
-          :key="`row-${rowIndex}`"
+          v-for="rowItem in bodyRenderRows"
+          :key="`row-${rowItem.rowIndex}`"
         >
           <td
-            v-for="(cell, cellIndex) in row.cells"
-            :key="`cell-${rowIndex}-${cellIndex}`"
+            v-for="item in rowItem.cells"
+            :key="`cell-${rowItem.rowIndex}-${item.cellIndex}`"
             :class="[
-              cell.align === 'right'
+              item.cell.align === 'right'
                 ? 'text-right'
-                : cell.align === 'center'
+                : item.cell.align === 'center'
                   ? 'text-center'
                   : 'text-left',
             ]"
             dir="auto"
           >
             <span
-              v-if="getSimpleCellPlainText(cell) !== null"
+              v-if="item.info.plainText !== null"
               class="simple-inline-text whitespace-pre-wrap break-words text-node"
               :custom-id="props.customId"
-            >{{ getSimpleCellPlainText(cell) }}</span>
+            >{{ item.info.plainText }}</span>
             <SimpleInlineRenderer
-              v-else-if="canRenderSimpleCell(cell)"
-              :nodes="cell.children"
+              v-else-if="item.info.simpleChildren"
+              :nodes="item.info.simpleChildren as any"
               :custom-id="props.customId"
-              :index-key="`table-td-${props.indexKey}-${rowIndex}-${cellIndex}`"
+              :index-key="`table-td-${props.indexKey}-${rowItem.rowIndex}-${item.cellIndex}`"
             />
             <NodeRenderer
               v-else
-              :nodes="cell.children"
+              :nodes="item.cell.children"
               :index-key="`table-td-${props.indexKey}`"
               :custom-id="props.customId"
               :typewriter="props.typewriter"
               :fade="props.fade"
+              :show-tooltips="props.showTooltips"
               @copy="$emit('copy', $event)"
             />
           </td>

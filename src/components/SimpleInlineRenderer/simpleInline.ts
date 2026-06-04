@@ -11,6 +11,11 @@ export type SimpleInlineTextNode = SimpleInlineNode & {
   center?: boolean
 }
 
+export interface ResolveSimpleInlineChildrenOptions {
+  allowSingleParagraph?: boolean
+  allowEmpty?: boolean
+}
+
 const SIMPLE_INLINE_TYPES = new Set([
   'checkbox',
   'checkbox_input',
@@ -57,6 +62,37 @@ export function isSimpleInlineNode(node: SimpleInlineNode) {
 
 export function areSimpleInlineNodes(nodes: readonly SimpleInlineNode[] | undefined) {
   return Array.isArray(nodes) && nodes.every(isSimpleInlineNode)
+}
+
+export function resolveSimpleInlineChildren(
+  nodes: readonly SimpleInlineNode[] | undefined,
+  options: ResolveSimpleInlineChildrenOptions = {},
+): readonly SimpleInlineNode[] | null {
+  if (!Array.isArray(nodes))
+    return null
+
+  const allowEmpty = options.allowEmpty === true
+
+  if (nodes.length === 0)
+    return allowEmpty ? nodes : null
+
+  if (areSimpleInlineNodes(nodes))
+    return nodes
+
+  if (options.allowSingleParagraph === false || nodes.length !== 1)
+    return null
+
+  const only = nodes[0]
+  if (only?.type !== 'paragraph' || !Array.isArray(only.children))
+    return null
+
+  const paragraphChildren = only.children
+  if (!allowEmpty && paragraphChildren.length === 0)
+    return null
+
+  return areSimpleInlineNodes(paragraphChildren)
+    ? paragraphChildren
+    : null
 }
 
 export function getPlainTextContent(

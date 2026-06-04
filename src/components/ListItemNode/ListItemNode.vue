@@ -3,7 +3,7 @@ import { computed, provide } from 'vue'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import NodeRenderer from '../NodeRenderer'
 import SimpleInlineRenderer from '../SimpleInlineRenderer'
-import { areSimpleInlineNodes, getPlainTextContent } from '../SimpleInlineRenderer/simpleInline'
+import { getPlainTextContent, resolveSimpleInlineChildren } from '../SimpleInlineRenderer/simpleInline'
 
 // 节点子元素类型
 interface NodeChild {
@@ -40,23 +40,20 @@ defineEmits<{
 
 const itemNode = computed(() => props.node ?? props.item)
 const customComponents = useCustomNodeComponents(() => props.customId)
-const simpleParagraphChildren = computed(() => {
-  if ((customComponents.value as any).paragraph)
-    return null
-
-  const children = itemNode.value?.children
-  if (!Array.isArray(children) || children.length !== 1)
-    return null
-
-  const child = children[0]
-  if (child?.type !== 'paragraph' || !Array.isArray((child as any).children))
-    return null
-
-  const paragraphChildren = (child as any).children
-  return areSimpleInlineNodes(paragraphChildren) ? paragraphChildren : null
+const hasParagraphOverride = computed(() =>
+  Boolean((customComponents.value as any).paragraph),
+)
+const hasTextOverride = computed(() =>
+  Boolean((customComponents.value as any).text),
+)
+const simpleBlockChildren = computed(() => {
+  return resolveSimpleInlineChildren(itemNode.value?.children as any, {
+    allowSingleParagraph: !hasParagraphOverride.value,
+    allowEmpty: false,
+  })
 })
-const simpleParagraphWithNestedLists = computed(() => {
-  if ((customComponents.value as any).paragraph)
+const simpleBlockWithNestedLists = computed(() => {
+  if (hasParagraphOverride.value)
     return null
 
   const children = itemNode.value?.children
@@ -71,41 +68,32 @@ const simpleParagraphWithNestedLists = computed(() => {
   if (!nestedLists.every(child => child?.type === 'list'))
     return null
 
-  const paragraphChildren = (firstChild as any).children
-  return areSimpleInlineNodes(paragraphChildren)
+  const paragraphChildren = resolveSimpleInlineChildren([firstChild] as any, {
+    allowSingleParagraph: true,
+    allowEmpty: false,
+  })
+
+  return paragraphChildren
     ? {
         paragraphChildren,
         nestedLists,
       }
     : null
 })
-const simpleInlineChildren = computed(() => {
-  if (simpleParagraphChildren.value || simpleParagraphWithNestedLists.value)
-    return null
-
-  const children = itemNode.value?.children
-  return areSimpleInlineNodes(children) ? children : null
-})
 const canRenderPlainTextInline = computed(() => {
-  return props.fade === false && !(customComponents.value as any).text
+  return props.fade === false && !hasTextOverride.value
 })
-const simpleParagraphPlainText = computed(() => {
+const simpleBlockPlainText = computed(() => {
   if (!canRenderPlainTextInline.value)
     return null
 
-  return getPlainTextContent(simpleParagraphChildren.value)
+  return getPlainTextContent(simpleBlockChildren.value)
 })
 const simpleNestedParagraphPlainText = computed(() => {
   if (!canRenderPlainTextInline.value)
     return null
 
-  return getPlainTextContent(simpleParagraphWithNestedLists.value?.paragraphChildren)
-})
-const simpleInlinePlainText = computed(() => {
-  if (!canRenderPlainTextInline.value)
-    return null
-
-  return getPlainTextContent(simpleInlineChildren.value)
+  return getPlainTextContent(simpleBlockWithNestedLists.value?.paragraphChildren)
 })
 
 const EMPTY_LI_VALUE_ATTRS = Object.freeze({}) as Record<string, never>
@@ -125,23 +113,23 @@ provide('markstreamFade', computed(() => props.fade))
 <template>
   <li class="list-item" dir="auto" v-bind="liValueAttrs">
     <p
-      v-if="simpleParagraphChildren"
+      v-if="simpleBlockChildren"
       dir="auto"
       class="paragraph-node"
     >
       <span
-        v-if="simpleParagraphPlainText !== null"
+        v-if="simpleBlockPlainText !== null"
         class="simple-inline-text whitespace-pre-wrap break-words text-node"
         :custom-id="props.customId"
-      >{{ simpleParagraphPlainText }}</span>
+      >{{ simpleBlockPlainText }}</span>
       <SimpleInlineRenderer
         v-else
-        :nodes="simpleParagraphChildren"
+        :nodes="simpleBlockChildren as any"
         :custom-id="props.customId"
         :index-key="`list-item-${props.indexKey}-paragraph`"
       />
     </p>
-    <template v-else-if="simpleParagraphWithNestedLists">
+    <template v-else-if="simpleBlockWithNestedLists">
       <p
         dir="auto"
         class="paragraph-node"
@@ -153,13 +141,13 @@ provide('markstreamFade', computed(() => props.fade))
         >{{ simpleNestedParagraphPlainText }}</span>
         <SimpleInlineRenderer
           v-else
-          :nodes="simpleParagraphWithNestedLists.paragraphChildren"
+          :nodes="simpleBlockWithNestedLists.paragraphChildren as any"
           :custom-id="props.customId"
           :index-key="`list-item-${props.indexKey}-paragraph`"
         />
       </p>
       <NodeRenderer
-        v-for="(nestedList, nestedIndex) in simpleParagraphWithNestedLists.nestedLists"
+        v-for="(nestedList, nestedIndex) in simpleBlockWithNestedLists.nestedLists"
         :key="`list-item-${props.indexKey}-nested-${nestedIndex}`"
         :nodes="[nestedList]"
         :custom-id="props.customId"
@@ -173,17 +161,6 @@ provide('markstreamFade', computed(() => props.fade))
         @copy="$emit('copy', $event)"
       />
     </template>
-    <span
-      v-else-if="simpleInlinePlainText !== null"
-      class="simple-inline-text whitespace-pre-wrap break-words text-node"
-      :custom-id="props.customId"
-    >{{ simpleInlinePlainText }}</span>
-    <SimpleInlineRenderer
-      v-else-if="simpleInlineChildren"
-      :nodes="simpleInlineChildren"
-      :custom-id="props.customId"
-      :index-key="`list-item-${props.indexKey}`"
-    />
     <NodeRenderer
       v-else
       :show-tooltips="props.showTooltips"

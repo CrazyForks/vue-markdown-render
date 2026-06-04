@@ -10,6 +10,22 @@ describe('simple inline fast path', () => {
     clearGlobalCustomComponents()
   })
 
+  function textNode(content: string) {
+    return {
+      type: 'text',
+      raw: content,
+      content,
+    }
+  }
+
+  function paragraphNode(content: string) {
+    return {
+      type: 'paragraph',
+      raw: content,
+      children: [textNode(content)],
+    }
+  }
+
   it('renders simple list item paragraphs without nested renderer wrappers', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
@@ -69,6 +85,44 @@ describe('simple inline fast path', () => {
     expect(item.get('strong.strong-node').text()).toBe('bold')
     expect(item.get('ul.list-node').text()).toContain('Child code')
     expect(item.get('code.inline-code').text()).toBe('code')
+  })
+
+  it('keeps the list item block wrapper when inline children become a paragraph', async () => {
+    const createList = (children: any[]) => ({
+      type: 'list',
+      ordered: false,
+      raw: '',
+      items: [
+        {
+          type: 'list_item',
+          raw: '',
+          children,
+        },
+      ],
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createList([textNode('Direct item')])],
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    const paragraph = wrapper.get('li.list-item > p.paragraph-node')
+    const paragraphElement = paragraph.element
+    expect(paragraph.text()).toBe('Direct item')
+
+    await wrapper.setProps({
+      nodes: [createList([paragraphNode('Paragraph item')])],
+    })
+    await flushAll()
+
+    const nextParagraph = wrapper.get('li.list-item > p.paragraph-node')
+    expect(nextParagraph.element).toBe(paragraphElement)
+    expect(nextParagraph.text()).toBe('Paragraph item')
   })
 
   it('uses a lightweight plain text node for top-level paragraphs when fade is disabled', async () => {
@@ -195,7 +249,7 @@ describe('simple inline fast path', () => {
 
     const table = wrapper.get('table.table-node')
     expect(table.find('.markdown-renderer').exists()).toBe(false)
-    expect(table.get('a[href="https://vuejs.org"]').attributes('title')).toBe('')
+    expect(table.get('a[href="https://vuejs.org"]').attributes('title')).toBe('https://vuejs.org')
     expect(table.get('strong.strong-node').text()).toBe('bold')
     expect(table.get('code.inline-code').text()).toBe('code')
   })
@@ -222,6 +276,59 @@ describe('simple inline fast path', () => {
     expect(valueCell.find('.text-node-stream-delta').exists()).toBe(false)
   })
 
+  it('keeps table cells on the simple path when inline children become a paragraph', async () => {
+    const createCell = (children: any[], header = false) => ({
+      type: 'table_cell',
+      header,
+      raw: '',
+      children,
+    })
+    const createTable = (valueChildren: any[]) => ({
+      type: 'table',
+      raw: '',
+      loading: false,
+      header: {
+        type: 'table_row',
+        raw: '',
+        cells: [createCell([textNode('Name')], true)],
+      },
+      rows: [
+        {
+          type: 'table_row',
+          raw: '',
+          cells: [createCell(valueChildren)],
+        },
+      ],
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createTable([textNode('Direct cell')])],
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    const valueCell = wrapper.get('tbody td')
+    const valueCellElement = valueCell.element
+    const textElement = valueCell.get('.simple-inline-text').element
+    expect(valueCell.find('.markdown-renderer').exists()).toBe(false)
+    expect(valueCell.text()).toBe('Direct cell')
+
+    await wrapper.setProps({
+      nodes: [createTable([paragraphNode('Paragraph cell')])],
+    })
+    await flushAll()
+
+    const nextValueCell = wrapper.get('tbody td')
+    expect(nextValueCell.element).toBe(valueCellElement)
+    expect(nextValueCell.find('.markdown-renderer').exists()).toBe(false)
+    expect(nextValueCell.get('.simple-inline-text').element).toBe(textElement)
+    expect(nextValueCell.text()).toBe('Paragraph cell')
+  })
+
   it('renders simple blockquote paragraphs without nested renderer wrappers', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
@@ -239,6 +346,37 @@ describe('simple inline fast path', () => {
     expect(quote.get('p.paragraph-node').text()).toContain('Final note with bold and code')
     expect(quote.get('strong.strong-node').text()).toBe('bold')
     expect(quote.get('code.inline-code').text()).toBe('code')
+  })
+
+  it('keeps the blockquote block wrapper when inline children become a paragraph', async () => {
+    const createBlockquote = (children: any[]) => ({
+      type: 'blockquote',
+      raw: '',
+      children,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [createBlockquote([textNode('Direct quote')])],
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    const paragraph = wrapper.get('blockquote.blockquote-node > p.paragraph-node')
+    const paragraphElement = paragraph.element
+    expect(paragraph.text()).toBe('Direct quote')
+
+    await wrapper.setProps({
+      nodes: [createBlockquote([paragraphNode('Paragraph quote')])],
+    })
+    await flushAll()
+
+    const nextParagraph = wrapper.get('blockquote.blockquote-node > p.paragraph-node')
+    expect(nextParagraph.element).toBe(paragraphElement)
+    expect(nextParagraph.text()).toBe('Paragraph quote')
   })
 
   it('uses a lightweight plain text node for simple blockquotes when fade is disabled', async () => {
@@ -260,6 +398,21 @@ describe('simple inline fast path', () => {
     expect(paragraph.text()).toBe('Lightweight final note')
     expect(paragraph.get('.simple-inline-text').text()).toBe('Lightweight final note')
     expect(paragraph.find('.text-node-stream-delta').exists()).toBe(false)
+  })
+
+  it('passes tooltip visibility through blockquote fast paths', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '> Read [Docs](https://vuejs.org)',
+        final: true,
+        batchRendering: false,
+        showTooltips: false,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.get('blockquote a[href="https://vuejs.org"]').attributes('title')).toBe('https://vuejs.org')
   })
 
   it('keeps the nested renderer path when paragraph has a custom component', async () => {
