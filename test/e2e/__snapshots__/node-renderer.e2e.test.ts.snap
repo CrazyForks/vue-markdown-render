@@ -50,22 +50,10 @@ exports[`markdownRender node e2e coverage > renders blockquote node 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="fade" appear="true" persisted="false" css="true">
-        <blockquote data-v-8ae59609="" data-v-8dfe8a80="" class="blockquote" dir="auto" is-dark="false">
-          <div data-v-8dfe8a80="" data-v-8ae59609="" class="markstream-vue markdown-renderer">
-            <!--v-if-->
-            <div data-v-8dfe8a80="" class="node-slot" data-node-index="0" data-node-type="paragraph">
-              <div data-v-8dfe8a80="" class="node-content">
-                <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-                <transition-stub data-v-8dfe8a80="" name="fade" appear="true" persisted="false" css="true">
-                  <p data-v-93ee5c2d="" data-v-8dfe8a80="" dir="auto" class="paragraph-node" typewriter="false" fade="true" is-dark="false"><span data-v-a84b8095="" data-v-93ee5c2d="" class="whitespace-pre-wrap break-words text-node" index-key="blockquote-markdown-renderer-0-0-0"><span data-v-a84b8095="">Blockquote rendered content.</span>
-                    <!--v-if--></span>
-                  </p>
-                </transition-stub>
-              </div>
-            </div>
-            <!--v-if-->
-            <!--v-if-->
-          </div>
+        <blockquote data-v-8ae59609="" data-v-8dfe8a80="" class="blockquote blockquote-node" dir="auto" is-dark="false">
+          <p data-v-8ae59609="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" data-v-8ae59609="" class="whitespace-pre-wrap break-words text-node" index-key="blockquote-markdown-renderer-0-paragraph-0"><span data-v-a84b8095="">Blockquote rendered content.</span>
+            <!--v-if--></span>
+          </p>
         </blockquote>
       </transition-stub>
     </div>

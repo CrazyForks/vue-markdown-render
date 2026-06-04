@@ -96,6 +96,46 @@ describe('simple inline fast path', () => {
     expect(valueCell.find('.text-node-stream-delta').exists()).toBe(false)
   })
 
+  it('renders simple blockquote paragraphs without nested renderer wrappers', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '> Final note with **bold** and `code`',
+        final: true,
+        batchRendering: false,
+        showTooltips: false,
+      },
+    })
+
+    await flushAll()
+
+    const quote = wrapper.get('blockquote.blockquote-node')
+    expect(quote.find('.markdown-renderer').exists()).toBe(false)
+    expect(quote.get('p.paragraph-node').text()).toContain('Final note with bold and code')
+    expect(quote.get('strong.strong-node').text()).toBe('bold')
+    expect(quote.get('code.inline-code').text()).toBe('code')
+  })
+
+  it('uses a lightweight plain text node for simple blockquotes when fade is disabled', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '> Lightweight final note',
+        final: true,
+        batchRendering: false,
+        fade: false,
+      },
+    })
+
+    await flushAll()
+
+    const quote = wrapper.get('blockquote.blockquote-node')
+    expect(quote.find('.markdown-renderer').exists()).toBe(false)
+
+    const paragraph = quote.get('p.paragraph-node')
+    expect(paragraph.text()).toBe('Lightweight final note')
+    expect(paragraph.get('.simple-inline-text').text()).toBe('Lightweight final note')
+    expect(paragraph.find('.text-node-stream-delta').exists()).toBe(false)
+  })
+
   it('keeps the nested renderer path when paragraph has a custom component', async () => {
     const scopeId = 'simple-inline-paragraph-override'
     setCustomComponents(scopeId, {
@@ -161,5 +201,40 @@ describe('simple inline fast path', () => {
     await flushAll()
 
     expect(wrapper.findAll('.custom-text-node').map(node => node.text())).toContain('Fast path')
+  })
+
+  it('keeps nested blockquote rendering when paragraph has a custom component', async () => {
+    const scopeId = 'simple-inline-blockquote-paragraph-override'
+
+    setCustomComponents(scopeId, {
+      paragraph: defineComponent({
+        name: 'CustomBlockquoteParagraphNode',
+        props: {
+          node: { type: Object, required: true },
+        },
+        setup(props) {
+          return () => h(
+            'p',
+            { class: 'custom-blockquote-paragraph-node' },
+            String((props.node as any).raw ?? ''),
+          )
+        },
+      }),
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '> overridden quote',
+        customId: scopeId,
+        final: true,
+        batchRendering: false,
+      },
+    })
+
+    await flushAll()
+
+    const quote = wrapper.get('blockquote.blockquote-node')
+    expect(quote.get('.markdown-renderer').exists()).toBe(true)
+    expect(quote.get('.custom-blockquote-paragraph-node').text()).toBe('overridden quote')
   })
 })
