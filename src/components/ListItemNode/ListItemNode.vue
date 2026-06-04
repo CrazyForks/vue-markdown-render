@@ -55,8 +55,32 @@ const simpleParagraphChildren = computed(() => {
   const paragraphChildren = (child as any).children
   return areSimpleInlineNodes(paragraphChildren) ? paragraphChildren : null
 })
+const simpleParagraphWithNestedLists = computed(() => {
+  if ((customComponents.value as any).paragraph)
+    return null
+
+  const children = itemNode.value?.children
+  if (!Array.isArray(children) || children.length < 2)
+    return null
+
+  const firstChild = children[0]
+  if (firstChild?.type !== 'paragraph' || !Array.isArray((firstChild as any).children))
+    return null
+
+  const nestedLists = children.slice(1)
+  if (!nestedLists.every(child => child?.type === 'list'))
+    return null
+
+  const paragraphChildren = (firstChild as any).children
+  return areSimpleInlineNodes(paragraphChildren)
+    ? {
+        paragraphChildren,
+        nestedLists,
+      }
+    : null
+})
 const simpleInlineChildren = computed(() => {
-  if (simpleParagraphChildren.value)
+  if (simpleParagraphChildren.value || simpleParagraphWithNestedLists.value)
     return null
 
   const children = itemNode.value?.children
@@ -70,6 +94,12 @@ const simpleParagraphPlainText = computed(() => {
     return null
 
   return getPlainTextContent(simpleParagraphChildren.value)
+})
+const simpleNestedParagraphPlainText = computed(() => {
+  if (!canRenderPlainTextInline.value)
+    return null
+
+  return getPlainTextContent(simpleParagraphWithNestedLists.value?.paragraphChildren)
 })
 const simpleInlinePlainText = computed(() => {
   if (!canRenderPlainTextInline.value)
@@ -111,6 +141,38 @@ provide('markstreamFade', computed(() => props.fade))
         :index-key="`list-item-${props.indexKey}-paragraph`"
       />
     </p>
+    <template v-else-if="simpleParagraphWithNestedLists">
+      <p
+        dir="auto"
+        class="paragraph-node"
+      >
+        <span
+          v-if="simpleNestedParagraphPlainText !== null"
+          class="simple-inline-text whitespace-pre-wrap break-words text-node"
+          :custom-id="props.customId"
+        >{{ simpleNestedParagraphPlainText }}</span>
+        <SimpleInlineRenderer
+          v-else
+          :nodes="simpleParagraphWithNestedLists.paragraphChildren"
+          :custom-id="props.customId"
+          :index-key="`list-item-${props.indexKey}-paragraph`"
+        />
+      </p>
+      <NodeRenderer
+        v-for="(nestedList, nestedIndex) in simpleParagraphWithNestedLists.nestedLists"
+        :key="`list-item-${props.indexKey}-nested-${nestedIndex}`"
+        :nodes="[nestedList]"
+        :custom-id="props.customId"
+        :index-key="`list-item-${props.indexKey}-nested-${nestedIndex}`"
+        :show-tooltips="props.showTooltips"
+        :typewriter="props.typewriter"
+        :fade="props.fade"
+        :batch-rendering="false"
+        :defer-nodes-until-visible="false"
+        :render-as-fragment="true"
+        @copy="$emit('copy', $event)"
+      />
+    </template>
     <span
       v-else-if="simpleInlinePlainText !== null"
       class="simple-inline-text whitespace-pre-wrap break-words text-node"
@@ -161,6 +223,6 @@ ul > .list-item::marker {
 .list-item :deep(.markdown-renderer) {
   content-visibility: visible;
   contain-intrinsic-size: 0px 0px;
-  contain: none;
+  contain: content;
 }
 </style>

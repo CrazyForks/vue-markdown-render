@@ -51,6 +51,26 @@ describe('simple inline fast path', () => {
     expect(paragraph.find('.text-node-stream-delta').exists()).toBe(false)
   })
 
+  it('renders simple nested list parents without wrapping the item in a nested renderer', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '- Parent **bold**\n  - Child `code`',
+        final: true,
+        batchRendering: false,
+        showTooltips: false,
+      },
+    })
+
+    await flushAll()
+
+    const item = wrapper.get('li.list-item')
+    expect(item.find('.markdown-renderer').exists()).toBe(false)
+    expect(item.get('p.paragraph-node').text()).toBe('Parent bold')
+    expect(item.get('strong.strong-node').text()).toBe('bold')
+    expect(item.get('ul.list-node').text()).toContain('Child code')
+    expect(item.get('code.inline-code').text()).toBe('code')
+  })
+
   it('uses a lightweight plain text node for top-level paragraphs when fade is disabled', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
