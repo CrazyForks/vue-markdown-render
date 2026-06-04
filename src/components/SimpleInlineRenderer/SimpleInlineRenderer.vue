@@ -18,12 +18,7 @@ import StrongNode from '../StrongNode'
 import SubscriptNode from '../SubscriptNode'
 import SuperscriptNode from '../SuperscriptNode'
 import TextNode from '../TextNode'
-
-type TextLikeSimpleInlineNode = SimpleInlineNode & {
-  type: 'text'
-  content?: unknown
-  center?: boolean
-}
+import { getPlainTextContent } from './simpleInline'
 
 const props = defineProps<{
   nodes: SimpleInlineNode[]
@@ -53,30 +48,6 @@ const overrides = useCustomNodeComponents(() => props.customId)
 const inheritedFade = inject<{ value?: boolean } | undefined>('markstreamFade', undefined)
 const hasTextOverride = computed(() => Boolean((overrides.value as any).text))
 
-function getTextContent(node: TextLikeSimpleInlineNode) {
-  return String(node.content ?? node.raw ?? '')
-}
-
-const plainTextNodes = computed<TextLikeSimpleInlineNode[] | null>(() => {
-  if (hasTextOverride.value || props.nodes.length === 0)
-    return null
-
-  const nodes: TextLikeSimpleInlineNode[] = []
-
-  for (const node of props.nodes) {
-    if (node?.type !== 'text')
-      return null
-
-    const textNode = node as TextLikeSimpleInlineNode
-    if (textNode.center === true)
-      return null
-
-    nodes.push(textNode)
-  }
-
-  return nodes
-})
-
 const singleDefaultTextNode = computed(() => {
   if (hasTextOverride.value || props.nodes.length !== 1)
     return null
@@ -85,13 +56,13 @@ const singleDefaultTextNode = computed(() => {
   return node?.type === 'text' ? node : null
 })
 
-const canRenderPlainTextNodes = computed(() => {
-  return Boolean(plainTextNodes.value && inheritedFade?.value === false)
-})
-
 const plainTextContent = computed(() => {
-  return plainTextNodes.value?.map(getTextContent).join('') ?? ''
+  if (hasTextOverride.value || inheritedFade?.value !== false)
+    return null
+
+  return getPlainTextContent(props.nodes)
 })
+const canRenderPlainTextNodes = computed(() => plainTextContent.value !== null)
 
 const nodeComponents = computed<Record<string, Component | undefined>>(() => {
   const custom = overrides.value as Record<string, Component | undefined>
@@ -109,7 +80,7 @@ const nodeComponents = computed<Record<string, Component | undefined>>(() => {
     v-if="canRenderPlainTextNodes"
     class="simple-inline-text whitespace-pre-wrap break-words text-node"
     :custom-id="props.customId"
-  >{{ plainTextContent }}</span>
+  >{{ plainTextContent ?? '' }}</span>
   <TextNode
     v-else-if="singleDefaultTextNode"
     :node="singleDefaultTextNode as any"

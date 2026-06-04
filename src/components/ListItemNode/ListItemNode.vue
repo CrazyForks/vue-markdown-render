@@ -3,7 +3,7 @@ import { computed, provide } from 'vue'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import NodeRenderer from '../NodeRenderer'
 import SimpleInlineRenderer from '../SimpleInlineRenderer'
-import { areSimpleInlineNodes } from '../SimpleInlineRenderer/simpleInline'
+import { areSimpleInlineNodes, getPlainTextContent } from '../SimpleInlineRenderer/simpleInline'
 
 // 节点子元素类型
 interface NodeChild {
@@ -62,6 +62,21 @@ const simpleInlineChildren = computed(() => {
   const children = itemNode.value?.children
   return areSimpleInlineNodes(children) ? children : null
 })
+const canRenderPlainTextInline = computed(() => {
+  return props.fade === false && !(customComponents.value as any).text
+})
+const simpleParagraphPlainText = computed(() => {
+  if (!canRenderPlainTextInline.value)
+    return null
+
+  return getPlainTextContent(simpleParagraphChildren.value)
+})
+const simpleInlinePlainText = computed(() => {
+  if (!canRenderPlainTextInline.value)
+    return null
+
+  return getPlainTextContent(simpleInlineChildren.value)
+})
 
 const EMPTY_LI_VALUE_ATTRS = Object.freeze({}) as Record<string, never>
 
@@ -84,12 +99,23 @@ provide('markstreamFade', computed(() => props.fade))
       dir="auto"
       class="paragraph-node"
     >
+      <span
+        v-if="simpleParagraphPlainText !== null"
+        class="simple-inline-text whitespace-pre-wrap break-words text-node"
+        :custom-id="props.customId"
+      >{{ simpleParagraphPlainText }}</span>
       <SimpleInlineRenderer
+        v-else
         :nodes="simpleParagraphChildren"
         :custom-id="props.customId"
         :index-key="`list-item-${props.indexKey}-paragraph`"
       />
     </p>
+    <span
+      v-else-if="simpleInlinePlainText !== null"
+      class="simple-inline-text whitespace-pre-wrap break-words text-node"
+      :custom-id="props.customId"
+    >{{ simpleInlinePlainText }}</span>
     <SimpleInlineRenderer
       v-else-if="simpleInlineChildren"
       :nodes="simpleInlineChildren"

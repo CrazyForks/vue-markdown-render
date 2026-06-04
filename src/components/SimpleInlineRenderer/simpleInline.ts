@@ -5,6 +5,12 @@ export interface SimpleInlineNode {
   [key: string]: unknown
 }
 
+export type SimpleInlineTextNode = SimpleInlineNode & {
+  type: 'text'
+  content?: unknown
+  center?: boolean
+}
+
 const SIMPLE_INLINE_TYPES = new Set([
   'checkbox',
   'checkbox_input',
@@ -51,4 +57,26 @@ export function isSimpleInlineNode(node: SimpleInlineNode) {
 
 export function areSimpleInlineNodes(nodes: readonly SimpleInlineNode[] | undefined) {
   return Array.isArray(nodes) && nodes.every(isSimpleInlineNode)
+}
+
+export function getPlainTextContent(
+  nodes: readonly SimpleInlineNode[] | undefined,
+) {
+  if (!Array.isArray(nodes) || nodes.length === 0)
+    return null
+
+  let content = ''
+
+  for (const node of nodes) {
+    if (node?.type !== 'text')
+      return null
+
+    const textNode = node as SimpleInlineTextNode
+    if (textNode.center === true)
+      return null
+
+    content += String(textNode.content ?? textNode.raw ?? '')
+  }
+
+  return content
 }

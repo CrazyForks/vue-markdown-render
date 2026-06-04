@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, provide, ref, watch } from 'vue'
+import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import NodeRenderer from '../NodeRenderer'
 import SimpleInlineRenderer from '../SimpleInlineRenderer'
-import { areSimpleInlineNodes } from '../SimpleInlineRenderer/simpleInline'
+import { areSimpleInlineNodes, getPlainTextContent } from '../SimpleInlineRenderer/simpleInline'
 
 interface TableCellNode {
   type: 'table_cell'
@@ -63,22 +64,44 @@ const hasColumnWidths = computed(() => columnWidths.value.length > 0)
 provide('markstreamShowTooltips', computed(() => true))
 provide('markstreamFade', computed(() => props.fade))
 
+const customComponents = useCustomNodeComponents(() => props.customId)
+const canRenderPlainTextCell = computed(() => {
+  return props.fade === false && !(customComponents.value as any).text
+})
+
 const simpleCellCache = new WeakMap<TableCellNode, {
   children: TableCellNode['children']
-  result: boolean
+  textFastPath: boolean
+  canRender: boolean
+  plainText: string | null
 }>()
 
-function canRenderSimpleCell(cell: TableCellNode) {
+function getSimpleCellInfo(cell: TableCellNode) {
+  const textFastPath = canRenderPlainTextCell.value
   const cached = simpleCellCache.get(cell)
-  if (cached?.children === cell.children)
-    return cached.result
+  if (cached?.children === cell.children && cached.textFastPath === textFastPath)
+    return cached
 
-  const result = areSimpleInlineNodes(cell.children)
-  simpleCellCache.set(cell, {
+  const canRender = areSimpleInlineNodes(cell.children)
+  const info = {
     children: cell.children,
-    result,
-  })
-  return result
+    textFastPath,
+    canRender,
+    plainText: canRender && textFastPath
+      ? getPlainTextContent(cell.children)
+      : null,
+  }
+
+  simpleCellCache.set(cell, info)
+  return info
+}
+
+function canRenderSimpleCell(cell: TableCellNode) {
+  return getSimpleCellInfo(cell).canRender
+}
+
+function getSimpleCellPlainText(cell: TableCellNode) {
+  return getSimpleCellInfo(cell).plainText
 }
 
 function measureHeaderWidths() {
@@ -180,8 +203,13 @@ onBeforeUnmount(stopColumnResize)
                   : 'text-left',
             ]"
           >
+            <span
+              v-if="getSimpleCellPlainText(cell) !== null"
+              class="simple-inline-text whitespace-pre-wrap break-words text-node"
+              :custom-id="props.customId"
+            >{{ getSimpleCellPlainText(cell) }}</span>
             <SimpleInlineRenderer
-              v-if="canRenderSimpleCell(cell)"
+              v-else-if="canRenderSimpleCell(cell)"
               :nodes="cell.children"
               :custom-id="props.customId"
               :index-key="`table-th-${props.indexKey}-${index}`"
@@ -222,8 +250,13 @@ onBeforeUnmount(stopColumnResize)
             ]"
             dir="auto"
           >
+            <span
+              v-if="getSimpleCellPlainText(cell) !== null"
+              class="simple-inline-text whitespace-pre-wrap break-words text-node"
+              :custom-id="props.customId"
+            >{{ getSimpleCellPlainText(cell) }}</span>
             <SimpleInlineRenderer
-              v-if="canRenderSimpleCell(cell)"
+              v-else-if="canRenderSimpleCell(cell)"
               :nodes="cell.children"
               :custom-id="props.customId"
               :index-key="`table-td-${props.indexKey}-${rowIndex}-${cellIndex}`"
