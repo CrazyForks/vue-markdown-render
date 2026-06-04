@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, provide, ref, watch } from 'vue'
 import NodeRenderer from '../NodeRenderer'
+import SimpleInlineRenderer from '../SimpleInlineRenderer'
+import { areSimpleInlineNodes } from '../SimpleInlineRenderer/simpleInline'
 
 interface TableCellNode {
   type: 'table_cell'
@@ -57,6 +59,13 @@ const columnStyles = computed(() =>
   columnWidths.value.map(width => width > 0 ? { width: `${width}px` } : undefined),
 )
 const hasColumnWidths = computed(() => columnWidths.value.length > 0)
+
+provide('markstreamShowTooltips', computed(() => true))
+provide('markstreamFade', computed(() => props.fade))
+
+function canRenderSimpleCell(cell: TableCellNode) {
+  return areSimpleInlineNodes(cell.children)
+}
 
 function measureHeaderWidths() {
   const cells = tableRef.value?.querySelectorAll('thead th')
@@ -157,7 +166,14 @@ onBeforeUnmount(stopColumnResize)
                   : 'text-left',
             ]"
           >
+            <SimpleInlineRenderer
+              v-if="canRenderSimpleCell(cell)"
+              :nodes="cell.children"
+              :custom-id="props.customId"
+              :index-key="`table-th-${props.indexKey}-${index}`"
+            />
             <NodeRenderer
+              v-else
               :nodes="cell.children"
               :index-key="`table-th-${props.indexKey}`"
               :custom-id="props.customId"
@@ -192,7 +208,14 @@ onBeforeUnmount(stopColumnResize)
             ]"
             dir="auto"
           >
+            <SimpleInlineRenderer
+              v-if="canRenderSimpleCell(cell)"
+              :nodes="cell.children"
+              :custom-id="props.customId"
+              :index-key="`table-td-${props.indexKey}-${rowIndex}-${cellIndex}`"
+            />
             <NodeRenderer
+              v-else
               :nodes="cell.children"
               :index-key="`table-td-${props.indexKey}`"
               :custom-id="props.customId"

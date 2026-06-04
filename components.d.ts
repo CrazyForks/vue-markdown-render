@@ -48,6 +48,7 @@ declare module 'vue' {
     ReferenceNode: typeof import('./src/components/ReferenceNode/ReferenceNode.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SimpleInlineRenderer: typeof import('./src/components/SimpleInlineRenderer/SimpleInlineRenderer.vue')['default']
     StrikethroughNode: typeof import('./src/components/StrikethroughNode/StrikethroughNode.vue')['default']
     StrongNode: typeof import('./src/components/StrongNode/StrongNode.vue')['default']
     SubscriptNode: typeof import('./src/components/SubscriptNode/SubscriptNode.vue')['default']
