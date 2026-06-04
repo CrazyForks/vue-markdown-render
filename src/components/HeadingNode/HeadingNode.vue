@@ -84,13 +84,13 @@ const nodeComponents = computed(() => ({
   >
     <span
       v-if="plainTextContent !== null"
-      class="simple-inline-text whitespace-pre-wrap break-words text-node"
+      class="text-node"
       :custom-id="props.customId"
     >{{ plainTextContent }}</span>
     <template v-else>
       <NodeChildRenderer
         v-for="(child, index) in node.children"
-        :key="`${indexKey || 'heading'}-${index}`"
+        :key="index"
         :components="nodeComponents"
         :custom-id="props.customId"
         :node="child"

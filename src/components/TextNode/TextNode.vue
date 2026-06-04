@@ -105,7 +105,7 @@ const streamedDeltaClass = computed(() => (
 <template>
   <span
     :class="[katexReady && node.center ? 'text-node-center' : '']"
-    class="whitespace-pre-wrap break-words text-node"
+    class="text-node"
   >
     <span v-if="settledContent">{{ settledContent }}</span>
     <span

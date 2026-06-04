@@ -47,10 +47,7 @@ const hasTextOverride = computed(() =>
   Boolean((customComponents.value as any).text),
 )
 const simpleBlockChildren = computed(() => {
-  return resolveSimpleInlineChildren(itemNode.value?.children as any, {
-    allowSingleParagraph: !hasParagraphOverride.value,
-    allowEmpty: false,
-  })
+  return resolveSimpleInlineChildren(itemNode.value?.children as any, !hasParagraphOverride.value)
 })
 const simpleBlockWithNestedLists = computed(() => {
   if (hasParagraphOverride.value)
@@ -68,10 +65,7 @@ const simpleBlockWithNestedLists = computed(() => {
   if (!nestedLists.every(child => child?.type === 'list'))
     return null
 
-  const paragraphChildren = resolveSimpleInlineChildren([firstChild] as any, {
-    allowSingleParagraph: true,
-    allowEmpty: false,
-  })
+  const paragraphChildren = resolveSimpleInlineChildren([firstChild] as any)
 
   return paragraphChildren
     ? {
@@ -80,17 +74,17 @@ const simpleBlockWithNestedLists = computed(() => {
       }
     : null
 })
-const canRenderPlainTextInline = computed(() => {
+function canRenderPlainTextInline() {
   return props.fade === false && !hasTextOverride.value
-})
+}
 const simpleBlockPlainText = computed(() => {
-  if (!canRenderPlainTextInline.value)
+  if (!canRenderPlainTextInline())
     return null
 
   return getPlainTextContent(simpleBlockChildren.value)
 })
 const simpleNestedParagraphPlainText = computed(() => {
-  if (!canRenderPlainTextInline.value)
+  if (!canRenderPlainTextInline())
     return null
 
   return getPlainTextContent(simpleBlockWithNestedLists.value?.paragraphChildren)
@@ -119,7 +113,7 @@ provide('markstreamFade', computed(() => props.fade))
     >
       <span
         v-if="simpleBlockPlainText !== null"
-        class="simple-inline-text whitespace-pre-wrap break-words text-node"
+        class="text-node"
         :custom-id="props.customId"
       >{{ simpleBlockPlainText }}</span>
       <SimpleInlineRenderer
@@ -136,7 +130,7 @@ provide('markstreamFade', computed(() => props.fade))
       >
         <span
           v-if="simpleNestedParagraphPlainText !== null"
-          class="simple-inline-text whitespace-pre-wrap break-words text-node"
+          class="text-node"
           :custom-id="props.customId"
         >{{ simpleNestedParagraphPlainText }}</span>
         <SimpleInlineRenderer
@@ -148,7 +142,7 @@ provide('markstreamFade', computed(() => props.fade))
       </p>
       <NodeRenderer
         v-for="(nestedList, nestedIndex) in simpleBlockWithNestedLists.nestedLists"
-        :key="`list-item-${props.indexKey}-nested-${nestedIndex}`"
+        :key="nestedIndex"
         :nodes="[nestedList]"
         :custom-id="props.customId"
         :index-key="`list-item-${props.indexKey}-nested-${nestedIndex}`"

@@ -11,75 +11,37 @@ export type SimpleInlineTextNode = SimpleInlineNode & {
   center?: boolean
 }
 
-export interface ResolveSimpleInlineChildrenOptions {
-  allowSingleParagraph?: boolean
-  allowEmpty?: boolean
-}
+const SIMPLE_INLINE_TYPES = '|checkbox|checkbox_input|emoji|emphasis|hardbreak|highlight|inline_code|insert|link|reference|strikethrough|strong|subscript|superscript|text|'
 
-const SIMPLE_INLINE_TYPES = new Set([
-  'checkbox',
-  'checkbox_input',
-  'emoji',
-  'emphasis',
-  'hardbreak',
-  'highlight',
-  'inline_code',
-  'insert',
-  'link',
-  'reference',
-  'strikethrough',
-  'strong',
-  'subscript',
-  'superscript',
-  'text',
-])
-
-const SIMPLE_INLINE_CONTAINER_TYPES = new Set([
-  'emphasis',
-  'highlight',
-  'insert',
-  'link',
-  'strikethrough',
-  'strong',
-  'subscript',
-  'superscript',
-])
+const SIMPLE_INLINE_CONTAINER_TYPES = '|emphasis|highlight|insert|link|strikethrough|strong|subscript|superscript|'
 
 export function isSimpleInlineNode(node: SimpleInlineNode) {
   if (!node || typeof node !== 'object')
     return false
 
-  const type = String(node.type)
-  if (!SIMPLE_INLINE_TYPES.has(type))
+  const type = `|${node.type}|`
+  if (!SIMPLE_INLINE_TYPES.includes(type))
     return false
 
-  if (!SIMPLE_INLINE_CONTAINER_TYPES.has(type))
+  if (!SIMPLE_INLINE_CONTAINER_TYPES.includes(type))
     return true
 
   const children = node.children
   return Array.isArray(children) && children.every(isSimpleInlineNode)
 }
 
-export function areSimpleInlineNodes(nodes: readonly SimpleInlineNode[] | undefined) {
-  return Array.isArray(nodes) && nodes.every(isSimpleInlineNode)
-}
-
 export function resolveSimpleInlineChildren(
   nodes: readonly SimpleInlineNode[] | undefined,
-  options: ResolveSimpleInlineChildrenOptions = {},
+  allowSingleParagraph = true,
+  allowEmpty = false,
 ): readonly SimpleInlineNode[] | null {
-  if (!Array.isArray(nodes))
+  if (!nodes || (!allowEmpty && nodes.length === 0))
     return null
 
-  const allowEmpty = options.allowEmpty === true
-
-  if (nodes.length === 0)
-    return allowEmpty ? nodes : null
-
-  if (areSimpleInlineNodes(nodes))
+  if (nodes.every(isSimpleInlineNode))
     return nodes
 
-  if (options.allowSingleParagraph === false || nodes.length !== 1)
+  if (!allowSingleParagraph || nodes.length !== 1)
     return null
 
   const only = nodes[0]
@@ -87,10 +49,7 @@ export function resolveSimpleInlineChildren(
     return null
 
   const paragraphChildren = only.children
-  if (!allowEmpty && paragraphChildren.length === 0)
-    return null
-
-  return areSimpleInlineNodes(paragraphChildren)
+  return (allowEmpty || paragraphChildren.length > 0) && paragraphChildren.every(isSimpleInlineNode)
     ? paragraphChildren
     : null
 }
@@ -98,20 +57,16 @@ export function resolveSimpleInlineChildren(
 export function getPlainTextContent(
   nodes: readonly SimpleInlineNode[] | undefined,
 ) {
-  if (!Array.isArray(nodes) || nodes.length === 0)
+  if (!nodes?.length)
     return null
 
   let content = ''
 
   for (const node of nodes) {
-    if (node?.type !== 'text')
+    if (node?.type !== 'text' || (node as SimpleInlineTextNode).center === true)
       return null
 
-    const textNode = node as SimpleInlineTextNode
-    if (textNode.center === true)
-      return null
-
-    content += String(textNode.content ?? textNode.raw ?? '')
+    content += String((node as SimpleInlineTextNode).content ?? node.raw ?? '')
   }
 
   return content

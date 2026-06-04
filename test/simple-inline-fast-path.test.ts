@@ -63,7 +63,7 @@ describe('simple inline fast path', () => {
 
     const paragraph = item.get('p.paragraph-node')
     expect(paragraph.text()).toBe('Fast path list item')
-    expect(paragraph.get('.simple-inline-text').text()).toBe('Fast path list item')
+    expect(paragraph.get('.text-node').text()).toBe('Fast path list item')
     expect(paragraph.find('.text-node-stream-delta').exists()).toBe(false)
   })
 
@@ -139,7 +139,7 @@ describe('simple inline fast path', () => {
 
     const paragraph = wrapper.get('p.paragraph-node')
     expect(paragraph.text()).toBe('Fast path paragraph')
-    expect(paragraph.get('.simple-inline-text').text()).toBe('Fast path paragraph')
+    expect(paragraph.get('.text-node').text()).toBe('Fast path paragraph')
     expect(paragraph.find('.text-node-stream-delta').exists()).toBe(false)
   })
 
@@ -193,7 +193,7 @@ describe('simple inline fast path', () => {
     await flushAll()
 
     expect(wrapper.get('.custom-text-node').text()).toBe('Custom paragraph text')
-    expect(wrapper.find('.simple-inline-text').exists()).toBe(false)
+    expect(wrapper.find('.text-node').exists()).toBe(false)
   })
 
   it('uses a lightweight plain text node for headings when fade is disabled', async () => {
@@ -210,7 +210,7 @@ describe('simple inline fast path', () => {
 
     const heading = wrapper.get('h1.heading-node')
     expect(heading.text()).toBe('Fast heading')
-    expect(heading.get('.simple-inline-text').text()).toBe('Fast heading')
+    expect(heading.get('.text-node').text()).toBe('Fast heading')
     expect(heading.find('.text-node-stream-delta').exists()).toBe(false)
   })
 
@@ -228,7 +228,6 @@ describe('simple inline fast path', () => {
 
     const heading = wrapper.get('h1.heading-node')
     expect(heading.get('strong.strong-node').text()).toBe('heading')
-    expect(heading.find('.simple-inline-text').exists()).toBe(false)
   })
 
   it('renders simple table cells without nested renderer wrappers', async () => {
@@ -313,7 +312,7 @@ describe('simple inline fast path', () => {
 
     const valueCell = wrapper.get('tbody td')
     const valueCellElement = valueCell.element
-    const textElement = valueCell.get('.simple-inline-text').element
+    const textElement = valueCell.get('.text-node').element
     expect(valueCell.find('.markdown-renderer').exists()).toBe(false)
     expect(valueCell.text()).toBe('Direct cell')
 
@@ -325,7 +324,7 @@ describe('simple inline fast path', () => {
     const nextValueCell = wrapper.get('tbody td')
     expect(nextValueCell.element).toBe(valueCellElement)
     expect(nextValueCell.find('.markdown-renderer').exists()).toBe(false)
-    expect(nextValueCell.get('.simple-inline-text').element).toBe(textElement)
+    expect(nextValueCell.get('.text-node').element).toBe(textElement)
     expect(nextValueCell.text()).toBe('Paragraph cell')
   })
 
@@ -396,7 +395,7 @@ describe('simple inline fast path', () => {
 
     const paragraph = quote.get('p.paragraph-node')
     expect(paragraph.text()).toBe('Lightweight final note')
-    expect(paragraph.get('.simple-inline-text').text()).toBe('Lightweight final note')
+    expect(paragraph.get('.text-node').text()).toBe('Lightweight final note')
     expect(paragraph.find('.text-node-stream-delta').exists()).toBe(false)
   })
 

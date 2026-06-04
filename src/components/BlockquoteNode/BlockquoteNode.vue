@@ -43,16 +43,13 @@ const hasTextOverride = computed(() =>
   Boolean((customComponents.value as any).text),
 )
 const simpleBlockChildren = computed(() => {
-  return resolveSimpleInlineChildren(props.node.children as any, {
-    allowSingleParagraph: !hasParagraphOverride.value,
-    allowEmpty: false,
-  })
+  return resolveSimpleInlineChildren(props.node.children as any, !hasParagraphOverride.value)
 })
-const canRenderPlainTextInline = computed(() => {
+function canRenderPlainTextInline() {
   return props.fade === false && !hasTextOverride.value
-})
+}
 const simpleBlockPlainText = computed(() => {
-  if (!canRenderPlainTextInline.value)
+  if (!canRenderPlainTextInline())
     return null
 
   return getPlainTextContent(simpleBlockChildren.value)
@@ -71,7 +68,7 @@ provide('markstreamFade', computed(() => props.fade))
     >
       <span
         v-if="simpleBlockPlainText !== null"
-        class="simple-inline-text whitespace-pre-wrap break-words text-node"
+        class="text-node"
         :custom-id="props.customId"
       >{{ simpleBlockPlainText }}</span>
       <SimpleInlineRenderer

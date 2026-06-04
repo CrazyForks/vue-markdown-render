@@ -224,7 +224,7 @@ const processedChildren = computed(() => renderedChildren.value.map((child, inde
   <p dir="auto" class="paragraph-node">
     <span
       v-if="plainTextContent !== null"
-      class="simple-inline-text whitespace-pre-wrap break-words text-node"
+      class="text-node"
       :custom-id="props.customId"
     >{{ plainTextContent }}</span>
     <template
