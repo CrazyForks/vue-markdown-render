@@ -3964,17 +3964,10 @@ describe('virtual timeline API', () => {
 
     const above = slotProps.find(props => props.itemKey === 'u0')
     const measured = document.createElement('div')
-    vi.spyOn(measured, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      top: 0,
-      right: 800,
-      bottom: 120,
-      left: 0,
-      width: 800,
-      height: 120,
-      toJSON: () => ({}),
-    } as DOMRect)
+    Object.defineProperty(measured, 'offsetHeight', {
+      configurable: true,
+      value: 120,
+    })
 
     above.measureRef(measured)
 
@@ -4214,17 +4207,10 @@ describe('virtual timeline API', () => {
     })
 
     const measured = document.createElement('div')
-    vi.spyOn(measured, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      top: 0,
-      right: 800,
-      bottom: 120,
-      left: 0,
-      width: 800,
-      height: 120,
-      toJSON: () => ({}),
-    } as DOMRect)
+    Object.defineProperty(measured, 'offsetHeight', {
+      configurable: true,
+      value: 120,
+    })
 
     controller.measureItem(items[0], 0, measured)
 

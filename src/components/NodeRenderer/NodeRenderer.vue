@@ -2040,11 +2040,7 @@ function getVirtualizedDomLogicalHeight() {
     if (!el)
       continue
 
-    total += Math.max(
-      0,
-      readLayout('getVirtualizedDomLogicalHeight.offsetHeight', () => el.offsetHeight || 0),
-      readLayout('getVirtualizedDomLogicalHeight.getBoundingClientRect', () => el.getBoundingClientRect?.().height || 0),
-    )
+    total += Math.max(0, readLayout('getVirtualizedDomLogicalHeight.offsetHeight', () => el.offsetHeight || 0))
   }
 
   return Math.ceil(Math.max(0, total))

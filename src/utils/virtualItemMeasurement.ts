@@ -17,15 +17,8 @@ export function readElementBoxHeight(
     return 0
 
   countLayoutRead(countRead, 'readElementBoxHeight.offsetHeight')
-  countLayoutRead(countRead, 'readElementBoxHeight.scrollHeight')
-  countLayoutRead(countRead, 'readElementBoxHeight.getBoundingClientRect')
 
-  return Math.ceil(Math.max(
-    0,
-    element.offsetHeight || 0,
-    element.scrollHeight || 0,
-    element.getBoundingClientRect?.().height || 0,
-  ))
+  return Math.ceil(Math.max(0, element.offsetHeight || 0))
 }
 
 export function readElementOuterHeight(
@@ -57,6 +50,7 @@ export function findMarkstreamRenderer(element: HTMLElement | null | undefined) 
 export function getMarkdownItemChromeHeight(
   element: HTMLElement | null | undefined,
   countRead?: VirtualItemLayoutReadCounter,
+  outerHeight?: number,
 ) {
   if (!element)
     return 0
@@ -65,7 +59,9 @@ export function getMarkdownItemChromeHeight(
   if (!renderer)
     return 0
 
-  const outer = readElementOuterHeight(element, countRead)
+  const outer = Number.isFinite(outerHeight)
+    ? Number(outerHeight)
+    : readElementOuterHeight(element, countRead)
   const rendererBox = readElementBoxHeight(renderer, countRead)
 
   return Math.max(0, outer - rendererBox)

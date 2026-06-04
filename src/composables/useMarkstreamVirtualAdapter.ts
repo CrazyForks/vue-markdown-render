@@ -745,8 +745,8 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     return readElementOuterHeight(measuredElements.get(key), recordLayoutRead)
   }
 
-  function getMeasuredMarkdownChromeHeight(key: string) {
-    return getMarkdownItemChromeHeight(measuredElements.get(key), recordLayoutRead)
+  function getMeasuredMarkdownChromeHeight(key: string, outerHeight?: number) {
+    return getMarkdownItemChromeHeight(measuredElements.get(key), recordLayoutRead, outerHeight)
   }
 
   function flushMarkdownReconciles() {
@@ -814,7 +814,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     }
 
     const markdown = getKnownMarkdownLogicalHeight(key)
-    const chrome = getMeasuredMarkdownChromeHeight(key)
+    const chrome = getMeasuredMarkdownChromeHeight(key, measured)
 
     if (markdown > 0) {
       let next = Math.max(measured, markdown + chrome)

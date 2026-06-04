@@ -1242,8 +1242,8 @@ function getMeasuredItemHeight(key: string) {
   return readElementOuterHeight(measuredElements.get(key), recordLayoutRead)
 }
 
-function getMeasuredMarkdownChromeHeight(key: string) {
-  return getMarkdownItemChromeHeight(measuredElements.get(key), recordLayoutRead)
+function getMeasuredMarkdownChromeHeight(key: string, outerHeight?: number) {
+  return getMarkdownItemChromeHeight(measuredElements.get(key), recordLayoutRead, outerHeight)
 }
 
 function reconcileRecordSize(
@@ -1272,7 +1272,7 @@ function reconcileRecordSize(
     ? itemSizes.get(record.key) ?? 0
     : 0
   const markdown = options.markdownLogicalHeight ?? getKnownMarkdownLogicalHeight(record.key)
-  const chrome = getMeasuredMarkdownChromeHeight(record.key)
+  const chrome = getMeasuredMarkdownChromeHeight(record.key, measured)
 
   if (markdown > 0) {
     let next = Math.max(measured, markdown + chrome)
