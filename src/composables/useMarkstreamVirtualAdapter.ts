@@ -627,10 +627,10 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     if (!anchor)
       return
 
-    pendingOuterAnchor = anchor
     if (outerAnchorRestoreScheduled)
       return
 
+    pendingOuterAnchor = anchor
     outerAnchorRestoreScheduled = true
     outerAnchorRestoreRaf = requestFrameOrNextTick(flushOuterAnchorRestore)
   }
@@ -766,6 +766,11 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       })
     }
 
+    flushOuterAnchorRestore()
+  }
+
+  function flushPendingLayoutReconciles() {
+    flushMarkdownReconciles()
     flushOuterAnchorRestore()
   }
 
@@ -1027,7 +1032,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   }
 
   function captureThreadState(): MarkstreamThreadVirtualState {
-    flushMarkdownReconciles()
+    flushPendingLayoutReconciles()
 
     const measurementKey = normalizeBaseMeasurementKey()
     return {

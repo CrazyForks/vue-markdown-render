@@ -1143,14 +1143,15 @@ function cancelTimelineRaf(id: number | null) {
 }
 
 function scheduleScrollReconcileAfterSizeChange(anchor: MarkstreamThreadAnchor | undefined) {
-  if (anchor)
+  if (!pendingScrollReconcile.scheduled) {
     pendingScrollReconcile.anchor = anchor
-
-  if (pendingScrollReconcile.scheduled)
+    pendingScrollReconcile.scheduled = true
+    pendingScrollReconcile.raf = requestFrameOrNextTick(flushScrollReconcile)
     return
+  }
 
-  pendingScrollReconcile.scheduled = true
-  pendingScrollReconcile.raf = requestFrameOrNextTick(flushScrollReconcile)
+  if (!pendingScrollReconcile.anchor && anchor)
+    pendingScrollReconcile.anchor = anchor
 }
 
 function flushScrollReconcile() {
@@ -1202,6 +1203,11 @@ function flushMarkdownReconciles() {
     })
   }
 
+  flushScrollReconcile()
+}
+
+function flushPendingLayoutReconciles() {
+  flushMarkdownReconciles()
   flushScrollReconcile()
 }
 
@@ -1454,7 +1460,7 @@ function captureOuterAnchor(): MarkstreamThreadAnchor | undefined {
 }
 
 function captureThreadStateForKey(threadKey = normalizedThreadKey.value): MarkstreamThreadVirtualState {
-  flushMarkdownReconciles()
+  flushPendingLayoutReconciles()
 
   const itemHeights: Record<string, number> = {}
   const itemSizeSourceSnapshot: NonNullable<MarkstreamThreadVirtualState['itemSizeSources']> = {}
@@ -1536,7 +1542,7 @@ function scheduleThreadStateRemember(threadKey = normalizedThreadKey.value) {
 }
 
 function rememberPreviousThreadState(threadKey: string) {
-  flushMarkdownReconciles()
+  flushPendingLayoutReconciles()
 
   if (flushThreadStateRemember()?.threadKey === threadKey)
     return
