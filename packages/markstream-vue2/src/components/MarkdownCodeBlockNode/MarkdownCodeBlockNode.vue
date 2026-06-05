@@ -1,30 +1,49 @@
 <script setup lang="ts">
-import type { MarkdownCodeBlockPreviewPayload } from '../../types/component-props'
+import type { CommonCodeBlockProps, MarkdownCodeBlockPreviewPayload } from '../../types/component-props'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier } from '../../utils'
 
-const props = defineProps({
-  node: { type: Object, required: true },
-  loading: { type: Boolean, default: true },
-  stream: { type: Boolean, default: true },
-  darkTheme: { type: String, default: 'vitesse-dark' },
-  lightTheme: { type: String, default: 'vitesse-light' },
-  isDark: { type: Boolean, default: false },
-  isShowPreview: { type: Boolean, default: true },
-  enableFontSizeControl: { type: Boolean, default: true },
-  minWidth: { type: [String, Number], default: undefined },
-  maxWidth: { type: [String, Number], default: undefined },
-  themes: { type: Array, default: undefined },
-  langs: { type: Array, default: undefined },
-  showHeader: { type: Boolean, default: true },
-  showCopyButton: { type: Boolean, default: true },
-  showExpandButton: { type: Boolean, default: true },
-  showPreviewButton: { type: Boolean, default: true },
-  showCollapseButton: { type: Boolean, default: true },
-  showFontSizeButtons: { type: Boolean, default: true },
-  showTooltips: { type: Boolean, default: undefined },
+interface MarkdownCodeBlockNodeProps extends CommonCodeBlockProps {
+  node: {
+    type: 'code_block'
+    language: string
+    code: string
+    raw: string
+    diff?: boolean
+    originalCode?: string
+    updatedCode?: string
+  }
+  loading?: boolean
+  stream?: boolean
+  darkTheme?: string
+  lightTheme?: string
+  isDark?: boolean
+  isShowPreview?: boolean
+  enableFontSizeControl?: boolean
+  minWidth?: string | number
+  maxWidth?: string | number
+  showPreviewButton?: boolean
+  showCollapseButton?: boolean
+  showFontSizeButtons?: boolean
+  showTooltips?: boolean
+}
+
+const props = withDefaults(defineProps<MarkdownCodeBlockNodeProps>(), {
+  loading: true,
+  stream: true,
+  darkTheme: 'vitesse-dark',
+  lightTheme: 'vitesse-light',
+  isDark: false,
+  isShowPreview: true,
+  enableFontSizeControl: true,
+  showHeader: true,
+  showCopyButton: true,
+  showExpandButton: true,
+  showPreviewButton: true,
+  showCollapseButton: true,
+  showFontSizeButtons: true,
 })
 
 const emits = defineEmits<{
@@ -270,8 +289,7 @@ let createShikiRenderer:
 
 let registerHighlight
 let registeredHighlightLanguages: Set<string> | undefined
-let registeredHighlightThemesKey: string | null = null
-let registeredHighlightLangsKey: string | null = null
+let registeredHighlightKey: string | null = null
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
@@ -323,18 +341,22 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null)
 function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
   if (!registerHighlight)
     return
+  const normalizedLangs = Array.isArray(langs) && langs.length > 0
+    ? langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean)
+    : []
   const themesKey = Array.isArray(themes) && themes.length > 0 ? [...themes].sort().join('\u0000') : ''
-  const langsKey = Array.isArray(langs) && langs.length > 0 ? langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean).sort().join('\u0000') : ''
-  if (registeredHighlightThemesKey === themesKey && registeredHighlightLangsKey === langsKey)
-    return
+  const langsKey = normalizedLangs.length > 0 ? [...normalizedLangs].sort().join('\u0000') : ''
+  const key = `${themesKey}\u0000\u0000${langsKey}`
   const opts: { themes?: string[], langs?: string[] } = {}
   if (Array.isArray(themes) && themes.length > 0)
     opts.themes = themes
-  if (Array.isArray(langs) && langs.length > 0)
-    opts.langs = langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean)
+  if (normalizedLangs.length > 0)
+    opts.langs = normalizedLangs
+
+  if (registeredHighlightKey === key)
+    return
   registerHighlight(opts)
-  registeredHighlightThemesKey = themesKey
-  registeredHighlightLangsKey = langsKey
+  registeredHighlightKey = key
 }
 
 async function ensureStreamMarkdownLoaded() {
@@ -407,20 +429,19 @@ onBeforeUnmount(() => {
   renderObserver = undefined
 })
 
-watch(() => props.themes, async () => {
-  ensureHighlightRegistered(getResolvedThemes(), props.langs)
-})
-
-watch(() => props.langs, async () => {
-  if (Array.isArray(props.langs) && props.langs.length > 0) {
-    registeredHighlightLanguages = new Set(props.langs.map((l: string) => normalizeLanguageIdentifier(l)))
+watch([() => props.themes, () => props.langs], async ([, langs], [, previousLangs]) => {
+  const themes = getResolvedThemes()
+  const langsChanged = langs !== previousLangs
+  if (langsChanged && Array.isArray(langs) && langs.length > 0) {
+    registeredHighlightLanguages = new Set(langs.map((l: string) => normalizeLanguageIdentifier(l)))
   }
-  else {
+  else if (langsChanged) {
     registeredHighlightLanguages = undefined
+    registeredHighlightKey = null
   }
-  ensureHighlightRegistered(getResolvedThemes(), props.langs)
+  ensureHighlightRegistered(themes, langs)
   // Re-render current code block so blocks that fell back to plaintext can recover highlighting
-  if (renderer) {
+  if (langsChanged && renderer) {
     renderFallback(props.node.code, !hasStableRender.value)
     const updated = await updateRendererWithFallback(props.node.code, codeLanguage.value)
     if (updated)

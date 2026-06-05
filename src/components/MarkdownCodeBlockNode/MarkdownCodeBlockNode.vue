@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MarkdownCodeBlockPreviewPayload } from '../../types/component-props'
+import type { CommonCodeBlockProps, MarkdownCodeBlockPreviewPayload } from '../../types/component-props'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
@@ -12,49 +12,37 @@ import {
 } from '../../utils/languageIcon'
 import CodeBlockShell from '../CodeBlockNode/CodeBlockShell.vue'
 
+interface MarkdownCodeBlockNodeProps extends CommonCodeBlockProps {
+  node: {
+    type: 'code_block'
+    language: string
+    code: string
+    raw: string
+    diff?: boolean
+    originalCode?: string
+    updatedCode?: string
+  }
+  loading?: boolean
+  stream?: boolean
+  darkTheme?: string
+  lightTheme?: string
+  isDark?: boolean
+  isShowPreview?: boolean
+  enableFontSizeControl?: boolean
+  minWidth?: string | number
+  maxWidth?: string | number
+  showPreviewButton?: boolean
+  showCollapseButton?: boolean
+  showFontSizeButtons?: boolean
+  showTooltips?: boolean
+  autoScrollOnUpdate?: boolean
+  autoScrollInitial?: boolean
+  estimatedHeightPx?: number
+  estimatedContentHeightPx?: number
+}
+
 const props = withDefaults(
-  defineProps<{
-    node: {
-      type: 'code_block'
-      language: string
-      code: string
-      raw: string
-      diff?: boolean
-      originalCode?: string
-      updatedCode?: string
-    }
-    loading?: boolean
-    /**
-     * If true, update and render code content as it streams in.
-     * If false, keep a lightweight loading state and create the editor only when loading becomes false.
-     */
-    stream?: boolean
-    darkTheme?: string
-    lightTheme?: string
-    isDark?: boolean
-    isShowPreview?: boolean
-    enableFontSizeControl?: boolean
-    /** Minimum width for the code block container (px or CSS unit string) */
-    minWidth?: string | number
-    /** Maximum width for the code block container (px or CSS unit string) */
-    maxWidth?: string | number
-    /** Shiki language list forwarded to stream-markdown's registerHighlight. Overrides the default language preload when provided. */
-    langs?: string[]
-    themes?: string[]
-    /** Header visibility and controls */
-    showHeader?: boolean
-    showCopyButton?: boolean
-    showExpandButton?: boolean
-    showPreviewButton?: boolean
-    showCollapseButton?: boolean
-    showFontSizeButtons?: boolean
-    /** Toggle singleton tooltips for header action buttons */
-    showTooltips?: boolean
-    autoScrollOnUpdate?: boolean
-    autoScrollInitial?: boolean
-    estimatedHeightPx?: number
-    estimatedContentHeightPx?: number
-  }>(),
+  defineProps<MarkdownCodeBlockNodeProps>(),
   {
     isShowPreview: true,
     // Align defaults with CodeBlockNode behaviour: light first, explicit dark
@@ -263,8 +251,7 @@ let createShikiRenderer:
   | undefined
 let registerHighlight
 let registeredHighlightLanguages: Set<string> | undefined
-let registeredHighlightThemesKey: string | null = null
-let registeredHighlightLangsKey: string | null = null
+let registeredHighlightKey: string | null = null
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV)
@@ -340,18 +327,22 @@ async function ensureStreamMarkdownLoaded() {
 function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
   if (!registerHighlight)
     return
+  const normalizedLangs = Array.isArray(langs) && langs.length > 0
+    ? langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean)
+    : []
   const themesKey = Array.isArray(themes) && themes.length > 0 ? [...themes].sort().join('\u0000') : ''
-  const langsKey = Array.isArray(langs) && langs.length > 0 ? langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean).sort().join('\u0000') : ''
-  if (registeredHighlightThemesKey === themesKey && registeredHighlightLangsKey === langsKey)
-    return
+  const langsKey = normalizedLangs.length > 0 ? [...normalizedLangs].sort().join('\u0000') : ''
+  const key = `${themesKey}\u0000\u0000${langsKey}`
   const opts: { themes?: string[], langs?: string[] } = {}
   if (Array.isArray(themes) && themes.length > 0)
     opts.themes = themes
-  if (Array.isArray(langs) && langs.length > 0)
-    opts.langs = langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean)
+  if (normalizedLangs.length > 0)
+    opts.langs = normalizedLangs
+
+  if (registeredHighlightKey === key)
+    return
   registerHighlight(opts)
-  registeredHighlightThemesKey = themesKey
-  registeredHighlightLangsKey = langsKey
+  registeredHighlightKey = key
 }
 
 async function initRenderer() {
@@ -404,21 +395,18 @@ onBeforeUnmount(() => {
   renderObserver = undefined
 })
 
-watch(() => props.themes, async () => {
-  ensureHighlightRegistered(props.themes, props.langs)
-})
-
-watch(() => props.langs, async () => {
-  if (Array.isArray(props.langs) && props.langs.length > 0) {
-    registeredHighlightLanguages = new Set(props.langs.map((l: string) => normalizeLanguageIdentifier(l)))
+watch([() => props.themes, () => props.langs], async ([themes, langs], [, previousLangs]) => {
+  const langsChanged = langs !== previousLangs
+  if (langsChanged && Array.isArray(langs) && langs.length > 0) {
+    registeredHighlightLanguages = new Set(langs.map((l: string) => normalizeLanguageIdentifier(l)))
   }
-  else {
-    // Reset to undefined so normalizeRendererLanguage skips the guard check
+  else if (langsChanged) {
     registeredHighlightLanguages = undefined
+    registeredHighlightKey = null
   }
-  ensureHighlightRegistered(props.themes, props.langs)
+  ensureHighlightRegistered(themes, langs)
   // Re-render current code block so blocks that fell back to plaintext can recover highlighting
-  if (renderer) {
+  if (langsChanged && renderer) {
     renderFallback(props.node.code)
     await updateRendererWithFallback(props.node.code, codeLanguage.value)
     await clearFallbackWhenRendererReady()

@@ -1,11 +1,12 @@
 import type { VisibilityHandle } from '../../context/viewportPriority'
+import type { CommonCodeBlockProps } from '../../types/component-props'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
 import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
 
-export interface MarkdownCodeBlockNodeProps {
+export interface MarkdownCodeBlockNodeProps extends CommonCodeBlockProps {
   node: {
     type: 'code_block'
     language: string
@@ -24,12 +25,6 @@ export interface MarkdownCodeBlockNodeProps {
   enableFontSizeControl?: boolean
   minWidth?: string | number
   maxWidth?: string | number
-  themes?: string[]
-  /** Shiki language list forwarded to stream-markdown's registerHighlight. Overrides the default language preload when provided. */
-  langs?: string[]
-  showHeader?: boolean
-  showCopyButton?: boolean
-  showExpandButton?: boolean
   showPreviewButton?: boolean
   showCollapseButton?: boolean
   showFontSizeButtons?: boolean
