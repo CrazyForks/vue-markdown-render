@@ -413,6 +413,10 @@ watch(() => props.langs, () => {
   if (Array.isArray(props.langs) && props.langs.length > 0) {
     registeredHighlightLanguages = new Set(props.langs.map((l: string) => l.toLowerCase()))
   }
+  else {
+    // Reset to undefined so normalizeRendererLanguage skips the guard check
+    registeredHighlightLanguages = undefined
+  }
   ensureHighlightRegistered(props.themes, props.langs)
 })
 
