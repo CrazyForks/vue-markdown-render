@@ -65,17 +65,14 @@ let resizeState: {
 } | null = null
 
 const columnCount = computed(() => props.node.header.cells.length)
-const columnStyles = computed(() => {
-  const count = columnCount.value
-  if (count <= 0)
-    return []
-
-  const defaultWidth = `${100 / count}%`
-  return Array.from({ length: count }, (_, index) => {
-    const width = columnWidths.value[index]
-    return { width: width > 0 ? `${width}px` : defaultWidth }
-  })
-})
+const hasColumnWidths = computed(() =>
+  columnWidths.value.some(width => Number.isFinite(width) && width > 0),
+)
+const columnStyles = computed(() =>
+  hasColumnWidths.value
+    ? columnWidths.value.map(width => width > 0 ? { width: `${width}px` } : undefined)
+    : [],
+)
 
 provide('markstreamShowTooltips', computed(() => props.showTooltips))
 provide('markstreamFade', computed(() => props.fade))
@@ -207,7 +204,7 @@ onBeforeUnmount(stopColumnResize)
       :class="{ 'table-node--loading': isLoading }"
       :aria-busy="isLoading"
     >
-      <colgroup>
+      <colgroup v-if="hasColumnWidths">
         <col
           v-for="(_, index) in node.header.cells"
           :key="index"

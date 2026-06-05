@@ -122,6 +122,7 @@ describe('codeBlockNode editor creation locking', () => {
     expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
     expect(wrapper.find('pre.code-pre-fallback').classes()).toContain('markstream-pre--line-numbers')
     expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1'])
+    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-pending')).toBe('true')
     expect(wrapper.find('.code-editor-container').classes()).toContain('is-hidden')
 
     const finish = resolveCreate
@@ -131,6 +132,7 @@ describe('codeBlockNode editor creation locking', () => {
 
     await vi.waitFor(() => {
       expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-pending')).toBeUndefined()
       expect(wrapper.find('.code-editor-container').classes()).not.toContain('is-hidden')
     })
 

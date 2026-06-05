@@ -495,6 +495,11 @@ const showPreWhileMonacoLoads = computed(() => {
 })
 const renderPreFallback = computed(() => showPreWhileMonacoLoads.value || diffFallbackExitActive.value)
 const hideCodeEditorContainer = computed(() => showPreWhileMonacoLoads.value && !diffFallbackExitActive.value)
+const restoreVisualPending = computed(() =>
+  !usePreCodeRender.value
+  && !editorCreationFailed.value
+  && (showPreWhileMonacoLoads.value || diffFallbackExitActive.value || diffFallbackFadingOut.value),
+)
 const showInlinePreview = ref(false)
 const preCodeNode = computed(() => {
   if (!isDiff.value || props.node.diff === true)
@@ -3242,6 +3247,7 @@ onUnmounted(() => {
     class="code-block-container rounded-lg border"
     data-markstream-code-block="1"
     :data-markstream-enhanced="editorDisplayReady && !usePreCodeRender ? 'true' : 'false'"
+    :data-markstream-pending="restoreVisualPending ? 'true' : undefined"
     :class="[
       { 'dark': props.isDark, 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
     ]"

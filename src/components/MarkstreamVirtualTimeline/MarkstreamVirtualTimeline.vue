@@ -2757,7 +2757,9 @@ defineExpose({
 
 .markstream-virtual-timeline.is-restoring-thread > .markstream-virtual-timeline__spacer,
 .markstream-virtual-timeline.is-restoring-thread > .markstream-virtual-timeline__item {
+  opacity: 0;
   visibility: hidden;
+  pointer-events: none;
 }
 
 .markstream-virtual-timeline__restore-loading {
@@ -2770,7 +2772,7 @@ defineExpose({
   place-items: center;
   pointer-events: none;
   overflow: hidden;
-  background: color-mix(in srgb, Canvas 88%, transparent);
+  background: Canvas;
   contain: strict;
 }
 
