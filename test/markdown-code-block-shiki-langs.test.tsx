@@ -77,6 +77,14 @@ async function waitForReactRendererCreated() {
   }
 }
 
+function createDeferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((r) => {
+    resolve = r
+  })
+  return { promise, resolve }
+}
+
 function resetStreamMarkdownMock() {
   streamMarkdownMock.createdRenderers.length = 0
   streamMarkdownMock.createShikiStreamRenderer.mockClear()
@@ -115,6 +123,30 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledWith(
       expect.any(HTMLElement),
       expect.objectContaining({ langs: ['typescript'] }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it('normalizes suffixed fence language before Vue registration and rendering', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript:example.ts'),
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith(
+      expect.objectContaining({ langs: ['typescript'] }),
+    )
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'typescript',
     )
 
     wrapper.unmount()
@@ -220,6 +252,177 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
+  })
+
+  it('keeps React theme order significant for highlight registration', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const node = makeNode('typescript')
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        themes: ['a', 'b'],
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ themes: ['a', 'b'], langs: ['typescript'] }),
+    )
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        themes: ['b', 'a'],
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ themes: ['b', 'a'], langs: ['typescript'] }),
+    )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('registers default highlight options when React langs is omitted', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('typescript'),
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith({})
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'typescript',
+    )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('normalizes suffixed fence language before React registration and rendering', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('typescript:example.ts'),
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith(
+      expect.objectContaining({ langs: ['typescript'] }),
+    )
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'typescript',
+    )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('ignores stale React highlight registrations', async () => {
+    const first = createDeferred()
+    const second = createDeferred()
+    streamMarkdownMock.registerHighlight
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const node = makeNode('typescript')
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: ['typescript'],
+      }))
+    })
+    await flushReact()
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: ['python'],
+      }))
+    })
+    await flushReact()
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      second.resolve()
+      await second.promise
+    })
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    const renderer = streamMarkdownMock.createdRenderers[0]
+    expect(renderer?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'plaintext',
+    )
+
+    await act(async () => {
+      first.resolve()
+      await first.promise
+    })
+    await flushReact()
+
+    expect(renderer.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'plaintext',
+    )
+
+    await act(async () => {
+      root.unmount()
+    })
   })
 
   it('keeps Objective-C Shiki ids in React registration and rendering', async () => {

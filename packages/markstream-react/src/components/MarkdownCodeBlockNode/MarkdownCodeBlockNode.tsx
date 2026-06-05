@@ -72,8 +72,16 @@ function escapeHtml(str: string) {
 }
 
 function normalizeShikiLanguage(rawLang?: string | null) {
-  const normalized = normalizeLanguageIdentifier(rawLang)
+  const normalized = normalizeDisplayLanguage(rawLang)
   return SHIKI_LANGUAGE_CANONICAL_ALIAS[normalized] ?? normalized
+}
+
+function getLanguageBaseToken(rawLang?: string | null) {
+  return String(rawLang ?? '').split(':')[0]?.trim() ?? ''
+}
+
+function normalizeDisplayLanguage(rawLang?: string | null) {
+  return normalizeLanguageIdentifier(getLanguageBaseToken(rawLang))
 }
 
 function getShikiLanguageMatchKey(rawLang?: string | null) {
@@ -115,14 +123,14 @@ function normalizeRendererLanguageForRegistered(
 }
 
 function getHighlightRegistrationKey(themes?: readonly string[], langs?: readonly string[]): string {
-  const sortedThemes = Array.isArray(themes) && themes.length > 0
-    ? [...themes].sort().join('\u0000')
+  const themesKey = Array.isArray(themes) && themes.length > 0
+    ? themes.map(theme => String(theme)).join('\u0000')
     : ''
   const sortedLangs = getShikiLangs(langs)
     ?.map(lang => getShikiLanguageMatchKey(lang))
     .sort()
     .join('\u0000') ?? ''
-  return `${sortedThemes}\u0000\u0000${sortedLangs}`
+  return `${themesKey}\u0000\u0000${sortedLangs}`
 }
 
 function getRegisterHighlightOptions(themes?: readonly string[], langs?: readonly string[]): RegisterHighlightOptions {
@@ -169,7 +177,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }
 
   const codeLanguage = useMemo(() => String(props.node.language ?? ''), [props.node.language])
-  const canonicalLanguage = useMemo(() => normalizeLanguageIdentifier(codeLanguage), [codeLanguage])
+  const canonicalLanguage = useMemo(() => normalizeDisplayLanguage(codeLanguage), [codeLanguage])
   const [languageIconsRevision, setLanguageIconsRevision] = useState(0)
 
   useEffect(() => {
@@ -233,6 +241,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const defaultHighlightLanguagesRef = useRef<string[] | undefined>()
   const registeredHighlightLanguagesRef = useRef<Set<string> | undefined>()
   const registeredKeyRef = useRef<string>('')
+  const highlightRegistrationSeqRef = useRef(0)
+  const latestRegistrationKeyRef = useRef('')
   const viewportHandleRef = useRef<VisibilityHandle | null>(null)
   const registerViewport = useViewportPriority()
   const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
@@ -279,13 +289,19 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     [props.themes, props.langs],
   )
 
+  useEffect(() => {
+    latestRegistrationKeyRef.current = registrationKey
+  }, [registrationKey])
+
   const ensureHighlightRegistered = useCallback(async (): Promise<boolean> => {
     if (!registerHighlightRef.current)
       return true
-    if (registeredKeyRef.current === registrationKey)
+    const key = registrationKey
+    if (registeredKeyRef.current === key)
       return true
     const opts = getRegisterHighlightOptions(props.themes, props.langs)
     const effectiveLangs = opts.langs ?? defaultHighlightLanguagesRef.current
+    const seq = ++highlightRegistrationSeqRef.current
 
     try {
       await registerHighlightRef.current(opts)
@@ -294,7 +310,10 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       return false
     }
 
-    registeredKeyRef.current = registrationKey
+    if (seq !== highlightRegistrationSeqRef.current || latestRegistrationKeyRef.current !== key)
+      return false
+
+    registeredKeyRef.current = key
     registeredHighlightLanguagesRef.current = createRegisteredHighlightLanguages(effectiveLangs)
     return true
   }, [props.langs, props.themes, registrationKey])

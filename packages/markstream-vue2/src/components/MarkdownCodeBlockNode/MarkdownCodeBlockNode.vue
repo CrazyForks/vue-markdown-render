@@ -67,7 +67,7 @@ const emits = defineEmits<{
 }>()
 const { t } = useSafeI18n()
 
-const codeLanguage = ref<string>(normalizeLanguageIdentifier(String(props.node.language ?? '')))
+const codeLanguage = ref<string>(normalizeDisplayLanguage(props.node.language))
 const copyText = ref(false)
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
@@ -317,6 +317,7 @@ let registerHighlight:
 let defaultHighlightLanguages: string[] | undefined
 let registeredHighlightLanguages: Set<string> | undefined
 let registeredHighlightKey: string | null = null
+let highlightRegistrationSeq = 0
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
@@ -334,8 +335,16 @@ const SHIKI_LANGUAGE_CANONICAL_ALIAS: Record<string, string> = {
 }
 
 function normalizeShikiLanguage(rawLang?: string | null) {
-  const normalized = normalizeLanguageIdentifier(rawLang)
+  const normalized = normalizeDisplayLanguage(rawLang)
   return SHIKI_LANGUAGE_CANONICAL_ALIAS[normalized] ?? normalized
+}
+
+function getLanguageBaseToken(rawLang?: string | null) {
+  return String(rawLang ?? '').split(':')[0]?.trim() ?? ''
+}
+
+function normalizeDisplayLanguage(rawLang?: string | null) {
+  return normalizeLanguageIdentifier(getLanguageBaseToken(rawLang))
 }
 
 function getShikiLanguageMatchKey(rawLang?: string | null) {
@@ -354,7 +363,7 @@ function getShikiLangs(langs?: readonly string[]) {
 
 function getHighlightRegistrationKey(themes?: readonly string[], langs?: readonly string[]) {
   const themesKey = Array.isArray(themes) && themes.length > 0
-    ? [...themes].sort().join('\u0000')
+    ? themes.map(theme => String(theme)).join('\u0000')
     : ''
 
   const langsKey = getShikiLangs(langs)
@@ -444,6 +453,7 @@ async function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
 
   const opts = getRegisterHighlightOptions(themes, langs)
   const effectiveLangs = opts.langs ?? defaultHighlightLanguages
+  const seq = ++highlightRegistrationSeq
 
   try {
     await registerHighlight(opts)
@@ -451,6 +461,9 @@ async function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
   catch {
     return false
   }
+
+  if (seq !== highlightRegistrationSeq)
+    return false
 
   registeredHighlightKey = key
   registeredHighlightLanguages = createRegisteredHighlightLanguages(effectiveLangs)
@@ -557,7 +570,7 @@ watch(tooltipsEnabled, (enabled) => {
 })
 
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
-  const normalizedLang = normalizeLanguageIdentifier(String(lang ?? ''))
+  const normalizedLang = normalizeDisplayLanguage(lang)
   if (normalizedLang !== codeLanguage.value)
     codeLanguage.value = normalizedLang
   if (!codeBlockContent.value || !rendererTarget.value) {
@@ -768,7 +781,7 @@ function previewCode() {
   if (!isPreviewable.value)
     return
 
-  const lowerLang = normalizeLanguageIdentifier(String(codeLanguage.value || props.node.language)).toLowerCase()
+  const lowerLang = normalizeDisplayLanguage(codeLanguage.value || props.node.language).toLowerCase()
   const artifactType = lowerLang === 'html' ? 'text/html' : 'image/svg+xml'
   const artifactTitle
     = lowerLang === 'html'
