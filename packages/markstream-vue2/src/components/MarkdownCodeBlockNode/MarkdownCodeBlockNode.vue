@@ -17,6 +17,7 @@ const props = defineProps({
   minWidth: { type: [String, Number], default: undefined },
   maxWidth: { type: [String, Number], default: undefined },
   themes: { type: Array, default: undefined },
+  langs: { type: Array, default: undefined },
   showHeader: { type: Boolean, default: true },
   showCopyButton: { type: Boolean, default: true },
   showExpandButton: { type: Boolean, default: true },
@@ -323,9 +324,20 @@ async function ensureStreamMarkdownLoaded() {
     const mod = await import('stream-markdown')
     createShikiRenderer = mod.createShikiStreamRenderer
     registerHighlight = mod.registerHighlight
-    const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
-    registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
-    registerHighlight?.({ themes: getResolvedThemes() })
+    if (Array.isArray(props.langs) && props.langs.length > 0) {
+      registeredHighlightLanguages = new Set(props.langs.map((l: string) => l.toLowerCase()))
+    }
+    else {
+      const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
+      registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
+    }
+    const opts: { themes?: string[], langs?: string[] } = {}
+    const themes = getResolvedThemes()
+    if (Array.isArray(themes) && themes.length > 0)
+      opts.themes = themes
+    if (Array.isArray(props.langs) && props.langs.length > 0)
+      opts.langs = props.langs
+    registerHighlight?.(opts)
   }
   catch (e) {
     // stream-markdown is an optional peer; if missing, silently skip highlighting
@@ -341,7 +353,13 @@ async function initRenderer() {
     return
   }
 
-  registerHighlight?.({ themes: getResolvedThemes() })
+  const opts: { themes?: string[], langs?: string[] } = {}
+  const themes = getResolvedThemes()
+  if (Array.isArray(themes) && themes.length > 0)
+    opts.themes = themes
+  if (Array.isArray(props.langs) && props.langs.length > 0)
+    opts.langs = props.langs
+  registerHighlight?.(opts)
 
   if (!renderer && createShikiRenderer) {
     renderer = createShikiRenderer(rendererTarget.value, {

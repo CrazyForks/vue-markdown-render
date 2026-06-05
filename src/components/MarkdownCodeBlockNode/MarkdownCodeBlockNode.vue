@@ -38,6 +38,8 @@ const props = withDefaults(
     minWidth?: string | number
     /** Maximum width for the code block container (px or CSS unit string) */
     maxWidth?: string | number
+    /** Shiki language list forwarded to stream-markdown's registerHighlight. Overrides the default language preload when provided. */
+    langs?: string[]
     themes?: string[]
     /** Header visibility and controls */
     showHeader?: boolean
@@ -262,6 +264,7 @@ let createShikiRenderer:
 let registerHighlight
 let registeredHighlightLanguages: Set<string> | undefined
 let registeredHighlightThemesKey: string | null = null
+let registeredHighlightLangsKey: string | null = null
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV)
@@ -313,11 +316,16 @@ async function ensureStreamMarkdownLoaded() {
       const mod = await import('stream-markdown')
       createShikiRenderer = mod.createShikiStreamRenderer
       registerHighlight = mod.registerHighlight
-      const defaultLangs = Array.isArray((mod as { defaultLanguages?: unknown }).defaultLanguages)
-        ? (mod as { defaultLanguages: unknown[] }).defaultLanguages
-        : undefined
-      registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
-      ensureHighlightThemesRegistered(props.themes)
+      if (Array.isArray(props.langs) && props.langs.length > 0) {
+        registeredHighlightLanguages = new Set(props.langs.map((l: string) => l.toLowerCase()))
+      }
+      else {
+        const defaultLangs = Array.isArray((mod as { defaultLanguages?: unknown }).defaultLanguages)
+          ? (mod as { defaultLanguages: unknown[] }).defaultLanguages
+          : undefined
+        registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
+      }
+      ensureHighlightRegistered(props.themes, props.langs)
     }
     catch (e) {
       console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
@@ -330,14 +338,21 @@ async function ensureStreamMarkdownLoaded() {
   return streamMarkdownLoadPromise
 }
 
-function ensureHighlightThemesRegistered(themes?: string[]) {
+function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
   if (!registerHighlight)
     return
-  const nextKey = Array.isArray(themes) ? themes.join('\u0000') : ''
-  if (registeredHighlightThemesKey === nextKey)
+  const themesKey = Array.isArray(themes) ? themes.join('\u0000') : ''
+  const langsKey = Array.isArray(langs) ? langs.join('\u0000') : ''
+  if (registeredHighlightThemesKey === themesKey && registeredHighlightLangsKey === langsKey)
     return
-  registerHighlight({ themes })
-  registeredHighlightThemesKey = nextKey
+  const opts: { themes?: string[], langs?: string[] } = {}
+  if (Array.isArray(themes) && themes.length > 0)
+    opts.themes = themes
+  if (Array.isArray(langs) && langs.length > 0)
+    opts.langs = langs
+  registerHighlight(opts)
+  registeredHighlightThemesKey = themesKey
+  registeredHighlightLangsKey = langsKey
 }
 
 async function initRenderer() {
@@ -353,7 +368,7 @@ async function initRenderer() {
     return
   }
 
-  ensureHighlightThemesRegistered(props.themes)
+  ensureHighlightRegistered(props.themes, props.langs)
 
   if (!renderer && createShikiRenderer) {
     renderer = createShikiRenderer(rendererTarget.value, {
@@ -391,7 +406,14 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.themes, async () => {
-  ensureHighlightThemesRegistered(props.themes)
+  ensureHighlightRegistered(props.themes, props.langs)
+})
+
+watch(() => props.langs, () => {
+  if (Array.isArray(props.langs) && props.langs.length > 0) {
+    registeredHighlightLanguages = new Set(props.langs.map((l: string) => l.toLowerCase()))
+  }
+  ensureHighlightRegistered(props.themes, props.langs)
 })
 
 watch(() => props.loading, (loading) => {

@@ -25,6 +25,8 @@ export interface MarkdownCodeBlockNodeProps {
   minWidth?: string | number
   maxWidth?: string | number
   themes?: string[]
+  /** Shiki language list forwarded to stream-markdown's registerHighlight. Overrides the default language preload when provided. */
+  langs?: string[]
   showHeader?: boolean
   showCopyButton?: boolean
   showExpandButton?: boolean
@@ -182,6 +184,14 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     try {
       const mod: any = await import('stream-markdown')
       createRendererRef.current = mod.createShikiStreamRenderer
+      if (mod.registerHighlight) {
+        const opts: { themes?: string[], langs?: string[] } = {}
+        if (Array.isArray(props.themes) && props.themes.length > 0)
+          opts.themes = props.themes
+        if (Array.isArray(props.langs) && props.langs.length > 0)
+          opts.langs = props.langs
+        mod.registerHighlight(opts)
+      }
     }
     catch {
       // optional peer
