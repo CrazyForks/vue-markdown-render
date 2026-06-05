@@ -154,6 +154,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const rendererRef = useRef<ShikiRenderer | null>(null)
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: { theme?: string | undefined, themes?: string[] | undefined }) => ShikiRenderer)>(null)
   const importAttemptedRef = useRef(false)
+  const registerHighlightRef = useRef<((opts: { themes?: string[], langs?: string[] }) => void) | null>(null)
+  const registeredKeyRef = useRef<string>('')
   const viewportHandleRef = useRef<VisibilityHandle | null>(null)
   const registerViewport = useViewportPriority()
   const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
@@ -184,14 +186,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     try {
       const mod: any = await import('stream-markdown')
       createRendererRef.current = mod.createShikiStreamRenderer
-      if (mod.registerHighlight) {
-        const opts: { themes?: string[], langs?: string[] } = {}
-        if (Array.isArray(props.themes) && props.themes.length > 0)
-          opts.themes = props.themes
-        if (Array.isArray(props.langs) && props.langs.length > 0)
-          opts.langs = props.langs
-        mod.registerHighlight(opts)
-      }
+      if (mod.registerHighlight)
+        registerHighlightRef.current = mod.registerHighlight
     }
     catch {
       // optional peer
@@ -205,6 +201,22 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     }
 
     await ensureStreamMarkdownLoaded()
+
+    // Register highlight with current themes/langs after import
+    if (registerHighlightRef.current) {
+      const themesKey = Array.isArray(props.themes) ? props.themes.join('\0') : ''
+      const langsKey = Array.isArray(props.langs) ? props.langs.join('\0') : ''
+      const key = `${themesKey}\x01${langsKey}`
+      if (registeredKeyRef.current !== key) {
+        registeredKeyRef.current = key
+        const opts: { themes?: string[], langs?: string[] } = {}
+        if (Array.isArray(props.themes) && props.themes.length > 0)
+          opts.themes = props.themes
+        if (Array.isArray(props.langs) && props.langs.length > 0)
+          opts.langs = props.langs
+        registerHighlightRef.current(opts)
+      }
+    }
 
     if (!codeBlockContentRef.current || !rendererTargetRef.current) {
       renderFallback(props.node.code)
@@ -237,7 +249,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     catch {
       // keep fallback
     }
-  }, [clearFallback, ensureStreamMarkdownLoaded, getPreferredColorScheme, normalizedLanguage, props.loading, props.node.code, props.stream, props.themes, renderFallback, viewportReady])
+  }, [clearFallback, ensureStreamMarkdownLoaded, getPreferredColorScheme, normalizedLanguage, props.langs, props.loading, props.node.code, props.stream, props.themes, renderFallback, viewportReady])
 
   useEffect(() => {
     const el = viewportTargetRef.current
@@ -261,6 +273,24 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       rendererRef.current = null
     }
   }, [initRenderer])
+
+  // Reactively register highlight when themes/langs change
+  useEffect(() => {
+    if (!registerHighlightRef.current)
+      return
+    const themesKey = Array.isArray(props.themes) ? props.themes.join('\0') : ''
+    const langsKey = Array.isArray(props.langs) ? props.langs.join('\0') : ''
+    const key = `${themesKey}\x01${langsKey}`
+    if (registeredKeyRef.current === key)
+      return
+    registeredKeyRef.current = key
+    const opts: { themes?: string[], langs?: string[] } = {}
+    if (Array.isArray(props.themes) && props.themes.length > 0)
+      opts.themes = props.themes
+    if (Array.isArray(props.langs) && props.langs.length > 0)
+      opts.langs = props.langs
+    registerHighlightRef.current(opts)
+  }, [props.themes, props.langs])
 
   useEffect(() => {
     if (!rendererRef.current)

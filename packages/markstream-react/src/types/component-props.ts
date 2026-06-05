@@ -92,6 +92,8 @@ export interface CodeBlockNodeProps {
   minWidth?: string | number
   maxWidth?: string | number
   themes?: CodeBlockMonacoTheme[]
+  /** Shiki language list forwarded to stream-markdown's registerHighlight. Overrides the default language preload when provided. */
+  langs?: string[]
   showHeader?: boolean
   showCopyButton?: boolean
   showExpandButton?: boolean

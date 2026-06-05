@@ -400,8 +400,15 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.themes, async () => {
-  if (registerHighlight)
-    registerHighlight({ themes: getResolvedThemes() })
+  if (registerHighlight) {
+    const opts: { themes?: string[], langs?: string[] } = {}
+    const themes = getResolvedThemes()
+    if (Array.isArray(themes) && themes.length > 0)
+      opts.themes = themes
+    if (Array.isArray(props.langs) && props.langs.length > 0)
+      opts.langs = props.langs
+    registerHighlight(opts)
+  }
 })
 
 watch(() => props.langs, () => {
