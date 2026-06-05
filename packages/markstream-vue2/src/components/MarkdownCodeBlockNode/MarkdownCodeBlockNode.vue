@@ -321,67 +321,25 @@ const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
 
-const SHIKI_RENDER_LANGUAGE_ALIAS: Record<string, string> = {
-  'golang': 'go',
-  'objectivec': 'objective-c',
-  'objective-c++': 'objective-cpp',
-  'objectivecpp': 'objective-cpp',
-}
-
-const SHIKI_MATCH_LANGUAGE_ALIAS: Record<string, string> = {
-  'js': 'javascript',
-  'mjs': 'javascript',
-  'cjs': 'javascript',
-  'javascript': 'javascript',
-  'ts': 'typescript',
-  'typescript': 'typescript',
-  'py': 'python',
-  'python': 'python',
-  'rb': 'ruby',
-  'ruby': 'ruby',
-  'md': 'markdown',
-  'markdown': 'markdown',
-  'yml': 'yaml',
-  'yaml': 'yaml',
-  'c#': 'csharp',
+const SHIKI_LANGUAGE_CANONICAL_ALIAS: Record<string, string> = {
+  'plain': 'plaintext',
+  'text': 'plaintext',
+  'txt': 'plaintext',
   'cs': 'csharp',
-  'csharp': 'csharp',
-  'c++': 'cpp',
-  'cpp': 'cpp',
-  'golang': 'go',
-  'go': 'go',
   'objectivec': 'objective-c',
   'objective-c': 'objective-c',
   'objectivecpp': 'objective-cpp',
   'objective-c++': 'objective-cpp',
   'objective-cpp': 'objective-cpp',
-  'sh': 'shell',
-  'bash': 'shell',
-  'zsh': 'shell',
-  'shellscript': 'shell',
-  'shell': 'shell',
-  'ps1': 'powershell',
-  'powershell': 'powershell',
-  'plain': 'plaintext',
-  'plaintext': 'plaintext',
-  'text': 'plaintext',
-  'txt': 'plaintext',
-}
-
-function getShikiLanguageToken(rawLang?: string | null) {
-  const [firstToken = ''] = String(rawLang ?? '').trim().split(/\s+/)
-  const [base = ''] = firstToken.split(':')
-  return base.trim().toLowerCase()
 }
 
 function normalizeShikiLanguage(rawLang?: string | null) {
-  const token = getShikiLanguageToken(rawLang)
-  return SHIKI_RENDER_LANGUAGE_ALIAS[token] ?? token
+  const normalized = normalizeLanguageIdentifier(rawLang)
+  return SHIKI_LANGUAGE_CANONICAL_ALIAS[normalized] ?? normalized
 }
 
 function getShikiLanguageMatchKey(rawLang?: string | null) {
-  const normalized = normalizeShikiLanguage(rawLang)
-  return SHIKI_MATCH_LANGUAGE_ALIAS[normalized] ?? normalized
+  return normalizeShikiLanguage(rawLang)
 }
 
 function getShikiLangs(langs?: readonly string[]) {
@@ -488,10 +446,10 @@ async function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
   const opts = getRegisterHighlightOptions(themes, langs)
   const effectiveLangs = opts.langs ?? defaultHighlightLanguages
 
+  await registerHighlight(opts)
+
   registeredHighlightKey = key
   rememberRegisteredHighlightLanguages(effectiveLangs)
-
-  await registerHighlight(opts)
 }
 
 async function ensureStreamMarkdownLoaded() {
@@ -502,11 +460,6 @@ async function ensureStreamMarkdownLoaded() {
     createShikiRenderer = mod.createShikiStreamRenderer
     registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
     defaultHighlightLanguages = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
-    rememberRegisteredHighlightLanguages(
-      Array.isArray(props.langs) && props.langs.length > 0
-        ? props.langs
-        : defaultHighlightLanguages,
-    )
     await ensureHighlightRegistered(getResolvedThemes(), props.langs)
   }
   catch (e) {

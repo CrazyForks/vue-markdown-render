@@ -50,51 +50,16 @@ interface ShikiRendererOptions {
   langs?: string[]
 }
 
-const SHIKI_RENDER_LANGUAGE_ALIAS: Record<string, string> = {
-  'golang': 'go',
-  'objectivec': 'objective-c',
-  'objective-c++': 'objective-cpp',
-  'objectivecpp': 'objective-cpp',
-}
-
-const SHIKI_MATCH_LANGUAGE_ALIAS: Record<string, string> = {
-  'js': 'javascript',
-  'mjs': 'javascript',
-  'cjs': 'javascript',
-  'javascript': 'javascript',
-  'ts': 'typescript',
-  'typescript': 'typescript',
-  'py': 'python',
-  'python': 'python',
-  'rb': 'ruby',
-  'ruby': 'ruby',
-  'md': 'markdown',
-  'markdown': 'markdown',
-  'yml': 'yaml',
-  'yaml': 'yaml',
-  'c#': 'csharp',
+const SHIKI_LANGUAGE_CANONICAL_ALIAS: Record<string, string> = {
+  'plain': 'plaintext',
+  'text': 'plaintext',
+  'txt': 'plaintext',
   'cs': 'csharp',
-  'csharp': 'csharp',
-  'c++': 'cpp',
-  'cpp': 'cpp',
-  'golang': 'go',
-  'go': 'go',
   'objectivec': 'objective-c',
   'objective-c': 'objective-c',
   'objectivecpp': 'objective-cpp',
   'objective-c++': 'objective-cpp',
   'objective-cpp': 'objective-cpp',
-  'sh': 'shell',
-  'bash': 'shell',
-  'zsh': 'shell',
-  'shellscript': 'shell',
-  'shell': 'shell',
-  'ps1': 'powershell',
-  'powershell': 'powershell',
-  'plain': 'plaintext',
-  'plaintext': 'plaintext',
-  'text': 'plaintext',
-  'txt': 'plaintext',
 }
 
 function escapeHtml(str: string) {
@@ -106,20 +71,13 @@ function escapeHtml(str: string) {
     .replace(/'/g, '&#39;')
 }
 
-function getShikiLanguageToken(rawLang?: string | null) {
-  const [firstToken = ''] = String(rawLang ?? '').trim().split(/\s+/)
-  const [base = ''] = firstToken.split(':')
-  return base.trim().toLowerCase()
-}
-
 function normalizeShikiLanguage(rawLang?: string | null) {
-  const token = getShikiLanguageToken(rawLang)
-  return SHIKI_RENDER_LANGUAGE_ALIAS[token] ?? token
+  const normalized = normalizeLanguageIdentifier(rawLang)
+  return SHIKI_LANGUAGE_CANONICAL_ALIAS[normalized] ?? normalized
 }
 
 function getShikiLanguageMatchKey(rawLang?: string | null) {
-  const normalized = normalizeShikiLanguage(rawLang)
-  return SHIKI_MATCH_LANGUAGE_ALIAS[normalized] ?? normalized
+  return normalizeShikiLanguage(rawLang)
 }
 
 function getShikiLangs(langs?: readonly string[]) {
@@ -132,9 +90,33 @@ function getShikiLangs(langs?: readonly string[]) {
     : undefined
 }
 
-function normalizeRendererLanguage(rawLang?: string | null) {
+function rememberRegisteredHighlightLanguages(
+  current: Set<string> | undefined,
+  langs?: readonly string[],
+) {
+  const shikiLangs = getShikiLangs(langs)
+  if (!shikiLangs?.length)
+    return current
+
+  const next = current ?? new Set<string>()
+  for (const lang of shikiLangs)
+    next.add(getShikiLanguageMatchKey(lang))
+
+  return next
+}
+
+function normalizeRendererLanguageForRegistered(
+  rawLang: string | null | undefined,
+  registeredLanguages?: ReadonlySet<string>,
+) {
   const normalized = normalizeShikiLanguage(rawLang)
-  return normalized || 'plaintext'
+  if (!normalized)
+    return 'plaintext'
+
+  if (!registeredLanguages || registeredLanguages.has(getShikiLanguageMatchKey(normalized)))
+    return normalized
+
+  return 'plaintext'
 }
 
 function getHighlightRegistrationKey(themes?: readonly string[], langs?: readonly string[]): string {
@@ -192,7 +174,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }
 
   const codeLanguage = useMemo(() => String(props.node.language ?? ''), [props.node.language])
-  const normalizedLanguage = useMemo(() => normalizeRendererLanguage(codeLanguage), [codeLanguage])
   const canonicalLanguage = useMemo(() => normalizeLanguageIdentifier(codeLanguage), [codeLanguage])
   const [languageIconsRevision, setLanguageIconsRevision] = useState(0)
 
@@ -254,6 +235,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
   const importAttemptedRef = useRef(false)
   const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
+  const defaultHighlightLanguagesRef = useRef<string[] | undefined>()
+  const registeredHighlightLanguagesRef = useRef<Set<string> | undefined>()
   const registeredKeyRef = useRef<string>('')
   const viewportHandleRef = useRef<VisibilityHandle | null>(null)
   const registerViewport = useViewportPriority()
@@ -287,6 +270,9 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       createRendererRef.current = mod.createShikiStreamRenderer
       if (mod.registerHighlight)
         registerHighlightRef.current = mod.registerHighlight
+      defaultHighlightLanguagesRef.current = Array.isArray(mod.defaultLanguages)
+        ? mod.defaultLanguages
+        : undefined
     }
     catch {
       // optional peer
@@ -303,11 +289,45 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       return
     if (registeredKeyRef.current === registrationKey)
       return
+    const opts = getRegisterHighlightOptions(props.themes, props.langs)
+    const effectiveLangs = opts.langs ?? defaultHighlightLanguagesRef.current
+
+    await registerHighlightRef.current(opts)
+
     registeredKeyRef.current = registrationKey
-    await registerHighlightRef.current(
-      getRegisterHighlightOptions(props.themes, props.langs),
+    registeredHighlightLanguagesRef.current = rememberRegisteredHighlightLanguages(
+      registeredHighlightLanguagesRef.current,
+      effectiveLangs,
     )
   }, [props.langs, props.themes, registrationKey])
+
+  const updateRendererWithFallback = useCallback(async (code: string) => {
+    const renderer = rendererRef.current
+    if (!renderer)
+      return
+
+    const lang = normalizeRendererLanguageForRegistered(
+      codeLanguage,
+      registeredHighlightLanguagesRef.current,
+    )
+
+    try {
+      await renderer.updateCode(code, lang)
+      clearFallback()
+    }
+    catch {
+      if (lang === 'plaintext')
+        return
+
+      try {
+        await renderer.updateCode(code, 'plaintext')
+        clearFallback()
+      }
+      catch {
+        // keep fallback
+      }
+    }
+  }, [clearFallback, codeLanguage])
 
   const initRenderer = useCallback(async () => {
     if (!viewportReady) {
@@ -343,25 +363,18 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     }
 
     renderFallback(props.node.code)
-    try {
-      await rendererRef.current.updateCode(props.node.code, normalizedLanguage)
-      clearFallback()
-    }
-    catch {
-      // keep fallback
-    }
+    await updateRendererWithFallback(props.node.code)
   }, [
-    clearFallback,
     ensureHighlightRegistered,
     ensureStreamMarkdownLoaded,
     getPreferredColorScheme,
-    normalizedLanguage,
     props.langs,
     props.loading,
     props.node.code,
     props.stream,
     props.themes,
     renderFallback,
+    updateRendererWithFallback,
     viewportReady,
   ])
 
@@ -401,50 +414,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [getPreferredColorScheme, viewportReady])
 
   useEffect(() => {
-    let disposed = false
-
-    void (async () => {
-      if (!viewportReady) {
-        renderFallback(props.node.code)
-        return
-      }
-
-      await ensureHighlightRegistered()
-
-      if (disposed)
-        return
-
-      if (!rendererRef.current)
-        return
-      if (props.stream === false && props.loading)
-        return
-      renderFallback(props.node.code)
-      try {
-        await rendererRef.current.updateCode(props.node.code, normalizedLanguage)
-        if (!disposed)
-          clearFallback()
-      }
-      catch {
-        // keep fallback
-      }
-    })()
-
-    return () => {
-      disposed = true
-    }
-  }, [
-    clearFallback,
-    ensureHighlightRegistered,
-    normalizedLanguage,
-    props.loading,
-    props.node.code,
-    props.stream,
-    registrationKey,
-    renderFallback,
-    viewportReady,
-  ])
-
-  useEffect(() => {
     if (!tooltipsEnabled)
       hideTooltip(true)
   }, [tooltipsEnabled])
@@ -481,7 +450,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const previewCode = useCallback(() => {
     if (!isPreviewable)
       return
-    const lowerLang = normalizedLanguage
+    const lowerLang = canonicalLanguage
     const artifactType = lowerLang === 'html' ? 'text/html' : 'image/svg+xml'
     const artifactTitle = lowerLang === 'html' ? 'HTML Preview' : 'SVG Preview'
     props.onPreviewCode?.({
@@ -489,7 +458,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       content: props.node.code,
       title: artifactTitle,
     })
-  }, [isPreviewable, normalizedLanguage, props])
+  }, [canonicalLanguage, isPreviewable, props])
 
   const contentStyle = useMemo(() => ({ fontSize: `${fontSize}px` }), [fontSize])
 

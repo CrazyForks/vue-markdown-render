@@ -80,7 +80,8 @@ async function waitForReactRendererCreated() {
 function resetStreamMarkdownMock() {
   streamMarkdownMock.createdRenderers.length = 0
   streamMarkdownMock.createShikiStreamRenderer.mockClear()
-  streamMarkdownMock.registerHighlight.mockClear()
+  streamMarkdownMock.registerHighlight.mockReset()
+  streamMarkdownMock.registerHighlight.mockImplementation(async () => {})
 }
 
 beforeEach(() => {
@@ -117,6 +118,30 @@ describe('markdown code block Shiki langs', () => {
     )
 
     wrapper.unmount()
+  })
+
+  it('retries Vue registerHighlight when the previous registration failed', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    streamMarkdownMock.registerHighlight.mockRejectedValueOnce(new Error('load failed'))
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      },
+    })
+
+    try {
+      await flushAll()
+      await waitForRendererCreated()
+
+      expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+    }
+    finally {
+      wrapper.unmount()
+      warnSpy.mockRestore()
+    }
   })
 
   it('passes langs to Vue2 registerHighlight and renderer', async () => {
@@ -170,6 +195,35 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenCalledWith(
       'const value = 1',
       'objective-c',
+    )
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('falls back to plaintext in React when the block language is not included in langs', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('python'),
+        langs: ['typescript'],
+      }))
+    })
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'plaintext',
     )
 
     await act(async () => {
