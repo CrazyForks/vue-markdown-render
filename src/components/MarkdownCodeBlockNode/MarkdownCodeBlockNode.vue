@@ -245,11 +245,23 @@ interface ShikiRenderer {
   setTheme: (theme?: string) => void | Promise<void>
   dispose: () => void
 }
+interface RegisterHighlightOptions {
+  themes?: string[]
+  langs?: string[]
+}
+interface ShikiRendererOptions {
+  theme?: string
+  themes?: string[]
+  langs?: string[]
+}
 let renderer: ShikiRenderer | undefined
 let createShikiRenderer:
-  | ((el: HTMLElement, opts: { theme?: string | undefined, themes?: string[] | undefined }) => ShikiRenderer)
+  | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)
   | undefined
-let registerHighlight
+let registerHighlight:
+  | ((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown)
+  | undefined
+let defaultHighlightLanguages: string[] | undefined
 let registeredHighlightLanguages: Set<string> | undefined
 let registeredHighlightKey: string | null = null
 const warnedMissingLanguages = new Set<string>()
@@ -257,12 +269,125 @@ const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV)
 let streamMarkdownLoadPromise: Promise<void> | null = null
 
+const SHIKI_RENDER_LANGUAGE_ALIAS: Record<string, string> = {
+  'golang': 'go',
+  'objectivec': 'objective-c',
+  'objective-c++': 'objective-cpp',
+  'objectivecpp': 'objective-cpp',
+}
+
+const SHIKI_MATCH_LANGUAGE_ALIAS: Record<string, string> = {
+  'js': 'javascript',
+  'mjs': 'javascript',
+  'cjs': 'javascript',
+  'javascript': 'javascript',
+  'ts': 'typescript',
+  'typescript': 'typescript',
+  'py': 'python',
+  'python': 'python',
+  'rb': 'ruby',
+  'ruby': 'ruby',
+  'md': 'markdown',
+  'markdown': 'markdown',
+  'yml': 'yaml',
+  'yaml': 'yaml',
+  'c#': 'csharp',
+  'cs': 'csharp',
+  'csharp': 'csharp',
+  'c++': 'cpp',
+  'cpp': 'cpp',
+  'golang': 'go',
+  'go': 'go',
+  'objectivec': 'objective-c',
+  'objective-c': 'objective-c',
+  'objectivecpp': 'objective-cpp',
+  'objective-c++': 'objective-cpp',
+  'objective-cpp': 'objective-cpp',
+  'sh': 'shell',
+  'bash': 'shell',
+  'zsh': 'shell',
+  'shellscript': 'shell',
+  'shell': 'shell',
+  'ps1': 'powershell',
+  'powershell': 'powershell',
+  'plain': 'plaintext',
+  'plaintext': 'plaintext',
+  'text': 'plaintext',
+  'txt': 'plaintext',
+}
+
+function getShikiLanguageToken(rawLang?: string | null) {
+  const [firstToken = ''] = String(rawLang ?? '').trim().split(/\s+/)
+  const [base = ''] = firstToken.split(':')
+  return base.trim().toLowerCase()
+}
+
+function normalizeShikiLanguage(rawLang?: string | null) {
+  const token = getShikiLanguageToken(rawLang)
+  return SHIKI_RENDER_LANGUAGE_ALIAS[token] ?? token
+}
+
+function getShikiLanguageMatchKey(rawLang?: string | null) {
+  const normalized = normalizeShikiLanguage(rawLang)
+  return SHIKI_MATCH_LANGUAGE_ALIAS[normalized] ?? normalized
+}
+
+function getShikiLangs(langs?: readonly string[]) {
+  const normalized = Array.isArray(langs)
+    ? langs.map(lang => normalizeShikiLanguage(lang)).filter(Boolean)
+    : []
+
+  return normalized.length > 0
+    ? Array.from(new Set(normalized))
+    : undefined
+}
+
+function getHighlightRegistrationKey(themes?: readonly string[], langs?: readonly string[]) {
+  const themesKey = Array.isArray(themes) && themes.length > 0
+    ? [...themes].sort().join('\u0000')
+    : ''
+
+  const langsKey = getShikiLangs(langs)
+    ?.map(lang => getShikiLanguageMatchKey(lang))
+    .sort()
+    .join('\u0000') ?? ''
+
+  return `${themesKey}\u0000\u0000${langsKey}`
+}
+
+function getRegisterHighlightOptions(themes?: readonly string[], langs?: readonly string[]) {
+  const opts: RegisterHighlightOptions = {}
+
+  if (Array.isArray(themes) && themes.length > 0)
+    opts.themes = [...themes]
+
+  const shikiLangs = getShikiLangs(langs)
+  if (shikiLangs?.length)
+    opts.langs = shikiLangs
+
+  return opts
+}
+
+function rememberRegisteredHighlightLanguages(langs?: readonly string[]) {
+  const shikiLangs = getShikiLangs(langs)
+  if (!shikiLangs?.length)
+    return
+
+  registeredHighlightLanguages ||= new Set<string>()
+
+  for (const lang of shikiLangs)
+    registeredHighlightLanguages.add(getShikiLanguageMatchKey(lang))
+}
+
 function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) {
-  const normalized = normalizeLanguageIdentifier(rawLang)
+  const normalized = normalizeShikiLanguage(rawLang)
   if (!normalized)
     return 'plaintext'
-  if (!registeredHighlightLanguages || registeredHighlightLanguages.has(normalized))
+
+  const matchKey = getShikiLanguageMatchKey(normalized)
+  if (!registeredHighlightLanguages || registeredHighlightLanguages.has(matchKey))
     return normalized
+
   if (hasContent && isDevEnv && !warnedMissingLanguages.has(normalized)) {
     warnedMissingLanguages.add(normalized)
     console.warn(`[MarkdownCodeBlockNode] Language "${normalized}" not preloaded in stream-markdown; falling back to plaintext.`)
@@ -301,17 +426,16 @@ async function ensureStreamMarkdownLoaded() {
     try {
       const mod = await import('stream-markdown')
       createShikiRenderer = mod.createShikiStreamRenderer
-      registerHighlight = mod.registerHighlight
-      if (Array.isArray(props.langs) && props.langs.length > 0) {
-        registeredHighlightLanguages = new Set(props.langs.map((l: string) => normalizeLanguageIdentifier(l)))
-      }
-      else {
-        const defaultLangs = Array.isArray((mod as { defaultLanguages?: unknown }).defaultLanguages)
-          ? (mod as { defaultLanguages: unknown[] }).defaultLanguages
-          : undefined
-        registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => normalizeLanguageIdentifier(l))) : undefined
-      }
-      ensureHighlightRegistered(props.themes, props.langs)
+      registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
+      defaultHighlightLanguages = Array.isArray((mod as { defaultLanguages?: unknown }).defaultLanguages)
+        ? (mod as { defaultLanguages: string[] }).defaultLanguages
+        : undefined
+      rememberRegisteredHighlightLanguages(
+        Array.isArray(props.langs) && props.langs.length > 0
+          ? props.langs
+          : defaultHighlightLanguages,
+      )
+      await ensureHighlightRegistered(props.themes, props.langs)
     }
     catch (e) {
       console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
@@ -324,25 +448,20 @@ async function ensureStreamMarkdownLoaded() {
   return streamMarkdownLoadPromise
 }
 
-function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
+async function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
   if (!registerHighlight)
     return
-  const normalizedLangs = Array.isArray(langs) && langs.length > 0
-    ? langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean)
-    : []
-  const themesKey = Array.isArray(themes) && themes.length > 0 ? [...themes].sort().join('\u0000') : ''
-  const langsKey = normalizedLangs.length > 0 ? [...normalizedLangs].sort().join('\u0000') : ''
-  const key = `${themesKey}\u0000\u0000${langsKey}`
-  const opts: { themes?: string[], langs?: string[] } = {}
-  if (Array.isArray(themes) && themes.length > 0)
-    opts.themes = themes
-  if (normalizedLangs.length > 0)
-    opts.langs = normalizedLangs
-
+  const key = getHighlightRegistrationKey(themes, langs)
   if (registeredHighlightKey === key)
     return
-  registerHighlight(opts)
+
+  const opts = getRegisterHighlightOptions(themes, langs)
+  const effectiveLangs = opts.langs ?? defaultHighlightLanguages
+
   registeredHighlightKey = key
+  rememberRegisteredHighlightLanguages(effectiveLangs)
+
+  await registerHighlight(opts)
 }
 
 async function initRenderer() {
@@ -358,11 +477,13 @@ async function initRenderer() {
     return
   }
 
-  ensureHighlightRegistered(props.themes, props.langs)
+  await ensureHighlightRegistered(props.themes, props.langs)
 
   if (!renderer && createShikiRenderer) {
     renderer = createShikiRenderer(rendererTarget.value, {
       theme: getPreferredColorScheme(),
+      themes: props.themes,
+      langs: getShikiLangs(props.langs),
     })
     rendererReady.value = true
   }
@@ -396,15 +517,12 @@ onBeforeUnmount(() => {
 })
 
 watch([() => props.themes, () => props.langs], async ([themes, langs], [, previousLangs]) => {
-  const langsChanged = langs !== previousLangs
-  if (langsChanged && Array.isArray(langs) && langs.length > 0) {
-    registeredHighlightLanguages = new Set(langs.map((l: string) => normalizeLanguageIdentifier(l)))
-  }
-  else if (langsChanged) {
-    registeredHighlightLanguages = undefined
-    registeredHighlightKey = null
-  }
-  ensureHighlightRegistered(themes, langs)
+  const langsChanged
+    = getHighlightRegistrationKey(undefined, langs)
+      !== getHighlightRegistrationKey(undefined, previousLangs)
+
+  await ensureHighlightRegistered(themes, langs)
+
   // Re-render current code block so blocks that fell back to plaintext can recover highlighting
   if (langsChanged && renderer) {
     renderFallback(props.node.code)

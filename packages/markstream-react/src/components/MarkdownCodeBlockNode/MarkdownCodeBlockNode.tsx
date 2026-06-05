@@ -39,6 +39,64 @@ interface ShikiRenderer {
   dispose: () => void
 }
 
+interface RegisterHighlightOptions {
+  themes?: string[]
+  langs?: string[]
+}
+
+interface ShikiRendererOptions {
+  theme?: string
+  themes?: string[]
+  langs?: string[]
+}
+
+const SHIKI_RENDER_LANGUAGE_ALIAS: Record<string, string> = {
+  'golang': 'go',
+  'objectivec': 'objective-c',
+  'objective-c++': 'objective-cpp',
+  'objectivecpp': 'objective-cpp',
+}
+
+const SHIKI_MATCH_LANGUAGE_ALIAS: Record<string, string> = {
+  'js': 'javascript',
+  'mjs': 'javascript',
+  'cjs': 'javascript',
+  'javascript': 'javascript',
+  'ts': 'typescript',
+  'typescript': 'typescript',
+  'py': 'python',
+  'python': 'python',
+  'rb': 'ruby',
+  'ruby': 'ruby',
+  'md': 'markdown',
+  'markdown': 'markdown',
+  'yml': 'yaml',
+  'yaml': 'yaml',
+  'c#': 'csharp',
+  'cs': 'csharp',
+  'csharp': 'csharp',
+  'c++': 'cpp',
+  'cpp': 'cpp',
+  'golang': 'go',
+  'go': 'go',
+  'objectivec': 'objective-c',
+  'objective-c': 'objective-c',
+  'objectivecpp': 'objective-cpp',
+  'objective-c++': 'objective-cpp',
+  'objective-cpp': 'objective-cpp',
+  'sh': 'shell',
+  'bash': 'shell',
+  'zsh': 'shell',
+  'shellscript': 'shell',
+  'shell': 'shell',
+  'ps1': 'powershell',
+  'powershell': 'powershell',
+  'plain': 'plaintext',
+  'plaintext': 'plaintext',
+  'text': 'plaintext',
+  'txt': 'plaintext',
+}
+
 function escapeHtml(str: string) {
   return str
     .replace(/&/g, '&amp;')
@@ -48,27 +106,55 @@ function escapeHtml(str: string) {
     .replace(/'/g, '&#39;')
 }
 
+function getShikiLanguageToken(rawLang?: string | null) {
+  const [firstToken = ''] = String(rawLang ?? '').trim().split(/\s+/)
+  const [base = ''] = firstToken.split(':')
+  return base.trim().toLowerCase()
+}
+
+function normalizeShikiLanguage(rawLang?: string | null) {
+  const token = getShikiLanguageToken(rawLang)
+  return SHIKI_RENDER_LANGUAGE_ALIAS[token] ?? token
+}
+
+function getShikiLanguageMatchKey(rawLang?: string | null) {
+  const normalized = normalizeShikiLanguage(rawLang)
+  return SHIKI_MATCH_LANGUAGE_ALIAS[normalized] ?? normalized
+}
+
+function getShikiLangs(langs?: readonly string[]) {
+  const normalized = Array.isArray(langs)
+    ? langs.map(lang => normalizeShikiLanguage(lang)).filter(Boolean)
+    : []
+
+  return normalized.length > 0
+    ? Array.from(new Set(normalized))
+    : undefined
+}
+
 function normalizeRendererLanguage(rawLang?: string | null) {
-  const normalized = normalizeLanguageIdentifier(rawLang)
+  const normalized = normalizeShikiLanguage(rawLang)
   return normalized || 'plaintext'
 }
 
-function getHighlightRegistrationKey(themes?: string[], langs?: string[]): string {
+function getHighlightRegistrationKey(themes?: readonly string[], langs?: readonly string[]): string {
   const sortedThemes = Array.isArray(themes) && themes.length > 0
-    ? [...themes].sort().join('\0')
+    ? [...themes].sort().join('\u0000')
     : ''
-  const sortedLangs = Array.isArray(langs) && langs.length > 0
-    ? langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean).sort().join('\0')
-    : ''
-  return `${sortedThemes}\0\0${sortedLangs}`
+  const sortedLangs = getShikiLangs(langs)
+    ?.map(lang => getShikiLanguageMatchKey(lang))
+    .sort()
+    .join('\u0000') ?? ''
+  return `${sortedThemes}\u0000\u0000${sortedLangs}`
 }
 
-function getRegisterHighlightOptions(themes?: string[], langs?: string[]): { themes?: string[], langs?: string[] } {
-  const opts: { themes?: string[], langs?: string[] } = {}
+function getRegisterHighlightOptions(themes?: readonly string[], langs?: readonly string[]): RegisterHighlightOptions {
+  const opts: RegisterHighlightOptions = {}
   if (Array.isArray(themes) && themes.length > 0)
-    opts.themes = themes
-  if (Array.isArray(langs) && langs.length > 0)
-    opts.langs = langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean)
+    opts.themes = [...themes]
+  const shikiLangs = getShikiLangs(langs)
+  if (shikiLangs?.length)
+    opts.langs = shikiLangs
   return opts
 }
 
@@ -165,9 +251,9 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const codeBlockContentRef = useRef<HTMLDivElement | null>(null)
   const rendererTargetRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<ShikiRenderer | null>(null)
-  const createRendererRef = useRef<null | ((el: HTMLElement, opts: { theme?: string | undefined, themes?: string[] | undefined }) => ShikiRenderer)>(null)
+  const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
   const importAttemptedRef = useRef(false)
-  const registerHighlightRef = useRef<((opts: { themes?: string[], langs?: string[] }) => void) | null>(null)
+  const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
   const registeredKeyRef = useRef<string>('')
   const viewportHandleRef = useRef<VisibilityHandle | null>(null)
   const registerViewport = useViewportPriority()
@@ -207,6 +293,22 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     }
   }, [])
 
+  const registrationKey = useMemo(
+    () => getHighlightRegistrationKey(props.themes, props.langs),
+    [props.themes, props.langs],
+  )
+
+  const ensureHighlightRegistered = useCallback(async () => {
+    if (!registerHighlightRef.current)
+      return
+    if (registeredKeyRef.current === registrationKey)
+      return
+    registeredKeyRef.current = registrationKey
+    await registerHighlightRef.current(
+      getRegisterHighlightOptions(props.themes, props.langs),
+    )
+  }, [props.langs, props.themes, registrationKey])
+
   const initRenderer = useCallback(async () => {
     if (!viewportReady) {
       renderFallback(props.node.code)
@@ -214,15 +316,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     }
 
     await ensureStreamMarkdownLoaded()
-
-    // Register highlight with current themes/langs after import
-    if (registerHighlightRef.current) {
-      const key = getHighlightRegistrationKey(props.themes, props.langs)
-      if (registeredKeyRef.current !== key) {
-        registeredKeyRef.current = key
-        registerHighlightRef.current(getRegisterHighlightOptions(props.themes, props.langs))
-      }
-    }
+    await ensureHighlightRegistered()
 
     if (!codeBlockContentRef.current || !rendererTargetRef.current) {
       renderFallback(props.node.code)
@@ -233,6 +327,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       rendererRef.current = createRendererRef.current(rendererTargetRef.current, {
         theme: getPreferredColorScheme(),
         themes: props.themes,
+        langs: getShikiLangs(props.langs),
       })
       setRendererReady(true)
     }
@@ -255,7 +350,20 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     catch {
       // keep fallback
     }
-  }, [clearFallback, ensureStreamMarkdownLoaded, getPreferredColorScheme, normalizedLanguage, props.loading, props.node.code, props.stream, props.themes, renderFallback, viewportReady])
+  }, [
+    clearFallback,
+    ensureHighlightRegistered,
+    ensureStreamMarkdownLoaded,
+    getPreferredColorScheme,
+    normalizedLanguage,
+    props.langs,
+    props.loading,
+    props.node.code,
+    props.stream,
+    props.themes,
+    renderFallback,
+    viewportReady,
+  ])
 
   useEffect(() => {
     const el = viewportTargetRef.current
@@ -284,17 +392,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     }
   }, [])
 
-  // Reactively register highlight when themes/langs change
-  useEffect(() => {
-    if (!registerHighlightRef.current)
-      return
-    const key = getHighlightRegistrationKey(props.themes, props.langs)
-    if (registeredKeyRef.current === key)
-      return
-    registeredKeyRef.current = key
-    registerHighlightRef.current(getRegisterHighlightOptions(props.themes, props.langs))
-  }, [props.themes, props.langs])
-
   useEffect(() => {
     if (!rendererRef.current)
       return
@@ -304,19 +401,48 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [getPreferredColorScheme, viewportReady])
 
   useEffect(() => {
-    if (!viewportReady) {
+    let disposed = false
+
+    void (async () => {
+      if (!viewportReady) {
+        renderFallback(props.node.code)
+        return
+      }
+
+      await ensureHighlightRegistered()
+
+      if (disposed)
+        return
+
+      if (!rendererRef.current)
+        return
+      if (props.stream === false && props.loading)
+        return
       renderFallback(props.node.code)
-      return
+      try {
+        await rendererRef.current.updateCode(props.node.code, normalizedLanguage)
+        if (!disposed)
+          clearFallback()
+      }
+      catch {
+        // keep fallback
+      }
+    })()
+
+    return () => {
+      disposed = true
     }
-    if (!rendererRef.current)
-      return
-    if (props.stream === false && props.loading)
-      return
-    renderFallback(props.node.code)
-    Promise.resolve(rendererRef.current.updateCode(props.node.code, normalizedLanguage))
-      .then(() => clearFallback())
-      .catch(() => {})
-  }, [clearFallback, normalizedLanguage, props.loading, props.node.code, props.stream, renderFallback, viewportReady])
+  }, [
+    clearFallback,
+    ensureHighlightRegistered,
+    normalizedLanguage,
+    props.loading,
+    props.node.code,
+    props.stream,
+    registrationKey,
+    renderFallback,
+    viewportReady,
+  ])
 
   useEffect(() => {
     if (!tooltipsEnabled)
