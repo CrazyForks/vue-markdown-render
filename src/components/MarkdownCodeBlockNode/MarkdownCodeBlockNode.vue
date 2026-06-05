@@ -271,8 +271,7 @@ const isDevEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.
 let streamMarkdownLoadPromise: Promise<void> | null = null
 
 function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) {
-  const [baseToken] = String(rawLang ?? '').split(':')
-  const normalized = baseToken?.trim().toLowerCase() ?? ''
+  const normalized = normalizeLanguageIdentifier(rawLang)
   if (!normalized)
     return 'plaintext'
   if (!registeredHighlightLanguages || registeredHighlightLanguages.has(normalized))
@@ -317,13 +316,13 @@ async function ensureStreamMarkdownLoaded() {
       createShikiRenderer = mod.createShikiStreamRenderer
       registerHighlight = mod.registerHighlight
       if (Array.isArray(props.langs) && props.langs.length > 0) {
-        registeredHighlightLanguages = new Set(props.langs.map((l: string) => l.toLowerCase()))
+        registeredHighlightLanguages = new Set(props.langs.map((l: string) => normalizeLanguageIdentifier(l)))
       }
       else {
         const defaultLangs = Array.isArray((mod as { defaultLanguages?: unknown }).defaultLanguages)
           ? (mod as { defaultLanguages: unknown[] }).defaultLanguages
           : undefined
-        registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
+        registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => normalizeLanguageIdentifier(l))) : undefined
       }
       ensureHighlightRegistered(props.themes, props.langs)
     }
@@ -411,13 +410,15 @@ watch(() => props.themes, async () => {
 
 watch(() => props.langs, () => {
   if (Array.isArray(props.langs) && props.langs.length > 0) {
-    registeredHighlightLanguages = new Set(props.langs.map((l: string) => l.toLowerCase()))
+    registeredHighlightLanguages = new Set(props.langs.map((l: string) => normalizeLanguageIdentifier(l)))
   }
   else {
     // Reset to undefined so normalizeRendererLanguage skips the guard check
     registeredHighlightLanguages = undefined
   }
   ensureHighlightRegistered(props.themes, props.langs)
+  // Re-render current code block so it picks up the new language set
+  updateRendererWithFallback(props.node.code, codeLanguage.value)
 })
 
 watch(() => props.loading, (loading) => {

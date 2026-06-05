@@ -325,11 +325,11 @@ async function ensureStreamMarkdownLoaded() {
     createShikiRenderer = mod.createShikiStreamRenderer
     registerHighlight = mod.registerHighlight
     if (Array.isArray(props.langs) && props.langs.length > 0) {
-      registeredHighlightLanguages = new Set(props.langs.map((l: string) => l.toLowerCase()))
+      registeredHighlightLanguages = new Set(props.langs.map((l: string) => normalizeLanguageIdentifier(l)))
     }
     else {
       const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
-      registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
+      registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => normalizeLanguageIdentifier(l))) : undefined
     }
     const opts: { themes?: string[], langs?: string[] } = {}
     const themes = getResolvedThemes()
@@ -402,6 +402,26 @@ onBeforeUnmount(() => {
 watch(() => props.themes, async () => {
   if (registerHighlight)
     registerHighlight({ themes: getResolvedThemes() })
+})
+
+watch(() => props.langs, () => {
+  if (Array.isArray(props.langs) && props.langs.length > 0) {
+    registeredHighlightLanguages = new Set(props.langs.map((l: string) => normalizeLanguageIdentifier(l)))
+  }
+  else {
+    registeredHighlightLanguages = undefined
+  }
+  if (registerHighlight) {
+    const opts: { themes?: string[], langs?: string[] } = {}
+    const themes = getResolvedThemes()
+    if (Array.isArray(themes) && themes.length > 0)
+      opts.themes = themes
+    if (Array.isArray(props.langs) && props.langs.length > 0)
+      opts.langs = props.langs
+    registerHighlight(opts)
+  }
+  // Re-render current code block so it picks up the new language set
+  updateRendererWithFallback(props.node.code, codeLanguage.value)
 })
 
 watch(() => props.loading, (loading) => {
