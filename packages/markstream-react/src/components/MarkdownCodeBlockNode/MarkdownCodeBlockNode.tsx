@@ -60,9 +60,13 @@ function normalizeRendererLanguage(rawLang?: string | null) {
 }
 
 function getHighlightRegistrationKey(themes?: string[], langs?: string[]): string {
-  const themesKey = Array.isArray(themes) && themes.length > 0 ? themes.join('\0') : ''
-  const langsKey = Array.isArray(langs) && langs.length > 0 ? langs.join('\0') : ''
-  return `${themesKey}\0\0${langsKey}`
+  const sortedThemes = Array.isArray(themes) && themes.length > 0
+    ? [...themes].sort().join('\0')
+    : ''
+  const sortedLangs = Array.isArray(langs) && langs.length > 0
+    ? langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean).sort().join('\0')
+    : ''
+  return `${sortedThemes}\0\0${sortedLangs}`
 }
 
 export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {

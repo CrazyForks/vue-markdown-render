@@ -340,8 +340,8 @@ async function ensureStreamMarkdownLoaded() {
 function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
   if (!registerHighlight)
     return
-  const themesKey = Array.isArray(themes) ? themes.join('\u0000') : ''
-  const langsKey = Array.isArray(langs) ? langs.join('\u0000') : ''
+  const themesKey = Array.isArray(themes) && themes.length > 0 ? [...themes].sort().join('\u0000') : ''
+  const langsKey = Array.isArray(langs) && langs.length > 0 ? langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean).sort().join('\u0000') : ''
   if (registeredHighlightThemesKey === themesKey && registeredHighlightLangsKey === langsKey)
     return
   const opts: { themes?: string[], langs?: string[] } = {}
