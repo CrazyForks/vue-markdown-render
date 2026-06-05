@@ -306,7 +306,10 @@ interface ShikiRendererOptions {
   themes?: string[]
   langs?: string[]
 }
+type HighlightRegistrationStatus = 'ready' | 'failed' | 'stale'
+
 let renderer: ShikiRenderer | undefined
+let rendererConfigKey: string | null = null
 let createShikiRenderer:
   | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)
   | undefined
@@ -317,6 +320,7 @@ let registerHighlight:
 let defaultHighlightLanguages: string[] | undefined
 let registeredHighlightLanguages: Set<string> | undefined
 let registeredHighlightKey: string | null = null
+let latestHighlightRegistrationKey = ''
 let highlightRegistrationSeq = 0
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
@@ -444,12 +448,14 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null)
   }
 }
 
-async function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
+async function ensureHighlightRegistered(themes?: string[], langs?: string[]): Promise<HighlightRegistrationStatus> {
   if (!registerHighlight)
-    return true
+    return 'ready'
   const key = getHighlightRegistrationKey(themes, langs)
+  latestHighlightRegistrationKey = key
+
   if (registeredHighlightKey === key)
-    return true
+    return 'ready'
 
   const opts = getRegisterHighlightOptions(themes, langs)
   const effectiveLangs = opts.langs ?? defaultHighlightLanguages
@@ -459,15 +465,23 @@ async function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
     await registerHighlight(opts)
   }
   catch {
-    return false
+    return 'failed'
   }
 
-  if (seq !== highlightRegistrationSeq)
-    return false
+  if (seq !== highlightRegistrationSeq || latestHighlightRegistrationKey !== key)
+    return 'stale'
 
   registeredHighlightKey = key
   registeredHighlightLanguages = createRegisteredHighlightLanguages(effectiveLangs)
-  return true
+  return 'ready'
+}
+
+async function waitForCurrentHighlightRegistration(themes?: string[], langs?: string[]) {
+  const status = await ensureHighlightRegistered(themes, langs)
+  if (status !== 'failed')
+    return status
+
+  return ensureHighlightRegistered(themes, langs)
 }
 
 async function ensureStreamMarkdownLoaded() {
@@ -494,18 +508,30 @@ async function initRenderer() {
     return
   }
 
-  const highlightReady = await ensureHighlightRegistered(getResolvedThemes(), props.langs)
-  if (!highlightReady) {
+  const themes = getResolvedThemes()
+  const highlightStatus = await waitForCurrentHighlightRegistration(themes, props.langs)
+  if (highlightStatus === 'stale')
+    return
+  if (highlightStatus === 'failed') {
     renderFallback(props.node.code, !hasStableRender.value)
     return
+  }
+
+  const nextRendererConfigKey = getHighlightRegistrationKey(themes, props.langs)
+  if (renderer && rendererConfigKey !== nextRendererConfigKey) {
+    renderer.dispose()
+    renderer = undefined
+    rendererConfigKey = null
+    rendererReady.value = false
   }
 
   if (!renderer && createShikiRenderer) {
     renderer = createShikiRenderer(rendererTarget.value, {
       theme: getPreferredColorScheme(),
-      themes: getResolvedThemes(),
+      themes,
       langs: getShikiLangs(props.langs),
     })
+    rendererConfigKey = nextRendererConfigKey
     rendererReady.value = true
   }
 
@@ -539,23 +565,12 @@ onBeforeUnmount(() => {
   renderObserver = undefined
 })
 
-watch([() => props.themes, () => props.langs], async ([, langs], [, previousLangs]) => {
-  const themes = getResolvedThemes()
-  const langsChanged
-    = getHighlightRegistrationKey(undefined, langs)
-      !== getHighlightRegistrationKey(undefined, previousLangs)
+watch(() => props.themes, async () => {
+  await initRenderer()
+})
 
-  const highlightReady = await ensureHighlightRegistered(themes, langs)
-  if (!highlightReady)
-    return
-
-  // Re-render current code block so blocks that fell back to plaintext can recover highlighting
-  if (langsChanged && renderer) {
-    renderFallback(props.node.code, !hasStableRender.value)
-    const updated = await updateRendererWithFallback(props.node.code, codeLanguage.value)
-    if (updated)
-      await clearFallbackWhenRendererReady()
-  }
+watch(() => props.langs, async () => {
+  await initRenderer()
 })
 
 watch(() => props.loading, (loading) => {

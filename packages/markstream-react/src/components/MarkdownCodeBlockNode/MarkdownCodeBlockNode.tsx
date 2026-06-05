@@ -50,6 +50,8 @@ interface ShikiRendererOptions {
   langs?: string[]
 }
 
+type HighlightRegistrationStatus = 'ready' | 'failed' | 'stale'
+
 const SHIKI_LANGUAGE_CANONICAL_ALIAS: Record<string, string> = {
   'plain': 'plaintext',
   'text': 'plaintext',
@@ -235,6 +237,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const codeBlockContentRef = useRef<HTMLDivElement | null>(null)
   const rendererTargetRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<ShikiRenderer | null>(null)
+  const rendererConfigKeyRef = useRef('')
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
   const importAttemptedRef = useRef(false)
   const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
@@ -293,12 +296,14 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     latestRegistrationKeyRef.current = registrationKey
   }, [registrationKey])
 
-  const ensureHighlightRegistered = useCallback(async (): Promise<boolean> => {
+  const ensureHighlightRegistered = useCallback(async (): Promise<HighlightRegistrationStatus> => {
     if (!registerHighlightRef.current)
-      return true
+      return 'ready'
     const key = registrationKey
+    latestRegistrationKeyRef.current = key
+
     if (registeredKeyRef.current === key)
-      return true
+      return 'ready'
     const opts = getRegisterHighlightOptions(props.themes, props.langs)
     const effectiveLangs = opts.langs ?? defaultHighlightLanguagesRef.current
     const seq = ++highlightRegistrationSeqRef.current
@@ -307,16 +312,24 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       await registerHighlightRef.current(opts)
     }
     catch {
-      return false
+      return 'failed'
     }
 
     if (seq !== highlightRegistrationSeqRef.current || latestRegistrationKeyRef.current !== key)
-      return false
+      return 'stale'
 
     registeredKeyRef.current = key
     registeredHighlightLanguagesRef.current = createRegisteredHighlightLanguages(effectiveLangs)
-    return true
+    return 'ready'
   }, [props.langs, props.themes, registrationKey])
+
+  const waitForCurrentHighlightRegistration = useCallback(async () => {
+    const status = await ensureHighlightRegistered()
+    if (status !== 'failed')
+      return status
+
+    return ensureHighlightRegistered()
+  }, [ensureHighlightRegistered])
 
   const updateRendererWithFallback = useCallback(async (code: string) => {
     const renderer = rendererRef.current
@@ -354,10 +367,10 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
 
     await ensureStreamMarkdownLoaded()
 
-    let highlightReady = await ensureHighlightRegistered()
-    if (!highlightReady)
-      highlightReady = await ensureHighlightRegistered()
-    if (!highlightReady) {
+    const highlightStatus = await waitForCurrentHighlightRegistration()
+    if (highlightStatus === 'stale')
+      return
+    if (highlightStatus === 'failed') {
       renderFallback(props.node.code)
       return
     }
@@ -367,12 +380,20 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       return
     }
 
+    if (rendererRef.current && rendererConfigKeyRef.current !== registrationKey) {
+      rendererRef.current.dispose()
+      rendererRef.current = null
+      rendererConfigKeyRef.current = ''
+      setRendererReady(false)
+    }
+
     if (!rendererRef.current && createRendererRef.current) {
       rendererRef.current = createRendererRef.current(rendererTargetRef.current, {
         theme: getPreferredColorScheme(),
         themes: props.themes,
         langs: getShikiLangs(props.langs),
       })
+      rendererConfigKeyRef.current = registrationKey
       setRendererReady(true)
     }
 
@@ -389,9 +410,10 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     renderFallback(props.node.code)
     await updateRendererWithFallback(props.node.code)
   }, [
-    ensureHighlightRegistered,
     ensureStreamMarkdownLoaded,
     getPreferredColorScheme,
+    registrationKey,
+    waitForCurrentHighlightRegistration,
     props.langs,
     props.loading,
     props.node.code,
@@ -428,6 +450,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     return () => {
       rendererRef.current?.dispose()
       rendererRef.current = null
+      rendererConfigKeyRef.current = ''
     }
   }, [])
 
