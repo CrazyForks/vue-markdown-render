@@ -378,15 +378,14 @@ function getRegisterHighlightOptions(themes?: readonly string[], langs?: readonl
   return opts
 }
 
-function rememberRegisteredHighlightLanguages(langs?: readonly string[]) {
+function createRegisteredHighlightLanguages(langs?: readonly string[]) {
   const shikiLangs = getShikiLangs(langs)
   if (!shikiLangs?.length)
-    return
+    return undefined
 
-  registeredHighlightLanguages ||= new Set<string>()
-
-  for (const lang of shikiLangs)
-    registeredHighlightLanguages.add(getShikiLanguageMatchKey(lang))
+  return new Set(
+    shikiLangs.map(lang => getShikiLanguageMatchKey(lang)),
+  )
 }
 
 function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) {
@@ -438,18 +437,24 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null)
 
 async function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
   if (!registerHighlight)
-    return
+    return true
   const key = getHighlightRegistrationKey(themes, langs)
   if (registeredHighlightKey === key)
-    return
+    return true
 
   const opts = getRegisterHighlightOptions(themes, langs)
   const effectiveLangs = opts.langs ?? defaultHighlightLanguages
 
-  await registerHighlight(opts)
+  try {
+    await registerHighlight(opts)
+  }
+  catch {
+    return false
+  }
 
   registeredHighlightKey = key
-  rememberRegisteredHighlightLanguages(effectiveLangs)
+  registeredHighlightLanguages = createRegisteredHighlightLanguages(effectiveLangs)
+  return true
 }
 
 async function ensureStreamMarkdownLoaded() {
@@ -476,7 +481,11 @@ async function initRenderer() {
     return
   }
 
-  await ensureHighlightRegistered(getResolvedThemes(), props.langs)
+  const highlightReady = await ensureHighlightRegistered(getResolvedThemes(), props.langs)
+  if (!highlightReady) {
+    renderFallback(props.node.code, !hasStableRender.value)
+    return
+  }
 
   if (!renderer && createShikiRenderer) {
     renderer = createShikiRenderer(rendererTarget.value, {
@@ -523,7 +532,9 @@ watch([() => props.themes, () => props.langs], async ([, langs], [, previousLang
     = getHighlightRegistrationKey(undefined, langs)
       !== getHighlightRegistrationKey(undefined, previousLangs)
 
-  await ensureHighlightRegistered(themes, langs)
+  const highlightReady = await ensureHighlightRegistered(themes, langs)
+  if (!highlightReady)
+    return
 
   // Re-render current code block so blocks that fell back to plaintext can recover highlighting
   if (langsChanged && renderer) {

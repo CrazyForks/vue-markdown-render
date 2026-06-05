@@ -144,6 +144,41 @@ describe('markdown code block Shiki langs', () => {
     }
   })
 
+  it('resets Vue registered language guard when langs changes', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    const renderer = streamMarkdownMock.createdRenderers[0]
+    expect(renderer?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'typescript',
+    )
+
+    renderer.updateCode.mockClear()
+
+    await wrapper.setProps({ langs: ['python'] })
+    await flushAll()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ langs: ['python'] }),
+    )
+    expect(renderer.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'plaintext',
+    )
+
+    wrapper.unmount()
+  })
+
   it('passes langs to Vue2 registerHighlight and renderer', async () => {
     const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
@@ -164,6 +199,25 @@ describe('markdown code block Shiki langs', () => {
       expect.any(HTMLElement),
       expect.objectContaining({ langs: ['typescript'] }),
     )
+
+    wrapper.unmount()
+  })
+
+  it('retries Vue2 registerHighlight when the previous registration failed', async () => {
+    streamMarkdownMock.registerHighlight.mockRejectedValueOnce(new Error('load failed'))
+    const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
   })
@@ -203,6 +257,57 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
+  it('resets React registered language guard when langs changes', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const node = makeNode('typescript')
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    const renderer = streamMarkdownMock.createdRenderers[0]
+    expect(renderer?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'typescript',
+    )
+
+    renderer.updateCode.mockClear()
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: ['python'],
+      }))
+    })
+
+    await flushReact()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ langs: ['python'] }),
+    )
+    expect(renderer.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'plaintext',
+    )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
   it('falls back to plaintext in React when the block language is not included in langs', async () => {
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
@@ -224,6 +329,38 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',
       'plaintext',
+    )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('retries React registerHighlight when the previous registration failed', async () => {
+    streamMarkdownMock.registerHighlight.mockRejectedValueOnce(new Error('load failed'))
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'typescript',
     )
 
     await act(async () => {

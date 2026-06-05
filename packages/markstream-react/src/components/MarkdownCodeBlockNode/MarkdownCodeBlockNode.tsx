@@ -90,19 +90,14 @@ function getShikiLangs(langs?: readonly string[]) {
     : undefined
 }
 
-function rememberRegisteredHighlightLanguages(
-  current: Set<string> | undefined,
-  langs?: readonly string[],
-) {
+function createRegisteredHighlightLanguages(langs?: readonly string[]) {
   const shikiLangs = getShikiLangs(langs)
   if (!shikiLangs?.length)
-    return current
+    return undefined
 
-  const next = current ?? new Set<string>()
-  for (const lang of shikiLangs)
-    next.add(getShikiLanguageMatchKey(lang))
-
-  return next
+  return new Set(
+    shikiLangs.map(lang => getShikiLanguageMatchKey(lang)),
+  )
 }
 
 function normalizeRendererLanguageForRegistered(
@@ -284,21 +279,24 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     [props.themes, props.langs],
   )
 
-  const ensureHighlightRegistered = useCallback(async () => {
+  const ensureHighlightRegistered = useCallback(async (): Promise<boolean> => {
     if (!registerHighlightRef.current)
-      return
+      return true
     if (registeredKeyRef.current === registrationKey)
-      return
+      return true
     const opts = getRegisterHighlightOptions(props.themes, props.langs)
     const effectiveLangs = opts.langs ?? defaultHighlightLanguagesRef.current
 
-    await registerHighlightRef.current(opts)
+    try {
+      await registerHighlightRef.current(opts)
+    }
+    catch {
+      return false
+    }
 
     registeredKeyRef.current = registrationKey
-    registeredHighlightLanguagesRef.current = rememberRegisteredHighlightLanguages(
-      registeredHighlightLanguagesRef.current,
-      effectiveLangs,
-    )
+    registeredHighlightLanguagesRef.current = createRegisteredHighlightLanguages(effectiveLangs)
+    return true
   }, [props.langs, props.themes, registrationKey])
 
   const updateRendererWithFallback = useCallback(async (code: string) => {
@@ -336,7 +334,14 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     }
 
     await ensureStreamMarkdownLoaded()
-    await ensureHighlightRegistered()
+
+    let highlightReady = await ensureHighlightRegistered()
+    if (!highlightReady)
+      highlightReady = await ensureHighlightRegistered()
+    if (!highlightReady) {
+      renderFallback(props.node.code)
+      return
+    }
 
     if (!codeBlockContentRef.current || !rendererTargetRef.current) {
       renderFallback(props.node.code)
@@ -394,8 +399,10 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [registerViewport])
 
   useEffect(() => {
-    void initRenderer()
-  }, [initRenderer])
+    void initRenderer().catch(() => {
+      renderFallback(props.node.code)
+    })
+  }, [initRenderer, props.node.code, renderFallback])
 
   // Dispose renderer on unmount only
   useEffect(() => {
