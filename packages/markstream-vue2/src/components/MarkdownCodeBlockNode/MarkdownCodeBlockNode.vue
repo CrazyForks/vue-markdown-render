@@ -420,7 +420,7 @@ watch(() => props.langs, () => {
       opts.langs = props.langs
     registerHighlight(opts)
   }
-  // Re-render current code block so it picks up the new language set
+  // Re-render current code block so blocks that fell back to plaintext can recover highlighting
   updateRendererWithFallback(props.node.code, codeLanguage.value)
 })
 

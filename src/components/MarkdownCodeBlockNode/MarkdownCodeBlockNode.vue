@@ -417,7 +417,7 @@ watch(() => props.langs, () => {
     registeredHighlightLanguages = undefined
   }
   ensureHighlightRegistered(props.themes, props.langs)
-  // Re-render current code block so it picks up the new language set
+  // Re-render current code block so blocks that fell back to plaintext can recover highlighting
   updateRendererWithFallback(props.node.code, codeLanguage.value)
 })
 
