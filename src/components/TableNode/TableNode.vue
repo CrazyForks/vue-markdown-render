@@ -64,10 +64,15 @@ let resizeState: {
   widths: number[]
 } | null = null
 
-const columnStyles = computed(() =>
-  columnWidths.value.map(width => width > 0 ? { width: `${width}px` } : undefined),
+const columnCount = computed(() => props.node.header.cells.length)
+const hasColumnWidths = computed(() =>
+  columnWidths.value.some(width => Number.isFinite(width) && width > 0),
 )
-const hasColumnWidths = computed(() => columnWidths.value.length > 0)
+const columnStyles = computed(() =>
+  hasColumnWidths.value
+    ? columnWidths.value.map(width => width > 0 ? { width: `${width}px` } : undefined)
+    : [],
+)
 
 provide('markstreamShowTooltips', computed(() => props.showTooltips))
 provide('markstreamFade', computed(() => props.fade))
@@ -181,7 +186,7 @@ function startColumnResize(index: number, event: PointerEvent) {
 }
 
 watch(
-  () => props.node.header.cells.length,
+  columnCount,
   () => {
     stopColumnResize()
     columnWidths.value = []
@@ -317,6 +322,7 @@ onBeforeUnmount(stopColumnResize)
 
 .table-node {
   width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   margin: var(--ms-flow-table-y) 0;

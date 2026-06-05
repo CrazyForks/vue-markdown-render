@@ -233,6 +233,43 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('coalesces table row pipes until a delimiter line appears', async () => {
+    vi.useFakeTimers()
+    const initial = 'hello '.repeat(18).trim()
+    const content = ref(initial)
+    const smooth = ref(true)
+    const { scope, state } = createParsingState(content, smooth, { parseCoalesceMs: 1000 })
+
+    content.value = `${initial}\n| A | B |`
+    expect(state.parsedNodes.value[0]?.raw).toBe(initial)
+
+    content.value = `${content.value}\n| - | - |`
+    expect(state.parsedNodes.value[0]?.type).toBe('paragraph')
+    expect(state.parsedNodes.value[1]?.type).toBe('table')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(state.parsedNodes.value[1]?.type).toBe('table')
+
+    scope.stop()
+  })
+
+  it('coalesces a table header row with trailing newline until a delimiter line appears', async () => {
+    vi.useFakeTimers()
+    const initial = 'hello '.repeat(18).trim()
+    const content = ref(initial)
+    const smooth = ref(true)
+    const { scope, state } = createParsingState(content, smooth, { parseCoalesceMs: 1000 })
+
+    content.value = `${initial}\n| A | B |\n`
+    expect(state.parsedNodes.value[0]?.raw).toBe(initial)
+
+    content.value = `${content.value}| - | - |`
+    expect(state.parsedNodes.value[0]?.type).toBe('paragraph')
+    expect(state.parsedNodes.value[1]?.type).toBe('table')
+
+    scope.stop()
+  })
+
   it('reuses unchanged ParsedNode references after append parses', () => {
     const content = ref('alpha\n\nbeta')
     const { scope, state } = createParsingState(content)

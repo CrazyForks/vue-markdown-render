@@ -247,6 +247,7 @@ describe('simple inline fast path', () => {
     await flushAll()
 
     const table = wrapper.get('table.table-node')
+    expect(table.find('colgroup').exists()).toBe(false)
     expect(table.find('.markdown-renderer').exists()).toBe(false)
     expect(table.get('a[href="https://vuejs.org"]').attributes('title')).toBe('https://vuejs.org')
     expect(table.get('strong.strong-node').text()).toBe('bold')

@@ -1131,25 +1131,27 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if (silent)
       return true
 
-    if (
-      lineText.includes(closeDelim)
-      && lineText.indexOf(closeDelim) > openDelim.length
-    ) {
-      const startDelimIndex = lineText.indexOf(openDelim)
-      const endDelimIndex = lineText.indexOf(
-        closeDelim,
-        startDelimIndex + openDelim.length,
-      )
+    const startDelimIndex = lineText.indexOf(openDelim)
+    const closeSearchStart = startDelimIndex + openDelim.length
+    const escapedPlainBracketCloseIndex = !strict && openDelim === '['
+      ? lineText.indexOf('\\]', closeSearchStart)
+      : -1
+    const sameLineCloseDelim = escapedPlainBracketCloseIndex >= 0 ? '\\]' : closeDelim
+    const sameLineCloseIndex = escapedPlainBracketCloseIndex >= 0
+      ? escapedPlainBracketCloseIndex
+      : lineText.indexOf(closeDelim, closeSearchStart)
+
+    if (sameLineCloseIndex > openDelim.length) {
       const content = lineText.slice(
         startDelimIndex + openDelim.length,
-        endDelimIndex,
+        sameLineCloseIndex,
       )
       const token = s.push('math_block', 'math', 0)
       token.content = normalizeStandaloneBackslashT(content)
       token.markup
         = openDelim === '$$' ? '$$' : openDelim === '[' ? '[]' : '\\[\\]'
       token.map = [startLine, startLine + 1]
-      token.raw = `${openDelim}${content}${closeDelim}`
+      token.raw = `${openDelim}${content}${sameLineCloseDelim}`
       token.block = true
       token.loading = false
       s.line = startLine + 1
@@ -1178,13 +1180,26 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const lineStart = s.bMarks[nextLine] + s.tShift[nextLine]
         const lineEnd = s.eMarks[nextLine]
         const currentLine = s.src.slice(lineStart, lineEnd)
+        const currentLineTrimmed = currentLine.trim()
+        if (!strict && openDelim === '[' && currentLineTrimmed === '\\]') {
+          closeDelim = '\\]'
+          found = true
+          break
+        }
         if (fallbackPlainBracketClose && currentLine.trim() === fallbackPlainBracketClose) {
           closeDelim = fallbackPlainBracketClose
           found = true
           break
         }
-        if (currentLine.trim() === closeDelim) {
+        if (currentLineTrimmed === closeDelim) {
           found = true
+          break
+        }
+        else if (!strict && openDelim === '[' && currentLine.includes('\\]')) {
+          found = true
+          const endIndex = currentLine.indexOf('\\]')
+          closeDelim = '\\]'
+          content += (content ? '\n' : '') + currentLine.slice(0, endIndex)
           break
         }
         else if (currentLine.includes(closeDelim)) {

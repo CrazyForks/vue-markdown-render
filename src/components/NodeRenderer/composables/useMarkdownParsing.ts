@@ -199,9 +199,58 @@ function shouldFlushParseImmediately(previous: string, next: string) {
   if (!appended)
     return false
 
+  if (endsWithTableDelimiterLine(next))
+    return true
+
+  if (appended.includes('\n\n')
+    || /(?:^|\n)(?:#{1,6}\s|[-+*]\s+|\d+[.)]\s+|>\s*|`{3,}|~{3,})/.test(appended)
+  ) {
+    return true
+  }
+
   return appended.endsWith('\n')
-    || appended.includes('\n\n')
-    || /(?:^|\n)(?:#{1,6}\s|[-+*]\s+|\d+[.)]\s+|>\s*|`{3,}|~{3,}|\|)/.test(appended)
+    && !endsWithPendingTableRow(next)
+}
+
+function endsWithTableDelimiterLine(value: string) {
+  return isTableDelimiterLine(getTrailingContentLine(value))
+}
+
+function endsWithPendingTableRow(value: string) {
+  const line = getTrailingContentLine(value)
+  if (isTableDelimiterLine(line))
+    return false
+
+  const cells = getTableLineCells(line)
+  return cells.length >= 2 && cells.some(cell => cell.trim())
+}
+
+function getTrailingContentLine(value: string) {
+  let end = value.length
+  while (end > 0 && value.charCodeAt(end - 1) === 10)
+    end -= 1
+
+  const lineStart = value.lastIndexOf('\n', end - 1) + 1
+  return value.slice(lineStart, end).trim()
+}
+
+function isTableDelimiterLine(line: string) {
+  const cells = getTableLineCells(line)
+  return cells.length >= 2 && cells.every((cell) => {
+    const marker = cell.trim()
+    return marker.length >= 1
+      && marker.replace(/^:/, '').replace(/:$/, '').split('').every(char => char === '-')
+  })
+}
+
+function getTableLineCells(line: string) {
+  if (!line.includes('|'))
+    return []
+
+  return line
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
 }
 
 function resolveParseCoalesceMs(props: Readonly<NodeRendererProps>) {

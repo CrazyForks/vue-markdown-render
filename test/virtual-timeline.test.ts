@@ -233,7 +233,7 @@ describe('virtual timeline API', () => {
     expect(wrapper.text()).toContain('# Result')
 
     const markdownSlot = slotProps.find(props => props.kind === 'assistant-markdown')
-    expect(markdownSlot.markdownProps.nodeVirtual).toBe('auto')
+    expect(markdownSlot.markdownProps.nodeVirtual).toBe(false)
     expect(markdownSlot.markdownProps.mode).toBe('docs')
     expect(markdownSlot.markdownProps.codeRenderer).toBe('monaco')
     expect(markdownSlot.markdownProps.virtualScroll.enabled).toBe(true)
@@ -836,7 +836,7 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
-  it('connects markdown logical height and non-markdown measurements to an outer adapter', () => {
+  it('connects markdown logical height and non-markdown measurements to an outer adapter', async () => {
     const items = [
       { kind: 'user-message', id: 'u1', text: 'hello' },
       { kind: 'assistant-markdown', id: 'a1', content: '# Hello', final: true },
@@ -877,6 +877,7 @@ describe('virtual timeline API', () => {
 
     const markdownProps = controller.markdownProps(items[1], 1)
     markdownProps.onHeightChange(createMetrics(640, markdownProps.virtualScroll!.sessionKey!))
+    await flushAnimationFrame()
     expect(sizes.get('a1')).toBe(640)
 
     const state: MarkstreamVirtualState = {
@@ -1059,7 +1060,7 @@ describe('virtual timeline API', () => {
     scope.stop()
   })
 
-  it('adds wrapper chrome to markdown logical height when logical height is larger than mounted DOM', () => {
+  it('adds wrapper chrome to markdown logical height when logical height is larger than mounted DOM', async () => {
     const items = [
       { kind: 'assistant-markdown', id: 'a1', content: '# Hello', final: true },
     ]
@@ -1121,6 +1122,7 @@ describe('virtual timeline API', () => {
       createMetrics(1000, markdownProps.virtualScroll!.sessionKey!),
     )
 
+    await flushAnimationFrame()
     expect(sizes.get('a1')).toBe(1060)
 
     scope.stop()
@@ -1178,7 +1180,7 @@ describe('virtual timeline API', () => {
     scope.stop()
   })
 
-  it('keeps markdown item height as max(wrapper height, markdown logical height)', () => {
+  it('keeps markdown item height as max(wrapper height, markdown logical height)', async () => {
     const items = [
       { kind: 'assistant-markdown', id: 'a1', content: '# Hello', final: true },
     ]
@@ -1226,6 +1228,7 @@ describe('virtual timeline API', () => {
       createMetrics(640, markdownProps.virtualScroll!.sessionKey!),
     )
 
+    await flushAnimationFrame()
     expect(sizes.get('a1')).toBe(640)
 
     wrapperHeight = 720
@@ -1234,6 +1237,7 @@ describe('virtual timeline API', () => {
       createMetrics(640, markdownProps.virtualScroll!.sessionKey!),
     )
 
+    await flushAnimationFrame()
     expect(sizes.get('a1')).toBe(720)
 
     scope.stop()
@@ -1324,6 +1328,177 @@ describe('virtual timeline API', () => {
     await nextTick()
 
     expect((wrapper.vm as any).getItemSize('a1')).toBe(1060)
+
+    wrapper.unmount()
+  })
+
+  it('allows restored markdown item height to grow when markdown metrics exceed the saved floor', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      if (el.classList.contains('markstream-virtual-timeline__item'))
+        return Number.parseFloat(el.style.minHeight || '') || 48
+      if (el.dataset.kind === 'assistant-markdown')
+        return 1400
+      return 48
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      if (el.dataset.kind === 'assistant-markdown')
+        return 1400
+      return 48
+    })
+    installVirtualTimelineGeometryStub()
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '# A', final: true, revision: 1 },
+      { kind: 'user-message', id: 'u1', text: 'anchor' },
+    ]
+    const slotProps: any[] = []
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+        overscan: 10,
+        stickToBottom: false,
+      },
+      slots: {
+        default(props: any) {
+          slotProps.push(props)
+          return h('div', {
+            'ref': props.measureRef,
+            'data-kind': props.kind,
+          }, props.markdownProps?.content ?? props.item.text ?? '')
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    ;(wrapper.vm as any).restoreThreadState({
+      threadKey: 'thread-a',
+      measurementKey: ':800',
+      widthBucket: 800,
+      outerAnchor: {
+        type: 'item',
+        itemKey: 'a1',
+        offsetWithinItemPx: 40,
+      },
+      itemHeights: {
+        a1: 1060,
+        u1: 80,
+      },
+      itemSizeSources: {
+        a1: timelineMarkdownItemSource('thread-a', 'a1', 1),
+        u1: timelineItemSource('thread-a', 'u1'),
+      },
+      markdownStates: {
+        a1: {
+          sessionKey: 'thread-a:a1:1',
+          threadKey: 'thread-a',
+          metrics: createMetrics(1000, 'thread-a:a1:1'),
+          width: 800,
+          measurementKey: timelineMarkdownMeasurementKey(),
+        } as MarkstreamVirtualState,
+      },
+    })
+    await nextTick()
+
+    expect((wrapper.vm as any).getItemSize('a1')).toBe(1060)
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    await waitForTimelineRestoreSettled(root)
+
+    const markdownProps = slotProps.find(props => props.kind === 'assistant-markdown').markdownProps
+    markdownProps.onHeightChange(createMetrics(1400, 'thread-a:a1:1'))
+
+    await flushAnimationFrame()
+    await nextTick()
+
+    expect((wrapper.vm as any).getItemSize('a1')).toBe(1400)
+
+    wrapper.unmount()
+  })
+
+  it('shrinks an empty restored markdown item to its measured height', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      if (el.classList.contains('markstream-virtual-timeline__item'))
+        return Number.parseFloat(el.style.minHeight || '') || 48
+      if (el.dataset.kind === 'assistant-markdown')
+        return 46
+      return 48
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      if (el.dataset.kind === 'assistant-markdown')
+        return 46
+      return 48
+    })
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '', final: true, revision: 1 },
+    ]
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+        overscan: 10,
+        stickToBottom: false,
+      },
+      slots: {
+        default(props: any) {
+          return h('div', {
+            'ref': props.measureRef,
+            'data-kind': props.kind,
+          }, props.markdownProps?.content ?? '')
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    ;(wrapper.vm as any).restoreThreadState({
+      threadKey: 'thread-a',
+      measurementKey: ':800',
+      widthBucket: 800,
+      outerAnchor: {
+        type: 'item',
+        itemKey: 'a1',
+        offsetWithinItemPx: 0,
+      },
+      itemHeights: {
+        a1: 548,
+      },
+      itemSizeSources: {
+        a1: timelineMarkdownItemSource('thread-a', 'a1', 1),
+      },
+      markdownStates: {},
+    })
+    await nextTick()
+
+    expect((wrapper.vm as any).getItemSize('a1')).toBe(46)
 
     wrapper.unmount()
   })
@@ -1586,7 +1761,7 @@ describe('virtual timeline API', () => {
       confidence: 'measured',
     })
 
-    await nextTick()
+    await flushAnimationFrame()
     expect((wrapper.vm as any).getItemSize('m1')).toBe(1000)
 
     markdown.markdownProps.onHeightChange({
@@ -1650,6 +1825,7 @@ describe('virtual timeline API', () => {
       confidence: 'measured',
     })
 
+    await flushAnimationFrame()
     expect(sizes.get('m1')).toBe(1000)
 
     markdownProps.onHeightChange({
@@ -1738,6 +1914,71 @@ describe('virtual timeline API', () => {
     controller.measureItem(items[0], 0, el)
 
     expect(sizes.get('a1')).toBe(1060)
+
+    scope.stop()
+  })
+
+  it('adapter shrinks an empty restored markdown item to its measured height', () => {
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '', final: true, revision: 1 },
+    ]
+
+    const sizes = new Map<string, number>()
+    const root = document.createElement('div')
+
+    const adapterHost = {
+      getScrollElement: () => root,
+      getScrollTop: () => 0,
+      setScrollTop: vi.fn(),
+      getViewportHeight: () => 300,
+      getTotalHeight: () => sizes.get('a1') ?? 0,
+      getItemOffset: () => 0,
+      getItemSize: (key: string) => sizes.get(key) ?? 0,
+      setItemSize: (key: string, size: number) => {
+        sizes.set(key, size)
+      },
+      getVisibleRange: () => ({ start: 0, end: 1 }),
+      scrollToOffset: vi.fn(),
+      scrollToIndex: vi.fn(),
+    }
+
+    const scope = effectScope()
+    const controller = scope.run(() => useMarkstreamVirtualAdapter({
+      items,
+      threadKey: 'thread-a',
+      getRevision: item => item.revision,
+      virtualizer: adapterHost,
+    }))!
+
+    controller.restoreThreadState({
+      threadKey: 'thread-a',
+      outerAnchor: {
+        type: 'item',
+        itemKey: 'a1',
+        offsetWithinItemPx: 0,
+      },
+      itemHeights: {
+        a1: 548,
+      },
+      itemSizeSources: {
+        a1: adapterMarkdownItemSource('thread-a', 'a1', 1),
+      },
+      markdownStates: {},
+    })
+
+    const el = document.createElement('article')
+    Object.defineProperty(el, 'offsetHeight', {
+      configurable: true,
+      value: 46,
+    })
+    Object.defineProperty(el, 'scrollHeight', {
+      configurable: true,
+      value: 46,
+    })
+
+    controller.measureItem(items[0], 0, el)
+
+    expect(sizes.get('a1')).toBe(46)
 
     scope.stop()
   })
@@ -3597,6 +3838,147 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('preserves the first outer anchor when two timeline items change height in one frame', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const slotProps: any[] = []
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '# First', final: true },
+      { kind: 'assistant-markdown', id: 'a2', content: '# Second', final: true },
+      { kind: 'user-message', id: 'u1', text: 'Anchor item' },
+      { kind: 'assistant-markdown', id: 'a3', content: '# Third', final: true },
+    ]
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+        overscan: 10,
+        stickToBottom: false,
+      },
+      slots: {
+        default(props: any) {
+          slotProps.push(props)
+
+          return h('div', {
+            'ref': props.measureRef,
+            'data-kind': props.kind,
+          }, props.markdownProps?.content ?? props.item.text ?? '')
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+
+    ;(wrapper.vm as any).scrollToOffset(740)
+    await nextTick()
+
+    const before = (wrapper.vm as any).captureThreadState().outerAnchor
+    expect(before).toEqual({
+      type: 'item',
+      itemKey: 'u1',
+      offsetWithinItemPx: 20,
+    })
+
+    const firstMarkdown = slotProps.find(props => props.itemKey === 'a1')
+    const secondMarkdown = slotProps.find(props => props.itemKey === 'a2')
+
+    firstMarkdown.markdownProps.onHeightChange(
+      createMetrics(420, firstMarkdown.markdownProps.virtualScroll.sessionKey),
+    )
+    secondMarkdown.markdownProps.onHeightChange(
+      createMetrics(420, secondMarkdown.markdownProps.virtualScroll.sessionKey),
+    )
+
+    await nextTick()
+    await flushAnimationFrame()
+
+    expect(root.scrollTop).toBe(860)
+    expect((wrapper.vm as any).captureThreadState().outerAnchor).toEqual(before)
+
+    wrapper.unmount()
+  })
+
+  it('flushes pending timeline scroll reconcile before capturing thread state', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const slotProps: any[] = []
+    const items = [
+      { kind: 'user-message', id: 'u0', text: 'Above item' },
+      { kind: 'user-message', id: 'u1', text: 'Anchor item' },
+      { kind: 'assistant-markdown', id: 'a1', content: '# Tail', final: true },
+    ]
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+        overscan: 10,
+        stickToBottom: false,
+      },
+      slots: {
+        default(props: any) {
+          slotProps.push(props)
+
+          return h('div', {
+            'ref': props.measureRef,
+            'data-kind': props.kind,
+          }, props.markdownProps?.content ?? props.item.text ?? '')
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+
+    ;(wrapper.vm as any).scrollToOffset(100)
+    await nextTick()
+
+    const before = (wrapper.vm as any).captureThreadState().outerAnchor
+    expect(before).toEqual({
+      type: 'item',
+      itemKey: 'u1',
+      offsetWithinItemPx: 12,
+    })
+
+    const above = slotProps.find(props => props.itemKey === 'u0')
+    const measured = document.createElement('div')
+    Object.defineProperty(measured, 'offsetHeight', {
+      configurable: true,
+      value: 120,
+    })
+
+    above.measureRef(measured)
+
+    const captured = (wrapper.vm as any).captureThreadState()
+
+    expect(root.scrollTop).toBe(132)
+    expect(captured.outerAnchor).toEqual(before)
+
+    wrapper.unmount()
+  })
+
   it('adapter preserves the outer anchor when a markdown item above the viewport changes height', async () => {
     const items = [
       { kind: 'assistant-markdown', id: 'a1', content: '# First', final: true },
@@ -3673,6 +4055,169 @@ describe('virtual timeline API', () => {
       expect(after.itemKey).toBe(before.itemKey)
       expect(Math.abs(after.offsetWithinItemPx - before.offsetWithinItemPx)).toBeLessThanOrEqual(2)
     }
+
+    scope.stop()
+  })
+
+  it('adapter preserves the first outer anchor when two items change height in one frame', async () => {
+    const items = [
+      { kind: 'assistant-markdown', id: 'a1', content: '# First', final: true },
+      { kind: 'assistant-markdown', id: 'a2', content: '# Second', final: true },
+      { kind: 'user-message', id: 'u1', text: 'Anchor item' },
+      { kind: 'assistant-markdown', id: 'a3', content: '# Third', final: true },
+    ]
+
+    const sizes = new Map<string, number>([
+      ['a1', 360],
+      ['a2', 360],
+      ['u1', 88],
+      ['a3', 360],
+    ])
+
+    let scrollTop = 740
+
+    function offsetOf(key: string) {
+      let offset = 0
+
+      for (const item of items) {
+        if (item.id === key)
+          return offset
+
+        offset += sizes.get(item.id) ?? 0
+      }
+
+      return 0
+    }
+
+    const root = document.createElement('div')
+    const adapter = {
+      getScrollElement: () => root,
+      getScrollTop: () => scrollTop,
+      setScrollTop: (value: number) => {
+        scrollTop = value
+      },
+      getViewportHeight: () => 300,
+      getTotalHeight: () => Array.from(sizes.values()).reduce((a, b) => a + b, 0),
+      getItemOffset: (key: string) => offsetOf(key),
+      getItemSize: (key: string) => sizes.get(key) ?? 0,
+      setItemSize: (key: string, size: number) => {
+        sizes.set(key, size)
+      },
+      getVisibleRange: () => ({ start: 0, end: 4 }),
+      scrollToOffset: (offset: number) => {
+        scrollTop = offset
+      },
+      scrollToIndex: vi.fn(),
+    }
+
+    const scope = effectScope()
+    const controller = scope.run(() => useMarkstreamVirtualAdapter({
+      items,
+      threadKey: 'thread-a',
+      virtualizer: adapter,
+    }))!
+
+    const before = controller.captureThreadState().outerAnchor
+    expect(before).toEqual({
+      type: 'item',
+      itemKey: 'u1',
+      offsetWithinItemPx: 20,
+    })
+
+    const firstMarkdown = controller.markdownProps(items[0], 0)
+    const secondMarkdown = controller.markdownProps(items[1], 1)
+
+    firstMarkdown.onHeightChange(
+      createMetrics(420, firstMarkdown.virtualScroll!.sessionKey!),
+    )
+    secondMarkdown.onHeightChange(
+      createMetrics(420, secondMarkdown.virtualScroll!.sessionKey!),
+    )
+
+    await nextTick()
+    await flushAnimationFrame()
+
+    expect(scrollTop).toBe(860)
+    expect(controller.captureThreadState().outerAnchor).toEqual(before)
+
+    scope.stop()
+  })
+
+  it('adapter flushes pending outer anchor restore before capturing thread state', () => {
+    const items = [
+      { kind: 'user-message', id: 'u0', text: 'Above item' },
+      { kind: 'user-message', id: 'u1', text: 'Anchor item' },
+      { kind: 'assistant-markdown', id: 'a1', content: '# Tail', final: true },
+    ]
+
+    const sizes = new Map<string, number>([
+      ['u0', 88],
+      ['u1', 88],
+      ['a1', 360],
+    ])
+
+    let scrollTop = 100
+
+    function offsetOf(key: string) {
+      let offset = 0
+
+      for (const item of items) {
+        if (item.id === key)
+          return offset
+
+        offset += sizes.get(item.id) ?? 0
+      }
+
+      return 0
+    }
+
+    const root = document.createElement('div')
+    const adapter = {
+      getScrollElement: () => root,
+      getScrollTop: () => scrollTop,
+      setScrollTop: (value: number) => {
+        scrollTop = value
+      },
+      getViewportHeight: () => 300,
+      getTotalHeight: () => Array.from(sizes.values()).reduce((a, b) => a + b, 0),
+      getItemOffset: (key: string) => offsetOf(key),
+      getItemSize: (key: string) => sizes.get(key) ?? 0,
+      setItemSize: (key: string, size: number) => {
+        sizes.set(key, size)
+      },
+      getVisibleRange: () => ({ start: 0, end: 3 }),
+      scrollToOffset: (offset: number) => {
+        scrollTop = offset
+      },
+      scrollToIndex: vi.fn(),
+    }
+
+    const scope = effectScope()
+    const controller = scope.run(() => useMarkstreamVirtualAdapter({
+      items,
+      threadKey: 'thread-a',
+      virtualizer: adapter,
+    }))!
+
+    const before = controller.captureThreadState().outerAnchor
+    expect(before).toEqual({
+      type: 'item',
+      itemKey: 'u1',
+      offsetWithinItemPx: 12,
+    })
+
+    const measured = document.createElement('div')
+    Object.defineProperty(measured, 'offsetHeight', {
+      configurable: true,
+      value: 120,
+    })
+
+    controller.measureItem(items[0], 0, measured)
+
+    const captured = controller.captureThreadState()
+
+    expect(scrollTop).toBe(132)
+    expect(captured.outerAnchor).toEqual(before)
 
     scope.stop()
   })
@@ -3896,6 +4441,78 @@ describe('virtual timeline API', () => {
     expect(controller.markdownProps(items[0], 0).fade).toBe(false)
 
     scope.stop()
+  })
+
+  it('corrects one-pixel scroll drift while restoring a thread anchor', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const items = [
+      { kind: 'user-message', id: 'u1', text: 'before' },
+      { kind: 'assistant-markdown', id: 'm1', content: '# long\n\ncontent', final: true, revision: 1 },
+    ]
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+        overscan: 10,
+        stickToBottom: false,
+        estimateItemHeight(item: any) {
+          return item.id === 'u1' ? 80 : 640
+        },
+      },
+      slots: {
+        default(props: any) {
+          return h('div', {
+            ref: props.measureRef,
+          }, props.markdownProps?.content ?? props.item.text ?? '')
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    ;(wrapper.vm as any).restoreThreadState({
+      threadKey: 'thread-a',
+      measurementKey: ':800',
+      widthBucket: 800,
+      outerAnchor: {
+        type: 'item',
+        itemKey: 'm1',
+        offsetWithinItemPx: 240,
+      },
+      itemHeights: {
+        u1: 80,
+        m1: 640,
+      },
+      itemSizeSources: {
+        u1: timelineItemSource('thread-a', 'u1'),
+        m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
+      },
+      markdownStates: {},
+    })
+    await nextTick()
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    const expectedScrollTop = 80 + 240
+
+    expect(root.scrollTop).toBe(expectedScrollTop)
+
+    root.scrollTop = expectedScrollTop - 1
+    root.dispatchEvent(new Event('scroll'))
+
+    expect(root.scrollTop).toBe(expectedScrollTop)
+
+    wrapper.unmount()
   })
 
   it('restores per-thread scroll positions without auto-bottom overriding item anchors', async () => {

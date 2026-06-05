@@ -13,6 +13,9 @@ import {
   readElementOuterHeight,
 } from '../utils/virtualItemMeasurement'
 
+const TIMELINE_MARKDOWN_EMIT_INTERVAL_MS = 96
+const TIMELINE_MARKDOWN_HEIGHT_DIFF_THRESHOLD_PX = 4
+
 function shouldAllowMarkdownShrink(metrics: MarkstreamVirtualMetrics) {
   if (metrics.phase === 'final')
     return true
@@ -189,6 +192,8 @@ export interface UseMarkstreamVirtualAdapterOptions<T = MarkstreamTimelineItem> 
    */
   bottomThresholdPx?: number
 
+  debug?: boolean
+
   virtualizer: MarkstreamOuterVirtualizerAdapter
 }
 
@@ -197,6 +202,7 @@ export interface MarkstreamVirtualAdapterController<T = MarkstreamTimelineItem> 
   markdownStates: Map<string, MarkstreamVirtualState>
   getItemKey: (item: T, index: number) => string
   isMarkdownItem: (item: T, index: number) => boolean
+  isRestoringThread: () => boolean
   measureItem: (item: T, index: number, el: Element | { $el?: Element | null } | null | undefined) => void
   markdownProps: (item: T, index: number) => MarkstreamVirtualMarkdownProps
   captureThreadState: () => MarkstreamThreadVirtualState
@@ -303,6 +309,11 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     measurementKey?: string
   }
 
+  interface PendingMarkdownReconcile {
+    allowMarkdownShrink: boolean
+    logicalHeight: number
+  }
+
   const itemHeights = reactive(new Map<string, number>()) as Map<string, number>
   const itemSizeSources = new Map<string, MarkstreamItemSizeSource>()
   const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
@@ -318,6 +329,64 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   let restoreThreadTimers: number[] = []
   let activeRestoreSeq = 0
   let activeRestoreAnchor: MarkstreamThreadAnchor | undefined
+  const layoutReadCounts = new Map<string, number>()
+  const pendingMarkdownReconciles = new Map<string, PendingMarkdownReconcile>()
+  let markdownReconcileScheduled = false
+  let markdownReconcileRaf: number | null = null
+  let outerAnchorRestoreScheduled = false
+  let outerAnchorRestoreRaf: number | null = null
+  let pendingOuterAnchor: MarkstreamThreadAnchor | undefined
+
+  function recordLayoutRead(label: string) {
+    if (options.debug !== true)
+      return
+
+    layoutReadCounts.set(label, (layoutReadCounts.get(label) ?? 0) + 1)
+  }
+
+  function takeLayoutReadStats() {
+    if (options.debug !== true || layoutReadCounts.size === 0)
+      return null
+
+    let total = 0
+    for (const count of layoutReadCounts.values())
+      total += count
+
+    const snapshot = {
+      total,
+      byLabel: Object.fromEntries(
+        Array.from(layoutReadCounts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+      ),
+    }
+
+    layoutReadCounts.clear()
+    return snapshot
+  }
+
+  function logLayoutReads(label: string, itemKey: string) {
+    const layoutReads = takeLayoutReadStats()
+    if (!layoutReads)
+      return
+
+    console.info('[markstream-vue][virtual-adapter][perf] layout-reads', {
+      label,
+      itemKey,
+      layoutReads,
+    })
+  }
+
+  function requestFrameOrNextTick(callback: () => void) {
+    if (typeof requestAnimationFrame === 'function')
+      return requestAnimationFrame(callback)
+
+    void nextTick(callback)
+    return null
+  }
+
+  function cancelAdapterRaf(id: number | null) {
+    if (id != null && typeof cancelAnimationFrame === 'function')
+      cancelAnimationFrame(id)
+  }
 
   function getItems() {
     return [...toValue(options.items)]
@@ -559,15 +628,32 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     if (!anchor)
       return
 
-    void nextTick(() => {
-      restoreOuterAnchor(anchor)
+    if (outerAnchorRestoreScheduled)
+      return
 
-      if (typeof requestAnimationFrame === 'function') {
-        requestAnimationFrame(() => {
-          restoreOuterAnchor(anchor)
-        })
-      }
-    })
+    pendingOuterAnchor = anchor
+    outerAnchorRestoreScheduled = true
+    outerAnchorRestoreRaf = requestFrameOrNextTick(flushOuterAnchorRestore)
+  }
+
+  function flushOuterAnchorRestore() {
+    if (!outerAnchorRestoreScheduled)
+      return
+
+    outerAnchorRestoreScheduled = false
+    outerAnchorRestoreRaf = null
+    const pendingAnchor = pendingOuterAnchor
+    pendingOuterAnchor = undefined
+
+    if (pendingAnchor)
+      restoreOuterAnchor(pendingAnchor)
+  }
+
+  function clearOuterAnchorRestoreSchedule() {
+    cancelAdapterRaf(outerAnchorRestoreRaf)
+    outerAnchorRestoreScheduled = false
+    outerAnchorRestoreRaf = null
+    pendingOuterAnchor = undefined
   }
 
   function clearRestoreThreadSchedule() {
@@ -656,11 +742,53 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   }
 
   function getMeasuredItemHeight(key: string) {
-    return readElementOuterHeight(measuredElements.get(key))
+    return readElementOuterHeight(measuredElements.get(key), recordLayoutRead)
   }
 
-  function getMeasuredMarkdownChromeHeight(key: string) {
-    return getMarkdownItemChromeHeight(measuredElements.get(key))
+  function getMeasuredMarkdownChromeHeight(key: string, outerHeight?: number) {
+    return getMarkdownItemChromeHeight(measuredElements.get(key), recordLayoutRead, outerHeight)
+  }
+
+  function flushMarkdownReconciles() {
+    if (!markdownReconcileScheduled)
+      return
+
+    markdownReconcileScheduled = false
+    markdownReconcileRaf = null
+    const entries = Array.from(pendingMarkdownReconciles.entries())
+    pendingMarkdownReconciles.clear()
+
+    for (const [key, pending] of entries) {
+      if (getKnownMarkdownLogicalHeight(key) !== pending.logicalHeight)
+        continue
+
+      reconcileItemSize(key, {
+        allowMarkdownShrink: pending.allowMarkdownShrink,
+      })
+    }
+
+    flushOuterAnchorRestore()
+  }
+
+  function flushPendingLayoutReconciles() {
+    flushMarkdownReconciles()
+    flushOuterAnchorRestore()
+  }
+
+  function scheduleMarkdownReconcile(key: string, pending: PendingMarkdownReconcile) {
+    pendingMarkdownReconciles.set(key, pending)
+    if (markdownReconcileScheduled)
+      return
+
+    markdownReconcileScheduled = true
+    markdownReconcileRaf = requestFrameOrNextTick(flushMarkdownReconciles)
+  }
+
+  function clearPendingMarkdownReconciles() {
+    cancelAdapterRaf(markdownReconcileRaf)
+    markdownReconcileScheduled = false
+    markdownReconcileRaf = null
+    pendingMarkdownReconciles.clear()
   }
 
   function reconcileItemSize(
@@ -669,16 +797,24 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   ) {
     const measured = getMeasuredItemHeight(key)
     const cached = getCompatibleItemSize(key)
+    let didLogLayoutReads = false
+    const logItemLayoutReads = () => {
+      if (didLogLayoutReads)
+        return
+      didLogLayoutReads = true
+      logLayoutReads('reconcileItemSize', key)
+    }
 
     if (!isCurrentMarkdownKey(key)) {
       if (measured > 0)
         setItemSize(key, measured)
 
+      logItemLayoutReads()
       return
     }
 
     const markdown = getKnownMarkdownLogicalHeight(key)
-    const chrome = getMeasuredMarkdownChromeHeight(key)
+    const chrome = getMeasuredMarkdownChromeHeight(key, measured)
 
     if (markdown > 0) {
       let next = Math.max(measured, markdown + chrome)
@@ -689,6 +825,16 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       if (next > 0)
         setItemSize(key, next)
 
+      logItemLayoutReads()
+      return
+    }
+
+    const match = findCurrentItemByKey(key)
+    if (match && !getMarkstreamTimelineItemContent(match.item, match.index, options).trim()) {
+      if (measured > 0)
+        setItemSize(key, measured)
+
+      logItemLayoutReads()
       return
     }
 
@@ -696,11 +842,14 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       if (measured > cached + 1)
         setItemSize(key, measured)
 
+      logItemLayoutReads()
       return
     }
 
     if (measured > 0)
       setItemSize(key, measured)
+
+    logItemLayoutReads()
   }
 
   function measureItem(item: T, index: number, el: Element | { $el?: Element | null } | null | undefined) {
@@ -773,8 +922,8 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       measurementKey,
       settleMode: 'manual',
       settledToken: final,
-      emitIntervalMs: 32,
-      heightDiffThresholdPx: 1,
+      emitIntervalMs: TIMELINE_MARKDOWN_EMIT_INTERVAL_MS,
+      heightDiffThresholdPx: TIMELINE_MARKDOWN_HEIGHT_DIFF_THRESHOLD_PX,
     }
 
     const props: MarkstreamVirtualMarkdownProps = {
@@ -782,7 +931,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       final,
       mode: markdownMode,
       codeRenderer: markdownCodeRenderer,
-      nodeVirtual: 'auto',
+      nodeVirtual: false,
       fade: options.markdownFade === true,
       indexKey: sessionKey,
       virtualScroll,
@@ -799,17 +948,9 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
         const allowMarkdownShrink = shouldAllowMarkdownShrink(metrics)
         const logicalHeight = Math.ceil(metrics.totalHeight)
 
-        reconcileItemSize(itemKey, {
+        scheduleMarkdownReconcile(itemKey, {
           allowMarkdownShrink,
-        })
-
-        void nextTick(() => {
-          if (getKnownMarkdownLogicalHeight(itemKey) !== logicalHeight)
-            return
-
-          reconcileItemSize(itemKey, {
-            allowMarkdownShrink,
-          })
+          logicalHeight,
         })
       },
       onVirtualStateChange(state) {
@@ -901,6 +1042,8 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
   }
 
   function captureThreadState(): MarkstreamThreadVirtualState {
+    flushPendingLayoutReconciles()
+
     const measurementKey = normalizeBaseMeasurementKey()
     return {
       threadKey: normalizeThreadKey(),
@@ -1023,8 +1166,9 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     if (seq !== restoreThreadSeq)
       return
 
-    applyRestorePass(seq, activeRestoreAnchor)
     restoringThread.value = false
+    flushPendingLayoutReconciles()
+    applyRestorePass(seq, activeRestoreAnchor)
     activeRestoreAnchor = undefined
     activeRestoreSeq = 0
   }
@@ -1080,6 +1224,8 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
 
   function dispose() {
     clearRestoreThreadSchedule()
+    clearOuterAnchorRestoreSchedule()
+    clearPendingMarkdownReconciles()
 
     for (const observer of resizeObservers.values())
       observer.disconnect()
@@ -1099,6 +1245,7 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
     markdownStates,
     getItemKey,
     isMarkdownItem,
+    isRestoringThread: () => restoringThread.value,
     measureItem,
     markdownProps,
     captureThreadState,

@@ -272,6 +272,48 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('does not count height-estimation probe scrollHeight as empty virtual content height', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(0)
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function () {
+      const el = this as HTMLElement
+      return el.classList.contains('markdown-renderer') || el.classList.contains('height-estimation-probes')
+        ? 548
+        : 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      const el = this as HTMLElement
+      const height = el.classList.contains('height-estimation-probes') ? 548 : 0
+      return makeDomRect(0, height, 800)
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'empty-probe-scroll-height',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    const metrics = (wrapper.vm as any).getVirtualMetrics()
+    expect(metrics.nodeCount).toBe(0)
+    expect(metrics.totalHeight).toBe(0)
+
+    wrapper.unmount()
+  })
+
   it('exposes logical height metrics and settled events for outer virtualizers', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
