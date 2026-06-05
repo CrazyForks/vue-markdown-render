@@ -270,6 +270,8 @@ let createShikiRenderer:
 
 let registerHighlight
 let registeredHighlightLanguages: Set<string> | undefined
+let registeredHighlightThemesKey: string | null = null
+let registeredHighlightLangsKey: string | null = null
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
@@ -317,6 +319,24 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null)
     return false
   }
 }
+
+function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
+  if (!registerHighlight)
+    return
+  const themesKey = Array.isArray(themes) && themes.length > 0 ? [...themes].sort().join('\u0000') : ''
+  const langsKey = Array.isArray(langs) && langs.length > 0 ? langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean).sort().join('\u0000') : ''
+  if (registeredHighlightThemesKey === themesKey && registeredHighlightLangsKey === langsKey)
+    return
+  const opts: { themes?: string[], langs?: string[] } = {}
+  if (Array.isArray(themes) && themes.length > 0)
+    opts.themes = themes
+  if (Array.isArray(langs) && langs.length > 0)
+    opts.langs = langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean)
+  registerHighlight(opts)
+  registeredHighlightThemesKey = themesKey
+  registeredHighlightLangsKey = langsKey
+}
+
 async function ensureStreamMarkdownLoaded() {
   if (createShikiRenderer)
     return
@@ -331,13 +351,7 @@ async function ensureStreamMarkdownLoaded() {
       const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
       registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => normalizeLanguageIdentifier(l))) : undefined
     }
-    const opts: { themes?: string[], langs?: string[] } = {}
-    const themes = getResolvedThemes()
-    if (Array.isArray(themes) && themes.length > 0)
-      opts.themes = themes
-    if (Array.isArray(props.langs) && props.langs.length > 0)
-      opts.langs = props.langs
-    registerHighlight?.(opts)
+    ensureHighlightRegistered(getResolvedThemes(), props.langs)
   }
   catch (e) {
     // stream-markdown is an optional peer; if missing, silently skip highlighting
@@ -353,13 +367,7 @@ async function initRenderer() {
     return
   }
 
-  const opts: { themes?: string[], langs?: string[] } = {}
-  const themes = getResolvedThemes()
-  if (Array.isArray(themes) && themes.length > 0)
-    opts.themes = themes
-  if (Array.isArray(props.langs) && props.langs.length > 0)
-    opts.langs = props.langs
-  registerHighlight?.(opts)
+  ensureHighlightRegistered(getResolvedThemes(), props.langs)
 
   if (!renderer && createShikiRenderer) {
     renderer = createShikiRenderer(rendererTarget.value, {
@@ -400,35 +408,24 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.themes, async () => {
-  if (registerHighlight) {
-    const opts: { themes?: string[], langs?: string[] } = {}
-    const themes = getResolvedThemes()
-    if (Array.isArray(themes) && themes.length > 0)
-      opts.themes = themes
-    if (Array.isArray(props.langs) && props.langs.length > 0)
-      opts.langs = props.langs
-    registerHighlight(opts)
-  }
+  ensureHighlightRegistered(getResolvedThemes(), props.langs)
 })
 
-watch(() => props.langs, () => {
+watch(() => props.langs, async () => {
   if (Array.isArray(props.langs) && props.langs.length > 0) {
     registeredHighlightLanguages = new Set(props.langs.map((l: string) => normalizeLanguageIdentifier(l)))
   }
   else {
     registeredHighlightLanguages = undefined
   }
-  if (registerHighlight) {
-    const opts: { themes?: string[], langs?: string[] } = {}
-    const themes = getResolvedThemes()
-    if (Array.isArray(themes) && themes.length > 0)
-      opts.themes = themes
-    if (Array.isArray(props.langs) && props.langs.length > 0)
-      opts.langs = props.langs
-    registerHighlight(opts)
-  }
+  ensureHighlightRegistered(getResolvedThemes(), props.langs)
   // Re-render current code block so blocks that fell back to plaintext can recover highlighting
-  updateRendererWithFallback(props.node.code, codeLanguage.value)
+  if (renderer) {
+    renderFallback(props.node.code, !hasStableRender.value)
+    const updated = await updateRendererWithFallback(props.node.code, codeLanguage.value)
+    if (updated)
+      await clearFallbackWhenRendererReady()
+  }
 })
 
 watch(() => props.loading, (loading) => {

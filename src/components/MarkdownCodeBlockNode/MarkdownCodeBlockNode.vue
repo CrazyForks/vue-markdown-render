@@ -348,7 +348,7 @@ function ensureHighlightRegistered(themes?: string[], langs?: string[]) {
   if (Array.isArray(themes) && themes.length > 0)
     opts.themes = themes
   if (Array.isArray(langs) && langs.length > 0)
-    opts.langs = langs
+    opts.langs = langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean)
   registerHighlight(opts)
   registeredHighlightThemesKey = themesKey
   registeredHighlightLangsKey = langsKey
@@ -408,7 +408,7 @@ watch(() => props.themes, async () => {
   ensureHighlightRegistered(props.themes, props.langs)
 })
 
-watch(() => props.langs, () => {
+watch(() => props.langs, async () => {
   if (Array.isArray(props.langs) && props.langs.length > 0) {
     registeredHighlightLanguages = new Set(props.langs.map((l: string) => normalizeLanguageIdentifier(l)))
   }
@@ -418,7 +418,11 @@ watch(() => props.langs, () => {
   }
   ensureHighlightRegistered(props.themes, props.langs)
   // Re-render current code block so blocks that fell back to plaintext can recover highlighting
-  updateRendererWithFallback(props.node.code, codeLanguage.value)
+  if (renderer) {
+    renderFallback(props.node.code)
+    await updateRendererWithFallback(props.node.code, codeLanguage.value)
+    await clearFallbackWhenRendererReady()
+  }
 })
 
 watch(() => props.loading, (loading) => {

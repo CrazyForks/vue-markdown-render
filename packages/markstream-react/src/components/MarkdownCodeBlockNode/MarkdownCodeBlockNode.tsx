@@ -54,8 +54,7 @@ function escapeHtml(str: string) {
 }
 
 function normalizeRendererLanguage(rawLang?: string | null) {
-  const [baseToken] = String(rawLang ?? '').split(':')
-  const normalized = baseToken?.trim().toLowerCase() ?? ''
+  const normalized = normalizeLanguageIdentifier(rawLang)
   return normalized || 'plaintext'
 }
 
@@ -67,6 +66,15 @@ function getHighlightRegistrationKey(themes?: string[], langs?: string[]): strin
     ? langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean).sort().join('\0')
     : ''
   return `${sortedThemes}\0\0${sortedLangs}`
+}
+
+function getRegisterHighlightOptions(themes?: string[], langs?: string[]): { themes?: string[], langs?: string[] } {
+  const opts: { themes?: string[], langs?: string[] } = {}
+  if (Array.isArray(themes) && themes.length > 0)
+    opts.themes = themes
+  if (Array.isArray(langs) && langs.length > 0)
+    opts.langs = langs.map(l => normalizeLanguageIdentifier(l)).filter(Boolean)
+  return opts
 }
 
 export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
@@ -217,12 +225,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       const key = getHighlightRegistrationKey(props.themes, props.langs)
       if (registeredKeyRef.current !== key) {
         registeredKeyRef.current = key
-        const opts: { themes?: string[], langs?: string[] } = {}
-        if (Array.isArray(props.themes) && props.themes.length > 0)
-          opts.themes = props.themes
-        if (Array.isArray(props.langs) && props.langs.length > 0)
-          opts.langs = props.langs
-        registerHighlightRef.current(opts)
+        registerHighlightRef.current(getRegisterHighlightOptions(props.themes, props.langs))
       }
     }
 
@@ -257,7 +260,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     catch {
       // keep fallback
     }
-  }, [clearFallback, ensureStreamMarkdownLoaded, getPreferredColorScheme, normalizedLanguage, props.langs, props.loading, props.node.code, props.stream, props.themes, renderFallback, viewportReady])
+  }, [clearFallback, ensureStreamMarkdownLoaded, getPreferredColorScheme, normalizedLanguage, props.loading, props.node.code, props.stream, props.themes, renderFallback, viewportReady])
 
   useEffect(() => {
     const el = viewportTargetRef.current
@@ -276,11 +279,15 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
 
   useEffect(() => {
     void initRenderer()
+  }, [initRenderer])
+
+  // Dispose renderer on unmount only
+  useEffect(() => {
     return () => {
       rendererRef.current?.dispose()
       rendererRef.current = null
     }
-  }, [initRenderer])
+  }, [])
 
   // Reactively register highlight when themes/langs change
   useEffect(() => {
@@ -290,12 +297,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (registeredKeyRef.current === key)
       return
     registeredKeyRef.current = key
-    const opts: { themes?: string[], langs?: string[] } = {}
-    if (Array.isArray(props.themes) && props.themes.length > 0)
-      opts.themes = props.themes
-    if (Array.isArray(props.langs) && props.langs.length > 0)
-      opts.langs = props.langs
-    registerHighlightRef.current(opts)
+    registerHighlightRef.current(getRegisterHighlightOptions(props.themes, props.langs))
   }, [props.themes, props.langs])
 
   useEffect(() => {
