@@ -977,15 +977,8 @@ function onHeightChange(message: Message, metrics: MarkstreamVirtualMetrics) {
   if (previous == null || Math.abs(previous - nextHeight) > 1) {
     setItemHeight(key, nextHeight)
 
-    if (isActiveThreadMessage && shouldRestoreOuterAnchorAfterHeightChange(outerAnchor)) {
-      void restoreOuterAnchor(outerAnchor, {
-        immediate: true,
-        expectedJump: outerAnchor?.type === 'bottom'
-          || streamTimer != null
-          || isStreamingHeightChangeExpected()
-          || threadRestoreTargets.has(activeThreadId.value),
-      })
-    }
+    if (isActiveThreadMessage && shouldRestoreOuterAnchorAfterHeightChange(outerAnchor))
+      void restoreOuterAnchor(outerAnchor, { immediate: true })
   }
 
   if (isActiveThreadMessage && !isForceHidden(message)) {
