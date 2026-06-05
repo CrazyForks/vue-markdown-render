@@ -232,6 +232,10 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const [defaultFontSize, setDefaultFontSize] = useState<number>(14)
   const [fontSize, setFontSize] = useState<number>(defaultFontSize)
   const tooltipsEnabled = useMemo(() => props.showTooltips !== false, [props.showTooltips])
+  const registrationKey = useMemo(
+    () => getHighlightRegistrationKey(props.themes, props.langs),
+    [props.themes, props.langs],
+  )
 
   const viewportTargetRef = useRef<HTMLDivElement | null>(null)
   const codeBlockContentRef = useRef<HTMLDivElement | null>(null)
@@ -245,7 +249,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const registeredHighlightLanguagesRef = useRef<Set<string> | undefined>()
   const registeredKeyRef = useRef<string>('')
   const highlightRegistrationSeqRef = useRef(0)
-  const latestRegistrationKeyRef = useRef('')
+  const latestRegistrationKeyRef = useRef(registrationKey)
   const viewportHandleRef = useRef<VisibilityHandle | null>(null)
   const registerViewport = useViewportPriority()
   const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
@@ -269,6 +273,11 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     setRendererReady(true)
   }, [])
 
+  const clearRendererTarget = useCallback(() => {
+    if (rendererTargetRef.current)
+      rendererTargetRef.current.innerHTML = ''
+  }, [])
+
   const ensureStreamMarkdownLoaded = useCallback(async () => {
     if (createRendererRef.current || importAttemptedRef.current)
       return
@@ -287,20 +296,18 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     }
   }, [])
 
-  const registrationKey = useMemo(
-    () => getHighlightRegistrationKey(props.themes, props.langs),
-    [props.themes, props.langs],
-  )
-
   useEffect(() => {
     latestRegistrationKeyRef.current = registrationKey
   }, [registrationKey])
 
   const ensureHighlightRegistered = useCallback(async (): Promise<HighlightRegistrationStatus> => {
+    const key = registrationKey
+
+    if (latestRegistrationKeyRef.current !== key)
+      return 'stale'
+
     if (!registerHighlightRef.current)
       return 'ready'
-    const key = registrationKey
-    latestRegistrationKeyRef.current = key
 
     if (registeredKeyRef.current === key)
       return 'ready'
@@ -312,6 +319,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       await registerHighlightRef.current(opts)
     }
     catch {
+      if (seq !== highlightRegistrationSeqRef.current || latestRegistrationKeyRef.current !== key)
+        return 'stale'
       return 'failed'
     }
 
@@ -328,8 +337,11 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (status !== 'failed')
       return status
 
+    if (latestRegistrationKeyRef.current !== registrationKey)
+      return 'stale'
+
     return ensureHighlightRegistered()
-  }, [ensureHighlightRegistered])
+  }, [ensureHighlightRegistered, registrationKey])
 
   const updateRendererWithFallback = useCallback(async (code: string) => {
     const renderer = rendererRef.current
@@ -384,6 +396,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       rendererRef.current.dispose()
       rendererRef.current = null
       rendererConfigKeyRef.current = ''
+      clearRendererTarget()
       setRendererReady(false)
     }
 
@@ -414,6 +427,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     getPreferredColorScheme,
     registrationKey,
     waitForCurrentHighlightRegistration,
+    clearRendererTarget,
     props.langs,
     props.loading,
     props.node.code,
@@ -451,8 +465,9 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       rendererRef.current?.dispose()
       rendererRef.current = null
       rendererConfigKeyRef.current = ''
+      clearRendererTarget()
     }
-  }, [])
+  }, [clearRendererTarget])
 
   useEffect(() => {
     if (!rendererRef.current)

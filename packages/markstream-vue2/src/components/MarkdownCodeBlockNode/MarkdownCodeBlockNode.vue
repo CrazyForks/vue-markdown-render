@@ -263,6 +263,11 @@ function keepLastSuccessfulRender() {
   rendererReady.value = true
 }
 
+function clearRendererTarget() {
+  if (rendererTarget.value)
+    rendererTarget.value.innerHTML = ''
+}
+
 function hasRendererContent() {
   const target = rendererTarget.value
   if (!target)
@@ -401,6 +406,10 @@ function createRegisteredHighlightLanguages(langs?: readonly string[]) {
   )
 }
 
+const highlightRegistrationKey = computed(() =>
+  getHighlightRegistrationKey(getResolvedThemes(), props.langs),
+)
+
 function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) {
   const normalized = normalizeShikiLanguage(rawLang)
   if (!normalized)
@@ -452,7 +461,8 @@ async function ensureHighlightRegistered(themes?: string[], langs?: string[]): P
   if (!registerHighlight)
     return 'ready'
   const key = getHighlightRegistrationKey(themes, langs)
-  latestHighlightRegistrationKey = key
+  if (latestHighlightRegistrationKey !== key)
+    return 'stale'
 
   if (registeredHighlightKey === key)
     return 'ready'
@@ -465,6 +475,8 @@ async function ensureHighlightRegistered(themes?: string[], langs?: string[]): P
     await registerHighlight(opts)
   }
   catch {
+    if (seq !== highlightRegistrationSeq || latestHighlightRegistrationKey !== key)
+      return 'stale'
     return 'failed'
   }
 
@@ -477,9 +489,13 @@ async function ensureHighlightRegistered(themes?: string[], langs?: string[]): P
 }
 
 async function waitForCurrentHighlightRegistration(themes?: string[], langs?: string[]) {
+  const key = getHighlightRegistrationKey(themes, langs)
   const status = await ensureHighlightRegistered(themes, langs)
   if (status !== 'failed')
     return status
+
+  if (latestHighlightRegistrationKey !== key)
+    return 'stale'
 
   return ensureHighlightRegistered(themes, langs)
 }
@@ -492,7 +508,6 @@ async function ensureStreamMarkdownLoaded() {
     createShikiRenderer = mod.createShikiStreamRenderer
     registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
     defaultHighlightLanguages = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
-    await ensureHighlightRegistered(getResolvedThemes(), props.langs)
   }
   catch (e) {
     // stream-markdown is an optional peer; if missing, silently skip highlighting
@@ -509,7 +524,11 @@ async function initRenderer() {
   }
 
   const themes = getResolvedThemes()
-  const highlightStatus = await waitForCurrentHighlightRegistration(themes, props.langs)
+  const langs = props.langs
+  const nextRendererConfigKey = getHighlightRegistrationKey(themes, langs)
+  latestHighlightRegistrationKey = nextRendererConfigKey
+
+  const highlightStatus = await waitForCurrentHighlightRegistration(themes, langs)
   if (highlightStatus === 'stale')
     return
   if (highlightStatus === 'failed') {
@@ -517,11 +536,11 @@ async function initRenderer() {
     return
   }
 
-  const nextRendererConfigKey = getHighlightRegistrationKey(themes, props.langs)
   if (renderer && rendererConfigKey !== nextRendererConfigKey) {
     renderer.dispose()
     renderer = undefined
     rendererConfigKey = null
+    clearRendererTarget()
     rendererReady.value = false
   }
 
@@ -529,7 +548,7 @@ async function initRenderer() {
     renderer = createShikiRenderer(rendererTarget.value, {
       theme: getPreferredColorScheme(),
       themes,
-      langs: getShikiLangs(props.langs),
+      langs: getShikiLangs(langs),
     })
     rendererConfigKey = nextRendererConfigKey
     rendererReady.value = true
@@ -563,13 +582,13 @@ onMounted(() => {
 onBeforeUnmount(() => {
   renderObserver?.disconnect()
   renderObserver = undefined
+  renderer?.dispose()
+  renderer = undefined
+  rendererConfigKey = null
+  clearRendererTarget()
 })
 
-watch(() => props.themes, async () => {
-  await initRenderer()
-})
-
-watch(() => props.langs, async () => {
+watch(highlightRegistrationKey, async () => {
   await initRenderer()
 })
 

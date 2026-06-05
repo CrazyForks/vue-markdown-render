@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, ref } from 'vue'
 import { flushAll } from './setup/flush-all'
 
 const streamMarkdownMock = vi.hoisted(() => {
@@ -77,6 +78,16 @@ async function waitForRendererCount(count: number) {
   }
 }
 
+async function waitForLastRegisterHighlightLangs(langs: string[]) {
+  for (let i = 0; i < 10; i++) {
+    const calls = streamMarkdownMock.registerHighlight.mock.calls
+    const lastCall = calls[calls.length - 1]?.[0] as { langs?: string[] } | undefined
+    if (JSON.stringify(lastCall?.langs) === JSON.stringify(langs))
+      return
+    await flushAll()
+  }
+}
+
 async function waitForReactRendererCreated() {
   for (let i = 0; i < 10; i++) {
     if (streamMarkdownMock.createShikiStreamRenderer.mock.calls.length > 0)
@@ -95,10 +106,12 @@ async function waitForReactRendererCount(count: number) {
 
 function createDeferred() {
   let resolve!: () => void
-  const promise = new Promise<void>((r) => {
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<void>((r, j) => {
     resolve = r
+    reject = j
   })
-  return { promise, resolve }
+  return { promise, reject, resolve }
 }
 
 function resetStreamMarkdownMock() {
@@ -228,6 +241,94 @@ describe('markdown code block Shiki langs', () => {
       expect.objectContaining({ langs: ['python'] }),
     )
     expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'plaintext',
+    )
+
+    wrapper.unmount()
+  })
+
+  it('recreates Vue renderer when langs is mutated in place', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const Parent = defineComponent({
+      components: { MarkdownCodeBlockNode },
+      setup() {
+        const langs = ref(['typescript'])
+        return {
+          langs,
+          node: makeNode('typescript'),
+        }
+      },
+      template: '<MarkdownCodeBlockNode :loading="false" :node="node" :langs="langs" />',
+    })
+    const wrapper = mount(Parent)
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    const initialRendererCount = streamMarkdownMock.createdRenderers.length
+    const renderer = streamMarkdownMock.createdRenderers[initialRendererCount - 1]
+
+    ;(wrapper.vm.langs as string[]).splice(0, 1, 'python')
+    await flushAll()
+    await waitForLastRegisterHighlightLangs(['python'])
+    await waitForRendererCount(initialRendererCount + 1)
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ langs: ['python'] }),
+    )
+    expect(renderer.dispose).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ langs: ['python'] }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it('does not retry stale failed Vue highlight registrations', async () => {
+    const first = createDeferred()
+    const second = createDeferred()
+    streamMarkdownMock.registerHighlight
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+      .mockImplementation(async () => {
+        throw new Error('stale failed registration should not be retried')
+      })
+
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({ langs: ['python'] })
+    await flushAll()
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+
+    second.resolve()
+    await second.promise
+    await flushAll()
+    await waitForRendererCreated()
+
+    const renderer = streamMarkdownMock.createdRenderers[streamMarkdownMock.createdRenderers.length - 1]
+    expect(renderer?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'plaintext',
+    )
+
+    first.reject(new Error('stale failed registration'))
+    await first.promise.catch(() => {})
+    await flushAll()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+    expect(renderer?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',
       'plaintext',
     )
@@ -458,6 +559,74 @@ describe('markdown code block Shiki langs', () => {
       'plaintext',
     )
     expect(host.querySelector('.code-fallback-plain')).toBeNull()
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('does not retry stale failed React highlight registrations', async () => {
+    const first = createDeferred()
+    const second = createDeferred()
+    streamMarkdownMock.registerHighlight
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+      .mockImplementation(async () => {
+        throw new Error('stale failed registration should not be retried')
+      })
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const node = makeNode('typescript')
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: ['typescript'],
+      }))
+    })
+    await flushReact()
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: ['python'],
+      }))
+    })
+    await flushReact()
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      second.resolve()
+      await second.promise
+    })
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    const renderer = streamMarkdownMock.createdRenderers[streamMarkdownMock.createdRenderers.length - 1]
+    expect(renderer?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'plaintext',
+    )
+
+    await act(async () => {
+      first.reject(new Error('stale failed registration'))
+      await first.promise.catch(() => {})
+    })
+    await flushReact()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+    expect(renderer?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'plaintext',
+    )
 
     await act(async () => {
       root.unmount()
