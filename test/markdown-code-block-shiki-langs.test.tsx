@@ -3,6 +3,7 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, ref } from 'vue'
+import { getHighlightRegistrationKey, getRegisterHighlightOptions } from '../src/utils/shikiLanguage'
 import { flushAll } from './setup/flush-all'
 
 const streamMarkdownMock = vi.hoisted(() => {
@@ -133,6 +134,19 @@ afterEach(() => {
 })
 
 describe('markdown code block Shiki langs', () => {
+  it('normalizes Shiki langs and omits empty lang lists from registration options', () => {
+    expect(getRegisterHighlightOptions(undefined, ['ts', 'js', 'ts'])).toEqual({
+      langs: ['typescript', 'javascript'],
+    })
+    expect(getRegisterHighlightOptions(undefined, [])).toEqual({})
+  })
+
+  it('uses a stable registration key for reordered normalized langs', () => {
+    expect(getHighlightRegistrationKey(['vitesse-light'], ['ts', 'js', 'ts'])).toBe(
+      getHighlightRegistrationKey(['vitesse-light'], ['javascript', 'typescript']),
+    )
+  })
+
   it('passes langs to Vue registerHighlight and renderer', async () => {
     const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const wrapper = mount(MarkdownCodeBlockNode, {
@@ -153,6 +167,60 @@ describe('markdown code block Shiki langs', () => {
       expect.any(HTMLElement),
       expect.objectContaining({ langs: ['typescript'] }),
     )
+
+    wrapper.unmount()
+  })
+
+  it('uses default Vue highlight options when langs is empty', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: [],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    const registerCalls = streamMarkdownMock.registerHighlight.mock.calls
+    const rendererCalls = streamMarkdownMock.createShikiStreamRenderer.mock.calls
+    const rendererOptions = rendererCalls[rendererCalls.length - 1]?.[1]
+
+    expect(registerCalls[registerCalls.length - 1]?.[0]).toEqual({})
+    expect(rendererOptions.langs).toBeUndefined()
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'typescript',
+    )
+
+    wrapper.unmount()
+  })
+
+  it('does not re-register Vue highlight when the normalized lang set is reordered', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['ts', 'js', 'ts'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ langs: ['typescript', 'javascript'] }),
+    )
+
+    await wrapper.setProps({ langs: ['javascript', 'typescript'] })
+    await flushAll()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(1)
 
     wrapper.unmount()
   })

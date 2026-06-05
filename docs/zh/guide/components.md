@@ -231,10 +231,20 @@ setCustomComponents('docs', {
 > 基于 Shiki 和 `stream-markdown` 的轻量代码块渲染器。
 
 - **适合**：SSR 友好的文档站、博客页、更小的打包体积
-- **关键 props**：`node`、`stream`、`loading`
+- **关键 props**：`node`、`stream`、`loading`、`themes`、`langs`
 - **插槽**：`header-left`、`header-right`
 - **同伴依赖**：`stream-markdown`
 - **常见问题**：一直没有高亮时，先确认 `stream-markdown` 已安装，并在实际渲染环境里可用
+
+传入 `langs` 可以限制 `stream-markdown` 为 Shiki 预加载的语言；不传或传空数组时，会保留默认语言预加载行为。
+
+```vue
+<MarkdownCodeBlockNode
+  :node="node"
+  :themes="['vitesse-light', 'vitesse-dark']"
+  :langs="['javascript', 'typescript', 'vue']"
+/>
+```
 
 如果你不需要 Monaco 的编辑面板和 diff 交互，这个通常是更轻的选择。
 

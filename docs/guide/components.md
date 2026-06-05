@@ -231,10 +231,20 @@ Deep dive: [CodeBlockNode](/guide/code-block-node), [Monaco](/guide/monaco)
 > Lightweight syntax-highlighted code block renderer powered by Shiki via `stream-markdown`.
 
 - **Best for**: SSR-friendly docs, blog-style pages, smaller bundles
-- **Key props**: `node`, `stream`, `loading`
+- **Key props**: `node`, `stream`, `loading`, `themes`, `langs`
 - **Slots**: `header-left`, `header-right`
 - **Peers**: `stream-markdown`
 - **Common gotcha**: if highlighting never appears, confirm `stream-markdown` is installed and loaded in the environment where rendering happens
+
+Pass `langs` to limit the Shiki languages preloaded by `stream-markdown`; omit it or pass an empty array to keep the default language preload behavior.
+
+```vue
+<MarkdownCodeBlockNode
+  :node="node"
+  :themes="['vitesse-light', 'vitesse-dark']"
+  :langs="['javascript', 'typescript', 'vue']"
+/>
+```
 
 Choose this when you do not need Monaco's editing surface or diff interactions.
 
