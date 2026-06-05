@@ -62,7 +62,7 @@ export function useScrollRestore(options: ScrollRestoreOptions): ScrollRestore {
   } = options
 
   const activeRestoreAnchor = ref<RestoreAnchor | null>(null)
-  const RESTORE_DRIFT_DEADBAND_PX = 2
+  const RESTORE_DRIFT_DEADBAND_PX = 0.5
 
   let restoreReconcileRaf: number | null = null
   let restoreReconcileTimers: number[] = []

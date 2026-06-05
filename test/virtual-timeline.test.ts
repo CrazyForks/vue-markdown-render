@@ -4443,6 +4443,78 @@ describe('virtual timeline API', () => {
     scope.stop()
   })
 
+  it('corrects one-pixel scroll drift while restoring a thread anchor', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const items = [
+      { kind: 'user-message', id: 'u1', text: 'before' },
+      { kind: 'assistant-markdown', id: 'm1', content: '# long\n\ncontent', final: true, revision: 1 },
+    ]
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items,
+        threadKey: 'thread-a',
+        overscan: 10,
+        stickToBottom: false,
+        estimateItemHeight(item: any) {
+          return item.id === 'u1' ? 80 : 640
+        },
+      },
+      slots: {
+        default(props: any) {
+          return h('div', {
+            ref: props.measureRef,
+          }, props.markdownProps?.content ?? props.item.text ?? '')
+        },
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    ;(wrapper.vm as any).restoreThreadState({
+      threadKey: 'thread-a',
+      measurementKey: ':800',
+      widthBucket: 800,
+      outerAnchor: {
+        type: 'item',
+        itemKey: 'm1',
+        offsetWithinItemPx: 240,
+      },
+      itemHeights: {
+        u1: 80,
+        m1: 640,
+      },
+      itemSizeSources: {
+        u1: timelineItemSource('thread-a', 'u1'),
+        m1: timelineMarkdownItemSource('thread-a', 'm1', 1),
+      },
+      markdownStates: {},
+    })
+    await nextTick()
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    const expectedScrollTop = 80 + 240
+
+    expect(root.scrollTop).toBe(expectedScrollTop)
+
+    root.scrollTop = expectedScrollTop - 1
+    root.dispatchEvent(new Event('scroll'))
+
+    expect(root.scrollTop).toBe(expectedScrollTop)
+
+    wrapper.unmount()
+  })
+
   it('restores per-thread scroll positions without auto-bottom overriding item anchors', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)

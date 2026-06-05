@@ -181,6 +181,7 @@ const THREAD_RESTORE_COLD_STABLE_FRAMES = 8
 const THREAD_RESTORE_READY_RETRY_DELAY_MS = 120
 const THREAD_STATE_REMEMBER_DELAY_MS = 80
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
+const SCROLL_RESTORE_DEADBAND_PX = 0.5
 let rootResizeObserver: ResizeObserver | null = null
 let threadRestoreSeq = 0
 let threadRestoreRaf: number | null = null
@@ -889,7 +890,7 @@ function applyScrollOffset(
   if (root) {
     viewportHeight.value = root.clientHeight || viewportHeight.value || 0
 
-    if (options.writeDom !== false && Math.abs((root.scrollTop || 0) - target) > 1)
+    if (options.writeDom !== false && Math.abs((root.scrollTop || 0) - target) > SCROLL_RESTORE_DEADBAND_PX)
       root.scrollTop = target
   }
 
@@ -911,7 +912,7 @@ function handleTimelineScroll() {
     const root = scrollRoot.value
     const target = activeThreadRestoreScrollTop
 
-    if (root && target != null && Math.abs((root.scrollTop || 0) - target) > 1)
+    if (root && target != null && Math.abs((root.scrollTop || 0) - target) > SCROLL_RESTORE_DEADBAND_PX)
       root.scrollTop = target
 
     applyThreadRestorePass(activeThreadRestoreSeq, activeThreadRestoreAnchor)
@@ -1963,7 +1964,7 @@ function isRestoreViewportReady() {
   const anchorOffset = resolveOuterAnchorOffset(activeThreadRestoreAnchor)
   if (
     anchorOffset != null
-    && Math.abs((root.scrollTop || 0) - clampScrollOffset(anchorOffset)) > 1
+    && Math.abs((root.scrollTop || 0) - clampScrollOffset(anchorOffset)) > SCROLL_RESTORE_DEADBAND_PX
   ) {
     return false
   }

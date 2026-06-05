@@ -217,6 +217,19 @@ describe('useScrollRestore', () => {
     expect(h.root.scrollTop).toBe(300)
   })
 
+  it('corrects one-pixel drift while restoring an anchor', () => {
+    const h = createHarness({ count: 3 })
+
+    h.root.scrollTop = 301
+
+    h.restore.restoreAnchor({
+      nodeIndex: 2,
+      offsetWithinNodePx: 0,
+    })
+
+    expect(h.root.scrollTop).toBe(300)
+  })
+
   it('scheduleRestoreReconcile uses requestAnimationFrame when available', () => {
     let frameCallback: FrameRequestCallback | null = null
     const requestFrame = vi.fn((callback: FrameRequestCallback) => {
