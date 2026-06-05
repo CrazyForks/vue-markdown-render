@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import type { PropType } from 'vue-demi'
 import type { MarkdownCodeBlockPreviewPayload } from '../../types/component-props'
+import type { RegisterHighlightOptions, ShikiRendererOptions } from '../../utils/shikiLanguage'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier } from '../../utils'
+import { getLanguageIcon, languageIconsRevision, languageMap } from '../../utils'
+import {
+  createRegisteredHighlightLanguages,
+  getHighlightRegistrationKey,
+  getRegisterHighlightOptions,
+  getShikiLangs,
+  getShikiLanguageMatchKey,
+  normalizeDisplayLanguage,
+  normalizeShikiLanguage,
+} from '../../utils/shikiLanguage'
 
 interface MarkdownCodeBlockNodeProps {
   node: {
@@ -302,15 +312,6 @@ interface ShikiRenderer {
   setTheme: (theme?: string) => void | Promise<void>
   dispose: () => void
 }
-interface RegisterHighlightOptions {
-  themes?: string[]
-  langs?: string[]
-}
-interface ShikiRendererOptions {
-  theme?: string
-  themes?: string[]
-  langs?: string[]
-}
 type HighlightRegistrationStatus = 'ready' | 'failed' | 'stale'
 
 let renderer: ShikiRenderer | undefined
@@ -330,81 +331,6 @@ let highlightRegistrationSeq = 0
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
-
-const SHIKI_LANGUAGE_CANONICAL_ALIAS: Record<string, string> = {
-  'plain': 'plaintext',
-  'text': 'plaintext',
-  'txt': 'plaintext',
-  'cs': 'csharp',
-  'objectivec': 'objective-c',
-  'objective-c': 'objective-c',
-  'objectivecpp': 'objective-cpp',
-  'objective-c++': 'objective-cpp',
-  'objective-cpp': 'objective-cpp',
-}
-
-function normalizeShikiLanguage(rawLang?: string | null) {
-  const normalized = normalizeDisplayLanguage(rawLang)
-  return SHIKI_LANGUAGE_CANONICAL_ALIAS[normalized] ?? normalized
-}
-
-function getLanguageBaseToken(rawLang?: string | null) {
-  return String(rawLang ?? '').split(':')[0]?.trim() ?? ''
-}
-
-function normalizeDisplayLanguage(rawLang?: string | null) {
-  return normalizeLanguageIdentifier(getLanguageBaseToken(rawLang))
-}
-
-function getShikiLanguageMatchKey(rawLang?: string | null) {
-  return normalizeShikiLanguage(rawLang)
-}
-
-function getShikiLangs(langs?: readonly string[]) {
-  const normalized = Array.isArray(langs)
-    ? langs.map(lang => normalizeShikiLanguage(lang)).filter(Boolean)
-    : []
-
-  return normalized.length > 0
-    ? Array.from(new Set(normalized))
-    : undefined
-}
-
-function getHighlightRegistrationKey(themes?: readonly string[], langs?: readonly string[]) {
-  const themesKey = Array.isArray(themes) && themes.length > 0
-    ? themes.map(theme => String(theme)).join('\u0000')
-    : ''
-
-  const langsKey = getShikiLangs(langs)
-    ?.map(lang => getShikiLanguageMatchKey(lang))
-    .sort()
-    .join('\u0000') ?? ''
-
-  return `${themesKey}\u0000\u0000${langsKey}`
-}
-
-function getRegisterHighlightOptions(themes?: readonly string[], langs?: readonly string[]) {
-  const opts: RegisterHighlightOptions = {}
-
-  if (Array.isArray(themes) && themes.length > 0)
-    opts.themes = [...themes]
-
-  const shikiLangs = getShikiLangs(langs)
-  if (shikiLangs?.length)
-    opts.langs = shikiLangs
-
-  return opts
-}
-
-function createRegisteredHighlightLanguages(langs?: readonly string[]) {
-  const shikiLangs = getShikiLangs(langs)
-  if (!shikiLangs?.length)
-    return undefined
-
-  return new Set(
-    shikiLangs.map(lang => getShikiLanguageMatchKey(lang)),
-  )
-}
 
 const highlightRegistrationKey = computed(() =>
   getHighlightRegistrationKey(getResolvedThemes(), props.langs),
@@ -565,7 +491,7 @@ async function initRenderer() {
   }
 
   renderFallback(props.node.code, !hasStableRender.value)
-  const updated = await updateRendererWithFallback(props.node.code, codeLanguage.value)
+  const updated = await updateRendererWithFallback(props.node.code, props.node.language)
   if (!updated) {
     keepLastSuccessfulRender()
     return
@@ -575,9 +501,21 @@ async function initRenderer() {
   else
     await clearFallbackWhenRendererReady()
 }
-initRenderer()
+
+async function safeInitRenderer() {
+  try {
+    await initRenderer()
+  }
+  catch (err) {
+    if (isDevEnv)
+      console.warn('[MarkdownCodeBlockNode] Failed to initialize Shiki renderer.', err)
+    renderFallback(props.node.code, !hasStableRender.value)
+  }
+}
+
+void safeInitRenderer()
 onMounted(() => {
-  initRenderer()
+  void safeInitRenderer()
 })
 onBeforeUnmount(() => {
   renderObserver?.disconnect()
@@ -589,13 +527,13 @@ onBeforeUnmount(() => {
 })
 
 watch(highlightRegistrationKey, async () => {
-  await initRenderer()
+  await safeInitRenderer()
 })
 
 watch(() => props.loading, (loading) => {
   if (loading)
     return
-  initRenderer()
+  void safeInitRenderer()
 })
 
 watch(tooltipsEnabled, (enabled) => {
@@ -624,7 +562,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
 
   if (!renderer) {
     renderFallback(code, !hasStableRender.value)
-    await initRenderer()
+    await safeInitRenderer()
   }
   if (!renderer || !code)
     return
@@ -633,7 +571,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
     return
 
   renderFallback(code, !hasStableRender.value)
-  const updated = await updateRendererWithFallback(code, normalizedLang)
+  const updated = await updateRendererWithFallback(code, lang)
   if (!updated) {
     keepLastSuccessfulRender()
     return
@@ -650,7 +588,7 @@ watch(
     if (!codeBlockContent.value || !rendererTarget.value)
       return
     if (!renderer)
-      await initRenderer()
+      await safeInitRenderer()
     await renderer?.setTheme(getPreferredColorScheme())
     syncRenderedCssVars()
   },

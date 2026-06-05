@@ -1,10 +1,20 @@
 import type { VisibilityHandle } from '../../context/viewportPriority'
 import type { CommonCodeBlockProps } from '../../types/component-props'
+import type { RegisterHighlightOptions, ShikiRendererOptions } from '../../utils/shikiLanguage'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
-import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
+import { getLanguageIcon, languageMap, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
+import {
+  createRegisteredHighlightLanguages,
+  getHighlightRegistrationKey,
+  getRegisterHighlightOptions,
+  getShikiLangs,
+  getShikiLanguageMatchKey,
+  normalizeDisplayLanguage,
+  normalizeShikiLanguage,
+} from '../../utils/shikiLanguage'
 
 export interface MarkdownCodeBlockNodeProps extends CommonCodeBlockProps {
   node: {
@@ -39,30 +49,7 @@ interface ShikiRenderer {
   dispose: () => void
 }
 
-interface RegisterHighlightOptions {
-  themes?: string[]
-  langs?: string[]
-}
-
-interface ShikiRendererOptions {
-  theme?: string
-  themes?: string[]
-  langs?: string[]
-}
-
 type HighlightRegistrationStatus = 'ready' | 'failed' | 'stale'
-
-const SHIKI_LANGUAGE_CANONICAL_ALIAS: Record<string, string> = {
-  'plain': 'plaintext',
-  'text': 'plaintext',
-  'txt': 'plaintext',
-  'cs': 'csharp',
-  'objectivec': 'objective-c',
-  'objective-c': 'objective-c',
-  'objectivecpp': 'objective-cpp',
-  'objective-c++': 'objective-cpp',
-  'objective-cpp': 'objective-cpp',
-}
 
 function escapeHtml(str: string) {
   return str
@@ -71,43 +58,6 @@ function escapeHtml(str: string) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
-}
-
-function normalizeShikiLanguage(rawLang?: string | null) {
-  const normalized = normalizeDisplayLanguage(rawLang)
-  return SHIKI_LANGUAGE_CANONICAL_ALIAS[normalized] ?? normalized
-}
-
-function getLanguageBaseToken(rawLang?: string | null) {
-  return String(rawLang ?? '').split(':')[0]?.trim() ?? ''
-}
-
-function normalizeDisplayLanguage(rawLang?: string | null) {
-  return normalizeLanguageIdentifier(getLanguageBaseToken(rawLang))
-}
-
-function getShikiLanguageMatchKey(rawLang?: string | null) {
-  return normalizeShikiLanguage(rawLang)
-}
-
-function getShikiLangs(langs?: readonly string[]) {
-  const normalized = Array.isArray(langs)
-    ? langs.map(lang => normalizeShikiLanguage(lang)).filter(Boolean)
-    : []
-
-  return normalized.length > 0
-    ? Array.from(new Set(normalized))
-    : undefined
-}
-
-function createRegisteredHighlightLanguages(langs?: readonly string[]) {
-  const shikiLangs = getShikiLangs(langs)
-  if (!shikiLangs?.length)
-    return undefined
-
-  return new Set(
-    shikiLangs.map(lang => getShikiLanguageMatchKey(lang)),
-  )
 }
 
 function normalizeRendererLanguageForRegistered(
@@ -122,27 +72,6 @@ function normalizeRendererLanguageForRegistered(
     return normalized
 
   return 'plaintext'
-}
-
-function getHighlightRegistrationKey(themes?: readonly string[], langs?: readonly string[]): string {
-  const themesKey = Array.isArray(themes) && themes.length > 0
-    ? themes.map(theme => String(theme)).join('\u0000')
-    : ''
-  const sortedLangs = getShikiLangs(langs)
-    ?.map(lang => getShikiLanguageMatchKey(lang))
-    .sort()
-    .join('\u0000') ?? ''
-  return `${themesKey}\u0000\u0000${sortedLangs}`
-}
-
-function getRegisterHighlightOptions(themes?: readonly string[], langs?: readonly string[]): RegisterHighlightOptions {
-  const opts: RegisterHighlightOptions = {}
-  if (Array.isArray(themes) && themes.length > 0)
-    opts.themes = [...themes]
-  const shikiLangs = getShikiLangs(langs)
-  if (shikiLangs?.length)
-    opts.langs = shikiLangs
-  return opts
 }
 
 export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {

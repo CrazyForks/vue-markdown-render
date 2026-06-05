@@ -15,7 +15,11 @@ export type CodeBlockMonacoLanguage = string | ((...args: unknown[]) => unknown)
 
 export interface CommonCodeBlockProps<TTheme = string> {
   themes?: TTheme[]
-  /** Shiki language list forwarded to stream-markdown's registerHighlight. Overrides the default language preload when provided. */
+  /**
+   * Shiki-only language list forwarded to stream-markdown's registerHighlight().
+   * When provided, only these languages are preloaded for the Shiki renderer.
+   * This does not configure Monaco languages.
+   */
   langs?: string[]
   showHeader?: boolean
   showCopyButton?: boolean

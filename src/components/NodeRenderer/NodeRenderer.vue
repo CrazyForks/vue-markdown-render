@@ -1773,6 +1773,8 @@ function getVirtualRendererLayoutKey() {
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
     stringifyVirtualToken(props.codeBlockMinWidth),
     stringifyVirtualToken(props.codeBlockMaxWidth),
+    renderer === 'shiki' ? stringifyVirtualToken(codeProps?.themes) : '',
+    renderer === 'shiki' ? stringifyVirtualToken(codeProps?.langs) : '',
     stringifyVirtualToken(monaco?.fontSize),
     stringifyVirtualToken(monaco?.lineHeight),
     stringifyVirtualToken(monaco?.fontFamily),

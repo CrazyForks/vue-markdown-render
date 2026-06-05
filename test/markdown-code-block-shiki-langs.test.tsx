@@ -157,6 +157,63 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('normalizes Vue Shiki aliases without using display aliases', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('cs'),
+        langs: ['cs', 'txt'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith(
+      expect.objectContaining({ langs: ['csharp', 'plaintext'] }),
+    )
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ langs: ['csharp', 'plaintext'] }),
+    )
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'csharp',
+    )
+    expect(wrapper.text()).toContain('C#')
+
+    wrapper.unmount()
+  })
+
+  it('keeps valid Shiki ids that differ from icon aliases in Vue', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('bat'),
+        langs: ['bat'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith(
+      expect.objectContaining({ langs: ['bat'] }),
+    )
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ langs: ['bat'] }),
+    )
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'bat',
+    )
+
+    wrapper.unmount()
+  })
+
   it('normalizes suffixed fence language before Vue registration and rendering', async () => {
     const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const wrapper = mount(MarkdownCodeBlockNode, {
@@ -360,6 +417,34 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('keeps valid Shiki ids that differ from icon aliases in Vue2', async () => {
+    const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
+      props: {
+        loading: false,
+        node: makeNode('bat'),
+        langs: ['bat'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith(
+      expect.objectContaining({ langs: ['bat'] }),
+    )
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ langs: ['bat'] }),
+    )
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'bat',
+    )
+
+    wrapper.unmount()
+  })
+
   it('retries Vue2 registerHighlight when the previous registration failed', async () => {
     streamMarkdownMock.registerHighlight.mockRejectedValueOnce(new Error('load failed'))
     const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
@@ -426,6 +511,42 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
       expect.any(HTMLElement),
       expect.objectContaining({ themes: ['b', 'a'], langs: ['typescript'] }),
+    )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('keeps valid Shiki ids that differ from icon aliases in React', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('bat'),
+        langs: ['bat'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith(
+      expect.objectContaining({ langs: ['bat'] }),
+    )
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ langs: ['bat'] }),
+    )
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'bat',
     )
 
     await act(async () => {
