@@ -1,3 +1,34 @@
+## [1.0.1-beta.5](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.1-beta.4...markstream-vue@1.0.1-beta.5) (2026-06-05)
+
+
+### Bug Fixes
+
+* add blockquote simple inline fast path ([41bef2b](https://github.com/Simon-He95/markstream-vue/commit/41bef2b84e7f43a6a5b465b12f37bbdfce832fc1))
+* align diff code fallback height ([3ee3ebe](https://github.com/Simon-He95/markstream-vue/commit/3ee3ebe04074d1877e065a9a1e374c8d3486d020))
+* expand simple inline fast path ([51cddda](https://github.com/Simon-He95/markstream-vue/commit/51cdddac9d5592e0b31546c293a9dddab4ebd895))
+* reduce package size ([69b9c95](https://github.com/Simon-He95/markstream-vue/commit/69b9c9558f2a961e48f7694670f06525067ef2b0))
+* reduce streaming table layout work ([55b4547](https://github.com/Simon-He95/markstream-vue/commit/55b4547abef4432853bdf03241d0b0d0e2d13e69))
+* reduce virtual height layout reads ([1b44446](https://github.com/Simon-He95/markstream-vue/commit/1b44446fe369a6ee0b088dc922dbc7dba9c5b973))
+* stabilize simple inline fast paths ([f52fb3a](https://github.com/Simon-He95/markstream-vue/commit/f52fb3a6ac37028af7dbfa7cf33bf01e2ca9c4bc))
+* stabilize streaming height reconciliation ([2a515a5](https://github.com/Simon-He95/markstream-vue/commit/2a515a58f977fa32c7545a66ddf561d0856f82e8))
+* stabilize streaming timeline rendering ([96cda70](https://github.com/Simon-He95/markstream-vue/commit/96cda705c053a92e93d349215eb2caf1ac16cc0d))
+* stabilize virtual restore and table layout ([a878199](https://github.com/Simon-He95/markstream-vue/commit/a87819902a5c7211295906e509f1f86f0256fe6e))
+* stabilize virtual timeline restore heights ([4119aa0](https://github.com/Simon-He95/markstream-vue/commit/4119aa0efad2d3c76e0371b9149bc26890be9350))
+* tighten timeline restore scroll drift ([afc76b7](https://github.com/Simon-He95/markstream-vue/commit/afc76b7b1b615f11c4fe1dcc648086b9053763c7))
+
+
+### Performance Improvements
+
+* extend simple inline plain text fast path ([9dad9f2](https://github.com/Simon-He95/markstream-vue/commit/9dad9f2a21693efe94b51ebf71f02fc82a06f218))
+* inline plain text fast path ([aaad9f8](https://github.com/Simon-He95/markstream-vue/commit/aaad9f85a05bbe2d6254cc31abfb88792620fee5))
+* optimize nested list inline fast path ([c5d6adf](https://github.com/Simon-He95/markstream-vue/commit/c5d6adf644d796013709de25f05844ad6a985fb2))
+* optimize simple inline fast path ([a28de12](https://github.com/Simon-He95/markstream-vue/commit/a28de12041ef8ee66ef2c383634c95b2152036fd))
+* optimize simple inline text rendering ([0984b9a](https://github.com/Simon-He95/markstream-vue/commit/0984b9a9d13f9c57dbe6b1229ba733af99b84447))
+* reduce simple list and table renderer wrappers ([b892041](https://github.com/Simon-He95/markstream-vue/commit/b892041ebc33eddee47df6679cd630c7578656fc))
+* simplify static inline code rendering ([79f91c9](https://github.com/Simon-He95/markstream-vue/commit/79f91c9f91eefef05ca6309e3e6d1254860fb146))
+
+
+
 ## [1.0.1-beta.4](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.1-beta.2...markstream-vue@1.0.1-beta.4) (2026-06-03)
 
 
