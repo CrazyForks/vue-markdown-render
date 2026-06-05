@@ -59,6 +59,12 @@ function normalizeRendererLanguage(rawLang?: string | null) {
   return normalized || 'plaintext'
 }
 
+function getHighlightRegistrationKey(themes?: string[], langs?: string[]): string {
+  const themesKey = Array.isArray(themes) && themes.length > 0 ? themes.join('\0') : ''
+  const langsKey = Array.isArray(langs) && langs.length > 0 ? langs.join('\0') : ''
+  return `${themesKey}\0\0${langsKey}`
+}
+
 export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const props: Required<Pick<
     MarkdownCodeBlockNodeProps,
@@ -204,9 +210,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
 
     // Register highlight with current themes/langs after import
     if (registerHighlightRef.current) {
-      const themesKey = Array.isArray(props.themes) ? props.themes.join('\0') : ''
-      const langsKey = Array.isArray(props.langs) ? props.langs.join('\0') : ''
-      const key = `${themesKey}\x01${langsKey}`
+      const key = getHighlightRegistrationKey(props.themes, props.langs)
       if (registeredKeyRef.current !== key) {
         registeredKeyRef.current = key
         const opts: { themes?: string[], langs?: string[] } = {}
@@ -278,9 +282,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   useEffect(() => {
     if (!registerHighlightRef.current)
       return
-    const themesKey = Array.isArray(props.themes) ? props.themes.join('\0') : ''
-    const langsKey = Array.isArray(props.langs) ? props.langs.join('\0') : ''
-    const key = `${themesKey}\x01${langsKey}`
+    const key = getHighlightRegistrationKey(props.themes, props.langs)
     if (registeredKeyRef.current === key)
       return
     registeredKeyRef.current = key
