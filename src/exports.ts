@@ -117,7 +117,6 @@ export type {
   CodeBlockNodeProps,
   CodeBlockPreviewPayload,
   CodeBlockThemeProp,
-  CommonCodeBlockProps,
   D2BlockNodeProps,
   ImageNodeProps,
   InfographicBlockNodeProps,

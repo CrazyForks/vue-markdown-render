@@ -16,12 +16,15 @@ const SHIKI_LANGUAGE_ALIAS_MAP: Record<string, string> = {
   'plain': 'plaintext',
   'text': 'plaintext',
   'txt': 'plaintext',
+
   'js': 'javascript',
   'mjs': 'javascript',
   'cjs': 'javascript',
+
   'ts': 'typescript',
   'mts': 'typescript',
   'cts': 'typescript',
+
   'py': 'python',
   'rb': 'ruby',
   'rs': 'rust',
@@ -29,10 +32,21 @@ const SHIKI_LANGUAGE_ALIAS_MAP: Record<string, string> = {
   'kts': 'kotlin',
   'md': 'markdown',
   'yml': 'yaml',
+
+  'sh': 'shellscript',
+  'bash': 'shellscript',
+  'zsh': 'shellscript',
+  'shell': 'shellscript',
+  'shellscript': 'shellscript',
+
+  'ps': 'powershell',
   'ps1': 'powershell',
+  'pwsh': 'powershell',
+
   'c++': 'cpp',
   'c#': 'csharp',
   'cs': 'csharp',
+
   'objc': 'objective-c',
   'objectivec': 'objective-c',
   'objective-c': 'objective-c',

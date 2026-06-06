@@ -167,6 +167,15 @@ describe('markdown code block Shiki langs', () => {
     expect(getRegisterHighlightOptions(undefined, [])).toEqual({})
   })
 
+  it('normalizes common shell Shiki aliases', () => {
+    expect(getRegisterHighlightOptions(undefined, ['sh', 'bash', 'zsh'])).toEqual({
+      langs: ['shellscript'],
+    })
+    expect(getRegisterHighlightOptions(undefined, ['ps', 'ps1', 'pwsh'])).toEqual({
+      langs: ['powershell'],
+    })
+  })
+
   it('uses a stable registration key for reordered normalized langs', () => {
     expect(getHighlightRegistrationKey(['vitesse-light'], ['ts', 'js', 'ts'])).toBe(
       getHighlightRegistrationKey(['vitesse-light'], ['javascript', 'typescript']),
@@ -276,6 +285,30 @@ describe('markdown code block Shiki langs', () => {
       'csharp',
     )
     expect(wrapper.text()).toContain('C#')
+
+    wrapper.unmount()
+  })
+
+  it('matches bash fences when only sh is configured', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('bash', 'echo hi'),
+        langs: ['sh'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith(
+      expect.objectContaining({ langs: ['shellscript'] }),
+    )
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'echo hi',
+      'shellscript',
+    )
 
     wrapper.unmount()
   })
@@ -1286,6 +1319,64 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
     expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',
+      'typescript',
+    )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('waits for in-flight React stream-markdown import before rendering the latest code', async () => {
+    const importGate = createDeferred()
+    const gatedStreamMarkdownFactory = async () => {
+      await importGate.promise
+      return {
+        createShikiStreamRenderer: streamMarkdownMock.createShikiStreamRenderer,
+        defaultLanguages: streamMarkdownMock.defaultLanguages,
+        registerHighlight: streamMarkdownMock.registerHighlight,
+      }
+    }
+
+    vi.doMock('stream-markdown', gatedStreamMarkdownFactory)
+    vi.doMock('../packages/markstream-react/node_modules/stream-markdown', gatedStreamMarkdownFactory)
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('typescript', 'const stale = 1'),
+        langs: ['typescript'],
+      }))
+    })
+    await flushReact()
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('typescript', 'const fresh = 2'),
+        langs: ['typescript'],
+      }))
+    })
+    await flushReact()
+
+    expect(streamMarkdownMock.createShikiStreamRenderer).not.toHaveBeenCalled()
+
+    await act(async () => {
+      importGate.resolve()
+      await importGate.promise
+    })
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    expect(streamMarkdownMock.createdRenderers.at(-1)?.updateCode).toHaveBeenLastCalledWith(
+      'const fresh = 2',
       'typescript',
     )
 

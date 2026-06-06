@@ -195,6 +195,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const rendererConfigKeyRef = useRef('')
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
   const importAttemptedRef = useRef(false)
+  const streamMarkdownLoadPromiseRef = useRef<Promise<void> | null>(null)
   const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
   const defaultHighlightLanguagesRef = useRef<string[] | undefined>()
   const registeredHighlightLanguagesRef = useRef<Set<string> | undefined>()
@@ -250,21 +251,34 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [])
 
   const ensureStreamMarkdownLoaded = useCallback(async () => {
-    if (createRendererRef.current || importAttemptedRef.current)
+    if (createRendererRef.current)
       return
+    if (streamMarkdownLoadPromiseRef.current)
+      return streamMarkdownLoadPromiseRef.current
+    if (importAttemptedRef.current)
+      return
+
     importAttemptedRef.current = true
-    try {
-      const mod: any = await import('stream-markdown')
-      createRendererRef.current = mod.createShikiStreamRenderer
-      if (mod.registerHighlight)
-        registerHighlightRef.current = mod.registerHighlight
-      defaultHighlightLanguagesRef.current = Array.isArray(mod.defaultLanguages)
-        ? mod.defaultLanguages
-        : undefined
-    }
-    catch {
-      // optional peer
-    }
+
+    streamMarkdownLoadPromiseRef.current = (async () => {
+      try {
+        const mod: any = await import('stream-markdown')
+        createRendererRef.current = mod.createShikiStreamRenderer
+        if (mod.registerHighlight)
+          registerHighlightRef.current = mod.registerHighlight
+        defaultHighlightLanguagesRef.current = Array.isArray(mod.defaultLanguages)
+          ? mod.defaultLanguages
+          : undefined
+      }
+      catch {
+        // optional peer
+      }
+      finally {
+        streamMarkdownLoadPromiseRef.current = null
+      }
+    })()
+
+    return streamMarkdownLoadPromiseRef.current
   }, [])
 
   useEffect(() => {
