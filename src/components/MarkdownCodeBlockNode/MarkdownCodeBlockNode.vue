@@ -12,12 +12,13 @@ import {
 } from '../../utils/languageIcon'
 import {
   createRegisteredHighlightLanguages,
+  getEffectiveRegisterHighlightOptions,
+  getEffectiveShikiRendererOptions,
   getHighlightRegistrationKey,
-  getRegisterHighlightOptions,
   getShikiLanguageMatchKey,
-  getShikiRendererOptions,
   normalizeDisplayLanguage,
   normalizeShikiLanguage,
+  registerHighlightOnce,
 } from '../../utils/shikiLanguage'
 import CodeBlockShell from '../CodeBlockNode/CodeBlockShell.vue'
 
@@ -279,6 +280,7 @@ let createShikiRenderer:
 let registerHighlight:
   | ((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown)
   | undefined
+let defaultHighlightLanguages: string[] | undefined
 let registeredHighlightLanguages: Set<string> | undefined
 let registeredHighlightKey: string | null = null
 let latestHighlightRegistrationKey = ''
@@ -305,6 +307,15 @@ function disposeCurrentRenderer() {
   rendererConfigKey = null
   clearRendererTarget()
   rendererReady.value = false
+}
+
+function readDefaultLanguages(mod: unknown) {
+  const maybeDefaults = (mod as { defaultLanguages?: unknown }).defaultLanguages
+  if (!Array.isArray(maybeDefaults))
+    return undefined
+
+  const langs = maybeDefaults.filter((lang): lang is string => typeof lang === 'string')
+  return langs.length ? langs : undefined
 }
 
 const highlightRegistrationKey = computed(() =>
@@ -374,9 +385,11 @@ async function ensureStreamMarkdownLoaded() {
       const mod = await import('stream-markdown')
       createShikiRenderer = mod.createShikiStreamRenderer
       registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
+      defaultHighlightLanguages = readDefaultLanguages(mod)
     }
     catch (e) {
-      console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
+      if (isDevEnv)
+        console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
     }
     finally {
       streamMarkdownLoadPromise = null
@@ -389,19 +402,22 @@ async function ensureStreamMarkdownLoaded() {
 async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: readonly string[]): Promise<HighlightRegistrationStatus> {
   if (!registerHighlight)
     return 'ready'
-  const key = getHighlightRegistrationKey(themes, langs)
+  const opts = getEffectiveRegisterHighlightOptions(
+    themes,
+    langs,
+    defaultHighlightLanguages,
+  )
+  const key = getHighlightRegistrationKey(opts.themes, opts.langs)
   if (latestHighlightRegistrationKey !== key)
     return 'stale'
 
   if (registeredHighlightKey === key)
     return 'ready'
 
-  const opts = getRegisterHighlightOptions(themes, langs)
-  const effectiveLangs = opts.langs
   const seq = ++highlightRegistrationSeq
 
   try {
-    await registerHighlight(opts)
+    await registerHighlightOnce(registerHighlight, opts, key)
   }
   catch {
     if (seq !== highlightRegistrationSeq || latestHighlightRegistrationKey !== key)
@@ -413,12 +429,17 @@ async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: re
     return 'stale'
 
   registeredHighlightKey = key
-  registeredHighlightLanguages = createRegisteredHighlightLanguages(effectiveLangs)
+  registeredHighlightLanguages = createRegisteredHighlightLanguages(opts.langs)
   return 'ready'
 }
 
 async function waitForCurrentHighlightRegistration(themes?: readonly unknown[], langs?: readonly string[]) {
-  const key = getHighlightRegistrationKey(themes, langs)
+  const opts = getEffectiveRegisterHighlightOptions(
+    themes,
+    langs,
+    defaultHighlightLanguages,
+  )
+  const key = getHighlightRegistrationKey(opts.themes, opts.langs)
   const status = await ensureHighlightRegistered(themes, langs)
   if (status !== 'failed')
     return status
@@ -447,7 +468,11 @@ async function initRenderer(epoch: number) {
     return
   }
 
-  const rendererOptions = getShikiRendererOptions(props.themes, props.langs)
+  const rendererOptions = getEffectiveShikiRendererOptions(
+    props.themes,
+    props.langs,
+    defaultHighlightLanguages,
+  )
   const nextRendererConfigKey = getHighlightRegistrationKey(
     rendererOptions.themes,
     rendererOptions.langs,

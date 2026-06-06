@@ -8,12 +8,13 @@ import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonToolti
 import { getLanguageIcon, languageMap, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
 import {
   createRegisteredHighlightLanguages,
+  getEffectiveRegisterHighlightOptions,
+  getEffectiveShikiRendererOptions,
   getHighlightRegistrationKey,
-  getRegisterHighlightOptions,
   getShikiLanguageMatchKey,
-  getShikiRendererOptions,
   normalizeDisplayLanguage,
   normalizeShikiLanguage,
+  registerHighlightOnce,
 } from '../../utils/shikiLanguage'
 
 export interface MarkdownCodeBlockNodeProps extends ShikiCodeBlockProps {
@@ -57,17 +58,34 @@ interface HighlightRegistrationConfig {
   rendererOptions: Pick<ShikiRendererOptions, 'themes' | 'langs'>
 }
 
+interface HighlightRegistrationInput {
+  key: string
+  themes?: readonly unknown[]
+  langs?: readonly string[]
+}
+
 function createHighlightRegistrationConfig(
   themes?: readonly unknown[],
   langs?: readonly string[],
-  key = getHighlightRegistrationKey(themes, langs),
+  fallbackLangs?: readonly string[],
 ): HighlightRegistrationConfig {
-  const registerOptions = getRegisterHighlightOptions(themes, langs)
+  const registerOptions = getEffectiveRegisterHighlightOptions(themes, langs, fallbackLangs)
+  const rendererOptions = getEffectiveShikiRendererOptions(themes, langs, fallbackLangs)
+
   return {
-    key,
+    key: getHighlightRegistrationKey(rendererOptions.themes, rendererOptions.langs),
     registerOptions,
-    rendererOptions: getShikiRendererOptions(themes, langs),
+    rendererOptions,
   }
+}
+
+function readDefaultLanguages(mod: unknown) {
+  const maybeDefaults = (mod as { defaultLanguages?: unknown }).defaultLanguages
+  if (!Array.isArray(maybeDefaults))
+    return undefined
+
+  const langs = maybeDefaults.filter((lang): lang is string => typeof lang === 'string')
+  return langs.length ? langs : undefined
 }
 
 function escapeHtml(str: string) {
@@ -180,11 +198,15 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const [defaultFontSize, setDefaultFontSize] = useState<number>(14)
   const [fontSize, setFontSize] = useState<number>(defaultFontSize)
   const tooltipsEnabled = useMemo(() => props.showTooltips !== false, [props.showTooltips])
-  const registrationKey = getHighlightRegistrationKey(props.themes, props.langs)
-  const registrationConfigRef = useRef<HighlightRegistrationConfig | null>(null)
-  if (!registrationConfigRef.current || registrationConfigRef.current.key !== registrationKey)
-    registrationConfigRef.current = createHighlightRegistrationConfig(props.themes, props.langs, registrationKey)
-  const registrationConfig = registrationConfigRef.current
+  const registrationInputKey = getHighlightRegistrationKey(props.themes, props.langs)
+  const registrationInputRef = useRef<HighlightRegistrationInput | null>(null)
+  if (!registrationInputRef.current || registrationInputRef.current.key !== registrationInputKey) {
+    registrationInputRef.current = {
+      key: registrationInputKey,
+      themes: props.themes,
+      langs: props.langs,
+    }
+  }
 
   const viewportTargetRef = useRef<HTMLDivElement | null>(null)
   const codeBlockContentRef = useRef<HTMLDivElement | null>(null)
@@ -192,13 +214,13 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const rendererRef = useRef<ShikiRenderer | null>(null)
   const rendererConfigKeyRef = useRef('')
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
-  const importAttemptedRef = useRef(false)
   const streamMarkdownLoadPromiseRef = useRef<Promise<void> | null>(null)
   const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
+  const defaultHighlightLanguagesRef = useRef<string[] | undefined>()
   const registeredHighlightLanguagesRef = useRef<Set<string> | undefined>()
   const registeredKeyRef = useRef<string>('')
   const highlightRegistrationSeqRef = useRef(0)
-  const latestRegistrationKeyRef = useRef(registrationKey)
+  const latestRegistrationKeyRef = useRef(registrationInputKey)
   const renderSeqRef = useRef(0)
   const mountedRef = useRef(true)
   const viewportHandleRef = useRef<VisibilityHandle | null>(null)
@@ -252,17 +274,13 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       return
     if (streamMarkdownLoadPromiseRef.current)
       return streamMarkdownLoadPromiseRef.current
-    if (importAttemptedRef.current)
-      return
-
-    importAttemptedRef.current = true
 
     streamMarkdownLoadPromiseRef.current = (async () => {
       try {
         const mod: any = await import('stream-markdown')
         createRendererRef.current = mod.createShikiStreamRenderer
-        if (mod.registerHighlight)
-          registerHighlightRef.current = mod.registerHighlight
+        registerHighlightRef.current = mod.registerHighlight ?? null
+        defaultHighlightLanguagesRef.current = readDefaultLanguages(mod)
       }
       catch {
         // optional peer
@@ -275,12 +293,10 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     return streamMarkdownLoadPromiseRef.current
   }, [])
 
-  useEffect(() => {
-    latestRegistrationKeyRef.current = registrationConfig.key
-  }, [registrationConfig])
-
-  const ensureHighlightRegistered = useCallback(async (): Promise<HighlightRegistrationStatus> => {
-    const key = registrationConfig.key
+  const ensureHighlightRegistered = useCallback(async (
+    config: HighlightRegistrationConfig,
+  ): Promise<HighlightRegistrationStatus> => {
+    const key = config.key
 
     if (latestRegistrationKeyRef.current !== key)
       return 'stale'
@@ -290,11 +306,15 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
 
     if (registeredKeyRef.current === key)
       return 'ready'
-    const effectiveLangs = registrationConfig.registerOptions.langs
+
     const seq = ++highlightRegistrationSeqRef.current
 
     try {
-      await registerHighlightRef.current(registrationConfig.registerOptions)
+      await registerHighlightOnce(
+        registerHighlightRef.current,
+        config.registerOptions,
+        key,
+      )
     }
     catch {
       if (seq !== highlightRegistrationSeqRef.current || latestRegistrationKeyRef.current !== key)
@@ -306,20 +326,20 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       return 'stale'
 
     registeredKeyRef.current = key
-    registeredHighlightLanguagesRef.current = createRegisteredHighlightLanguages(effectiveLangs)
+    registeredHighlightLanguagesRef.current = createRegisteredHighlightLanguages(config.registerOptions.langs)
     return 'ready'
-  }, [registrationConfig])
+  }, [])
 
-  const waitForCurrentHighlightRegistration = useCallback(async () => {
-    const status = await ensureHighlightRegistered()
+  const waitForCurrentHighlightRegistration = useCallback(async (config: HighlightRegistrationConfig) => {
+    const status = await ensureHighlightRegistered(config)
     if (status !== 'failed')
       return status
 
-    if (latestRegistrationKeyRef.current !== registrationConfig.key)
+    if (latestRegistrationKeyRef.current !== config.key)
       return 'stale'
 
-    return ensureHighlightRegistered()
-  }, [ensureHighlightRegistered, registrationConfig])
+    return ensureHighlightRegistered(config)
+  }, [ensureHighlightRegistered])
 
   const updateRendererWithFallback = useCallback(async (
     code: string,
@@ -359,9 +379,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     const seq = nextRenderSeq()
     const code = props.node.code
     const rawLang = props.node.language
-    const key = registrationConfig.key
-
-    latestRegistrationKeyRef.current = key
+    const registrationInput = registrationInputRef.current
 
     if (!viewportReady) {
       renderFallback(code)
@@ -372,10 +390,18 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (!isCurrentRenderSeq(seq))
       return
 
+    const currentRegistrationConfig = createHighlightRegistrationConfig(
+      registrationInput?.themes,
+      registrationInput?.langs,
+      defaultHighlightLanguagesRef.current,
+    )
+    const key = currentRegistrationConfig.key
+    latestRegistrationKeyRef.current = key
+
     if (rendererRef.current && rendererConfigKeyRef.current !== key)
       disposeCurrentRenderer()
 
-    const highlightStatus = await waitForCurrentHighlightRegistration()
+    const highlightStatus = await waitForCurrentHighlightRegistration(currentRegistrationConfig)
     if (!isCurrentRenderSeq(seq) || highlightStatus === 'stale')
       return
     if (highlightStatus === 'failed') {
@@ -391,8 +417,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (!rendererRef.current && createRendererRef.current) {
       rendererRef.current = createRendererRef.current(rendererTargetRef.current, {
         theme: getPreferredColorScheme(),
-        themes: registrationConfig.rendererOptions.themes,
-        langs: registrationConfig.rendererOptions.langs,
+        themes: currentRegistrationConfig.rendererOptions.themes,
+        langs: currentRegistrationConfig.rendererOptions.langs,
       })
       rendererConfigKeyRef.current = key
       setRendererReady(true)
@@ -416,7 +442,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     props.node.language,
     props.stream,
     props.loading,
-    registrationConfig,
+    registrationInputKey,
     viewportReady,
     ensureStreamMarkdownLoaded,
     waitForCurrentHighlightRegistration,

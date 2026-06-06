@@ -8,12 +8,13 @@ import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingleto
 import { getLanguageIcon, languageIconsRevision, languageMap } from '../../utils'
 import {
   createRegisteredHighlightLanguages,
+  getEffectiveRegisterHighlightOptions,
+  getEffectiveShikiRendererOptions,
   getHighlightRegistrationKey,
-  getRegisterHighlightOptions,
   getShikiLanguageMatchKey,
-  getShikiRendererOptions,
   normalizeDisplayLanguage,
   normalizeShikiLanguage,
+  registerHighlightOnce,
 } from '../../utils/shikiLanguage'
 
 interface MarkdownCodeBlockNodeProps {
@@ -333,6 +334,7 @@ let createShikiRenderer:
 let registerHighlight:
   | ((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown)
   | undefined
+let defaultHighlightLanguages: string[] | undefined
 let registeredHighlightLanguages: Set<string> | undefined
 let registeredHighlightKey: string | null = null
 let latestHighlightRegistrationKey = ''
@@ -361,6 +363,15 @@ function disposeCurrentRenderer(options: { resetStableRender?: boolean } = {}) {
   rendererReady.value = false
   if (options.resetStableRender)
     hasStableRender.value = false
+}
+
+function readDefaultLanguages(mod: unknown) {
+  const maybeDefaults = (mod as { defaultLanguages?: unknown }).defaultLanguages
+  if (!Array.isArray(maybeDefaults))
+    return undefined
+
+  const langs = maybeDefaults.filter((lang): lang is string => typeof lang === 'string')
+  return langs.length ? langs : undefined
 }
 
 const highlightRegistrationKey = computed(() =>
@@ -422,19 +433,22 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null,
 async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: readonly string[]): Promise<HighlightRegistrationStatus> {
   if (!registerHighlight)
     return 'ready'
-  const key = getHighlightRegistrationKey(themes, langs)
+  const opts = getEffectiveRegisterHighlightOptions(
+    themes,
+    langs,
+    defaultHighlightLanguages,
+  )
+  const key = getHighlightRegistrationKey(opts.themes, opts.langs)
   if (latestHighlightRegistrationKey !== key)
     return 'stale'
 
   if (registeredHighlightKey === key)
     return 'ready'
 
-  const opts = getRegisterHighlightOptions(themes, langs)
-  const effectiveLangs = opts.langs
   const seq = ++highlightRegistrationSeq
 
   try {
-    await registerHighlight(opts)
+    await registerHighlightOnce(registerHighlight, opts, key)
   }
   catch {
     if (seq !== highlightRegistrationSeq || latestHighlightRegistrationKey !== key)
@@ -446,12 +460,17 @@ async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: re
     return 'stale'
 
   registeredHighlightKey = key
-  registeredHighlightLanguages = createRegisteredHighlightLanguages(effectiveLangs)
+  registeredHighlightLanguages = createRegisteredHighlightLanguages(opts.langs)
   return 'ready'
 }
 
 async function waitForCurrentHighlightRegistration(themes?: readonly unknown[], langs?: readonly string[]) {
-  const key = getHighlightRegistrationKey(themes, langs)
+  const opts = getEffectiveRegisterHighlightOptions(
+    themes,
+    langs,
+    defaultHighlightLanguages,
+  )
+  const key = getHighlightRegistrationKey(opts.themes, opts.langs)
   const status = await ensureHighlightRegistered(themes, langs)
   if (status !== 'failed')
     return status
@@ -473,6 +492,7 @@ async function ensureStreamMarkdownLoaded() {
       const mod = await import('stream-markdown')
       createShikiRenderer = mod.createShikiStreamRenderer
       registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
+      defaultHighlightLanguages = readDefaultLanguages(mod)
     }
     catch (e) {
       if (isDevEnv)
@@ -499,7 +519,11 @@ async function initRenderer(epoch: number) {
     return
   }
 
-  const rendererOptions = getShikiRendererOptions(getResolvedThemes(), props.langs)
+  const rendererOptions = getEffectiveShikiRendererOptions(
+    getResolvedThemes(),
+    props.langs,
+    defaultHighlightLanguages,
+  )
   const nextRendererConfigKey = getHighlightRegistrationKey(
     rendererOptions.themes,
     rendererOptions.langs,
