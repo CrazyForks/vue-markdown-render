@@ -585,6 +585,7 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   infographicProps: props.infographicProps,
   showTooltips: resolvedShowTooltips.value,
   themes: props.themes,
+  langs: props.langs,
   isDark: props.isDark,
   typewriter: props.typewriter,
   smoothStreamingOptions: props.smoothStreamingOptions,
@@ -1763,6 +1764,8 @@ function getVirtualRendererLayoutKey() {
   const renderer = resolvedCodeRenderer.value
   const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
   const codeProps = props.codeBlockProps as Record<string, unknown> | undefined
+  const includeShikiCodeOptions = renderer === 'shiki'
+    || Boolean(customComponentsMap.value.code_block)
 
   return [
     props.isDark ? 'dark' : 'light',
@@ -1774,8 +1777,8 @@ function getVirtualRendererLayoutKey() {
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
     stringifyVirtualToken(props.codeBlockMinWidth),
     stringifyVirtualToken(props.codeBlockMaxWidth),
-    renderer === 'shiki' ? stringifyVirtualToken(codeProps?.themes ?? props.themes) : '',
-    renderer === 'shiki' ? stringifyVirtualToken(codeProps?.langs ?? props.langs) : '',
+    includeShikiCodeOptions ? stringifyVirtualToken(codeProps?.themes ?? props.themes) : '',
+    includeShikiCodeOptions ? stringifyVirtualToken(codeProps?.langs ?? props.langs) : '',
     stringifyVirtualToken(monaco?.fontSize),
     stringifyVirtualToken(monaco?.lineHeight),
     stringifyVirtualToken(monaco?.fontFamily),
@@ -5125,6 +5128,12 @@ const codeBlockBindings = computed(() => ({
   ...(props.codeBlockProps || {}),
 }))
 
+const customCodeBlockBindings = computed(() => ({
+  ...codeBlockBindings.value,
+  langs: props.langs,
+  ...(props.codeBlockProps || {}),
+}))
+
 function pickBoolean(value: unknown) {
   return typeof value === 'boolean' ? value : undefined
 }
@@ -5381,6 +5390,10 @@ function isCustomCodeBlockComponent(component: unknown) {
   return Boolean(component && component === customComponentsMap.value.code_block)
 }
 
+function isCustomLanguageCodeBlockComponent(component: unknown, language?: string) {
+  return Boolean(component && language && component === customComponentsMap.value[language])
+}
+
 function shouldUsePreCodeBindings(
   node: ParsedNode,
   language: string,
@@ -5454,7 +5467,7 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
     return preCodeBlockBindings.value
 
   if (node.type === 'code_block' && isCustomCodeBlockComponent(component))
-    return codeBlockBindings.value
+    return customCodeBlockBindings.value
 
   if (node.type === 'code_block' && isMarkdownCodeBlockComponent(component))
     return shikiCodeBlockBindings.value
@@ -5467,6 +5480,9 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
 
   if (lang === 'd2' || lang === 'd2lang')
     return d2Bindings.value
+
+  if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang))
+    return customCodeBlockBindings.value
 
   if (node.type === 'link')
     return linkBindings.value

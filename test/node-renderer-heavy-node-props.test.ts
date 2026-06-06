@@ -73,6 +73,7 @@ const GenericCodeBlockAttrsProbe = defineComponent({
       'data-has-stream': String(Object.prototype.hasOwnProperty.call(attrs, 'stream')),
       'data-has-monaco-options': String(Object.prototype.hasOwnProperty.call(attrs, 'monacoOptions')),
       'data-has-themes': String(Object.prototype.hasOwnProperty.call(attrs, 'themes')),
+      'data-langs': JSON.stringify(attrs.langs ?? null),
     })
   },
 })
@@ -355,6 +356,66 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     await flushAll()
 
     expect(wrapper.get('.code-block-container').attributes('data-langs')).toBe('["python"]')
+  })
+
+  it('forwards top-level langs to nested shiki renderers', async () => {
+    setCustomComponents(customId, {
+      'answer-box': AnswerBox,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        codeRenderer: 'shiki',
+        langs: ['typescript'],
+        content: [
+          '<answer-box>',
+          '```ts',
+          'console.log(1)',
+          '```',
+          '</answer-box>',
+        ].join('\n'),
+        customHtmlTags: ['answer-box'],
+        final: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    for (let attempt = 0; attempt < 10 && !wrapper.find('.code-block-container').exists(); attempt++)
+      await flushAll()
+
+    expect(wrapper.get('.answer-box .code-block-container').attributes('data-langs')).toBe('["typescript"]')
+  })
+
+  it('forwards top-level langs to custom code_block renderers without forcing codeRenderer="shiki"', async () => {
+    setCustomComponents(customId, {
+      code_block: GenericCodeBlockAttrsProbe as any,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        langs: ['typescript'],
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        batchRendering: false,
+        maxLiveNodes: 0,
+      },
+    })
+
+    for (let attempt = 0; attempt < 10 && !wrapper.find('.generic-code-block-attrs-probe').exists(); attempt++)
+      await flushAll()
+
+    expect(wrapper.get('.generic-code-block-attrs-probe').attributes('data-langs')).toBe('["typescript"]')
   })
 
   it('ignores invalid runtime codeRenderer values', async () => {

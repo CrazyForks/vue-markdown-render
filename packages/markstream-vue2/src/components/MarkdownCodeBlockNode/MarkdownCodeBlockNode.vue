@@ -2,7 +2,8 @@
 import type { PropType } from 'vue-demi'
 import type { MarkdownCodeBlockPreviewPayload } from '../../types/component-props'
 import type { RegisterHighlightOptions, ShikiRendererOptions } from '../../utils/shikiLanguage'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
+import { onBeforeUnmount, onMounted } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { getLanguageIcon, languageIconsRevision, languageMap } from '../../utils'
@@ -566,7 +567,6 @@ async function safeInitRenderer(epoch = nextRenderEpoch()) {
   }
 }
 
-void safeInitRenderer()
 onMounted(() => {
   void safeInitRenderer()
 })
