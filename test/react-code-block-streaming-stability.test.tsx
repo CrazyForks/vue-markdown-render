@@ -154,6 +154,53 @@ describe('markstream-react code block streaming stability', () => {
     })
   })
 
+  it('forwards code block props to custom mermaid renderers on client and server', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    setCustomComponents(scopeId, { mermaid: CodeBlockProbe as any })
+
+    const node = {
+      type: 'code_block',
+      language: 'mermaid',
+      code: 'flowchart TD\nA-->B',
+      raw: '```mermaid\nflowchart TD\nA-->B\n```',
+    }
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(NodeRenderer as any, {
+        customId: scopeId,
+        nodes: [node],
+        langs: ['mermaid'],
+        codeBlockStream: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        batchRendering: false,
+        maxLiveNodes: 0,
+      }))
+    })
+    await flushReact()
+
+    const probe = host.querySelector('.code-block-probe') as HTMLElement | null
+    expect(probe?.getAttribute('data-langs')).toBe('["mermaid"]')
+    expect(probe?.getAttribute('data-stream')).toBe('false')
+
+    const html = renderToStaticMarkup(React.createElement(ServerNodeRenderer as any, {
+      customId: scopeId,
+      nodes: [node],
+      langs: ['mermaid'],
+      codeBlockStream: false,
+    }))
+
+    expect(html).toContain('data-langs="[&quot;mermaid&quot;]"')
+    expect(html).toContain('data-stream="false"')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
   it('does not let codeBlockProps override custom code_block structural props', async () => {
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
     setCustomComponents(scopeId, { code_block: CodeBlockProbe as any })

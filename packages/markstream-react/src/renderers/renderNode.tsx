@@ -71,6 +71,7 @@ function renderCustomCodeBlockComponent(
   node: any,
   key: React.Key,
   ctx: RenderContext,
+  specialProps: Record<string, unknown> = {},
 ) {
   const extraProps = getCustomCodeBlockExtraProps(ctx)
   return React.createElement(component, {
@@ -80,6 +81,7 @@ function renderCustomCodeBlockComponent(
     stream: ctx.codeBlockStream,
     customId: ctx.customId,
     isDark: ctx.isDark,
+    ...specialProps,
     darkTheme: ctx.codeBlockThemes?.darkTheme,
     lightTheme: ctx.codeBlockThemes?.lightTheme,
     themes: ctx.codeBlockThemes?.themes,
@@ -133,7 +135,7 @@ function renderCodeBlock(
     const mermaidProps = getMermaidRenderProps(node, ctx)
     const customMermaid = customForLanguage || customComponents.mermaid
     if (customMermaid)
-      return React.createElement(customMermaid as any, { key, node, isDark: ctx.isDark, ...mermaidProps })
+      return renderCustomCodeBlockComponent(customMermaid, node, key, ctx, mermaidProps)
     if (!ctx.renderCodeBlocksAsPre) {
       return (
         <MermaidBlockNode
@@ -151,7 +153,7 @@ function renderCodeBlock(
     const infographicProps = getInfographicRenderProps(node, ctx)
     const customInfographic = customForLanguage || customComponents.infographic
     if (customInfographic)
-      return React.createElement(customInfographic as any, { key, node, isDark: ctx.isDark, ...infographicProps })
+      return renderCustomCodeBlockComponent(customInfographic, node, key, ctx, infographicProps)
 
     return (
       <InfographicBlockNode
@@ -167,7 +169,7 @@ function renderCodeBlock(
   if (language === 'd2' || language === 'd2lang') {
     const customD2 = customForLanguage || customComponents.d2
     if (customD2)
-      return React.createElement(customD2 as any, { key, node, isDark: ctx.isDark, ...(ctx.d2Props || {}) })
+      return renderCustomCodeBlockComponent(customD2, node, key, ctx, ctx.d2Props || {})
 
     return (
       <D2BlockNode

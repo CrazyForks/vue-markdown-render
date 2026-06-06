@@ -2,7 +2,7 @@
 import type { BaseNode, HtmlPolicy, ParsedNode } from 'stream-markdown-parser'
 import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, ShikiCodeBlockProps } from '../../types/component-props'
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
-import { computed, getCurrentInstance, provide } from 'vue-demi'
+import { computed, provide } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -87,7 +87,6 @@ const emit = defineEmits<{
   (e: 'handleArtifactClick', payload: CodeBlockPreviewPayload): void
   (e: 'click', event: MouseEvent): void
 }>()
-const instance = getCurrentInstance()
 
 provide('markstreamTypewriter', computed(() => props.typewriter === true))
 provide('markstreamFade', computed(() => props.fade !== false))
@@ -99,16 +98,6 @@ function handleCopy(code: string) {
 function handleArtifactClick(payload: CodeBlockPreviewPayload) {
   emit('handleArtifactClick', payload)
 }
-
-;(handleCopy as any).fns = handleCopy
-;(handleArtifactClick as any).fns = handleArtifactClick
-
-const forwardedChildListeners = {
-  'copy': handleCopy,
-  'handle-artifact-click': handleArtifactClick,
-}
-const listeners = (instance?.proxy as any)?.$listeners ?? {}
-const hasForwardedChildListeners = Boolean(listeners.copy || listeners.handleArtifactClick || listeners['handle-artifact-click'])
 
 const nodeComponents = {
   text: TextNode,
@@ -257,7 +246,7 @@ const renderedItems = computed(() => {
       node,
       isCodeBlock: node?.type === 'code_block',
       component,
-      bindings: getBindingsFor(node, language),
+      bindings: getBindingsFor(node, language, component),
     }
   })
 })
@@ -301,16 +290,32 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   return (nodeComponents as any)[String((node as any).type)] || FallbackComponent
 }
 
-function getBindingsFor(node: ParsedNode, language?: string) {
+function isCustomCodeBlockComponent(component: unknown) {
+  return Boolean(component && component === customComponentsMap.value.code_block)
+}
+
+function isCustomLanguageCodeBlockComponent(component: unknown, language?: string) {
+  return Boolean(component && language && component === (customComponentsMap.value as any)[language])
+}
+
+function getBindingsFor(node: ParsedNode, language?: string, component?: unknown) {
   const lang = language ?? getCodeBlockLanguage(node)
+  if (
+    node.type === 'code_block'
+    && (
+      isCustomCodeBlockComponent(component)
+      || isCustomLanguageCodeBlockComponent(component, lang)
+    )
+  ) {
+    return customCodeBlockBindings.value
+  }
+
   if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
     return {}
   if (node.type === 'link')
     return linkBindings.value
   if (node.type === 'list')
     return listBindings.value
-  if (node.type === 'code_block' && (customComponentsMap.value.code_block || (lang && (customComponentsMap.value as any)[lang])))
-    return customCodeBlockBindings.value
   return node.type === 'code_block'
     ? codeBlockBindings.value
     : nonCodeBindings.value
@@ -333,7 +338,6 @@ function handleClick(event: MouseEvent) {
       <div class="node-content">
         <component
           :is="item.component"
-          v-if="hasForwardedChildListeners"
           :key="`${item.renderKey}-component`"
           :node="item.node"
           :loading="item.node.loading"
@@ -341,18 +345,8 @@ function handleClick(event: MouseEvent) {
           v-bind="item.bindings"
           :custom-id="props.customId"
           :is-dark="props.isDark"
-          v-on="forwardedChildListeners"
-        />
-        <component
-          :is="item.component"
-          v-else
-          :key="`${item.renderKey}-component`"
-          :node="item.node"
-          :loading="item.node.loading"
-          :index-key="item.indexKey"
-          v-bind="item.bindings"
-          :custom-id="props.customId"
-          :is-dark="props.isDark"
+          @copy="handleCopy"
+          @handle-artifact-click="handleArtifactClick"
         />
       </div>
     </div>

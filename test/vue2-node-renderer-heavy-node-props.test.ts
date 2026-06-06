@@ -91,6 +91,20 @@ const GenericCodeBlockAttrsProbe = defineComponent({
   },
 })
 
+const CopyEmitterProbe = defineComponent({
+  name: 'CopyEmitterProbe',
+  props: {
+    node: { type: Object, required: true },
+  },
+  emits: ['copy'],
+  setup(props, { emit }) {
+    return () => h('button', {
+      class: 'copy-emitter-probe',
+      onClick: () => emit('copy', (props.node as any).code),
+    }, 'copy')
+  },
+})
+
 const ReservedCodeBlockPropsProbe = defineComponent({
   name: 'ReservedCodeBlockPropsProbe',
   props: {
@@ -388,6 +402,57 @@ describe('markstream-vue2 heavy-node prop forwarding', () => {
     expect(probe.attributes('data-language')).toBe('ts')
     expect(probe.attributes('data-index-key')).toBe('legacy-renderer-0')
     expect(probe.attributes('data-show-header')).toBe('false')
+  })
+
+  it('forwards top-level langs to legacy exact custom mermaid renderers', async () => {
+    setCustomComponents(customId, {
+      mermaid: GenericCodeBlockAttrsProbe as any,
+    })
+
+    const wrapper = mount(LegacyNodesRenderer as any, {
+      props: {
+        customId,
+        langs: ['mermaid'],
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'mermaid',
+            code: 'flowchart TD\nA-->B',
+            raw: '```mermaid\nflowchart TD\nA-->B\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.generic-code-block-attrs-probe')
+    expect(probe.attributes('data-language')).toBe('mermaid')
+    expect(probe.attributes('data-langs')).toBe('["mermaid"]')
+  })
+
+  it('re-emits copy from legacy custom code block renderers', async () => {
+    setCustomComponents(customId, {
+      code_block: CopyEmitterProbe as any,
+    })
+
+    const wrapper = mount(LegacyNodesRenderer as any, {
+      props: {
+        customId,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await wrapper.get('.copy-emitter-probe').trigger('click')
+
+    expect(wrapper.emitted('copy')?.[0]).toEqual(['export const value = 1'])
   })
 
   it('lets d2lang exact overrides beat d2 fallback while keeping d2 props', async () => {

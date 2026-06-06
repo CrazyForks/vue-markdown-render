@@ -1961,7 +1961,7 @@ const legacyRenderedItems = computed(() => {
     return {
       node: resolvedNode,
       component,
-      bindings: getBindingsFor(resolvedNode, language),
+      bindings: getBindingsFor(resolvedNode, language, component),
       isCodeBlock: resolvedNode.type === 'code_block',
       index,
       indexKey: `${indexPrefix.value}-${index}`,
@@ -2029,7 +2029,7 @@ const renderedItems = computed(() => {
       ...item,
       node,
       component,
-      bindings: getBindingsFor(node, language),
+      bindings: getBindingsFor(node, language, component),
       isCodeBlock: node.type === 'code_block',
       indexKey: `${indexPrefix.value}-${item.index}`,
       renderKey: getRenderKey(node, item.index),
@@ -2188,8 +2188,32 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   return (nodeComponents as any)[String((node as any).type)] || FallbackComponent
 }
 
-function getBindingsFor(node: ParsedNode, language?: string) {
+function isCustomCodeBlockComponent(component: unknown) {
+  return Boolean(component && component === (customComponentsMap.value as any).code_block)
+}
+
+function isCustomLanguageCodeBlockComponent(component: unknown, language?: string) {
+  return Boolean(component && language && component === (customComponentsMap.value as any)[language])
+}
+
+function getBindingsFor(node: ParsedNode, language?: string, component?: unknown) {
   const lang = language ?? getCodeBlockLanguage(node)
+  if (node.type === 'code_block' && isCustomCodeBlockComponent(component))
+    return customCodeBlockBindings.value
+
+  if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang)) {
+    if (lang === 'mermaid')
+      return { ...getMermaidBindingsFor(node), ...customCodeBlockBindings.value }
+
+    if (lang === 'infographic')
+      return { ...getInfographicBindingsFor(node), ...customCodeBlockBindings.value }
+
+    if (lang === 'd2' || lang === 'd2lang')
+      return { ...d2Bindings.value, ...customCodeBlockBindings.value }
+
+    return customCodeBlockBindings.value
+  }
+
   if (lang === 'mermaid')
     return getMermaidBindingsFor(node)
 
@@ -2204,9 +2228,6 @@ function getBindingsFor(node: ParsedNode, language?: string) {
 
   if (node.type === 'list')
     return listBindings.value
-
-  if (node.type === 'code_block' && (customComponentsMap.value.code_block || (lang && (customComponentsMap.value as any)[lang])))
-    return customCodeBlockBindings.value
 
   return node.type === 'code_block'
     ? codeBlockBindings.value

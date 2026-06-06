@@ -16,10 +16,24 @@ export type RegisterHighlightFn
 
 type SharedHighlightRegistrationStatus = 'ready'
 
-const sharedHighlightRegistrationTasks = new Map<
+type HighlightRegistrationTaskMap = Map<
   string,
   Promise<SharedHighlightRegistrationStatus>
+>
+
+const sharedHighlightRegistrationTasks = new WeakMap<
+  RegisterHighlightFn,
+  HighlightRegistrationTaskMap
 >()
+
+function getHighlightRegistrationTasks(registerHighlight: RegisterHighlightFn) {
+  let tasks = sharedHighlightRegistrationTasks.get(registerHighlight)
+  if (!tasks) {
+    tasks = new Map()
+    sharedHighlightRegistrationTasks.set(registerHighlight, tasks)
+  }
+  return tasks
+}
 
 // Shiki ids are not display/icon ids; keep this map limited to safe Shiki aliases.
 const SHIKI_LANGUAGE_ALIAS_MAP: Record<string, string> = {
@@ -210,7 +224,8 @@ export async function registerHighlightOnce(
   if (!registerHighlight)
     return 'ready'
 
-  const cached = sharedHighlightRegistrationTasks.get(key)
+  const tasks = getHighlightRegistrationTasks(registerHighlight)
+  const cached = tasks.get(key)
   if (cached)
     return cached
 
@@ -218,10 +233,10 @@ export async function registerHighlightOnce(
     .then(() => registerHighlight(opts))
     .then(() => 'ready' as const)
     .catch((err) => {
-      sharedHighlightRegistrationTasks.delete(key)
+      tasks.delete(key)
       throw err
     })
 
-  sharedHighlightRegistrationTasks.set(key, task)
+  tasks.set(key, task)
   return task
 }

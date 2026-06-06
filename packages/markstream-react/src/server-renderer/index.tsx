@@ -125,6 +125,38 @@ function getCustomCodeBlockExtraProps(ctx: RenderContext) {
   return extraProps
 }
 
+function renderCustomCodeBlockComponent(
+  component: any,
+  node: any,
+  key: React.Key,
+  ctx: RenderContext,
+  specialProps: Record<string, unknown> = {},
+) {
+  const extraProps = getCustomCodeBlockExtraProps(ctx)
+
+  return React.createElement(component as any, {
+    key,
+    node,
+    loading: Boolean(node.loading),
+    stream: ctx.codeBlockStream,
+    customId: ctx.customId,
+    isDark: ctx.isDark,
+    ...specialProps,
+    darkTheme: ctx.codeBlockThemes?.darkTheme,
+    lightTheme: ctx.codeBlockThemes?.lightTheme,
+    themes: ctx.codeBlockThemes?.themes,
+    langs: ctx.codeBlockThemes?.langs,
+    minWidth: ctx.codeBlockThemes?.minWidth,
+    maxWidth: ctx.codeBlockThemes?.maxWidth,
+    onCopy: ctx.events.onCopy,
+    ...extraProps,
+    ctx,
+    renderNode,
+    indexKey: key,
+    typewriter: ctx.typewriter,
+  })
+}
+
 function createRenderContext(
   props: NodeRendererProps,
   customComponents: CustomComponentMap,
@@ -210,14 +242,8 @@ function renderCodeBlock(
   if (language === 'mermaid') {
     const mermaidProps = getMermaidRenderProps(node, ctx)
     const customMermaid = customForLanguage || customComponents.mermaid
-    if (customMermaid) {
-      return React.createElement(customMermaid as any, {
-        key,
-        node,
-        isDark: ctx.isDark,
-        ...mermaidProps,
-      })
-    }
+    if (customMermaid)
+      return renderCustomCodeBlockComponent(customMermaid, node, key, ctx, mermaidProps)
     return (
       <MermaidBlockNode
         key={key}
@@ -232,14 +258,8 @@ function renderCodeBlock(
   if (language === 'infographic') {
     const infographicProps = getInfographicRenderProps(node, ctx)
     const customInfographic = customForLanguage || customComponents.infographic
-    if (customInfographic) {
-      return React.createElement(customInfographic as any, {
-        key,
-        node,
-        isDark: ctx.isDark,
-        ...infographicProps,
-      })
-    }
+    if (customInfographic)
+      return renderCustomCodeBlockComponent(customInfographic, node, key, ctx, infographicProps)
     return (
       <InfographicBlockNode
         key={key}
@@ -253,14 +273,8 @@ function renderCodeBlock(
 
   if (language === 'd2' || language === 'd2lang') {
     const customD2 = customForLanguage || customComponents.d2
-    if (customD2) {
-      return React.createElement(customD2 as any, {
-        key,
-        node,
-        isDark: ctx.isDark,
-        ...(ctx.d2Props || {}),
-      })
-    }
+    if (customD2)
+      return renderCustomCodeBlockComponent(customD2, node, key, ctx, ctx.d2Props || {})
     return (
       <D2BlockNode
         key={key}
@@ -272,56 +286,12 @@ function renderCodeBlock(
     )
   }
 
-  if (customForLanguage) {
-    const extraProps = getCustomCodeBlockExtraProps(ctx)
-
-    return React.createElement(customForLanguage as any, {
-      key,
-      node,
-      loading: Boolean(node.loading),
-      stream: ctx.codeBlockStream,
-      customId: ctx.customId,
-      isDark: ctx.isDark,
-      darkTheme: ctx.codeBlockThemes?.darkTheme,
-      lightTheme: ctx.codeBlockThemes?.lightTheme,
-      themes: ctx.codeBlockThemes?.themes,
-      langs: ctx.codeBlockThemes?.langs,
-      minWidth: ctx.codeBlockThemes?.minWidth,
-      maxWidth: ctx.codeBlockThemes?.maxWidth,
-      onCopy: ctx.events.onCopy,
-      ...extraProps,
-      ctx,
-      renderNode,
-      indexKey: key,
-      typewriter: ctx.typewriter,
-    })
-  }
+  if (customForLanguage)
+    return renderCustomCodeBlockComponent(customForLanguage, node, key, ctx)
 
   const customCodeBlock = customComponents.code_block
-  if (customCodeBlock) {
-    const extraProps = getCustomCodeBlockExtraProps(ctx)
-
-    return React.createElement(customCodeBlock as any, {
-      key,
-      node,
-      loading: Boolean(node.loading),
-      stream: ctx.codeBlockStream,
-      customId: ctx.customId,
-      isDark: ctx.isDark,
-      darkTheme: ctx.codeBlockThemes?.darkTheme,
-      lightTheme: ctx.codeBlockThemes?.lightTheme,
-      themes: ctx.codeBlockThemes?.themes,
-      langs: ctx.codeBlockThemes?.langs,
-      minWidth: ctx.codeBlockThemes?.minWidth,
-      maxWidth: ctx.codeBlockThemes?.maxWidth,
-      onCopy: ctx.events.onCopy,
-      ...extraProps,
-      ctx,
-      renderNode,
-      indexKey: key,
-      typewriter: ctx.typewriter,
-    })
-  }
+  if (customCodeBlock)
+    return renderCustomCodeBlockComponent(customCodeBlock, node, key, ctx)
 
   if (ctx.renderCodeBlocksAsPre)
     return <PreCodeNode key={key} node={node} />

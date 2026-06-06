@@ -5503,6 +5503,19 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
   if (node.type === 'code_block' && isCustomCodeBlockComponent(component))
     return customCodeBlockBindings.value
 
+  if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang)) {
+    if (lang === 'mermaid')
+      return { ...mermaidBindings.value, ...customCodeBlockBindings.value }
+
+    if (lang === 'infographic')
+      return { ...infographicBindings.value, ...customCodeBlockBindings.value }
+
+    if (lang === 'd2' || lang === 'd2lang')
+      return { ...d2Bindings.value, ...customCodeBlockBindings.value }
+
+    return customCodeBlockBindings.value
+  }
+
   if (node.type === 'code_block' && isMarkdownCodeBlockComponent(component))
     return shikiCodeBlockBindings.value
 
@@ -5514,9 +5527,6 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
 
   if (lang === 'd2' || lang === 'd2lang')
     return d2Bindings.value
-
-  if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang))
-    return customCodeBlockBindings.value
 
   if (node.type === 'link')
     return linkBindings.value

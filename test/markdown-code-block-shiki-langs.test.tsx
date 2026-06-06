@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 import { removeCustomComponents as removeVue2CustomComponents, setCustomComponents as setVue2CustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
-import { getHighlightRegistrationKey, getRegisterHighlightOptions, getShikiRendererOptions } from '../src/utils/shikiLanguage'
+import { getHighlightRegistrationKey, getRegisterHighlightOptions, getShikiRendererOptions, registerHighlightOnce } from '../src/utils/shikiLanguage'
 import { flushAll } from './setup/flush-all'
 
 const streamMarkdownMock = vi.hoisted(() => {
@@ -218,6 +218,29 @@ describe('markdown code block Shiki langs', () => {
     expect(getHighlightRegistrationKey(['vitesse-light'], ['ts', 'js', 'ts'])).toBe(
       getHighlightRegistrationKey(['vitesse-light'], ['javascript', 'typescript']),
     )
+  })
+
+  it('scopes highlight registration tasks by registerHighlight function instance', async () => {
+    const vue2ShikiLanguage = await import('../packages/markstream-vue2/src/utils/shikiLanguage')
+    const reactShikiLanguage = await import('../packages/markstream-react/src/utils/shikiLanguage')
+    const modules = [
+      { registerHighlightOnce },
+      vue2ShikiLanguage,
+      reactShikiLanguage,
+    ]
+
+    for (const mod of modules) {
+      const firstRegisterHighlight = vi.fn()
+      const secondRegisterHighlight = vi.fn()
+      const opts = { langs: ['typescript'] }
+
+      await mod.registerHighlightOnce(firstRegisterHighlight, opts)
+      await mod.registerHighlightOnce(firstRegisterHighlight, opts)
+      await mod.registerHighlightOnce(secondRegisterHighlight, opts)
+
+      expect(firstRegisterHighlight).toHaveBeenCalledTimes(1)
+      expect(secondRegisterHighlight).toHaveBeenCalledTimes(1)
+    }
   })
 
   it('passes langs to Vue registerHighlight and renderer', async () => {

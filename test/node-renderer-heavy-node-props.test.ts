@@ -435,6 +435,43 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     expect(wrapper.get('.generic-code-block-attrs-probe').attributes('data-langs')).toBe('["typescript"]')
   })
 
+  it('forwards code block props to exact custom mermaid renderers', async () => {
+    setCustomComponents(customId, {
+      mermaid: GenericCodeBlockAttrsProbe as any,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        langs: ['mermaid'],
+        codeBlockStream: false,
+        mermaidProps: {
+          showHeader: false,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'mermaid',
+            code: 'flowchart TD\nA-->B',
+            raw: '```mermaid\nflowchart TD\nA-->B\n```',
+          },
+        ],
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        batchRendering: false,
+        maxLiveNodes: 0,
+      },
+    })
+
+    for (let attempt = 0; attempt < 10 && !wrapper.find('.generic-code-block-attrs-probe').exists(); attempt++)
+      await flushAll()
+
+    const probe = wrapper.get('.generic-code-block-attrs-probe')
+    expect(probe.attributes('data-show-header')).toBe('false')
+    expect(probe.attributes('data-has-stream')).toBe('true')
+    expect(probe.attributes('data-langs')).toBe('["mermaid"]')
+  })
+
   it('does not let codeBlockProps override reserved code block props', async () => {
     setCustomComponents(customId, {
       code_block: ReservedCodeBlockPropsProbe,
