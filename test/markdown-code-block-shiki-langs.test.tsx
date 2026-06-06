@@ -46,8 +46,7 @@ vi.mock('../packages/markstream-react/node_modules/stream-markdown', () => ({
   registerHighlight: streamMarkdownMock.registerHighlight,
 }))
 
-function makeNode(language = 'typescript') {
-  const code = 'const value = 1'
+function makeNode(language = 'typescript', code = 'const value = 1') {
   return {
     type: 'code_block' as const,
     language,
@@ -94,6 +93,15 @@ async function waitForRendererCount(count: number) {
       return
     await flushAll()
   }
+}
+
+async function waitForRendererUpdateCall(renderer: any, count: number) {
+  for (let i = 0; i < 10; i++) {
+    if (renderer?.updateCode.mock.calls.length >= count)
+      return
+    await flushAll()
+  }
+  throw new Error(`Timed out waiting for renderer update call ${count}`)
 }
 
 async function waitForLastRegisterHighlightLangs(langs: string[]) {
@@ -509,6 +517,60 @@ describe('markdown code block Shiki langs', () => {
       'plaintext',
     )
 
+    wrapper.unmount()
+  })
+
+  it('keeps Vue fallback when an older renderer update resolves after newer code', async () => {
+    const firstUpdate = createDeferred()
+    const secondUpdate = createDeferred()
+    streamMarkdownMock.createShikiStreamRenderer.mockImplementationOnce((el: HTMLElement) => {
+      const renderer = {
+        updateCode: vi.fn((code: string, lang?: string) => {
+          const write = () => {
+            el.textContent = `${lang ?? ''}:${code}`
+          }
+          if (code === 'const stale = 1')
+            return firstUpdate.promise.then(write)
+          if (code === 'const fresh = 2')
+            return secondUpdate.promise.then(write)
+          write()
+        }),
+        setTheme: vi.fn(async () => {}),
+        dispose: vi.fn(),
+      }
+      streamMarkdownMock.createdRenderers.push(renderer)
+      return renderer
+    })
+
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript', 'const stale = 1'),
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+    const renderer = streamMarkdownMock.createdRenderers[0]
+    await waitForRendererUpdateCall(renderer, 1)
+
+    await wrapper.setProps({
+      node: makeNode('typescript', 'const fresh = 2'),
+    })
+    await flushAll()
+    await waitForRendererUpdateCall(renderer, 2)
+
+    firstUpdate.resolve()
+    await firstUpdate.promise
+    await flushAll()
+
+    expect(wrapper.find('.code-fallback-plain').text()).toContain('const fresh = 2')
+
+    secondUpdate.resolve()
+    await secondUpdate.promise
+    await flushAll()
     wrapper.unmount()
   })
 

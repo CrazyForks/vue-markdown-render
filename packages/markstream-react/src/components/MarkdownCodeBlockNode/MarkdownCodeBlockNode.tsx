@@ -202,6 +202,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const highlightRegistrationSeqRef = useRef(0)
   const latestRegistrationKeyRef = useRef(registrationKey)
   const renderSeqRef = useRef(0)
+  const mountedRef = useRef(true)
   const viewportHandleRef = useRef<VisibilityHandle | null>(null)
   const registerViewport = useViewportPriority()
   const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
@@ -230,12 +231,13 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       rendererTargetRef.current.innerHTML = ''
   }, [])
 
-  const disposeCurrentRenderer = useCallback(() => {
+  const disposeCurrentRenderer = useCallback((updateReady = true) => {
     rendererRef.current?.dispose()
     rendererRef.current = null
     rendererConfigKeyRef.current = ''
     clearRendererTarget()
-    setRendererReady(false)
+    if (updateReady)
+      setRendererReady(false)
   }, [clearRendererTarget])
 
   const nextRenderSeq = useCallback(() => {
@@ -244,7 +246,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [])
 
   const isCurrentRenderSeq = useCallback((seq: number) => {
-    return renderSeqRef.current === seq
+    return mountedRef.current && renderSeqRef.current === seq
   }, [])
 
   const ensureStreamMarkdownLoaded = useCallback(async () => {
@@ -421,12 +423,17 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     const el = viewportTargetRef.current
     if (!el)
       return
+    let active = true
     const handle = registerViewport(el, { rootMargin: '400px' })
     viewportHandleRef.current = handle
     if (handle.isVisible())
       setViewportReady(true)
-    handle.whenVisible.then(() => setViewportReady(true))
+    handle.whenVisible.then(() => {
+      if (active)
+        setViewportReady(true)
+    })
     return () => {
+      active = false
       handle.destroy()
       viewportHandleRef.current = null
     }
@@ -434,14 +441,18 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
 
   useEffect(() => {
     void initRenderer().catch(() => {
-      renderFallback(props.node.code)
+      if (mountedRef.current && rendererTargetRef.current)
+        renderFallback(props.node.code)
     })
   }, [initRenderer, props.node.code, renderFallback])
 
   // Dispose renderer on unmount only
   useEffect(() => {
+    mountedRef.current = true
     return () => {
-      disposeCurrentRenderer()
+      mountedRef.current = false
+      renderSeqRef.current += 1
+      disposeCurrentRenderer(false)
     }
   }, [disposeCurrentRenderer])
 

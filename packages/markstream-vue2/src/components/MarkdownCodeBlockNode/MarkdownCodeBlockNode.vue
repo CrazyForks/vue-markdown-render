@@ -287,8 +287,10 @@ function hasRendererContent() {
   return Boolean(target.textContent?.trim().length)
 }
 
-async function clearFallbackWhenRendererReady() {
+async function clearFallbackWhenRendererReady(epoch: number) {
   await nextTick()
+  if (!isCurrentRenderEpoch(epoch))
+    return
   if (hasRendererContent()) {
     clearFallback()
     return
@@ -297,14 +299,22 @@ async function clearFallbackWhenRendererReady() {
   if (!target)
     return
   renderObserver?.disconnect()
-  renderObserver = new MutationObserver(() => {
+  const observer = new MutationObserver(() => {
+    if (!isCurrentRenderEpoch(epoch)) {
+      observer.disconnect()
+      if (renderObserver === observer)
+        renderObserver = undefined
+      return
+    }
     if (!hasRendererContent())
       return
     clearFallback()
-    renderObserver?.disconnect()
-    renderObserver = undefined
+    observer.disconnect()
+    if (renderObserver === observer)
+      renderObserver = undefined
   })
-  renderObserver.observe(target, { childList: true, subtree: true })
+  renderObserver = observer
+  observer.observe(target, { childList: true, subtree: true })
 }
 // Lazy-load stream-markdown (and thus shiki) only when needed
 interface ShikiRenderer {
@@ -328,10 +338,21 @@ let registeredHighlightLanguages: Set<string> | undefined
 let registeredHighlightKey: string | null = null
 let latestHighlightRegistrationKey = ''
 let highlightRegistrationSeq = 0
+let renderEpoch = 0
+let disposed = false
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
 let streamMarkdownLoadPromise: Promise<void> | null = null
+
+function nextRenderEpoch() {
+  renderEpoch += 1
+  return renderEpoch
+}
+
+function isCurrentRenderEpoch(epoch = renderEpoch) {
+  return !disposed && epoch === renderEpoch
+}
 
 function disposeCurrentRenderer() {
   renderer?.dispose()
@@ -362,15 +383,18 @@ function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) 
   return 'plaintext'
 }
 
-async function updateRendererWithFallback(code: string, rawLang?: string | null) {
-  if (!renderer)
+async function updateRendererWithFallback(code: string, rawLang?: string | null, epoch = renderEpoch) {
+  if (!renderer || !isCurrentRenderEpoch(epoch))
     return false
   const normalized = normalizeRendererLanguage(rawLang, Boolean(code && code.length))
   try {
     await renderer.updateCode(code, normalized)
-    return true
+    return isCurrentRenderEpoch(epoch)
   }
   catch (err) {
+    if (!isCurrentRenderEpoch(epoch))
+      return false
+
     if (normalized !== 'plaintext') {
       if (isDevEnv && !warnedRendererErrors.has(normalized)) {
         warnedRendererErrors.add(normalized)
@@ -378,9 +402,11 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null)
       }
       try {
         await renderer.updateCode(code, 'plaintext')
-        return true
+        return isCurrentRenderEpoch(epoch)
       }
       catch (plainErr) {
+        if (!isCurrentRenderEpoch(epoch))
+          return false
         if (isDevEnv)
           console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', plainErr)
         return false
@@ -461,8 +487,13 @@ async function ensureStreamMarkdownLoaded() {
   return streamMarkdownLoadPromise
 }
 
-async function initRenderer() {
+async function initRenderer(epoch: number) {
+  if (!isCurrentRenderEpoch(epoch))
+    return
+
   await ensureStreamMarkdownLoaded()
+  if (!isCurrentRenderEpoch(epoch))
+    return
 
   if (!codeBlockContent.value || !rendererTarget.value) {
     renderFallback(props.node.code, true)
@@ -478,7 +509,7 @@ async function initRenderer() {
     disposeCurrentRenderer()
 
   const highlightStatus = await waitForCurrentHighlightRegistration(themes, langs)
-  if (highlightStatus === 'stale')
+  if (!isCurrentRenderEpoch(epoch) || highlightStatus === 'stale')
     return
   if (highlightStatus === 'failed') {
     renderFallback(props.node.code, !hasStableRender.value)
@@ -506,7 +537,9 @@ async function initRenderer() {
   }
 
   renderFallback(props.node.code, !hasStableRender.value)
-  const updated = await updateRendererWithFallback(props.node.code, props.node.language)
+  const updated = await updateRendererWithFallback(props.node.code, props.node.language, epoch)
+  if (!isCurrentRenderEpoch(epoch))
+    return
   if (!updated) {
     keepLastSuccessfulRender()
     return
@@ -514,14 +547,16 @@ async function initRenderer() {
   if (hasStableRender.value)
     keepLastSuccessfulRender()
   else
-    await clearFallbackWhenRendererReady()
+    await clearFallbackWhenRendererReady(epoch)
 }
 
-async function safeInitRenderer() {
+async function safeInitRenderer(epoch = nextRenderEpoch()) {
   try {
-    await initRenderer()
+    await initRenderer(epoch)
   }
   catch (err) {
+    if (!isCurrentRenderEpoch(epoch))
+      return
     if (isDevEnv)
       console.warn('[MarkdownCodeBlockNode] Failed to initialize Shiki renderer.', err)
     renderFallback(props.node.code, !hasStableRender.value)
@@ -533,6 +568,8 @@ onMounted(() => {
   void safeInitRenderer()
 })
 onBeforeUnmount(() => {
+  disposed = true
+  renderEpoch += 1
   renderObserver?.disconnect()
   renderObserver = undefined
   disposeCurrentRenderer()
@@ -554,6 +591,7 @@ watch(tooltipsEnabled, (enabled) => {
 })
 
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
+  const epoch = nextRenderEpoch()
   const normalizedLang = normalizeDisplayLanguage(lang)
   if (normalizedLang !== codeLanguage.value)
     codeLanguage.value = normalizedLang
@@ -574,8 +612,10 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
 
   if (!renderer) {
     renderFallback(code, !hasStableRender.value)
-    await safeInitRenderer()
+    await safeInitRenderer(epoch)
   }
+  if (!isCurrentRenderEpoch(epoch))
+    return
   if (!renderer || !code)
     return
 
@@ -583,7 +623,9 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
     return
 
   renderFallback(code, !hasStableRender.value)
-  const updated = await updateRendererWithFallback(code, lang)
+  const updated = await updateRendererWithFallback(code, lang, epoch)
+  if (!isCurrentRenderEpoch(epoch))
+    return
   if (!updated) {
     keepLastSuccessfulRender()
     return
@@ -591,7 +633,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   if (hasStableRender.value)
     keepLastSuccessfulRender()
   else
-    await clearFallbackWhenRendererReady()
+    await clearFallbackWhenRendererReady(epoch)
 })
 
 watch(

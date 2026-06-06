@@ -2,7 +2,7 @@
 import type { BaseNode, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
 import type { NodeRendererProps } from './NodeRenderer/NodeRenderer.vue'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
-import { h as createVNode } from 'vue'
+import * as VueRuntime from 'vue'
 import { defineComponent } from 'vue-demi'
 import { isLegacyVue26Vm, resolveVueListeners } from '../utils/vue26'
 import NodeRenderer from './NodeRenderer'
@@ -132,6 +132,7 @@ export default defineComponent({
   },
   render(h) {
     const isVue2Render = typeof h === 'function'
+    const createVNode = (VueRuntime as any).h
     const createElement = isVue2Render ? h : createVNode
     const listeners = resolveVueListeners(this)
     const withRuntimeProps = (runtimeProps: Record<string, unknown>) => {
