@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 import { removeCustomComponents as removeVue2CustomComponents, setCustomComponents as setVue2CustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
-import { getHighlightRegistrationKey, getRegisterHighlightOptions } from '../src/utils/shikiLanguage'
+import { getHighlightRegistrationKey, getRegisterHighlightOptions, getShikiRendererOptions } from '../src/utils/shikiLanguage'
 import { flushAll } from './setup/flush-all'
 
 const streamMarkdownMock = vi.hoisted(() => {
@@ -174,6 +174,7 @@ describe('markdown code block Shiki langs', () => {
     }
 
     expect(getRegisterHighlightOptions(themes)).toEqual(expected)
+    expect(getShikiRendererOptions(themes)).toEqual(expected)
     expect(getHighlightRegistrationKey(themes)).toBe(
       getHighlightRegistrationKey(['vitesse-light', 'vitesse-dark']),
     )
@@ -182,7 +183,9 @@ describe('markdown code block Shiki langs', () => {
     const reactShikiLanguage = await import('../packages/markstream-react/src/utils/shikiLanguage')
 
     expect(vue2ShikiLanguage.getRegisterHighlightOptions(themes)).toEqual(expected)
+    expect(vue2ShikiLanguage.getShikiRendererOptions(themes)).toEqual(expected)
     expect(reactShikiLanguage.getRegisterHighlightOptions(themes)).toEqual(expected)
+    expect(reactShikiLanguage.getShikiRendererOptions(themes)).toEqual(expected)
   })
 
   it('normalizes common shell Shiki aliases', () => {
@@ -219,6 +222,35 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledWith(
       expect.any(HTMLElement),
       expect.objectContaining({ langs: ['typescript'] }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it('passes normalized Vue Shiki themes to renderer', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        themes: [' vitesse-light ', { name: 'custom-theme' }, 'vitesse-light'] as any,
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({
+      themes: ['vitesse-light'],
+      langs: ['typescript'],
+    })
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({
+        themes: ['vitesse-light'],
+        langs: ['typescript'],
+      }),
     )
 
     wrapper.unmount()
@@ -679,6 +711,35 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledWith(
       expect.any(HTMLElement),
       expect.objectContaining({ langs: ['typescript'] }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it('passes normalized Vue2 Shiki themes to renderer', async () => {
+    const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        themes: [' vitesse-light ', { name: 'custom-theme' }, 'vitesse-light'] as any,
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({
+      themes: ['vitesse-light'],
+      langs: ['typescript'],
+    })
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({
+        themes: ['vitesse-light'],
+        langs: ['typescript'],
+      }),
     )
 
     wrapper.unmount()

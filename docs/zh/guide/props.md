@@ -176,7 +176,7 @@ flowchart TD
 - `code-block-monaco-options`
 - `code-block-min-width`, `code-block-max-width`
 - `code-block-props`（额外代码块 props，例如 `showHeader`、`showFontSizeButtons`、`showTooltips`、`htmlPreviewAllowScripts`、`htmlPreviewSandbox`，同时保留自定义透传字段）
-- `themes`（在安装 `stream-monaco` 时，会转发给其主题系统）
+- `themes`（在安装 `stream-monaco` 时，会转发给其主题系统；Shiki 模式只会转发字符串主题名，主题对象会被忽略）
 - `langs`（转发给 `MarkdownCodeBlockNode` 的 Shiki 语言列表；不传或传 `[]` 时使用 `stream-markdown` 默认行为）
 
 注意：`code-block-monaco-options` 仅作用于 Monaco 版 `CodeBlockNode`。如果你把 `code_block` 覆盖成 `MarkdownCodeBlockNode`，此时 `code-block-dark-theme` / `code-block-light-theme` 应填写 Shiki 主题名，`themes` 为需要预加载的 Shiki 主题列表，`langs` 为需要预加载的 Shiki 语言列表。`htmlPreviewAllowScripts` 和 `htmlPreviewSandbox` 只影响内置 `CodeBlockNode` 的 inline HTML iframe preview；它们不会影响 `previewCode` 事件处理器、`MarkdownCodeBlockNode`，也不会影响外部 artifact renderer。

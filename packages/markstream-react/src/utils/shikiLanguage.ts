@@ -87,7 +87,7 @@ export function getShikiLangs(langs?: readonly string[]) {
     : undefined
 }
 
-function getShikiThemes(themes?: readonly unknown[]) {
+export function getShikiThemes(themes?: readonly unknown[]) {
   if (!Array.isArray(themes))
     return undefined
 
@@ -98,6 +98,19 @@ function getShikiThemes(themes?: readonly unknown[]) {
   return normalized.length > 0
     ? Array.from(new Set(normalized))
     : undefined
+}
+
+export function getShikiRendererOptions(
+  themes?: readonly unknown[],
+  langs?: readonly string[],
+): Pick<ShikiRendererOptions, 'themes' | 'langs'> {
+  const shikiThemes = getShikiThemes(themes)
+  const shikiLangs = getShikiLangs(langs)
+
+  return {
+    ...(shikiThemes?.length ? { themes: shikiThemes } : {}),
+    ...(shikiLangs?.length ? { langs: shikiLangs } : {}),
+  }
 }
 
 export function createRegisteredHighlightLanguages(langs?: readonly string[]) {

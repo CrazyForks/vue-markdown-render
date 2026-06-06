@@ -11,6 +11,7 @@ import {
   getHighlightRegistrationKey,
   getRegisterHighlightOptions,
   getShikiLanguageMatchKey,
+  getShikiRendererOptions,
   normalizeDisplayLanguage,
   normalizeShikiLanguage,
 } from '../../utils/shikiLanguage'
@@ -57,7 +58,7 @@ interface HighlightRegistrationConfig {
 }
 
 function createHighlightRegistrationConfig(
-  themes?: readonly string[],
+  themes?: readonly unknown[],
   langs?: readonly string[],
   key = getHighlightRegistrationKey(themes, langs),
 ): HighlightRegistrationConfig {
@@ -65,10 +66,7 @@ function createHighlightRegistrationConfig(
   return {
     key,
     registerOptions,
-    rendererOptions: {
-      themes: registerOptions.themes,
-      langs: registerOptions.langs,
-    },
+    rendererOptions: getShikiRendererOptions(themes, langs),
   }
 }
 

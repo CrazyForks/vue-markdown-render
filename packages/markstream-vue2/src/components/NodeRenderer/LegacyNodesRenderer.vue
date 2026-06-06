@@ -59,7 +59,13 @@ const props = withDefaults(defineProps<{
   codeBlockMaxWidth?: string | number
   codeBlockProps?: NodeRendererCodeBlockProps
   renderCodeBlocksAsPre?: boolean
+  /**
+   * Theme names or theme objects preloaded for Monaco-backed code blocks.
+   * When Shiki code blocks are used, only string theme names are forwarded to
+   * MarkdownCodeBlockNode / stream-markdown; theme objects are ignored.
+   */
   themes?: CodeBlockMonacoTheme[]
+  /** Shiki language preload list forwarded to MarkdownCodeBlockNode. */
   langs?: string[]
   isDark?: boolean
   customHtmlTags?: readonly string[]

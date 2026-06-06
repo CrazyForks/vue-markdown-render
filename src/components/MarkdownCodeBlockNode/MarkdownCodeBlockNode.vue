@@ -14,8 +14,8 @@ import {
   createRegisteredHighlightLanguages,
   getHighlightRegistrationKey,
   getRegisterHighlightOptions,
-  getShikiLangs,
   getShikiLanguageMatchKey,
+  getShikiRendererOptions,
   normalizeDisplayLanguage,
   normalizeShikiLanguage,
 } from '../../utils/shikiLanguage'
@@ -386,7 +386,7 @@ async function ensureStreamMarkdownLoaded() {
   return streamMarkdownLoadPromise
 }
 
-async function ensureHighlightRegistered(themes?: string[], langs?: string[]): Promise<HighlightRegistrationStatus> {
+async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: readonly string[]): Promise<HighlightRegistrationStatus> {
   if (!registerHighlight)
     return 'ready'
   const key = getHighlightRegistrationKey(themes, langs)
@@ -417,7 +417,7 @@ async function ensureHighlightRegistered(themes?: string[], langs?: string[]): P
   return 'ready'
 }
 
-async function waitForCurrentHighlightRegistration(themes?: string[], langs?: string[]) {
+async function waitForCurrentHighlightRegistration(themes?: readonly unknown[], langs?: readonly string[]) {
   const key = getHighlightRegistrationKey(themes, langs)
   const status = await ensureHighlightRegistered(themes, langs)
   if (status !== 'failed')
@@ -447,15 +447,20 @@ async function initRenderer(epoch: number) {
     return
   }
 
-  const themes = props.themes
-  const langs = props.langs
-  const nextRendererConfigKey = getHighlightRegistrationKey(themes, langs)
+  const rendererOptions = getShikiRendererOptions(props.themes, props.langs)
+  const nextRendererConfigKey = getHighlightRegistrationKey(
+    rendererOptions.themes,
+    rendererOptions.langs,
+  )
   latestHighlightRegistrationKey = nextRendererConfigKey
 
   if (renderer && rendererConfigKey !== nextRendererConfigKey)
     disposeCurrentRenderer()
 
-  const highlightStatus = await waitForCurrentHighlightRegistration(themes, langs)
+  const highlightStatus = await waitForCurrentHighlightRegistration(
+    rendererOptions.themes,
+    rendererOptions.langs,
+  )
   if (!isCurrentRenderEpoch(epoch) || highlightStatus === 'stale')
     return
   if (highlightStatus === 'failed') {
@@ -466,8 +471,7 @@ async function initRenderer(epoch: number) {
   if (!renderer && createShikiRenderer) {
     renderer = createShikiRenderer(rendererTarget.value, {
       theme: getPreferredColorScheme(),
-      themes,
-      langs: getShikiLangs(langs),
+      ...rendererOptions,
     })
     rendererConfigKey = nextRendererConfigKey
     rendererReady.value = true
