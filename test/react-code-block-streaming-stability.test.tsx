@@ -4,9 +4,11 @@
 
 import React, { act, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it } from 'vitest'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
 import { removeCustomComponents, setCustomComponents } from '../packages/markstream-react/src/customComponents'
+import { NodeRenderer as ServerNodeRenderer } from '../packages/markstream-react/src/server'
 
 const scopeId = 'react-code-block-streaming-stability'
 
@@ -31,6 +33,9 @@ function CodeBlockProbe(props: any) {
       data-code={String(props.node?.code ?? '')}
       data-langs={JSON.stringify(props.langs ?? null)}
       data-stream={String(props.stream)}
+      data-index-key={String(props.indexKey ?? '')}
+      data-has-ctx={String(Boolean(props.ctx && typeof props.ctx === 'object'))}
+      data-has-render-node={String(typeof props.renderNode === 'function')}
     />
   )
 }
@@ -147,5 +152,90 @@ describe('markstream-react code block streaming stability', () => {
     await act(async () => {
       root.unmount()
     })
+  })
+
+  it('does not let codeBlockProps override custom code_block structural props', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    setCustomComponents(scopeId, { code_block: CodeBlockProbe as any })
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(NodeRenderer as any, {
+        customId: scopeId,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const real = 1',
+            raw: '```ts\nexport const real = 1\n```',
+          },
+        ],
+        codeBlockProps: {
+          node: {
+            type: 'code_block',
+            language: 'python',
+            code: 'wrong = True',
+            raw: '```python\nwrong = True\n```',
+          },
+          ctx: { unsafe: true },
+          renderNode: null,
+          indexKey: 'wrong-index',
+          langs: ['python'],
+        },
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        batchRendering: false,
+        maxLiveNodes: 0,
+      }))
+    })
+    await flushReact()
+
+    const probe = host.querySelector('.code-block-probe') as HTMLElement | null
+    expect(probe?.getAttribute('data-code')).toBe('export const real = 1')
+    expect(probe?.getAttribute('data-langs')).toBe('["python"]')
+    expect(probe?.getAttribute('data-index-key')).not.toBe('wrong-index')
+    expect(probe?.getAttribute('data-has-ctx')).toBe('true')
+    expect(probe?.getAttribute('data-has-render-node')).toBe('true')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('does not let codeBlockProps override server custom code_block structural props', () => {
+    setCustomComponents(scopeId, { code_block: CodeBlockProbe as any })
+
+    const html = renderToStaticMarkup(React.createElement(ServerNodeRenderer as any, {
+      customId: scopeId,
+      nodes: [
+        {
+          type: 'code_block',
+          language: 'ts',
+          code: 'export const real = 1',
+          raw: '```ts\nexport const real = 1\n```',
+        },
+      ],
+      codeBlockProps: {
+        node: {
+          type: 'code_block',
+          language: 'python',
+          code: 'wrong = True',
+          raw: '```python\nwrong = True\n```',
+        },
+        ctx: { unsafe: true },
+        renderNode: null,
+        indexKey: 'wrong-index',
+        langs: ['python'],
+      },
+    }))
+
+    expect(html).toContain('data-code="export const real = 1"')
+    expect(html).toContain('data-langs="[&quot;python&quot;]"')
+    expect(html).not.toContain('wrong-index')
+    expect(html).toContain('data-has-ctx="true"')
+    expect(html).toContain('data-has-render-node="true"')
   })
 })

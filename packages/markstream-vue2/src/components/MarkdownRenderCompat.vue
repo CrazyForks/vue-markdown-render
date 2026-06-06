@@ -2,9 +2,8 @@
 import type { BaseNode, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
 import type { NodeRendererProps } from './NodeRenderer/NodeRenderer.vue'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
-import * as VueRuntime from 'vue'
 import { defineComponent } from 'vue-demi'
-import { isLegacyVue26Vm, resolveVue3ListenerProps, resolveVueListeners } from '../utils/vue26'
+import { isLegacyVue26Vm, resolveVueListeners } from '../utils/vue26'
 import NodeRenderer from './NodeRenderer'
 import LegacyNodesRenderer from './NodeRenderer/LegacyNodesRenderer.vue'
 
@@ -131,27 +130,11 @@ export default defineComponent({
     },
   },
   render(h) {
-    const isVue2Render = typeof h === 'function'
-    const createVNode = (VueRuntime as any).h
-    const createElement = isVue2Render ? h : createVNode
-    const vue2Listeners = resolveVueListeners(this)
-    const vue3ListenerProps = resolveVue3ListenerProps(this)
-    const withRuntimeProps = (runtimeProps: Record<string, unknown>) => {
-      return isVue2Render
-        ? {
-            props: runtimeProps,
-            ...(Object.keys(vue2Listeners).length > 0 ? { on: vue2Listeners } : {}),
-          }
-        : {
-            ...runtimeProps,
-            ...(Object.keys(vue3ListenerProps).length > 0 ? vue3ListenerProps : {}),
-          }
-    }
+    const listeners = resolveVueListeners(this)
 
     if (this.legacyVue26) {
-      return createElement(
-        LegacyNodesRenderer,
-        withRuntimeProps({
+      return h(LegacyNodesRenderer, {
+        props: {
           nodes: this.parsedLegacyNodes,
           customId: this.customId,
           indexKey: this.indexKey,
@@ -169,11 +152,15 @@ export default defineComponent({
           themes: this.themes,
           langs: this.langs,
           isDark: this.isDark,
-        }),
-      )
+        },
+        ...(Object.keys(listeners).length > 0 ? { on: listeners } : {}),
+      })
     }
 
-    return createElement(NodeRenderer, withRuntimeProps(this.forwardedProps))
+    return h(NodeRenderer, {
+      props: this.forwardedProps,
+      ...(Object.keys(listeners).length > 0 ? { on: listeners } : {}),
+    })
   },
 })
 </script>

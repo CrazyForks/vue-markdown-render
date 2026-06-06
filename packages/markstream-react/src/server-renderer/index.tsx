@@ -115,6 +115,16 @@ function mergeHtmlBlockWrapperProps(
   return next
 }
 
+function getCustomCodeBlockExtraProps(ctx: RenderContext) {
+  const extraProps = { ...(ctx.codeBlockProps || {}) } as Record<string, unknown>
+  delete extraProps.node
+  delete extraProps.key
+  delete extraProps.ctx
+  delete extraProps.renderNode
+  delete extraProps.indexKey
+  return extraProps
+}
+
 function createRenderContext(
   props: NodeRendererProps,
   customComponents: CustomComponentMap,
@@ -263,6 +273,8 @@ function renderCodeBlock(
   }
 
   if (customForLanguage) {
+    const extraProps = getCustomCodeBlockExtraProps(ctx)
+
     return React.createElement(customForLanguage as any, {
       key,
       node,
@@ -277,7 +289,7 @@ function renderCodeBlock(
       minWidth: ctx.codeBlockThemes?.minWidth,
       maxWidth: ctx.codeBlockThemes?.maxWidth,
       onCopy: ctx.events.onCopy,
-      ...(ctx.codeBlockProps || {}),
+      ...extraProps,
       ctx,
       renderNode,
       indexKey: key,
@@ -287,6 +299,8 @@ function renderCodeBlock(
 
   const customCodeBlock = customComponents.code_block
   if (customCodeBlock) {
+    const extraProps = getCustomCodeBlockExtraProps(ctx)
+
     return React.createElement(customCodeBlock as any, {
       key,
       node,
@@ -301,7 +315,7 @@ function renderCodeBlock(
       minWidth: ctx.codeBlockThemes?.minWidth,
       maxWidth: ctx.codeBlockThemes?.maxWidth,
       onCopy: ctx.events.onCopy,
-      ...(ctx.codeBlockProps || {}),
+      ...extraProps,
       ctx,
       renderNode,
       indexKey: key,

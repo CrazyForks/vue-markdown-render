@@ -47,6 +47,16 @@ import { resolveCustomHtmlTag } from '../utils/customHtmlTag'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { renderNodeChildren } from './renderChildren'
 
+function getCustomCodeBlockExtraProps(ctx: RenderContext) {
+  const extraProps = { ...(ctx.codeBlockProps || {}) } as Record<string, unknown>
+  delete extraProps.node
+  delete extraProps.key
+  delete extraProps.ctx
+  delete extraProps.renderNode
+  delete extraProps.indexKey
+  return extraProps
+}
+
 function getRawCodeBlockLanguage(node: any) {
   const trimmed = String(node?.language || '').trim()
   if (!trimmed)
@@ -62,6 +72,7 @@ function renderCustomCodeBlockComponent(
   key: React.Key,
   ctx: RenderContext,
 ) {
+  const extraProps = getCustomCodeBlockExtraProps(ctx)
   return React.createElement(component, {
     key,
     node,
@@ -76,7 +87,7 @@ function renderCustomCodeBlockComponent(
     minWidth: ctx.codeBlockThemes?.minWidth,
     maxWidth: ctx.codeBlockThemes?.maxWidth,
     onCopy: ctx.events.onCopy,
-    ...(ctx.codeBlockProps || {}),
+    ...extraProps,
     ctx,
     renderNode,
     indexKey: key,

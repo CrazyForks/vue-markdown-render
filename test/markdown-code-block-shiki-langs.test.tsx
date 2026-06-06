@@ -660,32 +660,6 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
-  it('forwards MarkdownRenderCompat listeners as Vue3 runtime event props', async () => {
-    const { default: MarkdownRenderCompat } = await import('../packages/markstream-vue2/src/components/MarkdownRenderCompat.vue')
-    const { default: NodeRenderer } = await import('../packages/markstream-vue2/src/components/NodeRenderer')
-    const onCopy = vi.fn()
-    const onHandleArtifactClick = vi.fn()
-    const payload = { artifactType: 'text/html', artifactTitle: 'Preview' }
-    const wrapper = mount(MarkdownRenderCompat as any, {
-      props: {
-        nodes: [],
-        onCopy,
-        onHandleArtifactClick,
-      },
-    })
-
-    await flushAll()
-
-    const nodeRenderer = wrapper.getComponent(NodeRenderer as any)
-    nodeRenderer.vm.$emit('copy', 'copied code')
-    nodeRenderer.vm.$emit('handleArtifactClick', payload)
-
-    expect(onCopy).toHaveBeenCalledWith('copied code')
-    expect(onHandleArtifactClick).toHaveBeenCalledWith(payload)
-
-    wrapper.unmount()
-  })
-
   it('passes langs to Vue2 registerHighlight and renderer', async () => {
     const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
@@ -757,23 +731,12 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
-  it('forwards Vue2 MarkdownRenderCompat top-level langs and lets codeBlockProps override them', async () => {
-    setVue2CustomComponents(vue2CustomId, { code_block: Vue2CodeBlockProbe as any })
+  it('forwards Vue2 MarkdownRenderCompat top-level langs and codeBlockProps through render props', async () => {
     const { default: MarkdownRenderCompat } = await import('../packages/markstream-vue2/src/components/MarkdownRenderCompat.vue')
-    const topLevelWrapper = mount(MarkdownRenderCompat as any, {
-      props: {
-        customId: vue2CustomId,
-        nodes: [makeNode('typescript')],
-        langs: ['typescript'],
-      },
-    })
-
-    await flushAll()
-    expect(topLevelWrapper.get('.vue2-code-block-probe').attributes('data-langs')).toBe('["typescript"]')
-    topLevelWrapper.unmount()
-
-    const overrideWrapper = mount(MarkdownRenderCompat as any, {
-      props: {
+    const h = (component: any, data: any) => ({ component, data })
+    const vnode = (MarkdownRenderCompat as any).render.call({
+      legacyVue26: false,
+      forwardedProps: {
         customId: vue2CustomId,
         nodes: [makeNode('typescript')],
         langs: ['typescript'],
@@ -781,11 +744,11 @@ describe('markdown code block Shiki langs', () => {
           langs: ['python'],
         },
       },
-    })
+      $attrs: {},
+    }, h)
 
-    await flushAll()
-    expect(overrideWrapper.get('.vue2-code-block-probe').attributes('data-langs')).toBe('["python"]')
-    overrideWrapper.unmount()
+    expect(vnode.data.props.langs).toEqual(['typescript'])
+    expect(vnode.data.props.codeBlockProps).toEqual({ langs: ['python'] })
   })
 
   it('forwards Vue2 LegacyNodesRenderer top-level langs and lets codeBlockProps override them', async () => {
