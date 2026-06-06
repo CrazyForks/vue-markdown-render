@@ -155,6 +155,14 @@ export default defineConfig(({ mode }) => {
             return true
           if (/node_modules\/mermaid(?:\/|$)/.test(id))
             return true
+          if (id === 'katex' || id.startsWith('katex/'))
+            return true
+          if (/node_modules\/katex(?:\/|$)/.test(id))
+            return true
+          if (id === 'stream-monaco' || id.startsWith('stream-monaco/'))
+            return true
+          if (/node_modules\/stream-monaco(?:\/|$)/.test(id))
+            return true
           return [
             'vue-demi',
             '@vue/composition-api',

@@ -3,8 +3,8 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
+import { getHighlightRegistrationKey, getRegisterHighlightOptions, getShikiRendererOptions, registerHighlightOnce } from '../packages/markstream-core/src'
 import { removeCustomComponents as removeVue2CustomComponents, setCustomComponents as setVue2CustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
-import { getHighlightRegistrationKey, getRegisterHighlightOptions, getShikiRendererOptions, registerHighlightOnce } from '../src/utils/shikiLanguage'
 import { flushAll } from './setup/flush-all'
 
 const streamMarkdownMock = vi.hoisted(() => {
@@ -196,13 +196,8 @@ describe('markdown code block Shiki langs', () => {
       getHighlightRegistrationKey(['vitesse-light', 'vitesse-dark']),
     )
 
-    const vue2ShikiLanguage = await import('../packages/markstream-vue2/src/utils/shikiLanguage')
-    const reactShikiLanguage = await import('../packages/markstream-react/src/utils/shikiLanguage')
-
-    expect(vue2ShikiLanguage.getRegisterHighlightOptions(themes)).toEqual(expected)
-    expect(vue2ShikiLanguage.getShikiRendererOptions(themes)).toEqual(expected)
-    expect(reactShikiLanguage.getRegisterHighlightOptions(themes)).toEqual(expected)
-    expect(reactShikiLanguage.getShikiRendererOptions(themes)).toEqual(expected)
+    expect(getRegisterHighlightOptions(themes)).toEqual(expected)
+    expect(getShikiRendererOptions(themes)).toEqual(expected)
   })
 
   it('normalizes common shell Shiki aliases', () => {
@@ -221,26 +216,16 @@ describe('markdown code block Shiki langs', () => {
   })
 
   it('scopes highlight registration tasks by registerHighlight function instance', async () => {
-    const vue2ShikiLanguage = await import('../packages/markstream-vue2/src/utils/shikiLanguage')
-    const reactShikiLanguage = await import('../packages/markstream-react/src/utils/shikiLanguage')
-    const modules = [
-      { registerHighlightOnce },
-      vue2ShikiLanguage,
-      reactShikiLanguage,
-    ]
+    const firstRegisterHighlight = vi.fn()
+    const secondRegisterHighlight = vi.fn()
+    const opts = { langs: ['typescript'] }
 
-    for (const mod of modules) {
-      const firstRegisterHighlight = vi.fn()
-      const secondRegisterHighlight = vi.fn()
-      const opts = { langs: ['typescript'] }
+    await registerHighlightOnce(firstRegisterHighlight, opts)
+    await registerHighlightOnce(firstRegisterHighlight, opts)
+    await registerHighlightOnce(secondRegisterHighlight, opts)
 
-      await mod.registerHighlightOnce(firstRegisterHighlight, opts)
-      await mod.registerHighlightOnce(firstRegisterHighlight, opts)
-      await mod.registerHighlightOnce(secondRegisterHighlight, opts)
-
-      expect(firstRegisterHighlight).toHaveBeenCalledTimes(1)
-      expect(secondRegisterHighlight).toHaveBeenCalledTimes(1)
-    }
+    expect(firstRegisterHighlight).toHaveBeenCalledTimes(1)
+    expect(secondRegisterHighlight).toHaveBeenCalledTimes(1)
   })
 
   it('passes langs to Vue registerHighlight and renderer', async () => {
@@ -296,7 +281,7 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
-  it('uses default Vue highlight options when langs is empty', async () => {
+  it('omits Vue langs options when langs is empty', async () => {
     const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const wrapper = mount(MarkdownCodeBlockNode, {
       props: {
@@ -313,10 +298,8 @@ describe('markdown code block Shiki langs', () => {
     const rendererCalls = streamMarkdownMock.createShikiStreamRenderer.mock.calls
     const rendererOptions = rendererCalls[rendererCalls.length - 1]?.[1]
 
-    expect(registerCalls[registerCalls.length - 1]?.[0]).toEqual({
-      langs: streamMarkdownMock.defaultLanguages,
-    })
-    expect(rendererOptions.langs).toEqual(streamMarkdownMock.defaultLanguages)
+    expect(registerCalls[registerCalls.length - 1]?.[0]).toEqual({})
+    expect(rendererOptions.langs).toBeUndefined()
     expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',
       'typescript',
@@ -576,12 +559,10 @@ describe('markdown code block Shiki langs', () => {
     await flushAll()
     await waitForRendererCount(initialRendererCount + 1)
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({
-      langs: streamMarkdownMock.defaultLanguages,
-    })
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({})
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
       expect.any(HTMLElement),
-      expect.objectContaining({ langs: streamMarkdownMock.defaultLanguages }),
+      expect.not.objectContaining({ langs: expect.any(Array) }),
     )
     expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',
@@ -1070,7 +1051,7 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
-  it('registers default highlight options when React langs is omitted', async () => {
+  it('omits React langs options when langs is omitted', async () => {
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -1088,9 +1069,7 @@ describe('markdown code block Shiki langs', () => {
     await flushReact()
     await waitForReactRendererCreated()
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith({
-      langs: streamMarkdownMock.defaultLanguages,
-    })
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith({})
     expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',
       'typescript',
@@ -1534,12 +1513,10 @@ describe('markdown code block Shiki langs', () => {
     await flushReact()
     await waitForReactRendererCount(initialRendererCount + 1)
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({
-      langs: streamMarkdownMock.defaultLanguages,
-    })
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({})
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
       expect.any(HTMLElement),
-      expect.objectContaining({ langs: streamMarkdownMock.defaultLanguages }),
+      expect.not.objectContaining({ langs: expect.any(Array) }),
     )
     expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',

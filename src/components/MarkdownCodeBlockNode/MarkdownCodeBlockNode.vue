@@ -1,6 +1,13 @@
 <script setup lang="ts">
+import type { RegisterHighlightOptions, ShikiRendererOptions } from 'markstream-core'
 import type { MarkdownCodeBlockPreviewPayload, ShikiCodeBlockProps } from '../../types/component-props'
-import type { RegisterHighlightOptions, ShikiRendererOptions } from '../../utils/shikiLanguage'
+import {
+  createRegisteredHighlightLanguages,
+  getHighlightRegistrationKey,
+  getRegisterHighlightOptions,
+  normalizeShikiLanguage,
+  registerHighlightOnce,
+} from 'markstream-core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
@@ -9,17 +16,8 @@ import {
   getLanguageIcon,
   languageIconsRevision,
   languageMap,
+  normalizeLanguageIdentifier,
 } from '../../utils/languageIcon'
-import {
-  createRegisteredHighlightLanguages,
-  getEffectiveRegisterHighlightOptions,
-  getEffectiveShikiRendererOptions,
-  getHighlightRegistrationKey,
-  getShikiLanguageMatchKey,
-  normalizeDisplayLanguage,
-  normalizeShikiLanguage,
-  registerHighlightOnce,
-} from '../../utils/shikiLanguage'
 import CodeBlockShell from '../CodeBlockNode/CodeBlockShell.vue'
 
 interface MarkdownCodeBlockNodeProps extends ShikiCodeBlockProps {
@@ -82,7 +80,7 @@ const emits = defineEmits<{
 }>()
 const { t } = useSafeI18n()
 
-const codeLanguage = ref<string>(normalizeDisplayLanguage(props.node.language))
+const codeLanguage = ref<string>(normalizeLanguageIdentifier(props.node.language))
 const copyText = ref(false)
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
@@ -311,11 +309,9 @@ function disposeCurrentRenderer() {
 
 function readDefaultLanguages(mod: unknown) {
   const maybeDefaults = (mod as { defaultLanguages?: unknown }).defaultLanguages
-  if (!Array.isArray(maybeDefaults))
-    return undefined
-
-  const langs = maybeDefaults.filter((lang): lang is string => typeof lang === 'string')
-  return langs.length ? langs : undefined
+  return Array.isArray(maybeDefaults)
+    ? maybeDefaults.filter((lang): lang is string => typeof lang === 'string')
+    : undefined
 }
 
 const highlightRegistrationKey = computed(() =>
@@ -327,8 +323,7 @@ function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) 
   if (!normalized)
     return 'plaintext'
 
-  const matchKey = getShikiLanguageMatchKey(normalized)
-  if (!registeredHighlightLanguages || registeredHighlightLanguages.has(matchKey))
+  if (!registeredHighlightLanguages || registeredHighlightLanguages.has(normalized))
     return normalized
 
   if (hasContent && isDevEnv && !warnedMissingLanguages.has(normalized)) {
@@ -402,11 +397,7 @@ async function ensureStreamMarkdownLoaded() {
 async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: readonly string[]): Promise<HighlightRegistrationStatus> {
   if (!registerHighlight)
     return 'ready'
-  const opts = getEffectiveRegisterHighlightOptions(
-    themes,
-    langs,
-    defaultHighlightLanguages,
-  )
+  const opts = getRegisterHighlightOptions(themes, langs)
   const key = getHighlightRegistrationKey(opts.themes, opts.langs)
   if (latestHighlightRegistrationKey !== key)
     return 'stale'
@@ -429,17 +420,11 @@ async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: re
     return 'stale'
 
   registeredHighlightKey = key
-  registeredHighlightLanguages = createRegisteredHighlightLanguages(opts.langs)
+  registeredHighlightLanguages = createRegisteredHighlightLanguages(opts.langs || defaultHighlightLanguages)
   return 'ready'
 }
 
-async function waitForCurrentHighlightRegistration(themes?: readonly unknown[], langs?: readonly string[]) {
-  const opts = getEffectiveRegisterHighlightOptions(
-    themes,
-    langs,
-    defaultHighlightLanguages,
-  )
-  const key = getHighlightRegistrationKey(opts.themes, opts.langs)
+async function waitForCurrentHighlightRegistration(themes: readonly unknown[] | undefined, langs: readonly string[] | undefined, key: string) {
   const status = await ensureHighlightRegistered(themes, langs)
   if (status !== 'failed')
     return status
@@ -468,15 +453,11 @@ async function initRenderer(epoch: number) {
     return
   }
 
-  const rendererOptions = getEffectiveShikiRendererOptions(
+  const rendererOptions = getRegisterHighlightOptions(
     props.themes,
     props.langs,
-    defaultHighlightLanguages,
   )
-  const nextRendererConfigKey = getHighlightRegistrationKey(
-    rendererOptions.themes,
-    rendererOptions.langs,
-  )
+  const nextRendererConfigKey = highlightRegistrationKey.value
   latestHighlightRegistrationKey = nextRendererConfigKey
 
   if (renderer && rendererConfigKey !== nextRendererConfigKey)
@@ -485,6 +466,7 @@ async function initRenderer(epoch: number) {
   const highlightStatus = await waitForCurrentHighlightRegistration(
     rendererOptions.themes,
     rendererOptions.langs,
+    nextRendererConfigKey,
   )
   if (!isCurrentRenderEpoch(epoch) || highlightStatus === 'stale')
     return
@@ -583,7 +565,7 @@ watch(() => props.autoScrollInitial, (enabled) => {
 
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   const epoch = nextRenderEpoch()
-  const normalizedLang = normalizeDisplayLanguage(lang)
+  const normalizedLang = normalizeLanguageIdentifier(lang)
   if (normalizedLang !== codeLanguage.value)
     codeLanguage.value = normalizedLang
   if (!viewportReady.value) {
@@ -758,7 +740,7 @@ function previewCode() {
   if (!isPreviewable.value)
     return
 
-  const lowerLang = normalizeDisplayLanguage(codeLanguage.value || props.node.language).toLowerCase()
+  const lowerLang = normalizeLanguageIdentifier(codeLanguage.value || props.node.language).toLowerCase()
   const artifactType = lowerLang === 'html' ? 'text/html' : 'image/svg+xml'
   const artifactTitle
     = lowerLang === 'html'

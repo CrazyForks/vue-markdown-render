@@ -1,5 +1,3 @@
-import { normalizeLanguageIdentifier } from './languageIcon'
-
 export interface RegisterHighlightOptions {
   themes?: string[]
   langs?: string[]
@@ -88,10 +86,6 @@ export function getLanguageBaseToken(rawLang?: string | null) {
   return firstToken.split(':')[0]?.trim().toLowerCase() ?? ''
 }
 
-export function normalizeDisplayLanguage(rawLang?: string | null) {
-  return normalizeLanguageIdentifier(getLanguageBaseToken(rawLang))
-}
-
 export function normalizeShikiLanguage(rawLang?: string | null) {
   const token = getLanguageBaseToken(rawLang)
   return SHIKI_LANGUAGE_ALIAS_MAP[token] ?? token
@@ -137,25 +131,12 @@ export function getShikiRendererOptions(
   }
 }
 
-export function getEffectiveShikiLangs(
-  langs?: readonly string[],
-  fallbackLangs?: readonly string[],
-) {
-  const explicit = getShikiLangs(langs)
-  if (explicit?.length)
-    return explicit
-
-  const fallback = getShikiLangs(fallbackLangs)
-  return fallback?.length ? fallback : undefined
-}
-
-export function getEffectiveShikiRendererOptions(
+export function getRegisterHighlightOptions(
   themes?: readonly unknown[],
   langs?: readonly string[],
-  fallbackLangs?: readonly string[],
-): Pick<ShikiRendererOptions, 'themes' | 'langs'> {
+): RegisterHighlightOptions {
   const shikiThemes = getShikiThemes(themes)
-  const shikiLangs = getEffectiveShikiLangs(langs, fallbackLangs)
+  const shikiLangs = getShikiLangs(langs)
 
   return {
     ...(shikiThemes?.length ? { themes: shikiThemes } : {}),
@@ -174,36 +155,12 @@ export function getHighlightRegistrationKey(themes?: readonly unknown[], langs?:
   return `${themesKey}\u0000\u0000${langsKey}`
 }
 
-export function getRegisterHighlightOptions(themes?: readonly unknown[], langs?: readonly string[]): RegisterHighlightOptions {
-  const opts: RegisterHighlightOptions = {}
-
-  const shikiThemes = getShikiThemes(themes)
-  if (shikiThemes?.length)
-    opts.themes = shikiThemes
-
+export function createRegisteredHighlightLanguages(langs?: readonly string[]) {
   const shikiLangs = getShikiLangs(langs)
-  if (shikiLangs?.length)
-    opts.langs = shikiLangs
+  if (!shikiLangs?.length)
+    return undefined
 
-  return opts
-}
-
-export function getEffectiveRegisterHighlightOptions(
-  themes?: readonly unknown[],
-  langs?: readonly string[],
-  fallbackLangs?: readonly string[],
-): RegisterHighlightOptions {
-  const opts: RegisterHighlightOptions = {}
-
-  const shikiThemes = getShikiThemes(themes)
-  if (shikiThemes?.length)
-    opts.themes = shikiThemes
-
-  const shikiLangs = getEffectiveShikiLangs(langs, fallbackLangs)
-  if (shikiLangs?.length)
-    opts.langs = shikiLangs
-
-  return opts
+  return new Set(shikiLangs)
 }
 
 export async function registerHighlightOnce(
@@ -229,14 +186,4 @@ export async function registerHighlightOnce(
 
   tasks.set(key, task)
   return task
-}
-
-export function createRegisteredHighlightLanguages(langs?: readonly string[]) {
-  const shikiLangs = getShikiLangs(langs)
-  if (!shikiLangs?.length)
-    return undefined
-
-  return new Set(
-    shikiLangs.map(lang => getShikiLanguageMatchKey(lang)),
-  )
 }

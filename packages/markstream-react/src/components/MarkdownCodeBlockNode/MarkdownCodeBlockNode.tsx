@@ -1,21 +1,18 @@
+import type { RegisterHighlightOptions, ShikiRendererOptions } from 'markstream-core'
 import type { VisibilityHandle } from '../../context/viewportPriority'
 import type { ShikiCodeBlockProps } from '../../types/component-props'
-import type { RegisterHighlightOptions, ShikiRendererOptions } from '../../utils/shikiLanguage'
+import {
+  createRegisteredHighlightLanguages,
+  getHighlightRegistrationKey,
+  getRegisterHighlightOptions,
+  normalizeShikiLanguage,
+  registerHighlightOnce,
+} from 'markstream-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
-import { getLanguageIcon, languageMap, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
-import {
-  createRegisteredHighlightLanguages,
-  getEffectiveRegisterHighlightOptions,
-  getEffectiveShikiRendererOptions,
-  getHighlightRegistrationKey,
-  getShikiLanguageMatchKey,
-  normalizeDisplayLanguage,
-  normalizeShikiLanguage,
-  registerHighlightOnce,
-} from '../../utils/shikiLanguage'
+import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
 
 export interface MarkdownCodeBlockNodeProps extends ShikiCodeBlockProps {
   node: {
@@ -67,10 +64,9 @@ interface HighlightRegistrationInput {
 function createHighlightRegistrationConfig(
   themes?: readonly unknown[],
   langs?: readonly string[],
-  fallbackLangs?: readonly string[],
 ): HighlightRegistrationConfig {
-  const registerOptions = getEffectiveRegisterHighlightOptions(themes, langs, fallbackLangs)
-  const rendererOptions = getEffectiveShikiRendererOptions(themes, langs, fallbackLangs)
+  const registerOptions = getRegisterHighlightOptions(themes, langs)
+  const rendererOptions = registerOptions
 
   return {
     key: getHighlightRegistrationKey(rendererOptions.themes, rendererOptions.langs),
@@ -81,11 +77,9 @@ function createHighlightRegistrationConfig(
 
 function readDefaultLanguages(mod: unknown) {
   const maybeDefaults = (mod as { defaultLanguages?: unknown }).defaultLanguages
-  if (!Array.isArray(maybeDefaults))
-    return undefined
-
-  const langs = maybeDefaults.filter((lang): lang is string => typeof lang === 'string')
-  return langs.length ? langs : undefined
+  return Array.isArray(maybeDefaults)
+    ? maybeDefaults.filter((lang): lang is string => typeof lang === 'string')
+    : undefined
 }
 
 function escapeHtml(str: string) {
@@ -105,7 +99,7 @@ function normalizeRendererLanguageForRegistered(
   if (!normalized)
     return 'plaintext'
 
-  if (!registeredLanguages || registeredLanguages.has(getShikiLanguageMatchKey(normalized)))
+  if (!registeredLanguages || registeredLanguages.has(normalized))
     return normalized
 
   return 'plaintext'
@@ -145,7 +139,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }
 
   const codeLanguage = useMemo(() => String(props.node.language ?? ''), [props.node.language])
-  const canonicalLanguage = useMemo(() => normalizeDisplayLanguage(codeLanguage), [codeLanguage])
+  const canonicalLanguage = useMemo(() => normalizeLanguageIdentifier(codeLanguage), [codeLanguage])
   const [languageIconsRevision, setLanguageIconsRevision] = useState(0)
 
   useEffect(() => {
@@ -326,7 +320,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       return 'stale'
 
     registeredKeyRef.current = key
-    registeredHighlightLanguagesRef.current = createRegisteredHighlightLanguages(config.registerOptions.langs)
+    registeredHighlightLanguagesRef.current = createRegisteredHighlightLanguages(config.registerOptions.langs || defaultHighlightLanguagesRef.current)
     return 'ready'
   }, [])
 
@@ -393,7 +387,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     const currentRegistrationConfig = createHighlightRegistrationConfig(
       registrationInput?.themes,
       registrationInput?.langs,
-      defaultHighlightLanguagesRef.current,
     )
     const key = currentRegistrationConfig.key
     latestRegistrationKeyRef.current = key
