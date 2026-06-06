@@ -1256,6 +1256,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     infographicProps: mergedInfographicProps,
     codeBlockThemes: {
       themes: props.themes,
+      langs: props.langs,
       monacoOptions: props.codeBlockMonacoOptions,
       minWidth: props.codeBlockMinWidth,
       maxWidth: props.codeBlockMaxWidth,
@@ -1280,6 +1281,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     mergedD2Props,
     mergedInfographicProps,
     props.themes,
+    props.langs,
     props.codeBlockMonacoOptions,
     props.codeBlockMinWidth,
     props.codeBlockMaxWidth,

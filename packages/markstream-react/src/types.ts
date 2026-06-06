@@ -10,9 +10,13 @@ import type {
   D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,
+  ShikiCodeBlockProps,
 } from './types/component-props'
 
-export type NodeRendererCodeBlockProps = Partial<Omit<CodeBlockNodeProps, 'node'>> & Record<string, unknown>
+export type NodeRendererCodeBlockProps
+  = Partial<Omit<CodeBlockNodeProps, 'node'>>
+    & Partial<Pick<ShikiCodeBlockProps, 'langs'>>
+    & Record<string, unknown>
 
 export interface NodeRendererProps {
   content?: string
@@ -46,6 +50,7 @@ export interface NodeRendererProps {
   infographicProps?: Partial<Omit<InfographicBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   showTooltips?: boolean
   themes?: CodeBlockMonacoTheme[]
+  langs?: string[]
   isDark?: boolean
   customId?: string
   indexKey?: number | string
@@ -105,6 +110,7 @@ export interface RenderContext {
     monacoOptions?: CodeBlockMonacoOptions
     minWidth?: string | number
     maxWidth?: string | number
+    langs?: string[]
   }
   events: {
     onCopy?: (code: string) => void

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BaseNode, HtmlPolicy, ParsedNode } from 'stream-markdown-parser'
-import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload } from '../../types/component-props'
+import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, ShikiCodeBlockProps } from '../../types/component-props'
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
 import { computed } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
@@ -39,6 +39,11 @@ import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import FallbackComponent from './FallbackComponent.vue'
 
+type NodeRendererCodeBlockProps
+  = Partial<Omit<CodeBlockNodeProps, 'node'>>
+    & Partial<Pick<ShikiCodeBlockProps, 'langs'>>
+    & Record<string, unknown>
+
 const props = withDefaults(defineProps<{
   nodes?: BaseNode[]
   customId?: string
@@ -52,9 +57,10 @@ const props = withDefaults(defineProps<{
   codeBlockMonacoOptions?: CodeBlockMonacoOptions
   codeBlockMinWidth?: string | number
   codeBlockMaxWidth?: string | number
-  codeBlockProps?: Partial<Omit<CodeBlockNodeProps, 'node'>>
+  codeBlockProps?: NodeRendererCodeBlockProps
   renderCodeBlocksAsPre?: boolean
   themes?: CodeBlockMonacoTheme[]
+  langs?: string[]
   isDark?: boolean
   customHtmlTags?: readonly string[]
   htmlPolicy?: HtmlPolicy
@@ -119,6 +125,7 @@ const codeBlockBindings = computed(() => ({
   lightTheme: props.codeBlockLightTheme,
   monacoOptions: props.codeBlockMonacoOptions,
   themes: props.themes,
+  langs: props.langs,
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
   ...(props.codeBlockProps || {}),

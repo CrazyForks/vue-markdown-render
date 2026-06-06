@@ -29,6 +29,8 @@ function CodeBlockProbe(props: any) {
       className="code-block-probe"
       data-instance-id={String(instanceIdRef.current)}
       data-code={String(props.node?.code ?? '')}
+      data-langs={JSON.stringify(props.langs ?? null)}
+      data-stream={String(props.stream)}
     />
   )
 }
@@ -100,6 +102,47 @@ describe('markstream-react code block streaming stability', () => {
     expect(updatedProbe?.getAttribute('data-code')).toBe('export const a = 1\nexport const b = 2')
     expect(mountCount).toBe(1)
     expect(unmountCount).toBe(0)
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('forwards top-level langs and lets codeBlockProps override them for custom code_block renderers', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    setCustomComponents(scopeId, { code_block: CodeBlockProbe as any })
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(NodeRenderer as any, {
+        customId: scopeId,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const a = 1',
+            raw: '```ts\nexport const a = 1\n```',
+          },
+        ],
+        langs: ['typescript'],
+        codeBlockProps: {
+          langs: ['python'],
+        },
+        codeBlockStream: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        batchRendering: false,
+        maxLiveNodes: 0,
+      }))
+    })
+    await flushReact()
+
+    const probe = host.querySelector('.code-block-probe') as HTMLElement | null
+    expect(probe?.getAttribute('data-langs')).toBe('["python"]')
+    expect(probe?.getAttribute('data-stream')).toBe('false')
 
     await act(async () => {
       root.unmount()

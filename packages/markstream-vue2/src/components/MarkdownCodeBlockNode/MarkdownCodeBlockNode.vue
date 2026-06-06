@@ -333,6 +333,15 @@ const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
 let streamMarkdownLoadPromise: Promise<void> | null = null
 
+function disposeCurrentRenderer() {
+  renderer?.dispose()
+  renderer = undefined
+  rendererConfigKey = null
+  clearRendererTarget()
+  rendererReady.value = false
+  hasStableRender.value = false
+}
+
 const highlightRegistrationKey = computed(() =>
   getHighlightRegistrationKey(getResolvedThemes(), props.langs),
 )
@@ -465,20 +474,15 @@ async function initRenderer() {
   const nextRendererConfigKey = getHighlightRegistrationKey(themes, langs)
   latestHighlightRegistrationKey = nextRendererConfigKey
 
+  if (renderer && rendererConfigKey !== nextRendererConfigKey)
+    disposeCurrentRenderer()
+
   const highlightStatus = await waitForCurrentHighlightRegistration(themes, langs)
   if (highlightStatus === 'stale')
     return
   if (highlightStatus === 'failed') {
     renderFallback(props.node.code, !hasStableRender.value)
     return
-  }
-
-  if (renderer && rendererConfigKey !== nextRendererConfigKey) {
-    renderer.dispose()
-    renderer = undefined
-    rendererConfigKey = null
-    clearRendererTarget()
-    rendererReady.value = false
   }
 
   if (!renderer && createShikiRenderer) {
@@ -531,10 +535,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   renderObserver?.disconnect()
   renderObserver = undefined
-  renderer?.dispose()
-  renderer = undefined
-  rendererConfigKey = null
-  clearRendererTarget()
+  disposeCurrentRenderer()
 })
 
 watch(highlightRegistrationKey, async () => {

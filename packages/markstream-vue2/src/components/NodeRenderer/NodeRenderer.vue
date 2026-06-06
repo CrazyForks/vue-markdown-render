@@ -2,7 +2,7 @@
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { SmoothMarkdownStreamOptions } from '../../composables/useSmoothMarkdownStream'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
-import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from '../../types/component-props'
+import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps, ShikiCodeBlockProps } from '../../types/component-props'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
 import { h as createVNode } from 'vue'
 import { computed, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue-demi'
@@ -53,6 +53,11 @@ interface IdleDeadlineLike {
   timeRemaining?: () => number
 }
 
+type NodeRendererCodeBlockProps
+  = Partial<Omit<CodeBlockNodeProps, 'node'>>
+    & Partial<Pick<ShikiCodeBlockProps, 'langs'>>
+    & Record<string, unknown>
+
 // Exported props interface so declaration generators can include prop types
 export interface NodeRendererProps {
   content?: string
@@ -93,7 +98,7 @@ export interface NodeRendererProps {
   /** Maximum width forwarded to CodeBlockNode (px or CSS unit) */
   codeBlockMaxWidth?: string | number
   /** Arbitrary props to forward to every CodeBlockNode */
-  codeBlockProps?: Partial<Omit<CodeBlockNodeProps, 'node'>>
+  codeBlockProps?: NodeRendererCodeBlockProps
   /** Props forwarded to MermaidBlockNode for mermaid fences */
   mermaidProps?: Partial<Omit<MermaidBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   /** Props forwarded to D2BlockNode for d2/d2lang fences */
@@ -103,6 +108,7 @@ export interface NodeRendererProps {
   /** Global tooltip toggle for link/code-block renderers (default: true) */
   showTooltips?: boolean
   themes?: CodeBlockMonacoTheme[]
+  langs?: string[]
   isDark?: boolean
   customId?: string
   indexKey?: number | string
@@ -1840,6 +1846,7 @@ const codeBlockBindings = computed(() => ({
   lightTheme: props.codeBlockLightTheme,
   monacoOptions: props.codeBlockMonacoOptions,
   themes: props.themes,
+  langs: props.langs,
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
   ...(typeof props.showTooltips === 'boolean' ? { showTooltips: props.showTooltips } : {}),

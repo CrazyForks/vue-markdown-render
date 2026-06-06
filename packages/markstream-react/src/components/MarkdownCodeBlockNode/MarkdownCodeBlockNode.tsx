@@ -230,6 +230,14 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       rendererTargetRef.current.innerHTML = ''
   }, [])
 
+  const disposeCurrentRenderer = useCallback(() => {
+    rendererRef.current?.dispose()
+    rendererRef.current = null
+    rendererConfigKeyRef.current = ''
+    clearRendererTarget()
+    setRendererReady(false)
+  }, [clearRendererTarget])
+
   const nextRenderSeq = useCallback(() => {
     renderSeqRef.current += 1
     return renderSeqRef.current
@@ -354,6 +362,9 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (!isCurrentRenderSeq(seq))
       return
 
+    if (rendererRef.current && rendererConfigKeyRef.current !== key)
+      disposeCurrentRenderer()
+
     const highlightStatus = await waitForCurrentHighlightRegistration()
     if (!isCurrentRenderSeq(seq) || highlightStatus === 'stale')
       return
@@ -365,14 +376,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (!codeBlockContentRef.current || !rendererTargetRef.current) {
       renderFallback(code)
       return
-    }
-
-    if (rendererRef.current && rendererConfigKeyRef.current !== key) {
-      rendererRef.current.dispose()
-      rendererRef.current = null
-      rendererConfigKeyRef.current = ''
-      clearRendererTarget()
-      setRendererReady(false)
     }
 
     if (!rendererRef.current && createRendererRef.current) {
@@ -407,7 +410,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     viewportReady,
     ensureStreamMarkdownLoaded,
     waitForCurrentHighlightRegistration,
-    clearRendererTarget,
+    disposeCurrentRenderer,
     getPreferredColorScheme,
     renderFallback,
     updateRendererWithFallback,
@@ -438,12 +441,9 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   // Dispose renderer on unmount only
   useEffect(() => {
     return () => {
-      rendererRef.current?.dispose()
-      rendererRef.current = null
-      rendererConfigKeyRef.current = ''
-      clearRendererTarget()
+      disposeCurrentRenderer()
     }
-  }, [clearRendererTarget])
+  }, [disposeCurrentRenderer])
 
   useEffect(() => {
     if (!rendererRef.current)

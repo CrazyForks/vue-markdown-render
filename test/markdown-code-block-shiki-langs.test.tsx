@@ -2,7 +2,8 @@ import { mount } from '@vue/test-utils'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, ref } from 'vue'
+import { defineComponent, h, ref } from 'vue'
+import { removeCustomComponents as removeVue2CustomComponents, setCustomComponents as setVue2CustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
 import { getHighlightRegistrationKey, getRegisterHighlightOptions } from '../src/utils/shikiLanguage'
 import { flushAll } from './setup/flush-all'
 
@@ -54,6 +55,22 @@ function makeNode(language = 'typescript') {
     raw: `\`\`\`${language}\n${code}\n\`\`\``,
   }
 }
+
+const vue2CustomId = 'vue2-shiki-langs-forwarding'
+const Vue2CodeBlockProbe = defineComponent({
+  name: 'Vue2CodeBlockProbe',
+  props: {
+    node: { type: Object, required: true },
+    langs: Array,
+  },
+  setup(props) {
+    return () => h('div', {
+      'class': 'vue2-code-block-probe',
+      'data-language': String((props.node as any)?.language ?? ''),
+      'data-langs': JSON.stringify(props.langs ?? null),
+    })
+  },
+})
 
 async function flushReact() {
   await act(async () => {
@@ -129,6 +146,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetStreamMarkdownMock()
+  removeVue2CustomComponents(vue2CustomId)
   document.body.innerHTML = ''
   ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = false
 })
@@ -373,6 +391,39 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('clears stale Vue renderer when re-registration for new langs fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      },
+    })
+
+    try {
+      await flushAll()
+      await waitForRendererCreated()
+
+      const initialRendererCount = streamMarkdownMock.createdRenderers.length
+      const oldRenderer = streamMarkdownMock.createdRenderers[initialRendererCount - 1]
+      streamMarkdownMock.registerHighlight.mockRejectedValue(new Error('load failed'))
+
+      await wrapper.setProps({ langs: ['python'] })
+      await flushAll()
+
+      expect(oldRenderer.dispose).toHaveBeenCalledTimes(1)
+      expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(initialRendererCount)
+      expect((wrapper.find('.code-block-render').element as HTMLElement).textContent).toBe('')
+      expect(wrapper.find('.code-fallback-plain').text()).toContain('const value = 1')
+    }
+    finally {
+      wrapper.unmount()
+      warnSpy.mockRestore()
+    }
+  })
+
   it('recreates Vue renderer when langs is mutated in place', async () => {
     const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const Parent = defineComponent({
@@ -530,6 +581,68 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
+  })
+
+  it('forwards Vue2 MarkdownRenderCompat top-level langs and lets codeBlockProps override them', async () => {
+    setVue2CustomComponents(vue2CustomId, { code_block: Vue2CodeBlockProbe as any })
+    const { default: MarkdownRenderCompat } = await import('../packages/markstream-vue2/src/components/MarkdownRenderCompat.vue')
+    const topLevelWrapper = mount(MarkdownRenderCompat as any, {
+      props: {
+        customId: vue2CustomId,
+        nodes: [makeNode('typescript')],
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    expect(topLevelWrapper.get('.vue2-code-block-probe').attributes('data-langs')).toBe('["typescript"]')
+    topLevelWrapper.unmount()
+
+    const overrideWrapper = mount(MarkdownRenderCompat as any, {
+      props: {
+        customId: vue2CustomId,
+        nodes: [makeNode('typescript')],
+        langs: ['typescript'],
+        codeBlockProps: {
+          langs: ['python'],
+        },
+      },
+    })
+
+    await flushAll()
+    expect(overrideWrapper.get('.vue2-code-block-probe').attributes('data-langs')).toBe('["python"]')
+    overrideWrapper.unmount()
+  })
+
+  it('forwards Vue2 LegacyNodesRenderer top-level langs and lets codeBlockProps override them', async () => {
+    setVue2CustomComponents(vue2CustomId, { code_block: Vue2CodeBlockProbe as any })
+    const { default: LegacyNodesRenderer } = await import('../packages/markstream-vue2/src/components/NodeRenderer/LegacyNodesRenderer.vue')
+    const topLevelWrapper = mount(LegacyNodesRenderer as any, {
+      props: {
+        customId: vue2CustomId,
+        nodes: [makeNode('typescript')],
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    expect(topLevelWrapper.get('.vue2-code-block-probe').attributes('data-langs')).toBe('["typescript"]')
+    topLevelWrapper.unmount()
+
+    const overrideWrapper = mount(LegacyNodesRenderer as any, {
+      props: {
+        customId: vue2CustomId,
+        nodes: [makeNode('typescript')],
+        langs: ['typescript'],
+        codeBlockProps: {
+          langs: ['python'],
+        },
+      },
+    })
+
+    await flushAll()
+    expect(overrideWrapper.get('.vue2-code-block-probe').attributes('data-langs')).toBe('["python"]')
+    overrideWrapper.unmount()
   })
 
   it('keeps React theme order significant for highlight registration', async () => {
@@ -1009,6 +1122,50 @@ describe('markdown code block Shiki langs', () => {
       'const value = 1',
       'plaintext',
     )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('clears stale React renderer when re-registration for new langs fails', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const node = makeNode('typescript')
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    const initialRendererCount = streamMarkdownMock.createdRenderers.length
+    const oldRenderer = streamMarkdownMock.createdRenderers[initialRendererCount - 1]
+    streamMarkdownMock.registerHighlight.mockRejectedValue(new Error('load failed'))
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: ['python'],
+      }))
+    })
+
+    await flushReact()
+
+    expect(oldRenderer.dispose).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(initialRendererCount)
+    expect(host.querySelector('.code-block-render')?.textContent).toBe('')
+    expect(host.querySelector('.code-fallback-plain')?.textContent).toContain('const value = 1')
 
     await act(async () => {
       root.unmount()

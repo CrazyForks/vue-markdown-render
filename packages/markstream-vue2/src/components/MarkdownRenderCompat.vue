@@ -2,6 +2,7 @@
 import type { BaseNode, MarkdownIt, ParseOptions } from 'stream-markdown-parser'
 import type { NodeRendererProps } from './NodeRenderer/NodeRenderer.vue'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
+import { h as createVNode } from 'vue'
 import { defineComponent } from 'vue-demi'
 import { isLegacyVue26Vm, resolveVueListeners } from '../utils/vue26'
 import NodeRenderer from './NodeRenderer'
@@ -35,6 +36,7 @@ export default defineComponent({
     codeBlockProps: Object as unknown as () => Record<string, any> | undefined,
     showTooltips: Boolean,
     themes: Array as unknown as () => string[] | undefined,
+    langs: Array as unknown as () => string[] | undefined,
     isDark: Boolean,
     customId: [String, Number],
     indexKey: [String, Number],
@@ -110,6 +112,7 @@ export default defineComponent({
         codeBlockProps: this.codeBlockProps,
         showTooltips: this.showTooltips,
         themes: this.themes,
+        langs: this.langs,
         isDark: this.isDark,
         customId: this.customId as string | undefined,
         indexKey: this.indexKey,
@@ -128,11 +131,25 @@ export default defineComponent({
     },
   },
   render(h) {
+    const isVue2Render = typeof h === 'function'
+    const createElement = isVue2Render ? h : createVNode
     const listeners = resolveVueListeners(this)
+    const withRuntimeProps = (runtimeProps: Record<string, unknown>) => {
+      return isVue2Render
+        ? {
+            props: runtimeProps,
+            ...(Object.keys(listeners).length > 0 ? { on: listeners } : {}),
+          }
+        : {
+            ...runtimeProps,
+            ...(Object.keys(listeners).length > 0 ? listeners : {}),
+          }
+    }
 
     if (this.legacyVue26) {
-      return h(LegacyNodesRenderer, {
-        props: {
+      return createElement(
+        LegacyNodesRenderer,
+        withRuntimeProps({
           nodes: this.parsedLegacyNodes,
           customId: this.customId,
           indexKey: this.indexKey,
@@ -148,16 +165,13 @@ export default defineComponent({
           codeBlockMaxWidth: this.codeBlockMaxWidth,
           codeBlockProps: this.codeBlockProps,
           themes: this.themes,
+          langs: this.langs,
           isDark: this.isDark,
-        },
-        ...(Object.keys(listeners).length > 0 ? { on: listeners } : {}),
-      })
+        }),
+      )
     }
 
-    return h(NodeRenderer, {
-      props: this.forwardedProps,
-      ...(Object.keys(listeners).length > 0 ? { on: listeners } : {}),
-    })
+    return createElement(NodeRenderer, withRuntimeProps(this.forwardedProps))
   },
 })
 </script>

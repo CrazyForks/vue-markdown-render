@@ -8,9 +8,13 @@ import type {
   D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,
+  ShikiCodeBlockProps,
 } from './component-props'
 
-export type NodeRendererCodeBlockProps = Partial<Omit<CodeBlockNodeProps, 'node'>> & Record<string, unknown>
+export type NodeRendererCodeBlockProps
+  = Partial<Omit<CodeBlockNodeProps, 'node'>>
+    & Partial<Pick<ShikiCodeBlockProps, 'langs'>>
+    & Record<string, unknown>
 export type NodeRendererMode = 'docs' | 'chat' | 'minimal'
 export type NodeRendererCodeRenderer = 'pre' | 'shiki' | 'monaco'
 
@@ -318,6 +322,8 @@ export interface NodeRendererProps {
   showTooltips?: boolean
   /** Theme names or theme objects preloaded for Monaco-backed code blocks. */
   themes?: CodeBlockMonacoTheme[]
+  /** Shiki language preload list forwarded to MarkdownCodeBlockNode. */
+  langs?: string[]
   /** Forces dark mode for built-in renderers such as Mermaid, D2, KaTeX, and code blocks. */
   isDark?: boolean
   /** Scope key used by `setCustomComponents()` and `data-custom-id` style overrides. */

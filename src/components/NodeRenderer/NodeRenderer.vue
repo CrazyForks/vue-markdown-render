@@ -248,6 +248,7 @@ const rendererProps = {
   get infographicProps() { return props.infographicProps },
   get showTooltips() { return resolvedShowTooltipsProp.value },
   get themes() { return props.themes },
+  get langs() { return props.langs },
   get isDark() { return props.isDark },
   get customId() { return props.customId },
   get indexKey() { return props.indexKey },
@@ -1761,7 +1762,7 @@ function getHostVirtualMeasurementKey() {
 function getVirtualRendererLayoutKey() {
   const renderer = resolvedCodeRenderer.value
   const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
-  const codeProps = props.codeBlockProps
+  const codeProps = props.codeBlockProps as Record<string, unknown> | undefined
 
   return [
     props.isDark ? 'dark' : 'light',
@@ -1773,8 +1774,8 @@ function getVirtualRendererLayoutKey() {
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
     stringifyVirtualToken(props.codeBlockMinWidth),
     stringifyVirtualToken(props.codeBlockMaxWidth),
-    renderer === 'shiki' ? stringifyVirtualToken(codeProps?.themes) : '',
-    renderer === 'shiki' ? stringifyVirtualToken(codeProps?.langs) : '',
+    renderer === 'shiki' ? stringifyVirtualToken(codeProps?.themes ?? props.themes) : '',
+    renderer === 'shiki' ? stringifyVirtualToken(codeProps?.langs ?? props.langs) : '',
     stringifyVirtualToken(monaco?.fontSize),
     stringifyVirtualToken(monaco?.lineHeight),
     stringifyVirtualToken(monaco?.fontFamily),
@@ -5117,6 +5118,7 @@ const codeBlockBindings = computed(() => ({
   lightTheme: props.codeBlockLightTheme,
   monacoOptions: props.codeBlockMonacoOptions,
   themes: props.themes,
+  langs: resolvedCodeRenderer.value === 'shiki' ? props.langs : undefined,
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
   ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
@@ -5158,6 +5160,7 @@ const shikiCodeBlockBindings = computed(() => {
     darkTheme: props.codeBlockDarkTheme,
     lightTheme: props.codeBlockLightTheme,
     themes: props.themes,
+    langs: props.langs,
     minWidth: props.codeBlockMinWidth,
     maxWidth: props.codeBlockMaxWidth,
     ...(typeof resolvedShowTooltips.value === 'boolean'

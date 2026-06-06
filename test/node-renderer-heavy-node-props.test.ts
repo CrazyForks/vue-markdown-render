@@ -16,6 +16,7 @@ vi.mock('../src/components/MarkdownCodeBlockNode', async () => {
         return () => h('div', {
           'class': 'code-block-container',
           'data-has-monaco-options': String(Object.prototype.hasOwnProperty.call(attrs, 'monacoOptions')),
+          'data-langs': JSON.stringify(attrs.langs ?? null),
         })
       },
     }),
@@ -323,6 +324,37 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     const shiki = wrapper.get('.code-block-container')
     expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
     expect(shiki.attributes('data-has-monaco-options')).toBe('false')
+  })
+
+  it('forwards top-level langs to the shiki renderer and lets codeBlockProps override them', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        codeRenderer: 'shiki',
+        langs: ['typescript'],
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    for (let attempt = 0; attempt < 10 && !wrapper.find('.code-block-container').exists(); attempt++)
+      await flushAll()
+
+    expect(wrapper.get('.code-block-container').attributes('data-langs')).toBe('["typescript"]')
+
+    await wrapper.setProps({
+      codeBlockProps: {
+        langs: ['python'],
+      },
+    })
+    await flushAll()
+
+    expect(wrapper.get('.code-block-container').attributes('data-langs')).toBe('["python"]')
   })
 
   it('ignores invalid runtime codeRenderer values', async () => {
