@@ -191,7 +191,6 @@ export default {
           :content="content"
           :final="isDone"
           :typewriter="false"
-          :fade="false"
           :code-block-stream="true"
           code-block-dark-theme="vitesse-dark"
           code-block-light-theme="vitesse-dark"

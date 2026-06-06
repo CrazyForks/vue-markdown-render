@@ -1,32 +1,17 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, ref } from 'vue-demi'
-import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import { isLegacyVue26Vm } from '../../utils/vue26'
 import NodeRenderer from '../NodeRenderer'
 import LegacyNodesRenderer from '../NodeRenderer/LegacyNodesRenderer.vue'
-import ParagraphNode from '../ParagraphNode'
 
 // 定义警告块节点类型
 export type AdmonitionKind = 'note' | 'info' | 'tip' | 'warning' | 'danger' | 'caution' | 'error'
-
-interface AdmonitionChild {
-  type: string
-  raw: string
-  children?: AdmonitionChild[]
-  [key: string]: unknown
-}
-
-interface ParagraphNodeChild {
-  type: 'paragraph'
-  children: AdmonitionChild[]
-  raw: string
-}
 
 interface AdmonitionNode {
   type: 'admonition'
   kind: AdmonitionKind
   title?: string
-  children: AdmonitionChild[]
+  children: { type: string, raw: string }[]
   raw: string
   // 可选：是否支持折叠
   collapsible?: boolean
@@ -35,7 +20,7 @@ interface AdmonitionNode {
 }
 
 // 接收 props（并在 script 中使用）
-const props = defineProps<{ node: AdmonitionNode, indexKey: number | string, isDark?: boolean, typewriter?: boolean, fade?: boolean, customId?: string }>()
+const props = defineProps<{ node: AdmonitionNode, indexKey: number | string, isDark?: boolean, typewriter?: boolean, customId?: string }>()
 // 定义事件
 const emit = defineEmits(['copy'])
 
@@ -74,23 +59,6 @@ const nestedRenderer = computed(() => {
   const vm = instance?.proxy as any
   return isLegacyVue26Vm(vm) ? LegacyNodesRenderer : NodeRenderer
 })
-const customComponents = computed(() => {
-  void customComponentsRevision.value
-  return getCustomNodeComponents(props.customId)
-})
-const directParagraphChildren = computed<ParagraphNodeChild[] | null>(() => {
-  if ((customComponents.value as any).paragraph)
-    return null
-
-  if (!props.node.children.every(child => child?.type === 'paragraph' && Array.isArray(child.children)))
-    return null
-
-  return props.node.children as ParagraphNodeChild[]
-})
-const hasCopyListener = Boolean((instance?.proxy as any)?.$listeners?.copy)
-function handleCopy(text: string) {
-  emit('copy', text)
-}
 </script>
 
 <template>
@@ -119,33 +87,13 @@ function handleCopy(text: string) {
       class="admonition-content"
       :aria-labelledby="headerId"
     >
-      <template v-if="directParagraphChildren">
-        <ParagraphNode
-          v-for="(child, childIndex) in directParagraphChildren"
-          :key="`${indexKey}-${childIndex}`"
-          :node="child"
-          :custom-id="props.customId"
-          :index-key="`admonition-${indexKey}-${childIndex}`"
-        />
-      </template>
       <component
         :is="nestedRenderer"
-        v-else-if="hasCopyListener"
         :index-key="`admonition-${indexKey}`"
         :nodes="props.node.children"
         :custom-id="props.customId"
         :typewriter="props.typewriter"
-        :fade="props.fade"
-        @copy="handleCopy"
-      />
-      <component
-        :is="nestedRenderer"
-        v-else
-        :index-key="`admonition-${indexKey}`"
-        :nodes="props.node.children"
-        :custom-id="props.customId"
-        :typewriter="props.typewriter"
-        :fade="props.fade"
+        @copy="emit('copy', $event)"
       />
     </div>
   </div>

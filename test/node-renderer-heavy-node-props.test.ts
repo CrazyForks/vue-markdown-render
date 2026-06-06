@@ -78,6 +78,23 @@ const GenericCodeBlockAttrsProbe = defineComponent({
   },
 })
 
+const ReservedCodeBlockPropsProbe = defineComponent({
+  name: 'ReservedCodeBlockPropsProbe',
+  props: {
+    node: { type: Object, required: true },
+    indexKey: { type: [String, Number], required: true },
+    showHeader: { type: Boolean, default: true },
+  },
+  setup(props) {
+    return () => h('div', {
+      'class': 'reserved-code-block-props-probe',
+      'data-language': String((props.node as any)?.language ?? ''),
+      'data-index-key': String(props.indexKey),
+      'data-show-header': String(props.showHeader),
+    })
+  },
+})
+
 const FadeProbe = defineComponent({
   name: 'FadeProbe',
   setup() {
@@ -416,6 +433,48 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
       await flushAll()
 
     expect(wrapper.get('.generic-code-block-attrs-probe').attributes('data-langs')).toBe('["typescript"]')
+  })
+
+  it('does not let codeBlockProps override reserved code block props', async () => {
+    setCustomComponents(customId, {
+      code_block: ReservedCodeBlockPropsProbe,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        codeBlockProps: {
+          node: {
+            type: 'code_block',
+            language: 'spoofed',
+          },
+          indexKey: 'spoofed-index',
+          key: 'spoofed-key',
+          ctx: {},
+          renderNode: () => null,
+          showHeader: false,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        batchRendering: false,
+        maxLiveNodes: 0,
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.reserved-code-block-props-probe')
+    expect(probe.attributes('data-language')).toBe('ts')
+    expect(probe.attributes('data-index-key')).toBe('markdown-renderer-0')
+    expect(probe.attributes('data-show-header')).toBe('false')
   })
 
   it('ignores invalid runtime codeRenderer values', async () => {

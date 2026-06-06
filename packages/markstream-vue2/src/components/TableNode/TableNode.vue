@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue-demi'
-import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import { isLegacyVue26Vm } from '../../utils/vue26'
 import NodeRenderer from '../NodeRenderer'
 import LegacyNodesRenderer from '../NodeRenderer/LegacyNodesRenderer.vue'
@@ -11,10 +10,7 @@ interface TableCellNode {
   header: boolean
   children: {
     type: string
-    content?: unknown
     raw: string
-    center?: boolean
-    children?: unknown[]
   }[]
   raw: string
   align?: 'left' | 'right' | 'center'
@@ -42,12 +38,11 @@ const props = defineProps<{
   indexKey: string | number
   isDark?: boolean
   typewriter?: boolean
-  fade?: boolean
   customId?: string
 }>()
 
 // 定义事件
-const emit = defineEmits(['copy'])
+defineEmits(['copy'])
 
 const isLoading = computed(() => props.node.loading ?? false)
 const bodyRows = computed(() => props.node.rows ?? [])
@@ -58,15 +53,6 @@ const nestedRenderer = computed(() => {
   const vm = instance?.proxy as any
   return isLegacyVue26Vm(vm) ? LegacyNodesRenderer : NodeRenderer
 })
-const hasCopyListener = Boolean((instance?.proxy as any)?.$listeners?.copy)
-function handleCopy(text: string) {
-  emit('copy', text)
-}
-const customComponentsMap = computed(() => {
-  void customComponentsRevision.value
-  return getCustomNodeComponents(props.customId)
-})
-const hasTextOverride = computed(() => Boolean((customComponentsMap.value as any).text))
 
 const MIN_COLUMN_WIDTH = 48
 
@@ -82,23 +68,6 @@ const columnStyles = computed(() =>
   columnWidths.value.map(width => width > 0 ? { width: `${width}px` } : undefined),
 )
 const hasColumnWidths = computed(() => columnWidths.value.length > 0)
-
-function getPlainTextCellContent(cell: TableCellNode) {
-  if (props.fade !== false || hasTextOverride.value)
-    return null
-
-  const children = cell.children.length === 1 && cell.children[0]?.type === 'paragraph' && Array.isArray(cell.children[0].children)
-    ? cell.children[0].children as TableCellNode['children']
-    : cell.children
-
-  let content = ''
-  for (const child of children) {
-    if (child?.type !== 'text' || child.center === true)
-      return null
-    content += String(child.content ?? child.raw ?? '')
-  }
-  return content
-}
 
 function measureHeaderWidths() {
   const cells = tableRef.value?.querySelectorAll('thead th')
@@ -163,8 +132,7 @@ watch(
   () => props.node.header.cells.length,
   () => {
     stopColumnResize()
-    if (columnWidths.value.length > 0)
-      columnWidths.value = []
+    columnWidths.value = []
   },
 )
 
@@ -201,31 +169,14 @@ onBeforeUnmount(stopColumnResize)
                   : 'text-left',
             ]"
           >
-            <span
-              v-if="getPlainTextCellContent(cell) !== null"
-              class="text-node"
-            >{{ getPlainTextCellContent(cell) }}</span>
-            <template v-else>
-              <component
-                :is="nestedRenderer"
-                v-if="hasCopyListener"
-                :nodes="cell.children"
-                :index-key="`table-th-${props.indexKey}`"
-                :custom-id="props.customId"
-                :typewriter="props.typewriter"
-                :fade="props.fade"
-                @copy="handleCopy"
-              />
-              <component
-                :is="nestedRenderer"
-                v-else
-                :nodes="cell.children"
-                :index-key="`table-th-${props.indexKey}`"
-                :custom-id="props.customId"
-                :typewriter="props.typewriter"
-                :fade="props.fade"
-              />
-            </template>
+            <component
+              :is="nestedRenderer"
+              :nodes="cell.children"
+              :index-key="`table-th-${props.indexKey}`"
+              :custom-id="props.customId"
+              :typewriter="props.typewriter"
+              @copy="$emit('copy', $event)"
+            />
             <button
               v-if="index < node.header.cells.length - 1"
               type="button"
@@ -256,31 +207,14 @@ onBeforeUnmount(stopColumnResize)
             ]"
             dir="auto"
           >
-            <span
-              v-if="getPlainTextCellContent(cell) !== null"
-              class="text-node"
-            >{{ getPlainTextCellContent(cell) }}</span>
-            <template v-else>
-              <component
-                :is="nestedRenderer"
-                v-if="hasCopyListener"
-                :nodes="cell.children"
-                :index-key="`table-td-${props.indexKey}`"
-                :custom-id="props.customId"
-                :typewriter="props.typewriter"
-                :fade="props.fade"
-                @copy="handleCopy"
-              />
-              <component
-                :is="nestedRenderer"
-                v-else
-                :nodes="cell.children"
-                :index-key="`table-td-${props.indexKey}`"
-                :custom-id="props.customId"
-                :typewriter="props.typewriter"
-                :fade="props.fade"
-              />
-            </template>
+            <component
+              :is="nestedRenderer"
+              :nodes="cell.children"
+              :index-key="`table-td-${props.indexKey}`"
+              :custom-id="props.customId"
+              :typewriter="props.typewriter"
+              @copy="$emit('copy', $event)"
+            />
           </td>
         </tr>
       </tbody>

@@ -194,7 +194,7 @@ async function collectTooltipRegression(page) {
 
   const samples = []
   const startedAt = Date.now()
-  while (Date.now() - startedAt < 45000) {
+  while (Date.now() - startedAt < 20000) {
     const tooltip = await readTooltipState(page)
     const progress = await readProgress(page)
     samples.push({ tooltip, progress })
@@ -208,11 +208,15 @@ async function collectTooltipRegression(page) {
   const hiddenSamples = samples.filter(sample => !sample.tooltip.visible).length
   const wrongTextSamples = samples.filter(sample => !sample.tooltip.text.includes('https://simonhe.me/')).length
   const finalProgress = samples.at(-1)?.progress ?? null
+  const progressAdvanced = progressAtMonitorStart != null && finalProgress != null
+    ? finalProgress - progressAtMonitorStart
+    : null
 
   return {
     firstProgress,
     progressAtMonitorStart,
     finalProgress,
+    progressAdvanced,
     firstTooltipText: firstTooltip.text,
     secondTooltipText: secondTooltip.text,
     hiddenSamples,

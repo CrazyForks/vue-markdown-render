@@ -1,8 +1,6 @@
 <script>
 import { NestedRenderer } from 'markstream-vue2'
 
-const customHtmlTags = Object.freeze(['thinking'])
-
 export default {
   name: 'ThinkingNode',
   components: {
@@ -13,11 +11,6 @@ export default {
       type: Object,
       required: true,
     },
-  },
-  data() {
-    return {
-      customHtmlTags,
-    }
   },
 }
 </script>
@@ -50,9 +43,8 @@ export default {
             <NestedRenderer
               :node="node"
               custom-id="vue2-demo"
-              :custom-html-tags="customHtmlTags"
+              :custom-html-tags="['thinking']"
               :typewriter="false"
-              :fade="false"
               :batch-rendering="false"
               :viewport-priority="false"
               :defer-nodes-until-visible="false"

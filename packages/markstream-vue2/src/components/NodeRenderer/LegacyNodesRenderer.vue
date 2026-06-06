@@ -152,6 +152,19 @@ const customComponentsMap = computed(() => {
   return getCustomNodeComponents(props.customId)
 })
 const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'legacy-renderer'))
+function getCodeBlockExtraProps(source: unknown) {
+  const extraProps = { ...((source ?? {}) as Record<string, unknown>) }
+
+  delete extraProps.node
+  delete extraProps.key
+  delete extraProps.ctx
+  delete extraProps.renderNode
+  delete extraProps.indexKey
+
+  return extraProps
+}
+
+const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
 const codeBlockBindings = computed(() => ({
   stream: props.codeBlockStream,
   darkTheme: props.codeBlockDarkTheme,
@@ -160,12 +173,12 @@ const codeBlockBindings = computed(() => ({
   themes: props.themes,
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
-  ...(props.codeBlockProps || {}),
+  ...codeBlockExtraProps.value,
 }))
 const customCodeBlockBindings = computed(() => ({
   ...codeBlockBindings.value,
   langs: props.langs,
-  ...(props.codeBlockProps || {}),
+  ...codeBlockExtraProps.value,
 }))
 const nonCodeBindings = computed(() => ({ typewriter: props.typewriter, fade: props.fade, htmlPolicy: props.htmlPolicy ?? 'safe' }))
 const linkBindings = computed(() => ({

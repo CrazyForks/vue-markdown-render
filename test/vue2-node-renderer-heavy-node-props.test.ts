@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
+import LegacyNodesRenderer from '../packages/markstream-vue2/src/components/NodeRenderer/LegacyNodesRenderer.vue'
 import NodeRenderer from '../packages/markstream-vue2/src/components/NodeRenderer/NodeRenderer.vue'
 import { removeCustomComponents, setCustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
@@ -86,6 +87,23 @@ const GenericCodeBlockAttrsProbe = defineComponent({
       'class': 'generic-code-block-attrs-probe',
       'data-language': String((this as any).node?.language ?? ''),
       'data-langs': JSON.stringify((this as any).$attrs.langs ?? null),
+    })
+  },
+})
+
+const ReservedCodeBlockPropsProbe = defineComponent({
+  name: 'ReservedCodeBlockPropsProbe',
+  props: {
+    node: { type: Object, required: true },
+    indexKey: { type: [String, Number], required: true },
+    showHeader: { type: Boolean, default: true },
+  },
+  render() {
+    return h('div', {
+      'class': 'reserved-code-block-props-probe',
+      'data-language': String((this as any).node?.language ?? ''),
+      'data-index-key': String((this as any).indexKey),
+      'data-show-header': String((this as any).showHeader),
     })
   },
 })
@@ -294,6 +312,82 @@ describe('markstream-vue2 heavy-node prop forwarding', () => {
     const probe = wrapper.get('.generic-code-block-attrs-probe')
     expect(probe.attributes('data-language')).toBe('ts')
     expect(probe.attributes('data-langs')).toBe('["typescript"]')
+  })
+
+  it('does not let codeBlockProps override reserved code block props', async () => {
+    setCustomComponents(customId, {
+      code_block: ReservedCodeBlockPropsProbe as any,
+    })
+
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        customId,
+        codeBlockProps: {
+          node: {
+            type: 'code_block',
+            language: 'spoofed',
+          },
+          indexKey: 'spoofed-index',
+          key: 'spoofed-key',
+          ctx: {},
+          renderNode: () => null,
+          showHeader: false,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.reserved-code-block-props-probe')
+    expect(probe.attributes('data-language')).toBe('ts')
+    expect(probe.attributes('data-index-key')).toBe('markdown-renderer-0')
+    expect(probe.attributes('data-show-header')).toBe('false')
+  })
+
+  it('does not let codeBlockProps override reserved legacy code block props', async () => {
+    setCustomComponents(customId, {
+      code_block: ReservedCodeBlockPropsProbe as any,
+    })
+
+    const wrapper = mount(LegacyNodesRenderer as any, {
+      props: {
+        customId,
+        codeBlockProps: {
+          node: {
+            type: 'code_block',
+            language: 'spoofed',
+          },
+          indexKey: 'spoofed-index',
+          key: 'spoofed-key',
+          ctx: {},
+          renderNode: () => null,
+          showHeader: false,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.reserved-code-block-props-probe')
+    expect(probe.attributes('data-language')).toBe('ts')
+    expect(probe.attributes('data-index-key')).toBe('legacy-renderer-0')
+    expect(probe.attributes('data-show-header')).toBe('false')
   })
 
   it('lets d2lang exact overrides beat d2 fallback while keeping d2 props', async () => {

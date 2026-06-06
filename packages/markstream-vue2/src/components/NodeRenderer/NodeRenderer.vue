@@ -1850,6 +1850,19 @@ const nodeComponents = {
   // 例如:custom_node: CustomNode,
 }
 const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'))
+function getCodeBlockExtraProps(source: unknown) {
+  const extraProps = { ...((source ?? {}) as Record<string, unknown>) }
+
+  delete extraProps.node
+  delete extraProps.key
+  delete extraProps.ctx
+  delete extraProps.renderNode
+  delete extraProps.indexKey
+
+  return extraProps
+}
+
+const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode
   stream: props.codeBlockStream,
@@ -1860,12 +1873,12 @@ const codeBlockBindings = computed(() => ({
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
   ...(typeof props.showTooltips === 'boolean' ? { showTooltips: props.showTooltips } : {}),
-  ...(props.codeBlockProps || {}),
+  ...codeBlockExtraProps.value,
 }))
 const customCodeBlockBindings = computed(() => ({
   ...codeBlockBindings.value,
   langs: props.langs,
-  ...(props.codeBlockProps || {}),
+  ...codeBlockExtraProps.value,
 }))
 const mermaidBindings = computed(() => ({
   ...(props.mermaidProps || {}),
@@ -2443,6 +2456,7 @@ watch(
       :code-block-max-width="props.codeBlockMaxWidth"
       :code-block-props="props.codeBlockProps"
       :themes="props.themes"
+      :langs="props.langs"
       :is-dark="props.isDark"
       :custom-html-tags="mergedParseOptions.customHtmlTags"
       :html-policy="resolvedHtmlPolicy"

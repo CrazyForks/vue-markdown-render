@@ -1764,9 +1764,7 @@ function getVirtualRendererLayoutKey() {
   const renderer = resolvedCodeRenderer.value
   const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
   const codeProps = props.codeBlockProps as Record<string, unknown> | undefined
-  const hasCustomComponents = Object.keys(customComponentsMap.value).length > 0
-  const includeShikiCodeOptions = renderer === 'shiki'
-    || hasCustomComponents
+  const includeShikiCodeOptions = usesShikiCodeBlockLayoutOptions()
 
   return [
     props.isDark ? 'dark' : 'light',
@@ -1795,6 +1793,29 @@ function getVirtualRendererLayoutKey() {
     stringifyVirtualToken(codeProps?.showCollapseButton),
     stringifyVirtualToken(codeProps?.showFontSizeButtons),
   ].join('\u0000')
+}
+
+function usesShikiCodeBlockLayoutOptions() {
+  if (resolvedCodeRenderer.value === 'shiki')
+    return true
+
+  const customComponents = customComponentsMap.value as Record<string, unknown>
+  if (customComponents.code_block)
+    return true
+
+  return parsedNodes.value.some((node) => {
+    if (node.type !== 'code_block')
+      return false
+
+    const lang = getCodeBlockLanguage(node)
+    if (!lang)
+      return false
+
+    if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
+      return false
+
+    return Boolean(customComponents[lang])
+  })
 }
 
 function getVirtualMeasurementKey() {
@@ -5115,6 +5136,19 @@ const nodeComponents: Partial<CustomComponents> = {
   // 例如:custom_node: CustomNode,
 }
 const indexPrefix = computed(() => getCurrentIndexPrefix())
+function getCodeBlockExtraProps(source: unknown) {
+  const extraProps = { ...((source ?? {}) as Record<string, unknown>) }
+
+  delete extraProps.node
+  delete extraProps.key
+  delete extraProps.ctx
+  delete extraProps.renderNode
+  delete extraProps.indexKey
+
+  return extraProps
+}
+
+const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode / MarkdownCodeBlockNode
   stream: rendererProps.codeBlockStream,
@@ -5126,13 +5160,13 @@ const codeBlockBindings = computed(() => ({
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
   ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
-  ...(props.codeBlockProps || {}),
+  ...codeBlockExtraProps.value,
 }))
 
 const customCodeBlockBindings = computed(() => ({
   ...codeBlockBindings.value,
   langs: props.langs,
-  ...(props.codeBlockProps || {}),
+  ...codeBlockExtraProps.value,
 }))
 
 function pickBoolean(value: unknown) {
@@ -5164,7 +5198,6 @@ const preCodeBlockBindings = computed(() => {
 })
 
 const shikiCodeBlockBindings = computed(() => {
-  const source = (props.codeBlockProps || {}) as Record<string, unknown>
   return {
     stream: rendererProps.codeBlockStream,
     darkTheme: props.codeBlockDarkTheme,
@@ -5176,7 +5209,7 @@ const shikiCodeBlockBindings = computed(() => {
     ...(typeof resolvedShowTooltips.value === 'boolean'
       ? { showTooltips: resolvedShowTooltips.value }
       : {}),
-    ...source,
+    ...codeBlockExtraProps.value,
   }
 })
 

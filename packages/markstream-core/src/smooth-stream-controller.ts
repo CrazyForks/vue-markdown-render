@@ -156,7 +156,7 @@ class SmoothMarkdownStreamControllerImpl {
 
     this.done = true
 
-    if (finishOptions.flush != null ? finishOptions.flush : this.flushOnFinish) {
+    if (finishOptions.flush ?? this.flushOnFinish) {
       this.visible = this.source
       this.charBudget = 0
       this.currentCps = this.minCharsPerSecond
@@ -222,8 +222,7 @@ class SmoothMarkdownStreamControllerImpl {
     this.paused = false
     const t = now()
     this.lastTick = t
-    if (!this.startedAt)
-      this.startedAt = t
+    this.startedAt ||= t
     this.emit()
     this.ensureLoop()
   }

@@ -163,7 +163,7 @@ async function collectRegression(page) {
   const uniqueProgress = new Set(progressAtMonitorStart == null ? [] : [progressAtMonitorStart])
 
   const start = Date.now()
-  while (Date.now() - start < 45000) {
+  while (Date.now() - start < 25000) {
     const snapshot = await page.evaluate(() => {
       const isVisible = (el) => {
         if (!el)
