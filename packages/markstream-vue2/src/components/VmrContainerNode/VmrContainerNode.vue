@@ -29,7 +29,7 @@ interface VmrContainerNode {
   raw: string
 }
 
-const props = defineProps<{ node: VmrContainerNode, indexKey: number | string, isDark?: boolean, typewriter?: boolean, customId?: string }>()
+const props = defineProps<{ node: VmrContainerNode, indexKey: number | string, isDark?: boolean, typewriter?: boolean, fade?: boolean, customId?: string }>()
 
 // Build CSS class from container name
 const containerClass = computed(() => `vmr-container vmr-container-${props.node.name}`)
@@ -75,6 +75,8 @@ function getNodeComponent(type: string) {
       :custom-id="props.customId"
       :node="child"
       :index-key="`${indexKey || 'vmr-container'}-${index}`"
+      :typewriter="props.typewriter"
+      :fade="props.fade"
     />
   </div>
 </template>

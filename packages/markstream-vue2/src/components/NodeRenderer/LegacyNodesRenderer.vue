@@ -2,7 +2,7 @@
 import type { BaseNode, HtmlPolicy, ParsedNode } from 'stream-markdown-parser'
 import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, ShikiCodeBlockProps } from '../../types/component-props'
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
-import { computed } from 'vue-demi'
+import { computed, getCurrentInstance, provide } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -65,7 +65,12 @@ const props = withDefaults(defineProps<{
    * MarkdownCodeBlockNode / stream-markdown; theme objects are ignored.
    */
   themes?: CodeBlockMonacoTheme[]
-  /** Shiki language preload list forwarded to MarkdownCodeBlockNode. */
+  /**
+   * Shiki language preload list forwarded to MarkdownCodeBlockNode.
+   *
+   * Vue2's default code block renderer is Monaco-backed. This prop is used
+   * when a custom `code_block` or language renderer uses MarkdownCodeBlockNode.
+   */
   langs?: string[]
   isDark?: boolean
   customHtmlTags?: readonly string[]
@@ -82,6 +87,28 @@ const emit = defineEmits<{
   (e: 'handleArtifactClick', payload: CodeBlockPreviewPayload): void
   (e: 'click', event: MouseEvent): void
 }>()
+const instance = getCurrentInstance()
+
+provide('markstreamTypewriter', computed(() => props.typewriter === true))
+provide('markstreamFade', computed(() => props.fade !== false))
+
+function handleCopy(code: string) {
+  emit('copy', code)
+}
+
+function handleArtifactClick(payload: CodeBlockPreviewPayload) {
+  emit('handleArtifactClick', payload)
+}
+
+;(handleCopy as any).fns = handleCopy
+;(handleArtifactClick as any).fns = handleArtifactClick
+
+const forwardedChildListeners = {
+  'copy': handleCopy,
+  'handle-artifact-click': handleArtifactClick,
+}
+const listeners = (instance?.proxy as any)?.$listeners ?? {}
+const hasForwardedChildListeners = Boolean(listeners.copy || listeners.handleArtifactClick || listeners['handle-artifact-click'])
 
 const nodeComponents = {
   text: TextNode,
@@ -158,8 +185,8 @@ const renderedItems = computed(() => {
   const nodes = Array.isArray(props.nodes) ? props.nodes : []
   return nodes.map((rawNode, index) => {
     let node = rawNode as ParsedNode
+    const type = String((rawNode as any)?.type || 'unknown')
     const language = getCodeBlockLanguage(node)
-    const type = String((node as any)?.type || 'unknown')
     let component = getNodeComponent(node, language)
 
     // Coerce html_block/html_inline nodes whose tag matches a registered
@@ -210,9 +237,8 @@ const renderedItems = computed(() => {
     return {
       index,
       indexKey: `${indexPrefix.value}-${index}`,
-      // Keep code blocks mounted during streaming so Shiki/Monaco renderers can
-      // preserve their last successful DOM instead of flashing back to <pre>.
-      renderKey: type === 'code_block'
+      // Keep stateful heavy nodes mounted during streaming.
+      renderKey: type === 'code_block' || type === 'table' || type === 'list'
         ? `${indexPrefix.value}-${index}-${type}`
         : `${indexPrefix.value}-${index}-${type}-${String((rawNode as any)?.raw || '').length}`,
       node,
@@ -294,14 +320,26 @@ function handleClick(event: MouseEvent) {
       <div class="node-content">
         <component
           :is="item.component"
+          v-if="hasForwardedChildListeners"
+          :key="`${item.renderKey}-component`"
           :node="item.node"
           :loading="item.node.loading"
           :index-key="item.indexKey"
           v-bind="item.bindings"
           :custom-id="props.customId"
           :is-dark="props.isDark"
-          @copy="emit('copy', $event)"
-          @handle-artifact-click="emit('handleArtifactClick', $event)"
+          v-on="forwardedChildListeners"
+        />
+        <component
+          :is="item.component"
+          v-else
+          :key="`${item.renderKey}-component`"
+          :node="item.node"
+          :loading="item.node.loading"
+          :index-key="item.indexKey"
+          v-bind="item.bindings"
+          :custom-id="props.customId"
+          :is-dark="props.isDark"
         />
       </div>
     </div>

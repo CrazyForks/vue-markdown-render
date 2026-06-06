@@ -138,10 +138,6 @@ async function scrollFirstIntoView(page, selector, timeout = 20000) {
   }, selector, { timeout })
 }
 
-function isIgnoredConsoleError(text) {
-  return String(text || '').includes('[Vue warn]: You may have an infinite update loop in a component render function.')
-}
-
 async function waitForRenderedMath(page) {
   await scrollFirstIntoView(page, '.math-block')
   await page.waitForFunction(() => Boolean(document.querySelector('.math-block .katex')), { timeout: 20000 })
@@ -167,7 +163,7 @@ async function collectRegression(page) {
   const uniqueProgress = new Set(progressAtMonitorStart == null ? [] : [progressAtMonitorStart])
 
   const start = Date.now()
-  while (Date.now() - start < 25000) {
+  while (Date.now() - start < 45000) {
     const snapshot = await page.evaluate(() => {
       const isVisible = (el) => {
         if (!el)
@@ -234,14 +230,10 @@ async function collectRegression(page) {
   }
 
   const finalProgress = Math.max(...Array.from(uniqueProgress.values()), 0)
-  const progressAdvanced = progressAtMonitorStart != null
-    ? finalProgress - progressAtMonitorStart
-    : null
 
   return {
     progressAtMonitorStart,
     finalProgress,
-    progressAdvanced,
     seenRenderedBlocks: Array.from(seenRenderedBlocks),
     seenRenderedInline: Array.from(seenRenderedInline),
     regressedBlocks: Array.from(regressedBlocks),
@@ -264,7 +256,7 @@ async function main() {
     const pageErrors = []
 
     page.on('console', (msg) => {
-      if (msg.type() === 'error' && !isIgnoredConsoleError(msg.text()))
+      if (msg.type() === 'error')
         consoleErrors.push(msg.text())
     })
     page.on('pageerror', error => pageErrors.push(String(error)))
@@ -297,8 +289,8 @@ async function main() {
       throw new Error('No rendered math block was observed during the run')
     if (result.seenRenderedInline.length === 0)
       throw new Error('No rendered math inline node was observed during the run')
-    if (result.progressAdvanced == null || result.progressAdvanced <= 0)
-      throw new Error(`Streaming did not advance while monitoring math nodes (ended at ${result.finalProgress}%)`)
+    if (result.finalProgress !== 100)
+      throw new Error(`Streaming did not finish while monitoring math nodes (ended at ${result.finalProgress}%)`)
     if (result.consoleErrorCount > 0 || result.pageErrorCount > 0)
       throw new Error(`Unexpected browser errors: console=${result.consoleErrorCount}, page=${result.pageErrorCount}`)
   }

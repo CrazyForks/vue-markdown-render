@@ -113,7 +113,12 @@ export interface NodeRendererProps {
    * MarkdownCodeBlockNode / stream-markdown; theme objects are ignored.
    */
   themes?: CodeBlockMonacoTheme[]
-  /** Shiki language preload list forwarded to MarkdownCodeBlockNode. */
+  /**
+   * Shiki language preload list forwarded to MarkdownCodeBlockNode.
+   *
+   * Vue2's default code block renderer is Monaco-backed. This prop is used
+   * when a custom `code_block` or language renderer uses MarkdownCodeBlockNode.
+   */
   langs?: string[]
   isDark?: boolean
   customId?: string

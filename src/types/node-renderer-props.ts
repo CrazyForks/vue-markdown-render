@@ -326,7 +326,13 @@ export interface NodeRendererProps {
    * MarkdownCodeBlockNode / stream-markdown; theme objects are ignored.
    */
   themes?: CodeBlockMonacoTheme[]
-  /** Shiki language preload list forwarded to MarkdownCodeBlockNode. */
+  /**
+   * Shiki language preload list forwarded to MarkdownCodeBlockNode.
+   *
+   * Vue 3 built-in Shiki mode consumes this when `codeRenderer="shiki"`.
+   * React/Vue2 consume it when a custom `code_block` or language renderer
+   * uses MarkdownCodeBlockNode.
+   */
   langs?: string[]
   /** Forces dark mode for built-in renderers such as Mermaid, D2, KaTeX, and code blocks. */
   isDark?: boolean

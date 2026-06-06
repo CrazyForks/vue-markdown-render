@@ -21,16 +21,21 @@ const props = defineProps<{
   node: DefinitionListNode
   indexKey: string | number
   typewriter?: boolean
+  fade?: boolean
   customId?: string
 }>()
 
-defineEmits(['copy'])
+const emit = defineEmits(['copy'])
 
 const instance = getCurrentInstance()
 const nestedRenderer = computed(() => {
   const vm = instance?.proxy as any
   return isLegacyVue26Vm(vm) ? LegacyNodesRenderer : NodeRenderer
 })
+const hasCopyListener = Boolean((instance?.proxy as any)?.$listeners?.copy)
+function handleCopy(text: string) {
+  emit('copy', text)
+}
 
 const definitionEntries = computed(() => {
   return props.node.items.flatMap((item, index) => ([
@@ -60,11 +65,22 @@ const definitionEntries = computed(() => {
     >
       <component
         :is="nestedRenderer"
+        v-if="hasCopyListener"
         :index-key="entry.key"
         :nodes="entry.nodes"
         :custom-id="props.customId"
         :typewriter="props.typewriter"
-        @copy="$emit('copy', $event)"
+        :fade="props.fade"
+        @copy="handleCopy"
+      />
+      <component
+        :is="nestedRenderer"
+        v-else
+        :index-key="entry.key"
+        :nodes="entry.nodes"
+        :custom-id="props.customId"
+        :typewriter="props.typewriter"
+        :fade="props.fade"
       />
     </component>
   </dl>

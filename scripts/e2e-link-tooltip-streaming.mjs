@@ -150,10 +150,6 @@ async function readTooltipState(page) {
   })
 }
 
-function isIgnoredConsoleError(text) {
-  return String(text || '').includes('[Vue warn]: You may have an infinite update loop in a component render function.')
-}
-
 async function hoverAndReadTooltip(page, locator, expectedText) {
   await locator.scrollIntoViewIfNeeded()
   await locator.hover()
@@ -198,7 +194,7 @@ async function collectTooltipRegression(page) {
 
   const samples = []
   const startedAt = Date.now()
-  while (Date.now() - startedAt < 20000) {
+  while (Date.now() - startedAt < 45000) {
     const tooltip = await readTooltipState(page)
     const progress = await readProgress(page)
     samples.push({ tooltip, progress })
@@ -212,15 +208,11 @@ async function collectTooltipRegression(page) {
   const hiddenSamples = samples.filter(sample => !sample.tooltip.visible).length
   const wrongTextSamples = samples.filter(sample => !sample.tooltip.text.includes('https://simonhe.me/')).length
   const finalProgress = samples.at(-1)?.progress ?? null
-  const progressAdvanced = progressAtMonitorStart != null && finalProgress != null
-    ? finalProgress - progressAtMonitorStart
-    : null
 
   return {
     firstProgress,
     progressAtMonitorStart,
     finalProgress,
-    progressAdvanced,
     firstTooltipText: firstTooltip.text,
     secondTooltipText: secondTooltip.text,
     hiddenSamples,
@@ -241,7 +233,7 @@ async function main() {
     const pageErrors = []
 
     page.on('console', (msg) => {
-      if (msg.type() === 'error' && !isIgnoredConsoleError(msg.text()))
+      if (msg.type() === 'error')
         consoleErrors.push(msg.text())
     })
     page.on('pageerror', error => pageErrors.push(String(error)))
@@ -270,8 +262,8 @@ async function main() {
       throw new Error(`Tooltip became hidden during streaming (${result.hiddenSamples} hidden samples).`)
     if (result.wrongTextSamples > 0)
       throw new Error(`Tooltip content got stuck or stale during streaming (${result.wrongTextSamples} wrong-text samples).`)
-    if (result.progressAdvanced == null || result.progressAdvanced <= 0)
-      throw new Error(`Streaming did not advance while tooltip was monitored (ended at ${result.finalProgress ?? 'n/a'}%).`)
+    if (result.finalProgress !== 100)
+      throw new Error(`Streaming did not finish while tooltip was monitored (ended at ${result.finalProgress ?? 'n/a'}%).`)
     if (result.consoleErrorCount > 0 || result.pageErrorCount > 0)
       throw new Error(`Unexpected browser errors: console=${result.consoleErrorCount}, page=${result.pageErrorCount}`)
   }
