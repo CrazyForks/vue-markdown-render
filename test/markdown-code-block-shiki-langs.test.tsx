@@ -209,6 +209,15 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
+  it('normalizes golang to the Shiki go id', () => {
+    expect(getRegisterHighlightOptions(undefined, ['golang', 'go'])).toEqual({
+      langs: ['go'],
+    })
+    expect(getHighlightRegistrationKey(undefined, ['golang'])).toBe(
+      getHighlightRegistrationKey(undefined, ['go']),
+    )
+  })
+
   it('uses a stable registration key for reordered normalized langs', () => {
     expect(getHighlightRegistrationKey(['vitesse-light'], ['ts', 'js', 'ts'])).toBe(
       getHighlightRegistrationKey(['vitesse-light'], ['javascript', 'typescript']),
@@ -414,6 +423,30 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
       'echo hi',
       'shellscript',
+    )
+
+    wrapper.unmount()
+  })
+
+  it('matches golang fences when only go is configured', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('golang', 'fmt.Println("hi")'),
+        langs: ['go'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith(
+      expect.objectContaining({ langs: ['go'] }),
+    )
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'fmt.Println("hi")',
+      'go',
     )
 
     wrapper.unmount()
@@ -746,6 +779,51 @@ describe('markdown code block Shiki langs', () => {
     secondUpdate.resolve()
     await secondUpdate.promise
     await flushAll()
+    wrapper.unmount()
+  })
+
+  it('keeps Vue renderer reconfiguration when code updates during pending langs registration', async () => {
+    const second = createDeferred()
+    streamMarkdownMock.registerHighlight
+      .mockImplementationOnce(async (opts?: { langs?: string[] }) => {
+        streamMarkdownMock.loadLangs(opts)
+      })
+      .mockImplementationOnce(() => second.promise.then(() => {
+        streamMarkdownMock.loadLangs({ langs: ['python'] })
+      }))
+
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript', 'const value = 1'),
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    const initialRendererCount = streamMarkdownMock.createdRenderers.length
+
+    await wrapper.setProps({ langs: ['python'] })
+    await wrapper.setProps({
+      node: makeNode('python', 'fresh_value = 2'),
+    })
+
+    second.resolve()
+    await second.promise
+    await flushAll()
+    await waitForRendererCount(initialRendererCount + 1)
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ langs: ['python'] }),
+    )
+    expect(streamMarkdownMock.createdRenderers.at(-1)?.updateCode).toHaveBeenLastCalledWith(
+      'fresh_value = 2',
+      'python',
+    )
+
     wrapper.unmount()
   })
 

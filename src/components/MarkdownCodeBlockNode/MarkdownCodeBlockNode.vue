@@ -310,6 +310,10 @@ const highlightRegistrationKey = computed(() =>
   getHighlightRegistrationKey(props.themes, props.langs),
 )
 
+function rendererNeedsReconfigure() {
+  return Boolean(renderer && rendererConfigKey !== highlightRegistrationKey.value)
+}
+
 function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) {
   const normalized = normalizeShikiLanguage(rawLang)
   if (!normalized)
@@ -568,9 +572,10 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
     return
   }
 
-  if (!renderer) {
+  if (!renderer || rendererNeedsReconfigure()) {
     renderFallback(code)
     await safeInitRenderer(epoch)
+    return
   }
   if (!isCurrentRenderEpoch(epoch))
     return

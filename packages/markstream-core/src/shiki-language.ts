@@ -47,6 +47,8 @@ const SHIKI_LANGUAGE_ALIAS_MAP: Record<string, string> = {
   'mts': 'typescript',
   'cts': 'typescript',
 
+  'golang': 'go',
+
   'py': 'python',
   'rb': 'ruby',
   'rs': 'rust',
