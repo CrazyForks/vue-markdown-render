@@ -75,6 +75,21 @@ const GenericCodeBlockProbe = defineComponent({
   },
 })
 
+const GenericCodeBlockAttrsProbe = defineComponent({
+  name: 'GenericCodeBlockAttrsProbe',
+  inheritAttrs: false,
+  props: {
+    node: { type: Object, required: true },
+  },
+  render() {
+    return h('div', {
+      'class': 'generic-code-block-attrs-probe',
+      'data-language': String((this as any).node?.language ?? ''),
+      'data-langs': JSON.stringify((this as any).$attrs.langs ?? null),
+    })
+  },
+})
+
 const CustomD2Probe = defineComponent({
   name: 'CustomD2Probe',
   props: {
@@ -231,6 +246,54 @@ describe('markstream-vue2 heavy-node prop forwarding', () => {
     expect(exact.attributes('data-show-header')).toBe('false')
     expect(generic.attributes('data-language')).toBe('ts')
     expect(generic.attributes('data-show-header')).toBe('false')
+  })
+
+  it('does not forward top-level langs to built-in pre code blocks', async () => {
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        langs: ['typescript'],
+        renderCodeBlocksAsPre: true,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.get('pre[data-language="ts"]').attributes('langs')).toBeUndefined()
+  })
+
+  it('forwards top-level langs to custom code block renderers', async () => {
+    setCustomComponents(customId, {
+      code_block: GenericCodeBlockAttrsProbe as any,
+    })
+
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        customId,
+        langs: ['typescript'],
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.generic-code-block-attrs-probe')
+    expect(probe.attributes('data-language')).toBe('ts')
+    expect(probe.attributes('data-langs')).toBe('["typescript"]')
   })
 
   it('lets d2lang exact overrides beat d2 fallback while keeping d2 props', async () => {

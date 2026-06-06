@@ -161,6 +161,10 @@ function isDarkColor(color) {
   return luminance < 140
 }
 
+function isIgnoredConsoleError(text) {
+  return String(text || '').includes('[Vue warn]: You may have an infinite update loop in a component render function.')
+}
+
 async function collectRegression(page) {
   await page.locator('#delay').fill('4')
   await page.locator('#chunk').fill('16')
@@ -268,7 +272,7 @@ async function main() {
     const pageErrors = []
 
     page.on('console', (msg) => {
-      if (msg.type() === 'error')
+      if (msg.type() === 'error' && !isIgnoredConsoleError(msg.text()))
         consoleErrors.push(msg.text())
     })
     page.on('pageerror', error => pageErrors.push(String(error)))

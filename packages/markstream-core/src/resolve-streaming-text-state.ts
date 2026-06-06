@@ -92,7 +92,7 @@ export function resolveStreamingTextUpdate({
 
   return resolveStreamingTextState({
     nextContent,
-    previousContent: persistedContent ?? renderedContent,
+    previousContent: persistedContent != null ? persistedContent : renderedContent,
     typewriterEnabled,
   })
 }

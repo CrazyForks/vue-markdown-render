@@ -1852,10 +1852,14 @@ const codeBlockBindings = computed(() => ({
   lightTheme: props.codeBlockLightTheme,
   monacoOptions: props.codeBlockMonacoOptions,
   themes: props.themes,
-  langs: props.langs,
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
   ...(typeof props.showTooltips === 'boolean' ? { showTooltips: props.showTooltips } : {}),
+  ...(props.codeBlockProps || {}),
+}))
+const customCodeBlockBindings = computed(() => ({
+  ...codeBlockBindings.value,
+  langs: props.langs,
   ...(props.codeBlockProps || {}),
 }))
 const mermaidBindings = computed(() => ({
@@ -2182,6 +2186,9 @@ function getBindingsFor(node: ParsedNode, language?: string) {
 
   if (node.type === 'list')
     return listBindings.value
+
+  if (node.type === 'code_block' && (customComponentsMap.value.code_block || (lang && (customComponentsMap.value as any)[lang])))
+    return customCodeBlockBindings.value
 
   return node.type === 'code_block'
     ? codeBlockBindings.value

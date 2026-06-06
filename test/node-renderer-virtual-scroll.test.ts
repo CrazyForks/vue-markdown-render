@@ -2647,6 +2647,60 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('includes langs in the virtual layout key for language custom code blocks', async () => {
+    const LanguageCodeBlockProbe = defineComponent({
+      inheritAttrs: false,
+      props: {
+        node: { type: Object, required: true },
+      },
+      setup(_, { attrs }) {
+        return () => h('div', {
+          'class': 'virtual-language-code-block-probe',
+          'data-langs': JSON.stringify(attrs.langs ?? null),
+        })
+      },
+    })
+
+    setCustomComponents('virtual-prefix-test', {
+      ts: LanguageCodeBlockProbe as any,
+    })
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-prefix-test',
+        nodes: [createCodeBlock(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        langs: ['typescript'],
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'language-code-block-layout-key',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.get('.virtual-language-code-block-probe').attributes('data-langs')).toBe('["typescript"]')
+    const initialKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(initialKey).toContain('["typescript"]')
+
+    await wrapper.setProps({
+      langs: ['typescript', 'python'],
+    })
+    await flushAll()
+
+    const nextKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(nextKey).not.toBe(initialKey)
+    expect(nextKey).toContain('["typescript","python"]')
+
+    wrapper.unmount()
+  })
+
   it('treats prop restoreState as cache-only unless restoreAnchor is provided', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 

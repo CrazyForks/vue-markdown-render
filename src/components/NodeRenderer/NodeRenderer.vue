@@ -1764,8 +1764,9 @@ function getVirtualRendererLayoutKey() {
   const renderer = resolvedCodeRenderer.value
   const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
   const codeProps = props.codeBlockProps as Record<string, unknown> | undefined
+  const hasCustomComponents = Object.keys(customComponentsMap.value).length > 0
   const includeShikiCodeOptions = renderer === 'shiki'
-    || Boolean(customComponentsMap.value.code_block)
+    || hasCustomComponents
 
   return [
     props.isDark ? 'dark' : 'light',
