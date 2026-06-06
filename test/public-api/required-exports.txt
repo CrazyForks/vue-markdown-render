@@ -99,6 +99,7 @@ CodeBlockNodeProps
 CodeBlockPreviewPayload
 CodeBlockThemeProp
 CommonCodeBlockProps
+ShikiCodeBlockProps
 CodeBlockMonacoLanguage
 CodeBlockMonacoOptions
 CodeBlockMonacoTheme

@@ -331,6 +331,7 @@ let highlightRegistrationSeq = 0
 const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
+let streamMarkdownLoadPromise: Promise<void> | null = null
 
 const highlightRegistrationKey = computed(() =>
   getHighlightRegistrationKey(getResolvedThemes(), props.langs),
@@ -429,16 +430,26 @@ async function waitForCurrentHighlightRegistration(themes?: string[], langs?: st
 async function ensureStreamMarkdownLoaded() {
   if (createShikiRenderer)
     return
-  try {
-    const mod = await import('stream-markdown')
-    createShikiRenderer = mod.createShikiStreamRenderer
-    registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
-    defaultHighlightLanguages = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
-  }
-  catch (e) {
-    // stream-markdown is an optional peer; if missing, silently skip highlighting
-    console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
-  }
+  if (streamMarkdownLoadPromise)
+    return streamMarkdownLoadPromise
+
+  streamMarkdownLoadPromise = (async () => {
+    try {
+      const mod = await import('stream-markdown')
+      createShikiRenderer = mod.createShikiStreamRenderer
+      registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
+      defaultHighlightLanguages = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
+    }
+    catch (e) {
+      if (isDevEnv)
+        console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
+    }
+    finally {
+      streamMarkdownLoadPromise = null
+    }
+  })()
+
+  return streamMarkdownLoadPromise
 }
 
 async function initRenderer() {

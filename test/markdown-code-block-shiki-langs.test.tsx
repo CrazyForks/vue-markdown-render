@@ -651,6 +651,46 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
+  it('does not recreate React renderer for content-equivalent inline langs arrays', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['ts'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
   it('normalizes suffixed fence language before React registration and rendering', async () => {
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
@@ -748,6 +788,65 @@ describe('markdown code block Shiki langs', () => {
       'plaintext',
     )
     expect(host.querySelector('.code-fallback-plain')).toBeNull()
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('ignores stale React renderer updates after a slower previous registration', async () => {
+    const firstRegistration = createDeferred()
+    streamMarkdownMock.registerHighlight
+      .mockImplementationOnce(() => firstRegistration.promise)
+      .mockImplementation(async () => {})
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const firstNode = {
+      ...makeNode('typescript'),
+      code: 'const staleValue = 1',
+    }
+    const secondNode = {
+      ...makeNode('python'),
+      code: 'fresh_value = 2',
+    }
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: firstNode,
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: secondNode,
+        langs: ['python'],
+      }))
+    })
+
+    await act(async () => {
+      firstRegistration.resolve()
+      await firstRegistration.promise
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    const lastRenderer = streamMarkdownMock.createdRenderers.at(-1)
+
+    expect(lastRenderer?.updateCode).toHaveBeenLastCalledWith(
+      'fresh_value = 2',
+      'python',
+    )
 
     await act(async () => {
       root.unmount()

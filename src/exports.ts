@@ -128,6 +128,7 @@ export type {
   MermaidBlockEvent,
   MermaidBlockNodeProps,
   PreCodeNodeProps,
+  ShikiCodeBlockProps,
 } from './types/component-props'
 export type {
   MarkstreamCaptureVirtualStateOptions,

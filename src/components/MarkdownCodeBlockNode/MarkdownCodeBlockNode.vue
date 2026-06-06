@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CommonCodeBlockProps, MarkdownCodeBlockPreviewPayload } from '../../types/component-props'
+import type { MarkdownCodeBlockPreviewPayload, ShikiCodeBlockProps } from '../../types/component-props'
 import type { RegisterHighlightOptions, ShikiRendererOptions } from '../../utils/shikiLanguage'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
@@ -21,7 +21,7 @@ import {
 } from '../../utils/shikiLanguage'
 import CodeBlockShell from '../CodeBlockNode/CodeBlockShell.vue'
 
-interface MarkdownCodeBlockNodeProps extends CommonCodeBlockProps {
+interface MarkdownCodeBlockNodeProps extends ShikiCodeBlockProps {
   node: {
     type: 'code_block'
     language: string
