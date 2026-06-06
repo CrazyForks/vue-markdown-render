@@ -47,7 +47,7 @@ import { resolveCustomHtmlTag } from '../utils/customHtmlTag'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
 import { renderNodeChildren } from './renderChildren'
 
-function getCustomCodeBlockExtraProps(ctx: RenderContext) {
+function getCodeBlockExtraProps(ctx: RenderContext) {
   const extraProps = { ...(ctx.codeBlockProps || {}) } as Record<string, unknown>
   delete extraProps.node
   delete extraProps.key
@@ -73,7 +73,7 @@ function renderCustomCodeBlockComponent(
   ctx: RenderContext,
   specialProps: Record<string, unknown> = {},
 ) {
-  const extraProps = getCustomCodeBlockExtraProps(ctx)
+  const extraProps = getCodeBlockExtraProps(ctx)
   return React.createElement(component, {
     key,
     node,
@@ -205,7 +205,7 @@ function renderCodeBlock(
       maxWidth={ctx.codeBlockThemes?.maxWidth}
       isDark={ctx.isDark}
       onCopy={ctx.events.onCopy}
-      {...(ctx.codeBlockProps || {})}
+      {...getCodeBlockExtraProps(ctx)}
     />
   )
 }

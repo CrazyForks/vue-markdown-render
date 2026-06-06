@@ -79,6 +79,49 @@ describe('markstream-react heavy-node prop forwarding', () => {
     expect(element?.props?.estimatedPreviewHeightPx).toBe(360)
   })
 
+  it('does not let codeBlockProps override default code block structural props', () => {
+    const realNode = {
+      type: 'code_block',
+      language: 'ts',
+      code: 'export const real = 1',
+      raw: '```ts\nexport const real = 1\n```',
+    }
+    const fakeNode = {
+      type: 'code_block',
+      language: 'python',
+      code: 'wrong = True',
+      raw: '```python\nwrong = True\n```',
+    }
+    const ctx: RenderContext = {
+      ...baseCtx,
+      codeBlockProps: {
+        key: 'wrong-key',
+        node: fakeNode,
+        ctx: { unsafe: true },
+        renderNode: null,
+        indexKey: 'wrong-index',
+        showHeader: false,
+      },
+    }
+
+    const clientElement = clientRenderNode(realNode as any, 'client-default-code', ctx) as any
+    const serverElement = serverRenderNode(realNode as any, 'server-default-code', ctx) as any
+
+    expect(clientElement?.key).toBe('client-default-code')
+    expect(clientElement?.props?.node).toBe(realNode)
+    expect(clientElement?.props?.showHeader).toBe(false)
+    expect(clientElement?.props?.ctx).toBeUndefined()
+    expect(clientElement?.props?.renderNode).toBeUndefined()
+    expect(clientElement?.props?.indexKey).toBeUndefined()
+
+    expect(serverElement?.key).toBe('server-default-code')
+    expect(serverElement?.props?.node).toBe(realNode)
+    expect(serverElement?.props?.showHeader).toBe(false)
+    expect(serverElement?.props?.ctx).toBeUndefined()
+    expect(serverElement?.props?.renderNode).toBeUndefined()
+    expect(serverElement?.props?.indexKey).toBeUndefined()
+  })
+
   it('injects stable preview height estimates for client Mermaid and Infographic custom renderers', () => {
     const longMermaidCode = 'flowchart TD\nA-->B\nB-->C\nC-->D\nD-->E\nE-->F\nF-->G\nG-->H\nH-->I\nI-->J\nJ-->K\nK-->L\n'
     const infographicCode = ['# Release progress', '- Plan: complete', '- Build: active', '- Verify: pending'].join('\n')

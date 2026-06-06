@@ -115,7 +115,7 @@ function mergeHtmlBlockWrapperProps(
   return next
 }
 
-function getCustomCodeBlockExtraProps(ctx: RenderContext) {
+function getCodeBlockExtraProps(ctx: RenderContext) {
   const extraProps = { ...(ctx.codeBlockProps || {}) } as Record<string, unknown>
   delete extraProps.node
   delete extraProps.key
@@ -132,7 +132,7 @@ function renderCustomCodeBlockComponent(
   ctx: RenderContext,
   specialProps: Record<string, unknown> = {},
 ) {
-  const extraProps = getCustomCodeBlockExtraProps(ctx)
+  const extraProps = getCodeBlockExtraProps(ctx)
 
   return React.createElement(component as any, {
     key,
@@ -307,7 +307,7 @@ function renderCodeBlock(
       minWidth={ctx.codeBlockThemes?.minWidth}
       maxWidth={ctx.codeBlockThemes?.maxWidth}
       isDark={ctx.isDark}
-      {...(ctx.codeBlockProps || {})}
+      {...getCodeBlockExtraProps(ctx)}
     />
   )
 }

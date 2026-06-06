@@ -1110,6 +1110,63 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
+  it('keeps React fallback until the async Shiki renderer writes DOM content', async () => {
+    let writeRendererDom: (() => void) | undefined
+    streamMarkdownMock.createShikiStreamRenderer.mockImplementationOnce((el: HTMLElement) => {
+      const renderer = {
+        updateCode: vi.fn((code: string, lang?: string) => {
+          writeRendererDom = () => {
+            el.textContent = `${lang ?? ''}:${code}`
+          }
+          return Promise.resolve()
+        }),
+        setTheme: vi.fn(async () => {}),
+        dispose: vi.fn(),
+      }
+      streamMarkdownMock.createdRenderers.push(renderer)
+      return renderer
+    })
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+    const renderer = streamMarkdownMock.createdRenderers[0]
+    await waitForRendererUpdateCall(renderer, 1)
+    await flushReact()
+
+    expect(renderer?.updateCode).toHaveBeenLastCalledWith('const value = 1', 'typescript')
+    expect(host.querySelector('.code-block-render')?.textContent).toBe('')
+    expect(host.querySelector('.code-fallback-plain')?.textContent).toContain('const value = 1')
+    expect(writeRendererDom).toBeTypeOf('function')
+
+    await act(async () => {
+      writeRendererDom?.()
+      await Promise.resolve()
+    })
+    await flushReact()
+
+    expect(host.querySelector('.code-block-render')?.textContent).toBe('typescript:const value = 1')
+    expect(host.querySelector('.code-fallback-plain')).toBeNull()
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
   it('does not recreate React renderer for content-equivalent inline langs arrays', async () => {
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true

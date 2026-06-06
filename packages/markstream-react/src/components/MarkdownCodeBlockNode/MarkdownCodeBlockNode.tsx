@@ -198,6 +198,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const viewportTargetRef = useRef<HTMLDivElement | null>(null)
   const codeBlockContentRef = useRef<HTMLDivElement | null>(null)
   const rendererTargetRef = useRef<HTMLDivElement | null>(null)
+  const renderObserverRef = useRef<MutationObserver | null>(null)
   const rendererRef = useRef<ShikiRenderer | null>(null)
   const rendererConfigKeyRef = useRef('')
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
@@ -217,7 +218,13 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     return props.isDark ? props.darkTheme : props.lightTheme
   }, [props.darkTheme, props.isDark, props.lightTheme])
 
+  const disconnectRenderObserver = useCallback(() => {
+    renderObserverRef.current?.disconnect()
+    renderObserverRef.current = null
+  }, [])
+
   const renderFallback = useCallback((code: string) => {
+    disconnectRenderObserver()
     if (!code) {
       setFallbackHtml('')
       setRendererReady(false)
@@ -225,26 +232,37 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     }
     setFallbackHtml(`<pre class="shiki shiki-fallback"><code>${escapeHtml(code)}</code></pre>`)
     setRendererReady(false)
-  }, [])
+  }, [disconnectRenderObserver])
 
   const clearFallback = useCallback(() => {
+    disconnectRenderObserver()
     setFallbackHtml('')
     setRendererReady(true)
-  }, [])
+  }, [disconnectRenderObserver])
 
   const clearRendererTarget = useCallback(() => {
     if (rendererTargetRef.current)
       rendererTargetRef.current.innerHTML = ''
   }, [])
 
+  const hasRendererContent = useCallback(() => {
+    const target = rendererTargetRef.current
+    if (!target)
+      return false
+    if (target.childNodes.length > 0)
+      return true
+    return Boolean(target.textContent?.trim().length)
+  }, [])
+
   const disposeCurrentRenderer = useCallback((updateReady = true) => {
+    disconnectRenderObserver()
     rendererRef.current?.dispose()
     rendererRef.current = null
     rendererConfigKeyRef.current = ''
     clearRendererTarget()
     if (updateReady)
       setRendererReady(false)
-  }, [clearRendererTarget])
+  }, [clearRendererTarget, disconnectRenderObserver])
 
   const nextRenderSeq = useCallback(() => {
     renderSeqRef.current += 1
@@ -254,6 +272,52 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const isCurrentRenderSeq = useCallback((seq: number) => {
     return mountedRef.current && renderSeqRef.current === seq
   }, [])
+
+  const clearFallbackWhenRendererReady = useCallback(async (seq: number) => {
+    await Promise.resolve()
+    if (!isCurrentRenderSeq(seq))
+      return
+
+    if (hasRendererContent()) {
+      clearFallback()
+      return
+    }
+
+    const target = rendererTargetRef.current
+    if (!target)
+      return
+
+    if (typeof MutationObserver === 'undefined') {
+      clearFallback()
+      return
+    }
+
+    disconnectRenderObserver()
+    const observer = new MutationObserver(() => {
+      if (!isCurrentRenderSeq(seq)) {
+        observer.disconnect()
+        if (renderObserverRef.current === observer)
+          renderObserverRef.current = null
+        return
+      }
+
+      if (!hasRendererContent())
+        return
+
+      clearFallback()
+      observer.disconnect()
+      if (renderObserverRef.current === observer)
+        renderObserverRef.current = null
+    })
+
+    renderObserverRef.current = observer
+    observer.observe(target, { childList: true, subtree: true })
+  }, [
+    clearFallback,
+    disconnectRenderObserver,
+    hasRendererContent,
+    isCurrentRenderSeq,
+  ])
 
   const ensureStreamMarkdownLoaded = useCallback(async () => {
     if (createRendererRef.current)
@@ -343,7 +407,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     try {
       await renderer.updateCode(code, lang)
       if (isCurrentRenderSeq(seq))
-        clearFallback()
+        await clearFallbackWhenRendererReady(seq)
     }
     catch {
       if (!isCurrentRenderSeq(seq) || lang === 'plaintext')
@@ -352,13 +416,13 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       try {
         await renderer.updateCode(code, 'plaintext')
         if (isCurrentRenderSeq(seq))
-          clearFallback()
+          await clearFallbackWhenRendererReady(seq)
       }
       catch {
         // keep fallback
       }
     }
-  }, [clearFallback, isCurrentRenderSeq])
+  }, [clearFallbackWhenRendererReady, isCurrentRenderSeq])
 
   const initRenderer = useCallback(async () => {
     const seq = nextRenderSeq()
