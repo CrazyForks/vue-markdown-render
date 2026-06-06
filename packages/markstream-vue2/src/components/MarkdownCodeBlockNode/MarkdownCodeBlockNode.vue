@@ -285,16 +285,29 @@ function hasRendererContent() {
   return Boolean(target.textContent?.trim().length)
 }
 
-async function clearFallbackWhenRendererReady(epoch: number) {
+function getRendererContentSnapshot() {
+  const target = rendererTarget.value
+  if (!target)
+    return ''
+  return `${target.childNodes.length}\u0000${target.textContent ?? ''}\u0000${target.innerHTML}`
+}
+
+function hasRendererContentChanged(previousSnapshot: string) {
+  return hasRendererContent() && getRendererContentSnapshot() !== previousSnapshot
+}
+
+async function clearFallbackWhenRendererReady(epoch: number, previousSnapshot: string) {
   await nextTick()
   if (!isCurrentRenderEpoch(epoch))
     return
-  if (hasRendererContent()) {
+  if (hasRendererContentChanged(previousSnapshot)) {
     clearFallback()
     return
   }
   const target = rendererTarget.value
   if (!target)
+    return
+  if (typeof MutationObserver === 'undefined')
     return
   renderObserver?.disconnect()
   const observer = new MutationObserver(() => {
@@ -304,7 +317,7 @@ async function clearFallbackWhenRendererReady(epoch: number) {
         renderObserver = undefined
       return
     }
-    if (!hasRendererContent())
+    if (!hasRendererContentChanged(previousSnapshot))
       return
     clearFallback()
     observer.disconnect()
@@ -540,6 +553,7 @@ async function initRenderer(epoch: number) {
   }
 
   renderFallback(props.node.code, !hasStableRender.value)
+  const previousSnapshot = getRendererContentSnapshot()
   const updated = await updateRendererWithFallback(props.node.code, props.node.language, epoch)
   if (!isCurrentRenderEpoch(epoch))
     return
@@ -550,7 +564,7 @@ async function initRenderer(epoch: number) {
   if (hasStableRender.value)
     keepLastSuccessfulRender()
   else
-    await clearFallbackWhenRendererReady(epoch)
+    await clearFallbackWhenRendererReady(epoch, previousSnapshot)
 }
 
 async function safeInitRenderer(epoch = nextRenderEpoch()) {
@@ -633,6 +647,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
     return
 
   renderFallback(code, !hasStableRender.value)
+  const previousSnapshot = getRendererContentSnapshot()
   const updated = await updateRendererWithFallback(code, lang, epoch)
   if (!isCurrentRenderEpoch(epoch))
     return
@@ -643,7 +658,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   if (hasStableRender.value)
     keepLastSuccessfulRender()
   else
-    await clearFallbackWhenRendererReady(epoch)
+    await clearFallbackWhenRendererReady(epoch, previousSnapshot)
 })
 
 watch(

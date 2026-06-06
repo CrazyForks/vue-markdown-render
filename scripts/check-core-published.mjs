@@ -71,6 +71,35 @@ function npmViewVersion(packageName, version) {
   return null
 }
 
+function hasGitChanges(repoRoot, relativePath) {
+  try {
+    const output = execFileSync(
+      'git',
+      ['diff', '--name-only', 'HEAD~1...HEAD', '--', relativePath],
+      { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim()
+    return output.length > 0
+  }
+  catch {
+    return false
+  }
+}
+
+function hasPackageVersionChanged(repoRoot, packageJsonRelativePath, targetVersion) {
+  try {
+    const previousRaw = execFileSync(
+      'git',
+      ['show', `HEAD~1:${packageJsonRelativePath}`],
+      { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    )
+    const previousPackageJson = JSON.parse(previousRaw)
+    return previousPackageJson.version !== targetVersion
+  }
+  catch {
+    return true
+  }
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2))
   const cwd = process.cwd()
@@ -109,6 +138,16 @@ function main() {
   if (publishedVersion !== targetVersion) {
     throw new Error(
       `[check-core-published] Expected ${args.corePackageName}@${targetVersion} on npm, got ${publishedVersion || 'none'}. Publish ${args.corePackageName} first.`,
+    )
+  }
+
+  if (
+    repoRoot
+    && hasGitChanges(repoRoot, path.relative(repoRoot, path.dirname(corePackageJsonPath)))
+    && !hasPackageVersionChanged(repoRoot, path.relative(repoRoot, corePackageJsonPath), targetVersion)
+  ) {
+    throw new Error(
+      `[check-core-published] ${args.corePackageName}@${targetVersion} is already published, but local core files changed. Bump ${args.corePackageName} before publishing dependents.`,
     )
   }
 

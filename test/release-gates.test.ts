@@ -133,6 +133,28 @@ describe('release dependency gates', () => {
     expect(script).toMatch(/packageJson: 'packages\/markdown-parser\/package\.json'/)
   })
 
+  it('blocks dependent publishes when changed core files reuse a published version', () => {
+    const script = readFileSync(resolve(process.cwd(), 'scripts/check-core-published.mjs'), 'utf8')
+
+    expect(script).toContain('HEAD~1...HEAD')
+    expect(script).toContain('hasPackageVersionChanged')
+    expect(script).toContain('local core files changed')
+    expect(script).toMatch(/Bump \$\{args\.corePackageName\} before publishing dependents\./)
+  })
+
+  it('keeps stream-markdown peer range aligned with the langs-capable release', () => {
+    const reactPackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-react/package.json'), 'utf8'))
+    const vue2PackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-vue2/package.json'), 'utf8'))
+    const streamMarkdownTypes = readFileSync(resolve(process.cwd(), 'node_modules/stream-markdown/dist/index.d.ts'), 'utf8')
+
+    expect(packageJson.peerDependencies['stream-markdown']).toBe('>=0.0.15')
+    expect(reactPackageJson.peerDependencies['stream-markdown']).toBe('>=0.0.15')
+    expect(vue2PackageJson.peerDependencies['stream-markdown']).toBe('>=0.0.15')
+    expect(streamMarkdownTypes).toContain('declare function registerHighlight(options?: {')
+    expect(streamMarkdownTypes).toContain('langs?: string[]')
+    expect(streamMarkdownTypes).toContain('declare function createShikiStreamRenderer')
+  })
+
   it('keeps dry-run workspace dependency checks local', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/check-workspace-deps-local.mjs'), 'utf8')
 

@@ -254,6 +254,17 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     return Boolean(target.textContent?.trim().length)
   }, [])
 
+  const getRendererContentSnapshot = useCallback(() => {
+    const target = rendererTargetRef.current
+    if (!target)
+      return ''
+    return `${target.childNodes.length}\u0000${target.textContent ?? ''}\u0000${target.innerHTML}`
+  }, [])
+
+  const hasRendererContentChanged = useCallback((previousSnapshot: string) => {
+    return hasRendererContent() && getRendererContentSnapshot() !== previousSnapshot
+  }, [getRendererContentSnapshot, hasRendererContent])
+
   const disposeCurrentRenderer = useCallback((updateReady = true) => {
     disconnectRenderObserver()
     rendererRef.current?.dispose()
@@ -273,12 +284,15 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     return mountedRef.current && renderSeqRef.current === seq
   }, [])
 
-  const clearFallbackWhenRendererReady = useCallback(async (seq: number) => {
+  const clearFallbackWhenRendererReady = useCallback(async (
+    seq: number,
+    previousSnapshot: string,
+  ) => {
     await Promise.resolve()
     if (!isCurrentRenderSeq(seq))
       return
 
-    if (hasRendererContent()) {
+    if (hasRendererContentChanged(previousSnapshot)) {
       clearFallback()
       return
     }
@@ -287,10 +301,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (!target)
       return
 
-    if (typeof MutationObserver === 'undefined') {
-      clearFallback()
+    if (typeof MutationObserver === 'undefined')
       return
-    }
 
     disconnectRenderObserver()
     const observer = new MutationObserver(() => {
@@ -301,7 +313,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
         return
       }
 
-      if (!hasRendererContent())
+      if (!hasRendererContentChanged(previousSnapshot))
         return
 
       clearFallback()
@@ -315,7 +327,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [
     clearFallback,
     disconnectRenderObserver,
-    hasRendererContent,
+    hasRendererContentChanged,
     isCurrentRenderSeq,
   ])
 
@@ -403,11 +415,12 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       rawLang,
       registeredHighlightLanguagesRef.current,
     )
+    const previousSnapshot = getRendererContentSnapshot()
 
     try {
       await renderer.updateCode(code, lang)
       if (isCurrentRenderSeq(seq))
-        await clearFallbackWhenRendererReady(seq)
+        await clearFallbackWhenRendererReady(seq, previousSnapshot)
     }
     catch {
       if (!isCurrentRenderSeq(seq) || lang === 'plaintext')
@@ -416,13 +429,13 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       try {
         await renderer.updateCode(code, 'plaintext')
         if (isCurrentRenderSeq(seq))
-          await clearFallbackWhenRendererReady(seq)
+          await clearFallbackWhenRendererReady(seq, previousSnapshot)
       }
       catch {
         // keep fallback
       }
     }
-  }, [clearFallbackWhenRendererReady, isCurrentRenderSeq])
+  }, [clearFallbackWhenRendererReady, getRendererContentSnapshot, isCurrentRenderSeq])
 
   const initRenderer = useCallback(async () => {
     const seq = nextRenderSeq()

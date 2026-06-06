@@ -124,13 +124,7 @@ export function getShikiRendererOptions(
   themes?: readonly unknown[],
   langs?: readonly string[],
 ): Pick<ShikiRendererOptions, 'themes' | 'langs'> {
-  const shikiThemes = getShikiThemes(themes)
-  const shikiLangs = getShikiLangs(langs)
-
-  return {
-    ...(shikiThemes?.length ? { themes: shikiThemes } : {}),
-    ...(shikiLangs?.length ? { langs: shikiLangs } : {}),
-  }
+  return getRegisterHighlightOptions(themes, langs)
 }
 
 export function getRegisterHighlightOptions(
