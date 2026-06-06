@@ -247,14 +247,12 @@ function createMonacoAssetCopyPlugins() {
 module.exports = {
   transpileDependencies: [
     'markstream-vue2',
-    'markstream-core',
     'stream-markdown-parser',
     'stream-markdown',
     'stream-monaco',
     'monaco-editor',
     'shiki',
     '@shikijs/core',
-    '@shikijs/primitive',
     '@shikijs/engine-javascript',
     '@shikijs/engine-oniguruma',
     '@shikijs/types',
@@ -276,10 +274,6 @@ module.exports = {
       new webpack.IgnorePlugin({
         resourceRegExp: createOptionalIgnoreRegex(),
       }),
-      new webpack.ContextReplacementPlugin(
-        /markstream-vue2[\\/]dist[\\/]chunks$/,
-        /\.cjs$/,
-      ),
       ...createMonacoAssetCopyPlugins(),
     ],
     resolve: {

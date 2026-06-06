@@ -5505,13 +5505,13 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
 
   if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang)) {
     if (lang === 'mermaid')
-      return { ...mermaidBindings.value, ...customCodeBlockBindings.value }
+      return { ...customCodeBlockBindings.value, ...mermaidBindings.value }
 
     if (lang === 'infographic')
-      return { ...infographicBindings.value, ...customCodeBlockBindings.value }
+      return { ...customCodeBlockBindings.value, ...infographicBindings.value }
 
     if (lang === 'd2' || lang === 'd2lang')
-      return { ...d2Bindings.value, ...customCodeBlockBindings.value }
+      return { ...customCodeBlockBindings.value, ...d2Bindings.value }
 
     return customCodeBlockBindings.value
   }

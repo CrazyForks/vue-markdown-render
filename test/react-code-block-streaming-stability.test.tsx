@@ -32,6 +32,7 @@ function CodeBlockProbe(props: any) {
       data-instance-id={String(instanceIdRef.current)}
       data-code={String(props.node?.code ?? '')}
       data-langs={JSON.stringify(props.langs ?? null)}
+      data-show-header={String(props.showHeader)}
       data-stream={String(props.stream)}
       data-index-key={String(props.indexKey ?? '')}
       data-has-ctx={String(Boolean(props.ctx && typeof props.ctx === 'object'))}
@@ -174,6 +175,12 @@ describe('markstream-react code block streaming stability', () => {
         nodes: [node],
         langs: ['mermaid'],
         codeBlockStream: false,
+        codeBlockProps: {
+          showHeader: true,
+        },
+        mermaidProps: {
+          showHeader: false,
+        },
         viewportPriority: false,
         deferNodesUntilVisible: false,
         batchRendering: false,
@@ -184,6 +191,7 @@ describe('markstream-react code block streaming stability', () => {
 
     const probe = host.querySelector('.code-block-probe') as HTMLElement | null
     expect(probe?.getAttribute('data-langs')).toBe('["mermaid"]')
+    expect(probe?.getAttribute('data-show-header')).toBe('false')
     expect(probe?.getAttribute('data-stream')).toBe('false')
 
     const html = renderToStaticMarkup(React.createElement(ServerNodeRenderer as any, {
@@ -191,9 +199,16 @@ describe('markstream-react code block streaming stability', () => {
       nodes: [node],
       langs: ['mermaid'],
       codeBlockStream: false,
+      codeBlockProps: {
+        showHeader: true,
+      },
+      mermaidProps: {
+        showHeader: false,
+      },
     }))
 
     expect(html).toContain('data-langs="[&quot;mermaid&quot;]"')
+    expect(html).toContain('data-show-header="false"')
     expect(html).toContain('data-stream="false"')
 
     await act(async () => {

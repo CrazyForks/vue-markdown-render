@@ -286,7 +286,7 @@ describe('markdown code block Shiki langs', () => {
     const wrapper = mount(MarkdownCodeBlockNode, {
       props: {
         loading: false,
-        node: makeNode('typescript'),
+        node: makeNode('ruby', 'puts 1'),
         langs: [],
       },
     })
@@ -300,9 +300,10 @@ describe('markdown code block Shiki langs', () => {
 
     expect(registerCalls[registerCalls.length - 1]?.[0]).toEqual({})
     expect(rendererOptions.langs).toBeUndefined()
-    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
-      'const value = 1',
-      'typescript',
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenNthCalledWith(
+      1,
+      'puts 1',
+      'ruby',
     )
 
     wrapper.unmount()
@@ -553,7 +554,7 @@ describe('markdown code block Shiki langs', () => {
     const initialRendererCount = streamMarkdownMock.createdRenderers.length
 
     await wrapper.setProps({
-      node: makeNode('python'),
+      node: makeNode('ruby', 'puts 1'),
       langs: [],
     })
     await flushAll()
@@ -564,9 +565,10 @@ describe('markdown code block Shiki langs', () => {
       expect.any(HTMLElement),
       expect.not.objectContaining({ langs: expect.any(Array) }),
     )
-    expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenLastCalledWith(
-      'const value = 1',
-      'python',
+    expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenNthCalledWith(
+      1,
+      'puts 1',
+      'ruby',
     )
 
     wrapper.unmount()
@@ -858,6 +860,33 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('does not keep a default Vue2 language guard when langs is empty', async () => {
+    const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
+      props: {
+        loading: false,
+        node: makeNode('ruby', 'puts 1'),
+        langs: [],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({})
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      expect.not.objectContaining({ langs: expect.any(Array) }),
+    )
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenNthCalledWith(
+      1,
+      'puts 1',
+      'ruby',
+    )
+
+    wrapper.unmount()
+  })
+
   it('retries Vue2 registerHighlight when the previous registration failed', async () => {
     streamMarkdownMock.registerHighlight.mockRejectedValueOnce(new Error('load failed'))
     const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
@@ -1062,7 +1091,7 @@ describe('markdown code block Shiki langs', () => {
     await act(async () => {
       root.render(React.createElement(ReactMarkdownCodeBlockNode, {
         loading: false,
-        node: makeNode('typescript'),
+        node: makeNode('ruby', 'puts 1'),
       }))
     })
 
@@ -1070,9 +1099,10 @@ describe('markdown code block Shiki langs', () => {
     await waitForReactRendererCreated()
 
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledWith({})
-    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
-      'const value = 1',
-      'typescript',
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenNthCalledWith(
+      1,
+      'puts 1',
+      'ruby',
     )
 
     await act(async () => {
@@ -1505,7 +1535,7 @@ describe('markdown code block Shiki langs', () => {
     await act(async () => {
       root.render(React.createElement(ReactMarkdownCodeBlockNode, {
         loading: false,
-        node: makeNode('python'),
+        node: makeNode('ruby', 'puts 1'),
         langs: [],
       }))
     })
@@ -1518,9 +1548,10 @@ describe('markdown code block Shiki langs', () => {
       expect.any(HTMLElement),
       expect.not.objectContaining({ langs: expect.any(Array) }),
     )
-    expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenLastCalledWith(
-      'const value = 1',
-      'python',
+    expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenNthCalledWith(
+      1,
+      'puts 1',
+      'ruby',
     )
 
     await act(async () => {

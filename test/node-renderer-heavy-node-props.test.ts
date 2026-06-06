@@ -445,6 +445,9 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
         customId,
         langs: ['mermaid'],
         codeBlockStream: false,
+        codeBlockProps: {
+          showHeader: true,
+        },
         mermaidProps: {
           showHeader: false,
         },

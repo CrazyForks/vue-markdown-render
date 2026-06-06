@@ -239,8 +239,9 @@ const renderedItems = computed(() => {
     return {
       index,
       indexKey: `${indexPrefix.value}-${index}`,
-      // Keep stateful heavy nodes mounted during streaming.
-      renderKey: type === 'code_block' || type === 'table' || type === 'list'
+      // Keep code blocks mounted during streaming so Shiki/Monaco renderers can
+      // preserve their last successful DOM instead of flashing back to <pre>.
+      renderKey: type === 'code_block'
         ? `${indexPrefix.value}-${index}-${type}`
         : `${indexPrefix.value}-${index}-${type}-${String((rawNode as any)?.raw || '').length}`,
       node,

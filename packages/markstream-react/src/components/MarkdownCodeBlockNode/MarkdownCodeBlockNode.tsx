@@ -75,13 +75,6 @@ function createHighlightRegistrationConfig(
   }
 }
 
-function readDefaultLanguages(mod: unknown) {
-  const maybeDefaults = (mod as { defaultLanguages?: unknown }).defaultLanguages
-  return Array.isArray(maybeDefaults)
-    ? maybeDefaults.filter((lang): lang is string => typeof lang === 'string')
-    : undefined
-}
-
 function escapeHtml(str: string) {
   return str
     .replace(/&/g, '&amp;')
@@ -210,7 +203,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
   const streamMarkdownLoadPromiseRef = useRef<Promise<void> | null>(null)
   const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
-  const defaultHighlightLanguagesRef = useRef<string[] | undefined>()
   const registeredHighlightLanguagesRef = useRef<Set<string> | undefined>()
   const registeredKeyRef = useRef<string>('')
   const highlightRegistrationSeqRef = useRef(0)
@@ -274,7 +266,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
         const mod: any = await import('stream-markdown')
         createRendererRef.current = mod.createShikiStreamRenderer
         registerHighlightRef.current = mod.registerHighlight ?? null
-        defaultHighlightLanguagesRef.current = readDefaultLanguages(mod)
       }
       catch {
         // optional peer
@@ -320,7 +311,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       return 'stale'
 
     registeredKeyRef.current = key
-    registeredHighlightLanguagesRef.current = createRegisteredHighlightLanguages(config.registerOptions.langs || defaultHighlightLanguagesRef.current)
+    registeredHighlightLanguagesRef.current = createRegisteredHighlightLanguages(config.registerOptions.langs)
     return 'ready'
   }, [])
 

@@ -331,7 +331,6 @@ let createShikiRenderer:
 let registerHighlight:
   | ((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown)
   | undefined
-let defaultHighlightLanguages: string[] | undefined
 let registeredHighlightLanguages: Set<string> | undefined
 let registeredHighlightKey: string | null = null
 let latestHighlightRegistrationKey = ''
@@ -360,13 +359,6 @@ function disposeCurrentRenderer(options: { resetStableRender?: boolean } = {}) {
   rendererReady.value = false
   if (options.resetStableRender)
     hasStableRender.value = false
-}
-
-function readDefaultLanguages(mod: unknown) {
-  const maybeDefaults = (mod as { defaultLanguages?: unknown }).defaultLanguages
-  return Array.isArray(maybeDefaults)
-    ? maybeDefaults.filter((lang): lang is string => typeof lang === 'string')
-    : undefined
 }
 
 const highlightRegistrationKey = computed(() =>
@@ -450,7 +442,7 @@ async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: re
     return 'stale'
 
   registeredHighlightKey = key
-  registeredHighlightLanguages = createRegisteredHighlightLanguages(opts.langs || defaultHighlightLanguages)
+  registeredHighlightLanguages = createRegisteredHighlightLanguages(opts.langs)
   return 'ready'
 }
 
@@ -476,7 +468,6 @@ async function ensureStreamMarkdownLoaded() {
       const mod = await import('stream-markdown')
       createShikiRenderer = mod.createShikiStreamRenderer
       registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
-      defaultHighlightLanguages = readDefaultLanguages(mod)
     }
     catch (e) {
       if (isDevEnv)

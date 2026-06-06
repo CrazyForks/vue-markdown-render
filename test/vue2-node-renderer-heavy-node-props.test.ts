@@ -500,6 +500,9 @@ describe('markstream-vue2 heavy-node prop forwarding', () => {
             raw: '```mermaid\ngraph LR\nA-->B\n```',
           },
         ],
+        codeBlockProps: {
+          showHeader: true,
+        },
         mermaidProps: {
           showHeader: false,
           showZoomControls: false,

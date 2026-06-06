@@ -2203,13 +2203,13 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
 
   if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang)) {
     if (lang === 'mermaid')
-      return { ...getMermaidBindingsFor(node), ...customCodeBlockBindings.value }
+      return { ...customCodeBlockBindings.value, ...getMermaidBindingsFor(node) }
 
     if (lang === 'infographic')
-      return { ...getInfographicBindingsFor(node), ...customCodeBlockBindings.value }
+      return { ...customCodeBlockBindings.value, ...getInfographicBindingsFor(node) }
 
     if (lang === 'd2' || lang === 'd2lang')
-      return { ...d2Bindings.value, ...customCodeBlockBindings.value }
+      return { ...customCodeBlockBindings.value, ...d2Bindings.value }
 
     return customCodeBlockBindings.value
   }
