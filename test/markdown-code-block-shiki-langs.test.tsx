@@ -167,6 +167,24 @@ describe('markdown code block Shiki langs', () => {
     expect(getRegisterHighlightOptions(undefined, [])).toEqual({})
   })
 
+  it('filters non-string Shiki themes from registration options', async () => {
+    const themes = ['vitesse-light', { name: 'custom-theme' }, ' vitesse-dark ', '', 'vitesse-light'] as any[]
+    const expected = {
+      themes: ['vitesse-light', 'vitesse-dark'],
+    }
+
+    expect(getRegisterHighlightOptions(themes)).toEqual(expected)
+    expect(getHighlightRegistrationKey(themes)).toBe(
+      getHighlightRegistrationKey(['vitesse-light', 'vitesse-dark']),
+    )
+
+    const vue2ShikiLanguage = await import('../packages/markstream-vue2/src/utils/shikiLanguage')
+    const reactShikiLanguage = await import('../packages/markstream-react/src/utils/shikiLanguage')
+
+    expect(vue2ShikiLanguage.getRegisterHighlightOptions(themes)).toEqual(expected)
+    expect(reactShikiLanguage.getRegisterHighlightOptions(themes)).toEqual(expected)
+  })
+
   it('normalizes common shell Shiki aliases', () => {
     expect(getRegisterHighlightOptions(undefined, ['sh', 'bash', 'zsh'])).toEqual({
       langs: ['shellscript'],
@@ -432,6 +450,41 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('clears Vue language guard when langs changes to empty', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    const initialRendererCount = streamMarkdownMock.createdRenderers.length
+
+    await wrapper.setProps({
+      node: makeNode('python'),
+      langs: [],
+    })
+    await flushAll()
+    await waitForRendererCount(initialRendererCount + 1)
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({})
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      expect.not.objectContaining({ langs: expect.anything() }),
+    )
+    expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'python',
+    )
+
+    wrapper.unmount()
+  })
+
   it('clears stale Vue renderer when re-registration for new langs fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
@@ -604,6 +657,32 @@ describe('markdown code block Shiki langs', () => {
     secondUpdate.resolve()
     await secondUpdate.promise
     await flushAll()
+    wrapper.unmount()
+  })
+
+  it('forwards MarkdownRenderCompat listeners as Vue3 runtime event props', async () => {
+    const { default: MarkdownRenderCompat } = await import('../packages/markstream-vue2/src/components/MarkdownRenderCompat.vue')
+    const { default: NodeRenderer } = await import('../packages/markstream-vue2/src/components/NodeRenderer')
+    const onCopy = vi.fn()
+    const onHandleArtifactClick = vi.fn()
+    const payload = { artifactType: 'text/html', artifactTitle: 'Preview' }
+    const wrapper = mount(MarkdownRenderCompat as any, {
+      props: {
+        nodes: [],
+        onCopy,
+        onHandleArtifactClick,
+      },
+    })
+
+    await flushAll()
+
+    const nodeRenderer = wrapper.getComponent(NodeRenderer as any)
+    nodeRenderer.vm.$emit('copy', 'copied code')
+    nodeRenderer.vm.$emit('handleArtifactClick', payload)
+
+    expect(onCopy).toHaveBeenCalledWith('copied code')
+    expect(onHandleArtifactClick).toHaveBeenCalledWith(payload)
+
     wrapper.unmount()
   })
 
@@ -787,6 +866,39 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
       expect.any(HTMLElement),
       expect.objectContaining({ themes: ['b', 'a'], langs: ['typescript'] }),
+    )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('filters non-string themes before React highlight registration', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('typescript'),
+        themes: ['a', { name: 'custom-theme' }, ' b ', 'a'] as any,
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ themes: ['a', 'b'], langs: ['typescript'] }),
+    )
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ themes: ['a', 'b'], langs: ['typescript'] }),
     )
 
     await act(async () => {
@@ -1216,6 +1328,53 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',
       'plaintext',
+    )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('clears React language guard when langs changes to empty', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    const initialRendererCount = streamMarkdownMock.createdRenderers.length
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node: makeNode('python'),
+        langs: [],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCount(initialRendererCount + 1)
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({})
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      expect.not.objectContaining({ langs: expect.anything() }),
+    )
+    expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'python',
     )
 
     await act(async () => {

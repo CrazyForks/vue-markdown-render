@@ -90,3 +90,24 @@ export function resolveVueListeners(input: any) {
   }
   return listeners
 }
+
+export function resolveVue3ListenerProps(input: any) {
+  if (!hasProperty(input, '$attrs'))
+    return {}
+
+  const attrs = input.$attrs
+  if (!attrs || typeof attrs !== 'object')
+    return {}
+
+  const listeners: Record<string, VueListenerValue> = {}
+  for (const [key, value] of Object.entries(attrs)) {
+    if (!/^on[A-Z]/.test(key))
+      continue
+    if (typeof value === 'function')
+      listeners[key] = value as VueListener
+    else if (Array.isArray(value) && value.every(item => typeof item === 'function'))
+      listeners[key] = value as VueListener[]
+  }
+
+  return listeners
+}

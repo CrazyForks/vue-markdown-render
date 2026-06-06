@@ -197,7 +197,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const importAttemptedRef = useRef(false)
   const streamMarkdownLoadPromiseRef = useRef<Promise<void> | null>(null)
   const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
-  const defaultHighlightLanguagesRef = useRef<string[] | undefined>()
   const registeredHighlightLanguagesRef = useRef<Set<string> | undefined>()
   const registeredKeyRef = useRef<string>('')
   const highlightRegistrationSeqRef = useRef(0)
@@ -266,9 +265,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
         createRendererRef.current = mod.createShikiStreamRenderer
         if (mod.registerHighlight)
           registerHighlightRef.current = mod.registerHighlight
-        defaultHighlightLanguagesRef.current = Array.isArray(mod.defaultLanguages)
-          ? mod.defaultLanguages
-          : undefined
       }
       catch {
         // optional peer
@@ -296,7 +292,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
 
     if (registeredKeyRef.current === key)
       return 'ready'
-    const effectiveLangs = registrationConfig.registerOptions.langs ?? defaultHighlightLanguagesRef.current
+    const effectiveLangs = registrationConfig.registerOptions.langs
     const seq = ++highlightRegistrationSeqRef.current
 
     try {

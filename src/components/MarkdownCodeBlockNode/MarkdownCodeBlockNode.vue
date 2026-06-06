@@ -279,7 +279,6 @@ let createShikiRenderer:
 let registerHighlight:
   | ((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown)
   | undefined
-let defaultHighlightLanguages: string[] | undefined
 let registeredHighlightLanguages: Set<string> | undefined
 let registeredHighlightKey: string | null = null
 let latestHighlightRegistrationKey = ''
@@ -375,9 +374,6 @@ async function ensureStreamMarkdownLoaded() {
       const mod = await import('stream-markdown')
       createShikiRenderer = mod.createShikiStreamRenderer
       registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
-      defaultHighlightLanguages = Array.isArray((mod as { defaultLanguages?: unknown }).defaultLanguages)
-        ? (mod as { defaultLanguages: string[] }).defaultLanguages
-        : undefined
     }
     catch (e) {
       console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
@@ -401,7 +397,7 @@ async function ensureHighlightRegistered(themes?: string[], langs?: string[]): P
     return 'ready'
 
   const opts = getRegisterHighlightOptions(themes, langs)
-  const effectiveLangs = opts.langs ?? defaultHighlightLanguages
+  const effectiveLangs = opts.langs
   const seq = ++highlightRegistrationSeq
 
   try {
