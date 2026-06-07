@@ -41,9 +41,16 @@ import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import FallbackComponent from './FallbackComponent.vue'
 
+type NodeRendererCodeBlockThemes
+  = CodeBlockNodeProps['themes']
+    | ShikiCodeBlockProps['themes']
+
 type NodeRendererCodeBlockProps
   = Partial<Omit<CodeBlockNodeProps, 'node' | 'themes'>>
-    & Partial<ShikiCodeBlockProps>
+    & Partial<Omit<ShikiCodeBlockProps, 'themes'>>
+    & {
+      themes?: NodeRendererCodeBlockThemes
+    }
     & Record<string, unknown>
 
 const props = withDefaults(defineProps<{

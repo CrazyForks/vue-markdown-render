@@ -18,6 +18,7 @@ import { flushAll } from './setup/flush-all'
 const streamMarkdownMock = vi.hoisted(() => {
   const createdRenderers: any[] = []
   const loadedLangs = new Set<string>()
+  let omitRegisterHighlight = false
   const defaultLanguages = ['typescript', 'javascript', 'python', 'objective-c', 'objective-cpp', 'plaintext']
   const loadLangs = (opts?: { langs?: string[] }) => {
     const langs = opts?.langs?.length ? opts.langs : defaultLanguages
@@ -48,6 +49,12 @@ const streamMarkdownMock = vi.hoisted(() => {
     defaultLanguages,
     loadedLangs,
     loadLangs,
+    get omitRegisterHighlight() {
+      return omitRegisterHighlight
+    },
+    set omitRegisterHighlight(value: boolean) {
+      omitRegisterHighlight = value
+    },
     registerHighlight,
   }
 })
@@ -55,17 +62,23 @@ const streamMarkdownMock = vi.hoisted(() => {
 vi.mock('stream-markdown', () => ({
   createShikiStreamRenderer: streamMarkdownMock.createShikiStreamRenderer,
   defaultLanguages: streamMarkdownMock.defaultLanguages,
-  registerHighlight: streamMarkdownMock.registerHighlight,
+  get registerHighlight() {
+    return streamMarkdownMock.omitRegisterHighlight ? undefined : streamMarkdownMock.registerHighlight
+  },
 }))
 vi.mock('../packages/markstream-vue2/node_modules/stream-markdown', () => ({
   createShikiStreamRenderer: streamMarkdownMock.createShikiStreamRenderer,
   defaultLanguages: streamMarkdownMock.defaultLanguages,
-  registerHighlight: streamMarkdownMock.registerHighlight,
+  get registerHighlight() {
+    return streamMarkdownMock.omitRegisterHighlight ? undefined : streamMarkdownMock.registerHighlight
+  },
 }))
 vi.mock('../packages/markstream-react/node_modules/stream-markdown', () => ({
   createShikiStreamRenderer: streamMarkdownMock.createShikiStreamRenderer,
   defaultLanguages: streamMarkdownMock.defaultLanguages,
-  registerHighlight: streamMarkdownMock.registerHighlight,
+  get registerHighlight() {
+    return streamMarkdownMock.omitRegisterHighlight ? undefined : streamMarkdownMock.registerHighlight
+  },
 }))
 
 function makeNode(language = 'typescript', code = 'const value = 1') {
@@ -188,6 +201,7 @@ function createDeferred() {
 function resetStreamMarkdownMock() {
   streamMarkdownMock.createdRenderers.length = 0
   streamMarkdownMock.loadedLangs.clear()
+  streamMarkdownMock.omitRegisterHighlight = false
   streamMarkdownMock.createShikiStreamRenderer.mockClear()
   streamMarkdownMock.registerHighlight.mockReset()
   streamMarkdownMock.registerHighlight.mockImplementation(async (opts?: { langs?: string[] }) => {
@@ -345,6 +359,37 @@ describe('markdown code block Shiki langs', () => {
     )
 
     wrapper.unmount()
+  })
+
+  it('omits Vue runtime langs when stream-markdown lacks registerHighlight', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    streamMarkdownMock.omitRegisterHighlight = true
+    streamMarkdownMock.loadedLangs.add('typescript')
+
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      },
+    })
+
+    try {
+      await flushAll()
+      await waitForRendererCreated()
+
+      expect(streamMarkdownMock.registerHighlight).not.toHaveBeenCalled()
+      expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+        expect.any(HTMLElement),
+        expect.not.objectContaining({ langs: expect.any(Array) }),
+      )
+      expect(warnSpy.mock.calls.some(([message]) => String(message).includes('`langs` requires stream-markdown'))).toBe(true)
+    }
+    finally {
+      wrapper.unmount()
+      warnSpy.mockRestore()
+    }
   })
 
   it('passes normalized Vue Shiki themes to renderer', async () => {
@@ -1110,6 +1155,37 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('omits Vue2 runtime langs when stream-markdown lacks registerHighlight', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    streamMarkdownMock.omitRegisterHighlight = true
+    streamMarkdownMock.loadedLangs.add('typescript')
+
+    const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      },
+    })
+
+    try {
+      await flushAll()
+      await waitForRendererCreated()
+
+      expect(streamMarkdownMock.registerHighlight).not.toHaveBeenCalled()
+      expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+        expect.any(HTMLElement),
+        expect.not.objectContaining({ langs: expect.any(Array) }),
+      )
+      expect(warnSpy.mock.calls.some(([message]) => String(message).includes('`langs` requires stream-markdown'))).toBe(true)
+    }
+    finally {
+      wrapper.unmount()
+      warnSpy.mockRestore()
+    }
+  })
+
   it('observes Vue2 renderer attribute and character data mutations', async () => {
     const OriginalMutationObserver = globalThis.MutationObserver
     const observe = vi.fn()
@@ -1675,6 +1751,45 @@ describe('markdown code block Shiki langs', () => {
     await act(async () => {
       root.unmount()
     })
+  })
+
+  it('omits React runtime langs when stream-markdown lacks registerHighlight', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    streamMarkdownMock.omitRegisterHighlight = true
+    streamMarkdownMock.loadedLangs.add('typescript')
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    try {
+      await act(async () => {
+        root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+          loading: false,
+          node: makeNode('typescript'),
+          langs: ['typescript'],
+        }))
+      })
+
+      await flushReact()
+      await waitForReactRendererCreated()
+
+      expect(streamMarkdownMock.registerHighlight).not.toHaveBeenCalled()
+      expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+        expect.any(HTMLElement),
+        expect.not.objectContaining({ langs: expect.any(Array) }),
+      )
+      expect(warnSpy.mock.calls.some(([message]) => String(message).includes('`langs` requires stream-markdown'))).toBe(true)
+    }
+    finally {
+      await act(async () => {
+        root.unmount()
+      })
+      warnSpy.mockRestore()
+    }
   })
 
   it('keeps valid Shiki ids that differ from icon aliases in React', async () => {

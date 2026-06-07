@@ -163,6 +163,28 @@ const safeMermaidSvgElement: SVGElement | null = toSafeSvgElement<SVGElement>('<
 const brokenMermaidSvg: boolean = isBrokenMermaidSvg('<svg viewBox="0 0 0 10"><rect width="10" height="10" /></svg>')
 
 const codeBlockProps: Partial<CodeBlockNodeProps> = {}
+const nodeRendererCodeBlockPropsWithMonacoThemeObject: NodeRendererProps = {
+  content: '```ts\nconsole.log(1)\n```',
+  codeBlockProps: {
+    themes: [
+      {
+        name: 'public-api-custom-dark',
+        base: 'vs-dark',
+        inherit: true,
+        rules: [],
+        colors: {},
+      },
+    ],
+  },
+}
+const nodeRendererCodeBlockPropsWithShikiOptions: NodeRendererProps = {
+  content: '```ts\nconsole.log(1)\n```',
+  codeRenderer: 'shiki',
+  codeBlockProps: {
+    themes: ['vitesse-light', 'vitesse-dark'],
+    langs: ['ts', 'vue'],
+  },
+}
 const mermaidProps: Partial<MermaidBlockNodeProps> = {}
 const mathProps: Partial<MathBlockNodeProps> = {}
 const mathInlineProps: Partial<MathInlineNodeProps> = {}
@@ -336,6 +358,8 @@ void safeMermaidSvgMarkup
 void safeMermaidSvgElement
 void brokenMermaidSvg
 void codeBlockProps
+void nodeRendererCodeBlockPropsWithMonacoThemeObject
+void nodeRendererCodeBlockPropsWithShikiOptions
 void mermaidProps
 void mathProps
 void mathInlineProps

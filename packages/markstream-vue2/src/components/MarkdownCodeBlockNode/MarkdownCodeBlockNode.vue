@@ -370,6 +370,7 @@ let renderEpoch = 0
 let disposed = false
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
+let warnedMissingRegisterHighlightForLangs = false
 let streamMarkdownLoadPromise: Promise<void> | null = null
 
 function nextRenderEpoch() {
@@ -397,7 +398,14 @@ const highlightRegistrationKey = computed(() =>
 )
 
 function rendererNeedsReconfigure() {
-  return Boolean(renderer && rendererConfigKey !== highlightRegistrationKey.value)
+  const rendererOptions = normalizeRuntimeShikiOptions(
+    getRegisterHighlightOptions(getResolvedThemes(), props.langs),
+  )
+
+  return Boolean(renderer && rendererConfigKey !== getHighlightRegistrationKey(
+    rendererOptions.themes,
+    rendererOptions.langs,
+  ))
 }
 
 function normalizeRendererLanguage(rawLang?: string | null) {
@@ -481,6 +489,23 @@ async function waitForCurrentHighlightRegistration(themes: readonly unknown[] | 
   return ensureHighlightRegistered(themes, langs)
 }
 
+function normalizeRuntimeShikiOptions(options: RegisterHighlightOptions): RegisterHighlightOptions {
+  if (!options.langs?.length || registerHighlight || !createShikiRenderer)
+    return options
+
+  if (isDevEnv && !warnedMissingRegisterHighlightForLangs) {
+    warnedMissingRegisterHighlightForLangs = true
+    console.warn(
+      '[MarkdownCodeBlockNode] `langs` requires stream-markdown >=0.0.15 with registerHighlight(); '
+      + 'ignoring `langs` and using stream-markdown default language preload.',
+    )
+  }
+
+  const fallbackOptions: RegisterHighlightOptions = { ...options }
+  delete fallbackOptions.langs
+  return fallbackOptions
+}
+
 async function ensureStreamMarkdownLoaded() {
   if (createShikiRenderer)
     return
@@ -518,10 +543,11 @@ async function initRenderer(epoch: number) {
     return
   }
 
-  const rendererOptions = getRegisterHighlightOptions(
+  const requestedRendererOptions = getRegisterHighlightOptions(
     getResolvedThemes(),
     props.langs,
   )
+  const rendererOptions = normalizeRuntimeShikiOptions(requestedRendererOptions)
   const nextRendererConfigKey = getHighlightRegistrationKey(
     rendererOptions.themes,
     rendererOptions.langs,

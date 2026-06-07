@@ -190,6 +190,15 @@ describe('release dependency gates', () => {
     expect(smokeScript).toContain('createShikiStreamRenderer')
   })
 
+  it('runs Shiki dependent import smoke in CI', () => {
+    const ci = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')
+
+    expect(ci).toContain('test:smoke:shiki-dependent-imports')
+    expect(ci.indexOf('test:smoke:pack:optional')).toBeLessThan(
+      ci.indexOf('test:smoke:shiki-dependent-imports'),
+    )
+  })
+
   it('keeps stream-markdown peer range aligned with the langs-capable release', () => {
     const reactPackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-react/package.json'), 'utf8'))
     const vue2PackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-vue2/package.json'), 'utf8'))
